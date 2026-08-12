@@ -61,12 +61,6 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
         diagnostic_pack.as_ref(),
     );
 
-    if let Some(pack) = code_pack.as_ref() {
-        if let Some(note) = radix::locale::fallback_notice(pack) {
-            eprintln!("{note}");
-        }
-    }
-
     let Some(output) = result.output else {
         eprintln!("compilation failed");
         std::process::exit(1);

@@ -142,12 +142,6 @@ pub(super) fn load_package_source(
     };
     diagnostics.extend(
         lex_result
-            .locale_fallbacks
-            .iter()
-            .map(|fallback| Diagnostic::from_locale_fallback(&display_name, &body, fallback)),
-    );
-    diagnostics.extend(
-        lex_result
             .locale_suggestions
             .iter()
             .map(|suggestion| Diagnostic::from_locale_suggestion(&display_name, &body, suggestion)),

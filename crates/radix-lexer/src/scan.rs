@@ -965,7 +965,7 @@ impl<'a> Lexer<'a> {
         // An exact declared keyword/type spelling is not a near-miss. It lexes
         // as an identifier and is claimed by the parser (keywords in grammar
         // slots) or canonicalized through `reader_type_latin_keys` (types), so
-        // it must skip the LOCALE002 suggestion and LOCALE001 fallback passes.
+        // it must skip the LOCALE002 suggestion and fallback passes.
         if declared {
             return TokenKind::Ident(self.interner.intern_normalized(text));
         }

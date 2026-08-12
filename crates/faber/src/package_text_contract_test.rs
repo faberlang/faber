@@ -207,7 +207,7 @@ fn package_render_emits_sem010_initializer_mismatch_hi() {
 
 #[test]
 fn package_render_emits_sem010_initializer_mismatch_vi() {
-    assert_single_locale_sem010_accepts_reader001("vi", "faults/type-mismatch.fab");
+    assert_single_locale_sem010_or_sem001_renders("vi", "faults/type-mismatch.fab");
 }
 
 fn assert_single_locale_sem010(locale: &str, fault_rel: &str) {
@@ -298,8 +298,11 @@ fn assert_single_locale_sem010_or_sem001(locale: &str, fault_rel: &str) {
     }
 }
 
-/// Some locales produce LOCALE001 warnings instead of semantic errors. Accept those.
-fn assert_single_locale_sem010_accepts_reader001(locale: &str, fault_rel: &str) {
+/// The fault must surface as a semantic error (SEM010 or SEM001) and render
+/// with the pack template. The retired reader-locale fallback warning is no
+/// longer a fallback path (S0-U5): if neither semantic error appears, the
+/// test fails loudly.
+fn assert_single_locale_sem010_or_sem001_renders(locale: &str, fault_rel: &str) {
     let fault = locale_fault_path(locale, fault_rel);
     let (config, pack) =
         config_with_locale(Target::HirRust, &fault, Some(locale), None).expect("reader config");
@@ -308,7 +311,7 @@ fn assert_single_locale_sem010_accepts_reader001(locale: &str, fault_rel: &str) 
 
     let diagnostics = check_package(&config, &fault);
 
-    // Try SEM010 first, fall back to SEM001, then accept LOCALE001 lexer warnings.
+    // Try SEM010 first, then SEM001.
     let sem010: Vec<_> = diagnostics
         .iter()
         .filter(|diag| diag.code == Some("SEM010"))
@@ -336,40 +339,24 @@ fn assert_single_locale_sem010_accepts_reader001(locale: &str, fault_rel: &str) 
         .iter()
         .filter(|diag| diag.code == Some("SEM001"))
         .collect();
-    if !sem001.is_empty() {
-        let unknown_id = diagnostics_with_issue(&sem001, "unknown_identifier");
-        assert!(
-            !unknown_id.is_empty(),
-            "missing unknown_identifier fact for {locale}: {sem001:?}"
-        );
-        for diag in unknown_id {
-            assert!(pack
-                .render_diagnostic_text(diag)
-                .expect("SEM001 template should render")
-                .is_some());
-            assert_plain_render_contract(
-                &render_plain(diag, &pack),
-                "error[SEM001:unknown_identifier]",
-            );
-        }
-        return;
-    }
-
-    // vi locale produces only LOCALE001/LOCALE002 lexer diagnostics plus PARSE030.
-    let reader001: Vec<_> = diagnostics
-        .iter()
-        .filter(|diag| diag.code == Some("LOCALE001"))
-        .collect();
     assert!(
-        !reader001.is_empty(),
-        "expected LOCALE001 diagnostics for {locale}: {diagnostics:?}"
+        !sem001.is_empty(),
+        "expected SEM001 diagnostics for {locale}: {diagnostics:?}"
     );
-    for diag in &reader001 {
+    let unknown_id = diagnostics_with_issue(&sem001, "unknown_identifier");
+    assert!(
+        !unknown_id.is_empty(),
+        "missing unknown_identifier fact for {locale}: {sem001:?}"
+    );
+    for diag in unknown_id {
         assert!(pack
             .render_diagnostic_text(diag)
-            .expect("LOCALE001 template should render")
+            .expect("SEM001 template should render")
             .is_some());
-        assert_plain_render_contract(&render_plain(diag, &pack), "warning[LOCALE001");
+        assert_plain_render_contract(
+            &render_plain(diag, &pack),
+            "error[SEM001:unknown_identifier]",
+        );
     }
 }
 
@@ -403,62 +390,48 @@ fn assert_single_locale_sem001_or_reader001(locale: &str, fault_rel: &str) {
     let (config, pack) =
         config_with_locale(Target::HirRust, &fault, Some(locale), None).expect("reader config");
     let pack = pack.expect("reader pack");
-    assert!(pack.diagnostics.contains_key("SEM001") || pack.diagnostics.contains_key("LOCALE001"));
+    assert!(pack.diagnostics.contains_key("SEM001"));
 
     let diagnostics = check_package(&config, &fault);
 
-    // Try SEM001 first (zh-Hans/Hant/ar/hi path), fall back to LOCALE001 (vi path).
+    // SEM001 is the only acceptance path now; the retired reader-locale
+    // fallback warning is no longer produced (S0-U5).
     let sem001: Vec<_> = diagnostics
         .iter()
         .filter(|diag| diag.code == Some("SEM001"))
         .collect();
-    if sem001.is_empty() {
-        let reader001: Vec<_> = diagnostics
+    assert!(
+        !sem001.is_empty(),
+        "expected SEM001 diagnostics for {locale}: {diagnostics:?}"
+    );
+    assert!(
+        sem001.iter().any(|diag| diag
+            .args
             .iter()
-            .filter(|diag| diag.code == Some("LOCALE001"))
-            .collect();
-        assert!(
-            !reader001.is_empty(),
-            "expected LOCALE001 diagnostics for {locale}: {diagnostics:?}"
+            .any(|arg| arg.name == "issue" && arg.value == "unknown_identifier")),
+        "expected SEM001 unknown_identifier issue for {locale}: {diagnostics:?}"
+    );
+    let unknown_identifier = diagnostics_with_issue(&sem001, "unknown_identifier");
+    assert!(
+        !unknown_identifier.is_empty(),
+        "missing SEM001 unknown_identifier fact for {locale}: {sem001:?}"
+    );
+    for diag in unknown_identifier {
+        assert!(pack
+            .render_diagnostic_text(diag)
+            .expect("SEM001 template should render")
+            .is_some());
+        assert_plain_render_contract(
+            &render_plain(diag, &pack),
+            "error[SEM001:unknown_identifier]",
         );
-        for diag in &reader001 {
-            assert!(pack
-                .render_diagnostic_text(diag)
-                .expect("LOCALE001 template should render")
-                .is_some());
-            assert_plain_render_contract(&render_plain(diag, &pack), "warning[LOCALE001");
-        }
-    } else {
-        assert!(
-            sem001.iter().any(|diag| diag
-                .args
-                .iter()
-                .any(|arg| arg.name == "issue" && arg.value == "unknown_identifier")),
-            "expected SEM001 unknown_identifier issue for {locale}: {diagnostics:?}"
-        );
-        let unknown_identifier = diagnostics_with_issue(&sem001, "unknown_identifier");
-        assert!(
-            !unknown_identifier.is_empty(),
-            "missing SEM001 unknown_identifier fact for {locale}: {sem001:?}"
-        );
-        for diag in unknown_identifier {
-            assert!(pack
-                .render_diagnostic_text(diag)
-                .expect("SEM001 template should render")
-                .is_some());
-            assert_plain_render_contract(
-                &render_plain(diag, &pack),
-                "error[SEM001:unknown_identifier]",
-            );
-        }
     }
 }
 
 #[test]
 fn package_render_emits_sem001_suggestion_for_vietnamese_name() {
-    // After radix reader locale changes, semantic-name-suggestion.fab
-    // produces LOCALE001/LOCALE002 lexer diagnostics with a PARSE030
-    // error. The test verifies LOCALE002 spelling suggestions.
+    // semantic-name-suggestion.fab produces LOCALE002 lexer suggestions plus a
+    // PARSE030 error. The test verifies LOCALE002 spelling suggestions.
     let fault = locale_fault_path("vi", "faults/semantic-name-suggestion.fab");
     let (config, pack) =
         config_with_locale(Target::HirRust, &fault, Some("vi"), None).expect("reader config");
