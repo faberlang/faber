@@ -16,6 +16,10 @@ path = "src/main.rs"
 [dependencies]
 # Private compiler workspace (local org layout). Not published with this crate.
 radix = { path = "../radix", default-features = false }
+# M7 (code review 2026-08-12): the shared library-module naming rule
+# (`decl::library_module_dash_name`). The TS product layer derives emitted
+# `.ts` file names and `.js` relative ESM paths from the same stem the
+# radix-hir-ts import emitter uses, so the product map cannot drift.
 # GI3-5 (gpu-inference-gguf): the Q1-default prefill device-run driver
 # constructs the prefill MIR program programmatically (tensor types via the
 # shared TypeTable / IndexExpr surface — the same typed-fact construction the
