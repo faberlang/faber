@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Freshness gate for radix/corpus/measurement/*.json (compat + conversio).
+#
+# Regenerates the measurement JSON to a temp root and fails if it differs from
+# the committed files. Wired into ./scripta/check-measurement-gates (stage 4a)
+# so a stale measurement fails ./scripta/test before later stages run.
+#
+# Cache envs (skip cargo):
+#   EBNF_MATRIX_HIR_LOG / EBNF_MATRIX_MIR_LOG / CONVERSIO_MATRIX_LOG
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if [[ -n "${EBNF_MATRIX_HIR_LOG:-}" ]]; then export EBNF_MATRIX_HIR_LOG; fi
+if [[ -n "${EBNF_MATRIX_MIR_LOG:-}" ]]; then export EBNF_MATRIX_MIR_LOG; fi
+if [[ -n "${CONVERSIO_MATRIX_LOG:-}" ]]; then export CONVERSIO_MATRIX_LOG; fi
+
+tmp="$(mktemp -d -t compat-json-freshness.XXXXXX)"
+trap 'rm -rf "$tmp"' EXIT
+
+COMPAT_OUT="$tmp" ./scripta/emit-compat-json.py >/dev/null 2>&1
+
+if ! diff -rq -x README.md corpus/measurement "$tmp" >/dev/null; then
+  echo "error: corpus/measurement JSON is stale; regenerate with:" >&2
+  echo "  ./scripta/emit-compat-json.py" >&2
+  diff -rq -x README.md corpus/measurement "$tmp" | head -20 >&2 || true
+  exit 1
+fi
+
+echo "compat measurement json fresh"
