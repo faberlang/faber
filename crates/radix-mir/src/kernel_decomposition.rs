@@ -277,7 +277,7 @@ pub fn decompose_kernel_function(
                 // (`producer_position`) then lands on a distinct kernel output
                 // buffer (the train_step reads alias the field buffers).
                 for &field in fields {
-                    if written.contains(&field) && !outputs.contains(&field) {
+                    if written.contains(&field) {
                         outputs.push(field);
                     }
                 }
@@ -458,11 +458,8 @@ fn split_oversized_elementwise_body(
     // together: a temp defined in the pre range and referenced by a field
     // writer in the field range would make every pre-range cut invalid).
     let mut first_field = first_field_raw;
-    // Parallel slot arrays (temps_defined_at / temps_referenced_at); index is
-    // the statement slot, not an item to iterate for its own sake.
-    #[allow(clippy::needless_range_loop)]
-    for index in 0..first_field_raw {
-        for &temp in &temps_defined_at[index] {
+    for (index, defined_at) in temps_defined_at[..first_field_raw].iter().enumerate() {
+        for &temp in defined_at {
             let feeds_field_range =
                 (first_field_raw..n).any(|later| temps_referenced_at[later].contains(&temp));
             if feeds_field_range {
@@ -685,21 +682,18 @@ fn temp_closed_range(
 ) -> bool {
     let mut defined = BTreeSet::new();
     let mut referenced = BTreeSet::new();
-    // Parallel slot arrays; index by statement range.
-    #[allow(clippy::needless_range_loop)]
-    for slot in start..end {
-        defined.extend(temps_defined_at[slot].iter().copied());
-        referenced.extend(temps_referenced_at[slot].iter().copied());
+    for (defined_at, referenced_at) in temps_defined_at[start..end]
+        .iter()
+        .zip(&temps_referenced_at[start..end])
+    {
+        defined.extend(defined_at.iter().copied());
+        referenced.extend(referenced_at.iter().copied());
     }
     if !referenced.is_subset(&defined) {
         return false;
     }
-    #[allow(clippy::needless_range_loop)]
-    for slot in end..temps_defined_at.len() {
-        if temps_referenced_at[slot]
-            .iter()
-            .any(|temp| defined.contains(temp))
-        {
+    for referenced_at in &temps_referenced_at[end..] {
+        if referenced_at.iter().any(|temp| defined.contains(temp)) {
             return false;
         }
     }
@@ -715,17 +709,14 @@ fn range_params_and_written(
     end: usize,
 ) -> (BTreeSet<MirLocalId>, BTreeSet<MirLocalId>) {
     let mut written = BTreeSet::new();
-    // Parallel slot arrays; index by statement range.
-    #[allow(clippy::needless_range_loop)]
-    for slot in start..end {
-        if let Some(local) = written_at[slot] {
+    for &written_at_slot in &written_at[start..end] {
+        if let Some(local) = written_at_slot {
             written.insert(local);
         }
     }
     let mut params = BTreeSet::new();
-    #[allow(clippy::needless_range_loop)]
-    for slot in start..end {
-        for &local in &reads_at[slot] {
+    for reads_at_slot in &reads_at[start..end] {
+        for &local in reads_at_slot {
             if !written.contains(&local) {
                 params.insert(local);
             }

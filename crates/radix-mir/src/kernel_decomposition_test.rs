@@ -17,10 +17,6 @@ fn f32_ty(types: &mut TypeTable) -> MirType {
     MirType::semantic(types.sized_numeric(Primitive::Fractus, NumericWidth::F32))
 }
 
-fn scalar_f32_ty(types: &mut TypeTable) -> MirType {
-    f32_ty(types)
-}
-
 /// A rank-2 `tf32[M, N]` tensor type with static literal dims (the matmul /
 /// transpose operand shape the contract/plan passes read).
 fn rank2_tensor_ty(types: &mut TypeTable, dims: [u64; 2]) -> MirType {
@@ -202,7 +198,7 @@ fn device_function(
 /// `TreeReduction(Mean)` recipe in one body.
 fn mlp_loss_function(types: &mut TypeTable) -> MirFunction {
     let r2 = rank2_tensor_ty(types, [4, 4]);
-    let scalar = scalar_f32_ty(types);
+    let scalar = f32_ty(types);
     device_function(
         &[(0, r2), (1, r2), (3, r2)],
         vec![
@@ -286,7 +282,7 @@ fn matmul_softmax_function(types: &mut TypeTable) -> MirFunction {
 /// drop it. (The former fixture used softmax, which S6-P1 admits.)
 fn matmul_crux_entropia_function(types: &mut TypeTable) -> MirFunction {
     let r2 = rank2_tensor_ty(types, [4, 4]);
-    let scalar = scalar_f32_ty(types);
+    let scalar = f32_ty(types);
     device_function(
         &[(0, r2), (1, r2)],
         vec![
@@ -428,7 +424,7 @@ fn tuple_construct_statement(destination: u32, fields: &[u32], ty: MirType) -> M
 /// full-tuple indices the caller's `gradient_slot` facts index).
 fn gradient_companion_tuple_function(types: &mut TypeTable) -> MirFunction {
     let r2 = rank2_tensor_ty(types, [4, 4]);
-    let scalar = scalar_f32_ty(types);
+    let scalar = f32_ty(types);
     let tuple_ty = MirType::semantic(types.tuple(vec![
         scalar.semantic_id(),
         r2.semantic_id(),
@@ -455,7 +451,7 @@ fn gradient_companion_tuple_function(types: &mut TypeTable) -> MirFunction {
 /// matmul's subchain.
 fn mlp_loss_gelu_function(types: &mut TypeTable) -> MirFunction {
     let r2 = rank2_tensor_ty(types, [4, 4]);
-    let scalar = scalar_f32_ty(types);
+    let scalar = f32_ty(types);
     let mut function = device_function(
         &[(0, r2), (1, r2), (5, r2)],
         vec![
@@ -877,7 +873,7 @@ fn assign_from_temp(destination: u32, source: MirTempId, ty: MirType) -> MirStat
 /// tuple `Construct`).
 fn oversized_elementwise_train_step(types: &mut TypeTable) -> MirFunction {
     let tensor = rank1_tensor_ty(types, 8);
-    let scalar = scalar_f32_ty(types);
+    let scalar = f32_ty(types);
     let span = test_span();
     let tuple_ty = MirType::semantic(types.intern(Type::Tuple(vec![tensor.semantic_id(); 12])));
     let mut params = Vec::with_capacity(25);
@@ -1148,7 +1144,7 @@ fn control_flow_body_fails_closed() {
     // silent Elementwise.
     let mut types = TypeTable::new();
     let r2 = rank2_tensor_ty(&mut types, [4, 4]);
-    let scalar = scalar_f32_ty(&mut types);
+    let scalar = f32_ty(&mut types);
     let span = test_span();
     let function = MirFunction {
         id: MirFunctionId(0),
@@ -1323,7 +1319,7 @@ fn unconsumed_elementwise_destination_is_not_exposed() {
     // recipe result h1.
     let mut types = TypeTable::new();
     let r2 = rank2_tensor_ty(&mut types, [4, 4]);
-    let scalar = scalar_f32_ty(&mut types);
+    let scalar = f32_ty(&mut types);
     let mut function = device_function(
         &[(0, r2), (1, r2), (5, r2)],
         vec![
@@ -1415,7 +1411,7 @@ fn plain_fixture_outputs_are_the_recipe_results() {
 /// tensor addition is a collection op, not a binary arithmetic value).
 fn mlp_loss_gelu_collection_function(types: &mut TypeTable) -> MirFunction {
     let r2 = rank2_tensor_ty(types, [4, 4]);
-    let scalar = scalar_f32_ty(types);
+    let scalar = f32_ty(types);
     device_function(
         &[(0, r2), (1, r2), (5, r2)],
         vec![
@@ -1445,7 +1441,7 @@ fn tuple_return_of_multi_output_subchain_validates_and_is_recognized() {
     // fresh tensor id, so the fixture's locals are the source of truth).
     let local2_ty = source_local_ty(&function, MirLocalId(2));
     let local4_ty = source_local_ty(&function, MirLocalId(4));
-    let scalar = scalar_f32_ty(&mut types);
+    let scalar = f32_ty(&mut types);
     types.tuple(vec![local2_ty.semantic_id(), local4_ty.semantic_id()]);
     let validation = MirValidationContext::new(&types);
     let decomposition =
