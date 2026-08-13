@@ -729,7 +729,10 @@ fn label() → string {
     assert!(entry_unit.analysis.hir.entry.is_some());
     assert_eq!(
         entry_unit.namespace_exports.get("thing"),
-        Some(&vec!["label".to_owned()])
+        Some(&std::collections::BTreeMap::from([(
+            "label".to_owned(),
+            radix::semantic::passes::visibility_annotation::VisibilityTier::Publica
+        )]))
     );
 
     let module_unit = package

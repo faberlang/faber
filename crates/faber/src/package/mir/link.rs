@@ -1,7 +1,7 @@
 //! Package-local namespace-call linking and rewrite passes.
 
 use super::*;
-use radix::hir::visit::{walk_expr, walk_program_mut, HirVisitor, HirVisitorMut, walk_expr_mut};
+use radix::hir::visit::{walk_expr, walk_expr_mut, walk_program_mut, HirVisitor, HirVisitorMut};
 
 /// Post-rewrite pass: recover the function type for synthetic-path call
 /// callees (pkg001-mir-fix).
@@ -129,10 +129,15 @@ fn synthetic_namespace_function_types(
     targets: &NamespaceCallTargets,
 ) -> HashMap<radix::hir::DefId, radix_types::TypeId> {
     let mut method_types = HashMap::new();
-    for import in analysis.hir.items.iter().filter_map(|item| match &item.kind {
-        HirItemKind::Import(import) => Some(import),
-        _ => None,
-    }) {
+    for import in analysis
+        .hir
+        .items
+        .iter()
+        .filter_map(|item| match &item.kind {
+            HirItemKind::Import(import) => Some(import),
+            _ => None,
+        })
+    {
         for import_item in &import.items {
             let binding = import_item.alias.unwrap_or(import_item.name);
             let exports = analysis.resolver.namespace_file_function_exports(binding);
@@ -145,7 +150,11 @@ fn synthetic_namespace_function_types(
                 }
                 let verb_name = analysis.interner.resolve(verb);
                 let Some(synthetic) = targets
-                    .get(&(unit_path.to_path_buf(), import_item.def_id, verb_name.to_owned()))
+                    .get(&(
+                        unit_path.to_path_buf(),
+                        import_item.def_id,
+                        verb_name.to_owned(),
+                    ))
                     .copied()
                 else {
                     continue;
@@ -280,7 +289,7 @@ pub(super) fn local_namespace_call_targets(
                         .get(binding)
                         .cloned()
                         .unwrap_or_default()
-                        .into_iter()
+                        .into_keys()
                         .collect::<BTreeSet<_>>();
                     links
                         .namespaces
@@ -300,7 +309,13 @@ pub(super) fn local_namespace_call_targets(
                         );
                     }
                     for member in exported_top_level_consts(sibling, &exports) {
-                        link_const_member(&mut links, &unit.path, import_item.def_id, &sibling.path, &member);
+                        link_const_member(
+                            &mut links,
+                            &unit.path,
+                            import_item.def_id,
+                            &sibling.path,
+                            &member,
+                        );
                     }
                 }
                 continue;
@@ -323,7 +338,7 @@ pub(super) fn local_namespace_call_targets(
                             .get(binding)
                             .cloned()
                             .unwrap_or_default()
-                            .into_iter()
+                            .into_keys()
                             .collect::<BTreeSet<_>>();
                         links
                             .namespaces
@@ -731,11 +746,13 @@ fn link_library_method_targets(
     }
     let mut sources: Vec<SourceStruct> = Vec::new();
     for library in &links.libraries {
-        let Ok(interface) = library_cached_file_interface(&library.import, library_resolver, library_cache)
+        let Ok(interface) =
+            library_cached_file_interface(&library.import, library_resolver, library_cache)
         else {
             continue;
         };
-        let Ok(analysis) = library_cached_analysis(&library.import, library_resolver, library_cache)
+        let Ok(analysis) =
+            library_cached_analysis(&library.import, library_resolver, library_cache)
         else {
             continue;
         };
@@ -776,9 +793,9 @@ fn link_library_method_targets(
     // method targets that resolve through the caller's canonical nominal
     // table.
     let register_caller = |links: &mut PackageMirLinkAccumulator,
-                               caller_path: &Path,
-                               resolver: &radix::semantic::Resolver,
-                               interner: &Interner| {
+                           caller_path: &Path,
+                           resolver: &radix::semantic::Resolver,
+                           interner: &Interner| {
         for source in &sources {
             if source.library_path == caller_path {
                 continue;
@@ -813,7 +830,12 @@ fn link_library_method_targets(
     };
 
     for unit in &package.units {
-        register_caller(links, &unit.path, &unit.analysis.resolver, &unit.analysis.interner);
+        register_caller(
+            links,
+            &unit.path,
+            &unit.analysis.resolver,
+            &unit.analysis.interner,
+        );
     }
     // The linked-library caller loop needs `&mut links` for synthetic
     // allocation while iterating the closure, so the target list is cloned
@@ -953,9 +975,14 @@ fn link_const_member(
             links.next_synthetic += 1;
             def_id
         });
-    links
-        .data_member_targets
-        .insert((caller_path.to_path_buf(), import_def_id, member.name.clone()), synthetic);
+    links.data_member_targets.insert(
+        (
+            caller_path.to_path_buf(),
+            import_def_id,
+            member.name.clone(),
+        ),
+        synthetic,
+    );
     links.data_members.push(DataMemberLink {
         synthetic,
         source_path: source_path.to_path_buf(),
@@ -1085,7 +1112,12 @@ pub(super) fn rewrite_analysis_namespace_calls(
     }
     let method_types = synthetic_namespace_function_types(unit_path, analysis, targets);
     if !method_types.is_empty() {
-        walk_program_mut(&mut SyntheticCalleeTypePass { method_types: &method_types }, &mut analysis.hir);
+        walk_program_mut(
+            &mut SyntheticCalleeTypePass {
+                method_types: &method_types,
+            },
+            &mut analysis.hir,
+        );
         // The callee type recovery makes failable synthetic calls lower as
         // try-calls; a cape whose binding was typed before the rewrite can
         // still carry the unresolved `ignotum` sink — recover it from the
@@ -1169,17 +1201,15 @@ pub(super) fn rewrite_stmt(
                 diagnostics,
             );
         }
-        HirStatementKind::Redde(Some(expr)) => {
-            rewrite_expr(
-                unit_path,
-                expr,
-                interner,
-                targets,
-                data_member_targets,
-                namespaces,
-                diagnostics,
-            )
-        }
+        HirStatementKind::Redde(Some(expr)) => rewrite_expr(
+            unit_path,
+            expr,
+            interner,
+            targets,
+            data_member_targets,
+            namespaces,
+            diagnostics,
+        ),
         HirStatementKind::IncDec(inc_dec) => rewrite_expr(
             unit_path,
             &mut inc_dec.target,
@@ -1229,8 +1259,24 @@ pub(super) fn rewrite_expr(
 ) {
     match &mut expr.kind {
         HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
-            rewrite_expr(unit_path, lhs, interner, targets, data_member_targets, namespaces, diagnostics);
-            rewrite_expr(unit_path, rhs, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_expr(
+                unit_path,
+                lhs,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+            rewrite_expr(
+                unit_path,
+                rhs,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
         }
         HirExpressionKind::ConversioAssign {
             target,
@@ -1274,11 +1320,25 @@ pub(super) fn rewrite_expr(
         | HirExpressionKind::Yield(inner)
         | HirExpressionKind::Panic(inner)
         | HirExpressionKind::Throw(inner)
-        | HirExpressionKind::Praefixum(inner) => {
-            rewrite_expr(unit_path, inner, interner, targets, data_member_targets, namespaces, diagnostics)
-        }
+        | HirExpressionKind::Praefixum(inner) => rewrite_expr(
+            unit_path,
+            inner,
+            interner,
+            targets,
+            data_member_targets,
+            namespaces,
+            diagnostics,
+        ),
         HirExpressionKind::Call(callee, type_args, args) => {
-            rewrite_call_args(unit_path, args, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_call_args(
+                unit_path,
+                args,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
             if let HirExpressionKind::Field(receiver, method) = &callee.kind {
                 if let Some(target_def) =
                     namespace_call_target(unit_path, receiver, *method, interner, targets)
@@ -1327,7 +1387,15 @@ pub(super) fn rewrite_expr(
                 namespaces,
                 diagnostics,
             );
-            rewrite_call_args(unit_path, args, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_call_args(
+                unit_path,
+                args,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
             if let Some(target_def) =
                 namespace_call_target(unit_path, receiver, *method, interner, targets)
             {
@@ -1357,9 +1425,13 @@ pub(super) fn rewrite_expr(
             // registered a data-member target for the member, rewrite the
             // reference to the member's synthetic def so the entry lowering
             // materializes the const through the top-level-const seam.
-            if let Some(target_def) =
-                namespace_data_member_target(unit_path, object, *field, interner, data_member_targets)
-            {
+            if let Some(target_def) = namespace_data_member_target(
+                unit_path,
+                object,
+                *field,
+                interner,
+                data_member_targets,
+            ) {
                 expr.kind = HirExpressionKind::Path(target_def);
                 expr.ty = None;
                 return;
@@ -1384,7 +1456,15 @@ pub(super) fn rewrite_expr(
                 namespaces,
                 diagnostics,
             );
-            rewrite_expr(unit_path, index, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_expr(
+                unit_path,
+                index,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
         }
         HirExpressionKind::OptionalChain(object, chain) => {
             rewrite_expr(
@@ -1396,7 +1476,15 @@ pub(super) fn rewrite_expr(
                 namespaces,
                 diagnostics,
             );
-            rewrite_optional_chain(unit_path, chain, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_optional_chain(
+                unit_path,
+                chain,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
         }
         HirExpressionKind::NonNull(object, chain) => {
             rewrite_expr(
@@ -1408,10 +1496,26 @@ pub(super) fn rewrite_expr(
                 namespaces,
                 diagnostics,
             );
-            rewrite_non_null_chain(unit_path, chain, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_non_null_chain(
+                unit_path,
+                chain,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
         }
         HirExpressionKind::Block(block) | HirExpressionKind::Loop(block) => {
-            rewrite_block(unit_path, block, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_block(
+                unit_path,
+                block,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
         }
         HirExpressionKind::Si {
             cond,
@@ -1419,7 +1523,15 @@ pub(super) fn rewrite_expr(
             then_catch,
             else_block,
         } => {
-            rewrite_expr(unit_path, cond, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_expr(
+                unit_path,
+                cond,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
             rewrite_block(
                 unit_path,
                 then_block,
@@ -1430,10 +1542,26 @@ pub(super) fn rewrite_expr(
                 diagnostics,
             );
             if let Some(cape) = then_catch {
-                rewrite_cape(unit_path, cape, interner, targets, data_member_targets, namespaces, diagnostics);
+                rewrite_cape(
+                    unit_path,
+                    cape,
+                    interner,
+                    targets,
+                    data_member_targets,
+                    namespaces,
+                    diagnostics,
+                );
             }
             if let Some(block) = else_block {
-                rewrite_block(unit_path, block, interner, targets, data_member_targets, namespaces, diagnostics);
+                rewrite_block(
+                    unit_path,
+                    block,
+                    interner,
+                    targets,
+                    data_member_targets,
+                    namespaces,
+                    diagnostics,
+                );
             }
         }
         HirExpressionKind::Discerne {
@@ -1451,12 +1579,36 @@ pub(super) fn rewrite_expr(
                 );
             }
             for arm in arms {
-                rewrite_casu_arm(unit_path, arm, interner, targets, data_member_targets, namespaces, diagnostics);
+                rewrite_casu_arm(
+                    unit_path,
+                    arm,
+                    interner,
+                    targets,
+                    data_member_targets,
+                    namespaces,
+                    diagnostics,
+                );
             }
         }
         HirExpressionKind::Dum(cond, block) => {
-            rewrite_expr(unit_path, cond, interner, targets, data_member_targets, namespaces, diagnostics);
-            rewrite_block(unit_path, block, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_expr(
+                unit_path,
+                cond,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+            rewrite_block(
+                unit_path,
+                block,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
         }
         HirExpressionKind::Itera(_, _, _, iterable, block) => {
             rewrite_expr(
@@ -1468,15 +1620,47 @@ pub(super) fn rewrite_expr(
                 namespaces,
                 diagnostics,
             );
-            rewrite_block(unit_path, block, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_block(
+                unit_path,
+                block,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
         }
         HirExpressionKind::Intervallum {
             start, end, step, ..
         } => {
-            rewrite_expr(unit_path, start, interner, targets, data_member_targets, namespaces, diagnostics);
-            rewrite_expr(unit_path, end, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_expr(
+                unit_path,
+                start,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+            rewrite_expr(
+                unit_path,
+                end,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
             if let Some(step) = step {
-                rewrite_expr(unit_path, step, interner, targets, data_member_targets, namespaces, diagnostics);
+                rewrite_expr(
+                    unit_path,
+                    step,
+                    interner,
+                    targets,
+                    data_member_targets,
+                    namespaces,
+                    diagnostics,
+                );
             }
         }
         HirExpressionKind::Array(elements) => {
@@ -1499,18 +1683,42 @@ pub(super) fn rewrite_expr(
         }
         HirExpressionKind::Struct(_, fields) => {
             for (_, value) in fields {
-                rewrite_expr(unit_path, value, interner, targets, data_member_targets, namespaces, diagnostics);
+                rewrite_expr(
+                    unit_path,
+                    value,
+                    interner,
+                    targets,
+                    data_member_targets,
+                    namespaces,
+                    diagnostics,
+                );
             }
         }
         HirExpressionKind::Tuple(items, _)
         | HirExpressionKind::Scribe(_, items)
         | HirExpressionKind::Scriptum(_, items) => {
             for item in items {
-                rewrite_expr(unit_path, item, interner, targets, data_member_targets, namespaces, diagnostics);
+                rewrite_expr(
+                    unit_path,
+                    item,
+                    interner,
+                    targets,
+                    data_member_targets,
+                    namespaces,
+                    diagnostics,
+                );
             }
         }
         HirExpressionKind::Adfirma(cond, message) => {
-            rewrite_expr(unit_path, cond, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_expr(
+                unit_path,
+                cond,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
             if let Some(message) = message {
                 rewrite_expr(
                     unit_path,
@@ -1524,12 +1732,34 @@ pub(super) fn rewrite_expr(
             }
         }
         HirExpressionKind::Handled { body, catch } => {
-            rewrite_block(unit_path, body, interner, targets, data_member_targets, namespaces, diagnostics);
-            rewrite_cape(unit_path, catch, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_block(
+                unit_path,
+                body,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+            rewrite_cape(
+                unit_path,
+                catch,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
         }
-        HirExpressionKind::Clausura(_, _, _, body) => {
-            rewrite_expr(unit_path, body, interner, targets, data_member_targets, namespaces, diagnostics)
-        }
+        HirExpressionKind::Clausura(_, _, _, body) => rewrite_expr(
+            unit_path,
+            body,
+            interner,
+            targets,
+            data_member_targets,
+            namespaces,
+            diagnostics,
+        ),
         HirExpressionKind::Verte {
             source, entries, ..
         } => {
@@ -1594,10 +1824,26 @@ pub(super) fn rewrite_expr(
             }
         }
         HirExpressionKind::Ref(_, inner) | HirExpressionKind::Deref(inner) => {
-            rewrite_expr(unit_path, inner, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_expr(
+                unit_path,
+                inner,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
         }
         HirExpressionKind::TypeCheck { expr: inner, .. } => {
-            rewrite_expr(unit_path, inner, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_expr(
+                unit_path,
+                inner,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
         }
         HirExpressionKind::Path(_)
         | HirExpressionKind::Literal(_)
@@ -1782,7 +2028,9 @@ fn rewrite_namespace_variant_members(analysis: &mut radix::driver::AnalyzedUnit)
         }
     }
 
-    let mut rewriter = VariantMemberRewriter { resolver: &analysis.resolver };
+    let mut rewriter = VariantMemberRewriter {
+        resolver: &analysis.resolver,
+    };
     rewriter.visit_program_mut(&mut analysis.hir);
 }
 
@@ -1817,8 +2065,14 @@ impl ShadowedAliasRewriter<'_> {
             return None;
         };
         // The main rewrite already handles directly-keyed receivers.
-        if namespace_call_target(self.unit_path, receiver, method, self.interner, self.targets)
-            .is_some()
+        if namespace_call_target(
+            self.unit_path,
+            receiver,
+            method,
+            self.interner,
+            self.targets,
+        )
+        .is_some()
         {
             return None;
         }
@@ -1873,7 +2127,13 @@ impl ShadowedAliasRewriter<'_> {
             ty: None,
             span: receiver.span,
         };
-        namespace_call_target(self.unit_path, &import_receiver, method, self.interner, self.targets)
+        namespace_call_target(
+            self.unit_path,
+            &import_receiver,
+            method,
+            self.interner,
+            self.targets,
+        )
     }
 
     /// Whether `method` resolves as a genuine method on `receiver`'s type:
@@ -1893,7 +2153,8 @@ impl ShadowedAliasRewriter<'_> {
             Type::Alias(_, inner) => self.types.get(*inner),
             other => other,
         };
-        if radix::intrinsics::lookup_method_for_type(normalized, &method_name, arg_count).is_some() {
+        if radix::intrinsics::lookup_method_for_type(normalized, &method_name, arg_count).is_some()
+        {
             return true;
         }
         let struct_def = match normalized {
@@ -1990,7 +2251,9 @@ fn rewrite_shadowed_alias_namespace_calls(
     // program (items, params, locals, patterns, handlers, loop bindings).
     let mut local_names: HashMap<DefId, Symbol> = HashMap::new();
     {
-        let mut collector = LocalNameCollector { names: &mut local_names };
+        let mut collector = LocalNameCollector {
+            names: &mut local_names,
+        };
         collector.visit_program(&analysis.hir);
     }
     // Genus/interface methods on the unit's own types: a synthetic receiver
@@ -2081,7 +2344,11 @@ impl HirVisitorMut for LibraryMethodCallRewriter<'_> {
         if let HirExpressionKind::MethodCall(receiver, method, type_args, args) = &mut expr.kind {
             if let Some(struct_def) = self.receiver_struct_def(receiver) {
                 let method_name = self.interner.resolve(*method).to_owned();
-                if let Some(synthetic) = self.methods.get(&(struct_def, method_name.clone())).copied() {
+                if let Some(synthetic) = self
+                    .methods
+                    .get(&(struct_def, method_name.clone()))
+                    .copied()
+                {
                     // CG2-R08: recover the callee's function type so the MIR
                     // lowerer keeps the try-call edge for failable methods;
                     // a method whose signature cannot be recovered fails
@@ -2248,28 +2515,24 @@ pub(super) fn rewrite_optional_chain(
 ) {
     match chain {
         HirOptionalChainKind::Member(_) => {}
-        HirOptionalChainKind::Index(index) => {
-            rewrite_expr(
-                unit_path,
-                index,
-                interner,
-                targets,
-                data_member_targets,
-                namespaces,
-                diagnostics,
-            )
-        }
-        HirOptionalChainKind::Call(args) => {
-            rewrite_call_args(
-                unit_path,
-                args,
-                interner,
-                targets,
-                data_member_targets,
-                namespaces,
-                diagnostics,
-            )
-        }
+        HirOptionalChainKind::Index(index) => rewrite_expr(
+            unit_path,
+            index,
+            interner,
+            targets,
+            data_member_targets,
+            namespaces,
+            diagnostics,
+        ),
+        HirOptionalChainKind::Call(args) => rewrite_call_args(
+            unit_path,
+            args,
+            interner,
+            targets,
+            data_member_targets,
+            namespaces,
+            diagnostics,
+        ),
     }
 }
 
@@ -2284,27 +2547,23 @@ pub(super) fn rewrite_non_null_chain(
 ) {
     match chain {
         radix::hir::HirNonNullKind::Member(_) => {}
-        radix::hir::HirNonNullKind::Index(index) => {
-            rewrite_expr(
-                unit_path,
-                index,
-                interner,
-                targets,
-                data_member_targets,
-                namespaces,
-                diagnostics,
-            )
-        }
-        radix::hir::HirNonNullKind::Call(args) => {
-            rewrite_call_args(
-                unit_path,
-                args,
-                interner,
-                targets,
-                data_member_targets,
-                namespaces,
-                diagnostics,
-            )
-        }
+        radix::hir::HirNonNullKind::Index(index) => rewrite_expr(
+            unit_path,
+            index,
+            interner,
+            targets,
+            data_member_targets,
+            namespaces,
+            diagnostics,
+        ),
+        radix::hir::HirNonNullKind::Call(args) => rewrite_call_args(
+            unit_path,
+            args,
+            interner,
+            targets,
+            data_member_targets,
+            namespaces,
+            diagnostics,
+        ),
     }
 }

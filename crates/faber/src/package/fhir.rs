@@ -31,6 +31,7 @@ use radix::hir::package::{
 };
 use radix::hir::HirItemKind;
 use radix::lexer::Span;
+use radix::semantic::passes::visibility_annotation::VisibilityTier;
 use radix::syntax::Visibility;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -440,11 +441,21 @@ fn namespace_exports_for_loaded(
     module: &LoadedHirModule,
     modules: &[LoadedHirModule],
     by_path: &BTreeMap<String, usize>,
-) -> BTreeMap<String, Vec<String>> {
+) -> BTreeMap<String, BTreeMap<String, VisibilityTier>> {
     let mut exports = BTreeMap::new();
     for link in &module.local_links {
         if let Some(&index) = by_path.get(&link.target) {
-            exports.insert(link.binding.clone(), modules[index].export_names.clone());
+            // The FHIR-loaded package carries export names without tiers;
+            // every name is marked publica (artifact round-trips do not
+            // re-run import resolution).
+            exports.insert(
+                link.binding.clone(),
+                modules[index]
+                    .export_names
+                    .iter()
+                    .map(|name| (name.clone(), VisibilityTier::Publica))
+                    .collect(),
+            );
         }
     }
     exports

@@ -48,11 +48,8 @@ entry = "main.fab"
 "#,
     )
     .expect("write manifest");
-    std::fs::write(
-        dir.join("src/main.fab"),
-        "main { const int unused ← 1 }\n",
-    )
-    .expect("write entry");
+    std::fs::write(dir.join("src/main.fab"), "main { const int unused ← 1 }\n")
+        .expect("write entry");
 
     let config = Config::default().with_warn_policy(radix::driver::WarnPolicy {
         deny_all_warnings: true,
@@ -262,40 +259,6 @@ fn go_import_path_handles_path_with_slashes() {
         go_import_path("\"github.com/example/pkg\""),
         Some("github.com/example/pkg")
     );
-}
-
-// ── sorted_export_names ────────────────────────────────────────────────────
-
-#[test]
-fn sorted_export_names_returns_sorted_deduped_list() {
-    let names = vec![
-        "z".to_owned(),
-        "a".to_owned(),
-        "b".to_owned(),
-        "a".to_owned(),
-    ];
-    let result = sorted_export_names(names);
-    assert_eq!(result, vec!["a", "b", "z"]);
-}
-
-#[test]
-fn sorted_export_names_handles_empty_list() {
-    let result: Vec<String> = sorted_export_names(Vec::new());
-    assert!(result.is_empty());
-}
-
-#[test]
-fn sorted_export_names_deduplicates_exact_duplicates() {
-    let names = vec!["x".to_owned(), "x".to_owned(), "x".to_owned()];
-    let result = sorted_export_names(names);
-    assert_eq!(result, vec!["x"]);
-}
-
-#[test]
-fn sorted_export_names_preserves_case_sensitive_order() {
-    let names = vec!["B".to_owned(), "a".to_owned(), "C".to_owned()];
-    let result = sorted_export_names(names);
-    assert_eq!(result, vec!["B", "C", "a"]);
 }
 
 // ── normalize_path_buf ─────────────────────────────────────────────────────
