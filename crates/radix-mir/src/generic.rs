@@ -191,6 +191,21 @@ fn try_bind_generic_type_witness(
                     seen,
                 )
         }
+        (Type::Tuple(expected_elements), Type::Tuple(actual_elements)) => {
+            expected_elements.len() == actual_elements.len()
+                && expected_elements.iter().zip(actual_elements.iter()).all(
+                    |(expected_element, actual_element)| {
+                        try_bind_generic_type_witness(
+                            types,
+                            *expected_element,
+                            *actual_element,
+                            generic_bindings,
+                            shape_bindings,
+                            seen,
+                        )
+                    },
+                )
+        }
         (Type::Ref(expected_mode, expected_inner), Type::Ref(actual_mode, actual_inner))
             if expected_mode == actual_mode =>
         {
@@ -588,6 +603,15 @@ fn instantiate_existing_type_id(
                 .collect::<Result<FxHashMap<_, _>, _>>()?;
             find_existing_type(types, &Type::Record(fields), span, index)
         }
+        Type::Tuple(elements) => {
+            let elements = elements
+                .iter()
+                .map(|element| {
+                    instantiate_existing_type_id(types, *element, generic_bindings, span, index)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            find_existing_type(types, &Type::Tuple(elements), span, index)
+        }
         Type::Set(inner) => {
             instantiate_existing_unary_type(types, inner, generic_bindings, span, index, Type::Set)
         }
@@ -742,7 +766,6 @@ fn instantiate_existing_type_id(
         | Type::SizedNumeric(_, _)
         | Type::ModularWord(_)
         | Type::SizedInstans(_)
-        | Type::Tuple(_)
         | Type::Struct(_)
         | Type::Enum(_)
         | Type::Interface(_)
@@ -878,6 +901,22 @@ fn instantiate_mutable_type_id(
                 })
                 .collect::<Result<FxHashMap<_, _>, _>>()?;
             Ok(intern_or_find(types, &Type::Record(fields), index))
+        }
+        Type::Tuple(elements) => {
+            let elements = elements
+                .iter()
+                .map(|element| {
+                    instantiate_mutable_type_id(
+                        types,
+                        *element,
+                        generic_bindings,
+                        shape_bindings,
+                        span,
+                        index,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(intern_or_find(types, &Type::Tuple(elements), index))
         }
         Type::Set(inner) => instantiate_mutable_unary_type(
             types,
@@ -1036,7 +1075,6 @@ fn instantiate_mutable_type_id(
         | Type::SizedNumeric(_, _)
         | Type::ModularWord(_)
         | Type::SizedInstans(_)
-        | Type::Tuple(_)
         | Type::Struct(_)
         | Type::Enum(_)
         | Type::Interface(_)
@@ -1232,6 +1270,9 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
         Type::Record(fields) => fields
             .values()
             .any(|field_ty| type_contains_param_inner(types, *field_ty, seen)),
+        Type::Tuple(elements) => elements
+            .iter()
+            .any(|element| type_contains_param_inner(types, *element, seen)),
         Type::Func(sig) => {
             sig.params
                 .iter()
@@ -1254,7 +1295,6 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
         | Type::SizedNumeric(_, _)
         | Type::ModularWord(_)
         | Type::SizedInstans(_)
-        | Type::Tuple(_)
         | Type::Struct(_)
         | Type::Enum(_)
         | Type::Interface(_)

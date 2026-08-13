@@ -416,6 +416,138 @@ fn instantiate_generic_type_with_shapes_substitutes_tensor_shape() {
 }
 
 #[test]
+fn witness_binds_shape_params_through_tuple_elements() {
+    let mut types = TypeTable::new();
+    let element = f32_ty(&mut types);
+    let expected_shape = shape_bd(&mut types);
+    let expected_tensor = types.intern(Type::Tensor(element, expected_shape));
+    let expected = types.tuple(vec![expected_tensor]);
+    let actual_shape = shape_2x8(&mut types);
+    let actual_tensor = types.intern(Type::Tensor(element, actual_shape));
+    let actual = types.tuple(vec![actual_tensor]);
+
+    let mut bindings = MirGenericBindings::default();
+    let mut shape_bindings = MirShapeBindings::default();
+    assert!(bind_generic_type_witness_with_shapes(
+        &types,
+        MirType::semantic(expected),
+        MirType::semantic(actual),
+        &mut bindings,
+        &mut shape_bindings,
+    ));
+
+    let rows = shape_bindings
+        .get(&Symbol(200))
+        .copied()
+        .expect("row shape parameter bound through tuple");
+    let cols = shape_bindings
+        .get(&Symbol(201))
+        .copied()
+        .expect("column shape parameter bound through tuple");
+    assert_eq!(types.get_index(rows), &IndexExpr::Literal(2));
+    assert_eq!(types.get_index(cols), &IndexExpr::Literal(8));
+}
+
+#[test]
+fn instantiate_existing_generic_type_recurses_through_tuple_elements() {
+    let mut types = TypeTable::new();
+    let param = types.intern(Type::Param(Symbol(220)));
+    let generic = types.tuple(vec![param]);
+    let numerus = types.primitive(Primitive::Numerus);
+    let concrete = types.tuple(vec![numerus]);
+
+    let mut bindings = MirGenericBindings::default();
+    bindings.insert(Symbol(220), MirType::semantic(numerus));
+
+    let resolved = instantiate_existing_generic_type(
+        &types,
+        MirType::semantic(generic),
+        &bindings,
+        Span::default(),
+    )
+    .expect("type-param instantiation must recurse through tuple elements");
+    assert_eq!(resolved.semantic_id(), concrete);
+}
+
+#[test]
+fn instantiate_generic_type_with_shapes_substitutes_tuple_tensor_shape() {
+    let mut types = TypeTable::new();
+    let element = f32_ty(&mut types);
+    let shape = shape_bd(&mut types);
+    let tensor = types.intern(Type::Tensor(element, shape));
+    let generic = types.tuple(vec![tensor]);
+
+    let mut shape_bindings = MirShapeBindings::default();
+    let lit2 = types.intern_index(IndexExpr::Literal(2));
+    let lit8 = types.intern_index(IndexExpr::Literal(8));
+    shape_bindings.insert(Symbol(200), lit2);
+    shape_bindings.insert(Symbol(201), lit8);
+
+    let resolved = instantiate_generic_type_with_shapes(
+        &mut types,
+        MirType::semantic(generic),
+        &MirGenericBindings::default(),
+        &shape_bindings,
+        Span::default(),
+    )
+    .expect("shape-param instantiation must recurse through tuple elements");
+
+    assert!(!type_contains_param(&types, resolved.semantic_id()));
+    let Type::Tuple(elements) = types.get(resolved.semantic_id()) else {
+        panic!("resolved type is not a Tuple");
+    };
+    let Type::Tensor(_, resolved_shape) = types.get(elements[0]) else {
+        panic!("resolved tuple element is not a Tensor");
+    };
+    assert_eq!(
+        literal_index_i64s(*resolved_shape, &types),
+        Some(vec![2, 8])
+    );
+}
+
+#[test]
+fn unresolved_tuple_tensor_shape_remains_visible_to_survivor_check() {
+    let mut types = TypeTable::new();
+    let element = f32_ty(&mut types);
+    let shape = shape_bd(&mut types);
+    let tensor = types.intern(Type::Tensor(element, shape));
+    let generic = types.tuple(vec![tensor]);
+
+    let mut shape_bindings = MirShapeBindings::default();
+    let lit2 = types.intern_index(IndexExpr::Literal(2));
+    shape_bindings.insert(Symbol(200), lit2);
+
+    let resolved = instantiate_generic_type_with_shapes(
+        &mut types,
+        MirType::semantic(generic),
+        &MirGenericBindings::default(),
+        &shape_bindings,
+        Span::default(),
+    )
+    .expect("partial shape substitution preserves unresolved params for D6");
+
+    assert!(
+        type_contains_param(&types, resolved.semantic_id()),
+        "an unresolved tuple child must not escape the survivor check"
+    );
+}
+
+#[test]
+fn type_contains_param_walks_tuple_elements() {
+    let mut types = TypeTable::new();
+    let element = f32_ty(&mut types);
+    let generic_shape = shape_bd(&mut types);
+    let generic_tensor = types.intern(Type::Tensor(element, generic_shape));
+    let generic = types.tuple(vec![generic_tensor]);
+    assert!(type_contains_param(&types, generic));
+
+    let concrete_shape = shape_2x8(&mut types);
+    let concrete_tensor = types.intern(Type::Tensor(element, concrete_shape));
+    let concrete = types.tuple(vec![concrete_tensor]);
+    assert!(!type_contains_param(&types, concrete));
+}
+
+#[test]
 fn canonical_index_collapses_structurally_equal_shapes() {
     let mut types = TypeTable::new();
     let lit2 = types.intern_index(IndexExpr::Literal(2));
