@@ -71,6 +71,7 @@ impl Parser {
                 Some(TokenKind::Mori) => self.parse_mori_stmt()?,
                 Some(TokenKind::Cede) => self.parse_cede_stmt()?,
                 Some(TokenKind::Adfirma) => self.parse_adfirma_stmt()?,
+                Some(TokenKind::Requirit) => self.parse_require_stmt()?,
                 Some(TokenKind::Scribe) => self.parse_scribe_stmt()?,
                 Some(TokenKind::Incipit | TokenKind::Incipiet) => self.parse_incipit_stmt()?,
                 Some(TokenKind::Ex) => self.parse_extract_stmt()?,

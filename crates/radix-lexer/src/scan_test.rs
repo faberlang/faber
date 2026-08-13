@@ -7,7 +7,8 @@
 
 use super::{Interner, INLINE_COMMENT_ISSUE};
 use crate::{
-    keyword_specs, lex, lookup_keyword_spec, KeywordScope, LexErrorKind, LexResult, TokenKind,
+    keyword_specs, lex, lookup_keyword_spec, KeywordCategory, KeywordScope, LexErrorKind,
+    LexResult, TokenKind,
 };
 
 fn has_arg(err: &crate::LexError, name: &str, value: &str) -> bool {
@@ -1322,6 +1323,33 @@ fn lexes_proba_metrics_keywords() {
     assert!(matches!(kinds[3], TokenKind::Ident(_)));
     assert!(matches!(kinds[4], TokenKind::Integer(1)));
     assert!(matches!(kinds[5], TokenKind::Eof));
+}
+
+#[test]
+fn lexes_requirit_statement_keyword() {
+    // `requirit` is a statement keyword (error-handling identity), not the
+    // retired proba modifier. It lexes as an identifier whose latin key the
+    // parser claims as `TokenKind::Requirit`.
+    let result = lex("requirit verum secus \"bad\"");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert!(matches!(kinds[0], TokenKind::Ident(_)));
+    assert!(matches!(kinds[1], TokenKind::Ident(_)));
+    assert!(matches!(kinds[2], TokenKind::Ident(_)));
+    assert!(matches!(kinds[3], TokenKind::String(_)));
+    assert!(matches!(kinds[4], TokenKind::Eof));
+    assert_eq!(
+        result.reader_keyword_latin_keys.get("requirit"),
+        Some(&"requirit".to_owned()),
+        "requirit must record its latin identity for parser claims"
+    );
+    let spec = lookup_keyword_spec("requirit").expect("requirit should be registered");
+    assert_eq!(spec.token_kind, Some(TokenKind::Requirit));
+    assert_eq!(
+        spec.category,
+        crate::KeywordCategory::ErrorHandling,
+        "requirit belongs to the error-handling category"
+    );
 }
 
 #[test]

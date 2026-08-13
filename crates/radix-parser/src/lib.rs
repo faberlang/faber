@@ -725,6 +725,7 @@ impl Parser {
                         | TokenKind::Mori
                         | TokenKind::Cede
                         | TokenKind::Adfirma
+                        | TokenKind::Requirit
                         | TokenKind::Scribe
                         | TokenKind::Incipiet
                         | TokenKind::Incipit

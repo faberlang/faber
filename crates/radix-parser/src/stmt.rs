@@ -557,6 +557,30 @@ impl Parser {
         Ok(StmtKind::Adfirma(AdfirmaStmt { cond, message }))
     }
 
+    /// Parse `requirit` / `require`.
+    ///
+    /// GRAMMAR:
+    ///   requirit-stmt := `requirit` expr 'secus' expr
+    ///
+    /// The `secus` separator claims the latin identity; the en surface `else`
+    /// resolves to the same identity through the reader pack. The error
+    /// expression is mandatory — the recoverable guard always names its
+    /// false-path payload. The statement stays a first-class syntax node;
+    /// lowering desugars it to `si non (cond) { iace err }`.
+    pub(super) fn parse_require_stmt(&mut self) -> Result<StmtKind, ParseError> {
+        self.expect_keyword_ident(TokenKind::Requirit, "expected 'requirit'")?;
+
+        let cond = Box::new(self.parse_expression()?);
+
+        if !self.eat_keyword_ident(TokenKind::Secus) {
+            return Err(self.expected_statement_error("requirit_secus"));
+        }
+
+        let error = Box::new(self.parse_expression()?);
+
+        Ok(StmtKind::Require(RequireStmt { cond, error }))
+    }
+
     // I/O AND DEBUGGING
 
     /// Parse `scribe` / `vide` / `mone` / `nota`.

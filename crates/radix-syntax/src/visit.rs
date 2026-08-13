@@ -361,6 +361,10 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
                 visitor.visit_expr(msg);
             }
         }
+        StmtKind::Require(stmt) => {
+            visitor.visit_expr(&stmt.cond);
+            visitor.visit_expr(&stmt.error);
+        }
         StmtKind::Scribe(stmt) => {
             for arg in &stmt.args {
                 visitor.visit_expr(arg);

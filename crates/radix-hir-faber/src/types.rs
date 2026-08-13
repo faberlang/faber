@@ -416,6 +416,7 @@ mod tests {
                 TokenKind::Mone => "mone",
                 TokenKind::Nota => "nota",
                 TokenKind::Adfirma => "adfirma",
+                TokenKind::Requirit => "requirit",
                 TokenKind::Mori => "mori",
                 TokenKind::Iace => "iace",
                 TokenKind::Cede => "cede",

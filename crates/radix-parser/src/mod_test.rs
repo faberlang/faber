@@ -2123,6 +2123,41 @@ fn parses_adfirma_without_message() {
 }
 
 #[test]
+fn parses_requirit_statement() {
+    let result = parse_ok("requirit verum secus \"bad\"");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    let StmtKind::Require(require_stmt) = &program.statements[0].kind else {
+        panic!("expected requirit statement");
+    };
+    assert!(
+        matches!(
+            require_stmt.cond.kind,
+            ExprKind::Literal(Literal::Bool(true))
+        ),
+        "cond should be the boolean literal verum"
+    );
+    assert!(matches!(require_stmt.error.kind, ExprKind::Literal(_)));
+}
+
+#[test]
+fn parses_requirit_error_expression_forms() {
+    let result =
+        parse_ok(r#"requirit conditio.finita secus finge SchedulaInvalida { causa = "bad" }"#);
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    assert!(matches!(program.statements[0].kind, StmtKind::Require(_)));
+}
+
+#[test]
+fn rejects_requirit_without_secus_payload() {
+    assert_parse_error_matches(
+        "requirit verum",
+        ParseExpectation::Args(&[("issue", "requirit_secus")]),
+    );
+}
+
+#[test]
 fn parses_nota_diagnostic() {
     let result = parse_ok("nota \"a\", \"b\"");
     let program = result
