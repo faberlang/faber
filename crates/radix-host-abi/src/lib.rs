@@ -1,25 +1,21 @@
 //! Radix-owned host ABI contract table.
 //!
-//! This module is the single source of truth for the host ABI surface Radix
+//! This crate is the single source of truth for the host ABI surface Radix
 //! emits: runtime symbol names, wire enum codes, LLVM layout spellings, status
-//! codes, and diagnostic symbol rows. The historical home for these constants
-//! was the retired runtime repository's `src/host_abi.rs`; Radix now owns them so a published
-//! compiler binary can report its own ABI through `radix abi` without importing
-//! the runtime at compile time.
+//! codes, and diagnostic symbol rows. A published compiler binary reports this
+//! table through `radix abi` without importing the runtime at compile time.
 //!
 //! Authority model
 //! ---------------
-//! The authority is the Radix binary itself (`radix abi`). The constant values
-//! here intentionally mirror the runtime table so that emitters and generated
-//! artifacts keep producing the same `__faber_rt_v1_*` spellings; drift between
-//! this table and the runtime is caught by dev-only coherence tests, not by the
-//! compiler reading the runtime back as an input.
+//! The authority is the Radix binary itself (`radix abi`). Constant values
+//! here match the runtime table so emitters and generated artifacts keep the
+//! `__faber_rt_v1_*` spellings. Drift is caught by dev-only coherence tests,
+//! not by the compiler reading the runtime back as an input.
 //!
-//! The individual `pub const` items remain the import surface for the MIR LLVM
-//! and Wasm text emitters (see Phase 2 of the `radix-abi-contract` goal). The
-//! paired `*_ROWS` tables are the structured view consumed by the `radix abi`
-//! renderers. Both are produced from one declaration list per family so the
-//! constant and its row entry can never drift apart.
+//! Individual `pub const` items are the import surface for the MIR LLVM and
+//! Wasm text emitters. The paired `*_ROWS` tables are the structured view
+//! consumed by the `radix abi` renderers. Both come from one declaration list
+//! per family so a constant and its row cannot drift apart.
 
 /// Host ABI version emitted by this Radix build.
 pub const ABI_VERSION: u32 = 1;
@@ -131,10 +127,8 @@ abi_string_family! {
         SYMBOL_FORMAT_I64_I64 = "__faber_rt_v1_format_i64_i64",
         SYMBOL_FORMAT_I64_I64_I64 = "__faber_rt_v1_format_i64_i64_i64",
         SYMBOL_FORMAT_F64 = "__faber_rt_v1_format_f64",
-        // L28 (ab91f49f, W16): f32 scalar format carrier — `display_fractus`
-        // keeps the f32 precision (`0.1f32` renders `0.1`, NOT the widened
-        // `0.10000000149011612` an f64 carrier would produce). Added serially
-        // to SYMBOL_ROWS per W16 single-writer discipline for the LLVM lane.
+        // `display_fractus` keeps f32 precision (`0.1f32` renders `0.1`, not
+        // the widened `0.10000000149011612` an f64 carrier would produce).
         SYMBOL_FORMAT_F32 = "__faber_rt_v1_format_f32",
         SYMBOL_FORMAT_TEXT = "__faber_rt_v1_format_text",
         SYMBOL_FORMAT_TEXT_TEXT = "__faber_rt_v1_format_text_text",
@@ -196,16 +190,13 @@ abi_string_family! {
         SYMBOL_INSTANS_FROM_VALOR = "__faber_rt_v1_instans_from_valor",
         SYMBOL_INSTANS_RETAG = "__faber_rt_v1_instans_retag",
         SYMBOL_INSTANS_GET_TEXT = "__faber_rt_v1_instans_get_text",
-        // P6 (promotion packet or-recovery-rows): the `⇥` recovery family for
-        // aggregate/opaque payload extraction. `expr ↦ T ⇥ recovery` lowers to
-        // a fixed-signature `(payload + fallback → payload)` row per closed-set
-        // conversion, so the host substitutes the fallback on a missing or
-        // wrong-typed payload instead of aborting. Precedent: the parse `_or`
-        // rows (text_parse_integer_or/text_parse_float_or) and option_get_or
-        // are the accepted closed-set recovery mechanism; the valor_cape row
-        // covers the fac/cape channel, not this inline `⇥` fallback. The wasm
-        // leaf rewires its convert_2_* shapes to these symbols (D5 closed-table
-        // rule); the LLVM leaf consumes the same rows.
+        // `⇥` recovery for aggregate/opaque payload extraction.
+        // `expr ↦ T ⇥ recovery` lowers to a fixed-signature
+        // `(payload + fallback → payload)` row per closed-set conversion, so
+        // the host substitutes the fallback on a missing or wrong-typed
+        // payload instead of aborting. Parse `_or` rows and `option_get_or`
+        // are the same closed-set mechanism; `valor_cape` is the fac/cape
+        // channel, not this inline `⇥` fallback.
         SYMBOL_VALOR_GET_I64_OR = "__faber_rt_v1_valor_get_i64_or",
         SYMBOL_VALOR_GET_F64_OR = "__faber_rt_v1_valor_get_f64_or",
         SYMBOL_VALOR_GET_I1_OR = "__faber_rt_v1_valor_get_i1_or",
@@ -229,12 +220,11 @@ abi_string_family! {
         SYMBOL_COMPARE_NE = "__faber_rt_v1_compare_ne_2_ptr_ptr_to_i1",
         SYMBOL_CONVERT_RUNTIME_PTR = "__faber_rt_v1_convert_runtime_1_ptr_to_ptr",
         SYMBOL_TEMPUS_NUNC = "__faber_rt_v1_tempus_nunc",
-        // P3 (wasm-host-parity residual): the async tempus wait (`dormiet`/
-        // `expectet`) capability. The LLVM lane inlines a `poll` sleep; the
-        // wasm module cannot syscall, so the wait routes through a closed-set
-        // host row taking the millisecond duration (numerus i64 carrier) and
-        // returning the (vacuum) payload carrier. The wasm host implements the
-        // sleep; the stub host default-values the import (instant wait).
+        // Async tempus wait (`dormiet`/`expectet`). The LLVM lane inlines a
+        // `poll` sleep; the wasm module cannot syscall, so the wait is a
+        // closed-set host row taking the millisecond duration (`numerus` i64)
+        // and returning the vacuum payload. The wasm host sleeps; the stub
+        // host default-values the import (instant wait).
         SYMBOL_TEMPUS_WAIT = "__faber_rt_v1_tempus_wait",
         SYMBOL_TOML_SOLVE = "__faber_rt_v1_toml_solve",
         SYMBOL_VALOR_CAPE = "__faber_rt_v1_valor_cape",
@@ -247,22 +237,7 @@ abi_string_family! {
         SYMBOL_VALOR_GET_OCTETI = "__faber_rt_v1_valor_get_octeti",
         SYMBOL_VALOR_GET_ARRAY = "__faber_rt_v1_valor_get_array",
         SYMBOL_VALOR_GET_MAP = "__faber_rt_v1_valor_get_map",
-        // P7 (promotion packet valor-genus-field-layout): the closed genus
-        // field-layout + defaulted-extraction ABI contract. `valor ↦ genus`
-        // crosses the host boundary through one named-field descriptor table:
-        // `__faber_rt_v1_valor_get_genus(context, valor, count, names, kinds,
-        // policies, outputs) → status` with parallel arrays in declaration
-        // order — UTF-8 name slices (`names`), `VALUE_KIND_*` codes (`kinds`),
-        // `GENUS_FIELD_POLICY_*` flags (`policies`), and pre-seeded typed
-        // output slots (`outputs`). The emitter seeds every slot with the
-        // field's construction default (declared default or sponte zero); a
-        // missing key with policy DEFAULTABLE keeps the seed, a missing key
-        // with policy MANDATORY fails the whole extraction (STATUS_*
-        // non-ok, latched for `⇥` recovery), and extra JSON keys are ignored.
-        // `__faber_rt_v1_valor_genus` boxes the same table shape. The LLVM
-        // lane binds both rows (stage-4s); the wasm leaf maps
-        // `convert_1_aggregate_to_aggregate` on a genus target to them — no
-        // target-local layout guess.
+        // Closed genus field-layout contract; see `GENUS_FIELD_POLICY_*`.
         SYMBOL_VALOR_GENUS = "__faber_rt_v1_valor_genus",
         SYMBOL_VALOR_GET_GENUS = "__faber_rt_v1_valor_get_genus",
         SYMBOL_ARRAY_NEW = "__faber_rt_v1_array_new",
@@ -279,9 +254,8 @@ abi_string_family! {
         SYMBOL_ARRAY_OPTION = "__faber_rt_v1_array_option",
         SYMBOL_ARRAY_SORT = "__faber_rt_v1_array_sort",
         SYMBOL_ARRAY_SUM = "__faber_rt_v1_array_sum",
-        // W16: S8.1 process argumenta — the runtime returns the captured
-        // argv (excluding host argv[0]) as a `lista<textus>` handle so the
-        // emitted entry can bind the `incipit argumenta` local.
+        // Process `argumenta`: captured argv excluding host argv[0], returned
+        // as a `lista<textus>` handle for `incipit argumenta`.
         SYMBOL_ARGUMENTS = "__faber_rt_v1_arguments",
         SYMBOL_OPTION_NONE = "__faber_rt_v1_option_none",
         SYMBOL_OPTION_SOME = "__faber_rt_v1_option_some",
@@ -346,13 +320,11 @@ abi_string_family! {
         SYMBOL_REGEX_GET_TEXT = "__faber_rt_v1_regex_get_text",
         SYMBOL_REGEX_LITERAL_1_PTR_TO_PTR = "__faber_rt_v1_regex_literal_1_ptr_to_ptr",
         SYMBOL_READ_LINE_0_TO_PTR = "__faber_rt_v1_read_line_0_to_ptr",
-        // P5 (promotion packet cursor-stream-abi): the shared cursor-stream
-        // materialization row. One fixed symbol whose signature carries the
-        // generator function id (the callee-encoded `cursor_stream_{callee}`
-        // dialect of the LLVM lane is retired in favor of this row — D5
-        // closed-table rule). The host invokes the generator to completion
-        // and collects its `cede` yields into a `lista<T>` (the stepper's
-        // `eval_cursor_stream` is the reference semantics).
+        // Shared cursor-stream materialization. One fixed symbol; the
+        // callee-encoded `cursor_stream_{callee}` LLVM dialect is retired.
+        // The host runs the generator to completion and collects `cede`
+        // yields into a `lista<T>` (`eval_cursor_stream` is the reference
+        // semantics).
         SYMBOL_CURSOR_STREAM = "__faber_rt_v1_cursor_stream",
         SYMBOL_INTERVAL_NEW = "__faber_rt_v1_interval_new",
         SYMBOL_INTERVAL_INTERSECT = "__faber_rt_v1_interval_intersect",
@@ -371,34 +343,21 @@ abi_string_family! {
         SYMBOL_CLI_FIELD_I1 = "__faber_rt_v1_cli_field_i1",
         SYMBOL_CLI_SELECTED_COMMAND = "__faber_rt_v1_cli_selected_command",
         SYMBOL_CLI_EXIT_CODE = "__faber_rt_v1_cli_exit_code",
-        // P10 (promotion packet failable-status-model): the shared failable
-        // error carrier row. One fixed symbol for the `ReturnError` payload
-        // channel — the host reads the typed error payload from a failable
-        // `(status, payload)` result (the `cape err` recovery read). The LLVM
-        // lane's per-type `__faber_runtime_return_error_{ty}` dialect retires
-        // in favor of this row (D5 closed-table rule); the wasm leaf lowers
-        // the terminator's payload read to this symbol. The four P10 fixtures
-        // (`iace/functio-fallibilis`, `iace/functio-propagans`,
-        // `iace/iace-si-guard`, `operatores/function-types`) exercise the
-        // channel with textus error payloads.
+        // Shared failable error-carrier row. One fixed symbol for the
+        // `ReturnError` payload channel — the host reads the typed error
+        // payload from a failable `(status, payload)` result (`cape err`).
+        // The LLVM per-type `__faber_runtime_return_error_{ty}` dialect is
+        // retired.
         SYMBOL_FALLIBLE_ERROR = "__faber_rt_v1_fallible_error",
         SYMBOL_PROGRAM_ENTRY = "__faber_program_entry_v1",
         SYMBOL_GPU_COPY_IN = "__faber_gpu_v1_copy_in",
         SYMBOL_GPU_READBACK = "__faber_gpu_v1_readback",
         SYMBOL_GPU_SYNC = "__faber_gpu_v1_sync",
-        // P8 (promotion packet sermo-runtime-surface): the shared sermo
-        // materialization surface. `ad 'route'(payload)` opens a sermo stream
-        // (SermoOpen: route + valor payload → opaque stream handle backed by
-        // faber-runtime `frame::Sermo`); SermoSetOpener replaces the first
-        // request frame's payload before the stream is consumed; `↦ textus` /
-        // `↦ valor` materialize the inbound frame stream to a carrier; the
-        // `_or` row is the `⇥`-style recovery for the stream extraction (P6
-        // precedent: per-carrier `_or` fallback — here a scalar
-        // materialization that substitutes the fallback on a missing or
-        // wrong-typed payload instead of aborting). The wasm leaf rewires its
-        // `convert_1_aggregate_to_text` / `value-returning runtime call` /
-        // `convert_2_aggregate_i64_to_i64` sermo shapes to these symbols (D5
-        // closed-table rule); the LLVM leaf consumes the same rows.
+        // Shared sermo materialization. `ad 'route'(payload)` opens a stream
+        // (route + valor → opaque handle); `SermoSetOpener` replaces the
+        // first request frame's payload before consume; `↦ textus` /
+        // `↦ valor` materialize inbound frames; the `_or` row is the `⇥`
+        // recovery for stream extraction.
         SYMBOL_SERMO_OPEN = "__faber_rt_v1_sermo_open",
         SYMBOL_SERMO_SET_OPENER = "__faber_rt_v1_sermo_set_opener",
         SYMBOL_SERMO_MATERIALIZE_TEXT = "__faber_rt_v1_sermo_materialize_text",
@@ -407,16 +366,19 @@ abi_string_family! {
     }
 }
 
-// Genus field-layout contract (promotion packet P7, wasm-host-parity).
+// Genus field-layout contract for `valor_get_genus`.
 //
-// The `defaultable` policy flag of the `valor_get_genus` field-descriptor
-// table. `0`/`GENUS_FIELD_POLICY_MANDATORY` marks a field whose key must be
-// present in the `Valor::Tabula` payload — a missing key fails the whole
-// extraction (non-OK status, latched for `⇥` recovery). `1` /
-// `GENUS_FIELD_POLICY_DEFAULTABLE` marks a field whose pre-seeded output
-// slot the host must retain when the key is missing — the seed is the
-// emitter-supplied construction default (declared default such as
-// `regio = "Roma"`, or the sponte zero/nihil seed for `optional` fields).
+// `valor ↦ genus` crosses the host through one named-field descriptor table
+// with parallel arrays in declaration order: UTF-8 names, `VALUE_KIND_*`
+// codes, these policy flags, and pre-seeded typed output slots.
+// `GENUS_FIELD_POLICY_MANDATORY` (`0`): the key must be present in the
+// `Valor::Tabula` payload — a missing key fails the whole extraction
+// (non-OK status, latched for `⇥` recovery).
+// `GENUS_FIELD_POLICY_DEFAULTABLE` (`1`): the host retains the pre-seeded
+// slot when the key is missing. The seed is the emitter-supplied
+// construction default (declared default, or the sponte zero/nihil seed
+// for optional fields). Extra JSON keys are ignored.
+// `__faber_rt_v1_valor_genus` boxes the same table shape.
 abi_enum_family! {
     GENUS_FIELD_POLICY_ROWS: type FaberRtGenusFieldPolicyV1 = u8 {
         GENUS_FIELD_POLICY_MANDATORY = 0,
@@ -429,13 +391,11 @@ abi_string_family! {
         LLVM_SLICE_TYPE = "%FaberRtSliceV1",
         LLVM_SLICE_TYPE_DEFINITION = "%FaberRtSliceV1 = type { ptr, i64 }",
         LLVM_EXIT_TYPE = "%FaberRtExitV1",
-        // W16 (hand-4 L9): the exit struct crosses the C boundary as a single
-        // register. LLVM's C-convention lowering of `{ i32, i32 }` splits the
-        // fields across w0/w1 on AArch64, while the rustc/clang caller packs
-        // both into x0 (verified by disassembly). The named type is now an
-        // `i64` carrying `process_code | (status.code << 32)`; the runtime
-        // `FaberRtExitV1 { process_code, status }` reads the packed x0 back
-        // unchanged.
+        // The exit struct crosses the C boundary as a single register.
+        // LLVM's C-convention lowering of `{ i32, i32 }` splits the fields
+        // across w0/w1 on AArch64, while the rustc/clang caller packs both
+        // into x0. The named type is an `i64` carrying
+        // `process_code | (status.code << 32)`.
         LLVM_EXIT_TYPE_DEFINITION = "%FaberRtExitV1 = type i64",
         LLVM_PTR_RESULT_TYPE = "%FaberRtPtrResultV1",
         LLVM_PTR_RESULT_TYPE_DEFINITION = "%FaberRtPtrResultV1 = type { i32, ptr }",
@@ -504,14 +464,11 @@ pub const STATUS_CODES: &[(&str, i32)] = &[
     ("STATUS_IO_ERROR", 2),
     ("STATUS_PANIC", 3),
     ("STATUS_UNSUPPORTED", 4),
-    // P10 (promotion packet failable-status-model): the failable error-channel
-    // discriminator. The shared failable status/payload model is the
-    // status-first multi-value `(i32 status, payload…)` of the W10 profile:
-    // STATUS_OK + the success payload on the happy path, STATUS_FALLIBLE + the
-    // typed `ReturnError` payload when the failable error channel fires
-    // (`iace` throw / `⇥` propagation / `fac`/`cape` recovery). The wasm leaf
-    // lowers `MirTerminatorKind::ReturnError` to this status-first shape; the
-    // LLVM lane consumes the same contract.
+    // Failable error-channel discriminator. Status-first multi-value
+    // `(i32 status, payload…)`: `STATUS_OK` + success payload on the happy
+    // path, `STATUS_FALLIBLE` + typed `ReturnError` payload when the
+    // failable channel fires (`iace` throw / `⇥` propagation / `fac`/`cape`
+    // recovery).
     ("STATUS_FALLIBLE", 5),
 ];
 
