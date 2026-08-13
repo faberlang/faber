@@ -38,6 +38,7 @@ mod cmd;
 #[cfg(feature = "hir-rust")]
 mod codegen;
 mod compile;
+pub(crate) mod composite_plan;
 #[cfg(feature = "device-runtime")]
 mod device;
 mod discovery;
