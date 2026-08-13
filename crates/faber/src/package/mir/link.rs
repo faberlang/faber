@@ -1377,6 +1377,31 @@ pub(super) fn rewrite_expr(
                 diagnostics,
             );
         }
+        HirExpressionKind::Gradient {
+            call,
+            selected_arguments,
+        } => {
+            rewrite_expr(
+                unit_path,
+                call,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+            for selected_argument in selected_arguments {
+                rewrite_expr(
+                    unit_path,
+                    selected_argument,
+                    interner,
+                    targets,
+                    data_member_targets,
+                    namespaces,
+                    diagnostics,
+                );
+            }
+        }
         HirExpressionKind::MethodCall(receiver, method, type_args, args) => {
             rewrite_expr(
                 unit_path,
