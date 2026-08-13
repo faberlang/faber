@@ -88,7 +88,7 @@ pub struct TypeTable {
     /// *semantic* match the linear scan returns (never an `intern_map` id), so
     /// callers render the same representative as the pre-memo scan.
     find_equal_memo: RefCell<FxHashMap<Type, TypeId>>,
-    /// First interned [`Type::ModularWord`] width, if any (BO-D-7 / PRP-066).
+    /// First interned [`Type::ModularWord`] width, if any.
     ///
     /// Updated on every `intern` that inserts a `ModularWord` when unset. Snapshot
     /// restore recomputes from the types arena so the flag stays consistent.
@@ -111,7 +111,6 @@ pub struct TypeTableSnapshot {
 }
 
 impl TypeTableSnapshot {
-    /// Number of semantic types in this snapshot.
     #[must_use]
     pub fn type_count(&self) -> usize {
         self.types.len()
@@ -131,7 +130,6 @@ impl TypeTableSnapshot {
 }
 
 impl TypeTable {
-    /// Build a type table with all primitive types available by name.
     #[must_use]
     pub fn new() -> Self {
         let mut table = Self {
@@ -201,7 +199,7 @@ impl TypeTable {
 
     /// Width of the first interned modular-word type, if any.
     ///
-    /// O(1) probe used by backend rejection (PRP-066 BO-D-7).
+    /// O(1) probe used by backend rejection.
     #[must_use]
     pub fn first_modular_word_width(&self) -> Option<NumericWidth> {
         self.first_modular_word
@@ -251,13 +249,11 @@ impl TypeTable {
         found
     }
 
-    /// Get a semantic type by table-local ID.
     #[must_use]
     pub fn get(&self, id: TypeId) -> &Type {
         &self.types[id.0 as usize]
     }
 
-    /// Number of semantic types currently interned in this table.
     #[must_use]
     pub fn type_count(&self) -> usize {
         self.types.len()
@@ -360,7 +356,6 @@ impl TypeTable {
         })
     }
 
-    /// Get the preloaded ID for a primitive type.
     #[must_use]
     pub fn primitive(&self, prim: Primitive) -> TypeId {
         self.primitives[&prim]
@@ -398,8 +393,6 @@ impl TypeTable {
     pub fn union_member_sort_key(&self, id: TypeId) -> TypeId {
         let mut resolved = id;
         let mut seen = FxHashSet::default();
-        // Peel top-level alias layers, tracking visited `TypeId`s so a
-        // cyclic chain terminates instead of looping.
         while let Type::Alias(_, inner) = self.get(resolved) {
             if !seen.insert(resolved) {
                 break;
@@ -419,7 +412,6 @@ impl TypeTable {
         }
     }
 
-    /// Find the table-local type ID for a user-defined struct declaration.
     #[must_use]
     #[allow(clippy::cast_possible_truncation)]
     pub fn find_struct(&self, def_id: DefId) -> Option<TypeId> {
@@ -448,17 +440,14 @@ impl TypeTable {
         self.intern(Type::Option(inner))
     }
 
-    /// Allocate a structural record type.
     pub fn record(&mut self, fields: impl IntoIterator<Item = (LexSymbol, TypeId)>) -> TypeId {
         self.intern(Type::Record(fields.into_iter().collect()))
     }
 
-    /// Allocate a positional tuple type (e.g. gradient aggregate, residual bundle).
     pub fn tuple(&mut self, elements: Vec<TypeId>) -> TypeId {
         self.intern(Type::Tuple(elements))
     }
 
-    /// Find an existing tuple type with the given element types, if one was interned.
     #[must_use]
     #[allow(clippy::cast_possible_truncation)]
     pub fn find_tuple(&self, elements: &[TypeId]) -> Option<TypeId> {
@@ -477,7 +466,7 @@ impl TypeTable {
     /// If `ty` is a nullable carrier (`T ∪ nihil` union or `Option<T>`), return
     /// the non-null payload type. Alias chains are traversed. Returns `None` for
     /// non-nullable types, unions whose non-null arm count is not exactly one,
-    /// or cyclic Alias chains (fail-closed; PRP-059 / BO-H-13 residual).
+    /// or cyclic Alias chains (fail-closed).
     #[must_use]
     pub fn nullable_inner(&self, ty: TypeId) -> Option<TypeId> {
         let mut seen = FxHashSet::default();
@@ -515,7 +504,6 @@ impl TypeTable {
         }
     }
 
-    /// Allocate a semantic reference type.
     pub fn reference(&mut self, mutability: SemanticMutability, inner: TypeId) -> TypeId {
         self.intern(Type::Ref(mutability, inner))
     }
@@ -562,7 +550,6 @@ impl TypeTable {
         var
     }
 
-    /// Store an index expression and return its arena id.
     #[allow(clippy::cast_possible_truncation)]
     pub fn intern_index(&mut self, expr: IndexExpr) -> IndexId {
         let id = IndexId(self.indices.len() as u32);
@@ -570,13 +557,11 @@ impl TypeTable {
         id
     }
 
-    /// Look up an interned index expression.
     #[must_use]
     pub fn get_index(&self, id: IndexId) -> &IndexExpr {
         &self.indices[id.0 as usize]
     }
 
-    /// Number of index expressions currently interned.
     #[must_use]
     pub fn index_count(&self) -> usize {
         self.indices.len()
@@ -625,7 +610,6 @@ impl TypeTable {
         self.intern(Type::Atomic(element))
     }
 
-    /// Return whether two index expressions are structurally equal.
     #[must_use]
     pub fn index_equals(&self, a: IndexId, b: IndexId) -> bool {
         if a == b {
@@ -676,7 +660,6 @@ impl TypeTable {
         })
     }
 
-    /// Allocate a function signature type.
     pub fn function(&mut self, sig: FuncSig) -> TypeId {
         self.intern(Type::Func(sig))
     }
@@ -948,7 +931,7 @@ impl TypeTable {
 
         match (from_ty, to_ty) {
             // Peel alias wrappers so numeric/instans carrier rules fire on
-            // the underlying type (F-003).
+            // the underlying type.
             (Type::Alias(_, a_inner), _) => self.assignable(*a_inner, to),
             (_, Type::Alias(_, b_inner)) => self.assignable(from, *b_inner),
 
@@ -957,12 +940,10 @@ impl TypeTable {
             // `ignotum` accepts any concrete value; must fire before tighter rejections.
             (_, Type::Primitive(Primitive::Ignotum)) => true,
 
-            // Union source is assignable when every member can flow into destination.
             (Type::Union(from_types), _) => {
                 from_types.iter().all(|member| self.assignable(*member, to))
             }
 
-            // Destination union accepts any source that can flow into at least one member.
             (_, Type::Union(to_types)) => {
                 to_types.iter().any(|member| self.assignable(from, *member))
             }
@@ -1001,7 +982,7 @@ impl TypeTable {
             // are representation-identical (`Vec<u8>` in Rust) once sized numerics
             // shipped; both directions are implicit so octeti carries every
             // `lista` method and either slot accepts the other. See
-            // `docs/factory/octeti-unify-lista/goal.md` and DEFER-029.
+            // `docs/factory/octeti-unify-lista/goal.md`.
             (Type::Primitive(Primitive::Octeti), Type::Array(inner))
             | (Type::Array(inner), Type::Primitive(Primitive::Octeti)) => {
                 matches!(
@@ -1031,16 +1012,12 @@ impl TypeTable {
             // valor, so octeti widens to valor too.
             (Type::Primitive(Primitive::Octeti), Type::Primitive(Primitive::Valor)) => true,
 
-            // --- Structural assignability (F-066) ---
-            //
-            // These arms cover same-variant structural types that previously fell
-            // through to `_ => false`. Applied types are invariant under equals;
-            // collection and aggregate types are element-covariant.
+            // Structural assignability: applied types are invariant; collections
+            // and aggregates are element-covariant.
 
             // Applied: generic application is invariant (type args are structural).
             (Type::Applied(_, _), Type::Applied(_, _)) => self.equals(from, to),
 
-            // Tuple: pointwise element-covariant.
             (Type::Tuple(from_elems), Type::Tuple(to_elems)) => {
                 from_elems.len() == to_elems.len()
                     && from_elems
@@ -1049,12 +1026,10 @@ impl TypeTable {
                         .all(|(f, t)| self.assignable(*f, *t))
             }
 
-            // Intervallum: covariant in bound type.
             (Type::Intervallum(from_bound), Type::Intervallum(to_bound)) => {
                 self.assignable(*from_bound, *to_bound)
             }
 
-            // Single-element collections: element-covariant.
             (Type::Array(from_elem), Type::Array(to_elem))
             | (Type::Set(from_elem), Type::Set(to_elem))
             | (Type::Promissum(from_elem), Type::Promissum(to_elem))
@@ -1062,24 +1037,18 @@ impl TypeTable {
                 self.assignable(*from_elem, *to_elem)
             }
 
-            // Two-channel promises: both success and alternate channels must be assignable.
-            // Infallible promissum<T> widens to promissum<T ⇥ E> (numquam bottom channel).
+            // Infallible promissum<T> widens to promissum<T ⇥ E> (numquam bottom).
             (Type::PromissumFailable(ft, fe), Type::PromissumFailable(tt, te)) => {
                 self.assignable(*ft, *tt) && self.assignable(*fe, *te)
             }
-            (Type::Promissum(ft), Type::PromissumFailable(tt, _te)) => {
-                // Infallible widens: T assignable to T, numquam assignable to any E.
-                self.assignable(*ft, *tt)
-            }
-            // Failable promises do NOT narrow to infallible (erases the alternate channel).
+            (Type::Promissum(ft), Type::PromissumFailable(tt, _te)) => self.assignable(*ft, *tt),
+            // Failable promises do not narrow to infallible (erases the alternate channel).
             (Type::PromissumFailable(_, _), Type::Promissum(_)) => false,
 
-            // Async cursors: both item and alternate channels must be assignable.
             (Type::AsyncCursor(fi, fe), Type::AsyncCursor(ti, te)) => {
                 self.assignable(*fi, *ti) && self.assignable(*fe, *te)
             }
 
-            // Map: covariant in both key and value.
             (Type::Map(from_key, from_val), Type::Map(to_key, to_val)) => {
                 self.assignable(*from_key, *to_key) && self.assignable(*from_val, *to_val)
             }
@@ -1111,7 +1080,6 @@ impl Default for TypeTable {
 /// resolver's symbol table.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Type {
-    /// Built-in scalar or special type.
     Primitive(Primitive),
 
     /// `lista<T>` collection.
@@ -1168,31 +1136,24 @@ pub enum Type {
     /// Optional value type written as `T ∪ nihil` in Faber type positions.
     Option(TypeId),
 
-    /// Reference type used by parameter-passing and borrow analysis.
     Ref(SemanticMutability, TypeId),
 
-    /// User-defined struct declaration.
     Struct(DefId),
 
-    /// User-defined enum declaration.
     Enum(DefId),
 
-    /// User-defined interface declaration.
     Interface(DefId),
 
     /// Resolved type alias retaining the alias declaration identity.
     Alias(DefId, TypeId),
 
-    /// Callable signature.
     Func(FuncSig),
 
     /// Generic type parameter that has not been substituted.
     Param(LexSymbol),
 
-    /// Generic type applied to concrete type arguments.
     Applied(TypeId, Vec<TypeId>),
 
-    /// Placeholder introduced during type inference.
     Infer(InferVar),
 
     /// Union-shaped inference hole written as a standalone `∪` in type
@@ -1201,10 +1162,9 @@ pub enum Type {
     /// variable instead of binding one inhabitant.
     InferUnion(InferVar),
 
-    /// Explicit union of possible value types.
     Union(Vec<TypeId>),
 
-    /// Ordered positional aggregate (e.g. gradient tuple, residual bundle).
+    /// Ordered positional aggregate.
     Tuple(Vec<TypeId>),
 
     /// Recovery sentinel used after an earlier type error.
@@ -1280,22 +1240,17 @@ pub enum Primitive {
     /// ASCII-only machine text.
     Ascii,
 
-    /// Text/string value.
     Textus,
 
-    /// Integer number.
     Numerus,
 
-    /// Floating-point number.
     Fractus,
 
-    /// Boolean truth value.
     Bivalens,
 
     /// Null value; nullable slots are modeled with option/union types.
     Nihil,
 
-    /// No returned value.
     Vacuum,
 
     /// Never-returning control-flow type.
@@ -1307,7 +1262,6 @@ pub enum Primitive {
     /// Raw byte buffer.
     Octeti,
 
-    /// Regular-expression literal value.
     Regex,
 
     /// Object-rooted JSON document, backed by `faber::Json`.
@@ -1451,13 +1405,11 @@ pub enum CollectionKind {
 }
 
 impl CollectionKind {
-    /// Resolve a Faber collection type name.
     #[must_use]
     pub fn from_name(name: &str) -> Option<Self> {
         lookup_collection_type_spec(name).map(|spec| spec.kind)
     }
 
-    /// Number of type arguments required by this collection family.
     #[must_use]
     pub fn arity(self) -> usize {
         match self {
@@ -1478,7 +1430,6 @@ impl CollectionKind {
         }
     }
 
-    /// Lower collection type arguments into the corresponding semantic type.
     pub fn lower(self, types: &mut TypeTable, params: &[TypeId]) -> TypeId {
         debug_assert_eq!(params.len(), self.arity());
         match self {
@@ -1671,7 +1622,7 @@ fn is_instans_carrier(ty: &Type) -> bool {
 ///
 /// Used by [`TypeTable::from_snapshot`] alongside [`type_refs_in_bounds`] so
 /// that nested `IndexExpr::Tuple` children cannot smuggle dangling references
-/// past the snapshot integrity check (F-065).
+/// past the snapshot integrity check.
 fn index_refs_in_bounds(expr: &IndexExpr, indices_len: usize) -> bool {
     let index_in_bounds = |id: &IndexId| (id.0 as usize) < indices_len;
     match expr {
@@ -1719,7 +1670,6 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         Type::Tensor(e, s) | Type::Vector(e, s) | Type::Matrix(e, s) | Type::Sparsa(e, s) => {
             type_in_bounds(e) && index_in_bounds(s)
         }
-        // Leaf types carry no TypeId or IndexId children.
         Type::Primitive(_)
         | Type::SizedNumeric(_, _)
         | Type::ModularWord(_)
@@ -1734,7 +1684,6 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
     }
 }
 
-/// Mutability carried by semantic reference types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SemanticMutability {
     Immutable,
@@ -1780,7 +1729,6 @@ pub enum SemanticParamMode {
     Move,
 }
 
-/// Identifier for a type inference placeholder.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct InferVar(pub u32);
 
