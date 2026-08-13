@@ -410,6 +410,7 @@ pub(crate) fn target_name(target: Target) -> &'static str {
         Target::MirFmirBinary => "fmir",
         Target::MirFmirBundle => "fmir-bin",
         Target::HirSwift => "swift",
+        Target::HirPython => "python",
         Target::HirFhir => "fhir",
     }
 }
