@@ -1,0 +1,46 @@
++++
+term = "×"
+kind = "operator-group"
+category = "arithmetic"
+canonical = true
+summary = "Glyph cross product: width-3 vectors × multiply into the perpendicular vector."
+syntax = "<expression> × <expression>"
+related = ["vector"]
+locale = "en"
++++
+
+# =============================================================================
+# × — glyph cross product (width-3 vectors).
+# =============================================================================
+#
+# What this teaches:
+#   • Cross product — `a × b` on two width-3 vectors yields the perpendicular vector
+#   • Width pin — the glyph rejects non-3 widths at compile time (physics 3-vector convention)
+#
+# Common mistakes:
+#   • cross on width ≠ 3 vectors — width 4 (or non-vector operands) fail closed with a rank diagnostic
+#   • confusing `×` with elementwise multiply — Hadamard is `⊙`; `×` is the cross product glyph
+#
+# See also: vector
+# =============================================================================
+
+
+
+# vector × vector → perpendicular vector (width 3 only)
+#
+# WHY: `×` is pinned to the width-3 cross product in Phase 1. `emit_vector_transversum`
+# enforces width 3 in codegen; the typecheck rejects any other width with a
+# structured issue. Result lanes are the standard cross-product formulas.
+#
+# a = [1.0, 2.0, 3.0]  b = [4.0, 5.0, 6.0]
+# a × b = [2*6 - 3*5, 3*4 - 1*6, 1*5 - 2*4] = [-3.0, 6.0, -3.0]
+#
+# EXPECTED stdout:
+#   [-3.0, 6.0, -3.0]
+
+main {
+    const vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
+    const vf32[3] b ← [4.0, 5.0, 6.0] ↦ vf32[3]
+    const vf32[3] c ← a × b
+    print c
+}

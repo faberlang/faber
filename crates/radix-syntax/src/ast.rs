@@ -1037,6 +1037,11 @@ pub enum BinOp {
     Mul,
     Div,
     Mod,
+    // Glyph products (tensor-glyphs family; multiplicative precedence)
+    Dot,           // · inner product (dot / matvec / matmul)
+    Cross,         // × cross product (3-vectors)
+    TensorProduct, // ⊗ outer / Kronecker product
+    Hadamard,      // ⊙ Hadamard / elementwise product
     // Comparison
     Eq,
     NotEq,

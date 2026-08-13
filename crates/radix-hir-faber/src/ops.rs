@@ -76,7 +76,13 @@ impl super::FaberCodegen {
             HirBinOp::BitAnd => 8,
             HirBinOp::Shl | HirBinOp::Shr => 9,
             HirBinOp::Add | HirBinOp::Sub => 10,
-            HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod => 11,
+            HirBinOp::Mul
+            | HirBinOp::Div
+            | HirBinOp::Mod
+            | HirBinOp::Dot
+            | HirBinOp::Cross
+            | HirBinOp::TensorProduct
+            | HirBinOp::Hadamard => 11,
             // Local nullable elimination: tighter than arithmetic.
             HirBinOp::Coalesce => 12,
         }
@@ -96,6 +102,10 @@ impl super::FaberCodegen {
             HirBinOp::Mul => "*".to_owned(),
             HirBinOp::Div => "/".to_owned(),
             HirBinOp::Mod => "%".to_owned(),
+            HirBinOp::Dot => "·".to_owned(),
+            HirBinOp::Cross => "×".to_owned(),
+            HirBinOp::TensorProduct => "⊗".to_owned(),
+            HirBinOp::Hadamard => "⊙".to_owned(),
             HirBinOp::Eq | HirBinOp::StrictEq => "≡".to_owned(),
             HirBinOp::ApproxEq => "≈".to_owned(),
             HirBinOp::ApproxNotEq => "≉".to_owned(),

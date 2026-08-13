@@ -1,0 +1,65 @@
++++
+term = "⊙"
+kind = "operator-group"
+category = "arithmetic"
+canonical = true
+summary = "Glyph Hadamard: identical-shape elementwise product on vectors, matrices, and tensors."
+syntax = "<expression> ⊙ <expression>"
+related = ["tensor", "vector", "matrix"]
+locale = "en"
++++
+
+# =============================================================================
+# ⊙ — glyph Hadamard (identical-shape elementwise product).
+# =============================================================================
+#
+# What this teaches:
+#   • Hadamard product — `a ⊙ b` multiplies elementwise under an identical-shape contract
+#   • Shape families — vectors, matrices, and tensors all lower; tensors route through the shared kernel
+#
+# Common mistakes:
+#   • shape mismatch — `⊙` rejects differing shapes at compile time (no broadcast stretch)
+#   • confusing `⊙` with `×` — cross is width-3 only; Hadamard is elementwise for any identical shape
+#
+# See also: tensor, vector, matrix
+# =============================================================================
+
+
+
+# ⊙ on vectors, matrices, and tensors (identical shapes)
+#
+# WHY: `⊙` is the elementwise product glyph. Identical built-in shapes multiply
+# per-element; tensor operands lower to the same recoverable elementwise kernel
+# as the `multiplica` intrinsic (one host carrier). Matrix operands come from
+# `⊗` results (register matrices have no literal construction surface yet).
+#
+# a ⊙ b = [1*4, 2*5, 3*6] = [4.0, 10.0, 18.0]
+# o ⊙ o (o = a ⊗ b) = [[16,25],[64,100],[144,225]]
+# ta ⊙ tb (tensor [2,2]) = [1.0, 4.0, 9.0, 16.0]
+#
+# EXPECTED stdout:
+#   [4.0, 10.0, 18.0]
+#   [[16.0, 25.0], [64.0, 100.0], [144.0, 225.0]]
+#   [1.0, 4.0, 9.0, 16.0]
+
+main {
+    const vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
+    const vf32[3] b ← [4.0, 5.0, 6.0] ↦ vf32[3]
+    const vf32[2] q ← [4.0, 5.0] ↦ vf32[2]
+    const matrix<f32, [3, 2]> o ← a ⊗ q
+
+    const vf32[3] v ← a ⊙ b
+    print v
+
+    const matrix<f32, [3, 2]> m ← o ⊙ o
+    print m
+
+    const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
+    const list<f32> flat_b ← [1.0, 2.0, 3.0, 4.0]
+    const tf32[] seed ← vacua
+    var tf32[2, 2] ta ← seed.from_flat(flat_a, [2, 2])
+    var tf32[2, 2] tb ← seed.from_flat(flat_b, [2, 2])
+    const tf32[2, 2] t ← ta ⊙ tb
+    const list<f32> out ← t.flatten()
+    print out
+}

@@ -282,6 +282,12 @@ pub enum TokenKind {
     Bang,       // !
     Question,   // ?
 
+    // === Glyph products (tensor-glyphs family) ===
+    MiddleDot,    // · U+00B7 inner product (dot / matvec / matmul)
+    Cross,        // × U+00D7 cross product (3-vectors)
+    CircledTimes, // ⊗ U+2297 outer / Kronecker product
+    CircledDot,   // ⊙ U+2299 Hadamard / elementwise product
+
     // === Comparison ===
     Eq,              // =
     Assign,          // ←

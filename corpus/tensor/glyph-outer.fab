@@ -1,0 +1,47 @@
++++
+term = "⊗"
+kind = "operator-group"
+category = "arithmetic"
+canonical = true
+summary = "Glyph outer product: vector ⊗ vector yields the rank-summed matrix of pairwise products."
+syntax = "<expression> ⊗ <expression>"
+related = ["vector", "matrix"]
+locale = "en"
++++
+
+# =============================================================================
+# ⊗ — glyph outer product (vector ⊗ vector → matrix).
+# =============================================================================
+#
+# What this teaches:
+#   • Outer product — `a ⊗ b` pairs every left lane with every right lane into a matrix
+#   • Rank sum — the result rank is the sum of the operand ranks (1 + 1 = 2)
+#
+# Common mistakes:
+#   • Kronecker on matrices — matrix ⊗ matrix is deferred (Phase 2); only vector ⊗ vector lowers in Phase 1
+#   • row/column orientation — rows come from the left vector, columns from the right vector
+#
+# See also: vector, matrix
+# =============================================================================
+
+
+
+# vector ⊗ vector → matrix (rank sum)
+#
+# WHY: `⊗` is the outer/Kronecker glyph. Phase 1 registers vector ⊗ vector →
+# matrix (rows = left width, columns = right width); tensor Kronecker is
+# deferred with an explicit diagnostic. Pairwise products fill the result.
+#
+# a = [1.0, 2.0, 3.0]  b = [4.0, 5.0]
+# a ⊗ b = [[1*4, 1*5], [2*4, 2*5], [3*4, 3*5]]
+#        = [[4.0, 5.0], [8.0, 10.0], [12.0, 15.0]]
+#
+# EXPECTED stdout:
+#   [[4.0, 5.0], [8.0, 10.0], [12.0, 15.0]]
+
+main {
+    const vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
+    const vf32[2] b ← [4.0, 5.0] ↦ vf32[2]
+    const matrix<f32, [3, 2]> o ← a ⊗ b
+    print o
+}
