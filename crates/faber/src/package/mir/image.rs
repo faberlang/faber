@@ -2,17 +2,19 @@
 
 use super::*;
 
-/// Struct/variant validation metadata carried by in-memory package FMIR
+/// Struct, variant, and closure validation metadata carried by in-memory package FMIR
 /// images (codex-gap S1 U2 VALUE members).
 ///
 /// The source-built run path re-validates the merged program inside
 /// [`run_fmir_package_image`] with a fresh [`radix::mir::MirValidationContext`].
 /// Enum-variant constructs require the merged variant surface (parent
 /// metadata, variant lists, variant field types) to validate — an empty
-/// context errors with "enum variant is missing parent metadata". The image
-/// therefore carries the maps the merge proved; the decoded-artifact routes
-/// (fmir / fmir-text wire formats) do not serialize this section and keep the
-/// previous empty-metadata behavior for those images.
+/// context errors with "enum variant is missing parent metadata". Captured
+/// closures likewise require their environment layouts when the fresh image
+/// context validates and executes an indirect call. The image therefore
+/// carries the maps the merge proved; the decoded-artifact routes (fmir /
+/// fmir-text wire formats) do not serialize this section and keep the previous
+/// empty-metadata behavior for those images.
 #[derive(Debug, Clone, Default)]
 pub(super) struct FmirValidationMetadata {
     pub struct_fields: HashMap<DefId, HashMap<Symbol, MirType>>,
@@ -26,6 +28,7 @@ pub(super) struct FmirValidationMetadata {
     pub enum_variants: HashMap<DefId, Vec<DefId>>,
     pub variant_positions: HashMap<DefId, usize>,
     pub variant_fields: HashMap<DefId, HashMap<Symbol, MirType>>,
+    pub closure_environments: Vec<MirClosureEnvironment>,
 }
 
 /// Snapshot the merged program's struct/variant validation surface from a
@@ -33,6 +36,12 @@ pub(super) struct FmirValidationMetadata {
 fn snapshot_validation_metadata(
     validation: &radix::mir::MirValidationContext<'_>,
 ) -> FmirValidationMetadata {
+    let mut closure_environments = validation
+        .closure_environments
+        .values()
+        .cloned()
+        .collect::<Vec<_>>();
+    closure_environments.sort_by_key(|environment| environment.id.0);
     FmirValidationMetadata {
         struct_fields: validation
             .struct_fields
@@ -63,7 +72,14 @@ fn snapshot_validation_metadata(
         json_struct_field_keys: validation
             .json_struct_field_keys
             .iter()
-            .map(|(def, keys)| (*def, keys.iter().map(|(key, value)| (*key, value.clone())).collect()))
+            .map(|(def, keys)| {
+                (
+                    *def,
+                    keys.iter()
+                        .map(|(key, value)| (*key, value.clone()))
+                        .collect(),
+                )
+            })
             .collect(),
         variant_parents: validation
             .variant_parents
@@ -85,6 +101,7 @@ fn snapshot_validation_metadata(
             .iter()
             .map(|(def, fields)| (*def, fields.iter().map(|(name, ty)| (*name, *ty)).collect()))
             .collect(),
+        closure_environments,
     }
 }
 
@@ -123,7 +140,14 @@ fn apply_validation_metadata(
     context.json_struct_field_keys = metadata
         .json_struct_field_keys
         .iter()
-        .map(|(def, keys)| (*def, keys.iter().map(|(key, value)| (*key, value.clone())).collect()))
+        .map(|(def, keys)| {
+            (
+                *def,
+                keys.iter()
+                    .map(|(key, value)| (*key, value.clone()))
+                    .collect(),
+            )
+        })
         .collect();
     context.variant_parents = metadata
         .variant_parents
@@ -144,6 +168,11 @@ fn apply_validation_metadata(
         .variant_fields
         .iter()
         .map(|(def, fields)| (*def, fields.iter().map(|(name, ty)| (*name, *ty)).collect()))
+        .collect();
+    context.closure_environments = metadata
+        .closure_environments
+        .iter()
+        .map(|environment| (environment.id, environment.clone()))
         .collect();
 }
 
@@ -310,9 +339,7 @@ pub(super) fn package_device_section(
     for (name, values) in upstream_seeds {
         device_inputs.insert(name, values);
     }
-    let selection = prepared
-        .device_backend
-        .unwrap_or(DeviceSelection::Auto);
+    let selection = prepared.device_backend.unwrap_or(DeviceSelection::Auto);
     let section = super::super::device::device_section_for_program(
         &program,
         &semantics,
