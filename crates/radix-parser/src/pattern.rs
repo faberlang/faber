@@ -5,15 +5,9 @@
 //! literals, identifiers, qualified paths, aliases, and shallow binding lists.
 //! It does not parse arbitrary expressions or nested destructuring trees.
 //!
-//! DESIGN PHILOSOPHY
-//! =================
 //! The parser records syntactic pattern intent and leaves type-aware matching,
-//! variant resolution, and exhaustiveness to later phases. This keeps the
-//! recursive-descent boundary simple while still preserving enough source shape
-//! for diagnostics and lowering.
+//! variant resolution, and exhaustiveness to later phases.
 //!
-//! INVARIANTS
-//! ==========
 //! - `,` and `et` separate patterns, but body-starting tokens stop the pattern
 //!   list so `ergo` and `{` remain statement-body syntax.
 //! - Pattern literals are parsed independently from expression literals because
@@ -25,9 +19,7 @@ use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::TokenKind;
 use radix_syntax::{AstMutability, ExField, Literal, PathPattern, Pattern, PatternBind};
 
-// =============================================================================
 // PATTERN PARSING
-// =============================================================================
 
 impl Parser {
     /// Parse one or more arm-head patterns.
@@ -42,14 +34,9 @@ impl Parser {
 
         loop {
             patterns.push(self.parse_pattern()?);
-            if self.eat(&TokenKind::Comma) {
-                // Continue parsing patterns
-            } else if self.eat_keyword_ident(TokenKind::Et) {
-                // 'et' also separates patterns
-            } else {
+            if !self.eat(&TokenKind::Comma) && !self.eat_keyword_ident(TokenKind::Et) {
                 break;
             }
-            // EDGE: Stop if we hit body-starting tokens
             if self.check(&TokenKind::LBrace) || self.check_keyword_ident(TokenKind::Ergo) {
                 break;
             }
@@ -68,37 +55,31 @@ impl Parser {
     /// Qualified paths are kept syntactic here; later phases decide whether a
     /// path names an enum variant, union variant, or invalid pattern target.
     fn parse_pattern(&mut self) -> Result<Pattern, ParseError> {
-        // Wildcard pattern
         if let TokenKind::Underscore(_) = self.peek().kind {
             let span = self.peek().span;
             self.advance();
             return Ok(Pattern::Wildcard(span));
         }
 
-        // Literal pattern
         if let Some(literal) = self.try_parse_pattern_literal() {
             return Ok(literal);
         }
 
-        // Identifier or path pattern
         if let TokenKind::Ident(_) = self.peek().kind {
             let start = self.current_span();
             let mut segments = Vec::new();
             segments.push(self.parse_ident()?);
 
-            // Parse path segments (e.g., Result.Ok)
             while self.eat(&TokenKind::Dot) {
                 segments.push(self.parse_ident()?);
             }
 
             let bind = self.parse_pattern_bind()?;
 
-            // Simple identifier pattern
             if segments.len() == 1 {
                 return Ok(Pattern::Ident(segments.remove(0), bind));
             }
 
-            // Path pattern
             let span = start.merge(self.previous_span());
             return Ok(Pattern::Path(PathPattern {
                 segments,
@@ -159,7 +140,6 @@ impl Parser {
             if !self.eat(&TokenKind::Comma) {
                 break;
             }
-            // EDGE: Stop at body-starting tokens or pattern separators
             if self.check(&TokenKind::LBrace)
                 || self.check_keyword_ident(TokenKind::Ergo)
                 || self.check_keyword_ident(TokenKind::Et)
@@ -201,9 +181,8 @@ impl Parser {
                 self.advance();
                 Some(Pattern::Literal(Literal::Octeti(sym), span))
             }
-            // Literal values (tokenless since Batch C): verum/falsum/nihil are
-            // claimed by spelling so `casu verum` stays a literal pattern
-            // instead of falling through to a name binding.
+            // verum/falsum/nihil are claimed by spelling so `casu verum` stays a
+            // literal pattern instead of falling through to a name binding.
             TokenKind::Ident(_) => {
                 let literal = if self.check_keyword_ident(TokenKind::Verum) {
                     Some(Literal::Bool(true))
