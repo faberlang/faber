@@ -1633,6 +1633,10 @@ impl Parser {
                 self.expect_annotation_end("unexpected token after @ privata")?;
                 return Ok(AnnotationKind::Privata);
             }
+            Some(TokenKind::Interna) => {
+                self.expect_annotation_end("unexpected token after @ interna")?;
+                return Ok(AnnotationKind::Interna);
+            }
             _ => {}
         }
 
@@ -1891,6 +1895,7 @@ impl Parser {
             TokenKind::Publica => Ok(self.keyword_ident("publica", span)),
             TokenKind::Protecta => Ok(self.keyword_ident("protecta", span)),
             TokenKind::Privata => Ok(self.keyword_ident("privata", span)),
+            TokenKind::Interna => Ok(self.keyword_ident("interna", span)),
             TokenKind::Futura => Ok(self.keyword_ident("futura", span)),
             TokenKind::Cursor => Ok(self.keyword_ident("cursor", span)),
             TokenKind::Tag => Ok(self.keyword_ident("tag", span)),

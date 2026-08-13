@@ -212,6 +212,34 @@ functio f() → vacuum { }
 }
 
 #[test]
+fn parses_interna_annotation_on_function() {
+    let result = parse_ok("@ interna\nfunctio hidden() → vacuum {\n}\n");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    assert_eq!(program.statements[0].annotations.len(), 1);
+    assert!(matches!(
+        program.statements[0].annotations[0].kind,
+        AnnotationKind::Interna
+    ));
+}
+
+#[test]
+fn parses_interna_annotation_on_class_member() {
+    let result =
+        parse_ok("genus Demo {\n    @ interna\n    functio hidden() → vacuum {\n    }\n}\n");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Class(class) = &program.statements[0].kind else {
+        panic!("expected class declaration");
+    };
+    assert_eq!(class.members.len(), 1);
+    assert_eq!(class.members[0].annotations.len(), 1);
+    assert!(matches!(
+        class.members[0].annotations[0].kind,
+        AnnotationKind::Interna
+    ));
+}
+
+#[test]
 fn stacked_braced_annotations_on_one_line_before_functio() {
     let result = parse_ok(
         "@ futura { } @ optio { binding = verbose, brevis = \"v\" } functio f() → vacuum { }",

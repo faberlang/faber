@@ -1442,6 +1442,8 @@ pub enum AnnotationKind {
     Publica,
     Protecta,
     Privata,
+    /// `@ interna` package-internal visibility annotation.
+    Interna,
     /// `@ name { field = expr, … }`
     Braced(BracedAnnotation),
 }
