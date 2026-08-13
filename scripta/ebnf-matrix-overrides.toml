@@ -1,0 +1,68 @@
+# EBNF_MATRIX.md planned-support overlay (faber/docs/EBNF_MATRIX.md).
+#
+# Curated (term, target) pairs that are PLANNED (not yet lowering, but intended),
+# so they render ○ instead of ✕ in the rendered matrix.
+#
+# Source of truth for "planned vs never" intent: the prose in the private
+# radix doc docs/design/target-capability-matrix.md. When you promote a planned
+# item to shipped (it lowers), REMOVE its entry here — the measured matrix will
+# then render ✓ automatically.
+#
+# Format:  "term"."target" = "short reason / owner"
+# Keys must match index.toml `term` spellings and the target column names
+# (rust, go, ts, faber, llvm-text, wasm-text, wasm, metal-text, wgsl-text,
+#  sexp-struct, sexp, scena).
+#
+# Seeded empty on purpose: do not guess planned items. Curate each entry from
+# the policy doc. Every entry here must trace to a stated deferral in
+# target-capability-matrix.md or an open factory track.
+
+[planned]
+# TENSOR-GLYPHS Phase 1 (delivery-phase1.md S7 + goal Phase 3): the four
+# product glyphs lower host Rust only; TS/Go/Swift and MIR/AIR lanes fail
+# closed ("not supported on this target"). Device parity is the Phase 3
+# track (per-backend lowering to MIR/WGSL/Metal/LLVM).
+"·"."go" = "Phase 3 device parity — glyph products are host-Rust only"
+"·"."ts" = "Phase 3 device parity — glyph products are host-Rust only"
+"·"."faber" = "Phase 3 device parity — glyph products are host-Rust only"
+"·"."llvm-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"·"."wasm-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"·"."wasm" = "Phase 3 device parity — glyph products are host-Rust only"
+"·"."metal-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"·"."wgsl-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"·"."sexp-struct" = "Phase 3 device parity — glyph products are host-Rust only"
+"·"."sexp" = "Phase 3 device parity — glyph products are host-Rust only"
+"·"."scena" = "Phase 3 device parity — glyph products are host-Rust only"
+"×"."go" = "Phase 3 device parity — glyph products are host-Rust only"
+"×"."ts" = "Phase 3 device parity — glyph products are host-Rust only"
+"×"."faber" = "Phase 3 device parity — glyph products are host-Rust only"
+"×"."llvm-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"×"."wasm-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"×"."wasm" = "Phase 3 device parity — glyph products are host-Rust only"
+"×"."metal-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"×"."wgsl-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"×"."sexp-struct" = "Phase 3 device parity — glyph products are host-Rust only"
+"×"."sexp" = "Phase 3 device parity — glyph products are host-Rust only"
+"×"."scena" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊗"."go" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊗"."ts" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊗"."faber" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊗"."llvm-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊗"."wasm-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊗"."wasm" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊗"."metal-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊗"."wgsl-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊗"."sexp-struct" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊗"."sexp" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊗"."scena" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊙"."go" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊙"."ts" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊙"."faber" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊙"."llvm-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊙"."wasm-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊙"."wasm" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊙"."metal-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊙"."wgsl-text" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊙"."sexp-struct" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊙"."sexp" = "Phase 3 device parity — glyph products are host-Rust only"
+"⊙"."scena" = "Phase 3 device parity — glyph products are host-Rust only"
