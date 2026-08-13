@@ -207,8 +207,6 @@ pub enum WarningKind {
     /// nullable scrutinee (`Option(_)` or a union containing `nihil`),
     /// silently treating null as a value.
     WildcardAbsorbsNull,
-    /// `@ publica` / `@ privata` parse but declaration visibility is not enforced.
-    DecorativeVisibility,
     UnnecessaryVaria,
     /// A provider/file-interface export could not be remapped and was skipped;
     /// sibling exports in the same namespace may still be usable.
@@ -249,6 +247,8 @@ pub enum SemanticErrorKind {
     LoweringError,
     CliValidation,
     InvalidAnnotation,
+    /// A declaration mixes distinct visibility tiers (`@ publica @ privata`).
+    ConflictingVisibility,
     ShadowedVariable,
 
     // Type errors

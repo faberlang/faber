@@ -25,6 +25,9 @@ locale = "en"
 # importa auxilium — sibling module for importa/importa.fab
 #
 # Exported functio saluta consumed via importa ex "./auxilium" privata.
+# `@ public` is the en-surface spelling of `@ publica`: only `@ publica` /
+# `@ interna` declarations are importable; unmarked declarations are
+# module-private.
 #
 # GRAMMAR:
 #   functio saluta(textus nomen) → textus { … }   (module-level export)
@@ -37,6 +40,7 @@ locale = "en"
 #
 # BACKEND: importa/importa.fab whitelisted when compiled alone (no sibling link).
 
+@ public
 fn saluta(string nomen) → string {
     return "Salve, §!"(nomen)
 }
