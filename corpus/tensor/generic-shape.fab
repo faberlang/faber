@@ -1,0 +1,43 @@
++++
+term = "tensor-shape-generic"
+kind = "concept"
+category = "type"
+canonical = true
+summary = "Shape-generic tensor functions: a magnitudo shape param binds implicitly at call sites."
+syntax = "functio name<T, magnitudo Figura>(tensor<T, Figura> …) → tensor<T, Figura>"
+related = ["tensor", "magnitudo", "functio", "vector"]
+locale = "la"
++++
+# =============================================================================
+# tensor-shape-generic — shape-generic tensor functions (magnitudo Figura)
+# =============================================================================
+#
+# What this teaches:
+#   • A `magnitudo Figura` shape param stands for the whole tensor shape; the
+#     shape is rank-agnostic, so one signature covers `[4]`, `[2, 2]`, `[1, 2]`,
+#     and `[]` witnesses.
+#   • The typechecker binds the shape param implicitly at call sites from the
+#     argument shapes or the expected type — no explicit figura arguments.
+#   • Fully static bodies compose elementwise ops (`reple`, `multiplica`,
+#     `subtrahe`) whose results keep the same shape symbolically.
+#
+# Common mistakes:
+#   • Spelling the shape as a rank-1 tuple `[Figura]` — that only matches
+#     rank-1 witnesses; use the bare `Figura` for rank-agnostic shapes.
+#   • Expecting a shape param bound by neither arguments nor the expected type
+#     to guess: it errors (SEM014) instead.
+#
+# See also: tensor, magnitudo, functio, vector
+# =============================================================================
+
+# One generic `sgd_step` replaces the concrete [4]/[2,2]/[1,2]/[] overloads:
+# the param/grad pair shares `Figura`, so every elementwise step proves the
+# same-shape result.
+
+functio sgd_step<magnitudo Figura>(tensor<f32, Figura> param, tensor<f32, Figura> grad, f32 lr) → tensor<f32, Figura> {
+    fixum tensor<f32, Figura> lr_fill ← param.reple(lr)
+    fixum tensor<f32, Figura> scaled ← grad.multiplica(lr_fill)
+    redde param.subtrahe(scaled)
+}
+
+nota "shape-generic sgd_step parata"
