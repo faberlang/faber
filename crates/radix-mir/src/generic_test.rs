@@ -425,3 +425,351 @@ fn canonical_index_collapses_structurally_equal_shapes() {
     assert_ne!(first, second);
     assert_eq!(canonical_index(&types, second), first);
 }
+
+// ── Phase-4 producer fact: shape-size scalar substitution ────────────────
+
+use crate::{
+    MirAggregateKind, MirBlock, MirBlockId, MirCallee, MirFunctionId, MirLocalId, MirPlace, MirPlaceBase,
+    MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirSwitchCase, MirTerminator,
+    MirTerminatorKind, MirValue, MirValueId, MirValueKind,
+};
+
+fn shape_test_function(blocks: Vec<MirBlock>) -> MirFunction {
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: Vec::new(),
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks,
+        return_ty: MirType::semantic(TypeId(0)),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    }
+}
+
+/// Symbolic rank-2 shape `[rows, cols]` with the two `magnitudo` params.
+fn symbolic_shape(types: &mut TypeTable) -> (Symbol, Symbol, IndexId) {
+    let rows = Symbol(100);
+    let cols = Symbol(101);
+    let row_dim = types.intern_index(IndexExpr::Param(rows));
+    let col_dim = types.intern_index(IndexExpr::Param(cols));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![row_dim, col_dim]));
+    (rows, cols, shape)
+}
+
+fn shape_size(shape: IndexId, axis: Option<i64>) -> MirOperand {
+    MirOperand::Constant(MirConstant::ShapeSize { shape, axis })
+}
+
+fn float(value: f64) -> MirOperand {
+    MirOperand::Constant(MirConstant::Float(value))
+}
+
+/// Collect every constant reachable in a function, in traversal order.
+fn collect_constants(function: &mut MirFunction) -> Vec<MirConstant> {
+    let mut constants = Vec::new();
+    let _ = rewrite_function_constants(function, &mut |constant| {
+        constants.push(constant.clone());
+        true
+    });
+    constants
+}
+
+fn assert_all_floats(function: &mut MirFunction, expected: &[f64]) {
+    let constants = collect_constants(function);
+    let mut values = constants
+        .iter()
+        .map(|constant| match constant {
+            MirConstant::Float(value) => *value,
+            other => panic!("expected only Float constants after substitution, got {other:?}"),
+        })
+        .collect::<Vec<_>>();
+    values.sort_by(f64::total_cmp);
+    let mut expected = expected.to_vec();
+    expected.sort_by(f64::total_cmp);
+    assert_eq!(values, expected, "rewritten constants must be the concrete floats");
+}
+
+#[test]
+fn substitute_shape_size_rewrites_every_operand_position() {
+    let mut types = TypeTable::new();
+    let (rows, cols, param_shape) = symbolic_shape(&mut types);
+    let lit8 = types.intern_index(IndexExpr::Literal(8));
+    let lit2 = types.intern_index(IndexExpr::Literal(2));
+    let mut shape_bindings = MirShapeBindings::default();
+    shape_bindings.insert(rows, lit8);
+    shape_bindings.insert(cols, lit2);
+
+    let mut block = MirBlock {
+        id: MirBlockId(0),
+        statements: Vec::new(),
+        terminator: MirTerminator {
+            kind: MirTerminatorKind::Unreachable,
+            span: Span::default(),
+        },
+        span: Span::default(),
+    };
+
+    // Assign value: a binary whose lhs is a whole-shape shape-size scalar.
+    block.statements.push(MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace {
+                base: MirPlaceBase::Local(MirLocalId(0)),
+                projections: Vec::new(),
+            },
+            value: MirValue {
+                id: MirValueId(0),
+                kind: MirValueKind::Binary {
+                    op: crate::MirBinOp::Add,
+                    lhs: shape_size(param_shape, None),
+                    rhs: float(1.0),
+                },
+                ty: MirType::semantic(TypeId(0)),
+                span: Span::default(),
+            },
+        },
+        span: Span::default(),
+    });
+
+    // Ordinary call args carry per-axis extents.
+    block.statements.push(MirStatement {
+        kind: MirStatementKind::Call {
+            destination: None,
+            callee: MirCallee::Function(MirFunctionId(1)),
+            args: vec![shape_size(param_shape, Some(0)), shape_size(param_shape, Some(1))],
+        },
+        span: Span::default(),
+    });
+
+    // Runtime-call args (the CTO-identified gap: runtime-call args were not
+    // rewritten by the old type-only substitution).
+    block.statements.push(MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: None,
+            call: MirRuntimeCall {
+                intrinsic: crate::MirIntrinsic::Panic,
+                args: vec![shape_size(param_shape, Some(-1))],
+                return_ty: MirType::semantic(TypeId(0)),
+            },
+        },
+        span: Span::default(),
+    });
+
+    // Aggregate field operands.
+    block.statements.push(MirStatement {
+        kind: MirStatementKind::Construct {
+            destination: MirPlace {
+                base: MirPlaceBase::Local(MirLocalId(1)),
+                projections: Vec::new(),
+            },
+            aggregate: crate::MirAggregate {
+                kind: MirAggregateKind::Tuple,
+                ty: MirType::semantic(TypeId(0)),
+                fields: crate::MirAggregateFields::Ordered(vec![
+                    crate::MirAggregateItem::Operand(shape_size(param_shape, None)),
+                ]),
+            },
+        },
+        span: Span::default(),
+    });
+
+    // Place index projection operand plus a switch-case dispatch value.
+    block.terminator = MirTerminator {
+        kind: MirTerminatorKind::Switch {
+            value: MirOperand::Place(MirPlace {
+                base: MirPlaceBase::Local(MirLocalId(2)),
+                projections: vec![MirProjection::Index(shape_size(param_shape, None))],
+            }),
+            cases: vec![MirSwitchCase {
+                value: MirConstant::ShapeSize { shape: param_shape, axis: None },
+                target: MirBlockId(1),
+            }],
+            default: MirBlockId(2),
+        },
+        span: Span::default(),
+    };
+
+    let mut function = shape_test_function(vec![block]);
+    assert!(
+        substitute_shape_size_constants(&mut types, &mut function, &shape_bindings),
+        "all bindings are concrete so substitution must fold every term"
+    );
+    assert!(
+        !function_contains_shape_size(&mut function),
+        "no shape-size scalar may survive a fully-concrete substitution"
+    );
+    // 1.0 (rhs) + 16.0 (product) + 8.0 + 2.0 (axes) + 2.0 (negative axis)
+    // + 16.0 (aggregate) + 16.0 (index projection) + 16.0 (switch case).
+    assert_all_floats(&mut function, &[1.0, 16.0, 8.0, 2.0, 2.0, 16.0, 16.0, 16.0]);
+}
+
+#[test]
+fn fold_shape_size_constant_matches_air_fold_semantics() {
+    let mut types = TypeTable::new();
+    let (rows, cols, param_shape) = symbolic_shape(&mut types);
+    let lit8 = types.intern_index(IndexExpr::Literal(8));
+    let lit2 = types.intern_index(IndexExpr::Literal(2));
+    let mut shape_bindings = MirShapeBindings::default();
+    shape_bindings.insert(rows, lit8);
+    shape_bindings.insert(cols, lit2);
+
+    let whole = fold_shape_size_constant(&mut types, param_shape, None, &shape_bindings);
+    assert_eq!(whole, Some(MirConstant::Float(16.0)));
+    let first = fold_shape_size_constant(&mut types, param_shape, Some(0), &shape_bindings);
+    assert_eq!(first, Some(MirConstant::Float(8.0)));
+    let second = fold_shape_size_constant(&mut types, param_shape, Some(1), &shape_bindings);
+    assert_eq!(second, Some(MirConstant::Float(2.0)));
+    let last = fold_shape_size_constant(&mut types, param_shape, Some(-1), &shape_bindings);
+    assert_eq!(last, Some(MirConstant::Float(2.0)));
+    // Out-of-range axes fail closed.
+    assert_eq!(fold_shape_size_constant(&mut types, param_shape, Some(5), &shape_bindings), None);
+    assert_eq!(fold_shape_size_constant(&mut types, param_shape, Some(-3), &shape_bindings), None);
+}
+
+#[test]
+fn substitute_shape_size_fails_closed_on_missing_binding() {
+    let mut types = TypeTable::new();
+    let (_rows, cols, param_shape) = symbolic_shape(&mut types);
+    let lit2 = types.intern_index(IndexExpr::Literal(2));
+    // `rows` is missing from the instance bindings.
+    let mut shape_bindings = MirShapeBindings::default();
+    shape_bindings.insert(cols, lit2);
+
+    let block = MirBlock {
+        id: MirBlockId(0),
+        statements: vec![MirStatement {
+            kind: MirStatementKind::Assign {
+                place: MirPlace {
+                    base: MirPlaceBase::Local(MirLocalId(0)),
+                    projections: Vec::new(),
+                },
+                value: MirValue {
+                    id: MirValueId(0),
+                    kind: MirValueKind::Operand(shape_size(param_shape, None)),
+                    ty: MirType::semantic(TypeId(0)),
+                    span: Span::default(),
+                },
+            },
+            span: Span::default(),
+        }],
+        terminator: MirTerminator {
+            kind: MirTerminatorKind::Return(None),
+            span: Span::default(),
+        },
+        span: Span::default(),
+    };
+
+    let mut function = shape_test_function(vec![block]);
+    assert!(
+        !substitute_shape_size_constants(&mut types, &mut function, &shape_bindings),
+        "a missing binding must fail closed instead of guessing"
+    );
+    assert!(
+        function_contains_shape_size(&mut function),
+        "the unresolved scalar must remain detectable by the survivor net"
+    );
+}
+
+#[test]
+fn substitute_shape_size_fails_closed_on_out_of_range_axis() {
+    let mut types = TypeTable::new();
+    let (rows, cols, param_shape) = symbolic_shape(&mut types);
+    let lit8 = types.intern_index(IndexExpr::Literal(8));
+    let lit2 = types.intern_index(IndexExpr::Literal(2));
+    let mut shape_bindings = MirShapeBindings::default();
+    shape_bindings.insert(rows, lit8);
+    shape_bindings.insert(cols, lit2);
+
+    let mut function = shape_test_function(vec![MirBlock {
+        id: MirBlockId(0),
+        statements: vec![MirStatement {
+            kind: MirStatementKind::Assign {
+                place: MirPlace {
+                    base: MirPlaceBase::Local(MirLocalId(0)),
+                    projections: Vec::new(),
+                },
+                value: MirValue {
+                    id: MirValueId(0),
+                    kind: MirValueKind::Operand(shape_size(param_shape, Some(7))),
+                    ty: MirType::semantic(TypeId(0)),
+                    span: Span::default(),
+                },
+            },
+            span: Span::default(),
+        }],
+        terminator: MirTerminator {
+            kind: MirTerminatorKind::Return(None),
+            span: Span::default(),
+        },
+        span: Span::default(),
+    }]);
+    assert!(
+        !substitute_shape_size_constants(&mut types, &mut function, &shape_bindings),
+        "an out-of-range axis must fail closed"
+    );
+    assert!(function_contains_shape_size(&mut function));
+}
+
+#[test]
+fn substitute_shape_size_fails_closed_on_infer_and_unspecified_dims() {
+    let mut types = TypeTable::new();
+    let infer_dim = types.intern_index(IndexExpr::Infer(radix_types::IndexVar(0)));
+    let unspecified_dim = types.intern_index(IndexExpr::Unspecified);
+    let infer_shape = types.intern_index(IndexExpr::Tuple(vec![infer_dim]));
+    let unspecified_shape = types.intern_index(IndexExpr::Tuple(vec![unspecified_dim]));
+
+    let mut function = shape_test_function(vec![MirBlock {
+        id: MirBlockId(0),
+        statements: vec![MirStatement {
+            kind: MirStatementKind::Assign {
+                place: MirPlace {
+                    base: MirPlaceBase::Local(MirLocalId(0)),
+                    projections: Vec::new(),
+                },
+                value: MirValue {
+                    id: MirValueId(0),
+                    kind: MirValueKind::Operand(shape_size(infer_shape, None)),
+                    ty: MirType::semantic(TypeId(0)),
+                    span: Span::default(),
+                },
+            },
+            span: Span::default(),
+        }],
+        terminator: MirTerminator {
+            kind: MirTerminatorKind::Return(None),
+            span: Span::default(),
+        },
+        span: Span::default(),
+    }]);
+    assert!(
+        !substitute_shape_size_constants(&mut types, &mut function, &MirShapeBindings::default()),
+        "an Infer dim must fail closed"
+    );
+    assert!(function_contains_shape_size(&mut function));
+
+    function.blocks[0].statements[0] = MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace {
+                base: MirPlaceBase::Local(MirLocalId(0)),
+                projections: Vec::new(),
+            },
+            value: MirValue {
+                id: MirValueId(0),
+                kind: MirValueKind::Operand(shape_size(unspecified_shape, None)),
+                ty: MirType::semantic(TypeId(0)),
+                span: Span::default(),
+            },
+        },
+        span: Span::default(),
+    };
+    assert!(
+        !substitute_shape_size_constants(&mut types, &mut function, &MirShapeBindings::default()),
+        "an Unspecified dim must fail closed"
+    );
+    assert!(function_contains_shape_size(&mut function));
+}

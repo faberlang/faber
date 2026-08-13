@@ -5,9 +5,13 @@
 //! then concrete functions consume the instantiated type graph. Keep that logic
 //! here so target emitters never grow their own generic policies.
 
-use crate::MirType;
+use crate::{
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirCallee, MirClosureValue, MirConstant, MirFunction,
+    MirIntrinsic, MirOperand, MirOptionChainLink, MirOptionOp, MirPlace, MirProjection, MirRuntimeCall,
+    MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueKind,
+};
 use radix_lexer::{Span, Symbol};
-use radix_types::{FuncSig, IndexExpr, IndexId, ParamType, Type, TypeId, TypeTable};
+use radix_types::{literal_index_i64s, FuncSig, IndexExpr, IndexId, ParamType, Type, TypeId, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use std::hash::{Hash, Hasher};
 
@@ -1266,6 +1270,306 @@ fn index_contains_param(types: &TypeTable, id: IndexId) -> bool {
         IndexExpr::Param(_) => true,
         IndexExpr::Tuple(dims) => dims.iter().any(|dim| index_contains_param(types, *dim)),
         IndexExpr::Literal(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => false,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Shape-size scalar substitution (Phase-4 producer fact)
+// ---------------------------------------------------------------------------
+
+/// Rewrite every `MirConstant` reachable from a function body — operands,
+/// place index projections, closure/callee payloads, aggregate fields,
+/// terminator operands, and switch-case dispatch values — in deterministic
+/// storage order.
+///
+/// `rewrite` replaces a constant in place; returning `false` aborts the walk
+/// early. Centralizes operand/constant traversal so monomorphization and
+/// validation share one seam instead of growing per-shape matches.
+#[must_use]
+pub fn rewrite_function_constants(
+    function: &mut MirFunction,
+    rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
+) -> bool {
+    for block in &mut function.blocks {
+        for statement in &mut block.statements {
+            if !rewrite_statement_constants(statement, rewrite) {
+                return false;
+            }
+        }
+        if !rewrite_terminator_constants(&mut block.terminator, rewrite) {
+            return false;
+        }
+    }
+    true
+}
+
+/// Fold one shape-size scalar term to the concrete `MirConstant::Float` it
+/// denotes: `magnitudo` shape params substitute through `shape_bindings`
+/// first, then an all-literal shape folds to the element count
+/// (`axis: None`) or one axis extent. Returns `None` — the fail-closed
+/// signal — when any dim stays symbolic (`Param`, `Infer`, `Unspecified`)
+/// or the axis is out of range. Mirrors the AIR fold semantics
+/// (`AirExpr::ShapeSize` → `AirLiteral::Float`), including the f64 carrier.
+#[must_use]
+pub fn fold_shape_size_constant(
+    types: &mut TypeTable,
+    shape: IndexId,
+    axis: Option<i64>,
+    shape_bindings: &MirShapeBindings,
+) -> Option<MirConstant> {
+    let substituted = substitute_index_params(types, shape, shape_bindings);
+    let dims = literal_index_i64s(substituted, types)?;
+    let value = match axis {
+        None => dims.iter().product::<i64>(),
+        Some(a) => {
+            let a_usize = if a >= 0 {
+                // Guarded: `a >= 0`; `try_from` rejects values beyond usize
+                // instead of truncating on 32-bit targets.
+                usize::try_from(a).ok()?
+            } else {
+                let neg = usize::try_from(-a).ok()?;
+                dims.len().checked_sub(neg)?
+            };
+            *dims.get(a_usize)?
+        }
+    };
+    // Semantic: the concrete size as f64 (the same carrier the literal
+    // companion path always emitted); precision loss only above 2^53.
+    #[expect(clippy::cast_precision_loss)]
+    Some(MirConstant::Float(value as f64))
+}
+
+/// Substitute every `MirConstant::ShapeSize` term in a function body to its
+/// concrete `MirConstant::Float` value from `shape_bindings` (Phase-4
+/// monomorphization producer fact). Terms that cannot fold — missing or
+/// unresolved shape bindings, `Infer`/`Unspecified` dims, or out-of-range
+/// axes — are left untouched and `false` is returned so the caller can fail
+/// closed through one stable diagnostic.
+#[must_use]
+pub fn substitute_shape_size_constants(
+    types: &mut TypeTable,
+    function: &mut MirFunction,
+    shape_bindings: &MirShapeBindings,
+) -> bool {
+    rewrite_function_constants(function, &mut |constant| match constant {
+        MirConstant::ShapeSize { shape, axis } => {
+            match fold_shape_size_constant(types, *shape, *axis, shape_bindings) {
+                Some(folded) => {
+                    *constant = folded;
+                    true
+                }
+                None => false,
+            }
+        }
+        _ => true,
+    })
+}
+
+/// Whether a function body still contains a `MirConstant::ShapeSize` term in
+/// any operand/constant position — the post-monomorphization survivor signal.
+#[must_use]
+pub fn function_contains_shape_size(function: &mut MirFunction) -> bool {
+    let mut found = false;
+    let _ = rewrite_function_constants(function, &mut |constant| {
+        if matches!(constant, MirConstant::ShapeSize { .. }) {
+            found = true;
+            false
+        } else {
+            true
+        }
+    });
+    found
+}
+
+fn rewrite_statement_constants(
+    statement: &mut MirStatement,
+    rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
+) -> bool {
+    match &mut statement.kind {
+        MirStatementKind::Assign { place, value } => {
+            rewrite_place_constants(place, rewrite) && rewrite_value_constants(value, rewrite)
+        }
+        MirStatementKind::Call {
+            destination,
+            callee,
+            args,
+        } => {
+            destination
+                .as_mut()
+                .is_none_or(|place| rewrite_place_constants(place, rewrite))
+                && rewrite_callee_constants(callee, rewrite)
+                && args
+                    .iter_mut()
+                    .all(|arg| rewrite_operand_constants(arg, rewrite))
+        }
+        MirStatementKind::RuntimeCall { destination, call } => {
+            destination
+                .as_mut()
+                .is_none_or(|place| rewrite_place_constants(place, rewrite))
+                && rewrite_runtime_call_constants(call, rewrite)
+        }
+        MirStatementKind::Construct {
+            destination,
+            aggregate,
+        } => rewrite_place_constants(destination, rewrite)
+            && rewrite_aggregate_constants(aggregate, rewrite),
+    }
+}
+
+fn rewrite_terminator_constants(
+    terminator: &mut MirTerminator,
+    rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
+) -> bool {
+    match &mut terminator.kind {
+        MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
+            rewrite_operand_constants(operand, rewrite)
+        }
+        MirTerminatorKind::TryCall {
+            destination,
+            callee,
+            args,
+            error_place,
+            ..
+        } => {
+            destination
+                .as_mut()
+                .is_none_or(|place| rewrite_place_constants(place, rewrite))
+                && rewrite_callee_constants(callee, rewrite)
+                && args
+                    .iter_mut()
+                    .all(|arg| rewrite_operand_constants(arg, rewrite))
+                && rewrite_place_constants(error_place, rewrite)
+        }
+        MirTerminatorKind::Branch { condition, .. } => rewrite_operand_constants(condition, rewrite),
+        MirTerminatorKind::Switch { value, cases, .. } => {
+            rewrite_operand_constants(value, rewrite)
+                && cases
+                    .iter_mut()
+                    .all(|case| rewrite(&mut case.value))
+        }
+        MirTerminatorKind::Return(None) | MirTerminatorKind::Goto(_) | MirTerminatorKind::Unreachable => true,
+    }
+}
+
+fn rewrite_value_constants(value: &mut MirValue, rewrite: &mut impl FnMut(&mut MirConstant) -> bool) -> bool {
+    match &mut value.kind {
+        MirValueKind::Operand(operand) => rewrite_operand_constants(operand, rewrite),
+        MirValueKind::Closure(closure) => rewrite_closure_value_constants(closure, rewrite),
+        MirValueKind::Unary { operand, .. } => rewrite_operand_constants(operand, rewrite),
+        MirValueKind::Binary { lhs, rhs, .. } => {
+            rewrite_operand_constants(lhs, rewrite) && rewrite_operand_constants(rhs, rewrite)
+        }
+        MirValueKind::Option(op) => rewrite_option_op_constants(op, rewrite),
+    }
+}
+
+fn rewrite_closure_value_constants(
+    closure: &mut MirClosureValue,
+    rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
+) -> bool {
+    rewrite_operand_constants(&mut closure.environment, rewrite)
+}
+
+fn rewrite_operand_constants(operand: &mut MirOperand, rewrite: &mut impl FnMut(&mut MirConstant) -> bool) -> bool {
+    match operand {
+        MirOperand::Place(place) => rewrite_place_constants(place, rewrite),
+        MirOperand::Temp(_) | MirOperand::Value(_) => true,
+        MirOperand::Constant(constant) => rewrite(constant),
+    }
+}
+
+fn rewrite_place_constants(place: &mut MirPlace, rewrite: &mut impl FnMut(&mut MirConstant) -> bool) -> bool {
+    for projection in &mut place.projections {
+        if let MirProjection::Index(index) = projection {
+            if !rewrite_operand_constants(index, rewrite) {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+fn rewrite_callee_constants(callee: &mut MirCallee, rewrite: &mut impl FnMut(&mut MirConstant) -> bool) -> bool {
+    match callee {
+        MirCallee::Closure(closure) => rewrite_operand_constants(&mut closure.environment, rewrite),
+        MirCallee::Value(operand) => rewrite_operand_constants(operand, rewrite),
+        MirCallee::Function(_) | MirCallee::Definition { .. } => true,
+    }
+}
+
+fn rewrite_runtime_call_constants(
+    call: &mut MirRuntimeCall,
+    rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
+) -> bool {
+    call.args
+        .iter_mut()
+        .all(|arg| rewrite_operand_constants(arg, rewrite))
+        && match &mut call.intrinsic {
+            MirIntrinsic::Convert(conversion) => {
+                conversion
+                    .recovery
+                    .as_mut()
+                    .is_none_or(|recovery| rewrite_operand_constants(recovery, rewrite))
+                    && conversion.struct_defaults.iter_mut().all(|defaults| {
+                        defaults
+                            .fields
+                            .iter_mut()
+                            .all(|field| rewrite_operand_constants(&mut field.value, rewrite))
+                    })
+            }
+            _ => true,
+        }
+}
+
+fn rewrite_aggregate_constants(
+    aggregate: &mut MirAggregate,
+    rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
+) -> bool {
+    match &mut aggregate.fields {
+        MirAggregateFields::Ordered(items) => items.iter_mut().all(|item| match item {
+            MirAggregateItem::Operand(operand) | MirAggregateItem::Spread(operand) => {
+                rewrite_operand_constants(operand, rewrite)
+            }
+        }),
+        MirAggregateFields::Named(items) => items
+            .iter_mut()
+            .all(|item| rewrite_operand_constants(&mut item.value, rewrite)),
+        MirAggregateFields::Keyed(items) => items.iter_mut().all(|item| {
+            rewrite_operand_constants(&mut item.key, rewrite)
+                && rewrite_operand_constants(&mut item.value, rewrite)
+        }),
+    }
+}
+
+fn rewrite_option_op_constants(op: &mut MirOptionOp, rewrite: &mut impl FnMut(&mut MirConstant) -> bool) -> bool {
+    match op {
+        MirOptionOp::None => true,
+        MirOptionOp::Some(value)
+        | MirOptionOp::IsNil(value)
+        | MirOptionOp::IsNotNil(value)
+        | MirOptionOp::Unwrap { value, .. } => rewrite_operand_constants(value, rewrite),
+        MirOptionOp::Coalesce { value, fallback } => {
+            rewrite_operand_constants(value, rewrite) && rewrite_operand_constants(fallback, rewrite)
+        }
+        MirOptionOp::Chain { base, link } => {
+            rewrite_operand_constants(base, rewrite) && rewrite_option_chain_link_constants(link, rewrite)
+        }
+    }
+}
+
+fn rewrite_option_chain_link_constants(
+    link: &mut MirOptionChainLink,
+    rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
+) -> bool {
+    match link {
+        MirOptionChainLink::Field(_) | MirOptionChainLink::VariantField { .. } => true,
+        MirOptionChainLink::Index(operand) => rewrite_operand_constants(operand, rewrite),
+        MirOptionChainLink::Call { callee, args } => {
+            rewrite_callee_constants(callee, rewrite)
+                && args
+                    .iter_mut()
+                    .all(|arg| rewrite_operand_constants(arg, rewrite))
+        }
     }
 }
 

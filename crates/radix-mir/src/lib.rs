@@ -103,8 +103,9 @@ pub use device_program_plans::{
 };
 pub use dump::dump_program;
 pub use generic::{
-    bind_generic_type_witness, instantiate_existing_generic_type, type_contains_param,
-    MirGenericBindings,
+    bind_generic_type_witness, fold_shape_size_constant, function_contains_shape_size,
+    instantiate_existing_generic_type, rewrite_function_constants, substitute_shape_size_constants,
+    type_contains_param, MirGenericBindings,
 };
 pub use host_partition::{derive_host_partition, HostPartition, HostPartitionError};
 pub use inference_blocker_matrix::{
