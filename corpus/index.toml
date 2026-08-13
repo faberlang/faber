@@ -968,7 +968,7 @@ phase = 4
 action = "review"
 rule = "operator-group"
 primary = "assignatio/assignatio.fab"
-paths = ["assignatio/assignatio.fab", "incrementa/incrementa.fab"]
+paths = ["assignatio/assignatio.fab"]
 
 [[terms]]
 term = "postpara"
@@ -2260,7 +2260,7 @@ category = "function"
 
 [[files]]
 path = "incrementa/incrementa.fab"
-term = "⊕"
+term = "↑"
 kind = "operator"
 category = "mutation"
 

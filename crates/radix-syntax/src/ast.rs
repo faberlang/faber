@@ -103,7 +103,7 @@ pub enum StmtKind {
     Ex(ExStmt),
     Block(BlockStmt),
     Expr(ExprStmt),
-    /// Postfix `⊕` / `⊖`.
+    /// Postfix `↑` / `↓`.
     IncDec(IncDecStmt),
     /// `si` conditional.
     Si(SiStmt),

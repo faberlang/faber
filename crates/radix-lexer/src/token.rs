@@ -300,8 +300,8 @@ pub enum TokenKind {
     GtEq,            // ≥
 
     // === Postfix increment/decrement (statement-only) ===
-    PostInc, // ⊕
-    PostDec, // ⊖
+    PostInc, // ↑
+    PostDec, // ↓
 
     // === Optional chaining ===
     QuestionDot,     // ?.

@@ -51,8 +51,8 @@ main {
     print one ≡ uno
     print one ≡ one + 0
 
-    max ⊕
-    zero ⊖
+    max ↑
+    zero ↓
     print max
     print zero
 

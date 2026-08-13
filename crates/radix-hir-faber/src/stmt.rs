@@ -445,8 +445,8 @@ impl super::FaberCodegen {
             HirStatementKind::IncDec(inc_dec) => {
                 self.write_expr(&inc_dec.target, types, names, interner, surface, writer);
                 writer.write(match inc_dec.op {
-                    radix_hir::HirIncDecOp::Inc => " ⊕",
-                    radix_hir::HirIncDecOp::Dec => " ⊖",
+                    radix_hir::HirIncDecOp::Inc => " ↑",
+                    radix_hir::HirIncDecOp::Dec => " ↓",
                 });
                 writer.newline();
             }

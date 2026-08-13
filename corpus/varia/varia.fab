@@ -6,7 +6,7 @@ canonical = true
 summary = "Declares a mutable binding."
 syntax = "varia <type|_> <pattern> [← <expression>]"
 aliases = ["let", "mutable"]
-related = ["fixum", "←", "⊕"]
+related = ["fixum", "←", "↑"]
 locale = "en"
 +++
 
@@ -21,7 +21,7 @@ locale = "en"
 # Common mistakes:
 #   • declaring varia when the binding is never reassigned — use fixum instead (WARN013)
 #
-# See also: fixum, ←, ⊕
+# See also: fixum, ←, ↑
 # =============================================================================
 
 

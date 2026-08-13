@@ -790,7 +790,7 @@ pub enum HirStatementKind {
     /// Explicit no-op.
     Tacet,
 
-    /// Postfix increment/decrement statement (`place ⊕` / `place ⊖`).
+    /// Postfix increment/decrement statement (`place ↑` / `place ↓`).
     IncDec(HirIncDec),
 
     /// Source-ordered guard section (`custodi { si ... }`).
@@ -819,7 +819,7 @@ pub struct HirIncDec {
     /// Assignment target evaluated once for read-modify-write.
     pub target: HirExpression,
 
-    /// Increment (`⊕`) or decrement (`⊖`).
+    /// Increment (`↑`) or decrement (`↓`).
     pub op: HirIncDecOp,
 }
 
