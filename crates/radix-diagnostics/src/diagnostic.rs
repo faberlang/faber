@@ -1,14 +1,15 @@
 //! Core diagnostic data model for the Radix compiler.
 //!
-//! Owns the `Diagnostic`, `Severity`, `DiagnosticPhase`, and `DiagnosticArg`
-//! types shared across all compiler phases. Phase-specific error conversion
-//! and catalogs live outside this crate to keep the foundation dependency-free.
+//! Owns the transport types and typed phase-error kinds shared across compiler
+//! phases. Phase-specific error conversion and catalogs live outside this crate
+//! to keep the foundation dependency-free.
+
+use std::fmt;
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use super::Span;
-use std::fmt;
-use std::path::Path;
 
 /// Named fact attached to a diagnostic template.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -21,6 +22,7 @@ pub struct DiagnosticArg {
 }
 
 impl DiagnosticArg {
+    #[must_use]
     pub fn new(name: &'static str, value: impl Into<String>) -> Self {
         Self {
             name,
@@ -318,13 +320,8 @@ impl SemanticErrorKind {
 /// kinds from Debug text or argument strings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PhaseErrorKind {
-    /// Lexer/tokenization failure class.
     Lex(LexErrorKind),
-
-    /// Parser/grammar failure class.
     Parse(ParseErrorKind),
-
-    /// Semantic analysis failure class (name resolution, type checking, etc.).
     Semantic(SemanticErrorKind),
 }
 
@@ -364,6 +361,7 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
+    #[must_use]
     pub fn new(severity: Severity, message: impl Into<String>) -> Self {
         Self {
             severity,
@@ -379,45 +377,40 @@ impl Diagnostic {
         }
     }
 
-    /// Start an error diagnostic and attach context with builder methods.
+    #[must_use]
     pub fn error(message: impl Into<String>) -> Self {
         Self::new(Severity::Error, message)
     }
 
-    /// Start a warning diagnostic and attach context with builder methods.
+    #[must_use]
     pub fn warning(message: impl Into<String>) -> Self {
         Self::new(Severity::Warning, message)
     }
 
-    /// Attach the compiler phase that owns this diagnostic.
     #[must_use]
     pub fn with_phase(mut self, phase: DiagnosticPhase) -> Self {
         self.phase = phase;
         self
     }
 
-    /// Attach a stable diagnostic code from the public catalog.
     #[must_use]
     pub fn with_code(mut self, code: &'static str) -> Self {
         self.code = Some(code);
         self
     }
 
-    /// Attach a typed phase error kind for programmatic consumers.
     #[must_use]
     pub fn with_error_kind(mut self, kind: PhaseErrorKind) -> Self {
         self.error_kind = Some(kind);
         self
     }
 
-    /// Attach a typed lexer error kind (`PhaseErrorKind::Lex`).
     #[must_use]
     pub fn with_lex_kind(mut self, kind: LexErrorKind) -> Self {
         self.error_kind = Some(PhaseErrorKind::Lex(kind));
         self
     }
 
-    /// Typed lexer error kind when this diagnostic carries one.
     #[must_use]
     pub fn lex_kind(&self) -> Option<LexErrorKind> {
         match self.error_kind {
@@ -426,14 +419,12 @@ impl Diagnostic {
         }
     }
 
-    /// Attach a typed parser error kind (`PhaseErrorKind::Parse`).
     #[must_use]
     pub fn with_parse_kind(mut self, kind: ParseErrorKind) -> Self {
         self.error_kind = Some(PhaseErrorKind::Parse(kind));
         self
     }
 
-    /// Typed parser error kind when this diagnostic carries one.
     #[must_use]
     pub fn parse_kind(&self) -> Option<ParseErrorKind> {
         match self.error_kind {
@@ -442,14 +433,12 @@ impl Diagnostic {
         }
     }
 
-    /// Attach a typed semantic error kind (`PhaseErrorKind::Semantic`).
     #[must_use]
     pub fn with_semantic_kind(mut self, kind: SemanticErrorKind) -> Self {
         self.error_kind = Some(PhaseErrorKind::Semantic(kind));
         self
     }
 
-    /// Typed semantic error kind when this diagnostic carries one.
     #[must_use]
     pub fn semantic_kind(&self) -> Option<SemanticErrorKind> {
         match self.error_kind {
@@ -458,14 +447,12 @@ impl Diagnostic {
         }
     }
 
-    /// Attach template facts used by structured diagnostics.
     #[must_use]
     pub fn with_args(mut self, args: Vec<DiagnosticArg>) -> Self {
         self.args = args;
         self
     }
 
-    /// Attach one named template argument.
     #[must_use]
     pub fn with_arg(mut self, name: &'static str, value: impl Into<String>) -> Self {
         self.args.push(DiagnosticArg::new(name, value));
@@ -479,21 +466,18 @@ impl Diagnostic {
         self
     }
 
-    /// Attach the display filename used by renderers and plain output.
     #[must_use]
     pub fn with_file(mut self, file: impl Into<String>) -> Self {
         self.file = file.into();
         self
     }
 
-    /// Attach the source span that should be highlighted.
     #[must_use]
     pub fn with_span(mut self, span: Span) -> Self {
         self.span = Some(span);
         self
     }
 
-    /// Attach the source line containing the primary span.
     #[must_use]
     pub fn with_source_line(mut self, line: impl Into<String>) -> Self {
         self.source_line = Some(line.into());
@@ -509,7 +493,6 @@ impl Diagnostic {
         self
     }
 
-    /// Attach actionable user guidance.
     #[must_use]
     pub fn with_help(mut self, help: impl Into<String>) -> Self {
         self.help = Some(help.into());
@@ -540,7 +523,6 @@ impl Diagnostic {
         self.lookup_key()
     }
 
-    /// Whether this diagnostic should make the compilation result fail.
     #[must_use]
     pub fn is_error(&self) -> bool {
         self.severity == Severity::Error
@@ -582,7 +564,6 @@ pub fn diagnostic_identity(code: &str, args: &[DiagnosticArg]) -> String {
     }
 }
 
-/// Extract a named diagnostic argument value.
 #[must_use]
 pub fn parse_arg_value(args: &[DiagnosticArg], name: &str) -> Option<String> {
     args.iter()
@@ -590,7 +571,6 @@ pub fn parse_arg_value(args: &[DiagnosticArg], name: &str) -> Option<String> {
         .map(|arg| arg.value.clone())
 }
 
-/// Extract the source line containing a byte offset.
 #[must_use]
 pub fn get_line_at_offset(source: &str, offset: usize) -> String {
     let offset = nearest_char_boundary(source, offset);
