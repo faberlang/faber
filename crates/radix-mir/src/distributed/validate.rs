@@ -1,59 +1,10 @@
-//! Fail-before-launch validation gate of the distributed execution model
-//! (MD2-V1; exit-gate bullets 2/3).
+//! Fail-before-launch validation of a distributed execution plan.
 //!
-//! [`DistributedExecutionPlan::validate`] is the gate: a plan that violates
-//! any of the seven checks is **rejected fail-closed** with a typed
-//! diagnostic naming the violated class and the exact failing fact. No
-//! cycle, missing owner, conflicting replica, unsupported collective,
-//! topology mismatch, stale version, or incomplete cross-device value
-//! reaches launch, admission, or binding without passing this gate
-//! (md2-delivery §MD2-V1; CAMPAIGN §MD2 exit-gate bullet 3).
-//!
-//! # Purity contract (C2 §1)
-//!
-//! Validation is a **pure evaluation** — no mutation of the plan, no I/O,
-//! no randomness; identical input yields the identical verdict. It never
-//! allocates execution resources; it only evaluates and rejects (the C2 §1
-//! GATE discipline: a violating plan is rejected outright, never scored,
-//! never ranked, never allocated). The diagnostic [`ValidateError`] carries
-//! every failing fact **by value** — Copy payloads, heap-free. The only
-//! heap use is bounded scratch proportional to the plan's own operation
-//! count (transfer grouping for cycle detection).
-//!
-//! # The seven fail-closed checks
-//!
-//! Checks run in the table order below (deterministic, first failure wins):
-//!
-//! 1. **(g) stale versions** — the plan shape version must equal the
-//!    supported [`LOGICAL_PLAN_VERSION`]; an older (stale) or newer
-//!    (unknown) version fails.
-//! 2. **(f) topology mismatch** — the partition set must be self-consistent:
-//!    no duplicate partition ids; every partition named by a placement,
-//!    constraint, transfer, collective, barrier, or launch exists in the
-//!    plan's partition set; a `RequireOwner` constraint agrees with the
-//!    declared owner; a partition budget is positive.
-//! 3. **(c) missing owners** — every cross-partition value (transfer or
-//!    collective) has one declared placement; a `Replicated` contract has a
-//!    non-empty replica set that contains its primary (MD-A5 — one declared
-//!    owner or an explicit coherent replication contract).
-//! 4. **(d) conflicting replicas** — no value is declared twice with
-//!    disagreeing contracts; no replica set repeats a partition; plan-level
-//!    and partition-level placements agree; all operations of one value
-//!    agree on the byte/shape contract; no duplicate move; no launch is
-//!    shared by two partitions.
-//! 5. **(a) cross-device completeness** — every transfer carries owner,
-//!    generation (present and ordered), byte/shape contract, producer,
-//!    consumer, and a completion boundary (a missing field fails); boundary
-//!    references resolve to the plan's barriers and launches.
-//! 6. **(b) cycles** — no value moves in a self-loop or a directed move
-//!    cycle at overlapping generations.
-//! 7. **(e) unsupported collectives** — every collective is in the v1
-//!    admissible form: [`CollectiveKind::Broadcast`], owner partition →
-//!    all consumers.
-//!
-//! The collective-kind match is exhaustive: if a kind is ever added to
-//! [`CollectiveKind`], this module stops compiling until a supporting arm
-//! and test exist — the fail-closed property holds at compile time.
+//! [`DistributedExecutionPlan::validate`] is a pure evaluation: it never
+//! mutates the plan or allocates execution resources. A violating plan is
+//! rejected fail-closed with a typed [`ValidateError`] that names the class
+//! and the exact failing fact. The [`CollectiveKind`] match is exhaustive,
+//! so a new kind fails to compile until this module admits it.
 
 use std::fmt;
 
@@ -65,11 +16,9 @@ use crate::distributed::types::{
     PlanVersion, TransferId, TransferOperation, LOGICAL_PLAN_VERSION,
 };
 
-// -----------------------------------------------------------------------
-// The typed diagnostic
-// -----------------------------------------------------------------------
+// DIAGNOSTICS
 
-/// The seven fail-closed check classes (exit-gate bullet 3).
+/// Fail-closed check class named by [`ValidateError::class`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValidateClass {
     /// Cross-device completeness — a field of the value contract is missing.
@@ -105,9 +54,7 @@ impl fmt::Display for ValidateClass {
 /// Identity of the operation a completeness fact belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpRef {
-    /// A transfer operation.
     Transfer(TransferId),
-    /// A collective operation.
     Collective(CollectiveId),
 }
 
@@ -123,9 +70,7 @@ impl fmt::Display for OpRef {
 /// A boundary reference that must resolve to the plan's own graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BoundaryRef {
-    /// A barrier id.
     Barrier(BarrierId),
-    /// A launch id.
     Launch(LaunchId),
 }
 
@@ -141,17 +86,11 @@ impl fmt::Display for BoundaryRef {
 /// The construct that names a partition in a topology check.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TopologyRef {
-    /// A declared value placement.
     Placement(SemanticValueId),
-    /// A declared constraint.
     Constraint,
-    /// A launch operation.
     Launch(LaunchId),
-    /// A transfer operation.
     Transfer(TransferId),
-    /// A collective operation.
     Collective(CollectiveId),
-    /// A barrier operation.
     Barrier(BarrierId),
 }
 
@@ -215,7 +154,6 @@ pub enum ContractFingerprint {
 #[allow(clippy::enum_variant_names)] // variant prefixes ARE the diagnostic vocabulary (the violated class)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValidateError {
-    // (g) stale versions
     /// The plan shape version is stale or unknown.
     StaleVersion {
         /// The plan's declared version.
@@ -224,7 +162,6 @@ pub enum ValidateError {
         supported_version: u32,
     },
 
-    // (f) topology mismatch
     /// The partition set contains a duplicate partition id.
     DuplicatePartition {
         /// The duplicated partition.
@@ -252,7 +189,6 @@ pub enum ValidateError {
         actual_owner: Option<PartitionId>,
     },
 
-    // (c) missing owners
     /// A cross-partition value has no declared placement.
     MissingOwner {
         /// The value moved without a placement.
@@ -275,7 +211,6 @@ pub enum ValidateError {
         primary: PartitionId,
     },
 
-    // (d) conflicting replicas
     /// The same value is declared twice with disagreeing contracts.
     ConflictingContracts {
         /// The doubly-declared value.
@@ -329,7 +264,6 @@ pub enum ValidateError {
         duplicate: TransferId,
     },
 
-    // (a) cross-device completeness
     /// A transfer lacks a generation (zero or absent).
     MissingGeneration {
         /// The moved value.
@@ -394,7 +328,6 @@ pub enum ValidateError {
         boundary_ref: BoundaryRef,
     },
 
-    // (b) cycles
     /// A transfer moves a value to its own partition.
     SelfMove {
         /// The moved value.
@@ -412,7 +345,6 @@ pub enum ValidateError {
         second: TransferId,
     },
 
-    // (e) unsupported collectives
     /// A collective is outside the v1 admissible set / form.
     UnsupportedCollective {
         /// The moved value.
@@ -653,32 +585,24 @@ impl fmt::Display for ValidateError {
     }
 }
 
-// -----------------------------------------------------------------------
-// The gate
-// -----------------------------------------------------------------------
+// GATE
 
 impl DistributedExecutionPlan {
     /// Run the fail-before-launch validation gate.
     ///
-    /// A plan returning `Ok` passes every exit-gate check: complete
-    /// cross-device value contracts, no cycles, one declared owner (or a
-    /// coherent replication contract) per value, no conflicting replicas,
-    /// only admissible collectives, self-consistent topology, and a current
-    /// plan version. Pure evaluation — never mutates the plan, never
-    /// allocates execution resources (C2 §1).
+    /// Pure evaluation: does not mutate the plan or allocate execution
+    /// resources. A plan returning `Ok` passed every check.
     ///
     /// # Errors
     ///
-    /// Returns the first [`ValidateError`] — a typed diagnostic naming the
-    /// violated class and the exact failing fact.
+    /// Returns the first [`ValidateError`], naming the violated class and
+    /// the exact failing fact.
     pub fn validate(&self) -> Result<(), ValidateError> {
         validate_plan(self)
     }
 }
 
-/// The ordered gate: (g) → (f) → (c) → (d) → (a) → (b) → (e).
 fn validate_plan(plan: &DistributedExecutionPlan) -> Result<(), ValidateError> {
-    // (g) stale versions.
     if plan.version.0 != LOGICAL_PLAN_VERSION {
         return Err(ValidateError::StaleVersion {
             plan_version: plan.version,
@@ -690,29 +614,19 @@ fn validate_plan(plan: &DistributedExecutionPlan) -> Result<(), ValidateError> {
     let launches = launch_universe(plan);
     let barriers = barrier_universe(plan);
 
-    // (f) topology mismatch.
     check_duplicate_partitions(plan)?;
     check_placement_topology(plan, &partitions)?;
     check_constraint_topology(plan, &partitions)?;
     check_operation_topology(plan, &partitions)?;
 
-    // (c) missing owners — declared placement coherence.
     check_declared_placements(plan)?;
-
-    // (d) conflicting replicas.
     check_partition_placements(plan)?;
     check_shared_launches(plan)?;
 
-    // (a) cross-device completeness.
     check_completeness(plan, &launches, &barriers)?;
-
-    // (d) byte-contract agreement + duplicate moves.
     check_mover_agreement(plan)?;
 
-    // (b) cycles.
     check_cycles(plan)?;
-
-    // (e) unsupported collectives.
     check_collectives(plan)?;
 
     Ok(())
@@ -788,8 +702,7 @@ fn contract_fingerprint(contract: &PlacementContract) -> ContractFingerprint {
     }
 }
 
-// (f) topology mismatch
-// -----------------------------------------------------------------------
+// TOPOLOGY
 
 fn check_duplicate_partitions(plan: &DistributedExecutionPlan) -> Result<(), ValidateError> {
     for (index, partition) in plan.partitions.iter().enumerate() {
@@ -870,22 +783,12 @@ fn check_constraint_topology(
                     });
                 }
                 let actual_owner = declared_owner(plan, *value);
-                match actual_owner {
-                    Some(owner) if owner != *partition => {
-                        return Err(ValidateError::RequireOwnerMismatch {
-                            value: *value,
-                            required_partition: *partition,
-                            actual_owner: Some(owner),
-                        });
-                    }
-                    None => {
-                        return Err(ValidateError::RequireOwnerMismatch {
-                            value: *value,
-                            required_partition: *partition,
-                            actual_owner: None,
-                        });
-                    }
-                    Some(_) => {}
+                if actual_owner != Some(*partition) {
+                    return Err(ValidateError::RequireOwnerMismatch {
+                        value: *value,
+                        required_partition: *partition,
+                        actual_owner,
+                    });
                 }
             }
         }
@@ -952,8 +855,7 @@ fn check_operation_topology(
     Ok(())
 }
 
-// (c) missing owners + (d) conflicting replica sets
-// -----------------------------------------------------------------------
+// PLACEMENT
 
 fn check_declared_placements(plan: &DistributedExecutionPlan) -> Result<(), ValidateError> {
     for (index, placement) in plan.declared_placement.placements.iter().enumerate() {
@@ -1043,8 +945,7 @@ fn check_shared_launches(plan: &DistributedExecutionPlan) -> Result<(), Validate
     Ok(())
 }
 
-// (a) cross-device completeness
-// -----------------------------------------------------------------------
+// COMPLETENESS
 
 fn check_completeness(
     plan: &DistributedExecutionPlan,
@@ -1094,7 +995,6 @@ fn check_transfer_completeness(
 ) -> Result<(), ValidateError> {
     let reference = OpRef::Transfer(transfer.id);
 
-    // owner — every cross-partition value has one declared placement.
     let Some(placement) = placement_for(plan, transfer.value) else {
         return Err(ValidateError::MissingOwner {
             value: transfer.value,
@@ -1102,7 +1002,6 @@ fn check_transfer_completeness(
         });
     };
 
-    // generation — present and ordered.
     if transfer.producer_generation == 0 || transfer.consumer_generation == 0 {
         return Err(ValidateError::MissingGeneration {
             value: transfer.value,
@@ -1120,7 +1019,6 @@ fn check_transfer_completeness(
         });
     }
 
-    // byte/shape contract — present.
     if transfer.byte_count == 0 {
         return Err(ValidateError::MissingByteContract {
             value: transfer.value,
@@ -1129,7 +1027,6 @@ fn check_transfer_completeness(
         });
     }
 
-    // completion boundary — present (barriers or launches).
     if transfer.completion_boundary.barriers.is_empty()
         && transfer.completion_boundary.launches.is_empty()
     {
@@ -1139,7 +1036,6 @@ fn check_transfer_completeness(
         });
     }
 
-    // producer — the boundary names a producing launch.
     if transfer.completion_boundary.launches.is_empty() {
         return Err(ValidateError::MissingProducer {
             value: transfer.value,
@@ -1147,7 +1043,6 @@ fn check_transfer_completeness(
         });
     }
 
-    // consumer — the destination holds a copy or runs a launch.
     let destination_runs_launches = plan
         .partitions
         .iter()
@@ -1161,7 +1056,6 @@ fn check_transfer_completeness(
         });
     }
 
-    // completion-boundary references resolve to the plan's graph.
     for barrier in &transfer.completion_boundary.barriers {
         if !barriers.contains(barrier) {
             return Err(ValidateError::DanglingBoundaryReference {
@@ -1182,8 +1076,7 @@ fn check_transfer_completeness(
     Ok(())
 }
 
-// (d) byte-contract agreement + duplicate moves
-// -----------------------------------------------------------------------
+// MOVE AGREEMENT
 
 fn check_mover_agreement(plan: &DistributedExecutionPlan) -> Result<(), ValidateError> {
     for (index, operation) in plan.graph.operations.iter().enumerate() {
@@ -1262,8 +1155,7 @@ fn find_transfer(plan: &DistributedExecutionPlan, id: TransferId) -> Option<&Tra
         })
 }
 
-// (b) cycles
-// -----------------------------------------------------------------------
+// CYCLES
 
 fn check_cycles(plan: &DistributedExecutionPlan) -> Result<(), ValidateError> {
     let transfers: Vec<&TransferOperation> = plan
@@ -1327,7 +1219,6 @@ fn directed_cycle(transfers: &[&TransferOperation]) -> Option<(TransferId, Trans
     None
 }
 
-/// Iterative-explicit DFS returning the back-edge pair when a cycle closes.
 fn visit(
     node: usize,
     transfers: &[&TransferOperation],
@@ -1355,17 +1246,15 @@ fn feeds(producer: &TransferOperation, consumer: &TransferOperation) -> bool {
         && consumer.producer_generation <= producer.consumer_generation
 }
 
-// (e) unsupported collectives
-// -----------------------------------------------------------------------
+// COLLECTIVES
 
 fn check_collectives(plan: &DistributedExecutionPlan) -> Result<(), ValidateError> {
     for operation in &plan.graph.operations {
         let ExecutionOperation::Collective(collective) = operation else {
             continue;
         };
-        // v1 admissible set: Broadcast, owner partition → all consumers.
-        // The match is exhaustive — an added kind stops compilation until a
-        // supporting arm and test exist (fail-closed at compile time).
+        // Keep this match exhaustive. A new collective kind must choose its
+        // admission policy rather than silently passing.
         match collective.kind {
             CollectiveKind::Broadcast => {
                 if !collective.participants.contains(&collective.source) {
