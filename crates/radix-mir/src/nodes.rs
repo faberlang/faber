@@ -20,7 +20,7 @@
 use crate::{MirKernelBuiltin, MirKernelShaderStage};
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
-use radix_types::TypeId;
+use radix_types::{IndexId, TypeId};
 use serde::{Deserialize, Serialize};
 
 /// Stable identifier for a MIR function within one `MirProgram`.
@@ -565,6 +565,17 @@ pub enum MirConstant {
     },
     /// Reference to a lowered MIR function (closure or top-level callable).
     Function(MirFunctionId),
+    /// Compiler-owned shape-derived scalar preserved across AIR→MIR: the
+    /// element count of a tensor shape (`axis: None`) or the extent of one
+    /// axis, carried symbolically when the shape contains `Param` dims.
+    /// Constant-folds to `MirConstant::Float` at lowering when every dim is
+    /// literal; full substitution of the concrete value at call sites is a
+    /// later (Phase-4) codegen step, so validation only needs it to type as
+    /// a float scalar.
+    ShapeSize {
+        shape: IndexId,
+        axis: Option<i64>,
+    },
 }
 
 impl Eq for MirConstant {}
@@ -587,6 +598,10 @@ impl std::hash::Hash for MirConstant {
                 flags.hash(state);
             }
             Self::Function(v) => v.hash(state),
+            Self::ShapeSize { shape, axis } => {
+                shape.hash(state);
+                axis.hash(state);
+            }
         }
     }
 }

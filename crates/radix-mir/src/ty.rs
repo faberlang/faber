@@ -151,6 +151,9 @@ pub fn constant_ty(
                 |function| Ok(function.return_ty),
             );
         }
+        // A shape-size scalar is a float-sized compile-time value (the
+        // symbolic companion divides by it at runtime).
+        MirConstant::ShapeSize { .. } => Primitive::Fractus,
     };
     Ok(MirType::semantic(types.primitive(primitive)))
 }

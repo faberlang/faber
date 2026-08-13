@@ -636,6 +636,9 @@ impl Validator<'_, '_> {
             MirConstant::Octeti(_) => self.primitive(Primitive::Octeti),
             MirConstant::Regex { .. } => self.primitive(Primitive::Regex),
             MirConstant::Function(_) => self.primitive(Primitive::Ignotum),
+            // A shape-size scalar is a float-sized compile-time value (the
+            // symbolic companion divides by it at runtime).
+            MirConstant::ShapeSize { .. } => self.primitive(Primitive::Fractus),
         }
     }
 

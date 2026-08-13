@@ -405,6 +405,9 @@ fn constant(value: &MirConstant) -> String {
         MirConstant::Octeti(bytes) => format!("const octeti [{}]", bytes.len()),
         MirConstant::Regex { pattern, .. } => format!("const regex sym#{}", pattern.0),
         MirConstant::Function(id) => format!("const function {}", function_id(*id)),
+        MirConstant::ShapeSize { shape, axis } => {
+            format!("const shape_size shape#{} axis {axis:?}", shape.0)
+        }
     }
 }
 

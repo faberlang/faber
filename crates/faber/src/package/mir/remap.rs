@@ -317,6 +317,7 @@ pub(super) fn remap_constant_text_symbols(
         | MirConstant::Nil
         | MirConstant::Unit
         | MirConstant::Octeti(_)
-        | MirConstant::Function(_) => {}
+        | MirConstant::Function(_)
+        | MirConstant::ShapeSize { .. } => {}
     }
 }
