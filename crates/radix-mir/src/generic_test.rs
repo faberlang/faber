@@ -297,3 +297,131 @@ fn atomic_instantiation_finds_interned() {
     .expect("generic Atomic instantiation must resolve against the interned type");
     assert_eq!(resolved.semantic_id(), interned);
 }
+
+// ---------------------------------------------------------------------------
+// 4A — shape-param binding and substitution
+// ---------------------------------------------------------------------------
+
+fn shape_2x8(types: &mut TypeTable) -> IndexId {
+    let lit2 = types.intern_index(IndexExpr::Literal(2));
+    let lit8 = types.intern_index(IndexExpr::Literal(8));
+    types.intern_index(IndexExpr::Tuple(vec![lit2, lit8]))
+}
+
+fn shape_bd(types: &mut TypeTable) -> IndexId {
+    let b = types.intern_index(IndexExpr::Param(Symbol(200)));
+    let d = types.intern_index(IndexExpr::Param(Symbol(201)));
+    types.intern_index(IndexExpr::Tuple(vec![b, d]))
+}
+
+fn f32_ty(types: &mut TypeTable) -> TypeId {
+    types.sized_numeric(Primitive::Fractus, radix_types::NumericWidth::F32)
+}
+
+#[test]
+fn witness_binds_shape_params_from_tensor_shapes() {
+    let mut types = TypeTable::new();
+    let element = f32_ty(&mut types);
+    let expected_shape = shape_bd(&mut types);
+    let expected = types.intern(Type::Tensor(element, expected_shape));
+    let actual_shape = shape_2x8(&mut types);
+    let actual = types.intern(Type::Tensor(element, actual_shape));
+
+    let mut bindings = MirGenericBindings::default();
+    let mut shape_bindings = MirShapeBindings::default();
+    assert!(bind_generic_type_witness_with_shapes(
+        &types,
+        MirType::semantic(expected),
+        MirType::semantic(actual),
+        &mut bindings,
+        &mut shape_bindings,
+    ));
+    assert_eq!(shape_bindings.len(), 2);
+    let b = shape_bindings.get(&Symbol(200)).copied().expect("B bound");
+    let d = shape_bindings.get(&Symbol(201)).copied().expect("D bound");
+    assert_eq!(types.get_index(b), &IndexExpr::Literal(2));
+    assert_eq!(types.get_index(d), &IndexExpr::Literal(8));
+}
+
+#[test]
+fn witness_rejects_rank_mismatched_tensor_shapes() {
+    let mut types = TypeTable::new();
+    let element = f32_ty(&mut types);
+    // Expected [B] against actual [2, 8] — rank mismatch must fail closed.
+    let b = types.intern_index(IndexExpr::Param(Symbol(210)));
+    let expected_shape = types.intern_index(IndexExpr::Tuple(vec![b]));
+    let expected = types.intern(Type::Tensor(element, expected_shape));
+    let actual_shape = shape_2x8(&mut types);
+    let actual = types.intern(Type::Tensor(element, actual_shape));
+
+    let mut bindings = MirGenericBindings::default();
+    let mut shape_bindings = MirShapeBindings::default();
+    assert!(!bind_generic_type_witness_with_shapes(
+        &types,
+        MirType::semantic(expected),
+        MirType::semantic(actual),
+        &mut bindings,
+        &mut shape_bindings,
+    ));
+    assert!(shape_bindings.is_empty());
+}
+
+#[test]
+fn type_contains_param_walks_tensor_shapes() {
+    let mut types = TypeTable::new();
+    let element = f32_ty(&mut types);
+    let shape = shape_bd(&mut types);
+    let generic = types.intern(Type::Tensor(element, shape));
+    assert!(type_contains_param(&types, generic));
+
+    let shape = shape_2x8(&mut types);
+    let concrete = types.intern(Type::Tensor(element, shape));
+    assert!(!type_contains_param(&types, concrete));
+}
+
+#[test]
+fn instantiate_generic_type_with_shapes_substitutes_tensor_shape() {
+    let mut types = TypeTable::new();
+    let element = f32_ty(&mut types);
+    let shape = shape_bd(&mut types);
+    let generic = types.intern(Type::Tensor(element, shape));
+
+    let mut shape_bindings = MirShapeBindings::default();
+    let lit2 = types.intern_index(IndexExpr::Literal(2));
+    let lit8 = types.intern_index(IndexExpr::Literal(8));
+    shape_bindings.insert(Symbol(200), lit2);
+    shape_bindings.insert(Symbol(201), lit8);
+
+    let resolved = instantiate_generic_type_with_shapes(
+        &mut types,
+        MirType::semantic(generic),
+        &MirGenericBindings::default(),
+        &shape_bindings,
+        Span::default(),
+    )
+    .expect("shape-param instantiation must resolve");
+
+    let Type::Tensor(resolved_element, resolved_shape) = types.get(resolved.semantic_id()) else {
+        panic!("resolved type is not a Tensor");
+    };
+    assert_eq!(*resolved_element, element);
+    let dims = match types.get_index(*resolved_shape) {
+        IndexExpr::Tuple(dims) => dims,
+        other => panic!("resolved shape is not a tuple: {other:?}"),
+    };
+    assert_eq!(dims.len(), 2);
+    for dim in dims {
+        assert!(matches!(types.get_index(*dim), IndexExpr::Literal(_)));
+    }
+}
+
+#[test]
+fn canonical_index_collapses_structurally_equal_shapes() {
+    let mut types = TypeTable::new();
+    let lit2 = types.intern_index(IndexExpr::Literal(2));
+    let first = types.intern_index(IndexExpr::Tuple(vec![lit2]));
+    let lit2_dup = types.intern_index(IndexExpr::Literal(2));
+    let second = types.intern_index(IndexExpr::Tuple(vec![lit2_dup]));
+    assert_ne!(first, second);
+    assert_eq!(canonical_index(&types, second), first);
+}

@@ -7,11 +7,18 @@
 
 use crate::MirType;
 use radix_lexer::{Span, Symbol};
-use radix_types::{FuncSig, IndexId, ParamType, Type, TypeId, TypeTable};
+use radix_types::{FuncSig, IndexExpr, IndexId, ParamType, Type, TypeId, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use std::hash::{Hash, Hasher};
 
 pub type MirGenericBindings = FxHashMap<Symbol, MirType>;
+
+/// Shape-param bindings (`magnitudo N`) parallel to [`MirGenericBindings`].
+///
+/// Shape params are compile-time index facts, not types: the witness binds
+/// them from call-site argument/destination shapes and substitution replaces
+/// `IndexExpr::Param` nodes inside indexed types.
+pub type MirShapeBindings = FxHashMap<Symbol, IndexId>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MirGenericError {
@@ -38,6 +45,23 @@ pub fn bind_generic_type_witness(
     actual: MirType,
     generic_bindings: &mut MirGenericBindings,
 ) -> bool {
+    let mut shape_bindings = MirShapeBindings::default();
+    bind_generic_type_witness_with_shapes(types, expected, actual, generic_bindings, &mut shape_bindings)
+}
+
+/// [`bind_generic_type_witness`] with shape-param binding (4A).
+///
+/// `magnitudo` shape params inside indexed types bind from the call-site
+/// shapes (D1), parallel to the type-param treatment. Validation's lenient
+/// definition-callee path keeps the 4-arg entry; monomorphization uses this
+/// one because it needs the bound shapes for the instance key.
+pub fn bind_generic_type_witness_with_shapes(
+    types: &TypeTable,
+    expected: MirType,
+    actual: MirType,
+    generic_bindings: &mut MirGenericBindings,
+    shape_bindings: &mut MirShapeBindings,
+) -> bool {
     if !type_contains_param(types, expected.semantic_id()) {
         return true;
     }
@@ -47,6 +71,7 @@ pub fn bind_generic_type_witness(
         expected.semantic_id(),
         actual.semantic_id(),
         generic_bindings,
+        shape_bindings,
         &mut seen,
     )
 }
@@ -66,6 +91,7 @@ fn try_bind_generic_type_witness(
     expected: TypeId,
     actual: TypeId,
     generic_bindings: &mut MirGenericBindings,
+    shape_bindings: &mut MirShapeBindings,
     seen: &mut FxHashSet<TypeId>,
 ) -> bool {
     // Param binds to the actual TypeId as-is, including when actual is Alias.
@@ -79,7 +105,7 @@ fn try_bind_generic_type_witness(
             return false;
         }
         let inner = *inner;
-        let ok = try_bind_generic_type_witness(types, inner, actual, generic_bindings, seen);
+        let ok = try_bind_generic_type_witness(types, inner, actual, generic_bindings, shape_bindings, seen);
         seen.remove(&expected);
         return ok;
     }
@@ -89,7 +115,7 @@ fn try_bind_generic_type_witness(
             return false;
         }
         let inner = *inner;
-        let ok = try_bind_generic_type_witness(types, expected, inner, generic_bindings, seen);
+        let ok = try_bind_generic_type_witness(types, expected, inner, generic_bindings, shape_bindings, seen);
         seen.remove(&actual);
         return ok;
     }
@@ -102,6 +128,7 @@ fn try_bind_generic_type_witness(
                 expected_inner,
                 actual_inner,
                 generic_bindings,
+                shape_bindings,
                 seen,
             );
         }
@@ -119,6 +146,7 @@ fn try_bind_generic_type_witness(
                 *expected_inner,
                 *actual_inner,
                 generic_bindings,
+                shape_bindings,
                 seen,
             )
         }
@@ -131,25 +159,31 @@ fn try_bind_generic_type_witness(
             Type::Vector(actual_inner, actual_shape),
         )
         | (
+            Type::Matrix(expected_inner, expected_shape),
+            Type::Matrix(actual_inner, actual_shape),
+        )
+        | (
             Type::Sparsa(expected_inner, expected_shape),
             Type::Sparsa(actual_inner, actual_shape),
         ) => {
-            types.index_equals(*expected_shape, *actual_shape)
+            try_bind_index_witness(types, *expected_shape, *actual_shape, shape_bindings)
                 && try_bind_generic_type_witness(
                     types,
                     *expected_inner,
                     *actual_inner,
                     generic_bindings,
+                    shape_bindings,
                     seen,
                 )
         }
         (Type::Map(expected_key, expected_value), Type::Map(actual_key, actual_value)) => {
-            try_bind_generic_type_witness(types, *expected_key, *actual_key, generic_bindings, seen)
+            try_bind_generic_type_witness(types, *expected_key, *actual_key, generic_bindings, shape_bindings, seen)
                 && try_bind_generic_type_witness(
                     types,
                     *expected_value,
                     *actual_value,
                     generic_bindings,
+                    shape_bindings,
                     seen,
                 )
         }
@@ -161,6 +195,7 @@ fn try_bind_generic_type_witness(
                 *expected_inner,
                 *actual_inner,
                 generic_bindings,
+                shape_bindings,
                 seen,
             )
         }
@@ -171,6 +206,7 @@ fn try_bind_generic_type_witness(
                     *expected_base,
                     *actual_base,
                     generic_bindings,
+                    shape_bindings,
                     seen,
                 )
                 && expected_args
@@ -182,6 +218,7 @@ fn try_bind_generic_type_witness(
                             *expected_arg,
                             *actual_arg,
                             generic_bindings,
+                            shape_bindings,
                             seen,
                         )
                     })
@@ -191,10 +228,11 @@ fn try_bind_generic_type_witness(
             expected_members,
             actual_members,
             generic_bindings,
+            shape_bindings,
             seen,
         ),
         (Type::Func(expected_sig), Type::Func(actual_sig)) => {
-            try_bind_func_signature(types, expected_sig, actual_sig, generic_bindings, seen)
+            try_bind_func_signature(types, expected_sig, actual_sig, generic_bindings, shape_bindings, seen)
         }
         _ => types.assignable(actual, expected),
     }
@@ -220,11 +258,55 @@ fn bind_type_param(
     }
 }
 
+/// Structural witness over an indexed type's shape term (D1 parallel).
+///
+/// `IndexExpr::Param` nodes on the expected side bind to the actual index
+/// node; tuple shapes bind elementwise; everything else falls back to
+/// [`TypeTable::index_equals`]. Insert-only, mirroring [`bind_type_param`], so
+/// union backtracking can roll back failed candidates.
+fn try_bind_index_witness(
+    types: &TypeTable,
+    expected: IndexId,
+    actual: IndexId,
+    shape_bindings: &mut MirShapeBindings,
+) -> bool {
+    if let IndexExpr::Param(sym) = types.get_index(expected) {
+        return bind_shape_param(types, *sym, actual, shape_bindings);
+    }
+    match (types.get_index(expected), types.get_index(actual)) {
+        (IndexExpr::Tuple(expected_dims), IndexExpr::Tuple(actual_dims)) => {
+            expected_dims.len() == actual_dims.len()
+                && expected_dims
+                    .iter()
+                    .zip(actual_dims.iter())
+                    .all(|(expected_dim, actual_dim)| {
+                        try_bind_index_witness(types, *expected_dim, *actual_dim, shape_bindings)
+                    })
+        }
+        _ => types.index_equals(expected, actual),
+    }
+}
+
+/// Bind a shape parameter to a concrete index node.
+///
+/// Insert-only: when `param` is already bound, compares for structural index
+/// equality and never overwrites (mirrors [`bind_type_param`] so union
+/// backtracking can roll back via [`undo_shape_bindings_to`]).
+fn bind_shape_param(types: &TypeTable, param: Symbol, actual: IndexId, shape_bindings: &mut MirShapeBindings) -> bool {
+    if let Some(bound) = shape_bindings.get(&param).copied() {
+        types.index_equals(bound, actual)
+    } else {
+        shape_bindings.insert(param, actual);
+        true
+    }
+}
+
 fn try_bind_union_members(
     types: &TypeTable,
     expected_members: &[TypeId],
     actual_members: &[TypeId],
     generic_bindings: &mut MirGenericBindings,
+    shape_bindings: &mut MirShapeBindings,
     seen: &mut FxHashSet<TypeId>,
 ) -> bool {
     if expected_members.len() != actual_members.len() {
@@ -239,6 +321,7 @@ fn try_bind_union_members(
         actual_members,
         &mut matched,
         generic_bindings,
+        shape_bindings,
         seen,
     )
 }
@@ -256,6 +339,7 @@ fn try_bind_union_member_at(
     actual_members: &[TypeId],
     matched: &mut [bool],
     generic_bindings: &mut MirGenericBindings,
+    shape_bindings: &mut MirShapeBindings,
     seen: &mut FxHashSet<TypeId>,
 ) -> bool {
     let Some(expected) = expected_members.get(index).copied() else {
@@ -267,18 +351,22 @@ fn try_bind_union_member_at(
             continue;
         }
 
-        // Snapshot keys present before this candidate. bind_type_param is
-        // insert-only, so rolling back means removing keys not in the snapshot.
+        // Snapshot keys present before this candidate. bind_type_param and
+        // bind_shape_param are insert-only, so rolling back means removing
+        // keys not in the snapshot.
         let keys_before: FxHashSet<Symbol> = generic_bindings.keys().copied().collect();
+        let shape_keys_before: FxHashSet<Symbol> = shape_bindings.keys().copied().collect();
 
         if !try_bind_generic_type_witness(
             types,
             expected,
             actual_members[actual_index],
             generic_bindings,
+            shape_bindings,
             seen,
         ) {
             undo_bindings_to(generic_bindings, &keys_before);
+            undo_shape_bindings_to(shape_bindings, &shape_keys_before);
             continue;
         }
 
@@ -290,6 +378,7 @@ fn try_bind_union_member_at(
             actual_members,
             matched,
             generic_bindings,
+            shape_bindings,
             seen,
         ) {
             matched[actual_index] = false;
@@ -297,6 +386,7 @@ fn try_bind_union_member_at(
         }
 
         undo_bindings_to(generic_bindings, &keys_before);
+        undo_shape_bindings_to(shape_bindings, &shape_keys_before);
         matched[actual_index] = false;
     }
 
@@ -310,11 +400,17 @@ fn undo_bindings_to(generic_bindings: &mut MirGenericBindings, keys_before: &FxH
     generic_bindings.retain(|key, _| keys_before.contains(key));
 }
 
+/// Shape-binding rollback mirroring [`undo_bindings_to`].
+fn undo_shape_bindings_to(shape_bindings: &mut MirShapeBindings, keys_before: &FxHashSet<Symbol>) {
+    shape_bindings.retain(|key, _| keys_before.contains(key));
+}
+
 fn try_bind_func_signature(
     types: &TypeTable,
     expected_sig: &FuncSig,
     actual_sig: &FuncSig,
     generic_bindings: &mut MirGenericBindings,
+    shape_bindings: &mut MirShapeBindings,
     seen: &mut FxHashSet<TypeId>,
 ) -> bool {
     expected_sig.params.len() == actual_sig.params.len()
@@ -330,6 +426,7 @@ fn try_bind_func_signature(
                         expected_param.ty,
                         actual_param.ty,
                         generic_bindings,
+                        shape_bindings,
                         seen,
                     )
             })
@@ -338,6 +435,7 @@ fn try_bind_func_signature(
             expected_sig.ret,
             actual_sig.ret,
             generic_bindings,
+            shape_bindings,
             seen,
         )
         && match (expected_sig.err, actual_sig.err) {
@@ -346,6 +444,7 @@ fn try_bind_func_signature(
                 expected_err,
                 actual_err,
                 generic_bindings,
+                shape_bindings,
                 seen,
             ),
             (None, None) => true,
@@ -366,10 +465,32 @@ pub fn instantiate_existing_generic_type(
     generic_bindings: &MirGenericBindings,
     span: Span,
 ) -> Result<MirType, MirGenericError> {
-    // Build once per top-level instantiate: O(T) setup, then O(1) probe per node.
     let index = ExistingTypeIndex::build(types);
     let instantiated =
         instantiate_existing_type_id(types, ty.semantic_id(), generic_bindings, span, &index)?;
+    Ok(MirType::semantic(instantiated))
+}
+
+/// Instantiate a generic type with shape-param substitution (4A).
+///
+/// Substituted shapes (e.g. a transposed `[D,B]` → `[8,2]`) and their concrete
+/// indexed types may be new to the unit, so this walk interns them into
+/// `types` instead of requiring them to pre-exist. Monomorphization uses this
+/// variant; type-param-only consumers keep the read-only
+/// [`instantiate_existing_generic_type`].
+///
+/// # Errors
+/// Returns [`MirGenericError`] when a type parameter is unbound.
+pub fn instantiate_generic_type_with_shapes(
+    types: &mut TypeTable,
+    ty: MirType,
+    generic_bindings: &MirGenericBindings,
+    shape_bindings: &MirShapeBindings,
+    span: Span,
+) -> Result<MirType, MirGenericError> {
+    let index = ExistingTypeIndex::build(types);
+    let instantiated =
+        instantiate_mutable_type_id(types, ty.semantic_id(), generic_bindings, shape_bindings, span, &index)?;
     Ok(MirType::semantic(instantiated))
 }
 
@@ -667,6 +788,314 @@ fn find_existing_type(
 }
 
 // ---------------------------------------------------------------------------
+// Shape-param substitution (4A)
+// ---------------------------------------------------------------------------
+
+/// Replace bound `IndexExpr::Param` nodes inside one index term.
+///
+/// Interning substituted tuple nodes needs `&mut TypeTable` (index nodes are
+/// not content-addressed), so the mutable instantiation walk calls this while
+/// holding `&mut`. Unbound params pass through unchanged.
+pub fn substitute_index_params(
+    types: &mut TypeTable,
+    index_id: IndexId,
+    shape_bindings: &MirShapeBindings,
+) -> IndexId {
+    match types.get_index(index_id).clone() {
+        IndexExpr::Param(sym) => shape_bindings.get(&sym).copied().unwrap_or(index_id),
+        IndexExpr::Tuple(dims) => {
+            let mut substituted = Vec::with_capacity(dims.len());
+            let mut changed = false;
+            for dim in dims {
+                let sub = substitute_index_params(types, dim, shape_bindings);
+                changed |= sub != dim;
+                substituted.push(sub);
+            }
+            if changed {
+                types.intern_index(IndexExpr::Tuple(substituted))
+            } else {
+                index_id
+            }
+        }
+        IndexExpr::Literal(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => index_id,
+    }
+}
+
+/// Intern-or-find for the mutable instantiation walk.
+///
+/// Concrete shape-generic types (e.g. a transposed tensor shape) may be new to
+/// the unit; unlike the read-only path's "must already be interned" contract,
+/// the first occurrence interns the candidate so the monomorphized instance
+/// carries a valid type graph.
+fn intern_or_find(types: &mut TypeTable, candidate: &Type, index: &ExistingTypeIndex) -> TypeId {
+    index.find(types, candidate).unwrap_or_else(|| types.intern(candidate.clone()))
+}
+
+/// Mutable mirror of [`instantiate_existing_type_id`] with shape substitution.
+///
+/// Shape params bind to their concrete index nodes via
+/// [`substitute_index_params`] and concrete indexed types are interned when
+/// absent (see [`intern_or_find`]).
+fn instantiate_mutable_type_id(
+    types: &mut TypeTable,
+    ty: TypeId,
+    generic_bindings: &MirGenericBindings,
+    shape_bindings: &MirShapeBindings,
+    span: Span,
+    index: &ExistingTypeIndex,
+) -> Result<TypeId, MirGenericError> {
+    match types.get(ty).clone() {
+        Type::Param(sym) => generic_bindings
+            .get(&sym)
+            .map(|ty| ty.semantic_id())
+            .ok_or_else(|| {
+                MirGenericError::new(span, "generic call signature has unresolved type parameter")
+            }),
+        Type::Array(inner) => instantiate_mutable_unary_type(
+            types,
+            inner,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            Type::Array,
+        ),
+        Type::Map(key, value) => {
+            let key = instantiate_mutable_type_id(types, key, generic_bindings, shape_bindings, span, index)?;
+            let value = instantiate_mutable_type_id(types, value, generic_bindings, shape_bindings, span, index)?;
+            Ok(intern_or_find(types, &Type::Map(key, value), index))
+        }
+        Type::Record(fields) => {
+            let fields = fields
+                .iter()
+                .map(|(name, field_ty)| {
+                    instantiate_mutable_type_id(types, *field_ty, generic_bindings, shape_bindings, span, index)
+                        .map(|field_ty| (*name, field_ty))
+                })
+                .collect::<Result<FxHashMap<_, _>, _>>()?;
+            Ok(intern_or_find(types, &Type::Record(fields), index))
+        }
+        Type::Set(inner) => instantiate_mutable_unary_type(
+            types,
+            inner,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            Type::Set,
+        ),
+        Type::Promissum(inner) => instantiate_mutable_unary_type(
+            types,
+            inner,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            Type::Promissum,
+        ),
+        Type::PromissumFailable(success, alternate) => {
+            let success = instantiate_mutable_type_id(types, success, generic_bindings, shape_bindings, span, index)?;
+            let alternate = instantiate_mutable_type_id(types, alternate, generic_bindings, shape_bindings, span, index)?;
+            Ok(intern_or_find(types, &Type::PromissumFailable(success, alternate), index))
+        }
+        Type::Cursor(inner) => instantiate_mutable_unary_type(
+            types,
+            inner,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            Type::Cursor,
+        ),
+        Type::AsyncCursor(item, alternate) => {
+            let item = instantiate_mutable_type_id(types, item, generic_bindings, shape_bindings, span, index)?;
+            let alternate = instantiate_mutable_type_id(types, alternate, generic_bindings, shape_bindings, span, index)?;
+            Ok(intern_or_find(types, &Type::AsyncCursor(item, alternate), index))
+        }
+        Type::Intervallum(inner) => instantiate_mutable_unary_type(
+            types,
+            inner,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            Type::Intervallum,
+        ),
+        Type::Option(inner) => instantiate_mutable_unary_type(
+            types,
+            inner,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            Type::Option,
+        ),
+        Type::Ref(mode, inner) => {
+            let inner = instantiate_mutable_type_id(types, inner, generic_bindings, shape_bindings, span, index)?;
+            Ok(intern_or_find(types, &Type::Ref(mode, inner), index))
+        }
+        Type::Tensor(inner, shape) => instantiate_mutable_indexed_type(
+            types,
+            inner,
+            shape,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            Type::Tensor,
+        ),
+        Type::Vector(inner, width) => instantiate_mutable_indexed_type(
+            types,
+            inner,
+            width,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            Type::Vector,
+        ),
+        Type::Matrix(inner, shape) => instantiate_mutable_indexed_type(
+            types,
+            inner,
+            shape,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            Type::Matrix,
+        ),
+        Type::Sparsa(inner, shape) => instantiate_mutable_indexed_type(
+            types,
+            inner,
+            shape,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            Type::Sparsa,
+        ),
+        Type::Atomic(inner) => instantiate_mutable_unary_type(
+            types,
+            inner,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            Type::Atomic,
+        ),
+        Type::Alias(def_id, inner) => {
+            let inner = instantiate_mutable_type_id(types, inner, generic_bindings, shape_bindings, span, index)?;
+            Ok(intern_or_find(types, &Type::Alias(def_id, inner), index))
+        }
+        Type::Applied(base, args) => {
+            let base = instantiate_mutable_type_id(types, base, generic_bindings, shape_bindings, span, index)?;
+            let args = args
+                .iter()
+                .map(|arg| instantiate_mutable_type_id(types, *arg, generic_bindings, shape_bindings, span, index))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(intern_or_find(types, &Type::Applied(base, args), index))
+        }
+        Type::Union(members) => {
+            let members = members
+                .iter()
+                .map(|member| instantiate_mutable_type_id(types, *member, generic_bindings, shape_bindings, span, index))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(intern_or_find(types, &Type::Union(members), index))
+        }
+        Type::Func(sig) => {
+            let sig = FuncSig {
+                type_params: sig.type_params.clone(),
+                type_param_constraints: sig.type_param_constraints.clone(),
+                params: sig
+                    .params
+                    .iter()
+                    .map(|param| {
+                        instantiate_mutable_type_id(types, param.ty, generic_bindings, shape_bindings, span, index)
+                            .map(|ty| ParamType {
+                                ty,
+                                mode: param.mode,
+                                optional: param.optional,
+                            })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+                ret: instantiate_mutable_type_id(types, sig.ret, generic_bindings, shape_bindings, span, index)?,
+                err: sig
+                    .err
+                    .map(|err| instantiate_mutable_type_id(types, err, generic_bindings, shape_bindings, span, index))
+                    .transpose()?,
+                is_async: sig.is_async,
+                is_generator: sig.is_generator,
+            };
+            Ok(intern_or_find(types, &Type::Func(sig), index))
+        }
+        Type::Primitive(_)
+        | Type::SizedNumeric(_, _)
+        | Type::ModularWord(_)
+        | Type::SizedInstans(_)
+        | Type::Tuple(_)
+        | Type::Struct(_)
+        | Type::Enum(_)
+        | Type::Interface(_)
+        | Type::Infer(_)
+        | Type::InferUnion(_)
+        | Type::Error => Ok(ty),
+    }
+}
+
+fn instantiate_mutable_unary_type(
+    types: &mut TypeTable,
+    inner: TypeId,
+    generic_bindings: &MirGenericBindings,
+    shape_bindings: &MirShapeBindings,
+    span: Span,
+    index: &ExistingTypeIndex,
+    build: impl FnOnce(TypeId) -> Type,
+) -> Result<TypeId, MirGenericError> {
+    let inner = instantiate_mutable_type_id(types, inner, generic_bindings, shape_bindings, span, index)?;
+    Ok(intern_or_find(types, &build(inner), index))
+}
+
+fn instantiate_mutable_indexed_type(
+    types: &mut TypeTable,
+    inner: TypeId,
+    index_id: IndexId,
+    generic_bindings: &MirGenericBindings,
+    shape_bindings: &MirShapeBindings,
+    span: Span,
+    index: &ExistingTypeIndex,
+    build: impl FnOnce(TypeId, IndexId) -> Type,
+) -> Result<TypeId, MirGenericError> {
+    let inner = instantiate_mutable_type_id(types, inner, generic_bindings, shape_bindings, span, index)?;
+    let shape = substitute_index_params(types, index_id, shape_bindings);
+    Ok(intern_or_find(types, &build(inner, shape), index))
+}
+
+/// Canonical index identity for monomorphization keys.
+///
+/// Index arena entries are not content-addressed, so one concrete shape can
+/// carry several `IndexId`s. Keys must not diverge on that, so each shape
+/// binding is collapsed to the first structurally-equal arena entry. Returns
+/// `id` itself when no earlier entry matches.
+#[must_use]
+pub fn canonical_index(types: &TypeTable, id: IndexId) -> IndexId {
+    (0..types.index_count())
+        .find_map(|index| {
+            let candidate = index_id_at(index);
+            types.index_equals(candidate, id).then_some(candidate)
+        })
+        .unwrap_or(id)
+}
+
+fn index_id_at(index: usize) -> IndexId {
+    // IndexId is a u32 arena index by design (radix-types::index).
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "IndexId is a u32 arena index by design"
+    )]
+    IndexId(index as u32)
+}
+
+// ---------------------------------------------------------------------------
 // Shape equality for interned candidates
 // ---------------------------------------------------------------------------
 
@@ -774,14 +1203,17 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
     }
     match types.get(ty) {
         Type::Param(_) => true,
+        Type::Tensor(inner, shape)
+        | Type::Vector(inner, shape)
+        | Type::Matrix(inner, shape)
+        | Type::Sparsa(inner, shape) => {
+            index_contains_param(types, *shape)
+                || type_contains_param_inner(types, *inner, seen)
+        }
         Type::Array(inner)
         | Type::Set(inner)
         | Type::Promissum(inner)
         | Type::Cursor(inner)
-        | Type::Tensor(inner, _)
-        | Type::Vector(inner, _)
-        | Type::Matrix(inner, _)
-        | Type::Sparsa(inner, _)
         | Type::Atomic(inner)
         | Type::Intervallum(inner)
         | Type::Option(inner)
@@ -825,6 +1257,15 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
         | Type::Infer(_)
         | Type::InferUnion(_)
         | Type::Error => false,
+    }
+}
+
+/// Whether an index term contains a `magnitudo` shape param (4A).
+fn index_contains_param(types: &TypeTable, id: IndexId) -> bool {
+    match types.get_index(id) {
+        IndexExpr::Param(_) => true,
+        IndexExpr::Tuple(dims) => dims.iter().any(|dim| index_contains_param(types, *dim)),
+        IndexExpr::Literal(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => false,
     }
 }
 

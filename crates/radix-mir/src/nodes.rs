@@ -71,10 +71,15 @@ impl MirExternalFunctionIdentity {
 pub struct MirLayoutId(pub u32);
 
 /// Concrete identity for one generic source callable instantiation.
+///
+/// `shape_args` holds the bound `magnitudo` shape values in declaration order
+/// (parallel to `type_args` for `typus` parameters), so distinct shapes yield
+/// distinct instances and one shape is never confused with another.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct MirMonomorphizationKey {
     pub source: DefId,
     pub type_args: Vec<MirType>,
+    pub shape_args: Vec<IndexId>,
 }
 
 /// MIR-owned link from a generic source callable to a concrete MIR function.
