@@ -71,6 +71,7 @@ impl Parser {
                 Some(TokenKind::Mori) => self.parse_mori_stmt()?,
                 Some(TokenKind::Cede) => self.parse_cede_stmt()?,
                 Some(TokenKind::Adfirma) => self.parse_adfirma_stmt()?,
+                Some(TokenKind::Requirit) => self.parse_require_stmt()?,
                 Some(TokenKind::Scribe) => self.parse_scribe_stmt()?,
                 Some(TokenKind::Incipit | TokenKind::Incipiet) => self.parse_incipit_stmt()?,
                 Some(TokenKind::Ex) => self.parse_extract_stmt()?,
@@ -1526,9 +1527,6 @@ impl Parser {
             } else if self.eat_keyword_ident(TokenKind::Fragilis) {
                 let n = self.parse_test_modifier_integer("fragilis")?;
                 modifiers.push(ProbaModifier::Fragilis(n));
-            } else if self.eat_keyword_ident(TokenKind::Requirit) {
-                let req = self.parse_string()?;
-                modifiers.push(ProbaModifier::Requirit(req));
             } else if self.eat_keyword_ident(TokenKind::SolumIn) {
                 let env = self.parse_string()?;
                 modifiers.push(ProbaModifier::SolumIn(env));

@@ -115,6 +115,7 @@ fn claim_stmt(stmt: &Stmt, claimed: &mut HashSet<u32>) {
         | StmtKind::Mori(_)
         | StmtKind::Tacet(_)
         | StmtKind::Adfirma(_)
+        | StmtKind::Require(_)
         | StmtKind::Scribe(_)
         | StmtKind::Reddet(_)
         | StmtKind::Tacebit(_) => {}

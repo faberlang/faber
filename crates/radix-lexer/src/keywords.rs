@@ -700,6 +700,12 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ErrorHandling,
     },
+    KeywordSpec {
+        text: "requirit",
+        token_kind: Some(TokenKind::Requirit),
+        scope: KeywordScope::Contextual(CONTROL_FLOW),
+        category: KeywordCategory::ErrorHandling,
+    },
     // === Keywords: Async ===
     KeywordSpec {
         text: "cede",
@@ -1064,12 +1070,6 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "repete",
         token_kind: Some(TokenKind::Repete),
-        scope: KeywordScope::TestOwned,
-        category: KeywordCategory::Testing,
-    },
-    KeywordSpec {
-        text: "requirit",
-        token_kind: Some(TokenKind::Requirit),
         scope: KeywordScope::TestOwned,
         category: KeywordCategory::Testing,
     },

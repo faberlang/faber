@@ -361,8 +361,9 @@ pub enum GpuBuiltinWire {
 /// Starts at 1 and ratchets on each breaking HIR change (`F3`). Version 2
 /// adds the [`HirPresentation`](radix_hir::HirPresentation) sidecar to
 /// [`HirArtifact`]; schema-v1 artifacts are rejected by the loader (no
-/// compatibility decoder).
-pub const SCHEMA_VERSION: u32 = 2;
+/// compatibility decoder). Version 3 removes the retired `Requirit` test
+/// modifier (serde variant removal changes the wire format).
+pub const SCHEMA_VERSION: u32 = 3;
 
 /// Serializable snapshot of one analyzed compilation unit (F1, F2, F4).
 ///
@@ -443,7 +444,7 @@ mod tests {
         let bytes = postcard::to_allocvec(&original).expect("serialize HirArtifact");
         let deserialized: HirArtifact =
             postcard::from_bytes(&bytes).expect("deserialize HirArtifact");
-        assert_eq!(original.schema_version, 2);
+        assert_eq!(original.schema_version, 3);
         assert_eq!(original, deserialized);
     }
 }

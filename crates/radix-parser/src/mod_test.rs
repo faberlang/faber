@@ -1739,7 +1739,7 @@ fn parses_probandum_with_all_modifiers() {
 probandum "suite" tag "parser" {
     praepara omnia {}
     postpara {}
-    proba "case" omitte "skip" futurum "later" solum tag "focus" temporis 5 metior repete 2 fragilis 1 requirit "net" solum_in "ci" {}
+    proba "case" omitte "skip" futurum "later" solum tag "focus" temporis 5 metior repete 2 fragilis 1 solum_in "ci" {}
     probandum "nested" { proba "inner" {} }
 }
 "#,
@@ -1758,7 +1758,7 @@ probandum "suite" tag "parser" {
     assert_eq!(test.body.nested.len(), 1);
 
     let case = &test.body.tests[0];
-    assert_eq!(case.modifiers.len(), 10);
+    assert_eq!(case.modifiers.len(), 9);
     assert!(matches!(case.modifiers[0], ProbaModifier::Omitte(_)));
     assert!(matches!(case.modifiers[1], ProbaModifier::Futurum(_)));
     assert!(matches!(case.modifiers[2], ProbaModifier::Solum));
@@ -1767,22 +1767,7 @@ probandum "suite" tag "parser" {
     assert!(matches!(case.modifiers[5], ProbaModifier::Metior));
     assert!(matches!(case.modifiers[6], ProbaModifier::Repete(2)));
     assert!(matches!(case.modifiers[7], ProbaModifier::Fragilis(1)));
-    assert!(matches!(
-        case.modifiers[8],
-        ProbaModifier::Requirit(_) | ProbaModifier::SolumIn(_)
-    ));
-    assert!(
-        case.modifiers
-            .iter()
-            .any(|modifier| matches!(modifier, ProbaModifier::Requirit(_))),
-        "expected requirit modifier"
-    );
-    assert!(
-        case.modifiers
-            .iter()
-            .any(|modifier| matches!(modifier, ProbaModifier::SolumIn(_))),
-        "expected solumIn modifier"
-    );
+    assert!(matches!(case.modifiers[8], ProbaModifier::SolumIn(_)));
 }
 
 #[test]
@@ -2135,6 +2120,41 @@ fn parses_adfirma_without_message() {
     let program = result.program.as_ref().expect("program");
     assert_eq!(program.statements.len(), 1);
     assert!(matches!(program.statements[0].kind, StmtKind::Adfirma(_)));
+}
+
+#[test]
+fn parses_requirit_statement() {
+    let result = parse_ok("requirit verum secus \"bad\"");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    let StmtKind::Require(require_stmt) = &program.statements[0].kind else {
+        panic!("expected requirit statement");
+    };
+    assert!(
+        matches!(
+            require_stmt.cond.kind,
+            ExprKind::Literal(Literal::Bool(true))
+        ),
+        "cond should be the boolean literal verum"
+    );
+    assert!(matches!(require_stmt.error.kind, ExprKind::Literal(_)));
+}
+
+#[test]
+fn parses_requirit_error_expression_forms() {
+    let result =
+        parse_ok(r#"requirit conditio.finita secus finge SchedulaInvalida { causa = "bad" }"#);
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    assert!(matches!(program.statements[0].kind, StmtKind::Require(_)));
+}
+
+#[test]
+fn rejects_requirit_without_secus_payload() {
+    assert_parse_error_matches(
+        "requirit verum",
+        ParseExpectation::Args(&[("issue", "requirit_secus")]),
+    );
 }
 
 #[test]

@@ -133,6 +133,8 @@ pub enum StmtKind {
     Tacet(TacetStmt),
     /// `adfirma` assert.
     Adfirma(AdfirmaStmt),
+    /// `requirit` recoverable guard (en surface `require`).
+    Require(RequireStmt),
     /// `nota` / `vide` / `mone` / `scribe` diagnostics.
     Scribe(ScribeStmt),
     /// `incipit` / `incipiet` entry point.
@@ -578,7 +580,6 @@ pub enum ProbaModifier {
     Metior,
     Omitte(Symbol),
     Repete(i64),
-    Requirit(Symbol),
     Solum,
     SolumIn(Symbol),
     Tag(Symbol),
@@ -827,6 +828,17 @@ pub struct CapeClause {
 pub struct AdfirmaStmt {
     pub cond: Box<Expr>,
     pub message: Option<Box<Expr>>,
+}
+
+/// `requirit <cond> secus <err>` — recoverable guard statement (en surface
+/// `require <cond> else <err>`).
+///
+/// Desugars to `si non (cond) { iace err }` at lowering; the thrown value
+/// enters the enclosing function's `⇥ E` channel, unlike `adfirma` (fatal).
+#[derive(Debug)]
+pub struct RequireStmt {
+    pub cond: Box<Expr>,
+    pub error: Box<Expr>,
 }
 
 #[derive(Debug)]

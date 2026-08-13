@@ -945,7 +945,6 @@ pub(crate) fn validate_referential_integrity(
                     radix_hir::HirTestModifier::Omitte(s)
                     | radix_hir::HirTestModifier::Futurum(s)
                     | radix_hir::HirTestModifier::Tag(s)
-                    | radix_hir::HirTestModifier::Requirit(s)
                     | radix_hir::HirTestModifier::SolumIn(s) => check_symbol(*s)?,
                     _ => {}
                 }
