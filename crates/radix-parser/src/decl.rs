@@ -1526,9 +1526,6 @@ impl Parser {
             } else if self.eat_keyword_ident(TokenKind::Fragilis) {
                 let n = self.parse_test_modifier_integer("fragilis")?;
                 modifiers.push(ProbaModifier::Fragilis(n));
-            } else if self.eat_keyword_ident(TokenKind::Requirit) {
-                let req = self.parse_string()?;
-                modifiers.push(ProbaModifier::Requirit(req));
             } else if self.eat_keyword_ident(TokenKind::SolumIn) {
                 let env = self.parse_string()?;
                 modifiers.push(ProbaModifier::SolumIn(env));

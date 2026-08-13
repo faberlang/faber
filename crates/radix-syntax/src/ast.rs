@@ -578,7 +578,6 @@ pub enum ProbaModifier {
     Metior,
     Omitte(Symbol),
     Repete(i64),
-    Requirit(Symbol),
     Solum,
     SolumIn(Symbol),
     Tag(Symbol),

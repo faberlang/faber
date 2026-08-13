@@ -1325,18 +1325,6 @@ fn lexes_proba_metrics_keywords() {
 }
 
 #[test]
-fn lexes_proba_environment_keywords() {
-    let result = lex(r#"requirit "net" solum_in "ci""#);
-    assert!(result.errors.is_empty());
-    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
-    assert!(matches!(kinds[0], TokenKind::Ident(_)));
-    assert!(matches!(kinds[1], TokenKind::String(_)));
-    assert!(matches!(kinds[2], TokenKind::Ident(_)));
-    assert!(matches!(kinds[3], TokenKind::String(_)));
-    assert!(matches!(kinds[4], TokenKind::Eof));
-}
-
-#[test]
 fn lexes_proba_block_braces() {
     let result = lex("{}");
     assert!(result.errors.is_empty());

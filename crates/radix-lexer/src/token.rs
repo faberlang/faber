@@ -237,7 +237,6 @@ pub enum TokenKind {
     Praepara,
     Praeparabit,
     Repete,
-    Requirit,
     Solum,
     SolumIn,
     Tag,
@@ -445,7 +444,6 @@ impl TokenKind {
                 | Praepara
                 | Praeparabit
                 | Repete
-                | Requirit
                 | Solum
                 | SolumIn
                 | Tag

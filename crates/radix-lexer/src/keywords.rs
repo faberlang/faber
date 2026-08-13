@@ -1068,12 +1068,6 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         category: KeywordCategory::Testing,
     },
     KeywordSpec {
-        text: "requirit",
-        token_kind: Some(TokenKind::Requirit),
-        scope: KeywordScope::TestOwned,
-        category: KeywordCategory::Testing,
-    },
-    KeywordSpec {
         text: "solum",
         token_kind: Some(TokenKind::Solum),
         scope: KeywordScope::Contextual(TEST_ANNOTATION_NAME),
