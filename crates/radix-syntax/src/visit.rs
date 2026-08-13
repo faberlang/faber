@@ -20,7 +20,7 @@
 //! - Walkers enforce [`MAX_VISIT_DEPTH`] fail-closed: deeper nesting calls
 //!   [`Visitor::on_depth_exceeded`] (default: panic) instead of overflowing the
 //!   stack. Depth is tracked inside the walk functions so existing `Visitor`
-//!   overrides that call `walk_*` keep working without signature changes (R2).
+//!   overrides that call `walk_*` keep working without signature changes.
 
 use std::cell::Cell;
 
@@ -34,8 +34,7 @@ use super::ast::{
 ///
 /// Chosen so a `visit_*` → `walk_*` pair (two frames per node) on a debug
 /// build stays safely under a typical ~2 MiB thread stack. Realistic Faber
-/// ASTs are far shallower; 1024 is the delivery open-question alternative to
-/// 4096 when earlier fail-closed is required to beat stack overflow.
+/// ASTs are far shallower.
 pub const MAX_VISIT_DEPTH: usize = 1024;
 
 thread_local! {
@@ -43,7 +42,7 @@ thread_local! {
     ///
     /// WHY thread-local: depth must propagate through default `visit_*` methods
     /// that call `walk_*` without an extra parameter, keeping existing
-    /// `Visitor` impls source-compatible (PRP-059 / R2).
+    /// `Visitor` impls source-compatible.
     static VISIT_DEPTH: Cell<usize> = const { Cell::new(0) };
 }
 
@@ -70,26 +69,15 @@ impl Drop for DepthFrame {
     }
 }
 
-// =============================================================================
-// VISITOR TRAIT
-// =============================================================================
+// ---------------------------------------------------------------------------
+// Visitor
+// ---------------------------------------------------------------------------
 
 /// Callback surface for source-shaped AST traversal.
 ///
 /// Implementers override the callbacks they care about and usually call the
 /// matching `walk_*` helper to keep descending. Omitting the helper is a valid
 /// way to prune traversal for a subtree.
-///
-/// USAGE:
-/// ```ignore
-/// struct TypeChecker { ... }
-/// impl Visitor for TypeChecker {
-///     fn visit_expr(&mut self, expr: &Expr) {
-///         // Custom logic here
-///         walk_expr(self, expr); // Continue traversal (depth tracked inside walk)
-///     }
-/// }
-/// ```
 pub trait Visitor: Sized {
     /// Called when a walker would nest deeper than [`MAX_VISIT_DEPTH`].
     ///
@@ -99,47 +87,36 @@ pub trait Visitor: Sized {
         panic!("AST visitor exceeded maximum depth of {MAX_VISIT_DEPTH} at node depth {depth}");
     }
 
-    /// Visit a complete parsed source unit.
     fn visit_program(&mut self, program: &Program) {
         walk_program(self, program);
     }
 
-    /// Visit one statement node.
     fn visit_stmt(&mut self, stmt: &Stmt) {
         walk_stmt(self, stmt);
     }
 
-    /// Visit one expression node.
     fn visit_expr(&mut self, expr: &Expr) {
         walk_expr(self, expr);
     }
 
-    /// Visit one written type expression.
     fn visit_type_expr(&mut self, ty: &TypeExpr) {
         walk_type_expr(self, ty);
     }
 
-    /// Visit an identifier occurrence or binding selected by a walker.
+    /// Identifier occurrence or binding selected by a walker. Default is a no-op
+    /// because identifiers are leaves.
     fn visit_ident(&mut self, _ident: &Ident) {}
 
-    /// Visit a statement block.
     fn visit_block(&mut self, block: &BlockStmt) {
         walk_block(self, block);
     }
 }
 
-// =============================================================================
-// WALKING FUNCTIONS
-// =============================================================================
-//
-// These functions are public so visitors can perform custom logic at a node and
-// then explicitly resume the shared traversal policy.
-//
-// Each walk entry checks and advances [`VISIT_DEPTH`]. Child nodes go through
-// `visitor.visit_*`, whose defaults call back into these walkers, so depth
-// propagates through the default Visitor methods without a public depth param.
+// ---------------------------------------------------------------------------
+// Walk helpers
+// ---------------------------------------------------------------------------
+// Public so a visitor can run custom logic at a node, then resume this policy.
 
-/// Continue traversal through a parsed source unit.
 pub fn walk_program<V: Visitor>(visitor: &mut V, program: &Program) {
     let Some(_frame) = DepthFrame::enter(visitor) else {
         return;
@@ -149,10 +126,6 @@ pub fn walk_program<V: Visitor>(visitor: &mut V, program: &Program) {
     }
 }
 
-/// Continue traversal through statement children covered by the generic walker.
-///
-/// NOTE: This walker now covers all statement variants defined by the grammar.
-/// Adding a new `StmtKind` variant should include a corresponding arm here.
 #[allow(clippy::too_many_lines)]
 pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
     let Some(_frame) = DepthFrame::enter(visitor) else {
@@ -420,11 +393,6 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
     }
 }
 
-/// Continue traversal through expression children covered by the generic walker.
-///
-/// NOTE: This walker now covers all expression variants defined by the grammar.
-/// Adding a new `ExprKind` variant should include a corresponding arm here.
-/// Depth guard (PRP-059 / BO-L-6): refuses to descend past [`MAX_VISIT_DEPTH`].
 #[allow(clippy::too_many_lines)]
 pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
     let Some(_frame) = DepthFrame::enter(visitor) else {
@@ -602,10 +570,6 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
     }
 }
 
-/// Walk a binding pattern, visiting all nested identifiers.
-///
-/// WHY: Destructuring patterns can contain nested patterns and rest elements.
-/// This function recursively visits all identifiers bound by a pattern.
 fn walk_binding_pattern<V: Visitor>(visitor: &mut V, pattern: &BindingPattern) {
     let Some(_frame) = DepthFrame::enter(visitor) else {
         return;
@@ -632,9 +596,6 @@ fn walk_binding_pattern<V: Visitor>(visitor: &mut V, pattern: &BindingPattern) {
     }
 }
 
-/// Continue traversal through written type syntax.
-///
-/// Depth guard (PRP-059 / BO-L-6): refuses to descend past [`MAX_VISIT_DEPTH`].
 pub fn walk_type_expr<V: Visitor>(visitor: &mut V, ty: &TypeExpr) {
     let Some(_frame) = DepthFrame::enter(visitor) else {
         return;
@@ -683,8 +644,7 @@ pub fn walk_type_expr<V: Visitor>(visitor: &mut V, ty: &TypeExpr) {
     }
 }
 
-/// Continue traversal through tensor `Figura` shape syntax.
-pub fn walk_figura_expr<V: Visitor>(visitor: &mut V, figura: &crate::FiguraExpr) {
+fn walk_figura_expr<V: Visitor>(visitor: &mut V, figura: &crate::FiguraExpr) {
     let Some(_frame) = DepthFrame::enter(visitor) else {
         return;
     };
@@ -699,7 +659,6 @@ pub fn walk_figura_expr<V: Visitor>(visitor: &mut V, figura: &crate::FiguraExpr)
     }
 }
 
-/// Continue traversal through statements in a block.
 pub fn walk_block<V: Visitor>(visitor: &mut V, block: &BlockStmt) {
     let Some(_frame) = DepthFrame::enter(visitor) else {
         return;
@@ -709,10 +668,7 @@ pub fn walk_block<V: Visitor>(visitor: &mut V, block: &BlockStmt) {
     }
 }
 
-/// Walk an if-statement body (which can be a block or single statement).
-///
-/// WHY: Faber allows `si cond ergo stmt` as a shorthand. This helper handles
-/// both body styles uniformly. Depth is enforced by the dispatched walkers.
+/// `IfBody::Ergo` is the `si cond ergo stmt` shorthand; dispatch both shapes.
 fn walk_if_body<V: Visitor>(visitor: &mut V, body: &IfBody) {
     match body {
         IfBody::Block(block) => visitor.visit_block(block),
@@ -752,11 +708,7 @@ fn walk_secus_clause<V: Visitor>(visitor: &mut V, clause: &SecusClause) {
     }
 }
 
-/// Continue traversal through a `discerne` pattern, visiting all bound identifiers.
-///
-/// Patterns are a restricted syntax; the walker covers identifiers in bindings
-/// (aliases and destructure fields) so visitors can register binding sites.
-/// Literal and wildcard patterns have no identifiers to visit.
+/// Visit identifiers in `discerne` bindings so visitors can register binding sites.
 fn walk_pattern<V: Visitor>(visitor: &mut V, pattern: &Pattern) {
     let Some(_frame) = DepthFrame::enter(visitor) else {
         return;
@@ -780,7 +732,6 @@ fn walk_pattern<V: Visitor>(visitor: &mut V, pattern: &Pattern) {
     }
 }
 
-/// Continue traversal through a pattern binding (alias or destructure).
 fn walk_pattern_bind<V: Visitor>(visitor: &mut V, bind: &PatternBind) {
     let Some(_frame) = DepthFrame::enter(visitor) else {
         return;
@@ -797,10 +748,6 @@ fn walk_pattern_bind<V: Visitor>(visitor: &mut V, bind: &PatternBind) {
         }
     }
 }
-
-// =============================================================================
-// TESTS
-// =============================================================================
 
 #[cfg(test)]
 mod tests {
@@ -938,10 +885,6 @@ mod tests {
             Some(MAX_VISIT_DEPTH + 1),
             "walker must fail closed past MAX_VISIT_DEPTH"
         );
-        // Must stop descending: visits are bounded, not proportional to full tree
-        // if the guard were absent (full tree would still be countable, but the
-        // exceeded flag is the fail-closed signal).
-        assert!(probe.exceeded_at.is_some());
     }
 
     #[test]
@@ -975,11 +918,6 @@ mod tests {
         assert!(result.is_err(), "default on_depth_exceeded must panic");
     }
 
-    // -------------------------------------------------------------------------
-    // F-063: FuncDecl.err, Probandum setup, Discerne patterns
-    // -------------------------------------------------------------------------
-
-    /// Helper: construct an Ident with the given symbol id.
     fn test_ident(sym: u32) -> Ident {
         Ident {
             name: Symbol(sym),
@@ -987,17 +925,6 @@ mod tests {
         }
     }
 
-    /// Helper: construct an `infer` `TypeExpr`.
-    fn test_type_expr() -> TypeExpr {
-        TypeExpr {
-            nullable: false,
-            mode: None,
-            kind: TypeExprKind::Infer,
-            span: Span::new(0, 1),
-        }
-    }
-
-    /// Helper: construct an empty block.
     fn test_block() -> BlockStmt {
         BlockStmt {
             statements: vec![],
@@ -1006,7 +933,6 @@ mod tests {
         }
     }
 
-    /// Visitor that counts callback invocations for F-063 assertions.
     struct CountVisitor {
         idents: usize,
         types: usize,
@@ -1041,8 +967,6 @@ mod tests {
 
     #[test]
     fn walk_func_decl_err() {
-        // Construct a FuncDecl with an error type annotation and no body.
-        // The walker must descend into decl.err (F-063).
         let func = FuncDecl {
             name: test_ident(1),
             type_params: vec![],
@@ -1050,7 +974,7 @@ mod tests {
             modifiers: vec![],
             posture: crate::CallablePosture::SyncFinite,
             ret: None,
-            err: Some(test_type_expr()),
+            err: Some(infer_type()),
             body: None,
             annotations: vec![],
             leading_trivia: vec![],
@@ -1066,15 +990,12 @@ mod tests {
         let mut visitor = CountVisitor::new();
         walk_stmt(&mut visitor, &stmt);
 
-        // Must visit the function name ident + the error type expr.
         assert_eq!(visitor.idents, 1, "must visit func name");
         assert_eq!(visitor.types, 1, "must visit decl.err");
     }
 
     #[test]
     fn walk_probandum_setup() {
-        // Construct a ProbandumDecl with one setup block and no tests/nested.
-        // The walker must descend into decl.body.setup (F-063).
         let probandum = ProbandumDecl {
             name: Symbol(1),
             modifiers: vec![],
@@ -1101,16 +1022,12 @@ mod tests {
         let mut visitor = CountVisitor::new();
         walk_stmt(&mut visitor, &stmt);
 
-        // Must visit the setup block.
         assert_eq!(visitor.blocks, 1, "must visit setup block");
     }
 
     #[test]
     fn walk_discern_patterns() {
-        // Construct a DiscerneStmt with one arm containing:
-        //   - an Ident pattern with an alias bind
-        //   - a Path pattern with destructure bindings
-        // The walker must descend into each pattern's identifiers (F-063).
+        // Ident pattern with alias bind + Path pattern with destructure bindings.
         let ident_pattern = Pattern::Ident(test_ident(1), Some(PatternBind::Alias(test_ident(2))));
         let path_pattern = Pattern::Path(PathPattern {
             segments: vec![test_ident(3), test_ident(4)],
