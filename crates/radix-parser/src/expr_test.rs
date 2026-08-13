@@ -233,6 +233,90 @@ fn vel_binds_tighter_than_multiplicative() {
     assert_eq!(coalesce.op, BinOp::Coalesce);
 }
 
+// ---------------------------------------------------------------------------
+// Glyph products (`·` `×` `⊗` `⊙`) at multiplicative precedence
+// ---------------------------------------------------------------------------
+
+/// `a + b · c` parses as `a + (b · c)` — glyphs bind tighter than additive.
+#[test]
+fn glyph_products_bind_tighter_than_additive() {
+    let result = parse_ok("fixum _ value ← a + b · c");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(add) = &expr.kind else {
+        panic!("expected additive root, got {:?}", expr.kind);
+    };
+    assert_eq!(add.op, BinOp::Add);
+    let ExprKind::Binary(dot) = &add.rhs.kind else {
+        panic!("expected glyph dot on additive RHS, got {:?}", add.rhs.kind);
+    };
+    assert_eq!(dot.op, BinOp::Dot);
+}
+
+/// All four glyph spellings map to their pinned `BinOp` variants.
+#[test]
+fn glyph_products_map_to_pinned_binops() {
+    for (spelling, expected) in [
+        ("·", BinOp::Dot),
+        ("×", BinOp::Cross),
+        ("⊗", BinOp::TensorProduct),
+        ("⊙", BinOp::Hadamard),
+    ] {
+        let source = format!("fixum _ value ← a {spelling} b");
+        let result = parse_ok(&source);
+        let program = result.program.as_ref().expect("program");
+        let StmtKind::Var(var) = &program.statements[0].kind else {
+            panic!("expected variable declaration");
+        };
+        let expr = var.init.as_deref().expect("initializer");
+        let ExprKind::Binary(bin) = &expr.kind else {
+            panic!("expected binary root for {spelling}, got {:?}", expr.kind);
+        };
+        assert_eq!(bin.op, expected, "glyph {spelling}");
+    }
+}
+
+/// Glyph chains are left-associative at the multiplicative level.
+#[test]
+fn glyph_products_chain_left_associatively() {
+    let result = parse_ok("fixum _ value ← a · b × c");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(cross) = &expr.kind else {
+        panic!("expected rightmost glyph at root, got {:?}", expr.kind);
+    };
+    assert_eq!(cross.op, BinOp::Cross);
+    let ExprKind::Binary(dot) = &cross.lhs.kind else {
+        panic!("expected dot on left, got {:?}", cross.lhs.kind);
+    };
+    assert_eq!(dot.op, BinOp::Dot);
+}
+
+/// Glyphs mix with `*` at the same precedence level.
+#[test]
+fn glyph_products_mix_with_star_at_same_precedence() {
+    let result = parse_ok("fixum _ value ← a * b ⊙ c");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(hadamard) = &expr.kind else {
+        panic!("expected hadamard at root, got {:?}", expr.kind);
+    };
+    assert_eq!(hadamard.op, BinOp::Hadamard);
+    let ExprKind::Binary(mul) = &hadamard.lhs.kind else {
+        panic!("expected star on left, got {:?}", hadamard.lhs.kind);
+    };
+    assert_eq!(mul.op, BinOp::Mul);
+}
+
 /// Interval constructors complete as `vel` `RHS` values: not `(x vel 0)‥0`.
 #[test]
 fn vel_rhs_completes_intervallum_constructor() {

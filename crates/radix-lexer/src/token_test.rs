@@ -62,3 +62,20 @@ fn conversio_assign_glyph_lexes_without_error() {
         result.errors
     );
 }
+
+#[test]
+fn glyph_product_tokens_are_operators_not_keywords() {
+    for kind in [
+        TokenKind::MiddleDot,
+        TokenKind::Cross,
+        TokenKind::CircledTimes,
+        TokenKind::CircledDot,
+    ] {
+        assert!(
+            !kind.is_keyword(),
+            "{kind:?} is an operator token, not a keyword identity"
+        );
+        assert!(!kind.is_comment(), "{kind:?} must not classify as trivia");
+        assert!(!kind.is_trivia(), "{kind:?} must not classify as trivia");
+    }
+}

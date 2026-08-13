@@ -290,6 +290,12 @@ impl<'a> Lexer<'a> {
             '⊖' => TokenKind::PostDec,
             '∷' => TokenKind::Verte,
 
+            // Glyph products (tensor-glyphs family); single-codepoint scans.
+            '·' => TokenKind::MiddleDot,
+            '×' => TokenKind::Cross,
+            '⊗' => TokenKind::CircledTimes,
+            '⊙' => TokenKind::CircledDot,
+
             '∴' => TokenKind::Therefore,
             '∪' => TokenKind::Cup,
             '+' => TokenKind::Plus,

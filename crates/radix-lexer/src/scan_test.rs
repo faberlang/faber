@@ -535,6 +535,53 @@ fn lexes_arithmetic_operators() {
 }
 
 #[test]
+fn lexes_glyph_product_operators() {
+    let result = lex("· × ⊗ ⊙");
+    assert!(
+        result.errors.is_empty(),
+        "glyph products must lex cleanly, errors: {:?}",
+        result.errors
+    );
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            TokenKind::MiddleDot,
+            TokenKind::Cross,
+            TokenKind::CircledTimes,
+            TokenKind::CircledDot,
+            TokenKind::Eof,
+        ]
+    );
+}
+
+#[test]
+fn lexes_glyph_products_mixed_with_arithmetic_chain() {
+    let result = lex("a · b × c");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert!(matches!(kinds[0], TokenKind::Ident(_)));
+    assert_eq!(kinds[1], TokenKind::MiddleDot);
+    assert!(matches!(kinds[2], TokenKind::Ident(_)));
+    assert_eq!(kinds[3], TokenKind::Cross);
+    assert!(matches!(kinds[4], TokenKind::Ident(_)));
+    assert_eq!(kinds[5], TokenKind::Eof);
+}
+
+#[test]
+fn glyph_product_glyph_codepoints_are_distinct() {
+    // Visual similarity is never permission to normalize a neighbor glyph.
+    assert_eq!('\u{00B7}', '·'); // middle dot
+    assert_eq!('\u{00D7}', '×'); // multiplication sign
+    assert_eq!('\u{2297}', '⊗'); // circled times
+    assert_eq!('\u{2299}', '⊙'); // circled dot
+    assert_ne!('\u{00B7}', '*'); // not ASCII star
+    assert_ne!('\u{00D7}', 'x'); // not ASCII x
+    assert_ne!('\u{2297}', '\u{00D7}'); // not the multiplication sign
+    assert_ne!('\u{2299}', '\u{00B7}'); // not the middle dot
+}
+
+#[test]
 fn lexes_postfix_inc_dec_operators() {
     let result = lex("⊕ ⊖");
     assert!(result.errors.is_empty());

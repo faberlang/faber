@@ -1230,6 +1230,11 @@ pub enum HirBinOp {
     Mul,
     Div,
     Mod,
+    // Glyph products (tensor-glyphs family; multiplicative precedence)
+    Dot,           // · inner product (dot / matvec / matmul)
+    Cross,         // × cross product (3-vectors)
+    TensorProduct, // ⊗ outer / Kronecker product
+    Hadamard,      // ⊙ Hadamard / elementwise product
     Eq,
     NotEq,
     ApproxEq,
@@ -1252,6 +1257,31 @@ pub enum HirBinOp {
     IsNot,
     InRange,
     Between,
+}
+
+impl HirBinOp {
+    /// Return whether this is one of the tensor-glyphs product operators
+    /// (`·` `×` `⊗` `⊙`). Lanes that have not implemented the glyph surface
+    /// fail closed on these before any lowering or emission.
+    #[must_use]
+    pub fn is_glyph_product(&self) -> bool {
+        matches!(
+            self,
+            Self::Dot | Self::Cross | Self::TensorProduct | Self::Hadamard
+        )
+    }
+
+    /// Unicode spelling of a glyph-product operator; `None` for non-glyph ops.
+    #[must_use]
+    pub fn glyph_spelling(&self) -> Option<&'static str> {
+        match self {
+            Self::Dot => Some("·"),
+            Self::Cross => Some("×"),
+            Self::TensorProduct => Some("⊗"),
+            Self::Hadamard => Some("⊙"),
+            _ => None,
+        }
+    }
 }
 
 /// Unary operator taxonomy after lexical/operator resolution.

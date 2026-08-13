@@ -10,6 +10,8 @@
 
 mod nodes;
 #[cfg(test)]
+mod nodes_test;
+#[cfg(test)]
 mod presentation_test;
 pub mod visit;
 
