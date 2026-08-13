@@ -46,31 +46,34 @@ image — it is not a text-emit product surface.
 
 ```mermaid
 flowchart TB
-    Faber["faber\npublic home: target APIs, grammar, matrices"]
+    subgraph faberrepo["faber — public repo"]
+        Home["home: grammar, matrices, docs"]
+        Runtime["runtime/\ngenerated-code carriers (faber-runtime package)"]
+    end
     Radix["radix\nprivate compiler + faber CLI"]
-    Runtime["faber-runtime\npublic generated-code carriers"]
     Hosts["hosts\nABI consumers and platform/browser hosts"]
     Norma["norma\nstdlib source"]
     Cista["cista\npackage store and lock writer"]
     Triga["triga\ngraphics / geometry"]
     Examples["examples\ncorpus and applications"]
 
-    Faber --> Radix
-    Faber --> Runtime
-    Faber --> Norma
-    Faber --> Hosts
-    Faber --> Cista
+    Home --> Radix
+    Home --> Norma
+    Home --> Hosts
+    Home --> Cista
     Radix --> Runtime
     Radix --> Triga
     Radix --> Hosts
-    Examples --> Faber
+    Examples --> Home
     Examples --> Radix
 ```
 
-`faber/docs/` holds the public grammar ([`EBNF.md`](EBNF.md)) and the generated
+`faber/docs/` holds the public grammar ([`EBNF.md`](EBNF.md)) and the rendered
 target matrices ([`EBNF_MATRIX.md`](EBNF_MATRIX.md),
-[`CONVERSIO_MATRIX.md`](CONVERSIO_MATRIX.md)). Radix regenerates the matrices
-and gates their freshness against this repository; the documentation site
+[`CONVERSIO_MATRIX.md`](CONVERSIO_MATRIX.md)). Radix measures: it emits
+per-target measurement JSON at the end of its test ladder
+(`radix/corpus/measurement/`, committed at release), and this repo renders the
+matrices from that data (`scripta/render-matrices.py`); the documentation site
 renders the localized views.
 
 ## Package workflow
