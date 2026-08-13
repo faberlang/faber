@@ -1,0 +1,46 @@
++++
+term = "·"
+kind = "operator-group"
+category = "arithmetic"
+canonical = true
+summary = "Glyph inner product: vector · vector reduces to a scalar dot product."
+syntax = "<expression> · <expression>"
+related = ["vector", "matrix", "tensor"]
+locale = "en"
++++
+
+# =============================================================================
+# · — glyph inner product (dot / matvec / matmul by rank).
+# =============================================================================
+#
+# What this teaches:
+#   • Dot product — `a · b` is the multiplicative-level inner-product glyph, dispatched by rank
+#   • Vector · vector — same-width vectors reduce to a scalar dot product
+#
+# Common mistakes:
+#   • mixing vector widths — `vector · vector` requires identical widths (inner dim contract)
+#   • scalar operands — the glyph rejects plain numbers instead of silently multiplying
+#
+# See also: vector, matrix, tensor
+# =============================================================================
+
+
+
+# vector · vector → scalar dot product
+#
+# WHY: the `·` glyph is the rank-dispatched inner product. Rank-1 · rank-1 is
+# the dot product: same width required, element type strict-equal. Rank-2
+# matmul lives in glyph-matmul.fab.
+#
+# a = [1.0, 2.0, 3.0]  b = [4.0, 5.0, 6.0]
+# a · b = 1*4 + 2*5 + 3*6 = 32.0
+#
+# EXPECTED stdout:
+#   32.0
+
+main {
+    const vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
+    const vf32[3] b ← [4.0, 5.0, 6.0] ↦ vf32[3]
+    const f32 d ← a · b
+    print d
+}

@@ -1,0 +1,49 @@
++++
+term = "·"
+kind = "operator-group"
+category = "arithmetic"
+summary = "Glyph matmul: rank-2 inner product matrix · matrix contracts the inner dimension."
+syntax = "<expression> · <expression>"
+related = ["matrix", "vector", "tensor"]
+locale = "en"
++++
+
+# =============================================================================
+# · — glyph matmul (matrix · matrix rank-2 inner product).
+# =============================================================================
+#
+# What this teaches:
+#   • Matmul — `A · B` contracts the inner dimension (A columns == B rows)
+#   • Operand shapes — built from `⊗` results so register matrices need no literals
+#
+# Common mistakes:
+#   • inner dimension mismatch — `matrix · matrix` with unequal inner dims fails closed at compile time
+#   • element type drift — both operands keep the same numeric width (no silent widening)
+#
+# See also: matrix, vector, tensor
+# =============================================================================
+
+
+
+# matrix · matrix → matrix (inner dim contract)
+#
+# WHY: `·` dispatches by rank — rank-2 · rank-2 is matrix multiplication. The
+# operand matrices here come from `⊗` outer products (register matrices have no
+# literal construction surface yet); the inner dims unify at typecheck.
+#
+# A = a ⊗ p = [[1,1],[2,2],[3,3]]   (3x2)   a = [1.0, 2.0, 3.0]  p = [1.0, 1.0]
+# B = p ⊗ s = [[1,2,3,4],[1,2,3,4]] (2x4)   s = [1.0, 2.0, 3.0, 4.0]
+# A · B = [[2,4,6,8],[4,8,12,16],[6,12,18,24]]  (3x4)
+#
+# EXPECTED stdout:
+#   [[2.0, 4.0, 6.0, 8.0], [4.0, 8.0, 12.0, 16.0], [6.0, 12.0, 18.0, 24.0]]
+
+main {
+    const vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
+    const vf32[2] p ← [1.0, 1.0] ↦ vf32[2]
+    const vf32[4] s ← [1.0, 2.0, 3.0, 4.0] ↦ vf32[4]
+    const matrix<f32, [3, 2]> left ← a ⊗ p
+    const matrix<f32, [2, 4]> right ← p ⊗ s
+    const matrix<f32, [3, 4]> product ← left · right
+    print product
+}
