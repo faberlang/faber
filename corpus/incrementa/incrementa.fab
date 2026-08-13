@@ -1,49 +1,49 @@
 +++
-term = "⊕"
+term = "↑"
 kind = "operator"
 category = "mutation"
 canonical = true
 summary = "Postfix increment statement for a mutable numerus place."
-syntax = "<place> ⊕"
+syntax = "<place> ↑"
 aliases = ["postfix increment", "increment statement"]
-related = ["⊖", "varia", "←", "numerus"]
+related = ["↓", "varia", "←", "numerus"]
 locale = "en"
 +++
 # =============================================================================
-# ⊕ — Postfix increment statement for a mutable numerus place
+# ↑ — Postfix increment statement for a mutable numerus place
 # =============================================================================
 #
 # What this teaches:
 #   • Postfix increment statement for a mutable numerus place.
-#   • Related keywords: ⊖, varia, ←, numerus
+#   • Related keywords: ↓, varia, ←, numerus
 #
 # Common mistakes:
-#   • Using `⊕` / `⊖` inside an expression — postfix increment/decrement are statements only and cannot appear inside larger expressions.
+#   • Using `↑` / `↓` inside an expression — postfix increment/decrement are statements only and cannot appear inside larger expressions.
 #
-# See also: ⊖, varia, ←, numerus
+# See also: ↓, varia, ←, numerus
 # =============================================================================
 
 # incrementa — postfix increment and decrement statements
 #
-# <place> ⊕   -- add 1 (statement only, no value)
-# <place> ⊖   -- subtract 1
+# <place> ↑   -- add 1 (statement only, no value)
+# <place> ↓   -- subtract 1
 #
 # Postfix forms are statements, not expressions. They cannot appear inside
 # larger expressions. Operand must be a mutable numerus place.
 
 main {
     var int count ← 0
-    count ⊕
+    count ↑
     # 1
     print count
 
-    count ⊖
+    count ↓
     # 0
     print count
 
     var int exclusivus ← 0
     for range 0‥3 const _ {
-        exclusivus ⊕
+        exclusivus ↑
     }
     # 3
     print exclusivus

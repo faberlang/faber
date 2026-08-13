@@ -45,8 +45,8 @@ main {
     print max ⇒ 16
     print max > zero
 
-    max ⊕
-    zero ⊖
+    max ↑
+    zero ↓
     print max
     print zero
 

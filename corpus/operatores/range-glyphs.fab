@@ -37,14 +37,14 @@ locale = "en"
 main {
     var int exclusivus ← 0
     for range 0‥5 const _ {
-        exclusivus ⊕
+        exclusivus ↑
     }
     # 5 iterations
     print exclusivus
 
     var int inclusivus ← 0
     for range 0…5 const _ {
-        inclusivus ⊕
+        inclusivus ↑
     }
     # 6 iterations
     print inclusivus

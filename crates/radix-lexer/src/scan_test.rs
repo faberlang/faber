@@ -536,7 +536,7 @@ fn lexes_arithmetic_operators() {
 
 #[test]
 fn lexes_postfix_inc_dec_operators() {
-    let result = lex("⊕ ⊖");
+    let result = lex("↑ ↓");
     assert!(result.errors.is_empty());
     let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
     assert_eq!(

@@ -20,7 +20,7 @@ locale = "en"
 #     (`≡ ≠ < >`), logic (`et aut`), nullish coalescing (`vel`), ternary
 #     (`sic/secus`), and bitwise (`∧ ∨ ⊻ ⇐ ⇒`)
 #   • Assignment patterns — explicit assignment (`←`) and postfix increment
-#     (`⊕ ⊖` statements)
+#     (`↑ ↓` statements)
 #   • `sit` sugar — compact inference syntax alongside explicit `fixum _`
 #     type inference
 #
@@ -34,7 +34,7 @@ locale = "en"
 #
 # Covers arithmetic (+ − * / %), comparison (≡ ≠ < >), logic (et aut),
 # nullish coalescing (vel), ternary (sic/secus), bitwise (∧ ∨ ⊻ ⇐ ⇒),
-# explicit assignment (←), and postfix increment (⊕ ⊖ statements).
+# explicit assignment (←), and postfix increment (↑ ↓ statements).
 #
 # GRAMMAR:
 #   binaryExpr :← expr (arithOp | cmpOp | logicOp | bitwiseOp) expr
@@ -65,8 +65,8 @@ main {
     # Assignatio explicita (compound glyphs removed)
     var _ index ← 0
     index ← index + 10
-    index ⊕
-    index ⊖
+    index ↑
+    index ↓
     index ← index * 2
     print index
 

@@ -6,7 +6,7 @@ canonical = true
 summary = "Assigns a value to a binding, field, or assignable expression."
 syntax = "<place> ← <expression>"
 aliases = ["assignment", "assign"]
-related = ["=", "fixum", "varia", "⊕", "⊖"]
+related = ["=", "fixum", "varia", "↑", "↓"]
 locale = "en"
 +++
 
@@ -20,13 +20,13 @@ locale = "en"
 #     to a new value
 #   • Compound operations — arithmetic expressions like `x ← x + 5` replace
 #     removed compound assignment glyphs
-#   • Postfix increment — `⊕` and `⊖` provide unit increment/decrement as
+#   • Postfix increment — `↑` and `↓` provide unit increment/decrement as
 #     standalone statements
 #
 # Common mistakes:
 #   • using `=` instead of `←` for assignment — `=` is structural field initialization in records, `←` is value assignment
 #
-# See also: =, fixum, varia, ⊕, ⊖
+# See also: =, fixum, varia, ↑, ↓
 # =============================================================================
 
 # assignatio — simple explicit assignment
@@ -34,7 +34,7 @@ locale = "en"
 # <place> ← <expression>
 #
 # Compound assignment glyphs were removed. Use explicit assignment, or postfix
-# ⊕ / ⊖ for unit increment/decrement (see incrementa/incrementa.fab).
+# ↑ / ↓ for unit increment/decrement (see incrementa/incrementa.fab).
 #
 # EXPECTED OUTPUT:
 #   20

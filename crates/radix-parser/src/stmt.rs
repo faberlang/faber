@@ -743,7 +743,7 @@ impl Parser {
     /// Parse a bare expression as a statement, or postfix increment/decrement.
     ///
     /// GRAMMAR:
-    ///   incDecStmt := place ('⊕' | '⊖')
+    ///   incDecStmt := place ('↑' | '↓')
     ///   exprStmt   := expression
     pub(super) fn parse_expr_stmt(&mut self) -> Result<StmtKind, ParseError> {
         let expr = self.parse_expression()?;
