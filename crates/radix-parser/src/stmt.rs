@@ -2,20 +2,17 @@
 //!
 //! This module owns the non-declaration statement forms that can appear inside
 //! blocks or at file scope: conditionals, loops, dispatch, transfer, diagnostics,
-//! entrypoints, resource scopes, endpoints, and destructuring statements. It
-//! shares `StmtKind` construction with `decl.rs`, but keeps executable grammar
-//! separate so declaration syntax and runtime control-flow syntax do not blur.
+//! entrypoints, resource scopes, and destructuring statements. It shares
+//! `StmtKind` construction with `decl.rs`, but keeps executable grammar separate
+//! so declaration syntax and runtime control-flow syntax do not blur.
+//! Statement-level `ad` is rejected here in favor of the expression form.
 //!
-//! DESIGN PHILOSOPHY
-//! =================
 //! Statement bodies deliberately use a small set of shapes: braced blocks for
 //! scoped bodies, `ergo` for single-statement bodies, and `fac { ... } cape ...`
 //! for structured error handling. The parser records surface intent and leaves
 //! reachability, exhaustiveness, ownership, and endpoint semantics to later
 //! phases.
 //!
-//! INVARIANTS
-//! ==========
 //! - `sin` is the canonical else-if spelling; `secus si` is diagnosed instead
 //!   of being accepted as an alias.
 //! - `elige` is value dispatch, while `discerne` is pattern dispatch. Their AST
@@ -25,17 +22,10 @@
 
 use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::{Span, TokenKind};
-use radix_syntax::{
-    AdfirmaStmt, AstMutability, BlockStmt, CapeClause, CasuArm, CasuCase, CeterumDefault, CuraKind,
-    CuraStmt, CustodiClause, CustodiStmt, DiscerneStmt, DumStmt, EligeStmt, ExField, ExStmt, Expr,
-    ExprKind, ExprStmt, FacStmt, IaceStmt, IfBody, IncDecOp, IncDecStmt, IncipitStmt, IteraMode,
-    IteraStmt, MoriStmt, PergeStmt, ReddeStmt, RumpeStmt, ScribeKind, ScribeStmt, SecusClause,
-    SiStmt, Stmt, StmtKind, TacetStmt, Trivia,
-};
+#[allow(clippy::wildcard_imports)]
+use radix_syntax::*;
 
-// =============================================================================
 // CONDITIONAL STATEMENTS
-// =============================================================================
 
 impl Parser {
     /// Parse `si` / `sin` / `secus` branching.
@@ -103,7 +93,6 @@ impl Parser {
         } else if self.check(&TokenKind::Therefore) {
             Err(self.therefore_wrong_context_error())
         } else if self.eat_keyword_ident(TokenKind::Ergo) {
-            // `ergo` bodies are single statements treated as one-arm blocks.
             Ok(IfBody::Ergo(Box::new(self.parse_stmt()?)))
         } else {
             Err(self.missing_block_error())
@@ -148,16 +137,12 @@ impl Parser {
         ParseError::structured(ParseErrorKind::ThereforeWrongContext, self.current_span())
     }
 
-    // =============================================================================
     // LOOP STATEMENTS
-    // =============================================================================
 
-    /// Parse while loop.
+    /// Parse `dum`.
     ///
     /// GRAMMAR:
     ///   dum-stmt := `dum` expr if-body [`cape` ident block]
-    ///
-    /// WHY: Standard while loop with optional error handling via `cape`.
     pub(super) fn parse_dum_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Dum, "expected 'dum'")?;
 
@@ -176,8 +161,6 @@ impl Parser {
     ///
     /// The parser records the source preposition mode; later phases validate
     /// the semantic source shape for that mode.
-    /// Typechecking and lowering decide whether the chosen mode is valid for the
-    /// iterable expression.
     pub(super) fn parse_itera_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Itera, "expected 'itera'")?;
 
@@ -210,9 +193,7 @@ impl Parser {
         }))
     }
 
-    // =============================================================================
     // PATTERN MATCHING AND DISPATCH
-    // =============================================================================
 
     /// Parse value-based `elige` dispatch.
     ///
@@ -277,14 +258,13 @@ impl Parser {
 
         let exhaustive = self.eat_keyword_ident(TokenKind::Omnia);
 
-        // Parse discriminants (comma-separated expressions)
         let mut subjects = Vec::new();
         loop {
             subjects.push(self.parse_expression()?);
             if !self.eat(&TokenKind::Comma) {
                 break;
             }
-            // Check if we hit the brace (don't parse it as expression)
+            // A trailing comma before `{` is not another subject.
             if self.check(&TokenKind::LBrace) {
                 break;
             }
@@ -333,13 +313,10 @@ impl Parser {
             .with_arg("ceterum", "ceterum")
     }
 
-    /// Parse guard statement (multi-branch early return).
+    /// Parse `custodi`.
     ///
     /// GRAMMAR:
     ///   custodi-stmt := `custodi` '{' (`si` expr if-body)+ '}'
-    ///
-    /// WHY: Guard clauses for early returns. Similar to Swift's guard statement.
-    /// Typically used with ergo return bodies for validation sequences.
     pub(super) fn parse_custodi_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Custodi, "expected 'custodi'")?;
         self.expect(&TokenKind::LBrace, "expected '{'")?;
@@ -394,20 +371,15 @@ impl Parser {
         })
     }
 
-    // =============================================================================
     // TRANSFER STATEMENTS
-    // =============================================================================
 
-    /// Parse return statement.
+    /// Parse `redde`.
     ///
     /// GRAMMAR:
     ///   redde-stmt := `redde` [`expr`]
-    ///
-    /// WHY: Returns a value from the current function. Optional value for void functions.
     pub(super) fn parse_redde_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Redde, "expected 'redde'")?;
 
-        // Check for value - if next token could start expression
         let value = if !self.is_at_end()
             && !self.check(&TokenKind::RBrace)
             && !self.check(&TokenKind::Semicolon)
@@ -454,7 +426,7 @@ impl Parser {
         Ok(StmtKind::Expr(ExprStmt {
             expr: Box::new(Expr {
                 id,
-                kind: ExprKind::Cede(radix_syntax::CedeExpr {
+                kind: ExprKind::Cede(CedeExpr {
                     expr: Box::new(expr),
                 }),
                 span,
@@ -467,7 +439,7 @@ impl Parser {
     /// GRAMMAR:
     ///   iace-stmt := `iace` expr [`si` expr]
     ///
-    /// The optional `si` guard is parser sugar.  When a guard is present the
+    /// The optional `si` guard is parser sugar. When a guard is present the
     /// parser desugars to a `si` block so downstream passes see a uniform
     /// conditional shape:
     ///
@@ -479,10 +451,10 @@ impl Parser {
         let value = Box::new(self.parse_expression()?);
 
         // Guard: only consume `si` when it directly follows the value
-        // expression — no intervening newline trivia.  A newline before
+        // expression — no intervening newline trivia. A newline before
         // `si` means it is a new statement, not this statement's guard.
         if self.peek_raw_keyword_is("si") {
-            self.advance(); // consume 'si'
+            self.advance();
             let guard = self.parse_expression()?;
             let inner_span = start.merge(value.span);
             let inner_id = self.next_id();
@@ -514,7 +486,7 @@ impl Parser {
     /// GRAMMAR:
     ///   mori-stmt := `mori` expr [`si` expr]
     ///
-    /// The optional `si` guard is parser sugar.  When a guard is present the
+    /// The optional `si` guard is parser sugar. When a guard is present the
     /// parser desugars to a `si` block:
     ///
     ///   mori `"msg"`          →  mori `"msg"`             (unchanged)
@@ -527,7 +499,7 @@ impl Parser {
         // Guard: only consume `si` when it directly follows the value
         // expression — no intervening newline trivia.
         if self.peek_raw_keyword_is("si") {
-            self.advance(); // consume 'si'
+            self.advance();
             let guard = self.parse_expression()?;
             let inner_span = start.merge(value.span);
             let inner_id = self.next_id();
@@ -554,28 +526,23 @@ impl Parser {
         }
     }
 
-    /// Parse explicit noop statement.
+    /// Parse `tacet`.
     pub(super) fn parse_tacet_stmt(&mut self) -> Result<StmtKind, ParseError> {
         let span = self.current_span();
         self.expect_keyword_ident(TokenKind::Tacet, "expected 'tacet'")?;
         Ok(StmtKind::Tacet(TacetStmt { span }))
     }
 
-    // =============================================================================
     // ERROR HANDLING
-    // =============================================================================
 
-    /// Parse assert statement.
+    /// Parse `adfirma`.
     ///
     /// GRAMMAR:
     ///   adfirma-stmt := `adfirma` expr ['secus' expr]
     ///
-    /// WHY: Runtime assertions for invariant checking. Optional message expression
-    /// provides diagnostic information on failure. `secus` introduces the false-path
-    /// payload (the failure message), mirroring its role in `si/secus` and the
-    /// `sic/secus` ternary. This keeps `adfirma` in the throw-family vocabulary
-    /// (`mori msg si cond`, `iace msg si cond`) rather than using a heterogeneous
-    /// comma, which the grammar reserves for homogeneous list separators.
+    /// `secus` introduces the failure payload, matching `si/secus` and the
+    /// `sic/secus` ternary. A comma would collide with the grammar's
+    /// homogeneous list separator.
     pub(super) fn parse_adfirma_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Adfirma, "expected 'adfirma'")?;
 
@@ -590,20 +557,12 @@ impl Parser {
         Ok(StmtKind::Adfirma(AdfirmaStmt { cond, message }))
     }
 
-    // =============================================================================
     // I/O AND DEBUGGING
-    // =============================================================================
 
-    /// Parse output statement.
+    /// Parse `scribe` / `vide` / `mone` / `nota`.
     ///
     /// GRAMMAR:
     ///   scribe-stmt := (`scribe`|`vide`|`mone`|`nota`) expr (',' expr)*
-    ///
-    /// WHY: Built-in output statements for different severity levels:
-    /// - `scribe` - diagnostic output
-    /// - `vide` (debug) - debug output
-    /// - `mone` (warn) - warning output
-    /// - `nota` (note) - neutral diagnostic output
     pub(super) fn parse_scribe_stmt(&mut self) -> Result<StmtKind, ParseError> {
         let kind = if self.eat_keyword_ident(TokenKind::Scribe) {
             ScribeKind::Scribe
@@ -628,17 +587,14 @@ impl Parser {
         Ok(StmtKind::Scribe(ScribeStmt { kind, args }))
     }
 
-    // =============================================================================
     // SPECIAL STATEMENTS
-    // =============================================================================
 
-    /// Parse entry point declaration.
+    /// Parse `incipit` / `incipiet`.
     ///
     /// GRAMMAR:
     ///   incipit-stmt := (`incipit`|`incipiet`) [`argumenta` ident] [`exitus` expr] block
     ///
-    /// WHY: Program entry points. `incipit` for sync main, `incipiet` for async main.
-    /// Optional `argumenta` binds command-line args, `exitus` sets exit code.
+    /// `incipit` is the sync entry point; `incipiet` is the async form.
     pub(super) fn parse_incipit_stmt(&mut self) -> Result<StmtKind, ParseError> {
         let is_async = if self.eat_keyword_ident(TokenKind::Incipit) {
             false
@@ -673,13 +629,13 @@ impl Parser {
         }))
     }
 
-    /// Parse allocator scope statement.
+    /// Parse `cura` allocator scope.
     ///
     /// GRAMMAR:
     ///   cura-stmt := `cura` STRING (`fixum`|`varia`) type ident block [`cape` ident block]
     ///
-    /// WHY: This is intentionally scoped to allocator setup. The allocator kind is
-    /// a validated string so allocator strategy names do not become grammar words.
+    /// The allocator kind is a validated string so strategy names do not become
+    /// grammar words.
     pub(super) fn parse_cura_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Cura, "expected 'cura'")?;
 
@@ -736,14 +692,11 @@ impl Parser {
             .with_arg("replacement", replacement)
     }
 
-    /// Parse destructuring statement.
+    /// Parse `ex` destructuring.
     ///
     /// GRAMMAR:
     ///   ex-stmt := `ex` expr (`fixum`|`varia`) field (',' field)* [`ceteri` ident]
     ///   field := ident [`ut` ident]
-    ///
-    /// WHY: Extracts fields from objects/structs into local variables. Similar to
-    /// JavaScript destructuring. `ceteri` (rest) captures remaining fields.
     pub(super) fn parse_extract_stmt(&mut self) -> Result<StmtKind, ParseError> {
         let start = self.current_span();
         self.expect_keyword_ident(TokenKind::Ex, "expected 'ex'")?;
@@ -842,7 +795,7 @@ impl Parser {
     ///   cape-clause := `cape` ident block
     ///
     /// Centralizing this grammar keeps catch binding and body spans consistent
-    /// across branches, loops, resource scopes, endpoints, and `fac`.
+    /// across branches, loops, resource scopes, and `fac`.
     fn try_parse_cape_stmt(&mut self) -> Result<Option<CapeClause>, ParseError> {
         if !self.eat_keyword_ident(TokenKind::Cape) {
             return Ok(None);
