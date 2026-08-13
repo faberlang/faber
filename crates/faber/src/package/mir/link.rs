@@ -988,6 +988,17 @@ pub(super) fn rewrite_analysis_namespace_calls(
     namespaces: &NamespaceExports,
     method_targets: &MethodCallTargets,
 ) -> Result<(), Vec<Diagnostic>> {
+    // Library call targets are keyed by the library's native export names.
+    // A localized consumer HIR uses the pack surface (`textus_visus`);
+    // alias those keys so linking matches what analysis already accepted.
+    let targets = expand_locale_namespace_targets(unit_path, analysis, targets);
+    let data_member_targets =
+        expand_locale_namespace_targets(unit_path, analysis, data_member_targets);
+    let namespaces = expand_locale_namespace_exports(unit_path, analysis, namespaces);
+    let targets = &targets;
+    let data_member_targets = &data_member_targets;
+    let namespaces = &namespaces;
+
     // S1 U2 VALUE members (operator ruling O1): namespace enum-variant value
     // references (`module.VARIANT`) rewrite to the consumer variant `Path`
     // before lowering, riding the nominal remap. The consumer analysis
@@ -1594,6 +1605,65 @@ pub(super) fn rewrite_expr(
         | HirExpressionKind::ReadLine(_)
         | HirExpressionKind::Error => {}
     }
+}
+
+fn expand_locale_namespace_targets<V: Clone>(
+    unit_path: &Path,
+    analysis: &mut radix::driver::AnalyzedUnit,
+    table: &HashMap<(PathBuf, DefId, String), V>,
+) -> HashMap<(PathBuf, DefId, String), V> {
+    let mut expanded = table.clone();
+    for ((path, def, name), value) in table {
+        if path != unit_path {
+            continue;
+        }
+        let Some(symbol) = analysis.resolver.get_symbol(*def) else {
+            continue;
+        };
+        let canonical = analysis.interner.intern(name);
+        let surface = analysis
+            .resolver
+            .imported_export_surface_name(symbol.name, canonical);
+        let surface_name = analysis.interner.resolve(surface).to_owned();
+        if &surface_name != name {
+            expanded.insert((path.clone(), *def, surface_name), value.clone());
+        }
+    }
+    expanded
+}
+
+fn expand_locale_namespace_exports(
+    unit_path: &Path,
+    analysis: &mut radix::driver::AnalyzedUnit,
+    namespaces: &NamespaceExports,
+) -> NamespaceExports {
+    let mut expanded = namespaces.clone();
+    for ((path, def), names) in namespaces {
+        if path != unit_path {
+            continue;
+        }
+        let Some(symbol) = analysis.resolver.get_symbol(*def) else {
+            continue;
+        };
+        let extra = names
+            .iter()
+            .filter_map(|name| {
+                let canonical = analysis.interner.intern(name);
+                let surface = analysis
+                    .resolver
+                    .imported_export_surface_name(symbol.name, canonical);
+                let surface_name = analysis.interner.resolve(surface).to_owned();
+                (surface_name != *name).then_some(surface_name)
+            })
+            .collect::<BTreeSet<_>>();
+        if !extra.is_empty() {
+            expanded
+                .entry((path.clone(), *def))
+                .or_default()
+                .extend(extra);
+        }
+    }
+    expanded
 }
 
 pub(super) fn namespace_call_target(
