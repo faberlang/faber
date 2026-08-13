@@ -70,7 +70,6 @@ use crate::device_program::{BufferRole, LaunchId};
 use crate::device_semantics::DeviceEffectBoundaryKind;
 use crate::host_partition::{callee_function_ids, CallsiteId, HostPartition, PartitionRecord};
 use crate::layout::MirLayoutKind;
-use crate::ty::constant_ty;
 use crate::{
     MirBlockId, MirCallee, MirConstant, MirFunction, MirFunctionId, MirLocalId, MirOperand,
     MirPlace, MirPlaceBase, MirProgram, MirStatementKind, MirTempId, MirType, MirValidationContext,
@@ -298,14 +297,13 @@ impl fmt::Display for BoundaryAbiError {
                 found_count,
             } => write!(
                 f,
-                "boundary call f{} → kernel f{} argument {position} carries element count {}{} but the boundary declares {expected_count} (wrong shape)",
+                "boundary call f{} → kernel f{} argument {position} carries element count {} but the boundary declares {expected_count} (wrong shape)",
                 host.0,
                 kernel.0,
                 found_count.map_or_else(
                     || "unresolvable".to_owned(),
                     |count| count.to_string(),
                 ),
-                if found_count.is_some() { "" } else { " " }
             ),
             Self::Lifetime {
                 host,
@@ -709,13 +707,11 @@ pub fn derive_host_device_calls(
                 },
                 |row| row.callsite,
             );
+        let launch_ids = region_launch_ids(partition, &boundary.region.kernels);
         let effect_boundary = record
             .effect_boundaries
             .iter()
-            .filter(|row| {
-                region_launch_ids(partition, &boundary.region.kernels)
-                    .contains(&LaunchId(row.launch))
-            })
+            .filter(|row| launch_ids.contains(&LaunchId(row.launch)))
             .map(|row| row.kind)
             .collect();
         calls.push(HostDeviceCall {
@@ -840,9 +836,7 @@ fn validate_host_calls(
                         if matches!(argument, MirOperand::Constant(_)) {
                             continue;
                         }
-                        let Some(argument_ty) =
-                            operand_ty(&scope, &values, argument, program, validation)
-                        else {
+                        let Some(argument_ty) = operand_ty(&scope, &values, argument) else {
                             continue;
                         };
                         let declared = &kernel.params[position];
@@ -992,11 +986,9 @@ fn validate_host_calls(
                     values.insert(value.id, value.ty);
                     local_holds_output.retain(|candidate| *candidate != local);
                 }
-                _ => {
-                    if let MirStatementKind::Assign { value, .. } = &statement.kind {
-                        values.insert(value.id, value.ty);
-                    }
-                }
+                // `RuntimeCall`/`Construct` produce no call-output or
+                // statement-value facts — nothing to record here.
+                _ => {}
             }
         }
     }
@@ -1004,19 +996,19 @@ fn validate_host_calls(
 }
 
 /// Resolve a call argument's MIR type from the host function's locals, temps,
-/// per-block statement values, and constants.
+/// and per-block statement values. Constant operands never reach here — the
+/// caller skips them before resolving (the boundary's exact-type check applies
+/// to carried values, not literals).
 fn operand_ty(
     scope: &HostFunctionScope<'_>,
     values: &FxHashMap<MirValueId, MirType>,
     operand: &MirOperand,
-    program: &MirProgram,
-    validation: &MirValidationContext<'_>,
 ) -> Option<MirType> {
     match operand {
         MirOperand::Place(place) => scope.place_ty(place),
-        MirOperand::Temp(id) => scope.temp_ty(*id),
+        MirOperand::Temp(id) => scope.function.temp_ty(*id),
         MirOperand::Value(id) => values.get(id).copied(),
-        MirOperand::Constant(constant) => constant_ty(constant, validation.types, program).ok(),
+        MirOperand::Constant(_) => None,
     }
 }
 
@@ -1122,11 +1114,6 @@ impl<'a> HostFunctionScope<'a> {
                 }),
             MirPlaceBase::Temp(temp) => self.function.temp_ty(temp),
         }
-    }
-
-    #[must_use]
-    fn temp_ty(&self, temp: MirTempId) -> Option<MirType> {
-        self.function.temp_ty(temp)
     }
 }
 
