@@ -50,7 +50,10 @@ fn scalar_shaped_kernel_carries_runtime_extent_in_launch_plan() {
     // carries a RuntimeExtent resource appended to extra_inputs, and the
     // launch plan enumerates it with the next-free binding.
     let mut types = TypeTable::new();
-    let _u32 = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    // The extent channel requires `numerus<u32>` to exist in the frozen
+    // table (signature.rs `maybe_append_runtime_extent`); the registration
+    // side effect is the point, not the returned id.
+    let _extent_count_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
     let ty = MirType::semantic(types.sized_numeric(Primitive::Fractus, NumericWidth::F32));
     let validation = MirValidationContext::new(&types);
     let function = scalar_kernel_function(ty);
@@ -432,9 +435,9 @@ fn result_tuple_gradient_outputs_bind_distinct_slots() {
 #[test]
 fn result_tuple_outputs_are_separate_resources_not_an_aggregate() {
     // S3-A1 done_when 3: tuple outputs become SEPARATE output resources,
-    // so no kernel value carries an aggregate type — the Metal aggregate
-    // rejection (radix-mir-metal lib.rs:3066/:3110) is unreachable
-    // through the multi-output ABI.
+    // so no kernel value carries an aggregate type — the Metal emitter's
+    // non-ordered aggregate rejection ("kernel tuple construct spread") is
+    // unreachable through the multi-output ABI.
     let mut types = TypeTable::new();
     let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
     let element_ty = MirType::semantic(f32);
@@ -1131,8 +1134,6 @@ fn kernel_abi_keeps_f64_scalar_fail_closed_for_pure_scalar_kernel() {
     assert_eq!(error.issue, "mir_kernel_scalar_layout_unsupported");
     assert_eq!(error.detail.as_deref(), Some("f64"));
 }
-
-// ── S6-C2: typed rank-extension broadcast fact ──────────────────────────
 
 /// Build a tensor-tensor `TensorAdd` kernel: `out = add(left, right)` with
 /// the given left/right/result tensor types.
