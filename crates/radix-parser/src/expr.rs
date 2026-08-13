@@ -726,17 +726,21 @@ impl Parser {
     /// Parse postfix operations that bind tighter than every infix operator.
     ///
     /// GRAMMAR:
-    ///   postfix := primary (call | member | index | cast | optional-chain | conversion)*
+    ///   postfix := primary (call | member | index | gradient | cast | optional-chain | conversion)*
     ///   call := `(` args `)`
     ///   member := `.` ident
     ///   index := `[` expr `]`
+    ///   gradient := '∇' ['[' place (',' place)* ']']
     ///   cast := `∷` type
     ///   optional-chain := '?.' ident | '?[' expr `]` | '?(' args `)`
     ///   conversion := '↦' type [type-params] ['⇥' recovery]
     ///
     /// Keeping every postfix form in one loop preserves left-to-right chaining
     /// (`a.b(c)[`d`]`) and prevents casts/conversions from accidentally binding at
-    /// a different level than calls or optional chaining.
+    /// a different level than calls or optional chaining. The gradient suffix
+    /// consumes its optional selector bracket here, before the loop resumes, so
+    /// later postfix operations apply to the gradient result — never to the
+    /// selector list.
     fn parse_postfix_inner(&mut self, allow_conversio: bool) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let mut expr = self.parse_primary()?;
@@ -761,6 +765,8 @@ impl Parser {
             } else if self.check(&TokenKind::LBracket) {
                 self.reject_retired_shape_sugar_type_call_constructor(&expr)?;
                 expr = self.parse_index_postfix(start, expr)?;
+            } else if self.check(&TokenKind::Nabla) {
+                expr = self.parse_gradient_postfix(start, expr)?;
             } else if self.check(&TokenKind::QuestionDot) {
                 expr = self.parse_optional_member_postfix(start, expr)?;
             } else if self.check(&TokenKind::QuestionBracket) {
@@ -831,6 +837,44 @@ impl Parser {
             ExprKind::Index(IndexExpr {
                 object: Box::new(object),
                 index,
+            }),
+        ))
+    }
+
+    /// Parse the postfix gradient suffix `∇ [places]?` bound to an already-parsed
+    /// forward expression.
+    ///
+    /// The gradient glyph is a structural postfix operator, never a prefix unary
+    /// form. The optional selector bracket is consumed here, before the ordinary
+    /// postfix loop resumes, so later postfix operations apply to the gradient
+    /// result rather than to the selector list. The grammar is
+    /// whitespace-insensitive: `loss(x) ∇[x]` parses and lowers to the same
+    /// selectors as `loss(x) ∇ [x]`; both formatters re-emit the canonical spaced
+    /// form. A non-empty selector list is required once `[` follows `∇`.
+    fn parse_gradient_postfix(&mut self, start: Span, call: Expr) -> Result<Expr, ParseError> {
+        self.advance(); // consume `∇`
+        let selectors = if self.check(&TokenKind::LBracket) {
+            self.advance();
+            if self.check(&TokenKind::RBracket) {
+                return Err(self.expected_expression_error("gradient_empty_selector_list"));
+            }
+            let mut selectors = Vec::new();
+            loop {
+                selectors.push(self.parse_expression()?);
+                if !self.eat(&TokenKind::Comma) {
+                    break;
+                }
+            }
+            self.expect(&TokenKind::RBracket, "expected ']' after gradient selectors")?;
+            selectors
+        } else {
+            Vec::new()
+        };
+        Ok(self.postfix_expr(
+            start,
+            ExprKind::Gradient(GradientExpr {
+                call: Box::new(call),
+                selectors,
             }),
         ))
     }

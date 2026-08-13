@@ -7,6 +7,7 @@
 use crate::parse;
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::parse_ok;
+use crate::ParseResult;
 use radix_lexer::lex;
 use radix_syntax::{
     AssignOp, BinOp, ConversioTarget, ExprKind, FiguraExpr, JsonValue, Literal, StmtKind,
@@ -1143,5 +1144,134 @@ fn same_module_finge_construction_unchanged() {
         matches!(cast.kind, TypeExprKind::Named(_, _)),
         "same-module cast stays a named type, got {:?}",
         cast.kind
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Postfix gradient selection (`call(...) ∇` / `call(...) ∇ [places]`)
+// ---------------------------------------------------------------------------
+
+fn gradient_expr<'a>(result: &'a ParseResult, statement_index: usize) -> &'a radix_syntax::GradientExpr {
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[statement_index].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Gradient(gradient) = &expr.kind else {
+        panic!("expected gradient expression, got {:?}", expr.kind);
+    };
+    gradient
+}
+
+#[test]
+fn bare_gradient_postfix_parses() {
+    let result = parse_ok("fixum _ g ← loss(x, y) ∇");
+    let gradient = gradient_expr(&result, 0);
+    assert!(gradient.selectors.is_empty(), "bare form has no selectors");
+    assert!(
+        matches!(gradient.call.kind, ExprKind::Call(_)),
+        "gradient call must be a call, got {:?}",
+        gradient.call.kind
+    );
+}
+
+#[test]
+fn single_selector_gradient_postfix_parses() {
+    let result = parse_ok("fixum _ g ← loss(x, y) ∇ [x]");
+    let gradient = gradient_expr(&result, 0);
+    assert_eq!(gradient.selectors.len(), 1, "one selector");
+    assert!(
+        matches!(gradient.selectors[0].kind, ExprKind::Ident(_)),
+        "selector must parse as an expression, got {:?}",
+        gradient.selectors[0].kind
+    );
+}
+
+#[test]
+fn ordered_selector_gradient_postfix_parses() {
+    let result = parse_ok("fixum _ g ← loss(x, y) ∇ [x, y]");
+    let gradient = gradient_expr(&result, 0);
+    assert_eq!(gradient.selectors.len(), 2);
+    assert!(
+        matches!(gradient.selectors[0].kind, ExprKind::Ident(_)),
+        "first selector, got {:?}",
+        gradient.selectors[0].kind
+    );
+    assert!(
+        matches!(gradient.selectors[1].kind, ExprKind::Ident(_)),
+        "second selector, got {:?}",
+        gradient.selectors[1].kind
+    );
+
+    // Selector order is preserved verbatim: `[y, x]` stays `[y, x]`.
+    let result = parse_ok("fixum _ g ← loss(x, y) ∇ [y, x]");
+    let gradient = gradient_expr(&result, 0);
+    assert_eq!(gradient.selectors.len(), 2);
+    assert!(
+        matches!(gradient.selectors[0].kind, ExprKind::Ident(_)),
+        "first selector, got {:?}",
+        gradient.selectors[0].kind
+    );
+    assert!(
+        matches!(gradient.selectors[1].kind, ExprKind::Ident(_)),
+        "second selector, got {:?}",
+        gradient.selectors[1].kind
+    );
+}
+
+#[test]
+fn gradient_selector_bracket_is_whitespace_insensitive() {
+    // `∇[x]` (no space) parses to the same dedicated node; the formatters
+    // re-emit the canonical ` ∇ [x]` spaced form.
+    let result = parse_ok("fixum _ g ← loss(x, y) ∇[x]");
+    let gradient = gradient_expr(&result, 0);
+    assert_eq!(gradient.selectors.len(), 1);
+}
+
+#[test]
+fn ordinary_postfix_continuation_applies_after_gradient() {
+    // The selector bracket is consumed as part of the gradient suffix, so a
+    // later postfix op applies to the gradient result.
+    let result = parse_ok("fixum _ g ← loss(x, y) ∇ [x].magnitudo");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Member(member) = &expr.kind else {
+        panic!("member continuation must wrap the gradient, got {:?}", expr.kind);
+    };
+    assert!(
+        matches!(member.object.kind, ExprKind::Gradient(_)),
+        "member object must be the gradient expression, got {:?}",
+        member.object.kind
+    );
+}
+
+#[test]
+fn prefix_nabla_fails_parse() {
+    // `∇` is a postfix gradient operator only; a prefix `∇ x` has no grammar.
+    let result = parse(lex("fixum _ g ← ∇ loss(x)"));
+    assert!(
+        !result.success(),
+        "prefix ∇ must fail parse; errors: {:?}",
+        result.errors
+    );
+    assert!(
+        result.errors.iter().any(|err| {
+            err.kind == crate::ParseErrorKind::InvalidExpression
+                && err.args.iter().any(|arg| arg.name == "issue" && arg.value == "expected_expression")
+        }),
+        "prefix ∇ must report the expected-expression error, got {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn empty_gradient_selector_list_fails_parse() {
+    // The selector contract requires a non-empty list once `[` follows `∇`.
+    crate::test_support::assert_parse_error_issue(
+        "fixum _ g ← loss(x, y) ∇ []",
+        "gradient_empty_selector_list",
     );
 }

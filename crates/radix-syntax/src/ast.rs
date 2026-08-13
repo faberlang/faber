@@ -927,6 +927,8 @@ pub enum ExprKind {
     Call(CallExpr),
     Member(MemberExpr),
     Index(IndexExpr),
+    /// Postfix gradient selection: `call(...) ∇ [places]?`.
+    Gradient(GradientExpr),
     /// Optional chain: `x?.y`, `x?[y]`, `x?(args)`.
     OptionalChain(OptionalChainExpr),
     /// Non-null assertion: `x!.y`, `x![y]`, `x!(args)`.
@@ -1124,6 +1126,20 @@ pub struct MemberExpr {
 pub struct IndexExpr {
     pub object: Box<Expr>,
     pub index: Box<Expr>,
+}
+
+/// Postfix gradient-selection expression: `call(...) ∇` or `call(...) ∇ [places]`.
+///
+/// The gradient glyph is a structural postfix operator, not a prefix unary op.
+/// `call` preserves the forward expression as parsed (semantic analysis must
+/// require it to resolve to an eligible differentiable forward call); `selectors`
+/// preserves the ordered request list, empty for the bare `∇` form. The bracket
+/// list is consumed as part of the gradient suffix before the ordinary postfix
+/// loop resumes, so later postfix operations apply to the gradient result.
+#[derive(Debug)]
+pub struct GradientExpr {
+    pub call: Box<Expr>,
+    pub selectors: Vec<Expr>,
 }
 
 #[derive(Debug)]

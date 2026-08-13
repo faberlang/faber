@@ -284,6 +284,15 @@ fn collect_expr_defs(
                 collect_expr_defs(&arg.expr, registry);
             }
         }
+        HirExpressionKind::Gradient {
+            call,
+            selected_arguments,
+        } => {
+            collect_expr_defs(call, registry);
+            for selector in selected_arguments {
+                collect_expr_defs(selector, registry);
+            }
+        }
         HirExpressionKind::MethodCall(receiver, _, _, args) => {
             collect_expr_defs(receiver, registry);
             for arg in args {
@@ -557,6 +566,15 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                 collect_expr(callee, registry);
                 for arg in args {
                     collect_expr(&arg.expr, registry);
+                }
+            }
+            HirExpressionKind::Gradient {
+                call,
+                selected_arguments,
+            } => {
+                collect_expr(call, registry);
+                for selector in selected_arguments {
+                    collect_expr(selector, registry);
                 }
             }
             HirExpressionKind::MethodCall(receiver, _, _, args) => {
@@ -1234,6 +1252,15 @@ pub(crate) fn validate_referential_integrity(
                         check_symbol(n)?;
                     }
                     validate_expr(&arg.expr, check_symbol, check_def, check_hir, check_type)?;
+                }
+            }
+            HirExpressionKind::Gradient {
+                call,
+                selected_arguments,
+            } => {
+                validate_expr(call, check_symbol, check_def, check_hir, check_type)?;
+                for selector in selected_arguments {
+                    validate_expr(selector, check_symbol, check_def, check_hir, check_type)?;
                 }
             }
             HirExpressionKind::MethodCall(receiver, method, type_args, args) => {

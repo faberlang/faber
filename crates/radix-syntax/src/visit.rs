@@ -435,6 +435,12 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
             visitor.visit_expr(&index.object);
             visitor.visit_expr(&index.index);
         }
+        ExprKind::Gradient(gradient) => {
+            visitor.visit_expr(&gradient.call);
+            for selector in &gradient.selectors {
+                visitor.visit_expr(selector);
+            }
+        }
         ExprKind::Assign(assign) => {
             visitor.visit_expr(&assign.target);
             visitor.visit_expr(&assign.value);

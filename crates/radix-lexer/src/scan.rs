@@ -296,6 +296,9 @@ impl<'a> Lexer<'a> {
             '⊗' => TokenKind::CircledTimes,
             '⊙' => TokenKind::CircledDot,
 
+            // Postfix gradient selection (tensor-glyphs family).
+            '∇' => TokenKind::Nabla,
+
             '∴' => TokenKind::Therefore,
             '∪' => TokenKind::Cup,
             '+' => TokenKind::Plus,

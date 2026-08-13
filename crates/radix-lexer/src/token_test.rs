@@ -70,6 +70,7 @@ fn glyph_product_tokens_are_operators_not_keywords() {
         TokenKind::Cross,
         TokenKind::CircledTimes,
         TokenKind::CircledDot,
+        TokenKind::Nabla,
     ] {
         assert!(
             !kind.is_keyword(),
@@ -78,4 +79,24 @@ fn glyph_product_tokens_are_operators_not_keywords() {
         assert!(!kind.is_comment(), "{kind:?} must not classify as trivia");
         assert!(!kind.is_trivia(), "{kind:?} must not classify as trivia");
     }
+}
+
+#[test]
+fn nabla_lexes_as_dedicated_gradient_operator() {
+    let result = crate::lex("loss(x) ∇");
+    assert!(
+        result.errors.is_empty(),
+        "U+2207 must lex cleanly; errors: {:?}",
+        result.errors
+    );
+    assert!(
+        result
+            .tokens
+            .iter()
+            .any(|token| token.kind == TokenKind::Nabla),
+        "∇ must produce TokenKind::Nabla, got {:?}",
+        result.tokens
+    );
+    // Nabla is never a keyword identity.
+    assert!(!TokenKind::Nabla.is_keyword());
 }

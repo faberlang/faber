@@ -919,6 +919,19 @@ pub enum HirExpressionKind {
     Unary(HirUnOp, Box<HirExpression>),
     Call(Box<HirExpression>, Vec<TypeId>, Vec<HirCallArg>),
 
+    /// Postfix gradient selection: `call(...) ∇` or `call(...) ∇ [places]`.
+    ///
+    /// Dedicated node, not a unary operation: it preserves the forward
+    /// expression and the ordered selector expressions whose adjoints are
+    /// requested. The bare form has an empty selector list (every eligible
+    /// argument, in call order). Semantic analysis resolves the call to an
+    /// eligible differentiable forward and the selectors to direct call
+    /// argument places.
+    Gradient {
+        call: Box<HirExpression>,
+        selected_arguments: Vec<HirExpression>,
+    },
+
     /// Method call normalized from receiver syntax.
     MethodCall(Box<HirExpression>, Symbol, Vec<TypeId>, Vec<HirCallArg>),
     Field(Box<HirExpression>, Symbol),

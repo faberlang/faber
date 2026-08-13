@@ -159,6 +159,23 @@ impl super::FaberCodegen {
                 self.write_expr(index, types, names, interner, surface, writer);
                 writer.write("]");
             }
+            HirExpressionKind::Gradient {
+                call,
+                selected_arguments,
+            } => {
+                self.write_expr_prec(call, 12, types, names, interner, surface, writer);
+                writer.write(" ∇");
+                if !selected_arguments.is_empty() {
+                    writer.write(" [");
+                    for (index, selector) in selected_arguments.iter().enumerate() {
+                        if index > 0 {
+                            writer.write(", ");
+                        }
+                        self.write_expr(selector, types, names, interner, surface, writer);
+                    }
+                    writer.write("]");
+                }
+            }
             HirExpressionKind::OptionalChain(object, chain) => {
                 self.write_expr_prec(object, 13, types, names, interner, surface, writer);
                 self.write_postfix_chain_tail(
