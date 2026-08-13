@@ -6,16 +6,12 @@
 //! optional chaining, non-null chaining, and conversions all bind tighter than
 //! infix operators.
 //!
-//! DESIGN PHILOSOPHY
-//! =================
 //! The parser prefers explicit grammar functions over a data-driven operator
 //! table. That makes the accepted syntax visible at the cost of boilerplate, and
 //! it keeps contextual Faber forms close to their diagnostics. Binary operators
 //! associate left through loops; assignment and ternary forms recurse on the
 //! right where the language expects right associativity.
 //!
-//! INVARIANTS
-//! ==========
 //! - No expression form may invent declaration syntax; constructors and casts
 //!   are parsed only through tokenized grammar surfaces.
 //! - Compact closures are the only expression form that uses speculative
@@ -28,12 +24,9 @@
 use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::{lookup_keyword_spec, KeywordOwner, KeywordScope, Span, Symbol, TokenKind};
 #[allow(clippy::wildcard_imports)]
-// syntax is a pure re-export barrel from radix-syntax
 use radix_syntax::*;
 
-// =============================================================================
 // EXPRESSION ENTRY POINT
-// =============================================================================
 
 impl Parser {
     /// Parse an expression from the lowest-precedence level.
@@ -58,11 +51,7 @@ impl Parser {
         }
     }
 
-    // =============================================================================
     // PRECEDENCE CLIMBING
-    // =============================================================================
-    // Each function handles one precedence level, calling the next-higher
-    // precedence level for its operands
 
     /// Parse assignment expression (lowest precedence).
     ///
@@ -141,7 +130,6 @@ impl Parser {
         let start = self.current_span();
         let cond = self.parse_or()?;
 
-        // ? : style
         if self.eat(&TokenKind::Question) {
             let then = Box::new(self.parse_expression()?);
             self.expect(&TokenKind::Colon, "expected ':' in ternary")?;
@@ -160,7 +148,6 @@ impl Parser {
             });
         }
 
-        // sic secus style
         if self.eat_keyword_ident(TokenKind::Sic) {
             let then = Box::new(self.parse_expression()?);
             self.expect_keyword_ident(TokenKind::Secus, "expected 'secus' after 'sic'")?;
@@ -196,7 +183,6 @@ impl Parser {
         Ok(left)
     }
 
-    /// Logical AND
     fn parse_and(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let mut left = self.parse_equality()?;
@@ -210,7 +196,6 @@ impl Parser {
         Ok(left)
     }
 
-    /// Equality
     fn parse_equality(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let mut left = self.parse_comparison()?;
@@ -250,7 +235,7 @@ impl Parser {
                 let id = self.next_id();
                 left = Expr {
                     id,
-                    kind: ExprKind::TypeCheck(radix_syntax::TypeCheckExpr {
+                    kind: ExprKind::TypeCheck(TypeCheckExpr {
                         positive,
                         expr: Box::new(left),
                         ty,
@@ -267,7 +252,6 @@ impl Parser {
         Ok(left)
     }
 
-    /// Comparison
     fn parse_comparison(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let mut left = self.parse_bitwise_or()?;
@@ -293,7 +277,6 @@ impl Parser {
         Ok(left)
     }
 
-    /// Bitwise OR
     fn parse_bitwise_or(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let mut left = self.parse_bitwise_xor()?;
@@ -307,7 +290,6 @@ impl Parser {
         Ok(left)
     }
 
-    /// Bitwise XOR
     fn parse_bitwise_xor(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let mut left = self.parse_bitwise_and()?;
@@ -321,7 +303,6 @@ impl Parser {
         Ok(left)
     }
 
-    /// Bitwise AND
     fn parse_bitwise_and(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let mut left = self.parse_shift()?;
@@ -335,7 +316,6 @@ impl Parser {
         Ok(left)
     }
 
-    /// Shift operations
     fn parse_shift(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let mut left = self.parse_range_with_conversio()?;
@@ -358,7 +338,6 @@ impl Parser {
         Ok(left)
     }
 
-    /// Range expressions
     fn parse_range(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let left = self.parse_range_bound()?;
@@ -534,7 +513,7 @@ impl Parser {
     ///   unary := unary-op unary | postfix
     ///   unary-op := '-' | '¬' | `non`
     ///
-    /// EDGE: Special handling for `finge` (variant construction). `novum` is no longer a keyword.
+    /// EDGE: `finge` is a unary-position variant constructor, not a prefix operator.
     fn parse_unary(&mut self) -> Result<Expr, ParseError> {
         self.parse_unary_inner(true)
     }
@@ -564,7 +543,6 @@ impl Parser {
             });
         }
 
-        // finge
         if self.check_keyword_ident(TokenKind::Finge) {
             return self.parse_variant_expr();
         }
@@ -646,7 +624,7 @@ impl Parser {
     /// operands; statement, declaration, and type keywords are grammar
     /// structure, not operands. This keeps the retired `nihil x` detection
     /// from firing on a value `nihil` followed by a migrated keyword (e.g.
-    /// `nota`) on the next line, for every future batch.
+    /// `nota`) on the next line.
     fn peek_at_one_starts_prefix_operand(&self) -> bool {
         match self.peek_at(1).kind {
             TokenKind::Ident(sym) => {
@@ -748,7 +726,7 @@ impl Parser {
     ///   call := `(` args `)`
     ///   member := `.` ident
     ///   index := `[` expr `]`
-    ///   cast := `∷` type   (static type ascription; qua/innatum/novum aliases removed)
+    ///   cast := `∷` type
     ///   optional-chain := '?.' ident | '?[' expr `]` | '?(' args `)`
     ///   conversion := '↦' type [type-params] ['⇥' recovery]
     ///
@@ -1027,7 +1005,6 @@ impl Parser {
         Ok(())
     }
 
-    /// Borrow the interner spelling for an identifier callee (zero-alloc).
     fn callee_ident_name<'a>(&'a self, callee: &Expr) -> Option<&'a str> {
         let ExprKind::Ident(ident) = &callee.kind else {
             return None;
@@ -1072,7 +1049,7 @@ impl Parser {
 
     /// Parse the target of `↦`: declared type or `intervallum` clamp operand.
     fn parse_conversio_target(&mut self) -> Result<ConversioTarget, ParseError> {
-        // F-060: speculative Integer/Float range parse must restore state if no
+        // Speculative Integer/Float range parse must restore state if no
         // range operator follows, so the token isn't silently consumed.
         if self.conversio_target_starts_inline_range() {
             let checkpoint = self.checkpoint();
@@ -1092,16 +1069,16 @@ impl Parser {
                 .reader_type_latin_keys
                 .get(name)
                 .map_or(name, String::as_str);
-            // Type-position keywords migrated to tokenless (Batch A: `modulus`,
-            // `iuncta`) must still route to an explicit type target rather than
-            // the range fallback — in Latin or a reader-pack surface spelling.
+            // Type-position keywords (`modulus`, `iuncta`) must still route to
+            // an explicit type target rather than the range fallback — in Latin
+            // or a reader-pack surface spelling.
             let is_type_slot_keyword = self.check_keyword_ident(TokenKind::Modulus)
                 || self.check_keyword_ident(TokenKind::Iuncta);
             if !Self::is_conversio_type_keyword(latin)
                 && !Self::is_capitalized_type_name(name)
                 && !is_type_slot_keyword
             {
-                // F-059: use parse_range (not parse_additive) so range tails
+                // Use parse_range (not parse_additive) so range tails
                 // like `..finem` are captured in the Intervallum target.
                 let expr = self.parse_range()?;
                 return Ok(ConversioTarget::Intervallum(Box::new(expr)));
@@ -1160,17 +1137,15 @@ impl Parser {
         name.chars().next().is_some_and(char::is_uppercase)
     }
 
-    // =============================================================================
     // PRIMARY EXPRESSIONS
-    // =============================================================================
 
     /// Parse primary expressions, the atoms that postfix and infix forms compose.
     ///
     /// GRAMMAR:
-    ///   primary := literal | ident | array | object | paren | closure | collection-dsl
+    ///   primary := literal | ident | array | json | paren | closure | collection-dsl
     ///   literal := integer | float | string | bool | nil
     ///   array := `[` (expr | `sparge` expr) (',' (expr | `sparge` expr))* `]`
-    ///   object := '{' field (',' field)* '}'
+    ///   json := '{' member (',' member)* '}'
     ///   paren := `(` expr `)`
     ///   closure := `clausura` params ['→' type] ('{' block '}' | ':' expr)
     ///
@@ -1187,7 +1162,6 @@ impl Parser {
         let id = self.next_id();
 
         let kind = match self.peek().kind.clone() {
-            // Literals
             TokenKind::Integer(n) => {
                 self.advance();
                 ExprKind::Literal(Literal::Int(n))
@@ -1213,23 +1187,12 @@ impl Parser {
                 ExprKind::Literal(Literal::Octeti(s))
             }
 
-            // Literal values: verum / falsum / nihil
-            // Recognized in the Ident arm below by spelling (Batch C made them
-            // tokenless).
-
-            // Iuncta tuple construction: iuncta<A, B> [a, b]
-            // Recognized in the Ident arm below by spelling in this slot
-            // (Batch A migration made `iuncta` tokenless).
-
-            // Self
             TokenKind::Ident(_) | TokenKind::Tag | TokenKind::Solum => {
-                // Iuncta tuple construction: iuncta<A, B> [a, b]. `iuncta` is
-                // tokenless (Batch A), so the constructor slot claims the
+                // `iuncta` is tokenless, so the constructor slot claims the
                 // spelling here — Latin text or a reader-pack surface.
                 if self.check_keyword_ident(TokenKind::Iuncta) {
                     return self.parse_iuncta_expr();
                 }
-                // Self literal (tokenless since Batch G).
                 if self.check_keyword_ident(TokenKind::Ego) {
                     let span = self.peek().span;
                     self.advance();
@@ -1239,25 +1202,20 @@ impl Parser {
                         span: start.merge(self.previous_span()),
                     });
                 }
-                // Comptime expression: praefixum(expr) (tokenless since Batch G).
                 if self.check_keyword_ident(TokenKind::Praefixum) {
                     return self.parse_praefixum_expr();
                 }
-                // Closure (tokenless since Batch G).
                 if self.check_keyword_ident(TokenKind::Clausura) {
                     return self.parse_clausura_expr();
                 }
-                // Expression-form stream ad: ad 'route' (opener)? (tokenless
-                // since Batch G). Blockless only — a following '{' belongs to
-                // the statement parser.
+                // Expression-form `ad` is blockless — a following `{` belongs
+                // to the statement parser.
                 if self.check_keyword_ident(TokenKind::Ad) {
                     return self.parse_ad_expr();
                 }
-                // Builtin calls: scriptum format calls and the lege/lineam
-                // input builtins. scriptum is claimed only when followed by
-                // `(` so the spelling stays usable as an ordinary identifier
-                // expression (`discerne format { … }` where `format` is a
-                // variable); lege/lineam are bare value builtins.
+                // `scriptum` is claimed only when followed by `(` so the
+                // spelling stays usable as an ordinary identifier (`discerne
+                // format { … }`). `lege`/`lineam` are bare value builtins.
                 if self.check_keyword_ident(TokenKind::Scriptum)
                     && self.peek_at(1).kind == TokenKind::LParen
                 {
@@ -1268,7 +1226,6 @@ impl Parser {
                 {
                     return self.parse_lege_expr();
                 }
-                // Literal values (tokenless since Batch C): verum/falsum/nihil.
                 if self.check_keyword_ident(TokenKind::Verum)
                     || self.check_keyword_ident(TokenKind::Falsum)
                     || self.check_keyword_ident(TokenKind::Nihil)
@@ -1288,7 +1245,7 @@ impl Parser {
                     });
                 }
                 let ident = self.parse_primary_ident()?;
-                // Locale-aware `vacua` claim (R4): the empty-collection marker
+                // Locale-aware `vacua` claim: the empty-collection marker
                 // claims only through the pack-authoritative surface gate.
                 // Under `la`/no-pack the registry-direct fallback lets the
                 // Latin spelling claim; under a non-`la` pack only a spelling
@@ -1328,7 +1285,6 @@ impl Parser {
                 }
             }
 
-            // Array literal
             TokenKind::LBracket => {
                 self.advance();
                 let elements = self.parse_array_elements()?;
@@ -1336,19 +1292,15 @@ impl Parser {
                 ExprKind::Array(ArrayExpr { elements })
             }
 
-            // JSON literal (bare `{` in expression position)
-            //
-            // WHY: Goal Stage 2 of inline-json-valor. Bare `{ }` is now JSON
-            // grammar, not a Faber anonymous record. The Faber anonymous record
-            // is retired (clean break). Genus construction (`Type { ... }`)
-            // keeps Faber `=` grammar via the `Ident` dispatch above.
+            // Bare `{ }` is JSON grammar, not a Faber anonymous record.
+            // Genus construction (`Type { ... }`) keeps Faber `=` grammar via
+            // the `Ident` dispatch above.
             TokenKind::LBrace => {
                 let start = self.current_span();
                 self.advance();
                 self.parse_json_literal(start)?
             }
 
-            // Parenthesized expression or closure
             TokenKind::LParen => {
                 self.advance();
                 let inner = self.parse_expression()?;
@@ -1476,17 +1428,13 @@ impl Parser {
     }
 
     /// Parse iuncta tuple construction: `iuncta<A, B> [a, b]`.
-    ///
-    /// Consumes the `iuncta` keyword via `expect_keyword_in_slot`.
     fn parse_iuncta_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         self.expect_keyword_ident(TokenKind::Iuncta, "expected 'iuncta'")?;
 
-        // Parse <type-args>
         self.expect(&TokenKind::LtAscii, "expected '<' after 'iuncta'")?;
         let type_args = self.finish_type_args_list()?;
 
-        // Parse [elements]
         self.expect(
             &TokenKind::LBracket,
             "expected '[' after iuncta type arguments",
@@ -1516,10 +1464,8 @@ impl Parser {
         let start = self.current_span();
         self.expect_keyword_ident(TokenKind::Clausura, "expected 'clausura'")?;
 
-        // Parse parameters: type name, type name, ...
         let mut params = Vec::new();
         loop {
-            // Check for end of params (→ or :)
             if self.check(&TokenKind::Arrow) || self.check(&TokenKind::Colon) {
                 break;
             }
@@ -1533,7 +1479,6 @@ impl Parser {
 
         let (ret, err) = self.parse_optional_clausura_signature()?;
 
-        // Body: either `: expr` or `{ block }`
         let body = if self.eat(&TokenKind::Colon) {
             ClausuraBody::Expr(Box::new(self.parse_expression()?))
         } else if self.check(&TokenKind::LBrace) {
@@ -1711,16 +1656,14 @@ impl Parser {
     ///   adExpr := `ad` asciiLiteral adOpener?
     ///   adOpener := `(` expression `)`
     ///
-    /// WHY: `parse_primary` claims `ad` by spelling without consuming it
-    /// (tokenless since Batch G), so this function must consume the keyword
-    /// itself (matches `parse_clausura_expr`).
-    /// This function must not consume a `{` block.
+    /// WHY: `parse_primary` claims `ad` by spelling without consuming it,
+    /// so this function must consume the keyword itself (matches
+    /// `parse_clausura_expr`). This function must not consume a `{` block.
     fn parse_ad_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         self.expect_keyword_ident(TokenKind::Ad, "expected 'ad'")?;
         let id = self.next_id();
 
-        // Route: required ascii literal
         let path = match &self.peek().kind {
             TokenKind::AsciiString(s) => {
                 let s = *s;
@@ -1732,7 +1675,6 @@ impl Parser {
             }
         };
 
-        // Optional opener: (expression)
         let opener = if self.eat(&TokenKind::LParen) {
             let expr = self.parse_expression()?;
             self.expect(&TokenKind::RParen, "expected ')' after ad opener")?;
@@ -1741,7 +1683,6 @@ impl Parser {
             None
         };
 
-        // Check that a block does NOT follow — expression ad is blockless.
         if self.check(&TokenKind::LBrace) {
             return Err(self.invalid_expression_error("expression_ad_block"));
         }
@@ -1782,9 +1723,7 @@ impl Parser {
         Ok(ClausuraBody::Expr(Box::new(self.parse_expression()?)))
     }
 
-    // =============================================================================
     // SPECIAL EXPRESSION FORMS
-    // =============================================================================
 
     /// Parse a function-call argument list after `(` has been consumed.
     ///
@@ -1840,7 +1779,6 @@ impl Parser {
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let start = self.current_span();
 
-            // Spread
             if self.eat_keyword_ident(TokenKind::Sparge) {
                 let expr = Box::new(self.parse_expression()?);
                 let span = start.merge(self.previous_span());
@@ -1850,7 +1788,6 @@ impl Parser {
                     span,
                 });
             } else if let TokenKind::String(s) = self.peek().kind {
-                // String key
                 self.advance();
                 self.expect_field_value_separator()?;
                 let value = Some(Box::new(self.parse_expression()?));
@@ -1861,7 +1798,6 @@ impl Parser {
                     span,
                 });
             } else if self.check(&TokenKind::LBracket) {
-                // Computed key
                 self.advance();
                 let key_expr = Box::new(self.parse_expression()?);
                 self.expect(&TokenKind::RBracket, "expected ']'")?;
@@ -1874,12 +1810,11 @@ impl Parser {
                     span,
                 });
             } else {
-                // Identifier key (possibly shorthand)
                 let ident = self.parse_ident()?;
                 let value = if self.eat(&TokenKind::Eq) {
                     Some(Box::new(self.parse_expression()?))
                 } else {
-                    None // Shorthand
+                    None
                 };
                 let span = start.merge(self.previous_span());
                 fields.push(ObjectField {
@@ -1897,14 +1832,11 @@ impl Parser {
         Ok(fields)
     }
 
-    // ------------------------------------------------------------------------
     // JSON literal parser (bare `{` in expression position)
     //
-    // WHY: Goal Stage 2 of inline-json-valor. Bare `{ }` is repurposed from the
-    // Faber anonymous record to compile-time JSON. This is a dedicated parser —
-    // `parse_object_fields` is NOT reused; it stays as the genus `=` specialist
-    // for `Type { ... }`. See `docs/factory/inline-json-valor/contract.md`.
-    // ------------------------------------------------------------------------
+    // Bare `{ }` is compile-time JSON, not a Faber anonymous record. This is a
+    // dedicated parser — `parse_object_fields` stays the genus `=` specialist
+    // for `Type { ... }`.
 
     /// Parse a JSON object literal whose opening `{` has already been consumed.
     ///
@@ -1939,8 +1871,7 @@ impl Parser {
     }
 
     /// JSON keys must be quoted strings. Bare identifiers are rejected to keep
-    /// JSON grammar unambiguous with Faber shorthand and to leave room for a
-    /// future JSON5 unquoted-key decision (deferred, non-v1).
+    /// JSON grammar unambiguous with Faber shorthand.
     fn parse_json_key(&mut self) -> Result<Symbol, ParseError> {
         match self.peek().kind {
             TokenKind::String(sym) => {
@@ -1991,11 +1922,9 @@ impl Parser {
                     "false" => Ok(JsonValue::Bool(false)),
                     "null" => Ok(JsonValue::Null),
                     _ if lookup_keyword_spec(&text).is_some() => {
-                        // A Faber keyword leaked into a JSON island — since the
-                        // migration, tokenless keywords like `verum` arrive as
-                        // identifiers. JSON values use wire tokens
-                        // `true`/`false`/`null`; diagnose clearly so the
-                        // author knows to switch.
+                        // A Faber keyword leaked into a JSON island — tokenless
+                        // keywords like `verum` arrive as identifiers. JSON
+                        // values use wire tokens `true`/`false`/`null`.
                         Err(self.json_unexpected_error("json_faber_keyword_value"))
                     }
                     _ => Err(self.json_unexpected_error("json_unknown_identifier_value")),
@@ -2015,7 +1944,7 @@ impl Parser {
     /// Parse a nested JSON array value `[ ... ]`. Arrays appear only as values
     /// inside objects (never at expression root, which stays Faber `lista<T>`).
     fn parse_json_array_value(&mut self) -> Result<JsonValue, ParseError> {
-        self.advance(); // consume `[`
+        self.advance();
         let mut elements = Vec::new();
         while !self.check(&TokenKind::RBracket) && !self.is_at_end() {
             elements.push(self.parse_json_value()?);
@@ -2031,7 +1960,7 @@ impl Parser {
     /// assemble the signed value. The lexer validated the digit run and the
     /// u64 range of the magnitude; the signed wire range is checked here.
     fn parse_json_negative_number(&mut self) -> Result<JsonValue, ParseError> {
-        self.advance(); // consume `-`
+        self.advance();
         match &self.peek().kind {
             TokenKind::Integer(n) => {
                 let n = *n;
@@ -2115,10 +2044,8 @@ impl Parser {
         self.expect_keyword_ident(TokenKind::Scriptum, "expected 'scriptum'")?;
         self.expect(&TokenKind::LParen, "expected '(' after 'scriptum'")?;
 
-        // First arg is the format string
         let template = self.parse_string()?;
 
-        // Remaining args
         let mut args = Vec::new();
         while self.eat(&TokenKind::Comma) {
             args.push(self.parse_expression()?);
