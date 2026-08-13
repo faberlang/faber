@@ -399,6 +399,121 @@ typo = "1.0.0"
     );
 }
 
+#[test]
+fn package_mir_rewrites_gradient_call_and_selected_arguments() {
+    let mut interner = Interner::default();
+    let unit_path = PathBuf::from("<gradient-link-test>.fab");
+    let forward_namespace = DefId(11);
+    let selector_namespace = DefId(12);
+    let data_namespace = DefId(13);
+    let forward_method = interner.intern("loss");
+    let selector_method = interner.intern("argument");
+    let data_member = interner.intern("WEIGHT");
+    let forward_target = DefId(2_000_000_001);
+    let selector_target = DefId(2_000_000_002);
+    let data_target = DefId(2_000_000_003);
+
+    let mut targets = NamespaceCallTargets::new();
+    targets.insert(
+        (unit_path.clone(), forward_namespace, "loss".to_owned()),
+        forward_target,
+    );
+    targets.insert(
+        (unit_path.clone(), selector_namespace, "argument".to_owned()),
+        selector_target,
+    );
+    let mut data_member_targets = NamespaceDataMemberTargets::new();
+    data_member_targets.insert(
+        (unit_path.clone(), data_namespace, "WEIGHT".to_owned()),
+        data_target,
+    );
+
+    let namespace_call = |namespace, method| HirExpression {
+        id: HirId(0),
+        kind: HirExpressionKind::Call(
+            Box::new(HirExpression {
+                id: HirId(0),
+                kind: HirExpressionKind::Field(
+                    Box::new(HirExpression {
+                        id: HirId(0),
+                        kind: HirExpressionKind::Path(namespace),
+                        ty: None,
+                        span: Span::default(),
+                    }),
+                    method,
+                ),
+                ty: None,
+                span: Span::default(),
+            }),
+            Vec::new(),
+            Vec::new(),
+        ),
+        ty: None,
+        span: Span::default(),
+    };
+    let mut gradient = HirExpression {
+        id: HirId(0),
+        kind: HirExpressionKind::Gradient {
+            call: Box::new(namespace_call(forward_namespace, forward_method)),
+            selected_arguments: vec![
+                namespace_call(selector_namespace, selector_method),
+                HirExpression {
+                    id: HirId(0),
+                    kind: HirExpressionKind::Field(
+                        Box::new(HirExpression {
+                            id: HirId(0),
+                            kind: HirExpressionKind::Path(data_namespace),
+                            ty: None,
+                            span: Span::default(),
+                        }),
+                        data_member,
+                    ),
+                    ty: None,
+                    span: Span::default(),
+                },
+            ],
+        },
+        ty: None,
+        span: Span::default(),
+    };
+
+    let mut diagnostics = Vec::new();
+    super::link::rewrite_expr(
+        &unit_path,
+        &mut gradient,
+        &interner,
+        &targets,
+        &data_member_targets,
+        &NamespaceExports::new(),
+        &mut diagnostics,
+    );
+
+    assert!(
+        diagnostics.is_empty(),
+        "unexpected diagnostics: {diagnostics:?}"
+    );
+    let HirExpressionKind::Gradient {
+        call,
+        selected_arguments,
+    } = gradient.kind
+    else {
+        panic!("the linker must preserve the gradient node");
+    };
+    let HirExpressionKind::Call(callee, _, _) = call.kind else {
+        panic!("the gradient's forward expression must remain a call");
+    };
+    assert_eq!(callee.kind, HirExpressionKind::Path(forward_target));
+    let HirExpressionKind::Call(callee, _, _) = &selected_arguments[0].kind else {
+        panic!("the first selected argument must remain a call");
+    };
+    assert_eq!(callee.kind, HirExpressionKind::Path(selector_target));
+    assert_eq!(
+        selected_arguments[1].kind,
+        HirExpressionKind::Path(data_target),
+        "const data members inside selected arguments must also be linked"
+    );
+}
+
 /// The `forma`-shadowing shape: a receiver def in the HIR-generated range
 /// (>= 1_000_000) whose binding name (recovered from the HIR def→name map)
 /// appears in the unit's imports resolves to the registered synthetic
