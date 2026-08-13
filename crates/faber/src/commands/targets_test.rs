@@ -88,7 +88,10 @@ fn default_build_reports_full_surface() {
     for &(_, name, _) in FABER_TARGET_ROWS {
         assert!(row(&rows, name).available, "{name} must be available");
     }
-    assert!(row(&rows, "host-wasm").available, "host-wasm must be available");
+    assert!(
+        row(&rows, "host-wasm").available,
+        "host-wasm must be available"
+    );
     for name in ["device-runtime", "host-macos-arm64"] {
         assert!(
             !rows.iter().any(|r| r.name == name),
