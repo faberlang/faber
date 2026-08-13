@@ -12,12 +12,17 @@
 //! FMIR lane with its trajectory matching the train.proba U6 pins.
 
 use super::*;
+use radix::lexer::Span;
 use radix::mir::BufferHost;
+use radix::mir::{MirConversion, MirConversionFlavor};
 use radix::semantic::Resolver;
 use std::path::PathBuf;
 
 const METHOD_LIB: &str = "genus Punctum {\n    numerus x\n\n    functio dupla() → numerus {\n        redde ego.x * 2\n    }\n}\n\nfunctio structa(numerus x) → Punctum {\n    redde Punctum { x = x }\n}\n";
 const METHOD_MAIN: &str = "import from \"methlib:lib\" private lib\n\nmain {\n    const lib.Punctum p ← lib.structa(21)\n    print p.dupla()\n}\n";
+
+const CALLBACK_LIB: &str = "genus Lectio {\n    bivalens successus\n    numerus valor\n    textus causa\n}\n\nfunctio applica((numerus, numerus) → Lectio f, numerus x) → numerus {\n    fixum Lectio lectio ← f(x, 2)\n    si non lectio.successus ergo redde 0\n    redde lectio.valor\n}\n";
+const CALLBACK_MAIN: &str = "importa ex \"callbacklib:lib\" privata lib\n\nincipit {\n    fixum numerus factor ← 1\n    nota lib.applica((numerus x, numerus y) → lib.Lectio ∴ lib.Lectio { successus = verum, valor = x * y * factor, causa = \"\" }, 21)\n}\n";
 
 // The forma-shadowing guard (fd0c939) false-positive exclusion: a local
 // `h1b` whose method call `h1b.gelu()` must NOT be rewritten into a
@@ -27,6 +32,43 @@ const METHOD_MAIN: &str = "import from \"methlib:lib\" private lib\n\nmain {\n  
 // rewritten to `nn.gelu(h1b)` — an arity-corrupting synthetic-path call.
 const GELU_LIB: &str = "functio gelu() → numerus {\n    redde 7\n}\n";
 const GELU_MAIN: &str = "import from \"gelulib:lib\" private nn\n\nclass H1B {\n    int x\n\n    fn gelu() → int {\n        return self.x * 2\n    }\n}\n\nfn structa(int x) → H1B {\n    return H1B { x = x }\n}\n\nmain {\n    const int nn_value ← nn.gelu()\n    const H1B h1b ← structa(21)\n    print h1b.gelu()\n    print nn_value\n}\n";
+
+#[test]
+fn package_mir_rewrites_runtime_conversion_types_with_imported_types() {
+    let mut statement = MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: None,
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Convert(MirConversion {
+                    flavor: MirConversionFlavor::Runtime,
+                    source_ty: MirType::semantic(TypeId(1)),
+                    target_ty: MirType::semantic(TypeId(2)),
+                    params: Vec::new(),
+                    recovery: None,
+                    struct_defaults: Vec::new(),
+                }),
+                args: vec![MirOperand::Constant(MirConstant::Int(1))],
+                return_ty: MirType::semantic(TypeId(2)),
+            },
+        },
+        span: Span::default(),
+    };
+
+    super::lower::rewrite_statement_type_id(
+        &mut statement,
+        &[(TypeId(1), TypeId(10)), (TypeId(2), TypeId(11))],
+    );
+
+    let MirStatementKind::RuntimeCall { call, .. } = statement.kind else {
+        panic!("expected a runtime call");
+    };
+    let MirIntrinsic::Convert(conversion) = call.intrinsic else {
+        panic!("expected a conversion intrinsic");
+    };
+    assert_eq!(conversion.source_ty.semantic_id(), TypeId(10));
+    assert_eq!(conversion.target_ty.semantic_id(), TypeId(11));
+    assert_eq!(call.return_ty.semantic_id(), TypeId(11));
+}
 
 /// The `forma`-shadowing guard (fd0c939) excludes the `h1b.gelu()` false
 /// positive: an ordinary method call on a local is NOT rewritten into a
@@ -43,7 +85,8 @@ fn package_mir_shadowed_alias_rewrite_skips_plain_local_method_calls() {
     let config = Config::default().with_stdlib(dir.join("libhome"));
 
     let mut host = BufferHost::default();
-    run_package_mir(&config, &entry, &mut host).expect("h1b.gelu() must not be rewritten into a namespace call");
+    run_package_mir(&config, &entry, &mut host)
+        .expect("h1b.gelu() must not be rewritten into a namespace call");
     assert_eq!(
         host.stdout_lines,
         vec!["42".to_owned(), "7".to_owned()],
@@ -51,8 +94,10 @@ fn package_mir_shadowed_alias_rewrite_skips_plain_local_method_calls() {
     );
 }
 
-const VERTE_CONST_LIB: &str = "+++\nlocale = \"en\"\n+++\nconst f32 GELU_ALPHA ← (0.7978845608028654 ∷ f32)\n";
-const VERTE_CONST_MAIN: &str = "import from \"verteclib:lib\" private vals\n\nmain {\n    print vals.GELU_ALPHA\n}\n";
+const VERTE_CONST_LIB: &str =
+    "+++\nlocale = \"en\"\n+++\nconst f32 GELU_ALPHA ← (0.7978845608028654 ∷ f32)\n";
+const VERTE_CONST_MAIN: &str =
+    "import from \"verteclib:lib\" private vals\n\nmain {\n    print vals.GELU_ALPHA\n}\n";
 
 /// Write a package under a config library home (`libhome/<lib>/src`) with the
 /// given library module and entry source, mirroring the S1-U1 constlib
@@ -67,6 +112,9 @@ fn write_library_package(
     let library = dir.join("libhome").join(lib_name);
     fs::create_dir_all(&src).expect("create package src");
     fs::create_dir_all(library.join("src")).expect("create library src");
+    let reader = (lib_name == "callbacklib")
+        .then_some("\n[reader]\nlocale = \"la\"\n")
+        .unwrap_or_default();
     fs::write(
         dir.join("faber.toml"),
         format!(
@@ -86,6 +134,7 @@ kind = "bin"
 
 [dependencies]
 {lib_name} = "1.0.0"
+{reader}
 "#
         ),
     )
@@ -122,6 +171,18 @@ fn package_mir_library_nominal_method_call_runs() {
     );
 }
 
+#[test]
+fn package_mir_passes_captured_entry_closure_to_linked_library_function() {
+    let dir = crate::package::test_support::test_temp_dir("linked-library-callback");
+    let entry = write_library_package(dir.as_ref(), "callbacklib", CALLBACK_LIB, CALLBACK_MAIN);
+    let config = Config::default().with_stdlib(dir.join("libhome"));
+
+    let mut host = BufferHost::default();
+    run_package_mir(&config, &entry, &mut host)
+        .expect("an entry closure with a nominal result must cross the linked-library call boundary and remain callable");
+    assert_eq!(host.stdout_lines, vec!["42".to_owned()]);
+}
+
 // CG2-R08: a failable method on a linked nominal (`ok.reciproca()` where the
 // library method is `→ numerus ⇥ textus`) must keep its try-call edge through
 // the LibraryMethodCallRewriter synthetic-path rewrite. Pre-fix the synthetic
@@ -140,7 +201,12 @@ fn package_mir_library_nominal_failable_method_preserves_handler_reachability() 
     // try-call; the success path prints the quotient and the throwing path
     // reaches the cape handler.
     let dir = crate::package::test_support::test_temp_dir("cg2-r08-failable-method");
-    let entry = write_library_package(dir.as_ref(), "failib", FAILABLE_METHOD_LIB, FAILABLE_METHOD_MAIN);
+    let entry = write_library_package(
+        dir.as_ref(),
+        "failib",
+        FAILABLE_METHOD_LIB,
+        FAILABLE_METHOD_MAIN,
+    );
     let config = Config::default().with_stdlib(dir.join("libhome"));
 
     let mut host = BufferHost::default();
@@ -167,7 +233,9 @@ fn package_mir_const_data_member_verte_initializer_transplants() {
 
     let mut host = BufferHost::default();
     run_package_mir(&config, &entry, &mut host).expect("∷-cast const member must run");
-    let value: f64 = host.stdout_lines[0].parse().expect("the const value prints");
+    let value: f64 = host.stdout_lines[0]
+        .parse()
+        .expect("the const value prints");
     assert!(
         (value - 0.7978845608028654).abs() < 1e-4,
         "the ascription-cast const must keep its value, got {value}"
@@ -222,8 +290,7 @@ fn package_mir_training_loop_mlp_runs_on_fmir_lane() {
     // `[build] target = "fmir"` propagated to the analysis config — so the
     // air-lane functions pass the lane policy at analysis instead of tripping
     // `lane_requires_mir_backed_target` under the old default `HirRust`.
-    let workspace =
-        radix::paths::faberlang_home().expect("faberlang container root");
+    let workspace = radix::paths::faberlang_home().expect("faberlang container root");
     let exemplum = workspace.join("gradus/exempla/training-loop-mlp");
     let dir = crate::package::test_support::test_temp_dir("pml4-lane");
     copy_package_dir_skipping_target(&exemplum, dir.path());
@@ -322,8 +389,9 @@ typo = "1.0.0"
 
     let config = Config::default().with_stdlib(dir.join("libhome"));
     let mut host = BufferHost::default();
-    run_package_mir(&config, &entry, &mut host)
-        .expect("forma.quantitas(forma) and forma.causa(n) must lower through the shadowed import binding");
+    run_package_mir(&config, &entry, &mut host).expect(
+        "forma.quantitas(forma) and forma.causa(n) must lower through the shadowed import binding",
+    );
     assert_eq!(
         host.stdout_lines,
         vec!["4".to_owned(), "9".to_owned()],
@@ -357,7 +425,10 @@ fn shadowed_alias_shadowing_receiver_rewrites_when_local_name_is_in_imports() {
     imports.insert("forma".to_owned(), import_def);
     let synthetic = DefId(2_000_000_000);
     let mut targets: NamespaceCallTargets = HashMap::new();
-    targets.insert((unit_path.clone(), import_def, "quantitas".to_owned()), synthetic);
+    targets.insert(
+        (unit_path.clone(), import_def, "quantitas".to_owned()),
+        synthetic,
+    );
 
     let receiver = HirExpression {
         id: HirId(0),
@@ -410,7 +481,10 @@ fn shadowed_alias_plain_local_method_call_is_not_rewritten() {
     imports.insert("nn".to_owned(), import_def);
     let synthetic = DefId(2_000_000_000);
     let mut targets: NamespaceCallTargets = HashMap::new();
-    targets.insert((unit_path.clone(), import_def, "gelu".to_owned()), synthetic);
+    targets.insert(
+        (unit_path.clone(), import_def, "gelu".to_owned()),
+        synthetic,
+    );
 
     let receiver = HirExpression {
         id: HirId(0),
