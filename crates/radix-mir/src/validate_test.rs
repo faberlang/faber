@@ -2744,6 +2744,51 @@ fn test_rope_rejects_odd_dim_const() {
 }
 
 #[test]
+fn test_rms_norm_rejects_non_tensor_receiver() {
+    let mut types = TypeTable::new();
+    let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorRmsNorm,
+        vec![
+            MirOperand::Constant(MirConstant::Int(0)),
+            MirOperand::Constant(MirConstant::Float(1e-5)),
+            MirOperand::Constant(MirConstant::Int(1)),
+        ],
+        numerus,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("rms_norm") && e.contains("not tensor")),
+        "expected rms_norm non-tensor receiver error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_rope_rejects_non_tensor_receiver() {
+    let mut types = TypeTable::new();
+    let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorRope,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Int(2)),
+        ],
+        numerus,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("rope") && e.contains("not tensor")),
+        "expected rope non-tensor receiver error, got: {errors:?}"
+    );
+}
+
+#[test]
 fn test_gather_valid_ids_array_operand() {
     let mut types = TypeTable::new();
     let return_ty = tensor_mty(&mut types, &[2, 3]);
