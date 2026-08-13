@@ -39,7 +39,7 @@ use super::token::TokenKind;
 ///
 /// Scope is policy metadata, not automatic lexer behavior. It tells tools and
 /// parser work whether a spelling is globally reserved, context-owned,
-/// annotation-only, test-owned, or transitional.
+/// annotation-only, test-owned, or an alias.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeywordScope {
     /// Reserved anywhere normal-mode keyword recognition runs.
@@ -48,7 +48,7 @@ pub enum KeywordScope {
     /// words. The variant remains for API compatibility.
     Global,
 
-    /// Intended for one or more parser contexts, even if currently lexed as a keyword.
+    /// Intended for one or more parser contexts.
     Contextual(&'static [KeywordOwner]),
 
     /// Annotation name or annotation-owned metadata after `@`.
@@ -264,8 +264,8 @@ pub struct KeywordSpec {
 impl KeywordSpec {
     /// Return whether this keyword has an identity token.
     ///
-    /// Every registered keyword has one; the lexer never emits keyword tokens,
-    /// so this is identity presence, not lexer emission.
+    /// The lexer never emits keyword tokens, so this is identity presence, not
+    /// lexer emission. Tokenless rows such as `vacua` return false.
     #[must_use]
     pub fn currently_lexes_as_keyword(&self) -> bool {
         self.token_kind.is_some()
@@ -279,8 +279,7 @@ pub struct KeywordGroupSpec {
     pub id: &'static str,
 
     /// Latin keyword keys that belong to the group. Spelling-keyed so
-    /// tokenless (contextual) members like `si`/`sin`/`secus` stay
-    /// referenceable after their `TokenKind` rows go `None`.
+    /// tokenless members stay referenceable without a `TokenKind`.
     pub members: &'static [&'static str],
 }
 
@@ -310,7 +309,6 @@ const ENTRY_FUNCTION_OR_PARAM_OR_MEMBER: &[KeywordOwner] = &[
 ];
 const ANNOTATION_NAME: &[KeywordOwner] = &[KeywordOwner::AnnotationName];
 const TYPE_PARAMETER: &[KeywordOwner] = &[KeywordOwner::TypeParameter];
-const GENERIC_PARAMETER: &[KeywordOwner] = &[KeywordOwner::TypeParameter];
 const REST_PATTERN: &[KeywordOwner] =
     &[KeywordOwner::RestPattern, KeywordOwner::AnnotationModifier];
 const FUNCTION_MODIFIER: &[KeywordOwner] = &[KeywordOwner::FunctionModifier];
@@ -327,18 +325,11 @@ const PREDICATE_OR_MEMBER: &[KeywordOwner] = &[
 ];
 const CALLABLE_POSTURE: &[KeywordOwner] = &[KeywordOwner::CallablePosture];
 const CONTROL_OPERATION: &[KeywordOwner] = &[KeywordOwner::ControlOperation];
-// Batch A type-name slots: `modulus` claims the type-name position;
-// `iuncta` claims both the type-name and the constructor-expression position.
 const TYPE_NAME: &[KeywordOwner] = &[KeywordOwner::TypeName];
 const TYPE_NAME_OR_CONSTRUCTOR: &[KeywordOwner] =
     &[KeywordOwner::TypeName, KeywordOwner::Constructor];
-// Batch B builtin slots: `nota`/`mone`/`vide` are claimed in the statement-
-// initial scribe slot; `lege`/`lineam`/`scriptum` in the expression-primary
-// builtin-call slot.
 const SCRIBE_STATEMENT: &[KeywordOwner] = &[KeywordOwner::ScribeStatement];
 const BUILTIN_CALL: &[KeywordOwner] = &[KeywordOwner::BuiltinCall];
-// Batch C literal slot: `verum`/`falsum`/`nihil` are claimed in expression and
-// pattern positions as literal values.
 const LITERAL: &[KeywordOwner] = &[KeywordOwner::Literal];
 const OPERATOR: &[KeywordOwner] = &[KeywordOwner::Operator];
 const DECLARATION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::DeclarationIntroducer];
@@ -363,8 +354,6 @@ const CHOICE_GROUP: &[&str] = &["elige", "casu", "ceterum"];
 const PATTERN_CHOICE_GROUP: &[&str] = &["discerne", "casu", "ceterum"];
 const TRY_RECOVERY_GROUP: &[&str] = &["cape"];
 const LOOP_GROUP: &[&str] = &["dum", "fac", "itera", "perge", "rumpe"];
-// Census-types relational-view declaration surface (S2-U1): the two
-// declaration keywords must be localized together in a complete reader pack.
 const RELATIONAL_VIEW_GROUP: &[&str] = &["schema", "columna"];
 
 /// Complete keyword-group declarations for static Latin source-surface data.
@@ -464,11 +453,8 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordCategory::Declaration,
     },
-    // Census-types relational-view declaration keywords (stage2-delivery S2-U1;
-    // docs/design/relational-views.md §7 lexical lock). `schema` introduces a
-    // partial application-owned relational heading; `columna` declares one
-    // column inside a schema. Both are claimed in the statement/body slot by
-    // identity (columna only inside a schema body).
+    // `schema` introduces a relational heading; `columna` declares one column
+    // inside a schema body. Both claim the declaration-introducer slot.
     KeywordSpec {
         text: "columna",
         token_kind: Some(TokenKind::Columna),
@@ -539,7 +525,7 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "magnitudo",
         token_kind: Some(TokenKind::Magnitudo),
-        scope: KeywordScope::Contextual(GENERIC_PARAMETER),
+        scope: KeywordScope::Contextual(TYPE_PARAMETER),
         category: KeywordCategory::Modifier,
     },
     KeywordSpec {
@@ -727,9 +713,9 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
         category: KeywordCategory::Async,
     },
-    // === Contextual callable-posture spellings (token_kind: None) ===
-    // WHY: morphology-driven async/stream posture. Recognized by spelling via
-    // parser-owned grammar slots (eat_identifier_text); not globally reserved.
+    // === Contextual callable-posture spellings ===
+    // WHY: morphology-driven async/stream posture; claimed in signature slots,
+    // not globally reserved.
     KeywordSpec {
         text: "fiet",
         token_kind: Some(TokenKind::Fiet),
@@ -748,7 +734,7 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(CALLABLE_POSTURE),
         category: KeywordCategory::Async,
     },
-    // === Contextual control-operation spellings (token_kind: None) ===
+    // === Contextual control-operation spellings ===
     KeywordSpec {
         text: "figendum",
         token_kind: Some(TokenKind::Figendum),
