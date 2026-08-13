@@ -35,6 +35,7 @@ use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_types::{Primitive, Type, TypeId, TypeTable};
 use rustc_hash::FxHashMap;
 
+#[derive(Clone, Copy)]
 struct PostfixChainPrefixes {
     member: &'static str,
     index_open: &'static str,
@@ -138,8 +139,6 @@ impl super::FaberCodegen {
                 writer.write(")");
             }
             HirExpressionKind::MethodCall(receiver, name, type_args, args) => {
-                // Method calls keep the resolved receiver expression intact and
-                // print the parser's canonical dot-call spelling.
                 self.write_expr_prec(receiver, 13, types, names, interner, surface, writer);
                 writer.write(".");
                 writer.write(&self.symbol_to_string(*name, interner));
@@ -160,8 +159,6 @@ impl super::FaberCodegen {
                 writer.write("]");
             }
             HirExpressionKind::OptionalChain(object, chain) => {
-                // Optional and non-null chains are source-level Faber forms, not
-                // desugared conditionals in this backend.
                 self.write_expr_prec(object, 13, types, names, interner, surface, writer);
                 self.write_postfix_chain_tail(
                     OPTIONAL_CHAIN,
@@ -355,7 +352,6 @@ impl super::FaberCodegen {
                 writer.write(" ← ");
                 self.write_expr_prec(rhs, 1, types, names, interner, surface, writer);
             }
-
             HirExpressionKind::ConversioAssign {
                 target,
                 source,
@@ -595,9 +591,8 @@ impl super::FaberCodegen {
                     source.ty,
                     arm_target_ty,
                 );
-                // Conversion spelling is grammar-owned Faber syntax. The type
-                // writer may degrade unsupported target types, but this layer
-                // still preserves source/recovery expression structure.
+                // The type writer may degrade unsupported target types; this
+                // layer still preserves source/recovery expression structure.
                 self.write_expr_prec(source, 2, types, names, interner, surface, writer);
                 writer.write(" ↦ ");
                 match target {
@@ -652,12 +647,6 @@ impl super::FaberCodegen {
                 }
             }
             HirExpressionKind::TypeCheck { positive, expr, ty } => {
-                // `expr est <type>` / `expr non est <type>`.
-                // Canonical re-emission: print the source surface back. The
-                // semantic check itself is evaluated by the codegen backends
-                // that target executable languages (Rust/TS/Go); the Faber
-                // backend only round-trips the syntax.
-                //
                 // Precedence matches `HirBinOp::Is` (4) — both spell `est`
                 // and bind at the same relational level.
                 if !*positive {
@@ -668,8 +657,7 @@ impl super::FaberCodegen {
                 writer.write(" ");
                 writer.write(surface.contextual_keyword("est"));
                 writer.write(" ");
-                let ty_str = self.type_to_faber(*ty, types, names, interner, surface);
-                writer.write(&ty_str);
+                writer.write(&self.type_to_faber(*ty, types, names, interner, surface));
             }
             HirExpressionKind::Praefixum(inner) => {
                 self.write_expr(inner, types, names, interner, surface, writer);
@@ -729,28 +717,18 @@ impl super::FaberCodegen {
                     writer.write("}");
                     return;
                 }
-                Type::Map(_, _) | Type::Record(_) => {
+                Type::Map(_, _) | Type::Record(_) | Type::Array(_) | Type::Set(_) => {
                     self.write_json_object_entries(
                         entries, types, names, interner, surface, writer,
                     );
-                    if !matches!(types.get(target), Type::Primitive(Primitive::Valor)) {
-                        writer.write(" ∷ ");
-                        writer.write(&self.type_to_faber(target, types, names, interner, surface));
-                    }
+                    writer.write(" ∷ ");
+                    writer.write(&self.type_to_faber(target, types, names, interner, surface));
                     return;
                 }
                 Type::Primitive(Primitive::Valor) => {
                     self.write_json_object_entries(
                         entries, types, names, interner, surface, writer,
                     );
-                    return;
-                }
-                Type::Array(_) | Type::Set(_) => {
-                    self.write_json_object_entries(
-                        entries, types, names, interner, surface, writer,
-                    );
-                    writer.write(" ∷ ");
-                    writer.write(&self.type_to_faber(target, types, names, interner, surface));
                     return;
                 }
                 _ => {}
@@ -947,7 +925,7 @@ impl super::FaberCodegen {
         self.write_block(body, types, names, interner, surface, writer);
     }
 
-    #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
+    #[allow(clippy::too_many_arguments)]
     fn write_postfix_chain_tail(
         &self,
         prefixes: PostfixChainPrefixes,
