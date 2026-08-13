@@ -36,7 +36,7 @@ impl super::FaberCodegen {
     /// `fac`/`dum` when the final block is exactly the synthetic `rumpe`.
     ///
     /// Also accepts `else_block: Some(empty)` when the compiler produces an
-    /// empty else clause for the break condition (F-102).
+    /// empty else clause for the break condition.
     pub(super) fn as_fac_loop<'a>(
         &self,
         block: &'a HirBlock,
@@ -54,8 +54,6 @@ impl super::FaberCodegen {
         else {
             return None;
         };
-        // Accept else_block when it's empty (no statements, no expr).
-        // The compiler may produce an empty else for `fac ... dum` (F-102).
         if let Some(eb) = else_block {
             if !eb.statements.is_empty() || eb.expr.is_some() {
                 return None;
@@ -103,7 +101,6 @@ impl super::FaberCodegen {
         self.return_expr(block).is_some() && !self.trivia.block_has_trivia(block)
     }
 
-    /// Emit statement leading trivia before the statement.
     pub(super) fn write_statement_trivia(
         &self,
         stmt: &HirStatement,
@@ -162,8 +159,8 @@ impl super::FaberCodegen {
     /// The chain is syntactic normalization only: every `sin` comes from a
     /// nested conditional else-tail, and any else-block that does not fit that
     /// exact shape remains a terminal `secus` block. An optional `cape` handler
-    /// is written before the `sin`/`secus` chain (F-101: cape belongs to the
-    /// then-block, not after else).
+    /// is written before the `sin`/`secus` chain — cape belongs to the then-block,
+    /// not after else.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn write_si_chain(
         &self,
@@ -182,7 +179,6 @@ impl super::FaberCodegen {
         self.write_expr(cond, types, names, interner, surface, writer);
         self.write_si_branch_body(then_block, types, names, interner, surface, writer);
 
-        // Cape belongs to the then-block and must appear before sin/secus (F-101).
         if let Some(catch) = catch {
             writer.newline();
             writer.write(surface.keyword(TokenKind::Cape));
@@ -290,7 +286,6 @@ impl super::FaberCodegen {
         self.return_expr(else_block).is_some() && !self.trivia.block_has_trivia(else_block)
     }
 
-    /// Write either compact `ergo redde` or a braced branch body.
     pub(super) fn write_si_branch_body(
         &self,
         block: &HirBlock,
@@ -374,33 +369,8 @@ impl super::FaberCodegen {
 
     /// Emit a block's statements followed by its tail expression, if present.
     ///
-    /// Tail expressions are preserved as expression statements in generated
-    /// Faber because this backend emits normalized source text, not lowered
-    /// target-language control flow.
-    /// Emit an `incipit` body, omitting compiler-synthesized CLI argument locals.
-    pub(super) fn write_entry_block(
-        &self,
-        block: &HirBlock,
-        types: &TypeTable,
-        names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
-        surface: &impl KeywordSurface,
-        writer: &mut CodeWriter,
-    ) {
-        for stmt in &block.statements {
-            if let HirStatementKind::Local(local) = &stmt.kind {
-                if local.runtime_provided {
-                    continue;
-                }
-            }
-            self.write_stmt(stmt, types, names, interner, surface, writer);
-        }
-        if let Some(expr) = &block.expr {
-            self.write_expr(expr, types, names, interner, surface, writer);
-            writer.newline();
-        }
-    }
-
+    /// Tail expressions stay as expression statements because this backend
+    /// emits normalized source text, not lowered target-language control flow.
     pub(super) fn write_block(
         &self,
         block: &HirBlock,
@@ -426,12 +396,6 @@ impl super::FaberCodegen {
         }
     }
 
-    /// Emit one canonical Faber statement.
-    ///
-    /// The statement surface here is intentionally direct: locals, resource
-    /// blocks, returns, loop controls, and expression statements are printed in
-    /// parser-valid Faber forms using HIR-owned semantic names and types.
-    /// Statement leading trivia renders immediately before the statement.
     pub(super) fn write_stmt(
         &self,
         stmt: &HirStatement,
@@ -508,10 +472,6 @@ impl super::FaberCodegen {
     }
 
     /// Emit a type-first local declaration.
-    ///
-    /// WHY: Locals are both statement syntax and DefId-bearing names used by
-    /// expression output. Keeping the declaration spelling here avoids repeating
-    /// mutability/type/initializer ordering in other statement paths.
     fn write_local_stmt(
         &self,
         local: &HirLocal,

@@ -171,7 +171,7 @@ impl FaberCodegen {
             }
             writer.writeln(" {");
             writer.indented(|writer| {
-                self.write_entry_block(entry, types, &names, interner, surface, writer);
+                self.write_block(entry, types, &names, interner, surface, writer);
                 self.write_block_end_trivia(entry, interner, writer);
             });
             writer.writeln("}");
