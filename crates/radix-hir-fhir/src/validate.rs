@@ -26,21 +26,7 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
         registry.insert(item.def_id);
         match &item.kind {
             HirItemKind::Function(func) => {
-                for tp in &func.type_params {
-                    registry.insert(tp.def_id);
-                }
-                for param in &func.params {
-                    registry.insert(param.def_id);
-                }
-                if let Some(ref cli) = func.cli_args {
-                    registry.insert(cli.def_id);
-                }
-                for ann in &func.annotations {
-                    collect_annotation_defs(ann, &mut registry);
-                }
-                if let Some(ref body) = func.body {
-                    collect_block_defs(body, &mut registry);
-                }
+                collect_function_defs(func, &mut registry);
             }
             HirItemKind::Struct(s) => {
                 for tp in &s.type_params {
@@ -54,25 +40,13 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
                     for ann in &field.annotations {
                         collect_annotation_defs(ann, &mut registry);
                     }
+                    if let Some(ref init) = field.init {
+                        collect_expr_defs(init, &mut registry);
+                    }
                 }
                 for method in &s.methods {
                     registry.insert(method.def_id);
-                    let func = &method.func;
-                    for tp in &func.type_params {
-                        registry.insert(tp.def_id);
-                    }
-                    for param in &func.params {
-                        registry.insert(param.def_id);
-                    }
-                    if let Some(ref cli) = func.cli_args {
-                        registry.insert(cli.def_id);
-                    }
-                    for ann in &func.annotations {
-                        collect_annotation_defs(ann, &mut registry);
-                    }
-                    if let Some(ref body) = func.body {
-                        collect_block_defs(body, &mut registry);
-                    }
+                    collect_function_defs(&method.func, &mut registry);
                 }
             }
             HirItemKind::Enum(e) => {
@@ -89,7 +63,7 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
                 }
                 for method in &iface.methods {
                     for param in &method.params {
-                        registry.insert(param.def_id);
+                        collect_param_defs(param, &mut registry);
                     }
                 }
             }
@@ -173,12 +147,45 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
                 } => {
                     registry.insert(*d);
                 }
-                _ => {}
+                crate::artifact::FileExportSnapshot::Type { def_id: None, .. }
+                | crate::artifact::FileExportSnapshot::Function(_) => {}
             }
         }
     }
 
     registry
+}
+
+/// Register a function's own def sites and any nested sites in defaults,
+/// annotations, or the body. Parameter defaults can introduce closures,
+/// `itera` bindings, and `cape` bindings; skipping them false-rejects a
+/// valid artifact at `check_def`.
+fn collect_function_defs(
+    func: &radix_hir::HirFunction,
+    registry: &mut FxHashSet<radix_types::DefId>,
+) {
+    for tp in &func.type_params {
+        registry.insert(tp.def_id);
+    }
+    for param in &func.params {
+        collect_param_defs(param, registry);
+    }
+    if let Some(ref cli) = func.cli_args {
+        collect_param_defs(cli, registry);
+    }
+    for ann in &func.annotations {
+        collect_annotation_defs(ann, registry);
+    }
+    if let Some(ref body) = func.body {
+        collect_block_defs(body, registry);
+    }
+}
+
+fn collect_param_defs(param: &radix_hir::HirParam, registry: &mut FxHashSet<radix_types::DefId>) {
+    registry.insert(param.def_id);
+    if let Some(ref init) = param.default {
+        collect_expr_defs(init, registry);
+    }
 }
 
 /// Collect definition-site `DefIds` from a HIR block, recursing into
@@ -222,7 +229,10 @@ fn collect_stmt_expr_defs(
                 collect_block_defs(&clause.body, registry);
             }
         }
-        _ => {}
+        HirStatementKind::Rumpe
+        | HirStatementKind::Perge
+        | HirStatementKind::Tacet
+        | HirStatementKind::Redde(None) => {}
     }
 }
 
@@ -423,7 +433,7 @@ fn collect_expr_defs(
         }
         HirExpressionKind::Clausura(params, _, _, body) => {
             for param in params {
-                registry.insert(param.def_id);
+                collect_param_defs(param, registry);
             }
             collect_expr_defs(body, registry);
         }
@@ -520,7 +530,10 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                         collect_block(&clause.body, registry);
                     }
                 }
-                _ => {}
+                HirStatementKind::Rumpe
+                | HirStatementKind::Perge
+                | HirStatementKind::Tacet
+                | HirStatementKind::Redde(None) => {}
             }
         }
         if let Some(ref expr) = block.expr {
@@ -718,15 +731,27 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                     collect_expr(r, registry);
                 }
             }
-            HirExpressionKind::Ad {
-                opener: Some(ref o),
-                ..
-            } => {
-                collect_expr(o, registry);
+            HirExpressionKind::Ad { opener, .. } => {
+                if let Some(o) = opener {
+                    collect_expr(o, registry);
+                }
             }
             HirExpressionKind::TypeCheck { expr, .. } => collect_expr(expr, registry),
             HirExpressionKind::Praefixum(inner) => collect_expr(inner, registry),
-            _ => {}
+            HirExpressionKind::Intervallum {
+                start, end, step, ..
+            } => {
+                collect_expr(start, registry);
+                collect_expr(end, registry);
+                if let Some(s) = step {
+                    collect_expr(s, registry);
+                }
+            }
+            HirExpressionKind::Path(_)
+            | HirExpressionKind::Literal(_)
+            | HirExpressionKind::Vacua
+            | HirExpressionKind::ReadLine(_)
+            | HirExpressionKind::Error => {}
         }
     }
 
@@ -1156,7 +1181,10 @@ pub(crate) fn validate_referential_integrity(
                         )?;
                     }
                 }
-                _ => {} // Rumpe, Perge, Tacet, Redde(None) carry no indices
+                HirStatementKind::Rumpe
+                | HirStatementKind::Perge
+                | HirStatementKind::Tacet
+                | HirStatementKind::Redde(None) => {}
             }
         }
         if let Some(ref expr) = block.expr {
@@ -1685,12 +1713,10 @@ pub(crate) fn validate_referential_integrity(
         Ok(())
     }
 
-    // ── Type arena walk helper (gap 4.2) ────────────────────────────────
+    // ── Type arena walk helper ──────────────────────────────────────────
 
     fn validate_type(
         ty: &radix_types::Type,
-        _idx: usize,
-        _type_count: usize,
         check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
         check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
         check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
@@ -1787,7 +1813,7 @@ pub(crate) fn validate_referential_integrity(
         Ok(())
     }
 
-    // ── Resolver deep walk helper (gap 4.3) ────────────────────────────
+    // ── Resolver snapshot walk helper ───────────────────────────────────
 
     fn validate_file_interface_snapshot(
         iface: &crate::artifact::FileInterfaceSnapshot,
@@ -1901,7 +1927,7 @@ pub(crate) fn validate_referential_integrity(
         }
     }
 
-    // 5. libraries: deep walk (gap 4.4).
+    // 5. libraries: deep walk.
     for def_id in artifact.libraries.bindings.keys() {
         check_def(*def_id)?;
     }
@@ -1923,7 +1949,7 @@ pub(crate) fn validate_referential_integrity(
 
     // 6. cli_program: resolved-use-like fields only (no Symbol-bearing fields in CliProgramWire).
 
-    // 7. resolver snapshot: deep walk (gap 4.3).
+    // 7. resolver snapshot: deep walk.
     for (sym, _) in &artifact.resolver.namespace_exports {
         check_symbol(*sym)?;
     }
@@ -1939,13 +1965,11 @@ pub(crate) fn validate_referential_integrity(
         check_type(*ty)?;
     }
 
-    // 8. Type arena walk (gap 4.2): validate TypeId/DefId/Symbol/IndexId
+    // 8. Type arena walk: validate TypeId/DefId/Symbol/IndexId
     //    cross-references inside the type-table snapshot.
-    for (idx, ty) in artifact.types.types().iter().enumerate() {
+    for ty in artifact.types.types() {
         validate_type(
             ty,
-            idx,
-            type_count,
             &check_def,
             &check_symbol,
             &check_type,
@@ -1978,4 +2002,98 @@ pub(crate) fn validate_referential_integrity(
     )?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::decode::{decode, encode};
+    use crate::test_support::stub_artifact;
+    use radix_hir::{
+        HirBlock, HirExpression, HirExpressionKind, HirId, HirItemKind, HirLiteral, HirParam,
+        HirParamMode, HirRangeKind,
+    };
+    use radix_lexer::{Span, Symbol};
+    use radix_types::{DefId, Type, TypeTable, USER_DEF_ID_BASE};
+
+    fn lit(id: u32, value: u64) -> HirExpression {
+        HirExpression {
+            id: HirId(id),
+            kind: HirExpressionKind::Literal(HirLiteral::Int(value)),
+            ty: None,
+            span: Span::default(),
+        }
+    }
+
+    fn stub_function(artifact: &mut crate::artifact::HirArtifact) -> &mut radix_hir::HirFunction {
+        match &mut artifact.hir.items[0].kind {
+            HirItemKind::Function(func) => func,
+            _ => panic!("stub artifact item must be a function"),
+        }
+    }
+
+    #[test]
+    fn decode_accepts_intervallum_child_hir_ids() {
+        let mut artifact = stub_artifact();
+        let body = HirBlock::simple(
+            Vec::new(),
+            Some(Box::new(HirExpression {
+                id: HirId(1),
+                kind: HirExpressionKind::Intervallum {
+                    start: Box::new(lit(2, 0)),
+                    end: Box::new(lit(3, 10)),
+                    step: Some(Box::new(lit(4, 1))),
+                    kind: HirRangeKind::Exclusive,
+                },
+                ty: None,
+                span: Span::default(),
+            })),
+            Span::default(),
+        );
+        stub_function(&mut artifact).body = Some(body);
+
+        let bytes = encode(&artifact).expect("encode artifact");
+        decode(&bytes).expect("intervallum child HirIds must be in the registry");
+    }
+
+    #[test]
+    fn decode_accepts_def_sites_inside_parameter_default() {
+        let mut artifact = stub_artifact();
+        let mut types = TypeTable::new();
+        let ty = types.intern(Type::Error);
+        artifact.types = types.snapshot();
+
+        let closure = HirExpression {
+            id: HirId(1),
+            kind: HirExpressionKind::Clausura(
+                vec![HirParam {
+                    def_id: DefId(USER_DEF_ID_BASE + 2),
+                    name: Symbol(1),
+                    ty,
+                    mode: HirParamMode::Owned,
+                    optional: false,
+                    sponte: false,
+                    default: None,
+                    span: Span::default(),
+                }],
+                None,
+                None,
+                Box::new(lit(2, 0)),
+            ),
+            ty: None,
+            span: Span::default(),
+        };
+        stub_function(&mut artifact).params.push(HirParam {
+            def_id: DefId(USER_DEF_ID_BASE + 1),
+            name: Symbol(0),
+            ty,
+            mode: HirParamMode::Owned,
+            optional: true,
+            sponte: false,
+            default: Some(closure),
+            span: Span::default(),
+        });
+
+        let bytes = encode(&artifact).expect("encode artifact");
+        decode(&bytes).expect("closure params in a default must register as def sites");
+    }
 }
