@@ -12,7 +12,9 @@
 //! FMIR lane with its trajectory matching the train.proba U6 pins.
 
 use super::*;
+use radix::lexer::Span;
 use radix::mir::BufferHost;
+use radix::mir::{MirConversion, MirConversionFlavor};
 use radix::semantic::Resolver;
 use std::path::PathBuf;
 
@@ -27,6 +29,43 @@ const METHOD_MAIN: &str = "import from \"methlib:lib\" private lib\n\nmain {\n  
 // rewritten to `nn.gelu(h1b)` — an arity-corrupting synthetic-path call.
 const GELU_LIB: &str = "functio gelu() → numerus {\n    redde 7\n}\n";
 const GELU_MAIN: &str = "import from \"gelulib:lib\" private nn\n\nclass H1B {\n    int x\n\n    fn gelu() → int {\n        return self.x * 2\n    }\n}\n\nfn structa(int x) → H1B {\n    return H1B { x = x }\n}\n\nmain {\n    const int nn_value ← nn.gelu()\n    const H1B h1b ← structa(21)\n    print h1b.gelu()\n    print nn_value\n}\n";
+
+#[test]
+fn package_mir_rewrites_runtime_conversion_types_with_imported_types() {
+    let mut statement = MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: None,
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Convert(MirConversion {
+                    flavor: MirConversionFlavor::Runtime,
+                    source_ty: MirType::semantic(TypeId(1)),
+                    target_ty: MirType::semantic(TypeId(2)),
+                    params: Vec::new(),
+                    recovery: None,
+                    struct_defaults: Vec::new(),
+                }),
+                args: vec![MirOperand::Constant(MirConstant::Int(1))],
+                return_ty: MirType::semantic(TypeId(2)),
+            },
+        },
+        span: Span::default(),
+    };
+
+    super::lower::rewrite_statement_type_id(
+        &mut statement,
+        &[(TypeId(1), TypeId(10)), (TypeId(2), TypeId(11))],
+    );
+
+    let MirStatementKind::RuntimeCall { call, .. } = statement.kind else {
+        panic!("expected a runtime call");
+    };
+    let MirIntrinsic::Convert(conversion) = call.intrinsic else {
+        panic!("expected a conversion intrinsic");
+    };
+    assert_eq!(conversion.source_ty.semantic_id(), TypeId(10));
+    assert_eq!(conversion.target_ty.semantic_id(), TypeId(11));
+    assert_eq!(call.return_ty.semantic_id(), TypeId(11));
+}
 
 /// The `forma`-shadowing guard (fd0c939) excludes the `h1b.gelu()` false
 /// positive: an ordinary method call on a local is NOT rewritten into a

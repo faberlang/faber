@@ -816,6 +816,15 @@ pub(super) fn rewrite_statement_type_id(
         MirStatementKind::Call { .. } => {}
         MirStatementKind::RuntimeCall { call, .. } => {
             rewrite_type_id(&mut call.return_ty, rewrites);
+            if let MirIntrinsic::Convert(conversion) = &mut call.intrinsic {
+                // A conversion carries both source and target types outside
+                // the ordinary call return type. Imported units get their
+                // semantic type ids rewritten into the merged entry table;
+                // leaving either side behind makes the validator compare a
+                // remapped operand against a source-local conversion type.
+                rewrite_type_id(&mut conversion.source_ty, rewrites);
+                rewrite_type_id(&mut conversion.target_ty, rewrites);
+            }
         }
         MirStatementKind::Construct { aggregate, .. } => {
             rewrite_type_id(&mut aggregate.ty, rewrites);
