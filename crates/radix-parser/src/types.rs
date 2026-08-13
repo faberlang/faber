@@ -6,16 +6,12 @@
 //! exists or whether generic arity is valid; it only builds the source shape that
 //! later phases resolve.
 //!
-//! DESIGN PHILOSOPHY
-//! =================
 //! Faber type syntax is explicit and conservative. Ownership modes are prefix
 //! markers (`de`, `in`), arrays use `lista<T>`, function types use arrow
 //! syntax, and nullable value slots are expressed by unioning with `nihil`.
 //! Optional declaration slots are not type suffixes; they are parsed as
 //! post-name `sponte` markers by declaration parsers.
 //!
-//! INVARIANTS
-//! ==========
 //! - There is no `Type?` grammar and no nullable prefix shorthand.
 //! - `ignotum` is just a named type at this layer, not a nullability marker.
 //! - `nihil` may appear as a type member because it is accepted in type position.
@@ -26,9 +22,7 @@ use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::{Span, TokenKind};
 use radix_syntax::{FiguraExpr, FuncTypeExpr, Ident, TypeExpr, TypeExprKind, TypeMode};
 
-// =============================================================================
 // TYPE PARSING
-// =============================================================================
 
 impl Parser {
     /// Try to parse a type expression without requiring one.
@@ -38,7 +32,6 @@ impl Parser {
     /// type position should call `parse_type` and receive a diagnostic instead.
     #[allow(dead_code)]
     pub(super) fn try_parse_type(&mut self) -> Result<Option<TypeExpr>, ParseError> {
-        // Check for type start (mode prefix or base: '_', ident, '(', or later ∪ handled inside parse_type)
         if self.check_keyword_ident(TokenKind::De)
             || self.check_keyword_ident(TokenKind::In)
             || self.check_keyword_ident(TokenKind::Iuncta)
@@ -57,7 +50,7 @@ impl Parser {
     /// Parse a required type expression.
     ///
     /// GRAMMAR:
-    ///   type := [de|in] (func-type | named-type | union-type) ([] )*
+    ///   type := [de|in] (func-type | named-type | union-type)
     ///   func-type := ( type-list ) arrow type
     ///   named-type := ident [type-list]
     ///   union-type := type cup type (cup type)*
@@ -78,7 +71,6 @@ impl Parser {
             None
         };
 
-        // Function type: (params) -> ret
         if self.check(&TokenKind::LParen) {
             let func = self.parse_func_type()?;
             let span = start.merge(self.previous_span());
@@ -91,9 +83,8 @@ impl Parser {
             return self.parse_union_tail(core, start);
         }
 
-        // Inferred type marker: _
-        // Union hole: standalone `∪` (a second cup is a parse error; the hole
-        // consumes the whole type expression).
+        // Standalone `∪` is a union hole. A second cup is a parse error; the
+        // hole consumes the whole type expression.
         let kind = if matches!(self.peek().kind, TokenKind::Underscore(_)) {
             self.advance();
             TypeExprKind::Infer
@@ -108,7 +99,6 @@ impl Parser {
             }
             TypeExprKind::UnionHole
         } else {
-            // Named type (including 'nihil' as type name)
             let name = if self.check_keyword_ident(TokenKind::Nihil) {
                 let span = self.peek().span;
                 self.advance();
@@ -295,8 +285,6 @@ impl Parser {
         let mut members = Vec::new();
         flatten_union_member(first, &mut members);
         loop {
-            // Parse the next member as a full type, then flatten any nested
-            // union shape produced by the recursive parse.
             let member = self.parse_type()?;
             if matches!(member.kind, TypeExprKind::UnionHole) {
                 return Err(
