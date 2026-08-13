@@ -11,9 +11,9 @@
 //! facts, submission-region facts, effect/capability requirements, and exact
 //! source revisions.
 //!
-//! SCOPE (M1): typed shape + assembly + deterministic `composite-plan v1`
-//! serialization only. M2 owns identity-preservation verification and typed
-//! first-divergence diagnostics; M3 owns the bounded synthetic-fixture
+//! SCOPE (M1+M2): typed shape + assembly + deterministic `composite-plan v1`
+//! serialization + identity-preservation verification with typed
+//! first-divergence diagnostics. M3 owns the bounded synthetic-fixture
 //! mechanism proof; M4 owns the real-graph campaign evidence. This module
 //! makes no execution claim and adds no CLI or FMIR wire surface.
 //!
@@ -46,7 +46,7 @@
 
 #![allow(dead_code)] // M1 shape surface; first consumers arrive in M2/M3/M4
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use radix::codegen::Target;
@@ -239,7 +239,134 @@ pub struct CompositePlanFacts {
     pub source_revisions: SourceRevisions,
 }
 
-/// Assemble a composite plan from a typed analyzed package and typed facts.
+/// The five campaign identity domains (EXEC-01 challenge C3), in
+/// verification order. The plan preserves each domain verbatim from its
+/// typed source of truth; verification fails closed on the first divergence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IdentityDomain {
+    /// Gradus model identity (`IdentitasContenuti` + architecture +
+    /// tokenizer identity + admission facts).
+    Model,
+    /// Backend selection + device artifacts (digests, stage, provenance).
+    Backend,
+    /// Kernel units (function id + entry) + prepared submission regions.
+    Kernel,
+    /// Buffer identities + versions (registry agreement).
+    Buffer,
+    /// Package source half (A10) + exact repo revisions.
+    Source,
+}
+
+impl IdentityDomain {
+    /// Stable diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::Model => "model",
+            Self::Backend => "backend",
+            Self::Kernel => "kernel",
+            Self::Buffer => "buffer",
+            Self::Source => "source",
+        }
+    }
+}
+
+/// Typed first-divergence diagnostic for identity verification: names the
+/// first failing identity domain and the divergence detail. A divergence
+/// always rejects — there is no silent repair and no FNV fallback.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompositePlanError {
+    /// The plan diverged from its typed source of truth in one domain.
+    DomainMismatch {
+        /// The identity domain that failed first.
+        domain: IdentityDomain,
+        /// The divergence detail.
+        detail: String,
+    },
+}
+
+impl CompositePlanError {
+    /// The identity domain that diverged first.
+    #[must_use]
+    pub fn domain(&self) -> IdentityDomain {
+        match self {
+            Self::DomainMismatch { domain, .. } => *domain,
+        }
+    }
+
+    /// A structured diagnostic (code + issue + named args) for the build
+    /// path: the issue names the identity-divergence class and the `domain`
+    /// arg names the first failing domain.
+    #[must_use]
+    pub fn to_diagnostic(&self) -> Diagnostic {
+        match self {
+            Self::DomainMismatch { domain, detail } => {
+                crate::package_diagnostic_error(format!(
+                    "composite-plan identity divergence: the {} identity domain does not match its typed source of truth",
+                    domain.spelling()
+                ))
+                .with_arg("issue", "composite_plan_identity_divergence")
+                .with_arg("domain", domain.spelling())
+                .with_arg("detail", detail.clone())
+            }
+        }
+    }
+}
+
+/// Expected kernel identity facts (the kernel domain's typed source of
+/// truth): the kernel unit's MIR function id and target-neutral entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KernelIdentity {
+    /// Expected MIR function id.
+    pub function: u32,
+    /// Expected target-neutral logical entry name.
+    pub entry: String,
+}
+
+/// Expected buffer identity + version facts (the buffer domain's typed
+/// source of truth), in the derived registry's first-reference order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExpectedBuffer {
+    /// Expected identity facts (id, name, role, storage, lifetime).
+    pub identity: BufferIdentity,
+    /// Expected content versions for the buffer.
+    pub versions: Vec<BufferVersion>,
+}
+
+/// Expected source-identity facts (the source domain's typed source of
+/// truth): the A10 source half and the exact repo revisions at construction.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ExpectedSource {
+    /// Expected per-file FNV-1a source hashes (A10 source half).
+    pub source_hashes: Vec<(String, String)>,
+    /// Expected exact repo revisions.
+    pub revisions: SourceRevisions,
+}
+
+/// The typed sources of truth the composite plan is verified against, one
+/// per campaign identity domain.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IdentitySource {
+    /// Expected Gradus model identity.
+    pub model: ModelIdentity,
+    /// Expected backend selection.
+    pub backend: BackendSelection,
+    /// Expected declared device artifacts (identity digests carried
+    /// verbatim from the typed artifact packets).
+    pub artifacts: Vec<FmirDeviceArtifact>,
+    /// Expected kernel identities, in program order.
+    pub kernels: Vec<KernelIdentity>,
+    /// Expected prepared-region ids, in derived order.
+    pub regions: Vec<u32>,
+    /// Expected buffer identity + version facts, in the derived registry's
+    /// first-reference order.
+    pub buffers: Vec<ExpectedBuffer>,
+    /// Expected source identity facts.
+    pub source_identity: ExpectedSource,
+}
+
+/// Assemble a composite plan from a typed analyzed package and typed facts,
+/// verifying every identity domain against its typed source of truth.
 ///
 /// Package identity (name, version, A10 source half) is derived from the
 /// analyzed package; the remaining facts are composed verbatim. Prepared
@@ -248,13 +375,19 @@ pub struct CompositePlanFacts {
 /// result is canonical: non-semantic collections are sorted so serialization
 /// is deterministic for a fixed plan.
 ///
+/// Construction fails closed when [`verify_identity_preservation`] finds a
+/// divergence in any of the five identity domains; the typed diagnostic
+/// names the first failing domain (no silent repair, no FNV fallback).
+///
 /// # Errors
 /// Fails closed when a package source file cannot be read for the A10
-/// source half (the same rule as the FMIR image path).
+/// source half (the same rule as the FMIR image path), or when identity
+/// verification rejects the plan.
 pub(crate) fn assemble_composite_plan(
     package: &AnalyzedPackage,
     target: Target,
     facts: CompositePlanFacts,
+    source: &IdentitySource,
 ) -> Result<CompositePlan, Vec<Diagnostic>> {
     let artifact_plan = plan_package(package, target);
     let launches: Vec<LaunchId> = facts
@@ -266,12 +399,7 @@ pub(crate) fn assemble_composite_plan(
     let prepared_regions = facts.semantics.derive_prepared_regions(&launches);
 
     let mut device_artifacts = facts.device_artifacts;
-    device_artifacts.sort_by(|left, right| {
-        (left.backend.spelling(), left.content_sha256.as_str()).cmp(&(
-            right.backend.spelling(),
-            right.content_sha256.as_str(),
-        ))
-    });
+    device_artifacts.sort_by(|left, right| artifact_sort_key(left).cmp(&artifact_sort_key(right)));
 
     let mut host_call_facts = facts.host_call_facts;
     host_call_facts.sort_by(|left, right| {
@@ -291,7 +419,7 @@ pub(crate) fn assemble_composite_plan(
     effect_capability_requirements.effects.sort();
     effect_capability_requirements.capabilities.sort();
 
-    Ok(CompositePlan {
+    let plan = CompositePlan {
         schema: COMPOSITE_PLAN_SCHEMA,
         package_identity: PackageIdentity {
             name: artifact_plan.package.name,
@@ -307,7 +435,353 @@ pub(crate) fn assemble_composite_plan(
         submission_region_facts,
         effect_capability_requirements,
         source_revisions: facts.source_revisions,
-    })
+    };
+    verify_identity_preservation(&plan, source)
+        .map_err(|error| vec![error.to_diagnostic()])?;
+    Ok(plan)
+}
+
+/// Verify the plan preserves all five identity domains against their typed
+/// sources of truth. The domains are checked in fixed order (model, backend,
+/// kernel, buffer, source); the first divergence fails closed with a typed
+/// diagnostic naming the failing domain. No silent repair, no FNV fallback.
+///
+/// # Errors
+/// Returns the first [`CompositePlanError`] the plan violates.
+pub(crate) fn verify_identity_preservation(
+    plan: &CompositePlan,
+    source: &IdentitySource,
+) -> Result<(), CompositePlanError> {
+    verify_model_identity(plan, source)?;
+    verify_backend_identity(plan, source)?;
+    verify_kernel_identity(plan, source)?;
+    verify_buffer_identity(plan, source)?;
+    verify_source_identity(plan, source)?;
+    Ok(())
+}
+
+/// Model domain: exact agreement with the expected Gradus model identity,
+/// then canonical well-formedness of the carried `IdentitasContenuti` facts
+/// (the `gradus:model/artifact` admission rules) so a digest mutated away
+/// from canonical form is rejected even when the expected facts agree.
+fn verify_model_identity(
+    plan: &CompositePlan,
+    source: &IdentitySource,
+) -> Result<(), CompositePlanError> {
+    let found = &plan.model_identity;
+    let expected = &source.model;
+    if found != expected {
+        return Err(CompositePlanError::DomainMismatch {
+            domain: IdentityDomain::Model,
+            detail: model_divergence_detail(found, expected),
+        });
+    }
+    if found.content.algorithm != "sha-256" {
+        return Err(CompositePlanError::DomainMismatch {
+            domain: IdentityDomain::Model,
+            detail: format!(
+                "content identity algorithm `{}` is not the canonical `sha-256`",
+                found.content.algorithm
+            ),
+        });
+    }
+    if !is_canonical_sha256_digestio(&found.content.digestio) {
+        return Err(CompositePlanError::DomainMismatch {
+            domain: IdentityDomain::Model,
+            detail: format!(
+                "content digest `{}` is not a canonical `sha256:<64 lowercase hex>` value",
+                found.content.digestio
+            ),
+        });
+    }
+    if found.content.longitudo <= 0 {
+        return Err(CompositePlanError::DomainMismatch {
+            domain: IdentityDomain::Model,
+            detail: format!("content byte length {} is not positive", found.content.longitudo),
+        });
+    }
+    Ok(())
+}
+
+/// The first divergent field of the model domain, for the typed diagnostic.
+fn model_divergence_detail(found: &ModelIdentity, expected: &ModelIdentity) -> String {
+    if found.content != expected.content {
+        return "content identity (algorithm/digest/byte length) differs from its typed source"
+            .to_owned();
+    }
+    if found.architecture != expected.architecture {
+        return format!(
+            "architecture `{}` differs from expected `{}`",
+            found.architecture, expected.architecture
+        );
+    }
+    if found.tokenizer_identity != expected.tokenizer_identity {
+        return "tokenizer identity differs from its typed source".to_owned();
+    }
+    if found.admission_facts != expected.admission_facts {
+        return "admission facts differ from their typed source".to_owned();
+    }
+    if found.tensor_count != expected.tensor_count {
+        return format!(
+            "tensor count {} differs from expected {}",
+            found.tensor_count, expected.tensor_count
+        );
+    }
+    "model identity differs from its typed source".to_owned()
+}
+
+/// Backend domain: selection agreement, per-artifact digest re-verification
+/// (recompute and compare over the carried bytes — never repair), then exact
+/// artifact-set agreement (no missing, replaced, or mutated artifact).
+fn verify_backend_identity(
+    plan: &CompositePlan,
+    source: &IdentitySource,
+) -> Result<(), CompositePlanError> {
+    if plan.backend_selection != source.backend {
+        return Err(CompositePlanError::DomainMismatch {
+            domain: IdentityDomain::Backend,
+            detail: "backend selection differs from its typed source".to_owned(),
+        });
+    }
+    for artifact in &plan.device_artifacts {
+        let content_digest = artifact.compute_content_sha256();
+        if artifact.content_sha256 != content_digest {
+            return Err(CompositePlanError::DomainMismatch {
+                domain: IdentityDomain::Backend,
+                detail: format!(
+                    "artifact `{}` content_sha256 `{}` does not match the canonical digest `{}` of its bytes",
+                    artifact.backend.spelling(),
+                    artifact.content_sha256,
+                    content_digest
+                ),
+            });
+        }
+        let packet_digest = artifact.compute_packet_sha256();
+        if artifact.packet_sha256 != packet_digest {
+            return Err(CompositePlanError::DomainMismatch {
+                domain: IdentityDomain::Backend,
+                detail: format!(
+                    "artifact `{}` packet_sha256 `{}` does not match the canonical packet digest `{}`",
+                    artifact.backend.spelling(),
+                    artifact.packet_sha256,
+                    packet_digest
+                ),
+            });
+        }
+    }
+    let mut expected_artifacts = source.artifacts.clone();
+    expected_artifacts.sort_by(|left, right| artifact_sort_key(left).cmp(&artifact_sort_key(right)));
+    if plan.device_artifacts != expected_artifacts {
+        return Err(CompositePlanError::DomainMismatch {
+            domain: IdentityDomain::Backend,
+            detail: "device artifacts differ from their typed source (missing, replaced, or mutated artifact)"
+                .to_owned(),
+        });
+    }
+    Ok(())
+}
+
+/// Kernel domain: kernel function ids and entries in program order, prepared
+/// region ids in derived order, and the NGAB0-R1 region partition rule
+/// (every launch in exactly one region, every region member declared).
+fn verify_kernel_identity(
+    plan: &CompositePlan,
+    source: &IdentitySource,
+) -> Result<(), CompositePlanError> {
+    if plan.device_program.kernels.len() != source.kernels.len() {
+        return Err(CompositePlanError::DomainMismatch {
+            domain: IdentityDomain::Kernel,
+            detail: format!(
+                "kernel count {} differs from expected {}",
+                plan.device_program.kernels.len(),
+                source.kernels.len()
+            ),
+        });
+    }
+    for (kernel_slot, kernel) in plan.device_program.kernels.iter().enumerate() {
+        let expected = &source.kernels[kernel_slot];
+        if kernel.function.0 != expected.function {
+            return Err(CompositePlanError::DomainMismatch {
+                domain: IdentityDomain::Kernel,
+                detail: format!(
+                    "kernel {kernel_slot} function id {} differs from expected {}",
+                    kernel.function.0, expected.function
+                ),
+            });
+        }
+        if kernel.entry != expected.entry {
+            return Err(CompositePlanError::DomainMismatch {
+                domain: IdentityDomain::Kernel,
+                detail: format!(
+                    "kernel {kernel_slot} entry `{}` differs from expected `{}`",
+                    kernel.entry, expected.entry
+                ),
+            });
+        }
+    }
+    if plan.prepared_regions.len() != source.regions.len() {
+        return Err(CompositePlanError::DomainMismatch {
+            domain: IdentityDomain::Kernel,
+            detail: format!(
+                "prepared-region count {} differs from expected {}",
+                plan.prepared_regions.len(),
+                source.regions.len()
+            ),
+        });
+    }
+    for (region_slot, region) in plan.prepared_regions.iter().enumerate() {
+        if region.id.0 != source.regions[region_slot] {
+            return Err(CompositePlanError::DomainMismatch {
+                domain: IdentityDomain::Kernel,
+                detail: format!(
+                    "prepared region {region_slot} id {} differs from expected {}",
+                    region.id.0, source.regions[region_slot]
+                ),
+            });
+        }
+    }
+    verify_region_partition(plan)
+}
+
+/// NGAB0-R1 partition rule: every declared launch belongs to exactly one
+/// prepared region and every region member is a declared launch.
+fn verify_region_partition(plan: &CompositePlan) -> Result<(), CompositePlanError> {
+    let declared: BTreeSet<LaunchId> = plan
+        .device_program
+        .launches
+        .iter()
+        .map(|launch| launch.id)
+        .collect();
+    let mut covered: Vec<LaunchId> = Vec::new();
+    for region in &plan.prepared_regions {
+        for launch in &region.launches {
+            if !declared.contains(launch) {
+                return Err(CompositePlanError::DomainMismatch {
+                    domain: IdentityDomain::Kernel,
+                    detail: format!(
+                        "prepared region {} references unknown launch {}",
+                        region.id.0, launch.0
+                    ),
+                });
+            }
+            if covered.contains(launch) {
+                return Err(CompositePlanError::DomainMismatch {
+                    domain: IdentityDomain::Kernel,
+                    detail: format!("launch {} appears in more than one prepared region", launch.0),
+                });
+            }
+            covered.push(*launch);
+        }
+    }
+    if covered.len() != declared.len() {
+        return Err(CompositePlanError::DomainMismatch {
+            domain: IdentityDomain::Kernel,
+            detail: format!(
+                "launches are not covered exactly once by prepared regions ({} covered, {} declared)",
+                covered.len(),
+                declared.len()
+            ),
+        });
+    }
+    Ok(())
+}
+
+/// Buffer domain: the derived buffer registry agrees with the expected
+/// buffer identity + version facts (in first-reference order), and no buffer
+/// carries the reserved version 0.
+fn verify_buffer_identity(
+    plan: &CompositePlan,
+    source: &IdentitySource,
+) -> Result<(), CompositePlanError> {
+    let registry = plan.device_program.buffer_registry();
+    if registry.buffers.len() != source.buffers.len() {
+        return Err(CompositePlanError::DomainMismatch {
+            domain: IdentityDomain::Buffer,
+            detail: format!(
+                "buffer count {} differs from expected {}",
+                registry.buffers.len(),
+                source.buffers.len()
+            ),
+        });
+    }
+    for (buffer_slot, entry) in registry.buffers.iter().enumerate() {
+        let expected = &source.buffers[buffer_slot];
+        if entry.identity != expected.identity {
+            return Err(CompositePlanError::DomainMismatch {
+                domain: IdentityDomain::Buffer,
+                detail: format!(
+                    "buffer {} identity facts differ from their typed source",
+                    entry.identity.id.0
+                ),
+            });
+        }
+        if entry.versions.len() != expected.versions.len() {
+            return Err(CompositePlanError::DomainMismatch {
+                domain: IdentityDomain::Buffer,
+                detail: format!(
+                    "buffer {} version count {} differs from expected {}",
+                    entry.identity.id.0,
+                    entry.versions.len(),
+                    expected.versions.len()
+                ),
+            });
+        }
+        for (version_slot, version_entry) in entry.versions.iter().enumerate() {
+            if version_entry.version.version == 0 {
+                return Err(CompositePlanError::DomainMismatch {
+                    domain: IdentityDomain::Buffer,
+                    detail: format!("buffer {} carries the reserved version 0", entry.identity.id.0),
+                });
+            }
+            if version_entry.version != expected.versions[version_slot] {
+                return Err(CompositePlanError::DomainMismatch {
+                    domain: IdentityDomain::Buffer,
+                    detail: format!(
+                        "buffer {} version {} differs from its typed source",
+                        entry.identity.id.0, version_entry.version.version
+                    ),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Source domain: exact agreement of the A10 source half and the exact repo
+/// revisions recorded at construction.
+fn verify_source_identity(
+    plan: &CompositePlan,
+    source: &IdentitySource,
+) -> Result<(), CompositePlanError> {
+    if plan.package_identity.source_hashes != source.source_identity.source_hashes {
+        return Err(CompositePlanError::DomainMismatch {
+            domain: IdentityDomain::Source,
+            detail: "package source hashes (A10 source half) differ from their typed source"
+                .to_owned(),
+        });
+    }
+    if plan.source_revisions != source.source_identity.revisions {
+        return Err(CompositePlanError::DomainMismatch {
+            domain: IdentityDomain::Source,
+            detail: "source revisions differ from their typed source (stale or altered revision)"
+                .to_owned(),
+        });
+    }
+    Ok(())
+}
+
+/// Canonical artifact order key: backend id, then content digest.
+fn artifact_sort_key(artifact: &FmirDeviceArtifact) -> (String, String) {
+    (artifact.backend.spelling(), artifact.content_sha256.clone())
+}
+
+/// Whether `digestio` is a canonical `sha256:` digest: the prefix plus 64
+/// lowercase hex digits (the `gradus:model/artifact` admission rule).
+fn is_canonical_sha256_digestio(digestio: &str) -> bool {
+    let Some(hex) = digestio.strip_prefix("sha256:") else {
+        return false;
+    };
+    hex.len() == 64 && hex.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 /// Render the plan as a deterministic `composite-plan v1` document.
@@ -833,3 +1307,7 @@ fn cadence_spelling(cadence: ObservationCadence) -> &'static str {
     }
 }
 
+
+#[cfg(test)]
+#[path = "composite_plan_test.rs"]
+mod tests;
