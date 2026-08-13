@@ -1,6 +1,6 @@
 //! Concrete syntax model for parsed Faber source.
 //!
-//! This file defines the AST that the parser hands to the rest of `radix`.
+//! This file defines the AST that the parser hands to later compiler phases.
 //! It is intentionally a source-shaped model: declarations, expressions, type
 //! syntax and annotations are recorded as the user wrote them, with
 //! spans and node IDs for later phases to attach diagnostics and side tables.
@@ -46,7 +46,6 @@ pub type NodeId = u32;
 /// remains the parse result for one file-like source body.
 #[derive(Debug)]
 pub struct Program {
-    /// Top-level declarations and executable statements in source order.
     pub statements: Vec<Stmt>,
 
     /// Comments and newlines collected immediately before EOF.
@@ -55,8 +54,6 @@ pub struct Program {
     /// file) has no following statement to attach to; it is retained on the
     /// program end boundary so the post-parse completeness check can claim it.
     pub end_trivia: Vec<Trivia>,
-
-    /// Source span covering the parsed unit.
     pub span: Span,
 }
 
@@ -68,17 +65,9 @@ pub struct Program {
 pub struct Stmt {
     /// Stable handle used by later phases for statement-scoped facts.
     pub id: NodeId,
-
-    /// Grammar form of this statement.
     pub kind: StmtKind,
-
-    /// Source location for diagnostics.
     pub span: Span,
-
-    /// Metadata attached directly to this statement by the parser.
     pub annotations: Vec<Annotation>,
-
-    /// Comments and newlines collected before this statement at a syntax boundary.
     pub leading_trivia: Vec<Trivia>,
 }
 
@@ -91,73 +80,68 @@ pub type AnnotatedStmt = Stmt;
 /// before they become module dependencies, endpoints, or entrypoints.
 #[derive(Debug)]
 pub enum StmtKind {
-    /// Variable declaration: fixum/varia
+    /// `fixum` / `varia` binding.
     Var(VarDecl),
-    /// Function declaration
     Func(FuncDecl),
-    /// Class declaration: genus
+    /// `genus` declaration.
     Class(ClassDecl),
-    /// Interface declaration: implendum
+    /// `implendum` declaration.
     Interface(InterfaceDecl),
-    /// Type alias: typus
+    /// `typus` alias.
     TypeAlias(TypeAliasDecl),
-    /// Relational schema: schema
     Schema(SchemaDecl),
-    /// Enum: ordo
+    /// `ordo` enumeration.
     Enum(EnumDecl),
-    /// Tagged union: discretio
+    /// `discretio` tagged union.
     Union(UnionDecl),
-    /// Import statement
     Import(ImportDecl),
-    /// Test suite: probandum
+    /// `probandum` test suite.
     Probandum(ProbandumDecl),
-    /// Test case: proba
+    /// `proba` test case.
     Proba(ProbaCase),
-    /// Extract: ex <expr> fixum|varia <fields>
+    /// `ex <expr> fixum|varia <fields>`
     Ex(ExStmt),
-    /// Block: { ... }
     Block(BlockStmt),
-    /// Expression statement
     Expr(ExprStmt),
-    /// Postfix increment/decrement: place ⊕ | place ⊖
+    /// Postfix `⊕` / `⊖`.
     IncDec(IncDecStmt),
-    /// If statement
+    /// `si` conditional.
     Si(SiStmt),
-    /// While loop: dum
+    /// `dum` loop.
     Dum(DumStmt),
-    /// For loop: itera
+    /// `itera` loop.
     Itera(IteraStmt),
-    /// Switch: elige
+    /// `elige` switch.
     Elige(EligeStmt),
-    /// Pattern match: discerne
+    /// `discerne` pattern match.
     Discerne(DiscerneStmt),
-    /// Guard: custodi
+    /// `custodi` guard.
     Custodi(CustodiStmt),
-    /// Scoped block: fac
+    /// `fac` scoped block.
     Fac(FacStmt),
-    /// Return: redde
+    /// `redde` return.
     Redde(ReddeStmt),
-    /// Break: rumpe
+    /// `rumpe` break.
     Rumpe(RumpeStmt),
-    /// Continue: perge
+    /// `perge` continue.
     Perge(PergeStmt),
-    /// Throw: iace
+    /// `iace` throw.
     Iace(IaceStmt),
-    /// Panic: mori
+    /// `mori` panic.
     Mori(MoriStmt),
-    /// Explicit noop: tacet
+    /// `tacet` explicit noop.
     Tacet(TacetStmt),
-    /// Assert: adfirma
+    /// `adfirma` assert.
     Adfirma(AdfirmaStmt),
-    /// Diagnostics: nota/vide/mone/scribe
+    /// `nota` / `vide` / `mone` / `scribe` diagnostics.
     Scribe(ScribeStmt),
-    /// Entry point: incipit/incipiet
+    /// `incipit` / `incipiet` entry point.
     Incipit(IncipitStmt),
-    /// Resource management: cura
+    /// `cura` resource management.
     Cura(CuraStmt),
-    /// Await-return: reddet future (fiet only)
+    /// `reddet future` await-return (`fiet` only).
     Reddet(ReddetStmt),
-    /// Await-discard: tacebit future
+    /// `tacebit future` await-discard.
     Tacebit(TacebitStmt),
 }
 
@@ -167,7 +151,7 @@ pub enum StmtKind {
 
 #[derive(Debug)]
 pub struct VarDecl {
-    /// Declared binding policy from `fixum` or `varia`.
+    /// Binding policy from `fixum` or `varia`.
     pub mutability: AstMutability,
 
     /// Whether the initializer was marked for await-like binding behavior.
@@ -175,11 +159,7 @@ pub struct VarDecl {
 
     /// Written type annotation, if present; inference is resolved later.
     pub ty: Option<TypeExpr>,
-
-    /// Identifier or destructuring pattern introduced by the declaration.
     pub binding: BindingPattern,
-
-    /// Optional initializer expression.
     pub init: Option<Box<Expr>>,
 }
 
@@ -231,13 +211,11 @@ pub enum CallablePosture {
 }
 
 impl CallablePosture {
-    /// Whether this posture is asynchronous.
     #[must_use]
     pub fn is_async(self) -> bool {
         matches!(self, Self::AsyncFinite | Self::AsyncStream)
     }
 
-    /// Whether this posture is a stream/generator.
     #[must_use]
     pub fn is_stream(self) -> bool {
         matches!(self, Self::SyncStream | Self::AsyncStream)
@@ -246,13 +224,8 @@ impl CallablePosture {
 
 #[derive(Debug)]
 pub struct FuncDecl {
-    /// Declared function name.
     pub name: Ident,
-
-    /// Generic parameters as written in source order.
     pub type_params: Vec<TypeParam>,
-
-    /// Parameter list, including ownership mode and optional defaults.
     pub params: Vec<Param>,
 
     /// Function-level modifiers that affect CLI/runtime/lowering policy.
@@ -269,11 +242,7 @@ pub struct FuncDecl {
 
     /// Function body, absent for interface contract declarations.
     pub body: Option<BlockStmt>,
-
-    /// Annotations parsed as part of the declaration payload.
     pub annotations: Vec<Annotation>,
-
-    /// Comments and newlines before this function at a member/module boundary.
     pub leading_trivia: Vec<Trivia>,
 }
 
@@ -304,19 +273,12 @@ pub struct Param {
     /// `ceteri` rest parameter marker.
     pub rest: bool,
 
-    /// Written parameter type.
     pub ty: TypeExpr,
-
-    /// Binding name introduced by the parameter.
     pub name: Ident,
 
     /// Optional external alias introduced by `ut`.
     pub alias: Option<Ident>,
-
-    /// Default expression, if the grammar supplied one.
     pub default: Option<Box<Expr>>,
-
-    /// Full parameter span for diagnostics.
     pub span: Span,
 }
 
@@ -415,10 +377,7 @@ pub struct InterfaceDecl {
 
 #[derive(Debug)]
 pub struct InterfaceMethod {
-    /// Comments and newlines before this method signature.
     pub leading_trivia: Vec<Trivia>,
-
-    /// Metadata attached to this signature.
     pub annotations: Vec<Annotation>,
     pub name: Ident,
     pub params: Vec<Param>,
@@ -451,7 +410,7 @@ pub struct SchemaDecl {
     /// Schema name (type-namespace identity; never a runtime value).
     pub name: Ident,
 
-    /// Ordered column declarations in source order (canonical column order).
+    /// Ordered column declarations (canonical column order).
     pub columns: Vec<SchemaColumn>,
 
     /// Comments and newlines collected immediately before the consuming `}`.
@@ -465,14 +424,12 @@ pub struct SchemaDecl {
 
 /// One `columna<T> publicName [: sourceName]` declaration inside a schema.
 ///
-/// `T` is written type syntax (the existing type parser); `T ∪ nihil` spells
-/// nullable columns through the type position (design §2.4.1 field 4). The
-/// optional `publicName : sourceName` alias row is the D4 source-column
-/// mapping (public → source); a missing alias is the identity mapping
-/// (fixture-contract §7).
+/// `T` is written type syntax; `T ∪ nihil` spells nullable columns through the
+/// type position. The optional `publicName : sourceName` alias row is the
+/// source-column mapping (public → source); a missing alias is the identity
+/// mapping.
 #[derive(Debug)]
 pub struct SchemaColumn {
-    /// Comments and newlines before this column at a member boundary.
     pub leading_trivia: Vec<Trivia>,
 
     /// Written Faber type contract (`T` or `T ∪ nihil`).
@@ -484,8 +441,6 @@ pub struct SchemaColumn {
     /// Optional source-column identity via `name : source`; identity mapping
     /// when absent.
     pub source_alias: Option<Ident>,
-
-    /// Full column span for diagnostics.
     pub span: Span,
 }
 
@@ -497,7 +452,6 @@ pub struct EnumDecl {
 
 #[derive(Debug)]
 pub struct EnumMember {
-    /// Comments and newlines before this member at a member boundary.
     pub leading_trivia: Vec<Trivia>,
     pub name: Ident,
     pub value: Option<EnumValue>,
@@ -519,7 +473,6 @@ pub struct UnionDecl {
 
 #[derive(Debug)]
 pub struct Variant {
-    /// Comments and newlines before this variant at a member boundary.
     pub leading_trivia: Vec<Trivia>,
     pub name: Ident,
     pub fields: Vec<VariantField>,
@@ -540,11 +493,7 @@ pub struct ImportDecl {
 
     /// Source visibility marker; package resolution interprets its reach.
     pub visibility: Visibility,
-
-    /// Import binding shape.
     pub kind: ImportKind,
-
-    /// Span of the full import declaration.
     pub span: Span,
 }
 
@@ -579,16 +528,11 @@ pub enum ImportKind {
 
 #[derive(Debug)]
 pub struct ProbandumDecl {
-    /// Suite name as source text.
     pub name: Symbol,
 
     /// Test-suite modifiers that later test lowering interprets.
     pub modifiers: Vec<ProbaModifier>,
-
-    /// Setup blocks, cases, and nested suites.
     pub body: ProbandumBody,
-
-    /// Span of the full suite declaration.
     pub span: Span,
 }
 
@@ -759,14 +703,8 @@ pub struct CeterumDefault {
 pub struct DiscerneStmt {
     /// `omnia` marker requiring exhaustive semantic coverage.
     pub exhaustive: bool,
-
-    /// Expressions being matched.
     pub subjects: Vec<Expr>,
-
-    /// Pattern arms in source order.
     pub arms: Vec<CasuArm>,
-
-    /// Optional fallback arm.
     pub default: Option<CeterumDefault>,
 }
 
@@ -912,11 +850,7 @@ pub struct IncipitStmt {
 
     /// Entrypoint body in either block or single-statement form.
     pub body: IfBody,
-
-    /// Optional argument binding exposed to the entrypoint body.
     pub args: Option<Ident>,
-
-    /// Optional exit expression supplied by the entrypoint declaration.
     pub exitus: Option<Box<Expr>>,
 }
 
@@ -959,11 +893,7 @@ pub enum CuraKind {
 pub struct Expr {
     /// Stable handle used by later phases for expression-scoped facts.
     pub id: NodeId,
-
-    /// Grammar form of this expression.
     pub kind: ExprKind,
-
-    /// Source location for diagnostics.
     pub span: Span,
 }
 
@@ -974,83 +904,65 @@ pub struct Expr {
 /// to shared HIR operations and which remain target-specific.
 #[derive(Debug)]
 pub enum ExprKind {
-    /// Identifier
     Ident(Ident),
-    /// Literal value
     Literal(Literal),
-    /// Contextual empty value expression: vacua
+    /// Contextual empty value: `vacua`.
     Vacua(Span),
-    /// Binary operation
     Binary(BinaryExpr),
-    /// Unary operation
     Unary(UnaryExpr),
-    /// Ternary conditional
     Ternary(TernaryExpr),
-    /// Function call
     Call(CallExpr),
-    /// Member access: x.y
     Member(MemberExpr),
-    /// Index access: x[y]
     Index(IndexExpr),
-    /// Optional chain: x?.y, x?[y], x?(args)
+    /// Optional chain: `x?.y`, `x?[y]`, `x?(args)`.
     OptionalChain(OptionalChainExpr),
-    /// Non-null assertion: x!.y, x![y], x!(args)
+    /// Non-null assertion: `x!.y`, `x![y]`, `x!(args)`.
     NonNull(NonNullExpr),
-    /// Assignment
     Assign(AssignExpr),
-    /// Unified type conversion: ∷ (postfix only; Latin aliases removed)
+    /// Postfix `∷` conversion.
     Verte(VerteExpr),
-    /// Variant construction: finge
+    /// `finge` variant construction.
     Finge(FingeExpr),
-    /// Closure: clausura
+    /// `clausura` closure.
     Clausura(ClausuraExpr),
-    /// Yield statement carrier: cede
+    /// `cede` yield carrier.
     Cede(CedeExpr),
-    /// Array literal
     Array(ArrayExpr),
-    /// Object literal
     Object(ObjectExpr),
-    /// Range: x‥y, x…y, x ante y, x usque y
+    /// Range: `x‥y`, `x…y`, `x ante y`, `x usque y`.
     Intervallum(IntervallumExpr),
-    /// Runtime value conversion: ↦ target
+    /// Runtime conversion: `↦ target`.
     Conversio(ConversioExpr),
-    /// Interpolated script: scriptum
+    /// `scriptum` interpolated script.
     Scriptum(ScriptumExpr),
-    /// Read input: lege
+    /// `lege` input.
     Lege(LegeExpr),
-    /// Expression-form stream ad: ad 'route' (opener)?
+    /// Expression-form `ad 'route' (opener)?`.
     Ad(Box<AdExpr>),
-
-    /// Comptime expression: praefixum(expr)
+    /// `praefixum(expr)` comptime.
     Praefixum(PraefixumExpr),
-    /// Self reference
+    /// `ego` self reference.
     Ego(Span),
-    /// Parenthesized expression
     Paren(Box<Expr>),
-    /// Runtime variant check: expr est <type>
+    /// Runtime variant check: `expr est <type>`.
     /// WHY: `est` with a type RHS is semantically a tag check, not value
     /// equality. Separating it from Binary(Is, ...) lets typecheck and codegen
     /// treat it as a variant discrimination (matches!) without overloading the
     /// equality path.
     TypeCheck(TypeCheckExpr),
-    /// Iuncta tuple construction: iuncta<A, B> [a, b]
+    /// `iuncta<A, B> [a, b]` tuple construction.
     Iuncta(IunctaExpr),
 }
 
 #[derive(Debug)]
 pub struct IunctaExpr {
-    /// Type arguments: A, B, ...
     pub type_args: Vec<TypeExpr>,
-    /// Positional value expressions: a, b, ...
     pub elements: Vec<Expr>,
 }
 
 #[derive(Debug)]
 pub struct Ident {
-    /// Interned spelling of the identifier.
     pub name: Symbol,
-
-    /// Span of the identifier token.
     pub span: Span,
 }
 
@@ -1074,7 +986,7 @@ pub enum Literal {
 }
 
 /// A member of a compile-time JSON object literal. Keys are always JSON strings;
-/// `key_span` is preserved for duplicate-key diagnostics (Goal Stage 3).
+/// `key_span` is preserved for duplicate-key diagnostics.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct JsonMember {
     pub key_span: Span,
@@ -1086,8 +998,7 @@ pub struct JsonMember {
 ///
 /// Mirrors the runtime `faber::Valor` enum but in compile-time AST form. Number
 /// variants follow the lexer's existing lexical split (`Integer` vs `Float`),
-/// preserving integer precision for large numbers. See
-/// `docs/factory/inline-json-valor/contract.md` §5.
+/// preserving integer precision for large numbers.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum JsonValue {
     Object(Vec<JsonMember>),
@@ -1383,7 +1294,7 @@ pub struct AdExpr {
     pub span: Span,
 }
 
-/// Compile-time expression: praefixum(expr) - forces compile-time evaluation.
+/// Compile-time `praefixum` body; evaluation is forced at compile time.
 #[derive(Debug)]
 pub struct PraefixumExpr {
     pub body: PraefixumBody,
@@ -1424,10 +1335,7 @@ pub struct TypeExpr {
     /// Borrowing mode marker from `de` or `in`, if written in type position.
     pub mode: Option<TypeMode>,
 
-    /// Syntactic form of the type expression.
     pub kind: TypeExprKind,
-
-    /// Span of the complete type expression.
     pub span: Span,
 }
 
@@ -1447,7 +1355,7 @@ pub enum TypeMode {
 /// Type-level tensor shape (Figura) in `tensor<T, Figura>`.
 #[derive(Debug)]
 pub enum FiguraExpr {
-    /// Inference hole: `_`
+    /// Inference hole: `_`.
     Infer,
     /// Compile-time natural literal (including `0`).
     Literal(u64),
@@ -1465,31 +1373,29 @@ pub enum FiguraExpr {
 /// syntax the user wrote.
 #[derive(Debug)]
 pub enum TypeExprKind {
-    /// Inferred type marker: _
+    /// Inference hole: `_`.
     Infer,
     /// Union-shaped inference hole: a standalone `∪` in type position. The
     /// hole consumes the whole type expression; it is distinct from `Infer`
     /// (monomorphic hole) and from `Union` (explicit member list).
     UnionHole,
-    /// Named type with optional type parameters
     Named(Ident, Vec<TypeExpr>),
-    /// Qualified named type with optional type parameters: `namespace.Type`
+    /// Qualified named type: `namespace.Type`.
     Qualified(Vec<Ident>, Vec<TypeExpr>),
-    /// Indexed tensor: `tensor<T, Figura>`
+    /// Indexed tensor: `tensor<T, Figura>`.
     Tensor(Box<TypeExpr>, FiguraExpr),
-    /// Indexed sparse tensor: `sparsa<T, Figura>`
+    /// Indexed sparse tensor: `sparsa<T, Figura>`.
     Sparsa(Box<TypeExpr>, FiguraExpr),
-    /// Register-class vector: `vector<T, N>`
+    /// Register-class vector: `vector<T, N>`.
     Vector(Box<TypeExpr>, FiguraExpr),
-    /// Register-class matrix: `matrix<T, [R, C]>`
+    /// Register-class matrix: `matrix<T, [R, C]>`.
     Matrix(Box<TypeExpr>, FiguraExpr),
-    /// Storage atomic cell: `atomic<T>`
+    /// Storage atomic cell: `atomic<T>`.
     Atomic(Box<TypeExpr>),
-    /// Two-channel promise: `promissum<T ⇥ E>`
+    /// Two-channel promise: `promissum<T ⇥ E>`.
     PromissumFailable(Box<TypeExpr>, Box<TypeExpr>),
-    /// Function type: (A, B) -> C
     Func(FuncTypeExpr),
-    /// Inline union type: T ∪ U (including T ∪ nihil for nullables)
+    /// Inline union: `T ∪ U` (including `T ∪ nihil` for nullables).
     Union(Vec<TypeExpr>),
 }
 
@@ -1506,10 +1412,7 @@ pub struct FuncTypeExpr {
 
 #[derive(Debug)]
 pub struct Annotation {
-    /// Parsed annotation family and payload.
     pub kind: AnnotationKind,
-
-    /// Span of the full annotation.
     pub span: Span,
 }
 
@@ -1521,39 +1424,25 @@ pub struct Annotation {
 /// legally use them; that policy belongs to the consumer phase.
 #[derive(Debug)]
 pub enum AnnotationKind {
-    /// Annotation as a statement with args
     Statement(AnnotationStmt),
-    /// @ radix typus T in textus lista<textus> ...
+    /// `@ radix typus T in textus lista<textus> ...`
     RadixTypusDomain(RadixTypusDomainAnnotation),
-    /// @ radix lane "air" / "mir" / "hir-direct"
+    /// `@ radix lane "air" / "mir" / "hir-direct"`
     RadixLane(RadixLaneAnnotation),
-    /// @ cli STRING
     Cli(CliAnnotation),
-    /// @ imperium STRING
     Imperium(ImperiumAnnotation),
-    /// @ optio ...
     Optio(OptioAnnotation),
-    /// @ operandus ...
     Operandus(OperandusAnnotation),
-    /// @ futura
     Futura,
-    /// @ cursor
     Cursor,
-    /// @ tag
     Tag,
-    /// @ solum
     Solum,
-    /// @ omitte
     Omitte,
-    /// @ metior
     Metior,
-    /// @ publica
     Publica,
-    /// @ protecta
     Protecta,
-    /// @ privata
     Privata,
-    /// @ name { field = expr, … }
+    /// `@ name { field = expr, … }`
     Braced(BracedAnnotation),
 }
 
@@ -1589,28 +1478,17 @@ pub struct ImperiumAnnotation {
 
 #[derive(Debug)]
 pub struct OptioAnnotation {
-    /// Program binding populated from the option.
     pub binding: Ident,
 
     /// Optional declared value type. Flags may omit this.
     pub ty: Option<TypeExpr>,
-
-    /// Short option spelling.
     pub short: Option<Symbol>,
-
-    /// Long option spelling.
     pub long: Option<Symbol>,
-
-    /// Whether the option is a boolean flag.
     pub flag: bool,
-
-    /// User-facing CLI help text, if supplied.
     pub description: Option<Symbol>,
 
     /// Whether the option applies outside one command scope.
     pub global: bool,
-
-    /// Default value expression parsed from the annotation.
     pub default: Option<Box<Expr>>,
 }
 
@@ -1618,30 +1496,20 @@ pub struct OptioAnnotation {
 pub struct OperandusAnnotation {
     /// Whether this positional operand captures the remaining arguments.
     pub rest: bool,
-
-    /// Declared operand type.
     pub ty: TypeExpr,
-
-    /// Program binding populated from the operand.
     pub binding: Ident,
-
-    /// User-facing CLI help text, if supplied.
     pub description: Option<Symbol>,
 
     /// Whether the operand applies outside one command scope.
     pub global: bool,
-
-    /// Default value expression parsed from the annotation.
     pub default: Option<Box<Expr>>,
 }
 
-/// Canonical braced annotation record: `@ family { field = value, … }`.
+/// Canonical braced annotation: `@ family { field = value, … }`.
 #[derive(Debug)]
 pub struct BracedAnnotation {
     /// Annotation family identifier (`optio`, `futura`, `cli`, …).
     pub name: Ident,
-
-    /// Ordered field assignments inside the braced body.
     pub fields: Vec<AnnotationField>,
 }
 
@@ -1653,7 +1521,7 @@ pub struct AnnotationField {
     pub span: Span,
 }
 
-/// Field payload in a braced annotation — expression or type position.
+/// Braced-annotation field payload: expression or type position.
 #[derive(Debug)]
 pub enum AnnotationFieldValue {
     Expr(Box<Expr>),
