@@ -71,6 +71,134 @@ fn package_mir_synthetic_def_base_is_above_hir_range() {
     assert_eq!(PACKAGE_MIR_SYNTHETIC_DEF_BASE, 2_000_000_000);
 }
 
+#[test]
+fn package_mir_append_uses_sparse_prefix_max_for_dispatch_id() {
+    let mut merged = MirProgram {
+        functions: vec![stub_mir_function(0), stub_mir_function(2)],
+    };
+    let mut appended = MirProgram {
+        functions: vec![stub_mir_function(0)],
+    };
+    let mut merged_environments = Vec::new();
+    let mut appended_environments = Vec::new();
+
+    let offset = append_shifted_parts(
+        &mut merged,
+        &mut merged_environments,
+        &mut appended,
+        &mut appended_environments,
+        Path::new("sparse.fab"),
+    )
+    .expect("sparse prefix append");
+    let dispatch = checked_shifted_function_id(MirFunctionId(0), offset, Path::new("sparse.fab"))
+        .expect("selected dispatch id");
+
+    assert_eq!(offset, 3);
+    assert_eq!(dispatch, MirFunctionId(3));
+    assert_eq!(
+        merged
+            .functions
+            .iter()
+            .map(|function| function.id)
+            .collect::<Vec<_>>(),
+        vec![MirFunctionId(0), MirFunctionId(2), MirFunctionId(3)]
+    );
+    assert!(
+        merged
+            .functions
+            .iter()
+            .any(|function| function.id == dispatch),
+        "selected CLI dispatch must target the uniquely appended function"
+    );
+}
+
+#[test]
+fn package_mir_append_keeps_dense_offset_equivalent() {
+    let mut merged = MirProgram {
+        functions: vec![stub_mir_function(0), stub_mir_function(1)],
+    };
+    let mut appended = MirProgram {
+        functions: vec![stub_mir_function(0)],
+    };
+    let mut merged_environments = Vec::new();
+    let mut appended_environments = Vec::new();
+
+    let offset = append_shifted_parts(
+        &mut merged,
+        &mut merged_environments,
+        &mut appended,
+        &mut appended_environments,
+        Path::new("dense.fab"),
+    )
+    .expect("dense prefix append");
+
+    assert_eq!(offset, 2);
+    assert_eq!(
+        merged
+            .functions
+            .iter()
+            .map(|function| function.id)
+            .collect::<Vec<_>>(),
+        vec![MirFunctionId(0), MirFunctionId(1), MirFunctionId(2)]
+    );
+}
+
+#[test]
+fn package_mir_append_reports_function_id_overflow() {
+    let mut merged = MirProgram {
+        functions: vec![stub_mir_function(u32::MAX)],
+    };
+    let mut appended = MirProgram {
+        functions: vec![stub_mir_function(0)],
+    };
+    let mut merged_environments = Vec::new();
+    let mut appended_environments = Vec::new();
+
+    let diagnostics = append_shifted_parts(
+        &mut merged,
+        &mut merged_environments,
+        &mut appended,
+        &mut appended_environments,
+        Path::new("overflow.fab"),
+    )
+    .expect_err("exhausted function id space must fail closed");
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].issue(),
+        Some("package_mir_function_id_overflow")
+    );
+    assert_eq!(merged.functions[0].id, MirFunctionId(u32::MAX));
+    assert_eq!(appended.functions[0].id, MirFunctionId(0));
+}
+
+fn stub_mir_function(id: u32) -> MirFunction {
+    let span = Span::default();
+    MirFunction {
+        id: MirFunctionId(id),
+        source: None,
+        name: None,
+        params: Vec::new(),
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span,
+            },
+            span,
+        }],
+        return_ty: MirType::semantic(TypeId(0)),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
 // ── fnv1a64 ────────────────────────────────────────────────────────────────
 
 #[test]
