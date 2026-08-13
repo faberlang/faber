@@ -439,7 +439,6 @@ mod tests {
                 TokenKind::Metior => "metior",
                 TokenKind::Repete => "repete",
                 TokenKind::Fragilis => "fragilis",
-                TokenKind::Requirit => "requirit",
                 TokenKind::SolumIn => "solum_in",
                 TokenKind::Magnitudo => "magnitudo",
                 TokenKind::Per => "per",

@@ -378,9 +378,6 @@ pub enum HirTestModifier {
     /// Allowed flake/failure tolerance marker.
     Fragilis(i64),
 
-    /// Required capability or environment marker.
-    Requirit(Symbol),
-
     /// Suite-scoped only marker.
     SolumIn(Symbol),
 }

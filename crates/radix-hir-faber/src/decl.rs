@@ -353,9 +353,6 @@ impl super::FaberCodegen {
                 writer.write(" ");
                 writer.write(&n.to_string());
             }
-            HirTestModifier::Requirit(req) => {
-                self.write_quoted_test_token(TokenKind::Requirit, *req, interner, surface, writer);
-            }
             HirTestModifier::SolumIn(env) => {
                 self.write_quoted_test_token(TokenKind::SolumIn, *env, interner, surface, writer);
             }

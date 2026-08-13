@@ -112,7 +112,7 @@ mod tests {
         match decode(&bytes) {
             Err(HirArtifactError::UnsupportedSchemaVersion {
                 found: 99,
-                expected: 2,
+                expected: 3,
             }) => {}
             other => panic!("expected UnsupportedSchemaVersion(99), got {other:?}"),
         }
