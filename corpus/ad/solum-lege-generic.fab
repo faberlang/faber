@@ -35,7 +35,7 @@ locale = "en"
 # prove each accepted target shape independently of the harness working
 # directory.
 
-import from "norma:solum" private solum
+import from "norma:solum" solum
 
 main {
     const string textPath ← "/tmp/faber-solum-lege-generic.txt"

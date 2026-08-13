@@ -67,7 +67,7 @@ fn trap_host_forwards_process_env_reads() {
     let mut host = BufferHost::default().with_env("FABER_TRAP_ENV", "via-trap");
     let status = run_source(
         r#"
-import from "faber:processus" private processus
+import from "faber:processus" processus
 
 main {
     print processus.lege("FABER_TRAP_ENV")
@@ -85,7 +85,7 @@ fn trap_host_forwards_virtual_cwd() {
     let mut host = BufferHost::default().with_cwd("/trap/sandbox");
     let status = run_source(
         r#"
-import from "faber:processus" private processus
+import from "faber:processus" processus
 
 main {
     print processus.sedes()
@@ -103,7 +103,7 @@ fn run_source_returns_explicit_exit_code() {
     let mut host = BufferHost::default();
     let status = run_source(
         r#"
-import from "faber:processus" private processus
+import from "faber:processus" processus
 
 main {
     processus.exi(7)

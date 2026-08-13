@@ -499,10 +499,11 @@ pub struct ImportDecl {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Visibility {
-    /// `privata` import visibility marker.
+    /// No re-export; the default when no import marker is written. No longer
+    /// spellable as `privata` on an import (VM-U3).
     Privata,
 
-    /// `publica` import visibility marker.
+    /// `publica` import visibility marker: re-export (`pub use`).
     Publica,
 }
 

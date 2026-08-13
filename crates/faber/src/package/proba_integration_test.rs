@@ -68,7 +68,7 @@ fn load_with_include_proba_discovers_sibling_proba_and_fab() {
     write_minimal_lib_package(dir.path());
     fs::write(
         dir.join("src/helpers.proba"),
-        r#"import from "./helpers" private helpers
+        r#"import from "./helpers" helpers
 
 fn local_helper(int n) → int {
     return helpers.double(n)
@@ -186,7 +186,7 @@ fn product_fab_cannot_import_proba() {
     .expect("helpers.proba");
     fs::write(
         dir.join("src/bad.fab"),
-        r#"import from "./helpers.proba" private ht
+        r#"import from "./helpers.proba" ht
 "#,
     )
     .expect("bad.fab");
@@ -225,7 +225,7 @@ describe "a" { test "ok" { assert 1 ≡ 1 } }
     .expect("a.proba");
     fs::write(
         dir.join("src/b.proba"),
-        r#"import from "./a.proba" private a
+        r#"import from "./a.proba" a
 describe "b" { test "use a" { assert a.shared() ≡ 1 } }
 "#,
     )
@@ -255,7 +255,7 @@ fn proba_may_import_product_fab_helpers() {
     write_minimal_lib_package(dir.path());
     fs::write(
         dir.join("src/helpers.proba"),
-        r#"import from "./helpers" private helpers
+        r#"import from "./helpers" helpers
 
 describe "helpers" {
     test "double works" {
@@ -349,7 +349,7 @@ fn compile_test_path_includes_proba_with_helpers() {
     write_minimal_lib_package(dir.path());
     fs::write(
         dir.join("src/helpers.proba"),
-        r#"import from "./helpers" private helpers
+        r#"import from "./helpers" helpers
 
 fn triple(int n) → int {
     return helpers.double(n) + n
@@ -472,7 +472,7 @@ fn addita(float a, float b) → float {
             .join("norma/src/mathesis.proba"),
     )
     .unwrap_or_else(|_| {
-        r#"import from "./mathesis" private mathesis
+        r#"import from "./mathesis" mathesis
 
 fn sum_pi(float x) → float {
     return mathesis.addita(mathesis.PI(), x)

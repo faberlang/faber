@@ -656,7 +656,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Packag
 
     // Namespace vars for local imports + explicit Norma host shims (entry + siblings).
     // WHY (79df18a): inject each binding name at most once — multi-unit packages
-    // that all `importa … privata consolum` must not redeclare `var consolum`.
+    // that all `importa … consolum` must not redeclare `var consolum`.
     let mut namespace_block = String::new();
     let mut injected_bindings: std::collections::BTreeSet<String> =
         std::collections::BTreeSet::new();

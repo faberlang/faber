@@ -139,7 +139,7 @@ fn compile_package_honors_group_frontmatter_for_module_tree() {
     fs::write(
         dir.join("main.fab"),
         r#"
-import from "./lib" private lib
+import from "./lib" lib
 
 main {
     print lib.answer()
@@ -399,7 +399,7 @@ fn vector3(f32 x, f32 y, f32 z) → Vector3 {
     .expect("math.fab");
     fs::write(
         src.join("math.proba"),
-        r#"import from "./math" private math
+        r#"import from "./math" math
 
 test "vector3 builds" {
     const math.Vector3 v ← math.vector3(1.0, 2.0, 3.0)

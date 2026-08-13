@@ -1173,8 +1173,64 @@ fn parses_import_with_public_alias() {
 #[test]
 fn import_with_empty_path_rejected() {
     assert_parse_error_matches(
-        r#"importa ex "" privata Value"#,
+        r#"importa ex "" Value"#,
         ParseExpectation::Kind(ParseErrorKind::InvalidImport),
+    );
+}
+
+#[test]
+fn import_without_marker_binds_explicit_name() {
+    let result = parse_ok(r#"importa ex "norma:solum" solum"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Import(import) = &program.statements[0].kind else {
+        panic!("expected import");
+    };
+    let ImportKind::Named { inferred, name, .. } = &import.kind else {
+        panic!("expected named import");
+    };
+    assert!(!inferred, "explicit name must bind, not infer");
+    assert_eq!(symbol_name(&result, name.name), "solum");
+}
+
+#[test]
+fn import_after_expression_start_infers_binding() {
+    // The identifier starts a following expression statement, so the import
+    // binding is inferred from the path and the statement is preserved.
+    let result = parse_ok(
+        "importa ex \"norma:chorda\"\nchorda.retorta(\"abc\")\n",
+    );
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 2, "import + expression statement");
+    let StmtKind::Import(import) = &program.statements[0].kind else {
+        panic!("expected import");
+    };
+    let ImportKind::Named { inferred, .. } = &import.kind else {
+        panic!("expected named import");
+    };
+    assert!(inferred, "binding must be inferred");
+}
+
+#[test]
+fn import_privata_marker_rejected() {
+    assert_parse_error_matches(
+        r#"importa ex "norma:solum" privata solum"#,
+        ParseExpectation::Kind(ParseErrorKind::InvalidImport),
+    );
+    assert_parse_error_matches(
+        r#"importa ex "norma:solum" privata solum"#,
+        ParseExpectation::Issue("import_privata_removed"),
+    );
+}
+
+#[test]
+fn import_record_privata_visibility_rejected() {
+    assert_parse_error_matches(
+        r#"importa { ex = "norma:solum", visibilitas = privata, nomen = solum }"#,
+        ParseExpectation::Kind(ParseErrorKind::InvalidImport),
+    );
+    assert_parse_error_matches(
+        r#"importa { ex = "norma:solum", visibilitas = privata, nomen = solum }"#,
+        ParseExpectation::Issue("import_privata_removed"),
     );
 }
 
@@ -3327,7 +3383,7 @@ fn mori_keyword_usable_as_binding_name() {
 
 #[test]
 fn parses_test_annotation_keywords_as_import_binding_names() {
-    let result = parse_ok(r#"importa ex "norma:solum" privata solum"#);
+    let result = parse_ok(r#"importa ex "norma:solum" solum"#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Import(import) = &program.statements[0].kind else {
         panic!("expected import");

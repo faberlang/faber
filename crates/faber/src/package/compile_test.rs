@@ -311,7 +311,7 @@ fn go_multi_unit_local_import_resolves_via_normalized_index() {
     std::fs::write(
         dir.join("main.fab"),
         r#"
-import from "./lib" private lib
+import from "./lib" lib
 
 main {
     print lib.answer()
@@ -364,7 +364,7 @@ fn rust_multi_unit_sibling_exports_resolve_via_package_index() {
     std::fs::write(
         dir.join("main.fab"),
         r#"
-import from "./lib" private lib
+import from "./lib" lib
 
 main {
     print lib.answer()

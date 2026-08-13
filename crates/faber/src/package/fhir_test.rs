@@ -34,25 +34,25 @@ fn dev_norma_library_home() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")
 }
 
-const LOCAL_MAIN: &str = "import from \"./util\" private * as utilModule\n\nfn run() → string {\n    return utilModule.salutare()\n}\n\nmain {\n    print utilModule.salutare()\n}\n";
+const LOCAL_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() → string {\n    return utilModule.salutare()\n}\n\nmain {\n    print utilModule.salutare()\n}\n";
 const LOCAL_UTIL: &str = "fn salutare() → string {\n    return \"salve\"\n}\n";
 
-const CONST_MEMBER_MAIN: &str = "import from \"./util\" private * as utilModule\n\nfn run() → string {\n    return utilModule.VALUE\n}\n\nmain {\n    print utilModule.VALUE\n}\n";
+const CONST_MEMBER_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() → string {\n    return utilModule.VALUE\n}\n\nmain {\n    print utilModule.VALUE\n}\n";
 const CONST_MEMBER_UTIL: &str = "const string VALUE ← \"salve\"\n";
 
-const LIBRARY_CONST_MAIN: &str = "import from \"constlib:vals\" private vals\n\nfn run() → string {\n    return vals.LIBRARY_VALUE\n}\n\nmain {\n    print vals.LIBRARY_VALUE\n}\n";
+const LIBRARY_CONST_MAIN: &str = "import from \"constlib:vals\" vals\n\nfn run() → string {\n    return vals.LIBRARY_VALUE\n}\n\nmain {\n    print vals.LIBRARY_VALUE\n}\n";
 const LIBRARY_CONST_VALS: &str =
     "+++\nlocale = \"en\"\n+++\nconst string LIBRARY_VALUE ← \"salve\"\n";
 
 /// Entry that CALLS a const data member — an unsupported shape that must
 /// keep the non-function fail-closed diagnostic (U1 done_when 4).
-const CONST_MEMBER_CALL_MAIN: &str = "import from \"./util\" private * as utilModule\n\nmain {\n    print utilModule.VALUE()\n}\n";
+const CONST_MEMBER_CALL_MAIN: &str = "import from \"./util\" * as utilModule\n\nmain {\n    print utilModule.VALUE()\n}\n";
 
-const LOCAL_LOCALE_MAIN: &str = "import from \"./util\" private * as utilModule\n\nfn run() → string {\n    return utilModule.greet()\n}\n\nmain {\n    print utilModule.greet()\n}\n";
+const LOCAL_LOCALE_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() → string {\n    return utilModule.greet()\n}\n\nmain {\n    print utilModule.greet()\n}\n";
 const LOCAL_LOCALE_UTIL: &str = "fn salutare() → string {\n    return \"salve\"\n}\n";
 
-const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" private math\nimport from \"norma:chorda\" private chorda\n\nfn run() → string {\n    const math.Vector3 canonical ← math.vector3(1.0, 0.0, 0.0)\n    const math.Vector3 canonical_shifted ← canonical.addita(math.vector3(0.0, 1.0, 0.0))\n    const float canonical_length ← canonical_shifted.longitudo()\n    const math.Vec3 original ← math.make_vector(1.0, 0.0, 0.0)\n    const math.Vec3 shifted ← original.add(math.make_vector(0.0, 2.0, 0.0))\n    const math.Vec3 normalized ← shifted.normalize()\n    const float length ← normalized.length()\n    const string reversed ← chorda.reverse(\"abc\")\n    print canonical_length\n    print length\n    return reversed\n}\n\nmain {\n    print run()\n}\n";
-const NORMA_LATIN_COMPATIBILITY_MAIN: &str = "importa ex \"norma:chorda\" privata chorda\n\nfunctio run() → textus {\n    redde chorda.retorta(\"abc\")\n}\n\nincipit {\n    nota run()\n}\n";
+const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:chorda\" chorda\n\nfn run() → string {\n    const math.Vector3 canonical ← math.vector3(1.0, 0.0, 0.0)\n    const math.Vector3 canonical_shifted ← canonical.addita(math.vector3(0.0, 1.0, 0.0))\n    const float canonical_length ← canonical_shifted.longitudo()\n    const math.Vec3 original ← math.make_vector(1.0, 0.0, 0.0)\n    const math.Vec3 shifted ← original.add(math.make_vector(0.0, 2.0, 0.0))\n    const math.Vec3 normalized ← shifted.normalize()\n    const float length ← normalized.length()\n    const string reversed ← chorda.reverse(\"abc\")\n    print canonical_length\n    print length\n    return reversed\n}\n\nmain {\n    print run()\n}\n";
+const NORMA_LATIN_COMPATIBILITY_MAIN: &str = "importa ex \"norma:chorda\" chorda\n\nfunctio run() → textus {\n    redde chorda.retorta(\"abc\")\n}\n\nincipit {\n    nota run()\n}\n";
 
 /// Two-module package with a local import and a namespace call in the entry.
 fn write_local_package(dir: &std::path::Path) -> std::path::PathBuf {
@@ -330,7 +330,7 @@ kind = "bin"
     fs::write(dir.join("faber.toml"), manifest).expect("write faber.toml");
     fs::write(
         src.join("main.fab"),
-        "import from \"norma:solum\" private solum\n\nfn scinde(string s) → int {\n    const list<string> partes ← solum.carpe(s)\n    return partes.length()\n}\n\nmain {\n    print scinde(\"a,b,c\")\n}\n",
+        "import from \"norma:solum\" solum\n\nfn scinde(string s) → int {\n    const list<string> partes ← solum.carpe(s)\n    return partes.length()\n}\n\nmain {\n    print scinde(\"a,b,c\")\n}\n",
     )
     .expect("write main.fab");
     src.join("main.fab")

@@ -31,7 +31,7 @@ locale = "en"
 # Norma currently declares the async wrapper with compatibility `@ futura`; this
 # example consumes it through `tacebit`.
 
-import from "norma:tempus" private tempus
+import from "norma:tempus" tempus
 
 async_main {
     tempus.expectet(0)

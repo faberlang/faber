@@ -3,28 +3,28 @@ term = "importa"
 kind = "keyword"
 category = "package"
 canonical = false
-summary = "Sibling module consumed by importa ex … privata."
-syntax = "importa ex \"<path>\" privata (<name> [ut <alias>] | *)"
-related = ["importa", "privata", "ex"]
+summary = "Sibling module consumed by importa ex … ."
+syntax = "importa ex \"<path>\" (<name> [ut <alias>] | *)"
+related = ["importa", "ex"]
 locale = "en"
 +++
 # =============================================================================
-# importa — Sibling module consumed by importa ex … privata
+# importa — Sibling module consumed by importa ex …
 # =============================================================================
 #
 # What this teaches:
-#   • Sibling module consumed by importa ex … privata.
-#   • Related keywords: importa, privata, ex
+#   • Sibling module consumed by importa ex … .
+#   • Related keywords: importa, ex
 #
 # Common mistakes:
 #   • Exporting a name without the module being importable — standalone compilation may fail to resolve sibling imports; use package or module mode.
 #
-# See also: importa, privata, ex
+# See also: importa, ex
 # =============================================================================
 
 # importa auxilium — sibling module for importa/importa.fab
 #
-# Exported functio saluta consumed via importa ex "./auxilium" privata.
+# Exported functio saluta consumed via importa ex "./auxilium".
 # `@ public` is the en-surface spelling of `@ publica`: only `@ publica` /
 # `@ interna` declarations are importable; unmarked declarations are
 # module-private.

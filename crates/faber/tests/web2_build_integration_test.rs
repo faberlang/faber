@@ -101,8 +101,8 @@ rustc = ""
     fs::write(
         app.join("src/main.fab"),
         r#"
-importa ex "web:web" privata web
-importa ex "web:dom" privata dom
+importa ex "web:web" web
+importa ex "web:dom" dom
 
 @ WebController { selector = "[data-faber=shell]" }
 functio shell(dom.Scope scope) → vacuum {
