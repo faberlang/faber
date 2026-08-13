@@ -104,6 +104,44 @@ fn maybe_append_runtime_extent(
         .push(runtime_extent_resource(binding, extent_ty));
 }
 
+/// Build the read-input resources for a kernel's params, in binding order,
+/// skipping `vacuum` params (the reverse-AD nil placeholder carries no
+/// device storage). Returns the resources and the next free binding.
+///
+/// `element_type`/`element_count` select the element-shape law per kernel
+/// family: the result-tuple arm reads buffer views (`buffer_element_*`), the
+/// reduction arm reads device views (`device_view_element_*`).
+fn input_resources_for_params(
+    inputs: &[MirParam],
+    validation: &MirValidationContext<'_>,
+    interner: Option<&Interner>,
+    allow_host_owned_tensor_entry: bool,
+    element_type: impl Fn(MirType, &MirValidationContext<'_>, bool) -> Result<MirType, MirAbiError>,
+    element_count: impl Fn(MirType, &MirValidationContext<'_>) -> Result<u64, MirAbiError>,
+) -> Result<(Vec<MirKernelResource>, u32), MirAbiError> {
+    let mut input_resources = Vec::with_capacity(inputs.len());
+    let mut next_binding = 0u32;
+    for input in inputs {
+        if is_vacuum(input.ty, validation) {
+            continue;
+        }
+        input_resources.push(MirKernelResource {
+            group: DEFAULT_KERNEL_RESOURCE_GROUP,
+            binding: next_binding,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Input,
+            access: MirKernelResourceAccess::Read,
+            element_ty: element_type(input.ty, validation, allow_host_owned_tensor_entry)?,
+            element_count: element_count(input.ty, validation)?,
+            source_local: Some(input.local),
+            source_name: param_source_name(input, interner),
+            reduced_projection: None,
+        });
+        next_binding += 1;
+    }
+    Ok((input_resources, next_binding))
+}
+
 impl MirKernelSignature {
     /// # Errors
     /// Returns an error when validation or type resolution fails. See [`MirAbiError`].
@@ -243,15 +281,6 @@ impl MirKernelSignature {
                     allow_host_owned_tensor_entry,
                 )
             }
-            [input, output, index] => {
-                let context = IndexedViewKernelContext {
-                    validation,
-                    builtin_inputs: vec![builtin_input_for_index_param(index, interner)],
-                    interner,
-                    allow_host_owned_tensor_entry,
-                };
-                Self::indexed_view_kernel(function, input, output, index, context)
-            }
             [inputs @ .., output, index] if !inputs.is_empty() => {
                 let context = IndexedViewKernelContext {
                     validation,
@@ -259,7 +288,11 @@ impl MirKernelSignature {
                     interner,
                     allow_host_owned_tensor_entry,
                 };
-                Self::multi_input_indexed_view_kernel(function, inputs, output, index, context)
+                if let [input] = inputs {
+                    Self::indexed_view_kernel(function, input, output, index, context)
+                } else {
+                    Self::multi_input_indexed_view_kernel(function, inputs, output, index, context)
+                }
             }
             _ => Err(MirAbiError::new(
                 "kernel must have either one buffer parameter or input*/output/index parameters",
@@ -297,22 +330,16 @@ impl MirKernelSignature {
         let output = &params[builtin_start - 1];
         let builtin_params = &params[builtin_start..];
         let builtin_inputs = builtin_inputs_for_named_params(builtin_params, validation, interner)?;
+        let context = IndexedViewKernelContext {
+            validation,
+            builtin_inputs,
+            interner: Some(interner),
+            allow_host_owned_tensor_entry,
+        };
         if let [input] = inputs {
-            let context = IndexedViewKernelContext {
-                validation,
-                builtin_inputs,
-                interner: Some(interner),
-                allow_host_owned_tensor_entry,
-            };
             Self::indexed_view_kernel(function, input, output, &builtin_params[0], context)
                 .map(Some)
         } else {
-            let context = IndexedViewKernelContext {
-                validation,
-                builtin_inputs,
-                interner: Some(interner),
-                allow_host_owned_tensor_entry,
-            };
             Self::multi_input_indexed_view_kernel(
                 function,
                 inputs,
@@ -355,29 +382,14 @@ impl MirKernelSignature {
         // and is skipped (S3-A2 companion shape: `backward(x, w, nil(),
         // upstream) → (grad_x, grad_w)`). Output bindings start after the
         // inputs, so each output binds a distinct slot.
-        let mut input_resources = Vec::with_capacity(inputs.len());
-        let mut next_binding = 0u32;
-        for input in inputs {
-            if is_vacuum(input.ty, validation) {
-                continue;
-            }
-            let element_ty =
-                buffer_element_type(input.ty, validation, allow_host_owned_tensor_entry)?;
-            let element_count = buffer_element_count(input.ty, validation)?;
-            input_resources.push(MirKernelResource {
-                group: DEFAULT_KERNEL_RESOURCE_GROUP,
-                binding: next_binding,
-                kind: MirKernelResourceKind::StorageBuffer,
-                role: MirKernelResourceRole::Input,
-                access: MirKernelResourceAccess::Read,
-                element_ty,
-                element_count,
-                source_local: Some(input.local),
-                source_name: param_source_name(input, interner),
-                reduced_projection: None,
-            });
-            next_binding += 1;
-        }
+        let (input_resources, next_binding) = input_resources_for_params(
+            inputs,
+            validation,
+            interner,
+            allow_host_owned_tensor_entry,
+            buffer_element_type,
+            buffer_element_count,
+        )?;
         let input = input_resources
             .first()
             .cloned()
@@ -535,29 +547,14 @@ impl MirKernelSignature {
             return Ok(None);
         }
 
-        let mut input_resources = Vec::with_capacity(function.params.len());
-        let mut next_binding = 0u32;
-        for input in &function.params {
-            if is_vacuum(input.ty, validation) {
-                continue;
-            }
-            let element_ty =
-                device_view_element_type(input.ty, validation, allow_host_owned_tensor_entry)?;
-            let element_count = device_view_element_count(input.ty, validation)?;
-            input_resources.push(MirKernelResource {
-                group: DEFAULT_KERNEL_RESOURCE_GROUP,
-                binding: next_binding,
-                kind: MirKernelResourceKind::StorageBuffer,
-                role: MirKernelResourceRole::Input,
-                access: MirKernelResourceAccess::Read,
-                element_ty,
-                element_count,
-                source_local: Some(input.local),
-                source_name: param_source_name(input, interner),
-                reduced_projection: None,
-            });
-            next_binding += 1;
-        }
+        let (input_resources, next_binding) = input_resources_for_params(
+            &function.params,
+            validation,
+            interner,
+            allow_host_owned_tensor_entry,
+            device_view_element_type,
+            device_view_element_count,
+        )?;
         let input = input_resources
             .first()
             .cloned()
