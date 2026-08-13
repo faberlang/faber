@@ -15,7 +15,9 @@ pub(super) fn exported_nominal_names(interface: &FileInterface) -> BTreeSet<Stri
             FileExportKind::Struct(_) | FileExportKind::Enum(_) | FileExportKind::Interface(_) => {
                 Some(export.name.clone())
             }
-            FileExportKind::Function(_) | FileExportKind::TypeAlias(_) | FileExportKind::Const(_) => None,
+            FileExportKind::Function(_)
+            | FileExportKind::TypeAlias(_)
+            | FileExportKind::Const(_) => None,
         })
         .collect()
 }
@@ -117,17 +119,12 @@ pub(super) fn plan_fmir_text_runtime_cli_root_entry(
         .iter()
         .chain(&cli_program.operands)
         .collect::<Vec<_>>();
-    if operands.iter().any(|operand| {
-        operand.rest
-            || operand.default.is_some()
-            || matches!(
-                operand.ty,
-                CliType::Octeti | CliType::ListaTextus | CliType::ListaNumerus
-            )
+    if operands.iter().enumerate().any(|(index, operand)| {
+        !is_fmir_text_runtime_supported_operand(operand, index + 1 == operands.len())
     }) {
         diagnostics.push(unsupported_cli_diagnostic(
             &unit.path,
-            "fmir-text runtime CLI operands beyond required scalar values",
+            "fmir-text runtime CLI operands beyond required scalars and a final rest textus list",
         ));
     }
     if diagnostics.len() != diagnostic_count {
@@ -158,10 +155,10 @@ pub(super) fn plan_fmir_text_runtime_cli_root_entry(
     let mut fields = Vec::new();
     let mut image_operands = Vec::new();
     for operand in planned {
-        let ty = fmir_text_cli_value_type(&operand.operand.ty)?;
+        let ty = fmir_text_runtime_cli_value_type(operand.operand)?;
         fields.push(MirRuntimeRecordField {
             name: unit.analysis.interner.intern(&operand.binding_name),
-            value: MirRuntimeRecordValue::Operand(fmir_text_cli_placeholder_value(unit, &ty)),
+            value: fmir_text_cli_placeholder_record_value(unit, operand.operand, &ty)?,
         });
         image_operands.push(FmirTextCliOperand {
             field: operand.binding_name,
@@ -187,8 +184,51 @@ pub(super) fn fmir_text_cli_value_type(ty: &CliType) -> Option<FmirTextCliValueT
         CliType::Numerus => Some(FmirTextCliValueType::Numerus),
         CliType::Fractus => Some(FmirTextCliValueType::Fractus),
         CliType::Bivalens => Some(FmirTextCliValueType::Bivalens),
-        CliType::Octeti | CliType::ListaTextus | CliType::ListaNumerus => None,
+        CliType::ListaTextus => Some(FmirTextCliValueType::ListaTextus),
+        CliType::Octeti | CliType::ListaNumerus => None,
     }
+}
+
+/// Image-runtime operand type: a final rest `textus` list is `ListaTextus`,
+/// not a scalar `Textus` placeholder.
+pub(super) fn fmir_text_runtime_cli_value_type(
+    operand: &radix::cli::CliOperand,
+) -> Option<FmirTextCliValueType> {
+    if operand.rest {
+        return matches!(
+            operand.ty,
+            CliType::Textus | CliType::Ignotum | CliType::ListaTextus
+        )
+        .then_some(FmirTextCliValueType::ListaTextus);
+    }
+    fmir_text_cli_value_type(&operand.ty)
+}
+
+pub(super) fn is_fmir_text_runtime_supported_operand(
+    operand: &radix::cli::CliOperand,
+    is_final: bool,
+) -> bool {
+    if operand.default.is_some() {
+        return false;
+    }
+    if operand.rest {
+        return is_final
+            && matches!(
+                operand.ty,
+                CliType::Textus | CliType::Ignotum | CliType::ListaTextus
+            );
+    }
+    if matches!(operand.ty, CliType::ListaTextus) {
+        return is_final;
+    }
+    matches!(
+        operand.ty,
+        CliType::Textus
+            | CliType::Ignotum
+            | CliType::Numerus
+            | CliType::Fractus
+            | CliType::Bivalens
+    )
 }
 
 pub(super) fn fmir_text_cli_placeholder_value(
@@ -202,8 +242,28 @@ pub(super) fn fmir_text_cli_placeholder_value(
         FmirTextCliValueType::Numerus => MirConstant::Int(0),
         FmirTextCliValueType::Fractus => MirConstant::Float(0.0),
         FmirTextCliValueType::Bivalens => MirConstant::Bool(false),
+        FmirTextCliValueType::ListaTextus => {
+            MirConstant::String(unit.analysis.interner.intern("__fmir_runtime_arg__"))
+        }
     };
     MirOperand::Constant(constant)
+}
+
+pub(super) fn fmir_text_cli_placeholder_record_value(
+    unit: &mut AnalyzedPackageUnit,
+    operand: &radix::cli::CliOperand,
+    ty: &FmirTextCliValueType,
+) -> Option<MirRuntimeRecordValue> {
+    if *ty == FmirTextCliValueType::ListaTextus {
+        let list_ty = cli_record_type(&mut unit.analysis.types, &operand.ty, operand.rest)?;
+        return Some(MirRuntimeRecordValue::Array {
+            ty: MirType::semantic(list_ty),
+            items: Vec::new(),
+        });
+    }
+    Some(MirRuntimeRecordValue::Operand(
+        fmir_text_cli_placeholder_value(unit, ty),
+    ))
 }
 
 pub(super) fn plan_cli_root_entry(
@@ -883,14 +943,12 @@ pub(super) fn build_nominal_remap(
         };
         let name_text = source_interner.resolve(symbol.name);
         let name = target_interner.intern(name_text);
-        let home_identity = source_resolver
-            .nominal_module_identity(def_id)
-            .or_else(|| {
-                source_exports
-                    .contains(name_text)
-                    .then(|| source_identity.cloned())
-                    .flatten()
-            });
+        let home_identity = source_resolver.nominal_module_identity(def_id).or_else(|| {
+            source_exports
+                .contains(name_text)
+                .then(|| source_identity.cloned())
+                .flatten()
+        });
         if let Some(entry_ty) =
             entry
                 .resolver
@@ -975,7 +1033,8 @@ pub(super) fn build_variant_remap(
             continue;
         };
         let variant_name = target_interner.intern(variant_name_text);
-        if let Some(entry_variant_def) = entry.resolver.variant_child(entry_enum_def, variant_name) {
+        if let Some(entry_variant_def) = entry.resolver.variant_child(entry_enum_def, variant_name)
+        {
             map.insert(variant_def, entry_variant_def);
         } else if enum_home
             .as_ref()
@@ -1018,7 +1077,9 @@ pub(super) fn import_semantic_type_with_nominal(
                 .map(|(name, field_ty)| {
                     (
                         name,
-                        import_semantic_type_with_nominal(source, target, field_ty, imported, nominal),
+                        import_semantic_type_with_nominal(
+                            source, target, field_ty, imported, nominal,
+                        ),
                     )
                 })
                 .collect();
@@ -1033,8 +1094,10 @@ pub(super) fn import_semantic_type_with_nominal(
             target.promissum(inner)
         }
         Type::PromissumFailable(success, alternate) => {
-            let success = import_semantic_type_with_nominal(source, target, success, imported, nominal);
-            let alternate = import_semantic_type_with_nominal(source, target, alternate, imported, nominal);
+            let success =
+                import_semantic_type_with_nominal(source, target, success, imported, nominal);
+            let alternate =
+                import_semantic_type_with_nominal(source, target, alternate, imported, nominal);
             target.promissum_failable(success, alternate)
         }
         Type::Cursor(inner) => {
@@ -1043,7 +1106,8 @@ pub(super) fn import_semantic_type_with_nominal(
         }
         Type::AsyncCursor(item, alternate) => {
             let item = import_semantic_type_with_nominal(source, target, item, imported, nominal);
-            let alternate = import_semantic_type_with_nominal(source, target, alternate, imported, nominal);
+            let alternate =
+                import_semantic_type_with_nominal(source, target, alternate, imported, nominal);
             target.async_cursor(item, alternate)
         }
         Type::Tensor(inner, shape) => {
@@ -1091,11 +1155,14 @@ pub(super) fn import_semantic_type_with_nominal(
         }
         Type::Func(mut sig) => {
             for param in &mut sig.params {
-                param.ty = import_semantic_type_with_nominal(source, target, param.ty, imported, nominal);
+                param.ty =
+                    import_semantic_type_with_nominal(source, target, param.ty, imported, nominal);
             }
             sig.ret = import_semantic_type_with_nominal(source, target, sig.ret, imported, nominal);
             if let Some(error_ty) = sig.err {
-                sig.err = Some(import_semantic_type_with_nominal(source, target, error_ty, imported, nominal));
+                sig.err = Some(import_semantic_type_with_nominal(
+                    source, target, error_ty, imported, nominal,
+                ));
             }
             target.function(sig)
         }
@@ -1103,28 +1170,36 @@ pub(super) fn import_semantic_type_with_nominal(
             let base = import_semantic_type_with_nominal(source, target, base, imported, nominal);
             let args = args
                 .into_iter()
-                .map(|arg| import_semantic_type_with_nominal(source, target, arg, imported, nominal))
+                .map(|arg| {
+                    import_semantic_type_with_nominal(source, target, arg, imported, nominal)
+                })
                 .collect();
             target.intern(Type::Applied(base, args))
         }
         Type::Union(members) => {
             let members = members
                 .into_iter()
-                .map(|member| import_semantic_type_with_nominal(source, target, member, imported, nominal))
+                .map(|member| {
+                    import_semantic_type_with_nominal(source, target, member, imported, nominal)
+                })
                 .collect();
             target.intern(Type::Union(members))
         }
         Type::Tuple(members) => {
             let members = members
                 .into_iter()
-                .map(|member| import_semantic_type_with_nominal(source, target, member, imported, nominal))
+                .map(|member| {
+                    import_semantic_type_with_nominal(source, target, member, imported, nominal)
+                })
                 .collect();
             target.intern(Type::Tuple(members))
         }
         other @ (Type::Struct(_) | Type::Enum(_) | Type::Interface(_)) => {
             import_nominal_by_canonical_key(&other, nominal).unwrap_or_else(|| target.intern(other))
         }
-        other @ (Type::Param(_) | Type::Infer(_) | Type::InferUnion(_) | Type::Error) => target.intern(other),
+        other @ (Type::Param(_) | Type::Infer(_) | Type::InferUnion(_) | Type::Error) => {
+            target.intern(other)
+        }
     };
     imported.insert(ty, imported_ty);
     imported_ty

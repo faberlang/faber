@@ -411,6 +411,15 @@ pub struct ScriptArgs {
     #[arg(default_value = ".")]
     pub path: PathBuf,
 
+    /// Code locale used to select a package-local locale pack. When omitted,
+    /// the package `[locale]` (or the product default `en`) is used.
+    #[arg(long = "locale", value_name = "LOCALE")]
+    pub locale: Option<String>,
+
+    /// Message language for diagnostics (independent of code locale).
+    #[arg(long = "diagnostics-locale", value_name = "LOCALE")]
+    pub diagnostics_locale: Option<String>,
+
     /// Arguments passed to the interpreted program (after --)
     #[arg(allow_hyphen_values = true, last = true)]
     pub args: Vec<String>,

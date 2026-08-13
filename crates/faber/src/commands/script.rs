@@ -20,13 +20,23 @@ use std::path::{Path, PathBuf};
 /// archive without compiling to Rust or invoking Cargo.
 pub(super) fn cmd_script(args: &ScriptArgs) {
     let path = PathBuf::from(&args.path);
-    interpret_path(&path, &args.args);
+    interpret_path(
+        &path,
+        &args.args,
+        args.locale.as_deref(),
+        args.diagnostics_locale.as_deref(),
+    );
 }
 
 /// Dispatch an interpreted input path to the package-MIR runner, archive
 /// extraction, or single-source stepper. Shared by `faber script` and
 /// `faber run --interpret`.
-pub(super) fn interpret_path(path: &PathBuf, program_args: &[String]) {
+pub(super) fn interpret_path(
+    path: &PathBuf,
+    program_args: &[String],
+    locale: Option<&str>,
+    diagnostics_locale: Option<&str>,
+) {
     if super::archive::is_zip_archive(path) {
         let archive = match super::archive::extract_package_archive(path) {
             Ok(archive) => archive,
@@ -35,13 +45,14 @@ pub(super) fn interpret_path(path: &PathBuf, program_args: &[String]) {
                 std::process::exit(1);
             }
         };
-        let config = match package::default_config_with_locale(radix::Target::HirTypeScript) {
-            Ok(config) => config.with_dev_stdlib(),
-            Err(diagnostic) => {
-                eprint_archive_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
-                std::process::exit(1);
-            }
-        };
+        let config =
+            match script_package_config(archive.package_input(), locale, diagnostics_locale) {
+                Ok(config) => config,
+                Err(diagnostic) => {
+                    eprint_archive_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
+                    std::process::exit(1);
+                }
+            };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
         if let Err(mut diagnostics) =
             package::run_package_mir(&config, archive.package_input(), &mut host)
@@ -55,8 +66,8 @@ pub(super) fn interpret_path(path: &PathBuf, program_args: &[String]) {
     }
 
     if is_package_interpret_input(path) {
-        let config = match package::default_config_with_locale(radix::Target::HirTypeScript) {
-            Ok(config) => config.with_dev_stdlib(),
+        let config = match script_package_config(path, locale, diagnostics_locale) {
+            Ok(config) => config,
             Err(diagnostic) => {
                 super::eprint_compile_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
                 std::process::exit(1);
@@ -78,8 +89,40 @@ pub(super) fn interpret_path(path: &PathBuf, program_args: &[String]) {
         }
     };
 
+    let config = match script_package_config(path, locale, diagnostics_locale) {
+        Ok(config) => config,
+        Err(diagnostic) => {
+            super::eprint_compile_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
+            std::process::exit(1);
+        }
+    };
+    let session = radix::driver::Session::new(config);
     let mut host = StdioHost::with_argumenta(program_args.to_vec());
-    interpret_source_or_exit(&path.display().to_string(), &source, &mut host);
+    if let Err(error) =
+        crate::script::run_with_session(&session, &path.display().to_string(), &source, &mut host)
+    {
+        print_run_source_error(&error);
+        std::process::exit(1);
+    }
+}
+
+/// Reader config for interpreted packages: CLI `--locale` / `--diagnostics-locale`
+/// over the package `[locale]`, then the product default. Do not use
+/// [`package::default_config_with_locale`] here — that installs the English
+/// pack and `effective_package_config` will not replace it with the package's
+/// declared locale.
+fn script_package_config(
+    input: &Path,
+    locale: Option<&str>,
+    diagnostics_locale: Option<&str>,
+) -> Result<radix::driver::Config, Box<Diagnostic>> {
+    package::config_with_locale(
+        radix::Target::HirTypeScript,
+        input,
+        locale,
+        diagnostics_locale,
+    )
+    .map(|(config, _)| config.with_dev_stdlib())
 }
 
 /// Whether `path` routes through the package-MIR runner rather than the
@@ -143,10 +186,7 @@ fn eprint_archive_diagnostics(diagnostics: &[Diagnostic]) {
 /// Execute `-c` / `--command` source via the MIR stepper.
 pub(super) fn cmd_eval(source: &str, args: Vec<String>) {
     let mut host = StdioHost::with_argumenta(args);
-    if let Err(error) = interpret_source("command-line", source, &mut host) {
-        print_run_source_error(&error);
-        std::process::exit(1);
-    }
+    interpret_source_or_exit("command-line", source, &mut host);
 }
 
 /// Interactive REPL: accumulate cells and re-lower MIR on each input line.

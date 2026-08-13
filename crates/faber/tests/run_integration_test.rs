@@ -545,9 +545,9 @@ fn run_reader_locale_accepts_manifest_file_input() {
 }
 
 #[test]
-fn run_interpret_rejects_reader_locale() {
+fn run_interpret_accepts_reader_locale() {
     let source = write_single_file(
-        "run-reader-locale-interpret-reject",
+        "run-reader-locale-interpret-accept",
         r#"
 入口 {
   显示 "salve"
@@ -563,15 +563,11 @@ fn run_interpret_rejects_reader_locale() {
         source.to_str().expect("utf8 source path"),
     ]);
 
-    assert!(!ok, "run --interpret should reject reader locale");
     assert!(
-        stdout.is_empty(),
-        "rejected run should not write stdout: {stdout}"
+        ok,
+        "run --interpret --locale should interpret the localized source:\n{stderr}"
     );
-    assert!(
-        stderr.contains("--locale is not supported with `faber run --interpret`"),
-        "expected interpret reader-locale rejection, got:\n{stderr}"
-    );
+    assert_eq!(stdout, "salve\n");
 }
 
 #[test]
