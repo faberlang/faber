@@ -6,8 +6,6 @@
 //! main grammar boundary between source-level declarations and `AST` contracts
 //! consumed by the collector and package CLI.
 //!
-//! DESIGN PHILOSOPHY
-//! =================
 //! Declarations are intentionally explicit: types precede names, inferred locals
 //! require `_`, voluntary slots use post-name `sponte`, and canonical modifier
 //! ordering is enforced in the parser when later phases would otherwise receive
@@ -15,10 +13,9 @@
 //! parser either normalizes it into the current `AST` contract or emits a targeted
 //! diagnostic instead of expanding the language silently.
 //!
-//! INVARIANTS
-//! ==========
-//! - `parse_stmt` is the dispatcher for both top-level and nested statements
-//!   contexts; recovery boundaries in `mod.rs` must stay aligned with it.
+//! - `parse_stmt` is the dispatcher for both top-level and nested statement
+//!   contexts; recovery boundaries in `Parser::is_recovery_boundary` must stay
+//!   aligned with it.
 //! - Function, parameter, field, and closure signatures delegate to `types.rs`
 //!   for type syntax; this file decides where type positions are legal.
 //! - Annotation parsers define the source contract for CLI/package metadata,
@@ -30,12 +27,9 @@ use radix_lexer::{
     KeywordScope, TokenKind,
 };
 #[allow(clippy::wildcard_imports)]
-// syntax is a pure re-export barrel from radix-syntax
 use radix_syntax::*;
 
-// =============================================================================
 // STATEMENT DISPATCH
-// =============================================================================
 
 impl Parser {
     /// Dispatch a top-level or nested statement by its leading token.
@@ -53,71 +47,60 @@ impl Parser {
         let id = self.next_id();
 
         let kind = match self.peek().kind {
-            // Block
             TokenKind::LBrace => StmtKind::Block(self.parse_block()?),
 
-            // Keyword-led statements: dispatch on the registry keyword
-            // identity (locale-independent), claimed only in statement-initial
-            // position.
-            TokenKind::Ident(_) => {
-                match self.current_keyword_ident() {
-                    // Declaration introducers.
-                    Some(TokenKind::Discretio) => self.parse_union_decl()?,
-                    Some(TokenKind::Fixum | TokenKind::Varia) => self.parse_var_decl()?,
-                    Some(TokenKind::Functio) => self.parse_func_decl()?,
-                    Some(TokenKind::Genus) => self.parse_class_decl()?,
-                    Some(TokenKind::Implendum) => self.parse_interface_decl()?,
-                    Some(TokenKind::Ordo) => self.parse_enum_decl()?,
-                    Some(TokenKind::Sit) => self.parse_sit_decl()?,
-                    Some(TokenKind::Typus) => self.parse_type_alias_decl()?,
-                    Some(TokenKind::Schema) => self.parse_schema_decl()?,
-                    // Statement introducers (previously token-shaped).
-                    Some(TokenKind::Abstractus) => self.parse_abstract_class_decl()?,
-                    Some(TokenKind::Importa) => self.parse_import_decl()?,
-                    Some(TokenKind::Proba) => StmtKind::Proba(self.parse_proba_case()?),
-                    Some(TokenKind::Probandum) => self.parse_probandum_decl()?,
-                    Some(TokenKind::Custodi) => self.parse_custodi_stmt()?,
-                    Some(TokenKind::Itera) => self.parse_itera_stmt()?,
-                    Some(TokenKind::Iace) => self.parse_iace_stmt()?,
-                    Some(TokenKind::Mori) => self.parse_mori_stmt()?,
-                    Some(TokenKind::Cede) => self.parse_cede_stmt()?,
-                    Some(TokenKind::Adfirma) => self.parse_adfirma_stmt()?,
-                    Some(TokenKind::Scribe) => self.parse_scribe_stmt()?,
-                    Some(TokenKind::Incipit | TokenKind::Incipiet) => self.parse_incipit_stmt()?,
-                    Some(TokenKind::Ex) => self.parse_extract_stmt()?,
-                    // Control flow.
-                    Some(TokenKind::Discerne) => self.parse_discerne_stmt()?,
-                    Some(TokenKind::Dum) => self.parse_dum_stmt()?,
-                    Some(TokenKind::Elige) => self.parse_elige_stmt()?,
-                    Some(TokenKind::Fac) => self.parse_fac_stmt()?,
-                    Some(TokenKind::Si) => self.parse_si_stmt()?,
-                    Some(TokenKind::Perge) => self.parse_perge_stmt()?,
-                    Some(TokenKind::Redde) => self.parse_redde_stmt()?,
-                    Some(TokenKind::Rumpe) => self.parse_rumpe_stmt()?,
-                    // Resource/transfer and route statements.
-                    Some(TokenKind::Cura) => self.parse_cura_stmt()?,
-                    Some(TokenKind::Tacet) => self.parse_tacet_stmt()?,
-                    Some(TokenKind::Ad) => self.parse_ad_stmt()?,
-                    Some(TokenKind::Figendum | TokenKind::Variandum) => {
-                        let is_immutable =
-                            self.current_keyword_ident() == Some(TokenKind::Figendum);
-                        self.parse_await_var_decl(if is_immutable {
-                            AstMutability::Immutable
-                        } else {
-                            AstMutability::Mutable
-                        })?
-                    }
-                    Some(TokenKind::Reddet) => self.parse_reddet_stmt(start)?,
-                    Some(TokenKind::Tacebit) => self.parse_tacebit_stmt(start)?,
-                    // Output scribe builtins.
-                    Some(TokenKind::Nota | TokenKind::Mone | TokenKind::Vide) => {
-                        self.parse_scribe_stmt()?
-                    }
-                    _ => self.parse_expr_stmt()?,
+            // Keyword identity is locale-independent and claimed only in
+            // statement-initial position.
+            TokenKind::Ident(_) => match self.current_keyword_ident() {
+                Some(TokenKind::Discretio) => self.parse_union_decl()?,
+                Some(TokenKind::Fixum | TokenKind::Varia) => self.parse_var_decl()?,
+                Some(TokenKind::Functio) => self.parse_func_decl()?,
+                Some(TokenKind::Genus) => self.parse_class_decl()?,
+                Some(TokenKind::Implendum) => self.parse_interface_decl()?,
+                Some(TokenKind::Ordo) => self.parse_enum_decl()?,
+                Some(TokenKind::Sit) => self.parse_sit_decl()?,
+                Some(TokenKind::Typus) => self.parse_type_alias_decl()?,
+                Some(TokenKind::Schema) => self.parse_schema_decl()?,
+                Some(TokenKind::Abstractus) => self.parse_abstract_class_decl()?,
+                Some(TokenKind::Importa) => self.parse_import_decl()?,
+                Some(TokenKind::Proba) => StmtKind::Proba(self.parse_proba_case()?),
+                Some(TokenKind::Probandum) => self.parse_probandum_decl()?,
+                Some(TokenKind::Custodi) => self.parse_custodi_stmt()?,
+                Some(TokenKind::Itera) => self.parse_itera_stmt()?,
+                Some(TokenKind::Iace) => self.parse_iace_stmt()?,
+                Some(TokenKind::Mori) => self.parse_mori_stmt()?,
+                Some(TokenKind::Cede) => self.parse_cede_stmt()?,
+                Some(TokenKind::Adfirma) => self.parse_adfirma_stmt()?,
+                Some(TokenKind::Scribe) => self.parse_scribe_stmt()?,
+                Some(TokenKind::Incipit | TokenKind::Incipiet) => self.parse_incipit_stmt()?,
+                Some(TokenKind::Ex) => self.parse_extract_stmt()?,
+                Some(TokenKind::Discerne) => self.parse_discerne_stmt()?,
+                Some(TokenKind::Dum) => self.parse_dum_stmt()?,
+                Some(TokenKind::Elige) => self.parse_elige_stmt()?,
+                Some(TokenKind::Fac) => self.parse_fac_stmt()?,
+                Some(TokenKind::Si) => self.parse_si_stmt()?,
+                Some(TokenKind::Perge) => self.parse_perge_stmt()?,
+                Some(TokenKind::Redde) => self.parse_redde_stmt()?,
+                Some(TokenKind::Rumpe) => self.parse_rumpe_stmt()?,
+                Some(TokenKind::Cura) => self.parse_cura_stmt()?,
+                Some(TokenKind::Tacet) => self.parse_tacet_stmt()?,
+                Some(TokenKind::Ad) => self.parse_ad_stmt()?,
+                Some(TokenKind::Figendum | TokenKind::Variandum) => {
+                    let is_immutable = self.current_keyword_ident() == Some(TokenKind::Figendum);
+                    self.parse_await_var_decl(if is_immutable {
+                        AstMutability::Immutable
+                    } else {
+                        AstMutability::Mutable
+                    })?
                 }
-            }
+                Some(TokenKind::Reddet) => self.parse_reddet_stmt(start)?,
+                Some(TokenKind::Tacebit) => self.parse_tacebit_stmt(start)?,
+                Some(TokenKind::Nota | TokenKind::Mone | TokenKind::Vide) => {
+                    self.parse_scribe_stmt()?
+                }
+                _ => self.parse_expr_stmt()?,
+            },
 
-            // Annotations (for following statement)
             TokenKind::At => {
                 let annotations = self.parse_annotations()?;
                 let mut stmt = self.parse_stmt()?;
@@ -128,7 +111,6 @@ impl Parser {
                 return Ok(stmt);
             }
 
-            // Expression statement
             _ => self.parse_expr_stmt()?,
         };
 
@@ -142,9 +124,7 @@ impl Parser {
         })
     }
 
-    // =============================================================================
     // VARIABLE DECLARATIONS
-    // =============================================================================
 
     /// Parse `fixum` and `varia` binding declarations.
     ///
@@ -169,18 +149,14 @@ impl Parser {
             return Err(Self::expected_error("fixum or varia", self.current_span()));
         };
 
-        // Destructuring keeps the historical untyped pattern form; simple bindings
-        // use an explicit type slot, with `_` meaning "infer from the initializer".
         let ty = if self.check(&TokenKind::LBracket) || self.check(&TokenKind::LBrace) {
             None
         } else {
             Some(self.parse_type()?)
         };
 
-        // Binding pattern
         let binding = self.parse_binding_pattern()?;
 
-        // Optional initializer
         let init = if self.eat(&TokenKind::Assign) {
             Some(Box::new(self.parse_expression()?))
         } else if self.check(&TokenKind::ConversioAssign) {
@@ -255,7 +231,7 @@ impl Parser {
     /// and propagate a compatible alternate `E`. They reuse the ordinary
     /// `VarDecl` shape with `is_await = true` and the specified mutability.
     fn parse_await_var_decl(&mut self, mutability: AstMutability) -> Result<StmtKind, ParseError> {
-        self.advance(); // consume the figendum/variandum identifier
+        self.advance();
 
         let ty = if self.check(&TokenKind::LBracket) || self.check(&TokenKind::LBrace) {
             None
@@ -265,9 +241,9 @@ impl Parser {
 
         let binding = self.parse_binding_pattern()?;
 
-        // `figendum`/`variandum` retain `←` (goal decision 6): combining
-        // implicit conversion and await ordering needs a separate language
-        // decision, so `↤` here is a structured rejection.
+        // `figendum`/`variandum` retain `←`: combining implicit conversion and
+        // await ordering needs a separate language decision, so `↤` here is a
+        // structured rejection.
         if self.check(&TokenKind::ConversioAssign) {
             return Err(
                 ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
@@ -295,7 +271,7 @@ impl Parser {
     /// through the normal `→ T` channel, and adopts a compatible `E`. Valid only
     /// inside a `fiet` body.
     fn parse_reddet_stmt(&mut self, start: radix_lexer::Span) -> Result<StmtKind, ParseError> {
-        self.advance(); // consume `reddet`
+        self.advance();
         let future = Box::new(self.parse_expression()?);
         let span = start.merge(self.previous_span());
         Ok(StmtKind::Reddet(ReddetStmt { future, span }))
@@ -309,14 +285,13 @@ impl Parser {
     /// Awaits a `promissum<T>` or `promissum<T ⇥ E>` to completion for any success
     /// type `T`, discards the successful `T`, and propagates a compatible `E`.
     fn parse_tacebit_stmt(&mut self, start: radix_lexer::Span) -> Result<StmtKind, ParseError> {
-        self.advance(); // consume `tacebit`
+        self.advance();
         let future = Box::new(self.parse_expression()?);
         let span = start.merge(self.previous_span());
         Ok(StmtKind::Tacebit(TacebitStmt { future, span }))
     }
 
     /// Parse `sit` inferred immutable binding declarations.
-    /// kind.
     fn parse_sit_decl(&mut self) -> Result<StmtKind, ParseError> {
         let start = self.current_span();
         self.expect_keyword_ident(TokenKind::Sit, "expected 'sit'")?;
@@ -496,9 +471,7 @@ impl Parser {
         Ok(BindingPattern::Object { fields, rest, span })
     }
 
-    // =============================================================================
     // FUNCTION DECLARATIONS
-    // =============================================================================
 
     /// Parse function declaration.
     ///
@@ -506,9 +479,6 @@ impl Parser {
     ///   func-decl := `functio` ident `(` params `)` modifiers ['→' type] block
     ///   params    := type-param* regular-param*
     ///   type-param := `prae` `typus` ident
-    ///
-    /// WHY: Functions can have type parameters (for generics), ownership mode
-    /// parameters (de/in/ex), and trailing modifiers (curata, errata, etc.).
     fn parse_func_decl(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Functio, "expected 'functio'")?;
 
@@ -593,7 +563,6 @@ impl Parser {
         while !self.check(&TokenKind::RParen) && !self.is_at_end() {
             let start = self.current_span();
 
-            // Mode: de/in/ex (prefix on type)
             let mode = if self.eat_keyword_ident(TokenKind::De) {
                 AstParamMode::De
             } else if self.eat_keyword_ident(TokenKind::In) {
@@ -604,25 +573,20 @@ impl Parser {
                 AstParamMode::Owned
             };
 
-            // Rest: ceteri
             let rest = self.eat_keyword_ident(TokenKind::Ceteri);
 
-            // Type
             let ty = self.parse_type()?;
 
-            // Name
             let name = self.parse_param_name()?;
 
             let sponte = self.parse_post_name_marker()?;
 
-            // Alias: ut NAME
             let alias = if self.eat_keyword_ident(TokenKind::Ut) {
                 Some(self.parse_param_name()?)
             } else {
                 None
             };
 
-            // Default: vel EXPR
             let default = if self.eat_keyword_ident(TokenKind::Vel) {
                 Some(Box::new(self.parse_expression()?))
             } else {
@@ -708,9 +672,7 @@ impl Parser {
         Ok(self.eat_keyword_ident(TokenKind::Sponte))
     }
 
-    // =============================================================================
     // CLASS DECLARATIONS
-    // =============================================================================
 
     /// Parse a concrete class declaration.
     ///
@@ -737,14 +699,12 @@ impl Parser {
         let name = self.parse_class_name()?;
         let type_params = self.parse_generic_params()?;
 
-        // Extends
         let extends = if self.eat_keyword_ident(TokenKind::Sub) {
             Some(self.parse_decl_name()?)
         } else {
             None
         };
 
-        // Implements
         let mut implements = Vec::new();
         if self.eat_keyword_ident(TokenKind::Implet) {
             loop {
@@ -796,13 +756,11 @@ impl Parser {
         let annotations = self.parse_annotations()?;
 
         let kind = if self.check_keyword_ident(TokenKind::Functio) {
-            // Method
             let StmtKind::Func(func) = self.parse_func_decl()? else {
                 return Err(Self::expected_error("functio", self.current_span()));
             };
             ClassMemberKind::Method(func)
         } else {
-            // Field
             let is_static = self.eat_keyword_ident(TokenKind::Generis);
             let is_bound = self.eat_keyword_ident(TokenKind::Nexum);
 
@@ -836,9 +794,7 @@ impl Parser {
         })
     }
 
-    // =============================================================================
     // INTERFACE DECLARATIONS
-    // =============================================================================
 
     /// Parse an interface declaration and its method signatures.
     ///
@@ -922,9 +878,7 @@ impl Parser {
         }))
     }
 
-    // =============================================================================
     // SCHEMA DECLARATIONS
-    // =============================================================================
 
     /// Parse a relational-view schema declaration.
     ///
@@ -936,16 +890,14 @@ impl Parser {
     /// (docs/design/relational-views.md §2): it names only the columns the
     /// application needs, and extra source columns stay invisible. Column
     /// types reuse the ordinary type parser, so `T ∪ nihil` spells nullable
-    /// columns through the type position (design §2.4.1 field 4). The
-    /// optional `publicName : sourceName` alias row is the D4 source-column
-    /// mapping (fixture-contract §7); an absent alias is the identity mapping.
+    /// columns through the type position. The optional
+    /// `publicName : sourceName` alias row maps a public column to a source
+    /// column; an absent alias is the identity mapping.
     ///
-    /// Grammar-level rejections mirror the pinned semantic issue keys
-    /// (stage2-delivery §6): method-like members (`schema_method`),
-    /// `sub`/`implet` inheritance syntax (`schema_inheritance`), and nested
-    /// column declarations (`schema_nested_column`) fail here at parse time
-    /// via a deferred parse-error bridge — the `issue` fact carries the pinned
-    /// semantic identity the semantic unit raises for the same class.
+    /// Grammar-level rejections use the same issue keys as later semantic
+    /// checks: method-like members (`schema_method`), `sub`/`implet`
+    /// inheritance (`schema_inheritance`), and nested column declarations
+    /// (`schema_nested_column`) fail here at parse time.
     fn parse_schema_decl(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Schema, "expected 'schema'")?;
         let name = self.parse_decl_name()?;
@@ -1019,8 +971,6 @@ impl Parser {
                 .with_arg("issue", "schema_nested_column"));
             }
 
-            // D4 alias row: `publicName : sourceName`. `Colon` is the existing
-            // punctuation token (token.rs), reused as the alias separator.
             let source_alias = if self.eat(&TokenKind::Colon) {
                 Some(self.parse_ident()?)
             } else {
@@ -1051,17 +1001,13 @@ impl Parser {
         }))
     }
 
-    // =============================================================================
     // ENUM AND UNION DECLARATIONS
-    // =============================================================================
 
     /// Parse enum declaration.
     ///
     /// GRAMMAR:
     ///   enum-decl := `ordo` ident '{' enum-member* '}'
     ///   enum-member := ident ['=' (integer | string)]
-    ///
-    /// WHY: Enums can have explicit integer or string values for FFI compatibility.
     fn parse_enum_decl(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Ordo, "expected 'ordo'")?;
         let name = self.parse_decl_name()?;
@@ -1144,7 +1090,6 @@ impl Parser {
                 span,
             });
 
-            // Optional comma
             self.eat(&TokenKind::Comma);
         }
 
@@ -1159,9 +1104,6 @@ impl Parser {
     ///   union-decl := discretio ident [type-params] { variant* }
     ///   variant := ident [ { field* } ]
     ///   field := type ident
-    ///
-    /// WHY: Tagged unions (discriminated unions) enable sum types with optional
-    /// variant-specific payload fields.
     fn parse_union_decl(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Discretio, "expected 'discretio'")?;
         let name = self.parse_decl_name()?;
@@ -1215,9 +1157,7 @@ impl Parser {
         }))
     }
 
-    // =============================================================================
-    // IMPORT AND DIRECTIVE DECLARATIONS
-    // =============================================================================
+    // IMPORT DECLARATIONS
 
     /// Parse a source import declaration.
     ///
@@ -1456,18 +1396,13 @@ impl Parser {
         ParseError::structured(ParseErrorKind::InvalidImport, span).with_arg("issue", issue)
     }
 
-    // =============================================================================
     // TEST DECLARATIONS
-    // =============================================================================
 
     /// Parse test suite declaration.
     ///
     /// GRAMMAR:
     ///   probandum := `probandum` string proba-modifier* '{' probandum-body '}'
     ///   probandum-body := (setup | proba | nested-probandum)*
-    ///
-    /// WHY: Test suites support setup/teardown hooks (praepara/postpara), individual
-    /// test cases (proba), and nesting for organization.
     fn parse_probandum_decl(&mut self) -> Result<StmtKind, ParseError> {
         let start = self.current_span();
         self.expect_keyword_ident(TokenKind::Probandum, "expected 'probandum'")?;
@@ -1622,6 +1557,8 @@ impl Parser {
         }
     }
 
+    // ANNOTATIONS
+
     /// Parse one or more declaration annotations.
     ///
     /// Known CLI/package annotations are parsed into structured `AST` variants so
@@ -1633,7 +1570,7 @@ impl Parser {
 
         while self.check(&TokenKind::At) {
             let start = self.current_span();
-            self.advance(); // @
+            self.advance();
 
             let kind = self.parse_annotation_kind()?;
             let span = start.merge(self.previous_span());
@@ -2084,13 +2021,9 @@ impl Parser {
     }
 
     fn is_declaration_start_token(&self) -> bool {
-        // Token-shaped introducers plus the tokenless Batch E words, which
-        // arrive as identifiers and are claimed by spelling in
-        // statement-initial position. `typus` is deliberately absent: it is
-        // an annotation modifier key (`@optio … typus <type>`), so in
-        // annotation-arg position it stays an argument, matching the
-        // pre-migration token behavior (is_declaration_start_token never
-        // listed Typus; is_annotation_arg listed it as an arg).
+        // `typus` is deliberately absent: it is an annotation modifier key
+        // (`@optio … typus <type>`), so in annotation-arg position it stays
+        // an argument rather than starting a declaration.
         matches!(self.peek().kind, TokenKind::LBrace)
             || self.check_keyword_ident(TokenKind::Abstractus)
             || self.check_keyword_ident(TokenKind::Importa)
@@ -2169,9 +2102,7 @@ impl Parser {
         }
     }
 
-    // =============================================================================
-    // BLOCK AND ANNOTATION PARSING
-    // =============================================================================
+    // BLOCKS AND GENERIC PARAMETERS
 
     /// Parse a statement block and recover within its brace boundary.
     ///
