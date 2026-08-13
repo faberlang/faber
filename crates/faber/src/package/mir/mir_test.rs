@@ -297,9 +297,34 @@ fn fmir_text_cli_value_type_maps_bivalens() {
 }
 
 #[test]
-fn fmir_text_cli_value_type_returns_none_for_list_types() {
+fn fmir_text_cli_value_type_maps_lista_textus() {
+    assert!(matches!(
+        fmir_text_cli_value_type(&radix::cli::CliType::ListaTextus),
+        Some(FmirTextCliValueType::ListaTextus)
+    ));
+}
+
+#[test]
+fn fmir_text_runtime_cli_value_type_maps_rest_textus_to_lista() {
+    let operand = radix::cli::CliOperand {
+        binding: "files".to_owned(),
+        binding_symbol: radix::lexer::Interner::default().intern("files"),
+        ty: radix::cli::CliType::Textus,
+        rest: true,
+        description: None,
+        global: false,
+        default: None,
+        span: Span::default(),
+    };
+    assert!(matches!(
+        fmir_text_runtime_cli_value_type(&operand),
+        Some(FmirTextCliValueType::ListaTextus)
+    ));
+}
+
+#[test]
+fn fmir_text_cli_value_type_returns_none_for_unsupported_list_types() {
     assert!(fmir_text_cli_value_type(&radix::cli::CliType::Octeti).is_none());
-    assert!(fmir_text_cli_value_type(&radix::cli::CliType::ListaTextus).is_none());
     assert!(fmir_text_cli_value_type(&radix::cli::CliType::ListaNumerus).is_none());
 }
 
@@ -526,10 +551,10 @@ fn fmir_runtime_cli_binding_preserves_decoy_fields() {
         &cli,
         "run_entry",
         &interner,
-        &[MirNamedOperand {
+        &[FmirTextCliBinding::Scalar(MirNamedOperand {
             name,
             value: MirOperand::Constant(MirConstant::String(runtime)),
-        }],
+        })],
     );
 
     // Superset record (extra field) keeps its original value — only exact
@@ -550,10 +575,10 @@ fn fmir_runtime_cli_binding_patches_matching_fields() {
         &cli,
         "run_entry",
         &interner,
-        &[MirNamedOperand {
+        &[FmirTextCliBinding::Scalar(MirNamedOperand {
             name,
             value: MirOperand::Constant(MirConstant::String(runtime)),
-        }],
+        })],
     );
 
     // Exact-match record gets the runtime binding value.
@@ -660,8 +685,7 @@ fn copy_package_dir_skipping_target(src: &Path, dest: &Path) {
 fn package_fmir_image_provisions_decomposed_companion_upstream_seed() {
     use radix_mir_fmir::schema::{WireBufferLifetime, WireBufferRole};
 
-    let workspace =
-        radix::paths::faberlang_home().expect("faberlang container root");
+    let workspace = radix::paths::faberlang_home().expect("faberlang container root");
     let exemplum = workspace.join("examples/training/bert-tiny-fragment");
     let dir = crate::package::test_support::test_temp_dir("bert-tiny-seed");
     copy_package_dir_skipping_target(&exemplum, dir.path());

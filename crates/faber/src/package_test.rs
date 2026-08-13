@@ -11,11 +11,11 @@ use super::{
     discover_package, emit_generated_crate, emit_generated_crate_with_runtime_plan,
     invoke_cargo_build, library_cached_file_interface, library_resolver_from_config,
     load_package_with_locale_pack, package_host_selection_diagnostic, package_rust_runtime_plan,
-    read_manifest, run_package_fmir_image, run_package_fmir_text_image, run_package_mir,
-    run_package_mir_artifact, sanitize_crate_name, use_package_compiler,
-    use_package_compiler_from_args, validate_manifest, verify_library_binding_shapes,
-    verify_library_bindings, with_lowered_package_mir, BuildLayout, LibraryInterfaceCache,
-    ManifestProductEmit, ManifestProductKind, ManifestRustHost,
+    read_manifest, run_package_fmir_built_image, run_package_fmir_image,
+    run_package_fmir_text_image, run_package_mir, run_package_mir_artifact, sanitize_crate_name,
+    use_package_compiler, use_package_compiler_from_args, validate_manifest,
+    verify_library_binding_shapes, verify_library_bindings, with_lowered_package_mir, BuildLayout,
+    LibraryInterfaceCache, ManifestProductEmit, ManifestProductKind, ManifestRustHost,
 };
 use super::{fmir_image_test_summary, fmir_text_image_test_summary};
 use crate::library::{LibraryProviderKind, LibraryResolver, ResolvedLibraryModule};
@@ -1086,8 +1086,7 @@ entry = "main.fab"
 "#,
         )
         .expect("write manifest");
-        let workspace_root =
-            radix::paths::faberlang_home().expect("faberlang container root");
+        let workspace_root = radix::paths::faberlang_home().expect("faberlang container root");
         let touch_source = workspace_root.join("examples/coreutils/packages/touch/src/main.fab");
         fs::write(
             src.join("main.fab"),
@@ -1547,6 +1546,39 @@ main args args {
 }
 
 #[test]
+fn package_fmir_text_image_cli_rest_text_operand_uses_runtime_arguments() {
+    let dir = test_temp_dir("package-fmir-text-cli-rest-operand");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+@ cli "tool"
+@ operand rest string files
+main args args {
+  const list<string> files ← args.files
+  print files.length()
+}
+"#,
+    )
+    .expect("write entry");
+
+    let image =
+        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+            .expect("build fmir-text image");
+    let image_text = fs::read_to_string(&image.image_path).expect("read image");
+    assert!(
+        !image_text.contains("alpha"),
+        "image must not bake runtime rest argv:\n{image_text}"
+    );
+    fs::remove_file(&entry).expect("remove source after image build");
+
+    let mut host = BufferHost::with_argumenta(vec!["alpha".to_owned(), "beta".to_owned()]);
+    run_package_fmir_text_image(&image, &mut host).expect("run rest CLI fmir-text image");
+
+    assert_eq!(host.stdout_lines, vec!["2".to_owned()]);
+}
+
+#[test]
 fn package_fmir_image_cli_operand_uses_runtime_argument_after_source_is_removed() {
     let dir = test_temp_dir("package-fmir-cli-runtime-operand");
     let entry = dir.join("main.fab");
@@ -1580,6 +1612,75 @@ main args args {
     run_package_fmir_image(&image, &mut host).expect("run CLI fmir image");
 
     assert_eq!(host.stdout_lines, vec!["runtime-value".to_owned()]);
+}
+
+#[test]
+fn package_fmir_image_cli_rest_text_operand_uses_runtime_arguments() {
+    let dir = test_temp_dir("package-fmir-cli-rest-operand");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+@ cli "tool"
+@ operand rest string files
+main args args {
+  const list<string> files ← args.files
+  print files.length()
+}
+"#,
+    )
+    .expect("write entry");
+
+    let image = build_package_fmir_image(
+        &Config::default().with_target(Target::MirFmirBinary),
+        &entry,
+        &[],
+    )
+    .expect("build fmir image");
+    let image_bytes = fs::read(&image.image_path).expect("read image");
+    assert!(
+        !bytes_contain(&image_bytes, b"alpha"),
+        "image must not bake runtime rest argv"
+    );
+    fs::remove_file(&entry).expect("remove source after image build");
+
+    let mut host = BufferHost::with_argumenta(vec!["alpha".to_owned(), "beta".to_owned()]);
+    run_package_fmir_image(&image, &mut host).expect("run rest CLI fmir image");
+
+    assert_eq!(host.stdout_lines, vec!["2".to_owned()]);
+}
+
+#[test]
+fn package_fmir_built_image_cli_rest_text_operand_executes() {
+    let dir = test_temp_dir("package-fmir-built-cli-rest-operand");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+@ cli "tool"
+@ operand rest string files
+main args args {
+  const list<string> files ← args.files
+  print files.length()
+}
+"#,
+    )
+    .expect("write entry");
+
+    let mut host = BufferHost::with_argumenta(vec![
+        "alpha".to_owned(),
+        "beta".to_owned(),
+        "gamma".to_owned(),
+    ]);
+    run_package_fmir_built_image(
+        &Config::default().with_target(Target::MirFmirBinary),
+        &entry,
+        super::DeviceSelection::Auto,
+        &mut host,
+    )
+    .expect("run source-built rest CLI fmir image");
+
+    assert_eq!(host.stdout_lines, vec!["3".to_owned()]);
 }
 
 #[test]
@@ -7223,10 +7324,9 @@ locale = "zh-Hans"
         result.diagnostics
     );
     assert!(
-        result
-            .diagnostics
-            .iter()
-            .all(|diagnostic| !diagnostic.code.is_some_and(|code| code.starts_with("LOCALE"))),
+        result.diagnostics.iter().all(|diagnostic| !diagnostic
+            .code
+            .is_some_and(|code| code.starts_with("LOCALE"))),
         "no LOCALE diagnostic may be emitted on the flipped path: {:?}",
         result.diagnostics
     );
@@ -8194,11 +8294,7 @@ fn linked_library_emit_skips_entry_file_layouts_without_manifest() {
 fn emit_generated_crate_writes_cargo_toml_and_main_rs_under_target_faber() {
     let pkg = test_temp_dir("emit-writer");
     fs::create_dir_all(pkg.join("src")).expect("src");
-    fs::write(
-        pkg.join("src/main.fab"),
-        r#"main { print "writer test" }"#,
-    )
-    .expect("entry");
+    fs::write(pkg.join("src/main.fab"), r#"main { print "writer test" }"#).expect("entry");
     fs::write(
         pkg.join("faber.toml"),
         r#"
@@ -9224,8 +9320,7 @@ main {
     let config = config_with_library_home(library_home.path());
     let spec = discover_package(&entry).expect("package");
     let resolver = library_resolver_from_config(&config);
-    let files =
-        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None);
+    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None);
     assert!(files.is_err(), "cycle should fail package load");
     let err = files.err().expect("diagnostics");
     assert!(err.iter().any(|diag| {
@@ -9331,8 +9426,8 @@ main {
     let config = config_with_library_home(library_home.path());
     let spec = discover_package(&entry).expect("package");
     let resolver = library_resolver_from_config(&config);
-    let files =
-        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None).expect("load package");
+    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None)
+        .expect("load package");
     let file = files
         .iter()
         .find(|file| file.path == entry)
@@ -9398,8 +9493,8 @@ main {
     let config = config_with_library_home(library_home.path());
     let spec = discover_package(&entry).expect("package");
     let resolver = library_resolver_from_config(&config);
-    let files =
-        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None).expect("load package");
+    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None)
+        .expect("load package");
     let file = files
         .iter()
         .find(|file| file.path == entry)
@@ -9538,8 +9633,8 @@ main {
     let config = Config::default();
     let spec = discover_package(&entry).expect("package");
     let resolver = library_resolver_from_config(&config);
-    let files =
-        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None).expect("load package");
+    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None)
+        .expect("load package");
     let file = files
         .iter()
         .find(|file| file.path == entry)
@@ -9994,11 +10089,7 @@ bindings = "bindings/rust.toml"
 "#,
     )
     .expect("lib manifest");
-    fs::write(
-        lib.join("src/math.fab"),
-        "fn double(int n) → int\n",
-    )
-    .expect("lib source");
+    fs::write(lib.join("src/math.fab"), "fn double(int n) → int\n").expect("lib source");
     fs::write(
         lib.join("rust/shim.rs"),
         "pub fn double(n: i64) -> i64 { n * 2 }\n",
@@ -10160,11 +10251,7 @@ bindings = "bindings/rust.toml"
 "#,
     )
     .expect("lib manifest");
-    fs::write(
-        lib.join("src/math.fab"),
-        "fn double(int n) → int\n",
-    )
-    .expect("lib source");
+    fs::write(lib.join("src/math.fab"), "fn double(int n) → int\n").expect("lib source");
     fs::write(
         lib.join("rust/shim.rs"),
         "pub fn double(n: i64) -> i64 { n * 2 }\n",

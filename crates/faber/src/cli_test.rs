@@ -56,8 +56,7 @@ fn cli_rejects_install_subcommand() {
         assert!(
             matches!(
                 err.kind(),
-                clap::error::ErrorKind::InvalidSubcommand
-                    | clap::error::ErrorKind::UnknownArgument
+                clap::error::ErrorKind::InvalidSubcommand | clap::error::ErrorKind::UnknownArgument
             ),
             "argv {argv:?} must reject `faber install` as an unknown subcommand"
         );
@@ -101,9 +100,7 @@ fn targets_table_reports_capability_truth_for_the_default_build() {
         "rust host lane must be reported as available:\n{table}"
     );
     assert!(
-        table
-            .lines()
-            .any(|line| line.starts_with("host-wasm ")),
+        table.lines().any(|line| line.starts_with("host-wasm ")),
         "missing host-wasm capability row under the default build:\n{table}"
     );
     for row_name in ["device-runtime", "host-macos-arm64"] {
@@ -526,6 +523,30 @@ fn cli_parses_locale_on_test() {
 }
 
 #[test]
+fn cli_parses_locale_on_script() {
+    let script = Cli::try_parse_from([
+        "faber",
+        "script",
+        "--locale",
+        "la",
+        "--diagnostics-locale",
+        "en",
+        "pkg",
+        "--",
+        "--page",
+        "404",
+    ])
+    .expect("parse script reader locale");
+    let Some(crate::cli::Command::Script(args)) = script.command else {
+        panic!("expected script subcommand");
+    };
+    assert_eq!(args.locale.as_deref(), Some("la"));
+    assert_eq!(args.diagnostics_locale.as_deref(), Some("en"));
+    assert_eq!(args.path, std::path::PathBuf::from("pkg"));
+    assert_eq!(args.args, vec!["--page".to_owned(), "404".to_owned()]);
+}
+
+#[test]
 fn cli_parses_locale_on_format() {
     let format = Cli::try_parse_from(["faber", "format", "--locale", "zh-Hans", "main.fab"])
         .expect("parse format reader locale");
@@ -606,8 +627,7 @@ fn cli_rejects_format_write_with_stdout() {
 
 #[test]
 fn cli_parses_format_stdin_flag() {
-    let format = Cli::try_parse_from(["faber", "format", "--stdin"])
-        .expect("parse format --stdin");
+    let format = Cli::try_parse_from(["faber", "format", "--stdin"]).expect("parse format --stdin");
     let Some(crate::cli::Command::Format(args)) = format.command else {
         panic!("expected format subcommand");
     };
@@ -804,8 +824,14 @@ fn cli_rejects_explain_diagnostics_locale_without_term() {
 
 #[test]
 fn cli_parses_explain_diagnostics_locale_with_term() {
-    let cli = Cli::try_parse_from(["faber", "explain", "--diagnostics-locale", "th-TH", "SEM010"])
-        .expect("parse explain diagnostic locale");
+    let cli = Cli::try_parse_from([
+        "faber",
+        "explain",
+        "--diagnostics-locale",
+        "th-TH",
+        "SEM010",
+    ])
+    .expect("parse explain diagnostic locale");
     let Some(crate::cli::Command::Explain(args)) = cli.command else {
         panic!("expected explain subcommand");
     };

@@ -21,9 +21,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn should_interpret(args: &RunArgs, path: &Path) -> bool {
-    if args.locale.is_some() {
-        return false;
-    }
     if resolve_run_target(args, path) != Target::HirRust {
         return false;
     }
@@ -32,6 +29,9 @@ fn should_interpret(args: &RunArgs, path: &Path) -> bool {
     }
     if args.interpret {
         return true;
+    }
+    if args.locale.is_some() {
+        return false;
     }
     super::script::is_single_fab_file(path)
 }
@@ -46,10 +46,6 @@ pub(super) fn cmd_run(args: RunArgs) {
         false,
     ) {
         eprintln!("error: {message}");
-        std::process::exit(1);
-    }
-    if args.interpret && args.locale.is_some() {
-        eprintln!("error: --locale is not supported with `faber run --interpret`");
         std::process::exit(1);
     }
 
@@ -128,7 +124,12 @@ pub(super) fn cmd_run(args: RunArgs) {
     }
 
     if should_interpret(&args, &input_path) {
-        super::script::interpret_path(&input_path, &args.args);
+        super::script::interpret_path(
+            &input_path,
+            &args.args,
+            args.locale.as_deref(),
+            args.diagnostics_locale.as_deref(),
+        );
         return;
     }
 

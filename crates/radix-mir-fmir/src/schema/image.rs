@@ -118,11 +118,13 @@ pub struct FmirTextCliOperand {
     pub ty: FmirTextCliValueType,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum FmirTextCliValueType {
     Textus,
     Numerus,
     Fractus,
     Bivalens,
+    /// Final rest `textus` / `lista<textus>` operand. Consumes remaining argv.
+    ListaTextus,
 }
