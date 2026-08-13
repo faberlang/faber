@@ -3,8 +3,7 @@
 //! A FHIR package is a deterministic envelope around ordered per-unit
 //! [`HirArtifact`] records plus package identity, a module table, entry
 //! metadata, dependency coordinates, and local library-import references.
-//! Contract: [`fhir-package-contract.md`] (Stage 0 of the
-//! `hir-artifact-fhir` campaign's package delivery).
+//! Contract: `docs/factory/hir-artifact-fhir/fhir-package-contract.md`.
 //!
 //! The package envelope is a **separate schema** from the unit artifact:
 //! [`PACKAGE_SCHEMA_VERSION`] gates the envelope while each embedded unit
@@ -12,7 +11,7 @@
 //! compatibility decoders).
 //!
 //! Wire discipline mirrors the unit artifact:
-//! - `package_schema_version` is the first wire field (F3-style prefix gate);
+//! - `package_schema_version` is the first wire field (version prefix gate);
 //! - modules are sorted by canonical package-root-relative path and unique;
 //! - dependencies are sorted by name and unique;
 //! - no field carries an absolute checkout path (module paths are
@@ -20,7 +19,7 @@
 //! - unit-local `DefId`/`HirId`/`TypeId`/`Symbol` are never package-global.
 //!
 //! [`encode_package`] is a pure serializer; [`decode_package`] runs the
-//! version gates, per-unit decode (reusing the unit F3 + U2.3 gates), and the
+//! version gates, per-unit decode (reusing the unit decode gates), and the
 //! package-level checks, and returns the validated, decoded envelope.
 
 use crate::artifact::{HirArtifact, SCHEMA_VERSION};
@@ -32,7 +31,7 @@ use serde::{Deserialize, Serialize};
 /// there is no v0 compatibility decoder.
 pub const PACKAGE_SCHEMA_VERSION: u32 = 1;
 
-/// File extension for FHIR package artifacts (contract decision, Stage 0).
+/// File extension for FHIR package artifacts.
 pub const FHIR_PACKAGE_EXTENSION: &str = "fhirpkg";
 
 // ---------------------------------------------------------------------------
@@ -48,7 +47,7 @@ pub struct PackageIdentityWire {
 }
 
 /// One dependency coordinate. The envelope records exact references only;
-/// closure acquisition is the store's job (Cista, Stage 5). A loader that
+/// closure acquisition is the store's job (Cista). A loader that
 /// cannot satisfy a record fails closed with `MissingDependencyArtifact`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PackageDependencyWire {
@@ -88,7 +87,6 @@ pub struct FhirPackageModule {
     pub path: String,
     /// Module segments derived from the path (e.g. `["main"]`).
     pub module_segments: Vec<String>,
-    /// Whether this module is the package entry.
     pub is_entry: bool,
     /// Sorted public export names of this module (source-free surface used by
     /// package codegen assembly).
@@ -110,7 +108,7 @@ pub struct FhirPackageModule {
 /// The FHIR package envelope (wire form).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FhirPackage {
-    /// First wire field (F3-style prefix gate).
+    /// First wire field (version prefix gate).
     pub package_schema_version: u32,
     pub identity: PackageIdentityWire,
     /// Package-root-relative entry path.
@@ -150,8 +148,8 @@ pub struct DecodedFhirPackage {
 // FhirPackageError
 // ---------------------------------------------------------------------------
 
-/// Structured error for FHIR package decode and validation failures (F7:
-/// fail-closed — never panic on the load path).
+/// Structured error for FHIR package decode and validation failures.
+/// Fail-closed: never panic on the load path.
 #[derive(Debug)]
 pub enum FhirPackageError {
     /// The binary payload is not valid `postcard`-encoded data.
@@ -167,7 +165,7 @@ pub enum FhirPackageError {
         found: u32,
         expected: u32,
     },
-    /// An embedded unit failed its own decode/validation gates (F3, U2.3).
+    /// An embedded unit failed its own decode/validation gates.
     MalformedUnit { module: String, detail: String },
     /// The module table contains the same canonical path twice.
     DuplicateModulePath { path: String },
@@ -262,7 +260,7 @@ pub fn encode_package(pkg: &FhirPackage) -> Result<Vec<u8>, postcard::Error> {
 /// 1. package schema-version prefix (first wire field);
 /// 2. full postcard decode of the envelope;
 /// 3. per-unit manifest schema version + full unit [`decode_unit`]
-///    (unit F3 + U2.3 gates) and source-hash consistency;
+///    (unit decode gates) and source-hash consistency;
 /// 4. package-level checks: sorted/unique module table, sorted/unique
 ///    dependencies, entry presence and flag consistency.
 ///
@@ -278,7 +276,6 @@ pub fn encode_package(pkg: &FhirPackage) -> Result<Vec<u8>, postcard::Error> {
 /// version mismatch, and the unit-decode / package-level validation errors
 /// (missing entry, duplicate modules or dependencies).
 pub fn decode_package(bytes: &[u8]) -> Result<DecodedFhirPackage, FhirPackageError> {
-    // 1. Package version prefix gate.
     let (schema_version, _rest) = postcard::take_from_bytes::<u32>(bytes).map_err(|e| {
         if matches!(e, postcard::Error::DeserializeUnexpectedEnd) {
             FhirPackageError::Truncated
@@ -293,7 +290,6 @@ pub fn decode_package(bytes: &[u8]) -> Result<DecodedFhirPackage, FhirPackageErr
         });
     }
 
-    // 2. Full envelope decode.
     let pkg: FhirPackage = postcard::from_bytes(bytes).map_err(|e| {
         if matches!(e, postcard::Error::DeserializeUnexpectedEnd) {
             FhirPackageError::Truncated
@@ -302,7 +298,6 @@ pub fn decode_package(bytes: &[u8]) -> Result<DecodedFhirPackage, FhirPackageErr
         }
     })?;
 
-    // 3. Per-unit gates.
     let mut modules = Vec::with_capacity(pkg.modules.len());
     for module in &pkg.modules {
         if module.unit_schema_version != SCHEMA_VERSION {
@@ -334,7 +329,6 @@ pub fn decode_package(bytes: &[u8]) -> Result<DecodedFhirPackage, FhirPackageErr
         });
     }
 
-    // 4. Package-level checks.
     validate_module_table(&pkg, &modules)?;
     validate_dependencies(&pkg)?;
     validate_local_links(&pkg)?;
@@ -371,25 +365,12 @@ fn validate_module_table(
         }
     }
 
-    let entry_index = decoded
-        .iter()
-        .position(|module| module.path == pkg.entry_path);
-    let Some(entry_index) = entry_index else {
-        return Err(FhirPackageError::MissingEntry {
-            entry: pkg.entry_path.clone(),
-        });
-    };
-    if !decoded[entry_index].is_entry {
-        return Err(FhirPackageError::MissingEntry {
-            entry: pkg.entry_path.clone(),
-        });
-    }
     // Exactly one module may claim the entry flag, and it must be the entry path.
-    let flagged = decoded
+    let flagged: Vec<_> = decoded
         .iter()
         .filter(|module| module.is_entry)
         .map(|module| module.path.as_str())
-        .collect::<Vec<_>>();
+        .collect();
     if flagged.len() != 1 || flagged[0] != pkg.entry_path {
         return Err(FhirPackageError::MissingEntry {
             entry: pkg.entry_path.clone(),
@@ -723,13 +704,10 @@ mod tests {
 
     #[test]
     fn package_unit_failing_referential_integrity_is_rejected() {
-        // Build a package whose unit fails U2.3 by tampering with the
-        // interner length contract: decode_package must surface MalformedUnit,
-        // not panic.
         let artifact = stub_artifact();
         let mut unit = crate::encode(&artifact).expect("encode stub unit");
-        // Flip a byte deep inside the payload — postcard decode of the unit
-        // must fail closed (Malformed or Truncated) rather than panic.
+        // Flip a byte deep inside the payload — unit decode must fail closed
+        // rather than panic.
         let mid = unit.len() / 2;
         unit[mid] ^= 0xff;
         let mut pkg = stub_package();
