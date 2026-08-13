@@ -16,6 +16,14 @@ if [[ -n "${EBNF_MATRIX_HIR_LOG:-}" ]]; then export EBNF_MATRIX_HIR_LOG; fi
 if [[ -n "${EBNF_MATRIX_MIR_LOG:-}" ]]; then export EBNF_MATRIX_MIR_LOG; fi
 if [[ -n "${CONVERSIO_MATRIX_LOG:-}" ]]; then export CONVERSIO_MATRIX_LOG; fi
 
+# The conversio measurement marks fixture-backed cells; without the examples
+# fixtures the regenerated JSON would silently lose the measured flags and the
+# gate would report a confusing staleness. Fail with the real cause instead.
+if [[ -z "${CONVERSIO_MATRIX_FIXTURES:-}" ]] && [[ ! -d "../examples/conversio-matrix" ]]; then
+    echo "error: conversio fixtures missing (../examples/conversio-matrix); pin the examples repo or set CONVERSIO_MATRIX_FIXTURES" >&2
+    exit 1
+fi
+
 tmp="$(mktemp -d -t compat-json-freshness.XXXXXX)"
 trap 'rm -rf "$tmp"' EXIT
 
