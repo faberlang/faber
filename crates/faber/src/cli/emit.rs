@@ -67,6 +67,10 @@ pub enum FaberCliTarget {
     #[value(name = "go")]
     HirGo,
 
+    /// Python backend.
+    #[value(name = "python")]
+    HirPython,
+
     /// Experimental MIR-backed WebAssembly text target.
     #[value(name = "wasm-text", alias = "wat")]
     MirWasm,
@@ -105,6 +109,7 @@ impl FaberCliTarget {
             FaberCliTarget::HirRust => radix::codegen::Target::HirRust,
             FaberCliTarget::HirTypeScript => radix::codegen::Target::HirTypeScript,
             FaberCliTarget::HirGo => radix::codegen::Target::HirGo,
+            FaberCliTarget::HirPython => radix::codegen::Target::HirPython,
             FaberCliTarget::MirWasm => radix::codegen::Target::MirWasm,
             FaberCliTarget::MirWasmBinary => radix::codegen::Target::MirWasmBinary,
             FaberCliTarget::MirLlvm => radix::codegen::Target::MirLlvm,

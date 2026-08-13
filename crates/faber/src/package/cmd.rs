@@ -834,6 +834,7 @@ fn output_code(output: Output) -> String {
         Output::Faber(out) => out.code,
         Output::TypeScript(out) => out.code,
         Output::Go(out) => out.code,
+        Output::Python(out) => out.code,
         Output::WasmText(out) => out.code,
         // Unreachable: `cmd_build` writes binary wasm module bytes to the
         // output path, package wasm builds route through the package-wasm

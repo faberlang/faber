@@ -214,6 +214,7 @@ fn cli_parses_emit_external_target_names() {
         ("faber", FaberCliTarget::HirFaber),
         ("ts", FaberCliTarget::HirTypeScript),
         ("go", FaberCliTarget::HirGo),
+        ("python", FaberCliTarget::HirPython),
         ("wasm-text", FaberCliTarget::MirWasm),
         ("wasm", FaberCliTarget::MirWasmBinary),
         ("llvm-text", FaberCliTarget::MirLlvm),

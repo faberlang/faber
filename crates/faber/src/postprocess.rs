@@ -94,6 +94,7 @@ pub fn format_generated_code(target: Target, code: &str) -> Result<String, Strin
         Target::HirFaber => Ok(code.to_string()),
         Target::HirGo => run_formatter("gofmt", &[], code),
         Target::HirSwift => Ok(code.to_string()),
+        Target::HirPython => Ok(code.to_string()),
         Target::HirTypeScript => format_typescript_code(code),
         Target::HirFhir => Ok(code.to_string()),
         Target::MirStepper
@@ -121,9 +122,11 @@ pub fn format_generated_code(target: Target, code: &str) -> Result<String, Strin
 pub fn lint_generated_code(target: Target, code: &str) -> Result<String, String> {
     match target {
         Target::HirRust => lint_rust_code(code),
-        Target::HirFaber | Target::HirGo | Target::HirSwift | Target::HirFhir => {
-            Ok(code.to_string())
-        }
+        Target::HirFaber
+        | Target::HirGo
+        | Target::HirSwift
+        | Target::HirPython
+        | Target::HirFhir => Ok(code.to_string()),
         Target::HirTypeScript => lint_typescript_code(code),
         Target::MirStepper
         | Target::MirWasmBinary

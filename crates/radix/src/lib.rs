@@ -140,6 +140,9 @@ pub enum Output {
     /// Swift backend output.
     Swift(SwiftOutput),
 
+    /// Python backend output.
+    Python(PythonOutput),
+
     /// Canonical Faber source output.
     Faber(FaberOutput),
 
@@ -183,6 +186,12 @@ pub struct GoOutput {
 /// Swift backend output.
 pub struct SwiftOutput {
     /// Complete generated Swift source.
+    pub code: String,
+}
+
+/// Python backend output.
+pub struct PythonOutput {
+    /// Complete generated Python source.
     pub code: String,
 }
 

@@ -64,10 +64,75 @@ fn plan_package_go_and_ts_are_supported_seams() {
     let package = empty_package("/tmp/g4-plan-go");
     let go = plan_package(&package, Target::HirGo);
     let ts = plan_package(&package, Target::HirTypeScript);
+    let python = plan_package(&package, Target::HirPython);
     assert!(go.supported);
     assert_eq!(go.target, "go");
     assert!(ts.supported);
     assert_eq!(ts.target, "ts");
+    assert!(python.supported);
+    assert_eq!(python.target, "python");
+}
+
+#[test]
+fn plan_package_python_uses_analyzed_module_identities() {
+    let root = temp_dir("python-modules");
+    fs::create_dir_all(root.join("src/extra")).expect("src");
+    fs::write(
+        root.join(MANIFEST_FILE),
+        r#"
+[package]
+name = "py-plan"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        root.join("src/main.fab"),
+        "import from \"./extra/util\" util\nprint \"hi\"\n",
+    )
+    .expect("entry");
+    fs::write(
+        root.join("src/extra/util.fab"),
+        "@ publica\nfn greet() → string {\n    return \"x\"\n}\n",
+    )
+    .expect("module");
+    let package =
+        crate::package::compile::analyze_package(&radix::driver::Config::default(), &root)
+            .expect("analyze two-unit package");
+    let plan = plan_package(&package, Target::HirPython);
+    assert!(plan.supported);
+    assert_eq!(plan.target, "python");
+    assert!(
+        plan.nodes
+            .iter()
+            .any(|node| node.id.starts_with("python:entry:") && node.path.ends_with("main.py")),
+        "entry artifact missing: {:#?}",
+        plan.nodes
+    );
+    assert!(
+        plan.nodes.iter().any(|node| {
+            node.id.contains("python:module:") && node.path.ends_with("extra/util.py")
+        }),
+        "module artifact missing: {:#?}",
+        plan.nodes
+    );
+    assert!(
+        plan.nodes
+            .iter()
+            .any(|node| node.path.ends_with("extra/__init__.py")),
+        "package init missing: {:#?}",
+        plan.nodes
+    );
+    assert!(
+        plan.edges
+            .iter()
+            .all(|edge| edge.kind != DependencyKind::SourceImport || edge.to.starts_with("source:")),
+        "generated edges must point at analyzed source ids: {:#?}",
+        plan.edges
+    );
 }
 
 #[test]
