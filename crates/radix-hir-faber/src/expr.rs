@@ -54,6 +54,7 @@ const NON_NULL_CHAIN: PostfixChainPrefixes = PostfixChainPrefixes {
     call_open: "!(",
 };
 
+#[derive(Clone, Copy)]
 enum PostfixChainTail<'a> {
     Member(Symbol),
     Index(&'a HirExpression),
