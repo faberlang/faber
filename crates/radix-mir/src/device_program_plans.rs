@@ -1,41 +1,15 @@
-//! Typed device-program plan mapping (council TB5) and launch descriptors.
+//! Typed device-program plan mapping and launch descriptors.
 //!
-//! This module is the **typed `MirCollectionOp → CollectionKernelPlan`
-//! mapping** the frozen contract names (Stage 0 delivery spec §2 N1.6, S0-A
-//! architecture record §6.5): the typed bridge that turns a collection
-//! intrinsic plus the resolved dispatch contract into the closed recipe set
-//! ([`CollectionKernelPlan`]), and the backend-neutral **launch descriptor**
-//! derived from a [`DeviceProgram`]'s kernel units.
+//! This module is the fail-closed `MirCollectionOp → CollectionKernelPlan`
+//! bridge: it maps a collection intrinsic plus the resolved dispatch contract
+//! onto the closed recipe set, re-derives that plan from a kernel function's
+//! typed facts, and builds backend-neutral launch descriptors from a
+//! [`DeviceProgram`].
 //!
-//! The recipe itself is produced by the shared plan pass
-//! [`CollectionKernelPlan::from_contract`] (in `kernel_plan.rs`, the
-//! single implementation every backend lowers from); this module owns the
-//! mapping surface the device-program pipeline consumes:
-//!
-//! - [`plan_for_collection_op`] — the direct `MirCollectionOp →
-//!   CollectionKernelPlan` mapping (fail-closed: an op with no recipe under
-//!   the resolved contract errors with a typed [`PlanMappingError`], never a
-//!   silent [`CollectionKernelPlan::Elementwise`] floor);
-//! - [`kernel_plan_for_function`] — re-derives the plan from a kernel
-//!   function's typed facts (full statement scan + ABI contract + operand
-//!   shapes), used by the emitters to cross-check a device program's carried
-//!   plan against the MIR it was built from (A3: typed facts only, never
-//!   text). The scan covers ALL statements: a multi-op body is either
-//!   verified against the carried plan or rejected with a typed diagnostic —
-//!   never guessed from the first matching statement;
-//! - [`carried_plan_agrees`] — the agreement predicate for that cross-check;
-//! - [`KernelLaunchDescriptor`] + [`launch_descriptors`] — the typed
-//!   per-kernel launch facts hosts consume (entry, recipe kind,
-//!   workgroup/dispatch/workgroup-count, typed buffer slots, shared-memory
-//!   footprint). Every field is a program fact — never inferred from emitted
-//!   MSL/LLVM/PTX text (A3).
-//!
-//! # A3 boundary
-//!
-//! Nothing in this module reads emitted text, parses strings, or reflects on
-//! backend bindings. The mapping consumes the typed device-program and MIR
-//! surfaces only; the emitters (and, later, the device-program materializer)
-//! drive their output from these typed facts.
+//! Nothing here reads emitted text. An op with no recipe is a typed
+//! [`PlanMappingError`], never a silent [`CollectionKernelPlan::Elementwise`]
+//! floor. Mixed-recipe bodies belong to
+//! [`crate::kernel_decomposition::decompose_kernel_function`].
 
 use crate::abi::{
     collection_op_contract, CollectionOpContract, MirAbiError, MirKernelResource,
@@ -49,9 +23,9 @@ use crate::device_program::{
 use crate::kernel_plan::{CollectionKernelPlan, MatMulShapes, SharedMemoryLayout};
 use crate::layout::MirTensorStorageLayout;
 use crate::{
-    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirKernelDispatchSize,
-    MirKernelWorkgroupCount, MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirRuntimeCall,
-    MirStatementKind, MirType, MirUnOp, MirValidationContext, MirWorkgroupSize,
+    MirCollectionOp, MirConstant, MirFunction, MirKernelDispatchSize, MirKernelWorkgroupCount,
+    MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirRuntimeCall, MirStatementKind, MirType,
+    MirUnOp, MirValidationContext, MirWorkgroupSize,
 };
 use radix_types::{NumericWidth, Primitive, Type, TypeId};
 use rustc_hash::FxHashMap;
@@ -87,6 +61,10 @@ impl From<MirAbiError> for PlanMappingError {
         Self::mapping(error.message)
     }
 }
+
+// ---------------------------------------------------------------------------
+// PLAN MAPPING
+// ---------------------------------------------------------------------------
 
 /// The typed `MirCollectionOp → CollectionKernelPlan` mapping (council TB5).
 ///
@@ -209,20 +187,11 @@ pub fn kernel_plan_for_function(
                              (axis/epsilon from the const operands, shapes from the tensor types)"
                         ))
                     })?;
-            if let Some(existing) = &recipe {
-                if existing != &plan {
-                    return Err(PlanMappingError::mapping(format!(
-                        "kernel body mixes collection ops with conflicting recipes \
-                         ({op:?} resolves to {plan:?}, but the body already carries {existing:?})"
-                    )));
-                }
-            }
-            recipe = Some(plan);
-        } else if is_recipe_op(op) {
-            // Recipe ops resolve through the shared closed-set predicate
-            // ([`is_recipe_op`]) — the same boundary the decomposition slice
-            // uses; a second distinct recipe must agree exactly (never
-            // guessed).
+            adopt_recipe(&mut recipe, op, plan)?;
+        } else if is_contract_recipe_op(op) {
+            // Contract recipes resolve through the shared closed-set
+            // predicate — the same boundary the decomposition slice uses; a
+            // second distinct recipe must agree exactly (never guessed).
             let Some(contract) = &contract else {
                 return Err(PlanMappingError::mapping(format!(
                     "collection op {op:?} has a recipe but no resolved dispatch contract"
@@ -239,15 +208,7 @@ pub fn kernel_plan_for_function(
                         "collection op {op:?} has no kernel plan under the resolved {contract:?} contract"
                     ))
                 })?;
-            if let Some(existing) = &recipe {
-                if existing != &plan {
-                    return Err(PlanMappingError::mapping(format!(
-                        "kernel body mixes collection ops with conflicting recipes \
-                         ({op:?} resolves to {plan:?}, but the body already carries {existing:?})"
-                    )));
-                }
-            }
-            recipe = Some(plan);
+            adopt_recipe(&mut recipe, op, plan)?;
         } else if is_elementwise_collection_op(op) {
             // Elementwise transforms contribute no recipe; the function-level
             // scan decides them elementwise.
@@ -260,6 +221,27 @@ pub fn kernel_plan_for_function(
     }
     Ok(recipe)
 }
+
+fn adopt_recipe(
+    recipe: &mut Option<CollectionKernelPlan>,
+    op: MirCollectionOp,
+    plan: CollectionKernelPlan,
+) -> Result<(), PlanMappingError> {
+    if let Some(existing) = recipe.as_ref() {
+        if existing != &plan {
+            return Err(PlanMappingError::mapping(format!(
+                "kernel body mixes collection ops with conflicting recipes \
+                 ({op:?} resolves to {plan:?}, but the body already carries {existing:?})"
+            )));
+        }
+    }
+    *recipe = Some(plan);
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// CARRIED-FACT AGREEMENT
+// ---------------------------------------------------------------------------
 
 /// Whether a device program's carried plan agrees with the plan re-derived
 /// from the kernel function's typed facts.
@@ -307,8 +289,12 @@ pub fn carried_resources_agree(carried: &[DeviceResource], signature: &MirKernel
             return false;
         };
         let derived = BufferRole::from_abi_role(signature_resource.role, signature_resource.access);
-        let compatible =
-            derived == Some(resource.buffer.role) || (resource.buffer.role == BufferRole::InOut);
+        let compatible = match derived {
+            Some(derived_role) => {
+                derived_role == resource.buffer.role || resource.buffer.role == BufferRole::InOut
+            }
+            None => false,
+        };
         if !compatible {
             return false;
         }
@@ -332,6 +318,10 @@ pub fn carried_resources_agree(carried: &[DeviceResource], signature: &MirKernel
     }
     true
 }
+
+// ---------------------------------------------------------------------------
+// LAUNCH DESCRIPTORS
+// ---------------------------------------------------------------------------
 
 /// The recipe family of a kernel, as a typed tag.
 ///
@@ -584,6 +574,10 @@ fn shared_memory_layout_bytes(layout: &SharedMemoryLayout) -> u64 {
         .saturating_mul(u64::try_from(layout.element_byte_width).unwrap_or(u64::MAX))
 }
 
+// ---------------------------------------------------------------------------
+// RECIPE CLASSIFICATION
+// ---------------------------------------------------------------------------
+
 /// Whether a collection op is a pointwise tensor transform the generic
 /// elementwise kernel body covers (no recipe). This is the closed set that
 /// decides the no-recipe plan: an op outside it has no kernel plan and fails
@@ -659,6 +653,13 @@ pub fn is_transformer_recipe_op(op: MirCollectionOp) -> bool {
     )
 }
 
+/// Whether a collection op is a contract-shaped recipe (reduction, matmul,
+/// or transpose). Transformer recipes have no `CollectionOpContract` variant
+/// and resolve through [`CollectionKernelPlan::from_transformer_op`].
+fn is_contract_recipe_op(op: MirCollectionOp) -> bool {
+    is_recipe_op(op) && !is_transformer_recipe_op(op)
+}
+
 /// Whether a tensor-level unary assign (`MirValueKind::Unary` on a
 /// tensor-typed operand) is admitted in the device elementwise surface —
 /// the MIR-level admission seam declared by `S6-P1` for the emitter units
@@ -678,6 +679,40 @@ pub fn is_admitted_tensor_unary(op: MirUnOp) -> bool {
             // unary (the comparator's `kv_f16_round` register rounding).
             | MirUnOp::F16Round
     )
+}
+
+// ---------------------------------------------------------------------------
+// SUBCHAIN SIGNATURES
+// ---------------------------------------------------------------------------
+
+/// First collection runtime call that satisfies `visit`, in statement-scan
+/// order. Shared by the recipe-operand, destination, and shape scans so each
+/// site names the op it wants instead of re-walking the body.
+fn find_collection_call<'a, T>(
+    function: &'a MirFunction,
+    mut visit: impl FnMut(MirCollectionOp, &'a MirRuntimeCall, Option<&'a crate::MirPlace>) -> Option<T>,
+) -> Option<T> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let Some(op) = crate::collection_ops::statement_collection_op(statement) else {
+                continue;
+            };
+            let MirStatementKind::RuntimeCall { destination, call } = &statement.kind else {
+                continue;
+            };
+            if let Some(found) = visit(op, call, destination.as_ref()) {
+                return Some(found);
+            }
+        }
+    }
+    None
+}
+
+fn first_collection_call<'a>(
+    function: &'a MirFunction,
+    pred: impl Fn(MirCollectionOp) -> bool,
+) -> Option<(&'a MirRuntimeCall, Option<&'a crate::MirPlace>)> {
+    find_collection_call(function, |op, call, dest| pred(op).then_some((call, dest)))
 }
 
 /// The element type of a tensor-typed MIR type — the buffer element type the
@@ -751,38 +786,17 @@ fn recipe_operand_ty(
     function: &MirFunction,
     op: MirCollectionOp,
 ) -> Result<MirType, PlanMappingError> {
-    for block in &function.blocks {
-        for statement in &block.statements {
-            let Some(statement_op) = crate::collection_ops::statement_collection_op(statement)
-            else {
-                continue;
-            };
-            if statement_op != op {
-                continue;
-            }
-            let MirStatementKind::RuntimeCall {
-                call: MirRuntimeCall { args, .. },
-                ..
-            } = &statement.kind
-            else {
-                continue;
-            };
-            return args
-                .first()
-                .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
-                .map_or_else(
-                    || {
-                        Err(PlanMappingError::mapping(format!(
-                            "{op:?} recipe operand has no local type"
-                        )))
-                    },
-                    Ok,
-                );
-        }
-    }
-    Err(PlanMappingError::mapping(format!(
-        "recipe op {op:?} statement not found in the subchain body"
-    )))
+    let Some((call, _)) = first_collection_call(function, |found| found == op) else {
+        return Err(PlanMappingError::mapping(format!(
+            "recipe op {op:?} statement not found in the subchain body"
+        )));
+    };
+    call.args
+        .first()
+        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+        .ok_or_else(|| {
+            PlanMappingError::mapping(format!("{op:?} recipe operand has no local type"))
+        })
 }
 
 fn storage_input(binding: u32, element_ty: MirType, count: u64) -> MirKernelResource {
@@ -1059,28 +1073,14 @@ fn gather_statement_return_dims(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
 ) -> Result<Vec<u64>, PlanMappingError> {
-    for block in &function.blocks {
-        for statement in &block.statements {
-            let Some(op) = crate::collection_ops::statement_collection_op(statement) else {
-                continue;
-            };
-            if op != MirCollectionOp::TensorGather {
-                continue;
-            }
-            let MirStatementKind::RuntimeCall {
-                call: MirRuntimeCall { return_ty, .. },
-                ..
-            } = &statement.kind
-            else {
-                continue;
-            };
-            return crate::tensor_type::tensor_literal_dims(*return_ty, validation)
-                .map_err(PlanMappingError::mapping);
-        }
-    }
-    Err(PlanMappingError::mapping(
-        "row-gather statement not found in the subchain body",
-    ))
+    let Some((call, _)) = first_collection_call(function, |op| op == MirCollectionOp::TensorGather)
+    else {
+        return Err(PlanMappingError::mapping(
+            "row-gather statement not found in the subchain body",
+        ));
+    };
+    crate::tensor_type::tensor_literal_dims(call.return_ty, validation)
+        .map_err(PlanMappingError::mapping)
 }
 
 /// The row-gather id-vector length (GI3-1): the return dims' first element
@@ -1134,24 +1134,10 @@ fn gather_ids_element_ty(
 /// The ids operand local of the gather statement (the second argument — the
 /// first is the table).
 fn gather_ids_local(function: &MirFunction) -> Option<MirLocalId> {
-    for block in &function.blocks {
-        for statement in &block.statements {
-            if crate::collection_ops::statement_collection_op(statement)
-                != Some(MirCollectionOp::TensorGather)
-            {
-                continue;
-            }
-            let MirStatementKind::RuntimeCall {
-                call: MirRuntimeCall { args, .. },
-                ..
-            } = &statement.kind
-            else {
-                continue;
-            };
-            return args.get(1).and_then(crate::read_analysis::operand_local);
-        }
-    }
-    None
+    let (call, _) = first_collection_call(function, |op| op == MirCollectionOp::TensorGather)?;
+    call.args
+        .get(1)
+        .and_then(crate::read_analysis::operand_local)
 }
 
 /// The recipe operand local of a transformer recipe statement — the first
@@ -1159,22 +1145,10 @@ fn gather_ids_local(function: &MirFunction) -> Option<MirLocalId> {
 /// buffers). `None` when the op statement is absent or carries no tensor
 /// operand.
 fn transformer_operand_local(function: &MirFunction, op: MirCollectionOp) -> Option<MirLocalId> {
-    for block in &function.blocks {
-        for statement in &block.statements {
-            if crate::collection_ops::statement_collection_op(statement) != Some(op) {
-                continue;
-            }
-            let MirStatementKind::RuntimeCall {
-                call: MirRuntimeCall { args, .. },
-                ..
-            } = &statement.kind
-            else {
-                continue;
-            };
-            return args.iter().find_map(crate::read_analysis::operand_local);
-        }
-    }
-    None
+    let (call, _) = first_collection_call(function, |found| found == op)?;
+    call.args
+        .iter()
+        .find_map(crate::read_analysis::operand_local)
 }
 
 /// The emission signature for a decomposition subchain kernel (S5-U1b
@@ -1487,42 +1461,27 @@ fn sum_axis_destination_shape(
     local: MirLocalId,
     validation: &MirValidationContext<'_>,
 ) -> Option<(Vec<u64>, u64)> {
-    for block in &source.blocks {
-        for statement in &block.statements {
-            let MirStatementKind::RuntimeCall {
-                destination,
-                call:
-                    MirRuntimeCall {
-                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorSumAxis),
-                        args,
-                        ..
-                    },
-                ..
-            } = &statement.kind
-            else {
-                continue;
-            };
-            let Some(place) = destination else {
-                continue;
-            };
-            let MirPlaceBase::Local(dest_local) = place.base else {
-                continue;
-            };
-            if dest_local != local {
-                continue;
-            }
-            let operand = args.first()?;
-            let operand_ty = crate::local_ty::operand_local_ty(source, operand)?;
-            let dims = crate::tensor_type::tensor_literal_dims(operand_ty, validation).ok()?;
-            let axis: u64 = match args.get(1)? {
-                MirOperand::Constant(MirConstant::Int(axis)) => u64::try_from(*axis).ok()?,
-                MirOperand::Constant(MirConstant::UInt(axis)) => *axis,
-                _ => return None,
-            };
-            return Some((dims, axis));
+    find_collection_call(source, |op, call, destination| {
+        if op != MirCollectionOp::TensorSumAxis {
+            return None;
         }
-    }
-    None
+        let place = destination?;
+        let MirPlaceBase::Local(dest_local) = place.base else {
+            return None;
+        };
+        if dest_local != local {
+            return None;
+        }
+        let operand = call.args.first()?;
+        let operand_ty = crate::local_ty::operand_local_ty(source, operand)?;
+        let dims = crate::tensor_type::tensor_literal_dims(operand_ty, validation).ok()?;
+        let axis = match call.args.get(1)? {
+            MirOperand::Constant(MirConstant::Int(axis)) => u64::try_from(*axis).ok()?,
+            MirOperand::Constant(MirConstant::UInt(axis)) => *axis,
+            _ => return None,
+        };
+        Some((dims, axis))
+    })
 }
 
 /// The local a recipe statement produces (its destination place's base
@@ -1546,54 +1505,32 @@ fn sum_axis_destination_shape(
 /// semantic identity. Non-local destinations (temps, or no destination)
 /// yield `None` and the Synthetic origin fallback stays honest.
 fn recipe_destination_local_for(function: &MirFunction, op: MirCollectionOp) -> Option<MirLocalId> {
-    for block in &function.blocks {
-        for statement in &block.statements {
-            if crate::collection_ops::statement_collection_op(statement) != Some(op) {
-                continue;
-            }
-            let MirStatementKind::RuntimeCall { destination, .. } = &statement.kind else {
-                continue;
-            };
-            let Some(place) = destination else {
-                return None;
-            };
-            let MirPlaceBase::Local(local) = place.base else {
-                return None;
-            };
-            return Some(local);
-        }
+    let (_, destination) = first_collection_call(function, |found| found == op)?;
+    match destination?.base {
+        MirPlaceBase::Local(local) => Some(local),
+        _ => None,
     }
-    None
 }
 
 /// The recipe statement's operand locals, in operand order (the read inputs
 /// the contract-shaped signature binds at 0..).
 fn recipe_operand_locals(function: &MirFunction) -> Result<Vec<MirLocalId>, PlanMappingError> {
-    for block in &function.blocks {
-        for statement in &block.statements {
-            if crate::collection_ops::statement_collection_op(statement).is_none() {
-                continue;
-            }
-            let MirStatementKind::RuntimeCall {
-                call: MirRuntimeCall { args, .. },
-                ..
-            } = &statement.kind
-            else {
-                continue;
-            };
-            return args
-                .iter()
-                .map(|arg| {
-                    crate::read_analysis::operand_local(arg).ok_or_else(|| {
-                        PlanMappingError::mapping("recipe operand must reference a tensor local")
-                    })
-                })
-                .collect();
-        }
-    }
-    Err(PlanMappingError::mapping(
-        "subchain body has no collection-op statement",
-    ))
+    // Bind the contract recipe's operands, not the first collection statement.
+    // Decomposition folds a leading elementwise op into the adjacent recipe
+    // subchain; those prefix operands are data-flow inputs, not the recipe.
+    let Some((call, _)) = first_collection_call(function, is_contract_recipe_op) else {
+        return Err(PlanMappingError::mapping(
+            "subchain body has no recipe statement",
+        ));
+    };
+    call.args
+        .iter()
+        .map(|arg| {
+            crate::read_analysis::operand_local(arg).ok_or_else(|| {
+                PlanMappingError::mapping("recipe operand must reference a tensor local")
+            })
+        })
+        .collect()
 }
 
 /// A read input resource carrying a source local (the data-flow inputs the
@@ -1643,15 +1580,12 @@ fn function_local_ty(
 /// Whether the body's op-set scan carries the given recipe op (the
 /// reduction-operator disambiguation for [`contract_shape_signature`]).
 fn is_recipe_op_scan(function: &MirFunction, op: MirCollectionOp) -> bool {
-    for block in &function.blocks {
-        for statement in &block.statements {
-            if crate::collection_ops::statement_collection_op(statement) == Some(op) {
-                return true;
-            }
-        }
-    }
-    false
+    first_collection_call(function, |found| found == op).is_some()
 }
+
+// ---------------------------------------------------------------------------
+// SUBCHAIN PLAN RESOLUTION
+// ---------------------------------------------------------------------------
 
 /// Resolve the single plan a subchain kernel carries (S5-U1 decomposition
 /// driver seam).
@@ -1740,55 +1674,38 @@ fn kernel_matmul_shapes(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
 ) -> Result<Option<MatMulShapes>, PlanMappingError> {
-    for block in &function.blocks {
-        for statement in &block.statements {
-            if crate::collection_ops::statement_collection_op(statement)
-                != Some(MirCollectionOp::TensorMatMul)
-            {
-                continue;
-            }
-            let MirStatementKind::RuntimeCall {
-                call: MirRuntimeCall { args, .. },
-                ..
-            } = &statement.kind
-            else {
-                continue;
-            };
-            if args.len() != 2 {
-                return Err(PlanMappingError::mapping(
-                    "matmul requires exactly two tensor operands",
-                ));
-            }
-            let left_ty =
-                crate::local_ty::operand_local_ty(function, &args[0]).ok_or_else(|| {
-                    PlanMappingError::mapping("matmul left operand has no local type")
-                })?;
-            let right_ty =
-                crate::local_ty::operand_local_ty(function, &args[1]).ok_or_else(|| {
-                    PlanMappingError::mapping("matmul right operand has no local type")
-                })?;
-            let left_dims = crate::tensor_type::tensor_literal_dims(left_ty, validation)
-                .map_err(PlanMappingError::mapping)?;
-            let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)
-                .map_err(PlanMappingError::mapping)?;
-            if left_dims.len() != 2 || right_dims.len() != 2 {
-                return Err(PlanMappingError::mapping(
-                    "matmul requires rank-2 tensor operands",
-                ));
-            }
-            if left_dims[1] != right_dims[0] {
-                return Err(PlanMappingError::mapping(
-                    "matmul inner dimensions must match",
-                ));
-            }
-            return Ok(Some(MatMulShapes {
-                m: left_dims[0],
-                k: left_dims[1],
-                n: right_dims[1],
-            }));
-        }
+    let Some((call, _)) = first_collection_call(function, |op| op == MirCollectionOp::TensorMatMul)
+    else {
+        return Ok(None);
+    };
+    if call.args.len() != 2 {
+        return Err(PlanMappingError::mapping(
+            "matmul requires exactly two tensor operands",
+        ));
     }
-    Ok(None)
+    let left_ty = crate::local_ty::operand_local_ty(function, &call.args[0])
+        .ok_or_else(|| PlanMappingError::mapping("matmul left operand has no local type"))?;
+    let right_ty = crate::local_ty::operand_local_ty(function, &call.args[1])
+        .ok_or_else(|| PlanMappingError::mapping("matmul right operand has no local type"))?;
+    let left_dims = crate::tensor_type::tensor_literal_dims(left_ty, validation)
+        .map_err(PlanMappingError::mapping)?;
+    let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)
+        .map_err(PlanMappingError::mapping)?;
+    if left_dims.len() != 2 || right_dims.len() != 2 {
+        return Err(PlanMappingError::mapping(
+            "matmul requires rank-2 tensor operands",
+        ));
+    }
+    if left_dims[1] != right_dims[0] {
+        return Err(PlanMappingError::mapping(
+            "matmul inner dimensions must match",
+        ));
+    }
+    Ok(Some(MatMulShapes {
+        m: left_dims[0],
+        k: left_dims[1],
+        n: right_dims[1],
+    }))
 }
 
 #[cfg(test)]

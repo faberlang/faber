@@ -1,3 +1,9 @@
+//! Coverage for typed device-program plan mapping and launch descriptors.
+//!
+//! These tests prove fail-closed recipe mapping, carried-fact agreement, and
+//! subchain emission signatures. A folded elementwise prefix must bind the
+//! recipe operands, never the first collection statement.
+
 use super::*;
 use crate::abi::{
     CollectionOpContract, MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess,
@@ -1140,6 +1146,50 @@ fn kernel_plan_for_function_is_none_for_elementwise_function() {
 }
 
 #[test]
+fn carried_resources_agree_accepts_unified_inout_on_coherent_abi() {
+    // A unified intermediate carries InOut on slots whose ABI is a coherent
+    // (Input, Read) or (Output, Write) pair.
+    let signature = reduction_signature(4, 1, 1);
+    let carried = vec![
+        resource(
+            identity(1, "x", BufferRole::InOut),
+            version(1, signature.input.element_ty, 4),
+            0,
+            MirKernelResourceAccess::Read,
+        ),
+        resource(
+            identity(2, "y", BufferRole::InOut),
+            version(1, signature.output.element_ty, 1),
+            1,
+            MirKernelResourceAccess::Write,
+        ),
+    ];
+    assert!(carried_resources_agree(&carried, &signature));
+}
+
+#[test]
+fn carried_resources_agree_rejects_inout_on_incoherent_abi() {
+    // InOut does not paper over an incoherent ABI pair (writing an input).
+    let mut signature = reduction_signature(4, 1, 1);
+    signature.input.access = MirKernelResourceAccess::Write;
+    let carried = vec![
+        resource(
+            identity(1, "x", BufferRole::InOut),
+            version(1, signature.input.element_ty, 4),
+            0,
+            MirKernelResourceAccess::Write,
+        ),
+        resource(
+            identity(2, "y", BufferRole::Output),
+            version(1, signature.output.element_ty, 1),
+            1,
+            MirKernelResourceAccess::Write,
+        ),
+    ];
+    assert!(!carried_resources_agree(&carried, &signature));
+}
+
+#[test]
 fn carried_plan_agrees_rejects_recipe_mismatch() {
     let mut types = TypeTable::new();
     let function = reduction_function(&mut types, 1024);
@@ -2075,6 +2125,40 @@ fn f32_scalar_data_flow_param_resolves_in_subchain_emission_signature() {
         signature.output.binding, 3,
         "the output binds after the recipe inputs and the scalar seed"
     );
+}
+
+#[test]
+fn folded_elementwise_before_recipe_binds_recipe_operands() {
+    // Decomposition folds a leading elementwise op into the adjacent recipe
+    // subchain (`t = mul(x, w); s = sum(t)`). The emission signature must
+    // bind the reduction input to the Sum operand (t), not the first
+    // collection statement's operands (x, w).
+    let mut types = TypeTable::new();
+    let function = mul_sum_function(&mut types, 1024);
+    let validation = MirValidationContext::new(&types);
+    let contract = CollectionOpContract::Reduction {
+        length: 1024,
+        workgroup_x: 256,
+        partials: 4,
+    };
+
+    let signature =
+        subchain_signature_for_emission(&function, &contract, &validation, &[MirLocalId(3)])
+            .expect("mul+sum emission signature resolves");
+
+    assert_eq!(
+        signature.input.source_local,
+        Some(MirLocalId(2)),
+        "the reduction input must be the Sum operand (mul result), not the first mul operand"
+    );
+    assert_eq!(
+        signature.extra_inputs.len(),
+        2,
+        "x and w remain data-flow inputs of the folded mul"
+    );
+    assert_eq!(signature.extra_inputs[0].source_local, Some(MirLocalId(0)));
+    assert_eq!(signature.extra_inputs[1].source_local, Some(MirLocalId(1)));
+    assert_eq!(signature.output.source_local, Some(MirLocalId(3)));
 }
 
 #[test]
