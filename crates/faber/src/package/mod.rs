@@ -110,7 +110,8 @@ pub use cmd::{
 #[allow(unused_imports)] // binary build/run paths consume this crate-visible Go entry.
 pub(crate) use compile::compile_package_go;
 #[cfg(feature = "mir-wasm")]
-#[allow(unused_imports)] // U6-D package-wasm emit path (binary `faber build/emit --target wasm`).
+#[allow(unused_imports)]
+// U6-D package-wasm emit path (binary `faber build/emit --target wasm`).
 pub(crate) use compile::compile_package_wasm;
 pub(crate) use compile::package_rust_runtime_plan;
 #[allow(unused_imports)] // package MIR stages consume this crate-visible analysis API.
@@ -189,13 +190,6 @@ pub use llvm::{
     build_package_llvm, PackageLlvmBuild, PackageLlvmLinkManifest, PackageLlvmModule,
     PackageLlvmOptions,
 };
-#[cfg(feature = "mir-wasm")]
-#[allow(unused_imports)]
-// Wasm package harnesses consume the reusable package-to-Wasm builder (U6-D).
-pub use wasm::{
-    build_package_wasm, PackageWasmBuild, PackageWasmLinkManifest, PackageWasmModule,
-    PackageWasmOptions,
-};
 #[allow(unused_imports)]
 // `faber build/run --target llvm-host` + product tests consume the Stage 9 lane.
 #[cfg(feature = "mir-llvm")]
@@ -220,6 +214,13 @@ pub(crate) use mir::{
 };
 #[allow(unused_imports)]
 pub(crate) use mir::{build_package_mir_artifact, run_package_mir, run_package_mir_artifact};
+#[cfg(feature = "mir-wasm")]
+#[allow(unused_imports)]
+// Wasm package harnesses consume the reusable package-to-Wasm builder (U6-D).
+pub use wasm::{
+    build_package_wasm, PackageWasmBuild, PackageWasmLinkManifest, PackageWasmModule,
+    PackageWasmOptions,
+};
 
 // binary-only `faber run --interpret` route consumes this through `commands`.
 #[allow(unused_imports)]
@@ -305,7 +306,7 @@ use source_files::{is_proba_source_path, load_package_source, package_source_fil
 
 pub(crate) use library::{
     analysis_source_for_file, library_cached_analysis, library_cached_file_interface,
-    library_interface_export_names, library_interface_has_module, program_export_names,
+    library_interface_export_surface, library_interface_has_module, program_export_surface,
     LibraryInterfaceCache,
 };
 #[cfg(feature = "hir-rust")]
@@ -313,16 +314,16 @@ pub(crate) use library::{
     library_cached_expanded_imports, library_generates_rust_module, library_module_segments,
     with_library_cached_analysis_mut,
 };
-pub use locale::locale_pack_for_emit;
-#[allow(unused_imports)]
-pub(crate) use locale::{
-    config_with_locale, default_config_with_locale, load_locale_pack_for_input,
-};
 /// Installed reader-pack path resolution shared by lib surfaces
 /// (`diagnostic_explain`) and package code-locale lookup. Used by the lib
 /// crate only; the bin's copy is legitimately unused.
 #[allow(unused_imports)]
 pub(crate) use locale::installed_locale_pack_path;
+pub use locale::locale_pack_for_emit;
+#[allow(unused_imports)]
+pub(crate) use locale::{
+    config_with_locale, default_config_with_locale, load_locale_pack_for_input,
+};
 
 pub(super) const MANIFEST_FILE: &str = "faber.toml";
 

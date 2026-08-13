@@ -15,12 +15,15 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Module export visibility — `@ publica` re-exports a declaration from the
-#     current module, making it accessible to external consumers
+#   • Module export visibility — `@ publica` (en spelling `@ public`) exports a
+#     declaration from the current module, making it importable by any consumer
 #   • The opposite of `@ privata`; controls the public API surface of a module
+#   • Unmarked top-level declarations are module-private: only `@ publica` /
+#     `@ interna` declarations appear in the file's importable surface
 #
 # Common mistakes:
-#   • Expecting `@ publica` to enforce access control — visibility annotations are decorative only (WARN012).
+#   • Leaving a declaration unmarked and expecting it to be importable — the
+#     export surface is `@ publica` / `@ interna` only.
 #
 # See also: privata, importa
 # =============================================================================

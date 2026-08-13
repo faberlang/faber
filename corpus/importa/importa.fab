@@ -4,9 +4,9 @@ kind = "keyword"
 category = "package"
 canonical = true
 summary = "Imports names from another module or package source."
-syntax = "importa ex <source> <privata|publica> (<name> [ut <alias>] | * ut <alias>)"
+syntax = "importa ex <source> [publica] (<name> [ut <alias>] | * ut <alias>)"
 aliases = ["import"]
-related = ["ex", "privata", "publica", "ut"]
+related = ["ex", "publica", "ut"]
 locale = "en"
 +++
 # =============================================================================
@@ -15,20 +15,21 @@ locale = "en"
 #
 # What this teaches:
 #   • Imports names from another module or package source.
-#   • Related keywords: ex, privata, publica, ut
+#   • Related keywords: ex, publica, ut
 #
 # Common mistakes:
 #   • Missing the `ex` source in the import record — an import record requires an `ex` source path.
 #
-# See also: ex, privata, publica, ut
+# See also: ex, publica, ut
 # =============================================================================
 
 # importa ex — named import from a sibling module
 #
-# importa ex relative path with privata symbol selection.
+# importa ex relative path; an absent marker does not re-export.
 #
 # GRAMMAR:
-#   importa ex "<path>" privata <name> [ut <alias>]
+#   importa ex "<path>" <name> [ut <alias>]
+#   importa ex "<path>" publica <name>   (re-export)
 #
 # Requires module layout: importa/importa.fab imports from importa/auxilium.fab.
 # Harness compiles single files in isolation — sibling resolution needs package
@@ -39,7 +40,7 @@ locale = "en"
 #
 # BACKEND: Rust/Go e2e whitelist — single-file compile cannot resolve sibling.
 
-import from "./auxilium" private auxilium
+import from "./auxilium" auxilium
 
 main {
     print auxilium.saluta("Marcus")

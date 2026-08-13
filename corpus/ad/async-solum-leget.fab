@@ -32,7 +32,7 @@ locale = "en"
 # declares the wrapper with compatibility `@ futura`; callers consume it through
 # the explicit morphology forms such as `figendum`.
 
-import from "norma:solum" private solum
+import from "norma:solum" solum
 
 async_main {
     const string textPath ← "/tmp/faber-async-solum-leget.txt"

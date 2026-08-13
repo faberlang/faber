@@ -28,11 +28,12 @@ use super::import_graph::{
 };
 use super::{
     analysis_source_for_file, discover_build_layout, discover_package, library_cached_analysis,
-    library_cached_file_interface, library_interface_export_names, library_interface_has_module,
+    library_cached_file_interface, library_interface_export_surface, library_interface_has_module,
     library_resolver_for_package, load_locale_pack_for_input, load_package_with_locale_pack,
-    load_provider_manifests, program_export_names, read_manifest, selected_providers_for_routes,
+    load_provider_manifests, program_export_surface, read_manifest, selected_providers_for_routes,
     LibraryImportBinding, LibraryInterfaceCache, PackageFile, RustRuntimePlan,
 };
+use radix::semantic::passes::visibility_annotation::VisibilityTier;
 
 pub(crate) struct AnalyzedPackage {
     pub(crate) spec: super::PackageSpec,
@@ -63,7 +64,7 @@ pub(crate) struct AnalyzedPackageUnit {
     pub(crate) analysis: AnalyzedUnit,
     pub(crate) file_interface: radix::file_interface::FileInterface,
     pub(crate) export_names: Vec<String>,
-    pub(crate) namespace_exports: BTreeMap<String, Vec<String>>,
+    pub(crate) namespace_exports: BTreeMap<String, BTreeMap<String, VisibilityTier>>,
     pub(crate) expanded_library_imports: Vec<LibraryImportBinding>,
 }
 
@@ -655,7 +656,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Packag
 
     // Namespace vars for local imports + explicit Norma host shims (entry + siblings).
     // WHY (79df18a): inject each binding name at most once — multi-unit packages
-    // that all `importa … privata consolum` must not redeclare `var consolum`.
+    // that all `importa … consolum` must not redeclare `var consolum`.
     let mut namespace_block = String::new();
     let mut injected_bindings: std::collections::BTreeSet<String> =
         std::collections::BTreeSet::new();
@@ -1114,7 +1115,9 @@ fn analyze_package_spec(
             }
         }
 
-        let export_names = program_export_names(&file.program, &file.interner);
+        let export_names = program_export_surface(&file.program, &file.interner)
+            .into_keys()
+            .collect::<Vec<_>>();
         let package_name = manifest_path_for_spec(&spec)
             .and_then(|path| read_manifest(&path).ok())
             .map(|manifest| manifest.package.name);
@@ -1302,7 +1305,7 @@ fn namespace_exports_for_file(
     files: &[PackageFile],
     library_resolver: &crate::library::LibraryResolver,
     library_cache: &mut LibraryInterfaceCache,
-) -> Result<BTreeMap<String, Vec<String>>, Diagnostic> {
+) -> Result<BTreeMap<String, BTreeMap<String, VisibilityTier>>, Diagnostic> {
     let mut exports = BTreeMap::new();
     for stmt in &file.program.statements {
         let StmtKind::Import(decl) = &stmt.kind else {
@@ -1320,10 +1323,7 @@ fn namespace_exports_for_file(
                 };
                 exports.insert(
                     binding,
-                    sorted_export_names(program_export_names(
-                        &target_file.program,
-                        &target_file.interner,
-                    )),
+                    program_export_surface(&target_file.program, &target_file.interner),
                 );
             }
             ImportResolution::Library(module) => {
@@ -1332,11 +1332,7 @@ fn namespace_exports_for_file(
                 };
                 exports.insert(
                     binding,
-                    sorted_export_names(library_interface_export_names(
-                        &import,
-                        library_resolver,
-                        library_cache,
-                    )?),
+                    library_interface_export_surface(&import, library_resolver, library_cache)?,
                 );
             }
             ImportResolution::Unsupported | ImportResolution::Error(_) => {}
@@ -1345,11 +1341,7 @@ fn namespace_exports_for_file(
     for import in &file.expanded_library_imports {
         exports.insert(
             import.binding.clone(),
-            sorted_export_names(library_interface_export_names(
-                import,
-                library_resolver,
-                library_cache,
-            )?),
+            library_interface_export_surface(import, library_resolver, library_cache)?,
         );
     }
     Ok(exports)
@@ -1364,14 +1356,6 @@ fn import_binding(interner: &Interner, decl: &ImportDecl) -> Option<String> {
         ),
         ImportKind::Wildcard { alias } => Some(interner.resolve(alias.name).to_owned()),
     }
-}
-
-fn sorted_export_names(names: Vec<String>) -> Vec<String> {
-    names
-        .into_iter()
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect()
 }
 
 /// Check every loaded package module and return diagnostics without codegen.

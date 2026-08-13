@@ -21,7 +21,7 @@ locale = "en"
 # See also: 
 # =============================================================================
 
-import from "norma:json" private json
+import from "norma:json" json
 
 @ json
 class Payload {

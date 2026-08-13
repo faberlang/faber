@@ -523,6 +523,12 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         category: KeywordCategory::Modifier,
     },
     KeywordSpec {
+        text: "interna",
+        token_kind: Some(TokenKind::Interna),
+        scope: KeywordScope::Contextual(IMPORT_VISIBILITY_ANNOTATION_OR_MEMBER),
+        category: KeywordCategory::Modifier,
+    },
+    KeywordSpec {
         text: "magnitudo",
         token_kind: Some(TokenKind::Magnitudo),
         scope: KeywordScope::Contextual(TYPE_PARAMETER),

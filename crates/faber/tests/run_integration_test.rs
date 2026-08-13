@@ -179,7 +179,7 @@ entry = "main.fab"
     fs::write(
         src.join("main.fab"),
         r#"
-import from "./thing" private thing
+import from "./thing" thing
 
 main {
   print thing.label()
@@ -1021,7 +1021,7 @@ fn fmir_bin_multifile_package_runs_after_source_mutation() {
     let package = write_basic_package(
         "fmir-bin-multifile",
         r#"
-importa ex "./message" privata message
+importa ex "./message" message
 
 @ cli "tool"
 @ operandus textus name
@@ -1066,7 +1066,7 @@ functio text(textus name) → textus {
 fn fmir_bin_norma_solum_package_reads_file_after_source_is_removed() {
     let package = write_basic_package(
         "fmir-bin-solum",
-        r#"import from "norma:solum" private fileio
+        r#"import from "norma:solum" fileio
 
 incipit {
   nota fileio.lege<textus>("__PAYLOAD__")
@@ -1139,7 +1139,7 @@ entry = "main.fab"
         (
             format!("{root}src/main.fab"),
             r#"
-import from "./thing" private thing
+import from "./thing" thing
 
 main {
   print thing.label()
@@ -1174,7 +1174,7 @@ fn script_private_namespace_failure_does_not_emit_rust() {
     fs::write(
         package.join("main.fab"),
         r#"
-import from "./auxilium" private Aux
+import from "./auxilium" Aux
 
 main {
   print Aux.secretum()
@@ -1216,7 +1216,7 @@ fn script_import_cycle_failure_does_not_emit_rust() {
     let package = temp_dir("import-cycle");
     fs::write(
         package.join("main.fab"),
-        r#"import from "./jobs" private jobs
+        r#"import from "./jobs" jobs
 
 main {}
 "#,
@@ -1224,7 +1224,7 @@ main {}
     .expect("write entry");
     fs::write(
         package.join("jobs.fab"),
-        r#"import from "./main" private main
+        r#"import from "./main" main
 
 fn run() → void {}
 "#,
@@ -1258,7 +1258,7 @@ fn script_norma_library_import_executes_without_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-import from "norma:chorda" private chorda
+import from "norma:chorda" chorda
 
 main {
   print chorda.retorta("roma")
@@ -1566,7 +1566,7 @@ fn script_cli_mounted_command_executes_without_cargo_or_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-import from "./jobs" private * as jobs
+import from "./jobs" * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
@@ -1608,7 +1608,7 @@ fn script_cli_mounted_global_option_executes_without_cargo_or_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-import from "./jobs" private * as jobs
+import from "./jobs" * as jobs
 
 @ cli "tool"
 @ option verbose long "verbose" type bool global
@@ -1655,7 +1655,7 @@ fn script_cli_mounted_global_optional_option_executes_without_cargo_or_rust_emit
     fs::write(
         package.join("main.fab"),
         r#"
-import from "./jobs" private * as jobs
+import from "./jobs" * as jobs
 
 @ cli "tool"
 @ option name long "name" type string global
@@ -1702,7 +1702,7 @@ fn script_cli_mounted_global_text_operand_executes_without_cargo_or_rust_emit() 
     fs::write(
         package.join("main.fab"),
         r#"
-import from "./jobs" private * as jobs
+import from "./jobs" * as jobs
 
 @ cli "tool"
 @ operand string tenant global
@@ -1751,7 +1751,7 @@ fn script_cli_mounted_text_operand_executes_without_cargo_or_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-import from "./jobs" private * as jobs
+import from "./jobs" * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
@@ -1798,7 +1798,7 @@ fn script_cli_mounted_numerus_operand_executes_without_cargo_or_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-import from "./jobs" private * as jobs
+import from "./jobs" * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
@@ -1845,7 +1845,7 @@ fn script_cli_mounted_defaulted_option_executes_without_cargo_or_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-import from "./jobs" private * as jobs
+import from "./jobs" * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
@@ -1892,7 +1892,7 @@ fn script_cli_mounted_alias_text_operand_executes_without_cargo_or_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-import from "./jobs" private * as jobs
+import from "./jobs" * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
@@ -1975,7 +1975,7 @@ fn script_archive_manifestless_root_executes_without_cargo_or_rust_emit() {
             (
                 "main.fab",
                 r#"
-import from "./thing" private thing
+import from "./thing" thing
 
 main {
   print thing.label()
@@ -2058,7 +2058,7 @@ fn script_archive_package_diagnostic_reports_archive_member_path() {
             (
                 "main.fab",
                 r#"
-import from "./auxilium" private Aux
+import from "./auxilium" Aux
 
 main {
   print Aux.secretum()
@@ -2099,7 +2099,7 @@ fn script_manifestless_entry_package_executes_without_cargo_or_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-import from "./thing" private thing
+import from "./thing" thing
 
 main {
   print thing.label()
@@ -2173,7 +2173,7 @@ entry = "main.fab"
     fs::write(
         src.join("main.fab"),
         r#"
-import from "./thing" private thing
+import from "./thing" thing
 
 main {
   print thing.label()
@@ -2241,7 +2241,7 @@ entry = "main.fab"
     fs::write(
         src.join("main.fab"),
         format!(
-            r#"import from "norma:solum" private fileio
+            r#"import from "norma:solum" fileio
 
 main {{
   print fileio.lege<string>("{payload_str}")
@@ -2281,7 +2281,7 @@ entry = "main.fab"
     .expect("write manifest");
     fs::write(
         src.join("main.fab"),
-        r#"import from "norma:solum" private fileio
+        r#"import from "norma:solum" fileio
 
 main {
   const bool readable ← fileio.legibilene("/nonexistent")
@@ -2320,7 +2320,7 @@ entry = "main.fab"
     .expect("write manifest");
     fs::write(
         src.join("main.fab"),
-        r#"import from "norma:processus" private processus
+        r#"import from "norma:processus" processus
 
 main args args {
   print processus.argumenta()[0]

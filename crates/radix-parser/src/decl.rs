@@ -1163,7 +1163,7 @@ impl Parser {
     /// Parse a source import declaration.
     ///
     /// GRAMMAR:
-    ///   import-decl := `importa` `ex` string [`privata`|`publica`] import-kind
+    ///   import-decl := `importa` `ex` string [`publica`] import-kind
     ///   import-kind := ident [`ut` ident] | '*' `ut` ident
     ///
     /// The parser only records the import specifier, visibility, and binding
@@ -1202,11 +1202,11 @@ impl Parser {
             ));
         }
 
-        let explicit_visibility = self.check_keyword_ident(TokenKind::Privata)
-            || self.check_keyword_ident(TokenKind::Publica);
-        let visibility = if self.eat_keyword_ident(TokenKind::Privata) {
-            Visibility::Privata
-        } else if self.eat_keyword_ident(TokenKind::Publica) {
+        if self.check_keyword_ident(TokenKind::Privata) {
+            return Err(Self::removed_import_visibility_error(self.current_span()));
+        }
+        let explicit_visibility = self.check_keyword_ident(TokenKind::Publica);
+        let visibility = if self.eat_keyword_ident(TokenKind::Publica) {
             Visibility::Publica
         } else {
             Visibility::Privata
@@ -1216,7 +1216,10 @@ impl Parser {
             self.expect_keyword_ident(TokenKind::Ut, "expected 'ut'")?;
             let alias = self.parse_ident()?;
             ImportKind::Wildcard { alias }
-        } else if explicit_visibility && self.is_import_named_binding_start() {
+        } else if self.is_import_named_binding_start()
+            && (explicit_visibility || !self.import_binding_continues_expression())
+            && (explicit_visibility || !matches!(self.peek().kind, TokenKind::Tag))
+        {
             let name = self.parse_decl_name()?;
             let alias = if self.eat_keyword_ident(TokenKind::Ut) {
                 Some(self.parse_ident()?)
@@ -1328,9 +1331,10 @@ impl Parser {
     }
 
     fn parse_import_visibility_value(&mut self) -> Result<Visibility, ParseError> {
-        if self.eat_keyword_ident(TokenKind::Privata) {
-            Ok(Visibility::Privata)
-        } else if self.eat_keyword_ident(TokenKind::Publica) {
+        if self.check_keyword_ident(TokenKind::Privata) {
+            return Err(Self::removed_import_visibility_error(self.current_span()));
+        }
+        if self.eat_keyword_ident(TokenKind::Publica) {
             Ok(Visibility::Publica)
         } else {
             Err(self.invalid_import_error("invalid_import_visibility"))
@@ -1341,6 +1345,29 @@ impl Parser {
         match &self.peek().kind {
             TokenKind::Ident(_) | TokenKind::Underscore(_) | TokenKind::Tag => true,
             kind => keyword_allowed_as_ident(KeywordOwner::DeclarationName, kind).is_some(),
+        }
+    }
+
+    /// Whether the token after a candidate import binding continues an
+    /// expression, making the identifier the start of a following statement.
+    ///
+    /// A named binding is followed by `ut` (alias), a keyword or `@` (next
+    /// declaration), or EOF. A continuation token (`.`, `(`, `[`, operators,
+    /// assignment) or an ordinary identifier means the word belongs to a
+    /// following statement, so the import binding is inferred from the path
+    /// instead.
+    fn import_binding_continues_expression(&self) -> bool {
+        match &self.peek_at(1).kind {
+            TokenKind::Ut | TokenKind::Eof | TokenKind::At | TokenKind::Tag => false,
+            TokenKind::Ident(sym) => {
+                let Some(latin) = self.keyword_claim_key(*sym) else {
+                    return true;
+                };
+                lookup_keyword_spec(latin)
+                    .and_then(|spec| spec.token_kind.as_ref())
+                    .is_none()
+            }
+            _ => true,
         }
     }
 
@@ -1395,6 +1422,11 @@ impl Parser {
 
     fn invalid_import_error_at(issue: &'static str, span: radix_lexer::Span) -> ParseError {
         ParseError::structured(ParseErrorKind::InvalidImport, span).with_arg("issue", issue)
+    }
+
+    fn removed_import_visibility_error(span: radix_lexer::Span) -> ParseError {
+        Self::invalid_import_error_at("import_privata_removed", span)
+            .with_arg("keyword", "privata")
     }
 
     // TEST DECLARATIONS
@@ -1630,6 +1662,10 @@ impl Parser {
             Some(TokenKind::Privata) => {
                 self.expect_annotation_end("unexpected token after @ privata")?;
                 return Ok(AnnotationKind::Privata);
+            }
+            Some(TokenKind::Interna) => {
+                self.expect_annotation_end("unexpected token after @ interna")?;
+                return Ok(AnnotationKind::Interna);
             }
             _ => {}
         }
@@ -1889,6 +1925,7 @@ impl Parser {
             TokenKind::Publica => Ok(self.keyword_ident("publica", span)),
             TokenKind::Protecta => Ok(self.keyword_ident("protecta", span)),
             TokenKind::Privata => Ok(self.keyword_ident("privata", span)),
+            TokenKind::Interna => Ok(self.keyword_ident("interna", span)),
             TokenKind::Futura => Ok(self.keyword_ident("futura", span)),
             TokenKind::Cursor => Ok(self.keyword_ident("cursor", span)),
             TokenKind::Tag => Ok(self.keyword_ident("tag", span)),

@@ -120,6 +120,7 @@ pub enum TokenKind {
     Generis,
     Iacit,
     Immutata,
+    Interna,
     Nexum,
     Optiones,
     Prae,
@@ -371,6 +372,7 @@ impl TokenKind {
                 | Generis
                 | Iacit
                 | Immutata
+                | Interna
                 | Nexum
                 | Optiones
                 | Prae

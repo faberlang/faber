@@ -13,7 +13,7 @@ use super::*;
 use radix::mir::BufferHost;
 
 const REACH_UTIL: &str = "functio usata() → textus {\n    redde adjutrix()\n}\n\nfunctio adjutrix() → textus {\n    redde \"usata\"\n}\n\nfunctio non_usata() → textus {\n    redde \"non_usata\"\n}\n";
-const REACH_MAIN: &str = "import from \"reachlib:vals\" private vals\n\nfn run() → string {\n    return vals.usata()\n}\n\nmain {\n    print run()\n}\n";
+const REACH_MAIN: &str = "import from \"reachlib:vals\" vals\n\nfn run() → string {\n    return vals.usata()\n}\n\nmain {\n    print run()\n}\n";
 
 /// Package whose entry imports the `reachlib:vals` library fixture under a
 /// config library home (`libhome/reachlib/src`), so both the analysis phase
@@ -122,8 +122,8 @@ fn package_mir_unused_library_function_not_lowered() {
 // keep `computa` (entry → outer) AND `dupla` (outer → inner) while dropping
 // `otiosa` and `inanis`.
 const REACH_INNER: &str = "functio dupla(numerus value) → numerus {\n    redde value * 2\n}\n\nfunctio inanis(numerus value) → numerus {\n    redde value\n}\n";
-const REACH_OUTER: &str = "importa ex \"reachlib:inner\" privata inner\n\nfunctio computa(numerus value) → numerus {\n    redde inner.dupla(value) + 1\n}\n\nfunctio otiosa(numerus value) → numerus {\n    redde value\n}\n";
-const REACH_NESTED_MAIN: &str = "import from \"reachlib:outer\" private outer\n\nmain {\n    print outer.computa(4)\n}\n";
+const REACH_OUTER: &str = "importa ex \"reachlib:inner\" inner\n\nfunctio computa(numerus value) → numerus {\n    redde inner.dupla(value) + 1\n}\n\nfunctio otiosa(numerus value) → numerus {\n    redde value\n}\n";
+const REACH_NESTED_MAIN: &str = "import from \"reachlib:outer\" outer\n\nmain {\n    print outer.computa(4)\n}\n";
 
 fn write_nested_reach_library_package(dir: &std::path::Path) -> std::path::PathBuf {
     let src = dir.join("src");

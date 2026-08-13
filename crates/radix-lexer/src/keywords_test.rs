@@ -185,6 +185,28 @@ fn annotation_family_keywords_have_identities() {
 }
 
 #[test]
+fn interna_is_visibility_annotation_keyword() {
+    // VM-U1: `interna` joins the publica/privata annotation surface as a
+    // contextual keyword claiming the annotation-name slot.
+    let spec = lookup_keyword_spec("interna").expect("interna must be registered");
+    assert_eq!(spec.token_kind, Some(TokenKind::Interna));
+    assert_eq!(spec.category, KeywordCategory::Modifier);
+    assert_eq!(keyword_token_kind("interna"), Some(TokenKind::Interna));
+    assert!(TokenKind::Interna.is_keyword());
+    assert_eq!(
+        keyword_spelling_for_token(&TokenKind::Interna),
+        Some("interna")
+    );
+    let KeywordScope::Contextual(owners) = spec.scope else {
+        panic!("interna must be contextual");
+    };
+    assert!(
+        owners.contains(&KeywordOwner::AnnotationName),
+        "interna must claim the annotation-name slot"
+    );
+}
+
+#[test]
 fn keyword_groups_are_static_and_complete_for_latin_surface() {
     assert!(
         validate_keyword_groups().is_empty(),

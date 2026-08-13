@@ -16,6 +16,7 @@ use radix::hir::{
 };
 use radix::lexer::Interner;
 use radix::parser;
+use radix::semantic::passes::visibility_annotation::{statement_export_tier, VisibilityTier};
 use radix::syntax::{
     walk_expr, AnnotationKind, Expr, ExprKind, Program, StmtKind, Visibility, Visitor,
 };
@@ -80,21 +81,22 @@ pub(crate) fn analysis_source_for_file(
     Ok(file.source.clone())
 }
 
-pub(crate) fn library_interface_export_names(
+pub(crate) fn library_interface_export_surface(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
     library_cache: &mut LibraryInterfaceCache,
-) -> Result<Vec<String>, Diagnostic> {
+) -> Result<BTreeMap<String, VisibilityTier>, Diagnostic> {
     let cached = load_cached_library_interface(&import.module, library_cache)?;
-    let mut names = program_export_names(&cached.program, &cached.interner);
+    let mut surface = program_export_surface(&cached.program, &cached.interner);
     for child in public_library_imports(import, library_resolver, library_cache)? {
-        names.push(child.binding.clone());
-        for child_member in library_interface_export_names(&child, library_resolver, library_cache)?
+        surface.insert(child.binding.clone(), VisibilityTier::Publica);
+        for (child_member, tier) in
+            library_interface_export_surface(&child, library_resolver, library_cache)?
         {
-            names.push(format!("{}.{}", child.binding, child_member));
+            surface.insert(format!("{}.{}", child.binding, child_member), tier);
         }
     }
-    Ok(names)
+    Ok(surface)
 }
 
 fn library_module_label(import: &LibraryImportBinding) -> String {
@@ -585,7 +587,7 @@ fn analyze_cached_library_interface(
     for dependency in &direct_imports {
         namespace_exports.insert(
             dependency.binding.clone(),
-            library_namespace_member_export_names(dependency, library_resolver, library_cache)?,
+            library_namespace_member_export_surface(dependency, library_resolver, library_cache)?,
         );
     }
     let mut file_interfaces = BTreeMap::new();
@@ -645,7 +647,9 @@ fn analyze_cached_library_interface(
     )?;
     let export_names = {
         let cached = load_cached_library_interface(&import.module, library_cache)?;
-        program_export_names(&cached.program, &cached.interner)
+        program_export_surface(&cached.program, &cached.interner)
+            .into_keys()
+            .collect::<Vec<_>>()
     };
     let export_identity = super::file_interface::ExportIdentityContext {
         provider: "package".to_owned(),
@@ -771,7 +775,7 @@ pub(crate) fn attach_library_provenance_with_links(
         let rust_runtime_methods = BTreeMap::new();
         let interface_items = library_interface_items(import, library_resolver, library_cache)?;
         let exported_members =
-            library_namespace_member_export_names(import, library_resolver, library_cache)?;
+            library_namespace_member_export_surface(import, library_resolver, library_cache)?;
         let has_namespace_binding = library_interface_has_module(import, library_cache)?;
 
         let binding_def_id = hir_import_bindings
@@ -815,7 +819,7 @@ pub(crate) fn attach_library_provenance_with_links(
             analysis
                 .libraries
                 .exports
-                .insert(binding_def_id, exported_members.into_iter().collect());
+                .insert(binding_def_id, exported_members.keys().cloned().collect());
             for child_import in public_library_imports(import, library_resolver, library_cache)? {
                 let child_crate = linked_library_crates
                     .and_then(|map| map.get(&child_import.module.package))
@@ -832,10 +836,10 @@ pub(crate) fn attach_library_provenance_with_links(
             ))
             .with_span(import.import_span));
         } else if !exported_members.is_empty() {
-            for exported_member in exported_members {
+            for exported_member in exported_members.keys() {
                 if interface_items
                     .iter()
-                    .all(|item| item.exported_name != exported_member)
+                    .all(|item| item.exported_name != *exported_member)
                 {
                     return Err(crate::package_diagnostic_error(format!(
                         "library import `{}` did not produce binding `{}` in analyzed HIR",
@@ -891,12 +895,12 @@ pub(crate) fn attach_library_provenance_with_links(
     Ok(())
 }
 
-fn library_namespace_member_export_names(
+fn library_namespace_member_export_surface(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
     library_cache: &mut LibraryInterfaceCache,
-) -> Result<Vec<String>, Diagnostic> {
-    library_interface_export_names(import, library_resolver, library_cache)
+) -> Result<BTreeMap<String, VisibilityTier>, Diagnostic> {
+    library_interface_export_surface(import, library_resolver, library_cache)
 }
 
 fn public_library_imports(
@@ -1025,22 +1029,32 @@ fn library_interface_items(
     Ok(items)
 }
 
-pub(crate) fn program_export_names(program: &Program, interner: &Interner) -> Vec<String> {
-    let mut names = Vec::new();
+pub(crate) fn program_export_surface(
+    program: &Program,
+    interner: &Interner,
+) -> BTreeMap<String, VisibilityTier> {
+    let mut surface = BTreeMap::new();
     for stmt in &program.statements {
         if has_private_visibility(&stmt.annotations, interner) {
             continue;
         }
+        // Package-path legacy surface: unmarked declarations remain exported
+        // (the flip to module-private defaults is radix-scoped in VM-U2; the
+        // package-path flip is a follow-on). The tier is preserved so
+        // `@ interna` fails closed cross-package through the driver.
+        let tier = statement_export_tier(stmt, interner).unwrap_or(VisibilityTier::Publica);
         if let Some(name) = stmt_export_name(stmt, interner) {
-            names.push(name);
+            surface.insert(name, tier);
         }
         // `@ radix backward` companions are compiler-generated and have no
         // source statement of their own; their export names are derived from
         // the annotation so consumers can call them across import boundaries
         // (SEM004).
-        names.extend(backward_companion_export_names(stmt, interner));
+        for companion in backward_companion_export_names(stmt, interner) {
+            surface.insert(companion, VisibilityTier::Publica);
+        }
     }
-    names
+    surface
 }
 
 /// Companion export names from `@ radix backward "name"` annotations on a

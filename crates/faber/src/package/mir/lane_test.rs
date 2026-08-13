@@ -19,10 +19,10 @@ use radix::semantic::Resolver;
 use std::path::PathBuf;
 
 const METHOD_LIB: &str = "genus Punctum {\n    numerus x\n\n    functio dupla() → numerus {\n        redde ego.x * 2\n    }\n}\n\nfunctio structa(numerus x) → Punctum {\n    redde Punctum { x = x }\n}\n";
-const METHOD_MAIN: &str = "import from \"methlib:lib\" private lib\n\nmain {\n    const lib.Punctum p ← lib.structa(21)\n    print p.dupla()\n}\n";
+const METHOD_MAIN: &str = "import from \"methlib:lib\" lib\n\nmain {\n    const lib.Punctum p ← lib.structa(21)\n    print p.dupla()\n}\n";
 
 const CALLBACK_LIB: &str = "genus Lectio {\n    bivalens successus\n    numerus valor\n    textus causa\n}\n\nfunctio applica((numerus, numerus) → Lectio f, numerus x) → numerus {\n    fixum Lectio lectio ← f(x, 2)\n    si non lectio.successus ergo redde 0\n    redde lectio.valor\n}\n";
-const CALLBACK_MAIN: &str = "importa ex \"callbacklib:lib\" privata lib\n\nincipit {\n    fixum numerus factor ← 1\n    nota lib.applica((numerus x, numerus y) → lib.Lectio ∴ lib.Lectio { successus = verum, valor = x * y * factor, causa = \"\" }, 21)\n}\n";
+const CALLBACK_MAIN: &str = "importa ex \"callbacklib:lib\" lib\n\nincipit {\n    fixum numerus factor ← 1\n    nota lib.applica((numerus x, numerus y) → lib.Lectio ∴ lib.Lectio { successus = verum, valor = x * y * factor, causa = \"\" }, 21)\n}\n";
 
 // The forma-shadowing guard (fd0c939) false-positive exclusion: a local
 // `h1b` whose method call `h1b.gelu()` must NOT be rewritten into a
@@ -31,7 +31,7 @@ const CALLBACK_MAIN: &str = "importa ex \"callbacklib:lib\" privata lib\n\nincip
 // rewrote ANY HIR-generated receiver def (>= 1_000_000), so `h1b.gelu()` was
 // rewritten to `nn.gelu(h1b)` — an arity-corrupting synthetic-path call.
 const GELU_LIB: &str = "functio gelu() → numerus {\n    redde 7\n}\n";
-const GELU_MAIN: &str = "import from \"gelulib:lib\" private nn\n\nclass H1B {\n    int x\n\n    fn gelu() → int {\n        return self.x * 2\n    }\n}\n\nfn structa(int x) → H1B {\n    return H1B { x = x }\n}\n\nmain {\n    const int nn_value ← nn.gelu()\n    const H1B h1b ← structa(21)\n    print h1b.gelu()\n    print nn_value\n}\n";
+const GELU_MAIN: &str = "import from \"gelulib:lib\" nn\n\nclass H1B {\n    int x\n\n    fn gelu() → int {\n        return self.x * 2\n    }\n}\n\nfn structa(int x) → H1B {\n    return H1B { x = x }\n}\n\nmain {\n    const int nn_value ← nn.gelu()\n    const H1B h1b ← structa(21)\n    print h1b.gelu()\n    print nn_value\n}\n";
 
 #[test]
 fn package_mir_rewrites_runtime_conversion_types_with_imported_types() {
@@ -97,7 +97,7 @@ fn package_mir_shadowed_alias_rewrite_skips_plain_local_method_calls() {
 const VERTE_CONST_LIB: &str =
     "+++\nlocale = \"en\"\n+++\nconst f32 GELU_ALPHA ← (0.7978845608028654 ∷ f32)\n";
 const VERTE_CONST_MAIN: &str =
-    "import from \"verteclib:lib\" private vals\n\nmain {\n    print vals.GELU_ALPHA\n}\n";
+    "import from \"verteclib:lib\" vals\n\nmain {\n    print vals.GELU_ALPHA\n}\n";
 
 /// Write a package under a config library home (`libhome/<lib>/src`) with the
 /// given library module and entry source, mirroring the S1-U1 constlib
@@ -191,7 +191,7 @@ fn package_mir_passes_captured_entry_closure_to_linked_library_function() {
 // orphaned ("block bbN is not reachable from entry", PKG001). The success
 // path (`4`) and the error path (`caught`) both prove handler reachability.
 const FAILABLE_METHOD_LIB: &str = "genus Divisor {\n    numerus x\n\n    functio reciproca() → numerus ⇥ textus {\n        si ego.x ≡ 0 {\n            iace \"division by zero\"\n        }\n        redde 100 / ego.x\n    }\n}\n\nfunctio structa(numerus x) → Divisor {\n    redde Divisor { x = x }\n}\n";
-const FAILABLE_METHOD_MAIN: &str = "import from \"failib:lib\" private lib\n\nmain {\n    const lib.Divisor ok ← lib.structa(25)\n    do {\n        const int r ← ok.reciproca()\n        print r\n    }\n    catch err {\n        print \"caught\"\n    }\n    const lib.Divisor bad ← lib.structa(0)\n    do {\n        const int r2 ← bad.reciproca()\n        print r2\n    }\n    catch err {\n        print \"caught\"\n    }\n}\n";
+const FAILABLE_METHOD_MAIN: &str = "import from \"failib:lib\" lib\n\nmain {\n    const lib.Divisor ok ← lib.structa(25)\n    do {\n        const int r ← ok.reciproca()\n        print r\n    }\n    catch err {\n        print \"caught\"\n    }\n    const lib.Divisor bad ← lib.structa(0)\n    do {\n        const int r2 ← bad.reciproca()\n        print r2\n    }\n    catch err {\n        print \"caught\"\n    }\n}\n";
 
 #[test]
 fn package_mir_library_nominal_failable_method_preserves_handler_reachability() {
@@ -327,7 +327,7 @@ fn package_mir_training_loop_mlp_runs_on_fmir_lane() {
 
 // The gradus tensor.fab shadowed-alias shape (GPU last link, hand-1 21e12fb0):
 // a function param named `forma: lista<numerus>` shadows the import binding
-// `forma` (`importa ex "gradus:shape" privata forma`). The semantic namespace
+// `forma` (`importa ex "gradus:shape" forma`). The semantic namespace
 // reference `forma.quantitas(forma)` / `forma.causa(err)` then carries the
 // param's synthetic HIR def instead of the import item's def, and both
 // methods must still resolve through the receiver's OWN import binding —
@@ -336,7 +336,7 @@ fn package_mir_training_loop_mlp_runs_on_fmir_lane() {
 // mirroring gradus shape.fab + dtype.fab).
 const FORMA_LIB: &str = "functio quantitas(lista<numerus> forma) → numerus {\n    redde forma.longitudo()\n}\n\nfunctio causa(numerus n) → numerus {\n    redde n + 1\n}\n";
 const TYPO_LIB: &str = "functio causa(numerus n) → numerus {\n    redde n + 2\n}\n";
-const FORMA_MAIN: &str = "import from \"forma:lib\" private forma\nimport from \"typo:lib\" private typo\n\n# The local param `forma` shadows the import binding `forma` — the shadowed\n# namespace-reference shape of gradus tensor.fab `_quantitas_forma`.\nfn dubbia(list<int> forma) → int {\n    const int n ← forma.quantitas(forma)\n    return forma.causa(n)\n}\n\nmain {\n    print dubbia([2, 3, 4])\n    print typo.causa(7)\n}\n";
+const FORMA_MAIN: &str = "import from \"forma:lib\" forma\nimport from \"typo:lib\" typo\n\n# The local param `forma` shadows the import binding `forma` — the shadowed\n# namespace-reference shape of gradus tensor.fab `_quantitas_forma`.\nfn dubbia(list<int> forma) → int {\n    const int n ← forma.quantitas(forma)\n    return forma.causa(n)\n}\n\nmain {\n    print dubbia([2, 3, 4])\n    print typo.causa(7)\n}\n";
 
 /// The shadowed-alias rewrite fires for synthetic HIR receiver defs: a local
 /// param named like an import binding resolves its namespace calls through

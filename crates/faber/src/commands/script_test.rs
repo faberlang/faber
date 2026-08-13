@@ -57,7 +57,7 @@ fn interpret_package_input_detects_manifestless_import_entry() {
     let entry = dir.join("main.fab");
     std::fs::write(
         &entry,
-        r#"import from "./thing" private thing
+        r#"import from "./thing" thing
 
 main { print thing.label() }
 "#,
@@ -73,9 +73,9 @@ fn interpret_package_input_leaves_kernel_imports_as_single_source() {
     for (name, import) in [
         (
             "module.fab",
-            r#"import from "faber:processus" private processus"#,
+            r#"import from "faber:processus" processus"#,
         ),
-        ("glob.fab", r#"import from "faber:*" private faber"#),
+        ("glob.fab", r#"import from "faber:*" faber"#),
     ] {
         let entry = dir.join(name);
         std::fs::write(&entry, format!("{import}\n\nmain {{ print 1 }}\n")).expect("write entry");

@@ -3,25 +3,27 @@ term = "privata"
 kind = "keyword"
 category = "modifier"
 canonical = true
-summary = "Marks an import as local to the current module."
-syntax = "importa ex <source> privata <name>"
+summary = "Marks a declaration as module-private (the default tier)."
+syntax = "@ privata <declaration>"
 aliases = ["private"]
 related = ["publica", "importa"]
 locale = "en"
 +++
 
 # =============================================================================
-# privata — Marks an import as local to the current module.
+# privata — Marks a declaration as module-private (the default tier).
 # =============================================================================
 #
 # What this teaches:
-#   • Module-level visibility — `@ privata` restricts a declaration to the
-#     current module, preventing external access
+#   • Module-level visibility — `@ privata` (en spelling `@ private`) restricts
+#     a declaration to the current module, keeping it out of the importable
+#     surface
 #   • Used as an annotation (`@ privata`) on function declarations to control
-#     the module boundary
+#     the module boundary; unmarked declarations are module-private by default
 #
 # Common mistakes:
-#   • Expecting `@ privata` to enforce access control — visibility annotations are decorative only (WARN012).
+#   • Expecting `@ privata` to mean anything beyond module-private — it is an
+#     explicit marker for the default tier (accepted, no warning).
 #
 # See also: publica, importa
 # =============================================================================
