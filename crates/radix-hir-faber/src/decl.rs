@@ -26,25 +26,10 @@ use radix_hir::{
 };
 use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_syntax::{CallablePosture, GenericParamKind};
-use radix_types::TypeId;
-use radix_types::TypeTable;
+use radix_types::{TypeId, TypeTable};
 use rustc_hash::FxHashMap;
 
 impl super::FaberCodegen {
-    /// Return whether a function is compiler-carried test syntax.
-    ///
-    /// `proba` lowers through HIR as a function with test metadata. Re-emission
-    /// must restore the user-facing test declaration so canonical Faber output
-    /// does not expose that internal representation.
-    pub(super) fn is_synthetic_proba_function(&self, func: &HirFunction) -> bool {
-        func.test.is_some()
-    }
-
-    /// Emit a top-level declaration in canonical Faber syntax.
-    ///
-    /// The match mirrors the declaration surface understood by HIR: functions,
-    /// type aliases, constants, imports, structs, enums, and interfaces. Each
-    /// arm writes normalized Faber rather than original source trivia.
     pub(super) fn generate_item(
         &self,
         item: &HirItem,
@@ -161,12 +146,6 @@ impl super::FaberCodegen {
         }
     }
 
-    /// Emit a function or method signature plus its optional body.
-    ///
-    /// Async and generator flags return to their canonical annotation tokens.
-    /// Parameter mode, optionality, result type, and error type are emitted from
-    /// semantic HIR, so this function should not invent defaults for missing
-    /// type information.
     pub(super) fn generate_function(
         &self,
         func: &HirFunction,
@@ -176,7 +155,7 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        if self.is_synthetic_proba_function(func) {
+        if func.test.is_some() {
             self.generate_proba_function(func, types, names, interner, surface, writer);
             return;
         }
@@ -232,11 +211,10 @@ impl super::FaberCodegen {
         self.write_optional_block_body(func.body.as_ref(), types, names, interner, surface, writer);
     }
 
-    /// Emit member leading trivia for a genus field or method.
+    /// Emit leading trivia owned by a member `DefId`.
     ///
-    /// Member owners are back-referenced by [`DefId`] (`HirField.def_id`,
-    /// `HirMethod.def_id`). Interface methods carry no `DefId` in the current
-    /// HIR model, so their member anchoring is U-3's contract to provide.
+    /// Genus fields, genus methods, and enum variants carry one. Interface
+    /// methods do not, so they skip this helper.
     ///
     /// `annotation_follows` drops the trivia run's trailing annotation-line
     /// terminator (see [`crate::trivia::without_following_annotation`]) — the
@@ -268,8 +246,6 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        // Structs preserve their inheritance/interface relationships and
-        // member order, but not author layout inside the original declaration.
         writer.write(surface.contextual_keyword("genus"));
         writer.write(" ");
         writer.write(&self.symbol_to_string(s.name, interner));
@@ -340,8 +316,6 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        // Test modifiers are emitted as the canonical surface tokens accepted
-        // after a `proba` name; no target-specific test runner syntax leaks out.
         match modifier {
             HirTestModifier::Omitte(reason) => {
                 self.write_quoted_test_token(TokenKind::Omitte, *reason, interner, surface, writer);
@@ -500,7 +474,6 @@ impl super::FaberCodegen {
         }
     }
 
-    /// Emit one type-first parameter with canonical post-name declaration markers.
     fn write_param(
         &self,
         param: &HirParam,
@@ -537,7 +510,6 @@ impl super::FaberCodegen {
         }
     }
 
-    /// Emit post-name declaration markers in the grammar's canonical order.
     pub(super) fn write_sponte_marker(
         &self,
         sponte: bool,
@@ -674,6 +646,7 @@ fn callable_posture_keyword(posture: CallablePosture) -> Option<&'static str> {
     }
 }
 
+/// True when a legacy `@ futura` / `@ cursor` annotation already spells posture.
 fn has_legacy_posture_annotation(annotations: &[HirAnnotation], interner: &Interner) -> bool {
     annotations.iter().any(|annotation| {
         let family = interner.resolve(annotation.family);
