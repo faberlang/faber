@@ -1,16 +1,17 @@
 //! Stateful scanner for Faber tokens.
 //!
-//! This module turns the cursor and token definitions into the actual Phase 2
-//! lexer. It owns the tokenization state machine, line-scoped lexer modes,
-//! literal parsing, identifier NFKC interning, and the lexical recovery
-//! boundary. Parser recovery starts after this module emits tokens; scanner
-//! recovery is limited to consuming enough source to produce the next plausible
-//! token.
+//! This module turns the cursor and token definitions into the lexer. It owns
+//! the tokenization state machine, line-start comment policy, literal parsing,
+//! identifier NFKC interning, and the lexical recovery boundary. Parser recovery
+//! starts after this module emits tokens; scanner recovery is limited to
+//! consuming enough source to produce the next plausible token.
 //!
 //! TOKENIZATION POLICY
 //! ===================
-//! - Language keywords are reserved in all scanner contexts. Annotation
-//!   attachment boundaries are enforced in the parser, not via a lexer line mode.
+//! - Language keywords lex as identifiers. The scanner records latin identity
+//!   keys for registered spellings; the parser claims them by identity.
+//!   Annotation attachment boundaries are enforced in the parser, not via a
+//!   lexer line mode.
 //! - Identifier and keyword-lookup payloads are interned after Unicode NFKC
 //!   normalization so visually equivalent identifier spellings share a symbol.
 //!   Literal and comment payloads are interned as source bytes without NFKC
@@ -130,8 +131,7 @@ impl Interner {
         &self.strings
     }
 
-    /// Return the string table as an owned `Vec<String>` in insertion order
-    /// for serialization (F4, F5, CTM E.2, CXO F4).
+    /// Return interned strings in symbol-id order as an owned table.
     ///
     /// # Wire contract
     ///
@@ -139,8 +139,7 @@ impl Interner {
     /// - `Symbol(u32)` is the index into this vec (`strings[idx]`).
     /// - The lookup `map: FxHashMap<String, Symbol>` is **not** serialized.
     ///   It is rebuilt on load by calling `Interner::from_strings()` (or
-    ///   equivalent) which re-interns each entry without re-normalizing
-    ///   (CTM E.2).
+    ///   equivalent) which re-interns each entry without re-normalizing.
     /// - NFKC normalization for identifiers is applied at intern time, so
     ///   the stored strings are already in canonical form. Rebuilding the
     ///   map on load is `O(n)` and produces the same `String → Symbol`
@@ -164,10 +163,10 @@ impl Interner {
         interner
     }
 
-    /// Rebuild an interner from the serialized string table (CTM E.2).
+    /// Rebuild an interner from the serialized string table.
     ///
     /// Alias for [`Self::from_strings`] that matches the wire-contract
-    /// terminology used by the HIR artifact loader (U2.2).
+    /// terminology used by the HIR artifact loader.
     #[must_use]
     pub fn from_string_table(strings: Vec<String>) -> Self {
         Self::from_strings(strings)
@@ -199,9 +198,7 @@ pub struct Lexer<'a> {
     locale_suggestions: Vec<LocaleSuggestion>,
     reader_keyword_latin_keys: HashMap<String, String>,
     reader_type_latin_keys: HashMap<String, String>,
-    current_line: usize,
     /// True once any non-trivia token has been emitted on the current line.
-    /// Matches goal-doc `line_has_non_whitespace_code` (whitespace is not a token).
     line_has_code: bool,
 }
 
@@ -218,7 +215,6 @@ impl<'a> Lexer<'a> {
             locale_suggestions: Vec::new(),
             reader_keyword_latin_keys: HashMap::new(),
             reader_type_latin_keys: HashMap::new(),
-            current_line: 1,
             line_has_code: false,
         }
     }
@@ -241,7 +237,6 @@ impl<'a> Lexer<'a> {
         while !self.cursor.is_eof() {
             self.scan_token();
         }
-        // Always emit EOF token for parser convenience
         self.emit_token(TokenKind::Eof, self.cursor.pos());
         LexResult {
             tokens: self.tokens,
@@ -264,10 +259,6 @@ impl<'a> Lexer<'a> {
 
     fn token_counts_as_line_code(kind: &TokenKind) -> bool {
         *kind != TokenKind::Newline && !matches!(kind, TokenKind::LineComment(_))
-    }
-
-    fn reset_line_state(&mut self) {
-        self.line_has_code = false;
     }
 
     fn emit_error(&mut self, kind: LexErrorKind, start: u32, args: Vec<DiagnosticArg>) {
@@ -348,8 +339,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn emit_line_break(&mut self, start: u32) {
-        self.current_line += 1;
-        self.reset_line_state();
+        self.line_has_code = false;
         self.emit_token(TokenKind::Newline, start);
     }
 
@@ -394,9 +384,9 @@ impl<'a> Lexer<'a> {
     {
         self.cursor.eat_while(|c| predicate(c) || c == '_');
 
-        // F-056: trailing digits (or letters that look numeric-adjacent) that
-        // fail the radix predicate must not leak as separate tokens. Consume
-        // them and emit an error instead.
+        // Trailing digits (or letters that look numeric-adjacent) that fail
+        // the radix predicate must not leak as separate tokens. Consume them
+        // and emit an error instead.
         if self
             .cursor
             .peek()
@@ -420,14 +410,6 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn extract_and_intern(&mut self, start: u32, prefix_len: u32, suffix_len: u32) -> Symbol {
-        let content_start = start + prefix_len;
-        let content_end = self.cursor.pos().saturating_sub(suffix_len);
-        let text = self.cursor.slice(content_start, content_end);
-        // Literal payloads preserve source bytes (PRP-013); do not NFKC.
-        self.interner.intern_raw(text)
-    }
-
     /// Intern a delimited literal payload after the closing delimiter is found or recovery ends.
     fn finish_delimited_literal(
         &mut self,
@@ -437,7 +419,11 @@ impl<'a> Lexer<'a> {
         terminated: bool,
     ) -> Symbol {
         let suffix_len = if terminated { close_len } else { 0 };
-        self.extract_and_intern(start, open_len, suffix_len)
+        let content_start = start + open_len;
+        let content_end = self.cursor.pos().saturating_sub(suffix_len);
+        let text = self.cursor.slice(content_start, content_end);
+        // Literal payloads preserve source bytes (PRP-013); do not NFKC.
+        self.interner.intern_raw(text)
     }
 
     /// Skip one shallow escape sequence (`\` plus the next source character).
@@ -564,11 +550,6 @@ impl<'a> Lexer<'a> {
                 self.cursor.advance();
                 let mut terminated = false;
                 while let Some(c) = self.cursor.advance() {
-                    // F-058: track newlines inside /* */ so line numbers
-                    // remain correct for subsequent diagnostics.
-                    if c == '\n' {
-                        self.current_line += 1;
-                    }
                     if c == '*' && self.cursor.eat('/') {
                         terminated = true;
                         break;
@@ -660,10 +641,6 @@ impl<'a> Lexer<'a> {
                     terminated = true;
                     break;
                 }
-                Some('\n') => {
-                    self.current_line += 1;
-                    self.cursor.advance();
-                }
                 _ => {
                     self.cursor.advance();
                 }
@@ -694,10 +671,6 @@ impl<'a> Lexer<'a> {
                     self.cursor.advance();
                     terminated = true;
                     break;
-                }
-                Some('\n') => {
-                    self.current_line += 1;
-                    self.cursor.advance();
                 }
                 _ => {
                     self.cursor.advance();
@@ -784,10 +757,6 @@ impl<'a> Lexer<'a> {
                     terminated = true;
                     break;
                 }
-                Some('\n') => {
-                    self.current_line += 1;
-                    self.cursor.advance();
-                }
                 _ => {
                     self.cursor.advance();
                 }
@@ -853,7 +822,7 @@ impl<'a> Lexer<'a> {
         let is_float = if self.cursor.peek() == Some('.')
             && self.cursor.peek_next().is_some_and(|c| c.is_ascii_digit())
         {
-            self.cursor.advance(); // consume '.'
+            self.cursor.advance();
             self.cursor.eat_while(|c| c.is_ascii_digit() || c == '_');
             true
         } else {
@@ -880,8 +849,6 @@ impl<'a> Lexer<'a> {
                     self.emit_issue_error(LexErrorKind::InvalidNumber, start, "float_overflow");
                     self.emit_token(TokenKind::Error, start);
                 }
-                // F-057: underflow to 0.0 must produce a diagnostic when the
-                // significand is non-zero (true zero like 0e-400 is fine).
                 Ok(n) if n == 0.0 && Self::has_non_zero_significand(&clean) => {
                     self.emit_issue_error(LexErrorKind::InvalidNumber, start, "float_underflow");
                     self.emit_token(TokenKind::Error, start);
@@ -908,11 +875,11 @@ impl<'a> Lexer<'a> {
     // IDENTIFIER AND KEYWORD SCANNER
     // =========================================================================
 
-    /// Scan a Unicode identifier and apply the active keyword policy.
+    /// Scan a Unicode identifier and record keyword identity when applicable.
     ///
-    /// Identifier boundaries use Unicode XID rules plus `_`. The resulting text
-    /// is either resolved through the mode-specific keyword table or interned as
-    /// normalized identifier payload.
+    /// Identifier boundaries use Unicode XID rules plus `_`. Registered
+    /// keyword spellings still lex as identifiers; their latin keys are
+    /// recorded for parser claim.
     fn scan_identifier(&mut self, start: u32) {
         self.cursor.eat_while(is_ident_continue);
 

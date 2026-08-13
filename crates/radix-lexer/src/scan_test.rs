@@ -262,36 +262,27 @@ fn rejects_unterminated_c_style_block_comment() {
     }));
 }
 
-// ---------------------------------------------------------------------------
-// F-058: /* */ eater must advance current_line
-// ---------------------------------------------------------------------------
-
 #[test]
-fn c_block_comment_newlines_advance_current_line() {
-    // Newlines inside /* */ must be tracked so subsequent diagnostics have
-    // correct line numbers. After the block comment an Error token is emitted
-    // on the line where */ appears. We verify line tracking indirectly by
-    // checking that a comment on the *next* line is treated as line-start.
+fn hash_after_c_block_comment_with_newline_is_line_comment() {
+    // The newline token after `*/` resets line-start state, so `#` on the
+    // following line is trivia rather than an inline-comment error.
     let result = lex("/*\n*/\n# good\n");
     assert!(!result.success());
     assert!(result.errors.iter().any(|err| {
         err.kind == LexErrorKind::InvalidCommentSyntax
             && has_arg(err, "issue", "c_style_block_comment")
     }));
-    // The # good must lex as a LineComment (not InlineComment), which proves
-    // current_line was advanced past the newline inside /* */.
     assert!(
         result
             .tokens
             .iter()
             .any(|t| matches!(t.kind, TokenKind::LineComment(_))),
-        "expected LineComment on the line after unterminated /* */"
+        "expected LineComment on the line after /* */"
     );
 }
 
 #[test]
-fn terminated_c_block_comment_newlines_advance_current_line() {
-    // Even when terminated, newlines inside /* */ must advance current_line.
+fn hash_after_terminated_c_block_comment_with_newline_is_line_comment() {
     let result = lex("/*\n*/\n# next\n");
     assert!(!result.success());
     assert!(
