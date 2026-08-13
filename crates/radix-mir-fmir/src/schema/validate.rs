@@ -1,3 +1,10 @@
+//! Wire-level semantic admission for FMIR device programs.
+//!
+//! These checks run on the serialized wire form at the decode boundary and
+//! fail closed on the first violation. They never reconstruct missing facts
+//! or proceed to host construction. Plan-internal consistency of a
+//! reconstructed distributed plan belongs to the fail-before-launch gate.
+
 use super::device::FmirSessionSection;
 use super::distributed::FmirDistributedExecutionSection;
 use super::wire::{
@@ -9,18 +16,11 @@ use super::wire::{
 use super::SHA256_IDENTITY_PREFIX;
 
 // ---------------------------------------------------------------------------
-// Wire-level semantic admission (Stage 3R F1–F7)
+// Device program
 // ---------------------------------------------------------------------------
-//
-// The radix-mir `DeviceSemantics` rules, run on the serialized wire form at
-// the decode boundary: semantic identity (F1), generations (F2), roots +
-// dependencies (F3), the lossless relation (F4), and the independent
-// initialization/observation axes (F5/F6). Fail-closed: the first violation
-// fails admission before host construction or launch.
 
-/// Validate the carried wire facts fail-closed (F1–F7 + the S5-U5b declared
-/// step count + the S6-C2 broadcast fact + the council-8 CB-3 reduced-resource
-/// projection fact).
+/// Admit the carried F1–F7 facts, declared step count, broadcast facts, and
+/// reduced-resource projections.
 pub(crate) fn validate_wire_program(
     wire: &WireDeviceProgram,
 ) -> Result<(), crate::error::FmirImageError> {
@@ -36,12 +36,10 @@ pub(crate) fn validate_wire_program(
     Ok(())
 }
 
-/// Rule S6-C2 (A7): every carried rank-extension broadcast fact (the
-/// `RankExtensionAdd` plan payload) must be internally consistent — the
-/// higher-rank operand is exactly one rank above the lower-rank operand, the
-/// lower-rank dims equal the higher-rank trailing dims, and the result is
-/// the higher-rank shape. A shape mismatch fails admission closed (the fact
-/// is carried, never inferred — A3).
+/// A carried `RankExtensionAdd` fact must be internally consistent: the
+/// higher-rank operand is exactly one rank above the lower-rank operand,
+/// the lower-rank dims equal the higher-rank trailing dims, and the result
+/// is the higher-rank shape. The fact is carried, never inferred.
 fn validate_wire_broadcast_facts(
     wire: &WireDeviceProgram,
 ) -> Result<(), crate::error::FmirImageError> {
@@ -49,15 +47,10 @@ fn validate_wire_broadcast_facts(
         let WireCollectionKernelPlan::RankExtensionAdd(fact) = &kernel.plan else {
             continue;
         };
-        let higher = if fact.lhs_shape.len() >= fact.rhs_shape.len() {
-            &fact.lhs_shape
+        let (higher, lower) = if fact.lhs_shape.len() >= fact.rhs_shape.len() {
+            (&fact.lhs_shape, &fact.rhs_shape)
         } else {
-            &fact.rhs_shape
-        };
-        let lower = if fact.lhs_shape.len() >= fact.rhs_shape.len() {
-            &fact.rhs_shape
-        } else {
-            &fact.lhs_shape
+            (&fact.rhs_shape, &fact.lhs_shape)
         };
         if fact.declaration != WireBroadcastDeclaration::RankExtension {
             return Err(wire_invalid(format!(
@@ -81,37 +74,14 @@ fn validate_wire_broadcast_facts(
     Ok(())
 }
 
-/// Rule council-8 CB-3 (A7): every carried reduced-resource projection is
-/// admitted fail-closed at the decode boundary — the producer-defined
-/// mapping is carried, never reconstructed, so a producer bug stamping an
-/// impossible projection must fail here (the first keep-dims consumer
-/// trusting the carried fact would otherwise hit a division-by-zero or
-/// silent mis-addressing). Three sub-rules:
+/// Admit every carried reduced-resource projection fail-closed.
 ///
-/// 1. **Positivity** — every carried projection (the reduced buffer
-///    version's AND the `AxisReduction` plan's) has `axis_extent >= 1` and
-///    `inner_stride >= 1` (a zero extent/stride is not a mapping);
-/// 2. **Plan ↔ buffer-version agreement** — when an `AxisReduction` plan's
-///    reduced output buffer version also carries a projection, the two MUST
-///    be identical (the plan projection and the buffer version stamp the
-///    SAME producer fact);
-/// 3. **Divisibility** — a reduced buffer's `element_count` is exactly
-///    divisible by its carried projection's `inner_stride` (the keep-dims
-///    mapping is `axis_extent` strides of `inner_stride`; a non-divisible
-///    count means the carried fact cannot address the buffer);
-/// 4. **Saturation (council-13 cxo CB-W8)** — the block width
-///    `axis_extent · inner_stride` must be representable in `u64` (the
-///    keep-dims consumer divides the flat index by it; an overflowing width
-///    silently saturates and collapses every keep-dims element onto the first
-///    `inner_stride` slots — silent mis-addressing), and a projection-carrying
-///    reduced buffer must hold at least one element (a zero-count carrier
-///    cannot hold any real reduction output and passes divisibility
-///    vacuously);
-/// 5. **Operator (council-13 cxo CB-W8)** — an `AxisReduction` plan admits
-///    `Sum` only: the `TensorSumAxis` resolution and every axis-reduction
-///    emitter (the Metal emitter rejects non-`Sum` explicitly) cover `Sum`
-///    today, so a wire image carrying `Mean`/`Product`/`Max`/`Min` would
-///    pass decode and hit an unimplemented emitter path.
+/// The producer-defined mapping is carried, never reconstructed: extents
+/// and strides must be positive, plan and write-slot stamps of the same
+/// fact must agree, `element_count` must be a positive multiple of
+/// `inner_stride`, `axis_extent · inner_stride` must fit in `u64` (the
+/// keep-dims consumer divides by that width), and `AxisReduction` admits
+/// `Sum` only.
 fn validate_wire_reduced_projections(
     wire: &WireDeviceProgram,
 ) -> Result<(), crate::error::FmirImageError> {
@@ -143,14 +113,9 @@ fn validate_wire_reduced_projections(
         let WireCollectionKernelPlan::AxisReduction(plan) = &kernel.plan else {
             continue;
         };
-        // council-13 cxo CB-W8: only `Sum` is emitted today — the
-        // `TensorSumAxis` resolution (S6-P1) and every axis-reduction
-        // emitter (the Metal emitter rejects non-`Sum` explicitly) cover
-        // `Sum` only, so a non-`Sum` wire op would pass decode and then hit
-        // an unimplemented emitter path. `Mean` is deliberately
-        // tree-reduction-only today; the day an emitter lands a non-`Sum`
-        // axis-reduction op, extend THIS allow-list in lockstep with the
-        // emitter (and the faber boundary admission).
+        // Only `Sum` is emitted today. When an emitter lands another
+        // axis-reduction op, extend this allow-list in lockstep with the
+        // emitter and the faber boundary. `Mean` is tree-reduction-only.
         if plan.op != WireReduceOp::Sum {
             return Err(wire_invalid(format!(
                 "kernel '{}' carries an axis-reduction plan with op {:?}; only Sum is emitted today, a non-Sum op would hit an unimplemented emitter path (council-13 cxo CB-W8)",
@@ -164,9 +129,6 @@ fn validate_wire_reduced_projections(
                 kernel.entry
             )));
         }
-        // council-13 cxo CB-W8: the block width must be representable — the
-        // keep-dims consumer divides by it and an overflowing width would
-        // silently saturate to `u64::MAX`, collapsing the addressing.
         if projection
             .axis_extent
             .checked_mul(projection.inner_stride)
@@ -197,14 +159,9 @@ fn validate_wire_reduced_projections(
     Ok(())
 }
 
-/// council-8 CB-3 + council-13 cxo CB-W8: one carried reduced-resource
-/// projection must be positive, its reduced buffer's element count exactly
-/// divisible by its inner stride — checked BEFORE any arithmetic on the
-/// stride, so a zero stride is rejected rather than panicking the
-/// divisibility modulus — and neither degenerate nor saturated (a
-/// zero-element reduced buffer cannot hold a real reduction output, and a
-/// block width `axis_extent · inner_stride` that overflows `u64` would
-/// silently saturate the keep-dims consumer's addressing).
+/// One carried projection must be positive, its buffer count a positive
+/// multiple of `inner_stride`, and its block width representable in `u64`.
+/// Positivity is checked before the modulus so a zero stride cannot panic.
 fn validate_carried_reduced_projection(
     carrier: &str,
     element_count: u64,
@@ -215,18 +172,11 @@ fn validate_carried_reduced_projection(
             "{carrier} carries a reduced-resource projection with a non-positive axis extent or inner stride ({projection:?}); the mapping is carried positive (council-8 CB-3)"
         )));
     }
-    // council-13 cxo CB-W8: a zero-element reduced buffer cannot address a
-    // real reduction (a keep-dims consumer has nothing to read), and it
-    // passes the divisibility rule vacuously (`0 % inner_stride == 0`).
     if element_count < 1 {
         return Err(wire_invalid(format!(
             "{carrier} carries a reduced-resource projection on a zero-element buffer ({element_count} elements, {projection:?}); a zero-count reduced buffer cannot address a real reduction (council-13 cxo CB-W8)"
         )));
     }
-    // council-13 cxo CB-W8: the block width must be representable — the
-    // keep-dims consumer divides the flat index by `axis_extent · inner_stride`
-    // (a saturating multiply would silently collapse every keep-dims element
-    // onto the first `inner_stride` slots).
     if projection
         .axis_extent
         .checked_mul(projection.inner_stride)
@@ -245,10 +195,9 @@ fn validate_carried_reduced_projection(
     Ok(())
 }
 
-/// Rule S5-U5b: a `RepeatingStep` program must carry a declared step count
-/// of at least 1 — a zero-count training program is a contradiction and fails
-/// admission closed (the image's step count is the route's authority; a count
-/// the route could never drive is rejected before host construction).
+/// A `RepeatingStep` program must declare at least one step. The image's
+/// step count is the route's authority; a count the route could never drive
+/// is rejected before host construction.
 fn validate_wire_step_count(wire: &WireDeviceProgram) -> Result<(), crate::error::FmirImageError> {
     if let WireProgramLifetime::RepeatingStep(declared) = wire.lifetime {
         if declared == 0 {
@@ -319,8 +268,8 @@ fn validate_wire_generations(wire: &WireDeviceProgram) -> Result<(), crate::erro
             }
         }
     }
-    // Single definition per value generation: two DISTINCT write/read-write
-    // slots may not claim the same (value, generation).
+    // Two distinct write/read-write slots may not claim the same
+    // (value, generation).
     let producers: Vec<(u32, u32, usize, usize)> = wire
         .kernels
         .iter()
@@ -358,10 +307,9 @@ fn validate_wire_generations(wire: &WireDeviceProgram) -> Result<(), crate::erro
             }
         }
     }
-    // Complete inputs: a read consumes its generation; a read-write consumes
-    // the previous generation and produces its own. Every consumed generation
-    // is produced by a DIFFERENT slot, or is the buffer's initial state
-    // covered by its initialization policy.
+    // A read consumes its generation; a read-write consumes the previous
+    // generation. Every consumed generation is produced by a different slot
+    // or covered by the buffer's initialization policy.
     for (kernel_index, kernel) in wire.kernels.iter().enumerate() {
         for (slot_index, resource) in kernel.resources.iter().enumerate() {
             let value = resource.buffer.semantic_value;
@@ -486,8 +434,7 @@ fn validate_wire_graph(
         }
     }
     reject_wire_dependency_cycles(wire)?;
-    // Missing dependency: every generation producer must be reachable from a
-    // root; a producer hanging off the graph could never be scheduled.
+    // A generation producer hanging off the graph could never be scheduled.
     let producers: Vec<u32> = wire
         .launches
         .iter()
@@ -515,8 +462,6 @@ fn validate_wire_graph(
     Ok(())
 }
 
-/// Whether a launch is reachable from a declared root via the dependency
-/// edges.
 fn wire_reachable_from_root(wire: &WireDeviceProgram, launch: u32) -> bool {
     let mut seen = wire.roots.clone();
     let mut frontier = wire.roots.clone();
@@ -534,7 +479,7 @@ fn wire_reachable_from_root(wire: &WireDeviceProgram, launch: u32) -> bool {
     false
 }
 
-/// Reject a dependency cycle (F3) — depth-first back-edge detection.
+/// Depth-first back-edge detection (F3).
 fn reject_wire_dependency_cycles(
     wire: &WireDeviceProgram,
 ) -> Result<(), crate::error::FmirImageError> {
@@ -631,8 +576,7 @@ fn validate_wire_axes(
     wire: &WireDeviceProgram,
     launches: &[u32],
 ) -> Result<(), crate::error::FmirImageError> {
-    // Init policies per buffer must agree (F5: the axis is a single fact,
-    // never derived from role/lifetime).
+    // F5: the init axis is a single fact, never derived from role/lifetime.
     for resource in wire
         .kernels
         .iter()
@@ -653,24 +597,17 @@ fn validate_wire_axes(
                 result.buffer.id, result.observation.at_launch
             )));
         }
-        // F6: the observation fact is the result's explicit declaration —
-        // its completion boundary must be the producing launch. A result
-        // whose observation contradicts its producer is a writable
-        // intermediate exposed without an explicit observation fact.
+        // F6: a result whose observation contradicts its producer is a
+        // writable intermediate exposed without an explicit observation fact.
         if result.observation.at_launch != result.produced_by {
             return Err(wire_invalid(format!(
                 "result on buffer {} names producing launch {}, but its observation fact names launch {}; a result is a declared observation point at its producing launch",
                 result.buffer.id, result.produced_by, result.observation.at_launch
             )));
         }
-        // S5A-U1 (A7): the declared observation cadence must be consistent
-        // with the buffer's lifetime class — a PerStep readback names an
-        // ObservationPoint buffer (read back every step, read-then-release);
-        // an EndOfRun readback names a PerStep or PerProgram buffer (kept
-        // live through the final step). A cadence that contradicts the
-        // lifetime is rejected before host construction — the wire's
-        // declared cadence is the only authority for readback timing, never
-        // a shape/role coincidence.
+        // Declared cadence is the only authority for readback timing.
+        // PerStep names an ObservationPoint; EndOfRun names PerStep or
+        // PerProgram. Never infer timing from shape or role.
         match result.observation.cadence {
             WireObservationCadence::PerStep
                 if result.buffer.lifetime != WireBufferLifetime::ObservationPoint =>
@@ -729,29 +666,22 @@ fn wire_buffer_init_policy(
         .map(|resource| resource.initialization)
 }
 
-/// A focused `WireProgramInvalid` admission error.
 fn wire_invalid(detail: String) -> crate::error::FmirImageError {
     crate::error::FmirImageError::WireProgramInvalid { detail }
 }
 
 // ---------------------------------------------------------------------------
-// Wire-level distributed-section validation (MD2-W1)
+// Distributed section
 // ---------------------------------------------------------------------------
 
-/// Wire-level validation of the optional distributed execution section
-/// (MD2-W1): the declared placement facts must **resolve against the carried
-/// single-device program** — every fact names a declared F1 semantic value
-/// and a referenced device buffer, and every byte contract is positive; and
-/// the declared `logical_distributed_plan_hash` must be the canonical
-/// `sha256:<64-hex>` spelling (MD2-H1). Plan-internal consistency is the
-/// fail-before-launch gate's (MD2-V1), run on the reconstructed plan at
-/// admission — this module checks only the facts that live on the wire
-/// section and reference the program's own wire surface.
+/// Admit the optional distributed section against the carried single-device
+/// program: every placement names a declared F1 value and a referenced
+/// buffer, every byte contract is positive, and the logical-plan hash uses
+/// the canonical `sha256:<64-hex>` spelling.
 pub(crate) fn validate_wire_distributed_section(
     section: &FmirDistributedExecutionSection,
     wire: &WireDeviceProgram,
 ) -> Result<(), crate::error::FmirImageError> {
-    // MD2-H1 canonical format: `sha256:` + 64 hex.
     if !section
         .logical_distributed_plan_hash
         .starts_with(SHA256_IDENTITY_PREFIX)
@@ -799,44 +729,21 @@ pub(crate) fn validate_wire_distributed_section(
     Ok(())
 }
 
-/// A focused `DistributedSectionInvalid` admission error.
 fn distributed_invalid(detail: String) -> crate::error::FmirImageError {
     crate::error::FmirImageError::DistributedSectionInvalid { detail }
 }
 
 // ---------------------------------------------------------------------------
-// Wire-level session-section validation (GI4-2)
+// Session section
 // ---------------------------------------------------------------------------
 
-/// Wire-level validation of the optional cadence/session section (GI4-2):
-/// the carried session facts are admitted fail-closed against the carried
-/// single-device program — the equivalence-gate discipline (admission
-/// inspects the actually-delivered session facts, never a self-declared
-/// hash). Rules, in order:
-///
-/// 1. **KV layout dims** — every dimension is positive (a zero
-///    slot/context/layer/head layout is not a layout; it would silently
-///    produce a zero-byte KV — the `KvCacheLayout::new` mirror);
-/// 2. **KV dtype** — closed to `f32` (a dtype change is a contract revision,
-///    never a silent widening);
-/// 3. **invocation modes** — non-empty and duplicate-free (a session that
-///    executes no workload mode is a contradiction);
-/// 4. **session-input slots** — unique, and every slot resolves against a
-///    buffer the carried single-device program actually declares;
-/// 5. **cadence vs buffer facts** — a `Resident` input names a `PerProgram`
-///    buffer (a resident input is allocated once for the whole session), and
-///    a once-init (`PerProgram` + `HostProvided`) buffer named as a session
-///    input is `Resident` (a per-invocation cadence on a once-init buffer is
-///    the `SingleRun` re-copy semantic the GI4-1 discovery proved
-///    infeasible);
-/// 6. **observation cadence** — a session executing `scalar_decode` declares
-///    a per-invocation observation cadence (per-token decode reads back its
-///    observation per token).
+/// Admit the optional cadence/session section against the carried
+/// single-device program. Admission inspects the delivered session facts,
+/// never a self-declared hash.
 pub(crate) fn validate_wire_session_section(
     section: &FmirSessionSection,
     wire: &WireDeviceProgram,
 ) -> Result<(), crate::error::FmirImageError> {
-    // Rule 1: the KV layout dims are all positive.
     let kv = &section.kv_layout;
     if kv.slots == 0 {
         return Err(session_invalid(
@@ -863,13 +770,11 @@ pub(crate) fn validate_wire_session_section(
             "kv layout declares `head_dim` 0; a zero-dim layout is not a layout (it would silently produce a zero-byte KV)".to_owned(),
         ));
     }
-    // Rule 2: the dtype is closed.
     if !matches!(kv.dtype, WireKvCacheDtype::F32) {
         return Err(session_invalid(format!(
             "kv layout declares dtype {kv:?}; the dtype surface is closed to f32 (a dtype change is a contract revision, never a silent widening)"
         )));
     }
-    // Rule 3: at least one workload mode, no duplicates.
     if section.invocation_modes.is_empty() {
         return Err(session_invalid(
             "session declares no invocation mode; a session that executes no workload mode is a contradiction"
@@ -884,8 +789,6 @@ pub(crate) fn validate_wire_session_section(
             )));
         }
     }
-    // Rule 4: unique session-input slots that resolve against the carried
-    // program.
     let buffers = wire_buffers(wire);
     for (index, input) in section.inputs.iter().enumerate() {
         if section.inputs[index + 1..]
@@ -904,7 +807,6 @@ pub(crate) fn validate_wire_session_section(
             )));
         }
     }
-    // Rule 5: cadence vs the carried buffer facts.
     for input in &section.inputs {
         let Some(buffer) = buffers.iter().find(|buffer| buffer.id == input.slot) else {
             continue;
@@ -934,7 +836,6 @@ pub(crate) fn validate_wire_session_section(
             _ => {}
         }
     }
-    // Rule 6: a scalar-decode session observes per invocation.
     if section
         .invocation_modes
         .contains(&WireInvocationMode::ScalarDecode)
@@ -949,17 +850,12 @@ pub(crate) fn validate_wire_session_section(
     Ok(())
 }
 
-/// A focused `SessionSectionInvalid` admission error.
 fn session_invalid(detail: String) -> crate::error::FmirImageError {
     crate::error::FmirImageError::SessionSectionInvalid { detail }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    // The wire types the fixture names directly (the glob above resolves the
-    // validation surface from validate.rs's own imports; the schema's
-    // `pub use wire::*` re-exports are reachable through the explicit path).
     use super::super::wire::{
         WireAxisReductionPlan, WireBinding, WireBufferIdentity, WireBufferLifetime, WireBufferRole,
         WireBufferVersion, WireCollectionKernelPlan, WireDeviceProgram, WireDeviceResource,
@@ -969,16 +865,12 @@ mod tests {
         WireSemanticValue, WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount,
         WireWorkgroupSize,
     };
+    use super::*;
 
-    /// The council-8 CB-3 fixture: a one-kernel axis-reduction program
-    /// (`[8, 8]` → 8 elements along axis 0, `Sum`). The reduced output
-    /// buffer version and the `AxisReduction` plan carry the SAME
-    /// producer-defined projection (`axis_extent` 8, `inner_stride` 8);
-    /// the reduced element count (8) is divisible by the stride; and the
-    /// F1–F7 facts mirror the session-section fixture (a read
-    /// host-provided input, a write kernel-initialized observation-point
-    /// output, one root) so the program passes `validate_wire_program`
-    /// apart from the projection under test.
+    /// One-kernel axis-reduction program (`[8, 8]` → 8 elements along axis
+    /// 0, `Sum`). The reduced output version and the plan carry the same
+    /// projection; F1–F7 facts are otherwise well-formed so the fixture
+    /// isolates the projection under test.
     fn reduced_projection_fixture() -> WireDeviceProgram {
         let w = WireBufferIdentity {
             id: 1,
@@ -1089,19 +981,15 @@ mod tests {
         }
     }
 
-    /// council-8 CB-3: a fully consistent reduced-resource projection (plan
-    /// and buffer version agree, both positive, element count divisible by
-    /// the stride) admits at the decode boundary.
+    /// A consistent reduced-resource projection admits at the decode boundary.
     #[test]
     fn valid_reduced_projection_admits() {
         validate_wire_program(&reduced_projection_fixture())
             .expect("a consistent reduced-resource projection admits fail-closed");
     }
 
-    /// council-8 CB-3: a non-positive carried projection fails closed — a
-    /// zero `axis_extent` on the plan and a zero `inner_stride` on the
-    /// carried buffer-version projection (which would panic the divisibility
-    /// modulus if it reached it) both reject with the positivity diagnostic.
+    /// A zero plan `axis_extent` and a zero buffer `inner_stride` both
+    /// reject with the positivity diagnostic.
     #[test]
     fn zero_reduced_projection_extent_rejected() {
         let mut wire = reduced_projection_fixture();
@@ -1129,9 +1017,8 @@ mod tests {
         );
     }
 
-    /// council-8 CB-3: a plan projection that disagrees with the reduced
-    /// output buffer version's carried projection fails closed — the SAME
-    /// producer fact must agree everywhere it is stamped.
+    /// The plan projection and the reduced output version must stamp the
+    /// same producer fact.
     #[test]
     fn mismatched_plan_vs_buffer_projection_rejected() {
         let mut wire = reduced_projection_fixture();
@@ -1147,10 +1034,8 @@ mod tests {
         );
     }
 
-    /// council-8 CB-3: a reduced buffer whose element count is not exactly
-    /// divisible by its carried projection's inner stride fails closed — the
-    /// keep-dims mapping (`axis_extent` strides of `inner_stride`) cannot
-    /// address the buffer.
+    /// A reduced element count that is not a multiple of `inner_stride`
+    /// cannot address the buffer.
     #[test]
     fn non_divisible_reduced_element_count_rejected() {
         let mut wire = reduced_projection_fixture();
@@ -1163,10 +1048,8 @@ mod tests {
         );
     }
 
-    /// council-13 cxo CB-W8: an axis-reduction plan admitting only `Sum`
-    /// fails closed on a non-`Sum` op (`Mean` is tree-reduction-only today;
-    /// every axis-reduction emitter covers `Sum` only, so a non-`Sum` wire
-    /// op would pass decode and hit an unimplemented emitter path).
+    /// Axis-reduction plans admit `Sum` only; other ops would pass decode
+    /// and hit an unimplemented emitter.
     #[test]
     fn non_sum_axis_reduction_op_rejected() {
         let mut wire = reduced_projection_fixture();
@@ -1182,12 +1065,9 @@ mod tests {
         );
     }
 
-    /// council-13 cxo CB-W8: a saturated projection — a block width
-    /// `axis_extent · inner_stride` that overflows `u64` — fails closed (the
-    /// keep-dims consumer divides by the width; a saturating multiply would
-    /// silently collapse the addressing). Both the plan and the carried
-    /// buffer/result projections are stamped identically so the agreement
-    /// rule does not shadow the saturation rule.
+    /// An overflowing `axis_extent · inner_stride` fails closed. Plan and
+    /// buffer/result projections are stamped identically so agreement does
+    /// not shadow saturation.
     #[test]
     fn saturated_overflowing_projection_rejected() {
         let mut wire = reduced_projection_fixture();
@@ -1211,10 +1091,8 @@ mod tests {
         );
     }
 
-    /// council-13 cxo CB-W8: a degenerate zero-element reduced buffer
-    /// carrying a projection fails closed — a zero-count carrier cannot hold
-    /// any real reduction output (and passes the divisibility rule
-    /// vacuously, so it must be rejected before it).
+    /// A zero-element reduced buffer cannot hold a reduction output and
+    /// would pass divisibility vacuously.
     #[test]
     fn zero_element_reduced_buffer_rejected() {
         let mut wire = reduced_projection_fixture();
