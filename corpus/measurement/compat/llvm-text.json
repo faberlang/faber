@@ -1,0 +1,1153 @@
+{
+  "schemaVersion": 1,
+  "artifact": "faber-compat-measurement",
+  "target": "llvm-text",
+  "lane": "mir",
+  "generatedBy": "radix/scripta/emit-compat-json.py",
+  "summary": {
+    "capable": 280,
+    "analyzable": 286
+  },
+  "terms": [
+    {
+      "term": "abstractus",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "ab",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "ad",
+      "rule": "keyword",
+      "capable": 3,
+      "analyzable": 3
+    },
+    {
+      "term": "adfirma",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "alias",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⊜",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "∧",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "·",
+      "rule": "operator-group",
+      "capable": 2,
+      "analyzable": 3
+    },
+    {
+      "term": "×",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⊗",
+      "rule": "operator-group",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
+      "term": "⊙",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 2
+    },
+    {
+      "term": "ante",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "atomic",
+      "rule": "keyword",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
+      "term": "arena",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "argumenta",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "→",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⇥",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "←",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "↤",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "@",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "aut",
+      "rule": "operator-group",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "bivalens",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "![",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "!.",
+      "rule": "operator-group",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "≠",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "!(",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "cape",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⊻",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "casu",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "cede",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "ceteri",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "ceterum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "clausura",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "cli",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "↦",
+      "rule": "operator-group",
+      "capable": 9,
+      "analyzable": 9
+    },
+    {
+      "term": "copia",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "cura",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "curata",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "cursor",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "custodi",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "de",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "descriptio",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⇒",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "discerne",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "discretio",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "‥",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "dum",
+      "rule": "keyword",
+      "capable": 3,
+      "analyzable": 3
+    },
+    {
+      "term": "ego",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "elige",
+      "rule": "keyword",
+      "capable": 4,
+      "analyzable": 4
+    },
+    {
+      "term": "…",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "≡",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "=",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "errata",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "est",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "et",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "ex",
+      "rule": "keyword",
+      "capable": 4,
+      "analyzable": 4
+    },
+    {
+      "term": "exitus",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "fac",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "falsum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "f16",
+      "rule": "existing-home",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
+      "term": "fient",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "fiet",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "figendum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "finge",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "fiunt",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "fixum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "fragilis",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "fractus",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "functio",
+      "rule": "keyword",
+      "capable": 7,
+      "analyzable": 7
+    },
+    {
+      "term": "futura",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "futurum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "generis",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "genus",
+      "rule": "keyword",
+      "capable": 4,
+      "analyzable": 4
+    },
+    {
+      "term": "≥",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "iace",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "iacit",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "ignotum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "immutata",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "imperia",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "imperium",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "implet",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "importa",
+      "rule": "keyword",
+      "capable": 4,
+      "analyzable": 4
+    },
+    {
+      "term": "in",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "incipiet",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "incipit",
+      "rule": "keyword",
+      "capable": 3,
+      "analyzable": 3
+    },
+    {
+      "term": "inter",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "intra",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "instans",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "itera",
+      "rule": "keyword",
+      "capable": 5,
+      "analyzable": 5
+    },
+    {
+      "term": "lege",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "lineam",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "≤",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "lista",
+      "rule": "keyword",
+      "capable": 3,
+      "analyzable": 3
+    },
+    {
+      "term": "manifest",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "matrix",
+      "rule": "keyword",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
+      "term": "metior",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⊖",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "mone",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "mori",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "modulus<u16>",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "modulus<u32>",
+      "rule": "operator-group",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "modulus<u64>",
+      "rule": "operator-group",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "modulus<u8>",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "nexum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "nihil",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "nondum",
+      "rule": "existing-home",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "numquam",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "numerus",
+      "rule": "keyword",
+      "capable": 3,
+      "analyzable": 3
+    },
+    {
+      "term": "non est",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "non",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "omitte",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "omnia",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "operandus",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "optio",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "optiones",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "ordo",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "objectum",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "octeti",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "implendum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "per",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "perge",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⊚",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "∨",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "∪",
+      "rule": "operator-group",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "⊕",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "postpara",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "postparabit",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "prae",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "praefixum",
+      "rule": "keyword",
+      "capable": 0,
+      "analyzable": 0
+    },
+    {
+      "term": "praepara",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "praeparabit",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "prima",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "promissum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "privata",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "proba",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "probandum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "protecta",
+      "rule": "keyword",
+      "capable": 0,
+      "analyzable": 0
+    },
+    {
+      "term": "publica",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "?[",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "?.",
+      "rule": "operator-group",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "?(",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "redde",
+      "rule": "keyword",
+      "capable": 4,
+      "analyzable": 4
+    },
+    {
+      "term": "reddet",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "repete",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "requirit",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "rumpe",
+      "rule": "keyword",
+      "capable": 3,
+      "analyzable": 3
+    },
+    {
+      "term": "scribe",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "scriptum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "string",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "block-string",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "§",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "secus",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "si",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "sic",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "sin",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "sit",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⇐",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⊘",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "solum_in",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "solum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "sparge",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "sponte",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⊛",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "sub",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "summa",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "tacet",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "tacebit",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "tabula",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "tag",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "temporis",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "tensor",
+      "rule": "keyword",
+      "capable": 10,
+      "analyzable": 10
+    },
+    {
+      "term": "targets",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "textus",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "¬",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "typus",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "ubique",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "ultima",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "usque",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "ut",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "varia",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "variandum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "vel",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "versio",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "vector",
+      "rule": "keyword",
+      "capable": 9,
+      "analyzable": 9
+    },
+    {
+      "term": "∷",
+      "rule": "operator-group",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "vacuum",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "verum",
+      "rule": "keyword",
+      "capable": 2,
+      "analyzable": 2
+    },
+    {
+      "term": "vide",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "∴",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "ergo",
+      "rule": "operator-group",
+      "capable": 3,
+      "analyzable": 3
+    }
+  ]
+}
