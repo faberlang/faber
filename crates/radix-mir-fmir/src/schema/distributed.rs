@@ -53,6 +53,7 @@ use radix_mir::device_program::{
     DeviceProgramLifetime, DeviceResource, KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit,
     ObservationCadence, ResultBuffer,
 };
+use radix_mir::device_semantics::SemanticValueId;
 use radix_mir::distributed::{
     BarrierId, BarrierOperation, CollectiveId, CollectiveKind, CollectiveOperation,
     DeclaredPlacement, DeviceProgramPartition, DistributedExecutionGraph, DistributedExecutionPlan,
@@ -699,7 +700,7 @@ fn wire_contract(contract: &WirePlacementContract) -> PlacementContract {
 
 fn wire_placement(placement: &WireLogicalPlacement) -> LogicalPlacement {
     LogicalPlacement {
-        value: radix_mir::device_semantics::SemanticValueId(placement.value),
+        value: SemanticValueId(placement.value),
         contract: wire_contract(&placement.contract),
     }
 }
@@ -710,7 +711,7 @@ pub fn wire_facts_to_facts(facts: &[WirePlacementFact]) -> Vec<PlacementFact> {
     facts
         .iter()
         .map(|fact| PlacementFact {
-            value: radix_mir::device_semantics::SemanticValueId(fact.value),
+            value: SemanticValueId(fact.value),
             buffer: BufferId(fact.buffer),
             contract: wire_contract(&fact.contract),
             byte_count: fact.byte_count,
@@ -729,7 +730,7 @@ fn wire_constraint(constraint: &WirePlacementConstraint) -> PlacementConstraint 
         },
         WirePlacementConstraint::RequireOwner { value, partition } => {
             PlacementConstraint::RequireOwner {
-                value: radix_mir::device_semantics::SemanticValueId(*value),
+                value: SemanticValueId(*value),
                 partition: PartitionId(*partition),
             }
         }
@@ -769,7 +770,7 @@ fn wire_operation(
         WireExecutionOperation::Transfer(transfer) => {
             Ok(ExecutionOperation::Transfer(TransferOperation {
                 id: TransferId(transfer.id),
-                value: radix_mir::device_semantics::SemanticValueId(transfer.value),
+                value: SemanticValueId(transfer.value),
                 source: PartitionId(transfer.source),
                 destination: PartitionId(transfer.destination),
                 byte_count: transfer.byte_count,
@@ -791,7 +792,7 @@ fn wire_operation(
         WireExecutionOperation::Collective(collective) => {
             Ok(ExecutionOperation::Collective(CollectiveOperation {
                 id: CollectiveId(collective.id),
-                value: radix_mir::device_semantics::SemanticValueId(collective.value),
+                value: SemanticValueId(collective.value),
                 kind: match collective.kind {
                     WireCollectiveKind::Broadcast => CollectiveKind::Broadcast,
                 },
@@ -1063,20 +1064,6 @@ pub fn plan_to_wire_plan(plan: &DistributedExecutionPlan) -> WireDistributedExec
         },
         version: plan.version.0,
     }
-}
-
-/// Convert the declared placement facts to their wire mirror.
-#[must_use]
-pub fn facts_to_wire_facts(facts: &[PlacementFact]) -> Vec<WirePlacementFact> {
-    facts
-        .iter()
-        .map(|fact| WirePlacementFact {
-            value: fact.value.0,
-            buffer: fact.buffer.0,
-            contract: contract_to_wire(&fact.contract),
-            byte_count: fact.byte_count,
-        })
-        .collect()
 }
 
 /// The expected plan the equivalence gate re-derives: the deterministic
