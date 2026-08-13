@@ -129,10 +129,13 @@ fn plan_package_go_and_ts_are_supported_seams() {
     let package = empty_package("/tmp/g4-plan-go");
     let go = plan_package(&package, Target::HirGo);
     let ts = plan_package(&package, Target::HirTypeScript);
+    let haskell = plan_package(&package, Target::HirHaskell);
     assert!(go.supported);
     assert_eq!(go.target, "go");
     assert!(ts.supported);
     assert_eq!(ts.target, "ts");
+    assert!(haskell.supported);
+    assert_eq!(haskell.target, "haskell");
 }
 
 #[test]

@@ -162,6 +162,14 @@ pub(crate) fn plan_package(package: &AnalyzedPackage, target: Target) -> Artifac
                 .map(|n| n.id.clone());
             (true, None, entry)
         }
+        Target::HirHaskell => {
+            plan_haskell_artifacts(package, &package_id, &mut nodes, &mut edges, &mut seen_ids);
+            let entry = nodes
+                .iter()
+                .find(|n| n.kind == ArtifactKind::GeneratedEntry)
+                .map(|n| n.id.clone());
+            (true, None, entry)
+        }
         Target::HirFaber => (
             false,
             Some("package artifact planning does not emit Faber re-source packages yet".to_owned()),
@@ -410,6 +418,7 @@ pub(crate) fn target_name(target: Target) -> &'static str {
         Target::MirFmirBinary => "fmir",
         Target::MirFmirBundle => "fmir-bin",
         Target::HirSwift => "swift",
+        Target::HirHaskell => "haskell",
         Target::HirFhir => "fhir",
     }
 }

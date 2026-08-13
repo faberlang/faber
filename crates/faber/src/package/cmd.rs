@@ -849,5 +849,6 @@ fn output_code(output: Output) -> String {
         Output::WgslText(out) => out.code,
         Output::Sexp(out) => out.code,
         Output::Swift(out) => out.code,
+        Output::Haskell(out) => out.code,
     }
 }
