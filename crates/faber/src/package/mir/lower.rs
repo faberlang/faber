@@ -290,15 +290,20 @@ pub(super) fn lower_package_units<'a>(
     );
 
     for mut unit in pending {
+        let offset = append_shifted_program(&mut merged, &mut unit.lowered, &entry_path)?;
         if let Some(local_id) = unit.dispatch_function {
-            let offset = merged.program.functions.len() as u32;
-            dispatch_function = Some(MirFunctionId(local_id.0 + offset));
+            dispatch_function = Some(checked_shifted_function_id(local_id, offset, &entry_path)?);
         }
-        append_shifted_program(&mut merged, &mut unit.lowered);
         ensure_unique_definition_sources(&merged.program, &entry_path)?;
     }
     for (mut program, mut closure_environments) in library_parts {
-        append_shifted_parts(&mut merged, &mut program, &mut closure_environments);
+        append_shifted_parts(
+            &mut merged.program,
+            &mut merged.closure_environments,
+            &mut program,
+            &mut closure_environments,
+            &entry_path,
+        )?;
         ensure_unique_definition_sources(&merged.program, &entry_path)?;
     }
     rebuild_merged_validated(&mut merged, &entry_path)?;
@@ -1156,27 +1161,92 @@ pub(super) fn lower_unit<'a>(
 pub(super) fn append_shifted_program(
     merged: &mut LoweredMirUnit<'_>,
     lowered: &mut LoweredMirUnit<'_>,
-) {
+    diagnostic_path: &Path,
+) -> Result<u32, Vec<Diagnostic>> {
     append_shifted_parts(
-        merged,
+        &mut merged.program,
+        &mut merged.closure_environments,
         &mut lowered.program,
         &mut lowered.closure_environments,
-    );
+        diagnostic_path,
+    )
 }
 
 /// Append owned program parts (functions + closure environments) into the
 /// merged program, shifting function and closure ids past the merged prefix.
 pub(super) fn append_shifted_parts(
-    merged: &mut LoweredMirUnit<'_>,
+    merged_program: &mut MirProgram,
+    merged_closure_environments: &mut Vec<MirClosureEnvironment>,
     program: &mut MirProgram,
     closure_environments: &mut Vec<MirClosureEnvironment>,
-) {
-    let offset = merged.program.functions.len() as u32;
+    diagnostic_path: &Path,
+) -> Result<u32, Vec<Diagnostic>> {
+    let offset = next_function_id(merged_program, diagnostic_path)?;
+    ensure_shift_fits(program, closure_environments, offset, diagnostic_path)?;
     shift_program_ids(program, closure_environments, offset);
     // Closure environments are collected on the Vec and folded into a fresh
     // ValidatedMir token after all merges complete (rebuild_merged_validated).
-    merged.closure_environments.append(closure_environments);
-    merged.program.functions.append(&mut program.functions);
+    merged_closure_environments.append(closure_environments);
+    merged_program.functions.append(&mut program.functions);
+    Ok(offset)
+}
+
+fn next_function_id(program: &MirProgram, path: &Path) -> Result<u32, Vec<Diagnostic>> {
+    program
+        .functions
+        .iter()
+        .map(|function| function.id.0)
+        .max()
+        .map_or(Ok(0), |maximum| {
+            maximum.checked_add(1).ok_or_else(|| {
+                vec![function_id_overflow_diag(
+                    path,
+                    "package MIR function id space is exhausted",
+                )]
+            })
+        })
+}
+
+fn ensure_shift_fits(
+    program: &MirProgram,
+    closure_environments: &[MirClosureEnvironment],
+    offset: u32,
+    path: &Path,
+) -> Result<(), Vec<Diagnostic>> {
+    let max_function_id = program.functions.iter().map(|function| function.id.0).max();
+    let max_environment_id = closure_environments
+        .iter()
+        .map(|environment| environment.id.0)
+        .max();
+    if max_function_id.is_some_and(|id| id.checked_add(offset).is_none())
+        || max_environment_id.is_some_and(|id| id.checked_add(offset).is_none())
+    {
+        return Err(vec![function_id_overflow_diag(
+            path,
+            "package MIR append would overflow an id",
+        )]);
+    }
+    Ok(())
+}
+
+pub(super) fn checked_shifted_function_id(
+    id: MirFunctionId,
+    offset: u32,
+    path: &Path,
+) -> Result<MirFunctionId, Vec<Diagnostic>> {
+    id.0
+        .checked_add(offset)
+        .map(MirFunctionId)
+        .ok_or_else(|| {
+            vec![function_id_overflow_diag(
+                path,
+                "package MIR CLI dispatch function id would overflow",
+            )]
+        })
+}
+
+fn function_id_overflow_diag(path: &Path, message: &str) -> Diagnostic {
+    mir_issue_diag(path, "package_mir_function_id_overflow", message)
 }
 
 /// Rebuild the validated-MIR token after package merging shifts IDs and
