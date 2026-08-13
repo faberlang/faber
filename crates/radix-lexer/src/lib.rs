@@ -3,7 +3,6 @@
 //! Package `radix` re-exports this crate as `radix::lexer` so embedding paths
 //! stay stable while the crate DAG grows.
 //!
-//!
 //! This module is the compiler boundary between raw UTF-8 source and the token
 //! stream consumed by the parser. It owns source-position spans, token and
 //! literal representation, keyword spelling policy, Unicode identifier
@@ -18,10 +17,10 @@
 //! - Spans are byte offsets into the original source; they preserve exact
 //!   source locations even when identifiers are NFKC-normalized for symbol
 //!   identity. Literal and comment payloads keep source bytes (no NFKC).
-//! - Keyword recognition is mode-aware. Normal source keywords are reserved,
-//!   while annotation names remain identifier-like after `@` so metadata can use
-//!   language-looking words deliberately. Line-start `§` file directives were
-//!   removed; `§` remains valid only inside string templates.
+//! - Language keywords lex as identifiers. The scanner records latin identity
+//!   keys for registered spellings; the parser claims them by identity.
+//!   Line-start `§` file directives were removed; `§` remains valid only
+//!   inside string templates.
 //! - The lexer does not own grammar recovery. It emits `Error` tokens and
 //!   structured [`LexError`] values; parser and diagnostic layers decide how to
 //!   present or recover from the surrounding syntax.
