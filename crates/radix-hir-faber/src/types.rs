@@ -14,10 +14,6 @@ use radix_types::{
 };
 use rustc_hash::FxHashMap;
 
-fn primitive_marker(prim: Primitive, surface: &impl KeywordSurface) -> &str {
-    surface.type_surface(TypeBindingKind::Primitive(prim))
-}
-
 impl super::FaberCodegen {
     /// Strip nested semantic option wrappers before printing nullable syntax.
     pub(super) fn flatten_option(&self, mut type_id: TypeId, types: &TypeTable) -> TypeId {
@@ -27,7 +23,6 @@ impl super::FaberCodegen {
         type_id
     }
 
-    /// Convert a `TypeId` to the Faber backend's current type syntax.
     pub(super) fn type_to_faber(
         &self,
         type_id: TypeId,
@@ -39,7 +34,9 @@ impl super::FaberCodegen {
         let ty = types.get(type_id);
 
         match ty {
-            Type::Primitive(prim) => primitive_marker(*prim, surface).to_owned(),
+            Type::Primitive(prim) => surface
+                .type_surface(TypeBindingKind::Primitive(*prim))
+                .to_owned(),
 
             Type::SizedInstans(precision) => format!(
                 "{}<{}>",
@@ -315,10 +312,8 @@ impl super::FaberCodegen {
             );
         }
 
-        // Preserve field names in the type rendering (F-103). Render as
-        // a parenthesized tuple of `name: type` entries so the record reads
-        // back as one type in every type position (comma-splitting would break
-        // precedence on re-parse).
+        // Parenthesize `name: type` fields so the record stays one type in
+        // every position; comma-splitting would break precedence on re-parse.
         let entries: Vec<String> = fields
             .iter()
             .map(|(name, ty)| {
@@ -353,7 +348,6 @@ impl super::FaberCodegen {
         )
     }
 
-    /// Format `sparsa<T, Figura>` in canonical Faber syntax (long form only; sugar deferred).
     fn format_sparsa_type(
         &self,
         elem: TypeId,
@@ -583,12 +577,9 @@ mod tests {
 
     // ── Tensor-family + vacua surface routing probe ───────────────────────
 
-    /// Probe surface that maps the seven new keys to distinctive markers.
+    /// Probe surface that maps tensor-family and vacua identities to markers.
     ///
     /// If the emitter printed hardcoded Latin, the markers would never appear.
-    /// Proves `type_to_faber` / Vacua emit route through
-    /// `type_surface`/`contextual_keyword` — under any pack the localized
-    /// spelling would propagate (en == Latin for these rows is incidental).
     struct ProbeSurface;
 
     impl KeywordSurface for ProbeSurface {
@@ -739,8 +730,6 @@ mod tests {
         );
     }
 
-    // ── F-042 semantic round-trip loss tests ──────────────────────────────
-
     fn span() -> Span {
         Span::default()
     }
@@ -759,9 +748,7 @@ mod tests {
     }
 
     #[test]
-    fn f042_multi_import_emits_all_items() {
-        // Before fix: only `import.items.first()` was emitted, dropping
-        // subsequent items in a multi-import declaration.
+    fn multi_import_emits_all_items() {
         let mut interner = Interner::new();
         let path_sym = interner.intern("pkg");
         let name_a = interner.intern("alpha");
@@ -807,8 +794,7 @@ mod tests {
     }
 
     #[test]
-    fn f042_discerne_omnia_preserves_exhaustiveness() {
-        // Before fix: `exhaustive: true` was ignored; `omnia` never emitted.
+    fn discerne_omnia_preserves_exhaustiveness() {
         let mut interner = Interner::new();
         let name_f = interner.intern("f");
         let name_x = interner.intern("x");
@@ -904,10 +890,7 @@ mod tests {
     }
 
     #[test]
-    fn f042_si_with_cape_preserves_cape_keyword() {
-        // Before fix: `write_sic_secus_chain` returned true for `Si` with
-        // `then_catch` AND an else_block, short-circuiting before the `cape`
-        // block was written. Drop only occurs in the `sic/secus` compact form.
+    fn si_with_cape_preserves_cape_keyword() {
         let mut interner = Interner::new();
         let name_f = interner.intern("f");
         let name_err = interner.intern("err");
@@ -1041,10 +1024,8 @@ mod tests {
         );
     }
 
-    // ── F-101/102/103 diagnostic tests ───────────────────────────────────
-
     #[test]
-    fn f101_si_cape_else_with_compact_else_preserves_cape() {
+    fn si_cape_else_with_compact_else_preserves_cape() {
         // Si with then_catch AND an else_block that is sic/secus compatible
         // (single-expression return). The cape must still appear.
         let mut interner = Interner::new();
@@ -1164,30 +1145,28 @@ mod tests {
         };
 
         let code = generate_faber(&program, &types, &interner);
-        eprintln!("F-101 codegen output:\n{code}");
         assert!(
             code.contains("cape"),
-            "F-101: si with then_catch + else_block must emit `cape` keyword, got:\n{code}"
+            "si with then_catch + else_block must emit `cape` keyword, got:\n{code}"
         );
         assert!(
             code.contains("caught"),
-            "F-101: cape body value must appear, got:\n{code}"
+            "cape body value must appear, got:\n{code}"
         );
         assert!(
             code.contains("nope"),
-            "F-101: else_block value must appear, got:\n{code}"
+            "else_block value must appear, got:\n{code}"
         );
-        // Cape must appear before secus (F-101 fix)
         let cape_pos = code.find("cape").unwrap();
         let secus_pos = code.find("secus").unwrap();
         assert!(
             cape_pos < secus_pos,
-            "F-101: cape must appear before secus, got cape at {cape_pos}, secus at {secus_pos}\n{code}"
+            "cape must appear before secus, got cape at {cape_pos}, secus at {secus_pos}\n{code}"
         );
     }
 
     #[test]
-    fn f102_fac_loop_detection_long_body() {
+    fn fac_loop_detection_long_body() {
         // A `fac ... dum` where the body has multiple statements before the
         // final rumpe+not pattern. `as_fac_loop` must still recognize it.
         let mut interner = Interner::new();
@@ -1197,7 +1176,6 @@ mod tests {
         let numerus = types.primitive(Primitive::Numerus);
         let bivalens = types.primitive(Primitive::Bivalens);
         let i32_ty = types.sized_numeric(Primitive::Numerus, radix_types::NumericWidth::I32);
-        let _i32_id = interner.intern("i");
 
         let rumpe_si = HirExpression {
             id: HirId(30),
@@ -1235,7 +1213,6 @@ mod tests {
 
         let loop_block = HirBlock {
             statements: vec![
-                // A body statement before the rumpe guard
                 HirStatement {
                     id: HirId(40),
                     kind: HirStatementKind::Local(radix_hir::HirLocal {
@@ -1314,19 +1291,18 @@ mod tests {
         };
 
         let code = generate_faber(&program, &types, &interner);
-        eprintln!("F-102 codegen output:\n{code}");
         assert!(
             code.contains("fac"),
-            "F-102: multi-statement loop body must be recognized as fac, got:\n{code}"
+            "multi-statement loop body must be recognized as fac, got:\n{code}"
         );
         assert!(
             code.contains("dum"),
-            "F-102: loop must contain dum keyword, got:\n{code}"
+            "loop must contain dum keyword, got:\n{code}"
         );
     }
 
     #[test]
-    fn f103_record_type_preserves_field_names() {
+    fn record_type_preserves_field_names() {
         // Record types must emit field names, not just value type de-duplication.
         let codegen = FaberCodegen::default();
         let mut types = TypeTable::new();
@@ -1337,7 +1313,6 @@ mod tests {
         let textus = types.primitive(Primitive::Textus);
         let numerus = types.primitive(Primitive::Numerus);
 
-        // A record with two textus fields and one numerus field
         let name_sym = interner.intern("name");
         let desc_sym = interner.intern("desc");
         let age_sym = interner.intern("age");
@@ -1348,24 +1323,22 @@ mod tests {
         let record_id = types.intern(radix_types::Type::Record(fields));
 
         let result = codegen.type_to_faber(record_id, &types, &names, &interner, &surface);
-        eprintln!("F-103 record type output:\n{result}");
         assert!(
             result.contains("name"),
-            "F-103: record type must contain field name 'name', got: {result}"
+            "record type must contain field name 'name', got: {result}"
         );
         assert!(
             result.contains("desc"),
-            "F-103: record type must contain field name 'desc', got: {result}"
+            "record type must contain field name 'desc', got: {result}"
         );
         assert!(
             result.contains("age"),
-            "F-103: record type must contain field name 'age', got: {result}"
+            "record type must contain field name 'age', got: {result}"
         );
     }
 
     #[test]
-    fn f103_closure_params_preserve_sponte_and_defaults() {
-        // Closure (Clausura) params must emit sponte marker and vel default.
+    fn closure_params_preserve_sponte_and_defaults() {
         let mut interner = Interner::new();
         let name_f = interner.intern("f");
         let name_x = interner.intern("x");
@@ -1471,18 +1444,17 @@ mod tests {
         };
 
         let code = generate_faber(&program, &types, &interner);
-        eprintln!("F-103 closure codegen output:\n{code}");
         assert!(
             code.contains("sponte"),
-            "F-103: closure param with sponte must emit 'sponte', got:\n{code}"
+            "closure param with sponte must emit 'sponte', got:\n{code}"
         );
         assert!(
             code.contains("vel"),
-            "F-103: closure param with default must emit 'vel', got:\n{code}"
+            "closure param with default must emit 'vel', got:\n{code}"
         );
         assert!(
             code.contains("default"),
-            "F-103: closure param default value must appear, got:\n{code}"
+            "closure param default value must appear, got:\n{code}"
         );
     }
 }
