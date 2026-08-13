@@ -162,6 +162,14 @@ pub(crate) fn plan_package(package: &AnalyzedPackage, target: Target) -> Artifac
                 .map(|n| n.id.clone());
             (true, None, entry)
         }
+        Target::HirPython => {
+            plan_python_artifacts(package, &package_id, &mut nodes, &mut edges, &mut seen_ids);
+            let entry = nodes
+                .iter()
+                .find(|n| n.kind == ArtifactKind::GeneratedEntry)
+                .map(|n| n.id.clone());
+            (true, None, entry)
+        }
         Target::HirFaber => (
             false,
             Some("package artifact planning does not emit Faber re-source packages yet".to_owned()),
@@ -701,6 +709,87 @@ fn plan_ts_artifacts(
             to: source_id,
             kind: DependencyKind::SourceImport,
         });
+    }
+}
+
+fn plan_python_artifacts(
+    package: &AnalyzedPackage,
+    package_id: &PackageId,
+    nodes: &mut Vec<ArtifactNode>,
+    edges: &mut Vec<DependencyEdge>,
+    seen: &mut BTreeSet<String>,
+) {
+    let gen_root = package
+        .spec
+        .package_root
+        .join("target")
+        .join("faber")
+        .join("python");
+    for unit in &package.units {
+        let module = ModuleId {
+            package: package_id.clone(),
+            segments: unit.module_segments.clone(),
+        };
+        let source_id = format!("source:{}", module_key(&module));
+        let gen_id = if unit.is_entry {
+            format!("python:entry:{}", package_id.name)
+        } else {
+            format!("python:module:{}", module_key(&module))
+        };
+        let file = if unit.is_entry {
+            PathBuf::from("main.py")
+        } else if unit.module_segments.is_empty() {
+            PathBuf::from("__init__.py")
+        } else {
+            let mut path = PathBuf::new();
+            let last = unit.module_segments.len() - 1;
+            for (idx, segment) in unit.module_segments.iter().enumerate() {
+                if idx == last {
+                    path.push(format!("{segment}.py"));
+                } else {
+                    path.push(segment);
+                }
+            }
+            path
+        };
+        push_unique_node(
+            nodes,
+            seen,
+            ArtifactNode {
+                id: gen_id.clone(),
+                kind: if unit.is_entry {
+                    ArtifactKind::GeneratedEntry
+                } else {
+                    ArtifactKind::GeneratedModule
+                },
+                target: Some("python"),
+                path: gen_root.join(&file),
+                depends_on: vec![source_id.clone()],
+            },
+        );
+        edges.push(DependencyEdge {
+            from: gen_id,
+            to: source_id,
+            kind: DependencyKind::SourceImport,
+        });
+        if !unit.is_entry && unit.module_segments.len() > 1 {
+            let mut package_dir = gen_root.clone();
+            for segment in &unit.module_segments[..unit.module_segments.len() - 1] {
+                package_dir.push(segment);
+                let init_id = format!("python:init:{}", package_dir.display());
+                push_unique_node(
+                    nodes,
+                    seen,
+                    ArtifactNode {
+                        id: init_id,
+                        kind: ArtifactKind::GeneratedModule,
+                        target: Some("python"),
+                        path: package_dir.join("__init__.py"),
+                        depends_on: Vec::new(),
+                    },
+                );
+            }
+        }
     }
 }
 
