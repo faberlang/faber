@@ -252,3 +252,48 @@ fn promissum_failable_instantiation_finds_interned() {
     .expect("generic PromissumFailable instantiation must resolve against the interned type");
     assert_eq!(resolved.semantic_id(), interned);
 }
+
+#[test]
+fn matrix_instantiation_finds_interned() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let shape = types.rank0_shape();
+    let interned = types.intern(Type::Matrix(numerus, shape));
+
+    let param = types.intern(Type::Param(Symbol(60)));
+    let generic = types.intern(Type::Matrix(param, shape));
+
+    let mut bindings = MirGenericBindings::default();
+    bindings.insert(Symbol(60), MirType::semantic(numerus));
+
+    let resolved = instantiate_existing_generic_type(
+        &types,
+        MirType::semantic(generic),
+        &bindings,
+        Span::default(),
+    )
+    .expect("generic Matrix instantiation must resolve against the interned type");
+    assert_eq!(resolved.semantic_id(), interned);
+}
+
+#[test]
+fn atomic_instantiation_finds_interned() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let interned = types.intern(Type::Atomic(numerus));
+
+    let param = types.intern(Type::Param(Symbol(61)));
+    let generic = types.intern(Type::Atomic(param));
+
+    let mut bindings = MirGenericBindings::default();
+    bindings.insert(Symbol(61), MirType::semantic(numerus));
+
+    let resolved = instantiate_existing_generic_type(
+        &types,
+        MirType::semantic(generic),
+        &bindings,
+        Span::default(),
+    )
+    .expect("generic Atomic instantiation must resolve against the interned type");
+    assert_eq!(resolved.semantic_id(), interned);
+}

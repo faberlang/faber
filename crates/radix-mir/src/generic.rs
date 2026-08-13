@@ -7,8 +7,8 @@
 
 use crate::MirType;
 use radix_lexer::{Span, Symbol};
-use radix_types::{FuncSig, ParamType, Type, TypeId, TypeTable};
-use rustc_hash::{FxHashMap, FxHashSet};
+use radix_types::{FuncSig, IndexId, ParamType, Type, TypeId, TypeTable};
+use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use std::hash::{Hash, Hasher};
 
 pub type MirGenericBindings = FxHashMap<Symbol, MirType>;
@@ -27,6 +27,10 @@ impl MirGenericError {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Structural witness
+// ---------------------------------------------------------------------------
 
 pub fn bind_generic_type_witness(
     types: &TypeTable,
@@ -64,13 +68,12 @@ fn try_bind_generic_type_witness(
     generic_bindings: &mut MirGenericBindings,
     seen: &mut FxHashSet<TypeId>,
 ) -> bool {
-    // Param binds to the actual TypeId as-is (including when actual is Alias).
-    // Preserve this precedence over Alias peeling on the actual side.
+    // Param binds to the actual TypeId as-is, including when actual is Alias.
+    // That precedence must stay above Alias peeling on the actual side.
     if let Type::Param(sym) = types.get(expected) {
         return bind_type_param(types, *sym, actual, generic_bindings);
     }
 
-    // Peel expected Alias with path-local cycle guard.
     if let Type::Alias(_, inner) = types.get(expected) {
         if !seen.insert(expected) {
             return false;
@@ -81,7 +84,6 @@ fn try_bind_generic_type_witness(
         return ok;
     }
 
-    // Peel actual Alias with path-local cycle guard (expected is not Param/Alias).
     if let Type::Alias(_, inner) = types.get(actual) {
         if !seen.insert(actual) {
             return false;
@@ -294,7 +296,6 @@ fn try_bind_union_member_at(
             return true;
         }
 
-        // Branch failed — restore bindings to pre-candidate state.
         undo_bindings_to(generic_bindings, &keys_before);
         matched[actual_index] = false;
     }
@@ -352,8 +353,13 @@ fn try_bind_func_signature(
         }
 }
 
+// ---------------------------------------------------------------------------
+// Existing-type instantiation
+// ---------------------------------------------------------------------------
+
 /// # Errors
-/// Returns an error when validation or type resolution fails. See [`MirGenericError`].
+/// Returns [`MirGenericError`] when a parameter is unbound or the instantiated
+/// shape is not already interned in `types`.
 pub fn instantiate_existing_generic_type(
     types: &TypeTable,
     ty: MirType,
@@ -380,12 +386,7 @@ impl ExistingTypeIndex {
     fn build(types: &TypeTable) -> Self {
         let mut by_fingerprint: FxHashMap<u64, Vec<TypeId>> = FxHashMap::default();
         for index in 0..types.type_count() {
-            // TypeId is a u32 arena index by design (radix-types::types).
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "TypeId is a u32 arena index by design"
-            )]
-            let id = TypeId(index as u32);
+            let id = type_id_at(index);
             let fingerprint = type_fingerprint(types.get(id));
             by_fingerprint.entry(fingerprint).or_default().push(id);
         }
@@ -404,175 +405,25 @@ impl ExistingTypeIndex {
         // Equals-based matches can differ in child TypeId identity from the
         // fingerprint key; preserve prior semantics with a full scan.
         (0..types.type_count()).find_map(|index| {
-            // TypeId is a u32 arena index by design (radix-types::types).
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "TypeId is a u32 arena index by design"
-            )]
-            let id = TypeId(index as u32);
+            let id = type_id_at(index);
             type_matches_candidate(types, id, candidate).then_some(id)
         })
     }
 }
 
-fn type_fingerprint(ty: &Type) -> u64 {
-    let mut hasher = rustc_hash::FxHasher::default();
-    hash_type_shape(ty, &mut hasher);
-    hasher.finish()
+fn type_id_at(index: usize) -> TypeId {
+    // TypeId is a u32 arena index by design (radix-types::types).
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "TypeId is a u32 arena index by design"
+    )]
+    TypeId(index as u32)
 }
 
-fn hash_type_shape(ty: &Type, hasher: &mut impl Hasher) {
-    match ty {
-        Type::Primitive(prim) => {
-            0u8.hash(hasher);
-            prim.hash(hasher);
-        }
-        Type::Array(inner) => {
-            1u8.hash(hasher);
-            inner.0.hash(hasher);
-        }
-        Type::Map(key, value) => {
-            2u8.hash(hasher);
-            key.0.hash(hasher);
-            value.0.hash(hasher);
-        }
-        Type::Record(fields) => {
-            3u8.hash(hasher);
-            let mut pairs = fields
-                .iter()
-                .map(|(name, field_ty)| (name.0, field_ty.0))
-                .collect::<Vec<_>>();
-            pairs.sort_unstable();
-            pairs.hash(hasher);
-        }
-        Type::Set(inner) => {
-            4u8.hash(hasher);
-            inner.0.hash(hasher);
-        }
-        Type::Promissum(inner) => {
-            5u8.hash(hasher);
-            inner.0.hash(hasher);
-        }
-        Type::PromissumFailable(success, alternate) => {
-            5u8.hash(hasher);
-            success.0.hash(hasher);
-            alternate.0.hash(hasher);
-        }
-        Type::AsyncCursor(item, alternate) => {
-            31u8.hash(hasher);
-            item.0.hash(hasher);
-            alternate.0.hash(hasher);
-        }
-        Type::Cursor(inner) => {
-            6u8.hash(hasher);
-            inner.0.hash(hasher);
-        }
-        Type::Tensor(inner, shape) => {
-            7u8.hash(hasher);
-            inner.0.hash(hasher);
-            shape.0.hash(hasher);
-        }
-        Type::Vector(inner, width) => {
-            8u8.hash(hasher);
-            inner.0.hash(hasher);
-            width.0.hash(hasher);
-        }
-        Type::Matrix(inner, shape) => {
-            9u8.hash(hasher);
-            inner.0.hash(hasher);
-            shape.0.hash(hasher);
-        }
-        Type::Sparsa(inner, shape) => {
-            10u8.hash(hasher);
-            inner.0.hash(hasher);
-            shape.0.hash(hasher);
-        }
-        Type::Atomic(inner) => {
-            11u8.hash(hasher);
-            inner.0.hash(hasher);
-        }
-        Type::Intervallum(inner) => {
-            12u8.hash(hasher);
-            inner.0.hash(hasher);
-        }
-        Type::SizedNumeric(prim, width) => {
-            13u8.hash(hasher);
-            prim.hash(hasher);
-            width.hash(hasher);
-        }
-        Type::ModularWord(width) => {
-            14u8.hash(hasher);
-            width.hash(hasher);
-        }
-        Type::SizedInstans(precision) => {
-            15u8.hash(hasher);
-            precision.hash(hasher);
-        }
-        Type::Option(inner) => {
-            16u8.hash(hasher);
-            inner.0.hash(hasher);
-        }
-        Type::Ref(mode, inner) => {
-            17u8.hash(hasher);
-            mode.hash(hasher);
-            inner.0.hash(hasher);
-        }
-        Type::Struct(def) => {
-            18u8.hash(hasher);
-            def.hash(hasher);
-        }
-        Type::Enum(def) => {
-            19u8.hash(hasher);
-            def.hash(hasher);
-        }
-        Type::Interface(def) => {
-            20u8.hash(hasher);
-            def.hash(hasher);
-        }
-        Type::Alias(def, inner) => {
-            21u8.hash(hasher);
-            def.hash(hasher);
-            inner.0.hash(hasher);
-        }
-        Type::Func(sig) => {
-            22u8.hash(hasher);
-            sig.hash(hasher);
-        }
-        Type::Param(sym) => {
-            23u8.hash(hasher);
-            sym.0.hash(hasher);
-        }
-        Type::Applied(base, args) => {
-            24u8.hash(hasher);
-            base.0.hash(hasher);
-            for arg in args {
-                arg.0.hash(hasher);
-            }
-        }
-        Type::Infer(var) => {
-            25u8.hash(hasher);
-            var.0.hash(hasher);
-        }
-        Type::InferUnion(var) => {
-            29u8.hash(hasher);
-            var.0.hash(hasher);
-        }
-        Type::Union(members) => {
-            26u8.hash(hasher);
-            for member in members {
-                member.0.hash(hasher);
-            }
-        }
-        Type::Tuple(elems) => {
-            27u8.hash(hasher);
-            for elem in elems {
-                elem.0.hash(hasher);
-            }
-        }
-        Type::Error => {
-            28u8.hash(hasher);
-        }
-    }
+fn type_fingerprint(ty: &Type) -> u64 {
+    let mut hasher = FxHasher::default();
+    ty.hash(&mut hasher);
+    hasher.finish()
 }
 
 fn instantiate_existing_type_id(
@@ -589,10 +440,14 @@ fn instantiate_existing_type_id(
             .ok_or_else(|| {
                 MirGenericError::new(span, "generic call signature has unresolved type parameter")
             }),
-        Type::Array(inner) => {
-            let inner = instantiate_existing_type_id(types, inner, generic_bindings, span, index)?;
-            find_existing_type(types, &Type::Array(inner), span, index)
-        }
+        Type::Array(inner) => instantiate_existing_unary_type(
+            types,
+            inner,
+            generic_bindings,
+            span,
+            index,
+            Type::Array,
+        ),
         Type::Map(key, value) => {
             let key = instantiate_existing_type_id(types, key, generic_bindings, span, index)?;
             let value = instantiate_existing_type_id(types, value, generic_bindings, span, index)?;
@@ -787,11 +642,11 @@ fn instantiate_existing_unary_type(
 fn instantiate_existing_indexed_type(
     types: &TypeTable,
     inner: TypeId,
-    index_id: radix_types::IndexId,
+    index_id: IndexId,
     generic_bindings: &MirGenericBindings,
     span: Span,
     index: &ExistingTypeIndex,
-    build: impl FnOnce(TypeId, radix_types::IndexId) -> Type,
+    build: impl FnOnce(TypeId, IndexId) -> Type,
 ) -> Result<TypeId, MirGenericError> {
     let inner = instantiate_existing_type_id(types, inner, generic_bindings, span, index)?;
     find_existing_type(types, &build(inner, index_id), span, index)
@@ -811,6 +666,10 @@ fn find_existing_type(
     })
 }
 
+// ---------------------------------------------------------------------------
+// Shape equality for interned candidates
+// ---------------------------------------------------------------------------
+
 fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bool {
     match (types.get(id), candidate) {
         (Type::Primitive(a), Type::Primitive(b)) => a == b,
@@ -827,7 +686,8 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
         | (Type::Promissum(a), Type::Promissum(b))
         | (Type::Cursor(a), Type::Cursor(b))
         | (Type::Intervallum(a), Type::Intervallum(b))
-        | (Type::Option(a), Type::Option(b)) => types.equals(*a, *b),
+        | (Type::Option(a), Type::Option(b))
+        | (Type::Atomic(a), Type::Atomic(b)) => types.equals(*a, *b),
         (Type::AsyncCursor(a_item, a_alternate), Type::AsyncCursor(b_item, b_alternate)) => {
             types.equals(*a_item, *b_item) && types.equals(*a_alternate, *b_alternate)
         }
@@ -837,6 +697,7 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
         ) => types.equals(*a_success, *b_success) && types.equals(*a_alternate, *b_alternate),
         (Type::Tensor(a_ty, a_shape), Type::Tensor(b_ty, b_shape))
         | (Type::Vector(a_ty, a_shape), Type::Vector(b_ty, b_shape))
+        | (Type::Matrix(a_ty, a_shape), Type::Matrix(b_ty, b_shape))
         | (Type::Sparsa(a_ty, a_shape), Type::Sparsa(b_ty, b_shape)) => {
             types.equals(*a_ty, *b_ty) && types.index_equals(*a_shape, *b_shape)
         }
@@ -896,6 +757,10 @@ fn func_signature_matches(types: &TypeTable, a: &FuncSig, b: &FuncSig) -> bool {
         && a.is_async == b.is_async
         && a.is_generator == b.is_generator
 }
+
+// ---------------------------------------------------------------------------
+// Param occupancy
+// ---------------------------------------------------------------------------
 
 #[must_use]
 pub fn type_contains_param(types: &TypeTable, ty: TypeId) -> bool {
