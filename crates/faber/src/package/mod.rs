@@ -635,6 +635,9 @@ mod proba_integration_test;
 mod proba_stepper_test;
 
 #[cfg(test)]
+mod composite_plan_synthetic_test;
+
+#[cfg(test)]
 #[path = "../package_test.rs"]
 mod tests;
 
