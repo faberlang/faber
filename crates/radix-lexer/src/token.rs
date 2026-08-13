@@ -1,10 +1,10 @@
 //! Token and span data contracts shared after lexing.
 //!
 //! This module is the stable data boundary between the lexer and parser. It
-//! defines compact byte spans, interned symbol handles, and the complete set of
-//! token kinds the parser can observe. Scanner policy lives in `scan.rs`;
-//! keyword taxonomy and alias metadata live in `keywords.rs`; this file keeps
-//! the transport representation explicit and cheap to clone.
+//! owns compact byte spans, interned symbol handles, and the parser-facing
+//! token vocabulary. Scanner policy lives in `scan.rs`; keyword taxonomy lives
+//! in `keywords.rs`. Keyword variants here are identity tokens the parser
+//! claims by spelling; the scanner does not emit them as reserved words.
 //!
 //! INVARIANTS
 //! ==========
@@ -67,18 +67,19 @@ pub struct Symbol(pub u32);
 // TOKEN KINDS
 // =============================================================================
 
-/// Complete token vocabulary visible to the parser.
+/// Parser-facing token vocabulary.
 ///
-/// This enum is deliberately broad: it includes current source tokens, metadata
-/// tokens, error/recovery sentinels, and a small number of reserved internal
-/// variants. Keep spelling policy in scanner/keyword tables; keep this type as
-/// the parser-facing vocabulary.
+/// Includes source tokens the scanner emits, keyword identity variants the
+/// parser claims, metadata and recovery sentinels, and a few reserved internal
+/// variants with no current source spelling. Spelling policy lives in the
+/// scanner and keyword tables.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TokenKind {
     // === Identifiers and literals ===
     Ident(Symbol),
-    Underscore(Symbol), // WHY: Special case for pattern matching wildcard
-    /// WHY: Ordinary expression integers carry an unsigned `u64` magnitude so
+    /// Pattern-matching wildcard; not an ordinary identifier.
+    Underscore(Symbol),
+    /// Ordinary expression integers carry an unsigned `u64` magnitude so
     /// source values through `u64::MAX` survive lexing. Negative expressions
     /// remain unary negation over this magnitude; signed consumers (JSON,
     /// enum values, CLI, annotations) convert with explicit checked bounds.
@@ -93,162 +94,162 @@ pub enum TokenKind {
     OctetiString(Symbol),
 
     // === Keywords: Declarations ===
-    Columna,   // schema column declaration (census-types relational views)
-    Discretio, // tagged union
-    Fixum,     // const
-    Functio,   // function
-    Genus,     // class
-    Iuncta,    // tuple type
-    Implendum, // interface contract
-    Importa,   // import
-    Magnitudo, // compile-time size/index generic introducer
-    Modulus,   // fixed-width modular word type family
-    Ordo,      // enum
-    Proba,     // test case
-    Probandum, // test suite
-    Sit,       // inferred immutable local (sugar for fixum _)
-    Schema,    // partial relational heading (census-types relational views)
-    Typus,     // type alias
-    Varia,     // let/var
+    Columna,
+    Discretio,
+    Fixum,
+    Functio,
+    Genus,
+    Iuncta,
+    Implendum,
+    Importa,
+    Magnitudo,
+    Modulus,
+    Ordo,
+    Proba,
+    Probandum,
+    Sit, // inferred immutable local; sugar for `fixum _`
+    Schema,
+    Typus,
+    Varia,
     // === Keywords: Modifiers ===
-    Abstractus, // abstract
-    Ceteri,     // variadic rest
-    Curata,     // allocator requirement
-    Errata,     // custom error type
-    Exitus,     // exit code
-    Generis,    // static
-    Iacit,      // throws
-    Immutata,   // pure function
-    Nexum,      // bound method
-    Optiones,   // options struct
-    Prae,       // override
-    Privata,    // private
-    Protecta,   // protected
-    Publica,    // public
+    Abstractus,
+    Ceteri,
+    Curata,
+    Errata,
+    Exitus,
+    Generis,
+    Iacit,
+    Immutata,
+    Nexum,
+    Optiones,
+    Prae,
+    Privata,
+    Protecta,
+    Publica,
     // === Keywords: Control flow ===
-    Casu,     // case
-    Ceterum,  // default
-    Custodi,  // guard clauses
-    Discerne, // pattern match
-    Dum,      // while
-    Elige,    // switch
-    Ergo,     // 'ergo' — compact statement-body joint only
-    Fac,      // do-while
-    Itera,    // for
-    Secus,    // else
-    Si,       // if
-    Sic,      // then (ternary)
-    Sin,      // else if
+    Casu,
+    Ceterum,
+    Custodi,
+    Discerne,
+    Dum,
+    Elige,
+    Ergo, // compact statement-body joint only
+    Fac,
+    Itera,
+    Secus,
+    Si,
+    Sic,
+    Sin,
     // === Keywords: Transfer ===
-    Perge, // continue
-    Redde, // return
-    Rumpe, // break
-    Tacet, // explicit noop
+    Perge,
+    Redde,
+    Rumpe,
+    Tacet,
     // === Keywords: Error handling ===
-    Adfirma, // assert
-    Cape,    // catch
-    Iace,    // throw
-    Mori,    // panic
+    Adfirma,
+    Cape,
+    Iace,
+    Mori,
     // === Keywords: Async ===
-    Cede,      // await/yield
-    Clausura,  // closure
-    Cursor,    // generator (annotation)
-    Futura,    // async (annotation)
-    Fiet,      // async finite (callable posture)
-    Fiunt,     // sync stream (callable posture)
-    Fient,     // async generator (callable posture)
-    Figendum,  // await const binding
-    Variandum, // await var binding
-    Reddet,    // return_await
-    Tacebit,   // await
-    // === Keywords: Annotation families (wave 1) ===
-    Brevis,     // short
-    Cli,        // cli
-    Descriptio, // description
-    Fragment,   // fragment
-    Imperium,   // command
-    Longum,     // long
-    Machina,    // device
-    Nomen,      // name
-    Nondum,     // unstable
-    Nucleum,    // kernel
-    Operandus,  // operand
-    Optio,      // option
-    Radix,      // radix
-    Ubique,     // global
-    Vertex,     // vertex
+    Cede,
+    Clausura,
+    Cursor,
+    Futura,
+    Fiet,
+    Fiunt,
+    Fient,
+    Figendum,
+    Variandum,
+    Reddet,
+    Tacebit,
+    // === Keywords: Annotation families ===
+    Brevis,
+    Cli,
+    Descriptio,
+    Fragment,
+    Imperium,
+    Longum,
+    Machina,
+    Nomen,
+    Nondum,
+    Nucleum,
+    Operandus,
+    Optio,
+    Radix,
+    Ubique,
+    Vertex,
     // === Keywords: Boolean/null ===
-    Falsum, // false
-    Nihil,  // null/nil
-    Verum,  // true
+    Falsum,
+    Nihil,
+    Verum,
     // === Keywords: Logical operators ===
-    Aut, // or
-    Est, // identity check (===)
-    Et,  // and
-    Non, // not (!)
-    Vel, // nullish coalesce (??)
+    Aut,
+    Est,
+    Et,
+    Non,
+    Vel,
     // === Keywords: Objects ===
-    Ego,    // self/this
-    Finge,  // construct tagged union variant
-    Implet, // implements
-    Sub,    // extends
+    Ego,
+    Finge,
+    Implet,
+    Sub,
     // === Keywords: Type operations ===
-    Conversio, // ↦ — runtime value conversion
-    Verte,     // ∷ — postfix static type ascription (qua/innatum/novum removed)
+    Conversio, // ↦
+    Verte,     // ∷ postfix ascription; qua/innatum/novum removed
     // === Keywords: Output ===
-    Mone,   // warn print
-    Nota,   // neutral diagnostic note
-    Scribe, // print
-    Vide,   // debug print
+    Mone,
+    Nota,
+    Scribe,
+    Vide,
     // === Keywords: Entry points ===
-    Ad,        // HTTP endpoint
-    Argumenta, // command-line args
-    Cura,      // allocator scope
-    Incipiet,  // main (async)
-    Incipit,   // main (sync)
-    Meus,      // `ad` outgoing arm (caller→gateway)
-    Tuus,      // `ad` incoming arm (gateway→caller)
+    Ad,
+    Argumenta,
+    Cura,
+    Incipiet,
+    Incipit,
+    Meus, // `ad` outgoing arm (caller → gateway)
+    Tuus, // `ad` incoming arm (gateway → caller)
     // === Keywords: Misc ===
-    De,        // borrow/from
-    Ex,        // extract/move
-    In,        // mutable borrow/in
-    Lege,      // read input
-    Lineam,    // read line
-    Omnia,     // all (exhaustive match)
-    Praefixum, // comptime
-    Scriptum,  // interpolated script
-    Sparge,    // spread operator
-    Ut,        // as/alias
+    De,
+    Ex,
+    In,
+    Lege,
+    Lineam,
+    Omnia,
+    Praefixum,
+    Scriptum,
+    Sparge,
+    Ut,
     // === Keywords: Ranges ===
-    Ab,    // range/iteration mode
-    Ante,  // exclusive end range
-    Inter, // between
-    Intra, // within
-    Per,   // step
-    Usque, // inclusive end range
+    Ab,
+    Ante,
+    Inter,
+    Intra,
+    Per,
+    Usque,
     // === Keywords: Testing ===
-    Fragilis,    // flaky test retries
-    Futurum,     // todo test modifier
-    Metior,      // benchmark
-    Omitte,      // skip test
-    Postpara,    // after each
-    Postparabit, // after all
-    Praepara,    // before each
-    Praeparabit, // before all
-    Repete,      // repeat test
-    Requirit,    // test requires
-    Solum,       // only this test
-    SolumIn,     // only in environment
-    Tag,         // test tag
-    Temporis,    // test timeout
+    Fragilis,
+    Futurum,
+    Metior,
+    Omitte,
+    Postpara,
+    Postparabit,
+    Praepara,
+    Praeparabit,
+    Repete,
+    Requirit,
+    Solum,
+    SolumIn,
+    Tag,
+    Temporis,
     // === Keywords: Nullability ===
-    Negativum, // is negative check
-    Nonnihil,  // is not nil check
-    Nonnulla,  // is not null check
-    Nulla,     // is null check
-    Positivum, // is positive check
+    Negativum,
+    Nonnihil,
+    Nonnulla,
+    Nulla,
+    Positivum,
     // === Declaration markers (post-name) ===
-    Sponte, // voluntary / optional declaration slot
+    Sponte,
 
     // === Punctuation ===
     LParen,    // (
@@ -263,8 +264,8 @@ pub enum TokenKind {
     Dot,       // .
     Arrow,     // →
     ExitArrow, // ⇥
-    Cup,       // ∪ (inline union type T ∪ U, T ∪ nihil)
-    At,        // @ (annotation marker)
+    Cup,       // ∪ inline union
+    At,        // @
 
     // === Operators ===
     Plus,       // +
@@ -284,17 +285,17 @@ pub enum TokenKind {
     // === Comparison ===
     Eq,              // =
     Assign,          // ←
-    ConversioAssign, // ↤ — conversion-directed assignment (U+21A4)
+    ConversioAssign, // ↤ U+21A4
     EqEq,            // ≡
-    EqEqEq,          // (reserved for future / internal; no source form)
+    EqEqEq,          // reserved; no source form
     ApproxEq,        // ≈
     ApproxNotEq,     // ≉
     BangEq,          // ≠
-    BangEqEq,        // (reserved for future / internal; no source form)
-    Lt,              // ≺ strict less-than comparison
-    Gt,              // ≻ strict greater-than comparison
-    LtAscii,         // < generic application delimiter (legacy comparison during migration)
-    GtAscii,         // > generic application delimiter (legacy comparison during migration)
+    BangEqEq,        // reserved; no source form
+    Lt,              // ≺
+    Gt,              // ≻
+    LtAscii,         // < generic delimiter (legacy comparison during migration)
+    GtAscii,         // > generic delimiter (legacy comparison during migration)
     LtEq,            // ≤
     GtEq,            // ≥
 
@@ -303,34 +304,35 @@ pub enum TokenKind {
     PostDec, // ⊖
 
     // === Optional chaining ===
-    QuestionDot,     // ?. (optional member access)
-    QuestionBracket, // ?[ (optional index)
-    QuestionParen,   // ?( (optional call)
-    BangDot,         // !. (non-null assertion member)
-    BangBracket,     // ![ (non-null assertion index)
-    BangParen,       // !( (non-null assertion call)
+    QuestionDot,     // ?.
+    QuestionBracket, // ?[
+    QuestionParen,   // ?(
+    BangDot,         // !.
+    BangBracket,     // ![
+    BangParen,       // !(
 
     // === Range ===
-    DotDot,   // ‥ (exclusive range)
-    Ellipsis, // … (inclusive range)
+    DotDot,   // ‥ exclusive
+    Ellipsis, // … inclusive
 
     // === Compact clausura joint (glyph; never a keyword / pack row) ===
-    Therefore, // ∴ — compact clausura joint only (not statement bodies)
+    Therefore, // ∴ compact clausura joint only (not statement bodies)
 
     // === Comments and trivia ===
     LineComment(Symbol), // #
     Newline,             // \n (or \r\n normalized to one token)
 
     // === Special ===
-    Eof,   // End of file marker
-    Error, // Lexer error placeholder
+    Eof,
+    Error,
 }
 
 impl TokenKind {
-    /// Return whether this token kind is reserved-word syntax.
+    /// Return whether this token kind is a keyword identity variant.
     ///
-    /// The parser and diagnostics use this to distinguish "identifier-like"
-    /// payloads from tokens that need keyword-specific messages or formatting.
+    /// The scanner does not emit reserved words. This predicate classifies
+    /// parser-claimed identities and a few glyph-owned or annotation-owned
+    /// tokens that diagnostics and formatters treat as keyword-like.
     #[allow(clippy::too_many_lines)]
     #[must_use]
     pub fn is_keyword(&self) -> bool {
