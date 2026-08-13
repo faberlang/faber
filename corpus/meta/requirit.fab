@@ -1,0 +1,69 @@
++++
+term = "requirit"
+kind = "keyword"
+category = "errors"
+canonical = true
+summary = "Require a condition or throw a recoverable error."
+syntax = "requirit <expression> secus <expression>"
+aliases = ["require"]
+related = ["adfirma", "iace", "cape", "⇥"]
+locale = "en"
++++
+
+
+# =============================================================================
+# requirit — Require a condition or throw a recoverable error.
+# =============================================================================
+#
+# What this teaches:
+#   • Recoverable guard — `require <condition> else <error>` throws into the
+#     function's ⇥ channel when the condition is false (en surface of `requirit`)
+#   • Twin of `adfirma` — `assert` is fatal; `require` is catchable by `catch`
+#   • Typed payload — the false-path expression is a `variant` with `causa`,
+#     the same shape used at constructor guard ladders
+#
+# Common mistakes:
+#   • Using `require` in a function without `⇥ E` — SEM010 `iace_requires_alternate_exit`, same as `throw`
+#   • Treating `require` as a test-capability gate — it is a statement, not a named fixture on `test`
+#
+# See also: adfirma, iace, cape, ⇥
+# =============================================================================
+
+# requirit — recoverable require statement
+#
+# require <condition> else <error>
+#
+# GRAMMAR:
+#   requiritStmt :← 'requirit' expr 'secus' expr
+#
+# EXPECTED OUTPUT:
+#   empty — success-path main only (requirit.expected)
+
+union GuardError {
+    Invalid { string causa }
+}
+
+fn guarded(int value) → int ⇥ GuardError {
+    require value > 0 else variant Invalid { causa = "value must be positive" }
+    return value
+}
+
+main {
+    do {
+        const int ok ← guarded(1)
+        assert ok ≡ 1
+    }
+    catch err {
+        assert false else "success path must not throw"
+    }
+}
+
+test "false path is recoverable" {
+    do {
+        const int dropped ← guarded(0)
+        assert false else "false path must throw"
+    }
+    catch err {
+        # recovered — require entered ⇥ and catch intercepted it
+    }
+}
