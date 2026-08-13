@@ -703,6 +703,130 @@ fn plan_ts_artifacts(
     }
 }
 
+fn plan_haskell_artifacts(
+    package: &AnalyzedPackage,
+    package_id: &PackageId,
+    nodes: &mut Vec<ArtifactNode>,
+    edges: &mut Vec<DependencyEdge>,
+    seen: &mut BTreeSet<String>,
+) {
+    for unit in &package.units {
+        push_haskell_unit(
+            &package.spec.package_root,
+            package_id,
+            &unit.module_segments,
+            unit.is_entry,
+            nodes,
+            edges,
+            seen,
+        );
+    }
+}
+
+/// HS-MOD path and identity for one analyzed unit.
+///
+/// Segment capitalization stays aligned with
+/// `radix_hir_haskell::names::sanitize_module_segment`.
+fn push_haskell_unit(
+    package_root: &Path,
+    package_id: &PackageId,
+    segments: &[String],
+    is_entry: bool,
+    nodes: &mut Vec<ArtifactNode>,
+    edges: &mut Vec<DependencyEdge>,
+    seen: &mut BTreeSet<String>,
+) {
+    let module = ModuleId {
+        package: package_id.clone(),
+        segments: segments.to_vec(),
+    };
+    let source_id = format!("source:{}", module_key(&module));
+    let gen_id = if is_entry {
+        format!("haskell:entry:{}", package_id.name)
+    } else if segments.is_empty() {
+        format!("haskell:module:{}", package_id.name)
+    } else {
+        format!("haskell:module:{}:{}", package_id.name, segments.join("/"))
+    };
+    let gen_root = package_root.join("target").join("faber").join("haskell");
+    let file = if is_entry {
+        PathBuf::from("app/Main.hs")
+    } else {
+        haskell_module_rel_path(&package_id.name, segments)
+    };
+    push_unique_node(
+        nodes,
+        seen,
+        ArtifactNode {
+            id: gen_id.clone(),
+            kind: if is_entry {
+                ArtifactKind::GeneratedEntry
+            } else {
+                ArtifactKind::GeneratedModule
+            },
+            target: Some("haskell"),
+            path: gen_root.join(file),
+            depends_on: vec![source_id.clone()],
+        },
+    );
+    edges.push(DependencyEdge {
+        from: gen_id,
+        to: source_id,
+        kind: DependencyKind::SourceImport,
+    });
+}
+
+fn haskell_module_rel_path(package_name: &str, segments: &[String]) -> PathBuf {
+    let mut parts = vec![
+        "src".to_owned(),
+        "Faber".to_owned(),
+        "Romanus".to_owned(),
+        haskell_pascal_segment(package_name),
+    ];
+    if segments.is_empty() {
+        let file = format!("{}.hs", parts.pop().unwrap_or_else(|| "Module".to_owned()));
+        return PathBuf::from_iter(parts).join(file);
+    }
+    for (index, segment) in segments.iter().enumerate() {
+        let piece = haskell_pascal_segment(segment);
+        let piece = if piece == "Main" {
+            "Main_".to_owned()
+        } else {
+            piece
+        };
+        if index + 1 == segments.len() {
+            parts.push(format!("{piece}.hs"));
+        } else {
+            parts.push(piece);
+        }
+    }
+    PathBuf::from_iter(parts)
+}
+
+fn haskell_pascal_segment(raw: &str) -> String {
+    let pieces: Vec<String> = raw
+        .split(['-', '_', '.', '/'])
+        .filter(|piece| !piece.is_empty())
+        .map(|piece| {
+            let mut chars = piece.chars();
+            match chars.next() {
+                Some(first) => {
+                    let mut out = String::new();
+                    out.extend(first.to_uppercase());
+                    out.extend(chars);
+                    out
+                }
+                None => "Module".to_owned(),
+            }
+        })
+        .collect();
+    if pieces.is_empty() {
+        "Module".to_owned()
+    } else {
+        pieces.concat()
+    }
+}
+
 fn plan_wasm_artifacts(
     package: &AnalyzedPackage,
     package_id: &PackageId,

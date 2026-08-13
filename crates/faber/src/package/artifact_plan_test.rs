@@ -2,7 +2,7 @@ use super::*;
 use crate::package::{lockfile, MANIFEST_FILE};
 use radix::codegen::Target;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn empty_package(root: &str) -> AnalyzedPackage {
@@ -57,6 +57,71 @@ fn plan_package_rust_includes_runtime_dependency() {
         .nodes
         .iter()
         .any(|n| n.kind == ArtifactKind::RuntimeDependency));
+}
+
+#[test]
+fn plan_haskell_entry_and_module_paths_follow_hs_mod() {
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+    let mut seen = BTreeSet::new();
+    let package_id = PackageId {
+        name: "hello".to_owned(),
+        version: None,
+    };
+    push_haskell_unit(
+        Path::new("/tmp/hello"),
+        &package_id,
+        &[],
+        true,
+        &mut nodes,
+        &mut edges,
+        &mut seen,
+    );
+    push_haskell_unit(
+        Path::new("/tmp/hello"),
+        &package_id,
+        &["salve-munde".to_owned()],
+        false,
+        &mut nodes,
+        &mut edges,
+        &mut seen,
+    );
+    let entry = nodes
+        .iter()
+        .find(|node| node.id == "haskell:entry:hello")
+        .expect("entry node");
+    assert_eq!(entry.kind, ArtifactKind::GeneratedEntry);
+    assert_eq!(
+        entry.path,
+        PathBuf::from("/tmp/hello/target/faber/haskell/app/Main.hs")
+    );
+    let module = nodes
+        .iter()
+        .find(|node| node.id == "haskell:module:hello:salve-munde")
+        .expect("module node");
+    assert_eq!(module.kind, ArtifactKind::GeneratedModule);
+    assert_eq!(
+        module.path,
+        PathBuf::from("/tmp/hello/target/faber/haskell/src/Faber/Romanus/Hello/SalveMunde.hs")
+    );
+    assert!(edges.iter().any(|edge| {
+        edge.from == "haskell:entry:hello"
+            && edge.to == "source:hello"
+            && edge.kind == DependencyKind::SourceImport
+    }));
+    assert!(edges.iter().any(|edge| {
+        edge.from == "haskell:module:hello:salve-munde"
+            && edge.to == "source:hello/salve-munde"
+            && edge.kind == DependencyKind::SourceImport
+    }));
+}
+
+#[test]
+fn plan_haskell_empty_module_segments_use_package_file() {
+    assert_eq!(
+        haskell_module_rel_path("hello", &[]),
+        PathBuf::from("src/Faber/Romanus/Hello.hs")
+    );
 }
 
 #[test]
