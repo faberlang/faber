@@ -27,9 +27,9 @@
 //!   target-specific lowering belong in later phases.
 
 use radix_lexer::{Span, Symbol, Token};
-use radix_syntax::{CallablePosture, GenericParamKind};
+use radix_syntax::{CallablePosture, GenericParamKind, JsonValue, Visibility};
 use radix_types::TypeId;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -50,6 +50,10 @@ pub use radix_types::DefId;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct HirId(pub u32);
 
+// ---------------------------------------------------------------------------
+// Program and library surface
+// ---------------------------------------------------------------------------
+
 /// Lowered program split into declarations and executable entry code.
 ///
 /// HIR makes the source/package distinction explicit: declarations are always
@@ -57,10 +61,9 @@ pub struct HirId(pub u32);
 /// become one optional entry block.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirProgram {
-    /// Top-level declarations available to later semantic and backend phases.
     pub items: Vec<HirItem>,
 
-    /// Executable entry block from `incipit` or package-level statements.
+    /// Executable entry from `incipit` or implicit package-level statements.
     pub entry: Option<HirBlock>,
 
     /// Normalized metadata attached to the `incipit` statement.
@@ -86,10 +89,7 @@ pub enum LibraryProvider {
 /// Target-neutral identity of a resolved library import.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LibraryIdentity {
-    /// Provider namespace selected by the source import.
     pub provider: LibraryProvider,
-
-    /// Module path inside the provider.
     pub module_path: Vec<String>,
 }
 
@@ -118,34 +118,25 @@ pub enum LibraryItemKind {
 /// Provenance for a local binding introduced by a library import.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LibraryBinding {
-    /// Local binding definition.
     pub local_def_id: DefId,
-
-    /// Provider/module identity.
     pub identity: LibraryIdentity,
 
-    /// Rust runtime module supplied by library metadata, when this import is
-    /// backed by a target runtime crate instead of generated local declarations.
+    /// Rust runtime module when this import is backed by a target runtime crate
+    /// instead of generated local declarations.
     pub rust_runtime_module: Option<String>,
 
-    /// Faber method name to Rust runtime symbol mappings supplied by interface
-    /// metadata.
+    /// Faber method name to Rust runtime symbol mappings from interface metadata.
     pub rust_runtime_methods: BTreeMap<String, String>,
 }
 
 /// Provenance for a declaration imported from a library interface.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LibraryItem {
-    /// Definition of the imported declaration in this source unit.
     pub def_id: DefId,
-
-    /// Provider/module identity.
     pub identity: LibraryIdentity,
 
     /// Exported library name before local aliasing.
     pub exported_name: String,
-
-    /// Imported declaration kind.
     pub kind: LibraryItemKind,
 
     /// Whether an imported function declares an alternate-exit channel.
@@ -154,12 +145,11 @@ pub struct LibraryItem {
     /// Whether an imported function returns a future that must be awaited.
     pub is_async: bool,
 
-    /// Rust runtime type supplied by library metadata for declarations whose
-    /// Faber interface is a contract over a target runtime type.
+    /// Rust runtime type when the Faber interface is a contract over a target
+    /// runtime type.
     pub rust_runtime_type: Option<String>,
 
-    /// Whether Rust should omit the generated declaration because the runtime
-    /// crate owns the concrete surface.
+    /// Omit the generated Rust declaration because the runtime crate owns it.
     pub elide_rust_decl: bool,
 }
 
@@ -173,7 +163,7 @@ pub struct LibraryRegistry {
     pub items: FxHashMap<DefId, LibraryItem>,
 
     /// Public member names exposed by library namespace bindings.
-    pub exports: FxHashMap<DefId, rustc_hash::FxHashSet<String>>,
+    pub exports: FxHashMap<DefId, FxHashSet<String>>,
 
     /// Explicit `publica` child imports exported by a library namespace.
     pub reexports: FxHashMap<(DefId, String), String>,
@@ -186,18 +176,18 @@ pub struct LibraryRegistry {
 /// the declaration node itself rather than to its body expressions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirItem {
-    /// Node identifier for item-level analysis annotations.
+    /// Item-level analysis identity, distinct from the declaration's `DefId`.
     pub id: HirId,
 
-    /// Definition identifier produced by name resolution.
+    /// Definition reached by paths that name this declaration.
     pub def_id: DefId,
-
-    /// Declaration payload.
     pub kind: HirItemKind,
-
-    /// Source location for diagnostics about the whole declaration.
     pub span: Span,
 }
+
+// ---------------------------------------------------------------------------
+// Declarations
+// ---------------------------------------------------------------------------
 
 /// Source-level declaration taxonomy preserved after lowering.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -239,7 +229,7 @@ pub struct HirAnnotation {
     /// Canonical field records for structured and promoted families.
     pub fields: Vec<HirAnnotationField>,
 
-    /// Token payload for unpromoted `AnnotationKind::Statement` families (Stage 4 retires this).
+    /// Token payload for unpromoted `AnnotationKind::Statement` families.
     pub raw_args: Vec<Token>,
 
     /// Resolved annotation-contract definition when this application named a contract.
@@ -247,8 +237,6 @@ pub struct HirAnnotation {
     /// Compiler-owned families leave this `None`. Target/framework consumers should
     /// match on `contract_id` when present instead of reparsing family strings.
     pub contract_id: Option<DefId>,
-
-    /// Full source span of the annotation.
     pub span: Span,
 }
 
@@ -303,56 +291,45 @@ pub enum HirAnnotationValue {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct HirFunction {
-    /// Interned source name of the callable.
     pub name: Symbol,
-
-    /// Generic type parameters introduced by the signature.
     pub type_params: Vec<HirTypeParam>,
-
-    /// Ordinary call parameters, in declaration order.
     pub params: Vec<HirParam>,
 
     /// CLI argument bundle synthesized for mounted command entrypoints.
     pub cli_args: Option<HirParam>,
 
-    /// Return type; None until typecheck infers it.
+    /// Return type; `None` until typecheck infers it.
     pub ret_ty: Option<TypeId>,
 
     /// Recoverable alternate-exit type declared with `⇥`.
     pub err_ty: Option<TypeId>,
 
-    /// Function body; None for interface methods.
+    /// Function body; `None` for interface methods.
     pub body: Option<HirBlock>,
 
     /// Canonical callable posture (four-cell identity).
     pub posture: CallablePosture,
 
-    /// Whether the function is async (`fiet` / `futura`).
+    /// Async callable (`fiet` / `futura`).
     pub is_async: bool,
 
-    /// Whether the function is a generator (`fiunt`/`fient` / `cursor`).
+    /// Generator callable (`fiunt`/`fient` / `cursor`).
     pub is_generator: bool,
 
-    /// Whether the function is a CUDA kernel entry (`nucleum`).
+    /// CUDA kernel entry (`nucleum`).
     pub is_kernel: bool,
 
-    /// Whether the function is a CUDA device helper (`machina`).
+    /// CUDA device helper (`machina`).
     pub is_device: bool,
 
-    /// Whether the function is a graphics vertex shader entry (`@ vertex`).
-    /// Set from annotation family; MIR lowering for vertex shaders is not yet
-    /// implemented — see `device_role_for_function` in `mir/lower.rs`.
+    /// Graphics vertex shader entry (`@ vertex`).
     pub is_vertex: bool,
 
-    /// Whether the function is a graphics fragment shader entry (`@ fragment`).
-    /// Set from annotation family; MIR lowering for fragment shaders is not yet
-    /// implemented.
+    /// Graphics fragment shader entry (`@ fragment`).
     pub is_fragment: bool,
 
     /// Structured metadata for lowered Faber test cases.
     pub test: Option<HirTestMetadata>,
-
-    /// Normalized declaration metadata attached before lowering.
     pub annotations: Vec<HirAnnotation>,
 }
 
@@ -371,8 +348,6 @@ pub struct HirTestMetadata {
 
     /// Source modifiers that affect scheduling or selection.
     pub modifiers: Vec<HirTestModifier>,
-
-    /// Source span for diagnostics about the test declaration.
     pub span: Span,
 }
 
@@ -413,16 +388,11 @@ pub enum HirTestModifier {
 /// Generic parameter introduced by an item or callable signature.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirTypeParam {
-    /// Definition identity for references to this type parameter.
     pub def_id: DefId,
 
     /// Type vs compile-time size/index parameter.
     pub kind: GenericParamKind,
-
-    /// Interned source name.
     pub name: Symbol,
-
-    /// Declaration span for diagnostics.
     pub span: Span,
 
     /// Source-declared admission rule for concrete type arguments.
@@ -455,16 +425,9 @@ impl HirTypeParam {
 /// distinct source contracts and are kept as separate flags.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirParam {
-    /// Binding definition introduced by this parameter.
     pub def_id: DefId,
-
-    /// Interned parameter name.
     pub name: Symbol,
-
-    /// Declared parameter type.
     pub ty: TypeId,
-
-    /// Ownership/reference mode requested by the signature.
     pub mode: HirParamMode,
 
     /// Whether callers may omit this argument.
@@ -478,15 +441,12 @@ pub struct HirParam {
 
     /// Optional source-level default supplied with `vel`.
     pub default: Option<HirExpression>,
-
-    /// Source span for diagnostics about this binding.
     pub span: Span,
 }
 
 /// Source ownership/borrowing markers preserved through HIR lowering.
 ///
-/// Semantic analysis maps these to [`crate::semantic::ParamMode`] at the
-/// compiler-shaped boundary.
+/// Semantic analysis maps these to [`radix_types::SemanticParamMode`].
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum HirParamMode {
     /// Default value-passing mode when no ownership marker is written.
@@ -508,19 +468,12 @@ pub enum HirParamMode {
 /// checks can reason about relationships without reopening lexical scopes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirStruct {
-    /// Interned source name.
     pub name: Symbol,
-
-    /// Generic type parameters declared on the type.
     pub type_params: Vec<HirTypeParam>,
-
-    /// Normalized metadata attached to the genus declaration.
     pub annotations: Vec<HirAnnotation>,
 
     /// Instance/static fields in source order.
     pub fields: Vec<HirField>,
-
-    /// Methods declared inside the type body.
     pub methods: Vec<HirMethod>,
 
     /// Resolved base type, if the source declares extension.
@@ -537,13 +490,8 @@ pub struct HirStruct {
 /// default-value validation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirField {
-    /// Field definition identity used by field lookup and diagnostics.
     pub def_id: DefId,
-
-    /// Interned field name.
     pub name: Symbol,
-
-    /// Declared field type.
     pub ty: TypeId,
 
     /// Whether this field belongs to the type rather than instances.
@@ -551,14 +499,10 @@ pub struct HirField {
 
     /// Post-name declaration marker: the field is voluntary in object literals / construction.
     pub sponte: bool,
-
-    /// Normalized metadata attached to the field declaration.
     pub annotations: Vec<HirAnnotation>,
 
     /// Optional source initializer/default expression.
     pub init: Option<HirExpression>,
-
-    /// Declaration span for diagnostics.
     pub span: Span,
 }
 
@@ -573,8 +517,6 @@ pub struct HirMethod {
 
     /// Receiver mode lowered from method syntax.
     pub receiver: HirReceiver,
-
-    /// Whole-method source span.
     pub span: Span,
 }
 
@@ -597,29 +539,19 @@ pub enum HirReceiver {
 /// Sum type declaration with resolved variant definitions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirEnum {
-    /// Interned source name.
     pub name: Symbol,
-
-    /// Generic type parameters declared on the enum.
     pub type_params: Vec<HirTypeParam>,
-
-    /// Variants in source order.
     pub variants: Vec<HirVariant>,
 }
 
 /// Enum variant declaration.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirVariant {
-    /// Variant definition identity.
     pub def_id: DefId,
-
-    /// Interned variant name.
     pub name: Symbol,
 
     /// Positional or named fields carried by the variant.
     pub fields: Vec<HirVariantField>,
-
-    /// Variant declaration span.
     pub span: Span,
 }
 
@@ -628,11 +560,7 @@ pub struct HirVariant {
 pub struct HirVariantField {
     /// Field name when the variant uses named payloads.
     pub name: Symbol,
-
-    /// Declared payload type.
     pub ty: TypeId,
-
-    /// Source span for diagnostics.
     pub span: Span,
 }
 
@@ -643,10 +571,7 @@ pub struct HirVariantField {
 /// return type references.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirInterface {
-    /// Interned interface name.
     pub name: Symbol,
-
-    /// Generic type parameters declared on the interface.
     pub type_params: Vec<HirTypeParam>,
 
     /// Required method signatures.
@@ -658,11 +583,7 @@ pub struct HirInterface {
 pub struct HirInterfaceMethod {
     /// Target availability metadata. Empty means available for every target.
     pub availability: Vec<HirAvailability>,
-
-    /// Interned method name.
     pub name: Symbol,
-
-    /// Required parameter contract.
     pub params: Vec<HirParam>,
 
     /// Declared return type, or `None` when typecheck must infer/validate absence.
@@ -673,8 +594,6 @@ pub struct HirInterfaceMethod {
 
     /// Canonical callable posture (four-cell identity).
     pub posture: CallablePosture,
-
-    /// Signature span for diagnostics.
     pub span: Span,
 }
 
@@ -694,13 +613,8 @@ pub enum HirAvailability {
 /// Source alias from a name to a resolved semantic type.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirTypeAlias {
-    /// Alias name.
     pub name: Symbol,
-
-    /// Generic parameters on the alias declaration.
     pub type_params: Vec<HirTypeParam>,
-
-    /// Target type reference.
     pub ty: TypeId,
 }
 
@@ -710,19 +624,18 @@ pub struct HirTypeAlias {
 /// (docs/design/relational-views.md §2): it names only the columns the
 /// application needs, and extra source columns stay invisible. The name is a
 /// type-namespace identity and is **never** lowered to MIR or any backend
-/// leaf. Each column carries the D4 five-field metadata (public name, source
-/// mapping, Faber type, required/nullability, canonical order) as an ordered
-/// row.
+/// leaf. Each column carries five-field metadata (public name, source mapping,
+/// Faber type, required/nullability, canonical order) as an ordered row.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirSchema {
     /// Schema name (type-namespace identity; never a runtime value).
     pub name: Symbol,
 
-    /// Ordered per-column D4 metadata in canonical source order.
+    /// Ordered per-column metadata in canonical source order.
     pub columns: Vec<HirSchemaColumn>,
 }
 
-/// One ordered column of a lowered schema — the D4 five-field metadata row.
+/// One ordered column of a lowered schema — the five-field metadata row.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirSchemaColumn {
     /// Schema-facing public name; result rows are keyed by it.
@@ -750,13 +663,10 @@ pub struct HirSchemaColumn {
 /// compatibility are later-phase responsibilities.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirConst {
-    /// Constant name.
     pub name: Symbol,
 
     /// Explicit constant type, when declared.
     pub ty: Option<TypeId>,
-
-    /// Lowered initializer expression.
     pub value: HirExpression,
 
     /// Whether the source declaration permits mutation.
@@ -773,11 +683,8 @@ pub struct HirConst {
 /// back to the source import instead of losing that boundary.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirImport {
-    /// Interned import path/specifier.
     pub path: Symbol,
-
-    /// Visibility declared for the import.
-    pub visibility: radix_syntax::Visibility,
+    pub visibility: Visibility,
 
     /// Named items introduced by the import.
     pub items: Vec<HirImportItem>,
@@ -796,6 +703,10 @@ pub struct HirImportItem {
     pub alias: Option<Symbol>,
 }
 
+// ---------------------------------------------------------------------------
+// Blocks and statements
+// ---------------------------------------------------------------------------
+
 /// Breakable scope kind for [`HirBlock::breakable`].
 ///
 /// Loops (`dum` / `itera` / `fac … dum`) use expression-level lowering and do
@@ -813,13 +724,10 @@ pub enum HirBreakableKind {
 /// in its context.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct HirBlock {
-    /// Statements executed in order.
     pub statements: Vec<HirStatement>,
 
     /// Optional tail expression.
     pub expr: Option<Box<HirExpression>>,
-
-    /// Span covering the block construct.
     pub span: Span,
 
     /// When set, `rumpe` may exit this block before its syntactic end.
@@ -857,11 +765,7 @@ impl HirBlock {
 pub struct HirStatement {
     /// Statement identity for analysis tables.
     pub id: HirId,
-
-    /// Statement payload.
     pub kind: HirStatementKind,
-
-    /// Source span for diagnostics.
     pub span: Span,
 }
 
@@ -902,13 +806,10 @@ pub struct HirCustodi {
 /// One `si` clause inside a `custodi` section.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirCustodiClause {
-    /// Guard condition evaluated before the body.
     pub cond: HirExpression,
 
     /// Body executed when the guard condition is true.
     pub body: HirBlock,
-
-    /// Source span of the full guard clause.
     pub span: Span,
 }
 
@@ -935,10 +836,7 @@ pub enum HirIncDecOp {
 /// type from annotation, initializer, or both.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirLocal {
-    /// Local definition identity.
     pub def_id: DefId,
-
-    /// Interned local name.
     pub name: Symbol,
 
     /// Explicit local type annotation, if present.
@@ -966,14 +864,10 @@ pub struct HirLocal {
 pub struct HirExpression {
     /// Expression identity for analysis tables.
     pub id: HirId,
-
-    /// Expression payload.
     pub kind: HirExpressionKind,
 
     /// Type established by typecheck, or absent before analysis.
     pub ty: Option<TypeId>,
-
-    /// Source span for diagnostics about this expression.
     pub span: Span,
 }
 
@@ -985,11 +879,7 @@ pub struct HirCallArg {
 
     /// Whether the source argument used `sparge`.
     pub spread: bool,
-
-    /// Lowered argument expression.
     pub expr: HirExpression,
-
-    /// Whole argument span.
     pub span: Span,
 }
 
@@ -1002,19 +892,17 @@ pub struct HirCallArg {
 pub struct HirCape {
     /// Definition introduced for the caught value.
     pub binding_def_id: DefId,
-
-    /// Interned binding name.
     pub binding_name: Symbol,
 
     /// Declared or inferred binding type.
     pub binding_ty: Option<TypeId>,
-
-    /// Handler body.
     pub body: HirBlock,
-
-    /// Handler span for diagnostics.
     pub span: Span,
 }
+
+// ---------------------------------------------------------------------------
+// Expressions
+// ---------------------------------------------------------------------------
 
 /// Expression taxonomy after AST-to-HIR normalization.
 ///
@@ -1026,29 +914,17 @@ pub struct HirCape {
 pub enum HirExpressionKind {
     /// Resolved path to a definition.
     Path(DefId),
-
-    /// Literal value.
     Literal(HirLiteral),
 
-    /// Contextual empty value expression: `vacua`.
+    /// Contextual empty value: `vacua`.
     Vacua,
-
-    /// Binary operation.
     Binary(HirBinOp, Box<HirExpression>, Box<HirExpression>),
-
-    /// Unary operation.
     Unary(HirUnOp, Box<HirExpression>),
-
-    /// Function call.
     Call(Box<HirExpression>, Vec<TypeId>, Vec<HirCallArg>),
 
     /// Method call normalized from receiver syntax.
     MethodCall(Box<HirExpression>, Symbol, Vec<TypeId>, Vec<HirCallArg>),
-
-    /// Field access.
     Field(Box<HirExpression>, Symbol),
-
-    /// Index access.
     Index(Box<HirExpression>, Box<HirExpression>),
 
     /// Optional chaining for null-safe member, index, or call access.
@@ -1057,7 +933,6 @@ pub enum HirExpressionKind {
     /// Non-null assertion for member, index, or call access.
     NonNull(Box<HirExpression>, HirNonNullKind),
 
-    /// Block expression.
     Block(HirBlock),
 
     /// Conditional expression or statement form.
@@ -1089,7 +964,7 @@ pub enum HirExpressionKind {
     /// Iteration loop with a binding introduced by the loop head.
     Itera(HirIteraMode, DefId, Symbol, Box<HirExpression>, HirBlock),
 
-    /// Range expression.
+    /// Range (`intervallum`).
     Intervallum {
         start: Box<HirExpression>,
         end: Box<HirExpression>,
@@ -1097,7 +972,6 @@ pub enum HirExpressionKind {
         kind: HirRangeKind,
     },
 
-    /// Assignment.
     Assign(Box<HirExpression>, Box<HirExpression>),
 
     /// Conversion-directed assignment (`↤`, U+21A4).
@@ -1116,7 +990,6 @@ pub enum HirExpressionKind {
         recovery: Option<Box<HirExpression>>,
     },
 
-    /// Array literal.
     Array(Vec<HirArrayElement>),
 
     /// Struct literal whose type name is already resolved.
@@ -1152,7 +1025,10 @@ pub enum HirExpressionKind {
     Throw(Box<HirExpression>),
 
     /// Structured recoverable-error handler from an attached `cape` clause.
-    Handled { body: HirBlock, catch: Box<HirCape> },
+    Handled {
+        body: HirBlock,
+        catch: Box<HirCape>,
+    },
 
     /// Closure with parameters, optional return/error types, and expression body.
     Clausura(
@@ -1209,10 +1085,7 @@ pub enum HirExpressionKind {
         opener: Option<Box<HirExpression>>,
     },
 
-    /// Reference expression.
     Ref(HirRefKind, Box<HirExpression>),
-
-    /// Dereference expression.
     Deref(Box<HirExpression>),
 
     /// Runtime variant check: `expr est <type>` / `expr non est <type>`.
@@ -1240,10 +1113,7 @@ pub enum HirScribeKind {
 /// Array literal element, including spread syntax.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum HirArrayElement {
-    /// Ordinary element expression.
     Expr(HirExpression),
-
-    /// Spread element expression.
     Spread(HirExpression),
 }
 
@@ -1263,10 +1133,7 @@ pub struct HirObjectField {
 /// Object key taxonomy after lowering.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum HirObjectKey {
-    /// Identifier key.
     Ident(Symbol),
-
-    /// String literal key.
     String(Symbol),
 
     /// Computed key expression.
@@ -1348,8 +1215,8 @@ pub enum HirLiteral {
     Octeti(Symbol),
     /// Compile-time JSON object literal typed `valor`. The payload is the parsed
     /// constant JSON tree carried straight from the AST; duplicate keys are
-    /// rejected in the typecheck pass (Goal Stage 3).
-    JsonValor(radix_syntax::JsonValue),
+    /// rejected in the typecheck pass.
+    JsonValor(JsonValue),
     Regex(Symbol, Option<Symbol>),
     Bool(bool),
     Nil,
@@ -1411,16 +1278,9 @@ pub enum HirRefKind {
 /// surface, not parser-only syntax.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirCasuArm {
-    /// Accepted patterns for this arm.
     pub patterns: Vec<HirPattern>,
-
-    /// Optional guard expression.
     pub guard: Option<HirExpression>,
-
-    /// Arm body expression.
     pub body: HirExpression,
-
-    /// Source span for diagnostics about this arm.
     pub span: Span,
 }
 
@@ -1475,15 +1335,11 @@ pub enum HirTrivia {
     CommentLine {
         /// Interned comment payload, preserved verbatim.
         text: Symbol,
-        /// Source span for diagnostics.
         span: Span,
     },
 
     /// One boundary newline captured in lexer/parser order.
-    Newline {
-        /// Source span for diagnostics.
-        span: Span,
-    },
+    Newline { span: Span },
 }
 
 /// Closed taxonomy of presentation owner kinds for one schema version.
@@ -1530,8 +1386,6 @@ pub enum HirOwnerRef {
 pub struct HirTriviaOwner {
     /// Anchor identity for this owner (the attachment key).
     pub id: HirSourceAnchorId,
-
-    /// Owner kind within the closed taxonomy.
     pub kind: HirTriviaOwnerKind,
 
     /// Semantic node back-reference, when the owner annotates one.
@@ -1541,7 +1395,6 @@ pub struct HirTriviaOwner {
 /// Ordered trivia attached to one source anchor.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HirTriviaAttachment {
-    /// Owner anchor this trivia attaches to.
     pub anchor: HirSourceAnchorId,
 
     /// Trivia in lexer/parser order (comments and newlines interleaved).
@@ -1555,10 +1408,7 @@ pub struct HirTriviaAttachment {
 /// presentation always travel together.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HirPresentation {
-    /// Typed owners keyed by source anchor.
     pub owners: Vec<HirTriviaOwner>,
-
-    /// Ordered trivia attachments keyed by owner anchor.
     pub attachments: Vec<HirTriviaAttachment>,
 
     /// Structural ends of authored executable blocks.
@@ -1577,10 +1427,7 @@ pub struct HirPresentation {
 /// lowered to a target no-op.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HirBlockEnd {
-    /// Source anchor identity of this block end.
     pub id: HirSourceAnchorId,
-
-    /// Source span for diagnostics.
     pub span: Span,
 }
 
@@ -1589,9 +1436,6 @@ pub struct HirBlockEnd {
 /// Owned by the presentation sidecar — `HirProgram` carries no end field.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HirProgramEnd {
-    /// Source anchor identity of the program end.
     pub id: HirSourceAnchorId,
-
-    /// Source span for diagnostics.
     pub span: Span,
 }
