@@ -649,6 +649,7 @@ main {
     fs::write(
         dir.join("thing.fab"),
         r#"
+@ public
 fn label() → string {
   return "ok"
 }
@@ -705,6 +706,7 @@ main {
     fs::write(
         &module,
         r#"
+@ public
 fn label() → string {
   return "ok"
 }
@@ -810,6 +812,7 @@ main {
   print "module entry must not run"
 }
 
+@ public
 fn label() → int {
   return 7
 }
@@ -960,6 +963,7 @@ main {
     fs::write(
         dir.join("message.fab"),
         r#"
+@ public
 fn text() → string {
   return "stable"
 }
@@ -1029,6 +1033,7 @@ main {
         fs::write(
             dir.join("message.fab"),
             r#"
+@ public
 fn text() → string {
   return "multi"
 }
@@ -1285,6 +1290,7 @@ main {
     fs::write(
         &module,
         r#"
+@ public
 fn text() → string {
   return "multi"
 }
@@ -1338,6 +1344,7 @@ main {
     fs::write(
         &module,
         r#"
+@ public
 fn text() → string {
   return "multi"
 }
@@ -1784,6 +1791,7 @@ main args args {
     fs::write(
         &module,
         r#"
+@ public
 fn text(string name) → string {
   return "Salve, §!"(name)
 }
@@ -3601,6 +3609,7 @@ main {
     fs::write(
         dir.join("thing.fab"),
         r#"
+@ public
 fn label() → string {
   return "ok"
 }
@@ -3643,6 +3652,7 @@ main args args {
     fs::write(
         fixture.common.join("format.fab"),
         r#"
+@ public
 fn identity(string word) → string {
   return word
 }
@@ -3685,6 +3695,7 @@ main args args {
     fs::write(
         fixture.common.join("format.fab"),
         r#"
+@ public
 fn inter_spatia(list<string> verba) → string {
   if verba.length() ≡ 0 then return ""
   var string linea ← verba[0]
@@ -3736,6 +3747,7 @@ main args args {
         r##"
 import from "./format" format
 
+@ public
 fn scribe_identity(string word) → void {
   print format.identity(word)
 }
@@ -3745,6 +3757,7 @@ fn scribe_identity(string word) → void {
     fs::write(
         fixture.common.join("format.fab"),
         r#"
+@ public
 fn identity(string word) → string {
   return word
 }
@@ -3858,8 +3871,8 @@ fn identity(string word) → string {
     assert!(host.stdout_lines.is_empty());
     assert!(
         diagnostics.iter().any(|diag| {
-            diagnostic_has_issue(diag, "namespace_missing_export")
-                && diagnostic_has_arg(diag, "member", "hidden")
+            diagnostic_has_issue(diag, "import_module_private")
+                && diagnostic_has_arg(diag, "name", "hidden")
         }),
         "expected private shared export diagnostic, got {:?}",
         diagnostics
@@ -3889,6 +3902,7 @@ main {
         r#"
 import from "./util" U
 
+@ public
 fn run() → void {
   print U.adde(2, 3)
 }
@@ -3898,6 +3912,7 @@ fn run() → void {
     fs::write(
         dir.join("util.fab"),
         r#"
+@ public
 fn adde(int left, int right) → int {
   return left + right
 }
@@ -3943,6 +3958,7 @@ main {
     fs::write(
         dir.join("a").join("util.fab"),
         r#"
+@ public
 fn label() → int {
   return 1
 }
@@ -3952,6 +3968,7 @@ fn label() → int {
     fs::write(
         dir.join("b").join("util.fab"),
         r#"
+@ public
 fn label() → int {
   return 2
 }
@@ -4012,8 +4029,8 @@ fn publicum() → int {
     assert!(host.stdout_lines.is_empty());
     assert!(
         diagnostics.iter().any(|diag| {
-            diagnostic_has_issue(diag, "namespace_missing_export")
-                && diagnostic_has_arg(diag, "member", "secretum")
+            diagnostic_has_issue(diag, "import_module_private")
+                && diagnostic_has_arg(diag, "name", "secretum")
         }),
         "expected private export diagnostic, got {:?}",
         diagnostics
@@ -4598,6 +4615,7 @@ main {
     fs::write(
         dir.join("thing.fab"),
         r#"
+@ public
 class Thing {
     string name
 }
@@ -7474,6 +7492,7 @@ main {
     fs::write(
         dir.join("auxilium.fab"),
         r#"
+@ public
 fn saluta(string nomen) → string {
     return "Salve, §!"(nomen)
 }
@@ -7526,6 +7545,7 @@ main {
     fs::write(
         dir.join("auxilium.fab"),
         r#"
+@ public
 fn adde(int left, int right) → int {
     return left + right
 }
@@ -7571,6 +7591,7 @@ main {
     fs::write(
         dir.join("auxilium.fab"),
         r#"
+@ public
 fn label(string nomen) → string {
     return "Salve, §!"(nomen)
 }
@@ -7607,6 +7628,7 @@ main {
     fs::write(
         dir.join("auxilium.fab"),
         r#"
+@ public
 fn label(string nomen) → string {
     return nomen
 }
@@ -7716,6 +7738,7 @@ main {
     fs::write(
         dir.join("a").join("util.fab"),
         r#"
+@ public
 fn label() → string {
     return "A"
 }
@@ -7725,6 +7748,7 @@ fn label() → string {
     fs::write(
         dir.join("b").join("util.fab"),
         r#"
+@ public
 fn label() → string {
     return "B"
 }
@@ -7764,6 +7788,7 @@ main {
         r#"
 import from "./util" U
 
+@ public
 fn run() → void {
     print U.adde(2, 3)
 }
@@ -7773,6 +7798,7 @@ fn run() → void {
     fs::write(
         dir.join("util.fab"),
         r#"
+@ public
 fn adde(int left, int right) → int {
     return left + right
 }
@@ -7816,6 +7842,7 @@ main {
     fs::write(
         dir.join("a").join("types.fab"),
         r#"
+@ public
 class Thing {
     string label
 }
@@ -7825,6 +7852,7 @@ class Thing {
     fs::write(
         dir.join("b").join("types.fab"),
         r#"
+@ public
 class Thing {
     string label
 }
@@ -7861,6 +7889,7 @@ main {
     fs::write(
         dir.join("auxilium.fab"),
         r#"
+@ public
 fn dupla(int n) → int {
     return n * 2
 }
@@ -7919,8 +7948,8 @@ fn publicum() → string {
     let result = compile_package(&Config::default(), &dir.join("main.fab"));
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
-        diagnostic_has_issue(diag, "namespace_missing_export")
-            && diagnostic_has_arg(diag, "member", "secretum")
+        diagnostic_has_issue(diag, "import_module_private")
+            && diagnostic_has_arg(diag, "name", "secretum")
     }));
 }
 
@@ -7989,8 +8018,8 @@ fn solve(string input) → string {
     let result = compile_package(&Config::default(), &dir.join("main.fab"));
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
-        diagnostic_has_issue(diag, "namespace_missing_export")
-            && diagnostic_has_arg(diag, "member", "scan")
+        diagnostic_has_issue(diag, "import_module_private")
+            && diagnostic_has_arg(diag, "name", "scan")
     }));
 }
 
@@ -9249,6 +9278,7 @@ fn transitive_import_chorda_via_fixture_library_compiles() {
         r#"
 importa ex "norma:chorda" chorda
 
+@ publica
 functio split_fields(textus row) → lista<textus> {
     redde chorda.discissa(row, ",", row.length() + 1)
 }
@@ -9530,6 +9560,7 @@ fn publica_library_import_surfaces_as_nested_namespace_binding() {
         library_home.path(),
         "child",
         r#"
+@ publica
 functio label() → textus {
     redde "child"
 }
@@ -10522,7 +10553,7 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         dir.join("src/helper.fab"),
-        "fn identity(string s) → string {\n  return s\n}\n",
+        "@ public\nfn identity(string s) → string {\n  return s\n}\n",
     )
     .expect("helper");
     fs::write(
@@ -10641,6 +10672,7 @@ entry = "main.fab"
         r#"
 import from "norma:consolum" consolum
 
+@ public
 fn shout(string s) → void {
   consolum.scribe(s)
 }
@@ -10712,12 +10744,12 @@ entry = "main.fab"
     // Two non-entry modules export the same function name.
     fs::write(
         dir.join("src/a.fab"),
-        "fn identity(string s) → string {\n  return s\n}\n",
+        "@ public\nfn identity(string s) → string {\n  return s\n}\n",
     )
     .expect("a");
     fs::write(
         dir.join("src/b.fab"),
-        "fn identity(string s) → string {\n  return s + \"!\"\n}\n",
+        "@ public\nfn identity(string s) → string {\n  return s + \"!\"\n}\n",
     )
     .expect("b");
     fs::write(
@@ -10981,7 +11013,7 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         dir.join("src/helper.fab"),
-        format!("fn {func_name}(string s) → string {{\n  return s\n}}\n"),
+        format!("@ public\nfn {func_name}(string s) → string {{\n  return s\n}}\n"),
     )
     .expect("helper");
     fs::write(
@@ -11022,12 +11054,12 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         bad.join("src/a.fab"),
-        "fn identity(string s) → string {\n  return s\n}\n",
+        "@ public\nfn identity(string s) → string {\n  return s\n}\n",
     )
     .expect("a");
     fs::write(
         bad.join("src/b.fab"),
-        "fn identity(string s) → string {\n  return s + \"!\"\n}\n",
+        "@ public\nfn identity(string s) → string {\n  return s + \"!\"\n}\n",
     )
     .expect("b");
     fs::write(

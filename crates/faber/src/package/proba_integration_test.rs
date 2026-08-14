@@ -50,10 +50,12 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         dir.join("src/helpers.fab"),
-        r#"fn double(int n) → int {
+        r#"@ public
+fn double(int n) → int {
     return n * 2
 }
 
+@ public
 fn identity(int n) → int {
     return n
 }
@@ -456,23 +458,23 @@ targets = ["rust"]
     // Slim pure surface matching mathesis-style catalog helpers.
     fs::write(
         src.join("mathesis.fab"),
-        r#"fn PI() → float {
+        r#"@ public
+fn PI() → float {
     return 3.141592653589793
 }
 
+@ public
 fn addita(float a, float b) → float {
     return a + b
 }
 "#,
     )
     .expect("mathesis.fab");
-    let proba_body = fs::read_to_string(
-        radix::paths::faberlang_home()
-            .expect("faberlang container root")
-            .join("norma/src/mathesis.proba"),
-    )
-    .unwrap_or_else(|_| {
-        r#"import from "./mathesis" mathesis
+    // En-surface fixture mirroring the norma mathesis catalog style (import +
+    // describe/test blocks). The real `norma/src/mathesis.proba` is Latin
+    // surface with its own `privata` import; pinning the probe here keeps the
+    // package test independent of the sibling repo's surface.
+    let proba_body = r#"import from "./mathesis" mathesis
 
 fn sum_pi(float x) → float {
     return mathesis.addita(mathesis.PI(), x)
@@ -488,8 +490,7 @@ describe "mathesis catalog" {
     }
 }
 "#
-        .to_owned()
-    });
+    .to_owned();
     fs::write(src.join("mathesis.proba"), proba_body).expect("mathesis.proba");
 
     let result = compile_package_with_test_options(&Config::default(), dir.path(), None, None);

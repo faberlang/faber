@@ -322,6 +322,7 @@ main {
     std::fs::write(
         dir.join("lib.fab"),
         r#"
+@ public
 fn answer() → int {
     return 42
 }
@@ -375,6 +376,7 @@ main {
     std::fs::write(
         dir.join("lib.fab"),
         r#"
+@ public
 fn answer() → int {
     return 42
 }

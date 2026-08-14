@@ -153,6 +153,7 @@ main {
 group = "custom.lib"
 +++
 
+@ public
 fn answer() → int {
     return 42
 }
@@ -385,12 +386,14 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         src.join("math.fab"),
-        r#"class Vector3 {
+        r#"@ public
+class Vector3 {
     f32 x
     f32 y
     f32 z
 }
 
+@ public
 fn vector3(f32 x, f32 y, f32 z) → Vector3 {
     return Vector3 { x = x, y = y, z = z }
 }
