@@ -1,4 +1,4 @@
-//! `faber test` — interpret proba cases on the MIR stepper (not a Cargo harness).
+//! `faber test` — interpret proba cases on the MIR runner (not a Cargo harness).
 
 use crate::cli::TestArgs;
 use crate::input_shape::locale_without_package_error;
@@ -10,7 +10,7 @@ use radix::proba::{
 };
 use std::path::{Path, PathBuf};
 
-/// Discover, select, and run proba cases exclusively on the MIR stepper.
+/// Discover, select, and run proba cases exclusively on the MIR runner.
 pub(super) fn cmd_test(args: &TestArgs) {
     crate::commands::validate_deny_codes(&args.deny);
     let input_path = PathBuf::from(&args.path);
@@ -45,7 +45,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
     // not yet supported as a positive suite; document via fail-closed message.
     if args.ignored {
         eprintln!(
-            "error: --ignored is not supported on the MIR stepper runner; use omitte/futurum cases with default run (they skip) or --include-ignored to list them"
+            "error: --ignored is not supported on the MIR runner; use omitte/futurum cases with default run (they skip) or --include-ignored to list them"
         );
         std::process::exit(2);
     }
@@ -57,12 +57,12 @@ pub(super) fn cmd_test(args: &TestArgs) {
 
     // ONE-EFFECTIVE-TARGET SEAM (TARGETLANE001 executed-lane routing;
     // authoritative decision record `radix/docs/factory/
-    // executed-lane-target-decision.md`): the stepper analysis target resolves
+    // executed-lane-target-decision.md`): the runner analysis target resolves
     // to a MIR-backed target — the manifest `[build] target` when present,
     // else the executed-lane default `fmir` — so air-lane packages (e.g.
     // gradus) pass the lane policy at analysis instead of tripping
     // `lane_requires_mir_backed_target` under the old HIR-direct placeholder.
-    // The stepper never emits product targets; the target only selects the
+    // The runner never emits product targets; the target only selects the
     // analysis lane-policy posture.
     let analysis_target = package::executed_lane_analysis_target(&Config::default(), &input_path);
     let config = match package::config_with_locale(
@@ -178,7 +178,7 @@ fn run_package(
 
     let mut combined = ProbaReport::default();
     // Per-unit lower + run for units that inventory at least one proba case.
-    // Product-only units are skipped (no stepper lower) so packages with
+    // Product-only units are skipped (no runner lower) so packages with
     // unsupported product MIR still run self-contained test units. Cross-unit
     // imports that need package MIR linking fail closed — never Rust fallback.
     for unit in &mut package.units {
@@ -207,7 +207,7 @@ fn run_package(
                         suite_path: case.suite_path,
                         outcome: CaseOutcome::Failed {
                             message: format!(
-                                "unit failed to lower for stepper proba execution ({unit_path})"
+                                "unit failed to lower for runner proba execution ({unit_path})"
                             ),
                         },
                     });

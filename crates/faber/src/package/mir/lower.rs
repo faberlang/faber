@@ -845,7 +845,7 @@ pub(super) fn rewrite_value_type_id(value: &mut MirValue, rewrites: &[(TypeId, T
 /// consumer analysis's variant identities (codex-gap S1 U2 VALUE members).
 ///
 /// A library unit constructs and projects its variants under its own variant
-/// `DefId`s; the merged program's variant metadata and the stepper's variant
+/// `DefId`s; the merged program's variant metadata and the runner's variant
 /// tags are keyed by the *consumer* variant defs, so every
 /// `EnumVariant`/`VariantField` reference in the lowered source program must
 /// ride the nominal remap. Variant defs without a consumer mapping keep their

@@ -49,11 +49,11 @@ mod read_analysis;
 #[allow(dead_code)]
 mod tensor_bracket;
 
-/// Shared lista→tensor shape helpers used by validation and the MIR stepper.
+/// Shared lista→tensor shape helpers used by validation and the MIR runner.
 pub mod lista_tensor_conversio;
-/// Literal matrix shape resolution for MIR validation and the stepper.
+/// Literal matrix shape resolution for MIR validation and the runner.
 pub mod matrix_shape;
-/// Literal vector width resolution for MIR layout and the stepper.
+/// Literal vector width resolution for MIR layout and the runner.
 pub mod vector_width;
 
 pub use abi::{

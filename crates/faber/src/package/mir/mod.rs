@@ -1,4 +1,4 @@
-//! Package MIR linking spike for the systems-lane stepper.
+//! Package MIR linking spike for the systems-lane runner.
 //!
 //! INVARIANT: this path links only package-local file namespace calls into one
 //! validated MIR program. It does not use generated Rust metadata as the
@@ -85,7 +85,7 @@ use radix::mir::{
     MirOperand, MirOptionChainLink, MirOptionOp, MirPlace, MirProgram, MirProjection,
     MirProviderKind, MirRuntimeCall, MirRuntimeRecordField, MirRuntimeRecordValue, MirStatement,
     MirStatementKind, MirSwitchCase, MirTerminator, MirTerminatorKind, MirType, MirValue,
-    MirValueKind, StepperError,
+    MirValueKind, RunnerError,
 };
 use radix::semantic::{IndexExpr, Primitive, Resolver, Type, TypeId, TypeTable, TypeTableSnapshot};
 use radix_mir_fmir::{

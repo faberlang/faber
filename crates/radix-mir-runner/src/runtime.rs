@@ -1,0 +1,3811 @@
+//! In-process evaluation of MIR runtime calls, aggregates, and projections.
+//!
+//! This file is the runner's host-facing interpreter surface: runtime
+//! intrinsics and constructs become [`Value`]s through the active host.
+//! Control-flow stepping stays in `lib.rs`. Target-directed `↦` conversion
+//! stays in `conversio`.
+
+#![allow(
+    clippy::bool_to_int_with_if,
+    clippy::cast_lossless,
+    clippy::float_cmp,
+    clippy::match_bool,
+    clippy::match_same_arms,
+    clippy::match_wildcard_for_single_variants,
+    clippy::needless_pass_by_value,
+    clippy::too_many_lines,
+    clippy::map_unwrap_or,
+    clippy::unused_self
+)]
+// Semantic numeric conversions between host value kinds: collection and
+// tensor sizes/shapes surface as `Value::Int` (usize/i64), indexes narrow to
+// `usize`, and mixed-carrier math promotes to f64. Loss beyond the i64/f64
+// host range is the runner's deliberate wrap-on-convert behavior.
+#![expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss,
+    reason = "semantic numeric conversions between host value kinds in the MIR runtime evaluator"
+)]
+
+use super::value::{
+    format_template, modular_operand, modular_word_mask, modular_word_result,
+    uint_width_checked_add, values_equal, width_checked_add, GradientStorage, MapKey, SermoValue,
+    TensorValue, Value,
+};
+use super::{gelu_f64, Runner, RunnerError};
+use radix_hir::DefId;
+use radix_lexer::{Span, Symbol};
+use radix_mir::{
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlockId,
+    MirCollectionOp, MirConstant, MirConversion, MirConversionFlavor, MirGradientOp, MirIntrinsic,
+    MirOperand, MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirProvider, MirProviderKind,
+    MirRuntimeCall, MirSermoOp, MirType, MirTypeCheckOp,
+};
+use radix_runtime_contract::tensor::{
+    tensor_dim_non_negative, tensor_flat_offset, tensor_shape_element_count,
+    ERR_ACCIPE_INVALID_INDEX, ERR_CREA_INVALID_SHAPE, ERR_ELEMENT_COUNT_OVERFLOW,
+    ERR_FORMA_ELEMENT_COUNT, ERR_FORMA_RESHAPE_COUNT, ERR_MATMUL_ARGUMENT_RANK,
+    ERR_MATMUL_INNER_DIMENSION, ERR_MATMUL_RECEIVER_RANK, ERR_PONDE_INVALID_INDEX,
+};
+use radix_types::{
+    effective_width, IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable,
+};
+use rustc_hash::FxHashMap;
+use std::cell::RefCell;
+use std::rc::Rc;
+
+impl<H: super::Host + ?Sized> Runner<'_, H> {
+    // RUNTIME CALL DISPATCH
+
+    pub(crate) fn eval_runtime_call(
+        &mut self,
+        call: &MirRuntimeCall,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        match &call.intrinsic {
+            MirIntrinsic::Diagnostic(kind) => {
+                let [arg] = call.args.as_slice() else {
+                    return Err(RunnerError::internal(span, "diagnostic runtime arity"));
+                };
+                let text = self.eval_operand(arg, span)?.display(self.interner, span)?;
+                self.host.scribe(*kind, &text)?;
+                Ok(Value::Unit)
+            }
+            MirIntrinsic::FormatString { template } => {
+                let template_text = self.interner.resolve(*template);
+                let args = call
+                    .args
+                    .iter()
+                    .map(|arg| self.eval_operand(arg, span))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(Value::Str(format_template(
+                    template_text,
+                    &args,
+                    self.interner,
+                    span,
+                )?))
+            }
+            MirIntrinsic::Convert(conversion) => self.eval_convert(conversion, &call.args, span),
+            MirIntrinsic::Collection(op) => {
+                self.eval_collection(*op, &call.args, call.return_ty, span)
+            }
+            MirIntrinsic::Atomic(op) => Err(RunnerError::unsupported(
+                span,
+                &format!("intrinsic Atomic({})", op.spelling()),
+            )),
+            MirIntrinsic::Assert => self.eval_assert(&call.args, span),
+            MirIntrinsic::Panic => self.eval_panic(&call.args, span),
+            MirIntrinsic::ReadLine => {
+                if !call.args.is_empty() {
+                    return Err(RunnerError::internal(span, "read_line runtime arity"));
+                }
+                match self.host.read_line()? {
+                    Some(line) => Ok(Value::Str(line)),
+                    None => Ok(Value::Nil),
+                }
+            }
+            MirIntrinsic::Provider(provider) => self.eval_provider(provider, &call.args, span),
+            MirIntrinsic::SermoOpen => self.eval_sermo_open(&call.args, span),
+            MirIntrinsic::SermoSetOpener => self.eval_sermo_set_opener(&call.args, span),
+            MirIntrinsic::Sermo(op) => self.eval_sermo_op(op, &call.args, call.return_ty, span),
+            MirIntrinsic::Cede => self.eval_cede(&call.args, span),
+            MirIntrinsic::CursorStream(stream) => self.eval_cursor_stream(stream, &call.args, span),
+            MirIntrinsic::Gradient(op) => self.eval_gradient(*op, &call.args, span),
+            MirIntrinsic::TypeCheck(op) => self.eval_type_check(op, &call.args, span),
+            other => Err(RunnerError::unsupported(
+                span,
+                &format!("intrinsic {other:?}"),
+            )),
+        }
+    }
+
+    fn eval_sermo_open(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [route] = args else {
+            return Err(RunnerError::internal(span, "sermo_open runtime arity"));
+        };
+        let route = self
+            .eval_operand(route, span)?
+            .display(self.interner, span)?;
+        Ok(Value::Sermo(Rc::new(RefCell::new(SermoValue {
+            route,
+            opener: Value::Nil,
+        }))))
+    }
+
+    fn eval_sermo_set_opener(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [sermo, opener] = args else {
+            return Err(RunnerError::internal(
+                span,
+                "sermo_set_opener runtime arity",
+            ));
+        };
+        let Value::Sermo(sermo) = self.eval_operand(sermo, span)? else {
+            return Err(RunnerError::internal(
+                span,
+                "sermo_set_opener requires sermo handle",
+            ));
+        };
+        let opener = self.eval_operand(opener, span)?;
+        sermo.borrow_mut().opener = opener;
+        Ok(Value::Unit)
+    }
+
+    #[allow(clippy::single_match_else)]
+    fn eval_sermo_op(
+        &mut self,
+        op: &MirSermoOp,
+        args: &[MirOperand],
+        return_ty: MirType,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        match op {
+            MirSermoOp::DrainCursor => {
+                let [cursor] = args else {
+                    return Err(RunnerError::internal(span, "sermo cursor drain arity"));
+                };
+                let Value::Array(frames) = self.eval_operand(cursor, span)? else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "sermo cursor drain requires cursor carrier",
+                    ));
+                };
+                let frames = frames.borrow().clone();
+                Ok(Value::Array(Rc::new(RefCell::new(frames))))
+            }
+            _ => {
+                let Some(receiver) = args.first() else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "sermo operation requires receiver",
+                    ));
+                };
+                let Value::Sermo(sermo) = self.eval_operand(receiver, span)? else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "sermo operation receiver mismatch",
+                    ));
+                };
+                match op {
+                    MirSermoOp::ViewMeus | MirSermoOp::ViewTuus => Ok(Value::Sermo(sermo)),
+                    MirSermoOp::Send => Ok(Value::Unit),
+                    MirSermoOp::Finish => {
+                        let Type::Enum(status) = self.types.get(return_ty.semantic_id()) else {
+                            return Err(RunnerError::internal(
+                                span,
+                                "sermo finish status type mismatch",
+                            ));
+                        };
+                        Ok(Value::EnumVariant(
+                            *status,
+                            Rc::new(RefCell::new(FxHashMap::default())),
+                        ))
+                    }
+                    MirSermoOp::Receive { frame, data_field } => {
+                        Ok(sermo_frame_value(&sermo.borrow(), *frame, *data_field))
+                    }
+                    MirSermoOp::Cursor { frame, data_field } => {
+                        Ok(array_value(vec![sermo_frame_value(
+                            &sermo.borrow(),
+                            *frame,
+                            *data_field,
+                        )]))
+                    }
+                    MirSermoOp::DrainCursor => {
+                        Err(RunnerError::internal(span, "nested cursor drain dispatch"))
+                    }
+                }
+            }
+        }
+    }
+
+    /// `cede <expr>` — yield inside a stream generator.
+    ///
+    /// WHY: inside a generator frame (`Frame::is_generator`) the value is
+    /// appended to the active yield buffer and `cede` returns `Unit`, letting
+    /// the generator continue to the next yield.
+    pub(crate) fn eval_cede(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [arg] = args else {
+            return Err(RunnerError::internal(span, "cede runtime arity"));
+        };
+        let value = self.eval_operand(arg, span)?;
+        let is_generator = self.frames.last().is_some_and(|frame| frame.is_generator);
+        if is_generator {
+            if let Some(buffer) = self.generator_yields.last_mut() {
+                buffer.push(value);
+            }
+            Ok(Value::Unit)
+        } else {
+            Ok(value)
+        }
+    }
+
+    /// Materialize a `@ cursor` call into a `lista<T>` by running the generator
+    /// to completion and collecting its `cede` yields.
+    ///
+    /// Mirrors `invoke_call` but marks the callee frame as a generator and drains
+    /// a dedicated yield buffer (the generator's own return value is discarded).
+    pub(crate) fn eval_cursor_stream(
+        &mut self,
+        stream: &radix_mir::MirCursorStream,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let func_id = self.resolve_definition(stream.callee, span)?;
+        let param_locals = self
+            .function_by_id(func_id, span)?
+            .params
+            .iter()
+            .map(|param| param.local)
+            .collect::<Vec<_>>();
+        let arg_values = args
+            .iter()
+            .map(|arg| self.eval_operand(arg, span))
+            .collect::<Result<Vec<_>, _>>()?;
+        if param_locals.len() != arg_values.len() {
+            return Err(RunnerError::internal(
+                span,
+                "cursor stream argument count mismatch",
+            ));
+        }
+
+        let depth = self.frames.len();
+        self.return_value = None;
+        self.return_error = None;
+        self.generator_yields.push(Vec::new());
+        self.push_frame(func_id, MirBlockId(0));
+        if let Some(frame) = self.frames.last_mut() {
+            frame.is_generator = true;
+            for (local, arg) in param_locals.into_iter().zip(arg_values) {
+                frame.locals.insert(local, arg);
+            }
+        }
+        self.run_until_depth(depth);
+
+        // WHY: the generator frame was popped on `Return`, but the yield buffer
+        // lives on the runner — pop it as the materialized `lista<T>`.
+        let yields = self.generator_yields.pop().unwrap_or_default();
+        if let Some(error) = self.errors.pop() {
+            while self.frames.len() > depth {
+                self.frames.pop();
+            }
+            return Err(error);
+        }
+        while self.frames.len() > depth {
+            self.frames.pop();
+        }
+        // The generator's own return value is discarded; CursorStream returns
+        // the collected yield list.
+        self.return_value = None;
+        self.return_error = None;
+        Ok(Value::Array(Rc::new(RefCell::new(yields))))
+    }
+
+    // GRADIENT HANDLES
+
+    /// Evaluate an in-process gradient-handle operation.
+    ///
+    /// Mirrors the host LLVM gradient ABI semantics
+    /// (`__faber_rt_v1_gradient_create/accumulate/read/zero`) as `Value`
+    /// carriers: a plain host-side map keyed by opaque handle id, element-wise
+    /// accumulation, and zero fill on `Zero`. This is the runner's
+    /// clean-break in-process contract — the device ABI ownership surface
+    /// (LLVM/WGSL/Wasm) is untouched.
+    fn eval_gradient(
+        &mut self,
+        op: MirGradientOp,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        match op {
+            MirGradientOp::Create => self.gradient_create(args, span),
+            MirGradientOp::Accumulate => self.gradient_accumulate(args, span),
+            MirGradientOp::Read => self.gradient_read(args, span),
+            MirGradientOp::Zero => self.gradient_zero(args, span),
+        }
+    }
+
+    /// `gradient create(shape, rank, kind)` — allocate zero-filled gradient
+    /// storage and return an opaque handle id.
+    ///
+    /// Argument contract mirrors `validate_gradient_call`: `args[0]` is the
+    /// shape (a `lista` of dims or a tensor whose shape provides the dims),
+    /// `args[1]` the rank, `args[2]` the element kind. The kind is accepted
+    /// as-is — the in-process carrier stores typed `Value`s, so the host's
+    /// f32-only ABI restriction is not runner policy.
+    fn gradient_create(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [shape_arg, rank_arg, _kind_arg, ..] = args else {
+            return Err(RunnerError::internal(span, "gradient create arity"));
+        };
+        let shape_value = self.eval_operand(shape_arg, span)?;
+        let rank = self.eval_operand(rank_arg, span)?.as_index(span)?;
+        let shape = gradient_shape_dims(&shape_value, rank, span)?;
+        let count = tensor_element_count(&shape, span)?;
+        let id = self.next_gradient_handle;
+        self.next_gradient_handle = self
+            .next_gradient_handle
+            .checked_add(1)
+            .ok_or_else(|| RunnerError::internal(span, "gradient handle id overflow"))?;
+        self.gradient_handles.insert(
+            id,
+            GradientStorage {
+                data: vec![Value::Float(0.0); count],
+                shape,
+            },
+        );
+        Ok(Value::GradientHandle(id))
+    }
+
+    /// `gradient accumulate(handle, data, shape, rank, scale)` — element-wise
+    /// accumulate incoming gradient data into stored storage.
+    ///
+    /// Mirrors the host ABI: incoming shape must match the stored shape and
+    /// the backing length must match before adding. The `scale` argument is
+    /// accepted but unused, matching the LLVM emitter which lowers only
+    /// `(handle, data, shape, rank)`.
+    fn gradient_accumulate(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [handle_arg, data_arg, shape_arg, rank_arg, _scale_arg] = args else {
+            return Err(RunnerError::internal(span, "gradient accumulate arity"));
+        };
+        let handle = self.gradient_handle_id(handle_arg, span)?;
+        let shape_value = self.eval_operand(shape_arg, span)?;
+        let rank = self.eval_operand(rank_arg, span)?.as_index(span)?;
+        let incoming_shape = gradient_shape_dims(&shape_value, rank, span)?;
+        let incoming = match self.eval_operand(data_arg, span)? {
+            Value::Tensor(tensor) => tensor.borrow().data.clone(),
+            Value::Array(items) => items.borrow().clone(),
+            _ => {
+                return Err(RunnerError::internal(
+                    span,
+                    "gradient accumulate data is not tensor storage",
+                ))
+            }
+        };
+        let storage = self.gradient_handles.get_mut(&handle).ok_or_else(|| {
+            RunnerError::internal(span, format!("gradient accumulate unknown handle {handle}"))
+        })?;
+        if incoming_shape != storage.shape {
+            return Err(RunnerError::internal(
+                span,
+                format!(
+                    "gradient accumulate shape mismatch {:?} vs stored {:?}",
+                    incoming_shape, storage.shape
+                ),
+            ));
+        }
+        if incoming.len() != storage.data.len() {
+            return Err(RunnerError::internal(
+                span,
+                "gradient accumulate backing-length mismatch",
+            ));
+        }
+        for (stored, incoming_value) in storage.data.iter_mut().zip(incoming.iter()) {
+            *stored = numeric_add(stored, incoming_value, NumericWidth::F64, span)?;
+        }
+        Ok(Value::Unit)
+    }
+
+    /// `gradient read(handle)` — return the accumulated gradient as a tensor.
+    fn gradient_read(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [handle_arg] = args else {
+            return Err(RunnerError::internal(span, "gradient read arity"));
+        };
+        let handle = self.gradient_handle_id(handle_arg, span)?;
+        let storage = self.gradient_handles.get(&handle).ok_or_else(|| {
+            RunnerError::internal(span, format!("gradient read unknown handle {handle}"))
+        })?;
+        Ok(Value::Tensor(Rc::new(RefCell::new(TensorValue {
+            data: storage.data.clone(),
+            shape: storage.shape.clone(),
+        }))))
+    }
+
+    /// `gradient zero(handle)` — reset the gradient storage to zero.
+    fn gradient_zero(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [handle_arg] = args else {
+            return Err(RunnerError::internal(span, "gradient zero arity"));
+        };
+        let handle = self.gradient_handle_id(handle_arg, span)?;
+        let storage = self.gradient_handles.get_mut(&handle).ok_or_else(|| {
+            RunnerError::internal(span, format!("gradient zero unknown handle {handle}"))
+        })?;
+        for slot in &mut storage.data {
+            *slot = Value::Float(0.0);
+        }
+        Ok(Value::Unit)
+    }
+
+    fn gradient_handle_id(
+        &mut self,
+        operand: &MirOperand,
+        span: Span,
+    ) -> Result<u64, RunnerError> {
+        match self.eval_operand(operand, span)? {
+            Value::GradientHandle(id) => Ok(id),
+            other => Err(RunnerError::internal(
+                span,
+                format!("gradient operation requires opaque handle, got {other:?}"),
+            )),
+        }
+    }
+
+    // AGGREGATE CONSTRUCTION
+
+    pub(crate) fn eval_construct(
+        &mut self,
+        aggregate: &MirAggregate,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        match aggregate.kind {
+            MirAggregateKind::Tuple => {
+                let items = self.eval_ordered_fields(&aggregate.fields, span)?;
+                Ok(Value::Tuple(items))
+            }
+            MirAggregateKind::Array => {
+                let items = self.eval_ordered_fields(&aggregate.fields, span)?;
+                Ok(Value::Array(Rc::new(RefCell::new(items))))
+            }
+            MirAggregateKind::Record => {
+                let map = self.eval_named_fields(
+                    &aggregate.fields,
+                    span,
+                    "record construct requires named fields",
+                )?;
+                Ok(Value::Record(Rc::new(RefCell::new(map))))
+            }
+            MirAggregateKind::Map => {
+                let mut map = FxHashMap::default();
+                let MirAggregateFields::Keyed(entries) = &aggregate.fields else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "map construct requires keyed fields",
+                    ));
+                };
+                for entry in entries {
+                    let key = self.eval_operand(&entry.key, span)?.to_key(span)?;
+                    let value = self.eval_operand(&entry.value, span)?;
+                    map.insert(key, value);
+                }
+                Ok(Value::Map(Rc::new(RefCell::new(map))))
+            }
+            MirAggregateKind::Set => {
+                let mut set = rustc_hash::FxHashSet::default();
+                let items = self.eval_ordered_fields(&aggregate.fields, span)?;
+                for item in items {
+                    set.insert(item.to_key(span)?);
+                }
+                Ok(Value::Set(Rc::new(RefCell::new(set))))
+            }
+            MirAggregateKind::Tensor => {
+                let MirAggregateFields::Ordered(items) = &aggregate.fields else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "tensor construct requires ordered fields",
+                    ));
+                };
+                if !items.is_empty() {
+                    return Err(RunnerError::internal(
+                        span,
+                        "tensor construct supports only vacua",
+                    ));
+                }
+                Ok(Value::Tensor(Rc::new(RefCell::new(TensorValue {
+                    data: Vec::new(),
+                    shape: Vec::new(),
+                }))))
+            }
+            MirAggregateKind::SparseTensor => {
+                let MirAggregateFields::Ordered(items) = &aggregate.fields else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "sparse tensor construct requires ordered fields",
+                    ));
+                };
+                if !items.is_empty() {
+                    return Err(RunnerError::internal(
+                        span,
+                        "sparse tensor construct supports only vacua",
+                    ));
+                }
+                let Type::Sparsa(element, shape) = self.types.get(aggregate.ty.semantic_id())
+                else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "sparse tensor construct type mismatch",
+                    ));
+                };
+                let shape = literal_sparse_shape(self.types, *shape, span)?;
+                let zero = sparse_zero_value(self.types, *element, span)?;
+                let count = tensor_element_count(&shape, span)?;
+                Ok(tensor_value(vec![zero; count], shape))
+            }
+            MirAggregateKind::Interval { inclusive } => {
+                let [start, end] = self
+                    .eval_ordered_fields(&aggregate.fields, span)?
+                    .try_into()
+                    .map_err(|_| {
+                        RunnerError::internal(span, "interval construct requires two bounds")
+                    })?;
+                // F-082: reject reversed bounds (start > end) — an interval must
+                // be monotonic so every materialized element is reachable.
+                match (&start, &end) {
+                    (Value::Int(a), Value::Int(b)) if a > b => {
+                        return Err(RunnerError::internal(
+                            span,
+                            "interval bounds must be monotonic (start ≤ end)",
+                        ));
+                    }
+                    (Value::UInt(a), Value::UInt(b)) if a > b => {
+                        return Err(RunnerError::internal(
+                            span,
+                            "interval bounds must be monotonic (start ≤ end)",
+                        ));
+                    }
+                    (Value::Float(a), Value::Float(b)) if a > b => {
+                        return Err(RunnerError::internal(
+                            span,
+                            "interval bounds must be monotonic (start ≤ end)",
+                        ));
+                    }
+                    _ => {}
+                }
+                Ok(interval_value(start, end, inclusive))
+            }
+            MirAggregateKind::Vector => {
+                let Type::Vector(_, width) = self.types.get(aggregate.ty.semantic_id()) else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "vector construct type mismatch",
+                    ));
+                };
+                let Some(width) = radix_mir::vector_width::literal_vector_width(*width, self.types)
+                else {
+                    return Err(RunnerError::unsupported(
+                        span,
+                        "vector construct non-literal width",
+                    ));
+                };
+                let values = self.eval_ordered_fields(&aggregate.fields, span)?;
+                if values.len() != usize::from(width) {
+                    return Err(RunnerError::internal(
+                        span,
+                        format!(
+                            "vector construct expected {width} lanes, got {}",
+                            values.len()
+                        ),
+                    ));
+                }
+                Ok(Value::Vector(Rc::new(RefCell::new(values))))
+            }
+            MirAggregateKind::Matrix => {
+                let Type::Matrix(_, shape) = self.types.get(aggregate.ty.semantic_id()) else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "matrix construct type mismatch",
+                    ));
+                };
+                let Some((rows, columns)) =
+                    radix_mir::matrix_shape::literal_matrix_shape(*shape, self.types)
+                else {
+                    return Err(RunnerError::unsupported(
+                        span,
+                        "matrix construct non-literal shape",
+                    ));
+                };
+                let values = self.eval_ordered_fields(&aggregate.fields, span)?;
+                let expected = usize::from(rows) * usize::from(columns);
+                if values.len() != expected {
+                    return Err(RunnerError::internal(
+                        span,
+                        format!(
+                            "matrix construct expected {expected} cells, got {}",
+                            values.len()
+                        ),
+                    ));
+                }
+                Ok(Value::Matrix(Rc::new(RefCell::new(
+                    super::value::MatrixValue {
+                        rows,
+                        columns,
+                        data: values,
+                    },
+                ))))
+            }
+            MirAggregateKind::ClosureEnvironment(environment_id) => {
+                let map = self.eval_named_fields(
+                    &aggregate.fields,
+                    span,
+                    "closure environment construct requires named fields",
+                )?;
+                Ok(Value::ClosureEnvironment(
+                    environment_id,
+                    Rc::new(RefCell::new(map)),
+                ))
+            }
+            MirAggregateKind::Struct(def_id) => {
+                let map = self.eval_named_fields(
+                    &aggregate.fields,
+                    span,
+                    "struct construct requires named fields",
+                )?;
+                Ok(Value::Struct(def_id, Rc::new(RefCell::new(map))))
+            }
+            MirAggregateKind::EnumVariant(def_id) => {
+                let items = self.eval_variant_fields(&aggregate.fields, span)?;
+                Ok(Value::EnumVariant(def_id, Rc::new(RefCell::new(items))))
+            }
+        }
+    }
+
+    // OPTION, CONVERSION, AND ASSERT
+
+    pub(crate) fn eval_option_value(
+        &mut self,
+        op: &MirOptionOp,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        match op {
+            MirOptionOp::None => Ok(Value::Nil),
+            MirOptionOp::Some(operand) => self.eval_operand(operand, span),
+            MirOptionOp::IsNil(operand) => {
+                let value = self.eval_operand(operand, span)?;
+                Ok(Value::Bool(matches!(value, Value::Nil)))
+            }
+            MirOptionOp::IsNotNil(operand) => {
+                let value = self.eval_operand(operand, span)?;
+                Ok(Value::Bool(!matches!(value, Value::Nil)))
+            }
+            MirOptionOp::Unwrap { value, mode } => {
+                let value = self.eval_operand(value, span)?;
+                match value {
+                    Value::Nil => match mode {
+                        MirOptionUnwrapMode::Assert => self.host.abort("unwrap of nihil"),
+                        MirOptionUnwrapMode::Assume => {
+                            Err(RunnerError::internal(span, "unwrap assume on nihil"))
+                        }
+                    },
+                    other => Ok(other),
+                }
+            }
+            MirOptionOp::Coalesce { value, fallback } => {
+                let value = self.eval_operand(value, span)?;
+                if matches!(value, Value::Nil) {
+                    self.eval_operand(fallback, span)
+                } else {
+                    Ok(value)
+                }
+            }
+            MirOptionOp::Chain { base, link } => self.eval_option_chain(base, link, span),
+        }
+    }
+
+    fn eval_ordered_fields(
+        &mut self,
+        fields: &MirAggregateFields,
+        span: Span,
+    ) -> Result<Vec<Value>, RunnerError> {
+        let MirAggregateFields::Ordered(items) = fields else {
+            return Err(RunnerError::internal(
+                span,
+                "expected ordered aggregate fields",
+            ));
+        };
+        let mut out = Vec::new();
+        for item in items {
+            match item {
+                MirAggregateItem::Operand(operand) => out.push(self.eval_operand(operand, span)?),
+                MirAggregateItem::Spread(operand) => {
+                    let spread = self.eval_operand(operand, span)?;
+                    match spread {
+                        Value::Array(cell) => out.extend(cell.borrow().clone()),
+                        _ => {
+                            return Err(RunnerError::internal(span, "spread operand is not array"))
+                        }
+                    }
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    fn eval_named_fields(
+        &mut self,
+        fields: &MirAggregateFields,
+        span: Span,
+        mismatch: &'static str,
+    ) -> Result<FxHashMap<Symbol, Value>, RunnerError> {
+        let MirAggregateFields::Named(fields) = fields else {
+            return Err(RunnerError::internal(span, mismatch));
+        };
+        let mut map = FxHashMap::default();
+        for field in fields {
+            map.insert(field.name, self.eval_operand(&field.value, span)?);
+        }
+        Ok(map)
+    }
+
+    fn eval_variant_fields(
+        &mut self,
+        fields: &MirAggregateFields,
+        span: Span,
+    ) -> Result<FxHashMap<Symbol, Value>, RunnerError> {
+        match fields {
+            MirAggregateFields::Ordered(_) => {
+                let mut out = FxHashMap::default();
+                for (idx, value) in self
+                    .eval_ordered_fields(fields, span)?
+                    .into_iter()
+                    .enumerate()
+                {
+                    out.insert(Symbol(idx as u32), value);
+                }
+                Ok(out)
+            }
+            MirAggregateFields::Named(items) => {
+                let mut out = FxHashMap::default();
+                for item in items {
+                    let value = match self.eval_operand(&item.value, span) {
+                        Ok(value) => value,
+                        Err(err) if err.issue == "runner_variant_field_projection_mismatch" => {
+                            Value::Nil
+                        }
+                        Err(err) => return Err(err),
+                    };
+                    out.insert(item.name, value);
+                }
+                Ok(out)
+            }
+            MirAggregateFields::Keyed(_) => Err(RunnerError::internal(
+                span,
+                "variant construct requires payload fields",
+            )),
+        }
+    }
+
+    pub(crate) fn eval_convert(
+        &mut self,
+        conversion: &MirConversion,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [source] = args else {
+            return Err(RunnerError::internal(span, "conversion runtime arity"));
+        };
+        let value = self.eval_operand(source, span)?;
+        if matches!(value, Value::Nil) {
+            if let Some(recovery) = &conversion.recovery {
+                return self.eval_recovery(recovery, span);
+            }
+        }
+        match conversion.flavor {
+            MirConversionFlavor::Cast => self.eval_cast(value, &conversion.target_ty, span),
+            MirConversionFlavor::Runtime => self.eval_runtime_convert(conversion, value, span),
+        }
+    }
+
+    fn eval_cast(
+        &self,
+        value: Value,
+        target_ty: &radix_mir::MirType,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let target = self.types.get(target_ty.semantic_id());
+        match (value, target) {
+            (
+                Value::Int(v),
+                Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _),
+            ) => Ok(Value::Float(v as f64)),
+            (
+                Value::Float(v),
+                Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _),
+            ) => Ok(Value::Int(v as i64)),
+            (
+                Value::Bool(v),
+                Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _),
+            ) => Ok(Value::Int(if v { 1 } else { 0 })),
+            (other, target) => Err(RunnerError::internal(
+                span,
+                format!("unsupported cast from {other:?} to {target:?}"),
+            )),
+        }
+    }
+
+    /// Evaluate `est <type>` / `non est <type>` against the operand's runtime
+    /// variant tag.
+    ///
+    /// The runner's `Value` variants are the runtime tags (Valor boxing in
+    /// `↦ value` is identity), so the tag check maps the operand carrier to
+    /// its corresponding valor-carried type. Inner type parameters are erased
+    /// at boxing time and never checked (mirrors the archived `est`
+    /// variant-check surface).
+    fn eval_type_check(
+        &mut self,
+        op: &MirTypeCheckOp,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [operand] = args else {
+            return Err(RunnerError::internal(span, "type_check runtime arity"));
+        };
+        let value = self.eval_operand(operand, span)?;
+        let target = self.types.get(op.ty.semantic_id());
+        let matches = matches!(
+            (&value, &target),
+            (Value::Nil, Type::Primitive(Primitive::Nihil))
+                | (Value::Bool(_), Type::Primitive(Primitive::Bivalens))
+                | (
+                    Value::Int(_) | Value::UInt(_),
+                    Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)
+                )
+                | (
+                    Value::Float(_),
+                    Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+                )
+                | (
+                    Value::Str(_),
+                    Type::Primitive(Primitive::Textus | Primitive::Ascii)
+                )
+                | (Value::Octeti(_), Type::Primitive(Primitive::Octeti))
+                | (Value::Array(_), Type::Array(_))
+                | (Value::Map(_), Type::Map(_, _))
+                | (Value::Set(_), Type::Set(_))
+                | (
+                    Value::Instans(_),
+                    Type::Primitive(Primitive::Instans) | Type::SizedInstans(_)
+                )
+                | (Value::Regex(_), Type::Primitive(Primitive::Regex))
+                | (Value::Unit, Type::Primitive(Primitive::Vacuum))
+                | (_, Type::Primitive(Primitive::Valor | Primitive::Ignotum))
+        );
+        Ok(Value::Bool(if op.positive { matches } else { !matches }))
+    }
+
+    fn eval_assert(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let Some(cond) = args.first() else {
+            return Err(RunnerError::internal(span, "assert runtime arity"));
+        };
+        if !self.eval_operand(cond, span)?.as_bool(span)? {
+            let message = args
+                .get(1)
+                .map(|arg| self.eval_operand(arg, span))
+                .transpose()?
+                .map(|value| value.display(self.interner, span))
+                .transpose()?
+                .unwrap_or_else(|| "assertion failed".to_owned());
+            self.host.abort(&message);
+        }
+        Ok(Value::Unit)
+    }
+
+    fn eval_panic(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [arg] = args else {
+            return Err(RunnerError::internal(span, "panic runtime arity"));
+        };
+        let message = self.eval_operand(arg, span)?.display(self.interner, span)?;
+        self.host.abort(&message);
+    }
+
+    // COLLECTION DISPATCH
+
+    fn eval_collection(
+        &mut self,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        return_ty: MirType,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        match op {
+            MirCollectionOp::Length => {
+                let [receiver] = args else {
+                    return Err(RunnerError::internal(span, "collection length arity"));
+                };
+                let value = self.eval_operand(receiver, span)?;
+                let len = match value {
+                    Value::Array(cell) => cell.borrow().len(),
+                    Value::Map(cell) => cell.borrow().len(),
+                    Value::Set(cell) => cell.borrow().len(),
+                    Value::Tensor(cell) => cell.borrow().shape.len(),
+                    Value::Str(text) => text.chars().count(),
+                    Value::Octeti(bytes) => bytes.len(),
+                    _ => {
+                        return Err(RunnerError::internal(
+                            span,
+                            "length receiver type mismatch",
+                        ))
+                    }
+                };
+                Ok(Value::Int(len as i64))
+            }
+            MirCollectionOp::SparseNonzeroCount => {
+                let [receiver] = args else {
+                    return Err(RunnerError::internal(span, "sparse nonzero-count arity"));
+                };
+                let Value::Tensor(tensor) = self.eval_operand(receiver, span)? else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "sparse nonzero-count receiver type mismatch",
+                    ));
+                };
+                let count =
+                    tensor
+                        .borrow()
+                        .data
+                        .iter()
+                        .try_fold(0_i64, |count, value| match value {
+                            Value::Int(value) => Ok(count + i64::from(*value != 0)),
+                            Value::Float(value) => Ok(count + i64::from(*value != 0.0)),
+                            _ => Err(RunnerError::internal(
+                                span,
+                                "sparse nonzero-count element is not numeric",
+                            )),
+                        })?;
+                Ok(Value::Int(count))
+            }
+            MirCollectionOp::SparseDensify => {
+                let [receiver] = args else {
+                    return Err(RunnerError::internal(span, "sparse densify arity"));
+                };
+                let Value::Tensor(tensor) = self.eval_operand(receiver, span)? else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "sparse densify receiver type mismatch",
+                    ));
+                };
+                // BO-M-8: layout-compatible densify path shares the Rc (current
+                // densify is identity on the in-memory TensorValue representation).
+                Ok(Value::Tensor(tensor))
+            }
+            MirCollectionOp::IntervalIntersect => self.interval_intersect(args, span),
+            MirCollectionOp::IntervalUnion => self.interval_union(args, span),
+            MirCollectionOp::IntervalLength => self.interval_length(args, span),
+            MirCollectionOp::IntervalContains => self.interval_contains(args, span),
+            MirCollectionOp::IntervalClamp => self.interval_clamp(args, span),
+            MirCollectionOp::IntervalMaterialize => {
+                self.interval_materialize(args, return_ty, span)
+            }
+            MirCollectionOp::IsEmpty => {
+                let [receiver] = args else {
+                    return Err(RunnerError::internal(span, "collection is_empty arity"));
+                };
+                Ok(Value::Bool(
+                    self.eval_operand(receiver, span)?.is_empty_collection(),
+                ))
+            }
+            MirCollectionOp::Index => {
+                let [receiver, index] = args else {
+                    return Err(RunnerError::internal(span, "collection index arity"));
+                };
+                let receiver = self.eval_operand(receiver, span)?;
+                let index = self.eval_operand(index, span)?;
+                self.collection_index(receiver, index, span)
+            }
+            MirCollectionOp::Contains => {
+                let [receiver, needle] = args else {
+                    return Err(RunnerError::internal(span, "collection contains arity"));
+                };
+                let receiver = self.eval_operand(receiver, span)?;
+                let needle = self.eval_operand(needle, span)?;
+                Ok(Value::Bool(
+                    self.collection_contains(receiver, needle, span)?,
+                ))
+            }
+            MirCollectionOp::Append => {
+                let [receiver_operand, item] = args else {
+                    return Err(RunnerError::internal(span, "collection append arity"));
+                };
+                let receiver = self.eval_operand(receiver_operand, span)?;
+                let item = self.eval_operand(item, span)?;
+                match receiver {
+                    Value::Array(cell) => {
+                        cell.borrow_mut().push(item);
+                        Ok(Value::Unit)
+                    }
+                    Value::Set(cell) => {
+                        cell.borrow_mut().insert(item.to_key(span)?);
+                        Ok(Value::Unit)
+                    }
+                    Value::Str(mut text) => {
+                        if let Value::Str(add) = item {
+                            text.push_str(&add);
+                            Ok(Value::Str(text))
+                        } else {
+                            Err(RunnerError::internal(
+                                span,
+                                "append to textus requires textus",
+                            ))
+                        }
+                    }
+                    Value::Octeti(mut bytes) => {
+                        bytes.push(byte_from_value(item, span)?);
+                        // F-086: when the receiver is a Place, write back so
+                        // the mutation persists in the frame; otherwise return
+                        // the owned modified value (same pattern as Str).
+                        if let MirOperand::Place(place) = receiver_operand {
+                            self.write_place(place, Value::Octeti(bytes), span)?;
+                            Ok(Value::Unit)
+                        } else {
+                            Ok(Value::Octeti(bytes))
+                        }
+                    }
+                    _ => Err(RunnerError::internal(
+                        span,
+                        "append receiver type mismatch",
+                    )),
+                }
+            }
+            MirCollectionOp::AppendImmutable => {
+                let [receiver, item] = args else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "collection append_immutable arity",
+                    ));
+                };
+                let receiver = self.eval_operand(receiver, span)?;
+                let item = self.eval_operand(item, span)?;
+                match receiver {
+                    Value::Array(cell) => {
+                        let mut next = cell.borrow().clone();
+                        next.push(item);
+                        Ok(Value::Array(Rc::new(RefCell::new(next))))
+                    }
+                    Value::Str(text) => match item {
+                        Value::Str(add) => Ok(Value::Str(format!("{text}{add}"))),
+                        _ => Err(RunnerError::internal(
+                            span,
+                            "append_immutable textus requires textus",
+                        )),
+                    },
+                    _ => Err(RunnerError::internal(
+                        span,
+                        "append_immutable receiver type mismatch",
+                    )),
+                }
+            }
+            MirCollectionOp::First | MirCollectionOp::Last => {
+                let [receiver] = args else {
+                    return Err(RunnerError::internal(span, "collection first/last arity"));
+                };
+                let receiver = self.eval_operand(receiver, span)?;
+                match receiver {
+                    Value::Array(cell) => {
+                        let borrow = cell.borrow();
+                        let item = match op {
+                            MirCollectionOp::First => borrow.first(),
+                            MirCollectionOp::Last => borrow.last(),
+                            _ => None,
+                        };
+                        Ok(item.cloned().unwrap_or(Value::Nil))
+                    }
+                    Value::Str(text) => {
+                        let item = match op {
+                            MirCollectionOp::First => {
+                                text.chars().next().map(|ch| Value::Str(ch.to_string()))
+                            }
+                            MirCollectionOp::Last => {
+                                text.chars().last().map(|ch| Value::Str(ch.to_string()))
+                            }
+                            _ => None,
+                        };
+                        Ok(item.unwrap_or(Value::Nil))
+                    }
+                    _ => Err(RunnerError::internal(
+                        span,
+                        "first/last receiver type mismatch",
+                    )),
+                }
+            }
+            MirCollectionOp::RemoveFirst => {
+                let [receiver] = args else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "collection remove_first arity",
+                    ));
+                };
+                let receiver = self.eval_operand(receiver, span)?;
+                match receiver {
+                    Value::Array(cell) => {
+                        let mut borrow = cell.borrow_mut();
+                        if borrow.is_empty() {
+                            Ok(Value::Nil)
+                        } else {
+                            Ok(borrow.remove(0))
+                        }
+                    }
+                    _ => Err(RunnerError::internal(
+                        span,
+                        "remove_first receiver type mismatch",
+                    )),
+                }
+            }
+            MirCollectionOp::RemoveLast => {
+                let [receiver] = args else {
+                    return Err(RunnerError::internal(span, "collection remove_last arity"));
+                };
+                let receiver = self.eval_operand(receiver, span)?;
+                match receiver {
+                    Value::Array(cell) => Ok(cell.borrow_mut().pop().unwrap_or(Value::Nil)),
+                    _ => Err(RunnerError::internal(
+                        span,
+                        "remove_last receiver type mismatch",
+                    )),
+                }
+            }
+            MirCollectionOp::Reverse => {
+                let [receiver] = args else {
+                    return Err(RunnerError::internal(span, "collection reverse arity"));
+                };
+                let receiver = self.eval_operand(receiver, span)?;
+                match receiver {
+                    Value::Array(cell) => {
+                        let mut next = cell.borrow().clone();
+                        next.reverse();
+                        Ok(Value::Array(Rc::new(RefCell::new(next))))
+                    }
+                    Value::Str(text) => Ok(Value::Str(text.chars().rev().collect())),
+                    _ => Err(RunnerError::internal(
+                        span,
+                        "reverse receiver type mismatch",
+                    )),
+                }
+            }
+            MirCollectionOp::ReverseInPlace => {
+                let [receiver] = args else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "collection reverse_in_place arity",
+                    ));
+                };
+                let receiver = self.eval_operand(receiver, span)?;
+                match receiver {
+                    Value::Array(cell) => {
+                        cell.borrow_mut().reverse();
+                        Ok(Value::Unit)
+                    }
+                    _ => Err(RunnerError::internal(
+                        span,
+                        "reverse_in_place receiver type mismatch",
+                    )),
+                }
+            }
+            MirCollectionOp::Sort => {
+                let [receiver] = args else {
+                    return Err(RunnerError::internal(span, "collection sort arity"));
+                };
+                let receiver = self.eval_operand(receiver, span)?;
+                match receiver {
+                    Value::Array(cell) => {
+                        let mut next = cell.borrow().clone();
+                        next.sort_by(Self::compare_sort_values);
+                        Ok(Value::Array(Rc::new(RefCell::new(next))))
+                    }
+                    _ => Err(RunnerError::internal(span, "sort receiver type mismatch")),
+                }
+            }
+            MirCollectionOp::Uppercase => self.map_str_arg(args, span, |text| text.to_uppercase()),
+            MirCollectionOp::Lowercase => self.map_str_arg(args, span, |text| text.to_lowercase()),
+            MirCollectionOp::Trim => self.map_str_arg(args, span, |text| text.trim().to_owned()),
+            MirCollectionOp::StartsWith => {
+                self.str_pair_bool(args, span, |left, right| left.starts_with(&right))
+            }
+            MirCollectionOp::EndsWith => {
+                self.str_pair_bool(args, span, |left, right| left.ends_with(&right))
+            }
+            MirCollectionOp::RegexMatches => {
+                let [receiver, text] = args else {
+                    return Err(RunnerError::internal(span, "regex consentit arity"));
+                };
+                let Value::Regex(pattern) = self.eval_operand(receiver, span)? else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "consentit receiver is not regex",
+                    ));
+                };
+                let Value::Str(text) = self.eval_operand(text, span)? else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "consentit argument is not textus",
+                    ));
+                };
+                let regex = regex::Regex::new(&pattern).map_err(|err| {
+                    RunnerError::internal(span, format!("regex compile failed: {err}"))
+                })?;
+                Ok(Value::Bool(regex.is_match(&text)))
+            }
+            MirCollectionOp::Split => {
+                let [receiver, delim] = args else {
+                    return Err(RunnerError::internal(span, "collection split arity"));
+                };
+                let Value::Str(text) = self.eval_operand(receiver, span)? else {
+                    return Err(RunnerError::internal(span, "split receiver is not textus"));
+                };
+                let Value::Str(delim) = self.eval_operand(delim, span)? else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "split delimiter is not textus",
+                    ));
+                };
+                let parts = text
+                    .split(&delim)
+                    .map(|part| Value::Str(part.to_owned()))
+                    .collect::<Vec<_>>();
+                Ok(Value::Array(Rc::new(RefCell::new(parts))))
+            }
+            MirCollectionOp::Replace => {
+                let [receiver, from, to] = args else {
+                    return Err(RunnerError::internal(span, "collection replace arity"));
+                };
+                let Value::Str(text) = self.eval_operand(receiver, span)? else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "replace receiver is not textus",
+                    ));
+                };
+                let Value::Str(from) = self.eval_operand(from, span)? else {
+                    return Err(RunnerError::internal(span, "replace from is not textus"));
+                };
+                let Value::Str(to) = self.eval_operand(to, span)? else {
+                    return Err(RunnerError::internal(span, "replace to is not textus"));
+                };
+                Ok(Value::Str(text.replace(&from, &to)))
+            }
+            MirCollectionOp::Absolute => self.map_numeric(args, span, f64::abs),
+            MirCollectionOp::Signum => self.map_numeric(args, span, f64::signum),
+            MirCollectionOp::Minimum => self.map_numeric_pair(args, span, f64::min),
+            MirCollectionOp::Maximum => self.map_numeric_pair(args, span, f64::max),
+            MirCollectionOp::Approximate => self.approximate_fractus(args, span),
+            MirCollectionOp::Sum => self.sum_numeric_array(args, return_ty, span),
+            MirCollectionOp::TensorSumAxis => {
+                // TensorSumAxis is a backward-only op used in the LayerNorm
+                // VJP. It sums across a specified axis, producing a tensor
+                // with rank = input.rank - 1.
+                self.tensor_sum_axis(args, span, return_ty)
+            }
+            MirCollectionOp::TensorShape => self.tensor_shape(args, span),
+            MirCollectionOp::TensorReshape => self.tensor_reshape(args, span),
+            MirCollectionOp::TensorGet => self.tensor_get(args, span),
+            MirCollectionOp::TensorSet => self.tensor_set(args, span),
+            MirCollectionOp::TensorFill => self.tensor_fill(args, span),
+            MirCollectionOp::TensorCreate => self.tensor_create(args, span),
+            MirCollectionOp::TensorFromFlat => self.tensor_from_flat(args, span),
+            MirCollectionOp::TensorFlatten => self.tensor_flatten(args, span),
+            MirCollectionOp::TensorMaterialize => self.tensor_materialize(args, span),
+            MirCollectionOp::TensorSlice => self.tensor_slice(args, span),
+            MirCollectionOp::TensorAdd => {
+                self.tensor_elementwise_or_scalar(args, span, "tensor add", numeric_add, return_ty)
+            }
+            MirCollectionOp::TensorSub => {
+                self.tensor_elementwise_or_scalar(args, span, "tensor sub", numeric_sub, return_ty)
+            }
+            MirCollectionOp::TensorMul => {
+                self.tensor_elementwise_or_scalar(args, span, "tensor mul", numeric_mul, return_ty)
+            }
+            MirCollectionOp::TensorMatMul => self.tensor_matmul(args, span, return_ty),
+            MirCollectionOp::TensorMean => self.tensor_mean(args, span),
+            MirCollectionOp::TensorLayerNorm => self.tensor_layernorm(args, span, return_ty),
+            MirCollectionOp::TensorRmsNorm => self.tensor_rms_norm(args, span),
+            MirCollectionOp::TensorRope => self.tensor_rope(args, span),
+            MirCollectionOp::TensorGather => self.tensor_gather(args, span),
+            // GI3-1: the causal masked-row softmax op is admitted on the
+            // plan surface with NO runner body — the CPU-oracle semantics
+            // (masked stable row softmax) are a recorded residual
+            // (gi3-contract.md); executing it fails closed with the honest
+            // unsupported diagnostic, never a silent pass.
+            MirCollectionOp::TensorCausalMaskedSoftmax => {
+                Err(RunnerError::unsupported(span, "causal masked softmax"))
+            }
+            MirCollectionOp::TensorDiv => {
+                self.tensor_elementwise_or_scalar(args, span, "tensor div", numeric_div, return_ty)
+            }
+            MirCollectionOp::TensorNeg => self.tensor_neg(args, span),
+            MirCollectionOp::TensorGelu => self.tensor_gelu(args, span),
+            MirCollectionOp::TensorRelu => self.tensor_relu(args, span),
+            MirCollectionOp::TensorSoftmax => self.tensor_softmax(args, span),
+            MirCollectionOp::TensorCruxEntropia => self.tensor_crux_entropia(args, span),
+            MirCollectionOp::TensorTranspose => self.tensor_transpose(args, span),
+            MirCollectionOp::SparseGet => self.sparse_get(args, span),
+            MirCollectionOp::SparseSet => self.sparse_set(args, span),
+            MirCollectionOp::Round => self.map_numeric(args, span, f64::round),
+            MirCollectionOp::Floor => self.map_numeric(args, span, f64::floor),
+            MirCollectionOp::Ceiling => self.map_numeric(args, span, f64::ceil),
+            MirCollectionOp::Truncate => self.map_numeric(args, span, f64::trunc),
+            MirCollectionOp::Keys => self.eval_map_snapshot(args, span, false),
+            MirCollectionOp::Values => self.eval_map_snapshot(args, span, true),
+            MirCollectionOp::Put => {
+                let [receiver, key, value] = args else {
+                    return Err(RunnerError::internal(span, "collection put arity"));
+                };
+                let receiver = self.eval_operand(receiver, span)?;
+                let key = self.eval_operand(key, span)?;
+                let value = self.eval_operand(value, span)?;
+                match receiver {
+                    Value::Map(cell) => {
+                        cell.borrow_mut().insert(key.to_key(span)?, value);
+                        Ok(Value::Unit)
+                    }
+                    _ => Err(RunnerError::internal(span, "put receiver is not map")),
+                }
+            }
+            MirCollectionOp::Delete => {
+                let [receiver, key] = args else {
+                    return Err(RunnerError::internal(span, "collection delete arity"));
+                };
+                let receiver = self.eval_operand(receiver, span)?;
+                let key = self.eval_operand(key, span)?;
+                match receiver {
+                    Value::Map(cell) => {
+                        let map_key = key.to_key(span)?;
+                        Ok(Value::Bool(cell.borrow_mut().remove(&map_key).is_some()))
+                    }
+                    Value::Set(cell) => {
+                        let set_key = key.to_key(span)?;
+                        Ok(Value::Bool(cell.borrow_mut().remove(&set_key)))
+                    }
+                    _ => Err(RunnerError::internal(
+                        span,
+                        "delete receiver is not map or set",
+                    )),
+                }
+            }
+            MirCollectionOp::Slice => {
+                let [receiver, start, end] = args else {
+                    return Err(RunnerError::internal(span, "collection slice arity"));
+                };
+                let receiver = self.eval_operand(receiver, span)?;
+                let start = self.eval_operand(start, span)?.as_index(span)?;
+                let end = self.eval_operand(end, span)?.as_index(span)?;
+                match receiver {
+                    Value::Array(cell) => {
+                        let borrow = cell.borrow();
+                        let end = end.min(borrow.len());
+                        let start = start.min(end);
+                        Ok(array_value(borrow[start..end].to_vec()))
+                    }
+                    Value::Str(text) => {
+                        let chars: Vec<char> = text.chars().collect();
+                        let end = end.min(chars.len());
+                        let start = start.min(end);
+                        Ok(Value::Str(chars[start..end].iter().collect()))
+                    }
+                    _ => Err(RunnerError::internal(
+                        span,
+                        "slice receiver is not textus or array",
+                    )),
+                }
+            }
+            MirCollectionOp::Take | MirCollectionOp::TakeLast | MirCollectionOp::DropFirst => {
+                let [receiver, count] = args else {
+                    return Err(RunnerError::internal(span, "collection copy/view arity"));
+                };
+                let receiver = self.eval_operand(receiver, span)?;
+                let count = self.eval_operand(count, span)?.as_index(span)?;
+                match receiver {
+                    Value::Array(cell) => {
+                        let borrow = cell.borrow();
+                        let start = if matches!(op, MirCollectionOp::DropFirst) {
+                            count.min(borrow.len())
+                        } else {
+                            0
+                        };
+                        let end = if matches!(op, MirCollectionOp::Take) {
+                            count.min(borrow.len())
+                        } else {
+                            borrow.len()
+                        };
+                        let start = match op {
+                            MirCollectionOp::TakeLast => borrow.len().saturating_sub(count),
+                            _ => start,
+                        };
+                        Ok(array_value(borrow[start..end].to_vec()))
+                    }
+                    _ => Err(RunnerError::internal(
+                        span,
+                        "copy/view receiver is not array",
+                    )),
+                }
+            }
+            MirCollectionOp::Union
+            | MirCollectionOp::Intersection
+            | MirCollectionOp::Difference
+            | MirCollectionOp::SymmetricDifference
+            | MirCollectionOp::IsSubset
+            | MirCollectionOp::IsSuperset => self.eval_set_algebra(op, args, span),
+        }
+    }
+
+    // TENSOR, SPARSE, AND INTERVAL OPS
+
+    fn tensor_shape(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "tensor shape arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let shape = tensor
+            .borrow()
+            .shape
+            .iter()
+            .copied()
+            .map(Value::Int)
+            .collect();
+        Ok(array_value(shape))
+    }
+
+    fn tensor_reshape(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver, shape] = args else {
+            return Err(RunnerError::internal(span, "tensor reshape arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let shape = self.shape_arg(shape, span, ERR_FORMA_RESHAPE_COUNT)?;
+        let data = tensor.borrow().data.clone();
+        self.ensure_tensor_element_count(&shape, data.len(), span, ERR_FORMA_ELEMENT_COUNT)?;
+        Ok(tensor_value(data, shape))
+    }
+
+    fn tensor_get(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver, index] = args else {
+            return Err(RunnerError::internal(span, "tensor get arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let index = self.shape_arg(index, span, ERR_ACCIPE_INVALID_INDEX)?;
+        let borrow = tensor.borrow();
+        let Some(offset) = tensor_flat_offset(&borrow.shape, &index) else {
+            return Ok(Value::Nil);
+        };
+        Ok(borrow.data.get(offset).cloned().unwrap_or(Value::Nil))
+    }
+
+    fn tensor_set(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver, index, value] = args else {
+            return Err(RunnerError::internal(span, "tensor set arity"));
+        };
+        self.write_tensor_element(receiver, index, value, span)
+    }
+
+    fn sparse_get(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver, index] = args else {
+            return Err(RunnerError::internal(span, "sparse get arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let index = self.shape_arg(index, span, ERR_ACCIPE_INVALID_INDEX)?;
+        let borrow = tensor.borrow();
+        let Some(offset) = tensor_flat_offset(&borrow.shape, &index) else {
+            return Err(RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX));
+        };
+        borrow
+            .data
+            .get(offset)
+            .cloned()
+            .ok_or_else(|| RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX))
+    }
+
+    fn interval_intersect(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [left, right] = args else {
+            return Err(RunnerError::internal(span, "interval intersect arity"));
+        };
+        let left = self.eval_operand(left, span)?;
+        let right = self.eval_operand(right, span)?;
+        interval_intersection(&left, &right, span).map(|value| value.unwrap_or(Value::Nil))
+    }
+
+    fn interval_union(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [left, right] = args else {
+            return Err(RunnerError::internal(span, "interval union arity"));
+        };
+        let left = self.eval_operand(left, span)?;
+        let right = self.eval_operand(right, span)?;
+        interval_union_value(&left, &right, span).map(|value| value.unwrap_or(Value::Nil))
+    }
+
+    fn interval_length(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [interval] = args else {
+            return Err(RunnerError::internal(span, "interval length arity"));
+        };
+        let interval = self.eval_operand(interval, span)?;
+        let (start, end, inclusive) = interval_parts(&interval, span)?;
+        // Int-only bounds are not a hidden carrier gap: `intervallum` over an
+        // unsigned-64 element type is rejected semantically, so interval
+        // bounds can never surface as `UInt` here.
+        let (Value::Int(start), Value::Int(end)) = (start, end) else {
+            return Err(RunnerError::internal(
+                span,
+                "interval length requires numerus bounds",
+            ));
+        };
+        Ok(Value::Int((end - start + i64::from(inclusive)).max(0)))
+    }
+
+    fn interval_contains(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [interval, value] = args else {
+            return Err(RunnerError::internal(span, "interval contains arity"));
+        };
+        let interval = self.eval_operand(interval, span)?;
+        let value = self.eval_operand(value, span)?;
+        let (start, end, inclusive) = interval_parts(&interval, span)?;
+        let value = numeric_as_f64(&value, span)?;
+        let start = numeric_as_f64(&start, span)?;
+        let end = numeric_as_f64(&end, span)?;
+        Ok(Value::Bool(
+            value >= start && if inclusive { value <= end } else { value < end },
+        ))
+    }
+
+    fn interval_clamp(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [source, target] = args else {
+            return Err(RunnerError::internal(span, "interval clamp arity"));
+        };
+        let source = self.eval_operand(source, span)?;
+        let target = self.eval_operand(target, span)?;
+        if matches!(source, Value::Tuple(_)) {
+            return interval_intersection(&source, &target, span)?.ok_or_else(|| {
+                RunnerError::internal(span, "interval clamp produced an empty interval")
+            });
+        }
+        let (start, end, inclusive) = interval_parts(&target, span)?;
+        match (source, start, end) {
+            (Value::Int(value), Value::Int(start), Value::Int(end)) => {
+                let upper = if inclusive {
+                    end
+                } else {
+                    end.saturating_sub(1)
+                };
+                if upper < start {
+                    // F-088: an empty exclusive interval (`[5, 5)` — monotonic
+                    // bounds with `end == start`) has no valid clamped output.
+                    // `value.clamp(start, upper)` with `min > max` panics, so
+                    // return the source unchanged (identity on the empty set).
+                    Ok(Value::Int(value))
+                } else {
+                    Ok(Value::Int(value.clamp(start, upper)))
+                }
+            }
+            (Value::Float(value), Value::Float(start), Value::Float(end)) if inclusive => {
+                Ok(Value::Float(value.clamp(start, end)))
+            }
+            _ => Err(RunnerError::internal(
+                span,
+                "unsupported interval clamp bound type",
+            )),
+        }
+    }
+
+    fn interval_materialize(
+        &mut self,
+        args: &[MirOperand],
+        return_ty: MirType,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [interval] = args else {
+            return Err(RunnerError::internal(span, "interval materialize arity"));
+        };
+        let interval = self.eval_operand(interval, span)?;
+        let (Value::Int(start), Value::Int(end), inclusive) = interval_parts(&interval, span)?
+        else {
+            return Err(RunnerError::internal(
+                span,
+                "interval materialize requires numerus bounds",
+            ));
+        };
+        // F-087: when end == i64::MAX and the interval is inclusive, the
+        // exclusive stop `end.saturating_add(1)` saturates back to i64::MAX,
+        // silently dropping the final element. Use checked_add to detect the
+        // overflow and fall back to an inclusive range iteration.
+        let values: Vec<Value> = if inclusive {
+            if let Some(stop) = end.checked_add(1) {
+                (start..stop).map(Value::Int).collect()
+            } else {
+                // end == i64::MAX — inclusive range through the final value.
+                (start..=end).map(Value::Int).collect()
+            }
+        } else {
+            (start..end).map(Value::Int).collect()
+        };
+        match self.types.get(return_ty.semantic_id()) {
+            Type::Array(_) => Ok(array_value(values)),
+            Type::Tensor(_, _) => {
+                let len = i64::try_from(values.len()).map_err(|_| {
+                    RunnerError::internal(span, "interval materialization length overflow")
+                })?;
+                Ok(tensor_value(values, vec![len]))
+            }
+            _ => Err(RunnerError::internal(
+                span,
+                "interval materialize result type mismatch",
+            )),
+        }
+    }
+
+    fn modular_word_width_of(&self, ty: MirType) -> Option<NumericWidth> {
+        match self.types.get(ty.semantic_id()) {
+            Type::ModularWord(width) => Some(*width),
+            _ => None,
+        }
+    }
+
+    fn sparse_set(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver, index, value] = args else {
+            return Err(RunnerError::internal(span, "sparse set arity"));
+        };
+        self.write_tensor_element(receiver, index, value, span)
+    }
+
+    fn write_tensor_element(
+        &mut self,
+        receiver: &MirOperand,
+        index: &MirOperand,
+        value: &MirOperand,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let tensor = self.tensor_arg(receiver, span)?;
+        let index = self.shape_arg(index, span, ERR_PONDE_INVALID_INDEX)?;
+        let value = self.eval_operand(value, span)?;
+        let mut borrow = tensor.borrow_mut();
+        let Some(offset) = tensor_flat_offset(&borrow.shape, &index) else {
+            return Err(RunnerError::internal(span, ERR_PONDE_INVALID_INDEX));
+        };
+        let Some(slot) = borrow.data.get_mut(offset) else {
+            return Err(RunnerError::internal(span, ERR_PONDE_INVALID_INDEX));
+        };
+        *slot = value;
+        Ok(Value::Unit)
+    }
+
+    fn tensor_fill(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver, value] = args else {
+            return Err(RunnerError::internal(span, "tensor fill arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let value = self.eval_operand(value, span)?;
+        let borrow = tensor.borrow();
+        let shape = borrow.shape.clone();
+        let count = borrow.data.len();
+        // When the fill value is itself a tensor, broadcast/tile its elements
+        // to fill the receiver shape. This supports the backward companion's
+        // broadcasts: filling [B,D] with [B] (prefix repeat each element)
+        // or with [D] (suffix cycle the block).
+        match &value {
+            Value::Tensor(fill_cell) => {
+                let fill_borrow = fill_cell.borrow();
+                let fill_count = fill_borrow.data.len();
+                let fill_shape = &fill_borrow.shape;
+                if fill_count == 0 || count % fill_count != 0 {
+                    return Err(RunnerError::internal(
+                        span,
+                        "tensor fill: fill tensor element count must divide receiver element count",
+                    ));
+                }
+                let repeats = count / fill_count;
+                let data: Vec<Value> = if shape.starts_with(fill_shape) {
+                    // Fill shape is a prefix (e.g. [B] → [B,D]):
+                    // repeat each element to fill suffix dimensions.
+                    fill_borrow
+                        .data
+                        .iter()
+                        .flat_map(|v| std::iter::repeat_n(v, repeats))
+                        .cloned()
+                        .collect()
+                } else {
+                    // Fill shape is a suffix (e.g. [D] → [B,D])
+                    // or neither prefix nor suffix: cycle the entire block.
+                    fill_borrow
+                        .data
+                        .iter()
+                        .cycle()
+                        .take(count)
+                        .cloned()
+                        .collect()
+                };
+                Ok(tensor_value(data, shape))
+            }
+            _ => Ok(tensor_value(vec![value; count], shape)),
+        }
+    }
+
+    fn tensor_create(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [_receiver, fill, shape] = args else {
+            return Err(RunnerError::internal(span, "tensor create arity"));
+        };
+        let shape = self.shape_arg(shape, span, ERR_CREA_INVALID_SHAPE)?;
+        let fill = self.eval_operand(fill, span)?;
+        let count = tensor_element_count(&shape, span)?;
+        Ok(tensor_value(vec![fill; count], shape))
+    }
+
+    fn tensor_from_flat(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [_receiver, flat, shape] = args else {
+            return Err(RunnerError::internal(span, "tensor from flat arity"));
+        };
+        let flat = self.array_arg(flat, span)?;
+        let shape = self.shape_arg(
+            shape,
+            span,
+            radix_mir::lista_tensor_conversio::LISTA_TO_TENSOR_STRUCTA_COUNT_MSG,
+        )?;
+        self.ensure_tensor_element_count(
+            &shape,
+            flat.len(),
+            span,
+            radix_mir::lista_tensor_conversio::LISTA_TO_TENSOR_STRUCTA_COUNT_MSG,
+        )?;
+        Ok(tensor_value(flat, shape))
+    }
+
+    fn tensor_flatten(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "tensor flatten arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let data = tensor.borrow().data.clone();
+        Ok(array_value(data))
+    }
+
+    fn tensor_materialize(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "tensor materialize arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let borrow = tensor.borrow();
+        Ok(tensor_value(borrow.data.clone(), borrow.shape.clone()))
+    }
+
+    fn tensor_slice(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver, start, end] = args else {
+            return Err(RunnerError::internal(span, "tensor slice arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let start = self.eval_operand(start, span)?.as_index(span)?;
+        let end = self.eval_operand(end, span)?.as_index(span)?;
+        let borrow = tensor.borrow();
+        let axis = borrow.shape.first().copied().unwrap_or(0).max(0) as usize;
+        let end = end.min(axis);
+        let start = start.min(end);
+        let stride = borrow
+            .shape
+            .iter()
+            .skip(1)
+            .try_fold(1_usize, |acc, dim| {
+                usize::try_from((*dim).max(0))
+                    .ok()
+                    .and_then(|d| acc.checked_mul(d))
+            })
+            .ok_or_else(|| RunnerError::internal(span, "tensor slice shape overflow"))?;
+        let data_start = start.saturating_mul(stride);
+        let data_end = end.saturating_mul(stride).min(borrow.data.len());
+        let mut shape = borrow.shape.clone();
+        if let Some(first) = shape.first_mut() {
+            *first = (end - start) as i64;
+        }
+        Ok(tensor_value(
+            borrow.data[data_start..data_end].to_vec(),
+            shape,
+        ))
+    }
+
+    /// Elementwise tensor op with scalar broadcast: if one arg is a scalar,
+    /// broadcast it across all elements of the tensor arg.
+    fn tensor_elementwise_or_scalar(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        label: &'static str,
+        op: fn(&Value, &Value, NumericWidth, Span) -> Result<Value, RunnerError>,
+        return_ty: MirType,
+    ) -> Result<Value, RunnerError> {
+        let [left, right] = args else {
+            return Err(RunnerError::internal(span, format!("{label} arity")));
+        };
+        let left_val = self.eval_operand(left, span)?;
+        let right_val = self.eval_operand(right, span)?;
+        let width =
+            effective_width(self.types, return_ty.semantic_id()).unwrap_or(NumericWidth::I64);
+        match (&left_val, &right_val) {
+            (Value::Tensor(l_cell), Value::Tensor(r_cell)) => {
+                let l = l_cell.borrow();
+                let r = r_cell.borrow();
+                if l.shape != r.shape {
+                    // S6-C2: the tensor-tensor elementwise family learns the
+                    // bounded rank-extension broadcast (the `addita_bias`
+                    // contract): the lower-rank operand is replicated across
+                    // the leading axis of the higher-rank operand when its
+                    // dims equal the higher operand's trailing dims. Any
+                    // other differing pair fails closed with a typed
+                    // diagnostic — the broadcast fact must be recorded, never
+                    // guessed (A3).
+                    let (higher_shape, lower_shape, lower_data) = if l.shape.len() >= r.shape.len()
+                    {
+                        (&l.shape, &r.shape, &r.data)
+                    } else {
+                        (&r.shape, &l.shape, &l.data)
+                    };
+                    if higher_shape.len() != lower_shape.len() + 1
+                        || lower_shape != &higher_shape[1..]
+                    {
+                        return Err(RunnerError::internal_with_issue(
+                            span,
+                            format!(
+                                "{label} tensor-tensor shape pair {:?} + {:?} is neither same-shape nor a rank-extension broadcast",
+                                l.shape, r.shape
+                            ),
+                            "runner_tensor_tensor_broadcast_unsupported",
+                        ));
+                    }
+                    let rows: usize = usize::try_from(higher_shape[0].max(0)).map_err(|_| {
+                        RunnerError::internal(span, format!("{label} broadcast row overflow"))
+                    })?;
+                    let mut lower_broadcast =
+                        Vec::with_capacity(lower_data.len().saturating_mul(rows.max(1)));
+                    for _ in 0..rows {
+                        lower_broadcast.extend(lower_data.iter().cloned());
+                    }
+                    // Operand order is preserved (Sub is not commutative); the
+                    // lower-rank operand is the one expanded into the higher
+                    // rank's leading-axis frame.
+                    let (l_data, r_data) = if l.shape.len() >= r.shape.len() {
+                        (&l.data, &lower_broadcast)
+                    } else {
+                        (&lower_broadcast, &r.data)
+                    };
+                    // Backing-length mismatch would silently truncate via zip
+                    // (PRP-077) — reject explicitly.
+                    if l_data.len() != r_data.len() {
+                        return Err(RunnerError::internal(
+                            span,
+                            format!("{label} backing-length mismatch"),
+                        ));
+                    }
+                    let data = l_data
+                        .iter()
+                        .zip(r_data.iter())
+                        .map(|(a, b)| op(a, b, width, span))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    return Ok(tensor_value(data, higher_shape.clone()));
+                }
+                // Equal shapes with unequal backing lengths would silently
+                // truncate via zip — reject explicitly (PRP-077).
+                if l.data.len() != r.data.len() {
+                    return Err(RunnerError::internal(
+                        span,
+                        format!("{label} backing-length mismatch"),
+                    ));
+                }
+                let data = l
+                    .data
+                    .iter()
+                    .zip(r.data.iter())
+                    .map(|(a, b)| op(a, b, width, span))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(tensor_value(data, l.shape.clone()))
+            }
+            (Value::Tensor(cell), scalar) => {
+                let tensor = cell.borrow();
+                debug_assert!(!tensor.data.is_empty(), "{label} broadcast on empty tensor");
+                let data = tensor
+                    .data
+                    .iter()
+                    .map(|elem| op(elem, scalar, width, span))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(tensor_value(data, tensor.shape.clone()))
+            }
+            (scalar, Value::Tensor(cell)) => {
+                let tensor = cell.borrow();
+                debug_assert!(!tensor.data.is_empty(), "{label} broadcast on empty tensor");
+                let data = tensor
+                    .data
+                    .iter()
+                    .map(|elem| op(scalar, elem, width, span))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(tensor_value(data, tensor.shape.clone()))
+            }
+            _ => {
+                // Both scalars: return the raw scalar result (not a tensor).
+                op(&left_val, &right_val, width, span)
+            }
+        }
+    }
+
+    fn tensor_mean(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "tensor mean arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let borrow = tensor.borrow();
+        if borrow.data.is_empty() {
+            return Ok(Value::Float(0.0));
+        }
+        let mut sum = 0.0;
+        for value in &borrow.data {
+            sum += numeric_as_f64(value, span)?;
+        }
+        Ok(Value::Float(sum / borrow.data.len() as f64))
+    }
+
+    fn tensor_neg(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "tensor neg arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let borrow = tensor.borrow();
+        let data = borrow
+            .data
+            .iter()
+            .map(|v| {
+                Ok(match v {
+                    Value::Int(n) => Value::Int(-n),
+                    Value::Float(f) => Value::Float(-f),
+                    _ => {
+                        return Err(RunnerError::internal(
+                            span,
+                            "tensor neg element type mismatch",
+                        ))
+                    }
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(tensor_value(data, borrow.shape.clone()))
+    }
+
+    fn tensor_gelu(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "tensor gelu arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let borrow = tensor.borrow();
+        let data = borrow
+            .data
+            .iter()
+            .map(|v| match v {
+                Value::Float(f) => Ok(Value::Float(gelu_f64(*f))),
+                _ => Err(RunnerError::internal(
+                    span,
+                    "tensor gelu element type mismatch",
+                )),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(tensor_value(data, borrow.shape.clone()))
+    }
+
+    fn tensor_relu(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "tensor relu arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let borrow = tensor.borrow();
+        let data = borrow
+            .data
+            .iter()
+            .map(|v| match v {
+                Value::Float(f) => Ok(Value::Float(f.max(0.0))),
+                Value::Int(i) => Ok(Value::Int((*i).max(0))),
+                _ => Err(RunnerError::internal(
+                    span,
+                    "tensor relu element type mismatch",
+                )),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(tensor_value(data, borrow.shape.clone()))
+    }
+
+    /// Softmax: `exp(x_i` - max(x)) / `sum(exp(x_j` - max(x))) with numerical
+    /// stability. Operates on rank-1 (vector) or rank-2 (batched row-wise,
+    /// axis 1 — the last axis). Uses inline `f64::exp()` from Rust stdlib.
+    fn tensor_softmax(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "tensor softmax arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let borrow = tensor.borrow();
+        let shape = &borrow.shape;
+
+        if shape.is_empty() {
+            return Err(RunnerError::internal(
+                span,
+                "tensor softmax requires non-empty tensor",
+            ));
+        }
+        if shape.len() > 2 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor softmax requires rank-1 or rank-2 tensor",
+            ));
+        }
+        if shape.contains(&0) {
+            return Err(RunnerError::internal(
+                span,
+                "tensor softmax requires all dimensions to be positive",
+            ));
+        }
+
+        let rank = shape.len();
+        let last_dim = shape[rank - 1] as usize;
+        let batch = borrow.data.len() / last_dim;
+
+        let mut out_data = Vec::with_capacity(borrow.data.len());
+        for b in 0..batch {
+            let base = b * last_dim;
+            // Subtract max before exp so the row softmax stays finite.
+            let mut max_val = f64::NEG_INFINITY;
+            for i in 0..last_dim {
+                if let Some(v) = borrow.data.get(base + i) {
+                    max_val = max_val.max(numeric_as_f64(v, span)?);
+                }
+            }
+            let mut exps = Vec::with_capacity(last_dim);
+            let mut exp_sum = 0.0_f64;
+            for i in 0..last_dim {
+                let v = numeric_as_f64(
+                    borrow.data.get(base + i).ok_or_else(|| {
+                        RunnerError::internal(span, "tensor softmax index out of bounds")
+                    })?,
+                    span,
+                )?;
+                let exp_val = (v - max_val).exp();
+                exps.push(exp_val);
+                exp_sum += exp_val;
+            }
+            for exp_val in exps {
+                out_data.push(Value::Float(exp_val / exp_sum));
+            }
+        }
+        Ok(tensor_value(out_data, shape.clone()))
+    }
+
+    /// Categorical cross-entropy loss: `-sum(targets * log(softmax(logits) + ε)) / N`.
+    /// Loss is normalized by N = last dimension (number of classes), not batch size.
+    /// Takes 2 args: logits (receiver) and targets. Returns scalar f32 loss.
+    /// Domain constraints: finite inputs, targets in [0,1], matching shapes, rank 1-2.
+    fn tensor_crux_entropia(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [logits, targets] = args else {
+            return Err(RunnerError::internal(span, "tensor crux_entropia arity"));
+        };
+        let logits = self.tensor_arg(logits, span)?;
+        let targets = self.tensor_arg(targets, span)?;
+        let logits_borrow = logits.borrow();
+        let targets_borrow = targets.borrow();
+
+        let shape = &logits_borrow.shape;
+        if shape.is_empty() {
+            return Err(RunnerError::internal(
+                span,
+                "tensor crux_entropia requires non-empty tensor",
+            ));
+        }
+        if shape.len() > 2 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor crux_entropia requires rank-1 or rank-2 tensor",
+            ));
+        }
+        if shape.contains(&0) {
+            return Err(RunnerError::internal(
+                span,
+                "tensor crux_entropia requires all dimensions to be positive",
+            ));
+        }
+        if logits_borrow.shape != targets_borrow.shape {
+            return Err(RunnerError::internal(
+                span,
+                "tensor crux_entropia shape mismatch",
+            ));
+        }
+
+        let rank = shape.len();
+        let last_dim = shape[rank - 1] as usize;
+        let batch = logits_borrow.data.len() / last_dim;
+        let eps = 1e-7_f64;
+
+        let mut total_loss = 0.0_f64;
+        for b in 0..batch {
+            let base = b * last_dim;
+            // Find max for numerical stability of softmax.
+            let mut max_val = f64::NEG_INFINITY;
+            for i in 0..last_dim {
+                let v = numeric_as_f64(&logits_borrow.data[base + i], span)?;
+                max_val = max_val.max(v);
+            }
+            // Compute softmax: exp(x - max) / sum(exp(x - max))
+            let mut exp_vals = Vec::with_capacity(last_dim);
+            let mut exp_sum = 0.0_f64;
+            for i in 0..last_dim {
+                let v = numeric_as_f64(&logits_borrow.data[base + i], span)?;
+                let exp_val = (v - max_val).exp();
+                exp_vals.push(exp_val);
+                exp_sum += exp_val;
+            }
+            // Compute cross-entropy: -sum(targets * log(softmax + eps))
+            let mut row_loss = 0.0_f64;
+            for (i, exp_val) in exp_vals.iter().enumerate() {
+                let softmax_val = exp_val / exp_sum;
+                let target = numeric_as_f64(&targets_borrow.data[base + i], span)?;
+                row_loss -= target * (softmax_val + eps).ln();
+            }
+            total_loss += row_loss;
+        }
+        // Normalize by N = last_dim (class count), not by batch size.
+        // For rank-1 shape [C]: N = C, batch = 1.
+        // For rank-2 shape [B, C]: N = C, batch = B.
+        Ok(Value::Float(total_loss / last_dim as f64))
+    }
+
+    /// Rank-2 matrix multiply over runner `Value` tensors.
+    ///
+    /// Validates rank-2 on both operands, enforces matching inner dimension,
+    /// and performs the O(M·K·N) contraction. Integer overflow and element
+    /// width mismatch are the author's responsibility (per v1 scope).
+    fn tensor_matmul(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        return_ty: MirType,
+    ) -> Result<Value, RunnerError> {
+        let [left, right] = args else {
+            return Err(RunnerError::internal(span, "tensor matmul arity"));
+        };
+        let width =
+            effective_width(self.types, return_ty.semantic_id()).unwrap_or(NumericWidth::I64);
+        let left = self.tensor_arg(left, span)?;
+        let right = self.tensor_arg(right, span)?;
+        let borrow = left.borrow();
+        let borrow_r = right.borrow();
+        let l_shape = &borrow.shape;
+        let r_shape = &borrow_r.shape;
+        if l_shape.len() != 2 {
+            return Err(RunnerError::internal(span, ERR_MATMUL_RECEIVER_RANK));
+        }
+        if r_shape.len() != 2 {
+            return Err(RunnerError::internal(span, ERR_MATMUL_ARGUMENT_RANK));
+        }
+        let k_left = l_shape[1];
+        let k_right = r_shape[0];
+        if k_left != k_right {
+            return Err(RunnerError::internal(span, ERR_MATMUL_INNER_DIMENSION));
+        }
+        let m = l_shape[0];
+        let n = r_shape[1];
+        let mut result_data = Vec::with_capacity((m * n) as usize);
+        for i in 0..m {
+            for j in 0..n {
+                let mut acc = Value::Int(0);
+                let mut first = true;
+                for k in 0..k_left {
+                    let a = borrow.data[(i * k_left + k) as usize].clone();
+                    let b = borrow_r.data[(k * n + j) as usize].clone();
+                    if first {
+                        acc = numeric_mul(&a, &b, width, span)?;
+                        first = false;
+                    } else {
+                        let prod = numeric_mul(&a, &b, width, span)?;
+                        acc = numeric_add(&acc, &prod, width, span)?;
+                    }
+                }
+                result_data.push(acc);
+            }
+        }
+        Ok(tensor_value(result_data, vec![m, n]))
+    }
+
+    /// Sum across a specified axis: `sum(x, axis)`.
+    ///
+    /// Reduces the tensor by summing along one axis. Result rank is
+    /// input rank - 1. v1: rank-2 only with axis 0 (sum rows) or
+    /// axis = last (sum columns).
+    ///
+    /// Args layout: `[input, axis_const]`.
+    fn tensor_sum_axis(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        return_ty: MirType,
+    ) -> Result<Value, RunnerError> {
+        if args.len() != 2 {
+            return Err(RunnerError::internal(span, "tensor sum_axis arity"));
+        }
+        let width =
+            effective_width(self.types, return_ty.semantic_id()).unwrap_or(NumericWidth::I64);
+        let axis = match &args[1] {
+            MirOperand::Constant(MirConstant::Int(i)) => *i,
+            other => {
+                let v = self.eval_operand(other, span)?;
+                match v {
+                    Value::Int(i) => i,
+                    _ => {
+                        return Err(RunnerError::internal(
+                            span,
+                            "tensor sum_axis axis must be int",
+                        ))
+                    }
+                }
+            }
+        };
+        let input = self.tensor_arg(&args[0], span)?;
+        let borrow = input.borrow();
+        let shape = &borrow.shape;
+        if shape.is_empty() || shape.len() > 2 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor sum_axis requires rank 1 or 2",
+            ));
+        }
+        let rank = shape.len();
+        if axis < 0 || axis as usize >= rank {
+            return Err(RunnerError::internal(
+                span,
+                "tensor sum_axis axis out of range",
+            ));
+        }
+        if rank == 1 {
+            // Sum over the only axis → scalar.
+            let mut sum = Value::Float(0.0);
+            let mut first = true;
+            for item in &borrow.data {
+                if first {
+                    sum = item.clone();
+                    first = false;
+                } else {
+                    sum = numeric_add(&sum, item, width, span)?;
+                }
+            }
+            return Ok(sum);
+        }
+        // rank == 2
+        let rows = shape[0] as usize;
+        let cols = shape[1] as usize;
+        if axis == 0 {
+            // Sum across rows → result has shape [cols].
+            let mut result = vec![Value::Float(0.0); cols];
+            for (ci, slot) in result.iter_mut().enumerate() {
+                let mut first = true;
+                for ri in 0..rows {
+                    let val = &borrow.data[ri * cols + ci];
+                    if first {
+                        *slot = val.clone();
+                        first = false;
+                    } else {
+                        *slot = numeric_add(slot, val, width, span)?;
+                    }
+                }
+            }
+            Ok(tensor_value(result, vec![cols as i64]))
+        } else {
+            // axis == 1 (last axis) — sum across columns → result has shape [rows].
+            let mut result = Vec::with_capacity(rows);
+            for ri in 0..rows {
+                let mut first = true;
+                let mut sum = Value::Float(0.0);
+                for ci in 0..cols {
+                    let val = &borrow.data[ri * cols + ci];
+                    if first {
+                        sum = val.clone();
+                        first = false;
+                    } else {
+                        sum = numeric_add(&sum, val, width, span)?;
+                    }
+                }
+                result.push(sum);
+            }
+            Ok(tensor_value(result, vec![rows as i64]))
+        }
+    }
+
+    /// Layer normalization with manual shape-loops.
+    ///
+    /// Computes `(x - mean) / sqrt(var + eps)` with optional affine
+    /// transform `* gamma + beta`. Axis and epsilon are trailing const
+    /// operands — `MirIntrinsic::Collection` is a bare discriminant with
+    /// no payload fields.
+    ///
+    /// Args layout: `[input, axis_const, epsilon_const, gamma?, beta?]`.
+    /// Arity: 3 (no affine), 4 (gamma only), or 5 (gamma + beta).
+    /// Method call order: `input.laminatio(axis, eps, gamma?, beta?)`.
+    fn tensor_layernorm(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        return_ty: MirType,
+    ) -> Result<Value, RunnerError> {
+        let n = args.len();
+        if !(3..=5).contains(&n) {
+            return Err(RunnerError::internal(span, "tensor layernorm arity"));
+        }
+
+        let width =
+            effective_width(self.types, return_ty.semantic_id()).unwrap_or(NumericWidth::I64);
+
+        // Extract axis and epsilon from args[1] and args[2],
+        // resolving through `eval_operand` in case the literal was
+        // assigned to a sized-fractus temp during MIR lowering.
+        let axis = match self.eval_operand(&args[1], span)? {
+            Value::Int(i) => i,
+            other => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("tensor layernorm axis must be int, got {other:?}"),
+                ))
+            }
+        };
+        let epsilon = match self.eval_operand(&args[2], span)? {
+            Value::Float(f) => f,
+            other => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("tensor layernorm epsilon must be float, got {other:?}"),
+                ))
+            }
+        };
+
+        let input = self.tensor_arg(&args[0], span)?;
+        let borrow = input.borrow();
+        let shape = &borrow.shape;
+
+        if shape.is_empty() || shape.len() > 2 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor layernorm requires rank 1 or 2",
+            ));
+        }
+
+        let rank = shape.len();
+        if axis < 0 || axis as usize >= rank {
+            return Err(RunnerError::internal(
+                span,
+                "tensor layernorm axis out of range",
+            ));
+        }
+
+        // v1 constraint: axis must be the last axis.
+        if axis as usize != rank - 1 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor layernorm axis must be the last axis (v1)",
+            ));
+        }
+
+        let total_len = borrow.data.len();
+        if total_len == 0 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor layernorm requires non-empty tensor",
+            ));
+        }
+
+        let norm_dim = shape[rank - 1] as usize;
+        let batch = total_len / norm_dim;
+
+        let (gamma, beta) = match n {
+            4 => {
+                let gamma = self.tensor_arg(&args[3], span)?;
+                require_rank1_extent(
+                    &gamma.borrow(),
+                    norm_dim,
+                    span,
+                    "tensor layernorm gamma shape mismatch",
+                )?;
+                (Some(gamma), None)
+            }
+            5 => {
+                let gamma = self.tensor_arg(&args[3], span)?;
+                require_rank1_extent(
+                    &gamma.borrow(),
+                    norm_dim,
+                    span,
+                    "tensor layernorm gamma shape mismatch",
+                )?;
+                let beta = self.tensor_arg(&args[4], span)?;
+                require_rank1_extent(
+                    &beta.borrow(),
+                    norm_dim,
+                    span,
+                    "tensor layernorm beta shape mismatch",
+                )?;
+                (Some(gamma), Some(beta))
+            }
+            _ => (None, None),
+        };
+
+        // --- Compute mean over axis ---
+        let mut means = vec![0.0f64; batch];
+        for (row, mean_slot) in means.iter_mut().enumerate() {
+            let mut sum = 0.0f64;
+            let base = row * norm_dim;
+            for c in 0..norm_dim {
+                sum += numeric_as_f64(&borrow.data[base + c], span)?;
+            }
+            *mean_slot = sum / norm_dim as f64;
+        }
+
+        // --- Compute centered = input - mean (broadcast) ---
+        let mut x_centered = Vec::with_capacity(total_len);
+        for (row, mean) in means.iter().enumerate() {
+            let base = row * norm_dim;
+            for c in 0..norm_dim {
+                let val = numeric_as_f64(&borrow.data[base + c], span)?;
+                let centered = val - mean;
+                x_centered.push(Value::Float(centered));
+            }
+        }
+
+        // --- Compute variance = mean(centered²) over axis ---
+        let mut inv_stds = vec![0.0f64; batch];
+        for (row, inv_std_slot) in inv_stds.iter_mut().enumerate() {
+            let mut sum_sq = 0.0f64;
+            let base = row * norm_dim;
+            for c in 0..norm_dim {
+                let centered = x_centered[base + c].clone();
+                let val = numeric_as_f64(&centered, span)?;
+                sum_sq += val * val;
+            }
+            let var = sum_sq / norm_dim as f64;
+            *inv_std_slot = 1.0 / (var + epsilon).sqrt();
+        }
+
+        // --- Compute normalized = centered * inv_std (broadcast) ---
+        let mut normalized = Vec::with_capacity(total_len);
+        for (row, istd) in inv_stds.iter().enumerate() {
+            let base = row * norm_dim;
+            for c in 0..norm_dim {
+                let centered = &x_centered[base + c];
+                let val = numeric_as_f64(centered, span)?;
+                normalized.push(Value::Float(val * istd));
+            }
+        }
+
+        // --- Apply affine transform if present ---
+        let output: Vec<Value> = match (gamma, beta) {
+            (Some(g), Some(b)) => {
+                let g_borrow = g.borrow();
+                let b_borrow = b.borrow();
+                let mut out = Vec::with_capacity(total_len);
+                for row in 0..batch {
+                    let base = row * norm_dim;
+                    for c in 0..norm_dim {
+                        let norm = &normalized[base + c];
+                        let g_val = &g_borrow.data[c];
+                        let b_val = &b_borrow.data[c];
+                        // norm * gamma + beta
+                        let prod = numeric_mul(norm, g_val, width, span)?;
+                        let sum = numeric_add(&prod, b_val, width, span)?;
+                        out.push(sum);
+                    }
+                }
+                out
+            }
+            (Some(g), None) => {
+                let g_borrow = g.borrow();
+                let mut out = Vec::with_capacity(total_len);
+                for row in 0..batch {
+                    let base = row * norm_dim;
+                    for c in 0..norm_dim {
+                        let norm = &normalized[base + c];
+                        let g_val = &g_borrow.data[c];
+                        out.push(numeric_mul(norm, g_val, width, span)?);
+                    }
+                }
+                out
+            }
+            _ => normalized,
+        };
+
+        Ok(tensor_value(output, shape.clone()))
+    }
+
+    fn tensor_rms_norm(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        // MIR layout: [x, axis, eps, gamma].
+        let [input, axis_arg, eps_arg, gamma_arg] = args else {
+            return Err(RunnerError::internal(span, "tensor rms_norm arity"));
+        };
+
+        let axis = match self.eval_operand(axis_arg, span)? {
+            Value::Int(i) => i,
+            other => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("tensor rms_norm axis must be int, got {other:?}"),
+                ))
+            }
+        };
+        let epsilon = match self.eval_operand(eps_arg, span)? {
+            Value::Float(f) => f,
+            other => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("tensor rms_norm epsilon must be float, got {other:?}"),
+                ))
+            }
+        };
+
+        let input = self.tensor_arg(input, span)?;
+        let borrow = input.borrow();
+        let shape = &borrow.shape;
+
+        if shape.is_empty() || shape.len() > 2 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor rms_norm requires rank 1 or 2",
+            ));
+        }
+        let rank = shape.len();
+        if axis < 0 || usize::try_from(axis).map_or(true, |a| a >= rank) {
+            return Err(RunnerError::internal(
+                span,
+                "tensor rms_norm axis out of range",
+            ));
+        }
+        if usize::try_from(axis).map_or(true, |a| a != rank - 1) {
+            return Err(RunnerError::internal(
+                span,
+                "tensor rms_norm axis must be the last axis (v1)",
+            ));
+        }
+
+        let total_len = borrow.data.len();
+        if total_len == 0 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor rms_norm requires non-empty tensor",
+            ));
+        }
+        let norm_dim = shape[rank - 1] as usize;
+        let batch = total_len / norm_dim;
+
+        // Gamma is the mandatory affine peer: rank-1, width == axis extent
+        // (the `decoder_ops::rms_norm` weight-length contract).
+        let gamma = self.tensor_arg(gamma_arg, span)?;
+        require_rank1_extent(
+            &gamma.borrow(),
+            norm_dim,
+            span,
+            "tensor rms_norm gamma shape mismatch",
+        )?;
+        let g_borrow = gamma.borrow();
+
+        // rms_norm: y = x·(1/sqrt(mean(x²)+eps))·gamma, no mean subtraction.
+        // f64 sum of squares → f32 mean → f32 scale (the pinned
+        // `decoder_ops::rms_norm` operation order).
+        let mut output = Vec::with_capacity(total_len);
+        for row in 0..batch {
+            let base = row * norm_dim;
+            let mut sum_sq = 0.0f64;
+            for c in 0..norm_dim {
+                let val = numeric_as_f64(&borrow.data[base + c], span)?;
+                sum_sq += val * val;
+            }
+            let mean = (sum_sq / norm_dim as f64) as f32;
+            let eps_f32 = epsilon as f32;
+            let scale = f64::from(1.0f32 / (mean + eps_f32).sqrt());
+            for c in 0..norm_dim {
+                let x = numeric_as_f64(&borrow.data[base + c], span)?;
+                let g = numeric_as_f64(&g_borrow.data[c], span)?;
+                output.push(Value::Float(x * scale * g));
+            }
+        }
+        Ok(tensor_value(output, shape.clone()))
+    }
+
+    fn tensor_rope(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        const FREQ_BASE: f64 = 100_000.0;
+
+        // MIR layout: [x, pos, dim].
+        let [input, pos_arg, dim_arg] = args else {
+            return Err(RunnerError::internal(span, "tensor rope arity"));
+        };
+        let pos = match self.eval_operand(pos_arg, span)? {
+            Value::Int(i) => i,
+            other => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("tensor rope pos must be int, got {other:?}"),
+                ))
+            }
+        };
+        let dim = match self.eval_operand(dim_arg, span)? {
+            Value::Int(i) => i,
+            other => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("tensor rope dim must be int, got {other:?}"),
+                ))
+            }
+        };
+
+        let input = self.tensor_arg(input, span)?;
+        let borrow = input.borrow();
+        let shape = &borrow.shape;
+        if shape.is_empty() || shape.len() > 2 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor rope requires rank 1 or 2",
+            ));
+        }
+        let last_extent = shape[shape.len() - 1] as usize;
+        if dim <= 0 || dim % 2 != 0 || usize::try_from(dim).map_or(true, |d| d > last_extent) {
+            return Err(RunnerError::internal(
+                span,
+                format!("tensor rope dim {dim} must be even and within the last-axis extent {last_extent}"),
+            ));
+        }
+        let batch = borrow.data.len() / last_extent;
+        if batch == 0 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor rope requires non-empty tensor",
+            ));
+        }
+
+        // llama-arch NORM consecutive-pair rotation; freq_base frozen at
+        // 100000 (the CCI-1 v1 source constant).
+        let pos_f = pos as f64;
+        let dim_f = dim as f64;
+        let mut output = Vec::with_capacity(borrow.data.len());
+        for row in 0..batch {
+            let base = row * last_extent;
+            let mut row_data: Vec<Value> = borrow.data[base..base + last_extent].to_vec();
+            for k in 0..dim / 2 {
+                let kf = k as f64;
+                let theta = pos_f * FREQ_BASE.powf(-(2.0 * kf) / dim_f);
+                let cos = theta.cos();
+                let sin = theta.sin();
+                let x0 = numeric_as_f64(&row_data[2 * k as usize], span)?;
+                let x1 = numeric_as_f64(&row_data[2 * k as usize + 1], span)?;
+                row_data[2 * k as usize] = Value::Float(x0 * cos - x1 * sin);
+                row_data[2 * k as usize + 1] = Value::Float(x0 * sin + x1 * cos);
+            }
+            output.extend(row_data);
+        }
+        Ok(tensor_value(output, shape.clone()))
+    }
+
+    fn tensor_gather(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        // MIR layout: [table, ids].
+        let [table_arg, ids_arg] = args else {
+            return Err(RunnerError::internal(span, "tensor gather arity"));
+        };
+        let table = self.tensor_arg(table_arg, span)?;
+        let borrow = table.borrow();
+        let shape = &borrow.shape;
+        if shape.len() < 2 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor gather requires a rank-2 table receiver",
+            ));
+        }
+        let rows = shape[0];
+        // Tensor dims are non-negative i64; clamp via try_from if ever negative.
+        let cols = usize::try_from(shape[1]).unwrap_or(0);
+        let ids = self.array_arg(ids_arg, span)?;
+        let mut indices = Vec::with_capacity(ids.len());
+        for value in &ids {
+            let Value::Int(id) = value else {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("tensor gather id is not numerus: {value:?}"),
+                ));
+            };
+            if *id < 0 || *id >= rows {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("tensor gather id {id} is out of range for table rows {rows}"),
+                ));
+            }
+            let index = usize::try_from(*id).map_err(|_| {
+                RunnerError::internal(
+                    span,
+                    format!("tensor gather id {id} is out of range for table rows {rows}"),
+                )
+            })?;
+            indices.push(index);
+        }
+        // out[t] = table[ids[t]] → [T, D]; repeated/out-of-order ids preserved.
+        let mut output = Vec::with_capacity(indices.len() * cols);
+        for index in &indices {
+            let base = index * cols;
+            output.extend(borrow.data[base..base + cols].iter().cloned());
+        }
+        let result_shape = vec![indices.len() as i64, cols as i64];
+        Ok(tensor_value(output, result_shape))
+    }
+
+    fn tensor_transpose(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [tensor] = args else {
+            return Err(RunnerError::internal(span, "tensor transpose arity"));
+        };
+        let tensor = self.tensor_arg(tensor, span)?;
+        let borrow = tensor.borrow();
+        let shape = &borrow.shape;
+        if shape.len() != 2 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor transpose requires rank 2",
+            ));
+        }
+        let m = shape[0];
+        let n = shape[1];
+        let mut result_data = Vec::with_capacity((m * n) as usize);
+        for j in 0..n {
+            for i in 0..m {
+                result_data.push(borrow.data[(i * n + j) as usize].clone());
+            }
+        }
+        Ok(tensor_value(result_data, vec![n, m]))
+    }
+
+    // COLLECTION HELPERS
+
+    fn eval_map_snapshot(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        values: bool,
+    ) -> Result<Value, RunnerError> {
+        let label = if values { "values" } else { "keys" };
+        let [receiver] = args else {
+            return Err(RunnerError::internal(
+                span,
+                format!("collection {label} arity"),
+            ));
+        };
+        let receiver = self.eval_operand(receiver, span)?;
+        match receiver {
+            Value::Map(cell) => {
+                let items = if values {
+                    cell.borrow().values().cloned().collect::<Vec<_>>()
+                } else {
+                    cell.borrow()
+                        .keys()
+                        .map(Self::key_to_value)
+                        .collect::<Vec<_>>()
+                };
+                Ok(Value::Array(Rc::new(RefCell::new(items))))
+            }
+            _ => Err(RunnerError::internal(
+                span,
+                format!("{label} receiver is not map"),
+            )),
+        }
+    }
+
+    fn collection_index(
+        &self,
+        receiver: Value,
+        index: Value,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        match receiver {
+            Value::Array(cell) => {
+                let idx = index.as_index(span)?;
+                cell.borrow()
+                    .get(idx)
+                    .cloned()
+                    .ok_or_else(|| RunnerError::internal(span, "array index out of bounds"))
+            }
+            Value::Tuple(elems) => {
+                let idx = index.as_index(span)?;
+                elems
+                    .get(idx)
+                    .cloned()
+                    .ok_or_else(|| RunnerError::internal(span, "tuple index out of bounds"))
+            }
+            Value::Str(text) => {
+                let idx = index.as_index(span)?;
+                let ch = text
+                    .chars()
+                    .nth(idx)
+                    .ok_or_else(|| RunnerError::internal(span, "text index out of bounds"))?;
+                Ok(Value::Str(ch.to_string()))
+            }
+            Value::Octeti(bytes) => {
+                let idx = index.as_index(span)?;
+                bytes
+                    .get(idx)
+                    .map(|byte| Value::Int(i64::from(*byte)))
+                    .ok_or_else(|| RunnerError::internal(span, "octeti index out of bounds"))
+            }
+            Value::Map(cell) => {
+                let key = index.to_key(span)?;
+                Ok(cell.borrow().get(&key).cloned().unwrap_or(Value::Nil))
+            }
+            _ => Err(RunnerError::internal(span, "index receiver type mismatch")),
+        }
+    }
+
+    fn optional_collection_index(
+        &self,
+        receiver: Value,
+        index: Value,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let optional_index = match &index {
+            Value::Int(value) if *value >= 0 => Some(*value as usize),
+            Value::Int(_) => None,
+            _ => return self.collection_index(receiver, index, span),
+        };
+        match receiver {
+            Value::Array(cell) => Ok(optional_index
+                .and_then(|idx| cell.borrow().get(idx).cloned())
+                .unwrap_or(Value::Nil)),
+            Value::Str(text) => Ok(optional_index
+                .and_then(|idx| text.chars().nth(idx))
+                .map(|ch| Value::Str(ch.to_string()))
+                .unwrap_or(Value::Nil)),
+            Value::Octeti(bytes) => Ok(optional_index
+                .and_then(|idx| bytes.get(idx).copied())
+                .map(|byte| Value::Int(i64::from(byte)))
+                .unwrap_or(Value::Nil)),
+            Value::Map(cell) => Ok(cell
+                .borrow()
+                .get(&index.to_key(span)?)
+                .cloned()
+                .unwrap_or(Value::Nil)),
+            other => self.collection_index(other, index, span),
+        }
+    }
+
+    fn tensor_arg(
+        &mut self,
+        operand: &MirOperand,
+        span: Span,
+    ) -> Result<Rc<RefCell<TensorValue>>, RunnerError> {
+        match self.eval_operand(operand, span)? {
+            Value::Tensor(cell) => Ok(cell),
+            other => Err(RunnerError::internal(
+                span,
+                format!("tensor receiver type mismatch: {other:?}"),
+            )),
+        }
+    }
+
+    fn array_arg(&mut self, operand: &MirOperand, span: Span) -> Result<Vec<Value>, RunnerError> {
+        match self.eval_operand(operand, span)? {
+            Value::Array(cell) => Ok(cell.borrow().clone()),
+            other => Err(RunnerError::internal(
+                span,
+                format!("tensor lista argument type mismatch: {other:?}"),
+            )),
+        }
+    }
+
+    fn shape_arg(
+        &mut self,
+        operand: &MirOperand,
+        span: Span,
+        negative_message: &'static str,
+    ) -> Result<Vec<i64>, RunnerError> {
+        self.array_arg(operand, span)?
+            .into_iter()
+            .map(|value| match value {
+                Value::Int(dim) if tensor_dim_non_negative(dim) => Ok(dim),
+                Value::Int(_) => Err(RunnerError::internal(span, negative_message)),
+                other => Err(RunnerError::internal(
+                    span,
+                    format!("tensor shape element is not numerus: {other:?}"),
+                )),
+            })
+            .collect()
+    }
+
+    fn ensure_tensor_element_count(
+        &self,
+        shape: &[i64],
+        actual: usize,
+        span: Span,
+        message: &'static str,
+    ) -> Result<(), RunnerError> {
+        match tensor_shape_element_count(shape) {
+            Some(expected) if expected == actual => Ok(()),
+            Some(_) => Err(RunnerError::internal(span, message)),
+            None => Err(RunnerError::internal(span, ERR_ELEMENT_COUNT_OVERFLOW)),
+        }
+    }
+
+    fn collection_contains(
+        &self,
+        receiver: Value,
+        needle: Value,
+        span: Span,
+    ) -> Result<bool, RunnerError> {
+        match receiver {
+            Value::Array(cell) => Ok(cell.borrow().iter().any(|item| values_equal(item, &needle))),
+            Value::Set(cell) => Ok(cell.borrow().contains(&needle.to_key(span)?)),
+            Value::Map(cell) => Ok(cell.borrow().contains_key(&needle.to_key(span)?)),
+            Value::Str(text) => {
+                let Value::Str(needle) = needle else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "contains needle is not textus",
+                    ));
+                };
+                Ok(text.contains(&needle))
+            }
+            _ => Err(RunnerError::internal(
+                span,
+                "contains receiver type mismatch",
+            )),
+        }
+    }
+
+    fn map_str_arg(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        f: impl FnOnce(String) -> String,
+    ) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "text collection arity"));
+        };
+        let Value::Str(text) = self.eval_operand(receiver, span)? else {
+            return Err(RunnerError::internal(span, "text receiver is not textus"));
+        };
+        Ok(Value::Str(f(text)))
+    }
+
+    fn str_pair_bool(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        f: impl FnOnce(String, String) -> bool,
+    ) -> Result<Value, RunnerError> {
+        let [left, right] = args else {
+            return Err(RunnerError::internal(span, "text pair arity"));
+        };
+        let Value::Str(left) = self.eval_operand(left, span)? else {
+            return Err(RunnerError::internal(span, "text pair left is not textus"));
+        };
+        let Value::Str(right) = self.eval_operand(right, span)? else {
+            return Err(RunnerError::internal(
+                span,
+                "text pair right is not textus",
+            ));
+        };
+        Ok(Value::Bool(f(left, right)))
+    }
+
+    fn map_numeric(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        f: impl FnOnce(f64) -> f64,
+    ) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "numeric collection arity"));
+        };
+        let value = self.eval_operand(receiver, span)?;
+        Ok(match value {
+            Value::Int(v) => Value::Int(f(v as f64) as i64),
+            Value::Float(v) => Value::Float(f(v)),
+            _ => {
+                return Err(RunnerError::internal(
+                    span,
+                    "numeric receiver type mismatch",
+                ))
+            }
+        })
+    }
+
+    fn map_numeric_pair(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        f: impl FnOnce(f64, f64) -> f64,
+    ) -> Result<Value, RunnerError> {
+        let [left, right] = args else {
+            return Err(RunnerError::internal(span, "numeric pair arity"));
+        };
+        let left = self.eval_operand(left, span)?;
+        let right = self.eval_operand(right, span)?;
+        match (left, right) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(f(a as f64, b as f64) as i64)),
+            (Value::Int(a), Value::Float(b)) => Ok(Value::Float(f(a as f64, b))),
+            (Value::Float(a), Value::Int(b)) => Ok(Value::Float(f(a, b as f64))),
+            (Value::Float(a), Value::Float(b)) => Ok(Value::Float(f(a, b))),
+            _ => Err(RunnerError::internal(span, "numeric pair type mismatch")),
+        }
+    }
+
+    fn sum_numeric_array(
+        &mut self,
+        args: &[MirOperand],
+        return_ty: MirType,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "collection sum arity"));
+        };
+        let values = match self.eval_operand(receiver, span)? {
+            Value::Array(cell) => cell.borrow().clone(),
+            Value::Tensor(cell) => cell.borrow().data.clone(),
+            _ => return Err(RunnerError::internal(span, "sum receiver type mismatch")),
+        };
+
+        // Modular-word sum: fold with wrapping_add and mask to the declared
+        // width so the result respects 2^W wraparound.
+        if let Some(width) = self.modular_word_width_of(return_ty) {
+            let mask = modular_word_mask(width);
+            let mut acc: u64 = 0;
+            for value in &values {
+                let v = modular_operand(value.clone(), span, "modular sum element type mismatch")?;
+                acc = acc.wrapping_add(v) & mask;
+            }
+            return Ok(modular_word_result(acc, width));
+        }
+
+        // The integer path applies the same width-checking discipline as every
+        // other integer op (`numeric_binop`): the declared `numerus<W>` width
+        // governs the accumulation, so `sum` overflows exactly where a
+        // width-checked add would. Unsigned carriers accumulate in u64 and
+        // never sign-encode upper-half magnitudes.
+        let width =
+            effective_width(self.types, return_ty.semantic_id()).unwrap_or(NumericWidth::I64);
+        let mut int_sum = 0_i64;
+        let mut uint_sum = 0_u64;
+        let mut saw_uint = false;
+        let mut float_sum = 0.0_f64;
+        let mut saw_float = false;
+        for value in &values {
+            match value {
+                Value::Int(v) if saw_float => float_sum += *v as f64,
+                Value::Int(v) if saw_uint => {
+                    uint_sum = uint_width_checked_add(
+                        uint_sum,
+                        u64::try_from(*v).map_err(|_| {
+                            RunnerError::internal(span, "sum element type mismatch")
+                        })?,
+                        width,
+                        span,
+                    )?;
+                }
+                Value::Int(v) => int_sum = width_checked_add(int_sum, *v, width, span)?,
+                Value::UInt(v) if saw_float => float_sum += *v as f64,
+                Value::UInt(v) => {
+                    if !saw_uint {
+                        // Carry any prior signed accumulation into the unsigned
+                        // lane; a negative prior sum cannot exist in an
+                        // unsigned-width context (width checks reject it).
+                        uint_sum = u64::try_from(int_sum).map_err(|_| {
+                            RunnerError::internal(span, "sum element type mismatch")
+                        })?;
+                        saw_uint = true;
+                    }
+                    uint_sum = uint_width_checked_add(uint_sum, *v, width, span)?;
+                }
+                Value::Float(v) => {
+                    if !saw_float {
+                        float_sum = if saw_uint {
+                            uint_sum as f64
+                        } else {
+                            int_sum as f64
+                        };
+                        saw_float = true;
+                    }
+                    float_sum += *v;
+                }
+                _ => return Err(RunnerError::internal(span, "sum element type mismatch")),
+            }
+        }
+        if saw_float {
+            Ok(Value::Float(float_sum))
+        } else if saw_uint {
+            Ok(Value::UInt(uint_sum))
+        } else {
+            Ok(Value::Int(int_sum))
+        }
+    }
+
+    fn approximate_fractus(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [receiver, other, tolerance] = args else {
+            return Err(RunnerError::internal(span, "approximate comparison arity"));
+        };
+        let receiver = self.eval_operand(receiver, span)?;
+        let other = self.eval_operand(other, span)?;
+        let tolerance = self.eval_operand(tolerance, span)?;
+        let Value::Float(receiver) = receiver else {
+            return Err(RunnerError::internal(
+                span,
+                "approximate receiver type mismatch",
+            ));
+        };
+        let Value::Float(other) = other else {
+            return Err(RunnerError::internal(
+                span,
+                "approximate argument type mismatch",
+            ));
+        };
+        let Value::Float(tolerance) = tolerance else {
+            return Err(RunnerError::internal(
+                span,
+                "approximate tolerance type mismatch",
+            ));
+        };
+        Ok(Value::Bool((receiver - other).abs() <= tolerance))
+    }
+
+    fn eval_option_chain(
+        &mut self,
+        base: &MirOperand,
+        link: &MirOptionChainLink,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let current = self.eval_operand(base, span)?;
+        if matches!(current, Value::Nil) {
+            return Ok(Value::Nil);
+        }
+        match link {
+            MirOptionChainLink::Field(field) => self.project_field(current, *field, span),
+            MirOptionChainLink::VariantField { variant, field } => {
+                self.project_variant_field(current, *variant, *field, span)
+            }
+            MirOptionChainLink::Index(index) => {
+                let index = self.eval_operand(index, span)?;
+                self.optional_collection_index(current, index, span)
+            }
+            MirOptionChainLink::Call { .. } => {
+                Err(RunnerError::unsupported(span, "option chain call"))
+            }
+        }
+    }
+
+    // PLACE PROJECTION
+
+    pub(crate) fn project(
+        &mut self,
+        value: Value,
+        projection: &radix_mir::MirProjection,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        match projection {
+            radix_mir::MirProjection::Field(field) => self.project_field(value, *field, span),
+            radix_mir::MirProjection::VariantField { variant, field } => {
+                self.project_variant_field(value, *variant, *field, span)
+            }
+            radix_mir::MirProjection::Index(index) => {
+                let index = self.eval_operand(index, span)?;
+                self.collection_index(value, index, span)
+            }
+            radix_mir::MirProjection::VectorLane(lane) => match value {
+                Value::Vector(lanes) => lanes
+                    .borrow()
+                    .get(usize::from(*lane))
+                    .cloned()
+                    .ok_or_else(|| RunnerError::internal(span, "vector lane out of bounds")),
+                _ => Err(RunnerError::internal(span, "vector lane projection base")),
+            },
+            radix_mir::MirProjection::MatrixCell { row, column } => match value {
+                Value::Matrix(matrix) => matrix
+                    .borrow()
+                    .cell(*row, *column)
+                    .cloned()
+                    .ok_or_else(|| RunnerError::internal(span, "matrix cell out of bounds")),
+                _ => Err(RunnerError::internal(span, "matrix cell projection base")),
+            },
+            radix_mir::MirProjection::ClosureCapture {
+                environment,
+                source,
+            } => self.project_closure_capture(value, *environment, *source, span),
+        }
+    }
+
+    fn project_closure_capture(
+        &self,
+        value: Value,
+        environment_id: radix_mir::MirClosureEnvironmentId,
+        source: radix_hir::DefId,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let Value::ClosureEnvironment(value_environment, cell) = value else {
+            return Err(RunnerError::internal(
+                span,
+                "closure capture projection base is not an environment",
+            ));
+        };
+        if value_environment != environment_id {
+            return Err(RunnerError::internal(
+                span,
+                "closure capture environment mismatch",
+            ));
+        }
+        let Some(environment) = self.context.closure_environments.get(&environment_id) else {
+            return Err(RunnerError::internal(
+                span,
+                "closure capture metadata is missing",
+            ));
+        };
+        let Some(capture) = environment
+            .captures
+            .iter()
+            .find(|capture| capture.source == source)
+        else {
+            return Err(RunnerError::internal(
+                span,
+                "closure capture source is missing",
+            ));
+        };
+        let capture_value = cell
+            .borrow()
+            .get(&capture.name)
+            .cloned()
+            .ok_or_else(|| RunnerError::internal(span, "closure capture value is missing"))?;
+        Ok(capture_value)
+    }
+
+    fn project_field(
+        &self,
+        value: Value,
+        field: Symbol,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        match value {
+            Value::Struct(def_id, cell) => {
+                if let Some(value) = cell.borrow().get(&field).cloned() {
+                    return Ok(value);
+                }
+                if self
+                    .context
+                    .optional_struct_fields
+                    .get(&def_id)
+                    .is_some_and(|fields| fields.contains(&field))
+                {
+                    return Ok(Value::Nil);
+                }
+                Err(RunnerError::internal(
+                    span,
+                    format!("missing struct field sym#{}", field.0),
+                ))
+            }
+            Value::Record(cell) => cell.borrow().get(&field).cloned().ok_or_else(|| {
+                RunnerError::internal(span, format!("missing record field sym#{}", field.0))
+            }),
+            Value::Tuple(items) => {
+                let idx = field.0 as usize;
+                items
+                    .get(idx)
+                    .cloned()
+                    .ok_or_else(|| RunnerError::internal(span, "tuple field out of bounds"))
+            }
+            _ => Err(RunnerError::internal(
+                span,
+                "field projection on non-aggregate",
+            )),
+        }
+    }
+
+    pub(crate) fn project_variant_field(
+        &self,
+        value: Value,
+        variant: DefId,
+        field: Symbol,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        match value {
+            Value::EnumVariant(id, cell) if id == variant => {
+                if let Some(value) = cell.borrow().get(&field).cloned() {
+                    return Ok(value);
+                }
+                // F-083: optional fields on enum variants fall back to Nil,
+                // matching the Struct projection contract.
+                if self
+                    .context
+                    .optional_struct_fields
+                    .get(&variant)
+                    .is_some_and(|fields| fields.contains(&field))
+                {
+                    return Ok(Value::Nil);
+                }
+                Err(RunnerError::internal(span, "variant field out of bounds"))
+            }
+            _ => Err(RunnerError::internal(
+                span,
+                "variant field projection mismatch",
+            )),
+        }
+    }
+
+    fn compare_sort_values(left: &Value, right: &Value) -> std::cmp::Ordering {
+        match (left, right) {
+            (Value::Int(a), Value::Int(b)) => a.cmp(b),
+            (Value::UInt(a), Value::UInt(b)) => a.cmp(b),
+            // Mixed carriers order by numeric value: a negative signed value
+            // sorts below every unsigned value, a non-negative signed value
+            // compares by magnitude (same rule as `compare_values`).
+            (Value::Int(a), Value::UInt(b)) => {
+                if *a < 0 {
+                    std::cmp::Ordering::Less
+                } else {
+                    (*a as u64).cmp(b)
+                }
+            }
+            (Value::UInt(a), Value::Int(b)) => {
+                if *b < 0 {
+                    std::cmp::Ordering::Greater
+                } else {
+                    a.cmp(&(*b as u64))
+                }
+            }
+            (Value::Float(a), Value::Float(b)) => {
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+            }
+            (Value::Str(a), Value::Str(b)) => a.cmp(b),
+            (Value::Bool(a), Value::Bool(b)) => a.cmp(b),
+            _ => format!("{left:?}").cmp(&format!("{right:?}")),
+        }
+    }
+
+    fn key_to_value(key: &MapKey) -> Value {
+        match key {
+            MapKey::Int(v) => Value::Int(*v),
+            MapKey::UInt(v) => Value::UInt(*v),
+            MapKey::Bool(v) => Value::Bool(*v),
+            MapKey::Str(v) => Value::Str(v.clone()),
+            MapKey::Unit => Value::Unit,
+        }
+    }
+
+    // PROVIDERS
+
+    fn eval_provider(
+        &mut self,
+        provider: &MirProvider,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        if let MirProviderKind::Kernel(module) = provider.kind {
+            let mut evaluated = Vec::with_capacity(args.len());
+            for arg in args {
+                evaluated.push(self.eval_operand(arg, span)?);
+            }
+            let verb = self.interner.resolve(provider.name);
+            return self.host.kernel_call(module, verb, &evaluated, span);
+        }
+        self.host.provider(provider)
+    }
+
+    fn eval_set_algebra(
+        &mut self,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [left, right] = args else {
+            return Err(RunnerError::internal(span, "set algebra arity"));
+        };
+        let left = self.eval_operand(left, span)?;
+        let right = self.eval_operand(right, span)?;
+        let (Value::Set(left_cell), Value::Set(right_cell)) = (left, right) else {
+            return Err(RunnerError::internal(
+                span,
+                "set algebra requires copia operands",
+            ));
+        };
+        let left = left_cell.borrow().clone();
+        let right = right_cell.borrow().clone();
+        match op {
+            MirCollectionOp::Union => {
+                let mut out = left.clone();
+                out.extend(right.iter().cloned());
+                Ok(Value::Set(Rc::new(RefCell::new(out))))
+            }
+            MirCollectionOp::Intersection => {
+                let out = left.intersection(&right).cloned().collect();
+                Ok(Value::Set(Rc::new(RefCell::new(out))))
+            }
+            MirCollectionOp::Difference => {
+                let out = left.difference(&right).cloned().collect();
+                Ok(Value::Set(Rc::new(RefCell::new(out))))
+            }
+            MirCollectionOp::SymmetricDifference => {
+                let out = left.symmetric_difference(&right).cloned().collect();
+                Ok(Value::Set(Rc::new(RefCell::new(out))))
+            }
+            MirCollectionOp::IsSubset => Ok(Value::Bool(left.is_subset(&right))),
+            MirCollectionOp::IsSuperset => Ok(Value::Bool(left.is_superset(&right))),
+            _ => Err(RunnerError::unsupported(
+                span,
+                &format!("set algebra {op:?}"),
+            )),
+        }
+    }
+}
+
+// LOCAL VALUE HELPERS
+
+fn require_rank1_extent(
+    tensor: &TensorValue,
+    extent: usize,
+    span: Span,
+    message: &'static str,
+) -> Result<(), RunnerError> {
+    if tensor.shape.len() != 1 || tensor.shape[0] as usize != extent {
+        return Err(RunnerError::internal(span, message));
+    }
+    Ok(())
+}
+
+fn byte_from_value(value: Value, span: Span) -> Result<u8, RunnerError> {
+    match value {
+        Value::Int(value) => u8::try_from(value)
+            .map_err(|_| RunnerError::internal(span, "octeti append byte out of range")),
+        _ => Err(RunnerError::internal(
+            span,
+            "octeti append requires numerus byte",
+        )),
+    }
+}
+
+fn array_value(items: Vec<Value>) -> Value {
+    Value::Array(Rc::new(RefCell::new(items)))
+}
+
+fn tensor_value(data: Vec<Value>, shape: Vec<i64>) -> Value {
+    Value::Tensor(Rc::new(RefCell::new(TensorValue { data, shape })))
+}
+
+fn interval_value(start: Value, end: Value, inclusive: bool) -> Value {
+    Value::Tuple(vec![start, end, Value::Bool(inclusive)])
+}
+
+fn sermo_frame_value(sermo: &SermoValue, frame: DefId, data_field: Symbol) -> Value {
+    let mut fields = FxHashMap::default();
+    fields.insert(data_field, sermo.opener.clone());
+    Value::Struct(frame, Rc::new(RefCell::new(fields)))
+}
+
+fn interval_parts(value: &Value, span: Span) -> Result<(Value, Value, bool), RunnerError> {
+    let Value::Tuple(parts) = value else {
+        return Err(RunnerError::internal(
+            span,
+            "interval value carrier mismatch",
+        ));
+    };
+    let [start, end, Value::Bool(inclusive)] = parts.as_slice() else {
+        return Err(RunnerError::internal(
+            span,
+            "interval value shape mismatch",
+        ));
+    };
+    Ok((start.clone(), end.clone(), *inclusive))
+}
+
+fn interval_intersection(
+    left: &Value,
+    right: &Value,
+    span: Span,
+) -> Result<Option<Value>, RunnerError> {
+    let (left_start, left_end, left_inclusive) = interval_parts(left, span)?;
+    let (right_start, right_end, right_inclusive) = interval_parts(right, span)?;
+    let left_start_number = numeric_as_f64(&left_start, span)?;
+    let right_start_number = numeric_as_f64(&right_start, span)?;
+    let left_end_number = numeric_as_f64(&left_end, span)?;
+    let right_end_number = numeric_as_f64(&right_end, span)?;
+    let start = if left_start_number >= right_start_number {
+        left_start
+    } else {
+        right_start
+    };
+    let (end, inclusive) = if left_end_number < right_end_number {
+        (left_end, left_inclusive)
+    } else if right_end_number < left_end_number {
+        (right_end, right_inclusive)
+    } else {
+        (left_end, left_inclusive && right_inclusive)
+    };
+    let start_number = numeric_as_f64(&start, span)?;
+    let end_number = numeric_as_f64(&end, span)?;
+    Ok(
+        (start_number < end_number || (inclusive && start_number == end_number))
+            .then(|| interval_value(start, end, inclusive)),
+    )
+}
+
+fn interval_union_value(
+    left: &Value,
+    right: &Value,
+    span: Span,
+) -> Result<Option<Value>, RunnerError> {
+    let (left_start, left_end, left_inclusive) = interval_parts(left, span)?;
+    let (right_start, right_end, right_inclusive) = interval_parts(right, span)?;
+    let left_start_number = numeric_as_f64(&left_start, span)?;
+    let right_start_number = numeric_as_f64(&right_start, span)?;
+    let (start, first_end, first_inclusive, second_start, second_end, second_inclusive) =
+        if left_start_number <= right_start_number {
+            (
+                left_start,
+                left_end,
+                left_inclusive,
+                right_start,
+                right_end,
+                right_inclusive,
+            )
+        } else {
+            (
+                right_start,
+                right_end,
+                right_inclusive,
+                left_start,
+                left_end,
+                left_inclusive,
+            )
+        };
+    if numeric_as_f64(&second_start, span)? > numeric_as_f64(&first_end, span)? {
+        return Ok(None);
+    }
+    let first_end_number = numeric_as_f64(&first_end, span)?;
+    let second_end_number = numeric_as_f64(&second_end, span)?;
+    let (end, inclusive) = if second_end_number > first_end_number {
+        (second_end, second_inclusive)
+    } else if first_end_number > second_end_number {
+        (first_end, first_inclusive)
+    } else {
+        (first_end, first_inclusive || second_inclusive)
+    };
+    Ok(Some(interval_value(start, end, inclusive)))
+}
+
+fn literal_sparse_shape(
+    types: &TypeTable,
+    shape: IndexId,
+    span: Span,
+) -> Result<Vec<i64>, RunnerError> {
+    match types.get_index(shape) {
+        IndexExpr::Tuple(dimensions) => dimensions
+            .iter()
+            .map(|dimension| match types.get_index(*dimension) {
+                IndexExpr::Literal(value) => i64::try_from(*value)
+                    .map_err(|_| RunnerError::internal(span, "sparse shape dimension overflow")),
+                _ => Err(RunnerError::internal(
+                    span,
+                    "sparse vacua requires literal shape",
+                )),
+            })
+            .collect(),
+        IndexExpr::Literal(value) => i64::try_from(*value)
+            .map(|value| vec![value])
+            .map_err(|_| RunnerError::internal(span, "sparse shape dimension overflow")),
+        _ => Err(RunnerError::internal(
+            span,
+            "sparse vacua requires literal shape",
+        )),
+    }
+}
+
+fn sparse_zero_value(
+    types: &TypeTable,
+    mut element: TypeId,
+    span: Span,
+) -> Result<Value, RunnerError> {
+    loop {
+        match types.get(element) {
+            Type::Alias(_, inner) => element = *inner,
+            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
+                return Ok(Value::Int(0));
+            }
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
+                return Ok(Value::Float(0.0));
+            }
+            _ => {
+                return Err(RunnerError::internal(
+                    span,
+                    "sparse element type is not numeric",
+                ))
+            }
+        }
+    }
+}
+
+fn tensor_element_count(shape: &[i64], span: Span) -> Result<usize, RunnerError> {
+    for dim in shape {
+        if !tensor_dim_non_negative(*dim) {
+            return Err(RunnerError::internal(
+                span,
+                "tensor shape dimension overflow",
+            ));
+        }
+    }
+    tensor_shape_element_count(shape)
+        .ok_or_else(|| RunnerError::internal(span, ERR_ELEMENT_COUNT_OVERFLOW))
+}
+
+/// Extract non-negative gradient shape dims from a shape operand.
+///
+/// Accepts a `lista` of dims or a tensor (whose declared shape provides the
+/// dims), and verifies the dim count matches the declared `rank` — mirroring
+/// the host ABI's rank/negative-dim validation before storage allocation.
+fn gradient_shape_dims(
+    shape_value: &Value,
+    rank: usize,
+    span: Span,
+) -> Result<Vec<i64>, RunnerError> {
+    let dims: Vec<i64> = match shape_value {
+        Value::Array(items) => items
+            .borrow()
+            .iter()
+            .map(|dim| match dim {
+                Value::Int(v) if *v >= 0 => Ok(*v),
+                Value::UInt(v) => i64::try_from(*v)
+                    .map_err(|_| RunnerError::internal(span, "gradient shape dim out of range")),
+                _ => Err(RunnerError::internal(
+                    span,
+                    "gradient shape dim is not a non-negative numerus",
+                )),
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        Value::Tensor(tensor) => tensor.borrow().shape.clone(),
+        _ => {
+            return Err(RunnerError::internal(
+                span,
+                "gradient shape is not a lista or tensor",
+            ))
+        }
+    };
+    if dims.len() != rank {
+        return Err(RunnerError::internal(span, "gradient shape rank mismatch"));
+    }
+    if dims.iter().any(|dim| *dim < 0) {
+        return Err(RunnerError::internal(
+            span,
+            "gradient shape has negative dim",
+        ));
+    }
+    Ok(dims)
+}
+
+fn numeric_as_f64(value: &Value, span: Span) -> Result<f64, RunnerError> {
+    match value {
+        Value::Int(value) => Ok(*value as f64),
+        Value::Float(value) => Ok(*value),
+        _ => Err(RunnerError::internal(
+            span,
+            "tensor numeric element type mismatch",
+        )),
+    }
+}
+
+/// Numeric pair dispatch with width-checked integer arithmetic and zero-div guard.
+///
+/// Routes integer operands through `width_checked_*` / `uint_width_checked_*`
+/// so overflow honors `numerus<W>`. Float operands remain width-agnostic
+/// (f32 vs f64 fidelity is a separate gap). Mixed int/float promotes to float.
+///
+/// F-029: replaces raw i64 +/−/*// with width-checked ops; adds `UInt` support
+/// and zero-div guard on the tensor arithmetic path.
+fn numeric_pair(
+    left: &Value,
+    right: &Value,
+    width: NumericWidth,
+    span: Span,
+    int_op: fn(i64, i64, NumericWidth, Span) -> Result<i64, RunnerError>,
+    uint_op: fn(u64, u64, NumericWidth, Span) -> Result<u64, RunnerError>,
+    float_op: impl FnOnce(f64, f64) -> f64,
+) -> Result<Value, RunnerError> {
+    match (left, right) {
+        // Signed integer pair → width-checked.
+        (Value::Int(a), Value::Int(b)) => int_op(*a, *b, width, span).map(Value::Int),
+        // Unsigned integer pair → width-checked.
+        (Value::UInt(a), Value::UInt(b)) => uint_op(*a, *b, width, span).map(Value::UInt),
+        // Mixed signed/unsigned: promote to float for consistency with the
+        // rest of the runner's non-binop numeric paths (the binop path uses
+        // numeric_binop which has stricter carrier rules).
+        (Value::UInt(a), Value::Int(b)) | (Value::Int(b), Value::UInt(a)) => {
+            Ok(Value::Float(float_op(*a as f64, *b as f64)))
+        }
+        // Float pair or mixed int/float → promote to float.
+        _ => Ok(Value::Float(float_op(
+            numeric_as_f64(left, span)?,
+            numeric_as_f64(right, span)?,
+        ))),
+    }
+}
+
+fn numeric_add(
+    left: &Value,
+    right: &Value,
+    width: NumericWidth,
+    span: Span,
+) -> Result<Value, RunnerError> {
+    numeric_pair(
+        left,
+        right,
+        width,
+        span,
+        super::value::width_checked_add,
+        super::value::uint_width_checked_add,
+        |a, b| a + b,
+    )
+}
+
+fn numeric_sub(
+    left: &Value,
+    right: &Value,
+    width: NumericWidth,
+    span: Span,
+) -> Result<Value, RunnerError> {
+    numeric_pair(
+        left,
+        right,
+        width,
+        span,
+        super::value::width_checked_sub,
+        super::value::uint_width_checked_sub,
+        |a, b| a - b,
+    )
+}
+
+fn numeric_mul(
+    left: &Value,
+    right: &Value,
+    width: NumericWidth,
+    span: Span,
+) -> Result<Value, RunnerError> {
+    numeric_pair(
+        left,
+        right,
+        width,
+        span,
+        super::value::width_checked_mul,
+        super::value::uint_width_checked_mul,
+        |a, b| a * b,
+    )
+}
+
+fn numeric_div(
+    left: &Value,
+    right: &Value,
+    width: NumericWidth,
+    span: Span,
+) -> Result<Value, RunnerError> {
+    numeric_pair(
+        left,
+        right,
+        width,
+        span,
+        super::value::width_checked_div,
+        super::value::uint_width_checked_div,
+        |a, b| a / b,
+    )
+}

@@ -283,7 +283,7 @@ pub(crate) fn compile_package_wasm(config: &Config, input: &Path) -> PackageComp
 /// Compile a package while forwarding a Rust test-selection policy to codegen.
 ///
 /// Historical Rust harness path: still used by package integration tests that
-/// assert on generated Rust. Product `faber test` uses the MIR stepper instead.
+/// assert on generated Rust. Product `faber test` uses the MIR runner instead.
 #[allow(dead_code)] // public API + lib tests; binary test command no longer calls this
 pub fn compile_package_with_test_selection(
     config: &Config,

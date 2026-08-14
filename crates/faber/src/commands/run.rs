@@ -422,7 +422,7 @@ fn cmd_run_fmir_text(args: RunArgs, selection: DeviceSelection) {
     // The one host-construction policy against the built image's device
     // section (S1-6): a device-bearing image resolves `selection` against the
     // admitted backends and runs through the composite host's device route;
-    // anything else runs the CPU/FMIR stepper.
+    // anything else runs the CPU/FMIR runner.
     if let Err(diagnostics) =
         package::run_package_fmir_text_image_with_selection(&image, selection, &mut host)
     {
@@ -594,7 +594,7 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
     let mut host = StdioHost::with_argumenta(args.args);
     // The route function applies the one host-construction policy: a
     // device-bearing image runs through the composite host's device route
-    // (S1-6 launch seam); anything else runs the CPU/FMIR stepper.
+    // (S1-6 launch seam); anything else runs the CPU/FMIR runner.
     if let Err(diagnostics) =
         package::run_fmir_image_path_with_selection(&args.image, Some(selection), &mut host)
     {

@@ -1,4 +1,4 @@
-//! Stepper-backed proba runner tests (shipped `radix::proba` + package analysis).
+//! Runner-backed proba runner tests (shipped `radix::proba` + package analysis).
 //!
 //! Proves `faber test` definition: MIR interpretation, not Cargo/Rust harness.
 
@@ -14,7 +14,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// The product-default English code pack (en = authority). The loader-level
-/// and stepper-level tests below call `load_package_with_locale_pack` /
+/// and runner-level tests below call `load_package_with_locale_pack` /
 /// `run_proba_source` directly, so they must pass the same default pack the
 /// `compile_package*`/`analyze_package` routes apply — not the pack-less
 /// (registry-direct) lexing `None` / `Config::default()` would select.
@@ -32,12 +32,12 @@ fn write_minimal_lib_package(dir: &Path) {
     fs::write(
         dir.join("faber.toml"),
         r#"[package]
-name = "stepper_proba_fixture"
+name = "runner_proba_fixture"
 version = "0.1.0"
 edition = "2026"
 
 [library]
-provider = "stepper_proba_fixture"
+provider = "runner_proba_fixture"
 
 [paths]
 source = "src"
@@ -59,8 +59,8 @@ targets = ["rust"]
 }
 
 #[test]
-fn stepper_pass_fail_skip_on_inline_fixture() {
-    let dir = test_temp_dir("stepper-pfs");
+fn runner_pass_fail_skip_on_inline_fixture() {
+    let dir = test_temp_dir("runner-pfs");
     let path = dir.join("cases.fab");
     fs::write(
         &path,
@@ -102,7 +102,7 @@ test "skip" skip "later" {
 
 #[test]
 fn analyze_package_for_tests_includes_proba_build_excludes() {
-    let dir = test_temp_dir("stepper-include");
+    let dir = test_temp_dir("runner-include");
     write_minimal_lib_package(dir.path());
     fs::write(
         dir.join("src/math.proba"),
@@ -152,8 +152,8 @@ test "math ok" {
 }
 
 #[test]
-fn package_inline_proba_runs_on_stepper_after_analyze() {
-    let dir = test_temp_dir("stepper-pkg-inline");
+fn package_inline_proba_runs_on_runner_after_analyze() {
+    let dir = test_temp_dir("runner-pkg-inline");
     write_minimal_lib_package(dir.path());
     fs::write(
         dir.join("src/lib.fab"),
@@ -197,7 +197,7 @@ test "identity holds" {
 }
 
 #[test]
-fn name_and_suite_selection_on_stepper() {
+fn name_and_suite_selection_on_runner() {
     let source = r#"
 probandum "suite_a" {
     proba "alpha" { adfirma 1 ≡ 1 }

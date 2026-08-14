@@ -3,7 +3,7 @@
 //!
 //! Mirrors `faber-runtime::tensor`. Radix is the authority for this contract;
 //! the runtime copy is expected to become a generated/committed artifact in a
-//! later phase. Copied faithfully so compile-time (stepper) and runtime emit
+//! later phase. Copied faithfully so compile-time (runner) and runtime emit
 //! byte-identical error text and agree on shape math.
 //!
 //! KEEP IN SYNC: `radix-hir-rust/src/runtime_contract_tensor.rs`

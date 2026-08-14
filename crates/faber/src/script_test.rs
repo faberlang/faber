@@ -20,10 +20,10 @@ main {
 }
 
 #[test]
-fn print_run_source_error_accepts_stepper_failures() {
-    let error = RunSourceError::Stepper(vec![radix::mir::StepperError {
+fn print_run_source_error_accepts_runner_failures() {
+    let error = RunSourceError::Stepper(vec![radix::mir::RunnerError {
         message: "FaberScript unsupported: async".to_owned(),
-        issue: "stepper_unsupported".to_owned(),
+        issue: "runner_unsupported".to_owned(),
         span: radix::lexer::Span::default(),
     }]);
     print_run_source_error(&error);
@@ -123,15 +123,15 @@ fn run_source_surfaces_frontend_errors() {
 }
 
 #[test]
-fn empty_source_returns_stepper_no_entry_error() {
+fn empty_source_returns_runner_no_entry_error() {
     let mut host = BufferHost::default();
     let error = run_source("", &mut host).expect_err("empty source has no entry");
     let RunSourceError::Stepper(errors) = error else {
-        panic!("expected stepper error for empty source");
+        panic!("expected runner error for empty source");
     };
     assert!(errors
         .iter()
-        .any(|error| error.issue == "stepper_no_entry_function_in_mir_program"));
+        .any(|error| error.issue == "runner_no_entry_function_in_mir_program"));
 }
 
 #[test]
@@ -143,7 +143,7 @@ fn print_run_source_error_accepts_frontend_failures() {
 }
 
 #[test]
-fn run_source_surfaces_stepper_errors() {
+fn run_source_surfaces_runner_errors() {
     let mut host = BufferHost::default();
     let error =
         run_source("@ future\nfn bad() { }\n", &mut host).expect_err("invalid async fails");

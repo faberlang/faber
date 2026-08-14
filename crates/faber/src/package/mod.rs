@@ -126,7 +126,7 @@ pub(crate) use fhir::{
     build_package_fhir, load_package_fhir, run_loaded_package_fhir, PackageFhir,
 };
 // `compile_package_with_test_*` remain public for lib tests / tooling; the
-// binary `faber test` path no longer emits Rust tests (stepper-only).
+// binary `faber test` path no longer emits Rust tests (runner-only).
 #[allow(unused_imports)] // binary crate root does not call test compile helpers
 pub use compile::{
     check_package, compile_package, compile_package_with_test_options,
@@ -255,7 +255,7 @@ use std::path::{Path, PathBuf};
 ///      firing at analysis on the executed path.
 ///   3. **Executed-lane default `fmir`** (`Target::MirFmirBinary`) when no
 ///      target is named — the source-independent package-MIR binary image the
-///      in-process stepper consumes.
+///      in-process runner consumes.
 ///
 /// The seam is single-valued and never ambient: analysis and execution resolve
 /// from the same source, so the two targets cannot diverge (ABI source-of-
@@ -440,7 +440,7 @@ pub(crate) fn library_resolver_for_package(
 /// [`load_package_with_locale_pack`] or the higher-level compile/run routes
 /// directly, while the package test suites (`package_test`,
 /// `frontmatter_integration_test`, `proba_integration_test`,
-/// `proba_stepper_test`) exercise this wrapper. The deferred FHIR package
+/// `proba_runner_test`) exercise this wrapper. The deferred FHIR package
 /// Stages 5-6 (Cista installed-library path) reconstruct packages through
 /// radix's `radix::hir::package::load_package` + faber `load_package_fhir`
 /// (see `radix/docs/factory/hir-artifact-fhir/`), not this source-tree
@@ -632,7 +632,7 @@ mod frontmatter_integration_test;
 mod proba_integration_test;
 
 #[cfg(test)]
-mod proba_stepper_test;
+mod proba_runner_test;
 
 #[cfg(test)]
 mod composite_plan_synthetic_test;

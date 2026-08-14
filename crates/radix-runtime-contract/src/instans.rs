@@ -8,7 +8,7 @@
 //! (significant-figures semantics), not a different storage width.
 //!
 //! Unlike the runtime original, this copy carries no `Valor` coupling: the
-//! stepper extracts instans values from concrete `Value` via [`Instans::from_rfc3339`]
+//! runner extracts instans values from concrete `Value` via [`Instans::from_rfc3339`]
 //! and [`Instans::from_epoch_integer`].
 
 const NANOS_PER_SECOND: i64 = 1_000_000_000;

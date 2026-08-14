@@ -740,9 +740,9 @@ pub enum MirIntrinsic {
     Gradient(MirGradientOp),
     /// Compiler-owned runtime variant-tag check (`est <type>` / `non est <type>`).
     ///
-    /// Stepper-dispatched type check on the runtime value's variant tag against
+    /// Runner-dispatched type check on the runtime value's variant tag against
     /// a concrete valor-carried target type; never attempts extraction. The
-    /// MIR stepper is the first systems-lane consumer of the `est`
+    /// MIR runner is the first systems-lane consumer of the `est`
     /// variant-check surface (archived `docs/archived/est-variant-check/`);
     /// device/application lanes fail closed on it.
     TypeCheck(MirTypeCheckOp),

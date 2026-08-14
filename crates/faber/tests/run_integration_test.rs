@@ -2203,7 +2203,7 @@ fn label() → string {
 }
 
 #[test]
-fn script_manifestless_single_file_uses_single_source_stepper() {
+fn script_manifestless_single_file_uses_single_source_runner() {
     let dir = temp_dir("single-file");
     let script = dir.join("script.fab");
     fs::write(&script, "main { print \"single\" }\n").expect("write script");
@@ -2218,7 +2218,7 @@ fn script_manifestless_single_file_uses_single_source_stepper() {
 #[test]
 fn script_norma_solum_package_reads_file_through_kernel_bridge() {
     // One `norma:*` import block; interpreted package execution satisfies it
-    // through the stepper kernel (Stage 1b host bridge). No second stepper-only
+    // through the runner kernel (Stage 1b host bridge). No second runner-only
     // source file, no compiled-Rust fallback.
     let package = temp_dir("norma-solum-bridge");
     let src = package.join("src");

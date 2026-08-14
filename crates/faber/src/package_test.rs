@@ -24,7 +24,7 @@ use radix::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase};
 use radix::driver::Config;
 use radix::file_interface::FileExportKind;
 use radix::hir::{HirItemKind, LibraryBinding, LibraryItem, LibraryItemKind, LibraryProvider};
-use radix::mir::{BufferHost, Host, MirDiagnosticKind, MirProvider, StepperError, Value};
+use radix::mir::{BufferHost, Host, MirDiagnosticKind, MirProvider, RunnerError, Value};
 use radix::Output;
 use std::fs;
 use std::io::{Read, Write};
@@ -135,11 +135,11 @@ impl ExitRecordingHost {
 }
 
 impl Host for ExitRecordingHost {
-    fn scribe(&mut self, kind: MirDiagnosticKind, text: &str) -> Result<(), StepperError> {
+    fn scribe(&mut self, kind: MirDiagnosticKind, text: &str) -> Result<(), RunnerError> {
         self.buffer.scribe(kind, text)
     }
 
-    fn read_line(&mut self) -> Result<Option<String>, StepperError> {
+    fn read_line(&mut self) -> Result<Option<String>, RunnerError> {
         self.buffer.read_line()
     }
 
@@ -147,7 +147,7 @@ impl Host for ExitRecordingHost {
         self.buffer.abort(reason)
     }
 
-    fn provider(&mut self, provider: &MirProvider) -> Result<Value, StepperError> {
+    fn provider(&mut self, provider: &MirProvider) -> Result<Value, RunnerError> {
         self.buffer.provider(provider)
     }
 
@@ -155,7 +155,7 @@ impl Host for ExitRecordingHost {
         std::panic::panic_any(ExitPanic(code));
     }
 
-    fn argumenta(&self) -> Result<&[String], StepperError> {
+    fn argumenta(&self) -> Result<&[String], RunnerError> {
         self.buffer.argumenta()
     }
 }
@@ -13471,7 +13471,7 @@ fn package_mir_linking_fails_closed_on_unresolvable_companion() {
     // companion with no resolvable symbol in the library analysis fails
     // closed at link time with the stable `package_mir_companion_unresolved`
     // identity instead of silently skipping the companion (which previously
-    // surfaced as an unstable stepper-internal `missing MIR function` error).
+    // surfaced as an unstable runner-internal `missing MIR function` error).
     // The primal here has no tensor parameter, so radix's reverse-AD snapshot
     // pass skips it and no companion function is ever generated.
     let dir = test_temp_dir("package-mir-companion-unresolved");

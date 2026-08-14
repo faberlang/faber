@@ -1,9 +1,9 @@
 //! Interpreted Faber source execution: `faber script`, the `-c` one-liner,
-//! and the `faber repl` interactive stepper.
+//! and the `faber repl` interactive runner.
 //!
 //! `script` owns the canonical interpreted-source command path shared with
 //! `faber run --interpret` (retained until Stage 6 removal). It routes a path to
-//! the single-source stepper, the package-MIR runner, or archive extraction —
+//! the single-source runner, the package-MIR runner, or archive extraction —
 //! never to generated Rust or Cargo.
 
 use crate::cli::{ReplArgs, ScriptArgs};
@@ -29,7 +29,7 @@ pub(super) fn cmd_script(args: &ScriptArgs) {
 }
 
 /// Dispatch an interpreted input path to the package-MIR runner, archive
-/// extraction, or single-source stepper. Shared by `faber script` and
+/// extraction, or single-source runner. Shared by `faber script` and
 /// `faber run --interpret`.
 pub(super) fn interpret_path(
     path: &PathBuf,
@@ -126,7 +126,7 @@ fn script_package_config(
 }
 
 /// Whether `path` routes through the package-MIR runner rather than the
-/// single-source stepper: manifest-backed or directory packages, or a
+/// single-source runner: manifest-backed or directory packages, or a
 /// manifestless `.fab` file that declares a non-kernel import.
 pub(super) fn is_package_interpret_input(path: &Path) -> bool {
     package::is_manifest_backed_or_directory_package_input(path)
@@ -163,7 +163,7 @@ fn manifestless_file_declares_non_kernel_import(path: &Path) -> bool {
     })
 }
 
-/// Whether `path` is a single `.fab` file (the single-source stepper input).
+/// Whether `path` is a single `.fab` file (the single-source runner input).
 pub(super) fn is_single_fab_file(path: &Path) -> bool {
     path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("fab")
 }
@@ -183,7 +183,7 @@ fn eprint_archive_diagnostics(diagnostics: &[Diagnostic]) {
     }
 }
 
-/// Execute `-c` / `--command` source via the MIR stepper.
+/// Execute `-c` / `--command` source via the MIR runner.
 pub(super) fn cmd_eval(source: &str, args: Vec<String>) {
     let mut host = StdioHost::with_argumenta(args);
     interpret_source_or_exit("command-line", source, &mut host);

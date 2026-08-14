@@ -43,7 +43,7 @@ pub enum TensorOperationFloorFamily {
     /// Gradient handles provide create/accumulate/read/zero operations for
     /// accumulating parameter gradients on a host. Unlike other floor families
     /// (which track tensor operations), this family tracks gradient handle
-    /// delivery across backends. The MIR stepper implements gradient handles
+    /// delivery across backends. The MIR runner implements gradient handles
     /// in-process (S5-U1); the LLVM and WGSL backends both implement gradient
     /// handles; Wasm is deferred.
     ///
@@ -166,7 +166,7 @@ pub const TENSOR_OPERATION_FLOOR_ROWS: &[TensorOperationFloorRow] = &[
         family: TensorOperationFloorFamily::Construction,
         target: TensorOperationFloorTarget::MirStepper,
         status: TensorOperationFloorStatus::MirExecutable,
-        evidence: "crates/radix/src/mir/stepper_test.rs::stepper_runs_tensor_shape_fixture",
+        evidence: "crates/radix/src/mir/runner_test.rs::runner_runs_tensor_shape_fixture",
     },
     TensorOperationFloorRow {
         family: TensorOperationFloorFamily::Construction,
@@ -196,7 +196,7 @@ pub const TENSOR_OPERATION_FLOOR_ROWS: &[TensorOperationFloorRow] = &[
         family: TensorOperationFloorFamily::FlattenOutput,
         target: TensorOperationFloorTarget::MirStepper,
         status: TensorOperationFloorStatus::MirExecutable,
-        evidence: "crates/radix/src/mir/stepper_test.rs::stepper_runs_tensor_shape_fixture",
+        evidence: "crates/radix/src/mir/runner_test.rs::runner_runs_tensor_shape_fixture",
     },
     TensorOperationFloorRow {
         family: TensorOperationFloorFamily::FlattenOutput,
@@ -226,7 +226,7 @@ pub const TENSOR_OPERATION_FLOOR_ROWS: &[TensorOperationFloorRow] = &[
         family: TensorOperationFloorFamily::Shape,
         target: TensorOperationFloorTarget::MirStepper,
         status: TensorOperationFloorStatus::MirExecutable,
-        evidence: "crates/radix/src/mir/stepper_test.rs::stepper_runs_tensor_shape_fixture",
+        evidence: "crates/radix/src/mir/runner_test.rs::runner_runs_tensor_shape_fixture",
     },
     TensorOperationFloorRow {
         family: TensorOperationFloorFamily::Shape,
@@ -286,7 +286,7 @@ pub const TENSOR_OPERATION_FLOOR_ROWS: &[TensorOperationFloorRow] = &[
         family: TensorOperationFloorFamily::ElementwiseArithmetic,
         target: TensorOperationFloorTarget::MirStepper,
         status: TensorOperationFloorStatus::MirExecutable,
-        evidence: "crates/radix/src/mir/stepper_test.rs::stepper_runs_tensor_arithmetic_elementwise_fixture",
+        evidence: "crates/radix/src/mir/runner_test.rs::runner_runs_tensor_arithmetic_elementwise_fixture",
     },
     TensorOperationFloorRow {
         family: TensorOperationFloorFamily::ElementwiseArithmetic,
@@ -316,7 +316,7 @@ pub const TENSOR_OPERATION_FLOOR_ROWS: &[TensorOperationFloorRow] = &[
         family: TensorOperationFloorFamily::Reductions,
         target: TensorOperationFloorTarget::MirStepper,
         status: TensorOperationFloorStatus::MirExecutable,
-        evidence: "crates/radix/src/mir/stepper_test.rs::stepper_runs_tensor_arithmetic_reduction_fixture",
+        evidence: "crates/radix/src/mir/runner_test.rs::runner_runs_tensor_arithmetic_reduction_fixture",
     },
     TensorOperationFloorRow {
         family: TensorOperationFloorFamily::Reductions,
@@ -346,7 +346,7 @@ pub const TENSOR_OPERATION_FLOOR_ROWS: &[TensorOperationFloorRow] = &[
         family: TensorOperationFloorFamily::Rank2MatMul,
         target: TensorOperationFloorTarget::MirStepper,
         status: TensorOperationFloorStatus::MirExecutable,
-        evidence: "crates/radix/src/mir/stepper_test.rs::stepper_runs_tensor_arithmetic_matmul_fixture",
+        evidence: "crates/radix/src/mir/runner_test.rs::runner_runs_tensor_arithmetic_matmul_fixture",
     },
     TensorOperationFloorRow {
         family: TensorOperationFloorFamily::Rank2MatMul,
@@ -376,7 +376,7 @@ pub const TENSOR_OPERATION_FLOOR_ROWS: &[TensorOperationFloorRow] = &[
         family: TensorOperationFloorFamily::Activations,
         target: TensorOperationFloorTarget::MirStepper,
         status: TensorOperationFloorStatus::MirExecutable,
-        evidence: "crates/radix-mir-stepper — MirUnOp dispatch (ReLU, Sqrt, Exp, Log, …) + TensorGelu (MirCollectionOp) dispatch via runtime.rs tensor_gelu",
+        evidence: "crates/radix-mir-runner — MirUnOp dispatch (ReLU, Sqrt, Exp, Log, …) + TensorGelu (MirCollectionOp) dispatch via runtime.rs tensor_gelu",
     },
     TensorOperationFloorRow {
         family: TensorOperationFloorFamily::Activations,
@@ -406,7 +406,7 @@ pub const TENSOR_OPERATION_FLOOR_ROWS: &[TensorOperationFloorRow] = &[
         family: TensorOperationFloorFamily::Normalizations,
         target: TensorOperationFloorTarget::MirStepper,
         status: TensorOperationFloorStatus::MirExecutable,
-        evidence: "crates/radix-mir-stepper/src/runtime.rs — TensorLayerNorm dispatched via manual shape-loops (d-p-10-layernorm U2)",
+        evidence: "crates/radix-mir-runner/src/runtime.rs — TensorLayerNorm dispatched via manual shape-loops (d-p-10-layernorm U2)",
     },
     TensorOperationFloorRow {
         family: TensorOperationFloorFamily::Normalizations,
@@ -436,7 +436,7 @@ pub const TENSOR_OPERATION_FLOOR_ROWS: &[TensorOperationFloorRow] = &[
         family: TensorOperationFloorFamily::GradientHandles,
         target: TensorOperationFloorTarget::MirStepper,
         status: TensorOperationFloorStatus::MirExecutable,
-        evidence: "crates/radix-mir-stepper/src/runtime.rs::eval_gradient — in-process gradient-handle dispatch (Create/Accumulate/Read/Zero over opaque handle storage); proof: crates/radix-mir-stepper/src/lib_test.rs::stepper_gradient_handle_create_accumulate_read_zero_round_trip",
+        evidence: "crates/radix-mir-runner/src/runtime.rs::eval_gradient — in-process gradient-handle dispatch (Create/Accumulate/Read/Zero over opaque handle storage); proof: crates/radix-mir-runner/src/lib_test.rs::runner_gradient_handle_create_accumulate_read_zero_round_trip",
     },
 ];
 

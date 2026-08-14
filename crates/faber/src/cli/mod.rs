@@ -19,7 +19,7 @@ const FABER_AFTER_HELP: &str = include_str!("../../docs/help/faber-after-help.md
     version
 )]
 pub struct Cli {
-    /// Execute Faber source via the MIR stepper (one-liner)
+    /// Execute Faber source via the MIR runner (one-liner)
     #[arg(short = 'c', long = "command")]
     pub eval_source: Option<String>,
 
@@ -62,10 +62,10 @@ pub enum Command {
     /// Run Faber source through the interpreter (single file, package, or archive)
     Script(ScriptArgs),
 
-    /// Interactive MIR stepper REPL (accumulating cells, re-lowers each line)
+    /// Interactive MIR runner REPL (accumulating cells, re-lowers each line)
     Repl(ReplArgs),
 
-    /// Run proba cases on the MIR stepper (no Cargo / rustc on the package)
+    /// Run proba cases on the MIR runner (no Cargo / rustc on the package)
     Test(TestArgs),
 
     /// Internal FMIR image runner used by generated executable bundles
@@ -402,7 +402,7 @@ pub struct FmirRunArgs {
 
 /// Arguments for `faber script`.
 ///
-/// `script` always interprets source through the MIR stepper or package-MIR
+/// `script` always interprets source through the MIR runner or package-MIR
 /// runner; it never compiles to Rust or invokes Cargo. See `commands::script`.
 #[derive(clap::Args, Debug)]
 pub struct ScriptArgs {
@@ -425,7 +425,7 @@ pub struct ScriptArgs {
     pub args: Vec<String>,
 }
 
-/// Arguments for `faber test` (MIR stepper — no Cargo / rustc on the package).
+/// Arguments for `faber test` (MIR runner — no Cargo / rustc on the package).
 #[derive(clap::Args, Debug)]
 pub struct TestArgs {
     /// Package path or single `.fab` / `.proba` file to test
@@ -487,11 +487,11 @@ pub struct TestArgs {
     #[arg(long)]
     pub nocapture: bool,
 
-    /// Reserved (serial execution only; ignored by the stepper runner)
+    /// Reserved (serial execution only; ignored by the runner)
     #[arg(long, value_name = "N")]
     pub test_threads: Option<usize>,
 
-    /// Not supported on the stepper runner (exits with an error)
+    /// Not supported on the runner (exits with an error)
     #[arg(long, conflicts_with = "include_ignored")]
     pub ignored: bool,
 

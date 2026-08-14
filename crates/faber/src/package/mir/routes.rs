@@ -128,7 +128,7 @@ pub(crate) fn build_package_fmir_image(
 /// package (struct literals, method calls, field projections) failed at run
 /// with missing field metadata. The image file is still written so the
 /// artifact surface is unchanged; the run consumes the in-memory image under
-/// the same host-construction policy (CPU stepper vs device route).
+/// the same host-construction policy (CPU runner vs device route).
 pub(crate) fn run_package_fmir_built_image<H: Host + ?Sized>(
     config: &Config,
     input: &Path,
@@ -264,7 +264,7 @@ pub(crate) fn run_package_fmir_image_with_selection<H: Host + ?Sized>(
 /// N1.5, S1-6): resolve the loaded image's selection against the machine's
 /// admitted backends; a device-bearing image that resolves runs through the
 /// composite host's device route (S1-6 launch seam), anything else runs the
-/// CPU/FMIR stepper. Fail-closed diagnostics; an explicit GPU request never
+/// CPU/FMIR runner. Fail-closed diagnostics; an explicit GPU request never
 /// silently falls back.
 pub(super) fn run_loaded_fmir_image_route<H: Host + ?Sized>(
     image: FmirPackageImage,

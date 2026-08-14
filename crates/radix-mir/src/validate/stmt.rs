@@ -234,7 +234,7 @@ impl Validator<'_, '_> {
                 // carries the synthetic source; deferring their check to that
                 // stage matches the plain-`Call` treatment of cross-unit
                 // definitions. A never-resolvable def is caught downstream the
-                // same way a plain `Call` to one is: by the stepper/emitter.
+                // same way a plain `Call` to one is: by the runner/emitter.
                 if sig.is_none() {
                     match &callee {
                         MirCallee::Definition { .. } => {}

@@ -451,7 +451,7 @@ pub(super) fn run_fmir_package_image<H: Host + ?Sized>(
                 .collect::<Vec<_>>()
         })?;
     run_entry(&validated, host)
-        .map_err(|errors| stepper_diagnostics(&image.diagnostic_path, errors))?;
+        .map_err(|errors| runner_diagnostics(&image.diagnostic_path, errors))?;
     if let Some(code) = image.exit_code {
         host.exit(code);
     }
