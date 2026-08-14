@@ -143,6 +143,9 @@ pub enum Output {
     /// Python backend output.
     Python(PythonOutput),
 
+    /// Haskell backend output.
+    Haskell(HaskellOutput),
+
     /// Canonical Faber source output.
     Faber(FaberOutput),
 
@@ -192,6 +195,12 @@ pub struct SwiftOutput {
 /// Python backend output.
 pub struct PythonOutput {
     /// Complete generated Python source.
+    pub code: String,
+}
+
+/// Haskell backend output.
+pub struct HaskellOutput {
+    /// Complete generated Haskell source.
     pub code: String,
 }
 

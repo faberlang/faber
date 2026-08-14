@@ -229,6 +229,7 @@ fn run_target_name(target: Target) -> &'static str {
         Target::MirFmirBundle => "fmir-bin",
         Target::HirSwift => "swift",
         Target::HirPython => "python",
+        Target::HirHaskell => "haskell",
         Target::HirFhir => "fhir",
     }
 }

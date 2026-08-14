@@ -47,6 +47,7 @@ fn small_build_reports_only_compiled_capabilities() {
         "fmir-bin",
         "faber",
         "go",
+        "haskell",
         "wasm",
         "wasm-text",
         "llvm-text",

@@ -71,6 +71,10 @@ pub enum FaberCliTarget {
     #[value(name = "python")]
     HirPython,
 
+    /// Haskell backend.
+    #[value(name = "haskell")]
+    HirHaskell,
+
     /// Experimental MIR-backed WebAssembly text target.
     #[value(name = "wasm-text", alias = "wat")]
     MirWasm,
@@ -110,6 +114,7 @@ impl FaberCliTarget {
             FaberCliTarget::HirTypeScript => radix::codegen::Target::HirTypeScript,
             FaberCliTarget::HirGo => radix::codegen::Target::HirGo,
             FaberCliTarget::HirPython => radix::codegen::Target::HirPython,
+            FaberCliTarget::HirHaskell => radix::codegen::Target::HirHaskell,
             FaberCliTarget::MirWasm => radix::codegen::Target::MirWasm,
             FaberCliTarget::MirWasmBinary => radix::codegen::Target::MirWasmBinary,
             FaberCliTarget::MirLlvm => radix::codegen::Target::MirLlvm,
