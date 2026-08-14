@@ -51,7 +51,7 @@ const CONST_MEMBER_CALL_MAIN: &str = "import from \"./util\" * as utilModule\n\n
 const LOCAL_LOCALE_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() → string {\n    return utilModule.greet()\n}\n\nmain {\n    print utilModule.greet()\n}\n";
 const LOCAL_LOCALE_UTIL: &str = "@ publica\nfn salutare() → string {\n    return \"salve\"\n}\n";
 
-const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:chorda\" chorda\n\nfn run() → string {\n    const math.Vector3 canonical ← math.vector3(1.0, 0.0, 0.0)\n    const math.Vector3 canonical_shifted ← canonical.addita(math.vector3(0.0, 1.0, 0.0))\n    const float canonical_length ← canonical_shifted.longitudo()\n    const math.Vec3 original ← math.make_vector(1.0, 0.0, 0.0)\n    const math.Vec3 shifted ← original.add(math.make_vector(0.0, 2.0, 0.0))\n    const math.Vec3 normalized ← shifted.normalize()\n    const float length ← normalized.length()\n    const string reversed ← chorda.reverse(\"abc\")\n    print canonical_length\n    print length\n    return reversed\n}\n\nmain {\n    print run()\n}\n";
+const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:chorda\" chorda\n\nfn run() → string {\n    const math.Vec3 canonical ← math.make_vector(1.0, 0.0, 0.0)\n    const math.Vec3 canonical_shifted ← canonical.add(math.make_vector(0.0, 1.0, 0.0))\n    const float canonical_length ← canonical_shifted.length()\n    const math.Vec3 original ← math.make_vector(1.0, 0.0, 0.0)\n    const math.Vec3 shifted ← original.add(math.make_vector(0.0, 2.0, 0.0))\n    const math.Vec3 normalized ← shifted.normalize()\n    const float length ← normalized.length()\n    const string reversed ← chorda.reverse(\"abc\")\n    print canonical_length\n    print length\n    return reversed\n}\n\nmain {\n    print run()\n}\n";
 const NORMA_LATIN_COMPATIBILITY_MAIN: &str = "importa ex \"norma:chorda\" chorda\n\nfunctio run() → textus {\n    redde chorda.retorta(\"abc\")\n}\n\nincipit {\n    nota run()\n}\n";
 
 /// Two-module package with a local import and a namespace call in the entry.
@@ -400,7 +400,7 @@ fn local_library_locale_surface_resolves_through_package_loader() {
             .map(|pack| pack.metadata.id.as_str()),
         Some("en-local-library")
     );
-    let package = analyze_package(&config, &entry).expect("analyze localized local package");
+    let mut package = analyze_package(&config, &entry).expect("analyze localized local package");
 
     assert!(
         package
@@ -427,6 +427,72 @@ fn local_library_locale_surface_resolves_through_package_loader() {
     assert!(
         util.file_interface.exports.contains_key("salutare"),
         "local interface must retain canonical export names"
+    );
+
+    // The locale projection must stay atomic through Rust emission: the
+    // entry unit calls the canonical `salutare` implementation, never the
+    // consumer-locale surface spelling `greet`.
+    let resolver = library_resolver_from_config(&config);
+    let generated = generate_package_rust(
+        &mut package,
+        &resolver,
+        None,
+        RustFieldNamePolicy::Preserve,
+        None,
+    );
+    assert!(
+        generated.diagnostics.iter().all(|diag| !diag.is_error()),
+        "localized package Rust generation failed: {:?}",
+        generated.diagnostics
+    );
+    let entry_code = generated.entry_code.expect("localized entry code");
+    assert!(
+        entry_code.contains("salutare"),
+        "emitted Rust must call the canonical `salutare` implementation:\n{entry_code}"
+    );
+    assert!(
+        !entry_code.contains("greet"),
+        "consumer-locale surface spelling must not leak into emitted Rust:\n{entry_code}"
+    );
+    let assembled = assemble_crate(&entry_code, &generated.module_tree.render(0));
+    assert!(
+        assembled.contains("salutare"),
+        "assembled crate must carry the canonical `salutare` implementation:\n{assembled}"
+    );
+}
+
+#[test]
+fn strict_pack_rejects_unlisted_canonical_member_spelling() {
+    let dir = test_temp_dir("fhir-local-locale-strict");
+    let entry = write_local_locale_package(&dir);
+    // The strict `en-local-library` pack lists only the `greet` surface for
+    // the canonical `salutare` member. The canonical spelling must not be
+    // accepted as an implicit alias at the source boundary.
+    fs::write(
+        dir.join("src/main.fab"),
+        "import from \"./util\" * as utilModule\n\nfn run() → string {\n    return utilModule.salutare()\n}\n\nmain {\n    print utilModule.salutare()\n}\n",
+    )
+    .expect("write canonical-spelling consumer");
+    let (config, _diagnostic_pack) = crate::package::config_with_locale(
+        radix::codegen::Target::HirRust,
+        &entry,
+        Some("en-local-library"),
+        None,
+    )
+    .expect("load local library locale through package selection");
+    let diagnostics = match analyze_package(&config, &entry) {
+        Ok(package) => package.diagnostics,
+        Err(diagnostics) => diagnostics,
+    };
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diag| diag.code.as_deref() == Some("SEM004") && diag.issue() == Some("namespace_missing_export")),
+        "canonical spelling must be rejected under the strict pack: {:?}",
+        diagnostics
+            .iter()
+            .map(|d| (d.code.as_deref(), d.issue()))
+            .collect::<Vec<_>>()
     );
 }
 

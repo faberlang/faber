@@ -4096,7 +4096,7 @@ fn package_mir_linking_executes_norma_source_library_import() {
 import from "norma:chorda" chorda
 
 main {
-  print chorda.retorta("roma")
+  print chorda.reverse("roma")
 }
 "#,
     )
@@ -4521,7 +4521,7 @@ fn compile_package_resolves_builtin_norma_chorda_native_body() {
 import from "norma:chorda" chorda
 
 main {
-  const string reversed ← chorda.retorta("roma")
+  const string reversed ← chorda.reverse("roma")
   print reversed
 }
 "#,
