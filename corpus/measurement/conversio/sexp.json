@@ -1,0 +1,2661 @@
+{
+  "schemaVersion": 1,
+  "artifact": "faber-conversio-measurement",
+  "target": "sexp",
+  "lane": "mir",
+  "generatedBy": "radix/scripta/emit-compat-json.py",
+  "summary": {
+    "dedicated": 0,
+    "fallback": 0,
+    "rejected": 190,
+    "not-emitted": 251
+  },
+  "cells": [
+    {
+      "src": "numerus",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "octeti",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "json",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "tabula",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "intervallum",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "tensor",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "cursor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "numerus",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "octeti",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "json",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "tabula",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "tensor",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "cursor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "octeti",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "json",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "tabula",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "tensor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "cursor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "bivalens",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "octeti",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "regex",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "json",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "tabula",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "tensor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "cursor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "octeti",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "regex",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "json",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "tabula",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "tensor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "cursor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "ascii",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "numerus",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "fractus",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "bivalens",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "octeti",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "json",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "tabula",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "tensor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "cursor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "octeti",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "octeti",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "json",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "tabula",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "tensor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "cursor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "regex",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "numerus",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "fractus",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "bivalens",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "textus",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "ascii",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "octeti",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "json",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "instans",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "tabula",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "tensor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "cursor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "json",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "octeti",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "json",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "tabula",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "tensor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "cursor",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "valor",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "octeti",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "json",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "tabula",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "tensor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "cursor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "instans",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "octeti",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "json",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "tabula",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "tensor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "cursor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "modulus",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "octeti",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "json",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "tabula",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "tensor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "cursor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "lista",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "octeti",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "json",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "tabula",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "copia",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "tensor",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "cursor",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tabula",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "octeti",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "json",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "tabula",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "tensor",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "cursor",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "copia",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "octeti",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "json",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "tabula",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "intervallum",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "tensor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "cursor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "intervallum",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "numerus",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "fractus",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "octeti",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "json",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "tabula",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "copia",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "tensor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "cursor",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "tensor",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "octeti",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "json",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "tabula",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "tensor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "cursor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "vector",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "octeti",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "json",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "valor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "tabula",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "copia",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "tensor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "cursor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "matrix",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "numerus",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "fractus",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "bivalens",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "textus",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "ascii",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "octeti",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "json",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "valor",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "instans",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "modulus",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "lista",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "tabula",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "copia",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "tensor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "cursor",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "sparsa",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "numerus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "bivalens",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "ascii",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "octeti",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "json",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "valor",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "instans",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "modulus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "lista",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "tabula",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "copia",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "tensor",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "cursor",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "cursor",
+      "tgt": "promissum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "numerus",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "fractus",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "bivalens",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "textus",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "ascii",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "octeti",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "regex",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "json",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "valor",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "instans",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "modulus",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "lista",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "tabula",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "copia",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "intervallum",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "tensor",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "vector",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "matrix",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "sparsa",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "cursor",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "promissum",
+      "tgt": "promissum",
+      "tier": "not-emitted",
+      "measured": true
+    }
+  ]
+}
