@@ -865,7 +865,10 @@ impl Parser {
                     break;
                 }
             }
-            self.expect(&TokenKind::RBracket, "expected ']' after gradient selectors")?;
+            self.expect(
+                &TokenKind::RBracket,
+                "expected ']' after gradient selectors",
+            )?;
             selectors
         } else {
             Vec::new()

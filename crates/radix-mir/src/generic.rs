@@ -6,12 +6,15 @@
 //! here so target emitters never grow their own generic policies.
 
 use crate::{
-    MirAggregate, MirAggregateFields, MirAggregateItem, MirCallee, MirClosureValue, MirConstant, MirFunction,
-    MirIntrinsic, MirOperand, MirOptionChainLink, MirOptionOp, MirPlace, MirProjection, MirRuntimeCall,
-    MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueKind,
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirCallee, MirClosureValue, MirConstant,
+    MirFunction, MirIntrinsic, MirOperand, MirOptionChainLink, MirOptionOp, MirPlace,
+    MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator,
+    MirTerminatorKind, MirType, MirValue, MirValueKind,
 };
 use radix_lexer::{Span, Symbol};
-use radix_types::{literal_index_i64s, FuncSig, IndexExpr, IndexId, ParamType, Type, TypeId, TypeTable};
+use radix_types::{
+    literal_index_i64s, FuncSig, IndexExpr, IndexId, ParamType, Type, TypeId, TypeTable,
+};
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use std::hash::{Hash, Hasher};
 
@@ -50,7 +53,13 @@ pub fn bind_generic_type_witness(
     generic_bindings: &mut MirGenericBindings,
 ) -> bool {
     let mut shape_bindings = MirShapeBindings::default();
-    bind_generic_type_witness_with_shapes(types, expected, actual, generic_bindings, &mut shape_bindings)
+    bind_generic_type_witness_with_shapes(
+        types,
+        expected,
+        actual,
+        generic_bindings,
+        &mut shape_bindings,
+    )
 }
 
 /// [`bind_generic_type_witness`] with shape-param binding (4A).
@@ -109,7 +118,14 @@ fn try_bind_generic_type_witness(
             return false;
         }
         let inner = *inner;
-        let ok = try_bind_generic_type_witness(types, inner, actual, generic_bindings, shape_bindings, seen);
+        let ok = try_bind_generic_type_witness(
+            types,
+            inner,
+            actual,
+            generic_bindings,
+            shape_bindings,
+            seen,
+        );
         seen.remove(&expected);
         return ok;
     }
@@ -119,7 +135,14 @@ fn try_bind_generic_type_witness(
             return false;
         }
         let inner = *inner;
-        let ok = try_bind_generic_type_witness(types, expected, inner, generic_bindings, shape_bindings, seen);
+        let ok = try_bind_generic_type_witness(
+            types,
+            expected,
+            inner,
+            generic_bindings,
+            shape_bindings,
+            seen,
+        );
         seen.remove(&actual);
         return ok;
     }
@@ -181,15 +204,21 @@ fn try_bind_generic_type_witness(
                 )
         }
         (Type::Map(expected_key, expected_value), Type::Map(actual_key, actual_value)) => {
-            try_bind_generic_type_witness(types, *expected_key, *actual_key, generic_bindings, shape_bindings, seen)
-                && try_bind_generic_type_witness(
-                    types,
-                    *expected_value,
-                    *actual_value,
-                    generic_bindings,
-                    shape_bindings,
-                    seen,
-                )
+            try_bind_generic_type_witness(
+                types,
+                *expected_key,
+                *actual_key,
+                generic_bindings,
+                shape_bindings,
+                seen,
+            ) && try_bind_generic_type_witness(
+                types,
+                *expected_value,
+                *actual_value,
+                generic_bindings,
+                shape_bindings,
+                seen,
+            )
         }
         (Type::Tuple(expected_elements), Type::Tuple(actual_elements)) => {
             expected_elements.len() == actual_elements.len()
@@ -250,9 +279,14 @@ fn try_bind_generic_type_witness(
             shape_bindings,
             seen,
         ),
-        (Type::Func(expected_sig), Type::Func(actual_sig)) => {
-            try_bind_func_signature(types, expected_sig, actual_sig, generic_bindings, shape_bindings, seen)
-        }
+        (Type::Func(expected_sig), Type::Func(actual_sig)) => try_bind_func_signature(
+            types,
+            expected_sig,
+            actual_sig,
+            generic_bindings,
+            shape_bindings,
+            seen,
+        ),
         _ => types.assignable(actual, expected),
     }
 }
@@ -311,7 +345,12 @@ fn try_bind_index_witness(
 /// Insert-only: when `param` is already bound, compares for structural index
 /// equality and never overwrites (mirrors [`bind_type_param`] so union
 /// backtracking can roll back via [`undo_shape_bindings_to`]).
-fn bind_shape_param(types: &TypeTable, param: Symbol, actual: IndexId, shape_bindings: &mut MirShapeBindings) -> bool {
+fn bind_shape_param(
+    types: &TypeTable,
+    param: Symbol,
+    actual: IndexId,
+    shape_bindings: &mut MirShapeBindings,
+) -> bool {
     if let Some(bound) = shape_bindings.get(&param).copied() {
         types.index_equals(bound, actual)
     } else {
@@ -508,8 +547,14 @@ pub fn instantiate_generic_type_with_shapes(
     span: Span,
 ) -> Result<MirType, MirGenericError> {
     let index = ExistingTypeIndex::build(types);
-    let instantiated =
-        instantiate_mutable_type_id(types, ty.semantic_id(), generic_bindings, shape_bindings, span, &index)?;
+    let instantiated = instantiate_mutable_type_id(
+        types,
+        ty.semantic_id(),
+        generic_bindings,
+        shape_bindings,
+        span,
+        &index,
+    )?;
     Ok(MirType::semantic(instantiated))
 }
 
@@ -855,7 +900,9 @@ pub fn substitute_index_params(
 /// the first occurrence interns the candidate so the monomorphized instance
 /// carries a valid type graph.
 fn intern_or_find(types: &mut TypeTable, candidate: &Type, index: &ExistingTypeIndex) -> TypeId {
-    index.find(types, candidate).unwrap_or_else(|| types.intern(candidate.clone()))
+    index
+        .find(types, candidate)
+        .unwrap_or_else(|| types.intern(candidate.clone()))
 }
 
 /// Mutable mirror of [`instantiate_existing_type_id`] with shape substitution.
@@ -888,16 +935,37 @@ fn instantiate_mutable_type_id(
             Type::Array,
         ),
         Type::Map(key, value) => {
-            let key = instantiate_mutable_type_id(types, key, generic_bindings, shape_bindings, span, index)?;
-            let value = instantiate_mutable_type_id(types, value, generic_bindings, shape_bindings, span, index)?;
+            let key = instantiate_mutable_type_id(
+                types,
+                key,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
+            let value = instantiate_mutable_type_id(
+                types,
+                value,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
             Ok(intern_or_find(types, &Type::Map(key, value), index))
         }
         Type::Record(fields) => {
             let fields = fields
                 .iter()
                 .map(|(name, field_ty)| {
-                    instantiate_mutable_type_id(types, *field_ty, generic_bindings, shape_bindings, span, index)
-                        .map(|field_ty| (*name, field_ty))
+                    instantiate_mutable_type_id(
+                        types,
+                        *field_ty,
+                        generic_bindings,
+                        shape_bindings,
+                        span,
+                        index,
+                    )
+                    .map(|field_ty| (*name, field_ty))
                 })
                 .collect::<Result<FxHashMap<_, _>, _>>()?;
             Ok(intern_or_find(types, &Type::Record(fields), index))
@@ -937,9 +1005,27 @@ fn instantiate_mutable_type_id(
             Type::Promissum,
         ),
         Type::PromissumFailable(success, alternate) => {
-            let success = instantiate_mutable_type_id(types, success, generic_bindings, shape_bindings, span, index)?;
-            let alternate = instantiate_mutable_type_id(types, alternate, generic_bindings, shape_bindings, span, index)?;
-            Ok(intern_or_find(types, &Type::PromissumFailable(success, alternate), index))
+            let success = instantiate_mutable_type_id(
+                types,
+                success,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
+            let alternate = instantiate_mutable_type_id(
+                types,
+                alternate,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
+            Ok(intern_or_find(
+                types,
+                &Type::PromissumFailable(success, alternate),
+                index,
+            ))
         }
         Type::Cursor(inner) => instantiate_mutable_unary_type(
             types,
@@ -951,9 +1037,27 @@ fn instantiate_mutable_type_id(
             Type::Cursor,
         ),
         Type::AsyncCursor(item, alternate) => {
-            let item = instantiate_mutable_type_id(types, item, generic_bindings, shape_bindings, span, index)?;
-            let alternate = instantiate_mutable_type_id(types, alternate, generic_bindings, shape_bindings, span, index)?;
-            Ok(intern_or_find(types, &Type::AsyncCursor(item, alternate), index))
+            let item = instantiate_mutable_type_id(
+                types,
+                item,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
+            let alternate = instantiate_mutable_type_id(
+                types,
+                alternate,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
+            Ok(intern_or_find(
+                types,
+                &Type::AsyncCursor(item, alternate),
+                index,
+            ))
         }
         Type::Intervallum(inner) => instantiate_mutable_unary_type(
             types,
@@ -974,7 +1078,14 @@ fn instantiate_mutable_type_id(
             Type::Option,
         ),
         Type::Ref(mode, inner) => {
-            let inner = instantiate_mutable_type_id(types, inner, generic_bindings, shape_bindings, span, index)?;
+            let inner = instantiate_mutable_type_id(
+                types,
+                inner,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
             Ok(intern_or_find(types, &Type::Ref(mode, inner), index))
         }
         Type::Tensor(inner, shape) => instantiate_mutable_indexed_type(
@@ -1027,21 +1138,53 @@ fn instantiate_mutable_type_id(
             Type::Atomic,
         ),
         Type::Alias(def_id, inner) => {
-            let inner = instantiate_mutable_type_id(types, inner, generic_bindings, shape_bindings, span, index)?;
+            let inner = instantiate_mutable_type_id(
+                types,
+                inner,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
             Ok(intern_or_find(types, &Type::Alias(def_id, inner), index))
         }
         Type::Applied(base, args) => {
-            let base = instantiate_mutable_type_id(types, base, generic_bindings, shape_bindings, span, index)?;
+            let base = instantiate_mutable_type_id(
+                types,
+                base,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
             let args = args
                 .iter()
-                .map(|arg| instantiate_mutable_type_id(types, *arg, generic_bindings, shape_bindings, span, index))
+                .map(|arg| {
+                    instantiate_mutable_type_id(
+                        types,
+                        *arg,
+                        generic_bindings,
+                        shape_bindings,
+                        span,
+                        index,
+                    )
+                })
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(intern_or_find(types, &Type::Applied(base, args), index))
         }
         Type::Union(members) => {
             let members = members
                 .iter()
-                .map(|member| instantiate_mutable_type_id(types, *member, generic_bindings, shape_bindings, span, index))
+                .map(|member| {
+                    instantiate_mutable_type_id(
+                        types,
+                        *member,
+                        generic_bindings,
+                        shape_bindings,
+                        span,
+                        index,
+                    )
+                })
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(intern_or_find(types, &Type::Union(members), index))
         }
@@ -1053,18 +1196,41 @@ fn instantiate_mutable_type_id(
                     .params
                     .iter()
                     .map(|param| {
-                        instantiate_mutable_type_id(types, param.ty, generic_bindings, shape_bindings, span, index)
-                            .map(|ty| ParamType {
-                                ty,
-                                mode: param.mode,
-                                optional: param.optional,
-                            })
+                        instantiate_mutable_type_id(
+                            types,
+                            param.ty,
+                            generic_bindings,
+                            shape_bindings,
+                            span,
+                            index,
+                        )
+                        .map(|ty| ParamType {
+                            ty,
+                            mode: param.mode,
+                            optional: param.optional,
+                        })
                     })
                     .collect::<Result<Vec<_>, _>>()?,
-                ret: instantiate_mutable_type_id(types, sig.ret, generic_bindings, shape_bindings, span, index)?,
+                ret: instantiate_mutable_type_id(
+                    types,
+                    sig.ret,
+                    generic_bindings,
+                    shape_bindings,
+                    span,
+                    index,
+                )?,
                 err: sig
                     .err
-                    .map(|err| instantiate_mutable_type_id(types, err, generic_bindings, shape_bindings, span, index))
+                    .map(|err| {
+                        instantiate_mutable_type_id(
+                            types,
+                            err,
+                            generic_bindings,
+                            shape_bindings,
+                            span,
+                            index,
+                        )
+                    })
                     .transpose()?,
                 is_async: sig.is_async,
                 is_generator: sig.is_generator,
@@ -1093,7 +1259,8 @@ fn instantiate_mutable_unary_type(
     index: &ExistingTypeIndex,
     build: impl FnOnce(TypeId) -> Type,
 ) -> Result<TypeId, MirGenericError> {
-    let inner = instantiate_mutable_type_id(types, inner, generic_bindings, shape_bindings, span, index)?;
+    let inner =
+        instantiate_mutable_type_id(types, inner, generic_bindings, shape_bindings, span, index)?;
     Ok(intern_or_find(types, &build(inner), index))
 }
 
@@ -1107,7 +1274,8 @@ fn instantiate_mutable_indexed_type(
     index: &ExistingTypeIndex,
     build: impl FnOnce(TypeId, IndexId) -> Type,
 ) -> Result<TypeId, MirGenericError> {
-    let inner = instantiate_mutable_type_id(types, inner, generic_bindings, shape_bindings, span, index)?;
+    let inner =
+        instantiate_mutable_type_id(types, inner, generic_bindings, shape_bindings, span, index)?;
     let shape = substitute_index_params(types, index_id, shape_bindings);
     Ok(intern_or_find(types, &build(inner, shape), index))
 }
@@ -1249,8 +1417,7 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
         | Type::Vector(inner, shape)
         | Type::Matrix(inner, shape)
         | Type::Sparsa(inner, shape) => {
-            index_contains_param(types, *shape)
-                || type_contains_param_inner(types, *inner, seen)
+            index_contains_param(types, *shape) || type_contains_param_inner(types, *inner, seen)
         }
         Type::Array(inner)
         | Type::Set(inner)
@@ -1451,8 +1618,10 @@ fn rewrite_statement_constants(
         MirStatementKind::Construct {
             destination,
             aggregate,
-        } => rewrite_place_constants(destination, rewrite)
-            && rewrite_aggregate_constants(aggregate, rewrite),
+        } => {
+            rewrite_place_constants(destination, rewrite)
+                && rewrite_aggregate_constants(aggregate, rewrite)
+        }
     }
 }
 
@@ -1480,18 +1649,23 @@ fn rewrite_terminator_constants(
                     .all(|arg| rewrite_operand_constants(arg, rewrite))
                 && rewrite_place_constants(error_place, rewrite)
         }
-        MirTerminatorKind::Branch { condition, .. } => rewrite_operand_constants(condition, rewrite),
+        MirTerminatorKind::Branch { condition, .. } => {
+            rewrite_operand_constants(condition, rewrite)
+        }
         MirTerminatorKind::Switch { value, cases, .. } => {
             rewrite_operand_constants(value, rewrite)
-                && cases
-                    .iter_mut()
-                    .all(|case| rewrite(&mut case.value))
+                && cases.iter_mut().all(|case| rewrite(&mut case.value))
         }
-        MirTerminatorKind::Return(None) | MirTerminatorKind::Goto(_) | MirTerminatorKind::Unreachable => true,
+        MirTerminatorKind::Return(None)
+        | MirTerminatorKind::Goto(_)
+        | MirTerminatorKind::Unreachable => true,
     }
 }
 
-fn rewrite_value_constants(value: &mut MirValue, rewrite: &mut impl FnMut(&mut MirConstant) -> bool) -> bool {
+fn rewrite_value_constants(
+    value: &mut MirValue,
+    rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
+) -> bool {
     match &mut value.kind {
         MirValueKind::Operand(operand) => rewrite_operand_constants(operand, rewrite),
         MirValueKind::Closure(closure) => rewrite_closure_value_constants(closure, rewrite),
@@ -1510,7 +1684,10 @@ fn rewrite_closure_value_constants(
     rewrite_operand_constants(&mut closure.environment, rewrite)
 }
 
-fn rewrite_operand_constants(operand: &mut MirOperand, rewrite: &mut impl FnMut(&mut MirConstant) -> bool) -> bool {
+fn rewrite_operand_constants(
+    operand: &mut MirOperand,
+    rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
+) -> bool {
     match operand {
         MirOperand::Place(place) => rewrite_place_constants(place, rewrite),
         MirOperand::Temp(_) | MirOperand::Value(_) => true,
@@ -1518,7 +1695,10 @@ fn rewrite_operand_constants(operand: &mut MirOperand, rewrite: &mut impl FnMut(
     }
 }
 
-fn rewrite_place_constants(place: &mut MirPlace, rewrite: &mut impl FnMut(&mut MirConstant) -> bool) -> bool {
+fn rewrite_place_constants(
+    place: &mut MirPlace,
+    rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
+) -> bool {
     for projection in &mut place.projections {
         if let MirProjection::Index(index) = projection {
             if !rewrite_operand_constants(index, rewrite) {
@@ -1529,7 +1709,10 @@ fn rewrite_place_constants(place: &mut MirPlace, rewrite: &mut impl FnMut(&mut M
     true
 }
 
-fn rewrite_callee_constants(callee: &mut MirCallee, rewrite: &mut impl FnMut(&mut MirConstant) -> bool) -> bool {
+fn rewrite_callee_constants(
+    callee: &mut MirCallee,
+    rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
+) -> bool {
     match callee {
         MirCallee::Closure(closure) => rewrite_operand_constants(&mut closure.environment, rewrite),
         MirCallee::Value(operand) => rewrite_operand_constants(operand, rewrite),
@@ -1581,7 +1764,10 @@ fn rewrite_aggregate_constants(
     }
 }
 
-fn rewrite_option_op_constants(op: &mut MirOptionOp, rewrite: &mut impl FnMut(&mut MirConstant) -> bool) -> bool {
+fn rewrite_option_op_constants(
+    op: &mut MirOptionOp,
+    rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
+) -> bool {
     match op {
         MirOptionOp::None => true,
         MirOptionOp::Some(value)
@@ -1589,10 +1775,12 @@ fn rewrite_option_op_constants(op: &mut MirOptionOp, rewrite: &mut impl FnMut(&m
         | MirOptionOp::IsNotNil(value)
         | MirOptionOp::Unwrap { value, .. } => rewrite_operand_constants(value, rewrite),
         MirOptionOp::Coalesce { value, fallback } => {
-            rewrite_operand_constants(value, rewrite) && rewrite_operand_constants(fallback, rewrite)
+            rewrite_operand_constants(value, rewrite)
+                && rewrite_operand_constants(fallback, rewrite)
         }
         MirOptionOp::Chain { base, link } => {
-            rewrite_operand_constants(base, rewrite) && rewrite_option_chain_link_constants(link, rewrite)
+            rewrite_operand_constants(base, rewrite)
+                && rewrite_option_chain_link_constants(link, rewrite)
         }
     }
 }

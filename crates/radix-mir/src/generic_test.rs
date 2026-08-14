@@ -561,9 +561,9 @@ fn canonical_index_collapses_structurally_equal_shapes() {
 // ── Phase-4 producer fact: shape-size scalar substitution ────────────────
 
 use crate::{
-    MirAggregateKind, MirBlock, MirBlockId, MirCallee, MirFunctionId, MirLocalId, MirPlace, MirPlaceBase,
-    MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirSwitchCase, MirTerminator,
-    MirTerminatorKind, MirValue, MirValueId, MirValueKind,
+    MirAggregateKind, MirBlock, MirBlockId, MirCallee, MirFunctionId, MirLocalId, MirPlace,
+    MirPlaceBase, MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirSwitchCase,
+    MirTerminator, MirTerminatorKind, MirValue, MirValueId, MirValueKind,
 };
 
 fn shape_test_function(blocks: Vec<MirBlock>) -> MirFunction {
@@ -624,7 +624,10 @@ fn assert_all_floats(function: &mut MirFunction, expected: &[f64]) {
     values.sort_by(f64::total_cmp);
     let mut expected = expected.to_vec();
     expected.sort_by(f64::total_cmp);
-    assert_eq!(values, expected, "rewritten constants must be the concrete floats");
+    assert_eq!(
+        values, expected,
+        "rewritten constants must be the concrete floats"
+    );
 }
 
 #[test]
@@ -673,7 +676,10 @@ fn substitute_shape_size_rewrites_every_operand_position() {
         kind: MirStatementKind::Call {
             destination: None,
             callee: MirCallee::Function(MirFunctionId(1)),
-            args: vec![shape_size(param_shape, Some(0)), shape_size(param_shape, Some(1))],
+            args: vec![
+                shape_size(param_shape, Some(0)),
+                shape_size(param_shape, Some(1)),
+            ],
         },
         span: Span::default(),
     });
@@ -702,9 +708,9 @@ fn substitute_shape_size_rewrites_every_operand_position() {
             aggregate: crate::MirAggregate {
                 kind: MirAggregateKind::Tuple,
                 ty: MirType::semantic(TypeId(0)),
-                fields: crate::MirAggregateFields::Ordered(vec![
-                    crate::MirAggregateItem::Operand(shape_size(param_shape, None)),
-                ]),
+                fields: crate::MirAggregateFields::Ordered(vec![crate::MirAggregateItem::Operand(
+                    shape_size(param_shape, None),
+                )]),
             },
         },
         span: Span::default(),
@@ -718,7 +724,10 @@ fn substitute_shape_size_rewrites_every_operand_position() {
                 projections: vec![MirProjection::Index(shape_size(param_shape, None))],
             }),
             cases: vec![MirSwitchCase {
-                value: MirConstant::ShapeSize { shape: param_shape, axis: None },
+                value: MirConstant::ShapeSize {
+                    shape: param_shape,
+                    axis: None,
+                },
                 target: MirBlockId(1),
             }],
             default: MirBlockId(2),
@@ -759,8 +768,14 @@ fn fold_shape_size_constant_matches_air_fold_semantics() {
     let last = fold_shape_size_constant(&mut types, param_shape, Some(-1), &shape_bindings);
     assert_eq!(last, Some(MirConstant::Float(2.0)));
     // Out-of-range axes fail closed.
-    assert_eq!(fold_shape_size_constant(&mut types, param_shape, Some(5), &shape_bindings), None);
-    assert_eq!(fold_shape_size_constant(&mut types, param_shape, Some(-3), &shape_bindings), None);
+    assert_eq!(
+        fold_shape_size_constant(&mut types, param_shape, Some(5), &shape_bindings),
+        None
+    );
+    assert_eq!(
+        fold_shape_size_constant(&mut types, param_shape, Some(-3), &shape_bindings),
+        None
+    );
 }
 
 #[test]

@@ -1232,9 +1232,7 @@ fn import_without_marker_binds_explicit_name() {
 fn import_after_expression_start_infers_binding() {
     // The identifier starts a following expression statement, so the import
     // binding is inferred from the path and the statement is preserved.
-    let result = parse_ok(
-        "importa ex \"norma:chorda\"\nchorda.retorta(\"abc\")\n",
-    );
+    let result = parse_ok("importa ex \"norma:chorda\"\nchorda.retorta(\"abc\")\n");
     let program = result.program.as_ref().expect("program");
     assert_eq!(program.statements.len(), 2, "import + expression statement");
     let StmtKind::Import(import) = &program.statements[0].kind else {

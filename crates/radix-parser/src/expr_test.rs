@@ -1151,7 +1151,10 @@ fn same_module_finge_construction_unchanged() {
 // Postfix gradient selection (`call(...) ∇` / `call(...) ∇ [places]`)
 // ---------------------------------------------------------------------------
 
-fn gradient_expr<'a>(result: &'a ParseResult, statement_index: usize) -> &'a radix_syntax::GradientExpr {
+fn gradient_expr<'a>(
+    result: &'a ParseResult,
+    statement_index: usize,
+) -> &'a radix_syntax::GradientExpr {
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[statement_index].kind else {
         panic!("expected variable declaration");
@@ -1239,7 +1242,10 @@ fn ordinary_postfix_continuation_applies_after_gradient() {
     };
     let expr = var.init.as_deref().expect("initializer");
     let ExprKind::Member(member) = &expr.kind else {
-        panic!("member continuation must wrap the gradient, got {:?}", expr.kind);
+        panic!(
+            "member continuation must wrap the gradient, got {:?}",
+            expr.kind
+        );
     };
     assert!(
         matches!(member.object.kind, ExprKind::Gradient(_)),
@@ -1260,7 +1266,10 @@ fn prefix_nabla_fails_parse() {
     assert!(
         result.errors.iter().any(|err| {
             err.kind == crate::ParseErrorKind::InvalidExpression
-                && err.args.iter().any(|arg| arg.name == "issue" && arg.value == "expected_expression")
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "expected_expression")
         }),
         "prefix ∇ must report the expected-expression error, got {:?}",
         result.errors

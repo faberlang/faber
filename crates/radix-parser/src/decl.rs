@@ -1426,8 +1426,7 @@ impl Parser {
     }
 
     fn removed_import_visibility_error(span: radix_lexer::Span) -> ParseError {
-        Self::invalid_import_error_at("import_privata_removed", span)
-            .with_arg("keyword", "privata")
+        Self::invalid_import_error_at("import_privata_removed", span).with_arg("keyword", "privata")
     }
 
     // TEST DECLARATIONS
