@@ -138,8 +138,8 @@ pub(crate) use dispatch::{
     load_provider_manifests, selected_providers_for_routes, ProviderManifest,
 };
 #[cfg(feature = "hir-go")]
-#[allow(unused_imports)] // binary `commands/run` consumes run_go_binary
-pub(crate) use go_build::{emit_go_module, invoke_go_build, run_go_binary, GoBuildLayout};
+#[allow(unused_imports)] // binary `faber build -t go` consumes this crate-visible surface.
+pub(crate) use go_build::{emit_go_module, invoke_go_build, GoBuildLayout};
 #[allow(unused_imports)] // binary `commands/run` + `commands/test` G4 linkage
 pub(crate) use library_link::emit_linked_library_crates;
 pub(crate) use manifest::validate_manifest;
@@ -192,7 +192,7 @@ pub use llvm::{
     PackageLlvmOptions,
 };
 #[allow(unused_imports)]
-// `faber build/run --target llvm-host` + product tests consume the Stage 9 lane.
+// `faber build --target llvm-host` + product tests consume the Stage 9 lane.
 #[cfg(feature = "mir-llvm")]
 pub use llvm_host::{
     build_host_program, discover_llvm_host_toolchain, ensure_llvm_runtime_archive,
@@ -214,7 +214,10 @@ pub(crate) use mir::{
     run_package_fmir_text_image, run_package_fmir_text_image_with_selection,
 };
 #[allow(unused_imports)]
-pub(crate) use mir::{build_package_mir_artifact, run_package_mir, run_package_mir_artifact};
+pub(crate) use mir::{
+    build_package_mir_artifact, run_package_mir, run_package_mir_artifact,
+    run_package_mir_with_selection,
+};
 #[cfg(feature = "mir-wasm")]
 #[allow(unused_imports)]
 // Wasm package harnesses consume the reusable package-to-Wasm builder (U6-D).
@@ -223,7 +226,7 @@ pub use wasm::{
     PackageWasmOptions,
 };
 
-// binary-only `faber run --interpret` route consumes this through `commands`.
+// `commands/run` interpreted dispatch consumes this package-input classifier.
 #[allow(unused_imports)]
 pub(crate) use discovery::{discover_package, is_manifest_backed_or_directory_package_input};
 
@@ -242,12 +245,11 @@ use std::path::{Path, PathBuf};
 /// `radix/docs/factory/executed-lane-target-decision.md`).
 ///
 /// Resolve the effective analysis target for an executed package:
-///   1. **Explicit `-t <target>`** — an explicitly configured MIR-backed
-///      config target is authoritative and is never rerouted. The CLI `-t`
-///      surfaces through the run-route dispatch *before* the package-MIR path
-///      (`faber run -t rust` compiles via the HIR route and never reaches
-///      this seam), so a non-MIR-backed config target here means "no executed
-///      target chosen".
+///   1. **Explicit MIR-backed config target** — authoritative and never
+///      rerouted. `faber run` no longer carries a CLI `-t` (interpreted
+///      execution, always), so the config target arrives from callers that
+///      build their own config; a non-MIR-backed config target here means
+///      "no executed target chosen".
 ///   2. **Manifest `[build] target`** — propagated to the analysis target when
 ///      the caller did not name an executed target. The package's declared
 ///      target is the ABI source of truth for analysis and execution alike;

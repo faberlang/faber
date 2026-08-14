@@ -73,7 +73,7 @@ fn cmd_host_manifest(args: &ManifestArgs) {
         return;
     }
 
-    println!("faber script kernel manifest (v{})", manifest.version);
+    println!("faber run kernel manifest (v{})", manifest.version);
     for module in &manifest.modules {
         println!("  {}", module.import_path);
         println!("    provider: {}", module.provider_module);

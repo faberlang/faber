@@ -1,4 +1,4 @@
-//! In-process Faber scripting via the MIR runner (`faber script`, `-c`, REPL).
+//! In-process Faber scripting via the runner (`faber run`, `-c`, REPL).
 //!
 //! Absorbs the former `scena` crate: analyze, lower, and interpret Faber source
 //! through `radix::mir`. Custom hosts implement [`Host`] for diagnostics,

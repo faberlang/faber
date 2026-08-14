@@ -393,7 +393,10 @@ pub(crate) use routes::{
     run_package_fmir_text_image, run_package_fmir_text_image_with_selection,
 };
 #[allow(unused_imports)]
-pub(crate) use routes::{build_package_mir_artifact, run_package_mir, run_package_mir_artifact};
+pub(crate) use routes::{
+    build_package_mir_artifact, run_package_mir, run_package_mir_artifact,
+    run_package_mir_with_selection,
+};
 // binary `commands/run` resolves the interpreted consumer through fhir.rs.
 #[cfg(feature = "hir-fhir")]
 pub(crate) use routes::run_package_mir_from_loaded;

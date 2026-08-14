@@ -19,7 +19,7 @@ const FABER_AFTER_HELP: &str = include_str!("../../docs/help/faber-after-help.md
     version
 )]
 pub struct Cli {
-    /// Execute Faber source via the MIR runner (one-liner)
+    /// Interpret Faber source through the runner (one-liner)
     #[arg(short = 'c', long = "command")]
     pub eval_source: Option<String>,
 
@@ -56,13 +56,10 @@ pub enum Command {
     /// Explain a Faber glyph, keyword, or grammar term
     Explain(ExplainArgs),
 
-    /// Build (if needed) and run a compiled package
+    /// Interpret and run Faber source (single file, package, or archive)
     Run(RunArgs),
 
-    /// Run Faber source through the interpreter (single file, package, or archive)
-    Script(ScriptArgs),
-
-    /// Interactive MIR runner REPL (accumulating cells, re-lowers each line)
+    /// Interactive runner REPL (accumulating cells, re-lowers each line)
     Repl(ReplArgs),
 
     /// Run proba cases on the MIR runner (no Cargo / rustc on the package)
@@ -300,9 +297,14 @@ pub struct ReplArgs {
 }
 
 /// Arguments for `faber run`.
+///
+/// `run` is interpreted execution, always: a single `.fab` file, package
+/// directory, `faber.toml`, or archive is routed through the runner — never
+/// compiled. Compiled source artifacts are built with `faber build`, never
+/// executed by faber; device packages keep a host-driver execution route.
 #[derive(clap::Args, Debug)]
 pub struct RunArgs {
-    /// Package path to run (defaults to current directory)
+    /// Path to run (defaults to current directory)
     #[arg(default_value = ".")]
     pub path: PathBuf,
 
@@ -314,33 +316,17 @@ pub struct RunArgs {
     #[arg(long = "diagnostics-locale", value_name = "LOCALE")]
     pub diagnostics_locale: Option<String>,
 
-    /// Runtime target to build and execute. When omitted, the manifest
-    /// `[build] target` wins; otherwise the implicit portable default
-    /// (FHIR package → FMIR run) applies.
-    #[arg(short = 't', long = "target", value_enum)]
-    pub target: Option<radix::tool::CliTarget>,
-
     /// Backend selection for device-capable packages (differentiable-GPU
     /// campaign N1.1). When omitted, the manifest `[device] backend` wins;
     /// otherwise the default `auto` applies. Precedence: CLI > manifest >
     /// `auto`. An explicit `metal`/`cuda` request never silently falls back:
     /// it fails closed before launch (`E_BACKEND_UNAVAILABLE`) when the
     /// backend is not admitted on this machine, and a package with no device
-    /// program fails closed ("package has no device program").
+    /// program fails closed ("package has no device program"). Device
+    /// programs execute through the host driver (the first-party target
+    /// runtime).
     #[arg(long = "backend", value_enum, value_name = "BACKEND")]
     pub backend: Option<BackendSelection>,
-
-    /// Run the release binary
-    #[arg(long)]
-    pub release: bool,
-
-    /// Force in-process MIR interpretation for scripts or supported packages
-    #[arg(long, conflicts_with = "compile")]
-    pub interpret: bool,
-
-    /// Force compile-to-Rust execution even for single `.fab` files
-    #[arg(long, conflicts_with = "interpret")]
-    pub compile: bool,
 
     /// Promote all warning diagnostics to errors
     #[arg(long)]
@@ -350,7 +336,7 @@ pub struct RunArgs {
     #[arg(long = "deny", value_name = "CODE")]
     pub deny: Vec<String>,
 
-    /// Arguments passed to the executed program (after --)
+    /// Arguments passed to the interpreted program (after --)
     #[arg(allow_hyphen_values = true, last = true)]
     pub args: Vec<String>,
 }
@@ -396,31 +382,6 @@ pub struct FmirRunArgs {
     pub backend: Option<BackendSelection>,
 
     /// Arguments passed to the FMIR program.
-    #[arg(allow_hyphen_values = true, last = true)]
-    pub args: Vec<String>,
-}
-
-/// Arguments for `faber script`.
-///
-/// `script` always interprets source through the MIR runner or package-MIR
-/// runner; it never compiles to Rust or invokes Cargo. See `commands::script`.
-#[derive(clap::Args, Debug)]
-pub struct ScriptArgs {
-    /// Source path to interpret: a `.fab` file, package directory, `faber.toml`,
-    /// package entry file, or `.zip` archive
-    #[arg(default_value = ".")]
-    pub path: PathBuf,
-
-    /// Code locale used to select a package-local locale pack. When omitted,
-    /// the package `[locale]` (or the product default `en`) is used.
-    #[arg(long = "locale", value_name = "LOCALE")]
-    pub locale: Option<String>,
-
-    /// Message language for diagnostics (independent of code locale).
-    #[arg(long = "diagnostics-locale", value_name = "LOCALE")]
-    pub diagnostics_locale: Option<String>,
-
-    /// Arguments passed to the interpreted program (after --)
     #[arg(allow_hyphen_values = true, last = true)]
     pub args: Vec<String>,
 }

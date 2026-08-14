@@ -137,7 +137,7 @@ pub fn sanitize_crate_name(name: &str) -> String {
 
 type PackageDiscoveryResult = Result<PackageSpec, Box<Diagnostic>>;
 
-#[allow(dead_code)] // binary-only `faber run --interpret` route consumes this through `commands`.
+#[allow(dead_code)] // consumed by the bin `commands/run` interpreted dispatch.
 pub(crate) fn is_manifest_backed_or_directory_package_input(input: &Path) -> bool {
     let input = absolutize_path(input);
     if input.file_name().and_then(|name| name.to_str()) == Some(MANIFEST_FILE) {

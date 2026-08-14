@@ -17,7 +17,6 @@ pub mod host;
 mod init;
 mod model;
 mod run;
-mod script;
 pub(crate) mod self_update;
 #[cfg(test)]
 #[path = "self_update_test.rs"]
@@ -36,8 +35,7 @@ use format::cmd_format;
 use host::cmd_host;
 use init::cmd_init;
 use model::cmd_model;
-use run::{cmd_fmir_run_image, cmd_run};
-use script::{cmd_eval, cmd_repl, cmd_script};
+use run::{cmd_eval, cmd_fmir_run_image, cmd_repl, cmd_run};
 use self_update::cmd_self;
 use targets::cmd_targets;
 use test::cmd_test;
@@ -163,7 +161,6 @@ fn dispatch(command: Command) {
         Command::Explain(args) => cmd_explain(args),
         Command::Run(args) => cmd_run(args),
         Command::FmirRun(args) => cmd_fmir_run_image(args),
-        Command::Script(args) => cmd_script(&args),
         Command::Repl(args) => cmd_repl(args),
         Command::Test(args) => cmd_test(&args),
         Command::Lex(args) => tool::cmd_lex(&args.input),

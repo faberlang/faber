@@ -211,7 +211,7 @@ pub(super) fn package_device_section(
         // The selected entry lowers to no compute kernel: no device payload.
         // An explicit GPU request for this package fails closed at run time
         // (N1.1: "package has no device program"); `auto` keeps the CPU
-        // route. (A `faber script` capture runner in the same package —
+        // route. (A `faber run` capture runner in the same package —
         // e.g. a CPU oracle — legitimately has no kernel.)
         return Ok(None);
     };

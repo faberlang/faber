@@ -1,9 +1,8 @@
 //! Subprocess checks for the interpreted-source command surface.
 //!
-//! These exercise `faber script`, the canonical interpreted-source entry
-//! point. The same code path remains reachable via `faber run --interpret`
-//! until the Stage 6 clean break; tests migrated to `script` to prove the new
-//! command routes the identical single-file / package / archive surface.
+//! These exercise `faber run`, the canonical interpreted execution entry
+//! point: `faber run` always interprets (single file, package, or archive)
+//! through the runner and never compiles.
 
 use std::fs;
 use std::io::{Read, Write};
@@ -194,6 +193,7 @@ main {
   print "module entry must not run"
 }
 
+@ public
 fn label() → int {
   return 7
 }
@@ -541,32 +541,6 @@ fn run_reader_locale_accepts_manifest_file_input() {
     ]);
 
     assert!(ok, "manifest run with reader locale failed:\n{stderr}");
-    assert_eq!(stdout, "salve\n");
-}
-
-#[test]
-fn run_interpret_accepts_reader_locale() {
-    let source = write_single_file(
-        "run-reader-locale-interpret-accept",
-        r#"
-入口 {
-  显示 "salve"
-}
-"#,
-    );
-
-    let (stdout, stderr, ok) = run_faber(&[
-        "run",
-        "--interpret",
-        "--locale",
-        "zh-Hans",
-        source.to_str().expect("utf8 source path"),
-    ]);
-
-    assert!(
-        ok,
-        "run --interpret --locale should interpret the localized source:\n{stderr}"
-    );
     assert_eq!(stdout, "salve\n");
 }
 
@@ -990,15 +964,11 @@ incipit argumenta args {
         "runner manifest must pin the faber path dependency version:\n{runner_manifest}"
     );
 
-    let (run_stdout, run_stderr, run_ok) = run_faber(&[
-        "run",
-        "--target",
-        "fmir-bin",
-        package.to_str().expect("utf8 package path"),
-        "--",
-        "runtime",
-    ]);
-    assert!(run_ok, "faber run --target fmir-bin failed:\n{run_stderr}");
+    // `faber run` is interpreted execution and no longer executes built
+    // targets; the fmir-bin bundle is a self-contained artifact executed
+    // directly (compiled artifacts are built, never executed, by faber).
+    let (run_stdout, run_stderr, run_ok) = run_executable(&entrypoint, &["runtime"]);
+    assert!(run_ok, "fmir-bin entrypoint failed:\n{run_stderr}");
     assert_eq!(run_stdout, "fmir-bin runtime!\n");
 
     fs::remove_file(package.join("src/main.fab")).expect("remove source");
@@ -1150,6 +1120,7 @@ main {
         (
             format!("{root}src/thing.fab"),
             r"
+@ public
 fn label() → int {
   return 7
 }
@@ -1169,7 +1140,7 @@ fn write_numeric_manifest_archive(label: &str, prefix: &str) -> TempPath {
 }
 
 #[test]
-fn script_private_namespace_failure_does_not_emit_rust() {
+fn run_private_namespace_failure_does_not_emit_rust() {
     let package = temp_dir("private-namespace");
     fs::write(
         package.join("main.fab"),
@@ -1194,7 +1165,7 @@ fn secretum() → int {
     .expect("write module");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package
             .join("main.fab")
             .to_str()
@@ -1204,15 +1175,18 @@ fn secretum() → int {
     assert!(!ok, "private namespace package should fail");
     assert_eq!(stdout, "");
     // ALLOW_DIAGNOSTIC_RENDER_TEXT: subprocess CLI stderr renderer contract.
+    // Under VM-U2 a `@ private` member imported through a file-namespace
+    // alias fails at the import seam (SEM006) instead of typecheck
+    // namespace_missing_export (SEM004).
     assert!(
-        stderr.contains("SEM004.namespace_missing_export"),
+        stderr.contains("SEM006.import_module_private"),
         "expected private namespace diagnostic:\n{stderr}"
     );
     assert_no_generated_rust(&package);
 }
 
 #[test]
-fn script_import_cycle_failure_does_not_emit_rust() {
+fn run_import_cycle_failure_does_not_emit_rust() {
     let package = temp_dir("import-cycle");
     fs::write(
         package.join("main.fab"),
@@ -1232,7 +1206,7 @@ fn run() → void {}
     .expect("write jobs");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package
             .join("main.fab")
             .to_str()
@@ -1250,7 +1224,7 @@ fn run() → void {}
 }
 
 #[test]
-fn script_norma_library_import_executes_without_rust_emit() {
+fn run_norma_library_import_executes_without_rust_emit() {
     // LIB-MIR: non-bridged `norma:*` source libraries link into the
     // interpreted script path (chorda.retorta runs). The script must execute
     // without emitting Rust artifacts.
@@ -1267,7 +1241,7 @@ main {
     )
     .expect("write entry");
 
-    let (stdout, stderr, ok) = run_faber(&["script", package.to_str().expect("utf8 package path")]);
+    let (stdout, stderr, ok) = run_faber(&["run", package.to_str().expect("utf8 package path")]);
 
     assert!(ok, "norma library import should execute:\n{stderr}");
     assert_eq!(stdout, "amor\n");
@@ -1275,7 +1249,7 @@ main {
 }
 
 #[test]
-fn script_cli_root_package_executes_without_cargo_or_rust_emit() {
+fn run_cli_root_package_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-root");
     fs::write(
         package.join("main.fab"),
@@ -1288,7 +1262,7 @@ main args args {
     )
     .expect("write entry");
 
-    let (stdout, stderr, ok) = run_faber(&["script", package.to_str().expect("utf8 package path")]);
+    let (stdout, stderr, ok) = run_faber(&["run", package.to_str().expect("utf8 package path")]);
 
     assert!(ok, "CLI root package interpretation failed:\n{stderr}");
     assert_eq!(stdout, "cli root\n");
@@ -1300,7 +1274,7 @@ main args args {
 }
 
 #[test]
-fn script_cli_root_text_operand_executes_without_cargo_or_rust_emit() {
+fn run_cli_root_text_operand_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-operand");
     fs::write(
         package.join("main.fab"),
@@ -1315,7 +1289,7 @@ main args args {
     .expect("write entry");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package.to_str().expect("utf8 package path"),
         "--",
         "Ian",
@@ -1331,7 +1305,7 @@ main args args {
 }
 
 #[test]
-fn script_cli_root_rest_text_operand_executes_without_cargo_or_rust_emit() {
+fn run_cli_root_rest_text_operand_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-rest-operand");
     fs::write(
         package.join("main.fab"),
@@ -1349,7 +1323,7 @@ main args args {
     .expect("write entry");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package.to_str().expect("utf8 package path"),
         "--",
         "seed",
@@ -1370,7 +1344,7 @@ main args args {
 }
 
 #[test]
-fn script_cli_root_fixed_exit_uses_process_status_without_rust_emit() {
+fn run_cli_root_fixed_exit_uses_process_status_without_rust_emit() {
     let package = temp_dir("cli-fixed-exit");
     fs::write(
         package.join("main.fab"),
@@ -1384,7 +1358,7 @@ main args args exit 7 {
     .expect("write entry");
 
     let (stdout, stderr, status) =
-        run_faber_status(&["script", package.to_str().expect("utf8 package path")]);
+        run_faber_status(&["run", package.to_str().expect("utf8 package path")]);
 
     assert_eq!(status.code(), Some(7), "stderr:\n{stderr}");
     assert_eq!(stdout, "done\n");
@@ -1396,7 +1370,7 @@ main args args exit 7 {
 }
 
 #[test]
-fn script_cli_root_flag_option_executes_without_cargo_or_rust_emit() {
+fn run_cli_root_flag_option_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-flag-option");
     fs::write(
         package.join("main.fab"),
@@ -1411,7 +1385,7 @@ main args args {
     .expect("write entry");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package.to_str().expect("utf8 package path"),
         "--",
         "--verbose",
@@ -1430,7 +1404,7 @@ main args args {
 }
 
 #[test]
-fn script_cli_root_defaulted_option_executes_without_cargo_or_rust_emit() {
+fn run_cli_root_defaulted_option_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-defaulted-option");
     fs::write(
         package.join("main.fab"),
@@ -1445,7 +1419,7 @@ main args args {
     .expect("write entry");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package.to_str().expect("utf8 package path"),
         "--",
         "--name=Ian",
@@ -1464,7 +1438,7 @@ main args args {
 }
 
 #[test]
-fn script_cli_root_optional_option_executes_without_cargo_or_rust_emit() {
+fn run_cli_root_optional_option_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-optional-option");
     fs::write(
         package.join("main.fab"),
@@ -1479,7 +1453,7 @@ main args args {
     .expect("write entry");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package.to_str().expect("utf8 package path"),
         "--",
         "--name=Ian",
@@ -1498,7 +1472,7 @@ main args args {
 }
 
 #[test]
-fn script_cli_root_global_flag_option_executes_without_cargo_or_rust_emit() {
+fn run_cli_root_global_flag_option_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-global-flag-option");
     fs::write(
         package.join("main.fab"),
@@ -1513,7 +1487,7 @@ main args args {
     .expect("write entry");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package.to_str().expect("utf8 package path"),
         "--",
         "--verbose",
@@ -1532,7 +1506,7 @@ main args args {
 }
 
 #[test]
-fn script_cli_root_defaulted_operand_executes_without_cargo_or_rust_emit() {
+fn run_cli_root_defaulted_operand_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-defaulted-operand");
     fs::write(
         package.join("main.fab"),
@@ -1546,7 +1520,7 @@ main args args {
     )
     .expect("write entry");
 
-    let (stdout, stderr, ok) = run_faber(&["script", package.to_str().expect("utf8 package path")]);
+    let (stdout, stderr, ok) = run_faber(&["run", package.to_str().expect("utf8 package path")]);
 
     assert!(
         ok,
@@ -1561,7 +1535,7 @@ main args args {
 }
 
 #[test]
-fn script_cli_mounted_command_executes_without_cargo_or_rust_emit() {
+fn run_cli_mounted_command_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-mounted");
     fs::write(
         package.join("main.fab"),
@@ -1586,7 +1560,7 @@ fn run() args args {
     .expect("write jobs");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package.to_str().expect("utf8 package path"),
         "--",
         "jobs",
@@ -1603,7 +1577,7 @@ fn run() args args {
 }
 
 #[test]
-fn script_cli_mounted_global_option_executes_without_cargo_or_rust_emit() {
+fn run_cli_mounted_global_option_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-mounted-global-option");
     fs::write(
         package.join("main.fab"),
@@ -1629,7 +1603,7 @@ fn run() args args {
     .expect("write jobs");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package.to_str().expect("utf8 package path"),
         "--",
         "--verbose",
@@ -1650,7 +1624,7 @@ fn run() args args {
 }
 
 #[test]
-fn script_cli_mounted_global_optional_option_executes_without_cargo_or_rust_emit() {
+fn run_cli_mounted_global_optional_option_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-mounted-global-optional-option");
     fs::write(
         package.join("main.fab"),
@@ -1676,7 +1650,7 @@ fn run() args args {
     .expect("write jobs");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package.to_str().expect("utf8 package path"),
         "--",
         "--name=Ian",
@@ -1697,7 +1671,7 @@ fn run() args args {
 }
 
 #[test]
-fn script_cli_mounted_global_text_operand_executes_without_cargo_or_rust_emit() {
+fn run_cli_mounted_global_text_operand_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-mounted-global-operand");
     fs::write(
         package.join("main.fab"),
@@ -1724,7 +1698,7 @@ fn run() args args {
     .expect("write jobs");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package.to_str().expect("utf8 package path"),
         "--",
         "jobs",
@@ -1746,7 +1720,7 @@ fn run() args args {
 }
 
 #[test]
-fn script_cli_mounted_text_operand_executes_without_cargo_or_rust_emit() {
+fn run_cli_mounted_text_operand_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-mounted-operand");
     fs::write(
         package.join("main.fab"),
@@ -1772,7 +1746,7 @@ fn run() args args {
     .expect("write jobs");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package.to_str().expect("utf8 package path"),
         "--",
         "jobs",
@@ -1793,7 +1767,7 @@ fn run() args args {
 }
 
 #[test]
-fn script_cli_mounted_numerus_operand_executes_without_cargo_or_rust_emit() {
+fn run_cli_mounted_numerus_operand_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-mounted-numerus-operand");
     fs::write(
         package.join("main.fab"),
@@ -1819,7 +1793,7 @@ fn run() args args {
     .expect("write jobs");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package.to_str().expect("utf8 package path"),
         "--",
         "jobs",
@@ -1840,7 +1814,7 @@ fn run() args args {
 }
 
 #[test]
-fn script_cli_mounted_defaulted_option_executes_without_cargo_or_rust_emit() {
+fn run_cli_mounted_defaulted_option_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-mounted-defaulted-option");
     fs::write(
         package.join("main.fab"),
@@ -1866,7 +1840,7 @@ fn run() args args {
     .expect("write jobs");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package.to_str().expect("utf8 package path"),
         "--",
         "jobs",
@@ -1887,7 +1861,7 @@ fn run() args args {
 }
 
 #[test]
-fn script_cli_mounted_alias_text_operand_executes_without_cargo_or_rust_emit() {
+fn run_cli_mounted_alias_text_operand_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-mounted-alias");
     fs::write(
         package.join("main.fab"),
@@ -1914,7 +1888,7 @@ fn run() args args {
     .expect("write jobs");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package.to_str().expect("utf8 package path"),
         "--",
         "jobs",
@@ -1935,10 +1909,10 @@ fn run() args args {
 }
 
 #[test]
-fn script_archive_root_manifest_executes_without_cargo_or_rust_emit() {
+fn run_archive_root_manifest_executes_without_cargo_or_rust_emit() {
     let archive = write_numeric_manifest_archive("archive-root-manifest", "");
 
-    let (stdout, stderr, ok) = run_faber(&["script", archive.to_str().expect("utf8 archive path")]);
+    let (stdout, stderr, ok) = run_faber(&["run", archive.to_str().expect("utf8 archive path")]);
 
     assert!(ok, "archive package interpretation failed:\n{stderr}");
     assert_eq!(stdout, "7\n");
@@ -1950,10 +1924,10 @@ fn script_archive_root_manifest_executes_without_cargo_or_rust_emit() {
 }
 
 #[test]
-fn script_archive_wrapped_package_executes_without_cargo_or_rust_emit() {
+fn run_archive_wrapped_package_executes_without_cargo_or_rust_emit() {
     let archive = write_numeric_manifest_archive("archive-wrapped-package", "pkg");
 
-    let (stdout, stderr, ok) = run_faber(&["script", archive.to_str().expect("utf8 archive path")]);
+    let (stdout, stderr, ok) = run_faber(&["run", archive.to_str().expect("utf8 archive path")]);
 
     assert!(
         ok,
@@ -1968,7 +1942,7 @@ fn script_archive_wrapped_package_executes_without_cargo_or_rust_emit() {
 }
 
 #[test]
-fn script_archive_manifestless_root_executes_without_cargo_or_rust_emit() {
+fn run_archive_manifestless_root_executes_without_cargo_or_rust_emit() {
     let archive = write_zip_archive(
         "archive-manifestless-root",
         &[
@@ -1985,6 +1959,7 @@ main {
             (
                 "thing.fab",
                 r"
+@ public
 fn label() → int {
   return 7
 }
@@ -1993,7 +1968,7 @@ fn label() → int {
         ],
     );
 
-    let (stdout, stderr, ok) = run_faber(&["script", archive.to_str().expect("utf8 archive path")]);
+    let (stdout, stderr, ok) = run_faber(&["run", archive.to_str().expect("utf8 archive path")]);
 
     assert!(ok, "manifestless archive interpretation failed:\n{stderr}");
     assert_eq!(stdout, "7\n");
@@ -2001,7 +1976,7 @@ fn label() → int {
 }
 
 #[test]
-fn script_archive_rejects_parent_traversal_entry() {
+fn run_archive_rejects_parent_traversal_entry() {
     let archive = write_zip_archive(
         "archive-parent-traversal",
         &[("../escape.fab", "incipit { nota 1 }\n")],
@@ -2014,7 +1989,7 @@ fn script_archive_rejects_parent_traversal_entry() {
         .join("escape.fab");
     let _ = fs::remove_file(&escaped);
 
-    let (stdout, stderr, ok) = run_faber(&["script", archive.to_str().expect("utf8 archive path")]);
+    let (stdout, stderr, ok) = run_faber(&["run", archive.to_str().expect("utf8 archive path")]);
 
     assert!(!ok, "unsafe archive should fail");
     assert_eq!(stdout, "");
@@ -2030,7 +2005,7 @@ fn script_archive_rejects_parent_traversal_entry() {
 }
 
 #[test]
-fn script_archive_reports_missing_package_root() {
+fn run_archive_reports_missing_package_root() {
     let archive = write_zip_archive(
         "archive-missing-root",
         &[
@@ -2039,7 +2014,7 @@ fn script_archive_reports_missing_package_root() {
         ],
     );
 
-    let (stdout, stderr, ok) = run_faber(&["script", archive.to_str().expect("utf8 archive path")]);
+    let (stdout, stderr, ok) = run_faber(&["run", archive.to_str().expect("utf8 archive path")]);
 
     assert!(!ok, "ambiguous archive root should fail");
     assert_eq!(stdout, "");
@@ -2051,7 +2026,7 @@ fn script_archive_reports_missing_package_root() {
 }
 
 #[test]
-fn script_archive_package_diagnostic_reports_archive_member_path() {
+fn run_archive_package_diagnostic_reports_archive_member_path() {
     let archive = write_zip_archive(
         "archive-private-diagnostic",
         &[
@@ -2077,7 +2052,7 @@ fn secretum() → int {
         ],
     );
 
-    let (stdout, stderr, ok) = run_faber(&["script", archive.to_str().expect("utf8 archive path")]);
+    let (stdout, stderr, ok) = run_faber(&["run", archive.to_str().expect("utf8 archive path")]);
 
     assert!(!ok, "private archive package should fail");
     assert_eq!(stdout, "");
@@ -2086,15 +2061,17 @@ fn secretum() → int {
         "expected archive member diagnostic path:\n{stderr}"
     );
     // ALLOW_DIAGNOSTIC_RENDER_TEXT: subprocess CLI stderr renderer contract.
+    // Under VM-U2 a `@ private` member imported through a file-namespace
+    // alias fails at the import seam (SEM006).
     assert!(
-        stderr.contains("SEM004.namespace_missing_export"),
+        stderr.contains("SEM006.import_module_private"),
         "expected private namespace diagnostic:\n{stderr}"
     );
     assert_no_generated_rust(archive.parent().expect("archive parent"));
 }
 
 #[test]
-fn script_manifestless_entry_package_executes_without_cargo_or_rust_emit() {
+fn run_manifestless_entry_package_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("manifestless-numeric");
     fs::write(
         package.join("main.fab"),
@@ -2110,6 +2087,7 @@ main {
     fs::write(
         package.join("thing.fab"),
         r"
+@ public
 fn label() → int {
   return 7
 }
@@ -2118,14 +2096,14 @@ fn label() → int {
     .expect("write module");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package
             .join("main.fab")
             .to_str()
             .expect("utf8 package path"),
     ]);
 
-    assert!(ok, "faber run --interpret failed:\n{stderr}");
+    assert!(ok, "faber run failed:\n{stderr}");
     assert_eq!(stdout, "7\n");
     assert!(
         !stderr.contains("Compiling") && !stderr.contains("cargo"),
@@ -2135,15 +2113,15 @@ fn label() → int {
 }
 
 #[test]
-fn script_package_inputs_execute_without_cargo_or_rust_emit() {
+fn run_package_inputs_execute_without_cargo_or_rust_emit() {
     let package = write_numeric_package("numeric");
     let manifest = package.join("faber.toml");
     let entry = package.join("src/main.fab");
 
     for input in [&*package, manifest.as_path(), entry.as_path()] {
         let (stdout, stderr, ok) =
-            run_faber(&["script", input.to_str().expect("utf8 package path")]);
-        assert!(ok, "faber run --interpret failed:\n{stderr}");
+            run_faber(&["run", input.to_str().expect("utf8 package path")]);
+        assert!(ok, "faber run failed:\n{stderr}");
         assert_eq!(stdout, "7\n");
         assert!(
             !stderr.contains("Compiling") && !stderr.contains("cargo"),
@@ -2154,7 +2132,7 @@ fn script_package_inputs_execute_without_cargo_or_rust_emit() {
 }
 
 #[test]
-fn script_text_return_package_executes_without_cargo_or_rust_emit() {
+fn run_text_return_package_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("text-remap");
     let src = package.join("src");
     fs::create_dir_all(&src).expect("create src");
@@ -2184,6 +2162,7 @@ main {
     fs::write(
         src.join("thing.fab"),
         r#"
+@ public
 fn label() → string {
   return "ok"
 }
@@ -2191,7 +2170,7 @@ fn label() → string {
     )
     .expect("write module");
 
-    let (stdout, stderr, ok) = run_faber(&["script", package.to_str().expect("utf8 path")]);
+    let (stdout, stderr, ok) = run_faber(&["run", package.to_str().expect("utf8 path")]);
 
     assert!(ok, "text-return package interpretation failed:\n{stderr}");
     assert_eq!(stdout, "ok\n");
@@ -2203,12 +2182,12 @@ fn label() → string {
 }
 
 #[test]
-fn script_manifestless_single_file_uses_single_source_runner() {
+fn run_manifestless_single_file_uses_single_source_runner() {
     let dir = temp_dir("single-file");
     let script = dir.join("script.fab");
     fs::write(&script, "main { print \"single\" }\n").expect("write script");
 
-    let (stdout, stderr, ok) = run_faber(&["script", script.to_str().expect("utf8 path")]);
+    let (stdout, stderr, ok) = run_faber(&["run", script.to_str().expect("utf8 path")]);
 
     assert!(ok, "single-file interpretation failed:\n{stderr}");
     assert_eq!(stdout, "single\n");
@@ -2216,7 +2195,7 @@ fn script_manifestless_single_file_uses_single_source_runner() {
 }
 
 #[test]
-fn script_norma_solum_package_reads_file_through_kernel_bridge() {
+fn run_norma_solum_package_reads_file_through_kernel_bridge() {
     // One `norma:*` import block; interpreted package execution satisfies it
     // through the runner kernel (Stage 1b host bridge). No second runner-only
     // source file, no compiled-Rust fallback.
@@ -2251,7 +2230,7 @@ main {{
     )
     .expect("write entry");
 
-    let (stdout, stderr, ok) = run_faber(&["script", package.to_str().expect("utf8 package path")]);
+    let (stdout, stderr, ok) = run_faber(&["run", package.to_str().expect("utf8 package path")]);
 
     assert!(ok, "norma:solum package bridge failed:\n{stderr}");
     assert_eq!(stdout, "bridge-ok\n");
@@ -2263,7 +2242,7 @@ main {{
 }
 
 #[test]
-fn script_norma_solum_unsupported_verb_fails_closed() {
+fn run_norma_solum_unsupported_verb_fails_closed() {
     let package = temp_dir("norma-solum-unsupported");
     let src = package.join("src");
     fs::create_dir_all(&src).expect("create src");
@@ -2290,7 +2269,7 @@ main {
     )
     .expect("write entry");
 
-    let (stdout, stderr, ok) = run_faber(&["script", package.to_str().expect("utf8 package path")]);
+    let (stdout, stderr, ok) = run_faber(&["run", package.to_str().expect("utf8 package path")]);
 
     assert!(!ok, "unsupported norma:solum verb should fail closed");
     assert_eq!(stdout, "");
@@ -2302,7 +2281,7 @@ main {
 }
 
 #[test]
-fn script_norma_processus_argumenta_bridges_to_kernel() {
+fn run_norma_processus_argumenta_bridges_to_kernel() {
     let package = temp_dir("norma-processus-bridge");
     let src = package.join("src");
     fs::create_dir_all(&src).expect("create src");
@@ -2330,7 +2309,7 @@ main args args {
     .expect("write entry");
 
     let (stdout, stderr, ok) = run_faber(&[
-        "script",
+        "run",
         package.to_str().expect("utf8 package path"),
         "--",
         "first-arg",
