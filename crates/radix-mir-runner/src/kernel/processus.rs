@@ -50,10 +50,7 @@ pub(crate) fn dispatch<H: Host + ?Sized>(
         }
         "lege" => {
             let [nomen] = args else {
-                return Err(RunnerError::internal(
-                    span,
-                    "processus.lege provider arity",
-                ));
+                return Err(RunnerError::internal(span, "processus.lege provider arity"));
             };
             let nomen = expect_str(nomen, span, "processus.lege name")?;
             match host.env_get(&nomen)? {
@@ -88,10 +85,7 @@ pub(crate) fn dispatch<H: Host + ?Sized>(
         }
         "muta" => {
             let [via] = args else {
-                return Err(RunnerError::internal(
-                    span,
-                    "processus.muta provider arity",
-                ));
+                return Err(RunnerError::internal(span, "processus.muta provider arity"));
             };
             let via = expect_str(via, span, "processus.muta path")?;
             host.set_cwd(&via)?;

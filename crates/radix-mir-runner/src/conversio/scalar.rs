@@ -297,11 +297,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         Ok(Value::Bool(false))
     }
 
-    pub(crate) fn convert_to_octeti(
-        &self,
-        value: Value,
-        span: Span,
-    ) -> Result<Value, RunnerError> {
+    pub(crate) fn convert_to_octeti(&self, value: Value, span: Span) -> Result<Value, RunnerError> {
         Ok(match value {
             Value::Str(text) => Value::Octeti(text.into_bytes()),
             Value::Octeti(bytes) => Value::Octeti(bytes),
@@ -646,9 +642,9 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             }
             Value::Octeti(bytes) => {
                 if bytes.is_ascii() {
-                    String::from_utf8(bytes).map(Value::Str).map_err(|_| {
-                        RunnerError::internal(span, "ascii bytes failed UTF-8 decode")
-                    })
+                    String::from_utf8(bytes)
+                        .map(Value::Str)
+                        .map_err(|_| RunnerError::internal(span, "ascii bytes failed UTF-8 decode"))
                 } else {
                     self.recover_or_fail(recovery, span, "octeti to ascii conversion failed")
                 }

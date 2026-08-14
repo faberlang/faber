@@ -14,9 +14,7 @@ mod runtime;
 mod textus_literal;
 pub mod value;
 
-pub use capability::{
-    classify_runner_lowerability, runner_dispatch_status, RunnerDispatchStatus,
-};
+pub use capability::{classify_runner_lowerability, runner_dispatch_status, RunnerDispatchStatus};
 
 pub use host::{BufferHost, Host, StdioHost};
 pub use value::{MapKey, Value};
@@ -1130,10 +1128,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         .iter()
                         .map(|v| match v {
                             Value::Float(f) if *f >= 0.0 => Ok(Value::Float(f.sqrt())),
-                            Value::Float(_) => Err(RunnerError::internal(
-                                span,
-                                "tensor sqrt of negative float",
-                            )),
+                            Value::Float(_) => {
+                                Err(RunnerError::internal(span, "tensor sqrt of negative float"))
+                            }
                             Value::Int(i) if *i >= 0 => Ok(Value::Float((*i as f64).sqrt())),
                             Value::UInt(u) => Ok(Value::Float((*u as f64).sqrt())),
                             _ => Err(RunnerError::internal(
@@ -1155,10 +1152,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             MirUnOp::Relu => match value {
                 Value::Float(v) => Ok(Value::Float(v.max(0.0))),
                 Value::Int(v) => Ok(Value::Int(v.max(0))),
-                _ => Err(RunnerError::internal(
-                    span,
-                    "relu requires numeric operand",
-                )),
+                _ => Err(RunnerError::internal(span, "relu requires numeric operand")),
             },
             MirUnOp::Gelu => match value {
                 Value::Float(v) => Ok(Value::Float(gelu_f64(v))),

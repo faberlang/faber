@@ -448,11 +448,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         Ok(Value::Unit)
     }
 
-    fn gradient_handle_id(
-        &mut self,
-        operand: &MirOperand,
-        span: Span,
-    ) -> Result<u64, RunnerError> {
+    fn gradient_handle_id(&mut self, operand: &MirOperand, span: Span) -> Result<u64, RunnerError> {
         match self.eval_operand(operand, span)? {
             Value::GradientHandle(id) => Ok(id),
             other => Err(RunnerError::internal(
@@ -940,12 +936,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     Value::Tensor(cell) => cell.borrow().shape.len(),
                     Value::Str(text) => text.chars().count(),
                     Value::Octeti(bytes) => bytes.len(),
-                    _ => {
-                        return Err(RunnerError::internal(
-                            span,
-                            "length receiver type mismatch",
-                        ))
-                    }
+                    _ => return Err(RunnerError::internal(span, "length receiver type mismatch")),
                 };
                 Ok(Value::Int(len as i64))
             }
@@ -1060,10 +1051,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                             Ok(Value::Octeti(bytes))
                         }
                     }
-                    _ => Err(RunnerError::internal(
-                        span,
-                        "append receiver type mismatch",
-                    )),
+                    _ => Err(RunnerError::internal(span, "append receiver type mismatch")),
                 }
             }
             MirCollectionOp::AppendImmutable => {
@@ -1129,10 +1117,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             MirCollectionOp::RemoveFirst => {
                 let [receiver] = args else {
-                    return Err(RunnerError::internal(
-                        span,
-                        "collection remove_first arity",
-                    ));
+                    return Err(RunnerError::internal(span, "collection remove_first arity"));
                 };
                 let receiver = self.eval_operand(receiver, span)?;
                 match receiver {
@@ -1252,10 +1237,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     return Err(RunnerError::internal(span, "split receiver is not textus"));
                 };
                 let Value::Str(delim) = self.eval_operand(delim, span)? else {
-                    return Err(RunnerError::internal(
-                        span,
-                        "split delimiter is not textus",
-                    ));
+                    return Err(RunnerError::internal(span, "split delimiter is not textus"));
                 };
                 let parts = text
                     .split(&delim)
@@ -1550,11 +1532,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         Ok(Value::Int((end - start + i64::from(inclusive)).max(0)))
     }
 
-    fn interval_contains(
-        &mut self,
-        args: &[MirOperand],
-        span: Span,
-    ) -> Result<Value, RunnerError> {
+    fn interval_contains(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
         let [interval, value] = args else {
             return Err(RunnerError::internal(span, "interval contains arity"));
         };
@@ -2954,10 +2932,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             Value::Map(cell) => Ok(cell.borrow().contains_key(&needle.to_key(span)?)),
             Value::Str(text) => {
                 let Value::Str(needle) = needle else {
-                    return Err(RunnerError::internal(
-                        span,
-                        "contains needle is not textus",
-                    ));
+                    return Err(RunnerError::internal(span, "contains needle is not textus"));
                 };
                 Ok(text.contains(&needle))
             }
@@ -2996,10 +2971,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "text pair left is not textus"));
         };
         let Value::Str(right) = self.eval_operand(right, span)? else {
-            return Err(RunnerError::internal(
-                span,
-                "text pair right is not textus",
-            ));
+            return Err(RunnerError::internal(span, "text pair right is not textus"));
         };
         Ok(Value::Bool(f(left, right)))
     }
@@ -3275,12 +3247,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         Ok(capture_value)
     }
 
-    fn project_field(
-        &self,
-        value: Value,
-        field: Symbol,
-        span: Span,
-    ) -> Result<Value, RunnerError> {
+    fn project_field(&self, value: Value, field: Symbol, span: Span) -> Result<Value, RunnerError> {
         match value {
             Value::Struct(def_id, cell) => {
                 if let Some(value) = cell.borrow().get(&field).cloned() {
@@ -3504,10 +3471,7 @@ fn interval_parts(value: &Value, span: Span) -> Result<(Value, Value, bool), Run
         ));
     };
     let [start, end, Value::Bool(inclusive)] = parts.as_slice() else {
-        return Err(RunnerError::internal(
-            span,
-            "interval value shape mismatch",
-        ));
+        return Err(RunnerError::internal(span, "interval value shape mismatch"));
     };
     Ok((start.clone(), end.clone(), *inclusive))
 }

@@ -91,9 +91,8 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                     "solum.funde data expects octeti",
                 ));
             };
-            fs::write(&path, bytes).map_err(|err| {
-                RunnerError::internal(span, format!("solum.funde failed: {err}"))
-            })?;
+            fs::write(&path, bytes)
+                .map_err(|err| RunnerError::internal(span, format!("solum.funde failed: {err}")))?;
             Ok(Value::Unit)
         }
         "appone" => {
@@ -174,9 +173,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
             let path = expect_str(via, span, "solum.modus path")?;
             let mode = fs::symlink_metadata(path)
                 .map(|meta| (meta.mode() & 0o7777) as i64)
-                .map_err(|err| {
-                    RunnerError::internal(span, format!("solum.modus failed: {err}"))
-                })?;
+                .map_err(|err| RunnerError::internal(span, format!("solum.modus failed: {err}")))?;
             Ok(Value::Int(mode))
         }
         "enumera" => {
@@ -188,10 +185,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
         }
         "describe" => {
             let [via] = args else {
-                return Err(RunnerError::internal(
-                    span,
-                    "solum.describe provider arity",
-                ));
+                return Err(RunnerError::internal(span, "solum.describe provider arity"));
             };
             let path = expect_str(via, span, "solum.describe path")?;
             describe(&path, span)
@@ -224,10 +218,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
         }
         "exscribe" => {
             let [origo, finis] = args else {
-                return Err(RunnerError::internal(
-                    span,
-                    "solum.exscribe provider arity",
-                ));
+                return Err(RunnerError::internal(span, "solum.exscribe provider arity"));
             };
             let source = expect_str(origo, span, "solum.exscribe source")?;
             let destination = expect_str(finis, span, "solum.exscribe destination")?;
@@ -236,10 +227,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
         }
         "renomina" => {
             let [origo, finis] = args else {
-                return Err(RunnerError::internal(
-                    span,
-                    "solum.renomina provider arity",
-                ));
+                return Err(RunnerError::internal(span, "solum.renomina provider arity"));
             };
             let source = expect_str(origo, span, "solum.renomina source")?;
             let destination = expect_str(finis, span, "solum.renomina destination")?;
@@ -260,9 +248,8 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
             };
             let path = expect_str(via, span, "solum.modum path")?;
             let mode = expect_mode(modus, span)?;
-            fs::set_permissions(path, fs::Permissions::from_mode(mode)).map_err(|err| {
-                RunnerError::internal(span, format!("solum.modum failed: {err}"))
-            })?;
+            fs::set_permissions(path, fs::Permissions::from_mode(mode))
+                .map_err(|err| RunnerError::internal(span, format!("solum.modum failed: {err}")))?;
             Ok(Value::Unit)
         }
         "crea" => {
@@ -318,10 +305,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
         }
         "suffixum" => {
             let [via] = args else {
-                return Err(RunnerError::internal(
-                    span,
-                    "solum.suffixum provider arity",
-                ));
+                return Err(RunnerError::internal(span, "solum.suffixum provider arity"));
             };
             let path = expect_str(via, span, "solum.suffixum path")?;
             Ok(Value::Str(

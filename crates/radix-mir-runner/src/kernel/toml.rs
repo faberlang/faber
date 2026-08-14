@@ -176,10 +176,7 @@ fn value_to_toml_table(value: &Value, span: Span) -> Result<toml::Table, RunnerE
             }
             Ok(table)
         }
-        _ => Err(RunnerError::internal(
-            span,
-            "toml.pange root must be a map",
-        )),
+        _ => Err(RunnerError::internal(span, "toml.pange root must be a map")),
     }
 }
 

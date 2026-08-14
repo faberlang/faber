@@ -119,10 +119,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
         }
         "semina" => {
             let [n] = args else {
-                return Err(RunnerError::internal(
-                    span,
-                    "aleator.semina provider arity",
-                ));
+                return Err(RunnerError::internal(span, "aleator.semina provider arity"));
             };
             let n = match n {
                 Value::Int(v) => *v,
