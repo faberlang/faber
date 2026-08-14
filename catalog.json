@@ -19,5 +19,11 @@
     "typescript": "runtime/typescript",
     "go": "runtime/go",
     "swift": "runtime/swift"
+  },
+  "docs": {
+    "grammar": "docs/EBNF.md",
+    "targetMatrix": "docs/EBNF_MATRIX.md",
+    "conversioMatrix": "docs/CONVERSIO_MATRIX.md",
+    "architecture": "docs/architecture.md"
   }
 }

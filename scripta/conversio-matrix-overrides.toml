@@ -1,0 +1,15 @@
+# CONVERSIO_MATRIX.md tier overlay (reserved).
+#
+# The conversio matrix uses a strict 4-tier model (dedicated / fallback /
+# rejected / not-emitted) with no `planned` tier today, so this overlay is
+# currently empty and the renderer does not read it. It is committed for
+# parity with `ebnf-matrix-overrides.toml` and reserved for a later phase that
+# may want to curate "planned but not-yet-lowered" cells (e.g. wasm-text ML
+# conversion support) as a distinct glyph instead of `—`.
+#
+# Format (reserved, not yet consumed by render-matrices.py):
+#   "src"."tgt"."target" = "short reason / owner"
+# where `src`/`tgt` match ConversioTypeFamily::name() and `target` matches a
+# ConversioCoverageTarget column name (rust, wasm-text, ...).
+
+[planned]
