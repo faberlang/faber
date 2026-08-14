@@ -171,6 +171,42 @@ fn same_line_futura_stops_before_functio_declaration() {
 }
 
 #[test]
+fn publica_annotation_stops_before_type_alias_declaration() {
+    // Type aliases are declaration starts after a visibility annotation; the
+    // alias declaration must not be swallowed as annotation args (MB-U1 / tela
+    // U5: `@ publica type Nomen = string` joins the import surface).
+    let result = parse_ok("@ publica\ntypus Nomen = string\n");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1, "type alias is a statement");
+
+    let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
+        panic!("expected type alias declaration");
+    };
+    assert_eq!(symbol_name(&result, alias.name.name), "Nomen");
+    assert_eq!(program.statements[0].annotations.len(), 1);
+    assert!(matches!(
+        program.statements[0].annotations[0].kind,
+        AnnotationKind::Publica
+    ));
+}
+
+#[test]
+fn publica_annotation_attaches_inline_before_type_alias() {
+    let result = parse_ok("@ publica typus Nomen = string\n");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
+        panic!("expected type alias declaration");
+    };
+    assert_eq!(symbol_name(&result, alias.name.name), "Nomen");
+    assert_eq!(program.statements[0].annotations.len(), 1);
+    assert!(matches!(
+        program.statements[0].annotations[0].kind,
+        AnnotationKind::Publica
+    ));
+}
+
+#[test]
 fn parses_braced_futura_cli_and_optio_annotations() {
     let result = parse_ok(
         r#"

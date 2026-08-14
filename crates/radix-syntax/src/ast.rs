@@ -396,6 +396,7 @@ pub struct TypeAliasDecl {
     pub name: Ident,
     pub type_params: Vec<TypeParam>,
     pub ty: TypeExpr,
+    pub annotations: Vec<Annotation>,
 }
 
 /// Relational-view schema declaration: `schema Name { columna<T> name [: source] … }`.

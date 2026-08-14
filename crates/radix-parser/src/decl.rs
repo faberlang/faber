@@ -876,6 +876,7 @@ impl Parser {
             name,
             type_params,
             ty,
+            annotations: Vec::new(),
         }))
     }
 
@@ -1781,7 +1782,7 @@ impl Parser {
         let mut global = false;
         let mut default = None;
 
-        while self.is_annotation_arg() {
+        while self.is_annotation_arg() || self.check_keyword_ident(TokenKind::Typus) {
             if self.eat_annotation_ident(TokenKind::Brevis) {
                 short = Some(self.parse_string()?);
             } else if self.eat_annotation_ident(TokenKind::Longum) {
@@ -2056,9 +2057,10 @@ impl Parser {
     }
 
     fn is_declaration_start_token(&self) -> bool {
-        // `typus` is deliberately absent: it is an annotation modifier key
-        // (`@optio … typus <type>`), so in annotation-arg position it stays
-        // an argument rather than starting a declaration.
+        // `typus` ends an annotation and starts a declaration. The annotation
+        // modifier key `typus` (`@optio … typus <type>`) is consumed inside
+        // `parse_optio_annotation`'s own loop, which extends the generic
+        // argument guard with the keyword.
         matches!(self.peek().kind, TokenKind::LBrace)
             || self.check_keyword_ident(TokenKind::Abstractus)
             || self.check_keyword_ident(TokenKind::Importa)
@@ -2072,6 +2074,7 @@ impl Parser {
             || self.check_keyword_ident(TokenKind::Implendum)
             || self.check_keyword_ident(TokenKind::Ordo)
             || self.check_keyword_ident(TokenKind::Sit)
+            || self.check_keyword_ident(TokenKind::Typus)
             || self.check_keyword_ident(TokenKind::Varia)
     }
 
@@ -2105,7 +2108,6 @@ impl Parser {
                 | TokenKind::Assign
                 | TokenKind::Nihil
                 | TokenKind::Si
-                | TokenKind::Typus
                 | TokenKind::Vel
                 | TokenKind::Verum
         )
