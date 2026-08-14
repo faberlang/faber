@@ -390,6 +390,7 @@ fn try_bind_union_members(
 /// failed candidate (PRP-060 / BO-H-5). Does not clone the bindings map per
 /// candidate. Undo is correct because [`bind_type_param`] only inserts, never
 /// overwrites existing bindings.
+#[allow(clippy::too_many_arguments)]
 fn try_bind_union_member_at(
     types: &TypeTable,
     index: usize,
@@ -1264,6 +1265,7 @@ fn instantiate_mutable_unary_type(
     Ok(intern_or_find(types, &build(inner), index))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn instantiate_mutable_indexed_type(
     types: &mut TypeTable,
     inner: TypeId,

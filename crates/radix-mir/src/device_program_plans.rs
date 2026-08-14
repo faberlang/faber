@@ -708,10 +708,10 @@ fn find_collection_call<'a, T>(
     None
 }
 
-fn first_collection_call<'a>(
-    function: &'a MirFunction,
+fn first_collection_call(
+    function: &MirFunction,
     pred: impl Fn(MirCollectionOp) -> bool,
-) -> Option<(&'a MirRuntimeCall, Option<&'a crate::MirPlace>)> {
+) -> Option<(&MirRuntimeCall, Option<&crate::MirPlace>)> {
     find_collection_call(function, |op, call, dest| pred(op).then_some((call, dest)))
 }
 
