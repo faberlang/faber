@@ -140,6 +140,27 @@ fn has_comment(trivia: &[HirTrivia]) -> bool {
         .any(|item| matches!(item, HirTrivia::CommentLine { .. }))
 }
 
+/// Strip the boundary newlines that begin the file.
+///
+/// [`write_leading_trivia`] drops exactly one leading boundary newline because
+/// every render slot is preceded by the emitter's own statement/construct
+/// newline. At the very start of the file no construct newline precedes the
+/// slot, so every leading newline is boundary: canonical output never begins
+/// with blank lines. Without this, a source whose body starts with two or more
+/// blank lines (e.g. after `+++` frontmatter) emits a leading blank on the
+/// first round that the second round drops — non-idempotent.
+#[must_use]
+pub fn at_file_start(trivia: &[HirTrivia]) -> &[HirTrivia] {
+    let mut count = 0;
+    for item in trivia {
+        match item {
+            HirTrivia::Newline { .. } => count += 1,
+            _ => break,
+        }
+    }
+    &trivia[count..]
+}
+
 /// Strip one trailing boundary newline when a re-emitted annotation sequence
 /// follows the trivia slot.
 ///

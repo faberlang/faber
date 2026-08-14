@@ -841,7 +841,10 @@ impl super::FaberCodegen {
         };
 
         writer.write("`");
-        writer.write(interner.resolve(*sym));
+        // Raw payload: `writer.write` would re-indent every content line by the
+        // enclosing block level, and the re-indented text is part of the raw
+        // string on the next round — the emit would never stabilize.
+        writer.write_raw(interner.resolve(*sym));
         writer.write("`");
         if let Some(param_exprs) = param_exprs {
             if !param_exprs.is_empty() {

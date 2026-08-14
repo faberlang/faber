@@ -92,6 +92,21 @@ impl super::FaberCodegen {
         }
     }
 
+    /// Return the bare tail expression of a block, if any.
+    ///
+    /// Unlike [`FaberCodegen::return_expr`], a `redde` statement is not
+    /// eligible. The compact `sic ... secus ...` expression form has no
+    /// statement slot, so a branch whose value is an explicit `redde` must stay
+    /// in the statement chain (`ergo redde`): compressing it into a bare
+    /// expression drops the return and the re-emitted function no longer
+    /// terminates (SEM033 on re-check).
+    pub(super) fn tail_expression<'a>(&self, block: &'a HirBlock) -> Option<&'a HirExpression> {
+        if block.statements.is_empty() {
+            return block.expr.as_deref();
+        }
+        None
+    }
+
     /// Gate for compact `ergo redde` output.
     ///
     /// The candidate block must be a single-expression return shape with no
@@ -232,7 +247,7 @@ impl super::FaberCodegen {
             return false;
         }
 
-        let Some(then_expr) = self.return_expr(then_block) else {
+        let Some(then_expr) = self.tail_expression(then_block) else {
             return false;
         };
         let Some(else_block) = else_block else {
@@ -254,7 +269,7 @@ impl super::FaberCodegen {
             );
         }
 
-        let Some(else_expr) = self.return_expr(else_block) else {
+        let Some(else_expr) = self.tail_expression(else_block) else {
             return false;
         };
         self.write_expr_prec(else_expr, 2, types, names, interner, surface, writer);
@@ -265,13 +280,15 @@ impl super::FaberCodegen {
     ///
     /// Every candidate branch must be a single-return shape with no attached
     /// trivia on its statements or structural end; comment-bearing branches
-    /// stay braced.
+    /// stay braced. Only bare tail expressions are eligible — a branch whose
+    /// value is an explicit `redde` statement would lose its return in the
+    /// expression form (see [`FaberCodegen::tail_expression`]).
     pub(super) fn can_write_sic_secus_chain(
         &self,
         then_block: &HirBlock,
         else_block: Option<&HirBlock>,
     ) -> bool {
-        if self.return_expr(then_block).is_none() || self.trivia.block_has_trivia(then_block) {
+        if self.tail_expression(then_block).is_none() || self.trivia.block_has_trivia(then_block) {
             return false;
         }
 
@@ -283,7 +300,7 @@ impl super::FaberCodegen {
             return self.can_write_sic_secus_chain(sin_then, sin_else);
         }
 
-        self.return_expr(else_block).is_some() && !self.trivia.block_has_trivia(else_block)
+        self.tail_expression(else_block).is_some() && !self.trivia.block_has_trivia(else_block)
     }
 
     pub(super) fn write_si_branch_body(

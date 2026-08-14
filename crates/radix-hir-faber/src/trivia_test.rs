@@ -726,7 +726,11 @@ fn comment_bearing_branch_prevents_sic_secus_compaction() {
     );
 }
 
-/// Trivia-free branches keep the compact `sic … secus …` expression form.
+/// Trivia-free `redde` branches keep the statement `ergo` chain.
+///
+/// The compact `sic … secus …` expression form has no statement slot: a branch
+/// whose value is an explicit `redde` would lose its return, so those chains
+/// must re-emit as `si … ergo redde … secus ergo redde …`.
 #[test]
 fn trivia_free_blocks_keep_sic_secus_compact() {
     let mut interner = Interner::new();
@@ -751,8 +755,12 @@ fn trivia_free_blocks_keep_sic_secus_compact() {
 
     let code = render(&hir, &empty_presentation(), &interner);
     assert!(
-        code.contains("1 sic 5 secus 6"),
-        "trivia-free branches must keep the compact sic/secus form:\n{code}"
+        code.contains("si 1 ergo redde 5\n    secus ergo redde 6"),
+        "redde branches must keep the statement ergo chain:\n{code}"
+    );
+    assert!(
+        !code.contains("sic"),
+        "compact sic/secus must not absorb a redde branch:\n{code}"
     );
 }
 
@@ -825,6 +833,52 @@ fn boundary_newline_normalization_does_not_manufacture_blank_lines() {
     assert!(
         code.contains("    # first\n    redde 1\n\n    # second"),
         "one intentional blank line before the second comment must survive:\n{code}"
+    );
+}
+
+// ── file-start boundary newlines ──
+
+/// A file-start trivia run keeps no leading blank lines.
+///
+/// Round 1 of a source whose body begins with two or more blank lines (e.g.
+/// after `+++` frontmatter) must render the same as round 2 — canonical output
+/// never begins with blank lines.
+#[test]
+fn file_start_trivia_keeps_no_leading_blank_lines() {
+    let mut interner = Interner::new();
+    let body = authored_block(vec![redde_stmt(1, 10, 1)], 20);
+    let hir = program(
+        vec![function_item(
+            &mut interner,
+            100,
+            USER_DEF_ID_BASE,
+            "noop",
+            Some(body),
+            vec![],
+        )],
+        None,
+    );
+    // Two leading newlines (frontmatter gap) then a comment.
+    let leading = vec![newline(), newline(), comment(&mut interner, " file head")];
+    let presentation = HirPresentation {
+        owners: vec![owner(
+            5,
+            HirTriviaOwnerKind::Item,
+            Some(HirOwnerRef::Hir(HirId(100))),
+        )],
+        attachments: vec![attachment(5, leading)],
+        block_ends: Vec::new(),
+        program_end: HirProgramEnd {
+            id: anchor(999),
+            span: span(),
+        },
+        entry_start_anchor: None,
+    };
+
+    let code = render(&hir, &presentation, &interner);
+    assert!(
+        code.starts_with("# file head\nfunctio noop()"),
+        "canonical output must not begin with blank lines:\n{code}"
     );
 }
 

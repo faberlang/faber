@@ -132,11 +132,13 @@ impl FaberCodegen {
             })
             .collect();
 
+        let mut rendered_any_item = false;
         for (idx, item) in hir.items.iter().enumerate() {
             if is_compiler_injected_item(item) {
                 continue;
             }
-            self.write_item_trivia(item, interner, &mut writer);
+            self.write_item_trivia(item, !rendered_any_item, interner, &mut writer);
+            rendered_any_item = true;
             self.generate_item(item, types, &names, interner, surface, &mut writer);
             // Canonical blank separator between items. When the following slot
             // carries leading trivia, the trivia run owns the boundary: this
@@ -147,7 +149,12 @@ impl FaberCodegen {
             }
         }
 
-        self.write_entry_trivia(!hir.entry_annotations.is_empty(), interner, &mut writer);
+        self.write_entry_trivia(
+            !rendered_any_item,
+            !hir.entry_annotations.is_empty(),
+            interner,
+            &mut writer,
+        );
         self.write_hir_annotations(
             &hir.entry_annotations,
             types,
@@ -177,7 +184,11 @@ impl FaberCodegen {
             writer.writeln("}");
         }
 
-        self.write_program_end_trivia(interner, &mut writer);
+        self.write_program_end_trivia(
+            !rendered_any_item && hir.entry.is_none(),
+            interner,
+            &mut writer,
+        );
 
         Ok(FaberOutput {
             code: writer.finish(),
@@ -185,9 +196,22 @@ impl FaberCodegen {
     }
 
     /// Emit item leading trivia before the item (and before its annotations).
-    fn write_item_trivia(&self, item: &HirItem, interner: &Interner, writer: &mut CodeWriter) {
+    fn write_item_trivia(
+        &self,
+        item: &HirItem,
+        file_start: bool,
+        interner: &Interner,
+        writer: &mut CodeWriter,
+    ) {
         let Some(trivia) = self.trivia.for_hir(item.id) else {
             return;
+        };
+        // The first rendered item opens the file: its leading newlines are all
+        // boundary (see `trivia::at_file_start`), keeping the emit idempotent.
+        let trivia = if file_start {
+            crate::trivia::at_file_start(trivia)
+        } else {
+            trivia
         };
         // An annotation sequence follows for annotated functions; its line
         // terminator is re-emitted by the annotation writer (see
@@ -220,12 +244,18 @@ impl FaberCodegen {
     /// Emit entry (`incipit`) leading trivia before the entry keyword.
     fn write_entry_trivia(
         &self,
+        file_start: bool,
         has_annotations: bool,
         interner: &Interner,
         writer: &mut CodeWriter,
     ) {
         let Some(trivia) = self.trivia.entry_trivia() else {
             return;
+        };
+        let trivia = if file_start {
+            crate::trivia::at_file_start(trivia)
+        } else {
+            trivia
         };
         let trivia = if has_annotations {
             crate::trivia::without_following_annotation(trivia)
@@ -236,8 +266,18 @@ impl FaberCodegen {
     }
 
     /// Emit program-end trivia before EOF.
-    fn write_program_end_trivia(&self, interner: &Interner, writer: &mut CodeWriter) {
+    fn write_program_end_trivia(
+        &self,
+        file_start: bool,
+        interner: &Interner,
+        writer: &mut CodeWriter,
+    ) {
         if let Some(trivia) = self.trivia.program_end_trivia() {
+            let trivia = if file_start {
+                crate::trivia::at_file_start(trivia)
+            } else {
+                trivia
+            };
             write_leading_trivia(trivia, interner, writer);
         }
     }
