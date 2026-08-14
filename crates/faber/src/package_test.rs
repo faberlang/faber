@@ -9604,6 +9604,20 @@ main {
     };
     assert!(output.code.contains("crate::child::label()"));
     assert!(!output.code.contains("crate::parent::child::label()"));
+
+    // The generated crate must compile: the re-export reference is rewritten
+    // onto the root module tree (`crate::child::label()`), so a cargo build of
+    // the emitted crate proves there is no dangling `crate::parent::child`
+    // path left in the codegen.
+    let layout = discover_build_layout(&entry).expect("layout");
+    emit_generated_crate(&layout, &output.code, None).expect("emit generated crate");
+    let binary = invoke_cargo_build(&layout, false).expect("cargo build");
+    let run = Command::new(binary).output().expect("run generated binary");
+    assert!(run.status.success(), "generated binary failed: {run:?}");
+    assert_eq!(
+        String::from_utf8(run.stdout).expect("stdout utf8"),
+        "child\n"
+    );
 }
 
 #[test]

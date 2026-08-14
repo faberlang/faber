@@ -656,12 +656,25 @@ fn analyze_cached_library_interface(
         package: Some(import.module.package.clone()),
         module_path: import.module.module_path.clone(),
     };
-    let file_interface = super::file_interface::extract_file_interface_with_identity(
+    let mut file_interface = super::file_interface::extract_file_interface_with_identity(
         &analysis,
         &export_names,
         &import.module.interface_path.display().to_string(),
         Some(&export_identity),
     )?;
+    // `publica` imports surface as nested namespace bindings on the consumer
+    // (`parent.child.member()`); install the re-exported members on this
+    // module's interface so consumers typecheck them with the child's
+    // signature instead of falling back to `Ignotum`.
+    for child in public_library_imports(import, library_resolver, library_cache)? {
+        let child_interface =
+            library_cached_file_interface(&child, library_resolver, library_cache)?;
+        for (member, export) in &child_interface.exports {
+            let mut reexport = export.clone();
+            reexport.name = format!("{}.{}", child.binding, member);
+            file_interface.insert(reexport);
+        }
+    }
 
     let cached = library_cache.entries.get_mut(&key).ok_or_else(|| {
         crate::package_diagnostic_error("library interface cache missing entry after analysis")
