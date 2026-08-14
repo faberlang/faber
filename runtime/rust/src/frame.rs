@@ -863,20 +863,77 @@ fn start_host_dispatch(
     cancellation: Cancellation,
     override_dispatch: Option<Arc<dyn HostDispatch>>,
 ) -> Result<(), DispatchError> {
-    // S1-U3 split: concrete built-in effects live in hosts providers. The
-    // faber runtime package owns the HostDispatch contract only; with no host
-    // dispatch installed, a runtime route fails closed instead of falling
-    // back to an in-process builtin implementation.
-    if let Some(dispatch) = override_dispatch {
-        return dispatch.start(request, responses, cancellation);
+    // S1-U3 split, stabilized: the faber runtime package owns the
+    // HostDispatch contract plus the one builtin route (`runtime:echo`) whose
+    // provider split never shipped. An installed host is consulted first; when
+    // it rejects a builtin-classified route, the builtin fallback covers it.
+    // Unrelated routes stay fail-closed against the host error (no host is
+    // installed → `host_dispatch_unavailable`).
+    if let Some(dispatch) = &override_dispatch {
+        return dispatch_or_builtin_fallback(dispatch, request, responses, cancellation);
     }
     if let Some(dispatch) = HOST_DISPATCH.get() {
-        return dispatch.start(request, responses, cancellation);
+        return dispatch_or_builtin_fallback(dispatch, request, responses, cancellation);
+    }
+    if is_builtin_route(&request.route) {
+        return BuiltinRuntimeDispatch.start(request, responses, cancellation);
     }
     Err(DispatchError::new(
         "host_dispatch_unavailable",
         format!("no host dispatch installed for route `{}`", request.route),
     ))
+}
+
+/// When an installed host rejects a route that the builtin runtime covers
+/// (plan-time `is_builtin_ad_route` classification), fall back to the builtin
+/// dispatch instead of surfacing the host error. The dual-backend contract:
+/// builtin-covered routes (e.g. `runtime:echo`) must work without any host,
+/// so an installed host that does not manifest them must not shadow delivery.
+fn dispatch_or_builtin_fallback(
+    dispatch: &Arc<dyn HostDispatch>,
+    request: SermoRequest,
+    responses: ResponseSender,
+    cancellation: Cancellation,
+) -> Result<(), DispatchError> {
+    if let Err(error) = dispatch.start(request.clone(), responses.clone(), cancellation.clone()) {
+        if is_builtin_route(&request.route) {
+            return BuiltinRuntimeDispatch.start(request, responses, cancellation);
+        }
+        return Err(error);
+    }
+    Ok(())
+}
+
+/// Minimal S1-U3-stabilized builtin dispatch. Only `runtime:echo` is restored
+/// in-process (the provider split never shipped an echo provider); the full
+/// pre-split builtin table is intentionally not resurrected.
+#[derive(Clone, Copy, Debug)]
+struct BuiltinRuntimeDispatch;
+
+impl HostDispatch for BuiltinRuntimeDispatch {
+    fn start(
+        &self,
+        request: SermoRequest,
+        responses: ResponseSender,
+        _cancellation: Cancellation,
+    ) -> Result<(), DispatchError> {
+        // Echo one `Item` frame containing the opener, then `Done` (matches
+        // the MIR stepper / Go / TS inline echo contract).
+        thread::spawn(move || {
+            let _ = responses.item(request.opener);
+            let _ = responses.done();
+        });
+        Ok(())
+    }
+}
+
+/// Pure route-key classification for builtin-runtime coverage — the single
+/// source of truth for "is this route builtin-covered". Both the hostless
+/// dispatch gate and the native-host fallback probe route through it, so the
+/// coverage cannot drift. Must stay aligned with the radix-owned plan fact
+/// `is_builtin_ad_route`.
+fn is_builtin_route(route: &str) -> bool {
+    matches!(route, "runtime:echo")
 }
 
 fn sermo_request(inner: &SermoInner, target: Option<&'static str>) -> SermoRequest {

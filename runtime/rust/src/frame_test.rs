@@ -62,6 +62,56 @@ fn runtime_echo_returns_opener_then_done() {
     assert!(frame::sermo_recv(&mut sermo).is_none());
 }
 
+#[test]
+fn runtime_echo_builtin_covers_hostless_dispatch() {
+    // S1-U3 stabilization: the builtin `runtime:echo` route works with no host
+    // dispatch installed (the bare-binary e2e product path without host=native).
+    let mut sermo = frame::sermo_open("runtime:echo");
+    frame::sermo_set_opener(&mut sermo, Valor::Textus("salve".into()));
+
+    let item = frame::sermo_recv(&mut sermo).expect("builtin echo item frame");
+    assert_eq!(item.status, FrameStatus::Item);
+    assert_eq!(item.data, Valor::Textus("salve".into()));
+
+    let done = frame::sermo_recv(&mut sermo).expect("builtin echo terminal frame");
+    assert_eq!(done.status, FrameStatus::Done);
+    assert!(sermo.incoming_drained());
+    assert!(frame::sermo_recv(&mut sermo).is_none());
+}
+
+#[test]
+fn runtime_echo_falls_back_to_builtin_when_host_rejects() {
+    // An installed host that does not manifest `runtime:echo` must not shadow
+    // the builtin route (native-host fallback ordering, dual-backend contract).
+    let mut sermo = frame::sermo_open_with_dispatch("runtime:echo", Arc::new(RejectingDispatch));
+    frame::sermo_set_opener(&mut sermo, Valor::Textus("salve".into()));
+
+    let item = frame::sermo_recv(&mut sermo).expect("fallback echo item frame");
+    assert_eq!(item.status, FrameStatus::Item);
+    assert_eq!(item.data, Valor::Textus("salve".into()));
+
+    let done = frame::sermo_recv(&mut sermo).expect("fallback echo terminal frame");
+    assert_eq!(done.status, FrameStatus::Done);
+    assert!(sermo.incoming_drained());
+    assert!(frame::sermo_recv(&mut sermo).is_none());
+}
+
+#[test]
+fn non_builtin_route_rejected_by_host_does_not_fall_back() {
+    // The builtin fallback covers only builtin-classified routes; an unrelated
+    // route rejected by the installed host still surfaces the host error.
+    let mut sermo = frame::sermo_open_with_dispatch("solum:lege", Arc::new(RejectingDispatch));
+    frame::sermo_set_opener(&mut sermo, Valor::Textus("data.txt".into()));
+
+    let frame = frame::sermo_recv(&mut sermo).expect("rejection terminal");
+    assert_eq!(frame.status, FrameStatus::Error);
+    assert_eq!(frame.call, "solum:lege");
+    assert!(
+        matches!(frame.data, Valor::Textus(message) if message.contains("unsupported native host route"))
+    );
+    assert!(sermo.incoming_drained());
+}
+
 struct InlineDispatch;
 
 impl HostDispatch for InlineDispatch {
