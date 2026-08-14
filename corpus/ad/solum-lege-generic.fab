@@ -1,39 +1,44 @@
 +++
-term = "solum lege generic"
+term = "solum lege carpe hauri"
 kind = "concept"
 category = "ad"
 canonical = true
-summary = "solum.lege<T> admits only supported materialization target types."
-syntax = "solum.lege<textus>(via) | solum.lege<lista<textus>>(via) | solum.lege<octeti>(via)"
-related = ["ad", "solum", "generic"]
+summary = "solum file reads are shape-specific: lege<textus>, carpe (lista<textus>), hauri (octeti)."
+syntax = "solum.lege<textus>(via) | call 'solum:carpe' (via) ↦ lista<textus> | call 'solum:hauri' (via) ↦ octeti"
+related = ["ad", "solum", "lege", "carpe", "hauri"]
 locale = "en"
 +++
 
 # =============================================================================
-# solum lege generic — solum.lege<T> admits only supported materialization
-# target types.
+# solum lege carpe hauri — solum file reads are shape-specific routes.
 # =============================================================================
 #
 # What this teaches:
-#   • Generic materialization — `solum.lege<T>` reads file contents and
-#     materializes them into a specified target type
-#   • Supported type domain — only `textus`, `lista<textus>`, and `octeti` are
-#     accepted as T, enforced by compiler-owned `@ radix typus` metadata
+#   • Shape-specific reads — `solum.lege<textus>` reads a file as text;
+#     `solum:carpe` reads it as a line list; `solum:hauri` reads raw bytes
+#   • Manifest-backed surface — each route declares exactly one result shape in
+#     the solum provider manifest, so the materialized target always matches
 #
 # Common mistakes:
-#   • confusing ad route syntax — `solum.lege<T>` admits only `textus`, `lista<textus>`, and `octeti` as materialization targets
+#   • assuming one generic `solum.lege<T>` reads every shape — `lege` is
+#     text-only; use `carpe` for `lista<textus>` and `hauri` for `octeti`
 #
-# See also: ad, solum, generic
+# See also: ad, solum, lege, carpe, hauri
 # =============================================================================
 
-# solum.lege<T> — generic materialization domain
+# solum file reads — lege (text) / carpe (lines) / hauri (bytes)
 #
-# `solum.lege<T>` is constrained by compiler-owned `@ radix typus` metadata in
-# `stdlib/norma/solum.fab`. This fixture proves the accepted target types.
+# The provider contract (hosts/crates/solum manifest) keeps one result shape
+# per route: `solum:lege` → textus, `solum:carpe` → lista<textus>,
+# `solum:hauri` → octeti. The `norma:solum` wrappers `carpe`/`hauri` are
+# module-private this release, so this fixture reaches the line/byte routes
+# directly through the manifest-backed `ad` surface; the compiler's
+# `@ radix typus` metadata on `norma:solum.lege<T>` still admits the broader
+# targets, which the provider rejects (recorded residual). Generic
+# `solum.lege<T>` across all three shapes is separate future provider work.
 #
-# Runtime check: files are prepared under /tmp so the generic materializer can
-# prove each accepted target shape independently of the harness working
-# directory.
+# Runtime check: files are prepared under /tmp so each read route can prove its
+# accepted result shape independently of the harness working directory.
 
 import from "norma:solum" solum
 
@@ -42,10 +47,15 @@ main {
     solum.scribe(textPath, "prima\nsecunda\n")
 
     const string body ← solum.lege<string>(textPath)
-    const list<string> lineae ← solum.lege<list<string>>(textPath)
-    const bytes bytes ← solum.lege<bytes>(textPath)
+    assert body ≡ "prima\nsecunda\n"
+
+    const list<string> lineae ← call 'solum:carpe' (textPath) ↦ list<string>
+    assert lineae ≡ ["prima", "secunda"]
+
+    const bytes data ← call 'solum:hauri' (textPath) ↦ octeti
+    assert data ≡ |70 72 69 6d 61 0a 73 65 63 75 6e 64 61 0a|
     print body
     print lineae
-    print bytes
-    print "solum lege generic parata"
+    print data
+    print "solum lege carpe hauri parata"
 }

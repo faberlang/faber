@@ -43,99 +43,16 @@ pub(crate) fn selected_providers_for_routes(
 /// Plan-time route classification for the builtin runtime dispatch
 /// (dual-backend contract).
 ///
-/// These routes do **not** require `[target.rust] host = "native"`: the
-/// builtin runtime covers them, so a native host stays optional. The
-/// runtime-side `builtin_route_frames`/`dispatch_builtin_route` arms were
-/// removed from `faber/runtime/rust/src/frame.rs` (faber-target-runtime S1-U3
-/// split) and move to `hosts/` providers; this mirror is a radix-owned plan
-/// fact and must stay aligned with that provider coverage.
+/// This route does **not** require `[target.rust] host = "native"`: the
+/// builtin runtime covers it, so a native host stays optional. The S1-U3
+/// provider split removed the pre-split builtin table from
+/// `faber/runtime/rust/src/frame.rs`; only `runtime:echo` is restored
+/// in-process (the echo provider split never shipped). Every other route is a
+/// host-required provider route and must be backed by a selected host provider
+/// under `[target.rust] host`. This mirror is a radix-owned plan fact and must
+/// stay aligned with the runtime-side `is_builtin_route` coverage.
 pub(crate) fn is_builtin_ad_route(route: &str) -> bool {
-    matches!(
-        route,
-        "runtime:echo"
-            | "tempus:nunc"
-            | "tempus:monotonicum"
-            | "tempus:activum"
-            | "tempus:dormiet"
-            | "tempus:expectet"
-            | "solum:scribe"
-            | "solum:scribet"
-            | "solum:appone"
-            | "solum:apponet"
-            | "solum:funde"
-            | "solum:dele"
-            | "solum:delet"
-            | "solum:parens"
-            | "solum:nomen"
-            | "solum:suffixum"
-            | "solum:iunge"
-            | "solum:absolve"
-            | "solum:temporarium"
-            | "solum:domus"
-            | "solum:partem"
-            | "processus:exsequi"
-            | "processus:exsequetur"
-            | "processus:captura"
-            | "processus:dimitte"
-            | "processus:lege"
-            | "processus:scribe"
-            | "processus:sedes"
-            | "processus:muta"
-            | "processus:identitas"
-            | "processus:argumenta"
-            | "processus:exi"
-            | "consolum:dic"
-            | "consolum:dicet"
-            | "consolum:scribe"
-            | "consolum:scribet"
-            | "consolum:mone"
-            | "consolum:monet"
-            | "consolum:vide"
-            | "consolum:videbit"
-            | "consolum:lege"
-            | "consolum:leget"
-            | "consolum:hauri"
-            | "consolum:hauriet"
-            | "consolum:funde"
-            | "consolum:audit"
-            | "consolum:loquitur"
-            | "consolum:admonet"
-            | "solum:lege"
-            | "solum:hauri"
-            | "solum:hauriet"
-            | "solum:carpe"
-            | "solum:carpiet"
-            | "solum:mensura"
-            | "solum:inveni"
-            | "solum:crea"
-            | "solum:creabit"
-            | "solum:enumera"
-            | "solum:enumerabit"
-            | "solum:amputa"
-            | "solum:amputabit"
-            | "solum:exscribe"
-            | "solum:exscribet"
-            | "solum:renomina"
-            | "solum:renominabit"
-            | "solum:tange"
-            | "solum:tanget"
-            | "solum:sequere"
-            | "solum:sequetur"
-            | "solum:vincula"
-            | "solum:modum"
-            | "solum:modus"
-            | "solum:exstat"
-            | "solum:exstabit"
-            | "solum:directoriumne"
-            | "solum:regularene"
-            | "solum:legibilene"
-            | "solum:vinculumne"
-            | "aleator:fractum"
-            | "aleator:sortire"
-            | "aleator:octetos"
-            | "aleator:uuid"
-            | "aleator:semina"
-    )
+    matches!(route, "runtime:echo")
 }
 
 /// Non-`runtime:` routes that are **not** covered by builtin dispatch and therefore

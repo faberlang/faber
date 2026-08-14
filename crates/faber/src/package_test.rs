@@ -8378,9 +8378,11 @@ entry = "main.fab"
 }
 
 #[test]
-fn package_runtime_plan_builtin_inline_ad_does_not_require_host() {
-    // Dual-backend honesty (correctness 9e1bae1 false+): solum:lege is builtin —
-    // inline ad without [target.rust] host must not fail closed at plan time.
+fn package_runtime_plan_inline_ad_requires_host_for_provider_routes() {
+    // S1-U3 honest classification: solum:lege is a host-required provider
+    // route (only `runtime:echo` is builtin-covered this release). Inline ad
+    // without [target.rust] host must fail closed at plan time instead of
+    // shipping a binary that fails at runtime.
     let pkg = test_temp_dir("runtime-plan-builtin-hostless");
     fs::create_dir_all(pkg.join("src")).expect("src");
     fs::write(
@@ -8407,16 +8409,18 @@ entry = "main.fab"
         plan.non_runtime_routes.iter().cloned().collect::<Vec<_>>(),
         vec!["solum:lege".to_owned()]
     );
-    assert!(
-        plan.selected_providers.is_empty(),
-        "builtin-covered routes must not auto-select host providers without host=native: {:?}",
-        plan.selected_providers
+    assert_eq!(
+        plan.selected_providers.iter().cloned().collect::<Vec<_>>(),
+        vec!["solum".to_owned()],
+        "host-required routes must auto-select their provider"
     );
     assert!(plan.host.is_none());
-    assert!(
-        package_host_selection_diagnostic(&plan, &pkg.join("faber.toml")).is_none(),
-        "builtin ad must not require host selection"
-    );
+    let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
+        .expect("missing host selection diagnostic");
+    assert!(diagnostic_has_issue(
+        &diagnostic,
+        "package_host_selection_required"
+    ));
 }
 
 #[test]
@@ -8462,16 +8466,17 @@ entry = "main.fab"
 }
 
 #[test]
-fn package_runtime_plan_collects_library_ad_routes_without_host_for_builtin() {
-    // Dual-backend honesty (correctness 9e1bae1 false−): norma-wrapped ad must
-    // appear in non_runtime_routes. Builtin-covered library routes stay hostless.
-    let pkg = test_temp_dir("runtime-plan-library-aleator");
+fn package_runtime_plan_collects_library_ad_routes_and_requires_host() {
+    // Dual-backend honesty (S1-U3): norma-wrapped ad must appear in
+    // non_runtime_routes. tempus:dormiet is a host-required provider route, so
+    // a hostless package using it must fail closed at plan time.
+    let pkg = test_temp_dir("runtime-plan-library-tempus");
     fs::create_dir_all(pkg.join("src")).expect("src");
     fs::write(
         pkg.join("faber.toml"),
         r#"
 [package]
-name = "runtime-plan-library-aleator"
+name = "runtime-plan-library-tempus"
 
 [paths]
 source = "src"
@@ -8482,11 +8487,10 @@ entry = "main.fab"
     fs::write(
         pkg.join("src/main.fab"),
         r#"
-import from "norma:aleator" aleator
+import from "norma:tempus" tempus
 
 main {
-  const _ id ← aleator.uuid()
-  print id
+  tempus.expectet(0)
 }
 "#,
     )
@@ -8495,20 +8499,22 @@ main {
     let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
 
     assert!(
-        plan.non_runtime_routes.contains("aleator:uuid"),
+        plan.non_runtime_routes.contains("tempus:dormiet"),
         "library-expanded ad must be collected (got {:?})",
         plan.non_runtime_routes
     );
     assert!(
-        plan.selected_providers.is_empty(),
-        "builtin aleator routes must not force host providers: {:?}",
+        plan.selected_providers.contains("tempus"),
+        "host-required tempus route must select the tempus provider: {:?}",
         plan.selected_providers
     );
     assert!(plan.host.is_none());
-    assert!(
-        package_host_selection_diagnostic(&plan, &pkg.join("faber.toml")).is_none(),
-        "norma:aleator builtin surface must not require host"
-    );
+    let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
+        .expect("missing host selection diagnostic");
+    assert!(diagnostic_has_issue(
+        &diagnostic,
+        "package_host_selection_required"
+    ));
 }
 
 #[test]
