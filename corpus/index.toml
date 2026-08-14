@@ -771,12 +771,12 @@ primary = "lista/methodi-accessus.fab"
 paths = ["lista/methodi-accessus.fab"]
 
 [[terms]]
-term = "⊖"
+term = "↓"
 phase = 4
 action = "review"
 rule = "operator-group"
-primary = "assignatio/assignatio.fab"
-paths = ["assignatio/assignatio.fab"]
+primary = "incrementa/incrementa.fab"
+paths = ["incrementa/incrementa.fab"]
 
 [[terms]]
 term = "mone"
@@ -995,12 +995,12 @@ primary = "typus/typus.fab"
 paths = ["typus/typus.fab", "unio/unio.fab"]
 
 [[terms]]
-term = "⊕"
+term = "↑"
 phase = 4
 action = "review"
 rule = "operator-group"
-primary = "assignatio/assignatio.fab"
-paths = ["assignatio/assignatio.fab"]
+primary = "incrementa/incrementa.fab"
+paths = ["incrementa/incrementa.fab"]
 
 [[terms]]
 term = "postpara"
