@@ -46,7 +46,8 @@ const LIBRARY_CONST_VALS: &str =
 
 /// Entry that CALLS a const data member — an unsupported shape that must
 /// keep the non-function fail-closed diagnostic (U1 done_when 4).
-const CONST_MEMBER_CALL_MAIN: &str = "import from \"./util\" * as utilModule\n\nmain {\n    print utilModule.VALUE()\n}\n";
+const CONST_MEMBER_CALL_MAIN: &str =
+    "import from \"./util\" * as utilModule\n\nmain {\n    print utilModule.VALUE()\n}\n";
 
 const LOCAL_LOCALE_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() → string {\n    return utilModule.greet()\n}\n\nmain {\n    print utilModule.greet()\n}\n";
 const LOCAL_LOCALE_UTIL: &str = "@ publica\nfn salutare() → string {\n    return \"salve\"\n}\n";
@@ -144,11 +145,8 @@ constlib = "1.0.0"
         "[[package]]\nname = \"constlib\"\nversion = \"1.0.0\"\nsource = \"path:{library_display}\"\npackage_root = \"{library_display}\"\nkind = \"source\"\ntarget_language = \"\"\ntarget_triple = \"\"\ntarget_manifest = \"\"\ninterface_root = \"{library_display}/src\"\nartifact = \"\"\ncrate = \"\"\nrustc = \"\"\n"
     );
     fs::write(dir.join("faber.lock"), lock).expect("write faber.lock");
-    fs::write(
-        library.join("src/vals.fab"),
-        LIBRARY_CONST_VALS,
-    )
-    .expect("write library const module");
+    fs::write(library.join("src/vals.fab"), LIBRARY_CONST_VALS)
+        .expect("write library const module");
     fs::write(src.join("main.fab"), LIBRARY_CONST_MAIN).expect("write main.fab");
     src.join("main.fab")
 }
@@ -487,7 +485,8 @@ fn strict_pack_rejects_unlisted_canonical_member_spelling() {
     assert!(
         diagnostics
             .iter()
-            .any(|diag| diag.code.as_deref() == Some("SEM004") && diag.issue() == Some("namespace_missing_export")),
+            .any(|diag| diag.code.as_deref() == Some("SEM004")
+                && diag.issue() == Some("namespace_missing_export")),
         "canonical spelling must be rejected under the strict pack: {:?}",
         diagnostics
             .iter()
@@ -904,8 +903,9 @@ kind = "bin"
         Err(diagnostics) => {
             assert!(
                 diagnostics.iter().any(|diag| {
-                    diag.message
-                        .contains("package MIR does not yet support non-function namespace member `VALUE`")
+                    diag.message.contains(
+                        "package MIR does not yet support non-function namespace member `VALUE`",
+                    )
                 }),
                 "expected non-function namespace member diagnostic, got {diagnostics:?}"
             );

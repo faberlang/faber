@@ -8,11 +8,11 @@ mod emit;
 mod explain;
 mod format;
 #[cfg(test)]
-#[path = "format_test.rs"]
-mod format_test;
-#[cfg(test)]
 #[path = "format_corpus_test.rs"]
 mod format_corpus_test;
+#[cfg(test)]
+#[path = "format_test.rs"]
+mod format_test;
 pub mod host;
 mod init;
 mod model;

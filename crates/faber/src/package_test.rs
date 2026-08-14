@@ -328,11 +328,7 @@ fn compile_package_rust_code(entry: &Path) -> String {
 fn compile_package_reports_unresolved_external_imports() {
     let dir = test_temp_dir("external-import");
     let entry = dir.join("main.fab");
-    fs::write(
-        &entry,
-        "import from \"lodash\" map\nmain { print \"x\" }",
-    )
-    .expect("write entry");
+    fs::write(&entry, "import from \"lodash\" map\nmain { print \"x\" }").expect("write entry");
 
     let result = compile_package(&Config::default(), &entry);
     assert!(result.output.is_none());

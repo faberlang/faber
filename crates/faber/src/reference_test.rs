@@ -26,7 +26,8 @@ fn temp_dir(label: &str) -> PathBuf {
 }
 
 /// Minimal valid corpus index.toml that would satisfy the old dev walk-up.
-const FAKE_INDEX: &str = "generated_on = \"2026-08-07\"\nfab_count = 0\nregistry_terms = 0\nterms = []\n";
+const FAKE_INDEX: &str =
+    "generated_on = \"2026-08-07\"\nfab_count = 0\nregistry_terms = 0\nterms = []\n";
 
 #[test]
 fn release_mode_fails_closed_beside_stray_sibling_checkout() {
@@ -41,7 +42,11 @@ fn release_mode_fails_closed_beside_stray_sibling_checkout() {
 
     let err = resolve_reference_root_in(Some(&exe), Some(&hermetic), false)
         .expect_err("installed binary must fail closed");
-    assert!(err.message.contains("reference pack not found"), "{}", err.message);
+    assert!(
+        err.message.contains("reference pack not found"),
+        "{}",
+        err.message
+    );
     assert!(
         err.message.contains("share/faber/reference"),
         "error must name the install location: {}",
@@ -58,7 +63,11 @@ fn release_mode_fails_closed_in_hermetic_dir_without_packs() {
 
     let err = resolve_reference_root_in(Some(&exe), Some(&hermetic), false)
         .expect_err("installed binary must fail closed");
-    assert!(err.message.contains("reference pack not found"), "{}", err.message);
+    assert!(
+        err.message.contains("reference pack not found"),
+        "{}",
+        err.message
+    );
     let _ = fs::remove_dir_all(&hermetic);
 }
 
@@ -130,7 +139,11 @@ fn dev_walkup_does_not_resolve_when_disabled() {
     let exe = work.join("faber/bin/faber");
     let err = resolve_reference_root_in(Some(&exe), Some(&faber_dir), false)
         .expect_err("no dev walk-up for installed binaries");
-    assert!(err.message.contains("reference pack not found"), "{}", err.message);
+    assert!(
+        err.message.contains("reference pack not found"),
+        "{}",
+        err.message
+    );
     let _ = fs::remove_dir_all(&work);
 }
 

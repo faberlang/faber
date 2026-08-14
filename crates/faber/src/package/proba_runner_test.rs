@@ -3,9 +3,7 @@
 //! Proves `faber test` definition: MIR interpretation, not Cargo/Rust harness.
 
 use super::test_support::test_temp_dir;
-use super::{
-    analyze_package, analyze_package_for_tests, load_package_with_locale_pack,
-};
+use super::{analyze_package, analyze_package_for_tests, load_package_with_locale_pack};
 use super::{discover_package, library_resolver_from_config};
 use radix::driver::{Config, Session};
 use radix::locale::LocalePack;
@@ -137,9 +135,8 @@ test "math ok" {
     // en pack explicitly (a `None` pack would select registry-direct lexing).
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&config);
-    let files =
-        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None)
-            .expect("load");
+    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None)
+        .expect("load");
     assert!(files
         .iter()
         .all(|f| f.path.extension().and_then(|e| e.to_str()) != Some("proba")));

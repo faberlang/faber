@@ -98,9 +98,8 @@ fn normalise_v1_corpus_is_byte_exact_and_idempotent() {
             .and_then(|stem| stem.to_str())
             .expect("utf8 fixture stem");
         let expected_path = corpus_dir().join(format!("{stem}.normalise-v1.expected"));
-        let expected = fs::read_to_string(&expected_path).unwrap_or_else(|err| {
-            panic!("missing expectation for {stem}: {err}")
-        });
+        let expected = fs::read_to_string(&expected_path)
+            .unwrap_or_else(|err| panic!("missing expectation for {stem}: {err}"));
         let source = fs::read_to_string(&fixture).expect("read fixture source");
 
         let formatted = normalise_v1_pipeline(&fixture, &source);
@@ -134,9 +133,8 @@ fn pretty_v1_corpus_is_byte_exact_and_idempotent() {
             .and_then(|stem| stem.to_str())
             .expect("utf8 fixture stem");
         let expected_path = corpus_dir().join(format!("{stem}.pretty-v1.expected"));
-        let expected = fs::read_to_string(&expected_path).unwrap_or_else(|err| {
-            panic!("missing pretty-v1 expectation for {stem}: {err}")
-        });
+        let expected = fs::read_to_string(&expected_path)
+            .unwrap_or_else(|err| panic!("missing pretty-v1 expectation for {stem}: {err}"));
         let source = fs::read_to_string(&fixture).expect("read fixture source");
 
         let formatted = pretty_v1_pipeline(&fixture, &source);

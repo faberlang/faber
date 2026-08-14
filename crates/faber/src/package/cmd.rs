@@ -16,14 +16,14 @@ use super::compile_package_go;
 #[cfg(feature = "hir-go")]
 use super::go_build::{emit_go_module_with_postprocess, invoke_go_build, GoBuildLayout};
 use super::manifest::{manifest_build_target, FaberManifest};
+#[cfg(feature = "mir-llvm")]
+use super::{build_host_program, LlvmHostProfile};
 use super::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
     build_package_mir_artifact, check_package, compile_package, config_with_locale,
     discover_build_layout, package_host_selection_diagnostic, package_rust_runtime_plan,
     read_manifest, BuildLayout, MANIFEST_FILE,
 };
-#[cfg(feature = "mir-llvm")]
-use super::{build_host_program, LlvmHostProfile};
 
 /// Print `message` and terminate.
 fn fail(message: &str) -> ! {
@@ -329,12 +329,8 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     // module bytes to the output path (single-file wasm builds and any other
     // `Output::Wasm` producer). Package wasm builds are routed above.
     if let Output::Wasm(out) = &output {
-        let output_path = radix::tool::build_output_path(
-            &command.out_dir,
-            &input_path,
-            target,
-            is_package,
-        );
+        let output_path =
+            radix::tool::build_output_path(&command.out_dir, &input_path, target, is_package);
         write_output_file(&output_path, &out.bytes);
         println!("{}", output_path.display());
         return;
@@ -371,11 +367,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
         if let Some(diagnostic) =
             package_host_selection_diagnostic(&runtime_plan, &layout.manifest_path)
         {
-            report_diagnostics_and_exit(
-                &[diagnostic],
-                locale_pack.as_ref(),
-                "runtime plan failed",
-            );
+            report_diagnostics_and_exit(&[diagnostic], locale_pack.as_ref(), "runtime plan failed");
         }
         // G4: emit native-binding library crates before the application crate links them.
         match super::library_link::emit_linked_library_crates(&layout.package_root, &layout) {
@@ -427,13 +419,8 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
                 };
                 let generated_code =
                     crate::postprocess::postprocess_code(code.clone(), target, format, linter);
-                let binary_path = emit_crate_and_build(
-                    &layout,
-                    &generated_code,
-                    None,
-                    &plan,
-                    command.release,
-                );
+                let binary_path =
+                    emit_crate_and_build(&layout, &generated_code, None, &plan, command.release);
                 println!("{}", binary_path.display());
                 return;
             }
@@ -479,11 +466,7 @@ fn emit_crate_and_build(
 fn write_output_file(output_path: &Path, bytes: &[u8]) {
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).unwrap_or_else(|err| {
-            eprintln!(
-                "error: failed to create '{}': {}",
-                parent.display(),
-                err
-            );
+            eprintln!("error: failed to create '{}': {}", parent.display(), err);
             std::process::exit(1);
         });
     }
@@ -534,11 +517,10 @@ fn resolve_build_target(command: &radix::tool::BuildCommand, input_path: &Path) 
         return command.target;
     }
 
-    let manifest = read_manifest(&layout.manifest_path)
-        .unwrap_or_else(|diag| fail_with_diagnostic(&diag));
-    manifest_build_target(manifest.build.target.as_deref(), &layout.manifest_path).unwrap_or_else(
-        |diag| fail_with_diagnostic(&diag),
-    )
+    let manifest =
+        read_manifest(&layout.manifest_path).unwrap_or_else(|diag| fail_with_diagnostic(&diag));
+    manifest_build_target(manifest.build.target.as_deref(), &layout.manifest_path)
+        .unwrap_or_else(|diag| fail_with_diagnostic(&diag))
 }
 
 /// Resolve the target for `faber check` from the package manifest.
@@ -814,7 +796,8 @@ fn compile_package_input(
         std::process::exit(1);
     }
 
-    let (config, locale_pack) = match config_with_locale(target, &path, locale, diagnostics_locale) {
+    let (config, locale_pack) = match config_with_locale(target, &path, locale, diagnostics_locale)
+    {
         Ok(selection) => selection,
         Err(diag) => fail_with_diagnostic(&diag),
     };

@@ -124,8 +124,8 @@ fn author_format_keeps_ascii_angle_brackets_for_generics() {
 #[test]
 fn format_locale_resolves_imports_in_corpus_fixture() {
     let fixture = exempla("importa/default-minimal.fab");
-    let home = radix::paths::faberlang_home()
-        .expect("faber crate must sit in the faberlang container");
+    let home =
+        radix::paths::faberlang_home().expect("faber crate must sit in the faberlang container");
     let mut child = Command::new(faber_binary())
         .args(["format", "--locale", "la", "--stdout"])
         .arg(&fixture)
@@ -341,10 +341,7 @@ fn format_stdin_roundtrip_matches_author_pipeline() {
     let _ = fs::remove_file(&fixture);
 
     let (stdout, stderr, success) = run_faber_format_stdin(source);
-    assert!(
-        success,
-        "faber format --stdin must succeed: {stderr}"
-    );
+    assert!(success, "faber format --stdin must succeed: {stderr}");
     assert_eq!(
         normalize_trailing_newline(&stdout),
         expected,

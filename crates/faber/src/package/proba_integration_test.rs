@@ -22,8 +22,7 @@ const PROBA_IMPORT_MESSAGE: &str =
 /// pass the same default pack the `compile_package*`/`analyze_package` routes
 /// apply — not the pack-less (registry-direct) lexing `None` would select.
 fn english_pack() -> LocalePack {
-    let path =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
     LocalePack::from_toml_path(path).expect("load English locale pack")
 }
 
@@ -195,7 +194,8 @@ fn product_fab_cannot_import_proba() {
 
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
-    let Err(err) = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), true, None)
+    let Err(err) =
+        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), true, None)
     else {
         panic!("import of .proba must fail");
     };

@@ -128,13 +128,19 @@ fn fixture_program() -> DeviceProgram {
             DeviceResource {
                 buffer: weights_identity(),
                 version: weights_version(),
-                binding: Binding { group: 0, binding: 0 },
+                binding: Binding {
+                    group: 0,
+                    binding: 0,
+                },
                 access: MirKernelResourceAccess::Read,
             },
             DeviceResource {
                 buffer: scores_identity(),
                 version: scores_version(),
-                binding: Binding { group: 0, binding: 1 },
+                binding: Binding {
+                    group: 0,
+                    binding: 1,
+                },
                 access: MirKernelResourceAccess::Write,
             },
         ],
@@ -146,7 +152,10 @@ fn fixture_program() -> DeviceProgram {
     };
     DeviceProgram {
         kernels: vec![kernel],
-        launches: vec![LaunchUnit { id: LaunchId(1), kernel_index: 0 }],
+        launches: vec![LaunchUnit {
+            id: LaunchId(1),
+            kernel_index: 0,
+        }],
         lifetime: DeviceProgramLifetime::SingleRun,
         results: vec![ResultBuffer {
             buffer: scores_identity(),
@@ -313,9 +322,10 @@ fn fnv64_hex(bytes: &[u8]) -> String {
 fn assert_first_domain(diagnostics: &[Diagnostic], domain: &str) {
     assert!(
         diagnostics.iter().any(|diag| {
-            diag.args
-                .contains(&DiagnosticArg::new("issue", "composite_plan_identity_divergence"))
-                && diag.args.contains(&DiagnosticArg::new("domain", domain))
+            diag.args.contains(&DiagnosticArg::new(
+                "issue",
+                "composite_plan_identity_divergence",
+            )) && diag.args.contains(&DiagnosticArg::new("domain", domain))
         }),
         "expected first-failing domain `{domain}`, got: {diagnostics:?}"
     );
@@ -348,7 +358,10 @@ fn synthetic_plan_preserves_five_identity_domains() {
     assert_eq!(plan.model_identity, source.model);
     assert_eq!(plan.backend_selection, source.backend);
     assert_eq!(plan.device_artifacts, source.artifacts);
-    assert_eq!(plan.package_identity.source_hashes, source.source_identity.source_hashes);
+    assert_eq!(
+        plan.package_identity.source_hashes,
+        source.source_identity.source_hashes
+    );
     assert_eq!(plan.source_revisions, source.source_identity.revisions);
     assert_eq!(plan.prepared_regions.len(), 1);
     verify_identity_preservation(&plan, &source).expect("re-verification passes");
@@ -372,8 +385,7 @@ fn synthetic_plan_preserves_five_identity_domains() {
     println!(
         "PASS kernel_identity kernels={} entries={:?} regions={}",
         plan.device_program.kernels.len(),
-        plan
-            .device_program
+        plan.device_program
             .kernels
             .iter()
             .map(|kernel| kernel.entry.clone())
@@ -383,8 +395,7 @@ fn synthetic_plan_preserves_five_identity_domains() {
     println!(
         "PASS buffer_identity buffers={} versions={}",
         plan.device_program.buffer_registry().buffers.len(),
-        plan
-            .device_program
+        plan.device_program
             .buffer_registry()
             .buffers
             .iter()

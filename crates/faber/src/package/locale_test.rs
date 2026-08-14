@@ -241,7 +241,10 @@ fn dev_walkup_is_never_an_installed_binary_fallback() {
     let exe = work.join("faber/bin/faber");
 
     let installed = installed_locale_pack_path_in(Some(&exe), Some(&faber_dir), false, "en");
-    assert!(!installed.is_file(), "installed binary must not resolve a stray checkout");
+    assert!(
+        !installed.is_file(),
+        "installed binary must not resolve a stray checkout"
+    );
 
     let dev = installed_locale_pack_path_in(None, Some(&faber_dir), true, "en");
     assert_eq!(
@@ -251,4 +254,3 @@ fn dev_walkup_is_never_an_installed_binary_fallback() {
     );
     let _ = fs::remove_dir_all(&work);
 }
-

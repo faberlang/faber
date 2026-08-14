@@ -30,7 +30,11 @@ const NOMINAL_ENUM_VARIANT_MAIN: &str = "import from \"./util\" * as utilModule\
 
 /// Write a two-module package with `util.fab` content `util_source` and entry
 /// `main_source` (both imported through the package manifest).
-fn write_nominal_package(dir: &std::path::Path, util_source: &str, main_source: &str) -> std::path::PathBuf {
+fn write_nominal_package(
+    dir: &std::path::Path,
+    util_source: &str,
+    main_source: &str,
+) -> std::path::PathBuf {
     let src = dir.join("src");
     fs::create_dir_all(&src).expect("create package src");
     fs::write(
@@ -176,7 +180,12 @@ fn package_mir_same_name_nominals_from_distinct_modules_do_not_unify() {
     // must NOT unify — each resolves through its own canonical key, even when
     // the raw source DefIds numerically coincide.
     let dir = crate::package::test_support::test_temp_dir("s1u2-distinct");
-    let entry = write_three_module_package(dir.as_ref(), NOMINAL_DISTINCT_UTIL, NOMINAL_DISTINCT_OTHER, NOMINAL_DISTINCT_MAIN);
+    let entry = write_three_module_package(
+        dir.as_ref(),
+        NOMINAL_DISTINCT_UTIL,
+        NOMINAL_DISTINCT_OTHER,
+        NOMINAL_DISTINCT_MAIN,
+    );
     let config = Config::default();
 
     with_interpreted_lowered_package_mir(&config, &entry, |lowered| {
@@ -317,7 +326,10 @@ fn canonical_nominal_identity_key_shape_is_module_qualified() {
         package: Some("demo".to_owned()),
         module_path: vec!["other".to_owned()],
     };
-    assert_ne!(identity, other, "distinct module paths are distinct identities");
+    assert_ne!(
+        identity, other,
+        "distinct module paths are distinct identities"
+    );
     assert_eq!(
         identity.display_key() + "::Persona",
         "package::demo::util::Persona",
@@ -337,7 +349,8 @@ fn canonical_nominal_identity_key_shape_is_module_qualified() {
 // because Color IS present in the entry's canonical imported-nominal table.)
 const NOMINAL_VARIANT_OTHER: &str = "@ public\nclass Weird {\n    int gradus\n}\n";
 const NOMINAL_VARIANT_UTIL: &str = "import from \"./other\" * as otherModule\n\n@ public\nclass Gradus {\n    int gradus\n}\n\n@ public\nunion Color {\n    rubrum,\n    caeruleum { otherModule.Weird gradus }\n}\n\n@ public\nfn primus() → Color {\n    return Color.rubrum\n}\n";
-const NOMINAL_VARIANT_MAIN: &str = "import from \"./util\" * as utilModule\n\nmain {\n    print 1\n}\n";
+const NOMINAL_VARIANT_MAIN: &str =
+    "import from \"./util\" * as utilModule\n\nmain {\n    print 1\n}\n";
 
 #[test]
 fn identity_bearing_enum_variant_canonical_miss_fails_closed() {
@@ -350,9 +363,8 @@ fn identity_bearing_enum_variant_canonical_miss_fails_closed() {
     );
     let config = Config::default();
 
-    let errors = with_interpreted_lowered_package_mir(&config, &entry, |_| {}).expect_err(
-        "identity-bearing enum with a consumer canonical miss must fail closed",
-    );
+    let errors = with_interpreted_lowered_package_mir(&config, &entry, |_| {})
+        .expect_err("identity-bearing enum with a consumer canonical miss must fail closed");
     let messages: Vec<String> = errors.iter().map(|diag| diag.message.clone()).collect();
     assert!(
         messages

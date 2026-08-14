@@ -18,7 +18,11 @@ fn copy_tree(source: &Path, destination: &Path) {
     for entry in fs::read_dir(source).expect("read installed payload source") {
         let entry = entry.expect("read installed payload entry");
         let target = destination.join(entry.file_name());
-        if entry.file_type().expect("read installed payload type").is_dir() {
+        if entry
+            .file_type()
+            .expect("read installed payload type")
+            .is_dir()
+        {
             copy_tree(&entry.path(), &target);
         } else {
             fs::copy(entry.path(), target).expect("copy installed payload file");

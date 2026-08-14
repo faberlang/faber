@@ -90,12 +90,11 @@ use radix::mir::{
 use radix::semantic::{IndexExpr, Primitive, Resolver, Type, TypeId, TypeTable, TypeTableSnapshot};
 use radix_mir_fmir::{
     decode_binary_image, decode_text_image, encode_binary_image, encode_text_image,
-    is_known_host_requirement, FmirBinaryImageFile, FmirDeviceSection,
-    FmirDeviceSelection, FmirImageError, FmirTextCliOperand, FmirTextCliRootSection,
-    FmirTextCliSection, FmirTextCliValueType, FmirTextImageFile, FmirTextProgramSection,
-    FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
-    FmirTextToolchainSection, FmirTextTypesSection, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
-    PACKAGE_MIR_ARTIFACT_VERSION,
+    is_known_host_requirement, FmirBinaryImageFile, FmirDeviceSection, FmirDeviceSelection,
+    FmirImageError, FmirTextCliOperand, FmirTextCliRootSection, FmirTextCliSection,
+    FmirTextCliValueType, FmirTextImageFile, FmirTextProgramSection, FmirTextRuntimeSection,
+    FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection,
+    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
 };
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;

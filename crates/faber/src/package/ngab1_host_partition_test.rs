@@ -495,7 +495,10 @@ fn ngab1_two_kernel_composition_derives_one_region_per_call() {
         // batch's two kernels in invocation order (never per-kernel rows).
         assert_eq!(partition.boundary_calls.len(), 1);
         let call = &partition.boundary_calls[0];
-        assert_ne!(call.host, scale_id, "the boundary call's caller is a host function");
+        assert_ne!(
+            call.host, scale_id,
+            "the boundary call's caller is a host function"
+        );
         assert_eq!(call.region.kernels, vec![scale_id, offset_id]);
         assert!(
             !call.region.is_minimal(),

@@ -145,7 +145,6 @@ fn print_run_source_error_accepts_frontend_failures() {
 #[test]
 fn run_source_surfaces_runner_errors() {
     let mut host = BufferHost::default();
-    let error =
-        run_source("@ future\nfn bad() { }\n", &mut host).expect_err("invalid async fails");
+    let error = run_source("@ future\nfn bad() { }\n", &mut host).expect_err("invalid async fails");
     assert!(matches!(error, RunSourceError::Stepper(_)));
 }

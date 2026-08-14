@@ -2119,8 +2119,7 @@ fn run_package_inputs_execute_without_cargo_or_rust_emit() {
     let entry = package.join("src/main.fab");
 
     for input in [&*package, manifest.as_path(), entry.as_path()] {
-        let (stdout, stderr, ok) =
-            run_faber(&["run", input.to_str().expect("utf8 package path")]);
+        let (stdout, stderr, ok) = run_faber(&["run", input.to_str().expect("utf8 package path")]);
         assert!(ok, "faber run failed:\n{stderr}");
         assert_eq!(stdout, "7\n");
         assert!(

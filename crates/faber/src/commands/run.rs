@@ -280,7 +280,9 @@ fn eprint_route_diagnostics(diagnostics: &[Diagnostic]) {
 fn eprint_device_run_note(diagnostics: &[Diagnostic]) {
     let device_failure = diagnostics.iter().any(|diag| {
         let issue = diag.issue().unwrap_or_default();
-        issue.starts_with("E_DEVICE_") || issue.starts_with("E_BACKEND_") || diag.message.contains("device section")
+        issue.starts_with("E_DEVICE_")
+            || issue.starts_with("E_BACKEND_")
+            || diag.message.contains("device section")
     });
     if device_failure {
         eprintln!(

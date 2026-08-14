@@ -86,10 +86,7 @@ main { print thing.label() }
 fn interpret_package_input_leaves_kernel_imports_as_single_source() {
     let dir = temp_dir("kernel-script-input");
     for (name, import) in [
-        (
-            "module.fab",
-            r#"import from "faber:processus" processus"#,
-        ),
+        ("module.fab", r#"import from "faber:processus" processus"#),
         ("glob.fab", r#"import from "faber:*" faber"#),
     ] {
         let entry = dir.join(name);
