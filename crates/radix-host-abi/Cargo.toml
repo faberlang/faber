@@ -1,6 +1,6 @@
 [package]
 name = "radix-host-abi"
-version = "0.81.0"
+version = "0.82.0"
 edition = "2021"
 description = "Radix-owned host ABI contract table (runtime symbol names and layout spellings)"
 license = "MIT"

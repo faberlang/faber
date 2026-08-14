@@ -1,6 +1,6 @@
 [package]
 name = "radix-hir"
-version = "0.81.0"
+version = "0.82.0"
 edition = "2021"
 description = "HIR nodes and visitors for the Radix compiler"
 license = "MIT"

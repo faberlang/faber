@@ -1,6 +1,6 @@
 [package]
 name = "radix-diagnostics"
-version = "0.81.0"
+version = "0.82.0"
 edition = "2021"
 description = "Diagnostic transport types and source spans for the Radix compiler"
 license = "MIT"
