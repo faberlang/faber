@@ -8361,7 +8361,7 @@ entry = "main.fab"
     assert!(cargo_toml.contains("edition = \"2021\""));
     assert!(cargo_toml.contains("0.3.0"));
     assert!(cargo_toml.contains("[dependencies]"));
-    assert!(cargo_toml.contains("package = \"faber-runtime\"") && cargo_toml.contains("path = "));
+    assert!(cargo_toml.contains("package = \"faber-runtime\"") && cargo_toml.contains("git = "));
     assert!(!cargo_toml.contains("norma = { path = "));
     assert!(!cargo_toml.contains("tokio = { version = "));
 
@@ -9605,6 +9605,11 @@ main {
     // onto the root module tree (`crate::child::label()`), so a cargo build of
     // the emitted crate proves there is no dangling `crate::parent::child`
     // path left in the codegen.
+    // D1 offline seam: the generated crate resolves faber-runtime from the
+    // container-local checkout (the released `v<faber version>` git tag does
+    // not exist until the next release), so the cargo build stays offline.
+    let container_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    super::runtime_sources::set_path_override_for_test(Some(container_root));
     let layout = discover_build_layout(&entry).expect("layout");
     emit_generated_crate(&layout, &output.code, None).expect("emit generated crate");
     let binary = invoke_cargo_build(&layout, false).expect("cargo build");
@@ -10367,6 +10372,11 @@ main {
     // Call while CWD is not the app root — relative lock paths must still resolve.
     let old = std::env::current_dir().expect("cwd");
     std::env::set_current_dir(&root).expect("chdir root");
+    // D1 offline seam: the linked library's faber-runtime row falls back to
+    // the container-local checkout behind the path override.
+    let override_root = root.join("container");
+    fs::create_dir_all(override_root.join("faber/runtime/rust")).expect("override runtime");
+    super::runtime_sources::set_path_override_for_test(Some(override_root));
     let deps = super::artifact_plan::native_library_deps(&app).expect("native deps");
     assert_eq!(
         deps.len(),

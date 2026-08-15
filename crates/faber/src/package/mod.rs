@@ -68,6 +68,7 @@ mod modules;
 mod paths;
 mod product;
 mod runtime_dependency;
+mod runtime_sources;
 #[cfg(feature = "hir-rust")]
 mod rust_runtime_dependency;
 #[cfg(feature = "hir-rust")]
