@@ -4,6 +4,7 @@
 //! handlers live in [`init`], [`explain`], [`run`], and [`test`].
 
 mod archive;
+mod convert;
 mod emit;
 mod explain;
 mod format;
@@ -11,8 +12,9 @@ mod format;
 #[path = "format_corpus_test.rs"]
 mod format_corpus_test;
 #[cfg(test)]
+#[cfg(test)]
 #[path = "format_test.rs"]
-mod format_test;
+pub(crate) mod format_test;
 pub mod host;
 mod init;
 mod model;
@@ -30,6 +32,7 @@ use crate::package;
 use clap::Parser;
 use radix::tool::{self, BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
 
+use convert::cmd_convert;
 use explain::cmd_explain;
 use format::cmd_format;
 use host::cmd_host;
@@ -206,9 +209,16 @@ fn dispatch(command: Command) {
                 emit::cmd_emit_with_locale(emit_command, args.format, args.linter);
             }
         }
+        Command::Convert(args) => cmd_convert(&convert::ConvertCommand {
+            paths: args.paths,
+            to: args.to,
+            from: args.from,
+            check: args.check,
+            stdout: args.stdout,
+            stdin: args.stdin,
+        }),
         Command::Format(args) => cmd_format(&format::FormatCommand {
             paths: args.paths,
-            locale: args.locale,
             check: args.check,
             stdout: args.stdout,
             write: args.write,

@@ -325,7 +325,7 @@ pub(crate) use locale::installed_locale_pack_path;
 pub use locale::locale_pack_for_emit;
 #[allow(unused_imports)]
 pub(crate) use locale::{
-    config_with_locale, default_config_with_locale, load_locale_pack_for_input,
+    available_locales, config_with_locale, default_config_with_locale, load_locale_pack_for_input,
 };
 
 pub(super) const MANIFEST_FILE: &str = "faber.toml";

@@ -93,6 +93,10 @@ pub enum Command {
     )]
     Format(FormatArgs),
 
+    /// Convert source between reader-locale surfaces (en, la, zh-Hans, …) —
+    /// HIR-backed round-trip; not a formatter (see `faber convert --help`)
+    Convert(ConvertArgs),
+
     /// Script host introspection (kernel manifest)
     Host(crate::commands::host::HostArgs),
 
@@ -114,13 +118,6 @@ pub struct FormatArgs {
     /// package with its own `[format]` policy.
     #[arg(value_name = "PATH")]
     pub paths: Vec<PathBuf>,
-
-    /// Re-emit in the given reader-locale surface (HIR-backed round-trip;
-    /// `en` is the default product surface and `la` remains available for
-    /// heritage sources. No flag keeps
-    /// author mode.
-    #[arg(long = "locale", value_name = "LOCALE")]
-    pub locale: Option<String>,
 
     /// Check formatting without writing; exit 1 if any file would change
     #[arg(long)]
@@ -150,6 +147,39 @@ pub struct FormatArgs {
     /// Path to forma.toml override (schema deferred)
     #[arg(long, value_name = "PATH")]
     pub config: Option<PathBuf>,
+}
+
+/// Arguments for `faber convert`.
+#[derive(clap::Args, Debug)]
+pub struct ConvertArgs {
+    /// Files or directories to convert (default: current directory)
+    #[arg(value_name = "PATH")]
+    pub paths: Vec<PathBuf>,
+
+    /// Target reader locale (required; e.g. en, la, zh-Hans). Unknown
+    /// locales fail closed listing the installed pack locales
+    #[arg(long = "to", value_name = "LOCALE")]
+    pub to: String,
+
+    /// Source locale override for mislabeled frontmatter (default: the
+    /// source's own frontmatter locale, falling back to `en`)
+    #[arg(long = "from", value_name = "LOCALE")]
+    pub from: Option<String>,
+
+    /// Report pending conversions without writing files; exit 1 if any
+    /// file would change
+    #[arg(long)]
+    pub check: bool,
+
+    /// Write converted output to stdout instead of updating files (exactly
+    /// one input file)
+    #[arg(long, conflicts_with = "check")]
+    pub stdout: bool,
+
+    /// Read exactly one source document from stdin and print the converted
+    /// result to stdout
+    #[arg(long, conflicts_with_all = ["check", "stdout", "paths"])]
+    pub stdin: bool,
 }
 
 /// Arguments for `faber build`.

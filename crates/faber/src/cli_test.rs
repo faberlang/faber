@@ -506,13 +506,22 @@ fn cli_parses_locale_on_test() {
 }
 
 #[test]
-fn cli_parses_locale_on_format() {
-    let format = Cli::try_parse_from(["faber", "format", "--locale", "zh-Hans", "main.fab"])
-        .expect("parse format reader locale");
-    let Some(crate::cli::Command::Format(args)) = format.command else {
-        panic!("expected format subcommand");
+fn cli_parses_convert_target_locale() {
+    let convert = Cli::try_parse_from(["faber", "convert", "--to", "zh-Hans", "main.fab"])
+        .expect("parse convert target locale");
+    let Some(crate::cli::Command::Convert(args)) = convert.command else {
+        panic!("expected convert subcommand");
     };
-    assert_eq!(args.locale.as_deref(), Some("zh-Hans"));
+    assert_eq!(args.to, "zh-Hans");
+}
+
+#[test]
+fn cli_rejects_removed_format_locale_flag() {
+    let result = Cli::try_parse_from(["faber", "format", "--locale", "zh-Hans", "main.fab"]);
+    assert!(
+        result.is_err(),
+        "format --locale is retired; locale conversion is `faber convert --to`"
+    );
 }
 
 #[test]
