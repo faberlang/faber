@@ -51,12 +51,8 @@ unicode-normalization = "0.1"
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1"
-rand = "0.8"
-getrandom = "0.2"
 toml = "1.1.2"
 wait-timeout = "0.2"
-wasm-encoder = { version = "0.250", default-features = false, features = ["std"] }
-wat = { version = "1.250", default-features = false }
 
 [dev-dependencies]
 hygiene-ratchet = { path = "../hygiene-ratchet" }
@@ -69,8 +65,4 @@ full-targets = ["hir-faber", "hir-fhir", "mir-fmir"]
 hir-faber = ["dep:radix-hir-faber"]
 hir-fhir = ["dep:radix-hir-fhir"]
 mir-fmir = []
-wasm-stub-host = ["dep:wasmtime"]
 
-[dependencies.wasmtime]
-version = "46"
-optional = true

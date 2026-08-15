@@ -16,7 +16,7 @@ use radix::GoOutput;
 #[cfg(any(feature = "hir-go", feature = "mir-wasm"))]
 use radix::Output;
 #[cfg(feature = "mir-wasm")]
-use radix::WasmOutput;
+use radix::WasmTextOutput;
 #[cfg(feature = "hir-go")]
 use std::collections::HashMap;
 use std::collections::{BTreeMap, BTreeSet};
@@ -99,8 +99,6 @@ pub(crate) struct WasmPackageModuleFile {
     pub(crate) is_entry: bool,
     /// Emitted package-aware WAT (canonical sibling exports applied).
     pub(crate) wat: String,
-    /// Compiled wasm bytes for the module.
-    pub(crate) bytes: Vec<u8>,
 }
 
 /// Failed compile: no output, no Go/Wasm modules.
@@ -752,11 +750,10 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Packag
 
 /// U6-D — emit a package's Wasm through the reusable package-to-Wasm builder.
 ///
-/// The entry module's bytes are the compile result output; every unit module
-/// (entry + siblings) travels in [`PackageCompileResult::wasm_modules`] with
-/// its package-aware WAT (canonical sibling exports applied) and compiled
-/// bytes, so the product host can instantiate the module set together
-/// (`WasmRtV1Host::run_package`).
+/// The entry unit's WAT is the compile result output (text-only emission);
+/// every unit module (entry + siblings) travels in
+/// [`PackageCompileResult::wasm_modules`] with its package-aware WAT
+/// (canonical sibling exports applied).
 #[cfg(feature = "mir-wasm")]
 fn generate_package_wasm_result(
     package: &mut AnalyzedPackage,
@@ -774,6 +771,12 @@ fn generate_package_wasm_result(
         Ok(build) => build,
         Err(diagnostics) => return compile_failure(diagnostics),
     };
+    let entry_wat = build
+        .modules
+        .iter()
+        .find(|module| module.is_entry)
+        .map(|module| module.wat.clone())
+        .unwrap_or_default();
     let wasm_modules = build
         .modules
         .into_iter()
@@ -781,14 +784,11 @@ fn generate_package_wasm_result(
             module_segments: module.module_segments,
             is_entry: module.is_entry,
             wat: module.wat,
-            bytes: module.bytes,
         })
         .collect::<Vec<_>>();
     PackageCompileResult {
         compile_result: CompileResult {
-            output: Some(Output::Wasm(WasmOutput {
-                bytes: build.manifest.entry_bytes,
-            })),
+            output: Some(Output::WasmText(WasmTextOutput { code: entry_wat })),
             // Carry package-analysis diagnostics (warnings) forward like the
             // Go path; `build_package_wasm_from_graph` only surfaces errors.
             diagnostics: package.diagnostics.clone(),
