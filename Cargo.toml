@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/hygiene-ratchet",
+    "crates/handroll",
     "crates/radix",
     "crates/radix-codegen-shared",
     "crates/radix-hir-faber",
@@ -26,6 +27,7 @@ resolver = "2"
 # never a default member and is reached only via explicit `-p` selection.
 default-members = [
     "crates/hygiene-ratchet",
+    "crates/handroll",
     "crates/radix",
     "crates/radix-codegen-shared",
     "crates/radix-hir-faber",
