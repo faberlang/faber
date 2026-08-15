@@ -132,7 +132,7 @@ entry = "main.fab"
 }
 
 #[test]
-fn run_target_fhir_loads_and_runs_in_process() {
+fn run_fhir_package_loads_and_runs_in_process() {
     let package = temp_dir("fhir-run");
     let src = package.join("src");
     fs::create_dir_all(&src).expect("create src");
@@ -150,16 +150,12 @@ entry = "main.fab"
     .expect("write manifest");
     fs::write(src.join("main.fab"), "main { print \"salve\" }\n").expect("write entry");
 
-    let (stdout, stderr, ok) = run_faber(&[
-        "run",
-        "--target",
-        "fhir",
-        package.to_str().expect("utf8 package path"),
-    ]);
+    let (stdout, stderr, ok) =
+        run_faber(&["run", package.to_str().expect("utf8 package path")]);
     assert!(ok, "fhir run failed:\n{stderr}");
     assert_eq!(
         stdout, "salve\n",
-        "FMIR run from loaded FHIR must print the program output"
+        "faber run must interpret the FHIR package in-process and print the program output"
     );
 }
 
