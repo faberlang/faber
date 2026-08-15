@@ -80,6 +80,7 @@ pub mod lexer;
 pub mod live_tuus_cursor;
 pub mod llvm_host;
 pub mod locale;
+#[cfg(feature = "mir-core")]
 pub mod mir;
 pub mod octeti_literal;
 pub mod parser;

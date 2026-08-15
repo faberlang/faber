@@ -31,7 +31,7 @@ missing_panics_doc = "allow"
 radix-codegen-shared = { path = "../radix-codegen-shared" }
 # Consumerless leaves, gated out of default builds (U7, removal-delivery-spec).
 radix-hir-faber = { path = "../radix-hir-faber", optional = true }
-radix-mir = { path = "../radix-mir" }
+radix-mir = { path = "../radix-mir", optional = true }
 radix-host-abi = { path = "../radix-host-abi" }
 radix-runtime-contract = { path = "../radix-runtime-contract" }
 radix-mir-runner = { path = "../radix-mir-runner", optional = true }
@@ -65,5 +65,6 @@ full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "runner"]
 hir-faber = ["dep:radix-hir-faber"]
 hir-fhir = ["dep:radix-hir-fhir"]
 mir-fmir = []
-runner = ["dep:radix-mir-runner"]
+mir-core = ["dep:radix-mir"]
+runner = ["mir-core", "dep:radix-mir-runner"]
 
