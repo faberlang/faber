@@ -2,7 +2,9 @@
 
 use super::format::{formatted_source_for_write, normalize_trailing_newline, source_for_compare};
 use radix::driver::{Config, Session};
-use radix::forma::test_gate::{assert_author_reparses, author_format_once_with_session};
+use radix::forma::test_gate::{
+    assert_author_reparses, assert_author_reparses_with, author_format_once_with_session,
+};
 use radix::locale::LocalePack;
 use std::fs;
 use std::io::{Read, Write};
@@ -59,7 +61,8 @@ fn format_author_output_reparses_without_errors() {
     let path = exempla("incipit/salve-munde.fab");
     let source = fs::read_to_string(&path).expect("read salve-munde.fab");
     let formatted = author_format_pipeline(&path.display().to_string(), &source);
-    assert_author_reparses(&formatted, "salve-munde pipeline").expect("reparse");
+    assert_author_reparses_with(&formatted, "salve-munde pipeline", Some(&english_pack()))
+        .expect("reparse");
 }
 
 #[test]
@@ -71,7 +74,7 @@ fn format_author_path_preserves_salve_munde_comments() {
         formatted.contains("# incipit — canonical hello-world entry point"),
         "author format should preserve leading comments"
     );
-    assert!(formatted.contains("nota \"Salve, Munde!\""));
+    assert!(formatted.contains("print \"Salve, Munde!\""));
 }
 
 /// Strict comparison is canonicalized to the ≺/≻ glyphs; ≤/≥ stay as-is.
@@ -86,15 +89,15 @@ fn author_format_rewrites_ascii_comparison_to_glyph() {
 }";
     let formatted = author_format_pipeline("proba.fab", source);
     assert!(
-        formatted.contains("ego.x ≺ other"),
+        formatted.contains("self.x ≺ other"),
         "strict less-than should emit the ≺ glyph: {formatted}"
     );
     assert!(
-        formatted.contains("ego.x ≻ other"),
+        formatted.contains("self.x ≻ other"),
         "strict greater-than should emit the ≻ glyph: {formatted}"
     );
-    assert!(formatted.contains("ego.x ≤ other"));
-    assert!(formatted.contains("ego.x ≥ other"));
+    assert!(formatted.contains("self.x ≤ other"));
+    assert!(formatted.contains("self.x ≥ other"));
     assert!(
         !formatted.contains("< other"),
         "ASCII < comparison must not survive: {formatted}"
@@ -124,10 +127,11 @@ fn format_author_pipeline_reparses_cura_fixture() {
     let source = fs::read_to_string(&path).expect("read cura.fab");
     let formatted = author_format_pipeline(&path.display().to_string(), &source);
     assert!(
-        formatted.contains("cura \"arena\"") || formatted.contains("cura \"page\""),
-        "cura exempla should keep quoted arena/page routes:\n{formatted}"
+        formatted.contains("with \"arena\"") || formatted.contains("with \"page\""),
+        "cura exempla should keep quoted arena/page routes in the en surface:\n{formatted}"
     );
-    assert_author_reparses(&formatted, "cura pipeline").expect("reparse");
+    assert_author_reparses_with(&formatted, "cura pipeline", Some(&english_pack()))
+        .expect("reparse");
 }
 
 #[test]
@@ -135,7 +139,8 @@ fn format_author_pipeline_preserves_and_reparses_comment_fixture() {
     let source = "# lead comment\n\nmain {\n  print \"ok\"\n}\n";
     let formatted = author_format_pipeline("comment.fab", source);
     assert!(formatted.contains("# lead comment"));
-    assert_author_reparses(&formatted, "comment pipeline").expect("reparse");
+    assert_author_reparses_with(&formatted, "comment pipeline", Some(&english_pack()))
+        .expect("reparse");
     assert_author_idempotent("comment.fab", source);
 }
 
