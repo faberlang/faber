@@ -15,7 +15,7 @@ mod format_corpus_test;
 #[path = "format_test.rs"]
 pub(crate) mod format_test;
 pub mod host;
-mod init;
+pub(crate) mod init;
 mod model;
 mod run;
 pub(crate) mod self_update;

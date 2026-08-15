@@ -838,6 +838,29 @@ fn cli_init_defaults_to_current_directory() {
 }
 
 #[test]
+fn init_scaffold_is_en_surface_so_fresh_package_checks() {
+    // Regression (2026-08-15): the scaffold used latin keywords while
+    // untagged sources parse on the en surface, so `faber init` produced a
+    // package that failed its own `faber check`.
+    let dir = std::env::temp_dir().join(format!(
+        "faber-init-test-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).expect("create temp root");
+    let project = dir.join("demo");
+    crate::commands::init::scaffold(&project, "demo").expect("scaffold");
+    let entry = std::fs::read_to_string(project.join("src/main.fab")).expect("read scaffold");
+    assert!(
+        entry.starts_with("main {") && entry.contains("print \"Salve, munde!\""),
+        "scaffold must be en surface, got: {entry}"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn cli_test_defaults_to_current_directory() {
     let test = Cli::try_parse_from(["faber", "test"]).expect("parse test defaults");
     let Some(crate::cli::Command::Test(test_args)) = test.command else {
