@@ -3655,3 +3655,60 @@ fn runner_type_check_dispatches_on_runtime_variant_tag() {
         Value::Bool(false)
     );
 }
+
+// ---------------------------------------------------------------------------
+// Matrix display (runner display contract: nested rows, matching the
+// compiled host route goldens)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn matrix_display_emits_nested_rows() {
+    use crate::value::MatrixValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+
+    let matrix = Value::Matrix(Rc::new(RefCell::new(MatrixValue {
+        rows: 3,
+        columns: 2,
+        data: vec![
+            Value::Float(16.0),
+            Value::Float(25.0),
+            Value::Float(64.0),
+            Value::Float(100.0),
+            Value::Float(144.0),
+            Value::Float(225.0),
+        ],
+    })));
+
+    let interner = Interner::new();
+    let text = matrix
+        .display(&interner, Span::default())
+        .expect("matrix display must succeed");
+    assert_eq!(text, "[[16.0, 25.0], [64.0, 100.0], [144.0, 225.0]]");
+}
+
+#[test]
+fn matrix_display_rows_split_on_column_count() {
+    use crate::value::MatrixValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+
+    let matrix = Value::Matrix(Rc::new(RefCell::new(MatrixValue {
+        rows: 2,
+        columns: 3,
+        data: vec![
+            Value::Int(1),
+            Value::Int(2),
+            Value::Int(3),
+            Value::Int(4),
+            Value::Int(5),
+            Value::Int(6),
+        ],
+    })));
+
+    let interner = Interner::new();
+    let text = matrix
+        .display(&interner, Span::default())
+        .expect("matrix display must succeed");
+    assert_eq!(text, "[[1, 2, 3], [4, 5, 6]]");
+}
