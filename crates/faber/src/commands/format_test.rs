@@ -118,10 +118,6 @@ fn author_format_keeps_ascii_angle_brackets_for_generics() {
     );
 }
 
-/// Regression: `format --locale` must resolve provider/relative imports via the
-/// import contract. The forma re-emit path used to report SEM002
-/// unknown-qualified-type on any file with imports.
-#[test]
 #[test]
 fn format_author_pipeline_reparses_cura_fixture() {
     let path = exempla("cura/cura.fab");
@@ -718,14 +714,6 @@ fn format_manifest_empty_policy_slug_fails_clearly() {
     );
 }
 
-/// S5 locale regression: a package `[format] policy` must not disturb the
-/// locale path — reader-locale re-emission is canonical HIR output and stays
-/// policy-independent. Output is byte-identical with and without the
-/// `[format]` table, and no new CLI conflict fires (the `--policy` +
-/// `--locale` rejection contract is unchanged).
-#[cfg(feature = "hir-faber")]
-#[test]
-
 /// S5: `--config` stays the deferred warning stub — the flag still parses and
 /// prints the same not-implemented warning; the `[format]` manifest is the
 /// only config surface in v1.
@@ -786,11 +774,6 @@ fn format_write_flag_writes_in_place() {
     );
 }
 
-#[test]
-#[test]
-#[test]
-#[test]
-#[test]
 #[test]
 fn format_check_compare_keeps_frontmatter_in_baseline() {
     let path = exempla("incipit/salve-munde.fab");

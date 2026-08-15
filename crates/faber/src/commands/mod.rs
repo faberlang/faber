@@ -12,7 +12,6 @@ mod format;
 #[path = "format_corpus_test.rs"]
 mod format_corpus_test;
 #[cfg(test)]
-#[cfg(test)]
 #[path = "format_test.rs"]
 pub(crate) mod format_test;
 pub mod host;
