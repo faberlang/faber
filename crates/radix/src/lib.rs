@@ -56,6 +56,7 @@
 // lib, integration tests, examples, and bins (crate attrs only cover lib).
 
 pub mod abi;
+#[cfg(feature = "device")]
 pub mod air;
 pub mod ascii_literal;
 pub mod aspect;
@@ -83,6 +84,7 @@ pub mod mir;
 pub mod octeti_literal;
 pub mod parser;
 pub mod paths;
+#[cfg(feature = "runner")]
 pub mod proba;
 pub mod runtime_contract;
 pub mod semantic;
@@ -152,18 +154,23 @@ pub enum Output {
     /// Experimental WebAssembly text output emitted from validated MIR.
     /// Binary conversion is an external-tool step (`wat2wasm` /
     /// `wasm-tools parse`).
+    #[cfg(feature = "mir-wasm")]
     WasmText(WasmTextOutput),
 
     /// Experimental LLVM text output emitted from validated MIR.
+    #[cfg(feature = "mir-llvm")]
     LlvmText(LlvmTextOutput),
 
     /// Experimental Metal Shading Language source emitted from validated MIR.
+    #[cfg(feature = "mir-metal")]
     MetalText(MetalTextOutput),
 
     /// Experimental WGSL compute-shader source emitted from validated MIR.
+    #[cfg(feature = "mir-wgsl")]
     WgslText(WgslTextOutput),
 
     /// Experimental Racket s-expression output emitted from validated MIR.
+    #[cfg(feature = "mir-sexp")]
     Sexp(SexpOutput),
 }
 
@@ -211,18 +218,21 @@ pub struct FaberOutput {
 }
 
 /// Experimental WebAssembly text output.
+#[cfg(feature = "mir-wasm")]
 pub struct WasmTextOutput {
     /// Complete generated WAT source.
     pub code: String,
 }
 
 /// Experimental LLVM text output.
+#[cfg(feature = "mir-llvm")]
 pub struct LlvmTextOutput {
     /// Complete generated LLVM text source.
     pub code: String,
 }
 
 /// Experimental Metal Shading Language source output.
+#[cfg(feature = "mir-metal")]
 pub struct MetalTextOutput {
     /// Complete generated Metal Shading Language source.
     pub code: String,
@@ -231,6 +241,7 @@ pub struct MetalTextOutput {
 }
 
 /// Experimental WGSL compute-shader source output.
+#[cfg(feature = "mir-wgsl")]
 pub struct WgslTextOutput {
     /// Complete generated WGSL source.
     pub code: String,
@@ -239,6 +250,7 @@ pub struct WgslTextOutput {
 }
 
 /// Experimental Racket s-expression output.
+#[cfg(feature = "mir-sexp")]
 pub struct SexpOutput {
     /// Complete generated Racket source.
     pub code: String,

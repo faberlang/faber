@@ -3,7 +3,7 @@ use crate::{
     MirKernelBuiltin, MirLayoutKind, MirLocalId, MirScalarLayout, MirType, MirValidationContext,
 };
 use radix_types::{IndexExpr, Primitive, Type};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use super::{
     kernel_atomic_element_count_error, kernel_atomic_param_error, kernel_atomic_reflection_error,

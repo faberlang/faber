@@ -18,7 +18,8 @@ pub mod vocabulary;
 
 pub use def_id::DefId;
 pub use vocabulary::{
-    CapabilityGap, Lowerability, MirAtomicOp, MirCollectionOp, MirKernelAxis, MirKernelBuiltin,
+    CapabilityGap, KernelModule, Lowerability, MirAtomicOp, MirCollectionOp, MirKernelAxis,
+    MirKernelBuiltin,
 };
 
 /// [`DefId`] partition threshold: [`DefId`]s below this value are compiler-injected

@@ -113,7 +113,6 @@ pub use inference_blocker_matrix::{
     InferenceBlockerStatus, InferenceNonClaim, InferenceNonClaimKind,
 };
 pub use kernel_decomposition::{decompose_kernel_function, KernelDecomposition, KernelSubchain};
-pub use kernel_module::KernelModule;
 pub use kernel_plan::{
     BarrierPhase, BarrierPoint, CollectionKernelPlan, MatMulPlan, OobPaddingPolicy,
     PlanValidationError, ReduceOp, ReductionPlan, SharedMemoryLayout, TransposePlan,
@@ -133,7 +132,8 @@ pub use names::{
 };
 pub use nodes::*;
 pub use radix_types::{
-    CapabilityGap, Lowerability, MirAtomicOp, MirCollectionOp, MirKernelAxis, MirKernelBuiltin,
+    CapabilityGap, KernelModule, Lowerability, MirAtomicOp, MirCollectionOp, MirKernelAxis,
+    MirKernelBuiltin,
 };
 pub use rank2_reduction_readiness::{
     rank2_reduction_readiness_rows, Rank2ReductionReadinessPath, Rank2ReductionReadinessRow,
