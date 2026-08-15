@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 245,
-    "analyzable": 286
+    "analyzable": 287
   },
   "terms": [
     {
@@ -535,7 +535,7 @@
       "term": "instans",
       "rule": "keyword",
       "capable": 2,
-      "analyzable": 2
+      "analyzable": 3
     },
     {
       "term": "itera",
@@ -586,7 +586,7 @@
       "analyzable": 1
     },
     {
-      "term": "⊖",
+      "term": "↓",
       "rule": "operator-group",
       "capable": 1,
       "analyzable": 1
@@ -754,7 +754,7 @@
       "analyzable": 2
     },
     {
-      "term": "⊕",
+      "term": "↑",
       "rule": "operator-group",
       "capable": 1,
       "analyzable": 1
