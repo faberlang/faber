@@ -1122,9 +1122,13 @@ impl Parser {
                 .map_or(name, String::as_str);
             // Type-position keywords (`modulus`, `iuncta`) must still route to
             // an explicit type target rather than the range fallback — in Latin
-            // or a reader-pack surface spelling.
+            // or a reader-pack surface spelling. The `latin` catch covers the
+            // canonical Latin spelling under a non-Latin pack, where the
+            // keyword-claim path is pack-authoritative and rejects it (a
+            // formatter may re-emit the canonical type spelling).
             let is_type_slot_keyword = self.check_keyword_ident(TokenKind::Modulus)
-                || self.check_keyword_ident(TokenKind::Iuncta);
+                || self.check_keyword_ident(TokenKind::Iuncta)
+                || matches!(latin, "modulus" | "iuncta");
             if !Self::is_conversio_type_keyword(latin)
                 && !Self::is_capitalized_type_name(name)
                 && !is_type_slot_keyword

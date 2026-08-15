@@ -1,6 +1,6 @@
 //! Subprocess checks for `faber format --stdout` (requires built `faber` binary).
 
-use radix::forma::test_gate::{assert_author_idempotent, assert_author_reparses};
+use radix::forma::test_gate::{assert_author_idempotent, assert_author_reparses_with};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -14,6 +14,13 @@ fn exempla(path: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../corpus")
         .join(path)
+}
+
+/// English reader pack — the product-default surface the CLI uses for
+/// untagged sources and `locale = "en"` frontmatter files.
+fn english_pack() -> radix::locale::LocalePack {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    radix::locale::LocalePack::from_toml_path(path).expect("load English locale pack")
 }
 
 fn normalize_trailing_newline(text: &str) -> String {
@@ -62,8 +69,12 @@ fn format_cmd_stdout_reparses_salve_munde() {
         formatted.starts_with("+++"),
         "stdout must include frontmatter"
     );
-    assert_author_reparses(body_for_parse(&formatted), "salve-munde CLI --stdout")
-        .expect("reparse");
+    assert_author_reparses_with(
+        body_for_parse(&formatted),
+        "salve-munde CLI --stdout",
+        Some(&english_pack()),
+    )
+    .expect("reparse");
 }
 
 #[test]
@@ -86,10 +97,15 @@ fn format_cmd_stdout_reparses_cura() {
     let path = exempla("cura/cura.fab");
     let formatted = run_faber_format_stdout(&path);
     assert!(
-        formatted.contains("cura \"arena\"") || formatted.contains("cura \"page\""),
-        "cura routes must stay quoted:\n{formatted}"
+        formatted.contains("with \"arena\"") || formatted.contains("with \"page\""),
+        "cura routes must stay quoted in the en surface:\n{formatted}"
     );
-    assert_author_reparses(body_for_parse(&formatted), "cura CLI --stdout").expect("reparse");
+    assert_author_reparses_with(
+        body_for_parse(&formatted),
+        "cura CLI --stdout",
+        Some(&english_pack()),
+    )
+    .expect("reparse");
 }
 
 /// SC-3/verification step 5: CLI `format --stdout` on comment fixture re-parses.
@@ -107,7 +123,8 @@ fn format_cmd_comment_fixture_cli_reparses() {
         formatted.contains("# lead comment"),
         "CLI must preserve leading comment:\n{formatted}"
     );
-    assert_author_reparses(&formatted, "comment CLI --stdout").expect("reparse");
+    assert_author_reparses_with(&formatted, "comment CLI --stdout", Some(&english_pack()))
+        .expect("reparse");
     assert_author_idempotent(
         "comment.fab",
         "# lead comment\n\nincipit {\n  nota \"ok\"\n}\n",
