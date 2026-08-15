@@ -226,7 +226,7 @@ pub(crate) fn installed_locale_pack_path(locale: &str) -> PathBuf {
 /// (`faber convert --to <unknown>` fails closed naming the real options).
 /// Install roots first, then dev-tree roots — mirrors the pack resolution
 /// order in [`installed_locale_pack_path_in`].
-pub(crate) fn available_locales() -> Vec<String> {
+pub fn available_locales() -> Vec<String> {
     let exe = std::env::current_exe().ok();
     let cwd = std::env::current_dir().ok();
     let mut roots: Vec<PathBuf> = Vec::new();
