@@ -176,7 +176,7 @@ impl Value {
             Value::Array(items) => display_list(&items.borrow(), interner, span)?,
             Value::Tensor(tensor) => display_list(&tensor.borrow().data, interner, span)?,
             Value::Vector(lanes) => display_list(&lanes.borrow(), interner, span)?,
-            Value::Matrix(matrix) => display_list(&matrix.borrow().data, interner, span)?,
+            Value::Matrix(matrix) => display_matrix(&matrix.borrow(), interner, span)?,
             Value::Map(entries) => display_tabula_map(&entries.borrow(), interner, span)?,
             Value::Struct(_, fields) => display_tabula_struct(fields, interner, span)?,
             Value::Set(_) | Value::Record(_) | Value::EnumVariant(_, _) | Value::Tuple(_) => {
@@ -225,6 +225,25 @@ fn display_list(items: &[Value], interner: &Interner, span: Span) -> Result<Stri
         .map(|item| display_in_collection(item, interner, span))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(format!("[{}]", parts.join(", ")))
+}
+
+/// Render a register matrix as nested rows `[[...],[...]]`, matching the
+/// compiled host route (row-major cells split on the column count).
+fn display_matrix(
+    matrix: &MatrixValue,
+    interner: &Interner,
+    span: Span,
+) -> Result<String, RunnerError> {
+    let rows = usize::from(matrix.rows);
+    let columns = usize::from(matrix.columns);
+    let row_parts = (0..rows)
+        .map(|row| {
+            let start = row * columns;
+            let end = start + columns;
+            display_list(matrix.data.get(start..end).unwrap_or(&[]), interner, span)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(format!("[{}]", row_parts.join(", ")))
 }
 
 fn display_in_collection(
