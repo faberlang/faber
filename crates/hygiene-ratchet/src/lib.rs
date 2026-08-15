@@ -150,6 +150,10 @@ pub fn assert_budgets(counts: Counts, budgets: Budgets) {
 /// Assert each production file that has a companion `*_test.rs` embeds the
 /// repo `#[cfg(test)]` + `#[path = …]` module wiring.
 ///
+/// A lane-gated companion may stack a feature gate between `#[cfg(test)]`
+/// and the `#[path]` line (`#[cfg(feature = "mir-core")]`, the U8
+/// feature-granularity convention), which the check accepts.
+///
 /// # Panics
 ///
 /// Panics when a companion test file exists but the production source is
@@ -166,13 +170,33 @@ pub fn assert_companion_tests_use_cfg_path_module_convention(files: &[SourceFile
         let companion_name = companion.file_name().unwrap_or_default().to_string_lossy();
         let expected = format!("#[cfg(test)]\n#[path = \"{companion_name}\"]\nmod tests;");
         assert!(
-            file.content.contains(&expected),
+            companion_is_wired(&file.content, &companion_name),
             "{} has companion test {}, but is missing the repo convention:\n{}",
             file.path.display(),
             companion.display(),
             expected
         );
     }
+}
+
+/// True when the production source wires `mod tests;` via the `#[cfg(test)]` +
+/// `#[path = …]` pair, with zero or more stacked `#[cfg(feature = …)]` gates
+/// allowed between the two (the feature-granularity convention).
+fn companion_is_wired(content: &str, companion_name: &str) -> bool {
+    let needle = format!("#[path = \"{companion_name}\"]\nmod tests;");
+    let Some(pos) = content.find(&needle) else {
+        return false;
+    };
+    let above: Vec<&str> = content[..pos]
+        .lines()
+        .rev()
+        .take_while(|line| line.trim_start().starts_with("#["))
+        .map(str::trim)
+        .collect();
+    above.last().copied() == Some("#[cfg(test)]")
+        && above
+            .iter()
+            .all(|attr| *attr == "#[cfg(test)]" || attr.starts_with("#[cfg(feature = "))
 }
 
 fn is_test_support_path(path: &Path) -> bool {
