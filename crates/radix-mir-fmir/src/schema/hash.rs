@@ -9,9 +9,7 @@ use crate::schema::{
 /// encoding tag are transport, not payload.
 #[must_use]
 pub fn sha256_digest(bytes: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
-    let digest = Sha256::digest(bytes);
-    format!("sha256:{digest:x}")
+    format!("sha256:{}", handroll::sha256_hex(bytes))
 }
 
 /// `content_sha256` (DDCP2-U3 / contract §`IdentityDomains` rule 1): the
@@ -224,7 +222,7 @@ fn push_field(out: &mut Vec<u8>, tag: &str, bytes: &[u8]) {
 /// Returns the canonical `sha256:<64-hex>` spelling.
 #[must_use]
 pub fn device_identity_hash(source_hashes: &[&str], canonical_payload: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
+    use handroll::Sha256;
     let mut hasher = Sha256::new();
     for source_hash in source_hashes {
         let bytes = source_hash.as_bytes();
@@ -233,6 +231,5 @@ pub fn device_identity_hash(source_hashes: &[&str], canonical_payload: &[u8]) ->
     }
     hasher.update((canonical_payload.len() as u64).to_le_bytes());
     hasher.update(canonical_payload);
-    let digest = hasher.finalize();
-    format!("sha256:{digest:x}")
+    format!("sha256:{}", hasher.finalize_hex())
 }

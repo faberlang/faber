@@ -2,7 +2,6 @@
 mod assembler;
 use crate::core_support::path_deps;
 
-use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -107,7 +106,7 @@ fn assembly_is_deterministic_and_uses_only_the_explicit_roots() {
 #[test]
 fn embedded_archive_matches_its_build_metadata() {
     assert_eq!(
-        format!("{:x}", Sha256::digest(super::core_support::ARCHIVE)),
+        handroll::sha256_hex(super::core_support::ARCHIVE),
         super::core_support::SHA256
     );
     let mut archive =

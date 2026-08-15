@@ -2,7 +2,7 @@
 
 use super::{ARCHIVE, FILE_MANIFEST, SHA256};
 use fs2::FileExt;
-use sha2::{Digest, Sha256};
+use handroll::{sha256_hex, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs::{self, File, OpenOptions};
@@ -296,7 +296,7 @@ fn ensure_secure_cache_dir(_: &Path) -> Result<(), MaterializeError> {
 }
 
 fn verify_archive_hash(archive: &[u8], expected: &str) -> Result<(), MaterializeError> {
-    if !is_sha256(expected) || hex(&Sha256::digest(archive)) != expected {
+    if !is_sha256(expected) || sha256_hex(archive) != expected {
         return Err(MaterializeError::InvalidPayload("archive SHA-256 mismatch"));
     }
     Ok(())
@@ -594,7 +594,7 @@ fn write_completion(
 fn completion_contents(archive_hash: &str, files: &BTreeMap<String, String>) -> String {
     format!(
         "format={PAYLOAD_FORMAT}\narchive_sha256={archive_hash}\nfiles_sha256={}\n",
-        hex(&Sha256::digest(file_manifest_contents(files)))
+        sha256_hex(&file_manifest_contents(files))
     )
 }
 

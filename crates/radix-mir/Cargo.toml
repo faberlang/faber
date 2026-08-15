@@ -17,9 +17,8 @@ rustc-hash = "2"
 serde = { version = "1", features = ["derive"] }
 # DDCP3-U4 (c): the execution-descriptor identity domain is a distinct typed
 # domain from artifact identity — a collision-resistant digest (never FNV).
-# sha2 is already in the workspace lock via radix-mir-fmir; this adds the
-# edge to radix-mir's own identity surface (no new locked crate).
-sha2 = "0.10"
+# handroll::sha256 (U5c) — same digest values as the retired sha2 crate.
+handroll = { path = "../handroll" }
 
 [dev-dependencies]
 # DDCP3-U3 (c): the partition/callsite record's serialization round-trip proof

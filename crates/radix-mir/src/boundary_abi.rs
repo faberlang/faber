@@ -609,9 +609,10 @@ impl ExecutionDescriptor {
 /// consumes `content_sha256`/`packet_sha256`, never this value and never FNV.
 #[must_use]
 pub fn execution_descriptor_hash(canonical_descriptor_bytes: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
-    let digest = Sha256::digest(canonical_descriptor_bytes);
-    format!("sha256:{digest:x}")
+    format!(
+        "sha256:{}",
+        handroll::sha256_hex(canonical_descriptor_bytes)
+    )
 }
 
 /// Length-prefixed canonical byte encoding of one descriptor field (the

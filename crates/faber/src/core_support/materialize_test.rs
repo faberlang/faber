@@ -50,10 +50,10 @@ fn payload(entries: &[(&str, &[u8])]) -> (Vec<u8>, String, String) {
         header.set_mtime(0);
         header.set_cksum();
         tar.append_data(&mut header, name, *data).unwrap();
-        manifest.push_str(&format!("{}  {name}\n", hex(&Sha256::digest(*data))));
+        manifest.push_str(&format!("{}  {name}\n", handroll::sha256_hex(*data)));
     }
     let archive = zstd::stream::encode_all(tar.into_inner().unwrap().as_slice(), 19).unwrap();
-    let hash = hex(&Sha256::digest(&archive));
+    let hash = handroll::sha256_hex(&archive);
     (archive, hash, manifest)
 }
 
@@ -71,10 +71,10 @@ fn symlink_payload() -> (Vec<u8>, String, String) {
     header.set_cksum();
     tar.append(&header, io::empty()).unwrap();
     let archive = zstd::stream::encode_all(tar.into_inner().unwrap().as_slice(), 19).unwrap();
-    let hash = hex(&Sha256::digest(&archive));
+    let hash = handroll::sha256_hex(&archive);
     let manifest = format!(
         "{}  faber/runtime/rust/src/lib.rs\n",
-        hex(&Sha256::digest(b"ok"))
+        handroll::sha256_hex(b"ok")
     );
     (archive, hash, manifest)
 }
@@ -215,7 +215,7 @@ fn repairs_noncompleted_state_but_preserves_completed_corruption() {
 #[test]
 fn rejects_empty_archive() {
     let root = test_root("empty-archive");
-    let hash = hex(&Sha256::digest(b""));
+    let hash = handroll::sha256_hex(b"");
     let manifest = "";
     assert!(materialize_payload(&root, b"", &hash, manifest).is_err());
     cleanup(&root);
@@ -225,7 +225,7 @@ fn rejects_empty_archive() {
 fn rejects_malformed_archive_format() {
     let root = test_root("bad-format");
     let garbage = b"not-a-zstd-tar-at-all";
-    let hash = hex(&Sha256::digest(garbage));
+    let hash = handroll::sha256_hex(garbage);
     let manifest = "";
     assert!(materialize_payload(&root, garbage, &hash, manifest).is_err());
     cleanup(&root);

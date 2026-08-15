@@ -1,4 +1,4 @@
-use sha2::{Digest, Sha256};
+use handroll::sha256_hex;
 use std::collections::BTreeSet;
 use std::fs;
 use std::io;
@@ -79,12 +79,12 @@ pub fn assemble(workspace: &Path, roots: &[String]) -> io::Result<Assembly> {
         tar.append_data(&mut header, &name, data.as_slice())?;
         records.push(FileRecord {
             path: name,
-            sha256: hex(&Sha256::digest(&data)),
+            sha256: sha256_hex(&data),
         });
     }
     let tar = tar.into_inner()?;
     let archive = zstd::stream::encode_all(tar.as_slice(), 19)?;
-    let archive_sha256 = hex(&Sha256::digest(&archive));
+    let archive_sha256 = sha256_hex(&archive);
     Ok(Assembly {
         archive,
         archive_sha256,
@@ -304,16 +304,6 @@ fn is_secret(path: &Path) -> bool {
 
 fn invalid(message: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
-}
-
-fn hex(bytes: &[u8]) -> String {
-    bytes
-        .iter()
-        .fold(String::with_capacity(bytes.len() * 2), |mut acc, byte| {
-            use std::fmt::Write;
-            let _ = write!(acc, "{byte:02x}");
-            acc
-        })
 }
 
 #[cfg(unix)]

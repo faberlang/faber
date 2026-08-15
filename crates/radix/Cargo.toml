@@ -43,7 +43,7 @@ radix-types = { path = "../radix-types" }
 radix-hir = { path = "../radix-hir" }
 radix-hir-fhir = { path = "../radix-hir-fhir", optional = true }
 postcard = { version = "1.1.3", features = ["alloc"] }
-sha2 = "0.10"
+handroll = { path = "../handroll" }
 ariadne = "0.4"
 thiserror = "2"
 rustc-hash = "2"

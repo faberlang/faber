@@ -1,11 +1,11 @@
 use super::super::{RunnerError, Value};
+use handroll::entropy::{self, Rng};
+use handroll::uuid_v4;
 use radix_lexer::Span;
-use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
 use std::sync::{Mutex, MutexGuard};
 
 struct RngState {
-    seeded: Option<StdRng>,
+    seeded: Option<Rng>,
 }
 
 static RNG_STATE: Mutex<RngState> = Mutex::new(RngState { seeded: None });
@@ -17,33 +17,22 @@ fn rng_state() -> MutexGuard<'static, RngState> {
     }
 }
 
-fn with_rng<R>(f: impl FnOnce(&mut StdRng) -> R) -> R {
+fn with_rng<R>(f: impl FnOnce(&mut Rng) -> R) -> R {
     let mut guard = rng_state();
     if let Some(ref mut rng) = guard.seeded {
         f(rng)
     } else {
-        let mut rng = StdRng::from_entropy();
+        let mut rng = Rng::from_entropy();
         f(&mut rng)
     }
 }
 
-/// Generate a canonical RFC 9562 (v4) UUID string, `8-4-4-4-12` lowercase hex.
+/// Dispatch for the `faber:aleator` kernel module.
 ///
-/// Entropy is 16 bytes from `getrandom` (the same dependency the `octetos`
-/// provider uses — no new entropy path). The version nibble is pinned to 4
-/// (byte 6, `0x40`) and the RFC 4122 variant bits to `10xx` (byte 8, `0x80`).
-pub(crate) fn uuid_v4() -> Result<String, getrandom::Error> {
-    let mut bytes = [0_u8; 16];
-    getrandom::getrandom(&mut bytes)?;
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    Ok(format!(
-        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-        bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15],
-    ))
-}
-
+/// `fractum`/`sortire` draw from the seeded (or entropy-initialized) RNG;
+/// `octetos`/`uuid` read fresh OS entropy from `handroll::entropy::os_entropy`
+/// and are never influenced by `semina` (handroll U5b replaces the former
+/// rand/getrandom paths; sequence values changed, semantics preserved).
 pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, RunnerError> {
     match verb {
         "fractum" => {
@@ -53,7 +42,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                     "aleator.fractum provider arity",
                 ));
             }
-            Ok(Value::Float(with_rng(|rng| rng.gen_range(0.0..1.0))))
+            Ok(Value::Float(with_rng(Rng::gen_f64)))
         }
         "sortire" => {
             let [min, max] = args else {
@@ -81,7 +70,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                 }
             };
             let (lo, hi) = if min <= max { (min, max) } else { (max, min) };
-            Ok(Value::Int(with_rng(|rng| rng.gen_range(lo..=hi))))
+            Ok(Value::Int(with_rng(|rng| rng.gen_i64_inclusive(lo, hi))))
         }
         "octetos" => {
             let [n] = args else {
@@ -103,7 +92,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                 .map_err(|_| RunnerError::internal(span, "aleator.octetos length out of range"))?;
             let mut bytes = vec![0_u8; len];
             if len > 0 {
-                getrandom::getrandom(&mut bytes).map_err(|err| {
+                entropy::os_entropy(&mut bytes).map_err(|err| {
                     RunnerError::internal(span, format!("aleator.octetos failed: {err}"))
                 })?;
             }
@@ -131,7 +120,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                 }
             };
             let mut guard = rng_state();
-            guard.seeded = u64::try_from(n).ok().map(StdRng::seed_from_u64);
+            guard.seeded = u64::try_from(n).ok().map(Rng::seed_from_u64);
             Ok(Value::Unit)
         }
         other => Err(RunnerError::unsupported(
@@ -143,7 +132,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
 
 #[cfg(test)]
 mod tests {
-    use super::uuid_v4;
+    use handroll::uuid_v4;
     use regex::Regex;
 
     #[test]

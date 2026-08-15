@@ -7,13 +7,12 @@ license = "MIT"
 publish = false
 
 [dependencies]
-getrandom = "0.2"
+handroll = { path = "../handroll" }
 radix-hir = { path = "../radix-hir" }
 radix-lexer = { path = "../radix-lexer" }
 radix-mir = { path = "../radix-mir" }
 radix-runtime-contract = { path = "../radix-runtime-contract" }
 radix-types = { path = "../radix-types" }
-rand = "0.8"
 regex = "1"
 rustc-hash = "2"
 serde_json = "1"

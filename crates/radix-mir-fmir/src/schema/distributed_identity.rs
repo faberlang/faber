@@ -33,8 +33,7 @@ pub const SHA256_IDENTITY_PREFIX: &str = "sha256:";
 /// SHA-256 digest of the canonical bytes as lowercase hex — the
 /// [`SHA256_IDENTITY_PREFIX`]-suffixed part of every identity spelling.
 fn sha256_hex(canonical_bytes: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
-    format!("{:x}", Sha256::digest(canonical_bytes))
+    handroll::sha256_hex(canonical_bytes)
 }
 
 /// The portable logical-plan identity (naming contract §2; MD2-H1).
