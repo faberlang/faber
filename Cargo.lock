@@ -682,7 +682,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "thiserror",
  "toml",
  "unicode-ident",
  "unicode-normalization",
