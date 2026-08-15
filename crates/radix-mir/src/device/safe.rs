@@ -10,7 +10,6 @@ use dead_const_copy::{
 };
 
 use super::roles::MirDeviceContext;
-use crate::capability::{CapabilityGap, Lowerability};
 use crate::control::{
     is_structured_indexed_value_join_branch, is_structured_indexed_write_branch,
     is_structured_indexed_write_goto, is_structured_indexed_write_loop,
@@ -25,6 +24,7 @@ use crate::control::{
 use crate::kernel_decomposition::ResultAggregationSlots;
 use crate::literal_indexed_access::{LiteralIndexedAccessPlan, MirSlot};
 use crate::visit::MirVisitor;
+use crate::{CapabilityGap, Lowerability};
 use crate::{
     MirAggregate, MirAggregateKind, MirCollectionOp, MirFunction, MirIntrinsic, MirLayoutKind,
     MirLayoutTable, MirLocal, MirLocalId, MirOperand, MirParam, MirPlace, MirPlaceBase,

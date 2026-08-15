@@ -14,8 +14,12 @@ pub mod numeric_width;
 mod schema;
 mod schema_subset;
 mod types;
+pub mod vocabulary;
 
 pub use def_id::DefId;
+pub use vocabulary::{
+    CapabilityGap, Lowerability, MirAtomicOp, MirCollectionOp, MirKernelAxis, MirKernelBuiltin,
+};
 
 /// [`DefId`] partition threshold: [`DefId`]s below this value are compiler-injected
 /// builtins allocated via `fresh_builtin_def_id()`; [`DefId`]s at or above this

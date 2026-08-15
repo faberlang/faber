@@ -61,9 +61,9 @@ pub use abi::{
     validate_varying_consistency, MirAbiError, MirBroadcastDeclaration, MirColorTargetFormat,
     MirDepthCompareFunction, MirDepthStencilState, MirFragmentOutputReflection, MirFunctionAbi,
     MirFunctionAbiParam, MirGpuReflection, MirGraphicsPipelineReflection, MirInputStepMode,
-    MirKernelAxis, MirKernelBufferBindingType, MirKernelBuiltin, MirKernelBuiltinInput,
-    MirKernelBuiltinInputReflection, MirKernelBuiltinUsage, MirKernelDispatchSize,
-    MirKernelLaunchBindGroup, MirKernelLaunchBindGroupLayoutEntry, MirKernelLaunchBinding,
+    MirKernelBufferBindingType, MirKernelBuiltinInput, MirKernelBuiltinInputReflection,
+    MirKernelBuiltinUsage, MirKernelDispatchSize, MirKernelLaunchBindGroup,
+    MirKernelLaunchBindGroupLayoutEntry, MirKernelLaunchBinding,
     MirKernelLaunchPipelineBindGroupLayout, MirKernelLaunchPipelineLayout, MirKernelLaunchPlan,
     MirKernelOffsetMode, MirKernelProvenance, MirKernelReflection, MirKernelResource,
     MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceReflection,
@@ -85,7 +85,7 @@ pub use boundary_abi::{
     validate_boundary_abi, BoundaryAbiClass, BoundaryAbiError, BoundaryCall, PreparedRegion,
     HOST_CALL_ABI_VERSION,
 };
-pub use capability::{CapabilityGap, Lowerability};
+// Vocabulary moved down to radix-types (feature-granularity §2); re-exported
 pub use device::{
     classify_device_safe, classify_device_safe_for_target_entry, device_roles_from_hir,
     MirDeviceContext, MirDeviceRole,
@@ -132,6 +132,9 @@ pub use names::{
     text_literal_identity, MirNames,
 };
 pub use nodes::*;
+pub use radix_types::{
+    CapabilityGap, Lowerability, MirAtomicOp, MirCollectionOp, MirKernelAxis, MirKernelBuiltin,
+};
 pub use rank2_reduction_readiness::{
     rank2_reduction_readiness_rows, Rank2ReductionReadinessPath, Rank2ReductionReadinessRow,
     Rank2ReductionReadinessStatus,

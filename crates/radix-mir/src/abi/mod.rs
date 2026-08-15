@@ -21,4 +21,6 @@ pub use contract::*;
 pub use error::*;
 pub use launch::*;
 pub use resource::*;
+// Vocabulary types moved to radix-types (re-exported at the crate root).
+pub use crate::{MirKernelAxis, MirKernelBuiltin};
 pub use types::*;
