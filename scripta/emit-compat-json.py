@@ -57,12 +57,17 @@ CARGO_HIR = [
     "cargo", "test", "-p", "exempla", "--lib", "emit_hir_target_matrix",
     "--", "--ignored", "--nocapture",
 ]
+# The MIR emitters live behind the exempla `mir-core` lane feature
+# (crates/exempla/src/exempla_e2e/mod.rs); without it the tests compile to
+# nothing and the measurement would silently be empty.
 CARGO_MIR = [
     "cargo", "test", "-p", "exempla", "--lib", "emit_mir_target_matrix",
+    "--features", "mir-core",
     "--", "--ignored", "--nocapture",
 ]
 CARGO_CONVERSIO = [
     "cargo", "test", "-p", "exempla", "--lib", "emit_conversio_target_matrix",
+    "--features", "mir-core",
     "--", "--ignored", "--nocapture",
 ]
 
