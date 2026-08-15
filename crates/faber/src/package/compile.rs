@@ -81,7 +81,7 @@ pub(crate) struct PackageCompileResult {
     #[cfg(feature = "hir-go")]
     pub(crate) go_modules: Vec<(String, String)>,
     /// Package-aware Wasm modules (entry + sibling units), populated only for
-    /// `Target::MirWasmBinary` packages that reached codegen.
+    /// `Target::MirWasm` packages that reached codegen.
     #[cfg(feature = "mir-wasm")]
     pub(crate) wasm_modules: Vec<WasmPackageModuleFile>,
 }
@@ -261,7 +261,7 @@ pub(crate) fn compile_package_go(config: &Config, input: &Path) -> PackageCompil
 /// explicit per-unit module collection in one result (no hidden thread-local
 /// side channel).
 ///
-/// The `config` must target `Target::MirWasmBinary`; other targets leave
+/// The `config` must target `Target::MirWasm`; other targets leave
 /// [`PackageCompileResult::wasm_modules`] empty.
 // `allow(dead_code)`: emit-path seam with no in-crate caller — the binary
 // routes package wasm builds through `wasm::build_package_wasm` directly
@@ -445,10 +445,11 @@ fn compile_package_internal(
         }
     }
 
-    // U6-D: the package-aware Wasm path accepts Target::MirWasmBinary and
-    // emits one module per unit through the package-to-Wasm builder (entry +
-    // sibling units, canonical `faber_external` symbol linking).
-    if config.target == Target::MirWasmBinary {
+    // U6-D: the package-aware Wasm path accepts Target::MirWasm (the text
+    // target — binary conversion is external) and emits one module per unit
+    // through the package-to-Wasm builder (entry + sibling units, canonical
+    // `faber_external` symbol linking).
+    if config.target == Target::MirWasm {
         #[cfg(not(feature = "mir-wasm"))]
         return compile_failure(vec![crate::package_diagnostic_error(
             "target `wasm` is not available in this faber build; rebuild with feature `mir-wasm`",
@@ -459,7 +460,7 @@ fn compile_package_internal(
 
         #[cfg(feature = "mir-wasm")]
         {
-            let plan = super::artifact_plan::plan_package(&package, Target::MirWasmBinary);
+            let plan = super::artifact_plan::plan_package(&package, Target::MirWasm);
             if !plan.supported {
                 return compile_failure(vec![crate::package_diagnostic_error(
                     plan.rejection.unwrap_or_else(|| {

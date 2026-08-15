@@ -90,25 +90,22 @@ fn cli_parses_targets_subcommand() {
 #[test]
 fn targets_table_reports_capability_truth_for_the_default_build() {
     // The cli_test binary builds under default features (full-targets): the
-    // rust host lane and the compiled host-leaf capability row must be
-    // present, and the opt-in capability rows absent — `device-runtime` /
-    // `host-macos-arm64` left full-targets at the S3-U2 ordinary-tool cut
-    // (f683d94d0), so capability truth reports no row for an unbuilt surface.
+    // rust host lane must be present, and the opt-in capability rows absent —
+    // `device-runtime` / `host-macos-arm64` left full-targets at the S3-U2
+    // ordinary-tool cut (f683d94d0) and `host-wasm` left at the U2
+    // dependency-removal cut, so capability truth reports no row for an
+    // unbuilt surface.
     let table = crate::commands::targets::rendered_targets_table();
     assert!(
         table.contains("rust available=yes"),
         "rust host lane must be reported as available:\n{table}"
     );
-    assert!(
-        table.lines().any(|line| line.starts_with("host-wasm ")),
-        "missing host-wasm capability row under the default build:\n{table}"
-    );
-    for row_name in ["device-runtime", "host-macos-arm64"] {
+    for row_name in ["host-wasm", "device-runtime", "host-macos-arm64"] {
         assert!(
             !table
                 .lines()
                 .any(|line| line.starts_with(&format!("{row_name} "))),
-            "unexpected {row_name} capability row under the default build (feature left full-targets at S3-U2):\n{table}"
+            "unexpected {row_name} capability row under the default build (feature left full-targets):\n{table}"
         );
     }
 }
@@ -206,7 +203,7 @@ fn cli_parses_emit_external_target_names() {
         ("python", FaberCliTarget::HirPython),
         ("haskell", FaberCliTarget::HirHaskell),
         ("wasm-text", FaberCliTarget::MirWasm),
-        ("wasm", FaberCliTarget::MirWasmBinary),
+        ("wasm", FaberCliTarget::MirWasm),
         ("llvm-text", FaberCliTarget::MirLlvm),
         ("metal-text", FaberCliTarget::MirMetal),
         ("wgsl-text", FaberCliTarget::MirWgsl),

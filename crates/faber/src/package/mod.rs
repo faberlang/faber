@@ -283,7 +283,6 @@ fn is_mir_backed_target(target: Target) -> bool {
         target,
         Target::MirStepper
             | Target::MirWasm
-            | Target::MirWasmBinary
             | Target::MirLlvm
             | Target::MirLlvmHost
             | Target::MirMetal

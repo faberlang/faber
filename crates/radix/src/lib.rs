@@ -150,10 +150,9 @@ pub enum Output {
     Faber(FaberOutput),
 
     /// Experimental WebAssembly text output emitted from validated MIR.
+    /// Binary conversion is an external-tool step (`wat2wasm` /
+    /// `wasm-tools parse`).
     WasmText(WasmTextOutput),
-
-    /// Experimental WebAssembly binary output emitted from validated MIR.
-    Wasm(WasmOutput),
 
     /// Experimental LLVM text output emitted from validated MIR.
     LlvmText(LlvmTextOutput),
@@ -215,12 +214,6 @@ pub struct FaberOutput {
 pub struct WasmTextOutput {
     /// Complete generated WAT source.
     pub code: String,
-}
-
-/// Experimental WebAssembly binary output.
-pub struct WasmOutput {
-    /// Complete generated Wasm module bytes.
-    pub bytes: Vec<u8>,
 }
 
 /// Experimental LLVM text output.
