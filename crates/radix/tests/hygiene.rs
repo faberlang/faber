@@ -50,7 +50,12 @@ const BUDGETS: Budgets = Budgets {
     // WHY: exhaustive-match guard arms in MIR lower (runtime, control, place)
     // and semantic typecheck — shape verified before dispatch.
     // Burned 14→9 after removing artifact/monomorphize inline-test noise.
-    unreachable: 9,
+    // Re-baselined 9→11: tensor-glyphs rank-rule typecheck added two
+    // `fresh tensor result carries a shape` guards (ops.rs), and U8
+    // feature-granularity narrowed the driver target dispatch to Rust | Go
+    // (`match target above narrowed to Rust | Go`) — all shape-verified
+    // fail-closed arms, same guard rationale.
+    unreachable: 11,
     todo: 0,
     unimplemented: 0,
     // WHY: deliberate Result discards in dump formatters (air/dump.rs),
