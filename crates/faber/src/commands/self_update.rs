@@ -176,9 +176,8 @@ pub(crate) fn plan_self_update(
     if args.version.trim().is_empty() {
         return Err("--version is required: faber self update --version <version>".to_owned());
     }
-    let prefix = resolve_prefix(args.prefix.as_deref(), exe, cwd).map_err(|message| {
-        launcher_metadata_error(message, "the install prefix")
-    })?;
+    let prefix = resolve_prefix(args.prefix.as_deref(), exe, cwd)
+        .map_err(|message| launcher_metadata_error(message, "the install prefix"))?;
     let receipt = read_receipt(&prefix)
         .map_err(|message| launcher_metadata_error(message, prefix.display()))?;
     let current_version = receipt
@@ -239,9 +238,8 @@ pub(crate) fn plan_self_uninstall(
     exe: Option<&Path>,
     cwd: Option<&Path>,
 ) -> Result<SelfUninstallPlan, String> {
-    let prefix = resolve_prefix(args.prefix.as_deref(), exe, cwd).map_err(|message| {
-        uninstall_metadata_error(message, "the install prefix")
-    })?;
+    let prefix = resolve_prefix(args.prefix.as_deref(), exe, cwd)
+        .map_err(|message| uninstall_metadata_error(message, "the install prefix"))?;
     let receipt = read_receipt(&prefix)
         .map_err(|message| uninstall_metadata_error(message, prefix.display()))?;
     let current_version = receipt
@@ -371,8 +369,12 @@ pub(crate) fn read_receipt(prefix: &Path) -> Result<serde_json::Value, String> {
     let path = prefix.join(RECEIPT_REL);
     let text = std::fs::read_to_string(&path)
         .map_err(|err| format!("cannot read install receipt {}: {err}", path.display()))?;
-    serde_json::from_str(&text)
-        .map_err(|err| format!("install receipt {} is not valid JSON: {err}", path.display()))
+    serde_json::from_str(&text).map_err(|err| {
+        format!(
+            "install receipt {} is not valid JSON: {err}",
+            path.display()
+        )
+    })
 }
 
 /// Derive the asset base for the TARGET version from the recorded source URL.
@@ -402,7 +404,10 @@ fn execute_self_update(plan: &SelfUpdatePlan) {
         plan.current_version, plan.target_version, plan.triple
     );
     println!("  prefix:     {}", plan.prefix.display());
-    println!("  engine:     fetching {INSTALLER_SCRIPT} from {}", plan.script_url);
+    println!(
+        "  engine:     fetching {INSTALLER_SCRIPT} from {}",
+        plan.script_url
+    );
 
     let script = match fetch_installer_script(&plan.script_url) {
         Ok(bytes) => bytes,
@@ -480,7 +485,10 @@ fn execute_self_uninstall(plan: &SelfUninstallPlan) {
         plan.current_version, plan.triple
     );
     println!("  prefix:     {}", plan.prefix.display());
-    println!("  engine:     fetching {INSTALLER_SCRIPT} from {}", plan.script_url);
+    println!(
+        "  engine:     fetching {INSTALLER_SCRIPT} from {}",
+        plan.script_url
+    );
 
     let script = match fetch_installer_script(&plan.script_url) {
         Ok(bytes) => bytes,
@@ -514,15 +522,17 @@ fn execute_self_uninstall(plan: &SelfUninstallPlan) {
 pub(crate) fn fetch_installer_script(script_url: &str) -> Result<Vec<u8>, String> {
     if !script_url.contains("://") {
         let path = Path::new(script_url);
-        return std::fs::read(path)
-            .map_err(|err| format!("cannot read {INSTALLER_SCRIPT} from {}: {err}", path.display()));
+        return std::fs::read(path).map_err(|err| {
+            format!(
+                "cannot read {INSTALLER_SCRIPT} from {}: {err}",
+                path.display()
+            )
+        });
     }
     let output = Command::new("curl")
         .args(["-fsSL", script_url])
         .output()
-        .map_err(|err| {
-            format!("cannot fetch {INSTALLER_SCRIPT} from {script_url}: {err}")
-        })?;
+        .map_err(|err| format!("cannot fetch {INSTALLER_SCRIPT} from {script_url}: {err}"))?;
     if output.status.success() {
         return Ok(output.stdout);
     }

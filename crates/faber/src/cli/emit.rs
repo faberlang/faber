@@ -39,7 +39,8 @@ pub struct EmitArgs {
     #[arg(long)]
     pub reflection: bool,
 
-    /// Optional output path for binary targets (`wasm`). When set, writes bytes instead of stdout.
+    /// Optional output path for target artifacts. When set, writes to the
+    /// path instead of stdout.
     #[arg(short = 'o', long = "output")]
     pub output: Option<PathBuf>,
 
@@ -75,13 +76,11 @@ pub enum FaberCliTarget {
     #[value(name = "haskell")]
     HirHaskell,
 
-    /// Experimental MIR-backed WebAssembly text target.
-    #[value(name = "wasm-text", alias = "wat")]
+    /// Experimental MIR-backed WebAssembly text target. Emits `.wat` text
+    /// only; `wasm` is an alias kept for compatibility (binary conversion is
+    /// an external-tool step).
+    #[value(name = "wasm-text", alias = "wat", alias = "wasm")]
     MirWasm,
-
-    /// Experimental MIR-backed WebAssembly binary target.
-    #[value(name = "wasm")]
-    MirWasmBinary,
 
     /// Experimental MIR-backed LLVM text target.
     #[value(name = "llvm-text", alias = "llvm-ir", alias = "llvm")]
@@ -116,7 +115,6 @@ impl FaberCliTarget {
             FaberCliTarget::HirPython => radix::codegen::Target::HirPython,
             FaberCliTarget::HirHaskell => radix::codegen::Target::HirHaskell,
             FaberCliTarget::MirWasm => radix::codegen::Target::MirWasm,
-            FaberCliTarget::MirWasmBinary => radix::codegen::Target::MirWasmBinary,
             FaberCliTarget::MirLlvm => radix::codegen::Target::MirLlvm,
             FaberCliTarget::MirMetal => radix::codegen::Target::MirMetal,
             FaberCliTarget::MirWgsl => radix::codegen::Target::MirWgsl,

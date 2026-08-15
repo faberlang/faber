@@ -1,9 +1,9 @@
 use crate::{
-    shader_contract::ShaderStageIoRole, MirCollectionOp, MirFunction, MirLayoutKind, MirLocalId,
-    MirScalarLayout, MirType, MirValidationContext,
+    shader_contract::ShaderStageIoRole, MirCollectionOp, MirFunction, MirKernelAxis,
+    MirKernelBuiltin, MirLayoutKind, MirLocalId, MirScalarLayout, MirType, MirValidationContext,
 };
 use radix_types::{IndexExpr, Primitive, Type};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use super::{
     kernel_atomic_element_count_error, kernel_atomic_param_error, kernel_atomic_reflection_error,
@@ -106,32 +106,6 @@ pub struct MirKernelBuiltinInputReflection {
     pub layout: MirScalarLayout,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MirKernelBuiltin {
-    GlobalInvocationX,
-    GlobalInvocationY,
-    GlobalInvocationZ,
-    GlobalInvocationId,
-    WorkgroupIdX,
-    WorkgroupIdY,
-    WorkgroupIdZ,
-    WorkgroupId,
-    LocalInvocationIdX,
-    LocalInvocationIdY,
-    LocalInvocationIdZ,
-    LocalInvocationId,
-    WorkgroupSizeX,
-    WorkgroupSizeY,
-    WorkgroupSizeZ,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub enum MirKernelAxis {
-    X,
-    Y,
-    Z,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum MirKernelResourceKind {
     StorageBuffer,
@@ -149,112 +123,6 @@ pub enum MirKernelResourceKind {
     /// `oob_guard_limit` static axis as fallback) — they must not reintroduce
     /// a static-shape guard.
     RuntimeExtent,
-}
-
-impl MirKernelBuiltin {
-    /// Width of vector-valued builtins (`global_invocation_id`, `workgroup_id`, `local_invocation_id`).
-    pub const VECTOR_WIDTH: u8 = 3;
-
-    pub const ALL: [Self; 15] = [
-        Self::GlobalInvocationX,
-        Self::GlobalInvocationY,
-        Self::GlobalInvocationZ,
-        Self::GlobalInvocationId,
-        Self::WorkgroupIdX,
-        Self::WorkgroupIdY,
-        Self::WorkgroupIdZ,
-        Self::WorkgroupId,
-        Self::LocalInvocationIdX,
-        Self::LocalInvocationIdY,
-        Self::LocalInvocationIdZ,
-        Self::LocalInvocationId,
-        Self::WorkgroupSizeX,
-        Self::WorkgroupSizeY,
-        Self::WorkgroupSizeZ,
-    ];
-
-    #[must_use]
-    pub fn from_spelling(spelling: &str) -> Option<Self> {
-        match spelling {
-            "global_invocation_x" => Some(Self::GlobalInvocationX),
-            "global_invocation_y" => Some(Self::GlobalInvocationY),
-            "global_invocation_z" => Some(Self::GlobalInvocationZ),
-            "global_invocation_id" => Some(Self::GlobalInvocationId),
-            "workgroup_id_x" => Some(Self::WorkgroupIdX),
-            "workgroup_id_y" => Some(Self::WorkgroupIdY),
-            "workgroup_id_z" => Some(Self::WorkgroupIdZ),
-            "workgroup_id" => Some(Self::WorkgroupId),
-            "local_invocation_id_x" => Some(Self::LocalInvocationIdX),
-            "local_invocation_id_y" => Some(Self::LocalInvocationIdY),
-            "local_invocation_id_z" => Some(Self::LocalInvocationIdZ),
-            "local_invocation_id" => Some(Self::LocalInvocationId),
-            "workgroup_size_x" => Some(Self::WorkgroupSizeX),
-            "workgroup_size_y" => Some(Self::WorkgroupSizeY),
-            "workgroup_size_z" => Some(Self::WorkgroupSizeZ),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn spelling(self) -> &'static str {
-        match self {
-            Self::GlobalInvocationX => "global_invocation_x",
-            Self::GlobalInvocationY => "global_invocation_y",
-            Self::GlobalInvocationZ => "global_invocation_z",
-            Self::GlobalInvocationId => "global_invocation_id",
-            Self::WorkgroupIdX => "workgroup_id_x",
-            Self::WorkgroupIdY => "workgroup_id_y",
-            Self::WorkgroupIdZ => "workgroup_id_z",
-            Self::WorkgroupId => "workgroup_id",
-            Self::LocalInvocationIdX => "local_invocation_id_x",
-            Self::LocalInvocationIdY => "local_invocation_id_y",
-            Self::LocalInvocationIdZ => "local_invocation_id_z",
-            Self::LocalInvocationId => "local_invocation_id",
-            Self::WorkgroupSizeX => "workgroup_size_x",
-            Self::WorkgroupSizeY => "workgroup_size_y",
-            Self::WorkgroupSizeZ => "workgroup_size_z",
-        }
-    }
-
-    #[must_use]
-    pub fn returns_vector(self) -> bool {
-        matches!(
-            self,
-            Self::GlobalInvocationId | Self::LocalInvocationId | Self::WorkgroupId
-        )
-    }
-
-    #[must_use]
-    pub fn axis(self) -> MirKernelAxis {
-        match self {
-            Self::GlobalInvocationX
-            | Self::WorkgroupIdX
-            | Self::LocalInvocationIdX
-            | Self::WorkgroupSizeX => MirKernelAxis::X,
-            Self::GlobalInvocationY
-            | Self::WorkgroupIdY
-            | Self::LocalInvocationIdY
-            | Self::WorkgroupSizeY => MirKernelAxis::Y,
-            Self::GlobalInvocationZ
-            | Self::WorkgroupIdZ
-            | Self::LocalInvocationIdZ
-            | Self::WorkgroupSizeZ => MirKernelAxis::Z,
-            Self::GlobalInvocationId | Self::WorkgroupId | Self::LocalInvocationId => {
-                MirKernelAxis::X
-            }
-        }
-    }
-}
-
-impl MirKernelAxis {
-    #[must_use]
-    pub fn spelling(self) -> &'static str {
-        match self {
-            Self::X => "x",
-            Self::Y => "y",
-            Self::Z => "z",
-        }
-    }
 }
 
 impl MirKernelResourceKind {

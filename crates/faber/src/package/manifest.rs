@@ -693,11 +693,9 @@ pub(crate) fn validate_manifest(
         }
         if let Err(err) = FormatPolicy::from_slug(trimmed) {
             return Err(Box::new(
-                crate::package_diagnostic_error(format!(
-                    "faber.toml format.policy: {err}"
-                ))
-                .with_file(path.display().to_string())
-                .with_arg("issue", "unknown_format_policy"),
+                crate::package_diagnostic_error(format!("faber.toml format.policy: {err}"))
+                    .with_file(path.display().to_string())
+                    .with_arg("issue", "unknown_format_policy"),
             ));
         }
     }

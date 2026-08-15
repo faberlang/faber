@@ -2,7 +2,7 @@
 //!
 //! Resolves concrete width from a literal `IndexExpr` in the type table.
 //! Returns `None` when width is not statically known. Used by MIR layout and
-//! the stepper.
+//! the runner.
 
 use radix_types::{IndexExpr, IndexId, TypeTable};
 

@@ -211,7 +211,7 @@ pub(super) fn package_device_section(
         // The selected entry lowers to no compute kernel: no device payload.
         // An explicit GPU request for this package fails closed at run time
         // (N1.1: "package has no device program"); `auto` keeps the CPU
-        // route. (A `faber script` capture runner in the same package —
+        // route. (A `faber run` capture runner in the same package —
         // e.g. a CPU oracle — legitimately has no kernel.)
         return Ok(None);
     };
@@ -451,7 +451,7 @@ pub(super) fn run_fmir_package_image<H: Host + ?Sized>(
                 .collect::<Vec<_>>()
         })?;
     run_entry(&validated, host)
-        .map_err(|errors| stepper_diagnostics(&image.diagnostic_path, errors))?;
+        .map_err(|errors| runner_diagnostics(&image.diagnostic_path, errors))?;
     if let Some(code) = image.exit_code {
         host.exit(code);
     }

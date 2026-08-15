@@ -370,7 +370,7 @@ pub(super) fn local_namespace_call_targets(
                 }
                 ImportResolution::Library(module) => {
                     // Kernel-manifest `norma:*` modules stay on the
-                    // stepper-kernel bridge (`bridge_norma_providers_to_kernel`);
+                    // runner-kernel bridge (`bridge_norma_providers_to_kernel`);
                     // they are not linked into the program.
                     if is_bridged_norma_import_path(import_path) {
                         continue;
@@ -495,7 +495,7 @@ fn link_library_import_site(
             // A declared companion with no resolvable symbol fails closed
             // here (stable `package_mir_companion_unresolved` identity)
             // instead of silently vanishing from the link and surfacing later
-            // as an unstable stepper-internal error.
+            // as an unstable runner-internal error.
             for (primal_def_id, backward) in analysis.radix_lanes.iter_backward() {
                 let name = analysis
                     .interner
@@ -608,7 +608,7 @@ fn link_library_import_site(
 /// HIR with a return type and at least one tensor parameter). Without the
 /// latter, radix's snapshot pass skips the primal and no companion function
 /// is generated, so the link target would dangle into an unstable
-/// stepper-internal `missing MIR function` error.
+/// runner-internal `missing MIR function` error.
 fn companion_resolves(
     analysis: &radix::driver::AnalyzedUnit,
     primal_def_id: DefId,

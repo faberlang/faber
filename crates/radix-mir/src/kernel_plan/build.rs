@@ -206,7 +206,7 @@ impl CollectionKernelPlan {
     /// The resolved plan is cross-checked against the signature's element
     /// counts (input/output buffers must carry the flattened input/output
     /// dims) — the A3 typed cross-check: recipe facts are carried facts, never
-    /// inferred from names or bindings. Rank 1-2 only (the stepper's v1
+    /// inferred from names or bindings. Rank 1-2 only (the runner's v1
     /// constraint for all three ops); anything else yields `None` and the
     /// caller fails closed with a typed diagnostic.
     ///
@@ -530,7 +530,7 @@ pub(crate) fn transformer_recipe_shape(
             let dims = transformer_operand_dims(function, &args[0], validation)?;
             let rank = dims.len();
             if rank == 0 || rank > 2 {
-                // v1: rank 1-2 only (the stepper's constraint).
+                // v1: rank 1-2 only (the runner's constraint).
                 return None;
             }
             let axis = const_axis(args.get(1)?)?;
@@ -621,7 +621,7 @@ pub(crate) fn transformer_recipe_shape(
 /// `MirConstant::Float` (a const — never a value that would require
 /// inference, A3) that is finite and non-negative, and an optional affine
 /// pair (gamma, beta) must each be rank-1 tensors of the normalization
-/// dimension when present (the stepper's v1 constraint).
+/// dimension when present (the runner's v1 constraint).
 fn layer_norm_const_facts(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,

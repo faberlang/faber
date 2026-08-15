@@ -17,9 +17,9 @@ use crate::package::DeviceSelection;
 
 /// C2 small-build proof. Runs only outside `full-targets` (the
 /// `--no-default-features --features hir-rust` build): the GPU emitters and
-/// the wasm host leaf are also excluded there. The default build keeps those
-/// features compiled, so its device/native-host exclusions are asserted by
-/// [`default_build_is_faber_runtime_free`] instead.
+/// the wasm host leaf are also excluded there. The default build's
+/// exclusions are asserted by [`default_build_is_faber_runtime_free`]
+/// instead.
 #[cfg(not(feature = "full-targets"))]
 #[test]
 fn small_build_compiles_no_device_runtime_surface() {
@@ -32,25 +32,27 @@ fn small_build_compiles_no_device_runtime_surface() {
 }
 
 /// S3-U2 default-build regression: under the default build the cut holds —
-/// `device-runtime` and `host-macos-arm64` are off (no `faber-runtime` edge,
-/// no native host leaf) while the portable wasm host and the LLVM emit
-/// surface stay compiled.
+/// `device-runtime`, `host-macos-arm64`, and `host-wasm` are off (no
+/// `faber-runtime` edge, no native host leaf, no wasm host leaf) while the
+/// LLVM emit surface stays compiled.
 ///
 /// The faber-runtime-free graph claim is compile-level: the `faber-runtime`
 /// package enters this crate only through the optional dep behind
 /// `device-runtime` (`crates/faber/Cargo.toml:40`, `:111`), so this module
 /// compiling and running in the default build without that feature is the
 /// in-test proof; the transitive proof is `cargo tree -p faber -e normal`
-/// (unit validation), which must show no `faber-runtime` and no
-/// `faber-host-macos-arm64`.
+/// (unit validation), which must show no `faber-runtime`, no
+/// `faber-host-macos-arm64`, and no `faber-host-wasm` (host-wasm left
+/// full-targets at the U2 dependency-removal cut — it stays an explicit
+/// opt-in feature).
 #[cfg(feature = "full-targets")]
 #[test]
 fn default_build_is_faber_runtime_free() {
     assert!(!cfg!(feature = "device-runtime"));
     assert!(!cfg!(feature = "host-macos-arm64"));
-    // host-wasm stays in full-targets (portable product runner — no
-    // faber-runtime dependency) and the LLVM emit surface stays default.
-    assert!(cfg!(feature = "host-wasm"));
+    // host-wasm left full-targets at the U2 cut (wasm execution is external
+    // tools now); the LLVM emit surface stays default.
+    assert!(!cfg!(feature = "host-wasm"));
     assert!(cfg!(feature = "mir-llvm"));
 }
 

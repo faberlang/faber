@@ -94,7 +94,9 @@ pub(super) fn lower_package_units<'a>(
             &lowered.interner,
             &mut entry.analysis.interner,
         );
-        let nominal = NominalImportContext { nominal_map: &nominal_map };
+        let nominal = NominalImportContext {
+            nominal_map: &nominal_map,
+        };
         let source_to_entry_types = import_lowered_semantic_types(
             lowered.validated.validation().types,
             &mut entry.analysis.types,
@@ -163,7 +165,9 @@ pub(super) fn lower_package_units<'a>(
                 // module identity during analysis).
                 let cached_interface =
                     library_cached_file_interface(&library.import, library_resolver, cache).ok();
-                let source_identity = cached_interface.as_ref().and_then(|interface| interface.identity.clone());
+                let source_identity = cached_interface
+                    .as_ref()
+                    .and_then(|interface| interface.identity.clone());
                 let source_exports = cached_interface
                     .as_ref()
                     .map(exported_nominal_names)
@@ -235,7 +239,9 @@ pub(super) fn lower_package_units<'a>(
                     &lowered.interner,
                     &mut entry.analysis.interner,
                 );
-                let nominal = NominalImportContext { nominal_map: &nominal_map };
+                let nominal = NominalImportContext {
+                    nominal_map: &nominal_map,
+                };
                 let source_to_entry_types = import_lowered_semantic_types(
                     lowered.validated.validation().types,
                     &mut entry.analysis.types,
@@ -366,17 +372,21 @@ fn inject_package_data_members(
                     .libraries
                     .iter()
                     .find(|library| library.path == member.source_path)?;
-                let interface = library_cached_file_interface(
-                    &library.import,
-                    library_resolver,
-                    library_cache,
-                )
-                .ok()?;
-                let analysis = library_cached_analysis(&library.import, library_resolver, library_cache)
-                    .ok()?;
-                Some((analysis.interner.clone(), &analysis.types, &analysis.resolver, interface))
+                let interface =
+                    library_cached_file_interface(&library.import, library_resolver, library_cache)
+                        .ok()?;
+                let analysis =
+                    library_cached_analysis(&library.import, library_resolver, library_cache)
+                        .ok()?;
+                Some((
+                    analysis.interner.clone(),
+                    &analysis.types,
+                    &analysis.resolver,
+                    interface,
+                ))
             });
-        let Some((source_interner, source_types, source_resolver, source_interface)) = source else {
+        let Some((source_interner, source_types, source_resolver, source_interface)) = source
+        else {
             diagnostics.push(mir_issue_diag(
                 &entry_path,
                 "package_mir_data_member_unsupported",
@@ -438,21 +448,24 @@ fn transplant_data_member(
         &source_exports,
         &entry.analysis,
     )?;
-    let nominal = NominalImportContext { nominal_map: &nominal_map };
+    let nominal = NominalImportContext {
+        nominal_map: &nominal_map,
+    };
     let konst = HirConst {
-        name: remap_symbol(member.konst.name, source_interner, &mut entry.analysis.interner),
-        ty: member
-            .konst
-            .ty
-            .map(|ty| {
-                import_semantic_type_with_nominal(
-                    source_types,
-                    &mut entry.analysis.types,
-                    ty,
-                    &mut imported,
-                    Some(&nominal),
-                )
-            }),
+        name: remap_symbol(
+            member.konst.name,
+            source_interner,
+            &mut entry.analysis.interner,
+        ),
+        ty: member.konst.ty.map(|ty| {
+            import_semantic_type_with_nominal(
+                source_types,
+                &mut entry.analysis.types,
+                ty,
+                &mut imported,
+                Some(&nominal),
+            )
+        }),
         value: transplant_expr(
             &member.konst.value,
             source_interner,
@@ -495,9 +508,9 @@ fn transplant_expr(
     imported: &mut HashMap<TypeId, TypeId>,
     nominal: Option<&NominalImportContext<'_>>,
 ) -> Result<HirExpression, String> {
-    let ty = expr
-        .ty
-        .map(|ty| import_semantic_type_with_nominal(source_types, entry_types, ty, imported, nominal));
+    let ty = expr.ty.map(|ty| {
+        import_semantic_type_with_nominal(source_types, entry_types, ty, imported, nominal)
+    });
     let kind = match &expr.kind {
         HirExpressionKind::Literal(literal) => {
             HirExpressionKind::Literal(transplant_literal(literal, source_interner, entry_interner))
@@ -505,23 +518,63 @@ fn transplant_expr(
         HirExpressionKind::Vacua => HirExpressionKind::Vacua,
         HirExpressionKind::Binary(op, lhs, rhs) => HirExpressionKind::Binary(
             *op,
-            Box::new(transplant_expr(lhs, source_interner, source_types, entry_interner, entry_types, imported, nominal)?),
-            Box::new(transplant_expr(rhs, source_interner, source_types, entry_interner, entry_types, imported, nominal)?),
+            Box::new(transplant_expr(
+                lhs,
+                source_interner,
+                source_types,
+                entry_interner,
+                entry_types,
+                imported,
+                nominal,
+            )?),
+            Box::new(transplant_expr(
+                rhs,
+                source_interner,
+                source_types,
+                entry_interner,
+                entry_types,
+                imported,
+                nominal,
+            )?),
         ),
         HirExpressionKind::Unary(op, inner) => HirExpressionKind::Unary(
             *op,
-            Box::new(transplant_expr(inner, source_interner, source_types, entry_interner, entry_types, imported, nominal)?),
+            Box::new(transplant_expr(
+                inner,
+                source_interner,
+                source_types,
+                entry_interner,
+                entry_types,
+                imported,
+                nominal,
+            )?),
         ),
         HirExpressionKind::Array(elements) => {
             let mut transplanted = Vec::with_capacity(elements.len());
             for element in elements {
                 transplanted.push(match element {
-                    radix::hir::HirArrayElement::Expr(element) => radix::hir::HirArrayElement::Expr(
-                        transplant_expr(element, source_interner, source_types, entry_interner, entry_types, imported, nominal)?,
-                    ),
-                    radix::hir::HirArrayElement::Spread(element) => radix::hir::HirArrayElement::Spread(
-                        transplant_expr(element, source_interner, source_types, entry_interner, entry_types, imported, nominal)?,
-                    ),
+                    radix::hir::HirArrayElement::Expr(element) => {
+                        radix::hir::HirArrayElement::Expr(transplant_expr(
+                            element,
+                            source_interner,
+                            source_types,
+                            entry_interner,
+                            entry_types,
+                            imported,
+                            nominal,
+                        )?)
+                    }
+                    radix::hir::HirArrayElement::Spread(element) => {
+                        radix::hir::HirArrayElement::Spread(transplant_expr(
+                            element,
+                            source_interner,
+                            source_types,
+                            entry_interner,
+                            entry_types,
+                            imported,
+                            nominal,
+                        )?)
+                    }
                 });
             }
             HirExpressionKind::Array(transplanted)
@@ -539,13 +592,19 @@ fn transplant_expr(
                     nominal,
                 )?);
             }
-            let type_args = type_args
-                .as_ref()
-                .map(|args| {
-                    args.iter()
-                        .map(|ty| import_semantic_type_with_nominal(source_types, entry_types, *ty, imported, nominal))
-                        .collect()
-                });
+            let type_args = type_args.as_ref().map(|args| {
+                args.iter()
+                    .map(|ty| {
+                        import_semantic_type_with_nominal(
+                            source_types,
+                            entry_types,
+                            *ty,
+                            imported,
+                            nominal,
+                        )
+                    })
+                    .collect()
+            });
             HirExpressionKind::Tuple(transplanted, type_args)
         }
         HirExpressionKind::Scriptum(template, items) => {
@@ -586,7 +645,11 @@ fn transplant_expr(
         // this shape for typed literals (`fixum f32 GELU_ALPHA ← (0.79… ∷
         // f32)`), so the transplant must carry it through the entry's
         // top-level-const seam instead of failing closed.
-        HirExpressionKind::Verte { source, target, entries } => {
+        HirExpressionKind::Verte {
+            source,
+            target,
+            entries,
+        } => {
             let source = Box::new(transplant_expr(
                 source,
                 source_interner,
@@ -751,7 +814,8 @@ pub(super) fn import_lowered_semantic_types(
     let mut rewrites = Vec::new();
     for index in 0..source.type_count() {
         let source_ty = TypeId(index as u32);
-        let target_ty = import_semantic_type_with_nominal(source, target, source_ty, &mut imported, nominal);
+        let target_ty =
+            import_semantic_type_with_nominal(source, target, source_ty, &mut imported, nominal);
         push_type_rewrite(&mut rewrites, source_ty, target_ty);
     }
     rewrites
@@ -845,7 +909,7 @@ pub(super) fn rewrite_value_type_id(value: &mut MirValue, rewrites: &[(TypeId, T
 /// consumer analysis's variant identities (codex-gap S1 U2 VALUE members).
 ///
 /// A library unit constructs and projects its variants under its own variant
-/// `DefId`s; the merged program's variant metadata and the stepper's variant
+/// `DefId`s; the merged program's variant metadata and the runner's variant
 /// tags are keyed by the *consumer* variant defs, so every
 /// `EnumVariant`/`VariantField` reference in the lowered source program must
 /// ride the nominal remap. Variant defs without a consumer mapping keep their
@@ -918,7 +982,9 @@ fn rewrite_statement_variant_defs(
         MirStatementKind::Assign { value, .. } => {
             rewrite_value_variant_defs(value, variant_remap);
         }
-        MirStatementKind::Call { callee: _, args, .. } => {
+        MirStatementKind::Call {
+            callee: _, args, ..
+        } => {
             for arg in args {
                 rewrite_operand_variant_defs(arg, variant_remap);
             }
@@ -1234,15 +1300,12 @@ pub(super) fn checked_shifted_function_id(
     offset: u32,
     path: &Path,
 ) -> Result<MirFunctionId, Vec<Diagnostic>> {
-    id.0
-        .checked_add(offset)
-        .map(MirFunctionId)
-        .ok_or_else(|| {
-            vec![function_id_overflow_diag(
-                path,
-                "package MIR CLI dispatch function id would overflow",
-            )]
-        })
+    id.0.checked_add(offset).map(MirFunctionId).ok_or_else(|| {
+        vec![function_id_overflow_diag(
+            path,
+            "package MIR CLI dispatch function id would overflow",
+        )]
+    })
 }
 
 fn function_id_overflow_diag(path: &Path, message: &str) -> Diagnostic {
@@ -1657,7 +1720,9 @@ fn prune_unreachable_library_functions(
                 referenced_environments
                     .extend(scan_mir_function_references(program, function_id).environments);
             }
-            program.functions.retain(|function| keep.contains(&function.id));
+            program
+                .functions
+                .retain(|function| keep.contains(&function.id));
             environments.retain(|environment| referenced_environments.contains(&environment.id));
             // The reachability pruning leaves function-id gaps; the merge
             // shift assumes each appended program's ids are zero-based and
@@ -1678,10 +1743,7 @@ fn prune_unreachable_library_functions(
 /// the same shifted id (duplicate MIR function ids in the merged program).
 /// Block/local/temp ids stay per-function-scoped and untouched here; the
 /// merge's uniform shift handles them.
-fn reindex_function_ids(
-    program: &mut MirProgram,
-    environments: &mut [MirClosureEnvironment],
-) {
+fn reindex_function_ids(program: &mut MirProgram, environments: &mut [MirClosureEnvironment]) {
     let mut remap = HashMap::new();
     for (index, function) in program.functions.iter().enumerate() {
         remap.insert(function.id, MirFunctionId(index as u32));
@@ -1714,13 +1776,19 @@ fn remap_function_id(id: &mut MirFunctionId, remap: &HashMap<MirFunctionId, MirF
     }
 }
 
-fn remap_constant_function_ids(constant: &mut MirConstant, remap: &HashMap<MirFunctionId, MirFunctionId>) {
+fn remap_constant_function_ids(
+    constant: &mut MirConstant,
+    remap: &HashMap<MirFunctionId, MirFunctionId>,
+) {
     if let MirConstant::Function(id) = constant {
         remap_function_id(id, remap);
     }
 }
 
-fn remap_callee_function_ids(callee: &mut MirCallee, remap: &HashMap<MirFunctionId, MirFunctionId>) {
+fn remap_callee_function_ids(
+    callee: &mut MirCallee,
+    remap: &HashMap<MirFunctionId, MirFunctionId>,
+) {
     match callee {
         MirCallee::Function(id) => remap_function_id(id, remap),
         MirCallee::Closure(closure) => remap_function_id(&mut closure.function, remap),
@@ -1729,7 +1797,10 @@ fn remap_callee_function_ids(callee: &mut MirCallee, remap: &HashMap<MirFunction
     }
 }
 
-fn remap_operand_function_ids(operand: &mut MirOperand, remap: &HashMap<MirFunctionId, MirFunctionId>) {
+fn remap_operand_function_ids(
+    operand: &mut MirOperand,
+    remap: &HashMap<MirFunctionId, MirFunctionId>,
+) {
     if let MirOperand::Constant(constant) = operand {
         remap_constant_function_ids(constant, remap);
     }

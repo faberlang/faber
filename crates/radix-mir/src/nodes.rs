@@ -17,7 +17,7 @@
 //! - Terminators own CFG edges. Statements may call or construct values, but
 //!   only terminators decide where control moves next.
 
-use crate::{MirKernelBuiltin, MirKernelShaderStage};
+use crate::{MirAtomicOp, MirCollectionOp, MirKernelBuiltin, MirKernelShaderStage};
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_types::{IndexId, TypeId};
@@ -740,9 +740,9 @@ pub enum MirIntrinsic {
     Gradient(MirGradientOp),
     /// Compiler-owned runtime variant-tag check (`est <type>` / `non est <type>`).
     ///
-    /// Stepper-dispatched type check on the runtime value's variant tag against
+    /// Runner-dispatched type check on the runtime value's variant tag against
     /// a concrete valor-carried target type; never attempts extraction. The
-    /// MIR stepper is the first systems-lane consumer of the `est`
+    /// MIR runner is the first systems-lane consumer of the `est`
     /// variant-check surface (archived `docs/archived/est-variant-check/`);
     /// device/application lanes fail closed on it.
     TypeCheck(MirTypeCheckOp),
@@ -801,27 +801,6 @@ impl MirSermoOp {
     }
 }
 
-/// Compiler-owned atomic cell operation category.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum MirAtomicOp {
-    Load,
-    Store,
-    Exchange,
-    CompareExchange,
-}
-
-impl MirAtomicOp {
-    #[must_use]
-    pub fn spelling(self) -> &'static str {
-        match self {
-            Self::Load => "load",
-            Self::Store => "store",
-            Self::Exchange => "exchange",
-            Self::CompareExchange => "compare_exchange",
-        }
-    }
-}
-
 /// `@ cursor` call collected into a `lista<T>` before indexed iteration.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MirCursorStream {
@@ -868,146 +847,6 @@ pub struct MirStructFieldDefaults {
 pub enum MirConversionFlavor {
     Cast,
     Runtime,
-}
-
-/// Built-in collection operation category.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum MirCollectionOp {
-    Append,
-    AppendImmutable,
-    Put,
-    Delete,
-    Index,
-    IsEmpty,
-    Length,
-    Contains,
-    First,
-    Last,
-    RemoveFirst,
-    RemoveLast,
-    Reverse,
-    ReverseInPlace,
-    Sort,
-    Union,
-    Intersection,
-    Difference,
-    SymmetricDifference,
-    IsSubset,
-    IsSuperset,
-    Slice,
-    Take,
-    TakeLast,
-    DropFirst,
-    StartsWith,
-    EndsWith,
-    Uppercase,
-    Lowercase,
-    Trim,
-    Split,
-    Replace,
-    Absolute,
-    Signum,
-    Minimum,
-    Maximum,
-    Approximate,
-    Sum,
-    /// Sum across a specific axis: `sum(x, axis)`. The axis is a trailing
-    /// const operand (`MirConstant::Int`) in the `MirRuntimeCall::args` list.
-    /// Result rank is input rank - 1.
-    TensorSumAxis,
-    Round,
-    Floor,
-    Ceiling,
-    Truncate,
-    TensorShape,
-    TensorReshape,
-    TensorGet,
-    TensorSet,
-    TensorFill,
-    TensorCreate,
-    TensorFromFlat,
-    TensorFlatten,
-    TensorMaterialize,
-    TensorSlice,
-    TensorAdd,
-    TensorSub,
-    TensorMul,
-    TensorMatMul,
-    TensorMean,
-    /// Layer normalization: `(x - mean) / sqrt(var + eps)` with optional
-    /// affine transform (gamma, beta). Axis and epsilon are trailing const
-    /// operands in the `MirRuntimeCall::args` list, NOT a payload struct —
-    /// `MirIntrinsic::Collection` is a bare discriminant.
-    TensorLayerNorm,
-    /// Root-mean-square normalization (the CCI-1 `rms_norm` source contract;
-    /// `decoder_ops::rms_norm` semantics): `y = x·(1/sqrt(mean(x²)+eps))·gamma`,
-    /// no mean subtraction, f64 sum-of-squares → f32 mean. Axis and epsilon
-    /// are trailing const operands (`[x, axis, eps, gamma]`), gamma is the
-    /// mandatory affine peer operand — mirroring `TensorLayerNorm`'s const
-    /// layout without beta. Source-side axis-valid + gamma-width contract is
-    /// enforced at the HIR→AIR construction site (fail-closed).
-    TensorRmsNorm,
-    /// llama-arch NORM consecutive-pair rotary position embedding (the CCI-1
-    /// `rope_norm` source contract): pairs `(x[2k], x[2k+1])` with
-    /// `theta[k] = pos·freq_base^(−2k/dim)`, `freq_base` frozen at 100000
-    /// (v1 source constant). `pos` + `dim` are trailing const operands
-    /// (`[x, pos, dim]`); elements beyond `dim` on the last axis are
-    /// preserved. Odd/overlarge `dim` fail closed at the source surface.
-    TensorRope,
-    /// Row gather over the first axis (the CCI-1 `gather` source contract):
-    /// `table[V,D]` + `ids[T]` → `[T,D]` with `out[t] = table[ids[t]]`,
-    /// repeated/out-of-order ids preserved. The ids vector is a plain
-    /// operand (`[x, ids]`); out-of-range/negative ids fail closed at the
-    /// source surface (no silent clamping). Shape-transforming — not
-    /// `TensorGet`/`TensorSlice`.
-    TensorGather,
-    /// Causal masked-row softmax (GI3-1): numerically stable row softmax
-    /// over the causal attention scores with zero probability above the
-    /// diagonal (`[x]` — the rank-2 causal score matrix; row `i` masks
-    /// columns `j > i`). No mask tensor input (the causal structure is the
-    /// recipe's semantics); the diagonal is included.
-    TensorCausalMaskedSoftmax,
-    TensorDiv,
-    TensorNeg,
-    /// Gaussian Error Linear Unit using the tanh approximation:
-    /// 0.5*x*(1+tanh(√(2/π)*(x+0.044715*x³))). Error < 1e-6 vs exact Gelu.
-    /// Elementwise unary activation on tensor values. All finite f32 inputs valid.
-    TensorGelu,
-    /// Rectified linear unit: max(0, x), elementwise unary activation on tensor
-    /// values. All finite inputs valid; no domain constraints.
-    TensorRelu,
-    /// Softmax: `exp(x_i` - max(x)) / `sum(exp(x_j` - max(x))) with numerical
-    /// stability. Operates on rank-1 (vector) or rank-2 (batched row-wise,
-    /// axis 1 — the last axis). The AIR VJP exists
-    /// (`radix-air/src/reverse_ad/vjp.rs`, softmax walk: Mul → `TensorSumAxis`
-    /// → Fill → Sub → Mul); the MIR op itself is a forward collection op and
-    /// the device recipe (`RowSoftmax`) is admitted by the stage-6 P1 unit.
-    TensorSoftmax,
-    TensorTranspose,
-    /// Categorical cross-entropy loss: forward-only. Takes (logits, targets)
-    /// as 2-arg collection op and returns scalar f32 loss.
-    TensorCruxEntropia,
-    /// Number of explicitly stored nonzero entries in a sparse tensor.
-    SparseNonzeroCount,
-    /// Materialize a sparse tensor as a dense tensor with the same element and shape.
-    SparseDensify,
-    /// Read a sparse coordinate, returning the element zero when absent.
-    SparseGet,
-    /// Store or remove a sparse coordinate; storing zero removes it.
-    SparseSet,
-    IntervalIntersect,
-    IntervalUnion,
-    IntervalLength,
-    IntervalContains,
-    IntervalClamp,
-    IntervalMaterialize,
-    /// Map key snapshot used by `itera de` over `tabula<K,V>`.
-    Keys,
-    /// Map value snapshot used by `itera ex` over `tabula<K,V>`.
-    Values,
-    /// Regex `consentit`: whether the `regex` receiver's pattern matches a
-    /// `textus` argument (the Rust `regex` crate `is_match` semantics).
-    RegexMatches,
 }
 
 /// Provider classification for host dispatch routing.

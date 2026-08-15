@@ -104,7 +104,7 @@ pub const INDEXED_ACCESS_PARITY: &[TensorOperationParityRow] = &[
         family: TensorOperationFamily::IndexedAccess,
         target: TensorParityTarget::MirStepper,
         status: TensorParityStatus::Support,
-        evidence: "crates/radix/src/mir/stepper_test.rs::stepper_runs_tensor_indexed_access",
+        evidence: "crates/radix/src/mir/runner_test.rs::runner_runs_tensor_indexed_access",
     },
     TensorOperationParityRow {
         family: TensorOperationFamily::IndexedAccess,

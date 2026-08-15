@@ -1,7 +1,7 @@
 //! Code-owned rows for the first MIR tensor runtime ABI slice.
 //!
 //! TARGET: Stage 6 of the tensor systems timeline. This table records
-//! executable stepper support separately from probe-only import names so docs
+//! executable runner support separately from probe-only import names so docs
 //! and future package/runtime work cannot over-claim target support.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -73,25 +73,25 @@ pub const TENSOR_RUNTIME_ABI_ROWS: &[TensorRuntimeAbiRow] = &[
         facet: TensorRuntimeAbiFacet::ValueCarrier,
         target: TensorRuntimeAbiTarget::MirStepper,
         status: TensorRuntimeAbiStatus::Executable,
-        evidence: "crates/radix/src/mir/stepper/value.rs::Value::Tensor",
+        evidence: "crates/radix/src/mir/runner/value.rs::Value::Tensor",
     },
     TensorRuntimeAbiRow {
         facet: TensorRuntimeAbiFacet::OperationExecution,
         target: TensorRuntimeAbiTarget::MirStepper,
         status: TensorRuntimeAbiStatus::Executable,
-        evidence: "crates/radix/src/mir/stepper_test.rs::stepper_runs_tensor_runtime_abi_success_path",
+        evidence: "crates/radix/src/mir/runner_test.rs::runner_runs_tensor_runtime_abi_success_path",
     },
     TensorRuntimeAbiRow {
         facet: TensorRuntimeAbiFacet::RecoverableFailure,
         target: TensorRuntimeAbiTarget::MirStepper,
         status: TensorRuntimeAbiStatus::Executable,
-        evidence: "crates/radix/src/mir/stepper_test.rs::stepper_reports_tensor_runtime_abi_negative_index_failure",
+        evidence: "crates/radix/src/mir/runner_test.rs::runner_reports_tensor_runtime_abi_negative_index_failure",
     },
     TensorRuntimeAbiRow {
         facet: TensorRuntimeAbiFacet::ObservableOutput,
         target: TensorRuntimeAbiTarget::MirStepper,
         status: TensorRuntimeAbiStatus::Executable,
-        evidence: "crates/radix/src/mir/stepper_test.rs::stepper_runs_tensor_runtime_abi_success_path",
+        evidence: "crates/radix/src/mir/runner_test.rs::runner_runs_tensor_runtime_abi_success_path",
     },
     TensorRuntimeAbiRow {
         facet: TensorRuntimeAbiFacet::RuntimeImport,

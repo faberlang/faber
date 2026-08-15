@@ -16,14 +16,14 @@ use super::compile_package_go;
 #[cfg(feature = "hir-go")]
 use super::go_build::{emit_go_module_with_postprocess, invoke_go_build, GoBuildLayout};
 use super::manifest::{manifest_build_target, FaberManifest};
+#[cfg(feature = "mir-llvm")]
+use super::{build_host_program, LlvmHostProfile};
 use super::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
     build_package_mir_artifact, check_package, compile_package, config_with_locale,
     discover_build_layout, package_host_selection_diagnostic, package_rust_runtime_plan,
     read_manifest, BuildLayout, MANIFEST_FILE,
 };
-#[cfg(feature = "mir-llvm")]
-use super::{build_host_program, LlvmHostProfile};
 
 /// Print `message` and terminate.
 fn fail(message: &str) -> ! {
@@ -200,10 +200,11 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     }
 
     // U6-D: package Wasm builds emit one package-aware module per unit and
-    // print the module output directory. Linking/running is the product
-    // host's job (`faber-host-wasm::WasmRtV1Host::run_package`); the build
-    // artifact is the module set + link manifest.
-    if is_package && target == Target::MirWasmBinary {
+    // print the module output directory. Linking/running is external (the
+    // product host's job); the build artifact is the module set + link
+    // manifest. The `wasm` target is the text target — binary conversion is
+    // an external-tool step (`wat2wasm` / `wasm-tools parse`).
+    if is_package && target == Target::MirWasm {
         #[cfg(not(feature = "mir-wasm"))]
         {
             eprintln!(
@@ -325,21 +326,6 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
         fail("compilation failed");
     };
 
-    // Binary wasm output cannot travel the text `output_code` path: write the
-    // module bytes to the output path (single-file wasm builds and any other
-    // `Output::Wasm` producer). Package wasm builds are routed above.
-    if let Output::Wasm(out) = &output {
-        let output_path = radix::tool::build_output_path(
-            &command.out_dir,
-            &input_path,
-            target,
-            is_package,
-        );
-        write_output_file(&output_path, &out.bytes);
-        println!("{}", output_path.display());
-        return;
-    }
-
     // Package Rust builds own a generated crate under target/faber/ and let
     // Cargo place artifacts in sibling debug/release directories.
     if is_package && target == radix::codegen::Target::HirRust {
@@ -371,11 +357,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
         if let Some(diagnostic) =
             package_host_selection_diagnostic(&runtime_plan, &layout.manifest_path)
         {
-            report_diagnostics_and_exit(
-                &[diagnostic],
-                locale_pack.as_ref(),
-                "runtime plan failed",
-            );
+            report_diagnostics_and_exit(&[diagnostic], locale_pack.as_ref(), "runtime plan failed");
         }
         // G4: emit native-binding library crates before the application crate links them.
         match super::library_link::emit_linked_library_crates(&layout.package_root, &layout) {
@@ -427,13 +409,8 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
                 };
                 let generated_code =
                     crate::postprocess::postprocess_code(code.clone(), target, format, linter);
-                let binary_path = emit_crate_and_build(
-                    &layout,
-                    &generated_code,
-                    None,
-                    &plan,
-                    command.release,
-                );
+                let binary_path =
+                    emit_crate_and_build(&layout, &generated_code, None, &plan, command.release);
                 println!("{}", binary_path.display());
                 return;
             }
@@ -479,11 +456,7 @@ fn emit_crate_and_build(
 fn write_output_file(output_path: &Path, bytes: &[u8]) {
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).unwrap_or_else(|err| {
-            eprintln!(
-                "error: failed to create '{}': {}",
-                parent.display(),
-                err
-            );
+            eprintln!("error: failed to create '{}': {}", parent.display(), err);
             std::process::exit(1);
         });
     }
@@ -534,11 +507,10 @@ fn resolve_build_target(command: &radix::tool::BuildCommand, input_path: &Path) 
         return command.target;
     }
 
-    let manifest = read_manifest(&layout.manifest_path)
-        .unwrap_or_else(|diag| fail_with_diagnostic(&diag));
-    manifest_build_target(manifest.build.target.as_deref(), &layout.manifest_path).unwrap_or_else(
-        |diag| fail_with_diagnostic(&diag),
-    )
+    let manifest =
+        read_manifest(&layout.manifest_path).unwrap_or_else(|diag| fail_with_diagnostic(&diag));
+    manifest_build_target(manifest.build.target.as_deref(), &layout.manifest_path)
+        .unwrap_or_else(|diag| fail_with_diagnostic(&diag))
 }
 
 /// Resolve the target for `faber check` from the package manifest.
@@ -594,7 +566,7 @@ pub fn use_package_compiler(target: Target, path: &std::path::Path, force_packag
                 | Target::MirFmirBundle
                 | Target::HirFhir
                 | Target::MirLlvmHost
-                | Target::MirWasmBinary
+                | Target::MirWasm
         );
     }
     false
@@ -771,28 +743,9 @@ pub fn cmd_emit_package(command: radix::tool::EmitCommand, format: bool, linter:
         return;
     }
 
-    // Binary wasm output has no text form: emit the entry module bytes to
-    // stdout (the same behavior the single-file emit command uses).
-    match output {
-        Output::Wasm(out) => {
-            use std::io::Write;
-            std::io::stdout()
-                .write_all(&out.bytes)
-                .unwrap_or_else(|err| {
-                    eprintln!("error: failed to write wasm bytes to stdout: {err}");
-                    std::process::exit(1);
-                });
-        }
-        output => {
-            let code = crate::postprocess::postprocess_code(
-                output_code(output),
-                command.target,
-                format,
-                linter,
-            );
-            print!("{code}");
-        }
-    }
+    let code =
+        crate::postprocess::postprocess_code(output_code(output), command.target, format, linter);
+    print!("{code}");
 }
 
 fn compile_package_input(
@@ -814,7 +767,8 @@ fn compile_package_input(
         std::process::exit(1);
     }
 
-    let (config, locale_pack) = match config_with_locale(target, &path, locale, diagnostics_locale) {
+    let (config, locale_pack) = match config_with_locale(target, &path, locale, diagnostics_locale)
+    {
         Ok(selection) => selection,
         Err(diag) => fail_with_diagnostic(&diag),
     };
@@ -836,15 +790,6 @@ fn output_code(output: Output) -> String {
         Output::Go(out) => out.code,
         Output::Python(out) => out.code,
         Output::WasmText(out) => out.code,
-        // Unreachable: `cmd_build` writes binary wasm module bytes to the
-        // output path, package wasm builds route through the package-wasm
-        // builder, and `cmd_emit_package` rejects binary wasm on the stdout
-        // path with a recorded diagnostic — binary bytes never reach this
-        // text-only extractor.
-        Output::Wasm(_) => unreachable!(
-            "binary Wasm output is routed before output_code: package builds use the \
-             package-wasm path, emit uses `--output`, build writes module bytes"
-        ),
         Output::LlvmText(out) => out.code,
         Output::MetalText(out) => out.code,
         Output::WgslText(out) => out.code,

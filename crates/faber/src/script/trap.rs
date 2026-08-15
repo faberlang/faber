@@ -1,7 +1,7 @@
 //! Exit/abort traps so interpreted Faber can return an [`ExitCode`] without
 //! terminating the embedder process.
 
-use radix::mir::{Host, KernelModule, MirDiagnosticKind, MirProvider, StepperError, Value};
+use radix::mir::{Host, KernelModule, MirDiagnosticKind, MirProvider, RunnerError, Value};
 use std::any::Any;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::process::ExitCode;
@@ -20,11 +20,11 @@ pub(crate) struct TrapHost<'a> {
 }
 
 impl Host for TrapHost<'_> {
-    fn scribe(&mut self, kind: MirDiagnosticKind, text: &str) -> Result<(), StepperError> {
+    fn scribe(&mut self, kind: MirDiagnosticKind, text: &str) -> Result<(), RunnerError> {
         self.inner.scribe(kind, text)
     }
 
-    fn read_line(&mut self) -> Result<Option<String>, StepperError> {
+    fn read_line(&mut self) -> Result<Option<String>, RunnerError> {
         self.inner.read_line()
     }
 
@@ -32,7 +32,7 @@ impl Host for TrapHost<'_> {
         panic_trap(HostTrap::Abort(reason.to_owned()));
     }
 
-    fn provider(&mut self, provider: &MirProvider) -> Result<Value, StepperError> {
+    fn provider(&mut self, provider: &MirProvider) -> Result<Value, RunnerError> {
         self.inner.provider(provider)
     }
 
@@ -42,23 +42,23 @@ impl Host for TrapHost<'_> {
         verb: &str,
         args: &[Value],
         span: radix::lexer::Span,
-    ) -> Result<Value, StepperError> {
+    ) -> Result<Value, RunnerError> {
         // processus.exi must hit TrapHost::exit (HostTrap) rather than the
         // inner BufferHost::exit panic, so embedders can return ExitCode.
         if matches!(module, KernelModule::Processus) && verb == "exi" {
             let [code] = args else {
-                return Err(StepperError::internal(span, "exi provider arity"));
+                return Err(RunnerError::internal(span, "exi provider arity"));
             };
             let code = match code {
                 Value::Int(v) => i32::try_from(*v).unwrap_or(i32::MAX),
-                _ => return Err(StepperError::internal(span, "exi code is not numerus")),
+                _ => return Err(RunnerError::internal(span, "exi code is not numerus")),
             };
             self.exit(code);
         }
         self.inner.kernel_call(module, verb, args, span)
     }
 
-    fn write_stdout_raw(&mut self, text: &str) -> Result<(), StepperError> {
+    fn write_stdout_raw(&mut self, text: &str) -> Result<(), RunnerError> {
         self.inner.write_stdout_raw(text)
     }
 
@@ -66,27 +66,27 @@ impl Host for TrapHost<'_> {
         panic_trap(HostTrap::Exit(code));
     }
 
-    fn argumenta(&self) -> Result<&[String], StepperError> {
+    fn argumenta(&self) -> Result<&[String], RunnerError> {
         self.inner.argumenta()
     }
 
-    fn env_get(&self, name: &str) -> Result<Option<String>, StepperError> {
+    fn env_get(&self, name: &str) -> Result<Option<String>, RunnerError> {
         self.inner.env_get(name)
     }
 
-    fn env_set(&mut self, name: &str, value: &str) -> Result<(), StepperError> {
+    fn env_set(&mut self, name: &str, value: &str) -> Result<(), RunnerError> {
         self.inner.env_set(name, value)
     }
 
-    fn cwd(&self) -> Result<String, StepperError> {
+    fn cwd(&self) -> Result<String, RunnerError> {
         self.inner.cwd()
     }
 
-    fn set_cwd(&mut self, path: &str) -> Result<(), StepperError> {
+    fn set_cwd(&mut self, path: &str) -> Result<(), RunnerError> {
         self.inner.set_cwd(path)
     }
 
-    fn pid(&self) -> Result<i64, StepperError> {
+    fn pid(&self) -> Result<i64, RunnerError> {
         self.inner.pid()
     }
 }

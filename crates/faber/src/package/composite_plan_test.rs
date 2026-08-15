@@ -95,13 +95,19 @@ fn fixture_program() -> DeviceProgram {
             DeviceResource {
                 buffer: weights_identity(),
                 version: weights_version(),
-                binding: Binding { group: 0, binding: 0 },
+                binding: Binding {
+                    group: 0,
+                    binding: 0,
+                },
                 access: MirKernelResourceAccess::Read,
             },
             DeviceResource {
                 buffer: scores_identity(),
                 version: scores_version(),
-                binding: Binding { group: 0, binding: 1 },
+                binding: Binding {
+                    group: 0,
+                    binding: 1,
+                },
                 access: MirKernelResourceAccess::Write,
             },
         ],
@@ -113,7 +119,10 @@ fn fixture_program() -> DeviceProgram {
     };
     DeviceProgram {
         kernels: vec![kernel],
-        launches: vec![LaunchUnit { id: LaunchId(1), kernel_index: 0 }],
+        launches: vec![LaunchUnit {
+            id: LaunchId(1),
+            kernel_index: 0,
+        }],
         lifetime: DeviceProgramLifetime::SingleRun,
         results: vec![ResultBuffer {
             buffer: scores_identity(),
@@ -239,9 +248,10 @@ fn fixture_identity_source() -> IdentitySource {
 fn assert_first_domain(diagnostics: &[Diagnostic], domain: &str) {
     assert!(
         diagnostics.iter().any(|diag| {
-            diag.args
-                .contains(&DiagnosticArg::new("issue", "composite_plan_identity_divergence"))
-                && diag.args.contains(&DiagnosticArg::new("domain", domain))
+            diag.args.contains(&DiagnosticArg::new(
+                "issue",
+                "composite_plan_identity_divergence",
+            )) && diag.args.contains(&DiagnosticArg::new("domain", domain))
         }),
         "expected first-failing domain `{domain}`, got: {diagnostics:?}"
     );
@@ -344,8 +354,10 @@ fn mutated_artifact_digest_is_rejected_not_repaired() {
     let detail = error
         .iter()
         .find(|diag| {
-            diag.args
-                .contains(&DiagnosticArg::new("issue", "composite_plan_identity_divergence"))
+            diag.args.contains(&DiagnosticArg::new(
+                "issue",
+                "composite_plan_identity_divergence",
+            ))
         })
         .expect("typed divergence diagnostic present");
     assert!(detail
@@ -365,8 +377,11 @@ fn typed_error_names_the_first_failing_domain() {
     let error = verify_identity_preservation(&divergent, &source).unwrap_err();
     assert_eq!(error.domain(), IdentityDomain::Model);
     let diagnostic = error.to_diagnostic();
+    assert!(diagnostic.args.contains(&DiagnosticArg::new(
+        "issue",
+        "composite_plan_identity_divergence"
+    )));
     assert!(diagnostic
         .args
-        .contains(&DiagnosticArg::new("issue", "composite_plan_identity_divergence")));
-    assert!(diagnostic.args.contains(&DiagnosticArg::new("domain", "model")));
+        .contains(&DiagnosticArg::new("domain", "model")));
 }

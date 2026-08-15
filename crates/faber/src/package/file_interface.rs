@@ -3,8 +3,9 @@ use radix::driver::AnalyzedUnit;
 use radix::file_interface::{
     snapshot_interface_callable_with_identity, snapshot_interface_type_with_identity, FileExport,
     FileExportKind, FileInterface, FileInterfaceError, InterfaceAnnotationContract,
-    InterfaceAnnotationContractField, InterfaceEnumVariant, InterfaceLibraryIdentity, InterfaceMethodExport,
-    InterfaceNominalExport, InterfaceQualifiedIdentity, InterfaceStructExport, InterfaceStructField,
+    InterfaceAnnotationContractField, InterfaceEnumVariant, InterfaceLibraryIdentity,
+    InterfaceMethodExport, InterfaceNominalExport, InterfaceQualifiedIdentity,
+    InterfaceStructExport, InterfaceStructField,
 };
 use radix::hir::{
     DefId, HirConst, HirEnum, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind,
@@ -91,9 +92,12 @@ pub(crate) fn extract_file_interface_with_identity(
         }
 
         let kind = match &item.kind {
-            HirItemKind::Function(func) => {
-                FileExportKind::Function(snapshot_function(func, analysis, file_label, export_identity)?)
-            }
+            HirItemKind::Function(func) => FileExportKind::Function(snapshot_function(
+                func,
+                analysis,
+                file_label,
+                export_identity,
+            )?),
             HirItemKind::TypeAlias(alias) => FileExportKind::TypeAlias(
                 snapshot_interface_type_with_identity(
                     alias.ty,
@@ -112,18 +116,19 @@ pub(crate) fn extract_file_interface_with_identity(
                 item.def_id,
                 export_identity,
             )?),
-            HirItemKind::Enum(enm) => FileExportKind::Enum(snapshot_enum(
-                enm,
-                analysis,
-                file_label,
-                export_identity,
-            )?),
+            HirItemKind::Enum(enm) => {
+                FileExportKind::Enum(snapshot_enum(enm, analysis, file_label, export_identity)?)
+            }
             HirItemKind::Interface(interface_decl) => FileExportKind::Interface(
                 snapshot_interface(interface_decl, analysis, file_label, &name, export_identity)?,
             ),
-            HirItemKind::Constant(konst) => {
-                FileExportKind::Const(snapshot_const(konst, analysis, file_label, &name, export_identity)?)
-            }
+            HirItemKind::Constant(konst) => FileExportKind::Const(snapshot_const(
+                konst,
+                analysis,
+                file_label,
+                &name,
+                export_identity,
+            )?),
             HirItemKind::Schema(_) => continue,
             HirItemKind::Import(_) => continue,
         };
@@ -183,7 +188,13 @@ fn snapshot_interface(
         .map(|method| {
             Ok(InterfaceMethodExport {
                 name: analysis.interner.resolve(method.name).to_owned(),
-                callable: snapshot_interface_method(method, analysis, file_label, name, export_identity)?,
+                callable: snapshot_interface_method(
+                    method,
+                    analysis,
+                    file_label,
+                    name,
+                    export_identity,
+                )?,
             })
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;
@@ -226,7 +237,9 @@ fn snapshot_enum(
                         optional: false,
                         required: true,
                     })
-                    .map_err(|err| interface_error(file_label, &variant_name(analysis, variant), err))
+                    .map_err(|err| {
+                        interface_error(file_label, &variant_name(analysis, variant), err)
+                    })
                 })
                 .collect::<Result<Vec<_>, Diagnostic>>()?;
             Ok(InterfaceEnumVariant {
@@ -327,7 +340,13 @@ fn snapshot_struct(
         .map(|method| {
             Ok(InterfaceMethodExport {
                 name: analysis.interner.resolve(method.func.name).to_owned(),
-                callable: snapshot_struct_method(method, analysis, file_label, name, export_identity)?,
+                callable: snapshot_struct_method(
+                    method,
+                    analysis,
+                    file_label,
+                    name,
+                    export_identity,
+                )?,
             })
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;

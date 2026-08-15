@@ -34,7 +34,7 @@ const FABER_TARGET_ROWS: &[(radix::codegen::Target, &str, &str)] = &[
     (radix::codegen::Target::HirGo, "go", "hir-go"),
     (radix::codegen::Target::HirPython, "python", "hir-python"),
     (radix::codegen::Target::HirHaskell, "haskell", "hir-haskell"),
-    (radix::codegen::Target::MirWasmBinary, "wasm", "mir-wasm"),
+    (radix::codegen::Target::MirWasm, "wasm", "mir-wasm"),
     (radix::codegen::Target::MirWasm, "wasm-text", "mir-wasm"),
     (radix::codegen::Target::MirLlvm, "llvm-text", "mir-llvm"),
     (radix::codegen::Target::MirLlvmHost, "llvm-host", "mir-llvm"),
@@ -193,6 +193,9 @@ fn compiled_features() -> BTreeSet<&'static str> {
     }
     if cfg!(feature = "hir-python") {
         compiled.insert("hir-python");
+    }
+    if cfg!(feature = "hir-haskell") {
+        compiled.insert("hir-haskell");
     }
     if cfg!(feature = "mir-wasm") {
         compiled.insert("mir-wasm");

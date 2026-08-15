@@ -44,15 +44,8 @@ pub fn write_output_artifact(
 ) {
     ensure_artifact_parent(path);
 
-    match output {
-        Output::Wasm(out) => {
-            write_artifact_contents(path, &out.bytes);
-        }
-        other => {
-            let code = postprocess_code(radix::tool::output_code(other), target, format, linter);
-            write_artifact_contents(path, code);
-        }
-    }
+    let code = postprocess_code(radix::tool::output_code(output), target, format, linter);
+    write_artifact_contents(path, code);
 }
 
 fn ensure_artifact_parent(path: &Path) {
@@ -99,7 +92,6 @@ pub fn format_generated_code(target: Target, code: &str) -> Result<String, Strin
         Target::HirTypeScript => format_typescript_code(code),
         Target::HirFhir => Ok(code.to_string()),
         Target::MirStepper
-        | Target::MirWasmBinary
         | Target::MirWasm
         | Target::MirLlvm
         | Target::MirLlvmHost
@@ -131,7 +123,6 @@ pub fn lint_generated_code(target: Target, code: &str) -> Result<String, String>
         | Target::HirFhir => Ok(code.to_string()),
         Target::HirTypeScript => lint_typescript_code(code),
         Target::MirStepper
-        | Target::MirWasmBinary
         | Target::MirWasm
         | Target::MirLlvm
         | Target::MirLlvmHost

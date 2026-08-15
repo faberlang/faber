@@ -183,7 +183,7 @@ pub(crate) fn plan_package(package: &AnalyzedPackage, target: Target) -> Artifac
             Some("package artifact planning does not emit Faber re-source packages yet".to_owned()),
             None,
         ),
-        Target::MirWasmBinary => {
+        Target::MirWasm => {
             plan_wasm_artifacts(package, &package_id, &mut nodes, &mut edges, &mut seen_ids);
             let entry = nodes
                 .iter()
@@ -413,7 +413,6 @@ pub(crate) fn target_name(target: Target) -> &'static str {
         Target::HirTypeScript => "ts",
         Target::HirGo => "go",
         Target::HirFaber => "faber",
-        Target::MirWasmBinary => "wasm",
         Target::MirWasm => "wasm-text",
         Target::MirLlvm => "llvm-text",
         Target::MirLlvmHost => "llvm-host",

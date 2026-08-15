@@ -1,0 +1,3657 @@
+//! Tests for the in-process MIR runner.
+//!
+//! Proves tensor/vector/matrix elementwise dispatch, host fail-closed
+//! defaults, runner issue encoding, regex patterns, constant/value
+//! equality, and the F-0xx regression behaviors.
+
+#![expect(
+    clippy::cast_precision_loss,
+    reason = "test helpers promote Int elements to f64 for float comparison"
+)]
+
+use super::*;
+
+use radix_mir::KernelModule;
+use radix_mir::MirType;
+use radix_mir::{MirCollectionOp, MirDiagnosticKind, MirIntrinsic, MirProvider, MirRuntimeCall};
+use radix_types::TypeId;
+
+/// Canonical test program shape: one empty function with no params, locals, or blocks.
+fn test_function() -> MirFunction {
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![],
+        locals: vec![],
+        temps: vec![],
+        blocks: vec![],
+        return_ty: MirType::semantic(TypeId(0)),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    }
+}
+
+#[test]
+fn converts_numeric_array_to_octeti_in_one_step() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let program = MirProgram::new();
+    let runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let input = Value::Array(Rc::new(RefCell::new(vec![
+        Value::Int(0),
+        Value::Int(127),
+        Value::UInt(255),
+    ])));
+
+    let output = runner
+        .convert_to_octeti(input, Span::default())
+        .expect("byte-valued numeric lista should convert to octeti");
+
+    assert_eq!(output, Value::Octeti(vec![0, 127, 255]));
+}
+
+#[test]
+fn test_tensor_layernorm_rank2_no_affine() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // --- 1. Build 2×3 input tensor: [[1, 2, 3], [4, 5, 6]] ---
+    let input_data = vec![
+        Value::Float(1.0),
+        Value::Float(2.0),
+        Value::Float(3.0),
+        Value::Float(4.0),
+        Value::Float(5.0),
+        Value::Float(6.0),
+    ];
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: input_data,
+        shape: vec![2, 3],
+    })));
+
+    // --- 2. Build minimal runner context ---
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    // Push a frame and insert the input tensor in value slot 0.
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), input_tensor);
+
+    // --- 3. Build the layernorm call (axis=1, epsilon=1e-5, no affine) ---
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorLayerNorm),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),               // input tensor
+            MirOperand::Constant(MirConstant::Int(1)),      // axis
+            MirOperand::Constant(MirConstant::Float(1e-5)), // epsilon
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    // --- 4. Evaluate ---
+    let result = runner
+        .eval_runtime_call(&call, radix_lexer::Span::default())
+        .expect("layernorm dispatch should succeed");
+
+    // --- 5. Verify ---
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![2, 3], "output shape must match input shape");
+
+    // Row 0: mean=2.0, var = ((1-2)²+(2-2)²+(3-2)²)/3 = 0.666..., inv_std ≈ 1.22474
+    // Row 1: mean=5.0, var = ((4-5)²+(5-5)²+(6-5)²)/3 = 0.666..., same inv_std
+    // Normalized row 0: [-1.2247, 0.0, 1.2247]
+    // Normalized row 1: [-1.2247, 0.0, 1.2247]
+    #[allow(clippy::float_cmp)]
+    let expected: [(usize, f64); 6] = [
+        (0, -1.224_744_871_391_589),
+        (1, 0.0),
+        (2, 1.224_744_871_391_589),
+        (3, -1.224_744_871_391_589),
+        (4, 0.0),
+        (5, 1.224_744_871_391_589),
+    ];
+
+    for (idx, expected_val) in &expected {
+        let actual = match &out.data[*idx] {
+            Value::Float(f) => *f,
+            Value::Int(i) => *i as f64,
+            other => panic!("item {idx}: expected numeric, got {other:?}"),
+        };
+        let diff = (actual - expected_val).abs();
+        assert!(
+            diff < 1e-4,
+            "item {idx}: actual={actual}, expected={expected_val}, diff={diff:.6e}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TensorSoftmax runner dispatch smoke test
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_tensor_softmax_rank1() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // --- 1. Build rank-1 input tensor: [1.0, 2.0, 3.0] ---
+    let input_data = vec![Value::Float(1.0), Value::Float(2.0), Value::Float(3.0)];
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: input_data,
+        shape: vec![3],
+    })));
+
+    // --- 2. Build minimal runner context ---
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    // Push a frame and insert the input tensor in value slot 0.
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), input_tensor);
+
+    // --- 3. Build the softmax call ---
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorSoftmax),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    // --- 4. Evaluate ---
+    let result = runner
+        .eval_runtime_call(&call, radix_lexer::Span::default())
+        .expect("softmax dispatch should succeed");
+
+    // --- 5. Verify ---
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![3], "output shape must match input shape");
+
+    // softmax([1.0, 2.0, 3.0])
+    // max=3.0, exp(1-3)=e^-2≈0.1353, exp(2-3)=e^-1≈0.3679, exp(3-3)=1.0
+    // sum≈1.5032, normalized≈[0.0900, 0.2447, 0.6652]
+    let sum: f64 = out
+        .data
+        .iter()
+        .map(|v| match v {
+            Value::Float(f) => *f,
+            Value::Int(i) => *i as f64,
+            _ => 0.0,
+        })
+        .sum();
+    assert!(
+        (sum - 1.0).abs() < 1e-6,
+        "softmax sum must be 1.0, got {sum}"
+    );
+
+    let expected: [(usize, f64); 3] = [
+        (0, 0.090_030_573_170_380_46),
+        (1, 0.244_728_471_054_797_67),
+        (2, 0.665_240_955_774_821_9),
+    ];
+    for (idx, expected_val) in &expected {
+        let actual = match &out.data[*idx] {
+            Value::Float(f) => *f,
+            Value::Int(i) => *i as f64,
+            other => panic!("item {idx}: expected numeric, got {other:?}"),
+        };
+        let diff = (actual - expected_val).abs();
+        assert!(
+            diff < 1e-6,
+            "item {idx}: actual={actual}, expected={expected_val}, diff={diff:.6e}"
+        );
+    }
+}
+
+#[test]
+fn test_tensor_softmax_rank2() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // --- 1. Build rank-2 input tensor: [[1, 2, 3], [1, 2, 3]] ---
+    let input_data = vec![
+        Value::Float(1.0),
+        Value::Float(2.0),
+        Value::Float(3.0),
+        Value::Float(1.0),
+        Value::Float(2.0),
+        Value::Float(3.0),
+    ];
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: input_data,
+        shape: vec![2, 3],
+    })));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), input_tensor);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorSoftmax),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    let result = runner
+        .eval_runtime_call(&call, radix_lexer::Span::default())
+        .expect("softmax rank-2 dispatch should succeed");
+
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![2, 3], "output shape must match input shape");
+
+    // Each row sums to 1.0.
+    let row0_sum: f64 = out.data[0..3]
+        .iter()
+        .map(|v| match v {
+            Value::Float(f) => *f,
+            _ => 0.0,
+        })
+        .sum();
+    let row1_sum: f64 = out.data[3..6]
+        .iter()
+        .map(|v| match v {
+            Value::Float(f) => *f,
+            _ => 0.0,
+        })
+        .sum();
+    assert!(
+        (row0_sum - 1.0).abs() < 1e-6,
+        "row 0 sum must be 1.0, got {row0_sum}"
+    );
+    assert!(
+        (row1_sum - 1.0).abs() < 1e-6,
+        "row 1 sum must be 1.0, got {row1_sum}"
+    );
+
+    // Both rows are identical since input rows are identical.
+    for i in 0..3 {
+        let diff = match (&out.data[i], &out.data[i + 3]) {
+            (Value::Float(a), Value::Float(b)) => (a - b).abs(),
+            _ => 1.0,
+        };
+        assert!(
+            diff < 1e-10,
+            "rows must be identical; item {i} differs by {diff:.6e}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TensorGelu runner dispatch smoke test
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_tensor_gelu_rank1() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // --- 1. Build rank-1 input tensor: [-3.0, -1.0, 0.0, 1.0, 3.0] ---
+    let inputs = [-3.0, -1.0, 0.0, 1.0, 3.0];
+    let input_data: Vec<Value> = inputs.iter().map(|v| Value::Float(*v)).collect();
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: input_data,
+        shape: vec![5],
+    })));
+
+    // --- 2. Build minimal runner context ---
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), input_tensor);
+
+    // --- 3. Build the tensor_gelu call ---
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorGelu),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    // --- 4. Evaluate ---
+    let result = runner
+        .eval_runtime_call(&call, radix_lexer::Span::default())
+        .expect("tensor gelu dispatch should succeed");
+
+    // --- 5. Verify ---
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![5], "output shape must match input shape");
+    assert_eq!(out.data.len(), 5, "output data length must match input");
+
+    for (idx, input) in inputs.iter().enumerate() {
+        let expected = gelu_f64(*input);
+        let actual = match &out.data[idx] {
+            Value::Float(f) => *f,
+            other => panic!("item {idx}: expected float, got {other:?}"),
+        };
+        let diff = (actual - expected).abs();
+        assert!(
+            diff < 1e-12,
+            "tensor_gelu item {idx}: input={input}, actual={actual}, expected={expected}, diff={diff:.6e}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TensorRelu runner dispatch smoke test
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_tensor_relu_rank1() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // Mixed-sign input proves ReLU is not identity: negatives clamp to 0.0.
+    let inputs = [-3.0, -1.0, 0.0, 1.0, 3.0];
+    let input_data: Vec<Value> = inputs.iter().map(|v| Value::Float(*v)).collect();
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: input_data,
+        shape: vec![5],
+    })));
+
+    // --- 2. Build minimal runner context ---
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), input_tensor);
+
+    // --- 3. Build the tensor_relu call ---
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorRelu),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    // --- 4. Evaluate ---
+    let result = runner
+        .eval_runtime_call(&call, radix_lexer::Span::default())
+        .expect("tensor relu dispatch should succeed");
+
+    // --- 5. Verify ---
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![5], "output shape must match input shape");
+    assert_eq!(out.data.len(), 5, "output data length must match input");
+
+    for (idx, input) in inputs.iter().enumerate() {
+        let expected = input.max(0.0);
+        let actual = match &out.data[idx] {
+            Value::Float(f) => *f,
+            other => panic!("item {idx}: expected float, got {other:?}"),
+        };
+        assert!(
+            (actual - expected).abs() < 1e-9,
+            "tensor_relu item {idx}: input={input}, actual={actual}, expected={expected}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MirUnOp::Gelu tensor dispatch test
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_mir_unop_gelu_tensor() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    let inputs = [-2.0, -0.5, 0.0, 0.5, 2.0];
+    let input_data: Vec<Value> = inputs.iter().map(|v| Value::Float(*v)).collect();
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: input_data,
+        shape: vec![5],
+    })));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), input_tensor);
+
+    // --- 3. Call eval_unop with MirUnOp::Gelu on the tensor operand ---
+    let result = runner
+        .eval_unop(
+            MirUnOp::Gelu,
+            &MirOperand::Value(MirValueId(0)),
+            MirType::semantic(TypeId(0)),
+            radix_lexer::Span::default(),
+        )
+        .expect("MirUnOp::Gelu tensor dispatch should succeed");
+
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![5], "output shape must match");
+    assert_eq!(out.data.len(), 5);
+
+    for (idx, input) in inputs.iter().enumerate() {
+        let expected = gelu_f64(*input);
+        let actual = match &out.data[idx] {
+            Value::Float(f) => *f,
+            other => panic!("item {idx}: expected float, got {other:?}"),
+        };
+        let diff = (actual - expected).abs();
+        assert!(
+            diff < 1e-12,
+            "MirUnOp::Gelu tensor item {idx}: input={input}, actual={actual}, expected={expected}, diff={diff:.6e}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MirUnOp::Tanh tensor dispatch test
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_mir_unop_tanh_tensor() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    let inputs = [-2.0, -1.0, 0.0, 1.0, 2.0];
+    let input_data: Vec<Value> = inputs.iter().map(|v| Value::Float(*v)).collect();
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: input_data,
+        shape: vec![5],
+    })));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), input_tensor);
+
+    let result = runner
+        .eval_unop(
+            MirUnOp::Tanh,
+            &MirOperand::Value(MirValueId(0)),
+            MirType::semantic(TypeId(0)),
+            radix_lexer::Span::default(),
+        )
+        .expect("MirUnOp::Tanh tensor dispatch should succeed");
+
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![5], "shape preserved");
+
+    for (idx, input) in inputs.iter().enumerate() {
+        let expected = input.tanh();
+        let actual = match &out.data[idx] {
+            Value::Float(f) => *f,
+            other => panic!("item {idx}: expected float, got {other:?}"),
+        };
+        let diff = (actual - expected).abs();
+        assert!(
+            diff < 1e-15,
+            "MirUnOp::Tanh tensor item {idx}: input={input}, actual={actual}, expected={expected}, diff={diff:.6e}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MirUnOp::Exp tensor dispatch test (undocumented scope from original commit)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_mir_unop_exp_tensor() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    let inputs = [-1.0, 0.0, 1.0, 2.0, 3.0];
+    let input_data: Vec<Value> = inputs.iter().map(|v| Value::Float(*v)).collect();
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: input_data,
+        shape: vec![5],
+    })));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), input_tensor);
+
+    let result = runner
+        .eval_unop(
+            MirUnOp::Exp,
+            &MirOperand::Value(MirValueId(0)),
+            MirType::semantic(TypeId(0)),
+            radix_lexer::Span::default(),
+        )
+        .expect("MirUnOp::Exp tensor dispatch should succeed");
+
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![5], "shape preserved");
+
+    for (idx, input) in inputs.iter().enumerate() {
+        let expected = input.exp();
+        let actual = match &out.data[idx] {
+            Value::Float(f) => *f,
+            other => panic!("item {idx}: expected float, got {other:?}"),
+        };
+        let diff = (actual - expected).abs();
+        let tolerance = 1e-15;
+        assert!(
+            diff < tolerance,
+            "MirUnOp::Exp tensor item {idx}: input={input}, actual={actual}, expected={expected}, diff={diff:.6e}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// tensor_elementwise_or_scalar broadcast test
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_tensor_elementwise_or_scalar_broadcast() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // Tensor: [1.0, 2.0, 3.0], scalar: 2.0 → expected: [2.0, 4.0, 6.0]
+    let input_data: Vec<Value> = vec![Value::Float(1.0), Value::Float(2.0), Value::Float(3.0)];
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: input_data,
+        shape: vec![3],
+    })));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), input_tensor);
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), Value::Float(2.0));
+
+    // --- 3. Build TensorMul call with (tensor, scalar) ---
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMul),
+        args: vec![
+            MirOperand::Value(MirValueId(0)), // tensor
+            MirOperand::Value(MirValueId(1)), // scalar
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    let result = runner
+        .eval_runtime_call(&call, radix_lexer::Span::default())
+        .expect("tensor mul scalar broadcast should succeed");
+
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![3], "shape preserved");
+
+    let expected_values = [2.0, 4.0, 6.0];
+    for (idx, expected) in expected_values.iter().enumerate() {
+        let actual = match &out.data[idx] {
+            Value::Float(f) => *f,
+            other => panic!("item {idx}: expected float, got {other:?}"),
+        };
+        assert!(
+            (actual - expected).abs() < 1e-15,
+            "broadcast mul item {idx}: actual={actual}, expected={expected}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// (scalar, Tensor) Div: 1.0 / [2.0, 4.0, 8.0] → [0.5, 0.25, 0.125]
+// Exercises the (scalar, Tensor(cell)) arm added for non-commutative op
+// operand-order correctness (fixed in 73f3db582).
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_tensor_elementwise_or_scalar_broadcast_div_scalar_tensor() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // Scalar: 1.0, Tensor: [2.0, 4.0, 8.0] → expected: [0.5, 0.25, 0.125]
+    let input_data: Vec<Value> = vec![Value::Float(2.0), Value::Float(4.0), Value::Float(8.0)];
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: input_data,
+        shape: vec![3],
+    })));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), Value::Float(1.0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), input_tensor);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorDiv),
+        args: vec![
+            MirOperand::Value(MirValueId(0)), // scalar: 1.0
+            MirOperand::Value(MirValueId(1)), // tensor: [2.0, 4.0, 8.0]
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    let result = runner
+        .eval_runtime_call(&call, radix_lexer::Span::default())
+        .expect("scalar div tensor broadcast should succeed");
+
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![3], "shape preserved");
+
+    // 1.0 / [2.0, 4.0, 8.0] = [0.5, 0.25, 0.125]
+    let expected_values = [0.5, 0.25, 0.125];
+    for (idx, expected) in expected_values.iter().enumerate() {
+        let actual = match &out.data[idx] {
+            Value::Float(f) => *f,
+            other => panic!("item {idx}: expected float, got {other:?}"),
+        };
+        assert!(
+            (actual - expected).abs() < 1e-15,
+            "scalar/tensor div item {idx}: actual={actual}, expected={expected}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// (scalar, Tensor) Sub: 10.0 - [1.0, 2.0, 3.0] → [9.0, 8.0, 7.0]
+// Exercises the (scalar, Tensor(cell)) arm for non-commutative operand-order
+// correctness (fixed in 73f3db582).
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_tensor_elementwise_or_scalar_broadcast_sub_scalar_tensor() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // Scalar: 10.0, Tensor: [1.0, 2.0, 3.0] → expected: [9.0, 8.0, 7.0]
+    let input_data: Vec<Value> = vec![Value::Float(1.0), Value::Float(2.0), Value::Float(3.0)];
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: input_data,
+        shape: vec![3],
+    })));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), Value::Float(10.0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), input_tensor);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorSub),
+        args: vec![
+            MirOperand::Value(MirValueId(0)), // scalar: 10.0
+            MirOperand::Value(MirValueId(1)), // tensor: [1.0, 2.0, 3.0]
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    let result = runner
+        .eval_runtime_call(&call, radix_lexer::Span::default())
+        .expect("scalar sub tensor broadcast should succeed");
+
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![3], "shape preserved");
+
+    // 10.0 - [1.0, 2.0, 3.0] = [9.0, 8.0, 7.0]
+    let expected_values = [9.0, 8.0, 7.0];
+    for (idx, expected) in expected_values.iter().enumerate() {
+        let actual = match &out.data[idx] {
+            Value::Float(f) => *f,
+            other => panic!("item {idx}: expected float, got {other:?}"),
+        };
+        assert!(
+            (actual - expected).abs() < 1e-15,
+            "scalar/tensor sub item {idx}: actual={actual}, expected={expected}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MirUnOp::Sqrt on Value::Tensor unit test
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_unop_sqrt_tensor() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // --- 1. Build 2×2 input tensor: [[4.0, 9.0], [16.0, 25.0]] ---
+    let input_data = vec![
+        Value::Float(4.0),
+        Value::Float(9.0),
+        Value::Float(16.0),
+        Value::Float(25.0),
+    ];
+    let input_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: input_data,
+        shape: vec![2, 2],
+    })));
+
+    // --- 2. Build minimal runner context ---
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), input_tensor);
+
+    // --- 3. Build MirValueKind::Unary with Sqrt ---
+    let mir_value = MirValue {
+        id: MirValueId(42),
+        kind: MirValueKind::Unary {
+            op: MirUnOp::Sqrt,
+            operand: MirOperand::Value(MirValueId(0)),
+        },
+        ty: MirType::semantic(TypeId(0)),
+        span: radix_lexer::Span::default(),
+    };
+
+    // --- 4. Evaluate ---
+    let result = runner
+        .eval_value(&mir_value, radix_lexer::Span::default())
+        .expect("sqrt tensor should succeed");
+
+    // --- 5. Verify ---
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![2, 2], "output shape must match input shape");
+
+    let expected = [2.0, 3.0, 4.0, 5.0];
+    for (idx, expected_val) in expected.iter().enumerate() {
+        let actual = match &out.data[idx] {
+            Value::Float(f) => *f,
+            other => panic!("item {idx}: expected float, got {other:?}"),
+        };
+        let diff = (actual - expected_val).abs();
+        assert!(
+            diff < 1e-15,
+            "sqrt tensor item {idx}: actual={actual}, expected={expected_val}, diff={diff:.6e}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TensorFill prefix broadcast [B]→[B,D] unit test
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_tensor_fill_prefix_broadcast() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // --- 1. Create receiver [2,3] tensor and fill [2] tensor ---
+    let receiver_data = vec![Value::Float(0.0); 6];
+    let receiver_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: receiver_data,
+        shape: vec![2, 3],
+    })));
+
+    // Fill tensor shape [2] — prefix broadcast: each element repeats 3 times.
+    let fill_data = vec![Value::Float(10.0), Value::Float(20.0)];
+    let fill_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: fill_data,
+        shape: vec![2],
+    })));
+
+    // --- 2. Build minimal runner context ---
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), receiver_tensor);
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), fill_tensor);
+
+    // --- 3. Build TensorFill call ---
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorFill),
+        args: vec![
+            MirOperand::Value(MirValueId(0)), // receiver tensor [2,3]
+            MirOperand::Value(MirValueId(1)), // fill tensor [2]
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    // --- 4. Evaluate ---
+    let result = runner
+        .eval_runtime_call(&call, radix_lexer::Span::default())
+        .expect("tensor fill prefix broadcast should succeed");
+
+    // --- 5. Verify: [2,3] filled from [2] prefix → [10, 10, 10, 20, 20, 20] ---
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![2, 3], "output shape must be [2, 3]");
+
+    let expected = [10.0, 10.0, 10.0, 20.0, 20.0, 20.0];
+    for (idx, expected_val) in expected.iter().enumerate() {
+        let actual = match &out.data[idx] {
+            Value::Float(f) => *f,
+            other => panic!("item {idx}: expected float, got {other:?}"),
+        };
+        let diff = (actual - expected_val).abs();
+        assert!(
+            diff < 1e-15,
+            "fill prefix item {idx}: actual={actual}, expected={expected_val}, diff={diff:.6e}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TensorFill suffix broadcast [D]→[B,D] unit test
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_tensor_fill_suffix_broadcast() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // --- 1. Create receiver [2,3] tensor and fill [3] tensor ---
+    let receiver_data = vec![Value::Float(0.0); 6];
+    let receiver_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: receiver_data,
+        shape: vec![2, 3],
+    })));
+
+    // Fill tensor shape [3] — suffix broadcast: cycle the block 2 times.
+    let fill_data = vec![
+        Value::Float(100.0),
+        Value::Float(200.0),
+        Value::Float(300.0),
+    ];
+    let fill_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: fill_data,
+        shape: vec![3],
+    })));
+
+    // --- 2. Build minimal runner context ---
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), receiver_tensor);
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), fill_tensor);
+
+    // --- 3. Build TensorFill call ---
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorFill),
+        args: vec![
+            MirOperand::Value(MirValueId(0)), // receiver tensor [2,3]
+            MirOperand::Value(MirValueId(1)), // fill tensor [3]
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    // --- 4. Evaluate ---
+    let result = runner
+        .eval_runtime_call(&call, radix_lexer::Span::default())
+        .expect("tensor fill suffix broadcast should succeed");
+
+    // --- 5. Verify: [2,3] filled from [3] suffix → [100, 200, 300, 100, 200, 300] ---
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![2, 3], "output shape must be [2, 3]");
+
+    let expected = [100.0, 200.0, 300.0, 100.0, 200.0, 300.0];
+    for (idx, expected_val) in expected.iter().enumerate() {
+        let actual = match &out.data[idx] {
+            Value::Float(f) => *f,
+            other => panic!("item {idx}: expected float, got {other:?}"),
+        };
+        let diff = (actual - expected_val).abs();
+        assert!(
+            diff < 1e-15,
+            "fill suffix item {idx}: actual={actual}, expected={expected_val}, diff={diff:.6e}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TensorCruxEntropia runner dispatch smoke test
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_tensor_crux_entropia_rank2() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // --- 1. Build rank-2 logits: [[2.0, 1.0, 0.0], [1.0, 2.0, 1.0]] ---
+    let logits_data = vec![
+        Value::Float(2.0),
+        Value::Float(1.0),
+        Value::Float(0.0),
+        Value::Float(1.0),
+        Value::Float(2.0),
+        Value::Float(1.0),
+    ];
+    let logits_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: logits_data,
+        shape: vec![2, 3],
+    })));
+
+    // --- 2. Build rank-2 targets: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]] ---
+    let targets_data = vec![
+        Value::Float(1.0),
+        Value::Float(0.0),
+        Value::Float(0.0),
+        Value::Float(0.0),
+        Value::Float(1.0),
+        Value::Float(0.0),
+    ];
+    let targets_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: targets_data,
+        shape: vec![2, 3],
+    })));
+
+    // --- 3. Build minimal runner context ---
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), logits_tensor);
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), targets_tensor);
+
+    // --- 4. Build the crux_entropia call ---
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorCruxEntropia),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    // --- 5. Evaluate ---
+    let result = runner
+        .eval_runtime_call(&call, radix_lexer::Span::default())
+        .expect("crux_entropia dispatch should succeed");
+
+    // --- 6. Verify ---
+    // softmax row0 = [0.6652, 0.2447, 0.0900], row1 = [0.2119, 0.5761, 0.2119]
+    // CE: row0 = -log(0.6652+ε) ≈ 0.4076, row1 = -log(0.5761+ε) ≈ 0.5514
+    // Loss = (0.4076 + 0.5514) / 3 ≈ 0.3197
+    let Value::Float(loss) = result else {
+        panic!("expected float loss, got {result:?}");
+    };
+    let expected = 0.3197_f64;
+    let diff = (loss - expected).abs();
+    assert!(
+        diff < 1e-3,
+        "crux_entropia loss: actual={loss}, expected={expected}, diff={diff:.6e}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Host default fail-closed smoketests (PRP-001, PRP-002)
+// ---------------------------------------------------------------------------
+
+struct MinimalHost;
+
+impl Host for MinimalHost {
+    fn scribe(&mut self, _kind: MirDiagnosticKind, _text: &str) -> Result<(), RunnerError> {
+        Ok(())
+    }
+    fn read_line(&mut self) -> Result<Option<String>, RunnerError> {
+        Ok(None)
+    }
+    fn abort(&mut self, reason: &str) -> ! {
+        panic!("runner abort: {reason}")
+    }
+    fn provider(&mut self, _provider: &MirProvider) -> Result<Value, RunnerError> {
+        Err(RunnerError::unsupported(Span::default(), "provider"))
+    }
+    fn exit(&mut self, code: i32) -> ! {
+        panic!("runner exit: {code}")
+    }
+}
+
+#[test]
+fn test_host_kernel_call_default_rejects() {
+    let mut host = MinimalHost;
+    let result = host.kernel_call(KernelModule::Processus, "exsequi", &[], Span::default());
+    assert!(
+        result.is_err(),
+        "default kernel_call must reject unsupported"
+    );
+    let err = result.unwrap_err();
+    assert!(
+        err.issue.contains("kernel_call"),
+        "error issue must mention kernel_call, got: {err:?}"
+    );
+}
+
+#[test]
+fn test_host_argumenta_default_rejects() {
+    let host = MinimalHost;
+    let result = host.argumenta();
+    assert!(result.is_err(), "default argumenta must reject");
+}
+
+#[test]
+fn test_host_pid_default_rejects() {
+    let host = MinimalHost;
+    let result = host.pid();
+    assert!(result.is_err(), "default pid must reject");
+}
+
+#[test]
+fn test_host_env_get_default_rejects() {
+    let host = MinimalHost;
+    let result = host.env_get("PATH");
+    assert!(result.is_err(), "default env_get must reject");
+}
+
+#[test]
+fn test_host_env_set_default_rejects() {
+    let mut host = MinimalHost;
+    let result = host.env_set("PATH", "/usr/bin");
+    assert!(result.is_err(), "default env_set must reject");
+}
+
+#[test]
+fn test_host_cwd_default_rejects() {
+    let host = MinimalHost;
+    let result = host.cwd();
+    assert!(result.is_err(), "default cwd must reject");
+}
+
+#[test]
+fn test_host_set_cwd_default_rejects() {
+    let mut host = MinimalHost;
+    let result = host.set_cwd("/tmp");
+    assert!(result.is_err(), "default set_cwd must reject");
+}
+
+// ---------------------------------------------------------------------------
+// Tensor shape-mismatch rejection (PRP-011)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_tensor_elementwise_shape_mismatch_rejected() {
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // [2,3] tensor (6 elements)
+    let left_data: Vec<Value> = (1..=6).map(Value::Int).collect();
+    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: left_data,
+        shape: vec![2, 3],
+    })));
+
+    // [6] tensor (6 elements — same count, different shape)
+    let right_data: Vec<Value> = (10..=15).map(Value::Int).collect();
+    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: right_data,
+        shape: vec![6],
+    })));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), left_tensor);
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), right_tensor);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    let result = runner.eval_runtime_call(&call, Span::default());
+    assert!(result.is_err(), "[2,3] + [6] must reject on shape mismatch");
+    let err = result.unwrap_err();
+    // S6-C2: typed issue for non-same-shape / non-rank-extension pairs (not
+    // the old generic "shape mismatch" issue). Assert issue id only —
+    // hygiene forbids message/help prose asserts outside renderers.
+    assert_eq!(
+        err.issue, "runner_tensor_tensor_broadcast_unsupported",
+        "error issue must name the broadcast rejection, got: {err:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// PRP-077 — Backing-length mismatch rejection
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_tensor_elementwise_backing_length_mismatch_rejected() {
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // Both tensors have shape [2,2] but different backing lengths.
+    let left_data: Vec<Value> = (1..=4).map(Value::Int).collect();
+    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: left_data,
+        shape: vec![2, 2],
+    })));
+
+    // Same shape [2,2], but only 3 elements (should be 4).
+    let right_data: Vec<Value> = (10..=12).map(Value::Int).collect();
+    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: right_data,
+        shape: vec![2, 2],
+    })));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), left_tensor);
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), right_tensor);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    let result = runner.eval_runtime_call(&call, Span::default());
+    assert!(
+        result.is_err(),
+        "[2,2] + [2,2] with mismatched backing length must reject"
+    );
+    let err = result.unwrap_err();
+    assert!(
+        err.issue.contains("backing_length_mismatch"),
+        "error issue must mention backing-length mismatch, got: {err:?}"
+    );
+}
+
+#[test]
+fn test_tensor_elementwise_same_shape_succeeds() {
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // [2,3] + [2,3] → must succeed
+    let left_data = vec![
+        Value::Int(1),
+        Value::Int(2),
+        Value::Int(3),
+        Value::Int(4),
+        Value::Int(5),
+        Value::Int(6),
+    ];
+    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: left_data,
+        shape: vec![2, 3],
+    })));
+
+    let right_data = vec![
+        Value::Int(10),
+        Value::Int(20),
+        Value::Int(30),
+        Value::Int(40),
+        Value::Int(50),
+        Value::Int(60),
+    ];
+    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: right_data,
+        shape: vec![2, 3],
+    })));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), left_tensor);
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), right_tensor);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    let result = runner
+        .eval_runtime_call(&call, Span::default())
+        .expect("[2,3] + [2,3] must succeed");
+
+    let tensor_value = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor, got {other:?}"),
+    };
+    let tensor = tensor_value.borrow();
+    assert_eq!(tensor.shape, vec![2, 3]);
+    assert_eq!(tensor.data.len(), 6);
+    // 1+10=11, 2+20=22, 3+30=33, 4+40=44, 5+50=55, 6+60=66
+    let expected: [i64; 6] = [11, 22, 33, 44, 55, 66];
+    for (i, &exp) in expected.iter().enumerate() {
+        assert_eq!(tensor.data[i], Value::Int(exp), "element {i} mismatch");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Zero-width shape rejection (PRP-012)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_tensor_softmax_zero_width_rejected() {
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // Shape [0] — zero-width rank-1 tensor
+    let input = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: vec![],
+        shape: vec![0],
+    })));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), input);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorSoftmax),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    let result = runner.eval_runtime_call(&call, Span::default());
+    assert!(
+        result.is_err(),
+        "softmax on shape [0] must reject zero-width dimension"
+    );
+    let err = result.unwrap_err();
+    assert!(
+        err.issue.contains("positive"),
+        "error issue must mention positive dimensions, got: {err:?}"
+    );
+}
+
+#[test]
+fn test_tensor_softmax_rank2_zero_width_rejected() {
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // Shape [2, 0] — rank-2 with zero last dim
+    let input = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: vec![],
+        shape: vec![2, 0],
+    })));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), input);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorSoftmax),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    let result = runner.eval_runtime_call(&call, Span::default());
+    assert!(
+        result.is_err(),
+        "softmax on shape [2,0] must reject zero-width dimension"
+    );
+}
+
+#[test]
+fn test_tensor_crux_entropia_zero_width_rejected() {
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // Shape [3, 0] — rank-2 with zero last dim, both logits and targets
+    let logits = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: vec![],
+        shape: vec![3, 0],
+    })));
+    let targets = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: vec![],
+        shape: vec![3, 0],
+    })));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), logits);
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), targets);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorCruxEntropia),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    let result = runner.eval_runtime_call(&call, Span::default());
+    assert!(
+        result.is_err(),
+        "cross-entropy on shape [3,0] must reject zero-width dimension"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Utility function unit tests: runner_issue
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_runner_issue_simple_message() {
+    let issue = runner_issue("hello world");
+    assert_eq!(issue, "runner_hello_world");
+}
+
+#[test]
+fn test_runner_issue_alphanumeric_only() {
+    let issue = runner_issue("convert! fallback?");
+    assert_eq!(issue, "runner_convert_fallback");
+}
+
+#[test]
+fn test_runner_issue_special_chars_collapsed() {
+    let issue = runner_issue("foo---bar___baz");
+    assert_eq!(issue, "runner_foo_bar_baz");
+}
+
+#[test]
+fn test_runner_issue_trailing_underscore_trimmed() {
+    let issue = runner_issue("shape mismatch!!! ");
+    assert_eq!(issue, "runner_shape_mismatch");
+}
+
+#[test]
+fn test_runner_issue_empty_input() {
+    let issue = runner_issue("");
+    assert_eq!(issue, "runner");
+}
+
+// ---------------------------------------------------------------------------
+// Utility function unit tests: regex_pattern
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_regex_pattern_no_flags() {
+    let result = regex_pattern("^foo$", None);
+    assert_eq!(result, "^foo$");
+}
+
+#[test]
+fn test_regex_pattern_with_flag() {
+    let result = regex_pattern("^foo$", Some("i"));
+    assert_eq!(result, "(?i)^foo$");
+}
+
+#[test]
+fn test_regex_pattern_multiple_flags() {
+    let result = regex_pattern("foo", Some("imsUx"));
+    assert_eq!(result, "(?imsUx)foo");
+}
+
+#[test]
+fn test_regex_pattern_rejects_unknown_flags() {
+    let result = regex_pattern("foo", Some("izwx"));
+    // Only 'i' should be kept; 'z', 'w', 'x' are unknown but 'x' is valid per spec
+    assert_eq!(result, "(?ix)foo");
+}
+
+#[test]
+fn test_regex_pattern_only_unknown_flags() {
+    let result = regex_pattern("foo", Some("zwq"));
+    assert_eq!(result, "foo");
+}
+
+// ---------------------------------------------------------------------------
+// Utility function unit tests: constant_equals_value
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_constant_equals_value_int_equal() {
+    let konst = MirConstant::Int(42);
+    let value = Value::Int(42);
+    let interner = Interner::new();
+    assert!(constant_equals_value(&konst, &value, &interner));
+}
+
+#[test]
+fn test_constant_equals_value_int_not_equal() {
+    let konst = MirConstant::Int(42);
+    let value = Value::Int(7);
+    let interner = Interner::new();
+    assert!(!constant_equals_value(&konst, &value, &interner));
+}
+
+#[test]
+fn test_constant_equals_value_uint_equal() {
+    let konst = MirConstant::UInt(100);
+    let value = Value::UInt(100);
+    let interner = Interner::new();
+    assert!(constant_equals_value(&konst, &value, &interner));
+}
+
+#[test]
+fn test_constant_equals_value_uint_not_equal() {
+    let konst = MirConstant::UInt(100);
+    let value = Value::UInt(50);
+    let interner = Interner::new();
+    assert!(!constant_equals_value(&konst, &value, &interner));
+}
+
+#[test]
+fn test_constant_equals_value_int_uint_cross_equal() {
+    let konst = MirConstant::Int(5);
+    let value = Value::UInt(5);
+    let interner = Interner::new();
+    assert!(constant_equals_value(&konst, &value, &interner));
+}
+
+#[test]
+fn test_constant_equals_value_int_uint_cross_negative() {
+    let konst = MirConstant::Int(-1);
+    let value = Value::UInt(0);
+    let interner = Interner::new();
+    assert!(!constant_equals_value(&konst, &value, &interner));
+}
+
+#[test]
+fn test_constant_equals_value_bool_equal() {
+    let konst = MirConstant::Bool(true);
+    let value = Value::Bool(true);
+    let interner = Interner::new();
+    assert!(constant_equals_value(&konst, &value, &interner));
+}
+
+#[test]
+fn test_constant_equals_value_bool_not_equal() {
+    let konst = MirConstant::Bool(true);
+    let value = Value::Bool(false);
+    let interner = Interner::new();
+    assert!(!constant_equals_value(&konst, &value, &interner));
+}
+
+#[test]
+fn test_constant_equals_value_nil() {
+    let konst = MirConstant::Nil;
+    let value = Value::Nil;
+    let interner = Interner::new();
+    assert!(constant_equals_value(&konst, &value, &interner));
+}
+
+#[test]
+fn test_constant_equals_value_unit() {
+    let konst = MirConstant::Unit;
+    let value = Value::Unit;
+    let interner = Interner::new();
+    assert!(constant_equals_value(&konst, &value, &interner));
+}
+
+#[test]
+fn test_constant_equals_value_type_mismatch() {
+    let konst = MirConstant::Int(42);
+    let value = Value::Bool(false);
+    let interner = Interner::new();
+    assert!(!constant_equals_value(&konst, &value, &interner));
+}
+
+// ---------------------------------------------------------------------------
+// F-029: tensor ops width-checked arithmetic — red tests
+// ---------------------------------------------------------------------------
+
+/// F-029 verify: `TensorAdd` near u8 width max must overflow.
+#[test]
+fn test_f029_tensor_add_u8_overflow_rejected() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::{NumericWidth, Primitive, Type, TypeTable};
+
+    // Register numerus<u8> type so width checking applies.
+    let mut type_table = TypeTable::new();
+    let u8_ty = type_table.intern(Type::SizedNumeric(Primitive::Numerus, NumericWidth::U8));
+
+    // 200 + 100 = 300 > u8::MAX=255 → must overflow.
+    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: vec![Value::Int(200)],
+        shape: vec![1],
+    })));
+    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: vec![Value::Int(100)],
+        shape: vec![1],
+    })));
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), left_tensor);
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), right_tensor);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(u8_ty),
+    };
+
+    let result = runner.eval_runtime_call(&call, Span::default());
+    assert!(
+        result.is_err(),
+        "F-029: u8 overflow must be rejected, got {result:?}"
+    );
+    let err = result.unwrap_err();
+    assert!(
+        err.issue.contains("overflow") || err.issue.contains("numerus"),
+        "F-029: error must mention overflow/numerus, got: {}",
+        err.issue
+    );
+}
+
+/// F-029 verify: `UInt` tensor elementwise add must succeed (not rejected).
+#[test]
+fn test_f029_uint_tensor_add_succeeds() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::{NumericWidth, Primitive, Type, TypeTable};
+
+    // Register numerus<u64> type for UInt tensors.
+    let mut type_table = TypeTable::new();
+    let u64_ty = type_table.intern(Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64));
+
+    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: vec![Value::UInt(100), Value::UInt(200)],
+        shape: vec![2],
+    })));
+    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: vec![Value::UInt(50), Value::UInt(25)],
+        shape: vec![2],
+    })));
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), left_tensor);
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), right_tensor);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(u64_ty),
+    };
+
+    let result = runner
+        .eval_runtime_call(&call, Span::default())
+        .expect("F-029: UInt tensor add must succeed");
+    let tensor_value = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor, got {other:?}"),
+    };
+    let tensor = tensor_value.borrow();
+    assert_eq!(tensor.data.len(), 2);
+    // 100+50=150, 200+25=225
+    assert_eq!(tensor.data[0], Value::UInt(150));
+    assert_eq!(tensor.data[1], Value::UInt(225));
+}
+
+/// F-029 verify: `TensorDiv` by zero must be rejected.
+#[test]
+fn test_f029_tensor_div_zero_rejected() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::{NumericWidth, Primitive, Type, TypeTable};
+
+    // Register numerus<i32> type.
+    let mut type_table = TypeTable::new();
+    let i32_ty = type_table.intern(Type::SizedNumeric(Primitive::Numerus, NumericWidth::I32));
+
+    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: vec![Value::Int(42)],
+        shape: vec![1],
+    })));
+    // Right tensor contains zero → division by zero.
+    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: vec![Value::Int(0)],
+        shape: vec![1],
+    })));
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), left_tensor);
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), right_tensor);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorDiv),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(i32_ty),
+    };
+
+    let result = runner.eval_runtime_call(&call, Span::default());
+    assert!(
+        result.is_err(),
+        "F-029: division by zero must be rejected, got {result:?}"
+    );
+    let err = result.unwrap_err();
+    assert!(
+        err.issue.contains("division") || err.issue.contains("numerus"),
+        "F-029: error must mention division, got: {}",
+        err.issue
+    );
+}
+
+/// F-029 verify: float `TensorDiv` by zero is still allowed (floats are width-agnostic).
+#[test]
+fn test_f029_float_tensor_div_zero_allowed() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::{NumericWidth, Primitive, Type, TypeTable};
+
+    let mut type_table = TypeTable::new();
+    let f32_ty = type_table.intern(Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32));
+
+    let left_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: vec![Value::Float(42.0)],
+        shape: vec![1],
+    })));
+    let right_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: vec![Value::Float(0.0)],
+        shape: vec![1],
+    })));
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), left_tensor);
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), right_tensor);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorDiv),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(f32_ty),
+    };
+
+    let result = runner
+        .eval_runtime_call(&call, Span::default())
+        .expect("F-029: float tensor div by zero must succeed (IEEE 754)");
+    let tensor_value = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor, got {other:?}"),
+    };
+    let tensor = tensor_value.borrow();
+    let val = match &tensor.data[0] {
+        Value::Float(f) => *f,
+        other => panic!("expected float, got {other:?}"),
+    };
+    assert!(
+        val.is_infinite(),
+        "F-029: float division by zero should produce infinity, got {val}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// F-082…F-087: red-green tests
+// ---------------------------------------------------------------------------
+
+/// F-082: reversed intervallum bounds must be rejected at construction.
+#[test]
+fn test_f082_reversed_interval_bounds_rejected() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlockId,
+        MirOperand, MirProgram, MirType, MirValidationContext, MirValueId,
+    };
+    use radix_types::{TypeId, TypeTable};
+
+    let type_table = TypeTable::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    // Store start=5, end=1 (reversed) as MIR values.
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), crate::Value::Int(5));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), crate::Value::Int(1));
+
+    let aggregate = MirAggregate {
+        kind: MirAggregateKind::Interval { inclusive: false },
+        ty: MirType::semantic(TypeId(0)),
+        fields: MirAggregateFields::Ordered(vec![
+            MirAggregateItem::Operand(MirOperand::Value(MirValueId(0))),
+            MirAggregateItem::Operand(MirOperand::Value(MirValueId(1))),
+        ]),
+    };
+
+    let result = runner.eval_construct(&aggregate, radix_lexer::Span::default());
+    assert!(
+        result.is_err(),
+        "F-082: reversed interval bounds must be rejected, got {result:?}"
+    );
+    let err = result.unwrap_err();
+    assert!(
+        err.issue.contains("monotonic"),
+        "F-082: error issue must mention monotonic, got: {}",
+        err.issue
+    );
+}
+
+/// F-082: valid (monotonic) intervallum bounds must succeed.
+#[test]
+fn test_f082_valid_interval_bounds_accepted() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlockId,
+        MirOperand, MirProgram, MirType, MirValidationContext, MirValueId,
+    };
+    use radix_types::{TypeId, TypeTable};
+
+    let type_table = TypeTable::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), crate::Value::Int(1));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), crate::Value::Int(5));
+
+    let aggregate = MirAggregate {
+        kind: MirAggregateKind::Interval { inclusive: true },
+        ty: MirType::semantic(TypeId(0)),
+        fields: MirAggregateFields::Ordered(vec![
+            MirAggregateItem::Operand(MirOperand::Value(MirValueId(0))),
+            MirAggregateItem::Operand(MirOperand::Value(MirValueId(1))),
+        ]),
+    };
+
+    let result = runner.eval_construct(&aggregate, radix_lexer::Span::default());
+    assert!(
+        result.is_ok(),
+        "F-082: valid interval bounds must succeed, got {result:?}"
+    );
+    assert_eq!(
+        result.unwrap(),
+        crate::Value::Tuple(vec![
+            crate::Value::Int(1),
+            crate::Value::Int(5),
+            crate::Value::Bool(true),
+        ])
+    );
+}
+
+/// F-088: interval clamp on a legal empty exclusive interval `[5, 5)` must
+/// not panic — the clamp target has no valid output, so the source value is
+/// returned unchanged (identity on the empty set).
+#[test]
+fn test_f088_interval_clamp_empty_exclusive_interval_no_panic() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirBlockId, MirCollectionOp, MirIntrinsic, MirOperand, MirProgram, MirRuntimeCall, MirType,
+        MirValidationContext, MirValueId,
+    };
+    use radix_types::{TypeId, TypeTable};
+
+    let type_table = TypeTable::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    // Clamp a value against the empty exclusive interval `[5, 5)`.
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), crate::Value::Int(3));
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(1),
+        crate::Value::Tuple(vec![
+            crate::Value::Int(5),
+            crate::Value::Int(5),
+            crate::Value::Bool(false),
+        ]),
+    );
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::IntervalClamp),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    let result = runner.eval_runtime_call(&call, radix_lexer::Span::default());
+    assert_eq!(
+        result.expect("empty exclusive clamp must not panic"),
+        crate::Value::Int(3),
+        "clamping to an empty exclusive interval returns the source unchanged"
+    );
+}
+
+/// F-088 companion: a non-empty exclusive interval still clamps the source
+/// into `[start, end)`.
+#[test]
+fn test_f088_interval_clamp_exclusive_interval_clamps_into_range() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirBlockId, MirCollectionOp, MirIntrinsic, MirOperand, MirProgram, MirRuntimeCall, MirType,
+        MirValidationContext, MirValueId,
+    };
+    use radix_types::{TypeId, TypeTable};
+
+    let type_table = TypeTable::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    // Clamp 10 into `[5, 10)` → 9 (exclusive upper bound), and 3 → 5 (floor).
+    for (source, expected) in [(10, 9), (3, 5), (7, 7)] {
+        runner
+            .frames
+            .last_mut()
+            .unwrap()
+            .values
+            .insert(MirValueId(0), crate::Value::Int(source));
+        runner.frames.last_mut().unwrap().values.insert(
+            MirValueId(1),
+            crate::Value::Tuple(vec![
+                crate::Value::Int(5),
+                crate::Value::Int(10),
+                crate::Value::Bool(false),
+            ]),
+        );
+        let call = MirRuntimeCall {
+            intrinsic: MirIntrinsic::Collection(MirCollectionOp::IntervalClamp),
+            args: vec![
+                MirOperand::Value(MirValueId(0)),
+                MirOperand::Value(MirValueId(1)),
+            ],
+            return_ty: MirType::semantic(TypeId(0)),
+        };
+        let result = runner.eval_runtime_call(&call, radix_lexer::Span::default());
+        assert_eq!(
+            result.expect("exclusive clamp must not panic"),
+            crate::Value::Int(expected),
+            "clamp of {source} into [5, 10)"
+        );
+    }
+}
+
+/// The integer Sum path applies the same width checks as other integer ops:
+/// a `numerus<u8>` sum that overflows u8 rejects instead of wrapping.
+#[test]
+fn test_sum_numeric_u8_overflow_rejects() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirBlockId, MirCollectionOp, MirIntrinsic, MirOperand, MirProgram, MirRuntimeCall, MirType,
+        MirValidationContext, MirValueId,
+    };
+    use radix_types::{NumericWidth, Primitive, TypeTable};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let mut type_table = TypeTable::new();
+    let u8_ty = type_table.sized_numeric(Primitive::Numerus, NumericWidth::U8);
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(0),
+        crate::Value::Array(Rc::new(RefCell::new(vec![
+            crate::Value::Int(200),
+            crate::Value::Int(100),
+        ]))),
+    );
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::Sum),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(u8_ty),
+    };
+
+    let result = runner.eval_runtime_call(&call, radix_lexer::Span::default());
+    let err = result.expect_err("u8 sum of 200 + 100 must overflow");
+    assert!(
+        err.issue.contains("overflow"),
+        "expected a numerus overflow issue, got {err:?}"
+    );
+}
+
+/// A sum that stays within the declared width succeeds, and a `numerus<u64>`
+/// sum accumulates unsigned magnitudes without sign-encoding.
+#[test]
+fn test_sum_numeric_width_boundary_succeeds() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirBlockId, MirCollectionOp, MirIntrinsic, MirOperand, MirProgram, MirRuntimeCall, MirType,
+        MirValidationContext, MirValueId,
+    };
+    use radix_types::{NumericWidth, Primitive, TypeTable};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let mut type_table = TypeTable::new();
+    let u8_ty = type_table.sized_numeric(Primitive::Numerus, NumericWidth::U8);
+    let u64_ty = type_table.sized_numeric(Primitive::Numerus, NumericWidth::U64);
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    // u8 sum within the width: 50 + 100 = 150.
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(0),
+        crate::Value::Array(Rc::new(RefCell::new(vec![
+            crate::Value::Int(50),
+            crate::Value::Int(100),
+        ]))),
+    );
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::Sum),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(u8_ty),
+    };
+    let result = runner.eval_runtime_call(&call, radix_lexer::Span::default());
+    assert_eq!(
+        result.expect("u8 sum within width must succeed"),
+        crate::Value::Int(150)
+    );
+
+    // u64 sum keeps upper-half magnitudes as UInt: u64::MAX + 0.
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(0),
+        crate::Value::Array(Rc::new(RefCell::new(vec![
+            crate::Value::UInt(u64::MAX),
+            crate::Value::UInt(0),
+        ]))),
+    );
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::Sum),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(u64_ty),
+    };
+    let result = runner.eval_runtime_call(&call, radix_lexer::Span::default());
+    assert_eq!(
+        result.expect("u64 sum must succeed"),
+        crate::Value::UInt(u64::MAX),
+        "upper-half u64 magnitudes must not sign-encode"
+    );
+}
+
+/// `check_int_width` must not wrap `numerus<u64>` results above `i64::MAX` into
+/// a negative i64 — the i64 carrier cannot encode them, so the add fails
+/// closed exactly like every other out-of-width result.
+#[test]
+fn test_width_checked_add_u64_above_i64_max_fails_closed() {
+    use radix_types::NumericWidth;
+
+    let span = radix_lexer::Span::default();
+    let at_boundary = crate::value::width_checked_add(i64::MAX - 1, 1, NumericWidth::U64, span);
+    assert_eq!(
+        at_boundary.expect("u64 add at i64::MAX boundary fits"),
+        i64::MAX
+    );
+    let past_boundary = crate::value::width_checked_add(i64::MAX - 1, 2, NumericWidth::U64, span);
+    let err = past_boundary.expect_err("u64 add past i64::MAX must fail closed, not wrap");
+    assert!(
+        err.issue.contains("overflow"),
+        "expected a numerus overflow issue, got {err:?}"
+    );
+}
+
+/// F-083: optional enum variant field projection must return Nil, not error.
+#[test]
+fn test_f083_optional_variant_field_nil_fallback() {
+    use crate::host::BufferHost;
+    use radix_hir::DefId;
+    use radix_lexer::{Interner, Symbol};
+    use radix_mir::{MirBlockId, MirProgram, MirValidationContext};
+    use radix_types::TypeTable;
+    use rustc_hash::{FxHashMap, FxHashSet};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let variant_def = DefId(100);
+    let optional_field = Symbol(42);
+
+    let type_table = TypeTable::new();
+    let mut context = MirValidationContext::new(&type_table);
+    context
+        .optional_struct_fields
+        .insert(variant_def, FxHashSet::from_iter([optional_field]));
+
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    // EnumVariant with empty field map — the optional field is not present.
+    let variant_value =
+        crate::Value::EnumVariant(variant_def, Rc::new(RefCell::new(FxHashMap::default())));
+
+    let result = runner.project_variant_field(
+        variant_value,
+        variant_def,
+        optional_field,
+        radix_lexer::Span::default(),
+    );
+
+    assert!(
+        result.is_ok(),
+        "F-083: optional variant field must return Nil, not error, got {result:?}"
+    );
+    assert_eq!(
+        result.unwrap(),
+        crate::Value::Nil,
+        "F-083: optional variant field must return Nil"
+    );
+}
+
+/// F-083: missing non-optional variant field must still error.
+#[test]
+fn test_f083_required_variant_field_errors() {
+    use crate::host::BufferHost;
+    use radix_hir::DefId;
+    use radix_lexer::{Interner, Symbol};
+    use radix_mir::{MirBlockId, MirProgram, MirValidationContext};
+    use radix_types::TypeTable;
+    use rustc_hash::FxHashMap;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let variant_def = DefId(100);
+    let missing_field = Symbol(99);
+
+    let type_table = TypeTable::new();
+    let context = MirValidationContext::new(&type_table);
+
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    let variant_value =
+        crate::Value::EnumVariant(variant_def, Rc::new(RefCell::new(FxHashMap::default())));
+
+    let result = runner.project_variant_field(
+        variant_value,
+        variant_def,
+        missing_field,
+        radix_lexer::Span::default(),
+    );
+
+    assert!(
+        result.is_err(),
+        "F-083: non-optional variant field must error, got {result:?}"
+    );
+}
+
+/// F-084: JSON large u64 must surface as `UInt`, not lossy f64.
+#[test]
+fn test_f084_json_large_u64_not_lossy() {
+    use crate::kernel;
+    use radix_mir::KernelModule;
+
+    let large_u64 = u64::MAX;
+    let json = serde_json::Value::Number(serde_json::Number::from(large_u64));
+    let raw = serde_json::to_string(&json).unwrap();
+
+    let result = kernel::dispatch_kernel(
+        &mut crate::host::BufferHost::default(),
+        KernelModule::Json,
+        "solve",
+        &[crate::Value::Str(raw)],
+        radix_lexer::Span::default(),
+    );
+
+    assert!(
+        result.is_ok(),
+        "F-084: json.solve of large u64 must succeed, got {result:?}"
+    );
+    assert_eq!(
+        result.unwrap(),
+        crate::Value::UInt(u64::MAX),
+        "F-084: json large u64 must be UInt, not lossy f64"
+    );
+}
+
+/// F-084: JSON normal i64 still surfaces as Int.
+#[test]
+fn test_f084_json_small_i64_is_int() {
+    use crate::kernel;
+    use radix_mir::KernelModule;
+
+    let result = kernel::dispatch_kernel(
+        &mut crate::host::BufferHost::default(),
+        KernelModule::Json,
+        "solve",
+        &[crate::Value::Str("42".to_owned())],
+        radix_lexer::Span::default(),
+    );
+
+    assert!(
+        result.is_ok(),
+        "F-084: json.solve of small i64 must succeed, got {result:?}"
+    );
+    assert_eq!(
+        result.unwrap(),
+        crate::Value::Int(42),
+        "F-084: json small number must be Int"
+    );
+}
+
+/// F-085: processus.exsequi must error on nonzero exit.
+#[test]
+fn test_f085_processus_exsequi_nonzero_exit() {
+    use crate::kernel;
+    use radix_mir::KernelModule;
+
+    // Use a shell command that exits with status 1.
+    let result = kernel::dispatch_kernel(
+        &mut crate::host::BufferHost::default(),
+        KernelModule::Processus,
+        "exsequi",
+        &[crate::Value::Str("exit 1".to_owned())],
+        radix_lexer::Span::default(),
+    );
+
+    assert!(
+        result.is_err(),
+        "F-085: processus.exsequi nonzero exit must error, got {result:?}"
+    );
+    let err = result.unwrap_err();
+    assert!(
+        err.issue.contains("non_zero"),
+        "F-085: error issue must mention non-zero, got: {}",
+        err.issue
+    );
+}
+
+/// F-085: processus.exsequi must succeed on zero exit.
+#[test]
+fn test_f085_processus_exsequi_zero_exit() {
+    use crate::kernel;
+    use radix_mir::KernelModule;
+
+    let result = kernel::dispatch_kernel(
+        &mut crate::host::BufferHost::default(),
+        KernelModule::Processus,
+        "exsequi",
+        &[crate::Value::Str("echo hello".to_owned())],
+        radix_lexer::Span::default(),
+    );
+
+    assert!(
+        result.is_ok(),
+        "F-085: processus.exsequi zero exit must succeed, got {result:?}"
+    );
+    assert_eq!(
+        result.unwrap(),
+        crate::Value::Str("hello\n".to_owned()),
+        "F-085: exsequi must return stdout"
+    );
+}
+
+/// F-086: Octeti append on non-Place must return the modified Octeti.
+#[test]
+fn test_f086_octeti_append_non_place_returns_modified() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirBlockId, MirCollectionOp, MirIntrinsic, MirOperand, MirProgram, MirRuntimeCall, MirType,
+        MirValidationContext, MirValueId,
+    };
+    use radix_types::{TypeId, TypeTable};
+
+    let type_table = TypeTable::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    // Create empty octeti as a plain Value (not a Place).
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), crate::Value::Octeti(vec![]));
+    // Byte to append: 42.
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), crate::Value::Int(42));
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::Append),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    let result = runner.eval_runtime_call(&call, radix_lexer::Span::default());
+    assert!(
+        result.is_ok(),
+        "F-086: octeti append must succeed, got {result:?}"
+    );
+    assert_eq!(
+        result.unwrap(),
+        crate::Value::Octeti(vec![42]),
+        "F-086: octeti append must return modified octeti"
+    );
+}
+
+/// F-087: inclusive range materialize must include `i64::MAX`.
+#[test]
+fn test_f087_inclusive_range_materialize_i64max() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirBlockId, MirCollectionOp, MirIntrinsic, MirOperand, MirProgram, MirRuntimeCall, MirType,
+        MirValidationContext, MirValueId,
+    };
+    use radix_types::{Type, TypeId, TypeTable};
+
+    let mut type_table = TypeTable::new();
+    let lista_ty = type_table.intern(Type::Array(TypeId(0)));
+
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    // Inclusive interval [i64::MAX, i64::MAX] — should produce one element.
+    let interval = crate::Value::Tuple(vec![
+        crate::Value::Int(i64::MAX),
+        crate::Value::Int(i64::MAX),
+        crate::Value::Bool(true),
+    ]);
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), interval);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::IntervalMaterialize),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(lista_ty),
+    };
+
+    let result = runner.eval_runtime_call(&call, radix_lexer::Span::default());
+    assert!(
+        result.is_ok(),
+        "F-087: interval materialize must succeed, got {result:?}"
+    );
+    let array_value = result.unwrap();
+    let Value::Array(array) = array_value else {
+        panic!("F-087: expected array, got {array_value:?}");
+    };
+    let items = array.borrow();
+    assert_eq!(items.len(), 1, "F-087: must produce exactly 1 element");
+    assert_eq!(
+        items[0],
+        crate::Value::Int(i64::MAX),
+        "F-087: element must be i64::MAX"
+    );
+}
+
+/// F-087: exclusive range with `i64::MAX` must still work (materialize empty).
+#[test]
+fn test_f087_exclusive_range_i64max_empty() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirBlockId, MirCollectionOp, MirIntrinsic, MirOperand, MirProgram, MirRuntimeCall, MirType,
+        MirValidationContext, MirValueId,
+    };
+    use radix_types::{Type, TypeId, TypeTable};
+
+    let mut type_table = TypeTable::new();
+    let lista_ty = type_table.intern(Type::Array(TypeId(0)));
+
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    // Exclusive interval [i64::MAX, i64::MAX) — empty.
+    let interval = crate::Value::Tuple(vec![
+        crate::Value::Int(i64::MAX),
+        crate::Value::Int(i64::MAX),
+        crate::Value::Bool(false),
+    ]);
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), interval);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::IntervalMaterialize),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(lista_ty),
+    };
+
+    let result = runner.eval_runtime_call(&call, radix_lexer::Span::default());
+    assert!(
+        result.is_ok(),
+        "F-087: exclusive interval i64::MAX must succeed, got {result:?}"
+    );
+    let array_value = result.unwrap();
+    let Value::Array(array) = array_value else {
+        panic!("F-087: expected array, got {array_value:?}");
+    };
+    assert!(
+        array.borrow().is_empty(),
+        "F-087: exclusive [MAX, MAX) must be empty"
+    );
+}
+
+// ── S6-C2: tensor-tensor rank-extension broadcast (the [8]-bias add) ─────
+
+/// Helper: build a `[2,8]` left tensor, a `[8]` bias tensor, and a `TensorAdd`
+/// runtime call, then evaluate it through the runner.
+fn eval_tensor_add_bias(x_data: Vec<f64>, b_data: Vec<f64>) -> Value {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    let x_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: x_data.into_iter().map(Value::Float).collect(),
+        shape: vec![2, 8],
+    })));
+    let b_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: b_data.into_iter().map(Value::Float).collect(),
+        shape: vec![8],
+    })));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    let frame = runner.frames.last_mut().unwrap();
+    frame.values.insert(MirValueId(0), x_tensor);
+    frame.values.insert(MirValueId(1), b_tensor);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    runner
+        .eval_runtime_call(&call, radix_lexer::Span::default())
+        .expect("tensor-tensor rank-extension add should succeed")
+}
+
+/// S6-C2: the `[2,8]` + `[8]` tensor-tensor add broadcasts the bias across
+/// the leading axis (row b added to every row of x).
+#[test]
+fn tensor_add_rank_extension_broadcasts_8_bias_over_2_rows() {
+    let result = eval_tensor_add_bias(
+        vec![
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0,
+        ],
+        vec![100.0, 200.0, 300.0, 400.0, 500.0, 600.0, 700.0, 800.0],
+    );
+
+    let Value::Tensor(cell) = result else {
+        panic!("expected tensor result");
+    };
+    let out = cell.borrow();
+    assert_eq!(out.shape, vec![2, 8], "result keeps the higher-rank shape");
+    let expected = [
+        101.0, 202.0, 303.0, 404.0, 505.0, 606.0, 707.0, 808.0, // row 0 + b
+        110.0, 220.0, 330.0, 440.0, 550.0, 660.0, 770.0, 880.0, // row 1 + b
+    ];
+    for (index, (actual, expected)) in out.data.iter().zip(expected).enumerate() {
+        let Value::Float(actual) = actual else {
+            panic!("expected float element at {index}");
+        };
+        assert!(
+            (actual - expected).abs() < 1e-9,
+            "element {index}: expected {expected}, got {actual}"
+        );
+    }
+}
+
+/// S6-C2: a tensor-tensor pair that is neither same-shape nor a valid
+/// rank-extension broadcast fails closed with the typed diagnostic.
+#[test]
+fn tensor_add_invalid_broadcast_pair_fails_closed() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // Left `[2,8]`, right `[2]` — the bias dims are not the trailing dims.
+    let x_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: vec![Value::Float(1.0); 16],
+        shape: vec![2, 8],
+    })));
+    let wrong_tensor = Value::Tensor(Rc::new(RefCell::new(TensorValue {
+        data: vec![Value::Float(2.0); 2],
+        shape: vec![2],
+    })));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    let frame = runner.frames.last_mut().unwrap();
+    frame.values.insert(MirValueId(0), x_tensor);
+    frame.values.insert(MirValueId(1), wrong_tensor);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+
+    let error = runner
+        .eval_runtime_call(&call, radix_lexer::Span::default())
+        .expect_err("an invalid broadcast pair must fail closed");
+    assert_eq!(error.issue, "runner_tensor_tensor_broadcast_unsupported");
+}
+
+// ---------------------------------------------------------------------------
+// CCI-1: TensorRmsNorm / TensorRope / TensorGather runner dispatch
+// ---------------------------------------------------------------------------
+
+/// Evaluate a single collection runtime call with the given input value
+/// slots (mirrors the inline harness of the LayerNorm/Softmax smoke tests).
+fn evaluate_collection_call(
+    call: &MirRuntimeCall,
+    inputs: Vec<(MirValueId, Value)>,
+) -> Result<Value, RunnerError> {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    for (id, value) in inputs {
+        runner.frames.last_mut().unwrap().values.insert(id, value);
+    }
+    runner.eval_runtime_call(call, Span::default())
+}
+
+fn tensor_value(data: Vec<Value>, shape: Vec<i64>) -> Value {
+    use crate::value::TensorValue;
+    Value::Tensor(Rc::new(RefCell::new(TensorValue { data, shape })))
+}
+
+fn assert_numeric_close(out: &[Value], expected: &[f64], tolerance: f64) {
+    assert_eq!(out.len(), expected.len(), "output length mismatch");
+    for (idx, (actual, expected_val)) in out.iter().zip(expected).enumerate() {
+        let actual = match actual {
+            Value::Float(f) => *f,
+            Value::Int(i) => *i as f64,
+            other => panic!("item {idx}: expected numeric, got {other:?}"),
+        };
+        let diff = (actual - expected_val).abs();
+        assert!(
+            diff < tolerance,
+            "item {idx}: actual={actual}, expected={expected_val}, diff={diff:.6e}"
+        );
+    }
+}
+
+/// CCI-1: `rms_norm` follows the decoder oracle order (f64 sum of squares, f32
+/// mean, f32 scale, fused x·scale·gamma) with no mean subtraction.
+#[test]
+fn test_tensor_rms_norm_rank2_with_gamma() {
+    let input = tensor_value(
+        vec![
+            Value::Float(1.0),
+            Value::Float(2.0),
+            Value::Float(3.0),
+            Value::Float(4.0),
+            Value::Float(5.0),
+            Value::Float(6.0),
+        ],
+        vec![2, 3],
+    );
+    let gamma = tensor_value(
+        vec![Value::Float(2.0), Value::Float(1.0), Value::Float(0.5)],
+        vec![3],
+    );
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorRmsNorm),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),               // input tensor
+            MirOperand::Constant(MirConstant::Int(1)),      // axis (last)
+            MirOperand::Constant(MirConstant::Float(1e-5)), // epsilon
+            MirOperand::Value(MirValueId(1)),               // gamma peer
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let result =
+        evaluate_collection_call(&call, vec![(MirValueId(0), input), (MirValueId(1), gamma)])
+            .expect("rms_norm dispatch should succeed");
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![2, 3], "output shape must match input shape");
+    // Row 0 [1,2,3]: sum_sq=14, mean=14/3, scale=1/sqrt(mean+1e-5)≈0.462906.
+    // Row 1 [4,5,6]: sum_sq=77, mean=77/3, scale=1/sqrt(mean+1e-5)≈0.197367.
+    // gamma = [2, 1, 0.5].
+    let row0_scale = 1.0_f64 / (14.0_f64 / 3.0_f64 + 1e-5).sqrt();
+    let row1_scale = 1.0_f64 / (77.0_f64 / 3.0_f64 + 1e-5).sqrt();
+    assert_numeric_close(
+        &out.data,
+        &[
+            1.0 * row0_scale * 2.0,
+            2.0 * row0_scale * 1.0,
+            3.0 * row0_scale * 0.5,
+            4.0 * row1_scale * 2.0,
+            5.0 * row1_scale * 1.0,
+            6.0 * row1_scale * 0.5,
+        ],
+        1e-4,
+    );
+}
+
+/// CCI-1: `rope_norm` applies the NORM consecutive-pair rotation with
+/// `freq_base` 100000 and preserves no trailing remainder when dim == width.
+#[test]
+fn test_tensor_rope_rank1_norm_pairs() {
+    let input = tensor_value(
+        vec![
+            Value::Float(1.0),
+            Value::Float(2.0),
+            Value::Float(3.0),
+            Value::Float(4.0),
+        ],
+        vec![4],
+    );
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorRope),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),          // input tensor
+            MirOperand::Constant(MirConstant::Int(1)), // pos
+            MirOperand::Constant(MirConstant::Int(4)), // dim
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let result = evaluate_collection_call(&call, vec![(MirValueId(0), input)])
+        .expect("rope dispatch should succeed");
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![4], "output shape must match input shape");
+    // NORM consecutive-pair rotation, freq_base=100000, pos=1, dim=4:
+    // theta[0] = 1·100000^0 = 1; theta[1] = 1·100000^(−1/2) ≈ 0.0031623.
+    let c0 = 1.0_f64.cos();
+    let s0 = 1.0_f64.sin();
+    let theta1 = 1.0_f64 * 100_000.0_f64.powf(-(2.0 * 1.0) / 4.0);
+    let c1 = theta1.cos();
+    let s1 = theta1.sin();
+    let expected = [
+        1.0 * c0 - 2.0 * s0,
+        1.0 * s0 + 2.0 * c0,
+        3.0 * c1 - 4.0 * s1,
+        3.0 * s1 + 4.0 * c1,
+    ];
+    assert_numeric_close(&out.data, &expected, 1e-4);
+}
+
+/// CCI-1: `rope_norm` preserves elements beyond `dim` on the last axis.
+#[test]
+fn test_tensor_rope_preserves_remainder_beyond_dim() {
+    let input = tensor_value(
+        vec![
+            Value::Float(1.0),
+            Value::Float(2.0),
+            Value::Float(3.0),
+            Value::Float(4.0),
+            Value::Float(5.0),
+            Value::Float(6.0),
+        ],
+        vec![6],
+    );
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorRope),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Int(2)), // rotate only the first pair
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let result = evaluate_collection_call(&call, vec![(MirValueId(0), input)])
+        .expect("rope dispatch should succeed");
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![6]);
+    let c0 = 1.0_f64.cos();
+    let s0 = 1.0_f64.sin();
+    let expected = [1.0 * c0 - 2.0 * s0, 1.0 * s0 + 2.0 * c0, 3.0, 4.0, 5.0, 6.0];
+    assert_numeric_close(&out.data, &expected, 1e-4);
+}
+
+/// CCI-1: gather selects table rows by id, preserving repeated/out-of-order
+/// ids, and fails closed on an out-of-range id.
+#[test]
+fn test_tensor_gather_selects_rows_and_fails_closed_on_bad_id() {
+    // Table [3,2]: rows [1,2], [3,4], [5,6].
+    let table = tensor_value(
+        vec![
+            Value::Float(1.0),
+            Value::Float(2.0),
+            Value::Float(3.0),
+            Value::Float(4.0),
+            Value::Float(5.0),
+            Value::Float(6.0),
+        ],
+        vec![3, 2],
+    );
+    let ids = Value::Array(Rc::new(RefCell::new(vec![
+        Value::Int(2),
+        Value::Int(0),
+        Value::Int(2),
+    ])));
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorGather),
+        args: vec![
+            MirOperand::Value(MirValueId(0)), // table
+            MirOperand::Value(MirValueId(1)), // ids
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let result = evaluate_collection_call(
+        &call,
+        vec![(MirValueId(0), table.clone()), (MirValueId(1), ids)],
+    )
+    .expect("gather dispatch should succeed");
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![3, 2], "result shape is [T, D]");
+    assert_numeric_close(&out.data, &[5.0, 6.0, 1.0, 2.0, 5.0, 6.0], 1e-9);
+
+    // Out-of-range id (>= table rows) fails closed.
+    let bad_ids = Value::Array(Rc::new(RefCell::new(vec![Value::Int(0), Value::Int(3)])));
+    let bad_call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorGather),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let err = evaluate_collection_call(
+        &bad_call,
+        vec![(MirValueId(0), table), (MirValueId(1), bad_ids)],
+    )
+    .expect_err("out-of-range id must fail closed");
+    assert!(err.issue.contains("out_of_range"), "got: {err:?}");
+}
+
+// ---------------------------------------------------------------------------
+// Gradient-handle round trip (S5-U1): Create → Accumulate → Read → Zero
+// ---------------------------------------------------------------------------
+
+#[test]
+fn runner_gradient_handle_create_accumulate_read_zero_round_trip() {
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirDiagnosticKind;
+    use radix_mir::MirGradientOp;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    // --- 1. Build the round-trip program state ---
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    let span = radix_lexer::Span::default();
+
+    // Slot 0: shape [2]; slot 1: rank 1; slot 2: element kind (F32).
+    runner.frames.last_mut().unwrap().values.extend([
+        (
+            MirValueId(0),
+            Value::Array(Rc::new(RefCell::new(vec![Value::Int(2)]))),
+        ),
+        (MirValueId(1), Value::Int(1)),
+        (MirValueId(2), Value::Int(1)),
+        (
+            MirValueId(3),
+            Value::Tensor(Rc::new(RefCell::new(TensorValue {
+                data: vec![Value::Float(1.0), Value::Float(2.0)],
+                shape: vec![2],
+            }))),
+        ),
+        (
+            MirValueId(4),
+            Value::Tensor(Rc::new(RefCell::new(TensorValue {
+                data: vec![Value::Float(3.0), Value::Float(4.0)],
+                shape: vec![2],
+            }))),
+        ),
+    ]);
+
+    let shape = MirOperand::Value(MirValueId(0));
+    let rank = MirOperand::Value(MirValueId(1));
+
+    // --- 2. Create → opaque handle ---
+    let create = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Gradient(MirGradientOp::Create),
+        args: vec![
+            shape.clone(),
+            rank.clone(),
+            MirOperand::Value(MirValueId(2)),
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let handle = runner
+        .eval_runtime_call(&create, span)
+        .expect("gradient create should succeed");
+    let Value::GradientHandle(handle_id) = handle else {
+        panic!("gradient create must return an opaque handle, got {handle:?}");
+    };
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(5), Value::GradientHandle(handle_id));
+
+    // nota handle → "gradient-handle#0"
+    let nota_handle = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Diagnostic(MirDiagnosticKind::Nota),
+        args: vec![MirOperand::Value(MirValueId(5))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    runner
+        .eval_runtime_call(&nota_handle, span)
+        .expect("nota handle should succeed");
+
+    // --- 3. Accumulate [1.0, 2.0] then [3.0, 4.0] ---
+    for data_slot in [MirValueId(3), MirValueId(4)] {
+        let accumulate = MirRuntimeCall {
+            intrinsic: MirIntrinsic::Gradient(MirGradientOp::Accumulate),
+            args: vec![
+                MirOperand::Value(MirValueId(5)),
+                MirOperand::Value(data_slot),
+                shape.clone(),
+                rank.clone(),
+                MirOperand::Constant(MirConstant::Int(1)),
+            ],
+            return_ty: MirType::semantic(TypeId(0)),
+        };
+        runner
+            .eval_runtime_call(&accumulate, span)
+            .expect("gradient accumulate should succeed");
+    }
+
+    // --- 4. Read → nota → "[4.0, 6.0]" ---
+    let read = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Gradient(MirGradientOp::Read),
+        args: vec![MirOperand::Value(MirValueId(5))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let read_back = runner
+        .eval_runtime_call(&read, span)
+        .expect("gradient read should succeed");
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(6), read_back);
+    let nota_read = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Diagnostic(MirDiagnosticKind::Nota),
+        args: vec![MirOperand::Value(MirValueId(6))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    runner
+        .eval_runtime_call(&nota_read, span)
+        .expect("nota read-back should succeed");
+
+    // --- 5. Zero → read again → nota → "[0.0, 0.0]" ---
+    let zero = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Gradient(MirGradientOp::Zero),
+        args: vec![MirOperand::Value(MirValueId(5))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    runner
+        .eval_runtime_call(&zero, span)
+        .expect("gradient zero should succeed");
+    let zeroed = runner
+        .eval_runtime_call(&read, span)
+        .expect("gradient read after zero should succeed");
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(7), zeroed);
+    let nota_zeroed = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Diagnostic(MirDiagnosticKind::Nota),
+        args: vec![MirOperand::Value(MirValueId(7))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    runner
+        .eval_runtime_call(&nota_zeroed, span)
+        .expect("nota zeroed read-back should succeed");
+
+    // --- 6. Exact stdout oracle ---
+    assert_eq!(
+        host.stdout_lines,
+        vec![
+            "gradient-handle#0".to_owned(),
+            "[4.0, 6.0]".to_owned(),
+            "[0.0, 0.0]".to_owned(),
+        ]
+    );
+}
+
+#[test]
+fn runner_gradient_operations_fail_closed_on_unknown_or_foreign_handle() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::MirGradientOp;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    let span = radix_lexer::Span::default();
+
+    // Reading/zeroing an unknown handle must fail closed.
+    let read = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Gradient(MirGradientOp::Read),
+        args: vec![MirOperand::Constant(MirConstant::Int(99))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let err = runner
+        .eval_runtime_call(&read, span)
+        .expect_err("unknown gradient handle must fail closed");
+    assert!(
+        err.issue
+            .starts_with("runner_gradient_operation_requires_opaque_handle"),
+        "expected opaque-handle issue, got: {err:?}"
+    );
+
+    // A non-handle value (a numerus) is not a valid opaque handle.
+    let zero = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Gradient(MirGradientOp::Zero),
+        args: vec![MirOperand::Constant(MirConstant::Int(1))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let err = runner
+        .eval_runtime_call(&zero, span)
+        .expect_err("foreign scalar handle must fail closed");
+    assert!(
+        err.issue
+            .starts_with("runner_gradient_operation_requires_opaque_handle"),
+        "expected opaque-handle issue, got: {err:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// `est <type>` variant-tag dispatch (S5-U3): positive/negative type checks
+// ---------------------------------------------------------------------------
+
+#[test]
+fn runner_type_check_dispatches_on_runtime_variant_tag() {
+    use crate::host::BufferHost;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirType;
+    use radix_mir::MirTypeCheckOp;
+    use radix_mir::MirValidationContext;
+    use radix_types::Primitive;
+    use radix_types::TypeTable;
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    let span = radix_lexer::Span::default();
+
+    let textus = type_table.primitive(Primitive::Textus);
+    let numerus = type_table.primitive(Primitive::Numerus);
+
+    // Slot 0: a textus; slot 1: a numerus.
+    runner.frames.last_mut().unwrap().values.extend([
+        (MirValueId(0), Value::Str("faber".to_owned())),
+        (MirValueId(1), Value::Int(42)),
+    ]);
+
+    let type_check = |positive: bool, ty: TypeId, slot: u32| MirRuntimeCall {
+        intrinsic: MirIntrinsic::TypeCheck(MirTypeCheckOp {
+            positive,
+            ty: MirType::semantic(ty),
+        }),
+        args: vec![MirOperand::Value(MirValueId(slot))],
+        return_ty: MirType::semantic(textus),
+    };
+
+    // Positive checks against the runtime tag.
+    assert_eq!(
+        runner
+            .eval_runtime_call(&type_check(true, textus, 0), span)
+            .expect("textus is textus"),
+        Value::Bool(true)
+    );
+    assert_eq!(
+        runner
+            .eval_runtime_call(&type_check(true, numerus, 0), span)
+            .expect("textus is not numerus"),
+        Value::Bool(false)
+    );
+    assert_eq!(
+        runner
+            .eval_runtime_call(&type_check(true, numerus, 1), span)
+            .expect("numerus is numerus"),
+        Value::Bool(true)
+    );
+
+    // Negative checks (`non est`) invert the tag result.
+    assert_eq!(
+        runner
+            .eval_runtime_call(&type_check(false, textus, 1), span)
+            .expect("numerus is not textus"),
+        Value::Bool(true)
+    );
+    assert_eq!(
+        runner
+            .eval_runtime_call(&type_check(false, numerus, 1), span)
+            .expect("numerus is not numerus"),
+        Value::Bool(false)
+    );
+    assert_eq!(
+        runner
+            .eval_runtime_call(&type_check(false, textus, 0), span)
+            .expect("textus is not textus"),
+        Value::Bool(false)
+    );
+}

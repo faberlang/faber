@@ -80,10 +80,13 @@ fn plan_prefers_recorded_asset_base() {
     );
     receipt["assetBase"] = serde_json::json!("https://mirror.example/faber");
     write_receipt(&prefix, &receipt);
-    let plan = plan_self_update(&args("1.6.0"), Some(&prefix.join("bin/faber")), None)
-        .expect("plan");
+    let plan =
+        plan_self_update(&args("1.6.0"), Some(&prefix.join("bin/faber")), None).expect("plan");
     assert_eq!(plan.base_url, "https://mirror.example/faber");
-    assert_eq!(plan.script_url, "https://mirror.example/faber/install-faber");
+    assert_eq!(
+        plan.script_url,
+        "https://mirror.example/faber/install-faber"
+    );
 }
 
 #[test]
@@ -92,7 +95,10 @@ fn plan_base_url_override_wins() {
     let prefix = tmp.path().join("prefix");
     write_receipt(
         &prefix,
-        &receipt_json("https://host.example/download/faber-v1.5.0/faber-v1.5.0-aarch64-apple-darwin.tar.gz", "1.5.0"),
+        &receipt_json(
+            "https://host.example/download/faber-v1.5.0/faber-v1.5.0-aarch64-apple-darwin.tar.gz",
+            "1.5.0",
+        ),
     );
     let mut a = args("1.6.0");
     a.base_url = Some("/tmp/local-mirror".to_owned());
@@ -120,7 +126,10 @@ fn plan_missing_receipt_classifies_missing_launcher_metadata() {
     assert!(err.contains("missing-launcher-metadata"), "{err}");
     assert!(err.contains("cause:"), "{err}");
     assert!(err.contains("next:"), "{err}");
-    assert!(err.contains("scripta/install-faber without --update"), "{err}");
+    assert!(
+        err.contains("scripta/install-faber without --update"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -163,7 +172,13 @@ fn plan_missing_version_field_fails_closed() {
 fn explicit_prefix_is_used() {
     let tmp = tempfile::tempdir().expect("tmp");
     let prefix = tmp.path().join("prefix");
-    write_receipt(&prefix, &receipt_json("/tmp/local-mirror/faber-v1.5.0-aarch64-apple-darwin.tar.gz", "1.5.0"));
+    write_receipt(
+        &prefix,
+        &receipt_json(
+            "/tmp/local-mirror/faber-v1.5.0-aarch64-apple-darwin.tar.gz",
+            "1.5.0",
+        ),
+    );
     let mut a = args("1.6.0");
     a.prefix = Some(prefix.clone());
     let plan = plan_self_update(&a, None, None).expect("plan");
@@ -174,7 +189,10 @@ fn explicit_prefix_is_used() {
 fn allow_lane_change_is_forwarded() {
     let tmp = tempfile::tempdir().expect("tmp");
     let prefix = tmp.path().join("prefix");
-    write_receipt(&prefix, &receipt_json("/tmp/m/faber-v1.5.0-aarch64-apple-darwin.tar.gz", "1.5.0"));
+    write_receipt(
+        &prefix,
+        &receipt_json("/tmp/m/faber-v1.5.0-aarch64-apple-darwin.tar.gz", "1.5.0"),
+    );
     let mut a = args("2.0.0");
     a.allow_lane_change = true;
     let plan = plan_self_update(&a, Some(&prefix.join("bin/faber")), None).expect("plan");
@@ -249,7 +267,12 @@ fn cli_parse_self_update_shape() {
     // routes to the update handler.
     use clap::Parser;
     let cli = crate::cli::Cli::parse_from([
-        "faber", "self", "update", "--version", "1.6.0", "--allow-lane-change",
+        "faber",
+        "self",
+        "update",
+        "--version",
+        "1.6.0",
+        "--allow-lane-change",
     ]);
     match cli.command {
         Some(crate::cli::Command::SelfManage(manage)) => match manage.command {
@@ -399,7 +422,12 @@ fn cli_parse_self_uninstall_shape() {
     // parses and routes to the uninstall handler.
     use clap::Parser;
     let cli = crate::cli::Cli::parse_from([
-        "faber", "self", "uninstall", "--prefix", "/tmp/x", "--purge",
+        "faber",
+        "self",
+        "uninstall",
+        "--prefix",
+        "/tmp/x",
+        "--purge",
     ]);
     match cli.command {
         Some(crate::cli::Command::SelfManage(manage)) => match manage.command {

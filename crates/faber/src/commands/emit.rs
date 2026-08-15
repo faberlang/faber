@@ -91,26 +91,13 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
         return;
     }
 
-    match output {
-        radix::Output::Wasm(out) => {
-            use std::io::Write;
-            std::io::stdout()
-                .write_all(&out.bytes)
-                .unwrap_or_else(|err| {
-                    eprintln!("error: failed to write wasm bytes to stdout: {err}");
-                    std::process::exit(1);
-                });
-        }
-        output => {
-            let code = crate::postprocess::postprocess_code(
-                radix::tool::output_code(output),
-                command.target,
-                format,
-                linter,
-            );
-            print!("{code}");
-        }
-    }
+    let code = crate::postprocess::postprocess_code(
+        radix::tool::output_code(output),
+        command.target,
+        format,
+        linter,
+    );
+    print!("{code}");
 }
 
 pub fn is_faber_emit(target: FaberCliTarget) -> bool {

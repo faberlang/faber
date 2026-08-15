@@ -262,7 +262,7 @@ fn copy_package_dir_skipping_target(src: &std::path::Path, dest: &std::path::Pat
 
 /// The PML4-U6 accepted trajectory (train.proba U6 pins; f64 oracle
 /// evaluations of the documented convergence — compared under the documented
-/// 5e-4 absolute tolerance against the f32 self-hosted stepper output).
+/// 5e-4 absolute tolerance against the f32 self-hosted runner output).
 const PML4_PINS: [(usize, f64); 6] = [
     (0, 1.576448169383708),
     (10, 0.7815377070077427),
@@ -274,7 +274,7 @@ const PML4_PINS: [(usize, f64); 6] = [
 
 #[test]
 // Re-enabled with the LIB-MIR landing (radix 43c0102ba: textus.accipe
-// intrinsic + SizedNumeric zero-init arm): the FMIR stepper now lowers
+// intrinsic + SizedNumeric zero-init arm): the FMIR runner now lowers
 // library-to-library calls in the gradus multi-module library, so the PML4
 // executed-lane acceptance runs again (TARGETLANE001 a42bc97 + LIB-MIR).
 fn package_mir_training_loop_mlp_runs_on_fmir_lane() {
@@ -313,7 +313,7 @@ fn package_mir_training_loop_mlp_runs_on_fmir_lane() {
             .unwrap_or_else(|_| panic!("step {step} loss must be numeric"));
         assert!(
             (actual - pin).abs() <= 5e-4,
-            "step {step}: f32 stepper loss {actual} must match the f64 oracle pin {pin} within 5e-4"
+            "step {step}: f32 runner loss {actual} must match the f64 oracle pin {pin} within 5e-4"
         );
     }
     let initial: f64 = host.stdout_lines[0].parse().expect("initial loss numeric");

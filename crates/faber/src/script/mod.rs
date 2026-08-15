@@ -1,4 +1,4 @@
-//! In-process Faber scripting via the MIR stepper (`faber script`, `-c`, REPL).
+//! In-process Faber scripting via the runner (`faber run`, `-c`, REPL).
 //!
 //! Absorbs the former `scena` crate: analyze, lower, and interpret Faber source
 //! through `radix::mir`. Custom hosts implement [`Host`] for diagnostics,
@@ -29,7 +29,7 @@ pub const EMBED_SOURCE_NAME: &str = "<source>";
 /// (or the `exi` builtin) yields `code` masked to eight bits, matching common
 /// Unix status encoding. Abort paths yield [`ExitCode::FAILURE`].
 ///
-/// Frontend, MIR, and stepper failures return [`RunSourceError`] without running
+/// Frontend, MIR, and runner failures return [`RunSourceError`] without running
 /// `exit` on the embedder process.
 #[cfg_attr(not(test), allow(dead_code))]
 pub fn run_source(source: &str, host: &mut dyn Host) -> Result<ExitCode, RunSourceError> {
@@ -100,7 +100,7 @@ pub fn print_run_source_error(error: &RunSourceError) {
     }
 }
 
-/// Analyze, lower, and interpret Faber source on the stepper.
+/// Analyze, lower, and interpret Faber source on the runner.
 pub fn interpret_source<H: Host>(
     name: &str,
     source: &str,
@@ -109,7 +109,7 @@ pub fn interpret_source<H: Host>(
     run_named(name, source, host).map(|_| ())
 }
 
-/// Run source via the stepper, printing errors and exiting the process on failure.
+/// Run source via the runner, printing errors and exiting the process on failure.
 pub fn interpret_source_or_exit(name: &str, source: &str, host: &mut StdioHost) {
     match run_named(name, source, host) {
         Ok(status) => {

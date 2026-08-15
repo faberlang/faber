@@ -222,6 +222,51 @@ pub(crate) fn installed_locale_pack_path(locale: &str) -> PathBuf {
     )
 }
 
+/// Reader-locale names with an installed pack, for CLI error listing
+/// (`faber convert --to <unknown>` fails closed naming the real options).
+/// Install roots first, then dev-tree roots — mirrors the pack resolution
+/// order in [`installed_locale_pack_path_in`].
+pub fn available_locales() -> Vec<String> {
+    let exe = std::env::current_exe().ok();
+    let cwd = std::env::current_dir().ok();
+    let mut roots: Vec<PathBuf> = Vec::new();
+    if let Some(bin_dir) = exe.as_deref().and_then(Path::parent) {
+        roots.push(bin_dir.join("../share/faber/locale"));
+        roots.push(bin_dir.join("../lib/faber/locale"));
+    }
+    if cfg!(debug_assertions) {
+        for start in [cwd, exe.as_deref().map(Path::to_path_buf)]
+            .into_iter()
+            .flatten()
+        {
+            let mut dir = start;
+            loop {
+                roots.push(dir.join("radix").join("stdlib").join("locale"));
+                if !dir.pop() {
+                    break;
+                }
+            }
+        }
+    }
+    let mut locales: Vec<String> = Vec::new();
+    for root in roots {
+        let Ok(entries) = std::fs::read_dir(&root) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            if entry.path().join("pack.toml").is_file() {
+                if let Some(name) = entry.file_name().to_str() {
+                    if !locales.iter().any(|existing| existing == name) {
+                        locales.push(name.to_owned());
+                    }
+                }
+            }
+        }
+    }
+    locales.sort();
+    locales
+}
+
 /// The pure installed-pack resolution core, injectable for tests.
 ///
 /// Installed binaries resolve `<prefix>/share/faber/locale/<locale>/pack.toml`

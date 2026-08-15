@@ -90,38 +90,24 @@ fn cli_parses_targets_subcommand() {
 #[test]
 fn targets_table_reports_capability_truth_for_the_default_build() {
     // The cli_test binary builds under default features (full-targets): the
-    // rust host lane and the compiled host-leaf capability row must be
-    // present, and the opt-in capability rows absent — `device-runtime` /
-    // `host-macos-arm64` left full-targets at the S3-U2 ordinary-tool cut
-    // (f683d94d0), so capability truth reports no row for an unbuilt surface.
+    // rust host lane must be present, and the opt-in capability rows absent —
+    // `device-runtime` / `host-macos-arm64` left full-targets at the S3-U2
+    // ordinary-tool cut (f683d94d0) and `host-wasm` left at the U2
+    // dependency-removal cut, so capability truth reports no row for an
+    // unbuilt surface.
     let table = crate::commands::targets::rendered_targets_table();
     assert!(
         table.contains("rust available=yes"),
         "rust host lane must be reported as available:\n{table}"
     );
-    assert!(
-        table.lines().any(|line| line.starts_with("host-wasm ")),
-        "missing host-wasm capability row under the default build:\n{table}"
-    );
-    for row_name in ["device-runtime", "host-macos-arm64"] {
+    for row_name in ["host-wasm", "device-runtime", "host-macos-arm64"] {
         assert!(
             !table
                 .lines()
                 .any(|line| line.starts_with(&format!("{row_name} "))),
-            "unexpected {row_name} capability row under the default build (feature left full-targets at S3-U2):\n{table}"
+            "unexpected {row_name} capability row under the default build (feature left full-targets):\n{table}"
         );
     }
-}
-
-#[test]
-fn cli_parses_script_subcommand_with_forwarded_args() {
-    let cli = Cli::try_parse_from(["faber", "script", "pkg", "--", "--flag", "value"])
-        .expect("parse script");
-    let Some(crate::cli::Command::Script(args)) = cli.command else {
-        panic!("expected script subcommand");
-    };
-    assert_eq!(args.path, std::path::PathBuf::from("pkg"));
-    assert_eq!(args.args, vec!["--flag".to_owned(), "value".to_owned()]);
 }
 
 #[test]
@@ -217,7 +203,7 @@ fn cli_parses_emit_external_target_names() {
         ("python", FaberCliTarget::HirPython),
         ("haskell", FaberCliTarget::HirHaskell),
         ("wasm-text", FaberCliTarget::MirWasm),
-        ("wasm", FaberCliTarget::MirWasmBinary),
+        ("wasm", FaberCliTarget::MirWasm),
         ("llvm-text", FaberCliTarget::MirLlvm),
         ("metal-text", FaberCliTarget::MirMetal),
         ("wgsl-text", FaberCliTarget::MirWgsl),
@@ -289,40 +275,47 @@ fn cli_parses_scena_target_for_build() {
 }
 
 #[test]
-fn cli_parses_scena_target_for_run() {
-    let run = Cli::try_parse_from(["faber", "run", "--target", "scena", "pkg", "--", "Ian"])
-        .expect("parse run scena target");
-    let Some(crate::cli::Command::Run(args)) = run.command else {
-        panic!("expected run subcommand");
-    };
-    assert_eq!(args.target, Some(radix::tool::CliTarget::MirScena));
-    assert_eq!(args.path, std::path::PathBuf::from("pkg"));
-    assert_eq!(args.args, vec!["Ian".to_owned()]);
-}
-
-#[test]
-fn cli_run_defaults_to_current_directory_and_implicit_target() {
+fn cli_run_defaults_to_current_directory() {
     let run = Cli::try_parse_from(["faber", "run"]).expect("parse run defaults");
     let Some(crate::cli::Command::Run(args)) = run.command else {
         panic!("expected run subcommand");
     };
     assert_eq!(args.path, std::path::PathBuf::from("."));
-    // Unset target = implicit portable default (FHIR → FMIR), resolved from
-    // the manifest at run time.
-    assert_eq!(args.target, None);
-    assert!(!args.release);
-    assert!(!args.interpret);
-    assert!(!args.compile);
+    assert!(!args.deny_warnings);
     assert!(args.args.is_empty());
 }
 
 #[test]
-fn cli_rejects_conflicting_run_execution_modes() {
-    let error = Cli::try_parse_from(["faber", "run", "--interpret", "--compile", "pkg"])
-        .expect_err("run execution mode conflict");
-    let rendered = error.to_string();
-    assert!(rendered.contains("--interpret"));
-    assert!(rendered.contains("--compile"));
+fn cli_rejects_removed_run_mode_flags() {
+    // `faber run` is interpreted execution, always; the `--interpret` /
+    // `--compile` mode-switch flags retired with the Stage 6 clean break and
+    // must fail at parse time, never silently accept.
+    for flag in ["--interpret", "--compile"] {
+        let error =
+            Cli::try_parse_from(["faber", "run", flag, "pkg"]).expect_err("removed mode flag");
+        let rendered = error.to_string();
+        assert!(
+            rendered.contains(flag),
+            "removed run mode flag {flag} must be rejected:\n{rendered}"
+        );
+    }
+}
+
+#[test]
+fn cli_rejects_removed_run_target_flag() {
+    // `run` no longer selects a compiled target; targets are built with
+    // `faber build -t <target>`. The `-t` flag on run must fail at parse.
+    for argv in [
+        &["faber", "run", "--target", "scena", "pkg"][..],
+        &["faber", "run", "--target", "fmir-bin", "pkg"][..],
+    ] {
+        let error = Cli::try_parse_from(argv).expect_err("removed run target flag");
+        let rendered = error.to_string();
+        assert!(
+            rendered.contains("--target"),
+            "removed run --target must be rejected:\n{rendered}"
+        );
+    }
 }
 
 #[test]
@@ -391,18 +384,6 @@ fn cli_parses_fmir_bin_target_for_build() {
     };
     assert_eq!(args.target, Some(radix::tool::CliTarget::MirFmirBundle));
     assert_eq!(args.input, "pkg");
-}
-
-#[test]
-fn cli_parses_fmir_bin_target_for_run() {
-    let run = Cli::try_parse_from(["faber", "run", "--target", "fmir-bin", "pkg", "--", "Ian"])
-        .expect("parse run fmir-bin target");
-    let Some(crate::cli::Command::Run(args)) = run.command else {
-        panic!("expected run subcommand");
-    };
-    assert_eq!(args.target, Some(radix::tool::CliTarget::MirFmirBundle));
-    assert_eq!(args.path, std::path::PathBuf::from("pkg"));
-    assert_eq!(args.args, vec!["Ian".to_owned()]);
 }
 
 #[test]
@@ -525,37 +506,22 @@ fn cli_parses_locale_on_test() {
 }
 
 #[test]
-fn cli_parses_locale_on_script() {
-    let script = Cli::try_parse_from([
-        "faber",
-        "script",
-        "--locale",
-        "la",
-        "--diagnostics-locale",
-        "en",
-        "pkg",
-        "--",
-        "--page",
-        "404",
-    ])
-    .expect("parse script reader locale");
-    let Some(crate::cli::Command::Script(args)) = script.command else {
-        panic!("expected script subcommand");
+fn cli_parses_convert_target_locale() {
+    let convert = Cli::try_parse_from(["faber", "convert", "--to", "zh-Hans", "main.fab"])
+        .expect("parse convert target locale");
+    let Some(crate::cli::Command::Convert(args)) = convert.command else {
+        panic!("expected convert subcommand");
     };
-    assert_eq!(args.locale.as_deref(), Some("la"));
-    assert_eq!(args.diagnostics_locale.as_deref(), Some("en"));
-    assert_eq!(args.path, std::path::PathBuf::from("pkg"));
-    assert_eq!(args.args, vec!["--page".to_owned(), "404".to_owned()]);
+    assert_eq!(args.to, "zh-Hans");
 }
 
 #[test]
-fn cli_parses_locale_on_format() {
-    let format = Cli::try_parse_from(["faber", "format", "--locale", "zh-Hans", "main.fab"])
-        .expect("parse format reader locale");
-    let Some(crate::cli::Command::Format(args)) = format.command else {
-        panic!("expected format subcommand");
-    };
-    assert_eq!(args.locale.as_deref(), Some("zh-Hans"));
+fn cli_rejects_removed_format_locale_flag() {
+    let result = Cli::try_parse_from(["faber", "format", "--locale", "zh-Hans", "main.fab"]);
+    assert!(
+        result.is_err(),
+        "format --locale is retired; locale conversion is `faber convert --to`"
+    );
 }
 
 #[test]
@@ -869,16 +835,6 @@ fn cli_init_defaults_to_current_directory() {
         panic!("expected init subcommand");
     };
     assert_eq!(args.path, std::path::PathBuf::from("."));
-}
-
-#[test]
-fn cli_script_defaults_to_current_directory() {
-    let script = Cli::try_parse_from(["faber", "script"]).expect("parse script defaults");
-    let Some(crate::cli::Command::Script(script_args)) = script.command else {
-        panic!("expected script subcommand");
-    };
-    assert_eq!(script_args.path, std::path::PathBuf::from("."));
-    assert!(script_args.args.is_empty());
 }
 
 #[test]

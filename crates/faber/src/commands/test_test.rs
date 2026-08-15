@@ -1,4 +1,4 @@
-//! Companion tests for `faber test` (stepper proba runner).
+//! Companion tests for `faber test` (runner proba runner).
 //!
 //! WHY: the hygiene ratchet bans inline `#[cfg(test)] mod tests` in production
 //! sources; tests live in dedicated `*_test.rs` files.
@@ -9,13 +9,13 @@ use std::fs;
 use std::path::PathBuf;
 
 fn scratch_dir() -> PathBuf {
-    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/test-stepper-faber");
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/test-runner-faber");
     let _ = fs::create_dir_all(&base);
     base
 }
 
 #[test]
-fn stepper_runner_passes_simple_adfirma_fixture() {
+fn runner_runner_passes_simple_adfirma_fixture() {
     let dir = scratch_dir();
     let path = dir.join("pass.fab");
     fs::write(
@@ -44,7 +44,7 @@ proba "pass case" {
 }
 
 #[test]
-fn stepper_runner_fails_named_case() {
+fn runner_runner_fails_named_case() {
     let dir = scratch_dir();
     let path = dir.join("fail.fab");
     fs::write(
@@ -95,6 +95,6 @@ fn cmd_test_source_has_no_cargo_or_rust_executor() {
     );
     assert!(
         production.contains("run_proba_source") || production.contains("run_proba_on_analyzed"),
-        "cmd_test must drive the stepper proba runner"
+        "cmd_test must drive the runner proba runner"
     );
 }

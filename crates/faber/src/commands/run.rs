@@ -1,42 +1,26 @@
-//! `faber run` — compile and run a package, or interpret a single `.fab` file.
+//! `faber run` — interpreted execution, always.
 //!
-//! POLICY: single `.fab` file → interpret; package directory → compile. Override
-//! with `--interpret` / `--compile`. Shebang: `#!/usr/bin/env faber run`.
+//! `faber run <path>` interprets a single `.fab` file, package directory,
+//! `faber.toml` manifest, or archive through the runner — mode is never
+//! implicit in input shape and nothing is compiled. Compiled source artifacts
+//! are built with `faber build` and are never executed by faber (see
+//! `docs/operator/test-e2e-rework.md` §11); device packages whose route
+//! requires the host driver keep an execution path through it. Shebang:
+//! `#!/usr/bin/env faber run`.
 //!
-//! The canonical interpreted-source command is `faber script`; this command
-//! delegates to [`crate::commands::script::interpret_path`] on the interpret
-//! branch. `--interpret` / `--compile` are retained until the Stage 6 clean
-//! break (see `docs/archived/faber-script-runtime/stage0-baseline.md`).
+//! The `-c` one-liner and `faber repl` are the other runner entry modes.
 
-use crate::cli::{BackendSelection, FmirRunArgs, RunArgs};
+use crate::cli::{BackendSelection, FmirRunArgs, ReplArgs, RunArgs};
 use crate::input_shape::locale_without_package_error;
 use crate::package;
 use crate::package::DeviceSelection;
-use fs2::FileExt;
-use radix::codegen::Target;
+use crate::script::{interpret_source, interpret_source_or_exit, print_run_source_error};
 use radix::diagnostics::Diagnostic;
 use radix::mir::StdioHost;
-use std::fs::{self, OpenOptions};
+use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-fn should_interpret(args: &RunArgs, path: &Path) -> bool {
-    if resolve_run_target(args, path) != Target::HirRust {
-        return false;
-    }
-    if args.compile {
-        return false;
-    }
-    if args.interpret {
-        return true;
-    }
-    if args.locale.is_some() {
-        return false;
-    }
-    super::script::is_single_fab_file(path)
-}
-
-/// Builds a package as Rust or interprets a single `.fab` file.
 pub(super) fn cmd_run(args: RunArgs) {
     crate::commands::validate_deny_codes(&args.deny);
     let input_path = PathBuf::from(&args.path);
@@ -49,14 +33,9 @@ pub(super) fn cmd_run(args: RunArgs) {
         std::process::exit(1);
     }
 
-    // S1-5/S1-6 — the one host-construction policy (N1.1/N1.5). Resolve the
-    // effective backend selection (CLI `--backend` > manifest `[device]
-    // backend` > default `auto`) and apply it before launch on every route.
-    // Routes that never carry a device program (rust / go / scena / fhir)
-    // fail closed up front (`E_NO_DEVICE_PROGRAM` for an explicit GPU
-    // request; `auto` keeps the CPU route). The package-MIR routes
-    // (`fmir-text` / `fmir` / `fmir-bin`) and the image-runner route build or
-    // load their FMIR image first and resolve against its `device` section.
+    // N1.1 precedence: CLI `--backend` > manifest `[device] backend` > `auto`.
+    // An invalid manifest value fails closed with a structured diagnostic
+    // (never silently ignored).
     let selection = match resolve_route_selection(&args, &input_path) {
         Ok(selection) => selection,
         Err(diagnostic) => {
@@ -65,75 +44,172 @@ pub(super) fn cmd_run(args: RunArgs) {
         }
     };
 
-    let target = resolve_run_target(&args, &input_path);
-    let device_capable_route = matches!(
-        target,
-        Target::MirFmirBinary | Target::MirFmir | Target::MirFmirBundle
+    interpret_path(
+        &input_path,
+        &args.args,
+        args.locale.as_deref(),
+        args.diagnostics_locale.as_deref(),
+        selection,
     );
-    if !device_capable_route {
-        resolve_route_backend_or_exit(selection, false);
-    }
+}
 
-    match target {
-        Target::HirRust => {}
-        Target::HirGo => {
-            cmd_run_go(&args);
-            return;
-        }
-        Target::MirScena => {
-            cmd_run_scena(args);
-            return;
-        }
-        Target::MirFmir => {
-            cmd_run_fmir_text(args, selection);
-            return;
-        }
-        Target::MirFmirBinary => {
-            cmd_run_fmir(args, selection);
-            return;
-        }
-        Target::MirFmirBundle => {
-            cmd_run_fmir_bin(&args, selection);
-            return;
-        }
-        Target::HirFhir => {
-            cmd_run_fhir(args);
-            return;
-        }
-        Target::MirLlvmHost => {
-            #[cfg(not(feature = "mir-llvm"))]
-            {
-                eprintln!(
-                    "error: target `llvm-host` is not available in this faber build; rebuild with feature `mir-llvm`"
-                );
+/// Dispatch an interpreted input path to the package-MIR runner, archive
+/// extraction, or single-source runner. `faber run` always routes through
+/// this dispatch; nothing here compiles or invokes Cargo.
+pub(super) fn interpret_path(
+    path: &PathBuf,
+    program_args: &[String],
+    locale: Option<&str>,
+    diagnostics_locale: Option<&str>,
+    selection: DeviceSelection,
+) {
+    if super::archive::is_zip_archive(path) {
+        let archive = match super::archive::extract_package_archive(path) {
+            Ok(archive) => archive,
+            Err(diagnostic) => {
+                eprint_archive_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
                 std::process::exit(1);
             }
-            #[cfg(feature = "mir-llvm")]
-            {
-                cmd_run_llvm_host(&args);
-                return;
-            }
-        }
-        target => {
-            eprintln!(
-                "error: faber run does not support target `{}`; use `rust`, `go`, `scena`, `fhir`, `fmir-text`, `fmir`, `fmir-bin`, or `llvm-host`",
-                run_target_name(target)
-            );
+        };
+        let config =
+            match script_package_config(archive.package_input(), locale, diagnostics_locale) {
+                Ok(config) => config,
+                Err(diagnostic) => {
+                    eprint_archive_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
+                    std::process::exit(1);
+                }
+            };
+        let mut host = StdioHost::with_argumenta(program_args.to_vec());
+        if let Err(mut diagnostics) = package::run_package_mir_with_selection(
+            &config,
+            archive.package_input(),
+            selection,
+            &mut host,
+        ) {
+            archive.remap_diagnostics(&mut diagnostics);
+            eprint_archive_diagnostics(&diagnostics);
+            eprint_device_run_note(&diagnostics);
+            drop(archive);
             std::process::exit(1);
         }
-    }
-
-    if should_interpret(&args, &input_path) {
-        super::script::interpret_path(
-            &input_path,
-            &args.args,
-            args.locale.as_deref(),
-            args.diagnostics_locale.as_deref(),
-        );
         return;
     }
 
-    cmd_run_compiled(&args);
+    if is_package_interpret_input(path) {
+        let config = match script_package_config(path, locale, diagnostics_locale) {
+            Ok(config) => config,
+            Err(diagnostic) => {
+                super::eprint_compile_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
+                std::process::exit(1);
+            }
+        };
+        let mut host = StdioHost::with_argumenta(program_args.to_vec());
+        if let Err(diagnostics) =
+            package::run_package_mir_with_selection(&config, path, selection, &mut host)
+        {
+            super::eprint_compile_diagnostics(&diagnostics);
+            eprint_device_run_note(&diagnostics);
+            std::process::exit(1);
+        }
+        return;
+    }
+
+    // Single-source runner. A lone `.fab` file carries no package `[device]`
+    // section, so an explicit backend request can never be served here
+    // (N1.1 fail closed: "package has no device program").
+    if selection != DeviceSelection::Auto {
+        eprintln!(
+            "error: explicit backend selection `{}` cannot be served: a single `.fab` file carries no package device program; device execution requires a package with a `[device]` section",
+            selection.spelling()
+        );
+        std::process::exit(1);
+    }
+
+    let source = match fs::read_to_string(path) {
+        Ok(source) => source,
+        Err(err) => {
+            eprintln!("error: cannot read '{}': {}", path.display(), err);
+            std::process::exit(1);
+        }
+    };
+
+    let config = match script_package_config(path, locale, diagnostics_locale) {
+        Ok(config) => config,
+        Err(diagnostic) => {
+            super::eprint_compile_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
+            std::process::exit(1);
+        }
+    };
+    let session = radix::driver::Session::new(config);
+    let mut host = StdioHost::with_argumenta(program_args.to_vec());
+    if let Err(error) =
+        crate::script::run_with_session(&session, &path.display().to_string(), &source, &mut host)
+    {
+        print_run_source_error(&error);
+        std::process::exit(1);
+    }
+}
+
+/// Reader config for interpreted packages: CLI `--locale` / `--diagnostics-locale`
+/// over the package `[locale]`, then the product default. Do not use
+/// [`package::default_config_with_locale`] here — that installs the English
+/// pack and `effective_package_config` will not replace it with the package's
+/// declared locale.
+fn script_package_config(
+    input: &Path,
+    locale: Option<&str>,
+    diagnostics_locale: Option<&str>,
+) -> Result<radix::driver::Config, Box<Diagnostic>> {
+    package::config_with_locale(
+        radix::Target::HirTypeScript,
+        input,
+        locale,
+        diagnostics_locale,
+    )
+    .map(|(config, _)| config.with_dev_stdlib())
+}
+
+/// Whether `path` routes through the package-MIR runner rather than the
+/// single-source runner: manifest-backed or directory packages, or a
+/// manifestless `.fab` file that declares a non-kernel import.
+pub(super) fn is_package_interpret_input(path: &Path) -> bool {
+    package::is_manifest_backed_or_directory_package_input(path)
+        || manifestless_file_declares_non_kernel_import(path)
+}
+
+fn manifestless_file_declares_non_kernel_import(path: &Path) -> bool {
+    if !is_single_fab_file(path) {
+        return false;
+    }
+    let Ok(raw_source) = fs::read_to_string(path) else {
+        return false;
+    };
+    let display_name = path.display().to_string();
+    let Ok(peeled) = radix::driver::peel_raw_source(&display_name, &raw_source) else {
+        return false;
+    };
+    let lex = match package::default_config_with_locale(radix::Target::HirTypeScript) {
+        Ok(config) => match config.locale_pack.as_ref() {
+            Some(pack) => radix::lexer::lex_with_locale_pack(peeled.body, pack),
+            None => radix::lexer::lex(peeled.body),
+        },
+        Err(_) => radix::lexer::lex(peeled.body),
+    };
+    let parse = radix::parser::parse(lex);
+    let Some(program) = parse.program else {
+        return false;
+    };
+    program.statements.iter().any(|statement| {
+        let radix::syntax::StmtKind::Import(import) = &statement.kind else {
+            return false;
+        };
+        !radix::kernel::is_kernel_import_path(parse.interner.resolve(import.path))
+    })
+}
+
+/// Whether `path` is a single `.fab` file (the single-source runner input).
+pub(super) fn is_single_fab_file(path: &Path) -> bool {
+    path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("fab")
 }
 
 /// Resolve the effective backend selection for `faber run` (N1.1): CLI
@@ -172,68 +248,6 @@ fn resolve_route_selection(
     }
 }
 
-/// Apply the one host-construction policy to a route before launch (N1.1/
-/// N1.5): resolve the route's backend selection against the machine's
-/// admitted backends and fail closed with a structured diagnostic before any
-/// launch when the resolution fails (N1.4). The resolution value is
-/// deliberately dropped (DDPP1-U2 C2 isolation): callers only need the
-/// fail-closed side effect.
-fn resolve_route_backend_or_exit(selection: DeviceSelection, requires_device: bool) {
-    // DDPP1-U2 (C2 feature isolation): the composite-host backend resolution
-    // compiles only under `device-runtime`; without it an explicit device
-    // request fails closed before launch (never silently falls back to CPU).
-    // The resolution value is deliberately dropped (callers only need the
-    // fail-closed side effect); returning it would pin the function to the
-    // `device-runtime`-only `DeviceBackend` type.
-    #[cfg(feature = "device-runtime")]
-    {
-        let admitted = package::admitted_backends();
-        match package::resolve_backend_selection(selection, requires_device, &admitted) {
-            Ok(_) => {}
-            Err(diagnostic) => {
-                eprint_route_diagnostics(&[diagnostic]);
-                eprintln!("backend selection failed; aborting before launch");
-                std::process::exit(1);
-            }
-        }
-    }
-    #[cfg(not(feature = "device-runtime"))]
-    {
-        if selection != DeviceSelection::Auto || requires_device {
-            eprintln!(
-                "error: a device route was requested, but this faber build compiles no `device-runtime`; rebuild with the `device-runtime` feature"
-            );
-            std::process::exit(1);
-        }
-    }
-}
-
-fn run_target_name(target: Target) -> &'static str {
-    match target {
-        Target::MirStepper => "stepper",
-        Target::HirRust => "rust",
-        Target::HirTypeScript => "ts",
-        Target::HirGo => "go",
-        Target::HirFaber => "faber",
-        Target::MirWasm => "wasm-text",
-        Target::MirWasmBinary => "wasm",
-        Target::MirLlvm => "llvm-text",
-        Target::MirLlvmHost => "llvm-host",
-        Target::MirAmd => "amd",
-        Target::MirMetal => "metal-text",
-        Target::MirWgsl => "wgsl-text",
-        Target::MirSexp => "sexp",
-        Target::MirScena => "scena",
-        Target::MirFmir => "fmir-text",
-        Target::MirFmirBinary => "fmir",
-        Target::MirFmirBundle => "fmir-bin",
-        Target::HirSwift => "swift",
-        Target::HirPython => "python",
-        Target::HirHaskell => "haskell",
-        Target::HirFhir => "fhir",
-    }
-}
-
 /// Render route diagnostics with their stable host codes (N1.4). The
 /// composite-host failures carry `E_DEVICE_*` / `E_BACKEND_*` / `E_NO_*`
 /// `issue` args; surfacing them in the terminal keeps the fail-before-launch
@@ -258,320 +272,84 @@ fn eprint_route_diagnostics(diagnostics: &[Diagnostic]) {
     }
 }
 
-/// Resolve the run target for `faber run`: an explicit `--target` wins; else
-/// the manifest `[build] target`; else the implicit portable default (FHIR →
-/// FMIR). Never probes Cargo for an un-targeted package (portable default).
-fn resolve_run_target(args: &RunArgs, input_path: &Path) -> Target {
-    if let Some(target) = args.target {
-        return Target::from(target);
-    }
-    let Ok(layout) = crate::package::discover_build_layout(input_path) else {
-        return Target::HirFhir;
-    };
-    if !layout.manifest_path.exists() {
-        return Target::HirFhir;
-    }
-    let Ok(manifest) = crate::package::read_manifest(&layout.manifest_path) else {
-        return Target::HirFhir;
-    };
-    crate::package::manifest_build_target(manifest.build.target.as_deref(), &layout.manifest_path)
-        .unwrap_or(Target::HirFhir)
-}
-
-fn warn_policy_from_args(args: &RunArgs) -> radix::driver::WarnPolicy {
-    radix::driver::WarnPolicy {
-        deny_all_warnings: args.deny_warnings,
-        deny_codes: args.deny.clone(),
-    }
-}
-
-fn run_config(
-    target: Target,
-    input_path: &Path,
-    locale: Option<&str>,
-    diagnostics_locale: Option<&str>,
-    warn_policy: radix::driver::WarnPolicy,
-) -> Result<radix::driver::Config, Box<Diagnostic>> {
-    package::config_with_locale(target, input_path, locale, diagnostics_locale)
-        .map(|(config, _locale_pack)| config.with_warn_policy(warn_policy))
-}
-
-fn run_config_or_exit(
-    target: Target,
-    input_path: &Path,
-    locale: Option<&str>,
-    diagnostics_locale: Option<&str>,
-    warn_policy: radix::driver::WarnPolicy,
-) -> radix::driver::Config {
-    match run_config(target, input_path, locale, diagnostics_locale, warn_policy) {
-        Ok(config) => config,
-        Err(diag) => {
-            eprintln!("error: {}", diag.message);
-            std::process::exit(1);
-        }
-    }
-}
-
-/// G6 GO3 — package compile → go build → exec with forwarded argv.
-fn cmd_run_go(_args: &RunArgs) {
-    #[cfg(not(feature = "hir-go"))]
-    {
+/// After a failed interpreted run of a device-bearing package, point the user
+/// at the build + host-driver route: `faber run` interprets and never
+/// compiles, so a non-runnable device package is built with `faber build` and
+/// its artifact executed through the host driver (the first-party target
+/// runtime).
+fn eprint_device_run_note(diagnostics: &[Diagnostic]) {
+    let device_failure = diagnostics.iter().any(|diag| {
+        let issue = diag.issue().unwrap_or_default();
+        issue.starts_with("E_DEVICE_")
+            || issue.starts_with("E_BACKEND_")
+            || diag.message.contains("device section")
+    });
+    if device_failure {
         eprintln!(
-            "error: target `go` is not available in this faber build; rebuild with feature `hir-go`"
+            "note: this package declares a device program that executes through the host driver; if it cannot be run here, build the artifact with `faber build` and run the generated entrypoint through the host driver"
         );
-        std::process::exit(1);
     }
-    #[cfg(feature = "hir-go")]
-    {
-        let args = _args;
-        let input_path = PathBuf::from(&args.path);
-        let config = run_config_or_exit(
-            Target::HirGo,
-            &input_path,
-            args.locale.as_deref(),
-            args.diagnostics_locale.as_deref(),
-            warn_policy_from_args(args),
-        );
-        let result = package::compile_package_go(&config, &input_path);
-        eprint_route_diagnostics(&result.compile_result.diagnostics);
-        let Some(output) = result.compile_result.output else {
-            eprintln!("compilation failed");
-            std::process::exit(1);
-        };
-        let code = if let radix::Output::Go(go) = output {
-            go.code
+}
+
+fn eprint_archive_diagnostics(diagnostics: &[Diagnostic]) {
+    for diagnostic in diagnostics {
+        let level = if diagnostic.is_error() {
+            "error"
         } else {
-            eprintln!("error: go run expected Go package output");
-            std::process::exit(1);
+            "warning"
         };
-        let layout = match package::discover_build_layout(&input_path) {
-            Ok(l) => l,
-            Err(d) => {
-                eprintln!("error: {}", d.message);
-                std::process::exit(1);
-            }
-        };
-        let go_layout = package::GoBuildLayout::from_package(&layout);
-        if let Err(d) = package::emit_go_module(&go_layout, &code, &result.go_modules) {
-            eprintln!("error: {}", d.message);
-            std::process::exit(1);
-        }
-        let binary = match package::invoke_go_build(&go_layout) {
-            Ok(path) => path,
-            Err(d) => {
-                eprintln!("error: {}", d.message);
-                std::process::exit(1);
-            }
-        };
-        match package::run_go_binary(&binary, &args.args) {
-            Ok(code) => std::process::exit(code),
-            Err(d) => {
-                eprintln!("error: {}", d.message);
-                std::process::exit(1);
-            }
+        if diagnostic.file.is_empty() {
+            eprintln!("{level}: {}", diagnostic.message);
+        } else {
+            eprintln!("{level}: {}: {}", diagnostic.file, diagnostic.message);
         }
     }
 }
 
-fn cmd_run_scena(args: RunArgs) {
-    let input_path = PathBuf::from(&args.path);
-    let warn_policy = warn_policy_from_args(&args);
-    let argumenta = args.args.clone();
+/// Execute `-c` / `--command` source via the runner.
+pub(super) fn cmd_eval(source: &str, args: Vec<String>) {
+    let mut host = StdioHost::with_argumenta(args);
+    interpret_source_or_exit("command-line", source, &mut host);
+}
+
+/// Interactive runner REPL: accumulate cells and re-lower MIR on each input
+/// line.
+pub(super) fn cmd_repl(args: ReplArgs) {
     let mut host = StdioHost::with_argumenta(args.args);
-    let config = run_config_or_exit(
-        Target::MirScena,
-        &input_path,
-        args.locale.as_deref(),
-        args.diagnostics_locale.as_deref(),
-        warn_policy,
-    );
-    let artifact = match package::build_package_mir_artifact(&config, &input_path, &argumenta) {
-        Ok(artifact) => artifact,
-        Err(diagnostics) => {
-            eprint_route_diagnostics(&diagnostics);
-            eprintln!("scena artifact build failed");
-            std::process::exit(1);
-        }
-    };
-    if let Err(diagnostics) = package::run_package_mir_artifact(&config, &artifact, &mut host) {
-        eprint_route_diagnostics(&diagnostics);
-        eprintln!("scena artifact execution failed");
-        std::process::exit(1);
-    }
-}
+    let mut buffer = String::new();
+    let stdin = io::stdin();
+    let mut stdout = io::stdout();
 
-fn cmd_run_fmir_text(args: RunArgs, selection: DeviceSelection) {
-    let input_path = PathBuf::from(&args.path);
-    let warn_policy = warn_policy_from_args(&args);
-    let mut host = StdioHost::with_argumenta(args.args);
-    let config = run_config_or_exit(
-        Target::MirFmir,
-        &input_path,
-        args.locale.as_deref(),
-        args.diagnostics_locale.as_deref(),
-        warn_policy,
-    );
-    let image = match package::build_package_fmir_text_image(&config, &input_path, &[]) {
-        Ok(image) => image,
-        Err(diagnostics) => {
-            eprint_route_diagnostics(&diagnostics);
-            eprintln!("fmir-text image build failed");
-            std::process::exit(1);
-        }
-    };
-    // The one host-construction policy against the built image's device
-    // section (S1-6): a device-bearing image resolves `selection` against the
-    // admitted backends and runs through the composite host's device route;
-    // anything else runs the CPU/FMIR stepper.
-    if let Err(diagnostics) =
-        package::run_package_fmir_text_image_with_selection(&image, selection, &mut host)
-    {
-        eprint_route_diagnostics(&diagnostics);
-        eprintln!("fmir-text image execution failed");
-        std::process::exit(1);
-    }
-}
-
-fn cmd_run_fmir(args: RunArgs, selection: DeviceSelection) {
-    let input_path = PathBuf::from(&args.path);
-    let warn_policy = warn_policy_from_args(&args);
-    let mut host = StdioHost::with_argumenta(args.args);
-    let config = run_config_or_exit(
-        Target::MirFmirBinary,
-        &input_path,
-        args.locale.as_deref(),
-        args.diagnostics_locale.as_deref(),
-        warn_policy,
-    );
-    // The one host-construction policy against the built image's device
-    // section (S1-6, resolving the S1-5 open question: source-built images
-    // now carry the device section and the route flips to check it). A
-    // device-bearing image runs through the composite host's device route.
-    // The run consumes the IN-MEMORY source-built image (FMIR e2e-hardening
-    // CTO-1): the image-file round-trip drops the merged program's
-    // struct/variant validation metadata, which library-backed packages need
-    // for struct literals, method calls, and field projections.
-    if let Err(diagnostics) =
-        package::run_package_fmir_built_image(&config, &input_path, selection, &mut host)
-    {
-        eprint_route_diagnostics(&diagnostics);
-        eprintln!("fmir image execution failed");
-        std::process::exit(1);
-    }
-}
-
-/// Build the FHIR package envelope, load it source-free, lower to FMIR, and
-/// run in-process — no Rust, no Cargo (portable default route).
-fn cmd_run_fhir(_args: RunArgs) {
-    #[cfg(not(feature = "hir-fhir"))]
-    {
-        eprintln!(
-            "error: target `fhir` is not available in this faber build; rebuild with feature `hir-fhir`"
-        );
-        std::process::exit(1);
-    }
-    #[cfg(feature = "hir-fhir")]
-    {
-        let args = _args;
-        let input_path = PathBuf::from(&args.path);
-        let warn_policy = warn_policy_from_args(&args);
-        let mut host = StdioHost::with_argumenta(args.args);
-        let config = run_config_or_exit(
-            Target::HirFhir,
-            &input_path,
-            args.locale.as_deref(),
-            args.diagnostics_locale.as_deref(),
-            warn_policy,
-        );
-        let artifact = match package::build_package_fhir(&config, &input_path) {
-            Ok(artifact) => artifact,
-            Err(diagnostics) => {
-                eprint_route_diagnostics(&diagnostics);
-                eprintln!("fhir package build failed");
+    loop {
+        crate::io_buf::write_prompt(&mut stdout, "faber> ");
+        let mut line = String::new();
+        match stdin.read_line(&mut line) {
+            Ok(0) => break,
+            Ok(_) => {}
+            Err(err) => {
+                eprintln!("error: cannot read repl input: {err}");
                 std::process::exit(1);
             }
-        };
-        let loaded = match package::load_package_fhir(&artifact.package_path) {
-            Ok(loaded) => loaded,
-            Err(diagnostics) => {
-                eprint_route_diagnostics(&diagnostics);
-                eprintln!("fhir package load failed");
-                std::process::exit(1);
-            }
-        };
-        if let Err(diagnostics) =
-            package::run_loaded_package_fhir(&config, loaded, &artifact.root, &mut host)
-        {
-            eprint_route_diagnostics(&diagnostics);
-            eprintln!("fhir package execution failed");
-            std::process::exit(1);
+        }
+
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if matches!(trimmed, ":quit" | ":exit") {
+            break;
+        }
+
+        if !buffer.is_empty() && !buffer.ends_with('\n') {
+            buffer.push('\n');
+        }
+        buffer.push_str(trimmed);
+        buffer.push('\n');
+
+        if let Err(error) = interpret_source("repl", &buffer, &mut host) {
+            print_run_source_error(&error);
         }
     }
-}
-
-/// Stage 9 S9.3: `faber run --target llvm-host` — build the native host
-/// executable through the shared product builder, then execute it with the
-/// forwarded process arguments. stdout/stderr are inherited (forwarded to the
-/// caller) and the child exit code becomes the command's exit code.
-#[cfg(feature = "mir-llvm")]
-fn cmd_run_llvm_host(args: &RunArgs) {
-    let input_path = PathBuf::from(&args.path);
-    let config = run_config_or_exit(
-        Target::MirLlvmHost,
-        &input_path,
-        args.locale.as_deref(),
-        args.diagnostics_locale.as_deref(),
-        warn_policy_from_args(args),
-    );
-    let profile = if args.release {
-        package::LlvmHostProfile::Release
-    } else {
-        package::LlvmHostProfile::Debug
-    };
-    let build = match package::build_host_program(&config, &input_path, profile) {
-        Ok(build) => build,
-        Err(diagnostics) => {
-            eprint_route_diagnostics(&diagnostics);
-            eprintln!("llvm-host build failed");
-            std::process::exit(1);
-        }
-    };
-    run_executable(&build.binary_path, &args.args);
-}
-
-fn cmd_run_fmir_bin(args: &RunArgs, selection: DeviceSelection) {
-    let input_path = PathBuf::from(&args.path);
-    let config = run_config_or_exit(
-        Target::MirFmirBundle,
-        &input_path,
-        args.locale.as_deref(),
-        args.diagnostics_locale.as_deref(),
-        warn_policy_from_args(args),
-    );
-    let bundle =
-        match package::build_package_fmir_binary_bundle(&config, &input_path, &[], args.release) {
-            Ok(bundle) => bundle,
-            Err(diagnostics) => {
-                eprint_route_diagnostics(&diagnostics);
-                eprintln!("fmir-bin bundle build failed");
-                std::process::exit(1);
-            }
-        };
-    // The fmir-bin runner embeds the FMIR image bytes and applies the one
-    // host-construction policy at run time (the generated runner calls
-    // `run_fmir_image_bytes_with_stdio` with the image's recorded selection;
-    // the CLI `--backend` override is resolved here against the bundle's
-    // image before the executable is launched).
-    let decision = match package::fmir_image_route_decision(&bundle.image_path) {
-        Ok(decision) => decision,
-        Err(diagnostics) => {
-            eprint_route_diagnostics(&diagnostics);
-            eprintln!("fmir-bin image load failed");
-            std::process::exit(1);
-        }
-    };
-    resolve_route_backend_or_exit(selection, decision.requires_device);
-    run_executable(&bundle.entrypoint_path, &args.args);
 }
 
 pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
@@ -594,190 +372,12 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
     let mut host = StdioHost::with_argumenta(args.args);
     // The route function applies the one host-construction policy: a
     // device-bearing image runs through the composite host's device route
-    // (S1-6 launch seam); anything else runs the CPU/FMIR stepper.
+    // (S1-6 launch seam); anything else runs the CPU/FMIR runner.
     if let Err(diagnostics) =
         package::run_fmir_image_path_with_selection(&args.image, Some(selection), &mut host)
     {
         eprint_route_diagnostics(&diagnostics);
         eprintln!("fmir image execution failed");
-        std::process::exit(1);
-    }
-}
-
-#[cfg(test)]
-fn run_scena_package_with_host<H: radix::mir::Host + ?Sized>(
-    input_path: &Path,
-    argumenta: &[String],
-    host: &mut H,
-) -> Result<(), Vec<radix::diagnostics::Diagnostic>> {
-    let config = radix::driver::Config::default().with_target(Target::MirScena);
-    let artifact = package::build_package_mir_artifact(&config, input_path, argumenta)?;
-    package::run_package_mir_artifact(&config, &artifact, host)
-}
-
-/// Lock file for the per-package generated-crate sequence, stored beside the
-/// published crate (`target/faber/`) so atomic publication never replaces it.
-const GENERATED_CRATE_LOCK_FILE: &str = ".faber-build.lock";
-
-/// Exclusive per-package advisory lock covering the generated-crate emit +
-/// cargo sequence (FBR-P2-004).
-///
-/// Mirrors `package::cargo::lock_generated_crate_build` on the same lock file
-/// (`<pkg>/target/.faber-build.lock`) so `faber build` and `faber run` for the
-/// same package serialize against each other. The private `package::cargo`
-/// module is not reachable from `commands`, so the guard is reproduced here.
-fn lock_generated_crate(
-    layout: &package::BuildLayout,
-) -> Result<GeneratedCrateLock, Box<Diagnostic>> {
-    let target_dir = layout.cargo_target_dir.clone();
-    fs::create_dir_all(&target_dir)
-        .map_err(|err| Box::new(Diagnostic::io_error(&target_dir, &err)))?;
-    let lock_path = target_dir.join(GENERATED_CRATE_LOCK_FILE);
-    let file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .open(&lock_path)
-        .map_err(|err| Box::new(Diagnostic::io_error(&lock_path, &err)))?;
-    file.lock_exclusive()
-        .map_err(|err| Box::new(Diagnostic::io_error(&lock_path, &err)))?;
-    Ok(GeneratedCrateLock { _file: file })
-}
-
-/// RAII guard for the per-package generated-crate lock. Dropping the guard
-/// closes the file, which releases the OS-level advisory lock.
-struct GeneratedCrateLock {
-    _file: std::fs::File,
-}
-
-fn cmd_run_compiled(args: &RunArgs) {
-    let input_path = PathBuf::from(&args.path);
-
-    // POLICY: `run` is package-scoped, so stale generated crates are never
-    // trusted over the current Faber sources.
-    let config = run_config_or_exit(
-        Target::HirRust,
-        &input_path,
-        args.locale.as_deref(),
-        args.diagnostics_locale.as_deref(),
-        warn_policy_from_args(args),
-    );
-    let result = package::compile_package(&config, &input_path);
-
-    eprint_route_diagnostics(&result.diagnostics);
-
-    let Some(output) = result.output else {
-        eprintln!("compilation failed");
-        std::process::exit(1);
-    };
-
-    // EDGE: legacy entry paths still need a build layout so existing examples
-    // remain runnable while package manifests become the preferred surface.
-    let layout = match package::discover_build_layout(&input_path) {
-        Ok(l) => l,
-        Err(d) => {
-            eprintln!("error: {}", d.message);
-            std::process::exit(1);
-        }
-    };
-
-    // FBR-P2-004: the per-package advisory lock spans the emit + cargo
-    // sequence (library crates, generated crate snapshot, Cargo invocation) so
-    // a concurrent `faber build` for this package cannot interleave files from
-    // a different runtime plan. Released before the binary executes.
-    let _build_lock = match lock_generated_crate(&layout) {
-        Ok(lock) => lock,
-        Err(d) => {
-            eprintln!("error: {}", d.message);
-            std::process::exit(1);
-        }
-    };
-
-    let meta = if layout.manifest_path.exists() {
-        package::read_manifest(&layout.manifest_path).ok()
-    } else {
-        None
-    };
-
-    let code_string = if let radix::Output::Rust(r) = output {
-        r.code
-    } else {
-        eprintln!("error: run only supports Rust backend packages");
-        std::process::exit(1);
-    };
-
-    // Match `faber build`: runtime plan + G4 native library path deps (no text-sniff).
-    // Stage 3 SQLite apps failed here because run used the default plan without
-    // emit_linked_library_crates, so Cargo never saw the generated path dep.
-    let mut runtime_plan = match package::package_rust_runtime_plan(&config, &input_path) {
-        Ok(plan) => plan,
-        Err(diagnostics) => {
-            eprint_route_diagnostics(&diagnostics);
-            eprintln!("runtime plan failed");
-            std::process::exit(1);
-        }
-    };
-    if let Some(diagnostic) =
-        package::package_host_selection_diagnostic(&runtime_plan, &layout.manifest_path)
-    {
-        eprint_route_diagnostics(&[diagnostic]);
-        eprintln!("runtime plan failed");
-        std::process::exit(1);
-    }
-    match package::emit_linked_library_crates(&layout.package_root, &layout) {
-        Ok(linked) => {
-            runtime_plan.library_path_deps = linked
-                .into_iter()
-                .map(|lib| (lib.crate_name, lib.crate_root))
-                .collect();
-        }
-        Err(diagnostics) => {
-            eprint_route_diagnostics(&diagnostics);
-            eprintln!("library dependency graph failed");
-            std::process::exit(1);
-        }
-    }
-
-    if let Err(d) = package::emit_generated_crate_with_runtime_plan(
-        &layout,
-        &code_string,
-        meta.as_ref(),
-        &runtime_plan,
-    ) {
-        eprintln!("error emitting: {}", d.message);
-        std::process::exit(1);
-    }
-
-    let binary = match package::invoke_cargo_build(&layout, args.release) {
-        Ok(b) => b,
-        Err(d) => {
-            eprintln!("error: {}", d.message);
-            std::process::exit(1);
-        }
-    };
-
-    // Release the emit/cargo lock before executing the compiled program so a
-    // long-running binary never blocks a concurrent rebuild of the package.
-    drop(_build_lock);
-
-    // CONTRACT: `faber run` behaves like the compiled program for callers that
-    // depend on argv forwarding and process status.
-    run_executable(&binary, &args.args);
-}
-
-fn run_executable(binary: &Path, args: &[String]) {
-    let status = Command::new(binary)
-        .args(args)
-        .status()
-        .unwrap_or_else(|e| {
-            eprintln!("error: failed to execute {}: {}", binary.display(), e);
-            std::process::exit(1);
-        });
-
-    if let Some(code) = status.code() {
-        std::process::exit(code);
-    } else {
         std::process::exit(1);
     }
 }

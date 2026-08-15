@@ -5,7 +5,7 @@
 //! postcard) codecs, artifact-version and target-tag checks, and fail-closed
 //! image validation.
 //!
-//! This is a format crate, not a package resolver, stepper, host, or runner:
+//! This is a format crate, not a package resolver, host, or runner:
 //! package analysis and package-to-image assembly, package paths and target
 //! layout, CLI planning, generated `fmir-bin` runner construction, and
 //! loading/launching policy stay in the sibling `faber` crate. Faber passes

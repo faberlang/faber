@@ -4,20 +4,21 @@
 //! handlers live in [`init`], [`explain`], [`run`], and [`test`].
 
 mod archive;
+mod convert;
 mod emit;
 mod explain;
 mod format;
 #[cfg(test)]
-#[path = "format_test.rs"]
-mod format_test;
-#[cfg(test)]
 #[path = "format_corpus_test.rs"]
 mod format_corpus_test;
+#[cfg(test)]
+#[cfg(test)]
+#[path = "format_test.rs"]
+pub(crate) mod format_test;
 pub mod host;
 mod init;
 mod model;
 mod run;
-mod script;
 pub(crate) mod self_update;
 #[cfg(test)]
 #[path = "self_update_test.rs"]
@@ -31,13 +32,13 @@ use crate::package;
 use clap::Parser;
 use radix::tool::{self, BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
 
+use convert::cmd_convert;
 use explain::cmd_explain;
 use format::cmd_format;
 use host::cmd_host;
 use init::cmd_init;
 use model::cmd_model;
-use run::{cmd_fmir_run_image, cmd_run};
-use script::{cmd_eval, cmd_repl, cmd_script};
+use run::{cmd_eval, cmd_fmir_run_image, cmd_repl, cmd_run};
 use self_update::cmd_self;
 use targets::cmd_targets;
 use test::cmd_test;
@@ -163,7 +164,6 @@ fn dispatch(command: Command) {
         Command::Explain(args) => cmd_explain(args),
         Command::Run(args) => cmd_run(args),
         Command::FmirRun(args) => cmd_fmir_run_image(args),
-        Command::Script(args) => cmd_script(&args),
         Command::Repl(args) => cmd_repl(args),
         Command::Test(args) => cmd_test(&args),
         Command::Lex(args) => tool::cmd_lex(&args.input),
@@ -209,9 +209,16 @@ fn dispatch(command: Command) {
                 emit::cmd_emit_with_locale(emit_command, args.format, args.linter);
             }
         }
+        Command::Convert(args) => cmd_convert(&convert::ConvertCommand {
+            paths: args.paths,
+            to: args.to,
+            from: args.from,
+            check: args.check,
+            stdout: args.stdout,
+            stdin: args.stdin,
+        }),
         Command::Format(args) => cmd_format(&format::FormatCommand {
             paths: args.paths,
-            locale: args.locale,
             check: args.check,
             stdout: args.stdout,
             write: args.write,

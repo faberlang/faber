@@ -1,6 +1,7 @@
-//! `faber format` — author-mode formatter (default) with locale/check/stdout,
-//! the `--write`/`--stdin`/`--policy` steady-state flag surface (FORMAT-PRETTY
+//! `faber format` — author-mode formatter: check/stdout, the
+//! `--write`/`--stdin`/`--policy` steady-state flag surface (FORMAT-PRETTY
 //! S4) and the `[format]` manifest policy + precedence chain (S5).
+//! Reader-locale conversion lives in `faber convert` (`commands/convert.rs`).
 
 use radix::codegen::Target;
 use radix::driver::{peel_raw_source, split_frontmatter, Config, Session};
@@ -13,7 +14,6 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 pub struct FormatCommand {
     pub paths: Vec<PathBuf>,
-    pub locale: Option<String>,
     pub check: bool,
     pub stdout: bool,
     pub write: bool,
@@ -43,16 +43,6 @@ pub fn cmd_format(command: &FormatCommand) {
         }),
     };
 
-    // The locale-interplay contract: reader-locale re-emission is canonical
-    // HIR output and cannot honor a format policy. Reject explicitly rather
-    // than silently switching to canonical HIR re-emission.
-    if command.policy.is_some() && command.locale.is_some() {
-        eprintln!(
-            "error: --policy cannot be combined with --locale: reader-locale re-emission emits the canonical HIR surface and does not honor a format policy; drop one of the two flags"
-        );
-        std::process::exit(1);
-    }
-
     // --stdin: read exactly one source document from stdin and print the
     // formatted result to stdout (implies stdout; no path arguments — enforced
     // at the CLI parse boundary). The diagnostic source name is `<stdin>`.
@@ -66,7 +56,7 @@ pub fn cmd_format(command: &FormatCommand) {
         }
         let path = Path::new("<stdin>");
         let policy = cli_policy.unwrap_or_default();
-        match format_single_doc(path, command.locale.as_deref(), &source, policy) {
+        match format_single_doc(path, &source, policy) {
             Ok(formatted) => {
                 print!("{formatted}");
                 return;
@@ -130,7 +120,7 @@ pub fn cmd_format(command: &FormatCommand) {
             }
         };
 
-        let formatted = match format_single_doc(path, command.locale.as_deref(), &source, policy) {
+        let formatted = match format_single_doc(path, &source, policy) {
             Ok(formatted) => formatted,
             Err(()) => {
                 error_count += 1;
@@ -208,50 +198,63 @@ fn resolve_file_policy(
     }
 }
 
+/// Convert ONE source document to an explicit target locale surface
+/// (`faber convert --to <LOCALE>`). Same HIR round-trip as the former
+/// `format --locale` mode; no format policy applies (canonical surface).
+/// `Err(())` means a diagnostic was already printed.
+#[cfg(feature = "hir-faber")]
+pub(super) fn convert_single_doc(path: &Path, to: &str, source: &str) -> Result<String, ()> {
+    let name = path.display().to_string();
+    let session = match format_session(path, Some(to), source) {
+        Ok(session) => session,
+        Err(message) => {
+            eprintln!("error: {message}");
+            return Err(());
+        }
+    };
+    let result = radix::forma::compile_canonical(&session, &name, source);
+    let mut had_error = false;
+    for diag in &result.diagnostics {
+        if diag.is_error() {
+            eprintln!("error: {}: {}", path.display(), diag.message);
+            had_error = true;
+        } else {
+            eprintln!("warning: {}: {}", path.display(), diag.message);
+        }
+    }
+    let Some(output) = result.output else {
+        if !had_error {
+            eprintln!("error: {}: conversion failed", path.display());
+        }
+        return Err(());
+    };
+    match formatted_source_for_write(path, source, &output.code) {
+        Ok(converted) => Ok(converted),
+        Err(message) => {
+            eprintln!("error: {message}");
+            Err(())
+        }
+    }
+}
+
 /// Format ONE source document through the selected pipeline (author policy or
 /// reader-locale re-emit), printing diagnostics and returning the formatted
 /// output ready for write/stdout (frontmatter preserved). `Err(())` means a
 /// diagnostic was already printed.
-fn format_single_doc(
-    path: &Path,
-    locale: Option<&str>,
-    source: &str,
-    policy: FormatPolicy,
-) -> Result<String, ()> {
+fn format_single_doc(path: &Path, source: &str, policy: FormatPolicy) -> Result<String, ()> {
     let name = path.display().to_string();
-    let result = if locale.is_some() {
-        #[cfg(not(feature = "hir-faber"))]
-        {
-            eprintln!(
-                "error: localized Faber re-emission requires a faber build with feature `hir-faber`"
-            );
+    let session = match format_session(path, None, source) {
+        Ok(session) => session,
+        Err(message) => {
+            eprintln!("error: {message}");
             return Err(());
         }
-        #[cfg(feature = "hir-faber")]
-        {
-            let session = match format_session(path, locale, source) {
-                Ok(session) => session,
-                Err(message) => {
-                    eprintln!("error: {message}");
-                    return Err(());
-                }
-            };
-            radix::forma::compile_canonical(&session, &name, source)
-        }
-    } else {
-        let session = match format_session(path, None, source) {
-            Ok(session) => session,
-            Err(message) => {
-                eprintln!("error: {message}");
-                return Err(());
-            }
-        };
-        match compile_author_with_policy(&session, &name, source, policy) {
-            Ok(result) => result,
-            Err(err) => {
-                eprintln!("error: {err}");
-                return Err(());
-            }
+    };
+    let result = match compile_author_with_policy(&session, &name, source, policy) {
+        Ok(result) => result,
+        Err(err) => {
+            eprintln!("error: {err}");
+            return Err(());
         }
     };
 
@@ -281,7 +284,11 @@ fn format_single_doc(
     }
 }
 
-pub(super) fn format_session(path: &Path, locale: Option<&str>, source: &str) -> Result<Session, String> {
+pub(super) fn format_session(
+    path: &Path,
+    locale: Option<&str>,
+    source: &str,
+) -> Result<Session, String> {
     // An explicit CLI locale wins. Without one, preserve an existing source
     // locale while making an untagged source use the product default (`en`).
     let frontmatter_locale = if locale.is_none() {
@@ -350,6 +357,10 @@ pub(super) fn normalize_trailing_newline(text: &str) -> String {
     } else {
         format!("{trimmed}\n")
     }
+}
+
+pub(super) fn resolve_convert_paths(paths: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
+    resolve_format_paths(paths)
 }
 
 fn resolve_format_paths(paths: &[PathBuf]) -> Result<Vec<PathBuf>, String> {

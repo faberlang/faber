@@ -18,7 +18,7 @@ pub(super) fn mir_issue_diag(
     mir_diag(path, message).with_arg("issue", issue)
 }
 
-pub(super) fn stepper_diagnostics(path: &Path, errors: Vec<StepperError>) -> Vec<Diagnostic> {
+pub(super) fn runner_diagnostics(path: &Path, errors: Vec<RunnerError>) -> Vec<Diagnostic> {
     errors
         .into_iter()
         .map(|error| mir_diag(path, error.message))

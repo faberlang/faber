@@ -1,4 +1,4 @@
-use crate::core_support::materialize::materialize;
+use super::runtime_sources::{path_override_root, SupportCrateSource};
 use radix::diagnostics::Diagnostic;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -69,30 +69,37 @@ pub(crate) fn load_provider_manifests(
     providers: &BTreeSet<String>,
     routes: &BTreeSet<String>,
 ) -> Result<Vec<ProviderManifest>, Diagnostic> {
-    let support = materialize().map_err(|error| {
-        crate::package_diagnostic_error(format!("verified core support is unavailable: {error}"))
-            .with_arg("issue", "core_support_materialization_failed")
-    })?;
+    // D1 (2026-08-14): host provider sources are no longer embedded; their
+    // manifests are read from the container-local checkouts behind the
+    // offline path-override seam.
+    let Some(override_root) = path_override_root() else {
+        return Err(crate::package_diagnostic_error(format!(
+            "host provider manifests require the offline support path override: \
+             set {} to the container root (dev/container builds)",
+            super::runtime_sources::SUPPORT_PATH_OVERRIDE_ENV
+        ))
+        .with_arg("issue", "support_path_override_required"));
+    };
     let mut manifests = Vec::new();
     for provider in providers {
-        let path = support
-            .provider(provider)
-            .map_err(|error| {
-                crate::package_diagnostic_error(format!(
-                    "unsupported host provider `{provider}`: {error}"
-                ))
-                .with_arg("issue", "host_provider_unsupported")
-                .with_arg("provider", provider.clone())
-            })?
+        let Some(source) = SupportCrateSource::provider(provider) else {
+            return Err(crate::package_diagnostic_error(format!(
+                "unsupported host provider `{provider}`"
+            ))
+            .with_arg("issue", "host_provider_unsupported")
+            .with_arg("provider", provider.clone()));
+        };
+        let path = source
+            .override_crate_root(&override_root)
             .join("src/manifest.json");
-        let source = fs::read_to_string(&path).map_err(|error| {
+        let source_text = fs::read_to_string(&path).map_err(|error| {
             crate::package_diagnostic_error(format!(
                 "selected host provider `{provider}` has no readable manifest: {error}"
             ))
             .with_file(path.display().to_string())
             .with_arg("issue", "host_provider_manifest_missing")
         })?;
-        let manifest = serde_json::from_str::<ProviderManifest>(&source).map_err(|error| {
+        let manifest = serde_json::from_str::<ProviderManifest>(&source_text).map_err(|error| {
             crate::package_diagnostic_error(format!(
                 "invalid host provider manifest `{provider}`: {error}"
             ))

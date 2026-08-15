@@ -2,7 +2,7 @@
 //!
 //! Resolves concrete `(rows, columns)` from a literal `IndexExpr::Tuple` in
 //! the type table. Returns `None` when shape dimensions are not statically
-//! known. Used by MIR validation and the stepper.
+//! known. Used by MIR validation and the runner.
 
 use radix_types::{IndexExpr, IndexId, TypeTable};
 

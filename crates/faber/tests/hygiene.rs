@@ -27,8 +27,8 @@ const BUDGETS: Budgets = Budgets {
     todo: 0,
     unimplemented: 0,
     // WHY: deliberate discards in library resolution and diagnostic paths
-    // (io_buf, core_support assembler/materialize, prefill_run) — pre-existing
-    // drift documented by the prior ratchet (expect 1→2, let_ 3→8).
+    // (io_buf, prefill_run) — pre-existing drift documented by the prior
+    // ratchet (expect 1→2, let_ 3→8).
     let_underscore: 10,
     inline_test_modules: 0,
     test_attr_in_production: 0,

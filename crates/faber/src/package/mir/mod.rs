@@ -1,4 +1,4 @@
-//! Package MIR linking spike for the systems-lane stepper.
+//! Package MIR linking spike for the systems-lane runner.
 //!
 //! INVARIANT: this path links only package-local file namespace calls into one
 //! validated MIR program. It does not use generated Rust metadata as the
@@ -85,17 +85,16 @@ use radix::mir::{
     MirOperand, MirOptionChainLink, MirOptionOp, MirPlace, MirProgram, MirProjection,
     MirProviderKind, MirRuntimeCall, MirRuntimeRecordField, MirRuntimeRecordValue, MirStatement,
     MirStatementKind, MirSwitchCase, MirTerminator, MirTerminatorKind, MirType, MirValue,
-    MirValueKind, StepperError,
+    MirValueKind, RunnerError,
 };
 use radix::semantic::{IndexExpr, Primitive, Resolver, Type, TypeId, TypeTable, TypeTableSnapshot};
 use radix_mir_fmir::{
     decode_binary_image, decode_text_image, encode_binary_image, encode_text_image,
-    is_known_host_requirement, FmirBinaryImageFile, FmirDeviceSection,
-    FmirDeviceSelection, FmirImageError, FmirTextCliOperand, FmirTextCliRootSection,
-    FmirTextCliSection, FmirTextCliValueType, FmirTextImageFile, FmirTextProgramSection,
-    FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
-    FmirTextToolchainSection, FmirTextTypesSection, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
-    PACKAGE_MIR_ARTIFACT_VERSION,
+    is_known_host_requirement, FmirBinaryImageFile, FmirDeviceSection, FmirDeviceSelection,
+    FmirImageError, FmirTextCliOperand, FmirTextCliRootSection, FmirTextCliSection,
+    FmirTextCliValueType, FmirTextImageFile, FmirTextProgramSection, FmirTextRuntimeSection,
+    FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection,
+    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
 };
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
@@ -393,7 +392,10 @@ pub(crate) use routes::{
     run_package_fmir_text_image, run_package_fmir_text_image_with_selection,
 };
 #[allow(unused_imports)]
-pub(crate) use routes::{build_package_mir_artifact, run_package_mir, run_package_mir_artifact};
+pub(crate) use routes::{
+    build_package_mir_artifact, run_package_mir, run_package_mir_artifact,
+    run_package_mir_with_selection,
+};
 // binary `commands/run` resolves the interpreted consumer through fhir.rs.
 #[cfg(feature = "hir-fhir")]
 pub(crate) use routes::run_package_mir_from_loaded;

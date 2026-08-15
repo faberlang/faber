@@ -123,7 +123,8 @@ fn package_mir_unused_library_function_not_lowered() {
 // `otiosa` and `inanis`.
 const REACH_INNER: &str = "functio dupla(numerus value) → numerus {\n    redde value * 2\n}\n\nfunctio inanis(numerus value) → numerus {\n    redde value\n}\n";
 const REACH_OUTER: &str = "importa ex \"reachlib:inner\" inner\n\nfunctio computa(numerus value) → numerus {\n    redde inner.dupla(value) + 1\n}\n\nfunctio otiosa(numerus value) → numerus {\n    redde value\n}\n";
-const REACH_NESTED_MAIN: &str = "import from \"reachlib:outer\" outer\n\nmain {\n    print outer.computa(4)\n}\n";
+const REACH_NESTED_MAIN: &str =
+    "import from \"reachlib:outer\" outer\n\nmain {\n    print outer.computa(4)\n}\n";
 
 fn write_nested_reach_library_package(dir: &std::path::Path) -> std::path::PathBuf {
     let src = dir.join("src");

@@ -24,7 +24,7 @@ use radix::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase};
 use radix::driver::Config;
 use radix::file_interface::FileExportKind;
 use radix::hir::{HirItemKind, LibraryBinding, LibraryItem, LibraryItemKind, LibraryProvider};
-use radix::mir::{BufferHost, Host, MirDiagnosticKind, MirProvider, StepperError, Value};
+use radix::mir::{BufferHost, Host, MirDiagnosticKind, MirProvider, RunnerError, Value};
 use radix::Output;
 use std::fs;
 use std::io::{Read, Write};
@@ -135,11 +135,11 @@ impl ExitRecordingHost {
 }
 
 impl Host for ExitRecordingHost {
-    fn scribe(&mut self, kind: MirDiagnosticKind, text: &str) -> Result<(), StepperError> {
+    fn scribe(&mut self, kind: MirDiagnosticKind, text: &str) -> Result<(), RunnerError> {
         self.buffer.scribe(kind, text)
     }
 
-    fn read_line(&mut self) -> Result<Option<String>, StepperError> {
+    fn read_line(&mut self) -> Result<Option<String>, RunnerError> {
         self.buffer.read_line()
     }
 
@@ -147,7 +147,7 @@ impl Host for ExitRecordingHost {
         self.buffer.abort(reason)
     }
 
-    fn provider(&mut self, provider: &MirProvider) -> Result<Value, StepperError> {
+    fn provider(&mut self, provider: &MirProvider) -> Result<Value, RunnerError> {
         self.buffer.provider(provider)
     }
 
@@ -155,7 +155,7 @@ impl Host for ExitRecordingHost {
         std::panic::panic_any(ExitPanic(code));
     }
 
-    fn argumenta(&self) -> Result<&[String], StepperError> {
+    fn argumenta(&self) -> Result<&[String], RunnerError> {
         self.buffer.argumenta()
     }
 }
@@ -328,11 +328,7 @@ fn compile_package_rust_code(entry: &Path) -> String {
 fn compile_package_reports_unresolved_external_imports() {
     let dir = test_temp_dir("external-import");
     let entry = dir.join("main.fab");
-    fs::write(
-        &entry,
-        "import from \"lodash\" map\nmain { print \"x\" }",
-    )
-    .expect("write entry");
+    fs::write(&entry, "import from \"lodash\" map\nmain { print \"x\" }").expect("write entry");
 
     let result = compile_package(&Config::default(), &entry);
     assert!(result.output.is_none());
@@ -8365,7 +8361,7 @@ entry = "main.fab"
     assert!(cargo_toml.contains("edition = \"2021\""));
     assert!(cargo_toml.contains("0.3.0"));
     assert!(cargo_toml.contains("[dependencies]"));
-    assert!(cargo_toml.contains("package = \"faber-runtime\"") && cargo_toml.contains("path = "));
+    assert!(cargo_toml.contains("package = \"faber-runtime\"") && cargo_toml.contains("git = "));
     assert!(!cargo_toml.contains("norma = { path = "));
     assert!(!cargo_toml.contains("tokio = { version = "));
 
@@ -9609,6 +9605,11 @@ main {
     // onto the root module tree (`crate::child::label()`), so a cargo build of
     // the emitted crate proves there is no dangling `crate::parent::child`
     // path left in the codegen.
+    // D1 offline seam: the generated crate resolves faber-runtime from the
+    // container-local checkout (the released `v<faber version>` git tag does
+    // not exist until the next release), so the cargo build stays offline.
+    let container_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    super::runtime_sources::set_path_override_for_test(Some(container_root));
     let layout = discover_build_layout(&entry).expect("layout");
     emit_generated_crate(&layout, &output.code, None).expect("emit generated crate");
     let binary = invoke_cargo_build(&layout, false).expect("cargo build");
@@ -10371,6 +10372,11 @@ main {
     // Call while CWD is not the app root — relative lock paths must still resolve.
     let old = std::env::current_dir().expect("cwd");
     std::env::set_current_dir(&root).expect("chdir root");
+    // D1 offline seam: the linked library's faber-runtime row falls back to
+    // the container-local checkout behind the path override.
+    let override_root = root.join("container");
+    fs::create_dir_all(override_root.join("faber/runtime/rust")).expect("override runtime");
+    super::runtime_sources::set_path_override_for_test(Some(override_root));
     let deps = super::artifact_plan::native_library_deps(&app).expect("native deps");
     assert_eq!(
         deps.len(),
@@ -13471,7 +13477,7 @@ fn package_mir_linking_fails_closed_on_unresolvable_companion() {
     // companion with no resolvable symbol in the library analysis fails
     // closed at link time with the stable `package_mir_companion_unresolved`
     // identity instead of silently skipping the companion (which previously
-    // surfaced as an unstable stepper-internal `missing MIR function` error).
+    // surfaced as an unstable runner-internal `missing MIR function` error).
     // The primal here has no tensor parameter, so radix's reverse-AD snapshot
     // pass skips it and no companion function is ever generated.
     let dir = test_temp_dir("package-mir-companion-unresolved");

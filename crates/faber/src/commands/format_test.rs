@@ -9,7 +9,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-fn exempla(path: &str) -> PathBuf {
+pub(crate) fn exempla(path: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../corpus")
         .join(path)
@@ -47,7 +47,7 @@ fn assert_author_idempotent(name: &str, source: &str) {
 /// Strip `#` comment lines so keyword-surface assertions only see emitted
 /// code. Canonical reader-locale render preserves structural trivia
 /// (comments), which may legitimately mention Latin spellings.
-fn code_only(code: &str) -> String {
+pub(crate) fn code_only(code: &str) -> String {
     code.lines()
         .filter(|line| !line.trim_start().starts_with('#'))
         .collect::<Vec<_>>()
@@ -122,43 +122,6 @@ fn author_format_keeps_ascii_angle_brackets_for_generics() {
 /// import contract. The forma re-emit path used to report SEM002
 /// unknown-qualified-type on any file with imports.
 #[test]
-fn format_locale_resolves_imports_in_corpus_fixture() {
-    let fixture = exempla("importa/default-minimal.fab");
-    let home = radix::paths::faberlang_home()
-        .expect("faber crate must sit in the faberlang container");
-    let mut child = Command::new(faber_binary())
-        .args(["format", "--locale", "la", "--stdout"])
-        .arg(&fixture)
-        .env("FABER_LIBRARY_HOME", &home)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn faber format");
-    let mut stdout = String::new();
-    child
-        .stdout
-        .take()
-        .expect("stdout")
-        .read_to_string(&mut stdout)
-        .expect("read stdout");
-    let mut stderr = String::new();
-    if let Some(mut err) = child.stderr.take() {
-        let _ = err.read_to_string(&mut stderr);
-    }
-    assert!(
-        child.wait().expect("wait").success(),
-        "faber format --locale la failed on importing fixture: {stderr}"
-    );
-    assert!(
-        !stderr.contains("SEM002"),
-        "imports must resolve via the import contract: {stderr}"
-    );
-    assert!(
-        stdout.contains("importa ex \"norma:chorda\""),
-        "import line should survive re-emit"
-    );
-}
-
 #[test]
 fn format_author_pipeline_reparses_cura_fixture() {
     let path = exempla("cura/cura.fab");
@@ -194,7 +157,7 @@ fn format_test_gate_matches_compile_author_pipeline_for_salve() {
     );
 }
 
-fn faber_binary() -> PathBuf {
+pub(crate) fn faber_binary() -> PathBuf {
     if let Ok(path) = std::env::var("CARGO_BIN_EXE_faber") {
         return PathBuf::from(path);
     }
@@ -220,11 +183,11 @@ fn faber_binary() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/debug/faber")
 }
 
-fn run_faber_format_stdout(path: &Path) -> String {
+pub(crate) fn run_faber_format_stdout(path: &Path) -> String {
     run_faber_format_stdout_with_args(&["format", "--stdout", path.to_str().expect("utf8 path")])
 }
 
-fn run_faber_format_stdout_with_args(args: &[&str]) -> String {
+pub(crate) fn run_faber_format_stdout_with_args(args: &[&str]) -> String {
     let mut child = Command::new(faber_binary())
         .args(args)
         .stdout(Stdio::piped())
@@ -260,12 +223,12 @@ const SOFT_WIDTH_SOURCE: &str = "+++\nlocale = \"la\"\n+++\nfunctio f() → nume
 /// semantic analysis, so locale regression fixtures must name real
 /// identifiers). Latin-identity surface, read under the la reader (the
 /// product-default en pack is pack-authoritative).
-const VALID_BLOCK_SOURCE: &str = "+++\nlocale = \"la\"\n+++\nfunctio gradus(numerus x) → numerus {\n    si x ≻ 0 {\n        redde x\n    } sin x ≡ 0 {\n        redde 0\n    } secus {\n        redde 0 - x\n    }\n}\n";
+pub(crate) const VALID_BLOCK_SOURCE: &str = "+++\nlocale = \"la\"\n+++\nfunctio gradus(numerus x) → numerus {\n    si x ≻ 0 {\n        redde x\n    } sin x ≡ 0 {\n        redde 0\n    } secus {\n        redde 0 - x\n    }\n}\n";
 
 /// FORMAT-PRETTY S5: create a temporary package root with a valid
 /// `faber.toml` (carrying `[format] policy = <policy>` when given) and one
 /// source file. Returns the source file path.
-fn temp_format_package(root: &Path, policy: Option<&str>, source: &str) -> PathBuf {
+pub(crate) fn temp_format_package(root: &Path, policy: Option<&str>, source: &str) -> PathBuf {
     fs::create_dir_all(root.join("src")).expect("create package src");
     let mut manifest = String::from(
         "[package]\nname = \"format-pkg\"\nversion = \"0.1.0\"\nedition = \"0.1\"\n\n[paths]\nsource = \"src\"\nentry = \"main.fab\"\n",
@@ -341,10 +304,7 @@ fn format_stdin_roundtrip_matches_author_pipeline() {
     let _ = fs::remove_file(&fixture);
 
     let (stdout, stderr, success) = run_faber_format_stdin(source);
-    assert!(
-        success,
-        "faber format --stdin must succeed: {stderr}"
-    );
+    assert!(success, "faber format --stdin must succeed: {stderr}");
     assert_eq!(
         normalize_trailing_newline(&stdout),
         expected,
@@ -464,43 +424,6 @@ fn format_policy_pretty_v1_succeeds_on_block_fixture() {
         "pretty-v1 must emit the formatted block:\n{formatted}"
     );
     assert_author_reparses(&formatted, "pretty-v1 block fixture").expect("reparse");
-}
-
-/// S4 locale-interplay contract: `--policy` cannot be honored on the
-/// reader-locale re-emit path (canonical HIR output) — the combination must be
-/// rejected explicitly, never silently downgraded.
-#[test]
-fn format_policy_with_locale_is_rejected() {
-    let fixture = std::env::temp_dir().join("faber-format-policy-locale.fab");
-    fs::write(&fixture, "incipit {\n  nota \"ok\"\n}\n").expect("write fixture");
-
-    let output = Command::new(faber_binary())
-        .args([
-            "format",
-            "--locale",
-            "en",
-            "--policy",
-            "normalise-v1",
-            "--stdout",
-        ])
-        .arg(&fixture)
-        .output()
-        .expect("run faber format --locale --policy");
-    let _ = fs::remove_file(&fixture);
-
-    assert!(
-        !output.status.success(),
-        "--policy with --locale must be rejected, not silently downgraded"
-    );
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("--policy"),
-        "the rejection must name --policy: {stderr}"
-    );
-    assert!(
-        stderr.contains("--locale"),
-        "the rejection must name --locale: {stderr}"
-    );
 }
 
 // ---------------------------------------------------------------------------
@@ -802,45 +725,6 @@ fn format_manifest_empty_policy_slug_fails_clearly() {
 /// `--locale` rejection contract is unchanged).
 #[cfg(feature = "hir-faber")]
 #[test]
-fn format_manifest_policy_does_not_change_locale_reemission() {
-    let root_with = std::env::temp_dir().join("faber-format-s5-locale-with");
-    let root_without = std::env::temp_dir().join("faber-format-s5-locale-without");
-    let _ = fs::remove_dir_all(&root_with);
-    let _ = fs::remove_dir_all(&root_without);
-    let fixture_with = temp_format_package(&root_with, Some("pretty-v1"), VALID_BLOCK_SOURCE);
-    let fixture_without = temp_format_package(&root_without, None, VALID_BLOCK_SOURCE);
-
-    let run = |fixture: &Path| {
-        Command::new(faber_binary())
-            .args(["format", "--locale", "en", "--stdout"])
-            .arg(fixture)
-            .output()
-            .expect("run faber format --locale en")
-    };
-    let with = run(&fixture_with);
-    let without = run(&fixture_without);
-    let stderr_with = String::from_utf8_lossy(&with.stderr);
-    let stderr_without = String::from_utf8_lossy(&without.stderr);
-    let _ = fs::remove_dir_all(&root_with);
-    let _ = fs::remove_dir_all(&root_without);
-
-    assert!(
-        with.status.success(),
-        "manifest policy + --locale must succeed: {stderr_with}"
-    );
-    assert!(
-        without.status.success(),
-        "no-[format] package + --locale must succeed: {stderr_without}"
-    );
-    assert_eq!(
-        with.stdout, without.stdout,
-        "the [format] table must not change locale re-emission (byte-identical)"
-    );
-    assert!(
-        !stderr_with.contains("--policy"),
-        "manifest-declared policy must not trip the CLI --policy/--locale conflict: {stderr_with}"
-    );
-}
 
 /// S5: `--config` stays the deferred warning stub — the flag still parses and
 /// prints the same not-implemented warning; the `[format]` manifest is the
@@ -903,186 +787,10 @@ fn format_write_flag_writes_in_place() {
 }
 
 #[test]
-fn format_locale_thai_localizes_surface() {
-    let root = radix::paths::faberlang_home()
-        .expect("faberlang container root")
-        .join("examples/reader-locale/th-TH");
-    let thai = root.join("src/main.fab");
-    let latin = root.join("twins/main.la.fab");
-
-    let thai_output = run_faber_format_stdout_with_args(&[
-        "format",
-        "--locale",
-        "th-TH",
-        "--stdout",
-        thai.to_str().expect("utf8 thai path"),
-    ]);
-
-    // --locale drives the emitter surface: the re-emit localizes
-    // reader-locale keywords and types into Thai and no longer matches the
-    // Latin twin (which re-emits as `--locale la`).
-    assert_ne!(
-        thai_output,
-        run_faber_format_stdout_with_args(&[
-            "format",
-            "--locale",
-            "la",
-            "--stdout",
-            latin.to_str().expect("utf8 latin path"),
-        ]),
-        "localized Thai emit must differ from the Latin twin"
-    );
-
-    assert!(thai_output.contains("ฟังก์ชัน ทักทาย(ข้อความ name) → ข้อความ"));
-    assert!(thai_output.contains("คงที่ ข้อความ greeting ← \"สวัสดี, §!\"(name)"));
-    assert!(thai_output.contains("คืน greeting"));
-    assert!(thai_output.contains("ฟังก์ชัน ผ่าน(จำนวน score) → ตรรกะ"));
-    assert!(thai_output.contains("เช่นนั้น จริง มิฉะนั้น score ≥ 50 เช่นนั้น จริง มิฉะนั้น เท็จ"));
-    assert!(thai_output.contains("ฟังก์ชัน นับผ่าน(รายการ<จำนวน> scores) → จำนวน"));
-    assert!(thai_output.contains("แปร จำนวน total ← 0"));
-    assert!(thai_output.contains("วน จาก scores คงที่ score"));
-    assert!(thai_output.contains("ถ้า score ≺ 0 {"));
-    assert!(thai_output.contains("ไปต่อ"));
-    assert!(thai_output.contains("หยุด"));
-    assert!(thai_output.contains("ฟังก์ชัน นับถอยหลัง(จำนวน start) → จำนวน"));
-    assert!(thai_output.contains("ขณะ current ≻ 0"));
-    assert!(thai_output.contains("เริ่ม {"));
-    assert!(thai_output.contains("คงที่ จำนวน score ← 82"));
-    assert!(thai_output.contains("คงที่ รายการ<จำนวน> scores ← [-1, 82, 41, 60]"));
-    assert!(thai_output.contains("บันทึก ผ่าน(score)"));
-    assert!(thai_output.contains("บันทึก นับผ่าน(scores)"));
-    // The Latin keyword surface must not survive localized re-emit, and the
-    // template-application glyph `"…"(args)` must not expand to a named
-    // `scriptum(...)` call. Comments are preserved trivia and may mention
-    // Latin spellings, so the negative assertions run against code-only text.
-    let thai_code = code_only(&thai_output);
-    assert!(!thai_code.contains("scriptum"));
-    assert!(!thai_code.contains("functio"));
-    assert!(!thai_code.contains("fixum"));
-    assert!(!thai_code.contains("textus"));
-    assert!(!thai_code.contains("numerus"));
-    assert!(!thai_code.contains("bivalens"));
-    assert!(!thai_code.contains("lista<"));
-    assert!(!thai_code.contains("itera"));
-    assert!(!thai_code.contains("incipit"));
-}
-
 #[test]
-fn format_locale_la_emits_latin_surface() {
-    let path = exempla("incipit/salve-munde.fab");
-
-    let locale_output = run_faber_format_stdout_with_args(&[
-        "format",
-        "--locale",
-        "la",
-        "--stdout",
-        path.to_str().expect("utf8 path"),
-    ]);
-
-    assert!(locale_output.contains("incipit {"));
-    assert!(locale_output.contains("nota \"Salve, Munde!\""));
-}
-
 #[test]
-fn format_locale_preserves_template_application_sugar() {
-    // Reader-locale packs re-render the same semantic program with different
-    // keyword spellings while retaining glyph shapes. The `"…"(args)` template-
-    // application postfix is a glyph shape: `--locale en` localizes
-    // `nota` → `print` but must keep `print "val § here"(n)` instead of
-    // expanding into `print format("val § here", n)`.
-    let fixture = std::env::temp_dir().join("faber-format-rl-template-sugar.fab");
-    fs::write(
-        &fixture,
-        "+++\nlocale = \"la\"\n+++\nfunctio monstra(textus n) {\n  nota \"val § here\"(n)\n}\n",
-    )
-    .expect("write rl template-sugar fixture");
-
-    let llm_output = run_faber_format_stdout_with_args(&[
-        "format",
-        "--locale",
-        "en",
-        "--stdout",
-        fixture.to_str().expect("utf8 path"),
-    ]);
-    let author_output = run_faber_format_stdout(&fixture);
-    let _ = fs::remove_file(&fixture);
-
-    assert!(
-        llm_output.contains("print \"val § here\"(n)"),
-        "reader-locale must localize nota→print and keep the postfix sugar:\n{llm_output}"
-    );
-    assert!(
-        !llm_output.contains("format("),
-        "reader-locale must not expand template application into a named call:\n{llm_output}"
-    );
-    assert!(
-        author_output.contains("nota \"val § here\"(n)"),
-        "author surface must keep the sugar:\n{author_output}"
-    );
-}
-
 #[test]
-fn format_locale_localizes() {
-    // A bare --locale=<X> selects the HIR-backed re-emit path with the
-    // localized surface (author mode when --locale is absent).
-    let root = radix::paths::faberlang_home()
-        .expect("faberlang container root")
-        .join("examples/reader-locale/th-TH");
-    let thai = root.join("src/main.fab");
-
-    let output = Command::new(faber_binary())
-        .args([
-            "format",
-            "--locale",
-            "th-TH",
-            "--stdout",
-            thai.to_str().expect("utf8 thai path"),
-        ])
-        .output()
-        .expect("run faber format");
-
-    assert!(
-        output.status.success(),
-        "reader-locale formatting must succeed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
-    assert!(
-        stdout.contains("ฟังก์ชัน"),
-        "bare --locale=th-TH must emit the Thai surface: {stdout}"
-    );
-    assert!(
-        !code_only(&stdout).contains("functio"),
-        "bare --locale=th-TH must not emit the Latin keyword: {stdout}"
-    );
-}
-
 #[test]
-fn format_locale_check_passes_on_braced_futura_exempla() {
-    let path = exempla("annotation-sugar/futura-braced.fab");
-    let mut child = Command::new(faber_binary())
-        .args([
-            "format",
-            "--check",
-            "--locale",
-            "en",
-            path.to_str().expect("utf8 path"),
-        ])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn faber format --check --locale en");
-    let status = child.wait().expect("wait");
-    let mut stderr = String::new();
-    if let Some(mut err) = child.stderr.take() {
-        let _ = err.read_to_string(&mut stderr);
-    }
-    assert!(
-        status.success(),
-        "locale check must pass on braced futura exempla: {stderr}"
-    );
-}
-
 #[test]
 fn format_check_compare_keeps_frontmatter_in_baseline() {
     let path = exempla("incipit/salve-munde.fab");

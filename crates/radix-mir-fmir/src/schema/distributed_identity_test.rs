@@ -35,7 +35,6 @@ use radix_mir::distributed::{
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::MirType;
 use radix_types::TypeId;
-use sha2::{Digest, Sha256};
 
 // -----------------------------------------------------------------------
 // Fixture helpers
@@ -351,8 +350,8 @@ fn logical_distributed_plan_hash_covers_the_logical_plan_canonical_bytes_only() 
     // covers the logical-plan canonical bytes ONLY.
     let plan = sample_logical_plan();
     let reference = format!(
-        "{SHA256_IDENTITY_PREFIX}{:x}",
-        Sha256::digest(encode_logical_plan(&plan))
+        "{SHA256_IDENTITY_PREFIX}{}",
+        handroll::sha256_hex(&encode_logical_plan(&plan))
     );
     assert_eq!(logical_distributed_plan_hash(&plan), reference);
 }
@@ -414,8 +413,8 @@ fn bound_distributed_plan_hash_spelling_contract_is_frozen() {
     // bytes → identical spelling, canonical 64-hex digest.
     let bound_canonical = b"bound-distributed-plan-canonical-bytes";
     let spelling = format!(
-        "{SHA256_IDENTITY_PREFIX}{:x}",
-        Sha256::digest(bound_canonical)
+        "{SHA256_IDENTITY_PREFIX}{}",
+        handroll::sha256_hex(bound_canonical)
     );
     assert_eq!(spelling.len(), SHA256_IDENTITY_PREFIX.len() + 64);
     assert!(
@@ -427,8 +426,8 @@ fn bound_distributed_plan_hash_spelling_contract_is_frozen() {
     assert_eq!(
         spelling,
         format!(
-            "{SHA256_IDENTITY_PREFIX}{:x}",
-            Sha256::digest(bound_canonical)
+            "{SHA256_IDENTITY_PREFIX}{}",
+            handroll::sha256_hex(bound_canonical)
         )
     );
 }

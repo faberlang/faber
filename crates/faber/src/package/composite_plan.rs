@@ -56,17 +56,15 @@ use radix_mir::abi::{
     ReducedProjection,
 };
 use radix_mir::device_program::{
-    BufferIdentity, BufferLifetime, BufferRole, BufferVersion, DeviceProgram, DeviceProgramLifetime,
-    KernelUnit, LaunchId, LaunchUnit, ObservationCadence, PreparedRegion, RegistryBuffer,
-    RegistryVersion, ResultBuffer,
+    BufferIdentity, BufferLifetime, BufferRole, BufferVersion, DeviceProgram,
+    DeviceProgramLifetime, KernelUnit, LaunchId, LaunchUnit, ObservationCadence, PreparedRegion,
+    RegistryBuffer, RegistryVersion, ResultBuffer,
 };
 use radix_mir::device_semantics::DeviceSemantics;
 use radix_mir::kernel_plan::CollectionKernelPlan;
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::MirType;
-use radix_mir_fmir::{
-    DeviceTargetId, FmirDeviceArtifact, FmirDeviceBackend,
-};
+use radix_mir_fmir::{DeviceTargetId, FmirDeviceArtifact, FmirDeviceBackend};
 use serde::Serialize;
 
 use super::artifact_plan::plan_package;
@@ -403,7 +401,8 @@ pub(crate) fn assemble_composite_plan(
 
     let mut host_call_facts = facts.host_call_facts;
     host_call_facts.sort_by(|left, right| {
-        (left.callsite.as_str(), left.prepared_region).cmp(&(right.callsite.as_str(), right.prepared_region))
+        (left.callsite.as_str(), left.prepared_region)
+            .cmp(&(right.callsite.as_str(), right.prepared_region))
     });
 
     let mut submission_region_facts = facts.submission_region_facts;
@@ -436,8 +435,7 @@ pub(crate) fn assemble_composite_plan(
         effect_capability_requirements,
         source_revisions: facts.source_revisions,
     };
-    verify_identity_preservation(&plan, source)
-        .map_err(|error| vec![error.to_diagnostic()])?;
+    verify_identity_preservation(&plan, source).map_err(|error| vec![error.to_diagnostic()])?;
     Ok(plan)
 }
 
@@ -497,7 +495,10 @@ fn verify_model_identity(
     if found.content.longitudo <= 0 {
         return Err(CompositePlanError::DomainMismatch {
             domain: IdentityDomain::Model,
-            detail: format!("content byte length {} is not positive", found.content.longitudo),
+            detail: format!(
+                "content byte length {} is not positive",
+                found.content.longitudo
+            ),
         });
     }
     Ok(())
@@ -570,7 +571,8 @@ fn verify_backend_identity(
         }
     }
     let mut expected_artifacts = source.artifacts.clone();
-    expected_artifacts.sort_by(|left, right| artifact_sort_key(left).cmp(&artifact_sort_key(right)));
+    expected_artifacts
+        .sort_by(|left, right| artifact_sort_key(left).cmp(&artifact_sort_key(right)));
     if plan.device_artifacts != expected_artifacts {
         return Err(CompositePlanError::DomainMismatch {
             domain: IdentityDomain::Backend,
@@ -667,7 +669,10 @@ fn verify_region_partition(plan: &CompositePlan) -> Result<(), CompositePlanErro
             if covered.contains(launch) {
                 return Err(CompositePlanError::DomainMismatch {
                     domain: IdentityDomain::Kernel,
-                    detail: format!("launch {} appears in more than one prepared region", launch.0),
+                    detail: format!(
+                        "launch {} appears in more than one prepared region",
+                        launch.0
+                    ),
                 });
             }
             covered.push(*launch);
@@ -730,7 +735,10 @@ fn verify_buffer_identity(
             if version_entry.version.version == 0 {
                 return Err(CompositePlanError::DomainMismatch {
                     domain: IdentityDomain::Buffer,
-                    detail: format!("buffer {} carries the reserved version 0", entry.identity.id.0),
+                    detail: format!(
+                        "buffer {} carries the reserved version 0",
+                        entry.identity.id.0
+                    ),
                 });
             }
             if version_entry.version != expected.versions[version_slot] {
@@ -781,7 +789,10 @@ fn is_canonical_sha256_digestio(digestio: &str) -> bool {
     let Some(hex) = digestio.strip_prefix("sha256:") else {
         return false;
     };
-    hex.len() == 64 && hex.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    hex.len() == 64
+        && hex
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 /// Render the plan as a deterministic `composite-plan v1` document.
@@ -801,7 +812,9 @@ pub(crate) fn render_composite_plan_v1(plan: &CompositePlan) -> Result<String, S
 /// The A10 source half of the package identity: per-file FNV-1a source
 /// hashes over the analyzed package's source units (same spelling as the
 /// FMIR image path), sorted by path.
-fn package_source_hashes(package: &AnalyzedPackage) -> Result<Vec<(String, String)>, Vec<Diagnostic>> {
+fn package_source_hashes(
+    package: &AnalyzedPackage,
+) -> Result<Vec<(String, String)>, Vec<Diagnostic>> {
     let mut hashes = Vec::new();
     for unit in &package.units {
         let bytes = std::fs::read(&unit.path).map_err(|error| {
@@ -989,7 +1002,11 @@ impl From<&KernelUnit> for KernelDocument {
             entry: kernel.entry.clone(),
             plan: plan_spelling(&kernel.plan).to_owned(),
             launch: LaunchPlanDocument::from(&kernel.launch),
-            resources: kernel.resources.iter().map(ResourceDocument::from).collect(),
+            resources: kernel
+                .resources
+                .iter()
+                .map(ResourceDocument::from)
+                .collect(),
         }
     }
 }
@@ -1199,7 +1216,11 @@ impl From<&RegistryBuffer> for RegistryBufferDocument {
     fn from(entry: &RegistryBuffer) -> Self {
         Self {
             identity: BufferIdentityDocument::from(&entry.identity),
-            versions: entry.versions.iter().map(RegistryVersionDocument::from).collect(),
+            versions: entry
+                .versions
+                .iter()
+                .map(RegistryVersionDocument::from)
+                .collect(),
         }
     }
 }
@@ -1306,7 +1327,6 @@ fn cadence_spelling(cadence: ObservationCadence) -> &'static str {
         ObservationCadence::EndOfRun => "end-of-run",
     }
 }
-
 
 #[cfg(test)]
 #[path = "composite_plan_test.rs"]

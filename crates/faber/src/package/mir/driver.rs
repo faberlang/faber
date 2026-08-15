@@ -270,7 +270,7 @@ pub(super) fn is_bridged_norma_import_path(path: &str) -> bool {
 }
 
 /// Bridge interpreted `norma:<kernel-manifest-module>` providers to the
-/// in-process stepper kernel.
+/// in-process runner kernel.
 ///
 /// Post-validation transform (see
 /// `docs/archived/faber-script-runtime/stage1b-package-host-bridge.md`). For
@@ -280,7 +280,7 @@ pub(super) fn is_bridged_norma_import_path(path: &str) -> bool {
 /// package execution is unaffected (it never runs this path).
 ///
 /// RETIRE: delete this pass once core-stdlib Stage 8 routes `norma:*` over
-/// `ad` to the Rust frame runtime in the stepper.
+/// `ad` to the Rust frame runtime in the runner.
 pub(super) fn bridge_norma_providers_to_kernel(
     lowered: &mut LoweredMirUnit,
     entry_path: &Path,
@@ -316,7 +316,7 @@ pub(super) fn bridge_norma_providers_to_kernel(
                     continue;
                 };
                 let Some(module) = radix::kernel::resolve_kernel_module_name(norma_module) else {
-                    // Non-manifest `norma:*` stays as Package; the stepper's
+                    // Non-manifest `norma:*` stays as Package; the runner's
                     // `host.provider()` reports it unsupported.
                     continue;
                 };
