@@ -254,3 +254,29 @@ fn dev_walkup_is_never_an_installed_binary_fallback() {
     );
     let _ = fs::remove_dir_all(&work);
 }
+
+#[test]
+fn dev_resolution_prefers_own_checkout_over_stale_cwd_ancestor() {
+    // A dev binary built from a checkout must resolve that checkout's reader
+    // pack, not a stale `radix/stdlib` tree found higher in the cwd ancestry
+    // (e.g. `/tmp/radix` from a prior session whose en pack predates the
+    // identity rows — such a pack silently drops identity-row members and
+    // produces SEM004 for e.g. `chorda.pange` under en).
+    let work = temp_dir("faber-locale-own-checkout");
+    let stale = work.join("radix/stdlib/locale/en/pack.toml");
+    fs::create_dir_all(stale.parent().expect("stale pack dir")).expect("stale pack dir");
+    fs::write(&stale, "stale pack").expect("stale pack");
+    let own = work.join("faber/radix/stdlib/locale/en/pack.toml");
+    fs::create_dir_all(own.parent().expect("own pack dir")).expect("own pack dir");
+    fs::write(&own, "current pack").expect("own pack");
+    let exe = work.join("faber/radix/target/debug/faber");
+    fs::create_dir_all(exe.parent().expect("bin dir")).expect("bin dir");
+
+    let resolved = installed_locale_pack_path_in(Some(&exe), Some(&work), true, "en");
+    assert_eq!(
+        resolved,
+        own.canonicalize().unwrap_or(own.clone()),
+        "the binary's own checkout must win over a stale cwd-ancestor checkout"
+    );
+    let _ = fs::remove_dir_all(&work);
+}
