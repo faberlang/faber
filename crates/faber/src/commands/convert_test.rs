@@ -9,9 +9,10 @@ use super::super::format_test::{
 };
 use std::fs;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
 
+#[test]
 fn convert_resolves_imports_in_corpus_fixture() {
     let fixture = exempla("importa/default-minimal.fab");
     let home =
@@ -49,7 +50,6 @@ fn convert_resolves_imports_in_corpus_fixture() {
     );
 }
 
-#[test]
 #[test]
 fn convert_is_not_affected_by_manifest_format_policy() {
     let root_with = std::env::temp_dir().join("faber-format-s5-locale-with");
@@ -91,7 +91,6 @@ fn convert_is_not_affected_by_manifest_format_policy() {
     );
 }
 
-#[test]
 #[test]
 fn convert_thai_localizes_surface() {
     let root = radix::paths::faberlang_home()
@@ -158,7 +157,6 @@ fn convert_thai_localizes_surface() {
 }
 
 #[test]
-#[test]
 fn convert_la_emits_latin_surface() {
     let path = exempla("incipit/salve-munde.fab");
 
@@ -174,7 +172,6 @@ fn convert_la_emits_latin_surface() {
     assert!(locale_output.contains("nota \"Salve, Munde!\""));
 }
 
-#[test]
 #[test]
 fn convert_preserves_template_application_sugar() {
     // Reader-locale packs re-render the same semantic program with different
@@ -213,7 +210,6 @@ fn convert_preserves_template_application_sugar() {
     );
 }
 
-#[test]
 #[test]
 fn convert_localizes() {
     // A bare --locale=<X> selects the HIR-backed re-emit path with the
