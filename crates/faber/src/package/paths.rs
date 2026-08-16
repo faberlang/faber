@@ -1,25 +1,14 @@
+//! Path normalization helpers for the faber package surface.
+//!
+//! RP2b: lexical normalization is compiler-owned and lives in `radix-package`.
+//! The ambient-CWD absolutization seam stays faber-side (CTO memo):
+//! `radix-package` never reads the process working directory.
+
 #[cfg(test)]
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
-/// Normalize lexical path components without consulting the filesystem.
-///
-/// Package compilation uses normalized paths as stable graph keys, but must not
-/// require `std::fs::canonicalize` because missing files should become compiler
-/// diagnostics rather than path-resolution panics.
-pub(crate) fn normalize_path(path: &Path) -> PathBuf {
-    let mut normalized = PathBuf::new();
-    for component in path.components() {
-        match component {
-            Component::CurDir => {}
-            Component::ParentDir => {
-                normalized.pop();
-            }
-            other => normalized.push(other.as_os_str()),
-        }
-    }
-    normalized
-}
+pub(crate) use radix_package::paths::normalize_path;
 
 /// Convert a possibly relative path into the normalized form used for package
 /// graph keys.

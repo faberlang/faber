@@ -462,9 +462,20 @@ pub(crate) fn load_package_with_locale_pack(
     include_proba: bool,
     proba_filter: Option<&TestSourceFilter>,
 ) -> Result<Vec<PackageFile>, Vec<Diagnostic>> {
-    let manifest = match manifest::manifest_for_spec(spec) {
-        Ok(manifest) => manifest,
-        Err(diag) => return Err(vec![*diag]),
+    // Manifest presence is validated at load (FBR-P1-001: a validated manifest
+    // that later disappears or becomes unreadable is a diagnostic, never a
+    // silent default); the strict product-view parse also rejects unknown
+    // product fields here.
+    if let Err(diag) = manifest::manifest_for_spec(spec) {
+        return Err(vec![*diag]);
+    }
+    // Compiler-view manifest for source loading (RP2b: frontmatter conflict
+    // validation and lib-bodyless parsing moved with `load_package_source`).
+    let compiler_manifest = match frontmatter::manifest_path_for_spec(spec) {
+        Some(manifest_path) => {
+            Some(radix_package::manifest::read_manifest(&manifest_path).map_err(|diag| vec![*diag])?)
+        }
+        None => None,
     };
     let source_root_for_filter = if spec.source_root.is_dir() {
         spec.source_root.clone()
@@ -533,7 +544,7 @@ pub(crate) fn load_package_with_locale_pack(
         }
 
         let Some(loaded) =
-            load_package_source(&canonical, manifest.as_ref(), locale_pack, &mut diagnostics)
+            load_package_source(&canonical, compiler_manifest.as_ref(), locale_pack, &mut diagnostics)
         else {
             continue;
         };
