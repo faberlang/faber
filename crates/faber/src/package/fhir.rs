@@ -21,7 +21,7 @@
 use radix_package::analyze::{AnalyzedPackage, AnalyzedPackageUnit};
 use radix_package::discovery::PackageSpec;
 use radix_package::LibraryImportBinding;
-use crate::library::{LibraryProviderKind, ResolvedLibraryModule};
+use radix_package::library::ResolvedLibraryModule;
 use radix::diagnostics::Diagnostic;
 use radix::driver::Config;
 use radix::hir::package::{load_package, LoadedHirModule, LoadedHirPackage};
@@ -152,7 +152,6 @@ pub(crate) fn loaded_package_to_analyzed(
                     import.package.clone(),
                     import.module.clone(),
                     package_root.join("libs").join(&import.package),
-                    LibraryProviderKind::PackageDependency,
                 ),
             })
             .collect();
@@ -173,7 +172,6 @@ pub(crate) fn loaded_package_to_analyzed(
         units,
         entry_frontmatter,
         diagnostics: Vec::new(),
-        linked_library_crates: BTreeMap::new(),
     })
 }
 
