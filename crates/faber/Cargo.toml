@@ -32,8 +32,6 @@ radix-mir-fmir = { path = "../radix-mir-fmir" }
 # the shared radix-mir surface. Build-time only — never a runtime dependency.
 # DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `mir-metal`.
 # DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `mir-llvm`.
-# DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by
-# `host-macos-arm64` (the native Metal/CUDA host leaf).
 radix-mir-runner = { path = "../radix-mir-runner", optional = true }
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0.228", features = ["derive"] }
@@ -54,6 +52,7 @@ hir-faber = ["radix/hir-faber"]
 hir-fhir = ["radix/hir-fhir"]
 mir-fmir = ["radix/mir-fmir"]
 runner = ["radix/runner", "dep:radix-mir-runner"]
+host-macos-arm64 = []
 
 [lints]
 workspace = true
