@@ -30,7 +30,7 @@ use radix_types::TypeId;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-/// A shell analyzed package with no source units (the A10 source half is
+/// An empty analyzed package with no source units (the A10 source half is
 /// empty; package identity falls back to the root name).
 fn empty_package(label: &str) -> AnalyzedPackage {
     AnalyzedPackage {
@@ -44,7 +44,6 @@ fn empty_package(label: &str) -> AnalyzedPackage {
         units: Vec::new(),
         entry_frontmatter: None,
         diagnostics: Vec::new(),
-        linked_library_crates: BTreeMap::new(),
     }
 }
 

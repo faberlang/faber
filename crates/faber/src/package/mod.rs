@@ -127,13 +127,11 @@ pub use mir::run_fmir_image_bytes_with_stdio;
 pub use mir::with_lowered_package_mir;
 pub(crate) use mir::DeviceSelection;
 use crate::library::LibraryResolver;
-use radix_package::analyze::AnalyzedPackage;
 use radix_package::discovery::PackageSpec;
 use radix_package::library::LibraryInterfaceCache;
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 use radix::driver::Config;
-use std::collections::BTreeMap;
 use std::path::Path;
 
 /// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 executed-lane
@@ -335,15 +333,14 @@ pub(crate) fn library_resolver_for_package(
 
 // RP3: multi-unit analysis lives in `radix-package` (`analyze.rs`). These
 // adapters supply the faber product-orchestration seams — reader-locale pack
-// loading, strict product-view manifest validation (FBR-P1-001),
-// `FABER_LIBRARY_HOME` / workspace probing, and the G4 linked-crate map from
-// the artifact plan — and keep the faber-internal entry signatures.
+// loading, strict product-view manifest validation (FBR-P1-001), and
+// `FABER_LIBRARY_HOME` / workspace probing — while keeping the faber-internal
+// entry signatures.
 pub(crate) fn faber_analysis_seams() -> radix_package::analyze::AnalysisSeams {
     radix_package::analyze::AnalysisSeams {
         locale_loader: load_locale_pack_for_input,
         manifest_validator: validate_product_manifest_for_spec,
         resolver_for_package: library_resolver_for_package,
-        linked_crates_for_root: linked_crates_for_package_root,
     }
 }
 
@@ -355,77 +352,14 @@ pub(crate) fn faber_emission_seams() -> radix_package::emit::EmissionSeams {
         analysis: faber_analysis_seams(),
         #[cfg(feature = "hir-go")]
         emit_go: go_build::generate_package_go_result,
-        #[cfg(feature = "mir-wasm")]
-        emit_wasm: generate_package_wasm_result,
     }
 }
 
-#[cfg(feature = "mir-wasm")]
-fn generate_package_wasm_result(
-    package: &mut radix_package::analyze::AnalyzedPackage,
-    _input: &Path,
-) -> radix_package::emit::PackageCompileResult {
-    let options = radix_package::wasm::PackageWasmOptions::new(
-        package
-            .spec
-            .package_root
-            .join("target")
-            .join("faber")
-            .join("wasm"),
-    );
-    let build = match radix_package::wasm::build_package_wasm_from_graph(package, &options) {
-        Ok(build) => build,
-        Err(diagnostics) => return radix_package::emit::compile_failure(diagnostics),
-    };
-    let entry_wat = build
-        .modules
-        .iter()
-        .find(|module| module.is_entry)
-        .map(|module| module.wat.clone())
-        .unwrap_or_default();
-    let wasm_modules = build
-        .modules
-        .into_iter()
-        .map(|module| radix_package::emit::WasmPackageModuleFile {
-            module_segments: module.module_segments,
-            is_entry: module.is_entry,
-            wat: module.wat,
-        })
-        .collect::<Vec<_>>();
-    radix_package::emit::PackageCompileResult {
-        compile_result: radix::CompileResult {
-            output: Some(radix::Output::WasmText(radix::WasmTextOutput { code: entry_wat })),
-            diagnostics: package.diagnostics.clone(),
-        },
-        wasm_modules,
-        #[cfg(feature = "hir-go")]
-        go_modules: Vec::new(),
-    }
-}
 
 fn validate_product_manifest_for_spec(spec: &PackageSpec) -> Result<(), Box<Diagnostic>> {
     manifest::manifest_for_spec(spec).map(|_| ())
 }
 
-/// Linked native-binding crate map for a package root (G4). Stays faber-side
-/// with the artifact plan (RP4); analysis receives it through the seam.
-fn linked_crates_for_package_root(package_root: &Path) -> BTreeMap<String, String> {
-    // Build a lightweight shell package for the lock/manifest scan only.
-    let shell = AnalyzedPackage {
-        spec: PackageSpec {
-            package_root: package_root.to_path_buf(),
-            source_root: package_root.to_path_buf(),
-            entry: package_root.to_path_buf(),
-            templates: BTreeMap::new(),
-            manifest_backed: true,
-        },
-        units: Vec::new(),
-        entry_frontmatter: None,
-        diagnostics: Vec::new(),
-        linked_library_crates: BTreeMap::new(),
-    };
-    radix_package::artifact_plan::linked_library_crate_map(&shell)
-}
 
 #[cfg(test)]
 mod test_support;
