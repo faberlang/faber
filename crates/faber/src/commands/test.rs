@@ -5,9 +5,9 @@ use crate::input_shape::locale_without_package_error;
 use crate::package;
 use radix_package::test_source_filter::TestSourceFilter;
 use radix::driver::{Config, Session};
-use radix::proba::{
+use proba::{
     format_summary, inventory_cases, run_proba_on_analyzed, run_proba_source, CaseOutcome,
-    ProbaReport, TestSelection,
+    CaseResult, ProbaReport, TestSelection,
 };
 use std::path::{Path, PathBuf};
 
@@ -208,7 +208,7 @@ fn run_package(
                 print_run_error(&error);
                 // Fail closed for units that own proba cases.
                 for case in cases {
-                    combined.results.push(radix::proba::CaseResult {
+                    combined.results.push(CaseResult {
                         name: case.name,
                         suite_path: case.suite_path,
                         outcome: CaseOutcome::Failed {

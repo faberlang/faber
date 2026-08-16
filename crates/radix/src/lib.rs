@@ -85,8 +85,6 @@ pub mod mir;
 pub mod octeti_literal;
 pub mod parser;
 pub mod paths;
-#[cfg(feature = "runner")]
-pub mod proba;
 pub mod runtime_contract;
 pub mod semantic;
 pub mod syntax;

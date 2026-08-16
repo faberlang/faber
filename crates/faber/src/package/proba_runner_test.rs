@@ -1,4 +1,4 @@
-//! Runner-backed proba runner tests (shipped `radix::proba` + package analysis).
+//! Runner-backed proba runner tests (shipped `proba` leaf + package analysis).
 //!
 //! Proves `faber test` definition: MIR interpretation, not Cargo/Rust harness.
 
@@ -45,7 +45,7 @@ fn load_with_faber_seams(
         &seams(),
     )
 }
-use radix::proba::{run_proba_source, CaseOutcome, TestSelection};
+use proba::{run_proba_on_analyzed, run_proba_source, CaseOutcome, TestSelection};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -214,7 +214,7 @@ test "identity holds" {
 
     let mut any = false;
     for unit in &mut package.units {
-        let report = radix::proba::run_proba_on_analyzed(
+        let report = run_proba_on_analyzed(
             &mut unit.analysis,
             &TestSelection::default(),
             None,

@@ -1,0 +1,19 @@
+[package]
+name = "proba"
+version = "0.1.0"
+edition = "2021"
+description = "Faber proba inventory and MIR-runner case execution"
+license = "MIT"
+
+[dependencies]
+# The proba runner consumes compiler analysis and MIR values but does not own
+# another compiler pipeline. Keep the dependency downward and core builds
+# runner-free.
+radix = { path = "../radix", default-features = false }
+
+[features]
+default = []
+runner = ["radix/runner"]
+
+[lints]
+workspace = true

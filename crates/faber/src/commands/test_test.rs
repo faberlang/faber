@@ -4,7 +4,7 @@
 //! sources; tests live in dedicated `*_test.rs` files.
 
 use radix::driver::{Config, Session};
-use radix::proba::{run_proba_source, TestSelection};
+use proba::{run_proba_source, TestSelection};
 use std::fs;
 use std::path::PathBuf;
 
