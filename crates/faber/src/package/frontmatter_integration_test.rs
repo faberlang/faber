@@ -6,15 +6,71 @@
 //!
 //! Unit-level frontmatter tests live in `frontmatter_test.rs`.
 
-use super::frontmatter::RustTestSelection as TestSelection;
 use super::test_support::{diagnostic_has_arg, diagnostic_has_issue, test_temp_dir};
-use super::{
-    compile_package, compile_package_with_test_options, compile_package_with_test_selection,
-    discover_package, library_resolver_from_config, load_package,
-};
+use super::library_resolver_from_config;
+use radix_package::analyze::AnalysisSeams;
+use radix_package::discovery::PackageSpec;
+use radix_package::emit::{compile_package as compile_package_direct, compile_package_with_test_options as compile_package_with_test_options_direct, compile_package_with_test_selection as compile_package_with_test_selection_direct};
+use radix_package::frontmatter::RustTestSelection as TestSelection;
+use radix_package::test_source_filter::TestSourceFilter;
 use radix::driver::Config;
 use radix::Output;
+use std::path::Path;
 use std::fs;
+
+fn seams() -> AnalysisSeams {
+    crate::package::faber_analysis_seams()
+}
+
+fn compile_with_faber_seams(config: &Config, input: &Path) -> radix::CompileResult {
+    compile_package_direct(config, input, &crate::package::faber_emission_seams())
+}
+
+fn compile_with_test_selection(
+    config: &Config,
+    input: &Path,
+    selection: Option<&TestSelection>,
+) -> radix::CompileResult {
+    compile_package_with_test_selection_direct(
+        config,
+        input,
+        selection,
+        &crate::package::faber_emission_seams(),
+    )
+}
+
+fn compile_with_test_options(
+    config: &Config,
+    input: &Path,
+    selection: Option<&TestSelection>,
+    filter: Option<&TestSourceFilter>,
+) -> radix::CompileResult {
+    compile_package_with_test_options_direct(
+        config,
+        input,
+        selection,
+        filter,
+        &crate::package::faber_emission_seams(),
+    )
+}
+
+fn discover_package(input: &Path) -> Result<PackageSpec, Box<radix::diagnostics::Diagnostic>> {
+    crate::package::discover_package(input)
+}
+
+fn load_with_faber_seams(
+    spec: &PackageSpec,
+    resolver: &crate::library::LibraryResolver,
+) -> Result<Vec<radix_package::PackageFile>, Vec<radix::diagnostics::Diagnostic>> {
+    radix_package::analyze::load_package_with_locale_pack(
+        spec,
+        resolver,
+        None,
+        false,
+        None,
+        &seams(),
+    )
+}
 
 // ---------------------------------------------------------------------------
 // Frontmatter peeling
@@ -38,7 +94,7 @@ main { print "peeled" }
 
     let config = Config::default();
     let spec = discover_package(&entry).expect("package");
-    let files = load_package(&spec, &library_resolver_from_config(&config)).expect("load");
+    let files = load_with_faber_seams(&spec, &library_resolver_from_config(&config)).expect("load");
     let file = files
         .iter()
         .find(|file| file.path == entry)
@@ -79,7 +135,7 @@ main {}
 
     let config = Config::default();
     let spec = discover_package(&entry).expect("package");
-    let result = load_package(&spec, &library_resolver_from_config(&config));
+    let result = load_with_faber_seams(&spec, &library_resolver_from_config(&config));
     assert!(result.is_err());
     let err = result.err().expect("diagnostics");
     assert!(err.iter().any(|diag| diag.code == Some("PARSE052")));
@@ -117,7 +173,7 @@ main {}
 
     let config = Config::default();
     let spec = discover_package(dir.path()).expect("package");
-    let result = load_package(&spec, &library_resolver_from_config(&config));
+    let result = load_with_faber_seams(&spec, &library_resolver_from_config(&config));
     assert!(result.is_err());
     let err = result.err().expect("diagnostics");
     assert!(err.iter().any(|diag| {
@@ -161,7 +217,7 @@ fn answer() → int {
     )
     .expect("write lib");
 
-    let result = compile_package(&Config::default(), &dir.join("main.fab"));
+    let result = compile_with_faber_seams(&Config::default(), &dir.join("main.fab"));
     assert!(
         result.success(),
         "expected group frontmatter package compile success, got {:?}",
@@ -217,7 +273,7 @@ main {}
     )
     .expect("write entry");
 
-    let result = compile_package_with_test_selection(&Config::default(), &entry, None);
+    let result = compile_with_test_selection(&Config::default(), &entry, None);
     assert!(
         result.success(),
         "expected frontmatter test-default compile success, got {:?}",
@@ -269,7 +325,7 @@ main {}
         tag: Some("smoke".to_owned()),
         ..TestSelection::default()
     };
-    let result = compile_package_with_test_selection(&Config::default(), &entry, Some(&selection));
+    let result = compile_with_test_selection(&Config::default(), &entry, Some(&selection));
     assert!(
         result.success(),
         "expected CLI override compile success, got {:?}",
@@ -309,7 +365,7 @@ main { print "empty-frontmatter" }
 
     let config = Config::default();
     let spec = discover_package(&entry).expect("package");
-    let files = load_package(&spec, &library_resolver_from_config(&config)).expect("load");
+    let files = load_with_faber_seams(&spec, &library_resolver_from_config(&config)).expect("load");
     let file = files
         .iter()
         .find(|file| file.path == entry)
@@ -342,7 +398,7 @@ main { print "comment-frontmatter" }
 
     let config = Config::default();
     let spec = discover_package(&entry).expect("package");
-    let files = load_package(&spec, &library_resolver_from_config(&config)).expect("load");
+    let files = load_with_faber_seams(&spec, &library_resolver_from_config(&config)).expect("load");
     let file = files
         .iter()
         .find(|file| file.path == entry)
@@ -412,7 +468,7 @@ test "vector3 builds" {
     )
     .expect("math.proba");
 
-    let result = compile_package_with_test_options(&Config::default(), dir.path(), None, None);
+    let result = compile_with_test_options(&Config::default(), dir.path(), None, None);
     assert!(
         result.success(),
         "lib package without paths.entry should compile for faber test, got {:?}",

@@ -4,15 +4,60 @@
 //! (not a reimplemented mini-harness).
 
 use super::test_support::{diagnostic_has_issue, test_temp_dir};
-use super::{
-    compile_package, compile_package_with_test_options, discover_package,
-    library_resolver_from_config, load_package_with_locale_pack, PackageSpec, TestSourceFilter,
-};
+use super::library_resolver_from_config;
+use radix_package::analyze::AnalysisSeams;
+use radix_package::discovery::PackageSpec;
+use radix_package::emit::{compile_package as compile_package_direct, compile_package_with_test_options as compile_package_with_test_options_direct};
+use radix_package::test_source_filter::TestSourceFilter;
 use radix::driver::Config;
 use radix::locale::LocalePack;
 use radix::Output;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+fn seams() -> AnalysisSeams {
+    crate::package::faber_analysis_seams()
+}
+
+fn compile_with_faber_seams(config: &Config, input: &Path) -> radix::CompileResult {
+    compile_package_direct(config, input, &crate::package::faber_emission_seams())
+}
+
+fn compile_with_test_options(
+    config: &Config,
+    input: &Path,
+    selection: Option<&radix_package::frontmatter::RustTestSelection>,
+    filter: Option<&TestSourceFilter>,
+) -> radix::CompileResult {
+    compile_package_with_test_options_direct(
+        config,
+        input,
+        selection,
+        filter,
+        &crate::package::faber_emission_seams(),
+    )
+}
+
+fn discover_package(input: &Path) -> Result<PackageSpec, Box<radix::diagnostics::Diagnostic>> {
+    crate::package::discover_package(input)
+}
+
+fn load_with_faber_seams(
+    spec: &PackageSpec,
+    resolver: &crate::library::LibraryResolver,
+    locale_pack: Option<&LocalePack>,
+    include_proba: bool,
+    filter: Option<&TestSourceFilter>,
+) -> Result<Vec<radix_package::PackageFile>, Vec<radix::diagnostics::Diagnostic>> {
+    radix_package::analyze::load_package_with_locale_pack(
+        spec,
+        resolver,
+        locale_pack,
+        include_proba,
+        filter,
+        &seams(),
+    )
+}
 
 const PROBA_IMPORT_MESSAGE: &str =
     ".proba files are test sources and cannot be imported; move shared helpers to a .fab module";
@@ -94,7 +139,7 @@ describe "helpers" {
 
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
-    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), true, None)
+    let files = load_with_faber_seams(&spec, &resolver, Some(&english_pack()), true, None)
         .expect("load");
     let names: Vec<_> = files
         .iter()
@@ -130,7 +175,7 @@ fn load_without_include_proba_skips_sibling_proba() {
     // Production path (include_proba = false): the package loader applies the
     // product-default en code pack; pass it explicitly (a `None` pack would
     // select registry-direct lexing instead).
-    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None)
+    let files = load_with_faber_seams(&spec, &resolver, Some(&english_pack()), false, None)
         .expect("load");
     let names: Vec<_> = files
         .iter()
@@ -162,7 +207,7 @@ fn single_file_proba_entry_fails_closed_outside_test_path() {
         manifest_backed: false,
     };
     let resolver = library_resolver_from_config(&Config::default());
-    let Err(err) = load_package_with_locale_pack(&spec, &resolver, None, false, None) else {
+    let Err(err) = load_with_faber_seams(&spec, &resolver, None, false, None) else {
         panic!("non-test load of .proba must fail");
     };
     assert!(
@@ -195,7 +240,7 @@ fn product_fab_cannot_import_proba() {
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
     let Err(err) =
-        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), true, None)
+        load_with_faber_seams(&spec, &resolver, Some(&english_pack()), true, None)
     else {
         panic!("import of .proba must fail");
     };
@@ -236,7 +281,7 @@ describe "b" { test "use a" { assert a.shared() ≡ 1 } }
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
     let Err(err) =
-        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), true, None)
+        load_with_faber_seams(&spec, &resolver, Some(&english_pack()), true, None)
     else {
         panic!("proba→proba import must fail");
     };
@@ -270,7 +315,7 @@ describe "helpers" {
 
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
-    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), true, None)
+    let files = load_with_faber_seams(&spec, &resolver, Some(&english_pack()), true, None)
         .expect("load");
     assert!(
         files
@@ -310,7 +355,7 @@ fn proba_filter_include_selects_only_matching_proba() {
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
     let files =
-        load_package_with_locale_pack(&spec, &resolver, None, true, Some(&filter)).expect("load");
+        load_with_faber_seams(&spec, &resolver, None, true, Some(&filter)).expect("load");
     let proba_names: Vec<_> = files
         .iter()
         .filter_map(|f| {
@@ -333,7 +378,7 @@ this is not valid faber
     )
     .expect("helpers.proba");
 
-    let result = compile_package(&Config::default(), dir.path());
+    let result = compile_with_faber_seams(&Config::default(), dir.path());
     assert!(
         result.success(),
         "build must ignore invalid adjacent .proba: {:?}",
@@ -374,7 +419,7 @@ describe "helpers" {
     )
     .expect("inline.fab");
 
-    let result = compile_package_with_test_options(&Config::default(), dir.path(), None, None);
+    let result = compile_with_test_options(&Config::default(), dir.path(), None, None);
     assert!(
         result.success(),
         "test compile failed: {:?}",
@@ -417,12 +462,12 @@ fn norma_src_proba_is_discovered_beside_product_sources() {
         "stdlib .proba must not live under exempla: {path_str}"
     );
 
-    let files = super::source_files::package_source_files(&norma_src, true).expect("discover");
+    let files = radix_package::source_files::package_source_files(&norma_src, true).expect("discover");
     assert!(
         files.iter().any(|p| p.ends_with("mathesis.proba")),
         "include_proba=true must find mathesis.proba under norma/src"
     );
-    let prod = super::source_files::package_source_files(&norma_src, false).expect("prod");
+    let prod = radix_package::source_files::package_source_files(&norma_src, false).expect("prod");
     assert!(
         !prod.iter().any(|p| p.ends_with(".proba")),
         "production discovery must skip *.proba under norma/src"
@@ -493,7 +538,7 @@ describe "mathesis catalog" {
     .to_owned();
     fs::write(src.join("mathesis.proba"), proba_body).expect("mathesis.proba");
 
-    let result = compile_package_with_test_options(&Config::default(), dir.path(), None, None);
+    let result = compile_with_test_options(&Config::default(), dir.path(), None, None);
     assert!(
         result.success(),
         "norma-style proba compile failed: {:?}",

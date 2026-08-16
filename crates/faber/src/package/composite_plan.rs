@@ -18,14 +18,14 @@
 //! makes no execution claim and adds no CLI or FMIR wire surface.
 //!
 //! TARGET: internal product-pipeline typed value mirroring
-//! [`super::artifact_plan`] — debug/test/tooling surface, not a public ABI.
+//! [`radix_package::artifact_plan`] — debug/test/tooling surface, not a public ABI.
 //! WHY: the campaign join is a build-time typed value; there is no new
 //! top-level CLI (EXEC-01 challenge C1).
 //!
 //! # Assembly rule (DDPP0 §ProductShape)
 //!
 //! Assembly composes typed facts only: `AnalyzedPackage` → per-target
-//! [`ArtifactPlan`](super::artifact_plan::ArtifactPlan) (package identity),
+//! [`ArtifactPlan`](radix_package::artifact_plan::ArtifactPlan) (package identity),
 //! the target-neutral `DeviceProgram` plus its carried `DeviceSemantics`
 //! (prepared regions are derived from the carried dependency graph), FMIR
 //! device-section artifacts with their identity digests, Gradus
@@ -67,8 +67,8 @@ use radix_mir::MirType;
 use radix_mir_fmir::{DeviceTargetId, FmirDeviceArtifact, FmirDeviceBackend};
 use serde::Serialize;
 
-use super::artifact_plan::plan_package;
-use super::compile::AnalyzedPackage;
+use radix_package::analyze::AnalyzedPackage;
+use radix_package::artifact_plan::plan_package;
 
 /// The versioned composite-plan document schema.
 pub const COMPOSITE_PLAN_SCHEMA: &str = "composite-plan v1";
@@ -803,7 +803,7 @@ fn is_canonical_sha256_digestio(digestio: &str) -> bool {
 ///
 /// # Errors
 /// Serialization failure (a serde error is surfaced as a string, matching
-/// [`super::artifact_plan::ArtifactPlan::to_debug_json`]).
+/// [`radix_package::artifact_plan::ArtifactPlan::to_debug_json`]).
 pub(crate) fn render_composite_plan_v1(plan: &CompositePlan) -> Result<String, String> {
     serde_json::to_string_pretty(&CompositePlanDocument::from(plan))
         .map_err(|error| error.to_string())

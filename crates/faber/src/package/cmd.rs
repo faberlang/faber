@@ -11,12 +11,14 @@ use super::cargo::{
 };
 #[cfg(feature = "hir-go")]
 use super::go_build::{emit_go_module_with_postprocess, invoke_go_build, GoBuildLayout};
-use super::manifest::{manifest_build_target, FaberManifest};
+use super::manifest::FaberManifest;
+use radix_package::discovery::BuildLayout;
+use radix_package::manifest::manifest_build_target;
 #[cfg(feature = "mir-llvm")]
 use super::{build_host_program, LlvmHostProfile};
 use super::{
     config_with_locale, discover_build_layout, package_host_selection_diagnostic, read_manifest,
-    BuildLayout, MANIFEST_FILE,
+    MANIFEST_FILE,
 };
 
 /// Print `message` and terminate.
@@ -89,7 +91,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
             &config,
             &input_path,
             &[],
-            &super::faber_mir_seams(),
+            &super::mir::faber_mir_seams(),
         ) {
             Ok(artifact) => artifact,
             Err(diagnostics) => report_diagnostics_and_exit(
@@ -107,7 +109,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
             &config,
             &input_path,
             &[],
-            &super::faber_mir_seams(),
+            &super::mir::faber_mir_seams(),
         ) {
             Ok(image) => image,
             Err(diagnostics) => report_diagnostics_and_exit(
@@ -125,7 +127,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
             &config,
             &input_path,
             &[],
-            &super::faber_mir_seams(),
+            &super::mir::faber_mir_seams(),
         ) {
             Ok(image) => image,
             Err(diagnostics) => report_diagnostics_and_exit(
@@ -144,7 +146,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
             &input_path,
             &[],
             command.release,
-            &super::faber_mir_seams(),
+            &super::mir::faber_mir_seams(),
         ) {
                 Ok(bundle) => bundle,
                 Err(diagnostics) => report_diagnostics_and_exit(
@@ -508,7 +510,43 @@ fn single_file_rust_runtime_plan(
     config: &radix::Config,
     input_path: &Path,
 ) -> Result<super::RustRuntimePlan, Vec<radix::Diagnostic>> {
-    super::rust_target::single_file_rust_runtime_plan(config, input_path)
+    use radix::driver::{analyze_source, Session};
+    use std::fs;
+
+    let source = fs::read_to_string(input_path).map_err(|err| {
+        vec![crate::package_diagnostic_error(format!(
+            "failed to read '{}': {err}",
+            input_path.display()
+        ))]
+    })?;
+    let session = Session::new(config.clone());
+    let name = input_path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("input.fab");
+    let analysis = analyze_source(&session, name, &source)?;
+    let needs = radix::codegen::collect_rust_needs(
+        &analysis.hir,
+        &analysis.types,
+        std::collections::BTreeSet::new(),
+        None,
+    );
+    let needs_tokio = analysis.hir.entry_is_async
+        || analysis
+            .hir
+            .items
+            .iter()
+            .any(|item| matches!(&item.kind, radix::hir::HirItemKind::Function(f) if f.is_async));
+    Ok(super::RustRuntimePlan {
+        needs_faber: needs.needs_faber_runtime,
+        needs_tokio,
+        host: None,
+        non_runtime_routes: std::collections::BTreeSet::new(),
+        selected_providers: std::collections::BTreeSet::new(),
+        provider_manifests: Vec::new(),
+        provider_error: None,
+        library_path_deps: Vec::new(),
+    })
 }
 
 #[cfg(not(feature = "hir-rust"))]

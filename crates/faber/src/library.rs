@@ -5,8 +5,8 @@
 //! reads the ambient environment. This module keeps the faber-owned ambient
 //! discovery seam — `FABER_LIBRARY_HOME` env reading and the
 //! workspace-ancestor probe (CTO memo) — and constructs the explicit
-//! resolver inputs the compiler crate requires. The resolver types themselves
-//! are forwarded from `radix-package`.
+//! resolver inputs the compiler crate requires. The resolver types are supplied
+//! by `radix-package`; this module adds the Faber-only ambient discovery seam.
 
 #[cfg(test)]
 #[path = "library_test.rs"]

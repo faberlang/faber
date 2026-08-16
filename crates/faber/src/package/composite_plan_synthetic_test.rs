@@ -13,7 +13,6 @@
 //! for M4 — the first real-graph campaign evidence, gated on MODEL-04 and
 //! the GGUF-M6/M6 capstone package manifest (EXEC-01 challenge C2).
 
-use super::analyze_package;
 use super::composite_plan::{
     assemble_composite_plan, verify_identity_preservation, BackendLeaf, BackendSelection,
     CompositePlanFacts, ContentIdentity, EffectCapabilityRequirements, ExpectedBuffer,
@@ -44,6 +43,17 @@ use radix_mir_fmir::{
 use radix_types::TypeId;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+
+fn analyze_with_faber_seams(
+    config: &Config,
+    input: &Path,
+) -> Result<radix_package::analyze::AnalyzedPackage, Vec<Diagnostic>> {
+    radix_package::analyze::analyze_package(
+        config,
+        input,
+        &crate::package::faber_analysis_seams(),
+    )
+}
 
 /// The checked-in synthetic fixture package (analyzed via a tempdir copy so
 /// the checked-in tree is never written).
@@ -77,7 +87,7 @@ fn copy_package_dir_skipping_target(src: &Path, dest: &Path) {
 fn analyze_fixture() -> (TestDir, AnalyzedPackage) {
     let dir = copy_fixture();
     let config = Config::default();
-    let package = analyze_package(&config, dir.path()).expect("synthetic fixture package analyzes");
+    let package = analyze_with_faber_seams(&config, dir.path()).expect("synthetic fixture package analyzes");
     (dir, package)
 }
 

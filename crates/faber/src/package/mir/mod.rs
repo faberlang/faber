@@ -11,10 +11,10 @@
 //! - [`faber_mir_seams`] — the faber-supplied seam bundle (executed-lane
 //!   target, library resolver/cache, `[device]` projection, device-section
 //!   builder, host-route policy, runner writer, toolchain version) that the
-//!   moved compiler subset receives.
-//! - Forwarding wrappers for the moved public surface with the faber entry
-//!   signatures (faber callers stay green until RP6 re-wires the command
-//!   adapter).
+//!   compiler subset receives.
+//! - Faber product entry adapters that inject those seams into the typed
+//!   `radix-package` MIR operations. These adapters are product boundaries,
+//!   not compiler compatibility modules.
 #![allow(dead_code)] // Binary and library targets exercise different package runner surfaces.
 
 pub(crate) mod bin_runner;
@@ -26,188 +26,10 @@ mod tests;
 
 use radix::diagnostics::Diagnostic;
 use radix::driver::Config;
-use radix::mir::Host;
-use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-pub(crate) use radix_package::analyze::AnalyzedPackage;
 pub(crate) use radix_package::mir::DeviceSelection;
-pub(crate) use radix_package::mir::{
-    FmirImageRouteDecision, PackageFmirBinaryBundle, PackageFmirImage, PackageFmirTextImage,
-    PackageMirArtifact,
-};
-
-// Forwarding wrappers: faber's entry signatures inject the faber seams
-// (`faber_mir_seams()`), so faber callers stay green until RP6 re-wires the
-// command adapter.
-
-pub(crate) fn run_package_mir<H: Host + ?Sized>(
-    config: &Config,
-    input: &Path,
-    host: &mut H,
-) -> Result<(), Vec<Diagnostic>> {
-    radix_package::mir::run_package_mir(config, input, &faber_mir_seams(), host)
-}
-
-pub(crate) fn run_package_mir_with_selection<H: Host + ?Sized>(
-    config: &Config,
-    input: &Path,
-    selection: DeviceSelection,
-    host: &mut H,
-) -> Result<(), Vec<Diagnostic>> {
-    radix_package::mir::run_package_mir_with_selection(
-        config,
-        input,
-        selection,
-        &faber_mir_seams(),
-        host,
-    )
-}
-
-#[cfg(feature = "hir-fhir")]
-pub(crate) fn run_package_mir_from_loaded<H: Host + ?Sized>(
-    config: &Config,
-    package: AnalyzedPackage,
-    loaded_links: &BTreeMap<PathBuf, BTreeMap<String, PathBuf>>,
-    host: &mut H,
-) -> Result<(), Vec<Diagnostic>> {
-    radix_package::mir::run_package_mir_from_loaded(
-        config,
-        package,
-        loaded_links,
-        &faber_mir_seams(),
-        host,
-    )
-}
-
-pub(crate) fn build_package_mir_artifact(
-    config: &Config,
-    input: &Path,
-    argumenta: &[String],
-) -> Result<PackageMirArtifact, Vec<Diagnostic>> {
-    radix_package::mir::build_package_mir_artifact(config, input, argumenta, &faber_mir_seams())
-}
-
-pub(crate) fn build_package_fmir_text_image(
-    config: &Config,
-    input: &Path,
-    argumenta: &[String],
-) -> Result<PackageFmirTextImage, Vec<Diagnostic>> {
-    radix_package::mir::build_package_fmir_text_image(config, input, argumenta, &faber_mir_seams())
-}
-
-pub(crate) fn build_package_fmir_image(
-    config: &Config,
-    input: &Path,
-    argumenta: &[String],
-) -> Result<PackageFmirImage, Vec<Diagnostic>> {
-    radix_package::mir::build_package_fmir_image(config, input, argumenta, &faber_mir_seams())
-}
-
-pub(crate) fn run_package_fmir_built_image<H: Host + ?Sized>(
-    config: &Config,
-    input: &Path,
-    selection: DeviceSelection,
-    host: &mut H,
-) -> Result<(), Vec<Diagnostic>> {
-    radix_package::mir::run_package_fmir_built_image(
-        config,
-        input,
-        selection,
-        &faber_mir_seams(),
-        host,
-    )
-}
-
-pub(crate) fn build_package_fmir_binary_bundle(
-    config: &Config,
-    input: &Path,
-    argumenta: &[String],
-    release: bool,
-) -> Result<PackageFmirBinaryBundle, Vec<Diagnostic>> {
-    radix_package::mir::build_package_fmir_binary_bundle(
-        config,
-        input,
-        argumenta,
-        release,
-        &faber_mir_seams(),
-    )
-}
-
-pub(crate) fn run_package_mir_artifact<H: Host + ?Sized>(
-    config: &Config,
-    artifact: &PackageMirArtifact,
-    host: &mut H,
-) -> Result<(), Vec<Diagnostic>> {
-    radix_package::mir::run_package_mir_artifact(config, artifact, &faber_mir_seams(), host)
-}
-
-pub(crate) fn run_package_fmir_text_image<H: Host + ?Sized>(
-    image: &PackageFmirTextImage,
-    host: &mut H,
-) -> Result<(), Vec<Diagnostic>> {
-    radix_package::mir::run_package_fmir_text_image(image, &faber_mir_seams(), host)
-}
-
-pub(crate) fn run_package_fmir_text_image_with_selection<H: Host + ?Sized>(
-    image: &PackageFmirTextImage,
-    selection: DeviceSelection,
-    host: &mut H,
-) -> Result<(), Vec<Diagnostic>> {
-    radix_package::mir::run_package_fmir_text_image_with_selection(
-        image,
-        selection,
-        &faber_mir_seams(),
-        host,
-    )
-}
-
-pub(crate) fn run_package_fmir_image<H: Host + ?Sized>(
-    image: &PackageFmirImage,
-    host: &mut H,
-) -> Result<(), Vec<Diagnostic>> {
-    radix_package::mir::run_package_fmir_image(image, &faber_mir_seams(), host)
-}
-
-pub(crate) fn run_package_fmir_image_with_selection<H: Host + ?Sized>(
-    image: &PackageFmirImage,
-    selection: DeviceSelection,
-    host: &mut H,
-) -> Result<(), Vec<Diagnostic>> {
-    radix_package::mir::run_package_fmir_image_with_selection(
-        image,
-        selection,
-        &faber_mir_seams(),
-        host,
-    )
-}
-
-pub(crate) fn run_fmir_image_path<H: Host + ?Sized>(
-    image_path: &Path,
-    host: &mut H,
-) -> Result<(), Vec<Diagnostic>> {
-    radix_package::mir::run_fmir_image_path(image_path, &faber_mir_seams(), host)
-}
-
-pub(crate) fn run_fmir_image_path_with_selection<H: Host + ?Sized>(
-    image_path: &Path,
-    selection_override: Option<DeviceSelection>,
-    host: &mut H,
-) -> Result<(), Vec<Diagnostic>> {
-    radix_package::mir::run_fmir_image_path_with_selection(
-        image_path,
-        selection_override,
-        &faber_mir_seams(),
-        host,
-    )
-}
-
-pub(crate) fn fmir_image_route_decision(
-    image_path: &Path,
-) -> Result<FmirImageRouteDecision, Vec<Diagnostic>> {
-    radix_package::mir::fmir_image_route_decision(image_path, &faber_mir_seams())
-}
 
 // Faber's fmir-bin runner writer is the seam body radix-package's binary
 // bundle builder receives (`MirSeams::bin_runner_writer`).

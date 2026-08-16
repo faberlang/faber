@@ -3,10 +3,47 @@
 //! Proves `faber test` definition: MIR interpretation, not Cargo/Rust harness.
 
 use super::test_support::test_temp_dir;
-use super::{analyze_package, analyze_package_for_tests, load_package_with_locale_pack};
 use super::{discover_package, library_resolver_from_config};
+use radix_package::analyze::{analyze_package as analyze_package_direct, analyze_package_for_tests as analyze_package_for_tests_direct, AnalysisSeams};
+use radix_package::discovery::PackageSpec;
 use radix::driver::{Config, Session};
 use radix::locale::LocalePack;
+
+fn seams() -> AnalysisSeams {
+    crate::package::faber_analysis_seams()
+}
+
+fn analyze_with_faber_seams(
+    config: &Config,
+    input: &Path,
+) -> Result<radix_package::analyze::AnalyzedPackage, Vec<radix::diagnostics::Diagnostic>> {
+    analyze_package_direct(config, input, &seams())
+}
+
+fn analyze_tests_with_faber_seams(
+    config: &Config,
+    input: &Path,
+    filter: Option<&radix_package::test_source_filter::TestSourceFilter>,
+) -> Result<radix_package::analyze::AnalyzedPackage, Vec<radix::diagnostics::Diagnostic>> {
+    analyze_package_for_tests_direct(config, input, filter, &seams())
+}
+
+fn load_with_faber_seams(
+    spec: &PackageSpec,
+    resolver: &crate::library::LibraryResolver,
+    locale_pack: Option<&LocalePack>,
+    include_proba: bool,
+    filter: Option<&radix_package::test_source_filter::TestSourceFilter>,
+) -> Result<Vec<radix_package::PackageFile>, Vec<radix::diagnostics::Diagnostic>> {
+    radix_package::analyze::load_package_with_locale_pack(
+        spec,
+        resolver,
+        locale_pack,
+        include_proba,
+        filter,
+        &seams(),
+    )
+}
 use radix::proba::{run_proba_source, CaseOutcome, TestSelection};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -113,7 +150,7 @@ test "math ok" {
     .expect("proba");
 
     let config = Config::default();
-    let for_tests = analyze_package_for_tests(&config, dir.path(), None).expect("analyze tests");
+    let for_tests = analyze_tests_with_faber_seams(&config, dir.path(), None).expect("analyze tests");
     assert!(
         for_tests
             .units
@@ -122,7 +159,7 @@ test "math ok" {
         "test analysis must include .proba units"
     );
 
-    let production = analyze_package(&config, dir.path()).expect("analyze production");
+    let production = analyze_with_faber_seams(&config, dir.path()).expect("analyze production");
     assert!(
         production
             .units
@@ -135,13 +172,13 @@ test "math ok" {
     // en pack explicitly (a `None` pack would select registry-direct lexing).
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&config);
-    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None)
+    let files = load_with_faber_seams(&spec, &resolver, Some(&english_pack()), false, None)
         .expect("load");
     assert!(files
         .iter()
         .all(|f| f.path.extension().and_then(|e| e.to_str()) != Some("proba")));
     let test_files =
-        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), true, None)
+        load_with_faber_seams(&spec, &resolver, Some(&english_pack()), true, None)
             .expect("load tests");
     assert!(test_files
         .iter()
@@ -167,7 +204,7 @@ test "identity holds" {
     .expect("lib with proba");
 
     let mut package =
-        analyze_package_for_tests(&Config::default(), dir.path(), None).expect("analyze");
+        analyze_tests_with_faber_seams(&Config::default(), dir.path(), None).expect("analyze");
     assert!(
         package.diagnostics.iter().all(|d| !d.is_error()),
         "{:?}",

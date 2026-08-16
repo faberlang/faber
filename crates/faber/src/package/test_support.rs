@@ -6,6 +6,16 @@
 use radix::diagnostics::{Diagnostic, DiagnosticArg};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
+
+/// Compare paths after filesystem aliases such as macOS `/var` → `/private/var`
+/// while retaining lexical normalization for paths that do not exist yet.
+pub fn paths_equivalent(left: &Path, right: &Path) -> bool {
+    fn comparison_path(path: &Path) -> PathBuf {
+        std::fs::canonicalize(path).unwrap_or_else(|_| radix_package::paths::normalize_path(path))
+    }
+
+    comparison_path(left) == comparison_path(right)
+}
 use tempfile::TempDir;
 
 pub fn diagnostic_has_issue(diag: &Diagnostic, issue: &str) -> bool {

@@ -6,8 +6,12 @@ use radix::diagnostics::{Diagnostic, DiagnosticPhase};
 use radix::driver::Config;
 use serde::Deserialize;
 
-use super::file_interface::extract_callable_contracts;
-use super::{analyze_package, read_manifest, resolve_package_member, validate_manifest};
+use radix_package::analyze::AnalyzedPackage;
+use radix_package::discovery::resolve_source_root;
+use radix_package::file_interface::extract_callable_contracts;
+use radix_package::member_path::resolve_package_member;
+use radix_package::rust_target::render_binding_probe;
+use super::{faber_analysis_seams, read_manifest, validate_manifest};
 
 #[cfg(feature = "hir-rust")]
 use super::binding_probe::run_rust_binding_probe;
@@ -125,7 +129,7 @@ pub fn verify_library_bindings_with_probe_mode(
     // FBR-P1-001: the supported source-root set is `src` (default) and `.`
     // (package root). Reuse discovery's resolution so bindings follow the same
     // contract; `resolve_package_member` rejects a bare `.` as naming nothing.
-    let source_root = match super::discovery::resolve_source_root(
+    let source_root = match resolve_source_root(
         package_root,
         &manifest.paths.source,
         &manifest_path,
@@ -184,8 +188,12 @@ fn read_binding_manifest(path: &Path) -> Result<BindingManifest, Vec<Diagnostic>
 fn collect_binding_contracts(
     provider: &str,
     package_root: &Path,
-) -> Result<(super::AnalyzedPackage, Vec<BindingContract>), Vec<Diagnostic>> {
-    let package = analyze_package(&Config::default().with_bodyless_functions(), package_root)?;
+) -> Result<(AnalyzedPackage, Vec<BindingContract>), Vec<Diagnostic>> {
+    let package = radix_package::analyze::analyze_package(
+        &Config::default().with_bodyless_functions(),
+        package_root,
+        &faber_analysis_seams(),
+    )?;
     let mut declarations = Vec::new();
     let mut keys = BTreeSet::new();
     let mut diagnostics = Vec::new();
@@ -328,7 +336,7 @@ fn prove_rust_bindings(
     shim: Option<&Path>,
     manifest: &BindingManifest,
     declarations: &[BindingContract],
-    package: &super::AnalyzedPackage,
+    package: &AnalyzedPackage,
     probe_mode: BindingProbeMode,
 ) -> Result<(), Vec<Diagnostic>> {
     if manifest.functions.is_empty() {
@@ -353,7 +361,7 @@ fn prove_rust_bindings(
             continue;
         };
         let unit = &package.units[declaration.unit_index];
-        match super::rust_target::render_binding_probe(
+        match render_binding_probe(
             &unit.analysis,
             declaration.def_id,
             &binding.symbol,
@@ -409,7 +417,7 @@ fn prove_rust_bindings(
     _shim: Option<&Path>,
     manifest: &BindingManifest,
     _declarations: &[BindingContract],
-    _package: &super::AnalyzedPackage,
+    _package: &AnalyzedPackage,
     _probe_mode: BindingProbeMode,
 ) -> Result<(), Vec<Diagnostic>> {
     if manifest.functions.is_empty() {

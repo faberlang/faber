@@ -220,10 +220,11 @@ fn package_mir_run_with_selection_auto_stays_on_cpu_route() {
     std::fs::write(&entry, "main { print \"cpu\" }\n").expect("write entry");
 
     let mut host = radix::mir::BufferHost::default();
-    crate::package::run_package_mir_with_selection(
+    radix_package::mir::run_package_mir_with_selection(
         &radix::driver::Config::default(),
         &entry,
         DeviceSelection::Auto,
+        &crate::package::mir::faber_mir_seams(),
         &mut host,
     )
     .expect("auto selection must keep the CPU route");

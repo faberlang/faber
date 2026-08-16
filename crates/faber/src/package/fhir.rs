@@ -12,16 +12,15 @@
 //!   from the filesystem;
 //! - [`run_loaded_package_fhir`] runs a loaded package in-process.
 //!
-//! RP5: the writer half ([`build_package_fhir`]) moved to
-//! `radix-package/src/fhir.rs` (compiler-owned); this module forwards it with
-//! the faber analysis seams (ownership-freeze §5.3).
+//! RP5: the writer half ([`radix_package::fhir::build_package_fhir`]) moved to
+//! `radix-package/src/fhir.rs` (compiler-owned). This module keeps only the
+//! Faber-side loader and execution adapter, which consume the typed artifact
+//! through the Faber analysis/MIR seams (ownership-freeze §5.3).
 #![allow(dead_code)] // Binary build/run and lib tests exercise different surfaces.
 
-#[cfg(test)]
-use super::*;
-use super::compile::{AnalyzedPackage, AnalyzedPackageUnit};
-use super::discovery::PackageSpec;
-use super::mir::run_package_mir_from_loaded;
+use radix_package::analyze::{AnalyzedPackage, AnalyzedPackageUnit};
+use radix_package::discovery::PackageSpec;
+use radix_package::LibraryImportBinding;
 use crate::library::{LibraryProviderKind, ResolvedLibraryModule};
 use radix::diagnostics::Diagnostic;
 use radix::driver::Config;
@@ -32,19 +31,6 @@ use radix::syntax::Visibility;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-
-/// Built FHIR package artifact: root directory and the `.fhirpkg` file
-/// (forwarded from the moved writer).
-pub(crate) use radix_package::fhir::PackageFhir;
-
-/// Analyze a package and write it as a deterministic FHIR package artifact
-/// (forwarded to the compiler-owned writer with the faber analysis seams).
-pub(crate) fn build_package_fhir(
-    config: &Config,
-    input: &Path,
-) -> Result<PackageFhir, Vec<Diagnostic>> {
-    radix_package::fhir::build_package_fhir(config, input, &super::faber_analysis_seams())
-}
 
 // ---------------------------------------------------------------------------
 // Loader
@@ -158,7 +144,7 @@ pub(crate) fn loaded_package_to_analyzed(
         let expanded_library_imports = module
             .library_imports
             .iter()
-            .map(|import| super::LibraryImportBinding {
+            .map(|import| LibraryImportBinding {
                 binding: import.binding.clone(),
                 visibility: Visibility::Privata,
                 import_span: Span::default(),
@@ -247,7 +233,13 @@ pub(crate) fn run_loaded_package_fhir<H: radix::mir::Host + ?Sized>(
 ) -> Result<(), Vec<Diagnostic>> {
     let links = loaded_links_by_unit_path(&loaded, artifact_dir);
     let package = loaded_package_to_analyzed(loaded, artifact_dir)?;
-    run_package_mir_from_loaded(config, package, &links, host)
+    radix_package::mir::run_package_mir_from_loaded(
+        config,
+        package,
+        &links,
+        &super::mir::faber_mir_seams(),
+        host,
+    )
 }
 
 // ---------------------------------------------------------------------------

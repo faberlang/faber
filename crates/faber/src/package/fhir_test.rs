@@ -2,11 +2,47 @@
 //! HIR target parity (Rust, canonical Faber, FMIR run) from a loaded artifact.
 
 use super::*;
-use crate::package::codegen::assemble_crate;
 use crate::package::library_resolver_from_config;
-use crate::package::run_package_mir;
-use crate::package::rust_target::generate_package_rust;
 use crate::package::test_support::test_temp_dir;
+use radix_package::analyze::AnalyzedPackage;
+use radix_package::codegen::assemble_crate;
+use radix_package::rust_target::generate_package_rust;
+
+fn analyze_with_faber_seams(
+    config: &Config,
+    input: &Path,
+) -> Result<AnalyzedPackage, Vec<radix::diagnostics::Diagnostic>> {
+    radix_package::analyze::analyze_package(
+        config,
+        input,
+        &crate::package::faber_analysis_seams(),
+    )
+}
+
+fn build_fhir_with_faber_seams(
+    config: &Config,
+    input: &Path,
+) -> Result<radix_package::fhir::PackageFhir, Vec<radix::diagnostics::Diagnostic>> {
+    radix_package::fhir::build_package_fhir(
+        config,
+        input,
+        &crate::package::faber_analysis_seams(),
+    )
+}
+
+fn run_mir_with_faber_seams<H: radix::mir::Host + ?Sized>(
+    config: &Config,
+    input: &Path,
+    host: &mut H,
+) -> Result<(), Vec<radix::diagnostics::Diagnostic>> {
+    radix_package::mir::run_package_mir(
+        config,
+        input,
+        &crate::package::mir::faber_mir_seams(),
+        host,
+    )
+}
+
 use faber_hir_rust::RustFieldNamePolicy;
 use radix::codegen::{generate_from_analyzed, Target};
 use radix::driver::Config;
@@ -351,7 +387,7 @@ fn output_code(output: &radix::Output) -> &str {
 fn build_load_round_trip_with_local_import() {
     let dir = test_temp_dir("fhir-pkg");
     let entry = write_local_package(&dir);
-    let artifact = build_package_fhir(&Config::default(), &entry).expect("build FHIR package");
+    let artifact = build_fhir_with_faber_seams(&Config::default(), &entry).expect("build FHIR package");
     assert!(artifact.package_path.is_file(), "package artifact written");
 
     let loaded = load_package_fhir(&artifact.package_path).expect("load FHIR package");
@@ -398,7 +434,7 @@ fn local_library_locale_surface_resolves_through_package_loader() {
             .map(|pack| pack.metadata.id.as_str()),
         Some("en-local-library")
     );
-    let mut package = analyze_package(&config, &entry).expect("analyze localized local package");
+    let mut package = analyze_with_faber_seams(&config, &entry).expect("analyze localized local package");
 
     assert!(
         package
@@ -479,7 +515,7 @@ fn strict_pack_rejects_unlisted_canonical_member_spelling() {
         None,
     )
     .expect("load local library locale through package selection");
-    let diagnostics = match analyze_package(&config, &entry) {
+    let diagnostics = match analyze_with_faber_seams(&config, &entry) {
         Ok(package) => package.diagnostics,
         Err(diagnostics) => diagnostics,
     };
@@ -508,7 +544,7 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
     )
     .expect("load installed English library locale");
     let config = config.with_stdlib(dev_norma_library_home());
-    let package = analyze_package(&config, &entry).expect("analyze localized external libraries");
+    let package = analyze_with_faber_seams(&config, &entry).expect("analyze localized external libraries");
 
     assert!(
         package
@@ -574,7 +610,7 @@ fn latin_norma_consumer_keeps_canonical_surface_compatibility() {
         .with_stdlib(dev_norma_library_home())
         .with_locale_pack(la_pack);
     let package =
-        analyze_package(&config, &entry).expect("analyze Latin Norma compatibility consumer");
+        analyze_with_faber_seams(&config, &entry).expect("analyze Latin Norma compatibility consumer");
 
     assert!(
         package
@@ -611,9 +647,9 @@ fn latin_norma_consumer_keeps_canonical_surface_compatibility() {
 fn build_is_deterministic_byte_identical() {
     let dir = test_temp_dir("fhir-determinism");
     let entry = write_local_package(&dir);
-    let first = build_package_fhir(&Config::default(), &entry).expect("first build");
+    let first = build_fhir_with_faber_seams(&Config::default(), &entry).expect("first build");
     let first_bytes = fs::read(&first.package_path).expect("read first artifact");
-    let second = build_package_fhir(&Config::default(), &entry).expect("second build");
+    let second = build_fhir_with_faber_seams(&Config::default(), &entry).expect("second build");
     let second_bytes = fs::read(&second.package_path).expect("read second artifact");
     assert_eq!(
         first_bytes, second_bytes,
@@ -639,7 +675,7 @@ fn loaded_package_rust_parity_matches_direct() {
     let config = Config::default();
     let resolver = library_resolver_from_config(&config);
 
-    let mut direct = analyze_package(&config, &entry).expect("direct package analysis");
+    let mut direct = analyze_with_faber_seams(&config, &entry).expect("direct package analysis");
     let generated = generate_package_rust(
         &mut direct,
         &resolver,
@@ -658,7 +694,7 @@ fn loaded_package_rust_parity_matches_direct() {
         &generated.module_tree.render(0),
     );
 
-    let artifact = build_package_fhir(&config, &entry).expect("build FHIR package");
+    let artifact = build_fhir_with_faber_seams(&config, &entry).expect("build FHIR package");
     let loaded = load_package_fhir(&artifact.package_path).expect("load FHIR package");
     let links = loaded_links_by_unit_path(&loaded, &artifact.root);
     let mut adapted =
@@ -697,7 +733,7 @@ fn loaded_package_rust_parity_generics_patterns() {
     let config = Config::default();
     let resolver = library_resolver_from_config(&config);
 
-    let mut direct = analyze_package(&config, &entry).expect("direct analysis");
+    let mut direct = analyze_with_faber_seams(&config, &entry).expect("direct analysis");
     let generated = generate_package_rust(
         &mut direct,
         &resolver,
@@ -716,7 +752,7 @@ fn loaded_package_rust_parity_generics_patterns() {
         &generated.module_tree.render(0),
     );
 
-    let artifact = build_package_fhir(&config, &entry).expect("build FHIR package");
+    let artifact = build_fhir_with_faber_seams(&config, &entry).expect("build FHIR package");
     let loaded = load_package_fhir(&artifact.package_path).expect("load FHIR package");
     let links = loaded_links_by_unit_path(&loaded, &artifact.root);
     let mut adapted =
@@ -754,8 +790,8 @@ fn loaded_package_canonical_faber_parity() {
     let entry = write_local_package(&dir);
     let config = Config::default();
 
-    let direct = analyze_package(&config, &entry).expect("direct analysis");
-    let artifact = build_package_fhir(&config, &entry).expect("build FHIR package");
+    let direct = analyze_with_faber_seams(&config, &entry).expect("direct analysis");
+    let artifact = build_fhir_with_faber_seams(&config, &entry).expect("build FHIR package");
     let loaded = load_package_fhir(&artifact.package_path).expect("load FHIR package");
     assert_eq!(direct.units.len(), loaded.modules.len());
 
@@ -808,10 +844,10 @@ fn loaded_package_fmir_run_parity_matches_direct() {
     let config = Config::default();
 
     let mut direct_host = BufferHost::default();
-    run_package_mir(&config, &entry, &mut direct_host).expect("direct FMIR run");
+    run_mir_with_faber_seams(&config, &entry, &mut direct_host).expect("direct FMIR run");
     let direct_lines = direct_host.stdout_lines.clone();
 
-    let artifact = build_package_fhir(&config, &entry).expect("build FHIR package");
+    let artifact = build_fhir_with_faber_seams(&config, &entry).expect("build FHIR package");
     let loaded = load_package_fhir(&artifact.package_path).expect("load FHIR package");
     let mut loaded_host = BufferHost::default();
     run_loaded_package_fhir(&config, loaded, &artifact.root, &mut loaded_host)
@@ -834,10 +870,10 @@ fn loaded_package_const_data_member_parity() {
     // package-MIR paths must both link the const member, lower it through the
     // merged program, and match the direct-execution oracle.
     let mut direct_host = BufferHost::default();
-    run_package_mir(&config, &entry, &mut direct_host).expect("direct FMIR run");
+    run_mir_with_faber_seams(&config, &entry, &mut direct_host).expect("direct FMIR run");
     let direct_lines = direct_host.stdout_lines.clone();
 
-    let artifact = build_package_fhir(&config, &entry).expect("build FHIR package");
+    let artifact = build_fhir_with_faber_seams(&config, &entry).expect("build FHIR package");
     let loaded = load_package_fhir(&artifact.package_path).expect("load FHIR package");
     let mut loaded_host = BufferHost::default();
     run_loaded_package_fhir(&config, loaded, &artifact.root, &mut loaded_host)
@@ -865,7 +901,7 @@ fn loaded_package_library_const_data_member_runs() {
     // U1 done_when (2): a linked-library const data member links and executes
     // through the direct package-MIR path.
     let mut host = BufferHost::default();
-    run_package_mir(&config, &entry, &mut host).expect("library const FMIR run");
+    run_mir_with_faber_seams(&config, &entry, &mut host).expect("library const FMIR run");
     assert_eq!(
         host.stdout_lines,
         vec!["salve".to_owned()],
@@ -903,7 +939,7 @@ kind = "bin"
     // diagnostic instead of linking or passing silently. The const member is
     // never a callable verb: it lives only in the data-member target table.
     let mut host = BufferHost::default();
-    let result = run_package_mir(&Config::default(), &src.join("main.fab"), &mut host);
+    let result = run_mir_with_faber_seams(&Config::default(), &src.join("main.fab"), &mut host);
     match result {
         Err(diagnostics) => {
             assert!(
@@ -925,14 +961,14 @@ fn loaded_package_library_import_unit_parity() {
     let entry = write_library_package(&dir, true);
     let config = Config::default().with_stdlib(dev_norma_library_home());
 
-    let direct = analyze_package(&config, &entry).expect("direct analysis with norma");
+    let direct = analyze_with_faber_seams(&config, &entry).expect("direct analysis with norma");
     assert!(
         direct.diagnostics.iter().all(|diag| !diag.is_error()),
         "direct analysis diagnostics: {:?}",
         direct.diagnostics
     );
 
-    let artifact = build_package_fhir(&config, &entry).expect("build FHIR package");
+    let artifact = build_fhir_with_faber_seams(&config, &entry).expect("build FHIR package");
     let loaded = load_package_fhir(&artifact.package_path).expect("load FHIR package");
     assert_eq!(loaded.modules.len(), 1);
     assert_eq!(
@@ -973,7 +1009,7 @@ fn loaded_package_undeclared_library_import_fails_before_codegen() {
     // Analysis succeeds (norma resolves via the dev library home) and the
     // envelope builds, but the manifest declares no dependency record for
     // norma — the adapter must reject the load before any codegen.
-    let artifact = build_package_fhir(&config, &entry).expect("build FHIR package");
+    let artifact = build_fhir_with_faber_seams(&config, &entry).expect("build FHIR package");
     let loaded = load_package_fhir(&artifact.package_path).expect("load FHIR package");
     assert!(loaded.dependencies.is_empty());
     assert!(!loaded.modules[0].library_imports.is_empty());

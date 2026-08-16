@@ -131,7 +131,13 @@ fn package_fmir_image_provisions_decomposed_companion_upstream_seed() {
         .with_stdlib(workspace)
         .with_target(radix::codegen::Target::MirFmirBinary);
     let image =
-        build_package_fmir_image(&config, dir.path(), &[]).expect("the BERT-tiny image builds");
+        radix_package::mir::build_package_fmir_image(
+            &config,
+            dir.path(),
+            &[],
+            &super::faber_mir_seams(),
+        )
+        .expect("the BERT-tiny image builds");
     let bytes = std::fs::read(&image.image_path).expect("read the image");
     let loaded = radix_package::mir::load_fmir_image(&bytes, &image.image_path, PACKAGE_MIR_TOOLCHAIN_VERSION)
         .expect("the image loads");

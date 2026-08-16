@@ -4,10 +4,10 @@ use radix::driver::Config;
 use radix::locale::LocalePack;
 use std::path::{Path, PathBuf};
 
-use super::discovery::discover_package;
+use super::discover_package;
 use super::manifest::{manifest_for_spec, FaberManifest};
-use super::paths::normalize_path;
-use super::PackageSpec;
+use radix_package::discovery::PackageSpec;
+use radix_package::paths::normalize_path;
 
 pub(crate) const DEFAULT_CODE_LOCALE: &str = "en";
 

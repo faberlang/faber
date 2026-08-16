@@ -5,21 +5,169 @@
 //! needs them.
 
 use super::{
-    analyze_package, build_browser_product, build_browser_product_static_assets,
-    build_package_fmir_image, build_package_fmir_text_image, build_package_mir_artifact,
-    check_package, compile_package, compile_package_go, config_with_locale, discover_build_layout,
-    discover_package, emit_generated_crate, emit_generated_crate_with_runtime_plan,
-    invoke_cargo_build, library_cache_default,
-    library_resolver_from_config, load_package_with_locale_pack, package_host_selection_diagnostic,
-    package_rust_runtime_plan, read_manifest, run_package_fmir_built_image,
-    run_package_fmir_image, run_package_fmir_text_image, run_package_mir, run_package_mir_artifact,
-    sanitize_crate_name, use_package_compiler, use_package_compiler_from_args, validate_manifest,
-    verify_library_binding_shapes, verify_library_bindings, with_lowered_package_mir, BuildLayout,
-    ManifestProductEmit, ManifestProductKind, ManifestRustHost,
+    build_browser_product, build_browser_product_static_assets, config_with_locale,
+    emit_generated_crate, emit_generated_crate_with_runtime_plan, invoke_cargo_build,
+    library_resolver_from_config, package_host_selection_diagnostic, read_manifest,
+    use_package_compiler_from_args, validate_manifest,
+    verify_library_binding_shapes, verify_library_bindings, with_lowered_package_mir,
+    ManifestProductEmit, ManifestProductKind,
 };
-use super::library::library_cached_file_interface;
-use super::{fmir_image_test_summary, fmir_text_image_test_summary};
+use super::{cmd::use_package_compiler, faber_analysis_seams, faber_emission_seams};
+use radix_package::analyze::AnalyzedPackage;
+use radix_package::discovery::{
+    discover_build_layout, sanitize_crate_name,
+    BuildLayout, PackageSpec,
+};
+use radix_package::emit::{
+    compile_package as compile_package_compiler, compile_package_result,
+    package_rust_runtime_plan as package_rust_runtime_plan_compiler,
+};
+use radix_package::manifest::ManifestRustHost;
+use radix_package::test_source_filter::TestSourceFilter;
+fn analyze_with_faber_seams(config: &Config, input: &Path) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
+    radix_package::analyze::analyze_package(config, input, &faber_analysis_seams())
+}
+
+fn check_with_faber_seams(config: &Config, input: &Path) -> Vec<Diagnostic> {
+    radix_package::analyze::check_package(config, input, &faber_analysis_seams())
+}
+
+fn compile_with_faber_seams(config: &Config, input: &Path) -> radix::CompileResult {
+    compile_package_compiler(config, input, &faber_emission_seams())
+}
+
+#[cfg(feature = "hir-go")]
+fn compile_go_with_faber_seams(
+    config: &Config,
+    input: &Path,
+) -> radix_package::emit::PackageCompileResult {
+    compile_package_result(config, input, &faber_emission_seams())
+}
+
+fn runtime_plan_with_faber_seams(
+    config: &Config,
+    input: &Path,
+) -> Result<super::RustRuntimePlan, Vec<Diagnostic>> {
+    package_rust_runtime_plan_compiler(
+        config,
+        input,
+        &faber_analysis_seams(),
+        super::rust_runtime_plan_for_package,
+    )
+}
+
+fn discover_package(input: &Path) -> Result<PackageSpec, Box<Diagnostic>> {
+    super::discover_package(input)
+}
+
+fn load_with_faber_seams(
+    spec: &PackageSpec,
+    resolver: &crate::library::LibraryResolver,
+    locale_pack: Option<&radix::locale::LocalePack>,
+    include_proba: bool,
+    filter: Option<&TestSourceFilter>,
+) -> Result<Vec<radix_package::PackageFile>, Vec<Diagnostic>> {
+    radix_package::analyze::load_package_with_locale_pack(
+        spec,
+        resolver,
+        locale_pack,
+        include_proba,
+        filter,
+        &faber_analysis_seams(),
+    )
+}
+
+use radix_package::mir::test_support::{fmir_image_test_summary, fmir_text_image_test_summary};
 use crate::library::{LibraryProviderKind, ResolvedLibraryModule};
+
+fn build_fmir_image_for_faber(
+    config: &Config,
+    input: &Path,
+    argumenta: &[String],
+) -> Result<radix_package::mir::PackageFmirImage, Vec<Diagnostic>> {
+    radix_package::mir::build_package_fmir_image(
+        config,
+        input,
+        argumenta,
+        &super::mir::faber_mir_seams(),
+    )
+}
+
+fn build_fmir_text_image_for_faber(
+    config: &Config,
+    input: &Path,
+    argumenta: &[String],
+) -> Result<radix_package::mir::PackageFmirTextImage, Vec<Diagnostic>> {
+    radix_package::mir::build_package_fmir_text_image(
+        config,
+        input,
+        argumenta,
+        &super::mir::faber_mir_seams(),
+    )
+}
+
+fn build_mir_artifact_for_faber(
+    config: &Config,
+    input: &Path,
+    argumenta: &[String],
+) -> Result<radix_package::mir::PackageMirArtifact, Vec<Diagnostic>> {
+    radix_package::mir::build_package_mir_artifact(
+        config,
+        input,
+        argumenta,
+        &super::mir::faber_mir_seams(),
+    )
+}
+
+fn run_fmir_built_image_for_faber<H: Host + ?Sized>(
+    config: &Config,
+    input: &Path,
+    selection: radix_package::mir::DeviceSelection,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_package_fmir_built_image(
+        config,
+        input,
+        selection,
+        &super::mir::faber_mir_seams(),
+        host,
+    )
+}
+
+fn run_fmir_image_for_faber<H: Host + ?Sized>(
+    image: &radix_package::mir::PackageFmirImage,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_package_fmir_image(image, &super::mir::faber_mir_seams(), host)
+}
+
+fn run_fmir_text_image_for_faber<H: Host + ?Sized>(
+    image: &radix_package::mir::PackageFmirTextImage,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_package_fmir_text_image(image, &super::mir::faber_mir_seams(), host)
+}
+
+fn run_mir_for_faber<H: Host + ?Sized>(
+    config: &Config,
+    input: &Path,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_package_mir(config, input, &super::mir::faber_mir_seams(), host)
+}
+
+fn run_mir_artifact_for_faber<H: Host + ?Sized>(
+    config: &Config,
+    artifact: &radix_package::mir::PackageMirArtifact,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_package_mir_artifact(
+        config,
+        artifact,
+        &super::mir::faber_mir_seams(),
+        host,
+    )
+}
 use radix::codegen::Target;
 use radix::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase};
 use radix::driver::Config;
@@ -309,7 +457,7 @@ fn compile_emit_build_run(entry: &Path) -> String {
 }
 
 fn compile_package_rust_code(entry: &Path) -> String {
-    let result = compile_package(&Config::default(), entry);
+    let result = compile_with_faber_seams(&Config::default(), entry);
     assert!(
         result.success(),
         "expected package compile success, got {:?}",
@@ -331,7 +479,7 @@ fn compile_package_reports_unresolved_external_imports() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "import from \"lodash\" map\nmain { print \"x\" }").expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(result.output.is_none());
     assert!(result
         .diagnostics
@@ -344,7 +492,7 @@ fn compile_package_accepts_empty_source_as_noop() {
     let dir = test_temp_dir("empty-source");
     let entry = dir.join("main.fab");
     fs::write(&entry, "").expect("write empty entry");
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "empty source should compile as a no-op program, got {:?}",
@@ -387,7 +535,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:json package compile success, got {:?}",
@@ -432,7 +580,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:json package compile success, got {:?}",
@@ -473,7 +621,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(result.output.is_none());
     assert!(
         result
@@ -611,7 +759,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default().with_stdlib(library_home), &entry);
+    let result = compile_with_faber_seams(&Config::default().with_stdlib(library_home), &entry);
     assert!(
         result.success(),
         "expected locked norma platform default compile success, got {:?}",
@@ -654,7 +802,7 @@ fn label() → string {
     )
     .expect("write module");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected multifile package compile success, got {:?}",
@@ -682,40 +830,6 @@ fn label() → string {
         String::from_utf8_lossy(&rustfmt.stdout),
         String::from_utf8_lossy(&rustfmt.stderr)
     );
-}
-
-#[test]
-fn package_file_interface_cache_reuses_deterministic_norma_interfaces() {
-    let resolver = library_resolver_from_config(&Config::default());
-    let mut library_cache = library_cache_default();
-
-    for (specifier, binding) in [("norma:solum/path", "path"), ("norma:json/solve", "solve")] {
-        let module = resolver
-            .resolve(specifier)
-            .expect("resolve library")
-            .expect("builtin module");
-        let import = super::LibraryImportBinding {
-            binding: binding.to_owned(),
-            visibility: radix::syntax::Visibility::Privata,
-            import_span: radix::lexer::Span::default(),
-            module,
-        };
-
-        let first = library_cached_file_interface(&import, &resolver, &mut library_cache)
-            .expect("first interface");
-        let second = library_cached_file_interface(&import, &resolver, &mut library_cache)
-            .expect("cached interface");
-        assert_eq!(
-            first, second,
-            "{specifier} interface changed across cache hits"
-        );
-        if specifier == "norma:solum/path" {
-            assert!(matches!(
-                first.exports.get("nomen").map(|export| &export.kind),
-                Some(FileExportKind::Function(_))
-            ));
-        }
-    }
 }
 
 #[test]
@@ -749,7 +863,7 @@ fn label() → int {
     .expect("write module");
 
     let mut host = BufferHost::default();
-    let result = run_package_mir(&Config::default(), &entry, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -780,7 +894,7 @@ main args args {
     .expect("write entry");
 
     let mut host = BufferHost::default();
-    let result = run_package_mir(&Config::default(), &entry, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -809,14 +923,14 @@ main {
     )
     .expect("write entry");
 
-    let artifact = build_package_mir_artifact(&Config::default(), &entry, &[])
+    let artifact = build_mir_artifact_for_faber(&Config::default(), &entry, &[])
         .expect("build package MIR artifact");
     assert!(artifact.root.ends_with("target/faber-mir"));
     assert!(artifact.manifest_path.exists());
     assert!(!dir.join("target/faber/Cargo.toml").exists());
 
     let mut host = BufferHost::default();
-    let result = run_package_mir_artifact(&Config::default(), &artifact, &mut host);
+    let result = run_mir_artifact_for_faber(&Config::default(), &artifact, &mut host);
 
     assert!(
         result.is_ok(),
@@ -851,7 +965,7 @@ main args args {
     )
     .expect("write entry");
 
-    let artifact = build_package_mir_artifact(
+    let artifact = build_mir_artifact_for_faber(
         &Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         &[dir.to_string_lossy().into_owned()],
@@ -899,10 +1013,10 @@ fn text() → string {
     )
     .expect("write module");
 
-    let first = build_package_mir_artifact(&Config::default(), &entry, &[])
+    let first = build_mir_artifact_for_faber(&Config::default(), &entry, &[])
         .expect("first package MIR artifact build");
     let first_manifest = fs::read_to_string(&first.manifest_path).expect("read first manifest");
-    let second = build_package_mir_artifact(&Config::default(), &entry, &[])
+    let second = build_mir_artifact_for_faber(&Config::default(), &entry, &[])
         .expect("second package MIR artifact build");
     let second_manifest = fs::read_to_string(&second.manifest_path).expect("read second manifest");
 
@@ -1055,7 +1169,7 @@ fn artifact_harness_run_test(
 ) {
     let case = setup(_case_name);
     let config = Config::default().with_stdlib(dev_norma_library_home());
-    let artifact = build_package_mir_artifact(&config, &case.input, &case.argumenta)
+    let artifact = build_mir_artifact_for_faber(&config, &case.input, &case.argumenta)
         .unwrap_or_else(|diagnostics| {
             panic!(
                 "{} build-or-link failed: {:?}",
@@ -1073,7 +1187,7 @@ fn artifact_harness_run_test(
         artifact.manifest_path.display()
     );
     let mut host = BufferHost::with_argumenta(case.argumenta.clone());
-    run_package_mir_artifact(&config, &artifact, &mut host).unwrap_or_else(|diagnostics| {
+    run_mir_artifact_for_faber(&config, &artifact, &mut host).unwrap_or_else(|diagnostics| {
         panic!(
             "{} run failed: {:?}",
             case.name,
@@ -1112,12 +1226,12 @@ main {
     )
     .expect("write entry");
 
-    let artifact = build_package_mir_artifact(&Config::default(), &entry, &[])
+    let artifact = build_mir_artifact_for_faber(&Config::default(), &entry, &[])
         .expect("build package MIR artifact");
     fs::write(&artifact.manifest_path, "version = 999\n").expect("corrupt manifest");
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_mir_artifact(&Config::default(), &artifact, &mut host)
+    let diagnostics = run_mir_artifact_for_faber(&Config::default(), &artifact, &mut host)
         .expect_err("malformed package MIR artifact should fail closed");
 
     assert!(diagnostics
@@ -1146,7 +1260,7 @@ main {
 
     let config = Config::default().with_target(Target::MirScena);
     let artifact =
-        build_package_mir_artifact(&config, &entry, &[]).expect("build scena package artifact");
+        build_mir_artifact_for_faber(&config, &entry, &[]).expect("build scena package artifact");
 
     assert_eq!(
         artifact.manifest_path,
@@ -1171,7 +1285,7 @@ main {
     .expect("write entry");
 
     let image =
-        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
             .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read fmir text");
 
@@ -1193,7 +1307,7 @@ main {
     fs::remove_file(&entry).expect("remove source after image build");
 
     let mut host = BufferHost::default();
-    run_package_fmir_text_image(&image, &mut host).expect("run fmir-text image without source");
+    run_fmir_text_image_for_faber(&image, &mut host).expect("run fmir-text image without source");
 
     assert_eq!(host.stdout_lines, vec!["Salve, Munde!".to_owned()]);
     assert!(!dir.join("target/faber/Cargo.toml").exists());
@@ -1227,10 +1341,10 @@ fn text() → string {
     .expect("write module");
 
     let config = Config::default().with_target(Target::MirFmir);
-    let first = build_package_fmir_text_image(&config, &entry, &[]).expect("first fmir-text build");
+    let first = build_fmir_text_image_for_faber(&config, &entry, &[]).expect("first fmir-text build");
     let first_image = fs::read_to_string(&first.image_path).expect("read first image");
     let second =
-        build_package_fmir_text_image(&config, &entry, &[]).expect("second fmir-text build");
+        build_fmir_text_image_for_faber(&config, &entry, &[]).expect("second fmir-text build");
     let second_image = fs::read_to_string(&second.image_path).expect("read second image");
 
     assert_eq!(first.image_path, second.image_path);
@@ -1248,7 +1362,7 @@ fn text() → string {
     fs::write(&entry, "main { print \"changed\" }").expect("mutate entry");
 
     let mut host = BufferHost::default();
-    run_package_fmir_text_image(&first, &mut host).expect("run fmir-text image after mutation");
+    run_fmir_text_image_for_faber(&first, &mut host).expect("run fmir-text image after mutation");
 
     assert_eq!(host.stdout_lines, vec!["multi".to_owned()]);
 }
@@ -1281,7 +1395,7 @@ fn text() → string {
     .expect("write module");
 
     let image =
-        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
             .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
 
@@ -1303,7 +1417,7 @@ fn package_mir_artifacts_preserve_quoted_source_paths() {
     fs::write(&entry, "main { print \"quoted\" }").expect("write quoted entry");
 
     let config = Config::default().with_target(Target::MirFmir);
-    let artifact = build_package_mir_artifact(&config, &entry, &[]).expect("build manifest");
+    let artifact = build_mir_artifact_for_faber(&config, &entry, &[]).expect("build manifest");
     let manifest_text = fs::read_to_string(&artifact.manifest_path).expect("read manifest");
     let manifest: toml::Value = toml::from_str(&manifest_text).expect("parse manifest");
     assert_eq!(
@@ -1314,7 +1428,7 @@ fn package_mir_artifacts_preserve_quoted_source_paths() {
         "main\"quoted.fab"
     );
 
-    let image = build_package_fmir_text_image(&config, &entry, &[]).expect("build fmir-text");
+    let image = build_fmir_text_image_for_faber(&config, &entry, &[]).expect("build fmir-text");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     let image: toml::Value = toml::from_str(&image_text).expect("parse image");
     let source_file = image
@@ -1335,7 +1449,7 @@ fn package_fmir_text_image_rejects_bad_version_without_source_fallback() {
     fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
     let image =
-        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
             .expect("build fmir-text image");
     let mut image_text = fs::read_to_string(&image.image_path).expect("read image");
     image_text = rewrite_text_image_version(&image_text, 999);
@@ -1344,7 +1458,7 @@ fn package_fmir_text_image_rejects_bad_version_without_source_fallback() {
 
     let mut host = BufferHost::default();
     let diagnostics =
-        run_package_fmir_text_image(&image, &mut host).expect_err("bad version should fail closed");
+        run_fmir_text_image_for_faber(&image, &mut host).expect_err("bad version should fail closed");
 
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_text_image_version_unsupported")
@@ -1361,7 +1475,7 @@ fn package_fmir_text_image_rejects_unknown_records_without_source_fallback() {
     fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
     let image =
-        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
             .expect("build fmir-text image");
     let mut image_text = fs::read_to_string(&image.image_path).expect("read image");
     image_text.push_str("\nunsupported = true\n");
@@ -1369,7 +1483,7 @@ fn package_fmir_text_image_rejects_unknown_records_without_source_fallback() {
     fs::remove_file(&entry).expect("remove source after corrupting image");
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_fmir_text_image(&image, &mut host)
+    let diagnostics = run_fmir_text_image_for_faber(&image, &mut host)
         .expect_err("unknown fmir-text records should fail closed");
 
     assert!(diagnostics
@@ -1385,7 +1499,7 @@ fn package_fmir_text_image_rejects_unknown_runtime_requirement_without_source_fa
     fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
     let image =
-        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
             .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     let image_text = image_text.replacen(
@@ -1401,7 +1515,7 @@ fn package_fmir_text_image_rejects_unknown_runtime_requirement_without_source_fa
     fs::remove_file(&entry).expect("remove source after corrupting image");
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_fmir_text_image(&image, &mut host)
+    let diagnostics = run_fmir_text_image_for_faber(&image, &mut host)
         .expect_err("unknown fmir-text runtime requirement should fail closed");
 
     assert!(diagnostics.iter().any(|diag| {
@@ -1428,7 +1542,7 @@ main args args {
     )
     .expect("write entry");
 
-    let image = build_package_fmir_text_image(
+    let image = build_fmir_text_image_for_faber(
         &Config::default().with_target(Target::MirFmir),
         &entry,
         &["Ian".to_owned()],
@@ -1441,7 +1555,7 @@ main args args {
     fs::remove_file(&entry).expect("remove source after image build");
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_fmir_text_image(&image, &mut host)
+    let diagnostics = run_fmir_text_image_for_faber(&image, &mut host)
         .expect_err("bad type metadata should fail closed");
 
     assert!(diagnostics.iter().any(|diag| {
@@ -1468,7 +1582,7 @@ main args args {
     .expect("write entry");
 
     let image =
-        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
             .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     assert!(
@@ -1478,7 +1592,7 @@ main args args {
     fs::remove_file(&entry).expect("remove source after image build");
 
     let mut host = BufferHost::with_argumenta(vec!["runtime-value".to_owned()]);
-    run_package_fmir_text_image(&image, &mut host).expect("run CLI fmir-text image");
+    run_fmir_text_image_for_faber(&image, &mut host).expect("run CLI fmir-text image");
 
     assert_eq!(host.stdout_lines, vec!["runtime-value".to_owned()]);
 }
@@ -1501,7 +1615,7 @@ main args args {
     .expect("write entry");
 
     let image =
-        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
             .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     assert!(
@@ -1511,7 +1625,7 @@ main args args {
     fs::remove_file(&entry).expect("remove source after image build");
 
     let mut host = BufferHost::with_argumenta(vec!["alpha".to_owned(), "beta".to_owned()]);
-    run_package_fmir_text_image(&image, &mut host).expect("run rest CLI fmir-text image");
+    run_fmir_text_image_for_faber(&image, &mut host).expect("run rest CLI fmir-text image");
 
     assert_eq!(host.stdout_lines, vec!["2".to_owned()]);
 }
@@ -1532,7 +1646,7 @@ main args args {
     )
     .expect("write entry");
 
-    let image = build_package_fmir_image(
+    let image = build_fmir_image_for_faber(
         &Config::default().with_target(Target::MirFmirBinary),
         &entry,
         &[],
@@ -1547,7 +1661,7 @@ main args args {
     fs::remove_file(&entry).expect("remove source after image build");
 
     let mut host = BufferHost::with_argumenta(vec!["runtime-value".to_owned()]);
-    run_package_fmir_image(&image, &mut host).expect("run CLI fmir image");
+    run_fmir_image_for_faber(&image, &mut host).expect("run CLI fmir image");
 
     assert_eq!(host.stdout_lines, vec!["runtime-value".to_owned()]);
 }
@@ -1569,7 +1683,7 @@ main args args {
     )
     .expect("write entry");
 
-    let image = build_package_fmir_image(
+    let image = build_fmir_image_for_faber(
         &Config::default().with_target(Target::MirFmirBinary),
         &entry,
         &[],
@@ -1583,7 +1697,7 @@ main args args {
     fs::remove_file(&entry).expect("remove source after image build");
 
     let mut host = BufferHost::with_argumenta(vec!["alpha".to_owned(), "beta".to_owned()]);
-    run_package_fmir_image(&image, &mut host).expect("run rest CLI fmir image");
+    run_fmir_image_for_faber(&image, &mut host).expect("run rest CLI fmir image");
 
     assert_eq!(host.stdout_lines, vec!["2".to_owned()]);
 }
@@ -1610,7 +1724,7 @@ main args args {
         "beta".to_owned(),
         "gamma".to_owned(),
     ]);
-    run_package_fmir_built_image(
+    run_fmir_built_image_for_faber(
         &Config::default().with_target(Target::MirFmirBinary),
         &entry,
         super::DeviceSelection::Auto,
@@ -1637,7 +1751,7 @@ main args args exit 7 {
     .expect("write entry");
 
     let image =
-        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
             .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     assert!(
@@ -1648,7 +1762,7 @@ main args args exit 7 {
 
     let mut host = ExitRecordingHost::default();
     let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        run_package_fmir_text_image(&image, &mut host).expect("run fmir-text image");
+        run_fmir_text_image_for_faber(&image, &mut host).expect("run fmir-text image");
     }))
     .expect_err("fixed CLI exit should call host.exit");
 
@@ -1674,7 +1788,7 @@ main args args exit 7 {
     )
     .expect("write entry");
 
-    let image = build_package_fmir_image(
+    let image = build_fmir_image_for_faber(
         &Config::default().with_target(Target::MirFmirBinary),
         &entry,
         &[],
@@ -1687,7 +1801,7 @@ main args args exit 7 {
 
     let mut host = ExitRecordingHost::default();
     let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        run_package_fmir_image(&image, &mut host).expect("run fmir image");
+        run_fmir_image_for_faber(&image, &mut host).expect("run fmir image");
     }))
     .expect_err("fixed CLI exit should call host.exit");
 
@@ -1729,8 +1843,8 @@ fn text(string name) → string {
 
     let config = Config::default().with_target(Target::MirFmir);
     let text_image =
-        build_package_fmir_text_image(&config, &entry, &[]).expect("build fmir-text image");
-    let binary_image = build_package_fmir_image(
+        build_fmir_text_image_for_faber(&config, &entry, &[]).expect("build fmir-text image");
+    let binary_image = build_fmir_image_for_faber(
         &Config::default().with_target(Target::MirFmirBinary),
         &entry,
         &[],
@@ -1754,7 +1868,7 @@ fn package_fmir_image_rejects_bad_version_without_source_fallback() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
-    let image = build_package_fmir_image(
+    let image = build_fmir_image_for_faber(
         &Config::default().with_target(Target::MirFmirBinary),
         &entry,
         &[],
@@ -1767,7 +1881,7 @@ fn package_fmir_image_rejects_bad_version_without_source_fallback() {
 
     let mut host = BufferHost::default();
     let diagnostics =
-        run_package_fmir_image(&image, &mut host).expect_err("bad fmir version should fail closed");
+        run_fmir_image_for_faber(&image, &mut host).expect_err("bad fmir version should fail closed");
 
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_image_version_unsupported")
@@ -1800,7 +1914,7 @@ main args args {
     .expect("write entry");
 
     let mut host = BufferHost::with_argumenta(vec!["Ian".to_owned()]);
-    let result = run_package_mir(&Config::default(), &entry, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -1845,7 +1959,7 @@ main args args {
     .expect("write entry");
 
     let mut host = BufferHost::with_argumenta(vec!["Ian".to_owned()]);
-    let result = run_package_mir(&Config::default(), &dir, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &dir, &mut host);
 
     assert!(
         result.is_ok(),
@@ -1963,7 +2077,7 @@ main args args {
     let fixture_root = dir.join("workspace");
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
-    let result = run_package_mir(
+    let result = run_mir_for_faber(
         &Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         &mut host,
@@ -2014,7 +2128,7 @@ main args args {
     let fixture_root = dir.join("workspace");
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
-    let result = run_package_mir(
+    let result = run_mir_for_faber(
         &Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         &mut host,
@@ -2069,7 +2183,7 @@ main args args {
     let fixture_root = dir.join("workspace");
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
-    let result = run_package_mir(
+    let result = run_mir_for_faber(
         &Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         &mut host,
@@ -2118,7 +2232,7 @@ main args args {
     let fixture_root = dir.join("workspace");
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
-    let result = run_package_mir(
+    let result = run_mir_for_faber(
         &Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         &mut host,
@@ -2170,7 +2284,7 @@ main args args {
     let fixture_root = dir.join("workspace");
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
-    let result = run_package_mir(
+    let result = run_mir_for_faber(
         &Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         &mut host,
@@ -2224,7 +2338,7 @@ main args args {
     let source = fixture_root.join("nested").join("source.bin");
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
-    let result = run_package_mir(
+    let result = run_mir_for_faber(
         &Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         &mut host,
@@ -2276,7 +2390,7 @@ main args args {
     let fixture_root = dir.join("workspace");
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
-    let result = run_package_mir(
+    let result = run_mir_for_faber(
         &Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         &mut host,
@@ -2313,7 +2427,7 @@ main args args {
     .expect("write entry");
 
     let mut host = BufferHost::with_argumenta(vec![r"line\nraw".to_owned()]);
-    let result = run_package_mir(&Config::default(), &entry, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -2346,7 +2460,7 @@ main args args {
 
     for value in ["7", "-7"] {
         let mut host = BufferHost::with_argumenta(vec![value.to_owned()]);
-        let result = run_package_mir(&Config::default(), &entry, &mut host);
+        let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
         assert!(
             result.is_ok(),
@@ -2379,7 +2493,7 @@ main args args {
     .expect("write entry");
 
     let mut host = BufferHost::with_argumenta(vec!["not-a-number".to_owned()]);
-    let diagnostics = run_package_mir(&Config::default(), &entry, &mut host)
+    let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("non-numeric CLI operand should fail");
 
     assert!(host.stdout_lines.is_empty());
@@ -2419,7 +2533,7 @@ main args args {
         "alpha".to_owned(),
         "beta".to_owned(),
     ]);
-    let result = run_package_mir(&Config::default(), &entry, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -2452,7 +2566,7 @@ main args args {
     .expect("write entry");
 
     let mut host = BufferHost::with_argumenta(vec!["3".to_owned(), "5".to_owned(), "8".to_owned()]);
-    let result = run_package_mir(&Config::default(), &entry, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -2485,7 +2599,7 @@ main args args {
     .expect("write entry");
 
     let mut host = BufferHost::with_argumenta(vec!["Az".to_owned()]);
-    let result = run_package_mir(&Config::default(), &entry, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -2523,7 +2637,7 @@ main args args {
         (Vec::new(), "falsum"),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
-        let result = run_package_mir(&Config::default(), &entry, &mut host);
+        let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
         assert!(
             result.is_ok(),
@@ -2562,7 +2676,7 @@ main args args {
         (vec!["-n".to_owned(), "Nia".to_owned()], "Nia"),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
-        let result = run_package_mir(&Config::default(), &entry, &mut host);
+        let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
         assert!(
             result.is_ok(),
@@ -2599,7 +2713,7 @@ main args args {
         (vec!["--name=Ian".to_owned()], "Ian"),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
-        let result = run_package_mir(&Config::default(), &entry, &mut host);
+        let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
         assert!(
             result.is_ok(),
@@ -2637,7 +2751,7 @@ main args args {
         (vec!["--count".to_owned(), "-7".to_owned()], "-7"),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
-        let result = run_package_mir(&Config::default(), &entry, &mut host);
+        let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
         assert!(
             result.is_ok(),
@@ -2674,7 +2788,7 @@ main args args {
         (vec!["--verbose".to_owned()], "verum"),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
-        let result = run_package_mir(&Config::default(), &entry, &mut host);
+        let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
         assert!(
             result.is_ok(),
@@ -2708,7 +2822,7 @@ main args args {
 
     for (argumenta, expected) in [(Vec::new(), "9"), (vec!["7".to_owned()], "7")] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
-        let result = run_package_mir(&Config::default(), &entry, &mut host);
+        let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
         assert!(
             result.is_ok(),
@@ -2740,7 +2854,7 @@ main args args {
     .expect("write entry");
 
     let mut host = BufferHost::with_argumenta(vec!["unexpected".to_owned()]);
-    let diagnostics = run_package_mir(&Config::default(), &entry, &mut host)
+    let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("extra CLI arguments should not be ignored");
 
     assert!(host.stdout_lines.is_empty());
@@ -2774,7 +2888,7 @@ main args args {
     .expect("write entry");
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_mir(&Config::default(), &entry, &mut host)
+    let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("missing required CLI operand should fail");
 
     assert!(host.stdout_lines.is_empty());
@@ -2807,7 +2921,7 @@ main args args exit 7 {
 
     let mut host = ExitRecordingHost::default();
     let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let _ = run_package_mir(&Config::default(), &entry, &mut host);
+        let _ = run_mir_for_faber(&Config::default(), &entry, &mut host);
     }))
     .expect_err("fixed CLI exit should call host.exit");
 
@@ -2836,7 +2950,7 @@ main args args exit args.code {
 
     let mut host = ExitRecordingHost::with_argumenta(vec!["7".to_owned()]);
     let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let _ = run_package_mir(&Config::default(), &entry, &mut host);
+        let _ = run_mir_for_faber(&Config::default(), &entry, &mut host);
     }))
     .expect_err("dynamic CLI exit should call host.exit");
 
@@ -2864,7 +2978,7 @@ main args args {
     .expect("write entry");
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_mir(&Config::default(), &entry, &mut host)
+    let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("type-incompatible CLI option defaults should remain unsupported");
 
     assert!(host.stdout_lines.is_empty());
@@ -2911,7 +3025,7 @@ fn run() args args {
     .expect("write jobs");
 
     let mut host = BufferHost::with_argumenta(vec!["jobs".to_owned(), "run".to_owned()]);
-    let result = run_package_mir(&Config::default(), &dir, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &dir, &mut host);
 
     assert!(
         result.is_ok(),
@@ -2954,7 +3068,7 @@ fn run() args args {
 
     let mut host =
         BufferHost::with_argumenta(vec!["jobs".to_owned(), "run".to_owned(), "Ian".to_owned()]);
-    let result = run_package_mir(&Config::default(), &dir, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &dir, &mut host);
 
     assert!(
         result.is_ok(),
@@ -2997,7 +3111,7 @@ fn run() args args {
 
     let mut host =
         BufferHost::with_argumenta(vec!["jobs".to_owned(), "run".to_owned(), "7".to_owned()]);
-    let result = run_package_mir(&Config::default(), &dir, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &dir, &mut host);
 
     assert!(
         result.is_ok(),
@@ -3046,7 +3160,7 @@ fn sum() args args {
         "5".to_owned(),
         "8".to_owned(),
     ]);
-    let result = run_package_mir(&Config::default(), &dir, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &dir, &mut host);
 
     assert!(
         result.is_ok(),
@@ -3095,7 +3209,7 @@ fn run() args args {
         ),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
-        let result = run_package_mir(&Config::default(), &dir, &mut host);
+        let result = run_mir_for_faber(&Config::default(), &dir, &mut host);
 
         assert!(
             result.is_ok(),
@@ -3149,7 +3263,7 @@ fn run() args args {
         ),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
-        let result = run_package_mir(&Config::default(), &dir, &mut host);
+        let result = run_mir_for_faber(&Config::default(), &dir, &mut host);
 
         assert!(
             result.is_ok(),
@@ -3208,7 +3322,7 @@ fn run() args args {
         ),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
-        let result = run_package_mir(&Config::default(), &dir, &mut host);
+        let result = run_mir_for_faber(&Config::default(), &dir, &mut host);
 
         assert!(
             result.is_ok(),
@@ -3258,7 +3372,7 @@ fn run() args args {
         ),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
-        let result = run_package_mir(&Config::default(), &dir, &mut host);
+        let result = run_mir_for_faber(&Config::default(), &dir, &mut host);
 
         assert!(
             result.is_ok(),
@@ -3308,7 +3422,7 @@ fn run() args args {
         ),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
-        let result = run_package_mir(&Config::default(), &dir, &mut host);
+        let result = run_mir_for_faber(&Config::default(), &dir, &mut host);
 
         assert!(
             result.is_ok(),
@@ -3358,7 +3472,7 @@ fn run() args args {
         ),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
-        let result = run_package_mir(&Config::default(), &dir, &mut host);
+        let result = run_mir_for_faber(&Config::default(), &dir, &mut host);
 
         assert!(
             result.is_ok(),
@@ -3408,7 +3522,7 @@ fn run() args args {
         ),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
-        let result = run_package_mir(&Config::default(), &dir, &mut host);
+        let result = run_mir_for_faber(&Config::default(), &dir, &mut host);
 
         assert!(
             result.is_ok(),
@@ -3457,7 +3571,7 @@ fn run() args args {
         "acme".to_owned(),
         "Ian".to_owned(),
     ]);
-    let result = run_package_mir(&Config::default(), &dir, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &dir, &mut host);
 
     assert!(
         result.is_ok(),
@@ -3504,7 +3618,7 @@ fn run() args args {
         "start".to_owned(),
         "Ian".to_owned(),
     ]);
-    let result = run_package_mir(&Config::default(), &dir, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &dir, &mut host);
 
     assert!(
         result.is_ok(),
@@ -3546,7 +3660,7 @@ fn label() → string {
     .expect("write module");
 
     let mut host = BufferHost::default();
-    let result = run_package_mir(&Config::default(), &entry, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -3589,7 +3703,7 @@ fn identity(string word) → string {
     .expect("write shared helper");
 
     let mut host = BufferHost::with_argumenta(vec!["salve".to_owned()]);
-    let result = run_package_mir(&Config::default(), &fixture.package, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &fixture.package, &mut host);
 
     assert!(
         result.is_ok(),
@@ -3639,7 +3753,7 @@ fn inter_spatia(list<string> verba) → string {
     .expect("write shared formatter");
 
     let mut host = BufferHost::with_argumenta(vec!["salve".to_owned(), "munde".to_owned()]);
-    let result = run_package_mir(&Config::default(), &fixture.package, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &fixture.package, &mut host);
 
     assert!(
         result.is_ok(),
@@ -3694,7 +3808,7 @@ fn identity(string word) → string {
     .expect("write shared format");
 
     let mut host = BufferHost::with_argumenta(vec!["salve".to_owned()]);
-    let result = run_package_mir(&Config::default(), &fixture.package, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &fixture.package, &mut host);
 
     assert!(
         result.is_ok(),
@@ -3747,7 +3861,7 @@ fn value() → int {
     .expect("write shared b");
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_mir(&Config::default(), &fixture.package, &mut host)
+    let diagnostics = run_mir_for_faber(&Config::default(), &fixture.package, &mut host)
         .expect_err("shared import cycle should fail package analysis");
 
     assert!(host.stdout_lines.is_empty());
@@ -3793,7 +3907,7 @@ fn identity(string word) → string {
     .expect("write shared format");
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_mir(&Config::default(), &fixture.package, &mut host)
+    let diagnostics = run_mir_for_faber(&Config::default(), &fixture.package, &mut host)
         .expect_err("private shared export should fail package analysis");
 
     assert!(host.stdout_lines.is_empty());
@@ -3849,7 +3963,7 @@ fn adde(int left, int right) → int {
     .expect("write util");
 
     let mut host = BufferHost::default();
-    let result = run_package_mir(&Config::default(), &entry, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -3905,7 +4019,7 @@ fn label() → int {
     .expect("write b util");
 
     let mut host = BufferHost::default();
-    let result = run_package_mir(&Config::default(), &entry, &mut host);
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -3951,7 +4065,7 @@ fn publicum() → int {
     .expect("write auxilium");
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_mir(&Config::default(), &entry, &mut host)
+    let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("private namespace access should fail package analysis");
 
     assert!(host.stdout_lines.is_empty());
@@ -3994,7 +4108,7 @@ fn dupla(int n) → int {
     .expect("write auxilium");
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_mir(&Config::default(), &entry, &mut host)
+    let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("nested namespace calls should be explicitly unsupported");
 
     assert!(host.stdout_lines.is_empty());
@@ -4031,7 +4145,7 @@ main {
     .expect("write entry");
 
     let mut host = BufferHost::default();
-    let result = run_package_mir(
+    let result = run_mir_for_faber(
         &Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         &mut host,
@@ -4069,7 +4183,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected package compile success, got {:?}",
@@ -4124,7 +4238,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected package compile success, got {:?}",
@@ -4181,7 +4295,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "rust_field_name_collision")
@@ -4236,7 +4350,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected package compile success, got {:?}",
@@ -4274,7 +4388,7 @@ rust_field_names = "camel"
     let entry = src.join("main.fab");
     fs::write(&entry, "main { print \"x\" }").expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(result.output.is_none());
     assert!(result
         .diagnostics
@@ -4426,7 +4540,7 @@ fn summa(tf32[2] x) → f32 {
     )
     .expect("write entry");
     let entry = dir.join("src").join("main.fab");
-    let result = build_package_fmir_image(
+    let result = build_fmir_image_for_faber(
         &Config::default()
             .with_stdlib(dev_norma_library_home())
             .with_target(Target::MirFmirBinary),
@@ -4456,7 +4570,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:chorda package compile success, got {:?}",
@@ -4498,7 +4612,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:caelum/terminus package compile success, got {:?}",
@@ -4551,7 +4665,7 @@ class Thing {
     )
     .expect("write type module");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected local type-only package compile success, got {:?}",
@@ -4604,7 +4718,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&config_with_library_home(library_home.path()), &entry);
+    let result = compile_with_faber_seams(&config_with_library_home(library_home.path()), &entry);
     assert!(
         result.success(),
         "expected aliased file-stem type package compile success, got {:?}",
@@ -4646,7 +4760,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:chorda diducta package compile success, got {:?}",
@@ -4684,7 +4798,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected retenta filter compile success, got {:?}",
@@ -4731,7 +4845,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:tensor package compile success, got {:?}",
@@ -4769,7 +4883,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:chorda mixed package compile success, got {:?}",
@@ -4806,7 +4920,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:toml package compile success, got {:?}",
@@ -4848,7 +4962,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:toml native navigation compile success, got {:?}",
@@ -4891,7 +5005,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:toml exige_claves compile success, got {:?}",
@@ -4925,7 +5039,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:solum explora contract compile success, got {:?}",
@@ -4961,7 +5075,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:consolum package compile success, got {:?}",
@@ -5005,7 +5119,7 @@ async_main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:solum package compile success, got {:?}",
@@ -5050,7 +5164,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:processus package compile success, got {:?}",
@@ -5096,7 +5210,7 @@ async_main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:tempus package compile success, got {:?}",
@@ -5143,7 +5257,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:aleator package compile success, got {:?}",
@@ -5187,7 +5301,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected norma:yaml package compile success, got {:?}",
@@ -5234,7 +5348,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
 
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
@@ -5267,7 +5381,7 @@ main {{
         )
         .expect("write entry");
 
-        let result = compile_package(&Config::default(), &entry);
+        let result = compile_with_faber_seams(&Config::default(), &entry);
 
         assert!(result.output.is_none());
         assert!(
@@ -5320,7 +5434,7 @@ async_main {
     .expect("entry");
 
     let layout = discover_build_layout(&dir).expect("layout");
-    let compile_result = compile_package(&Config::default(), &dir);
+    let compile_result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(
         compile_result.success(),
         "expected HTTP package compile success, got {:?}",
@@ -5424,7 +5538,7 @@ main {
     )
     .expect("write entry");
 
-    let diagnostics = check_package(&Config::default(), &dir.join("faber.toml"));
+    let diagnostics = check_with_faber_seams(&Config::default(), &dir.join("faber.toml"));
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "namespace_missing_export")
             && diagnostic_has_arg(diag, "member", "nonexistent")
@@ -5464,7 +5578,7 @@ main {
     )
     .expect("write entry");
 
-    let diagnostics = check_package(&Config::default(), &dir.join("faber.toml"));
+    let diagnostics = check_with_faber_seams(&Config::default(), &dir.join("faber.toml"));
     assert!(
         !diagnostics.iter().any(|diag| diag.is_error()),
         "expected wildcard library import to resolve in check, got {:?}",
@@ -5488,7 +5602,7 @@ main {}
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(result.output.is_none());
     assert!(result
         .diagnostics
@@ -5509,7 +5623,7 @@ main {}
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(result.output.is_none());
     let unknown_module = result
         .diagnostics
@@ -5544,7 +5658,7 @@ main {}
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "old_builtin_norma_specifier")
@@ -5575,7 +5689,7 @@ fn salve() → string {
     )
     .expect("write local module");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected relative local import success, got {:?}",
@@ -5600,7 +5714,7 @@ main {}
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| diagnostic_has_issue(
         diag,
@@ -5643,7 +5757,7 @@ main {
     )
     .expect("write entry");
 
-    let package = analyze_package(&Config::default(), &entry).expect("analyze package");
+    let package = analyze_with_faber_seams(&Config::default(), &entry).expect("analyze package");
     let analysis = &package.entry_unit().expect("entry unit").analysis;
 
     let yaml_item = library_item_by_export(analysis, &["yaml"], "pange", LibraryItemKind::Function);
@@ -5657,7 +5771,7 @@ main {
     assert_eq!(yaml_item.exported_name, "pange");
     assert_eq!(json_item.exported_name, "pange");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected json+yaml package compile success, got {:?}",
@@ -5707,7 +5821,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected typed Norma package compile success, got {:?}",
@@ -5747,7 +5861,7 @@ async_main {
     )
     .expect("write entry");
 
-    let package = analyze_package(&Config::default(), &entry).expect("analyze package");
+    let package = analyze_with_faber_seams(&Config::default(), &entry).expect("analyze package");
     let analysis = &package.entry_unit().expect("entry unit").analysis;
 
     let binding = library_binding_by_module(analysis, &["http"]);
@@ -5803,7 +5917,7 @@ async_main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected aliased HTTP package compile success, got {:?}",
@@ -5853,7 +5967,7 @@ fn compile_package_resolves_relative_input_from_current_working_directory() {
     let original_cwd = std::env::current_dir().expect("current dir");
     std::env::set_current_dir(&dir).expect("set current dir");
 
-    let result = compile_package(&Config::default(), Path::new("./project/main.fab"));
+    let result = compile_with_faber_seams(&Config::default(), Path::new("./project/main.fab"));
 
     std::env::set_current_dir(original_cwd).expect("restore current dir");
 
@@ -5890,7 +6004,7 @@ fn set_config() args args {
     )
     .expect("write jobs");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(
         result.success(),
         "expected mounted package compile success, got {:?}",
@@ -5939,7 +6053,7 @@ fn run() args args {
     )
     .expect("write jobs");
 
-    let diagnostics = check_package(&Config::default(), &dir);
+    let diagnostics = check_with_faber_seams(&Config::default(), &dir);
 
     assert!(
         !diagnostics.iter().any(Diagnostic::is_error),
@@ -5977,7 +6091,7 @@ fn run() args args {
     )
     .expect("write jobs");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(
         result.success(),
         "expected mounted handler to see root globals, got {:?}",
@@ -6022,7 +6136,7 @@ fn run() {}
     )
     .expect("write jobs");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
     assert!(result
         .diagnostics
@@ -6050,7 +6164,7 @@ main args args {}
     )
     .expect("write jobs");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| diagnostic_has_issue(
         diag,
@@ -6078,7 +6192,7 @@ main args args {}
     )
     .expect("write jobs");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
     assert!(result
         .diagnostics
@@ -6105,7 +6219,7 @@ fn root_run() {}
     .expect("write entry");
     fs::write(dir.join("jobs.fab"), "@ command \"run\"\nfn run() {}").expect("write jobs");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| diagnostic_has_issue(
         diag,
@@ -6143,7 +6257,7 @@ fn two() {}
     )
     .expect("write jobs");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| diagnostic_has_issue(
         diag,
@@ -6170,7 +6284,7 @@ main args args {}
     .expect("write entry");
     fs::write(dir.join("jobs.fab"), "@ command \"run\"\nfn run() {}").expect("write jobs");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.success(), "expected package compile success");
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
@@ -6195,7 +6309,7 @@ fn compile_package_rejects_import_cycles() {
     )
     .expect("write jobs");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
     assert!(result
         .diagnostics
@@ -6223,7 +6337,7 @@ entry = "main.fab"
     )
     .expect("write manifest");
 
-    let result = compile_package(&Config::default(), &dir.join("faber.toml"));
+    let result = compile_with_faber_seams(&Config::default(), &dir.join("faber.toml"));
     assert!(result.success(), "expected package compile success");
 }
 
@@ -6241,7 +6355,7 @@ name = "minimal"
     )
     .expect("write manifest");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(result.output.is_none());
     assert!(result
         .diagnostics
@@ -6268,7 +6382,7 @@ entry = "main.fab"
     )
     .expect("write manifest");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(
         result.success(),
         "expected package directory compile success"
@@ -6700,7 +6814,7 @@ entry = "main.fab"
         "package_member_unsupported_source_root"
     ));
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
     assert!(result
         .diagnostics
@@ -6735,7 +6849,7 @@ entry = "main.fab"
     assert_eq!(spec.entry, dir.join("main.fab"));
 
     // Full compile proceeds with `source = "."` (examples/automation canary shape).
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(
         result.output.is_some(),
         "dot-source package must compile, got {:?}",
@@ -6770,7 +6884,7 @@ entry = "main.fab"
     fs::remove_file(dir.join("faber.toml")).expect("delete manifest after discovery");
 
     let resolver = library_resolver_from_config(&Config::default());
-    let Err(err) = load_package_with_locale_pack(&spec, &resolver, None, false, None) else {
+    let Err(err) = load_with_faber_seams(&spec, &resolver, None, false, None) else {
         panic!("missing manifest after validation must be a diagnostic, not a silent default");
     };
     assert!(err
@@ -6790,7 +6904,7 @@ fn load_package_with_locale_pack_rejects_malformed_manifest() {
     assert!(diagnostic_has_issue(&err, "invalid_package_manifest"));
 
     // A manifest-backed spec must not silently swallow a malformed manifest either.
-    let spec = super::discovery::PackageSpec {
+    let spec = radix_package::discovery::PackageSpec {
         package_root: dir.path().to_path_buf(),
         source_root: dir.join("src"),
         entry: dir.join("src/main.fab"),
@@ -6798,7 +6912,7 @@ fn load_package_with_locale_pack_rejects_malformed_manifest() {
         manifest_backed: true,
     };
     let resolver = library_resolver_from_config(&Config::default());
-    let Err(err) = load_package_with_locale_pack(&spec, &resolver, None, false, None) else {
+    let Err(err) = load_with_faber_seams(&spec, &resolver, None, false, None) else {
         panic!("malformed manifest must fail loudly on load, not be swallowed");
     };
     assert!(err
@@ -6816,7 +6930,7 @@ fn manifestless_legacy_spec_loads_without_manifest() {
     assert!(!spec.manifest_backed);
 
     let resolver = library_resolver_from_config(&Config::default());
-    let files = load_package_with_locale_pack(&spec, &resolver, None, false, None)
+    let files = load_with_faber_seams(&spec, &resolver, None, false, None)
         .expect("legacy manifestless load keeps working");
     assert_eq!(files.len(), 1);
 }
@@ -6837,7 +6951,7 @@ source = "src"
     )
     .expect("write manifest");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
     assert!(result
         .diagnostics
@@ -6864,7 +6978,7 @@ targets = ["rust"]
     )
     .expect("write manifest");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
     assert!(result
         .diagnostics
@@ -6891,7 +7005,7 @@ targets = ["rust"]
     )
     .expect("write manifest");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
     assert!(result
         .diagnostics
@@ -6917,7 +7031,7 @@ kind = "lib"
     )
     .expect("write manifest");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
     assert!(result
         .diagnostics
@@ -6948,7 +7062,7 @@ locale = "zh-Hans"
     )
     .expect("write manifest");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
 
     assert!(
         result.success(),
@@ -6983,7 +7097,7 @@ locale = "zh-Hans"
     )
     .expect("write manifest");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
 
     assert!(
         result.success(),
@@ -7018,7 +7132,7 @@ fn installed_reader_locale_reference_examples_compile_from_installed_packs() {
         "你好",
     );
     let example = root.join(path);
-    let result = compile_package(&Config::default(), &example);
+    let result = compile_with_faber_seams(&Config::default(), &example);
 
     assert!(
         result.success(),
@@ -7156,7 +7270,7 @@ fn probe() → bool {
     .expect("write consumer entry");
 
     let config = Config::default().with_stdlib(lib_root);
-    let diagnostics = check_package(&config, &consumer.join("src/main.fab"));
+    let diagnostics = check_with_faber_seams(&config, &consumer.join("src/main.fab"));
 
     assert!(
         !diagnostics.iter().any(Diagnostic::is_error),
@@ -7193,7 +7307,7 @@ pack = "./locale/custom.toml"
     )
     .expect("write manifest");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
@@ -7252,7 +7366,7 @@ locale = "zh-Hans"
     )
     .expect("write manifest");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
 
     // S2-U2 pack-authoritative gate: the zh-Hans pack does not declare the
     // Latin spellings `incipit`/`nota`, so they must NOT claim their grammar
@@ -7287,7 +7401,7 @@ fn thai_reader_locale_example_compiles_from_manifest() {
         .expect("faberlang container root")
         .join("examples/reader-locale/th-TH");
 
-    let result = compile_package(&Config::default(), &example);
+    let result = compile_with_faber_seams(&Config::default(), &example);
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let Some(Output::Rust(output)) = result.output else {
@@ -7334,7 +7448,7 @@ target = "go"
     )
     .expect("write manifest");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| diagnostic_has_issue(
         diag,
@@ -7395,7 +7509,7 @@ fn run() {}
     )
     .expect("write jobs");
 
-    let result = compile_package(&Config::default(), &dir);
+    let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
         diag.args
@@ -7428,7 +7542,7 @@ fn saluta(string nomen) → string {
     )
     .expect("write module");
 
-    let result = compile_package(&Config::default(), &dir.join("main.fab"));
+    let result = compile_with_faber_seams(&Config::default(), &dir.join("main.fab"));
     assert!(
         result.success(),
         "expected package compile success, got {:?}",
@@ -7481,7 +7595,7 @@ fn adde(int left, int right) → int {
     )
     .expect("write module");
 
-    let result = compile_package(&Config::default(), &dir.join("main.fab"));
+    let result = compile_with_faber_seams(&Config::default(), &dir.join("main.fab"));
     assert!(
         result.success(),
         "expected file namespace function package compile success, got {:?}",
@@ -7527,7 +7641,7 @@ fn label(string nomen) → string {
     )
     .expect("write module");
 
-    let diagnostics = check_package(&Config::default(), &entry);
+    let diagnostics = check_with_faber_seams(&Config::default(), &entry);
     assert!(
         !diagnostics.iter().any(|diag| diag.is_error()),
         "expected typed file namespace function call, got {:?}",
@@ -7564,7 +7678,7 @@ fn label(string nomen) → string {
     )
     .expect("write module");
 
-    let diagnostics = check_package(&Config::default(), &entry);
+    let diagnostics = check_with_faber_seams(&Config::default(), &entry);
     assert!(
         diagnostics
             .iter()
@@ -7594,7 +7708,7 @@ main {
     )
     .expect("write entry");
 
-    let diagnostics = check_package(&Config::default(), &entry);
+    let diagnostics = check_with_faber_seams(&Config::default(), &entry);
     assert!(
         !diagnostics.iter().any(|diag| diag.is_error()),
         "expected typed solum/path namespace call, got {:?}",
@@ -7633,7 +7747,7 @@ main {
     )
     .expect("write entry");
 
-    let diagnostics = check_package(&config_with_library_home(library_home.path()), &entry);
+    let diagnostics = check_with_faber_seams(&config_with_library_home(library_home.path()), &entry);
     assert!(
         !diagnostics.iter().any(|diag| diag.is_error()),
         "expected typed top-level json/solve namespace call, got {:?}",
@@ -7825,7 +7939,7 @@ fn dupla(int n) → int {
     )
     .expect("write module");
 
-    let result = compile_package(&Config::default(), &dir.join("main.fab"));
+    let result = compile_with_faber_seams(&Config::default(), &dir.join("main.fab"));
     assert!(
         result.success(),
         "expected file namespace function package compile success, got {:?}",
@@ -7873,7 +7987,7 @@ fn publicum() → string {
     )
     .expect("write module");
 
-    let result = compile_package(&Config::default(), &dir.join("main.fab"));
+    let result = compile_with_faber_seams(&Config::default(), &dir.join("main.fab"));
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "import_module_private")
@@ -7906,7 +8020,7 @@ fn publicum() → string {
     )
     .expect("write module");
 
-    let result = compile_package(&Config::default(), &dir.join("main.fab"));
+    let result = compile_with_faber_seams(&Config::default(), &dir.join("main.fab"));
     assert!(
         result.success(),
         "expected explicit publica function export success, got {:?}",
@@ -7943,7 +8057,7 @@ fn solve(string input) → string {
     )
     .expect("write module");
 
-    let result = compile_package(&Config::default(), &dir.join("main.fab"));
+    let result = compile_with_faber_seams(&Config::default(), &dir.join("main.fab"));
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "import_module_private")
@@ -7981,7 +8095,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&config_with_library_home(library_home.path()), &entry);
+    let result = compile_with_faber_seams(&config_with_library_home(library_home.path()), &entry);
     assert!(result.output.is_none());
     assert!(result
         .diagnostics
@@ -8021,7 +8135,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&config_with_library_home(library_home.path()), &entry);
+    let result = compile_with_faber_seams(&config_with_library_home(library_home.path()), &entry);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "namespace_missing_export")
@@ -8189,7 +8303,7 @@ entry = "main.fab"
     assert_eq!(spec.source_root, dir.join("src"));
     assert_eq!(spec.entry, explicit_entry);
 
-    let output = compile_package(&Config::default(), &explicit_entry)
+    let output = compile_with_faber_seams(&Config::default(), &explicit_entry)
         .output
         .expect("compile explicit entry");
     let rust = match output {
@@ -8235,7 +8349,7 @@ fn linked_library_emit_skips_entry_file_layouts_without_manifest() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "main { print \"no manifest\" }").expect("entry");
 
-    let deps = super::artifact_plan::native_library_deps(&dir)
+    let deps = radix_package::artifact_plan::native_library_deps(&dir)
         .expect("entry-file layouts without manifest should not require native deps");
     assert!(deps.is_empty());
 
@@ -8270,7 +8384,7 @@ entry = "main.fab"
     .expect("manifest");
 
     let layout = discover_build_layout(&pkg).expect("layout");
-    let compile_result = compile_package(&Config::default(), &pkg);
+    let compile_result = compile_with_faber_seams(&Config::default(), &pkg);
     assert!(compile_result.success(), "compile should succeed");
     let code = match &compile_result.output {
         Some(radix::Output::Rust(r)) => r.code.clone(),
@@ -8327,7 +8441,7 @@ entry = "main.fab"
     )
     .expect("entry");
 
-    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
 
     assert!(plan.non_runtime_routes.is_empty());
     assert!(plan.host.is_none());
@@ -8360,7 +8474,7 @@ entry = "main.fab"
     )
     .expect("entry");
 
-    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
 
     assert_eq!(
         plan.non_runtime_routes.iter().cloned().collect::<Vec<_>>(),
@@ -8403,7 +8517,7 @@ entry = "main.fab"
     )
     .expect("entry");
 
-    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
 
     assert_eq!(
         plan.non_runtime_routes.iter().cloned().collect::<Vec<_>>(),
@@ -8453,7 +8567,7 @@ main {
     )
     .expect("entry");
 
-    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
 
     assert!(
         plan.non_runtime_routes.contains("tempus:dormiet"),
@@ -8505,7 +8619,7 @@ providers = ["notaprovider"]
     )
     .expect("entry");
 
-    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
     assert_eq!(plan.host, Some(ManifestRustHost::Native));
     assert!(plan.selected_providers.contains("notaprovider"));
     assert!(
@@ -8545,8 +8659,8 @@ entry = "main.fab"
     .expect("entry");
 
     let layout = discover_build_layout(&pkg).expect("layout");
-    let package = analyze_package(&Config::default(), &pkg).expect("analyze");
-    let artifact = super::artifact_plan::plan_package(&package, Target::HirRust);
+    let package = analyze_with_faber_seams(&Config::default(), &pkg).expect("analyze");
+    let artifact = radix_package::artifact_plan::plan_package(&package, Target::HirRust);
     assert!(
         artifact.has_runtime_dependency("rust:runtime:faber"),
         "artifact plan must list faber runtime"
@@ -8556,11 +8670,11 @@ entry = "main.fab"
         "async entry must plan tokio runtime node"
     );
 
-    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
     assert!(plan.needs_faber);
     assert!(plan.needs_tokio);
 
-    let compile_result = compile_package(&Config::default(), &pkg);
+    let compile_result = compile_with_faber_seams(&Config::default(), &pkg);
     assert!(compile_result.success(), "compile should succeed");
     let code = match &compile_result.output {
         Some(radix::Output::Rust(r)) => r.code.clone(),
@@ -8602,13 +8716,13 @@ entry = "main.fab"
     .expect("entry");
 
     let layout = discover_build_layout(&pkg).expect("layout");
-    let compile_result = compile_package(&Config::default(), &pkg);
+    let compile_result = compile_with_faber_seams(&Config::default(), &pkg);
     assert!(compile_result.success(), "compile should succeed");
     let code = match &compile_result.output {
         Some(radix::Output::Rust(r)) => r.code.clone(),
         _ => panic!("expected rust output"),
     };
-    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
     assert!(plan.needs_tokio);
 
     emit_generated_crate_with_runtime_plan(
@@ -8661,7 +8775,7 @@ main {{
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected package compile success, got {:?}",
@@ -8729,13 +8843,13 @@ main {{
     .expect("write entry");
 
     let layout = discover_build_layout(&pkg).expect("layout");
-    let compile_result = compile_package(&Config::default(), &pkg);
+    let compile_result = compile_with_faber_seams(&Config::default(), &pkg);
     assert!(compile_result.success(), "compile should succeed");
     let code = match &compile_result.output {
         Some(radix::Output::Rust(r)) => r.code.clone(),
         _ => panic!("expected rust output"),
     };
-    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
     assert_eq!(plan.host, Some(ManifestRustHost::Native));
     assert_eq!(
         plan.selected_providers.iter().cloned().collect::<Vec<_>>(),
@@ -8844,7 +8958,7 @@ async_main {{
     .expect("write entry");
 
     let layout = discover_build_layout(&pkg).expect("layout");
-    let compile_result = compile_package(&Config::default(), &pkg);
+    let compile_result = compile_with_faber_seams(&Config::default(), &pkg);
     assert!(
         compile_result.success(),
         "compile should succeed: {:?}",
@@ -8854,7 +8968,7 @@ async_main {{
         Some(radix::Output::Rust(r)) => r.code.clone(),
         _ => panic!("expected rust output"),
     };
-    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
     assert_eq!(plan.host, Some(ManifestRustHost::Native));
     assert!(plan.needs_tokio);
     assert!(plan.selected_providers.contains("solum"));
@@ -8919,7 +9033,7 @@ host = "native"
     )
     .expect("write entry");
 
-    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
     assert_eq!(plan.host, Some(ManifestRustHost::Native));
     assert!(plan.selected_providers.contains("ignotum"));
     assert!(plan.provider_error.is_some(), "expected missing provider");
@@ -8961,7 +9075,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "compile should succeed: {:?}",
@@ -9098,7 +9212,7 @@ main {
     )
     .expect("write app entry");
 
-    let result = compile_package(&config_with_library_home(library_home.path()), &dir);
+    let result = compile_with_faber_seams(&config_with_library_home(library_home.path()), &dir);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "missing_installed_library_source_root")
@@ -9140,7 +9254,7 @@ main {
     )
     .expect("write app entry");
 
-    let result = compile_package(&config_with_library_home(library_home.path()), &dir);
+    let result = compile_with_faber_seams(&config_with_library_home(library_home.path()), &dir);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "invalid_installed_library_manifest")
@@ -9188,7 +9302,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&config_with_library_home(library_home.path()), &entry);
+    let result = compile_with_faber_seams(&config_with_library_home(library_home.path()), &entry);
     assert!(
         result.success(),
         "expected nested lista<lista<textus>> typecheck success, got {:?}",
@@ -9228,7 +9342,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&config_with_library_home(library_home.path()), &entry);
+    let result = compile_with_faber_seams(&config_with_library_home(library_home.path()), &entry);
     assert!(
         result.success(),
         "expected transitive chorda fixture compile success, got {:?}",
@@ -9287,7 +9401,7 @@ main {
     let config = config_with_library_home(library_home.path());
     let spec = discover_package(&entry).expect("package");
     let resolver = library_resolver_from_config(&config);
-    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None);
+    let files = load_with_faber_seams(&spec, &resolver, Some(&english_pack()), false, None);
     assert!(files.is_err(), "cycle should fail package load");
     let err = files.err().expect("diagnostics");
     assert!(err.iter().any(|diag| {
@@ -9295,7 +9409,7 @@ main {
             && diagnostic_has_arg(diag, "cycle", "cycle_a -> cycle_b -> cycle_a")
     }));
 
-    let result = compile_package(&config, &entry);
+    let result = compile_with_faber_seams(&config, &entry);
     assert!(result.output.is_none());
     assert!(result
         .diagnostics
@@ -9320,7 +9434,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "library_conflicting_aliases")
@@ -9393,7 +9507,7 @@ main {
     let config = config_with_library_home(library_home.path());
     let spec = discover_package(&entry).expect("package");
     let resolver = library_resolver_from_config(&config);
-    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None)
+    let files = load_with_faber_seams(&spec, &resolver, Some(&english_pack()), false, None)
         .expect("load package");
     let file = files
         .iter()
@@ -9406,12 +9520,12 @@ main {
         .count();
     assert_eq!(shared_d_count, 1, "shared_d should appear once in closure");
 
-    let package = analyze_package(&config, &entry).expect("analyze package");
+    let package = analyze_with_faber_seams(&config, &entry).expect("analyze package");
     let analysis = &package.entry_unit().expect("entry unit").analysis;
     let leaf_a = library_binding_by_module(analysis, &["leaf_a"]);
     assert_eq!(leaf_a.identity.module_path, vec!["leaf_a"]);
 
-    let result = compile_package(&config, &entry);
+    let result = compile_with_faber_seams(&config, &entry);
     assert!(
         result.success(),
         "expected diamond package compile success, got {:?}",
@@ -9460,7 +9574,7 @@ main {
     let config = config_with_library_home(library_home.path());
     let spec = discover_package(&entry).expect("package");
     let resolver = library_resolver_from_config(&config);
-    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None)
+    let files = load_with_faber_seams(&spec, &resolver, Some(&english_pack()), false, None)
         .expect("load package");
     let file = files
         .iter()
@@ -9520,7 +9634,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&config_with_library_home(library_home.path()), &entry);
+    let result = compile_with_faber_seams(&config_with_library_home(library_home.path()), &entry);
     assert!(
         result.success(),
         "expected public child re-export compile success, got {:?}",
@@ -9591,7 +9705,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&config_with_library_home(library_home.path()), &entry);
+    let result = compile_with_faber_seams(&config_with_library_home(library_home.path()), &entry);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "namespace_missing_export")
@@ -9620,7 +9734,7 @@ main {
     let config = Config::default();
     let spec = discover_package(&entry).expect("package");
     let resolver = library_resolver_from_config(&config);
-    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None)
+    let files = load_with_faber_seams(&spec, &resolver, Some(&english_pack()), false, None)
         .expect("load package");
     let file = files
         .iter()
@@ -9628,13 +9742,13 @@ main {
         .expect("entry file");
     assert_eq!(file.expanded_library_imports.len(), 2);
 
-    let package = analyze_package(&config, &entry).expect("analyze package");
+    let package = analyze_with_faber_seams(&config, &entry).expect("analyze package");
     let analysis = &package.entry_unit().expect("entry unit").analysis;
 
     let csv_binding = library_binding_by_module(analysis, &["csv"]);
     assert_eq!(csv_binding.identity.module_path, vec!["csv"]);
 
-    let result = compile_package(&config, &entry);
+    let result = compile_with_faber_seams(&config, &entry);
     assert!(
         result.success(),
         "expected norma:csv transitive compile success, got {:?}",
@@ -9672,7 +9786,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected empty solve success, got {:?}",
@@ -9697,7 +9811,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_package(&Config::default(), &entry);
+    let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
         "expected trailing row solve success, got {:?}",
@@ -9746,9 +9860,9 @@ entry = "main.fab"
     )
     .expect("manifest");
     fs::write(dir.join("src/main.fab"), "main { }\n").expect("entry");
-    let package = analyze_package(&Config::default(), &dir).expect("analyze");
-    let a = super::artifact_plan::plan_package(&package, Target::HirRust);
-    let b = super::artifact_plan::plan_package(&package, Target::HirRust);
+    let package = analyze_with_faber_seams(&Config::default(), &dir).expect("analyze");
+    let a = radix_package::artifact_plan::plan_package(&package, Target::HirRust);
+    let b = radix_package::artifact_plan::plan_package(&package, Target::HirRust);
     assert!(a.supported);
     assert_eq!(a.to_debug_json().unwrap(), b.to_debug_json().unwrap());
     assert!(a.nodes.iter().any(|n| n.id.starts_with("rust:entry:")));
@@ -9808,7 +9922,7 @@ rustc = ""
 }
 
 fn build_and_run_sqlite_app(app: &Path) -> std::process::Output {
-    let result = compile_package(&Config::default(), app);
+    let result = compile_with_faber_seams(&Config::default(), app);
     assert!(
         result.success(),
         "expected sqlite consumer compile, got {:?}",
@@ -9828,7 +9942,7 @@ fn build_and_run_sqlite_app(app: &Path) -> std::process::Output {
             .collect::<Vec<_>>()
     );
     let layout = discover_build_layout(app).expect("layout");
-    let mut runtime_plan = package_rust_runtime_plan(&Config::default(), app).expect("plan");
+    let mut runtime_plan = runtime_plan_with_faber_seams(&Config::default(), app).expect("plan");
     let linked = super::library_link::emit_linked_library_crates(app, &layout).expect("link");
     runtime_plan.library_path_deps = linked
         .into_iter()
@@ -10148,7 +10262,7 @@ main {
     let report = verify_library_binding_shapes(&lib, "rust").expect("library verifies");
     assert_eq!(report.bindings, 1);
 
-    let result = compile_package(&Config::default(), &app);
+    let result = compile_with_faber_seams(&Config::default(), &app);
     assert!(
         result.success(),
         "expected app compile success, got {:?}",
@@ -10179,7 +10293,7 @@ main {
     assert!(linked[0].crate_root.join("src/lib.rs").is_file());
     assert!(linked[0].crate_root.join("Cargo.toml").is_file());
 
-    let mut plan = package_rust_runtime_plan(&Config::default(), &app).expect("runtime plan");
+    let mut plan = runtime_plan_with_faber_seams(&Config::default(), &app).expect("runtime plan");
     plan.library_path_deps = linked
         .into_iter()
         .map(|l| (l.crate_name, l.crate_root))
@@ -10309,7 +10423,7 @@ main {
     let override_root = root.join("container");
     fs::create_dir_all(override_root.join("faber/runtime/rust")).expect("override runtime");
     super::runtime_sources::set_path_override_for_test(Some(override_root));
-    let deps = super::artifact_plan::native_library_deps(&app).expect("native deps");
+    let deps = radix_package::artifact_plan::native_library_deps(&app).expect("native deps");
     assert_eq!(
         deps.len(),
         1,
@@ -10354,7 +10468,7 @@ main {
 "#,
     )
     .unwrap();
-    let result = compile_package(
+    let result = compile_with_faber_seams(
         &Config::default().with_stdlib(dev_norma_library_home()),
         &app,
     );
@@ -10408,7 +10522,7 @@ entry = "main.fab"
     fs::write(dir.join("src/main.fab"), "main { }\n").expect("entry");
     // Wasm is now a supported package target (U6-D); wgsl stays a rejected
     // package target for the fail-closed seam.
-    let result = compile_package(&Config::default().with_target(Target::MirWgsl), &dir);
+    let result = compile_with_faber_seams(&Config::default().with_target(Target::MirWgsl), &dir);
     assert!(!result.success());
     assert!(result.diagnostics.iter().any(|d| diagnostic_has_issue(
         d,
@@ -10448,7 +10562,7 @@ main args args exit 0 {
     )
     .expect("entry");
 
-    let result = compile_package(&Config::default().with_target(Target::HirGo), &dir);
+    let result = compile_with_faber_seams(&Config::default().with_target(Target::HirGo), &dir);
     assert!(
         result.success(),
         "go package compile failed: {:?}",
@@ -10522,7 +10636,7 @@ main args args exit 0 {
     )
     .expect("entry");
 
-    let result = compile_package_go(&Config::default().with_target(Target::HirGo), &dir);
+    let result = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &dir);
     let modules = result.go_modules;
     let result = result.compile_result;
     assert!(
@@ -10571,7 +10685,7 @@ fn g6_go4_coreutils_true_package_go_builds() {
         eprintln!("skip: coreutils true package missing at {}", path.display());
         return;
     }
-    let result = compile_package_go(&Config::default().with_target(Target::HirGo), &path);
+    let result = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &path);
     let modules = result.go_modules;
     let result = result.compile_result;
     assert!(
@@ -10647,7 +10761,7 @@ main args args exit 0 {
     )
     .expect("entry");
 
-    let result = compile_package_go(&Config::default().with_target(Target::HirGo), &dir);
+    let result = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &dir);
     let modules = result.go_modules;
     let result = result.compile_result;
     assert!(
@@ -10719,7 +10833,7 @@ main args args exit 0 {
     )
     .expect("entry");
 
-    let result = compile_package(&Config::default().with_target(Target::HirGo), &dir);
+    let result = compile_with_faber_seams(&Config::default().with_target(Target::HirGo), &dir);
     assert!(!result.success(), "expected compile failure on collision");
     assert!(
         result
@@ -10742,7 +10856,7 @@ fn g6_go4_coreutils_echo_package_go_builds() {
         eprintln!("skip: coreutils echo package missing at {}", path.display());
         return;
     }
-    let result = compile_package_go(&Config::default().with_target(Target::HirGo), &path);
+    let result = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &path);
     let modules = result.go_modules;
     let result = result.compile_result;
     assert!(
@@ -10855,7 +10969,7 @@ main args args exit 0 {
     )
     .expect("entry");
 
-    let result = compile_package_go(&Config::default().with_target(Target::HirGo), &dir);
+    let result = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &dir);
     let modules = result.go_modules;
     let result = result.compile_result;
     assert!(
@@ -10914,7 +11028,7 @@ fn g6_go4_coreutils_false_package_go_builds() {
         );
         return;
     }
-    let result = compile_package_go(&Config::default().with_target(Target::HirGo), &path);
+    let result = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &path);
     let modules = result.go_modules;
     let result = result.compile_result;
     assert!(
@@ -11029,7 +11143,7 @@ main args args exit 0 {
     )
     .expect("entry");
 
-    let failed = compile_package_go(&Config::default().with_target(Target::HirGo), &bad);
+    let failed = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &bad);
     assert!(
         !failed.compile_result.success(),
         "expected Go compile failure on name collision"
@@ -11042,7 +11156,7 @@ main args args exit 0 {
     // A later successful compile must produce exactly its own module set.
     let good = test_temp_dir("go-fbr-good");
     write_go_module_package(&good, "go-fbr-good", "identity");
-    let ok = compile_package_go(&Config::default().with_target(Target::HirGo), &good);
+    let ok = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &good);
     assert!(ok.compile_result.success(), "good package must compile");
     assert_eq!(ok.go_modules.len(), 1, "expected one sibling module");
     assert!(
@@ -11059,7 +11173,7 @@ fn go_compile_repeated_and_nested_calls_do_not_exchange_modules() {
     let b = test_temp_dir("go-fbr-b");
     write_go_module_package(&b, "go-fbr-b", "beta");
 
-    let first = compile_package_go(&Config::default().with_target(Target::HirGo), &a);
+    let first = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &a);
     assert!(first.compile_result.success(), "package a must compile");
     assert_eq!(first.go_modules.len(), 1, "package a has one sibling");
     assert!(
@@ -11070,7 +11184,7 @@ fn go_compile_repeated_and_nested_calls_do_not_exchange_modules() {
 
     // Repeated call for a different package must not clobber the first
     // result's modules.
-    let second = compile_package_go(&Config::default().with_target(Target::HirGo), &b);
+    let second = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &b);
     assert!(second.compile_result.success(), "package b must compile");
     assert_eq!(second.go_modules.len(), 1, "package b has one sibling");
     assert!(
@@ -11087,7 +11201,7 @@ fn go_compile_repeated_and_nested_calls_do_not_exchange_modules() {
 
     // Nested: a compile that runs while earlier results are still held keeps
     // its own modules and leaves the earlier results untouched.
-    let third = compile_package_go(&Config::default().with_target(Target::HirGo), &a);
+    let third = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &a);
     assert!(
         third.compile_result.success(),
         "repeat of package a compiles"
@@ -11110,7 +11224,7 @@ fn go_compile_repeated_and_nested_calls_do_not_exchange_modules() {
 fn go_compile_modules_stay_scoped_across_non_go_compiles() {
     let go_dir = test_temp_dir("go-fbr-scope");
     write_go_module_package(&go_dir, "go-fbr-scope", "alpha");
-    let go_result = compile_package_go(&Config::default().with_target(Target::HirGo), &go_dir);
+    let go_result = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &go_dir);
     assert!(go_result.compile_result.success());
     assert!(
         !go_result.go_modules.is_empty(),
@@ -11135,7 +11249,7 @@ entry = "main.fab"
     )
     .expect("manifest");
     fs::write(rust_dir.join("src/main.fab"), "main { }\n").expect("entry");
-    let rust_result = compile_package(&Config::default(), &rust_dir);
+    let rust_result = compile_with_faber_seams(&Config::default(), &rust_dir);
     assert!(rust_result.success(), "rust package must compile");
     assert!(
         matches!(rust_result.output, Some(Output::Rust(_))),
@@ -11161,10 +11275,10 @@ fn go_compile_concurrent_calls_do_not_exchange_modules() {
     let a_path = a.to_path_buf();
     let b_path = b.to_path_buf();
     let handle_a = thread::spawn(move || {
-        compile_package_go(&Config::default().with_target(Target::HirGo), &a_path)
+        compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &a_path)
     });
     let handle_b = thread::spawn(move || {
-        compile_package_go(&Config::default().with_target(Target::HirGo), &b_path)
+        compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &b_path)
     });
     let result_a = handle_a.join().expect("thread a");
     let result_b = handle_b.join().expect("thread b");
@@ -11515,7 +11629,7 @@ fn g10_web1_faber_web_package_exports_controller_contract() {
     let lib = sibling_faber_web_lib();
     assert!(lib.is_dir(), "faber-web missing at {}", lib.display());
 
-    let package = analyze_package(&Config::default(), &lib).expect("analyze faber-web package");
+    let package = analyze_with_faber_seams(&Config::default(), &lib).expect("analyze faber-web package");
     let unit = package
         .units
         .iter()
@@ -12440,7 +12554,7 @@ incipit {
 "#,
     );
 
-    let package = analyze_package(&Config::default(), &app).expect("analyze web app package graph");
+    let package = analyze_with_faber_seams(&Config::default(), &app).expect("analyze web app package graph");
     let entry = package.entry_unit().expect("entry unit");
     let application = entry
         .analysis
@@ -12521,7 +12635,7 @@ rustc = ""
 }
 
 fn build_and_run_http_app(app: &Path) -> std::process::Output {
-    let result = compile_package(&Config::default(), app);
+    let result = compile_with_faber_seams(&Config::default(), app);
     assert!(
         result.success(),
         "expected http consumer compile, got {:?}",
@@ -12532,7 +12646,7 @@ fn build_and_run_http_app(app: &Path) -> std::process::Output {
             .collect::<Vec<_>>()
     );
     let layout = discover_build_layout(app).expect("layout");
-    let mut runtime_plan = package_rust_runtime_plan(&Config::default(), app).expect("plan");
+    let mut runtime_plan = runtime_plan_with_faber_seams(&Config::default(), app).expect("plan");
     let linked = super::library_link::emit_linked_library_crates(app, &layout).expect("link");
     runtime_plan.library_path_deps = linked
         .into_iter()
@@ -12564,7 +12678,7 @@ fn g9_api2_http_package_verifies_and_exports_http_application_contract() {
         report.declarations
     );
 
-    let package = analyze_package(&Config::default().with_bodyless_functions(), &lib)
+    let package = analyze_with_faber_seams(&Config::default().with_bodyless_functions(), &lib)
         .expect("analyze http package");
     let unit = package
         .units
@@ -12617,7 +12731,7 @@ main {
 "#,
     );
 
-    let package = analyze_package(&Config::default(), &app).expect("analyze package graph");
+    let package = analyze_with_faber_seams(&Config::default(), &app).expect("analyze package graph");
     let entry = package.entry_unit().expect("entry unit");
     let application = entry
         .analysis
@@ -12842,7 +12956,7 @@ main {{
     .expect("write entry");
 
     let layout = discover_build_layout(&pkg).expect("layout");
-    let compile_result = compile_package(&Config::default(), &pkg);
+    let compile_result = compile_with_faber_seams(&Config::default(), &pkg);
     assert!(
         compile_result.success(),
         "expected HTTP hello compile success, got {:?}",
@@ -12855,7 +12969,7 @@ main {{
     let Some(Output::Rust(output)) = compile_result.output else {
         panic!("expected Rust output");
     };
-    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
     assert_eq!(
         plan.selected_providers.iter().cloned().collect::<Vec<_>>(),
         vec!["http".to_owned()]
@@ -12980,7 +13094,7 @@ fn package_fmir_text_image_is_artifact_version_7() {
     fs::write(&entry, "main { print \"v7\" }").expect("write entry");
 
     let image =
-        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
             .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
 
@@ -12996,7 +13110,7 @@ fn package_fmir_image_is_artifact_version_7() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "main { print \"v7\" }").expect("write entry");
 
-    let image = build_package_fmir_image(
+    let image = build_fmir_image_for_faber(
         &Config::default().with_target(Target::MirFmirBinary),
         &entry,
         &[],
@@ -13018,7 +13132,7 @@ fn package_fmir_text_image_rejects_version_2_images() {
     fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
     let image =
-        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
             .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     fs::write(
@@ -13029,7 +13143,7 @@ fn package_fmir_text_image_rejects_version_2_images() {
     fs::remove_file(&entry).expect("remove source after rewriting image");
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_fmir_text_image(&image, &mut host)
+    let diagnostics = run_fmir_text_image_for_faber(&image, &mut host)
         .expect_err("version-2 fmir-text images must fail closed under the version-7 schema");
 
     assert!(diagnostics.iter().any(|diag| {
@@ -13047,7 +13161,7 @@ fn package_fmir_text_image_rejects_future_versions() {
     fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
     let image =
-        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
             .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     fs::write(
@@ -13058,7 +13172,7 @@ fn package_fmir_text_image_rejects_future_versions() {
     fs::remove_file(&entry).expect("remove source after rewriting image");
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_fmir_text_image(&image, &mut host)
+    let diagnostics = run_fmir_text_image_for_faber(&image, &mut host)
         .expect_err("future fmir-text versions must fail closed");
 
     assert!(diagnostics.iter().any(|diag| {
@@ -13075,7 +13189,7 @@ fn package_fmir_image_rejects_version_2_images() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
-    let image = build_package_fmir_image(
+    let image = build_fmir_image_for_faber(
         &Config::default().with_target(Target::MirFmirBinary),
         &entry,
         &[],
@@ -13087,7 +13201,7 @@ fn package_fmir_image_rejects_version_2_images() {
     fs::remove_file(&entry).expect("remove source after rewriting image");
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_fmir_image(&image, &mut host)
+    let diagnostics = run_fmir_image_for_faber(&image, &mut host)
         .expect_err("version-2 fmir images must fail closed under the version-7 schema");
 
     assert!(diagnostics.iter().any(|diag| {
@@ -13104,7 +13218,7 @@ fn package_fmir_image_rejects_future_versions() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
-    let image = build_package_fmir_image(
+    let image = build_fmir_image_for_faber(
         &Config::default().with_target(Target::MirFmirBinary),
         &entry,
         &[],
@@ -13116,7 +13230,7 @@ fn package_fmir_image_rejects_future_versions() {
     fs::remove_file(&entry).expect("remove source after rewriting image");
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_fmir_image(&image, &mut host)
+    let diagnostics = run_fmir_image_for_faber(&image, &mut host)
         .expect_err("future fmir versions must fail closed");
 
     assert!(diagnostics.iter().any(|diag| {
@@ -13149,12 +13263,12 @@ main {
     .expect("write entry");
 
     let image =
-        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
             .expect("build fmir-text image with upper-half u64 constants");
     fs::remove_file(&entry).expect("remove source after image build");
 
     let mut host = BufferHost::default();
-    run_package_fmir_text_image(&image, &mut host).expect("run fmir-text image without source");
+    run_fmir_text_image_for_faber(&image, &mut host).expect("run fmir-text image without source");
 
     assert_eq!(
         host.stdout_lines,
@@ -13182,7 +13296,7 @@ main {
     )
     .expect("write entry");
 
-    let image = build_package_fmir_image(
+    let image = build_fmir_image_for_faber(
         &Config::default().with_target(Target::MirFmirBinary),
         &entry,
         &[],
@@ -13191,7 +13305,7 @@ main {
     fs::remove_file(&entry).expect("remove source after image build");
 
     let mut host = BufferHost::default();
-    run_package_fmir_image(&image, &mut host).expect("run fmir image without source");
+    run_fmir_image_for_faber(&image, &mut host).expect("run fmir image without source");
 
     assert_eq!(
         host.stdout_lines,
@@ -13254,7 +13368,7 @@ fn simple_loss(
         target: radix::codegen::Target::MirFmirBinary,
         ..Config::default()
     };
-    let package = analyze_package(&config, &dir).expect("analyze library package");
+    let package = analyze_with_faber_seams(&config, &dir).expect("analyze library package");
     assert!(
         !package.diagnostics.iter().any(radix::Diagnostic::is_error),
         "expected no analysis errors, got {:?}",
@@ -13277,7 +13391,7 @@ fn simple_loss(
         gradient.export_names
     );
 
-    let interface = super::file_interface::extract_file_interface_with_identity(
+    let interface = radix_package::file_interface::extract_file_interface_with_identity(
         &gradient.analysis,
         &gradient.export_names,
         "gradient",
@@ -13385,7 +13499,7 @@ main {
         .with_target(radix::codegen::Target::MirFmirBinary)
         .with_stdlib(lib_root);
     let mut host = BufferHost::default();
-    let result = run_package_mir(&config, &entry, &mut host);
+    let result = run_mir_for_faber(&config, &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -13468,7 +13582,7 @@ main {
         .with_target(radix::codegen::Target::MirFmirBinary)
         .with_stdlib(lib_root);
     let mut host = BufferHost::default();
-    let diagnostics = run_package_mir(&config, &entry, &mut host)
+    let diagnostics = run_mir_for_faber(&config, &entry, &mut host)
         .expect_err("unresolvable companion should fail closed at link time");
 
     assert!(host.stdout_lines.is_empty());
@@ -13546,7 +13660,7 @@ main {
         .with_target(Target::MirFmirBinary)
         .with_stdlib(lib_root);
     let mut host = BufferHost::default();
-    let result = run_package_mir(&config, &entry, &mut host);
+    let result = run_mir_for_faber(&config, &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -13641,7 +13755,7 @@ main {
         .with_target(radix::codegen::Target::MirFmirBinary)
         .with_stdlib(lib_root);
     let mut host = BufferHost::default();
-    let result = run_package_mir(&config, &entry, &mut host);
+    let result = run_mir_for_faber(&config, &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -13747,7 +13861,7 @@ main {
         .with_target(radix::codegen::Target::MirFmirBinary)
         .with_stdlib(lib_root);
     let mut host = BufferHost::default();
-    let result = run_package_mir(&config, &entry, &mut host);
+    let result = run_mir_for_faber(&config, &entry, &mut host);
 
     assert!(
         result.is_ok(),

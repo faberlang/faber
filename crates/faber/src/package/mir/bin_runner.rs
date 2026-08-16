@@ -1,6 +1,7 @@
 //! Generated fmir-bin runner crate: write, render, and invoke.
 
 use super::*;
+use std::path::PathBuf;
 
 pub(super) fn write_fmir_bin_runner(
     artifact_root: &Path,

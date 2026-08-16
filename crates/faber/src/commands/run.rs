@@ -84,7 +84,7 @@ pub(super) fn interpret_path(
             &config,
             archive.package_input(),
             selection,
-            &package::faber_mir_seams(),
+            &package::mir::faber_mir_seams(),
             &mut host,
         ) {
             archive.remap_diagnostics(&mut diagnostics);
@@ -109,7 +109,7 @@ pub(super) fn interpret_path(
             &config,
             path,
             selection,
-            &package::faber_mir_seams(),
+            &package::mir::faber_mir_seams(),
             &mut host,
         ) {
             super::eprint_compile_diagnostics(&diagnostics);
@@ -364,7 +364,7 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
     // falling back to the image's recorded selection.
     let decision = match radix_package::mir::fmir_image_route_decision(
         &args.image,
-        &package::faber_mir_seams(),
+        &package::mir::faber_mir_seams(),
     ) {
         Ok(decision) => decision,
         Err(diagnostics) => {
@@ -384,7 +384,7 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
     if let Err(diagnostics) = radix_package::mir::run_fmir_image_path_with_selection(
         &args.image,
         Some(selection),
-        &package::faber_mir_seams(),
+        &package::mir::faber_mir_seams(),
         &mut host,
     ) {
         eprint_route_diagnostics(&diagnostics);

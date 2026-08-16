@@ -6,8 +6,8 @@
 //! interpretation — `[device]`, `[product]`, `[format]`, `[dispatch]`,
 //! product emit — plus the strict one-pass parse (`deny_unknown_fields`)
 //! that discovery and product flows validate against (goal §Manifest
-//! boundary). Compiler-view types and `manifest_build_target` are forwarded
-//! below so faber consumers keep their existing import paths.
+//! boundary). Compiler-view types and target selection are consumed directly
+//! from `radix-package`; this module retains only the product projection.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -22,10 +22,9 @@ use serde::Deserialize;
 // (the product-owned `DeviceSelection` under
 // `device-runtime`, a local equivalent in the small build).
 use super::DeviceSelection;
-
-pub use radix_package::manifest::{
+use radix_package::manifest::{
     manifest_build_target, ManifestBuild, ManifestLibrary, ManifestPackage, ManifestPaths,
-    ManifestReader, ManifestRustFieldNames, ManifestRustHost, ManifestTarget,
+    ManifestReader, ManifestTarget,
 };
 
 #[derive(Debug, Deserialize)]
@@ -259,7 +258,7 @@ pub(crate) fn manifest_build_target_for_input(
 pub(crate) fn manifest_format_policy(
     input: &Path,
 ) -> Result<Option<FormatPolicy>, Box<Diagnostic>> {
-    let spec = super::discovery::discover_package(input)?;
+    let spec = super::discover_package(input)?;
     let Some(manifest) = manifest_for_spec(&spec)? else {
         return Ok(None);
     };
@@ -340,12 +339,12 @@ pub fn read_manifest(path: &Path) -> Result<FaberManifest, Box<Diagnostic>> {
 /// must keep its manifest: a later missing or unreadable manifest is a
 /// diagnostic, never a silent `None` default (FBR-P1-001).
 pub(super) fn manifest_for_spec(
-    spec: &super::discovery::PackageSpec,
+    spec: &radix_package::discovery::PackageSpec,
 ) -> Result<Option<FaberManifest>, Box<Diagnostic>> {
     if !spec.manifest_backed {
         return Ok(None);
     }
-    let Some(path) = super::frontmatter::manifest_path_for_spec(spec) else {
+    let Some(path) = radix_package::frontmatter::manifest_path_for_spec(spec) else {
         return Err(Box::new(
             crate::package_diagnostic_error(
                 "package manifest faber.toml is missing after discovery validated it",

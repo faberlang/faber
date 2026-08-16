@@ -5,7 +5,13 @@
 //! output. They do not assert package manifest loading, library resolution, or
 //! build layout behavior.
 
-use super::{check_package, config_with_locale};
+use super::config_with_locale;
+use crate::package::faber_analysis_seams;
+use radix_package::analyze::check_package as check_package_direct;
+
+fn check_with_faber_seams(config: &radix::driver::Config, input: &std::path::Path) -> Vec<radix::diagnostics::Diagnostic> {
+    check_package_direct(config, input, &faber_analysis_seams())
+}
 use radix::codegen::Target;
 use radix::diagnostics::{Diagnostic, DiagnosticArg};
 use radix::locale::LocalePack;
@@ -98,7 +104,7 @@ fn assert_single_locale_lex004(locale: &str) {
         .and_then(|template| template.issues.get("unexpected_character"))
         .is_some());
 
-    let diagnostics = check_package(&config, &fault);
+    let diagnostics = check_with_faber_seams(&config, &fault);
     let lex004: Vec<_> = diagnostics
         .iter()
         .filter(|diag| diag.code == Some("LEX004"))
@@ -130,7 +136,7 @@ fn package_render_emits_thai_sem010_initializer_mismatch() {
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("SEM010"));
 
-    let diagnostics = check_package(&config, &fault);
+    let diagnostics = check_with_faber_seams(&config, &fault);
     let sem010: Vec<_> = diagnostics
         .iter()
         .filter(|diag| diag.code == Some("SEM010"))
@@ -166,7 +172,7 @@ fn package_render_preserves_bidi_for_arabic_sem010() {
         .and_then(|template| template.issues.get(ISSUE_INITIALIZER_ANNOTATION_MISMATCH))
         .is_some());
 
-    let diagnostics = check_package(&config, &fault);
+    let diagnostics = check_with_faber_seams(&config, &fault);
     let sem010: Vec<_> = diagnostics
         .iter()
         .filter(|diag| diag.code == Some("SEM010"))
@@ -217,7 +223,7 @@ fn assert_single_locale_sem010(locale: &str, fault_rel: &str) {
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("SEM010"));
 
-    let diagnostics = check_package(&config, &fault);
+    let diagnostics = check_with_faber_seams(&config, &fault);
     let sem010: Vec<_> = diagnostics
         .iter()
         .filter(|diag| diag.code == Some("SEM010"))
@@ -249,7 +255,7 @@ fn assert_single_locale_sem010_or_sem001(locale: &str, fault_rel: &str) {
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("SEM010"));
 
-    let diagnostics = check_package(&config, &fault);
+    let diagnostics = check_with_faber_seams(&config, &fault);
 
     let sem010: Vec<_> = diagnostics
         .iter()
@@ -309,7 +315,7 @@ fn assert_single_locale_sem010_or_sem001_renders(locale: &str, fault_rel: &str) 
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("SEM010"));
 
-    let diagnostics = check_package(&config, &fault);
+    let diagnostics = check_with_faber_seams(&config, &fault);
 
     // Try SEM010 first, then SEM001.
     let sem010: Vec<_> = diagnostics
@@ -392,7 +398,7 @@ fn assert_single_locale_sem001_or_reader001(locale: &str, fault_rel: &str) {
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("SEM001"));
 
-    let diagnostics = check_package(&config, &fault);
+    let diagnostics = check_with_faber_seams(&config, &fault);
 
     // SEM001 is the only acceptance path now; the retired reader-locale
     // fallback warning is no longer produced (S0-U5).
@@ -438,7 +444,7 @@ fn package_render_emits_sem001_suggestion_for_vietnamese_name() {
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("LOCALE002"));
 
-    let diagnostics = check_package(&config, &fault);
+    let diagnostics = check_with_faber_seams(&config, &fault);
     let reader002: Vec<_> = diagnostics
         .iter()
         .filter(|diag| diag.code == Some("LOCALE002"))
@@ -476,7 +482,7 @@ fn package_render_emits_reader002_accented_keyword_suggestion() {
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("LOCALE002"));
 
-    let diagnostics = check_package(&config, &fault);
+    let diagnostics = check_with_faber_seams(&config, &fault);
     let reader002: Vec<_> = diagnostics
         .iter()
         .filter(|diag| diag.code == Some("LOCALE002"))
@@ -512,7 +518,7 @@ fn package_render_emits_reader002_typo_keyword_suggestion() {
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("LOCALE002"));
 
-    let diagnostics = check_package(&config, &fault);
+    let diagnostics = check_with_faber_seams(&config, &fault);
     let reader002: Vec<_> = diagnostics
         .iter()
         .filter(|diag| diag.code == Some("LOCALE002"))

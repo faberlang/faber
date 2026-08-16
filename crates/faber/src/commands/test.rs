@@ -2,7 +2,8 @@
 
 use crate::cli::TestArgs;
 use crate::input_shape::locale_without_package_error;
-use crate::package::{self, TestSourceFilter};
+use crate::package;
+use radix_package::test_source_filter::TestSourceFilter;
 use radix::driver::{Config, Session};
 use radix::proba::{
     format_summary, inventory_cases, run_proba_on_analyzed, run_proba_source, CaseOutcome,

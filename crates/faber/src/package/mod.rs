@@ -29,153 +29,85 @@
 // Diagnostic is a large CLI error type by design; returning it by value is deliberate (faber is a CLI, not a hot library path).
 #![allow(clippy::result_large_err)]
 
-pub mod artifact_plan;
 pub mod binding;
 #[cfg(feature = "hir-rust")]
 mod binding_probe;
 mod cargo;
 mod cmd;
-#[cfg(feature = "hir-rust")]
-mod codegen;
-mod compile;
 pub(crate) mod composite_plan;
 #[cfg(feature = "device-runtime")]
 mod device;
-mod discovery;
 mod dispatch;
 #[cfg(feature = "hir-fhir")]
 mod fhir;
-mod file_interface;
-mod frontmatter;
 #[cfg(feature = "hir-go")]
 mod go_build;
 #[cfg(feature = "device-runtime")]
 mod host_factory;
-mod import_graph;
-mod library;
 #[cfg_attr(not(feature = "hir-rust"), path = "library_link_unavailable.rs")]
 mod library_link;
 #[cfg(feature = "mir-llvm")]
-mod llvm;
-#[cfg(feature = "mir-llvm")]
 mod llvm_host;
 mod locale;
-mod lockfile;
 mod manifest;
-mod member_path;
-mod mir;
-mod modules;
-mod paths;
+pub(crate) mod mir;
 mod product;
 mod runtime_dependency;
 mod runtime_sources;
 #[cfg(feature = "hir-rust")]
 mod rust_runtime_dependency;
-#[cfg(feature = "hir-rust")]
-pub(crate) mod rust_target;
-mod source_files;
-mod test_source_filter;
-#[cfg(feature = "mir-wasm")]
-mod wasm;
 
-#[allow(unused_imports)]
-// public package API for library callers; binary crate does not use it.
-pub use artifact_plan::ArtifactPlan;
 #[cfg(feature = "hir-rust")]
 #[allow(unused_imports)]
-// public package API for library callers/tests; binary may not call it.
-pub use binding::verify_library_binding_shapes;
+pub(crate) use binding::verify_library_binding_shapes;
 #[allow(unused_imports)]
-// public package API for library callers/tests; binary crate only uses full verification.
 pub use binding::{
     verify_library_bindings, verify_library_bindings_with_probe_mode, BindingProbeMode,
 };
-pub use test_source_filter::TestSourceFilter;
-// used by `commands/run.rs` / tests for G4 library path-deps on package emit
 #[allow(unused_imports)]
-// library crate tests use this re-export; binary crate imports cargo directly.
 pub(crate) use cargo::emit_generated_crate_with_runtime_plan;
 #[allow(unused_imports)]
-// used by `commands/run.rs` and `commands/test.rs` in the binary crate
 pub(crate) use cargo::invoke_cargo_build;
-#[allow(unused_imports)]
-// public package API for tests/library callers; binary crate uses narrower seams.
 pub use cargo::{emit_generated_crate, invoke_cargo_test};
-pub(crate) use cargo::{package_host_selection_diagnostic, RustRuntimePlan};
-#[cfg(test)]
-pub use cmd::use_package_compiler;
+pub(crate) use cargo::{
+    package_host_selection_diagnostic, rust_runtime_plan_for_package, RustRuntimePlan,
+};
 pub use cmd::{
     cmd_build, cmd_check_package, cmd_emit_package, should_treat_as_package_from_args,
     use_package_compiler_from_args,
 };
-#[cfg(feature = "hir-go")]
-#[allow(unused_imports)] // binary build/run paths consume this crate-visible Go entry.
-pub(crate) use compile::compile_package_go;
-#[cfg(feature = "mir-wasm")]
-#[allow(unused_imports)]
-// U6-D package-wasm emit path (binary `faber build/emit --target wasm`).
-pub(crate) use compile::compile_package_wasm;
-#[allow(unused_imports)] // lib tests consume this faber-signature adapter until RP7.
-pub(crate) use compile::package_rust_runtime_plan;
-// RP6: the binary command adapters consume the radix-package entries directly
-// with faber's seam bundles; re-export the seam constructors crate-visible.
-pub(crate) use compile::{faber_emission_seams, rust_runtime_plan_for_package};
-#[allow(unused_imports)] // package MIR stages consume this crate-visible analysis API.
-pub(crate) use compile::{AnalyzedPackage, AnalyzedPackageUnit};
-#[cfg(feature = "hir-fhir")]
-#[allow(unused_imports)]
-// binary commands/run consumes load/run + PackageFhir; lib uses build_package_fhir.
-pub(crate) use fhir::{
-    build_package_fhir, load_package_fhir, run_loaded_package_fhir, PackageFhir,
-};
-// `compile_package_with_test_*` remain public for lib tests / tooling; the
-// binary `faber test` path no longer emits Rust tests (runner-only).
-#[allow(unused_imports)] // binary crate root does not call test compile helpers
-pub use compile::{
-    check_package, compile_package, compile_package_with_test_options,
-    compile_package_with_test_selection,
-};
-#[allow(unused_imports)] // public package API; used by integration tests and external callers
-pub use discovery::{discover_build_layout, sanitize_crate_name, BuildLayout};
 pub(crate) use dispatch::{
     load_provider_manifests, selected_providers_for_routes, ProviderManifest,
 };
 #[cfg(feature = "hir-go")]
-#[allow(unused_imports)] // binary `faber build -t go` consumes this crate-visible surface.
+#[allow(unused_imports)]
 pub(crate) use go_build::{emit_go_module, invoke_go_build, GoBuildLayout};
-#[allow(unused_imports)] // binary `commands/run` + `commands/test` G4 linkage
+#[allow(unused_imports)]
 pub(crate) use library_link::emit_linked_library_crates;
 pub(crate) use manifest::validate_manifest;
 #[allow(unused_imports)]
-// binary commands/run resolves run targets through this crate-visible mapping.
 pub(crate) use manifest::{
-    manifest_backend_selection, manifest_build_target, manifest_device_inputs,
+    manifest_backend_selection, manifest_build_target_for_input, manifest_device_inputs,
     manifest_format_policy,
 };
-#[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use manifest::{
-    read_manifest, FaberManifest, ManifestBuild, ManifestDispatch, ManifestLibrary,
-    ManifestPackage, ManifestPaths, ManifestProduct, ManifestProductEmit, ManifestProductKind,
-    ManifestProductShaders, ManifestRustFieldNames, ManifestRustHost,
+    read_manifest, FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
+    ManifestProductShaders,
 };
 pub(crate) use product::build_browser_product_with_postprocess;
 #[cfg(test)]
 pub(crate) use product::{build_browser_product, build_browser_product_static_assets};
-// binary-only package interpretation route consumes this through `commands`.
 #[cfg(feature = "device-runtime")]
-#[allow(unused_imports)] // the S1-6 device-route seam (constructor + execution).
+#[allow(unused_imports)]
 pub(crate) use device::{
     admit_device_program_section, device_program_for_lowered, device_section_for_program,
     execute_device_route,
 };
-// NGAB1-U1 host-partition wire: the typed host/device partition + device
-// program of a lowered package (faber-owned ABI crossing; radix owns the
-// derivation facts).
 #[cfg(feature = "device-runtime")]
 #[allow(unused_imports)]
 pub(crate) use device::host_partition_for_lowered;
 #[cfg(feature = "device-runtime")]
-#[allow(unused_imports)] // the one host-construction policy for the run routes.
+#[allow(unused_imports)]
 pub(crate) use host_factory::{
     admitted_backends, construct_composite_host, create_program_session, discovery_receipt,
     effective_backend_selection, execute_device_descriptor, host_error_diagnostic,
@@ -183,57 +115,21 @@ pub(crate) use host_factory::{
     BackendDiscoveryReceipt, E_BACKEND_UNAVAILABLE, E_DEVICE_ABI_MISMATCH, E_DEVICE_DESCRIPTOR,
     E_DEVICE_DTYPE_MISMATCH, E_DEVICE_ENTRY_MISMATCH, E_DEVICE_SHAPE_MISMATCH, E_NO_DEVICE_PROGRAM,
 };
-#[allow(unused_imports)]
-// graph-rooted build is package-crate internal (graph type is pub(crate)).
 #[cfg(feature = "mir-llvm")]
-pub(crate) use llvm::build_package_llvm_from_graph;
 #[allow(unused_imports)]
-// LLVM host harnesses consume the reusable package-to-LLVM builder (S8.3).
-#[cfg(feature = "mir-llvm")]
-pub use llvm::{
-    build_package_llvm, PackageLlvmBuild, PackageLlvmLinkManifest, PackageLlvmModule,
-    PackageLlvmOptions,
-};
-#[allow(unused_imports)]
-// `faber build --target llvm-host` + product tests consume the Stage 9 lane.
-#[cfg(feature = "mir-llvm")]
 pub use llvm_host::{
     build_host_program, discover_llvm_host_toolchain, ensure_llvm_runtime_archive,
     host_llvm_target_triple, host_triple_for, LlvmHostBuild, LlvmHostProfile,
 };
-#[allow(unused_imports)] // generated fmir-bin runner crates consume this public API.
+#[allow(unused_imports)]
 pub use mir::run_fmir_image_bytes_with_stdio;
-#[cfg(test)]
-pub(super) use radix_package::mir::test_support::{fmir_image_test_summary, fmir_text_image_test_summary};
-#[allow(unused_imports)] // External backend harnesses consume the public package-MIR callback.
+#[allow(unused_imports)]
 pub use mir::with_lowered_package_mir;
-/// Product-owned device-selection request used by all route plumbing.
 pub(crate) use mir::DeviceSelection;
-#[allow(unused_imports)] // FMIR stages consume this crate-visible image API.
-pub(crate) use mir::{
-    build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
-    faber_mir_seams, fmir_image_route_decision, run_fmir_image_path, run_fmir_image_path_with_selection,
-    run_package_fmir_built_image, run_package_fmir_image, run_package_fmir_image_with_selection,
-    run_package_fmir_text_image, run_package_fmir_text_image_with_selection,
-};
-#[allow(unused_imports)]
-pub(crate) use mir::{
-    build_package_mir_artifact, run_package_mir, run_package_mir_artifact,
-    run_package_mir_with_selection,
-};
-#[cfg(feature = "mir-wasm")]
-#[allow(unused_imports)]
-// Wasm package harnesses consume the reusable package-to-Wasm builder (U6-D).
-pub use wasm::{
-    build_package_wasm, PackageWasmBuild, PackageWasmLinkManifest, PackageWasmModule,
-    PackageWasmOptions,
-};
-
-// `commands/run` interpreted dispatch consumes this package-input classifier.
-#[allow(unused_imports)]
-pub(crate) use discovery::{discover_package, is_manifest_backed_or_directory_package_input};
-
 use crate::library::LibraryResolver;
+use radix_package::analyze::AnalyzedPackage;
+use radix_package::discovery::PackageSpec;
+use radix_package::library::LibraryInterfaceCache;
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 use radix::driver::Config;
@@ -295,20 +191,6 @@ fn is_mir_backed_target(target: Target) -> bool {
     )
 }
 
-pub(crate) use discovery::PackageSpec;
-pub(crate) use member_path::resolve_package_member;
-
-#[allow(unused_imports)] // LibraryInterfaceCache consumed by the moved Rust assembly until RP7
-pub(crate) use library::{
-    library_cached_analysis, library_cache_default, library_cache_with_config,
-    LibraryInterfaceCache,
-};
-#[cfg(feature = "hir-rust")]
-#[allow(unused_imports)] // consumed by the moved Rust assembly until RP7
-pub(crate) use library::{
-    library_cached_expanded_imports, library_generates_rust_module, library_module_segments,
-    with_library_cached_analysis_mut,
-};
 /// Installed reader-pack path resolution shared by lib surfaces
 /// (`diagnostic_explain`) and package code-locale lookup. Used by the lib
 /// crate only; the bin's copy is legitimately unused.
@@ -322,11 +204,51 @@ pub(crate) use locale::{config_with_locale, default_config_with_locale, load_loc
 
 pub(super) const MANIFEST_FILE: &str = "faber.toml";
 
-// RP2c: the loaded-package-file and library-import-binding types moved to
-// `radix-package` with the import-graph and library surfaces that operate on
-// them; faber's loader and analysis/emission halves keep their existing names
-// through this re-export.
-pub(crate) use radix_package::{LibraryImportBinding, PackageFile};
+/// Resolve a product input against the caller's working directory before
+/// entering the explicit-input compiler API. Ambient CWD lookup is a Faber
+/// command concern, not a radix-package concern.
+fn absolutize_path(path: &Path) -> std::path::PathBuf {
+    let path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .unwrap_or_else(|_| std::path::PathBuf::from("."))
+            .join(path)
+    };
+    radix_package::paths::normalize_path(&path)
+}
+
+pub(crate) fn discover_package(input: &Path) -> Result<PackageSpec, Box<Diagnostic>> {
+    let spec = radix_package::discovery::discover_package(&absolutize_path(input))?;
+    if spec.manifest_backed {
+        let manifest_path = spec.package_root.join(MANIFEST_FILE);
+        if manifest_path.exists() {
+            let manifest = read_manifest(&manifest_path)?;
+            validate_manifest(&manifest, &manifest_path)?;
+        }
+    }
+    Ok(spec)
+}
+
+pub(crate) fn discover_build_layout(
+    input: &Path,
+) -> Result<radix_package::discovery::BuildLayout, Box<Diagnostic>> {
+    radix_package::discovery::discover_build_layout(&absolutize_path(input))
+}
+
+#[allow(dead_code)]
+pub(crate) fn is_manifest_backed_or_directory_package_input(input: &Path) -> bool {
+    radix_package::discovery::is_manifest_backed_or_directory_package_input(&absolutize_path(input))
+}
+
+/// Build the explicit library cache seam used by product MIR route plumbing.
+pub(crate) fn library_cache_with_config(config: &Config) -> LibraryInterfaceCache {
+    LibraryInterfaceCache::with_config(config).with_locale_loader(load_locale_pack_for_input)
+}
+
+pub(crate) fn library_cache_default() -> LibraryInterfaceCache {
+    LibraryInterfaceCache::default().with_locale_loader(load_locale_pack_for_input)
+}
 
 pub(crate) fn library_resolver_from_config(config: &radix::driver::Config) -> LibraryResolver {
     // The library home (provider repos such as `norma/` and `triga/`) is
@@ -361,11 +283,11 @@ pub(crate) fn library_resolver_for_package(
         Ok(manifest) => manifest,
         Err(diag) => return Err(vec![*diag]),
     };
-    let lock = match lockfile::read_lock(package_root) {
+    let lock = match radix_package::lockfile::read_lock(package_root) {
         Ok(lock) => lock,
         Err(diag) => return Err(vec![*diag]),
     };
-    let mut lock_diags = lockfile::validate_dependencies_against_lock(
+    let mut lock_diags = radix_package::lockfile::validate_dependencies_against_lock(
         package_root,
         &manifest.dependencies,
         lock.as_ref(),
@@ -378,7 +300,10 @@ pub(crate) fn library_resolver_for_package(
 
     let mut locked = std::collections::BTreeMap::new();
     if let Some(lock) = lock.as_ref() {
-        let lock_index = lockfile::lock_index(&package_root.join(lockfile::LOCK_FILE), lock)?;
+        let lock_index = radix_package::lockfile::lock_index(
+            &package_root.join(radix_package::lockfile::LOCK_FILE),
+            lock,
+        )?;
         for package in lock_index.values() {
             locked.insert(
                 package.name.clone(),
@@ -422,6 +347,62 @@ pub(crate) fn faber_analysis_seams() -> radix_package::analyze::AnalysisSeams {
     }
 }
 
+/// Faber-supplied package-emission seams. Go source assembly remains a product
+/// helper because it owns the generated multi-file package shape; the shared
+/// dispatch and Rust assembly live in `radix-package`.
+pub(crate) fn faber_emission_seams() -> radix_package::emit::EmissionSeams {
+    radix_package::emit::EmissionSeams {
+        analysis: faber_analysis_seams(),
+        #[cfg(feature = "hir-go")]
+        emit_go: go_build::generate_package_go_result,
+        #[cfg(feature = "mir-wasm")]
+        emit_wasm: generate_package_wasm_result,
+    }
+}
+
+#[cfg(feature = "mir-wasm")]
+fn generate_package_wasm_result(
+    package: &mut radix_package::analyze::AnalyzedPackage,
+    _input: &Path,
+) -> radix_package::emit::PackageCompileResult {
+    let options = radix_package::wasm::PackageWasmOptions::new(
+        package
+            .spec
+            .package_root
+            .join("target")
+            .join("faber")
+            .join("wasm"),
+    );
+    let build = match radix_package::wasm::build_package_wasm_from_graph(package, &options) {
+        Ok(build) => build,
+        Err(diagnostics) => return radix_package::emit::compile_failure(diagnostics),
+    };
+    let entry_wat = build
+        .modules
+        .iter()
+        .find(|module| module.is_entry)
+        .map(|module| module.wat.clone())
+        .unwrap_or_default();
+    let wasm_modules = build
+        .modules
+        .into_iter()
+        .map(|module| radix_package::emit::WasmPackageModuleFile {
+            module_segments: module.module_segments,
+            is_entry: module.is_entry,
+            wat: module.wat,
+        })
+        .collect::<Vec<_>>();
+    radix_package::emit::PackageCompileResult {
+        compile_result: radix::CompileResult {
+            output: Some(radix::Output::WasmText(radix::WasmTextOutput { code: entry_wat })),
+            diagnostics: package.diagnostics.clone(),
+        },
+        wasm_modules,
+        #[cfg(feature = "hir-go")]
+        go_modules: Vec::new(),
+    }
+}
+
 fn validate_product_manifest_for_spec(spec: &PackageSpec) -> Result<(), Box<Diagnostic>> {
     manifest::manifest_for_spec(spec).map(|_| ())
 }
@@ -443,74 +424,7 @@ fn linked_crates_for_package_root(package_root: &Path) -> BTreeMap<String, Strin
         diagnostics: Vec::new(),
         linked_library_crates: BTreeMap::new(),
     };
-    artifact_plan::linked_library_crate_map(&shell)
-}
-
-pub(crate) fn analyze_package(
-    config: &Config,
-    input: &Path,
-) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
-    radix_package::analyze::analyze_package(config, input, &faber_analysis_seams())
-}
-
-// Used by the binary `faber test` command and lib tests; the lib crate root
-// does not call it outside `cfg(test)`.
-#[allow(dead_code)]
-pub(crate) fn analyze_package_for_tests(
-    config: &Config,
-    input: &Path,
-    proba_filter: Option<&TestSourceFilter>,
-) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
-    radix_package::analyze::analyze_package_for_tests(
-        config,
-        input,
-        proba_filter,
-        &faber_analysis_seams(),
-    )
-}
-
-// RP4: the spec-level analysis entry and the config/root helpers moved to
-// `radix-package` with the emission assembly; their only faber consumers
-// (the emission dispatcher and the runtime-plan entry) now call
-// `radix-package` directly.
-
-/// Test-facing convenience wrapper around [`load_package_with_locale_pack`]
-/// (no reader pack, no proba filtering).
-///
-/// Dead-code allowance (lib/bin non-test builds): every production path calls
-/// [`load_package_with_locale_pack`] or the higher-level compile/run routes
-/// directly, while the package test suites (`package_test`,
-/// `frontmatter_integration_test`, `proba_integration_test`,
-/// `proba_runner_test`) exercise this wrapper. The deferred FHIR package
-/// Stages 5-6 (Cista installed-library path) reconstruct packages through
-/// radix's `radix::hir::package::load_package` + faber `load_package_fhir`
-/// (see `radix/docs/factory/hir-artifact-fhir/`), not this source-tree
-/// wrapper — retained as the test-facing convenience surface.
-#[allow(dead_code)]
-pub(crate) fn load_package(
-    spec: &PackageSpec,
-    library_resolver: &LibraryResolver,
-) -> Result<Vec<PackageFile>, Vec<Diagnostic>> {
-    load_package_with_locale_pack(spec, library_resolver, None, false, None)
-}
-
-pub(crate) fn load_package_with_locale_pack(
-    spec: &PackageSpec,
-    library_resolver: &LibraryResolver,
-    locale_pack: Option<&radix::locale::LocalePack>,
-    include_proba: bool,
-    proba_filter: Option<&TestSourceFilter>,
-) -> Result<Vec<PackageFile>, Vec<Diagnostic>> {
-    // RP3: the loader composition moved to `radix-package` (`analyze.rs`);
-    // faber supplies the product seams (manifest validation, locale packs).
-    radix_package::analyze::load_package_with_locale_pack(
-        spec,
-        library_resolver,
-        locale_pack,
-        include_proba,
-        proba_filter,
-        &faber_analysis_seams(),
-    )
+    radix_package::artifact_plan::linked_library_crate_map(&shell)
 }
 
 #[cfg(test)]
