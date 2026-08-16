@@ -193,7 +193,7 @@ impl super::FaberCodegen {
                 self.write_postfix_chain_tail(
                     OPTIONAL_CHAIN,
                     chain.into(),
-                    self.receiver_is_nominal(object, types),
+                    self.receiver_projects_intrinsic(object, types),
                     types,
                     names,
                     interner,
@@ -206,7 +206,7 @@ impl super::FaberCodegen {
                 self.write_postfix_chain_tail(
                     NON_NULL_CHAIN,
                     chain.into(),
-                    self.receiver_is_nominal(object, types),
+                    self.receiver_projects_intrinsic(object, types),
                     types,
                     names,
                     interner,
@@ -972,7 +972,7 @@ impl super::FaberCodegen {
         &self,
         prefixes: PostfixChainPrefixes,
         tail: PostfixChainTail<'_>,
-        receiver_is_nominal: bool,
+        receiver_projects_intrinsic: bool,
         types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
         interner: &Interner,
@@ -982,10 +982,10 @@ impl super::FaberCodegen {
         match tail {
             PostfixChainTail::Member(name) => {
                 writer.write(prefixes.member);
-                let spelling = if receiver_is_nominal {
-                    self.symbol_to_string(name, interner)
-                } else {
+                let spelling = if receiver_projects_intrinsic {
                     self.method_name_to_surface(name, surface, interner)
+                } else {
+                    self.symbol_to_string(name, interner)
                 };
                 writer.write(&spelling);
             }
@@ -1108,14 +1108,17 @@ impl super::FaberCodegen {
 
     /// Spelling for a method call on the given receiver.
     ///
-    /// Nominal (class/interface/enum) receivers keep the canonical method
-    /// name: their declaration is emitted from the canonical HIR symbol, the
-    /// re-parse resolves the canonical name directly, and the pack's
-    /// intrinsic rows are for builtin receivers only — localizing a class
-    /// method call (`longitudo` → `length`) produces a name the class does
-    /// not declare. Intrinsic-capable receivers (collections, tensors,
-    /// primitives) project through the pack surface, which the semantic layer
-    /// maps back to canonical on re-parse.
+    /// Intrinsic-capable receivers (collections, tensors, primitives) project
+    /// the canonical method name through the pack surface: HIR method symbols
+    /// are canonical registry spellings, and under a non-`la` reader pack
+    /// those spellings are not re-parseable method names. Nominal
+    /// (class/interface/enum) receivers and module-import receivers keep the
+    /// canonical symbol instead: the first declares its own method from the
+    /// canonical HIR symbol (localizing `longitudo` → `length` produces a name
+    /// the class does not declare), and the second names a user callable in
+    /// another module whose declaration is also emitted from the canonical
+    /// symbol (rewriting `parametrum.muta` → `parametrum.replace` breaks the
+    /// qualified call with a namespace-missing-export).
     fn method_spelling(
         &self,
         receiver: &HirExpression,
@@ -1124,26 +1127,54 @@ impl super::FaberCodegen {
         interner: &Interner,
         surface: &impl KeywordSurface,
     ) -> String {
-        if self.receiver_is_nominal(receiver, types) {
-            self.symbol_to_string(name, interner)
-        } else {
+        if self.receiver_projects_intrinsic(receiver, types) {
             self.method_name_to_surface(name, surface, interner)
+        } else {
+            self.symbol_to_string(name, interner)
         }
     }
 
-    /// Whether a method-call receiver expression denotes a nominal type
-    /// (class, interface, or enum), unwrapping reference/optional/application
-    /// wrappers the way semantic method lookup does.
-    fn receiver_is_nominal(&self, receiver: &HirExpression, types: &TypeTable) -> bool {
+    /// Whether a method-call receiver expression denotes an intrinsic-capable
+    /// receiver (a collection, a tensor, or a primitive value) whose method
+    /// name must project through the target surface.
+    ///
+    /// Mirrors the semantic intrinsic-receiver classification
+    /// (`receivers_for_type`): nominal types, module-import bindings (whose
+    /// qualified member calls name user callables in another module — their
+    /// receiver type is `ignotum`), and unsupported receivers keep the
+    /// canonical symbol. Reference/optional/application wrappers unwrap the
+    /// way semantic method lookup does.
+    fn receiver_projects_intrinsic(&self, receiver: &HirExpression, types: &TypeTable) -> bool {
         let Some(mut ty) = receiver.ty else {
             return false;
         };
         loop {
             match types.get(ty) {
-                Type::Struct(_) | Type::Enum(_) | Type::Interface(_) => return true,
                 Type::Ref(_, inner) | Type::Option(inner) | Type::Alias(_, inner) => ty = *inner,
                 Type::Applied(base, _) => ty = *base,
-                _ => return false,
+                ty => {
+                    return matches!(
+                        ty,
+                        Type::Array(_)
+                            | Type::Map(_, _)
+                            | Type::Set(_)
+                            | Type::Tensor(_, _)
+                            | Type::Matrix(_, _)
+                            | Type::Vector(_, _)
+                            | Type::Sparsa(_, _)
+                            | Type::Intervallum(_)
+                            | Type::Atomic(_)
+                            | Type::SizedNumeric(_, _)
+                            | Type::ModularWord(_)
+                            | Type::Primitive(
+                                Primitive::Octeti
+                                    | Primitive::Textus
+                                    | Primitive::Regex
+                                    | Primitive::Numerus
+                                    | Primitive::Fractus
+                            )
+                    );
+                }
             }
         }
     }

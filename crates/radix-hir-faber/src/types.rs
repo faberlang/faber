@@ -1909,10 +1909,13 @@ mod tests {
     fn intrinsic_method_call_localizes_through_surface() {
         // HIR method symbols are canonical registry spellings; under a
         // non-`la` reader pack the canonical Latin name is a compile error on
-        // re-parse. The emitter must project it through the target pack's
-        // intrinsic surface rows.
+        // re-parse. The emitter must project them through the target pack's
+        // intrinsic surface rows — for genuine intrinsic-method receivers
+        // (a collection, tensor, or primitive value); nominal and module-
+        // import receivers keep the canonical symbol.
         let mut interner = Interner::new();
         let types = TypeTable::new();
+        let textus = types.primitive(Primitive::Textus);
         let receiver_def = DefId(5);
 
         let body = HirBlock {
@@ -1924,7 +1927,7 @@ mod tests {
                         Box::new(HirExpression {
                             id: HirId(4),
                             kind: HirExpressionKind::Path(receiver_def),
-                            ty: None,
+                            ty: Some(textus),
                             span: span(),
                         }),
                         interner.intern("divide"),
