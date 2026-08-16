@@ -3,13 +3,10 @@ use super::frontmatter::RustTestSelection;
 use radix::cli::CliProgram;
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
-use radix::driver::{
-    analyze_source_with_cli_program_and_import_contract, AnalyzedUnit, Config, Session,
-};
+use radix::driver::Config;
 use radix::hir::visit::{walk_expr, HirVisitor};
 use radix::hir::{HirExpressionKind, HirItemKind};
 use radix::lexer::Interner;
-use radix::syntax::{ImportDecl, ImportKind, StmtKind};
 use radix::CompileResult;
 #[cfg(feature = "hir-go")]
 use radix::GoOutput;
@@ -19,55 +16,21 @@ use radix::Output;
 use radix::WasmTextOutput;
 #[cfg(feature = "hir-go")]
 use std::collections::HashMap;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use super::frontmatter::manifest_path_for_spec;
-use super::import_graph::{
-    build_mount_plan, library_import_binding, resolve_import, ImportResolution,
-};
+// RP3: multi-unit analysis lives in `radix-package` (`analyze.rs`); the
+// production analyzed-package contract is radix-package-owned. This forwarding
+// keeps faber-internal consumers compiling until RP7 removes the residue.
+pub use radix_package::analyze::{AnalyzedPackage, AnalyzedPackageUnit};
+pub(crate) use super::analyze_package;
+
+use super::import_graph::{resolve_import, ImportResolution};
 use super::{
-    analysis_source_for_file, discover_build_layout, discover_package, library_cache_default,
-    library_cache_with_config, library_cached_analysis, library_cached_file_interface,
-    library_interface_export_surface, library_interface_has_module,
-    library_resolver_for_package, load_locale_pack_for_input, load_package_with_locale_pack,
-    load_provider_manifests, program_export_surface, read_manifest, selected_providers_for_routes,
-    LibraryImportBinding, LibraryInterfaceCache, PackageFile, RustRuntimePlan,
+    analyze_package_spec, discover_package, effective_package_config, library_cache_default,
+    library_cached_analysis, library_resolver_for_package, load_provider_manifests,
+    package_root_for_input, selected_providers_for_routes, RustRuntimePlan,
 };
-use radix::semantic::passes::visibility_annotation::VisibilityTier;
-
-pub(crate) struct AnalyzedPackage {
-    pub(crate) spec: super::PackageSpec,
-    pub(crate) units: Vec<AnalyzedPackageUnit>,
-    // Entry frontmatter feeds the hir-rust test-selection merge (rust_target)
-    // and the hir-fhir writer. `allow(dead_code)`: dead only in builds with
-    // neither `hir-rust` nor `hir-fhir` enabled (minimal target leaves).
-    #[allow(dead_code)]
-    pub(crate) entry_frontmatter: Option<radix::driver::FileFrontmatter>,
-    pub(crate) diagnostics: Vec<Diagnostic>,
-    /// Provider → Cargo crate name for native-binding library path deps (G4).
-    pub(crate) linked_library_crates: std::collections::BTreeMap<String, String>,
-}
-
-impl AnalyzedPackage {
-    // Go package assembly (`generate_package_go_result`) consumes the entry
-    // unit directly. `allow(dead_code)`: dead only in builds without `hir-go`.
-    #[allow(dead_code)]
-    pub(crate) fn entry_unit(&self) -> Option<&AnalyzedPackageUnit> {
-        self.units.iter().find(|unit| unit.is_entry)
-    }
-}
-
-pub(crate) struct AnalyzedPackageUnit {
-    pub(crate) path: PathBuf,
-    pub(crate) module_segments: Vec<String>,
-    pub(crate) is_entry: bool,
-    pub(crate) analysis: AnalyzedUnit,
-    pub(crate) file_interface: radix::file_interface::FileInterface,
-    pub(crate) export_names: Vec<String>,
-    pub(crate) namespace_exports: BTreeMap<String, BTreeMap<String, VisibilityTier>>,
-    pub(crate) expanded_library_imports: Vec<LibraryImportBinding>,
-}
 
 /// Result of a package compile that explicitly carries the Go multi-module
 /// file collection produced by the Go assembly path (G6 GO3/GO4).
@@ -328,53 +291,6 @@ pub(crate) fn package_rust_runtime_plan(
     let library_resolver = library_resolver_for_package(&config, &package_root)?;
     let package = analyze_package_spec(&config, spec, &library_resolver, false, None)?;
     rust_runtime_plan_for_package(&package, &library_resolver).map_err(|diag| vec![*diag])
-}
-
-pub(crate) fn analyze_package(
-    config: &Config,
-    input: &Path,
-) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
-    let config = effective_package_config(config, input)?;
-    let spec = discover_package(input).map_err(|diag| vec![*diag])?;
-    let package_root = package_root_for_input(input);
-    let library_resolver = library_resolver_for_package(&config, &package_root)?;
-    analyze_package_spec(&config, spec, &library_resolver, false, None)
-}
-
-/// Analyze a package for `faber test`: includes `*.proba` and optional path filters.
-///
-/// Production [`analyze_package`] keeps `include_proba = false` so build/run graphs
-/// stay free of test sources.
-///
-/// Used by the binary `faber test` command and lib tests; the lib crate root does
-/// not call it outside `cfg(test)`.
-#[allow(dead_code)] // binary `commands/test` + cfg(test); shared package sources
-pub(crate) fn analyze_package_for_tests(
-    config: &Config,
-    input: &Path,
-    proba_filter: Option<&super::TestSourceFilter>,
-) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
-    let config = effective_package_config(config, input)?;
-    let spec = discover_package(input).map_err(|diag| vec![*diag])?;
-    let package_root = package_root_for_input(input);
-    let library_resolver = library_resolver_for_package(&config, &package_root)?;
-    analyze_package_spec(&config, spec, &library_resolver, true, proba_filter)
-}
-
-fn package_root_for_input(input: &Path) -> PathBuf {
-    match discover_build_layout(input) {
-        Ok(layout) => layout.package_root,
-        Err(_) => {
-            if input.is_file() {
-                input
-                    .parent()
-                    .unwrap_or_else(|| Path::new("."))
-                    .to_path_buf()
-            } else {
-                input.to_path_buf()
-            }
-        }
-    }
 }
 
 fn compile_package_internal(
@@ -988,378 +904,6 @@ fn go_import_path(segment: &str) -> Option<&str> {
 #[path = "compile_test.rs"]
 mod tests;
 
-fn effective_package_config(config: &Config, input: &Path) -> Result<Config, Vec<Diagnostic>> {
-    if config.locale_pack.is_some() {
-        return Ok(config.clone());
-    }
-    match load_locale_pack_for_input(input, None) {
-        Ok(Some(pack)) => Ok(config.clone().with_locale_pack(pack)),
-        Ok(None) => Ok(config.clone()),
-        Err(diag) => Err(vec![*diag]),
-    }
-}
-
-fn analyze_package_spec(
-    config: &Config,
-    spec: super::PackageSpec,
-    library_resolver: &crate::library::LibraryResolver,
-    include_proba: bool,
-    proba_filter: Option<&super::TestSourceFilter>,
-) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
-    let files = match config.locale_pack.as_ref() {
-        Some(pack) => load_package_with_locale_pack(
-            &spec,
-            library_resolver,
-            Some(pack),
-            include_proba,
-            proba_filter,
-        )?,
-        None => load_package_with_locale_pack(
-            &spec,
-            library_resolver,
-            None,
-            include_proba,
-            proba_filter,
-        )?,
-    };
-    let entry_frontmatter = files
-        .iter()
-        .find(|file| file.path == spec.entry)
-        .and_then(|file| file.frontmatter.clone());
-    // Install [paths.templates] into the driver config so SEM006 accepts §name/…
-    // and validation matches package resolution.
-    let mut config = config.clone();
-    if !spec.templates.is_empty() {
-        let mut templates = std::collections::BTreeMap::new();
-        for (name, path) in &spec.templates {
-            templates.insert(name.clone(), path.display().to_string());
-        }
-        config.import_path_templates = Some(templates);
-    }
-    let session = Session::new(config);
-    let mount_plan = build_mount_plan(&spec, &files)?;
-    let mut diagnostics = Vec::new();
-    let mut library_cache = library_cache_with_config(&session.config);
-    let mut units = Vec::new();
-    let mut analyzed_interfaces_by_path = BTreeMap::new();
-    // Linked crates are known from the package root + lock before unit analysis.
-    let linked_library_crates = linked_crates_for_package_root(&spec.package_root);
-
-    for file in package_analysis_order(&spec, &files, library_resolver) {
-        let file_cli = mount_plan.module_cli.get(&file.path).cloned();
-        let namespace_exports = match namespace_exports_for_file(
-            &spec,
-            file,
-            &files,
-            library_resolver,
-            &mut library_cache,
-        ) {
-            Ok(exports) => exports,
-            Err(diag) => {
-                diagnostics.push(diag);
-                continue;
-            }
-        };
-        let file_interfaces = match file_interfaces_for_file(
-            &spec,
-            file,
-            library_resolver,
-            &mut library_cache,
-            &analyzed_interfaces_by_path,
-        ) {
-            Ok(interfaces) => interfaces,
-            Err(diag) => {
-                diagnostics.push(diag);
-                continue;
-            }
-        };
-        let analysis_source =
-            match analysis_source_for_file(file, library_resolver, &mut library_cache) {
-                Ok(source) => source,
-                Err(diag) => {
-                    diagnostics.push(diag);
-                    continue;
-                }
-            };
-        let mut analysis = match analyze_source_with_cli_program_and_import_contract(
-            &session,
-            &file.path.display().to_string(),
-            &analysis_source,
-            file_cli,
-            namespace_exports.clone(),
-            file_interfaces,
-        ) {
-            Ok(analysis) => analysis,
-            Err(file_diagnostics) => {
-                diagnostics.extend(file_diagnostics);
-                continue;
-            }
-        };
-        let provenance_imports = file.library_imports.clone();
-        if let Err(diag) = super::library::attach_library_provenance_with_links(
-            &mut analysis,
-            &provenance_imports,
-            library_resolver,
-            &mut library_cache,
-            Some(&linked_library_crates),
-        ) {
-            diagnostics.push(diag);
-            continue;
-        }
-
-        let is_entry = file.path == spec.entry;
-        if !is_entry {
-            analysis.hir.entry = None;
-        }
-        if is_entry {
-            if let Some(root_cli) = mount_plan.root_cli.clone() {
-                analysis.cli_program = Some(root_cli);
-            }
-        }
-
-        let export_names = program_export_surface(&file.program, &file.interner)
-            .into_keys()
-            .collect::<Vec<_>>();
-        let package_name = manifest_path_for_spec(&spec)
-            .and_then(|path| read_manifest(&path).ok())
-            .map(|manifest| manifest.package.name);
-        let export_identity = super::file_interface::ExportIdentityContext {
-            provider: "package".to_owned(),
-            package: package_name,
-            module_path: file.module_segments.clone(),
-        };
-        let file_interface = match super::file_interface::extract_file_interface_with_identity(
-            &analysis,
-            &export_names,
-            &file.path.display().to_string(),
-            Some(&export_identity),
-        ) {
-            Ok(interface) => interface,
-            Err(diag) => {
-                diagnostics.push(diag);
-                continue;
-            }
-        };
-        analyzed_interfaces_by_path.insert(file.path.clone(), file_interface.clone());
-
-        diagnostics.extend(std::mem::take(&mut analysis.diagnostics));
-        units.push(AnalyzedPackageUnit {
-            path: file.path.clone(),
-            module_segments: file.module_segments.clone(),
-            is_entry,
-            analysis,
-            file_interface,
-            export_names,
-            namespace_exports,
-            expanded_library_imports: file.expanded_library_imports.clone(),
-        });
-    }
-
-    if diagnostics.iter().any(|diag| diag.is_error()) {
-        return Err(diagnostics);
-    }
-
-    Ok(AnalyzedPackage {
-        spec,
-        units,
-        entry_frontmatter,
-        diagnostics,
-        linked_library_crates,
-    })
-}
-
-fn linked_crates_for_package_root(
-    package_root: &Path,
-) -> std::collections::BTreeMap<String, String> {
-    // Build a lightweight shell package for the lock/manifest scan only.
-    let shell = AnalyzedPackage {
-        spec: super::PackageSpec {
-            package_root: package_root.to_path_buf(),
-            source_root: package_root.to_path_buf(),
-            entry: package_root.to_path_buf(),
-            templates: std::collections::BTreeMap::new(),
-            manifest_backed: true,
-        },
-        units: Vec::new(),
-        entry_frontmatter: None,
-        diagnostics: Vec::new(),
-        linked_library_crates: std::collections::BTreeMap::new(),
-    };
-    super::artifact_plan::linked_library_crate_map(&shell)
-}
-
-fn package_analysis_order<'a>(
-    spec: &super::PackageSpec,
-    files: &'a [PackageFile],
-    library_resolver: &crate::library::LibraryResolver,
-) -> Vec<&'a PackageFile> {
-    let files_by_path = files
-        .iter()
-        .map(|file| (file.path.clone(), file))
-        .collect::<BTreeMap<_, _>>();
-    let mut seen = BTreeSet::new();
-    let mut ordered = Vec::new();
-    for file in files {
-        visit_package_analysis_file(
-            spec,
-            file,
-            &files_by_path,
-            library_resolver,
-            &mut seen,
-            &mut ordered,
-        );
-    }
-    ordered
-}
-
-fn visit_package_analysis_file<'a>(
-    spec: &super::PackageSpec,
-    file: &'a PackageFile,
-    files_by_path: &BTreeMap<PathBuf, &'a PackageFile>,
-    library_resolver: &crate::library::LibraryResolver,
-    seen: &mut BTreeSet<PathBuf>,
-    ordered: &mut Vec<&'a PackageFile>,
-) {
-    if !seen.insert(file.path.clone()) {
-        return;
-    }
-    for stmt in &file.program.statements {
-        let StmtKind::Import(decl) = &stmt.kind else {
-            continue;
-        };
-        let import_path = file.interner.resolve(decl.path);
-        let ImportResolution::Local(target) =
-            resolve_import(spec, library_resolver, &file.path, import_path)
-        else {
-            continue;
-        };
-        if let Some(target_file) = files_by_path.get(&target).copied() {
-            visit_package_analysis_file(
-                spec,
-                target_file,
-                files_by_path,
-                library_resolver,
-                seen,
-                ordered,
-            );
-        }
-    }
-    ordered.push(file);
-}
-
-fn file_interfaces_for_file(
-    spec: &super::PackageSpec,
-    file: &PackageFile,
-    library_resolver: &crate::library::LibraryResolver,
-    library_cache: &mut LibraryInterfaceCache,
-    analyzed_interfaces_by_path: &BTreeMap<PathBuf, radix::file_interface::FileInterface>,
-) -> Result<BTreeMap<String, radix::file_interface::FileInterface>, Diagnostic> {
-    let mut interfaces = BTreeMap::new();
-    for stmt in &file.program.statements {
-        let StmtKind::Import(decl) = &stmt.kind else {
-            continue;
-        };
-        let Some(binding) = import_binding(&file.interner, decl) else {
-            continue;
-        };
-        let import_path = file.interner.resolve(decl.path);
-        match resolve_import(spec, library_resolver, &file.path, import_path) {
-            ImportResolution::Local(target) => {
-                let Some(interface) = analyzed_interfaces_by_path.get(&target).cloned() else {
-                    return Err(crate::package_diagnostic_error(format!(
-                        "local import `{import_path}` interface was not analyzed before importer"
-                    ))
-                    .with_file(file.path.display().to_string())
-                    .with_span(decl.span));
-                };
-                interfaces.insert(binding, interface);
-            }
-            ImportResolution::Library(module) => {
-                let Some(import) = library_import_binding(&file.interner, decl, module) else {
-                    continue;
-                };
-                if library_interface_has_module(&import, library_cache)? {
-                    continue;
-                }
-                interfaces.insert(
-                    binding,
-                    library_cached_file_interface(&import, library_resolver, library_cache)?,
-                );
-            }
-            ImportResolution::Unsupported | ImportResolution::Error(_) => {}
-        }
-    }
-    for import in &file.expanded_library_imports {
-        if library_interface_has_module(import, library_cache)? {
-            continue;
-        }
-        interfaces.insert(
-            import.binding.clone(),
-            library_cached_file_interface(import, library_resolver, library_cache)?,
-        );
-    }
-    Ok(interfaces)
-}
-
-fn namespace_exports_for_file(
-    spec: &super::PackageSpec,
-    file: &PackageFile,
-    files: &[PackageFile],
-    library_resolver: &crate::library::LibraryResolver,
-    library_cache: &mut LibraryInterfaceCache,
-) -> Result<BTreeMap<String, BTreeMap<String, VisibilityTier>>, Diagnostic> {
-    let mut exports = BTreeMap::new();
-    for stmt in &file.program.statements {
-        let StmtKind::Import(decl) = &stmt.kind else {
-            continue;
-        };
-        let Some(binding) = import_binding(&file.interner, decl) else {
-            continue;
-        };
-        let import_path = file.interner.resolve(decl.path);
-        match resolve_import(spec, library_resolver, &file.path, import_path) {
-            ImportResolution::Local(target) => {
-                let Some(target_file) = files.iter().find(|candidate| candidate.path == target)
-                else {
-                    continue;
-                };
-                exports.insert(
-                    binding,
-                    program_export_surface(&target_file.program, &target_file.interner),
-                );
-            }
-            ImportResolution::Library(module) => {
-                let Some(import) = library_import_binding(&file.interner, decl, module) else {
-                    continue;
-                };
-                exports.insert(
-                    binding,
-                    library_interface_export_surface(&import, library_resolver, library_cache)?,
-                );
-            }
-            ImportResolution::Unsupported | ImportResolution::Error(_) => {}
-        }
-    }
-    for import in &file.expanded_library_imports {
-        exports.insert(
-            import.binding.clone(),
-            library_interface_export_surface(import, library_resolver, library_cache)?,
-        );
-    }
-    Ok(exports)
-}
-
-fn import_binding(interner: &Interner, decl: &ImportDecl) -> Option<String> {
-    match &decl.kind {
-        ImportKind::Named { name, alias, .. } => Some(
-            interner
-                .resolve(alias.as_ref().unwrap_or(name).name)
-                .to_owned(),
-        ),
-        ImportKind::Wildcard { alias } => Some(interner.resolve(alias.name).to_owned()),
-    }
-}
-
 /// Check every loaded package module and return diagnostics without codegen.
 ///
 /// The checker mirrors package compilation discovery and CLI mount analysis so
@@ -1371,3 +915,4 @@ pub fn check_package(config: &Config, input: &Path) -> Vec<Diagnostic> {
         Err(diagnostics) => diagnostics,
     }
 }
+

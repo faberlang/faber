@@ -9,7 +9,7 @@ use super::{
     build_package_fmir_image, build_package_fmir_text_image, build_package_mir_artifact,
     check_package, compile_package, compile_package_go, config_with_locale, discover_build_layout,
     discover_package, emit_generated_crate, emit_generated_crate_with_runtime_plan,
-    invoke_cargo_build, library_cache_default, library_cached_file_interface,
+    invoke_cargo_build, library_cache_default,
     library_resolver_from_config, load_package_with_locale_pack, package_host_selection_diagnostic,
     package_rust_runtime_plan, read_manifest, run_package_fmir_built_image,
     run_package_fmir_image, run_package_fmir_text_image, run_package_mir, run_package_mir_artifact,
@@ -17,8 +17,9 @@ use super::{
     verify_library_binding_shapes, verify_library_bindings, with_lowered_package_mir, BuildLayout,
     ManifestProductEmit, ManifestProductKind, ManifestRustHost,
 };
+use super::library::library_cached_file_interface;
 use super::{fmir_image_test_summary, fmir_text_image_test_summary};
-use crate::library::{LibraryProviderKind, LibraryResolver, ResolvedLibraryModule};
+use crate::library::{LibraryProviderKind, ResolvedLibraryModule};
 use radix::codegen::Target;
 use radix::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase};
 use radix::driver::Config;
@@ -681,75 +682,6 @@ fn label() → string {
         String::from_utf8_lossy(&rustfmt.stdout),
         String::from_utf8_lossy(&rustfmt.stderr)
     );
-}
-
-#[test]
-fn package_analysis_api_exposes_multifile_units_without_rust_emit() {
-    let dir = test_temp_dir("package-analysis-api");
-    let entry = dir.join("main.fab");
-    fs::write(
-        &entry,
-        r##"
-import from "./thing" thing
-
-main {
-  print thing.label()
-}
-"##,
-    )
-    .expect("write entry");
-    let module = dir.join("thing.fab");
-    fs::write(
-        &module,
-        r#"
-@ public
-fn label() → string {
-  return "ok"
-}
-"#,
-    )
-    .expect("write module");
-
-    let package = analyze_package(&Config::default(), &entry).expect("analyze package");
-
-    assert!(
-        !package.diagnostics.iter().any(radix::Diagnostic::is_error),
-        "expected no analysis errors, got {:?}",
-        package
-            .diagnostics
-            .iter()
-            .map(|diag| (diag.code, diag.issue()))
-            .collect::<Vec<_>>()
-    );
-    assert_eq!(package.units.len(), 2);
-    let entry_unit = package.entry_unit().expect("entry unit");
-    assert_eq!(entry_unit.path, entry);
-    assert!(entry_unit.analysis.hir.entry.is_some());
-    assert_eq!(
-        entry_unit.namespace_exports.get("thing"),
-        Some(&std::collections::BTreeMap::from([(
-            "label".to_owned(),
-            radix::semantic::passes::visibility_annotation::VisibilityTier::Publica
-        )]))
-    );
-
-    let module_unit = package
-        .units
-        .iter()
-        .find(|unit| !unit.is_entry)
-        .expect("module unit");
-    assert_eq!(module_unit.path, module);
-    assert_eq!(module_unit.module_segments, vec!["thing".to_owned()]);
-    assert!(module_unit.analysis.hir.entry.is_none());
-    assert_eq!(module_unit.export_names, vec!["label".to_owned()]);
-    assert!(matches!(
-        module_unit
-            .file_interface
-            .exports
-            .get("label")
-            .map(|export| &export.kind),
-        Some(FileExportKind::Function(_))
-    ));
 }
 
 #[test]

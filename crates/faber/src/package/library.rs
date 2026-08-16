@@ -5,16 +5,16 @@
 //! provenance attachment moved to `radix-package`; this module forwards the
 //! moved surface and supplies the faber-owned locale-pack loader seam (locale
 //! packs are product layout — installed packs beside the binary, manifest
-//! `[locale] pack` overrides).
+//! `[locale] pack` overrides). RP3: the loader and analysis consume the cache
+//! in `radix-package` directly; only the surfaces the emission half still
+//! consumes are forwarded here.
 
 use radix::driver::Config;
 
 use super::locale::load_locale_pack_for_input;
 
 pub use radix_package::library::{
-    analysis_source_for_file, attach_library_provenance_with_links, expand_library_imports,
     is_builtin_norma_http_module, library_cached_analysis, library_cached_file_interface,
-    library_interface_export_surface, library_interface_has_module, program_export_surface,
     synthetic_library_item_def_id, LibraryInterfaceCache,
 };
 pub use radix_package::library::with_library_cached_analysis_mut;

@@ -117,9 +117,7 @@ pub(crate) use compile::compile_package_go;
 pub(crate) use compile::compile_package_wasm;
 pub(crate) use compile::package_rust_runtime_plan;
 #[allow(unused_imports)] // package MIR stages consume this crate-visible analysis API.
-pub(crate) use compile::{
-    analyze_package, analyze_package_for_tests, AnalyzedPackage, AnalyzedPackageUnit,
-};
+pub(crate) use compile::{AnalyzedPackage, AnalyzedPackageUnit};
 #[cfg(feature = "hir-fhir")]
 #[allow(unused_imports)]
 // binary commands/run consumes load/run + PackageFhir; lib uses build_package_fhir.
@@ -235,9 +233,8 @@ use crate::library::LibraryResolver;
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 use radix::driver::Config;
-use radix::syntax::StmtKind;
-use std::collections::{BTreeSet, VecDeque};
-use std::path::Path;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 /// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 executed-lane
 /// routing; authoritative decision record
@@ -295,20 +292,11 @@ fn is_mir_backed_target(target: Target) -> bool {
 }
 
 pub(crate) use discovery::PackageSpec;
-use import_graph::{
-    detect_import_cycles, import_unsupported_diagnostic, library_import_binding,
-    library_import_kind_diagnostic, resolve_import, ImportResolution,
-};
-use library::expand_library_imports;
 pub(crate) use member_path::resolve_package_member;
-use modules::module_segments_for_file;
-use paths::normalize_path;
-use source_files::{is_proba_source_path, load_package_source, package_source_files};
 
 pub(crate) use library::{
-    analysis_source_for_file, library_cached_analysis, library_cached_file_interface,
-    library_interface_export_surface, library_interface_has_module, library_cache_default,
-    library_cache_with_config, program_export_surface, LibraryInterfaceCache,
+    library_cached_analysis, library_cache_default, library_cache_with_config,
+    LibraryInterfaceCache,
 };
 #[cfg(feature = "hir-rust")]
 pub(crate) use library::{
@@ -414,6 +402,95 @@ pub(crate) fn library_resolver_for_package(
     Ok(resolver)
 }
 
+// RP3: multi-unit analysis lives in `radix-package` (`analyze.rs`). These
+// adapters supply the faber product-orchestration seams — reader-locale pack
+// loading, strict product-view manifest validation (FBR-P1-001),
+// `FABER_LIBRARY_HOME` / workspace probing, and the G4 linked-crate map from
+// the artifact plan — and keep the faber-internal entry signatures.
+fn faber_analysis_seams() -> radix_package::analyze::AnalysisSeams {
+    radix_package::analyze::AnalysisSeams {
+        locale_loader: load_locale_pack_for_input,
+        manifest_validator: validate_product_manifest_for_spec,
+        resolver_for_package: library_resolver_for_package,
+        linked_crates_for_root: linked_crates_for_package_root,
+    }
+}
+
+fn validate_product_manifest_for_spec(spec: &PackageSpec) -> Result<(), Box<Diagnostic>> {
+    manifest::manifest_for_spec(spec).map(|_| ())
+}
+
+/// Linked native-binding crate map for a package root (G4). Stays faber-side
+/// with the artifact plan (RP4); analysis receives it through the seam.
+fn linked_crates_for_package_root(package_root: &Path) -> BTreeMap<String, String> {
+    // Build a lightweight shell package for the lock/manifest scan only.
+    let shell = AnalyzedPackage {
+        spec: PackageSpec {
+            package_root: package_root.to_path_buf(),
+            source_root: package_root.to_path_buf(),
+            entry: package_root.to_path_buf(),
+            templates: BTreeMap::new(),
+            manifest_backed: true,
+        },
+        units: Vec::new(),
+        entry_frontmatter: None,
+        diagnostics: Vec::new(),
+        linked_library_crates: BTreeMap::new(),
+    };
+    artifact_plan::linked_library_crate_map(&shell)
+}
+
+pub(crate) fn analyze_package(
+    config: &Config,
+    input: &Path,
+) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
+    radix_package::analyze::analyze_package(config, input, &faber_analysis_seams())
+}
+
+// Used by the binary `faber test` command and lib tests; the lib crate root
+// does not call it outside `cfg(test)`.
+#[allow(dead_code)]
+pub(crate) fn analyze_package_for_tests(
+    config: &Config,
+    input: &Path,
+    proba_filter: Option<&TestSourceFilter>,
+) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
+    radix_package::analyze::analyze_package_for_tests(
+        config,
+        input,
+        proba_filter,
+        &faber_analysis_seams(),
+    )
+}
+
+pub(crate) fn analyze_package_spec(
+    config: &Config,
+    spec: PackageSpec,
+    library_resolver: &LibraryResolver,
+    include_proba: bool,
+    proba_filter: Option<&TestSourceFilter>,
+) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
+    radix_package::analyze::analyze_package_spec(
+        config,
+        spec,
+        library_resolver,
+        include_proba,
+        proba_filter,
+        &faber_analysis_seams(),
+    )
+}
+
+pub(crate) fn effective_package_config(
+    config: &Config,
+    input: &Path,
+) -> Result<Config, Vec<Diagnostic>> {
+    radix_package::analyze::effective_package_config(config, input, load_locale_pack_for_input)
+}
+
+pub(crate) fn package_root_for_input(input: &Path) -> PathBuf {
+    radix_package::analyze::package_root_for_input(input)
+}
+
 /// Test-facing convenience wrapper around [`load_package_with_locale_pack`]
 /// (no reader pack, no proba filtering).
 ///
@@ -441,172 +518,16 @@ pub(crate) fn load_package_with_locale_pack(
     include_proba: bool,
     proba_filter: Option<&TestSourceFilter>,
 ) -> Result<Vec<PackageFile>, Vec<Diagnostic>> {
-    // Manifest presence is validated at load (FBR-P1-001: a validated manifest
-    // that later disappears or becomes unreadable is a diagnostic, never a
-    // silent default); the strict product-view parse also rejects unknown
-    // product fields here.
-    if let Err(diag) = manifest::manifest_for_spec(spec) {
-        return Err(vec![*diag]);
-    }
-    // Compiler-view manifest for source loading (RP2b: frontmatter conflict
-    // validation and lib-bodyless parsing moved with `load_package_source`).
-    let compiler_manifest = match frontmatter::manifest_path_for_spec(spec) {
-        Some(manifest_path) => {
-            Some(radix_package::manifest::read_manifest(&manifest_path).map_err(|diag| vec![*diag])?)
-        }
-        None => None,
-    };
-    let source_root_for_filter = if spec.source_root.is_dir() {
-        spec.source_root.clone()
-    } else {
-        spec.entry
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .to_path_buf()
-    };
-    let proba_allowed = |path: &Path| -> bool {
-        if !is_proba_source_path(path) {
-            return true;
-        }
-        match proba_filter {
-            Some(filter) if !filter.is_empty() => filter.allows_path(&source_root_for_filter, path),
-            _ => true,
-        }
-    };
-    let initial_files = if spec.entry.is_dir() {
-        let all = package_source_files(&spec.entry, include_proba)?;
-        // When `faber test --include/--exclude` selects proba files, seed only
-        // those tests. Product modules enter via local import edges, so a
-        // focused math.proba run does not compile the whole library graph.
-        let proba_only_seed =
-            include_proba && proba_filter.is_some_and(|filter| !filter.is_empty());
-        if proba_only_seed {
-            all.into_iter()
-                .filter(|path| is_proba_source_path(path) && proba_allowed(path))
-                .collect::<Vec<_>>()
-        } else {
-            all.into_iter()
-                .filter(|path| proba_allowed(path))
-                .collect::<Vec<_>>()
-        }
-    } else {
-        // Single-file entry: allow an explicit `.proba` path on the test path only.
-        if is_proba_source_path(&spec.entry) && !include_proba {
-            return Err(vec![crate::package_diagnostic_error(
-                ".proba files are test sources; use `faber test` to load them",
-            )
-            .with_file(spec.entry.display().to_string())
-            .with_arg("issue", "proba_source_build_forbidden")]);
-        }
-        // Product graph starts at the entry file. For `faber test`, also walk
-        // `source_root` for `*.proba` so colocated test files are not orphaned
-        // when nothing imports them (they must not be importable).
-        let mut files = vec![spec.entry.clone()];
-        if include_proba {
-            for path in package_source_files(&source_root_for_filter, true)? {
-                if is_proba_source_path(&path) && proba_allowed(&path) {
-                    files.push(path);
-                }
-            }
-        }
-        files
-    };
-    let mut queue = VecDeque::from(initial_files);
-    let mut seen = BTreeSet::new();
-    let mut files = Vec::new();
-    let mut diagnostics = Vec::new();
-
-    while let Some(path) = queue.pop_front() {
-        let canonical = normalize_path(&path);
-        if !seen.insert(canonical.clone()) {
-            continue;
-        }
-
-        let Some(loaded) =
-            load_package_source(&canonical, compiler_manifest.as_ref(), locale_pack, &mut diagnostics)
-        else {
-            continue;
-        };
-
-        let mut library_imports = Vec::new();
-        for stmt in &loaded.program.statements {
-            let StmtKind::Import(decl) = &stmt.kind else {
-                continue;
-            };
-            let import_path = loaded.interner.resolve(decl.path);
-            match resolve_import(spec, library_resolver, &canonical, import_path) {
-                ImportResolution::Local(target) => {
-                    // Test sources may import product `.fab` modules; never the reverse.
-                    if is_proba_source_path(&target) {
-                        diagnostics.push(
-                            crate::package_diagnostic_error(
-                                ".proba files are test sources and cannot be imported; move shared helpers to a .fab module",
-                            )
-                            .with_file(canonical.display().to_string())
-                            .with_span(decl.span)
-                            .with_arg("issue", "proba_import_forbidden")
-                            .with_arg("import", import_path.to_owned()),
-                        );
-                    } else {
-                        queue.push_back(target);
-                    }
-                }
-                ImportResolution::Library(module) => {
-                    if let Some(binding) = library_import_binding(&loaded.interner, decl, module) {
-                        library_imports.push(binding);
-                    } else {
-                        diagnostics.push(library_import_kind_diagnostic(
-                            &canonical,
-                            decl,
-                            import_path,
-                        ));
-                    }
-                }
-                ImportResolution::Unsupported => {
-                    diagnostics.push(import_unsupported_diagnostic(&canonical, decl, import_path));
-                }
-                ImportResolution::Error(diag) => {
-                    diagnostics.push(diag.with_span(decl.span));
-                }
-            }
-        }
-
-        files.push(PackageFile {
-            module_segments: module_segments_for_file(
-                &spec.source_root,
-                &canonical,
-                loaded.frontmatter.as_ref(),
-            ),
-            path: canonical,
-            raw_source: loaded.raw_source,
-            source: loaded.body,
-            frontmatter: loaded.frontmatter,
-            program: loaded.program,
-            interner: loaded.interner,
-            library_imports,
-            expanded_library_imports: Vec::new(),
-        });
-    }
-
-    if diagnostics.iter().any(|diag| diag.is_error()) {
-        Err(diagnostics)
-    } else {
-        let mut library_cache = library_cache_default();
-        for file in &mut files {
-            file.expanded_library_imports = expand_library_imports(
-                &file.library_imports,
-                library_resolver,
-                &mut library_cache,
-                &mut diagnostics,
-            );
-        }
-        files.sort_by(|a, b| a.path.cmp(&b.path));
-        diagnostics.extend(detect_import_cycles(spec, &files));
-        if diagnostics.iter().any(|diag| diag.is_error()) {
-            return Err(diagnostics);
-        }
-        Ok(files)
-    }
+    // RP3: the loader composition moved to `radix-package` (`analyze.rs`);
+    // faber supplies the product seams (manifest validation, locale packs).
+    radix_package::analyze::load_package_with_locale_pack(
+        spec,
+        library_resolver,
+        locale_pack,
+        include_proba,
+        proba_filter,
+        &faber_analysis_seams(),
+    )
 }
 
 #[cfg(test)]

@@ -5,6 +5,7 @@
 //! module forwards the moved surface so faber package consumers keep their
 //! existing import paths.
 
-pub use radix_package::file_interface::{
-    extract_callable_contracts, extract_file_interface_with_identity, ExportIdentityContext,
-};
+pub use radix_package::file_interface::extract_callable_contracts;
+#[allow(unused_imports)]
+// consumed by `package_test.rs` analysis-shape assertions (cfg(test)).
+pub use radix_package::file_interface::extract_file_interface_with_identity;
