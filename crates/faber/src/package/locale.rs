@@ -308,14 +308,20 @@ fn install_locale_pack(exe: Option<&Path>, locale: &str) -> Option<PathBuf> {
 }
 
 fn dev_locale_pack(cwd: Option<&Path>, exe: Option<&Path>, locale: &str) -> Option<PathBuf> {
+    // The binary's own checkout is authoritative for a development build: it
+    // is the tree the binary was built from, so its reader pack is current by
+    // construction. The cwd ancestry is a fallback only — walking it first
+    // lets a stale or foreign `radix/stdlib` checkout (e.g. `/tmp/radix` from
+    // a prior session) silently shadow the correct pack with an outdated one
+    // whose surfaces predate later pack rows.
     let mut starts = Vec::new();
-    if let Some(cwd) = cwd {
-        starts.push(cwd.to_path_buf());
-    }
     if let Some(exe) = exe {
         if let Some(parent) = exe.parent() {
             starts.push(parent.to_path_buf());
         }
+    }
+    if let Some(cwd) = cwd {
+        starts.push(cwd.to_path_buf());
     }
     for mut dir in starts {
         loop {
