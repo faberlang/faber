@@ -235,11 +235,9 @@ use crate::library::LibraryResolver;
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 use radix::driver::Config;
-use radix::driver::FileFrontmatter;
-use radix::lexer::Interner;
-use radix::syntax::{Program, StmtKind, Visibility};
+use radix::syntax::StmtKind;
 use std::collections::{BTreeSet, VecDeque};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 executed-lane
 /// routing; authoritative decision record
@@ -309,8 +307,8 @@ use source_files::{is_proba_source_path, load_package_source, package_source_fil
 
 pub(crate) use library::{
     analysis_source_for_file, library_cached_analysis, library_cached_file_interface,
-    library_interface_export_surface, library_interface_has_module, program_export_surface,
-    LibraryInterfaceCache,
+    library_interface_export_surface, library_interface_has_module, library_cache_default,
+    library_cache_with_config, program_export_surface, LibraryInterfaceCache,
 };
 #[cfg(feature = "hir-rust")]
 pub(crate) use library::{
@@ -330,47 +328,28 @@ pub(crate) use locale::{config_with_locale, default_config_with_locale, load_loc
 
 pub(super) const MANIFEST_FILE: &str = "faber.toml";
 
-pub(super) struct PackageFile {
-    path: PathBuf,
-    module_segments: Vec<String>,
-    /// Original on-disk source, including optional `+++` frontmatter.
-    #[allow(dead_code)] // retained for future package inspect/diagnostic surfaces
-    raw_source: String,
-    /// Peeled Faber body used for parse spans and semantic analysis.
-    source: String,
-    frontmatter: Option<FileFrontmatter>,
-    program: Program,
-    interner: Interner,
-    /// Direct `norma:` (and future provider) imports declared in this package file.
-    library_imports: Vec<LibraryImportBinding>,
-    /// Transitive closure of [`library_imports`], dependencies first, deduped by identity.
-    expanded_library_imports: Vec<LibraryImportBinding>,
-}
-
-#[derive(Clone)]
-pub(super) struct LibraryImportBinding {
-    binding: String,
-    /// Preserved for Milestone C file-namespace re-export wiring.
-    #[allow(dead_code)]
-    visibility: Visibility,
-    import_span: radix::lexer::Span,
-    module: crate::library::ResolvedLibraryModule,
-}
+// RP2c: the loaded-package-file and library-import-binding types moved to
+// `radix-package` with the import-graph and library surfaces that operate on
+// them; faber's loader and analysis/emission halves keep their existing names
+// through this re-export.
+pub(crate) use radix_package::{LibraryImportBinding, PackageFile};
 
 pub(crate) fn library_resolver_from_config(config: &radix::driver::Config) -> LibraryResolver {
     // The library home (provider repos such as `norma/` and `triga/`) is
     // independent of the reader-pack stdlib path (`stdlib/locale/<id>/pack.toml`).
     // Precedence: an explicit custom stdlib roots the library home; otherwise
     // `FABER_LIBRARY_HOME` and the workspace probe locate provider repos. The
-    // auto-discovered dev stdlib is never a library home.
+    // auto-discovered dev stdlib is never a library home. The ambient probe is
+    // faber-owned (CTO memo); `radix-package` receives the resolved
+    // home as an explicit input.
     if config.stdlib_explicit {
         return config
             .stdlib_path
             .as_ref()
             .map(|path| LibraryResolver::new(path.clone()))
-            .unwrap_or_else(LibraryResolver::default);
+            .unwrap_or_else(crate::library::default_library_resolver);
     }
-    LibraryResolver::default()
+    crate::library::default_library_resolver()
 }
 
 /// Build a library resolver for a package root, attaching `faber.toml`
@@ -612,7 +591,7 @@ pub(crate) fn load_package_with_locale_pack(
     if diagnostics.iter().any(|diag| diag.is_error()) {
         Err(diagnostics)
     } else {
-        let mut library_cache = LibraryInterfaceCache::default();
+        let mut library_cache = library_cache_default();
         for file in &mut files {
             file.expanded_library_imports = expand_library_imports(
                 &file.library_imports,

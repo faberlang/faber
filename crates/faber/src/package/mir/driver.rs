@@ -148,7 +148,7 @@ fn prepare_package_mir<R>(
     }
     let cli_plan = plan_cli_package(&mut package, argumenta, cli_mode)?;
     let library_resolver = library_resolver_from_config(config);
-    let mut library_cache = LibraryInterfaceCache::with_config(config);
+    let mut library_cache = library_cache_with_config(config);
     let links = local_namespace_call_targets(
         &package,
         consumer,

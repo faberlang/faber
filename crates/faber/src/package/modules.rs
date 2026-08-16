@@ -5,4 +5,3 @@
 //! consumers keep their existing import paths.
 
 pub(super) use radix_package::modules::module_segments_for_file;
-pub(crate) use radix_package::modules::sanitize_rust_module_ident;

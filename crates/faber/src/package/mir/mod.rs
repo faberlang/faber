@@ -26,6 +26,7 @@ use super::library::{
     library_cached_analysis, library_cached_file_interface, with_library_cached_analysis_mut,
     LibraryInterfaceCache,
 };
+use super::library_cache_with_config;
 use super::library_resolver_from_config;
 use super::LibraryImportBinding;
 use crate::library::LibraryResolver;

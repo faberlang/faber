@@ -663,7 +663,7 @@ fn loaded_package_rust_parity_matches_direct() {
         loaded_package_to_analyzed(loaded, &artifact.root).expect("adapt loaded package");
     let generated_loaded = generate_package_rust(
         &mut adapted,
-        &crate::library::LibraryResolver::default(),
+        &crate::library::default_library_resolver(),
         None,
         RustFieldNamePolicy::Preserve,
         Some(&links),
@@ -719,7 +719,7 @@ fn loaded_package_rust_parity_generics_patterns() {
         loaded_package_to_analyzed(loaded, &artifact.root).expect("adapt loaded package");
     let generated_loaded = generate_package_rust(
         &mut adapted,
-        &crate::library::LibraryResolver::default(),
+        &crate::library::default_library_resolver(),
         None,
         RustFieldNamePolicy::Preserve,
         Some(&links),

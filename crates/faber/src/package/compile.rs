@@ -27,8 +27,9 @@ use super::import_graph::{
     build_mount_plan, library_import_binding, resolve_import, ImportResolution,
 };
 use super::{
-    analysis_source_for_file, discover_build_layout, discover_package, library_cached_analysis,
-    library_cached_file_interface, library_interface_export_surface, library_interface_has_module,
+    analysis_source_for_file, discover_build_layout, discover_package, library_cache_default,
+    library_cache_with_config, library_cached_analysis, library_cached_file_interface,
+    library_interface_export_surface, library_interface_has_module,
     library_resolver_for_package, load_locale_pack_for_input, load_package_with_locale_pack,
     load_provider_manifests, program_export_surface, read_manifest, selected_providers_for_routes,
     LibraryImportBinding, LibraryInterfaceCache, PackageFile, RustRuntimePlan,
@@ -161,7 +162,7 @@ fn rust_runtime_plan_for_package(
     // Collect ad routes from package units **and** expanded library import
     // bodies (norma is the primary product path — package-unit Ad alone is a
     // false-negative for host-only devices).
-    let mut library_cache = LibraryInterfaceCache::default();
+    let mut library_cache = library_cache_default();
     for unit in &package.units {
         let mut collector = AdRouteCollector {
             interner: &unit.analysis.interner,
@@ -806,7 +807,7 @@ fn resolve_local_import_path(
     from_file: &Path,
     import_path: &str,
 ) -> Option<PathBuf> {
-    let dummy = crate::library::LibraryResolver::default();
+    let dummy = crate::library::default_library_resolver();
     match resolve_import(spec, &dummy, from_file, import_path) {
         ImportResolution::Local(path) => Some(normalize_path_buf(&path)),
         _ => {
@@ -1038,7 +1039,7 @@ fn analyze_package_spec(
     let session = Session::new(config);
     let mount_plan = build_mount_plan(&spec, &files)?;
     let mut diagnostics = Vec::new();
-    let mut library_cache = LibraryInterfaceCache::with_config(&session.config);
+    let mut library_cache = library_cache_with_config(&session.config);
     let mut units = Vec::new();
     let mut analyzed_interfaces_by_path = BTreeMap::new();
     // Linked crates are known from the package root + lock before unit analysis.
