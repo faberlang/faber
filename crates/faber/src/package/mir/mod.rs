@@ -1,422 +1,487 @@
-//! Package MIR linking spike for the systems-lane runner.
+//! Faber package-MIR product surface (RP5 residual).
 //!
-//! INVARIANT: this path links only package-local file namespace calls into one
-//! validated MIR program. It does not use generated Rust metadata as the
-//! runtime model, and unsupported package shapes return diagnostics.
+//! RP5: the compiler-owned subset of this module moved to
+//! `radix-package/src/mir/` (lowering/linking/image/routes/driver/cli/diag/
+//! manifest writer + test support). This module keeps the faber product
+//! surface:
+//!
+//! - [`bin_runner`] — the generated fmir-bin runner crate writer (writes the
+//!   runner crate and invokes `cargo build`; external tool invocation stays
+//!   faber-side, ownership-freeze §3).
+//! - [`faber_mir_seams`] — the faber-supplied seam bundle (executed-lane
+//!   target, library resolver/cache, `[device]` projection, device-section
+//!   builder, host-route policy, runner writer, toolchain version) that the
+//!   moved compiler subset receives.
+//! - Forwarding wrappers for the moved public surface with the faber entry
+//!   signatures (faber callers stay green until RP6 re-wires the command
+//!   adapter).
 #![allow(dead_code)] // Binary and library targets exercise different package runner surfaces.
 
-mod bin_runner;
-mod cli_bind;
-mod cli_plan;
-mod cli_values;
-mod diag;
-mod driver;
-mod image;
-mod link;
-mod lower;
+pub(crate) mod bin_runner;
 mod manifest;
-mod remap;
-mod requirements;
-mod routes;
-mod sources;
-
-use super::compile::{analyze_package, AnalyzedPackage, AnalyzedPackageUnit};
-use super::import_graph::{resolve_import, ImportResolution};
-use super::library::{
-    library_cached_analysis, library_cached_file_interface, with_library_cached_analysis_mut,
-    LibraryInterfaceCache,
-};
-use super::library_cache_with_config;
-use super::library_resolver_from_config;
-use super::LibraryImportBinding;
-use crate::library::LibraryResolver;
-/// Product-owned device-selection request used by route plumbing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum DeviceSelection {
-    /// Resolve against host capability probes; fail closed when the machine
-    /// admits zero or more than one backend.
-    Auto,
-    /// Select Metal explicitly; never silently falls back.
-    Metal,
-    /// Select CUDA explicitly; never silently falls back.
-    Cuda,
-}
-
-impl DeviceSelection {
-    /// Parse a selection from its stable spelling (`auto` / `metal` / `cuda`).
-    #[must_use]
-    pub(crate) fn from_spelling(spelling: &str) -> Option<Self> {
-        match spelling {
-            "auto" => Some(Self::Auto),
-            "metal" => Some(Self::Metal),
-            "cuda" => Some(Self::Cuda),
-            _ => None,
-        }
-    }
-
-    /// Stable command and diagnostic spelling.
-    #[must_use]
-    pub(crate) const fn spelling(self) -> &'static str {
-        match self {
-            Self::Auto => "auto",
-            Self::Metal => "metal",
-            Self::Cuda => "cuda",
-        }
-    }
-}
-
-use radix::cli::{
-    CliCommand, CliDefault, CliExit, CliMode, CliOperand, CliOption, CliProgram, CliType,
-};
-use radix::diagnostics::{Diagnostic, DiagnosticPhase};
-use radix::driver::Config;
-use radix::file_interface::{InterfaceLibraryIdentity, InterfaceNominalKind};
-use radix::hir::{
-    DefId, HirBlock, HirCallArg, HirCape, HirCasuArm, HirConst, HirExpression, HirExpressionKind,
-    HirId, HirItem, HirItemKind, HirLiteral, HirObjectField, HirOptionalChainKind, HirStatement,
-    HirStatementKind,
-};
-use radix::lexer::{Interner, Symbol};
-use radix::mir::{
-    lower_analyzed_unit_allowing_cli_runtime_records_with_context,
-    lower_analyzed_unit_with_context, run_entry, validate_program, Host, LoweredMirUnit,
-    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirBlockId,
-    MirCallee, MirClosureCallee, MirClosureEnvironment, MirClosureEnvironmentId, MirClosureValue,
-    MirConstant, MirDiagnosticKind, MirFunction, MirFunctionId, MirIntrinsic, MirNamedOperand,
-    MirOperand, MirOptionChainLink, MirOptionOp, MirPlace, MirProgram, MirProjection,
-    MirProviderKind, MirRuntimeCall, MirRuntimeRecordField, MirRuntimeRecordValue, MirStatement,
-    MirStatementKind, MirSwitchCase, MirTerminator, MirTerminatorKind, MirType, MirValue,
-    MirValueKind, RunnerError,
-};
-use radix::semantic::{IndexExpr, Primitive, Resolver, Type, TypeId, TypeTable, TypeTableSnapshot};
-use radix_mir_fmir::{
-    decode_binary_image, decode_text_image, encode_binary_image, encode_text_image,
-    is_known_host_requirement, FmirBinaryImageFile, FmirDeviceSection, FmirDeviceSelection,
-    FmirImageError, FmirTextCliOperand, FmirTextCliRootSection, FmirTextCliSection,
-    FmirTextCliValueType, FmirTextImageFile, FmirTextProgramSection, FmirTextRuntimeSection,
-    FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection,
-    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
-};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::fs;
-use std::path::{Path, PathBuf};
-
-type NamespaceCallTargets = HashMap<(PathBuf, DefId, String), DefId>;
-type NamespaceExports = HashMap<(PathBuf, DefId), BTreeSet<String>>;
-type SourceRewrites = HashMap<(PathBuf, DefId), DefId>;
-/// Linked const data-member member references: `(caller path, import DefId,
-/// member name) → synthetic def id`. Distinct from [`NamespaceCallTargets`]
-/// so the call rewrite never mistakes a const member for a callable verb.
-type NamespaceDataMemberTargets = HashMap<(PathBuf, DefId, String), DefId>;
-/// Linked library genus-method call targets (FMIR e2e-hardening CTO-1): per
-/// caller unit, `(entry-side nominal struct DefId, method name) → synthetic
-/// def id` for methods on linked library nominals. The rewrite pass turns
-/// `receiver.method(args)` into `Path(synthetic)(receiver, args)` so the
-/// library's lowered method function (source = the same synthetic) resolves
-/// in the merged program. Keyed per caller path because each unit's imported
-/// nominal carries its own canonical entry-side DefId.
-type MethodCallTargets = HashMap<PathBuf, HashMap<(DefId, String), DefId>>;
-type CliRecordFieldsByLocal = HashMap<Symbol, Vec<MirRuntimeRecordField>>;
-type CliEntryRecords = HashMap<PathBuf, CliRecordFieldsByLocal>;
-
-// HIR lowering allocates generated DefIds starting at 1_000_000. Package MIR
-// linked function-source ids must live above that range or rewritten namespace
-// calls can collide with import/local bindings and lower as indirect calls.
-const PACKAGE_MIR_SYNTHETIC_DEF_BASE: u32 = 2_000_000_000;
-const PACKAGE_MIR_TOOLCHAIN_VERSION: &str = env!("CARGO_PKG_VERSION");
-const PACKAGE_MIR_TARGET_NAME: &str = "scena";
-const PACKAGE_MIR_ARTIFACT_DIR: &str = "faber-mir";
-const FMIR_BIN_ARTIFACT_DIR: &str = "exe";
-const PACKAGE_MIR_MANIFEST_FILE: &str = "image.toml";
-const FMIR_TEXT_IMAGE_FILE: &str = "image.fmir.txt";
-const FMIR_IMAGE_FILE: &str = "image.fmir";
-const FMIR_BIN_ENTRYPOINT_FILE: &str = "run";
-const FMIR_BIN_RUNNER_CRATE_DIR: &str = "runner";
-const FMIR_BIN_RUNNER_PACKAGE_NAME: &str = "faber-fmir-bin-runner";
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PackageMirArtifact {
-    pub(crate) root: PathBuf,
-    pub(crate) manifest_path: PathBuf,
-    entry: PathBuf,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PackageFmirTextImage {
-    pub(crate) image_path: PathBuf,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PackageFmirImage {
-    pub(crate) image_path: PathBuf,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PackageFmirBinaryBundle {
-    pub(crate) entrypoint_path: PathBuf,
-    pub(crate) image_path: PathBuf,
-}
-
-struct PreparedPackageMir<'a> {
-    entry_path: PathBuf,
-    source_paths: Vec<PathBuf>,
-    runtime_requirements: Vec<String>,
-    cli_exit_code: Option<i32>,
-    fmir_text_cli: Option<FmirTextCliSection>,
-    /// S1-6 vertical-slice device inputs (`[device] inputs`, mapped to f32).
-    device_inputs: BTreeMap<String, Vec<f32>>,
-    /// S1-6 device backend request (`[device] backend`), if declared.
-    device_backend: Option<DeviceSelection>,
-    /// S5-U5b declared training step count (`[device] steps`), if declared.
-    /// Absent selects the portable default [`DEFAULT_TRAINING_STEPS`].
-    device_steps: Option<u32>,
-    /// Whether the package declared any `[device]` surface (backend or
-    /// inputs) — the opt-in that constructs a device payload.
-    device_declared: bool,
-    _marker: std::marker::PhantomData<&'a ()>,
-}
-
-#[derive(Default)]
-struct DeviceManifestConfig {
-    inputs: BTreeMap<String, Vec<f32>>,
-    backend: Option<DeviceSelection>,
-    steps: Option<u32>,
-    declared: bool,
-}
-
-struct FmirPackageImage {
-    diagnostic_path: PathBuf,
-    format: FmirPackageImageFormat,
-    entry_function: String,
-    runtime_requirements: Vec<String>,
-    cli: Option<FmirTextCliSection>,
-    exit_code: Option<i32>,
-    types: TypeTableSnapshot,
-    interner: Vec<String>,
-    program: MirProgram,
-    /// Optional device payload (N1.7): present only for images whose package
-    /// carries a device program. Drives the route's `requires_device` decision
-    /// in the S1-5 host factory.
-    device: Option<FmirDeviceSection>,
-    /// Source-identity hashes (the A10 identity's source half; consumed by
-    /// the device route's complete-program identity).
-    source_hashes: Vec<String>,
-    /// Struct/variant validation metadata for the merged program (S1 U2
-    /// VALUE members): carried in memory by source-built/loaded images so the
-    /// run path re-validates with the merged variant surface. Decoded
-    /// artifact images carry the default (empty) metadata.
-    validation: FmirValidationMetadata,
-}
-
-#[derive(Clone, Copy)]
-enum FmirPackageImageFormat {
-    Source,
-    FmirText,
-    Fmir,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum PackageMirConsumer {
-    Interpreted,
-    ExternalTarget,
-}
-
-#[derive(Default)]
-struct CliPackagePlan {
-    entry_records: CliEntryRecords,
-    dispatch: Option<CliDispatchPlan>,
-    exit_code: Option<i32>,
-    uses_cli_runtime: bool,
-    fmir_text_cli: Option<FmirTextCliSection>,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum CliPlanningMode {
-    Parsed,
-    FmirTextRuntime,
-}
-
-struct CliDispatchPlan {
-    unit_path: PathBuf,
-    function: Symbol,
-    record_type_rewrite: Option<CliRecordTypeRewrite>,
-}
-
-struct CliRecordTypeRewrite {
-    types: Vec<(TypeId, TypeId)>,
-}
-
-struct PlannedCliOption<'a> {
-    option: &'a CliOption,
-    binding_name: String,
-}
-
-#[derive(Clone)]
-struct PlannedCliOperand<'a> {
-    operand: &'a CliOperand,
-    binding_name: String,
-}
-
-struct PackageMirLinks {
-    calls: NamespaceCallTargets,
-    namespaces: NamespaceExports,
-    sources: SourceRewrites,
-    /// Next free synthetic def id; the library-lowering pass continues from
-    /// here so auto-generated sub-companion sources cannot collide with the
-    /// linker's allocations.
-    next_synthetic: u32,
-    /// Library modules linked into the package MIR program. Each is lowered
-    /// alongside package units; its exported functions (including `@ radix
-    /// backward` companions) are reachable through synthetic definition ids.
-    libraries: Vec<LibraryLinkTarget>,
-    /// Linked const data-member member references: `(caller path, import
-    /// DefId, member name) → synthetic def id`. The entry rewrite turns a
-    /// `Field(Path(namespace), member)` value reference into `Path(synthetic)`
-    /// so the const materializes through the entry's top-level-const seam.
-    data_member_targets: NamespaceDataMemberTargets,
-    /// Const data members linked into the package MIR program (sibling units
-    /// and linked libraries). Each carries its synthetic def id and the source
-    /// const declaration; the entry lowering transplants the const value into
-    /// the entry analysis before the entry lowers.
-    data_members: Vec<DataMemberLink>,
-    /// Library genus-method call targets keyed by caller unit path
-    /// (FMIR e2e-hardening CTO-1).
-    method_targets: MethodCallTargets,
-}
-
-/// One linked const data member. The linker allocates a synthetic def id in
-/// the package-MIR range ([`PACKAGE_MIR_SYNTHETIC_DEF_BASE`] discipline); the
-/// lowering pass transplants the const's value into the entry analysis so a
-/// rewritten `Path(synthetic_def)` member reference materializes through the
-/// existing top-level-const seam.
-struct DataMemberLink {
-    /// Synthetic def id for the const member (no HIR/function-range collision).
-    synthetic: DefId,
-    /// Source unit path declaring the const (sibling unit or library module).
-    source_path: PathBuf,
-    /// The const declaration, cloned from the source analysis (source-interner
-    /// symbols and source-analysis type ids).
-    konst: HirConst,
-}
-
-/// One library module lowered into the package MIR program.
-struct LibraryLinkTarget {
-    /// Library source file path; the `source_rewrites` key for this module.
-    path: PathBuf,
-    /// Binding used to load the analyzed program from the library cache.
-    import: LibraryImportBinding,
-}
-
-impl FmirPackageImage {
-    /// The selection request recorded in the image's `device` section
-    /// (fallback `auto` when the image carries none). An unknown selection id
-    /// recorded on the image is representable on the packet but rejected
-    /// fail-closed here — never silently remapped to `auto` or a compiled-in
-    /// backend (DDCP2 gate bullet 4). The same holds for an explicit `amd`
-    /// selection (AMD-A3): AMDGPU is a radix compiler leaf, not a productized
-    /// faber backend — the product backend set stays Metal + Cuda
-    /// (amd-gpu-target goal boundary) until the operator authorizes the
-    /// product-backend stage, so `amd` fails closed at selection resolution.
-    fn route_selection(&self) -> Result<DeviceSelection, Vec<Diagnostic>> {
-        let Some(device) = &self.device else {
-            return Ok(DeviceSelection::Auto);
-        };
-        match &device.selection {
-            FmirDeviceSelection::Auto => Ok(DeviceSelection::Auto),
-            FmirDeviceSelection::Metal => Ok(DeviceSelection::Metal),
-            FmirDeviceSelection::Cuda => Ok(DeviceSelection::Cuda),
-            FmirDeviceSelection::Amd => Err(vec![mir_diag(
-                &self.diagnostic_path,
-                "device section records an explicit `amd` backend selection; faber's productized backend set is `metal` + `cuda` (AMDGPU is a compiler leaf, not a product backend — amd-gpu-target boundary); an explicit selection must name a productized backend or `auto` (never guessed, never silently remapped)"
-                    .to_owned(),
-            )]),
-            FmirDeviceSelection::Unknown(id) => Err(vec![mir_diag(
-                &self.diagnostic_path,
-                format!(
-                    "device section records unknown backend selection `{id}`; an explicit selection must name a compiled-in backend (never guessed, never silently remapped)"
-                ),
-            )]),
-        }
-    }
-}
-
-/// FNV-1a 64-bit idiom for the S1/S2 SOURCE-identity surface only
-/// ([`bin_runner::fnv64_hex`] — the embedded-image fingerprint and the A10
-/// identity's source half). This is the separate source-identity FNV surface
-/// explicitly preserved by ddpp0-contract §FnvRemoval; it is NOT the removed
-/// backend-artifact FNV provenance (B1–B7). Standard FNV-1a, identical to the
-/// deleted `radix_mir_fmir::fnv1a64`.
-pub(super) fn fnv1a64(bytes: &[u8]) -> u64 {
-    const FNV1A64_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
-    const FNV1A64_PRIME: u64 = 0x0000_0100_0000_01b3;
-    let mut hash = FNV1A64_OFFSET;
-    for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(FNV1A64_PRIME);
-    }
-    hash
-}
-
-// Submodule items are imported here (sibling modules reach each other
-// through `use super::*`); the explicit re-exports below carry the seams
-// package/mod.rs (and fhir.rs / device_test.rs) depend on.
-use bin_runner::*;
-use cli_bind::*;
-use cli_plan::*;
-use cli_values::*;
-use diag::*;
-use driver::*;
-use image::*;
-use link::*;
-use lower::*;
-use manifest::*;
-use remap::*;
-use requirements::*;
-use sources::*;
-
-// The LLVM package-emission lane (package/llvm.rs) canonicalizes direct
-// definition callees before the host-partition boundary-ABI gate.
-pub(crate) use lower::canonicalize_direct_definition_callees;
-
-#[cfg(test)]
-pub(crate) use driver::with_interpreted_lowered_package_mir;
-#[allow(unused_imports)] // external backend harnesses consume the public package-MIR callback.
-pub use driver::with_lowered_package_mir;
-// generated fmir-bin runner crates consume this public API.
-#[allow(unused_imports)]
-pub use routes::run_fmir_image_bytes_with_stdio;
-#[allow(unused_imports)] // FMIR stages consume this crate-visible image API.
-pub(crate) use routes::{
-    build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
-    fmir_image_route_decision, run_fmir_image_path, run_fmir_image_path_with_selection,
-    run_package_fmir_built_image, run_package_fmir_image, run_package_fmir_image_with_selection,
-    run_package_fmir_text_image, run_package_fmir_text_image_with_selection,
-};
-#[allow(unused_imports)]
-pub(crate) use routes::{
-    build_package_mir_artifact, run_package_mir, run_package_mir_artifact,
-    run_package_mir_with_selection,
-};
-// binary `commands/run` resolves the interpreted consumer through fhir.rs.
-#[cfg(feature = "hir-fhir")]
-pub(crate) use routes::run_package_mir_from_loaded;
 
 #[cfg(test)]
 #[path = "mir_test.rs"]
 mod tests;
 
-#[cfg(test)]
-#[path = "nominal_test.rs"]
-mod nominal_tests;
+use radix::diagnostics::Diagnostic;
+use radix::driver::Config;
+use radix::mir::Host;
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::{Path, PathBuf};
 
-#[cfg(test)]
-#[path = "reachability_test.rs"]
-mod reachability_tests;
+pub(crate) use radix_package::analyze::AnalyzedPackage;
+pub(crate) use radix_package::mir::DeviceSelection;
+pub(crate) use radix_package::mir::{
+    FmirImageRouteDecision, PackageFmirBinaryBundle, PackageFmirImage, PackageFmirTextImage,
+    PackageMirArtifact,
+};
 
-#[cfg(test)]
-#[path = "lane_test.rs"]
-mod lane_tests;
+// Forwarding wrappers: faber's entry signatures inject the faber seams
+// (`faber_mir_seams()`), so faber callers stay green until RP6 re-wires the
+// command adapter.
 
+pub(crate) fn run_package_mir<H: Host + ?Sized>(
+    config: &Config,
+    input: &Path,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_package_mir(config, input, &faber_mir_seams(), host)
+}
+
+pub(crate) fn run_package_mir_with_selection<H: Host + ?Sized>(
+    config: &Config,
+    input: &Path,
+    selection: DeviceSelection,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_package_mir_with_selection(
+        config,
+        input,
+        selection,
+        &faber_mir_seams(),
+        host,
+    )
+}
+
+#[cfg(feature = "hir-fhir")]
+pub(crate) fn run_package_mir_from_loaded<H: Host + ?Sized>(
+    config: &Config,
+    package: AnalyzedPackage,
+    loaded_links: &BTreeMap<PathBuf, BTreeMap<String, PathBuf>>,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_package_mir_from_loaded(
+        config,
+        package,
+        loaded_links,
+        &faber_mir_seams(),
+        host,
+    )
+}
+
+pub(crate) fn build_package_mir_artifact(
+    config: &Config,
+    input: &Path,
+    argumenta: &[String],
+) -> Result<PackageMirArtifact, Vec<Diagnostic>> {
+    radix_package::mir::build_package_mir_artifact(config, input, argumenta, &faber_mir_seams())
+}
+
+pub(crate) fn build_package_fmir_text_image(
+    config: &Config,
+    input: &Path,
+    argumenta: &[String],
+) -> Result<PackageFmirTextImage, Vec<Diagnostic>> {
+    radix_package::mir::build_package_fmir_text_image(config, input, argumenta, &faber_mir_seams())
+}
+
+pub(crate) fn build_package_fmir_image(
+    config: &Config,
+    input: &Path,
+    argumenta: &[String],
+) -> Result<PackageFmirImage, Vec<Diagnostic>> {
+    radix_package::mir::build_package_fmir_image(config, input, argumenta, &faber_mir_seams())
+}
+
+pub(crate) fn run_package_fmir_built_image<H: Host + ?Sized>(
+    config: &Config,
+    input: &Path,
+    selection: DeviceSelection,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_package_fmir_built_image(
+        config,
+        input,
+        selection,
+        &faber_mir_seams(),
+        host,
+    )
+}
+
+pub(crate) fn build_package_fmir_binary_bundle(
+    config: &Config,
+    input: &Path,
+    argumenta: &[String],
+    release: bool,
+) -> Result<PackageFmirBinaryBundle, Vec<Diagnostic>> {
+    radix_package::mir::build_package_fmir_binary_bundle(
+        config,
+        input,
+        argumenta,
+        release,
+        &faber_mir_seams(),
+    )
+}
+
+pub(crate) fn run_package_mir_artifact<H: Host + ?Sized>(
+    config: &Config,
+    artifact: &PackageMirArtifact,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_package_mir_artifact(config, artifact, &faber_mir_seams(), host)
+}
+
+pub(crate) fn run_package_fmir_text_image<H: Host + ?Sized>(
+    image: &PackageFmirTextImage,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_package_fmir_text_image(image, &faber_mir_seams(), host)
+}
+
+pub(crate) fn run_package_fmir_text_image_with_selection<H: Host + ?Sized>(
+    image: &PackageFmirTextImage,
+    selection: DeviceSelection,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_package_fmir_text_image_with_selection(
+        image,
+        selection,
+        &faber_mir_seams(),
+        host,
+    )
+}
+
+pub(crate) fn run_package_fmir_image<H: Host + ?Sized>(
+    image: &PackageFmirImage,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_package_fmir_image(image, &faber_mir_seams(), host)
+}
+
+pub(crate) fn run_package_fmir_image_with_selection<H: Host + ?Sized>(
+    image: &PackageFmirImage,
+    selection: DeviceSelection,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_package_fmir_image_with_selection(
+        image,
+        selection,
+        &faber_mir_seams(),
+        host,
+    )
+}
+
+pub(crate) fn run_fmir_image_path<H: Host + ?Sized>(
+    image_path: &Path,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_fmir_image_path(image_path, &faber_mir_seams(), host)
+}
+
+pub(crate) fn run_fmir_image_path_with_selection<H: Host + ?Sized>(
+    image_path: &Path,
+    selection_override: Option<DeviceSelection>,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_fmir_image_path_with_selection(
+        image_path,
+        selection_override,
+        &faber_mir_seams(),
+        host,
+    )
+}
+
+pub(crate) fn fmir_image_route_decision(
+    image_path: &Path,
+) -> Result<FmirImageRouteDecision, Vec<Diagnostic>> {
+    radix_package::mir::fmir_image_route_decision(image_path, &faber_mir_seams())
+}
+
+// Faber's fmir-bin runner writer is the seam body radix-package's binary
+// bundle builder receives (`MirSeams::bin_runner_writer`).
+use bin_runner::write_fmir_bin_runner;
+
+/// The faber-supplied package-MIR seams (RP5). Every faber product input the
+/// moved compiler subset needs enters as an explicit function — no ambient
+/// reads inside `radix-package`.
+pub(crate) fn faber_mir_seams() -> radix_package::mir::MirSeams {
+    radix_package::mir::MirSeams {
+        analysis: super::faber_analysis_seams(),
+        executed_lane_target: super::executed_lane_analysis_target,
+        library_resolver_for_config: super::library_resolver_from_config,
+        library_cache_for_config: super::library_cache_with_config,
+        device_config_for_input: manifest::manifest_device_config,
+        device_section_builder: device_section_builder,
+        host_route: host_route,
+        bin_runner_writer: write_fmir_bin_runner,
+        toolchain_version: env!("CARGO_PKG_VERSION"),
+    }
+}
+
+/// The faber product build of the FMIR device-section builder seam
+/// (ownership-freeze §5.1): faber's `device/` subtree builds the device
+/// payload. `Ok(None)` when the package declares no `[device]` surface or
+/// when this build compiles no `device-runtime`.
+fn device_section_builder(
+    prepared: &radix_package::mir::PreparedPackageMir<'_>,
+    lowered: &radix::mir::LoweredMirUnit<'_>,
+    diagnostic_path: &Path,
+) -> Result<Option<radix_mir_fmir::FmirDeviceSection>, Vec<Diagnostic>> {
+    // DDPP1-U2 (C2 feature isolation): the device-section builder compiles
+    // only under `device-runtime` (it consumes the faber `device/` subtree);
+    // without it no package carries a device payload.
+    #[cfg(feature = "device-runtime")]
+    {
+        if !prepared.device_declared {
+            return Ok(None);
+        }
+        // S5-U5b: the manifest `[device] steps` channel (or the portable
+        // default) is the declared repeating step count the constructor
+        // admits against the source loop bound and the wire carries.
+        let declared_steps = prepared
+            .device_steps
+            .unwrap_or(super::device::DEFAULT_TRAINING_STEPS);
+        let Some((program, semantics, step_count)) = super::device::device_program_for_lowered(
+            &lowered.validated,
+            &lowered.interner,
+            &lowered.companions,
+            declared_steps,
+        )?
+        else {
+            // The selected entry lowers to no compute kernel: no device
+            // payload. An explicit GPU request fails closed at run time
+            // (N1.1); `auto` keeps the CPU route.
+            return Ok(None);
+        };
+        // S5-U5b: `[device] steps` applies only to a RepeatingStep training
+        // program. A declared count on a SingleRun program is a contradiction
+        // — fail closed, never a silently dropped count.
+        if prepared.device_steps.is_some()
+            && program.lifetime != radix_mir::device_program::DeviceProgramLifetime::RepeatingStep
+        {
+            return Err(vec![crate::package_diagnostic_error(
+                "faber.toml device.steps applies only to a training-loop package; this package's device program is not a RepeatingStep training program",
+            )
+            .with_file(diagnostic_path.display().to_string())
+            .with_arg("issue", "package_device_steps_not_repeating")]);
+        }
+        // Fail closed when a declared input is missing for an input buffer.
+        // The TWO exemptions (S3-A5 + S5-U1): the companion's reverse-AD
+        // upstream seed — a synthetic 1-element input whose source param
+        // carries no source name — is provisioned with 1.0; and a DECOMPOSED
+        // kernel's data-flow input that another kernel produces (a forward
+        // intermediate) needs no external value.
+        let mut device_inputs = prepared.device_inputs.clone();
+        let mut upstream_seeds: Vec<(String, Vec<f32>)> = Vec::new();
+        let produced: std::collections::BTreeSet<String> = program
+            .kernels
+            .iter()
+            .flat_map(|kernel| kernel.resources.iter())
+            .filter(|resource| {
+                matches!(
+                    resource.buffer.role,
+                    radix_mir::device_program::BufferRole::Output
+                )
+            })
+            .map(|resource| resource.buffer.name.clone())
+            .collect();
+        for kernel in &program.kernels {
+            let Some(function) = lowered
+                .validated
+                .program()
+                .functions
+                .iter()
+                .find(|function| function.id == kernel.function)
+            else {
+                continue;
+            };
+            let has_anonymous_param = function.params.iter().any(|param| {
+                param.name.is_none()
+                    || param
+                        .name
+                        .is_some_and(|symbol| (symbol.0 as usize) >= lowered.interner.strings().len())
+            });
+            if has_anonymous_param {
+                for program_name in kernel.resources.iter().filter(|resource| {
+                    resource.buffer.role == radix_mir::device_program::BufferRole::Input
+                }) {
+                    if program_name.version.element_count == 1
+                        && !device_inputs.contains_key(&program_name.buffer.name)
+                        && !produced.contains(&program_name.buffer.name)
+                    {
+                        upstream_seeds.push((program_name.buffer.name.clone(), vec![1.0]));
+                    }
+                }
+            }
+            let Ok(_signature) =
+                radix_mir::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+                    function, lowered.validated.validation(), &lowered.interner,
+                )
+            else {
+                continue;
+            };
+            for program_name in kernel
+                .resources
+                .iter()
+                .filter(|resource| resource.buffer.role == radix_mir::device_program::BufferRole::Input)
+            {
+                if has_anonymous_param && program_name.version.element_count == 1 {
+                    continue;
+                }
+                if !device_inputs.contains_key(&program_name.buffer.name) {
+                    if produced.contains(&program_name.buffer.name) {
+                        continue;
+                    }
+                    return Err(vec![mir_issue_diag(
+                        diagnostic_path,
+                        "package_device_input_missing",
+                        format!(
+                            "[device] inputs has no value for kernel `{}` input buffer `{}`",
+                            kernel.entry, program_name.buffer.name
+                        ),
+                    )
+                    .with_arg("buffer", program_name.buffer.name.clone())]);
+                }
+            }
+        }
+        for (name, values) in upstream_seeds {
+            device_inputs.insert(name, values);
+        }
+        let selection = prepared.device_backend.unwrap_or(DeviceSelection::Auto);
+        let section = super::device::device_section_for_program(
+            &program,
+            &semantics,
+            &lowered.validated,
+            &lowered.interner,
+            super::device::DeviceSectionBuild {
+                selection,
+                inputs: &device_inputs,
+                ptx_target: S1_6_PTX_TARGET,
+                repeating_steps: step_count,
+            },
+        )?;
+        Ok(Some(section))
+    }
+    #[cfg(not(feature = "device-runtime"))]
+    {
+        let _ = (prepared, lowered, diagnostic_path);
+        Ok(None)
+    }
+}
+
+/// The NVPTX target the S1-6 device images compile for (faber-side with the
+/// device-section builder seam).
+#[cfg(feature = "device-runtime")]
+const S1_6_PTX_TARGET: &str = "sm_90";
+
+/// The faber host-construction policy (N1.1/N1.5, S1-6): decide whether a
+/// loaded image runs on the CPU/FMIR runner or a device route, and execute
+/// the device route when selected. `Ok(None)` runs the CPU route with the
+/// caller's host; `Ok(Some(()))` means the device route already executed.
+fn host_route(
+    image: &radix_package::mir::FmirPackageImage,
+    selection: DeviceSelection,
+) -> Result<Option<()>, Vec<Diagnostic>> {
+    let requires_device = image.device.is_some();
+    // DDPP1-U2 (C2 feature isolation): the device route is compiled only under
+    // `device-runtime`; without it an explicit backend request or a
+    // device-bearing image fails closed (never silently runs CPU).
+    #[cfg(feature = "device-runtime")]
+    {
+        match super::host_factory::resolve_backend_selection(
+            selection,
+            requires_device,
+            &super::host_factory::admitted_backends(),
+        ) {
+            Err(diagnostic) => Err(vec![diagnostic]),
+            Ok(None) => Ok(None),
+            Ok(Some(backend)) => {
+                let device = image.device.as_ref().ok_or_else(|| {
+                    vec![super::host_factory::missing_device_descriptor(backend)]
+                })?;
+                super::device::execute_device_route(device, backend, &image.source_hashes)?;
+                Ok(Some(()))
+            }
+        }
+    }
+    #[cfg(not(feature = "device-runtime"))]
+    {
+        if selection != DeviceSelection::Auto || requires_device {
+            return Err(vec![mir_diag(
+                &image.diagnostic_path,
+                "device section or explicit backend selection present, but this faber build compiles no `device-runtime`; rebuild with the `device-runtime` feature to execute device routes",
+            )]);
+        }
+        Ok(None)
+    }
+}
+
+/// Public package-MIR callback for external backend harnesses: forward to the
+/// moved compiler driver with the faber seams.
+pub fn with_lowered_package_mir<R>(
+    config: &Config,
+    input: &Path,
+    run: impl for<'a> FnOnce(&radix::mir::LoweredMirUnit<'a>) -> R,
+) -> Result<R, Vec<Diagnostic>> {
+    radix_package::mir::with_lowered_package_mir(config, input, &faber_mir_seams(), run)
+}
+
+/// The interpreted-consumer probe used by faber's device tests.
 #[cfg(test)]
-#[path = "test_support.rs"]
-pub(crate) mod test_support;
+pub(crate) fn with_interpreted_lowered_package_mir<R>(
+    config: &Config,
+    input: &Path,
+    run: impl for<'a> FnOnce(&radix::mir::LoweredMirUnit<'a>) -> R,
+) -> Result<R, Vec<Diagnostic>> {
+    radix_package::mir::with_interpreted_lowered_package_mir(config, input, &faber_mir_seams(), run)
+}
+
+/// Generated fmir-bin runner crates consume this public API (the stdio
+/// entry). Forward to the moved route with the faber seams.
+pub fn run_fmir_image_bytes_with_stdio(
+    image_bytes: &[u8],
+    diagnostic_path: &Path,
+    argumenta: Vec<String>,
+) -> Result<(), Vec<Diagnostic>> {
+    radix_package::mir::run_fmir_image_bytes_with_stdio(
+        image_bytes,
+        diagnostic_path,
+        argumenta,
+        &faber_mir_seams(),
+    )
+}
+
+// Re-exported helpers the faber bin_runner crate needs (they moved with the
+// compiler subset; bin_runner.rs reaches them through `super::*`). The
+// runner crate defines its own `fnv64_hex`/`source_identity` (they embed the
+// image into the generated runner source), so the moved copies are not
+// re-exported here.
+pub(crate) use radix_package::mir::{escape_toml_basic_string, fnv1a64, mir_diag, relative_or_display};
+pub(crate) use radix_mir_fmir::FmirTextSourceIdentity;
+
+// Runner-crate constants stay faber-side (the toolchain version is the
+// product version recorded in the generated runner's Cargo manifest).
+pub(crate) const PACKAGE_MIR_TOOLCHAIN_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub(crate) const FMIR_BIN_RUNNER_CRATE_DIR: &str = "runner";
+pub(crate) const FMIR_BIN_RUNNER_PACKAGE_NAME: &str = "faber-fmir-bin-runner";
+
+/// Diagnostic constructors used by the faber seam bodies.
+pub(crate) fn mir_issue_diag(
+    path: &Path,
+    issue: &'static str,
+    message: impl Into<String>,
+) -> Diagnostic {
+    mir_diag(path, message).with_arg("issue", issue)
+}

@@ -200,7 +200,7 @@ pub use llvm_host::{
 #[allow(unused_imports)] // generated fmir-bin runner crates consume this public API.
 pub use mir::run_fmir_image_bytes_with_stdio;
 #[cfg(test)]
-pub(super) use mir::test_support::{fmir_image_test_summary, fmir_text_image_test_summary};
+pub(super) use radix_package::mir::test_support::{fmir_image_test_summary, fmir_text_image_test_summary};
 #[allow(unused_imports)] // External backend harnesses consume the public package-MIR callback.
 pub use mir::with_lowered_package_mir;
 /// Product-owned device-selection request used by all route plumbing.
