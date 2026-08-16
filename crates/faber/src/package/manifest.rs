@@ -1,3 +1,14 @@
+//! Product view of the package manifest (`faber.toml`).
+//!
+//! RP2a: the compiler view (package identity, source paths, library identity,
+//! build target, locale, dependencies, lock-resolved inputs) moved to
+//! `radix-package`. This module keeps the product-only manifest
+//! interpretation — `[device]`, `[product]`, `[format]`, `[dispatch]`,
+//! product emit — plus the strict one-pass parse (`deny_unknown_fields`)
+//! that discovery and product flows validate against (goal §Manifest
+//! boundary). Compiler-view types and `manifest_build_target` are forwarded
+//! below so faber consumers keep their existing import paths.
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -11,6 +22,11 @@ use serde::Deserialize;
 // (the product-owned `DeviceSelection` under
 // `device-runtime`, a local equivalent in the small build).
 use super::DeviceSelection;
+
+pub use radix_package::manifest::{
+    manifest_build_target, ManifestBuild, ManifestLibrary, ManifestPackage, ManifestPaths,
+    ManifestReader, ManifestRustFieldNames, ManifestRustHost, ManifestTarget,
+};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -68,85 +84,6 @@ pub struct FaberManifest {
     /// Explicit additions to the native host provider selection.
     #[serde(default)]
     pub dispatch: ManifestDispatch,
-}
-
-/// `[package]` metadata from `faber.toml`.
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ManifestPackage {
-    /// Human-authored package name; sanitized before it becomes a Cargo name.
-    pub name: String,
-
-    /// Package version copied into the generated Cargo manifest.
-    #[serde(default = "default_version")]
-    pub version: String,
-
-    /// Faber source edition, distinct from the generated Rust edition.
-    #[serde(default = "default_edition")]
-    pub edition: String,
-}
-
-/// `[paths]` metadata that anchors package source discovery.
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ManifestPaths {
-    /// Directory containing package source files, relative to the manifest.
-    ///
-    /// Supported values are `"src"` (the default) and `"."` (the package
-    /// root). Any other value — nested roots such as `"components/faber"` or
-    /// depth-1 customs such as `"lib"` — is rejected at manifest validation
-    /// until a usage contract for custom source roots exists.
-    #[serde(default = "default_source_path")]
-    pub source: String,
-
-    /// Entry module path, relative to `source`; required for binary packages.
-    pub entry: Option<String>,
-
-    /// Named import templates for `§name/rest` forms (values relative to package root).
-    ///
-    /// Example:
-    /// ```toml
-    /// [paths.templates]
-    /// gnu = "../common/gnu"
-    /// ```
-    /// then `importa ex "§gnu/argv"` resolves under that directory.
-    #[serde(default)]
-    pub templates: BTreeMap<String, String>,
-}
-
-/// `[library]` metadata for source-library packages.
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ManifestLibrary {
-    /// Provider prefix used by imports such as `provider:module/path`.
-    pub provider: String,
-}
-
-/// `[build]` metadata accepted by the package command surface.
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ManifestBuild {
-    /// Backend target requested by the package. `None` selects the implicit
-    /// portable default (FHIR package + derived FMIR run) per the FHIR
-    /// package delivery; `Some("rust")` keeps the explicit Rust/Cargo route.
-    /// `faber init` intentionally leaves this unset so fresh packages are
-    /// portable by default.
-    #[serde(default)]
-    pub target: Option<String>,
-
-    /// Backend targets supported by a library package.
-    #[serde(default)]
-    pub targets: Vec<String>,
-
-    /// Package output kind; currently only binary crates are supported.
-    #[serde(default = "default_build_kind")]
-    pub kind: String,
-
-    /// Generated Rust struct-field spelling policy.
-    #[serde(default)]
-    #[allow(dead_code)]
-    // manifest compatibility: accepted even when the Rust target leaf is disabled
-    pub rust_field_names: ManifestRustFieldNames,
 }
 
 /// `[device]` metadata for package runner backend selection (N1.1), the
@@ -238,21 +175,6 @@ pub enum ManifestProductEmit {
     TypeScript,
 }
 
-/// `[locale]` metadata for package code-locale selection.
-///
-/// TODO(locale-rename): LEGACY — type name `ManifestReader` and any remaining
-/// `[reader]` prose should go with `LEGACY_READER_MANIFEST_ALIAS` (see field
-/// alias on [`FaberManifest::locale`]).
-#[derive(Debug, Default, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct ManifestReader {
-    /// Locale id such as `en`, `la`, `th-TH`, or `zh-Hans`.
-    pub locale: Option<String>,
-
-    /// Optional locale pack path relative to the package root.
-    pub pack: Option<String>,
-}
-
 /// `[format]` metadata for source-formatting policy selection
 /// (FORMAT-PRETTY S5).
 ///
@@ -269,20 +191,6 @@ pub struct ManifestFormat {
     pub policy: Option<String>,
 }
 
-/// `[target.<name>]` metadata for target-specific implementation data.
-#[derive(Debug, Default, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct ManifestTarget {
-    /// Binding manifest path, relative to the package root.
-    pub bindings: Option<String>,
-
-    /// Runtime host policy for generated applications.
-    pub host: Option<ManifestRustHost>,
-
-    /// Target dependency pins, e.g. `[target.rust.dependencies]`.
-    pub dependencies: BTreeMap<String, String>,
-}
-
 /// `[dispatch]` package policy for native host providers.
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -290,57 +198,6 @@ pub struct ManifestDispatch {
     /// Explicit provider additions; route analysis still supplies inferred
     /// providers, so this list never silently removes a required family.
     pub providers: Vec<String>,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ManifestRustHost {
-    Native,
-}
-
-#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ManifestRustFieldNames {
-    #[default]
-    Preserve,
-    SnakeCase,
-}
-
-impl Default for ManifestPaths {
-    fn default() -> Self {
-        Self {
-            source: default_source_path(),
-            entry: None,
-            templates: BTreeMap::new(),
-        }
-    }
-}
-
-impl Default for ManifestBuild {
-    fn default() -> Self {
-        Self {
-            target: None,
-            targets: Vec::new(),
-            kind: default_build_kind(),
-            rust_field_names: ManifestRustFieldNames::Preserve,
-        }
-    }
-}
-
-fn default_version() -> String {
-    "0.1.0".to_owned()
-}
-
-fn default_edition() -> String {
-    "2026".to_owned()
-}
-
-fn default_source_path() -> String {
-    "src".to_owned()
-}
-
-fn default_build_kind() -> String {
-    "bin".to_owned()
 }
 
 fn default_product_out() -> String {
@@ -365,33 +222,6 @@ fn default_product_assets_manifest() -> String {
 
 fn default_product_controllers_json() -> String {
     "controllers.json".to_owned()
-}
-
-/// Map a manifest `[build] target` value (or `None` for the implicit portable
-/// default) to a compiler [`Target`].
-pub(crate) fn manifest_build_target(
-    target: Option<&str>,
-    path: &Path,
-) -> Result<Target, Box<Diagnostic>> {
-    match target.map(str::trim) {
-        None => Ok(Target::HirFhir),
-        Some("rust") => Ok(Target::HirRust),
-        Some("fhir") => Ok(Target::HirFhir),
-        Some("ts") | Some("typescript") => Ok(Target::HirTypeScript),
-        Some("scena") => Ok(Target::MirScena),
-        Some("fmir-text") => Ok(Target::MirFmir),
-        Some("fmir") => Ok(Target::MirFmirBinary),
-        Some("fmir-bin") => Ok(Target::MirFmirBundle),
-        Some("llvm-host") => Ok(Target::MirLlvmHost),
-        Some(unsupported) => Err(Box::new(
-            crate::package_diagnostic_error(format!(
-                "faber.toml build.target '{unsupported}' is not supported for package builds"
-            ))
-            .with_file(path.display().to_string())
-            .with_arg("issue", "package_build_target_unsupported")
-            .with_arg("target", unsupported.to_owned()),
-        )),
-    }
 }
 
 /// Resolve the manifest `[build] target` for an input path, returning `None`
