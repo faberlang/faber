@@ -348,10 +348,9 @@ impl super::FaberCodegen {
         // `cape err { … }` handler whose first authored statement is a real
         // local (`fixum textus c ← …`) must keep it — skipping on "first
         // statement is a local" alone dropped authored bindings.
-        let skip_binding_local = block
-            .statements
-            .first()
-            .is_some_and(|stmt| matches!(&stmt.kind, HirStatementKind::Local(local) if local.runtime_provided));
+        let skip_binding_local = block.statements.first().is_some_and(
+            |stmt| matches!(&stmt.kind, HirStatementKind::Local(local) if local.runtime_provided),
+        );
         let name = binding_name.or_else(|| {
             block.statements.first().and_then(|stmt| match &stmt.kind {
                 HirStatementKind::Local(local) => Some(local.name),
