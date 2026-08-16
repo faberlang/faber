@@ -3,6 +3,11 @@
 This repository owns Faber's public project surface and generated-language API
 packages. It does not own compiler or `faber` CLI implementation.
 
+**Workspace work mode.** Ordinary development is **direct** in this
+checkout on `main`. Worktree packets under `../worktrees/<lane>/` are
+optional Tugboat isolation. Do not stand up lanes unless the operator
+asked. Container law: [`../AGENTS.md`](../AGENTS.md).
+
 ## Ownership
 
 - `runtime/{rust,typescript,go,swift}`: generated-language support packages.
