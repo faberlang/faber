@@ -23,4 +23,4 @@
 //! [`CapabilityGap`] and producing a [`Lowerability`] verdict from their own
 //! classifier. Each target owns its classifier (which shapes it rejects and into
 //! which category); the vocabulary is shared. See
-//! `docs/factory/mir-llvm/goals/02-target-capability-validation.md`.
+//! `docs/archived/mir-llvm/goals/02-target-capability-validation.md`.

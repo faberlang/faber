@@ -1,7 +1,7 @@
 //! Target-neutral MIR device-program schema (A2 — the common device program).
 //!
 //! This module is the **shared-schema authority** for the differentiable-GPU
-//! campaign (`docs/factory/gpu-training-lowering/`): the target-neutral
+//! campaign (`docs/archived/gpu-training-lowering/`): the target-neutral
 //! [`DeviceProgram`] representation that `hosts` sessions, the product CLI
 //! (`faber`), and the FMIR device payload (S1-2) all consume. It is
 //! single-writer in `radix` (campaign N2); nothing else in the workspace may

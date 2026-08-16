@@ -92,7 +92,7 @@ pub const RANK2_REDUCTION_READINESS_ROWS: &[Rank2ReductionReadinessRow] = &[
         status: Rank2ReductionReadinessStatus::HostProviderBlocked,
         owner: "cuda-kernel-emit host/provider path",
         gap: "The GPU workload rung-0 matmul proof has a reference but no output-checked device success; device handle placement, CUDA launch, copy/readback, and provider lifecycle remain outside Radix execution.",
-        evidence: "docs/factory/gpu-workload-floor/baseline-ledger.md::rung-0-matmul",
+        evidence: "docs/archived/gpu-workload-floor/baseline-ledger.md::rung-0-matmul",
     },
     Rank2ReductionReadinessRow {
         family: TensorOperationFloorFamily::Reductions,
@@ -100,7 +100,7 @@ pub const RANK2_REDUCTION_READINESS_ROWS: &[Rank2ReductionReadinessRow] = &[
         status: Rank2ReductionReadinessStatus::HostProviderBlocked,
         owner: "cuda-kernel-emit host/provider path",
         gap: "The GPU workload rung-1 softmax/reduction path has a reference but no output-checked device success; device reduction/broadcasting plus CUDA launch and readback remain unproven.",
-        evidence: "docs/factory/gpu-workload-floor/baseline-ledger.md::rung-1-softmax",
+        evidence: "docs/archived/gpu-workload-floor/baseline-ledger.md::rung-1-softmax",
     },
 ];
 
