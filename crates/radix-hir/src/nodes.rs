@@ -538,6 +538,10 @@ pub enum HirReceiver {
 pub struct HirEnum {
     pub name: Symbol,
     pub type_params: Vec<HirTypeParam>,
+    /// Item-level annotations (`@ publica`, `@ interna`, …). Carried so the
+    /// canonical Faber emitter can preserve declaration visibility through
+    /// convert round-trips.
+    pub annotations: Vec<HirAnnotation>,
     pub variants: Vec<HirVariant>,
 }
 

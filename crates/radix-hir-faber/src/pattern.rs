@@ -88,7 +88,7 @@ impl super::FaberCodegen {
                 writer.write(&self.symbol_to_string(name, interner));
             }
             HirPattern::Variant(def_id, patterns) => {
-                writer.write(&self.name_for_def(*def_id, names, interner));
+                writer.write(&self.name_for_def_imported(*def_id, names, interner));
                 if !patterns.is_empty() {
                     writer.write(" ");
                     writer.write(surface.contextual_keyword("fixum"));

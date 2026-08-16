@@ -371,9 +371,10 @@ mod tests {
     use super::*;
     use crate::{empty_presentation, FaberCodegen, KeywordSurface, TypeBindingKind};
     use radix_hir::{
-        DefId, HirBlock, HirCallArg, HirCape, HirCasuArm, HirEnum, HirExpression,
+        DefId, HirAnnotation, HirBlock, HirCallArg, HirCape, HirCasuArm, HirEnum, HirExpression,
         HirExpressionKind, HirFunction, HirId, HirImport, HirImportItem, HirItem, HirItemKind,
-        HirLiteral, HirLocal, HirPattern, HirProgram, HirStatement, HirStatementKind, HirVariant,
+        HirLiteral, HirLocal, HirPattern, HirProgram, HirStatement, HirStatementKind, HirStruct,
+        HirVariant,
     };
     use radix_lexer::{Interner, Span, TokenKind};
 
@@ -1518,6 +1519,7 @@ mod tests {
         let enum_item = HirEnum {
             name: interner.intern("DType"),
             type_params: Vec::new(),
+            annotations: Vec::new(),
             variants: vec![
                 HirVariant {
                     def_id: DefId(1),
@@ -1559,6 +1561,132 @@ mod tests {
     }
 
     #[test]
+    fn struct_publica_annotation_reemits() {
+        // S1-U2 convert defect: the canonical emitter dropped `@ publica` on
+        // `genus` declarations (dtype 16->14 publica decls through convert).
+        // Item-level annotations must re-emit ahead of the declaration so the
+        // converted module keeps its export tier.
+        let mut interner = Interner::new();
+        let types = TypeTable::new();
+        let publica = interner.intern("publica");
+
+        let struct_item = HirItem {
+            id: HirId(0),
+            def_id: DefId(radix_types::USER_DEF_ID_BASE),
+            kind: HirItemKind::Struct(HirStruct {
+                name: interner.intern("Artifactus"),
+                type_params: Vec::new(),
+                annotations: vec![HirAnnotation::with_fields(publica, Vec::new(), span())],
+                fields: Vec::new(),
+                methods: Vec::new(),
+                extends: None,
+                implements: Vec::new(),
+            }),
+            span: span(),
+        };
+
+        let program = HirProgram {
+            items: vec![struct_item],
+            entry: None,
+            entry_annotations: Vec::new(),
+            entry_args_name: None,
+            entry_is_async: false,
+        };
+
+        let code = generate_faber(&program, &types, &interner);
+        let publica_line = code
+            .lines()
+            .find(|line| line.contains("publica"))
+            .unwrap_or_else(|| panic!("struct must re-emit its @ publica annotation:\n{code}"));
+        let struct_line = code
+            .lines()
+            .position(|line| line.contains("genus Artifactus"))
+            .expect("struct declaration must be emitted");
+        assert!(
+            code.lines().position(|line| line == publica_line).unwrap() < struct_line,
+            "@ publica must precede the struct declaration:\n{code}"
+        );
+    }
+
+    #[test]
+    fn enum_publica_annotation_reemits() {
+        // S1-U2 convert defect: the canonical emitter dropped `@ publica` on
+        // `discretio` declarations. `HirEnum` now carries item annotations so
+        // the converted module keeps its export tier.
+        let mut interner = Interner::new();
+        let types = TypeTable::new();
+        let publica = interner.intern("publica");
+
+        let enum_item = HirItem {
+            id: HirId(0),
+            def_id: DefId(radix_types::USER_DEF_ID_BASE),
+            kind: HirItemKind::Enum(HirEnum {
+                name: interner.intern("DType"),
+                type_params: Vec::new(),
+                annotations: vec![HirAnnotation::with_fields(publica, Vec::new(), span())],
+                variants: vec![HirVariant {
+                    def_id: DefId(1),
+                    name: interner.intern("F32"),
+                    fields: vec![],
+                    span: span(),
+                }],
+            }),
+            span: span(),
+        };
+
+        let program = HirProgram {
+            items: vec![enum_item],
+            entry: None,
+            entry_annotations: Vec::new(),
+            entry_args_name: None,
+            entry_is_async: false,
+        };
+
+        let code = generate_faber(&program, &types, &interner);
+        let publica_line = code
+            .lines()
+            .find(|line| line.contains("publica"))
+            .unwrap_or_else(|| panic!("union must re-emit its @ publica annotation:\n{code}"));
+        let discretio_line = code
+            .lines()
+            .position(|line| line.contains("discretio DType"))
+            .expect("union declaration must be emitted");
+        assert!(
+            code.lines().position(|line| line == publica_line).unwrap() < discretio_line,
+            "@ publica must precede the union declaration:\n{code}"
+        );
+    }
+
+    #[test]
+    fn imported_variant_pattern_uses_qualified_spelling() {
+        // S1-U2 convert defect: a `discerne` arm matching an imported union
+        // variant (`manifestum.Cognita`) re-emitted as the `def_N` fallback,
+        // which the converted module re-parse rejected with SEM001. The
+        // import contract's qualified spelling must win.
+        let mut codegen = FaberCodegen::default();
+        let names = FxHashMap::default();
+        let interner = Interner::new();
+        let surface = LatinSurface;
+        let mut writer = radix_codegen_shared::CodeWriter::new();
+        let variant_def = DefId(0x9000_0001);
+        codegen
+            .imported_def_spellings
+            .insert(variant_def, "manifestum.Cognita".to_owned());
+        codegen.write_pattern(
+            &HirPattern::Variant(variant_def, Vec::new()),
+            &names,
+            &interner,
+            &surface,
+            &mut writer,
+        );
+        assert_eq!(
+            writer.as_str(),
+            "manifestum.Cognita",
+            "imported variant pattern must use the qualified spelling, not def_N"
+        );
+    }
+
+    #[test]
     fn call_to_local_variant_reemits_finge_construction() {
         // `finge F32` lowers to `Call(Path(variant_def), [], [])`; the emitter
         // must recover the `finge` keyword. A bare `F32()` re-emit is a retired
@@ -1570,6 +1698,7 @@ mod tests {
         let enum_item = HirEnum {
             name: interner.intern("DType"),
             type_params: Vec::new(),
+            annotations: Vec::new(),
             variants: vec![HirVariant {
                 def_id: variant_def,
                 name: interner.intern("F32"),
@@ -1662,6 +1791,7 @@ mod tests {
         let enum_item = HirEnum {
             name: interner.intern("TensorError"),
             type_params: Vec::new(),
+            annotations: Vec::new(),
             variants: vec![HirVariant {
                 def_id: variant_def,
                 name: interner.intern("FormaInvalida"),

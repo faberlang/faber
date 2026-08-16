@@ -32,6 +32,22 @@ impl super::FaberCodegen {
         )
     }
 
+    /// Spelling for a resolved reference that may be imported: imported
+    /// nominals and union variants carry their qualified source spelling
+    /// (`base.Vector3`, `manifestum.Cognita`) from the import contract, since
+    /// their `DefId` has no local name-table entry.
+    pub(super) fn name_for_def_imported(
+        &self,
+        def_id: DefId,
+        names: &FxHashMap<DefId, Symbol>,
+        interner: &Interner,
+    ) -> String {
+        self.imported_def_spellings
+            .get(&def_id)
+            .cloned()
+            .unwrap_or_else(|| self.name_for_def(def_id, names, interner))
+    }
+
     /// Prefer the collected binding name, falling back to the HIR placeholder.
     pub(super) fn resolved_binding_symbol(
         def_id: DefId,

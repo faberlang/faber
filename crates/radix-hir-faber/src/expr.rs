@@ -113,7 +113,7 @@ impl super::FaberCodegen {
                     // Print the localized self keyword instead of the type name.
                     writer.write(surface.keyword(TokenKind::Ego));
                 } else {
-                    writer.write(&self.name_for_def(*def_id, names, interner));
+                    writer.write(&self.name_for_def_imported(*def_id, names, interner));
                 }
             }
             HirExpressionKind::Literal(lit) => self.write_literal(lit, interner, surface, writer),
@@ -1054,7 +1054,7 @@ impl super::FaberCodegen {
     ) {
         writer.write(surface.keyword(TokenKind::Finge));
         writer.write(" ");
-        writer.write(&self.name_for_def(variant_def, names, interner));
+        writer.write(&self.name_for_def_imported(variant_def, names, interner));
         if !fields.is_empty() {
             writer.write(" {");
             for (idx, field) in fields.iter().enumerate() {

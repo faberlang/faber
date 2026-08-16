@@ -248,6 +248,8 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
+        self.write_hir_annotations(&s.annotations, types, names, interner, surface, writer);
+
         writer.write(surface.contextual_keyword("genus"));
         writer.write(" ");
         writer.write(&self.symbol_to_string(s.name, interner));
@@ -372,6 +374,8 @@ impl super::FaberCodegen {
     ) {
         // Enum variants are normalized to the block form that remains valid
         // for both plain variants and variants carrying named fields.
+        self.write_hir_annotations(&e.annotations, types, names, interner, surface, writer);
+
         writer.write(surface.contextual_keyword("discretio"));
         writer.write(" ");
         writer.write(&self.symbol_to_string(e.name, interner));
