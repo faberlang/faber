@@ -30,7 +30,6 @@ pub use radix_package::analyze::{AnalyzedPackage, AnalyzedPackageUnit};
 // (`emit.rs`); faber keeps the Go/Wasm generation bodies (toolchain-bound) and
 // forwards the result types so consumers keep their existing names.
 pub use radix_package::emit::{PackageCompileResult, WasmPackageModuleFile};
-pub(crate) use super::analyze_package;
 
 #[cfg(feature = "hir-go")]
 use super::import_graph::{resolve_import, ImportResolution};
@@ -53,7 +52,7 @@ pub(crate) fn faber_emission_seams() -> radix_package::emit::EmissionSeams {
     }
 }
 
-fn rust_runtime_plan_for_package(
+pub(crate) fn rust_runtime_plan_for_package(
     package: &AnalyzedPackage,
     library_resolver: &crate::library::LibraryResolver,
 ) -> Result<RustRuntimePlan, Box<Diagnostic>> {
@@ -173,7 +172,10 @@ impl HirVisitor for AdRouteCollector<'_> {
 /// falling back to single-file compilation.
 ///
 /// RP4: the emission assembly lives in `radix-package`; this adapter supplies
-/// the faber seams (Go/Wasm generation, analysis) and forwards.
+/// the faber seams (Go/Wasm generation, analysis) and forwards. RP6: the
+/// binary commands consume `radix_package::emit::compile_package` directly;
+/// this forward remains for the public API + lib tests until RP7.
+#[allow(dead_code)]
 pub fn compile_package(config: &Config, input: &Path) -> CompileResult {
     radix_package::emit::compile_package(config, input, &faber_emission_seams())
 }
@@ -184,6 +186,10 @@ pub fn compile_package(config: &Config, input: &Path) -> CompileResult {
 ///
 /// The `config` must target `Target::HirGo`; other targets leave
 /// [`PackageCompileResult::go_modules`] empty.
+// `allow(dead_code)`: RP6 re-wired the binary go route to
+// `radix_package::emit::compile_package_result` directly; lib tests keep this
+// adapter until RP7.
+#[allow(dead_code)]
 #[cfg(feature = "hir-go")]
 pub(crate) fn compile_package_go(config: &Config, input: &Path) -> PackageCompileResult {
     radix_package::emit::compile_package_result(config, input, &faber_emission_seams())
@@ -243,6 +249,10 @@ pub fn compile_package_with_test_options(
 /// Package runtime plan (RP4): the analysis spine runs in `radix-package`;
 /// the product `RustRuntimePlan` construction stays faber-side and is handed
 /// to the entry as the explicit plan builder.
+// `allow(dead_code)`: RP6 re-wired the binary build route to
+// `radix_package::emit::package_rust_runtime_plan` directly; lib tests keep
+// this adapter until RP7.
+#[allow(dead_code)]
 pub(crate) fn package_rust_runtime_plan(
     config: &Config,
     input: &Path,
@@ -746,10 +756,10 @@ mod tests;
 /// `faber check` reports the same import, manifest, and mounted-command policy
 /// errors that a package build would encounter.
 ///
-/// RP4: stays faber-side as the entry adapter until RP6.
+/// RP6: the command-entry body moved to `radix-package`
+/// (`analyze::check_package`); this forward keeps the faber signature for the
+/// lib-test surface until RP7.
+#[allow(dead_code)]
 pub fn check_package(config: &Config, input: &Path) -> Vec<Diagnostic> {
-    match analyze_package(config, input) {
-        Ok(package) => package.diagnostics,
-        Err(diagnostics) => diagnostics,
-    }
+    radix_package::analyze::check_package(config, input, &super::faber_analysis_seams())
 }

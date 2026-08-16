@@ -80,10 +80,11 @@ pub(super) fn interpret_path(
                 }
             };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
-        if let Err(mut diagnostics) = package::run_package_mir_with_selection(
+        if let Err(mut diagnostics) = radix_package::mir::run_package_mir_with_selection(
             &config,
             archive.package_input(),
             selection,
+            &package::faber_mir_seams(),
             &mut host,
         ) {
             archive.remap_diagnostics(&mut diagnostics);
@@ -104,9 +105,13 @@ pub(super) fn interpret_path(
             }
         };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
-        if let Err(diagnostics) =
-            package::run_package_mir_with_selection(&config, path, selection, &mut host)
-        {
+        if let Err(diagnostics) = radix_package::mir::run_package_mir_with_selection(
+            &config,
+            path,
+            selection,
+            &package::faber_mir_seams(),
+            &mut host,
+        ) {
             super::eprint_compile_diagnostics(&diagnostics);
             eprint_device_run_note(&diagnostics);
             std::process::exit(1);
@@ -357,7 +362,10 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
     // the image's device section decides whether the route carries a device
     // program, and the selection request is the CLI `--backend` override
     // falling back to the image's recorded selection.
-    let decision = match package::fmir_image_route_decision(&args.image) {
+    let decision = match radix_package::mir::fmir_image_route_decision(
+        &args.image,
+        &package::faber_mir_seams(),
+    ) {
         Ok(decision) => decision,
         Err(diagnostics) => {
             eprint_route_diagnostics(&diagnostics);
@@ -373,9 +381,12 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
     // The route function applies the one host-construction policy: a
     // device-bearing image runs through the composite host's device route
     // (S1-6 launch seam); anything else runs the CPU/FMIR runner.
-    if let Err(diagnostics) =
-        package::run_fmir_image_path_with_selection(&args.image, Some(selection), &mut host)
-    {
+    if let Err(diagnostics) = radix_package::mir::run_fmir_image_path_with_selection(
+        &args.image,
+        Some(selection),
+        &package::faber_mir_seams(),
+        &mut host,
+    ) {
         eprint_route_diagnostics(&diagnostics);
         eprintln!("fmir image execution failed");
         std::process::exit(1);

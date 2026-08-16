@@ -157,7 +157,12 @@ fn run_package(
     exact: bool,
     include_ignored: bool,
 ) -> ProbaReport {
-    let mut package = match package::analyze_package_for_tests(config, input, proba_filter) {
+    let mut package = match radix_package::analyze::analyze_package_for_tests(
+        config,
+        input,
+        proba_filter,
+        &package::faber_analysis_seams(),
+    ) {
         Ok(package) => package,
         Err(diagnostics) => {
             super::eprint_compile_diagnostics(&diagnostics);

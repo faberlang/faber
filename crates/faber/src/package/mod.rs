@@ -115,7 +115,11 @@ pub(crate) use compile::compile_package_go;
 #[allow(unused_imports)]
 // U6-D package-wasm emit path (binary `faber build/emit --target wasm`).
 pub(crate) use compile::compile_package_wasm;
+#[allow(unused_imports)] // lib tests consume this faber-signature adapter until RP7.
 pub(crate) use compile::package_rust_runtime_plan;
+// RP6: the binary command adapters consume the radix-package entries directly
+// with faber's seam bundles; re-export the seam constructors crate-visible.
+pub(crate) use compile::{faber_emission_seams, rust_runtime_plan_for_package};
 #[allow(unused_imports)] // package MIR stages consume this crate-visible analysis API.
 pub(crate) use compile::{AnalyzedPackage, AnalyzedPackageUnit};
 #[cfg(feature = "hir-fhir")]
@@ -208,7 +212,7 @@ pub(crate) use mir::DeviceSelection;
 #[allow(unused_imports)] // FMIR stages consume this crate-visible image API.
 pub(crate) use mir::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
-    fmir_image_route_decision, run_fmir_image_path, run_fmir_image_path_with_selection,
+    faber_mir_seams, fmir_image_route_decision, run_fmir_image_path, run_fmir_image_path_with_selection,
     run_package_fmir_built_image, run_package_fmir_image, run_package_fmir_image_with_selection,
     run_package_fmir_text_image, run_package_fmir_text_image_with_selection,
 };

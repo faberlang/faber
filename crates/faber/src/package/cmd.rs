@@ -6,23 +6,17 @@ use std::path::{Path, PathBuf};
 
 use crate::input_shape::locale_without_package_error;
 
-#[cfg(feature = "hir-fhir")]
-use super::build_package_fhir;
 use super::cargo::{
     emit_generated_crate_with_runtime_plan, invoke_cargo_build, lock_generated_crate_build,
 };
-#[cfg(feature = "hir-go")]
-use super::compile_package_go;
 #[cfg(feature = "hir-go")]
 use super::go_build::{emit_go_module_with_postprocess, invoke_go_build, GoBuildLayout};
 use super::manifest::{manifest_build_target, FaberManifest};
 #[cfg(feature = "mir-llvm")]
 use super::{build_host_program, LlvmHostProfile};
 use super::{
-    build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
-    build_package_mir_artifact, check_package, compile_package, config_with_locale,
-    discover_build_layout, package_host_selection_diagnostic, package_rust_runtime_plan,
-    read_manifest, BuildLayout, MANIFEST_FILE,
+    config_with_locale, discover_build_layout, package_host_selection_diagnostic, read_manifest,
+    BuildLayout, MANIFEST_FILE,
 };
 
 /// Print `message` and terminate.
@@ -91,7 +85,12 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     };
 
     if is_package && target == Target::MirScena {
-        let artifact = match build_package_mir_artifact(&config, &input_path, &[]) {
+        let artifact = match radix_package::mir::build_package_mir_artifact(
+            &config,
+            &input_path,
+            &[],
+            &super::faber_mir_seams(),
+        ) {
             Ok(artifact) => artifact,
             Err(diagnostics) => report_diagnostics_and_exit(
                 &diagnostics,
@@ -104,7 +103,12 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     }
 
     if is_package && target == Target::MirFmir {
-        let image = match build_package_fmir_text_image(&config, &input_path, &[]) {
+        let image = match radix_package::mir::build_package_fmir_text_image(
+            &config,
+            &input_path,
+            &[],
+            &super::faber_mir_seams(),
+        ) {
             Ok(image) => image,
             Err(diagnostics) => report_diagnostics_and_exit(
                 &diagnostics,
@@ -117,7 +121,12 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     }
 
     if is_package && target == Target::MirFmirBinary {
-        let image = match build_package_fmir_image(&config, &input_path, &[]) {
+        let image = match radix_package::mir::build_package_fmir_image(
+            &config,
+            &input_path,
+            &[],
+            &super::faber_mir_seams(),
+        ) {
             Ok(image) => image,
             Err(diagnostics) => report_diagnostics_and_exit(
                 &diagnostics,
@@ -130,8 +139,13 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     }
 
     if is_package && target == Target::MirFmirBundle {
-        let bundle =
-            match build_package_fmir_binary_bundle(&config, &input_path, &[], command.release) {
+        let bundle = match radix_package::mir::build_package_fmir_binary_bundle(
+            &config,
+            &input_path,
+            &[],
+            command.release,
+            &super::faber_mir_seams(),
+        ) {
                 Ok(bundle) => bundle,
                 Err(diagnostics) => report_diagnostics_and_exit(
                     &diagnostics,
@@ -152,7 +166,11 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
             std::process::exit(1);
         }
         #[cfg(feature = "hir-fhir")]
-        let artifact = match build_package_fhir(&config, &input_path) {
+        let artifact = match radix_package::fhir::build_package_fhir(
+            &config,
+            &input_path,
+            &super::faber_analysis_seams(),
+        ) {
             Ok(artifact) => artifact,
             Err(diagnostics) => report_diagnostics_and_exit(
                 &diagnostics,
@@ -222,8 +240,13 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
                     .join("wasm"),
                 Err(d) => fail_with_diagnostic(&d),
             };
-            let options = super::wasm::PackageWasmOptions::new(output_dir);
-            let build = match super::wasm::build_package_wasm(&config, &input_path, &options) {
+            let options = radix_package::wasm::PackageWasmOptions::new(output_dir);
+            let build = match radix_package::wasm::build_package_wasm(
+                &config,
+                &input_path,
+                &options,
+                &super::faber_analysis_seams(),
+            ) {
                 Ok(build) => build,
                 Err(diagnostics) => report_diagnostics_and_exit(
                     &diagnostics,
@@ -275,7 +298,11 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
         }
         #[cfg(feature = "hir-go")]
         {
-            let go_result = compile_package_go(&config, &input_path);
+            let go_result = radix_package::emit::compile_package_result(
+                &config,
+                &input_path,
+                &super::faber_emission_seams(),
+            );
             radix::tool::print_diagnostics(
                 &go_result.compile_result.diagnostics,
                 DiagnosticMode::Normal,
@@ -310,7 +337,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     }
 
     let result = if is_package {
-        compile_package(&config, &input_path)
+        radix_package::emit::compile_package(&config, &input_path, &super::faber_emission_seams())
     } else {
         let compiler = radix::Compiler::new(config.clone());
         compiler.compile(&input_path)
@@ -346,7 +373,12 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
         } else {
             None
         };
-        let mut runtime_plan = match package_rust_runtime_plan(&config, &input_path) {
+        let mut runtime_plan = match radix_package::emit::package_rust_runtime_plan(
+            &config,
+            &input_path,
+            &super::faber_analysis_seams(),
+            super::rust_runtime_plan_for_package,
+        ) {
             Ok(plan) => plan,
             Err(diagnostics) => report_diagnostics_and_exit(
                 &diagnostics,
@@ -635,7 +667,11 @@ pub fn cmd_check_package(command: radix::tool::CheckCommand) {
         ),
         Err(diag) => fail_with_diagnostic(&diag),
     };
-    let mut diagnostics = check_package(&config, &input_path);
+    let mut diagnostics = radix_package::analyze::check_package(
+        &config,
+        &input_path,
+        &super::faber_analysis_seams(),
+    );
     radix::apply_warn_policy(&mut diagnostics, &config.warn_policy);
 
     let mut fatal_errors = 0usize;
@@ -772,7 +808,10 @@ fn compile_package_input(
         Ok(selection) => selection,
         Err(diag) => fail_with_diagnostic(&diag),
     };
-    (compile_package(&config, &path), locale_pack)
+    (
+        radix_package::emit::compile_package(&config, &path, &super::faber_emission_seams()),
+        locale_pack,
+    )
 }
 
 fn is_permissive_check_code(code: Option<&'static str>) -> bool {
