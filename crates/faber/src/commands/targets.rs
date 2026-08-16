@@ -60,11 +60,6 @@ const FABER_CAPABILITY_ROWS: &[(&str, &str, &str)] = &[
         "host-macos-arm64",
         "native host leaf (Metal/CUDA host session support); compiled only under the host-macos-arm64 feature",
     ),
-    (
-        "host-wasm",
-        "host-wasm",
-        "wasm host leaf (browser host session support); compiled only under the host-wasm feature",
-    ),
 ];
 
 /// One rendered capability row.
@@ -220,9 +215,6 @@ fn compiled_features() -> BTreeSet<&'static str> {
     }
     if cfg!(feature = "host-macos-arm64") {
         compiled.insert("host-macos-arm64");
-    }
-    if cfg!(feature = "host-wasm") {
-        compiled.insert("host-wasm");
     }
     compiled
 }

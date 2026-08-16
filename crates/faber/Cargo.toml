@@ -32,14 +32,8 @@ radix-mir-fmir = { path = "../radix-mir-fmir" }
 # the shared radix-mir surface. Build-time only — never a runtime dependency.
 # DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `mir-metal`.
 # DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `mir-llvm`.
-# The generated-Rust support package supplies only language carriers used by
-# the proof receipt. Model admission and numeric comparison live in the
-# private test-only oracle crate below.
 # DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by
 # `host-macos-arm64` (the native Metal/CUDA host leaf).
-# Portable product runner (Stage 2 wasm-host-parity): the single v1
-# product-host owner; Faber packaging consumes the same API later.
-# DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `host-wasm`.
 radix-mir-runner = { path = "../radix-mir-runner", optional = true }
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0.228", features = ["derive"] }
