@@ -2063,9 +2063,7 @@ mod tests {
                     statements: vec![],
                     expr: Some(Box::new(HirExpression {
                         id: HirId(11),
-                        kind: HirExpressionKind::Literal(HirLiteral::String(
-                            interner.intern("ok"),
-                        )),
+                        kind: HirExpressionKind::Literal(HirLiteral::String(interner.intern("ok"))),
                         ty: Some(textus),
                         span: span(),
                     })),
