@@ -345,7 +345,7 @@ pub(crate) fn faber_analysis_seams() -> radix_package::analyze::AnalysisSeams {
 /// Faber-supplied package-emission seams. Go source assembly remains a product
 /// helper because it owns the generated multi-file package shape; the shared
 /// dispatch and Rust assembly live in `radix-package`.
-pub(crate) fn faber_emission_seams() -> radix_package::emit::EmissionSeams {
+pub fn faber_emission_seams() -> radix_package::emit::EmissionSeams {
     radix_package::emit::EmissionSeams {
         analysis: faber_analysis_seams(),
         #[cfg(feature = "hir-go")]

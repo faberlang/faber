@@ -20,7 +20,7 @@ use super::composite_plan::{
     SubmissionRegionFact,
 };
 use super::test_support::{test_temp_dir, TestDir};
-use super::AnalyzedPackage;
+use radix_package::analyze::AnalyzedPackage;
 use radix::codegen::Target;
 use radix::diagnostics::{Diagnostic, DiagnosticArg};
 use radix::driver::Config;
