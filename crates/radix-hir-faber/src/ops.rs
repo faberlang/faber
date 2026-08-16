@@ -34,6 +34,13 @@ impl super::FaberCodegen {
             HirExpressionKind::Unary(_, _)
             | HirExpressionKind::Ref(_, _)
             | HirExpressionKind::Deref(_) => 12,
+            // `∷` ascription is postfix, but the target type greedily consumes
+            // a trailing member/type-argument tail (`f32.power(x)` parses as
+            // one qualified type), so a Verte receiver of a postfix member or
+            // call form must regroup. 13 keeps every postfix *owner*
+            // (method/field/index/call receiver, parent_prec 13)
+            // parenthesizing it while leaving it tight against binary forms.
+            HirExpressionKind::Verte { .. } => 13,
             // Postfix (call/method/field/index/optional/nonnull/readline)
             // and residual forms share precedence 14.
             _ => 14,

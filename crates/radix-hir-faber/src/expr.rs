@@ -153,7 +153,8 @@ impl super::FaberCodegen {
             HirExpressionKind::MethodCall(receiver, name, type_args, args) => {
                 self.write_expr_prec(receiver, 13, types, names, interner, surface, writer);
                 writer.write(".");
-                writer.write(&self.method_name_to_surface(*name, surface, interner));
+                let method_name = self.method_spelling(receiver, *name, types, interner, surface);
+                writer.write(&method_name);
                 self.write_call_type_args(type_args, types, names, interner, surface, writer);
                 writer.write("(");
                 self.write_call_args(args, types, names, interner, surface, writer);
@@ -192,6 +193,7 @@ impl super::FaberCodegen {
                 self.write_postfix_chain_tail(
                     OPTIONAL_CHAIN,
                     chain.into(),
+                    self.receiver_is_nominal(object, types),
                     types,
                     names,
                     interner,
@@ -204,6 +206,7 @@ impl super::FaberCodegen {
                 self.write_postfix_chain_tail(
                     NON_NULL_CHAIN,
                     chain.into(),
+                    self.receiver_is_nominal(object, types),
                     types,
                     names,
                     interner,
@@ -622,14 +625,21 @@ impl super::FaberCodegen {
                 );
                 // The type writer may degrade unsupported target types; this
                 // layer still preserves source/recovery expression structure.
-                self.write_expr_prec(source, 2, types, names, interner, surface, writer);
+                //
+                // Operand precedence matches the parser: `↦` binds at the
+                // range level, tighter than shift/bitwise/comparison but
+                // looser than additive. Writing the operand at additive
+                // strength regroups shift-or-looser children (`n ⇒ 24 ↦ T`
+                // reparses as `n ⇒ (24 ↦ T)` without the parens), and the
+                // `⇥` recovery is a unary-level operand.
+                self.write_expr_prec(source, 10, types, names, interner, surface, writer);
                 writer.write(" ↦ ");
                 match target {
                     HirConversioTarget::Type(ty) => {
                         writer.write(&self.type_to_faber(*ty, types, names, interner, surface));
                     }
                     HirConversioTarget::Intervallum(operand) => {
-                        self.write_expr_prec(operand, 2, types, names, interner, surface, writer);
+                        self.write_expr_prec(operand, 10, types, names, interner, surface, writer);
                     }
                 }
                 if !params.is_empty() {
@@ -644,7 +654,7 @@ impl super::FaberCodegen {
                 }
                 if let Some(recovery) = recovery {
                     writer.write(" ⇥ ");
-                    self.write_expr_prec(recovery, 2, types, names, interner, surface, writer);
+                    self.write_expr_prec(recovery, 12, types, names, interner, surface, writer);
                 }
             }
             HirExpressionKind::Ref(kind, inner) => {
@@ -962,6 +972,7 @@ impl super::FaberCodegen {
         &self,
         prefixes: PostfixChainPrefixes,
         tail: PostfixChainTail<'_>,
+        receiver_is_nominal: bool,
         types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
         interner: &Interner,
@@ -971,7 +982,12 @@ impl super::FaberCodegen {
         match tail {
             PostfixChainTail::Member(name) => {
                 writer.write(prefixes.member);
-                writer.write(&self.method_name_to_surface(name, surface, interner));
+                let spelling = if receiver_is_nominal {
+                    self.symbol_to_string(name, interner)
+                } else {
+                    self.method_name_to_surface(name, surface, interner)
+                };
+                writer.write(&spelling);
             }
             PostfixChainTail::Index(index) => {
                 writer.write(prefixes.index_open);
@@ -1088,5 +1104,47 @@ impl super::FaberCodegen {
     ) -> String {
         let canonical = self.symbol_to_string(name, interner);
         surface.intrinsic_surface(&canonical).unwrap_or(canonical)
+    }
+
+    /// Spelling for a method call on the given receiver.
+    ///
+    /// Nominal (class/interface/enum) receivers keep the canonical method
+    /// name: their declaration is emitted from the canonical HIR symbol, the
+    /// re-parse resolves the canonical name directly, and the pack's
+    /// intrinsic rows are for builtin receivers only — localizing a class
+    /// method call (`longitudo` → `length`) produces a name the class does
+    /// not declare. Intrinsic-capable receivers (collections, tensors,
+    /// primitives) project through the pack surface, which the semantic layer
+    /// maps back to canonical on re-parse.
+    fn method_spelling(
+        &self,
+        receiver: &HirExpression,
+        name: Symbol,
+        types: &TypeTable,
+        interner: &Interner,
+        surface: &impl KeywordSurface,
+    ) -> String {
+        if self.receiver_is_nominal(receiver, types) {
+            self.symbol_to_string(name, interner)
+        } else {
+            self.method_name_to_surface(name, surface, interner)
+        }
+    }
+
+    /// Whether a method-call receiver expression denotes a nominal type
+    /// (class, interface, or enum), unwrapping reference/optional/application
+    /// wrappers the way semantic method lookup does.
+    fn receiver_is_nominal(&self, receiver: &HirExpression, types: &TypeTable) -> bool {
+        let Some(mut ty) = receiver.ty else {
+            return false;
+        };
+        loop {
+            match types.get(ty) {
+                Type::Struct(_) | Type::Enum(_) | Type::Interface(_) => return true,
+                Type::Ref(_, inner) | Type::Option(inner) | Type::Alias(_, inner) => ty = *inner,
+                Type::Applied(base, _) => ty = *base,
+                _ => return false,
+            }
+        }
     }
 }
