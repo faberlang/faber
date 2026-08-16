@@ -7,6 +7,7 @@
 //! import paths.
 
 pub use radix_package::frontmatter::RustTestSelection;
+#[allow(unused_imports)] // test-selection merge consumed by the moved Rust assembly until RP7
 pub(super) use radix_package::frontmatter::{
     manifest_path_for_spec, merge_entry_test_selection,
 };

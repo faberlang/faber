@@ -4,8 +4,11 @@ use radix::cli::CliProgram;
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 use radix::driver::Config;
+#[cfg(feature = "hir-go")]
 use radix::hir::visit::{walk_expr, HirVisitor};
+#[cfg(feature = "hir-go")]
 use radix::hir::{HirExpressionKind, HirItemKind};
+#[cfg(feature = "hir-go")]
 use radix::lexer::Interner;
 use radix::CompileResult;
 #[cfg(feature = "hir-go")]
@@ -23,59 +26,30 @@ use std::path::{Path, PathBuf};
 // production analyzed-package contract is radix-package-owned. This forwarding
 // keeps faber-internal consumers compiling until RP7 removes the residue.
 pub use radix_package::analyze::{AnalyzedPackage, AnalyzedPackageUnit};
+// RP4: the emission assembly (and its result envelope) moved to `radix-package`
+// (`emit.rs`); faber keeps the Go/Wasm generation bodies (toolchain-bound) and
+// forwards the result types so consumers keep their existing names.
+pub use radix_package::emit::{PackageCompileResult, WasmPackageModuleFile};
 pub(crate) use super::analyze_package;
 
+#[cfg(feature = "hir-go")]
 use super::import_graph::{resolve_import, ImportResolution};
 use super::{
-    analyze_package_spec, discover_package, effective_package_config, library_cache_default,
-    library_cached_analysis, library_resolver_for_package, load_provider_manifests,
-    package_root_for_input, selected_providers_for_routes, RustRuntimePlan,
+    library_cache_default, library_cached_analysis, load_provider_manifests,
+    selected_providers_for_routes, RustRuntimePlan,
 };
 
-/// Result of a package compile that explicitly carries the Go multi-module
-/// file collection produced by the Go assembly path (G6 GO3/GO4).
-///
-/// The module files are an output of the Go compile path — never hidden
-/// thread-local state (FBR-P2-003) — so failed, repeated, nested, and
-/// concurrent compile calls cannot exchange module output.
-pub(crate) struct PackageCompileResult {
-    pub(crate) compile_result: CompileResult,
-    /// Go multi-module files `(file name, file body)` for non-entry units,
-    /// populated only for `Target::HirGo` packages that reached codegen.
-    #[cfg(feature = "hir-go")]
-    pub(crate) go_modules: Vec<(String, String)>,
-    /// Package-aware Wasm modules (entry + sibling units), populated only for
-    /// `Target::MirWasm` packages that reached codegen.
-    #[cfg(feature = "mir-wasm")]
-    pub(crate) wasm_modules: Vec<WasmPackageModuleFile>,
-}
-
-/// One package-aware Wasm module file produced for a package unit.
-///
-/// `allow(dead_code)`: the faber binary routes package wasm builds through
-/// `wasm::build_package_wasm` directly (U6-D), so the compile-result module
-/// collection is only read by a future emit-path consumer; the fields are
-/// flagged by the bin target's dead-code analysis.
-#[allow(dead_code)]
-#[cfg(feature = "mir-wasm")]
-pub(crate) struct WasmPackageModuleFile {
-    pub(crate) module_segments: Vec<String>,
-    pub(crate) is_entry: bool,
-    /// Emitted package-aware WAT (canonical sibling exports applied).
-    pub(crate) wat: String,
-}
-
-/// Failed compile: no output, no Go/Wasm modules.
-fn compile_failure(diagnostics: Vec<Diagnostic>) -> PackageCompileResult {
-    PackageCompileResult {
-        compile_result: CompileResult {
-            output: None,
-            diagnostics,
-        },
+// RP4: faber-supplied emission seams. Go and Wasm package generation stay
+// faber-side (their toolchain modules are product-owned and stay in faber);
+// the shared analysis seams and the target-neutral dispatch live in
+// `radix-package`.
+pub(crate) fn faber_emission_seams() -> radix_package::emit::EmissionSeams {
+    radix_package::emit::EmissionSeams {
+        analysis: super::faber_analysis_seams(),
         #[cfg(feature = "hir-go")]
-        go_modules: Vec::new(),
+        emit_go: generate_package_go_result,
         #[cfg(feature = "mir-wasm")]
-        wasm_modules: Vec::new(),
+        emit_wasm: generate_package_wasm_result,
     }
 }
 
@@ -197,11 +171,11 @@ impl HirVisitor for AdRouteCollector<'_> {
 /// multiple modules and generated CLI surfaces into a single crate-shaped
 /// backend result. Unsupported targets are reported as diagnostics instead of
 /// falling back to single-file compilation.
+///
+/// RP4: the emission assembly lives in `radix-package`; this adapter supplies
+/// the faber seams (Go/Wasm generation, analysis) and forwards.
 pub fn compile_package(config: &Config, input: &Path) -> CompileResult {
-    finalize_package_compile_result(
-        compile_package_internal(config, input, None, false, None).compile_result,
-        &config.warn_policy,
-    )
+    radix_package::emit::compile_package(config, input, &faber_emission_seams())
 }
 
 /// Compile a Go-targeted package, returning the entry output and the explicit
@@ -212,13 +186,7 @@ pub fn compile_package(config: &Config, input: &Path) -> CompileResult {
 /// [`PackageCompileResult::go_modules`] empty.
 #[cfg(feature = "hir-go")]
 pub(crate) fn compile_package_go(config: &Config, input: &Path) -> PackageCompileResult {
-    let result = compile_package_internal(config, input, None, false, None);
-    PackageCompileResult {
-        compile_result: finalize_package_compile_result(result.compile_result, &config.warn_policy),
-        go_modules: result.go_modules,
-        #[cfg(feature = "mir-wasm")]
-        wasm_modules: result.wasm_modules,
-    }
+    radix_package::emit::compile_package_result(config, input, &faber_emission_seams())
 }
 
 /// Compile a Wasm-targeted package, returning the entry module output and the
@@ -233,13 +201,7 @@ pub(crate) fn compile_package_go(config: &Config, input: &Path) -> PackageCompil
 #[allow(dead_code)]
 #[cfg(feature = "mir-wasm")]
 pub(crate) fn compile_package_wasm(config: &Config, input: &Path) -> PackageCompileResult {
-    let result = compile_package_internal(config, input, None, false, None);
-    PackageCompileResult {
-        compile_result: finalize_package_compile_result(result.compile_result, &config.warn_policy),
-        wasm_modules: result.wasm_modules,
-        #[cfg(feature = "hir-go")]
-        go_modules: result.go_modules,
-    }
+    radix_package::emit::compile_package_result(config, input, &faber_emission_seams())
 }
 
 /// Compile a package while forwarding a Rust test-selection policy to codegen.
@@ -252,7 +214,12 @@ pub fn compile_package_with_test_selection(
     input: &Path,
     test_selection: Option<&RustTestSelection>,
 ) -> CompileResult {
-    compile_package_with_test_options(config, input, test_selection, None)
+    radix_package::emit::compile_package_with_test_selection(
+        config,
+        input,
+        test_selection,
+        &faber_emission_seams(),
+    )
 }
 
 /// Like [`compile_package_with_test_selection`], with optional path filters for
@@ -264,171 +231,28 @@ pub fn compile_package_with_test_options(
     test_selection: Option<&RustTestSelection>,
     proba_filter: Option<&super::TestSourceFilter>,
 ) -> CompileResult {
-    finalize_package_compile_result(
-        compile_package_internal(config, input, test_selection, true, proba_filter).compile_result,
-        &config.warn_policy,
+    radix_package::emit::compile_package_with_test_options(
+        config,
+        input,
+        test_selection,
+        proba_filter,
+        &faber_emission_seams(),
     )
 }
 
-fn finalize_package_compile_result(
-    mut result: CompileResult,
-    warn_policy: &radix::driver::WarnPolicy,
-) -> CompileResult {
-    radix::apply_warn_policy(&mut result.diagnostics, warn_policy);
-    if result.diagnostics.iter().any(Diagnostic::is_error) {
-        result.output = None;
-    }
-    result
-}
-
+/// Package runtime plan (RP4): the analysis spine runs in `radix-package`;
+/// the product `RustRuntimePlan` construction stays faber-side and is handed
+/// to the entry as the explicit plan builder.
 pub(crate) fn package_rust_runtime_plan(
     config: &Config,
     input: &Path,
 ) -> Result<RustRuntimePlan, Vec<Diagnostic>> {
-    let config = effective_package_config(config, input)?;
-    let spec = discover_package(input).map_err(|diag| vec![*diag])?;
-    let package_root = package_root_for_input(input);
-    let library_resolver = library_resolver_for_package(&config, &package_root)?;
-    let package = analyze_package_spec(&config, spec, &library_resolver, false, None)?;
-    rust_runtime_plan_for_package(&package, &library_resolver).map_err(|diag| vec![*diag])
-}
-
-fn compile_package_internal(
-    config: &Config,
-    input: &Path,
-    _test_selection: Option<&RustTestSelection>,
-    include_proba: bool,
-    proba_filter: Option<&super::TestSourceFilter>,
-) -> PackageCompileResult {
-    // G4: analyze once before target rejection so Go/TS planners and diagnostics
-    // share the same package graph (no reloading source per target).
-    let config = match effective_package_config(config, input) {
-        Ok(config) => config,
-        Err(diagnostics) => {
-            return compile_failure(diagnostics);
-        }
-    };
-
-    let spec = match discover_package(input) {
-        Ok(spec) => spec,
-        Err(diag) => {
-            return compile_failure(vec![*diag]);
-        }
-    };
-
-    let package_root = package_root_for_input(input);
-    let library_resolver = match library_resolver_for_package(&config, &package_root) {
-        Ok(resolver) => resolver,
-        Err(diagnostics) => {
-            return compile_failure(diagnostics);
-        }
-    };
-    let package = match analyze_package_spec(
-        &config,
-        spec,
-        &library_resolver,
-        include_proba,
-        proba_filter,
-    ) {
-        Ok(package) => package,
-        Err(diagnostics) => {
-            return compile_failure(diagnostics);
-        }
-    };
-
-    if config.target == Target::HirGo {
-        #[cfg(not(feature = "hir-go"))]
-        return compile_failure(vec![crate::package_diagnostic_error(
-            "target `go` is not available in this faber build; rebuild with feature `hir-go`",
-        )
-        .with_file(input.display().to_string())
-        .with_arg("issue", "package_target_unavailable")
-        .with_arg("target", "go")]);
-
-        #[cfg(feature = "hir-go")]
-        {
-            let plan = super::artifact_plan::plan_package(&package, Target::HirGo);
-            if !plan.supported {
-                return compile_failure(vec![crate::package_diagnostic_error(
-                    plan.rejection.unwrap_or_else(|| {
-                        "package compilation does not support this target".to_owned()
-                    }),
-                )
-                .with_file(input.display().to_string())
-                .with_arg("issue", "package_target_unsupported")
-                .with_arg("target", plan.target)]);
-            }
-            return generate_package_go_result(&package, input);
-        }
-    }
-
-    // U6-D: the package-aware Wasm path accepts Target::MirWasm (the text
-    // target — binary conversion is external) and emits one module per unit
-    // through the package-to-Wasm builder (entry + sibling units, canonical
-    // `faber_external` symbol linking).
-    if config.target == Target::MirWasm {
-        #[cfg(not(feature = "mir-wasm"))]
-        return compile_failure(vec![crate::package_diagnostic_error(
-            "target `wasm` is not available in this faber build; rebuild with feature `mir-wasm`",
-        )
-        .with_file(input.display().to_string())
-        .with_arg("issue", "package_target_unavailable")
-        .with_arg("target", "wasm")]);
-
-        #[cfg(feature = "mir-wasm")]
-        {
-            let plan = super::artifact_plan::plan_package(&package, Target::MirWasm);
-            if !plan.supported {
-                return compile_failure(vec![crate::package_diagnostic_error(
-                    plan.rejection.unwrap_or_else(|| {
-                        "package compilation does not support this target".to_owned()
-                    }),
-                )
-                .with_file(input.display().to_string())
-                .with_arg("issue", "package_target_unsupported")
-                .with_arg("target", plan.target)]);
-            }
-            let mut package = package;
-            return generate_package_wasm_result(&mut package, input);
-        }
-    }
-
-    if config.target != Target::HirRust {
-        let plan = super::artifact_plan::plan_package(&package, config.target);
-        if !plan.supported {
-            return compile_failure(vec![crate::package_diagnostic_error(
-                plan.rejection.unwrap_or_else(|| {
-                    "package compilation does not support this target".to_owned()
-                }),
-            )
-            .with_file(input.display().to_string())
-            .with_arg("issue", "package_target_unsupported")
-            .with_arg("target", plan.target)]);
-        }
-        // Planner seams exist; full product emit for TS is later deliveries.
-        return compile_failure(vec![crate::package_diagnostic_error(format!(
-            "package compilation has a {} artifact plan but full product assembly is not implemented yet",
-            plan.target
-        ))
-        .with_file(input.display().to_string())
-        .with_arg("issue", "package_target_assembly_pending")
-        .with_arg("target", plan.target)]);
-    }
-
-    #[cfg(not(feature = "hir-rust"))]
-    {
-        return compile_failure(vec![crate::package_diagnostic_error(
-            "target `rust` is not available in this faber build; rebuild with feature `hir-rust`",
-        )
-        .with_file(input.display().to_string())
-        .with_arg("issue", "package_target_unavailable")
-        .with_arg("target", "rust")]);
-    }
-
-    #[cfg(feature = "hir-rust")]
-    {
-        super::rust_target::compile_package_rust(package, &library_resolver, _test_selection)
-    }
+    radix_package::emit::package_rust_runtime_plan(
+        config,
+        input,
+        &super::faber_analysis_seams(),
+        rust_runtime_plan_for_package,
+    )
 }
 
 /// G6 GO3/GO4 — emit package Go for entry (+ sibling modules as same-package files).
@@ -436,6 +260,9 @@ fn compile_package_internal(
 /// Local Faber imports become same-package namespace vars (`binding.Field`) that
 /// point at package-level functions from sibling units. Norma/stdlib imports
 /// remain elided by Go codegen.
+///
+/// RP4: stays faber-side as the Go emission seam (consumes the product
+/// `go_build` module); the dispatcher lives in `radix-package`.
 #[cfg(feature = "hir-go")]
 fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> PackageCompileResult {
     let mut diagnostics = package.diagnostics.clone();
@@ -672,6 +499,9 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Packag
 /// every unit module (entry + siblings) travels in
 /// [`PackageCompileResult::wasm_modules`] with its package-aware WAT
 /// (canonical sibling exports applied).
+///
+/// RP4: stays faber-side as the Wasm emission seam (the package-to-Wasm
+/// builder is faber-owned until RP5).
 #[cfg(feature = "mir-wasm")]
 fn generate_package_wasm_result(
     package: &mut AnalyzedPackage,
@@ -715,6 +545,12 @@ fn generate_package_wasm_result(
         #[cfg(feature = "hir-go")]
         go_modules: Vec::new(),
     }
+}
+
+/// Failed compile: no output, no Go/Wasm modules (shared with the moved
+/// emission dispatcher in `radix-package`).
+fn compile_failure(diagnostics: Vec<Diagnostic>) -> PackageCompileResult {
+    radix_package::emit::compile_failure(diagnostics)
 }
 
 #[cfg(feature = "hir-go")]
@@ -909,10 +745,11 @@ mod tests;
 /// The checker mirrors package compilation discovery and CLI mount analysis so
 /// `faber check` reports the same import, manifest, and mounted-command policy
 /// errors that a package build would encounter.
+///
+/// RP4: stays faber-side as the entry adapter until RP6.
 pub fn check_package(config: &Config, input: &Path) -> Vec<Diagnostic> {
     match analyze_package(config, input) {
         Ok(package) => package.diagnostics,
         Err(diagnostics) => diagnostics,
     }
 }
-

@@ -234,7 +234,7 @@ use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 use radix::driver::Config;
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 executed-lane
 /// routing; authoritative decision record
@@ -294,11 +294,13 @@ fn is_mir_backed_target(target: Target) -> bool {
 pub(crate) use discovery::PackageSpec;
 pub(crate) use member_path::resolve_package_member;
 
+#[allow(unused_imports)] // LibraryInterfaceCache consumed by the moved Rust assembly until RP7
 pub(crate) use library::{
     library_cached_analysis, library_cache_default, library_cache_with_config,
     LibraryInterfaceCache,
 };
 #[cfg(feature = "hir-rust")]
+#[allow(unused_imports)] // consumed by the moved Rust assembly until RP7
 pub(crate) use library::{
     library_cached_expanded_imports, library_generates_rust_module, library_module_segments,
     with_library_cached_analysis_mut,
@@ -407,7 +409,7 @@ pub(crate) fn library_resolver_for_package(
 // loading, strict product-view manifest validation (FBR-P1-001),
 // `FABER_LIBRARY_HOME` / workspace probing, and the G4 linked-crate map from
 // the artifact plan — and keep the faber-internal entry signatures.
-fn faber_analysis_seams() -> radix_package::analyze::AnalysisSeams {
+pub(crate) fn faber_analysis_seams() -> radix_package::analyze::AnalysisSeams {
     radix_package::analyze::AnalysisSeams {
         locale_loader: load_locale_pack_for_input,
         manifest_validator: validate_product_manifest_for_spec,
@@ -463,33 +465,10 @@ pub(crate) fn analyze_package_for_tests(
     )
 }
 
-pub(crate) fn analyze_package_spec(
-    config: &Config,
-    spec: PackageSpec,
-    library_resolver: &LibraryResolver,
-    include_proba: bool,
-    proba_filter: Option<&TestSourceFilter>,
-) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
-    radix_package::analyze::analyze_package_spec(
-        config,
-        spec,
-        library_resolver,
-        include_proba,
-        proba_filter,
-        &faber_analysis_seams(),
-    )
-}
-
-pub(crate) fn effective_package_config(
-    config: &Config,
-    input: &Path,
-) -> Result<Config, Vec<Diagnostic>> {
-    radix_package::analyze::effective_package_config(config, input, load_locale_pack_for_input)
-}
-
-pub(crate) fn package_root_for_input(input: &Path) -> PathBuf {
-    radix_package::analyze::package_root_for_input(input)
-}
+// RP4: the spec-level analysis entry and the config/root helpers moved to
+// `radix-package` with the emission assembly; their only faber consumers
+// (the emission dispatcher and the runtime-plan entry) now call
+// `radix-package` directly.
 
 /// Test-facing convenience wrapper around [`load_package_with_locale_pack`]
 /// (no reader pack, no proba filtering).

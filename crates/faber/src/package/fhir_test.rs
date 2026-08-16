@@ -437,6 +437,7 @@ fn local_library_locale_surface_resolves_through_package_loader() {
         None,
         RustFieldNamePolicy::Preserve,
         None,
+        crate::package::locale::load_locale_pack_for_input,
     );
     assert!(
         generated.diagnostics.iter().all(|diag| !diag.is_error()),
@@ -645,6 +646,7 @@ fn loaded_package_rust_parity_matches_direct() {
         None,
         RustFieldNamePolicy::Preserve,
         None,
+        crate::package::locale::load_locale_pack_for_input,
     );
     assert!(
         generated.diagnostics.iter().all(|diag| !diag.is_error()),
@@ -667,6 +669,7 @@ fn loaded_package_rust_parity_matches_direct() {
         None,
         RustFieldNamePolicy::Preserve,
         Some(&links),
+        crate::package::locale::load_locale_pack_for_input,
     );
     assert!(
         generated_loaded
@@ -701,6 +704,7 @@ fn loaded_package_rust_parity_generics_patterns() {
         None,
         RustFieldNamePolicy::Preserve,
         None,
+        crate::package::locale::load_locale_pack_for_input,
     );
     assert!(
         generated.diagnostics.iter().all(|diag| !diag.is_error()),
@@ -723,6 +727,7 @@ fn loaded_package_rust_parity_generics_patterns() {
         None,
         RustFieldNamePolicy::Preserve,
         Some(&links),
+        crate::package::locale::load_locale_pack_for_input,
     );
     assert!(
         generated_loaded
