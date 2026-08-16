@@ -42,6 +42,11 @@ pub struct FaberCodegen {
     /// value position is a `ego` (self) reference and must re-emit as the
     /// self keyword, not the type name.
     pub(crate) self_def_ids: FxHashSet<DefId>,
+    /// Def ids of this unit's union variants: a `Call(Path(…), …)` whose
+    /// callee is one of these is a `finge` variant construction lowered to a
+    /// call shape, and must re-emit with the `finge` keyword (a bare
+    /// `<variant>()` call is not re-parseable source).
+    pub(crate) variant_def_ids: FxHashSet<DefId>,
 }
 
 /// Emit canonical Faber source from analyzed HIR and its presentation.
@@ -130,6 +135,16 @@ impl FaberCodegen {
                 HirItemKind::Struct(_) | HirItemKind::Enum(_) => Some(item.def_id),
                 _ => None,
             })
+            .collect();
+        self.variant_def_ids = hir
+            .items
+            .iter()
+            .filter_map(|item| match &item.kind {
+                HirItemKind::Enum(enm) => Some(&enm.variants),
+                _ => None,
+            })
+            .flatten()
+            .map(|variant| variant.def_id)
             .collect();
 
         let mut rendered_any_item = false;

@@ -133,16 +133,27 @@ impl super::FaberCodegen {
             HirExpressionKind::Call(callee, type_args, args) => {
                 // Postfix expression forms bind tighter than every infix form
                 // currently emitted by this backend.
-                self.write_expr_prec(callee, 13, types, names, interner, surface, writer);
-                self.write_call_type_args(type_args, types, names, interner, surface, writer);
-                writer.write("(");
-                self.write_call_args(args, types, names, interner, surface, writer);
-                writer.write(")");
+                let mut wrote_finge = false;
+                if let HirExpressionKind::Path(def_id) = &callee.kind {
+                    if self.variant_def_ids.contains(def_id) {
+                        self.write_finge_construction(
+                            *def_id, args, types, names, interner, surface, writer,
+                        );
+                        wrote_finge = true;
+                    }
+                }
+                if !wrote_finge {
+                    self.write_expr_prec(callee, 13, types, names, interner, surface, writer);
+                    self.write_call_type_args(type_args, types, names, interner, surface, writer);
+                    writer.write("(");
+                    self.write_call_args(args, types, names, interner, surface, writer);
+                    writer.write(")");
+                }
             }
             HirExpressionKind::MethodCall(receiver, name, type_args, args) => {
                 self.write_expr_prec(receiver, 13, types, names, interner, surface, writer);
                 writer.write(".");
-                writer.write(&self.symbol_to_string(*name, interner));
+                writer.write(&self.method_name_to_surface(*name, surface, interner));
                 self.write_call_type_args(type_args, types, names, interner, surface, writer);
                 writer.write("(");
                 self.write_call_args(args, types, names, interner, surface, writer);
@@ -960,7 +971,7 @@ impl super::FaberCodegen {
         match tail {
             PostfixChainTail::Member(name) => {
                 writer.write(prefixes.member);
-                writer.write(&self.symbol_to_string(name, interner));
+                writer.write(&self.method_name_to_surface(name, surface, interner));
             }
             PostfixChainTail::Index(index) => {
                 writer.write(prefixes.index_open);
@@ -1022,5 +1033,60 @@ impl super::FaberCodegen {
             }
             self.write_expr(&arg.expr, types, names, interner, surface, writer);
         }
+    }
+
+    /// Re-emit a `finge` variant construction.
+    ///
+    /// `finge` construction lowers to a plain call shape
+    /// (`Call(Path(variant_def), [], fields)`), so the callee being a variant
+    /// def is the recoverable signal. A bare `<variant>()` re-emit is not
+    /// valid source: the type-call constructor spelling is retired.
+    #[allow(clippy::too_many_arguments)]
+    fn write_finge_construction(
+        &self,
+        variant_def: DefId,
+        fields: &[HirCallArg],
+        types: &TypeTable,
+        names: &FxHashMap<DefId, Symbol>,
+        interner: &Interner,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        writer.write(surface.keyword(TokenKind::Finge));
+        writer.write(" ");
+        writer.write(&self.name_for_def(variant_def, names, interner));
+        if !fields.is_empty() {
+            writer.write(" {");
+            for (idx, field) in fields.iter().enumerate() {
+                if idx > 0 {
+                    writer.write(", ");
+                }
+                if let Some(name) = field.name {
+                    writer.write(&self.symbol_to_string(name, interner));
+                    writer.write(" = ");
+                }
+                self.write_expr(&field.expr, types, names, interner, surface, writer);
+            }
+            writer.write("}");
+        }
+    }
+
+    /// Localize a canonical intrinsic method name through the target surface.
+    ///
+    /// HIR method symbols are the canonical registry spellings (the
+    /// typechecker rewrites localized surface spellings to canonical before
+    /// lowering). Under a non-`la` reader pack those canonical names are not
+    /// re-parseable source (the pack rejects the canonical Latin spelling as a
+    /// wrong-locale miss), so emission must project them back through the
+    /// pack's intrinsic surface rows. Names the pack has no row for keep the
+    /// canonical spelling (identity).
+    fn method_name_to_surface(
+        &self,
+        name: Symbol,
+        surface: &impl KeywordSurface,
+        interner: &Interner,
+    ) -> String {
+        let canonical = self.symbol_to_string(name, interner);
+        surface.intrinsic_surface(&canonical).unwrap_or(canonical)
     }
 }

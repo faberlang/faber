@@ -117,11 +117,13 @@ impl super::FaberCodegen {
                 writer.write(surface.keyword(TokenKind::Ex));
                 writer.write(" ");
                 self.write_symbol_literal(import.path, interner, writer);
-                writer.write(" ");
-                writer.write(match import.visibility {
-                    radix_syntax::Visibility::Privata => surface.keyword(TokenKind::Privata),
-                    radix_syntax::Visibility::Publica => surface.keyword(TokenKind::Publica),
-                });
+                // The parser retired explicit import `privata` (VM-U3); the
+                // absence of `publica` is the private default. Emit only the
+                // non-default tier, mirroring the author/pretty printers.
+                if import.visibility == radix_syntax::Visibility::Publica {
+                    writer.write(" ");
+                    writer.write(surface.keyword(TokenKind::Publica));
+                }
                 for item in &import.items {
                     writer.write(" ");
                     let name = self.symbol_to_string(item.name, interner);
@@ -378,7 +380,7 @@ impl super::FaberCodegen {
 
         writer.writeln(" {");
         writer.indented(|writer| {
-            for variant in &e.variants {
+            for (idx, variant) in e.variants.iter().enumerate() {
                 self.write_member_trivia(variant.def_id, false, interner, writer);
                 writer.write(&self.symbol_to_string(variant.name, interner));
                 if !variant.fields.is_empty() {
@@ -395,7 +397,14 @@ impl super::FaberCodegen {
                     });
                     writer.write("}");
                 }
-                writer.writeln(",");
+                // Canonical union layout separates variants with a comma; the
+                // last variant carries none (mirror of the author/pretty
+                // printers, which the parser round-trips unchanged).
+                if idx + 1 < e.variants.len() {
+                    writer.writeln(",");
+                } else {
+                    writer.newline();
+                }
             }
         });
         writer.writeln("}");

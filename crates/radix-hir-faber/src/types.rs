@@ -371,9 +371,9 @@ mod tests {
     use super::*;
     use crate::{empty_presentation, FaberCodegen, KeywordSurface, TypeBindingKind};
     use radix_hir::{
-        DefId, HirBlock, HirCape, HirCasuArm, HirExpression, HirExpressionKind, HirFunction, HirId,
-        HirImport, HirImportItem, HirItem, HirItemKind, HirLiteral, HirPattern, HirProgram,
-        HirStatement, HirStatementKind,
+        DefId, HirBlock, HirCallArg, HirCape, HirCasuArm, HirEnum, HirExpression,
+        HirExpressionKind, HirFunction, HirId, HirImport, HirImportItem, HirItem, HirItemKind,
+        HirLiteral, HirLocal, HirPattern, HirProgram, HirStatement, HirStatementKind, HirVariant,
     };
     use radix_lexer::{Interner, Span, TokenKind};
 
@@ -419,6 +419,7 @@ mod tests {
                 TokenKind::Requirit => "requirit",
                 TokenKind::Mori => "mori",
                 TokenKind::Iace => "iace",
+                TokenKind::Finge => "finge",
                 TokenKind::Cede => "cede",
                 TokenKind::Tacet => "tacet",
                 TokenKind::Perge => "perge",
@@ -1455,6 +1456,543 @@ mod tests {
         assert!(
             code.contains("default"),
             "closure param default value must appear, got:\n{code}"
+        );
+    }
+
+    // ── Emitter convert-defect regressions (VM-U3 / gradus S1) ──────────────
+
+    #[test]
+    fn import_privata_emits_no_visibility_keyword() {
+        // The parser retired explicit import `privata` (VM-U3); the canonical
+        // emitter must not re-emit it. `faber convert` on gradus emitted
+        // `import from "gradus:dtype" private dtype`, which fails re-parse.
+        let mut interner = Interner::new();
+        let path_sym = interner.intern("gradus:dtype");
+        let name = interner.intern("dtype");
+
+        let types = TypeTable::new();
+
+        let import = HirImport {
+            path: path_sym,
+            visibility: radix_syntax::Visibility::Privata,
+            items: vec![HirImportItem {
+                def_id: DefId(1),
+                name,
+                alias: None,
+            }],
+        };
+
+        let program = HirProgram {
+            items: vec![HirItem {
+                id: HirId(0),
+                def_id: DefId(radix_types::USER_DEF_ID_BASE),
+                kind: HirItemKind::Import(import),
+                span: span(),
+            }],
+            entry: None,
+            entry_annotations: Vec::new(),
+            entry_args_name: None,
+            entry_is_async: false,
+        };
+
+        let code = generate_faber(&program, &types, &interner);
+        assert_eq!(
+            code.trim(),
+            r#"importa ex "gradus:dtype" dtype"#,
+            "private import must emit without a visibility keyword"
+        );
+        assert!(
+            !code.contains("privata"),
+            "import must not re-emit the retired `private` visibility: {code}"
+        );
+    }
+
+    #[test]
+    fn union_last_variant_has_no_trailing_comma() {
+        // Canonical union layout separates variants with a comma; the last
+        // variant must not carry one (PARSE030 on re-parse of the converted
+        // output under the source locale).
+        let mut interner = Interner::new();
+        let types = TypeTable::new();
+
+        let enum_item = HirEnum {
+            name: interner.intern("DType"),
+            type_params: Vec::new(),
+            variants: vec![
+                HirVariant {
+                    def_id: DefId(1),
+                    name: interner.intern("F32"),
+                    fields: vec![],
+                    span: span(),
+                },
+                HirVariant {
+                    def_id: DefId(2),
+                    name: interner.intern("F16"),
+                    fields: vec![],
+                    span: span(),
+                },
+            ],
+        };
+
+        let program = HirProgram {
+            items: vec![HirItem {
+                id: HirId(0),
+                def_id: DefId(radix_types::USER_DEF_ID_BASE),
+                kind: HirItemKind::Enum(enum_item),
+                span: span(),
+            }],
+            entry: None,
+            entry_annotations: Vec::new(),
+            entry_args_name: None,
+            entry_is_async: false,
+        };
+
+        let code = generate_faber(&program, &types, &interner);
+        assert!(
+            code.contains("F32,\n    F16\n"),
+            "earlier variants keep the comma separator, last carries none:\n{code}"
+        );
+        assert!(
+            !code.contains("F16,\n"),
+            "last variant must not carry a trailing comma:\n{code}"
+        );
+    }
+
+    #[test]
+    fn call_to_local_variant_reemits_finge_construction() {
+        // `finge F32` lowers to `Call(Path(variant_def), [], [])`; the emitter
+        // must recover the `finge` keyword. A bare `F32()` re-emit is a retired
+        // type-call constructor (PARSE001).
+        let mut interner = Interner::new();
+        let types = TypeTable::new();
+
+        let variant_def = DefId(7);
+        let enum_item = HirEnum {
+            name: interner.intern("DType"),
+            type_params: Vec::new(),
+            variants: vec![HirVariant {
+                def_id: variant_def,
+                name: interner.intern("F32"),
+                fields: vec![],
+                span: span(),
+            }],
+        };
+
+        let function = HirFunction {
+            cli_args: None,
+            name: interner.intern("f"),
+            type_params: Vec::new(),
+            params: Vec::new(),
+            ret_ty: None,
+            err_ty: None,
+            body: Some(HirBlock {
+                statements: vec![HirStatement {
+                    id: HirId(2),
+                    kind: HirStatementKind::Redde(Some(HirExpression {
+                        id: HirId(3),
+                        kind: HirExpressionKind::Call(
+                            Box::new(HirExpression {
+                                id: HirId(4),
+                                kind: HirExpressionKind::Path(variant_def),
+                                ty: None,
+                                span: span(),
+                            }),
+                            Vec::new(),
+                            vec![],
+                        ),
+                        ty: None,
+                        span: span(),
+                    })),
+                    span: span(),
+                }],
+                expr: None,
+                span: span(),
+                ..Default::default()
+            }),
+            posture: radix_syntax::CallablePosture::SyncFinite,
+            is_async: false,
+            is_generator: false,
+            is_kernel: false,
+            is_device: false,
+            is_vertex: false,
+            is_fragment: false,
+            annotations: Vec::new(),
+            test: None,
+        };
+
+        let program = HirProgram {
+            items: vec![
+                HirItem {
+                    id: HirId(0),
+                    def_id: DefId(radix_types::USER_DEF_ID_BASE),
+                    kind: HirItemKind::Enum(enum_item),
+                    span: span(),
+                },
+                HirItem {
+                    id: HirId(1),
+                    def_id: DefId(radix_types::USER_DEF_ID_BASE + 1),
+                    kind: HirItemKind::Function(Box::new(function)),
+                    span: span(),
+                },
+            ],
+            entry: None,
+            entry_annotations: Vec::new(),
+            entry_args_name: None,
+            entry_is_async: false,
+        };
+
+        let code = generate_faber(&program, &types, &interner);
+        assert!(
+            code.contains("redde finge F32"),
+            "variant construction must re-emit the `finge` keyword:\n{code}"
+        );
+        assert!(
+            !code.contains("F32()"),
+            "variant construction must not re-emit as a retired type call:\n{code}"
+        );
+    }
+
+    #[test]
+    fn finge_with_named_fields_reemits_braced_fields() {
+        let mut interner = Interner::new();
+        let types = TypeTable::new();
+
+        let variant_def = DefId(7);
+        let causa = interner.intern("causa");
+        let enum_item = HirEnum {
+            name: interner.intern("TensorError"),
+            type_params: Vec::new(),
+            variants: vec![HirVariant {
+                def_id: variant_def,
+                name: interner.intern("FormaInvalida"),
+                fields: vec![],
+                span: span(),
+            }],
+        };
+
+        let function = HirFunction {
+            cli_args: None,
+            name: interner.intern("f"),
+            type_params: Vec::new(),
+            params: Vec::new(),
+            ret_ty: None,
+            err_ty: None,
+            body: Some(HirBlock {
+                statements: vec![HirStatement {
+                    id: HirId(2),
+                    kind: HirStatementKind::Expr(HirExpression {
+                        id: HirId(3),
+                        kind: HirExpressionKind::Throw(Box::new(HirExpression {
+                            id: HirId(30),
+                            kind: HirExpressionKind::Call(
+                                Box::new(HirExpression {
+                                    id: HirId(4),
+                                    kind: HirExpressionKind::Path(variant_def),
+                                    ty: None,
+                                    span: span(),
+                                }),
+                                Vec::new(),
+                                vec![HirCallArg {
+                                    name: Some(causa),
+                                    spread: false,
+                                    expr: HirExpression {
+                                        id: HirId(5),
+                                        kind: HirExpressionKind::Path(DefId(9)),
+                                        ty: None,
+                                        span: span(),
+                                    },
+                                    span: span(),
+                                }],
+                            ),
+                            ty: None,
+                            span: span(),
+                        })),
+                        ty: None,
+                        span: span(),
+                    }),
+                    span: span(),
+                }],
+                expr: None,
+                span: span(),
+                ..Default::default()
+            }),
+            posture: radix_syntax::CallablePosture::SyncFinite,
+            is_async: false,
+            is_generator: false,
+            is_kernel: false,
+            is_device: false,
+            is_vertex: false,
+            is_fragment: false,
+            annotations: Vec::new(),
+            test: None,
+        };
+
+        let program = HirProgram {
+            items: vec![
+                HirItem {
+                    id: HirId(0),
+                    def_id: DefId(radix_types::USER_DEF_ID_BASE),
+                    kind: HirItemKind::Enum(enum_item),
+                    span: span(),
+                },
+                HirItem {
+                    id: HirId(1),
+                    def_id: DefId(radix_types::USER_DEF_ID_BASE + 1),
+                    kind: HirItemKind::Function(Box::new(function)),
+                    span: span(),
+                },
+            ],
+            entry: None,
+            entry_annotations: Vec::new(),
+            entry_args_name: None,
+            entry_is_async: false,
+        };
+
+        let code = generate_faber(&program, &types, &interner);
+        assert!(
+            code.contains("iace finge FormaInvalida {causa = def_9}"),
+            "named finge fields must re-emit in the braced form:\n{code}"
+        );
+    }
+
+    /// Probe surface that localizes one intrinsic canonical name.
+    struct IntrinsicProbeSurface;
+
+    impl KeywordSurface for IntrinsicProbeSurface {
+        fn keyword(&self, kind: TokenKind) -> &'static str {
+            match kind {
+                TokenKind::Finge => "variant",
+                _ => LatinSurface.keyword(kind),
+            }
+        }
+
+        fn intrinsic_surface(&self, canonical: &str) -> Option<String> {
+            (canonical == "divide").then(|| "split".to_owned())
+        }
+
+        fn type_surface(&self, kind: TypeBindingKind) -> &'static str {
+            LatinSurface.type_surface(kind)
+        }
+    }
+
+    #[test]
+    fn intrinsic_method_call_localizes_through_surface() {
+        // HIR method symbols are canonical registry spellings; under a
+        // non-`la` reader pack the canonical Latin name is a compile error on
+        // re-parse. The emitter must project it through the target pack's
+        // intrinsic surface rows.
+        let mut interner = Interner::new();
+        let types = TypeTable::new();
+        let receiver_def = DefId(5);
+
+        let body = HirBlock {
+            statements: vec![HirStatement {
+                id: HirId(2),
+                kind: HirStatementKind::Expr(HirExpression {
+                    id: HirId(3),
+                    kind: HirExpressionKind::MethodCall(
+                        Box::new(HirExpression {
+                            id: HirId(4),
+                            kind: HirExpressionKind::Path(receiver_def),
+                            ty: None,
+                            span: span(),
+                        }),
+                        interner.intern("divide"),
+                        Vec::new(),
+                        vec![HirCallArg {
+                            name: None,
+                            spread: false,
+                            expr: HirExpression {
+                                id: HirId(5),
+                                kind: HirExpressionKind::Literal(HirLiteral::String(
+                                    interner.intern("/"),
+                                )),
+                                ty: None,
+                                span: span(),
+                            },
+                            span: span(),
+                        }],
+                    ),
+                    ty: None,
+                    span: span(),
+                }),
+                span: span(),
+            }],
+            expr: None,
+            span: span(),
+            ..Default::default()
+        };
+
+        let function = HirFunction {
+            cli_args: None,
+            name: interner.intern("f"),
+            type_params: Vec::new(),
+            params: Vec::new(),
+            ret_ty: None,
+            err_ty: None,
+            body: Some(body),
+            posture: radix_syntax::CallablePosture::SyncFinite,
+            is_async: false,
+            is_generator: false,
+            is_kernel: false,
+            is_device: false,
+            is_vertex: false,
+            is_fragment: false,
+            annotations: Vec::new(),
+            test: None,
+        };
+
+        let program = HirProgram {
+            items: vec![HirItem {
+                id: HirId(0),
+                def_id: DefId(radix_types::USER_DEF_ID_BASE),
+                kind: HirItemKind::Function(Box::new(function)),
+                span: span(),
+            }],
+            entry: None,
+            entry_annotations: Vec::new(),
+            entry_args_name: None,
+            entry_is_async: false,
+        };
+
+        let code = FaberCodegen::default()
+            .generate(
+                &program,
+                &empty_presentation(),
+                &types,
+                &interner,
+                &IntrinsicProbeSurface,
+            )
+            .expect("codegen")
+            .code;
+        assert!(
+            code.contains(".split("),
+            "canonical intrinsic must localize through the surface:\n{code}"
+        );
+    }
+
+    #[test]
+    fn cape_handler_keeps_leading_author_local() {
+        // A `cape err { fixum textus c ← …; … }` handler whose first authored
+        // statement is a real local must keep it: the binding-local skip only
+        // applies to the synthetic runtime-provided binding.
+        let mut interner = Interner::new();
+        let types = TypeTable::new();
+        let textus = types.primitive(Primitive::Textus);
+
+        let err = interner.intern("err");
+        let c = interner.intern("c");
+        let catch = HirCape {
+            binding_def_id: DefId(100),
+            binding_name: err,
+            binding_ty: Some(textus),
+            body: HirBlock {
+                statements: vec![
+                    HirStatement {
+                        id: HirId(40),
+                        kind: HirStatementKind::Local(HirLocal {
+                            def_id: DefId(101),
+                            name: c,
+                            ty: Some(textus),
+                            init: Some(HirExpression {
+                                id: HirId(41),
+                                kind: HirExpressionKind::Literal(HirLiteral::String(
+                                    interner.intern("x"),
+                                )),
+                                ty: Some(textus),
+                                span: span(),
+                            }),
+                            mutable: false,
+                            is_await: false,
+                            runtime_provided: false,
+                        }),
+                        span: span(),
+                    },
+                    HirStatement {
+                        id: HirId(42),
+                        kind: HirStatementKind::Redde(Some(HirExpression {
+                            id: HirId(43),
+                            kind: HirExpressionKind::Path(DefId(101)),
+                            ty: Some(textus),
+                            span: span(),
+                        })),
+                        span: span(),
+                    },
+                ],
+                expr: None,
+                span: span(),
+                ..Default::default()
+            },
+            span: span(),
+        };
+
+        let expr = HirExpression {
+            id: HirId(10),
+            kind: HirExpressionKind::Handled {
+                body: HirBlock {
+                    statements: vec![],
+                    expr: Some(Box::new(HirExpression {
+                        id: HirId(11),
+                        kind: HirExpressionKind::Literal(HirLiteral::String(
+                            interner.intern("ok"),
+                        )),
+                        ty: Some(textus),
+                        span: span(),
+                    })),
+                    span: span(),
+                    ..Default::default()
+                },
+                catch: Box::new(catch),
+            },
+            ty: Some(textus),
+            span: span(),
+        };
+
+        let function = HirFunction {
+            cli_args: None,
+            name: interner.intern("f"),
+            type_params: Vec::new(),
+            params: Vec::new(),
+            ret_ty: Some(textus),
+            err_ty: None,
+            body: Some(HirBlock {
+                statements: vec![HirStatement {
+                    id: HirId(20),
+                    kind: HirStatementKind::Expr(expr),
+                    span: span(),
+                }],
+                expr: None,
+                span: span(),
+                ..Default::default()
+            }),
+            posture: radix_syntax::CallablePosture::SyncFinite,
+            is_async: false,
+            is_generator: false,
+            is_kernel: false,
+            is_device: false,
+            is_vertex: false,
+            is_fragment: false,
+            annotations: Vec::new(),
+            test: None,
+        };
+
+        let program = HirProgram {
+            items: vec![HirItem {
+                id: HirId(0),
+                def_id: DefId(radix_types::USER_DEF_ID_BASE),
+                kind: HirItemKind::Function(Box::new(function)),
+                span: span(),
+            }],
+            entry: None,
+            entry_annotations: Vec::new(),
+            entry_args_name: None,
+            entry_is_async: false,
+        };
+
+        let code = generate_faber(&program, &types, &interner);
+        assert!(
+            code.contains("cape err {") && code.contains("fixum textus c ← \"x\""),
+            "cape handler must keep its leading authored local:\n{code}"
         );
     }
 }

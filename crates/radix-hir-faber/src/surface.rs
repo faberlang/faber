@@ -33,6 +33,19 @@ pub trait KeywordSurface {
         false
     }
 
+    /// Localized (or identity) surface spelling for a canonical intrinsic
+    /// method name.
+    ///
+    /// HIR method symbols are canonical registry spellings; under a non-`la`
+    /// reader pack those spellings are not re-parseable method names (the pack
+    /// rejects the canonical Latin spelling in the wrong locale). Emission
+    /// projects them back through the pack's intrinsic surface rows. `None`
+    /// keeps the canonical spelling — identity for `la`/no pack and for names
+    /// the pack does not own.
+    fn intrinsic_surface(&self, _canonical: &str) -> Option<String> {
+        None
+    }
+
     /// Localized (or Latin-fallback) spelling for a type identity.
     fn type_surface(&self, kind: TypeBindingKind) -> &str;
 }
