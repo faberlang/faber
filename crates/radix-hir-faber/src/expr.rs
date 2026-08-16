@@ -774,7 +774,11 @@ impl super::FaberCodegen {
             }
         }
 
-        self.write_expr(source, types, names, interner, surface, writer);
+        // `∷` is a postfix cast, so its source must be emitted at unary
+        // strength. This keeps compound list elements such as `n % 256`
+        // grouped as `(n % 256) ∷ T` instead of letting the cast bind to the
+        // trailing arithmetic operand after a reparse.
+        self.write_expr_prec(source, 12, types, names, interner, surface, writer);
         writer.write(" ∷ ");
         writer.write(&self.type_to_faber(target, types, names, interner, surface));
     }
