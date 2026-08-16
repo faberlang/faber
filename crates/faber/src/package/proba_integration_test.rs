@@ -7,6 +7,7 @@ use super::test_support::{diagnostic_has_issue, test_temp_dir};
 use super::library_resolver_from_config;
 use radix_package::analyze::AnalysisSeams;
 use radix_package::discovery::PackageSpec;
+use radix_package::library::LibraryResolver;
 use radix_package::emit::{compile_package as compile_package_direct, compile_package_with_test_options as compile_package_with_test_options_direct};
 use radix_package::test_source_filter::TestSourceFilter;
 use radix::driver::Config;
@@ -44,7 +45,7 @@ fn discover_package(input: &Path) -> Result<PackageSpec, Box<radix::diagnostics:
 
 fn load_with_faber_seams(
     spec: &PackageSpec,
-    resolver: &crate::library::LibraryResolver,
+    resolver: &LibraryResolver,
     locale_pack: Option<&LocalePack>,
     include_proba: bool,
     filter: Option<&TestSourceFilter>,

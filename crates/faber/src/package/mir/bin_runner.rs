@@ -1,6 +1,8 @@
 //! Generated fmir-bin runner crate: write, render, and invoke.
 
 use super::*;
+use radix_mir_fmir::FmirTextSourceIdentity;
+use radix_package::mir::{escape_toml_basic_string, fnv1a64, mir_diag, relative_or_display};
 use std::path::PathBuf;
 
 pub(super) fn write_fmir_bin_runner(

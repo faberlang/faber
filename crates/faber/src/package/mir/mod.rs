@@ -29,7 +29,7 @@ use radix::driver::Config;
 use std::fs;
 use std::path::Path;
 
-pub(crate) use radix_package::mir::DeviceSelection;
+use radix_package::mir::{mir_diag, DeviceSelection};
 
 // Faber's fmir-bin runner writer is the seam body radix-package's binary
 // bundle builder receives (`MirSeams::bin_runner_writer`).
@@ -284,14 +284,6 @@ pub fn run_fmir_image_bytes_with_stdio(
         &faber_mir_seams(),
     )
 }
-
-// Re-exported helpers the faber bin_runner crate needs (they moved with the
-// compiler subset; bin_runner.rs reaches them through `super::*`). The
-// runner crate defines its own `fnv64_hex`/`source_identity` (they embed the
-// image into the generated runner source), so the moved copies are not
-// re-exported here.
-pub(crate) use radix_package::mir::{escape_toml_basic_string, fnv1a64, mir_diag, relative_or_display};
-pub(crate) use radix_mir_fmir::FmirTextSourceIdentity;
 
 // Runner-crate constants stay faber-side (the toolchain version is the
 // product version recorded in the generated runner's Cargo manifest).

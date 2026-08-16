@@ -125,10 +125,8 @@ pub use llvm_host::{
 pub use mir::run_fmir_image_bytes_with_stdio;
 #[allow(unused_imports)]
 pub use mir::with_lowered_package_mir;
-pub(crate) use mir::DeviceSelection;
-use crate::library::LibraryResolver;
 use radix_package::discovery::PackageSpec;
-use radix_package::library::LibraryInterfaceCache;
+use radix_package::library::{LibraryInterfaceCache, LibraryResolver, LockedLibraryPackage};
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 use radix::driver::Config;
@@ -305,7 +303,7 @@ pub(crate) fn library_resolver_for_package(
         for package in lock_index.values() {
             locked.insert(
                 package.name.clone(),
-                crate::library::LockedLibraryPackage {
+                LockedLibraryPackage {
                     name: package.name.clone(),
                     version: package.version.clone(),
                     interface_root: package.interface_root_path_for(package_root),
@@ -320,7 +318,7 @@ pub(crate) fn library_resolver_for_package(
     // (`faber-web` vs `web`) still analyzes; a lock entry always wins.
     if let Some(library) = manifest.library.as_ref() {
         locked.entry(library.provider.clone()).or_insert_with(|| {
-            crate::library::LockedLibraryPackage {
+            LockedLibraryPackage {
                 name: manifest.package.name.clone(),
                 version: manifest.package.version.clone(),
                 interface_root: package_root.join(&manifest.paths.source),

@@ -6,6 +6,7 @@ use super::test_support::test_temp_dir;
 use super::{discover_package, library_resolver_from_config};
 use radix_package::analyze::{analyze_package as analyze_package_direct, analyze_package_for_tests as analyze_package_for_tests_direct, AnalysisSeams};
 use radix_package::discovery::PackageSpec;
+use radix_package::library::LibraryResolver;
 use radix::driver::{Config, Session};
 use radix::locale::LocalePack;
 
@@ -30,7 +31,7 @@ fn analyze_tests_with_faber_seams(
 
 fn load_with_faber_seams(
     spec: &PackageSpec,
-    resolver: &crate::library::LibraryResolver,
+    resolver: &LibraryResolver,
     locale_pack: Option<&LocalePack>,
     include_proba: bool,
     filter: Option<&radix_package::test_source_filter::TestSourceFilter>,

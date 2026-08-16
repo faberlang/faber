@@ -18,10 +18,9 @@ use radix::diagnostics::Diagnostic;
 use radix::forma::FormatPolicy;
 use serde::Deserialize;
 
-// DDPP1-U2 (C2 feature isolation): the shared route-selection request type
-// (the product-owned `DeviceSelection` under
-// `device-runtime`, a local equivalent in the small build).
-use super::DeviceSelection;
+// DDPP1-U2 (C2 feature isolation): the shared route-selection request type.
+use radix_package::library::is_valid_provider_segment;
+use radix_package::mir::DeviceSelection;
 use radix_package::manifest::{
     manifest_build_target, ManifestBuild, ManifestLibrary, ManifestPackage, ManifestPaths,
     ManifestReader, ManifestTarget,
@@ -371,7 +370,7 @@ pub(crate) fn validate_manifest(
                 .with_file(path.display().to_string()),
         ));
     }
-    if !crate::library::is_valid_provider_segment(&manifest.package.name) {
+    if !is_valid_provider_segment(&manifest.package.name) {
         return Err(Box::new(
             crate::package_diagnostic_error(
                 "faber.toml package.name must contain only ASCII letters, numbers, underscore, or hyphen",
@@ -431,7 +430,7 @@ pub(crate) fn validate_manifest(
     }
 
     if let Some(library) = &manifest.library {
-        if !crate::library::is_valid_provider_segment(&library.provider) {
+        if !is_valid_provider_segment(&library.provider) {
             return Err(Box::new(
                 crate::package_diagnostic_error(
                     "faber.toml library.provider must contain only ASCII letters, numbers, underscore, or hyphen",
@@ -547,7 +546,7 @@ pub(crate) fn validate_manifest(
     }
 
     for provider in &manifest.dispatch.providers {
-        if provider.trim().is_empty() || !crate::library::is_valid_provider_segment(provider) {
+        if provider.trim().is_empty() || !is_valid_provider_segment(provider) {
             return Err(Box::new(
                 crate::package_diagnostic_error(format!(
                     "faber.toml [dispatch].providers entry `{provider}` is invalid"

@@ -10,6 +10,7 @@ use super::test_support::{diagnostic_has_arg, diagnostic_has_issue, test_temp_di
 use super::library_resolver_from_config;
 use radix_package::analyze::AnalysisSeams;
 use radix_package::discovery::PackageSpec;
+use radix_package::library::LibraryResolver;
 use radix_package::emit::{compile_package as compile_package_direct, compile_package_with_test_options as compile_package_with_test_options_direct, compile_package_with_test_selection as compile_package_with_test_selection_direct};
 use radix_package::frontmatter::RustTestSelection as TestSelection;
 use radix_package::test_source_filter::TestSourceFilter;
@@ -60,7 +61,7 @@ fn discover_package(input: &Path) -> Result<PackageSpec, Box<radix::diagnostics:
 
 fn load_with_faber_seams(
     spec: &PackageSpec,
-    resolver: &crate::library::LibraryResolver,
+    resolver: &LibraryResolver,
 ) -> Result<Vec<radix_package::PackageFile>, Vec<radix::diagnostics::Diagnostic>> {
     radix_package::analyze::load_package_with_locale_pack(
         spec,

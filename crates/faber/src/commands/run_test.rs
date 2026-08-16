@@ -1,5 +1,6 @@
 use super::*;
 use crate::cli::{BackendSelection, RunArgs};
+use radix_package::mir::DeviceSelection;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 

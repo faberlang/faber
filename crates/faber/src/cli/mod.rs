@@ -3,6 +3,7 @@
 mod emit;
 
 use clap::{Parser, Subcommand};
+use radix_package::mir::DeviceSelection;
 pub use emit::{EmitArgs, FaberCliTarget};
 use std::path::PathBuf;
 
@@ -388,13 +389,13 @@ pub enum BackendSelection {
 }
 
 impl BackendSelection {
-    /// Convert to the product-owned route-selection request.
+    /// Convert to the shared route-selection request.
     #[must_use]
-    pub fn selection(self) -> crate::package::DeviceSelection {
+    pub fn selection(self) -> DeviceSelection {
         match self {
-            Self::Auto => crate::package::DeviceSelection::Auto,
-            Self::Metal => crate::package::DeviceSelection::Metal,
-            Self::Cuda => crate::package::DeviceSelection::Cuda,
+            Self::Auto => DeviceSelection::Auto,
+            Self::Metal => DeviceSelection::Metal,
+            Self::Cuda => DeviceSelection::Cuda,
         }
     }
 }

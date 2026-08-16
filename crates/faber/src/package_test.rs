@@ -62,7 +62,7 @@ fn discover_package(input: &Path) -> Result<PackageSpec, Box<Diagnostic>> {
 
 fn load_with_faber_seams(
     spec: &PackageSpec,
-    resolver: &crate::library::LibraryResolver,
+    resolver: &LibraryResolver,
     locale_pack: Option<&radix::locale::LocalePack>,
     include_proba: bool,
     filter: Option<&TestSourceFilter>,
@@ -78,7 +78,7 @@ fn load_with_faber_seams(
 }
 
 use radix_package::mir::test_support::{fmir_image_test_summary, fmir_text_image_test_summary};
-use crate::library::{LibraryProviderKind, ResolvedLibraryModule};
+use radix_package::library::{LibraryResolveError, LibraryResolver, ResolvedLibraryModule};
 
 fn build_fmir_image_for_faber(
     config: &Config,
@@ -1727,7 +1727,7 @@ main args args {
     run_fmir_built_image_for_faber(
         &Config::default().with_target(Target::MirFmirBinary),
         &entry,
-        super::DeviceSelection::Auto,
+        radix_package::mir::DeviceSelection::Auto,
         &mut host,
     )
     .expect("run source-built rest CLI fmir image");
@@ -5489,7 +5489,6 @@ fn library_resolver_discovers_builtin_norma_modules_without_allowlist() {
     assert_eq!(resolved.package, "norma");
     assert_eq!(resolved.module_path, vec!["solum"]);
     assert!(resolved.interface_path.ends_with("norma/src/solum.fab"));
-    assert_eq!(resolved.provider, LibraryProviderKind::PackageDependency);
 }
 
 #[test]
@@ -5500,7 +5499,7 @@ fn library_resolver_rejects_retired_norma_hal_paths() {
 
     assert!(matches!(
         err,
-        crate::library::LibraryResolveError::UnknownModule {
+        LibraryResolveError::UnknownModule {
             specifier,
             package,
             ..
@@ -5947,13 +5946,11 @@ fn resolved_library_module_shape_can_describe_future_sqlite_without_rust_metadat
         "sqlite",
         vec!["transactio".to_owned()],
         "/tmp/faber-libs/sqlite/transactio.fab",
-        LibraryProviderKind::PackageDependency,
     );
 
     assert_eq!(module.package, "sqlite");
     assert_eq!(module.module_path, vec!["transactio"]);
     assert_eq!(module.module_name(), Some("transactio"));
-    assert_eq!(module.provider, LibraryProviderKind::PackageDependency);
     assert!(module.interface_path.ends_with("sqlite/transactio.fab"));
 }
 

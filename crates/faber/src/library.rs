@@ -14,13 +14,7 @@ mod tests;
 
 use std::path::{Path, PathBuf};
 
-pub(crate) use radix_package::library::{
-    is_valid_provider_segment, LockedLibraryPackage, LibraryProviderKind, LibraryResolver,
-    ResolvedLibraryModule,
-};
-// `LibraryResolveError` is named by the package test suite (parity guards).
-#[allow(unused_imports)]
-pub(crate) use radix_package::library::LibraryResolveError;
+use radix_package::library::LibraryResolver;
 
 pub(crate) const FABER_LIBRARY_HOME_ENV: &str = "FABER_LIBRARY_HOME";
 /// Env flag exercised by library probe tests; production probe path is not wired yet.
