@@ -2,6 +2,7 @@
 
 use super::*;
 use radix_module::driver::{Config, Session};
+use radix_module::tool::analyze_prepared_program_name;
 
 fn session() -> Session {
     Session::new(Config::default())
@@ -182,7 +183,7 @@ proba "other" {
 
 #[test]
 fn inventory_lists_cases_without_execution() {
-    let analysis = analyze_source(
+    let analysis = analyze_prepared_program_name(
         &session(),
         "inv.fab",
         r#"
