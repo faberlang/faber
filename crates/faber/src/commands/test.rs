@@ -198,14 +198,12 @@ fn run_package(
     }
 
     let mut test_units = Vec::new();
-    let mut roots = Vec::new();
     let mut functions = Vec::new();
     for unit in package.nodes.values() {
         let cases = inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
         if cases.is_empty() {
             continue;
         }
-        roots.push(unit.path.clone());
         functions.extend(cases.iter().map(|case| (unit.path.clone(), case.def_id)));
         test_units.push((unit.path.clone(), cases));
     }
@@ -213,11 +211,7 @@ fn run_package(
     let combined = if test_units.is_empty() {
         ProbaReport::default()
     } else {
-        let remap_anchor = roots.into_iter().next().expect("test units are non-empty");
-        let scope = radix_package::mir::TestPackageScope {
-            remap_anchor,
-            functions,
-        };
+        let scope = radix_package::mir::TestPackageScope::for_program(&package, functions);
         let failed_units = test_units.clone();
         match package::mir::with_linked_test_package_mir(
             package,

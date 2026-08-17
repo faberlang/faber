@@ -273,7 +273,6 @@ test "double" {
 
     let package = analyze_tests_with_faber_seams(&Config::default(), dir.path(), None)
         .expect("analyze entryless package tests");
-    let mut roots = Vec::new();
     let mut functions = Vec::new();
     let mut test_units = Vec::new();
     for unit in package.nodes.values() {
@@ -281,15 +280,10 @@ test "double" {
         if cases.is_empty() {
             continue;
         }
-        roots.push(unit.path.clone());
         functions.extend(cases.iter().map(|case| (unit.path.clone(), case.def_id)));
         test_units.push((unit.path.clone(), cases));
     }
-    let remap_anchor = roots.into_iter().next().expect("test units are non-empty");
-    let scope = radix_package::mir::TestPackageScope {
-        remap_anchor,
-        functions,
-    };
+    let scope = radix_package::mir::TestPackageScope::for_program(&package, functions);
     let report = crate::package::mir::with_linked_test_package_mir(
         package,
         &scope,
