@@ -192,11 +192,15 @@ fn is_mir_backed_target(target: Target) -> bool {
 /// crate only; the bin's copy is legitimately unused.
 #[allow(unused_imports)]
 pub(crate) use locale::installed_locale_pack_path;
+#[allow(unused_imports)]
 pub use locale::locale_pack_for_emit;
 #[allow(unused_imports)]
 pub use locale::available_locales;
 #[allow(unused_imports)]
-pub(crate) use locale::{config_with_locale, default_config_with_locale, load_locale_pack_for_input};
+pub(crate) use locale::{
+    config_with_locale, default_config_with_locale, load_locale_pack_for_input,
+    locale_pack_for_emit_with_diagnostic,
+};
 
 pub(super) const MANIFEST_FILE: &str = "faber.toml";
 

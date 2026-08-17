@@ -142,6 +142,26 @@ fn missing_installed_locale_pack_fails_closed_with_next_action() {
 }
 
 #[test]
+fn missing_emit_package_path_is_a_structured_diagnostic() {
+    let root = temp_dir("faber-emit-missing-package");
+    let missing = root.join("missing-package");
+    let input = vec![missing.display().to_string()];
+
+    let diagnostic = locale_pack_for_emit_with_diagnostic(&input, Some("th-TH"))
+        .expect_err("missing package path");
+    assert_eq!(diagnostic.code, Some("PKG001"));
+    assert_eq!(diagnostic.issue(), Some("package_path_missing"));
+    assert_eq!(diagnostic.file, missing.display().to_string());
+    assert!(diagnostic
+        .args
+        .iter()
+        .any(|arg| arg.name == "path" && arg.value == missing.display().to_string()));
+    assert!(!diagnostic.message.contains("No such file or directory"));
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn dev_installed_locale_pack_resolves_english_from_sibling_radix() {
     // Development builds resolve the installed pack from the sibling radix
     // tree without any CARGO_MANIFEST_DIR bake.

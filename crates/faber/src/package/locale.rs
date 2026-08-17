@@ -175,27 +175,33 @@ fn package_root_for_selection(spec: &PackageSpec, manifest_path: Option<&Path>) 
         .unwrap_or_else(|| spec.source_root.clone())
 }
 
-/// Resolve a CLI reader locale to a pack for single-file emit.
+/// Resolve a CLI reader locale to a pack for single-file emit while retaining
+/// the structured diagnostic produced by package discovery and locale loading.
 ///
 /// File input uses the package-aware resolver (package-local pack, else the
 /// installed pack); stdin falls back to the installed pack directly, since
 /// there is no package context to consult. An omitted locale selects the
 /// product-default `en` pack.
-pub fn locale_pack_for_emit(
+pub(crate) fn locale_pack_for_emit_with_diagnostic(
     input: &[String],
     cli_locale: Option<&str>,
-) -> Result<Option<LocalePack>, String> {
+) -> Result<Option<LocalePack>, Box<Diagnostic>> {
     let locale = match cli_locale {
         Some(locale) if locale.trim().is_empty() => {
-            return Err("--locale must not be empty".to_owned());
+            return Err(Box::new(crate::package_diagnostic_error(
+                "--locale must not be empty",
+            )));
         }
         Some(locale) => locale.trim(),
         None => DEFAULT_CODE_LOCALE,
     };
 
     if let Some(path) = input.iter().find(|s| !s.is_empty() && s.as_str() != "-") {
-        return load_locale_pack_for_input(Path::new(path), Some(locale))
-            .map_err(|diag| diag.message.clone());
+        let path = Path::new(path);
+        return match load_locale_pack_for_input(path, Some(locale)) {
+            Err(_diagnostic) if path_is_missing(path) => Err(missing_package_path_diagnostic(path)),
+            result => result,
+        };
     }
 
     // Stdin: no package context, use the installed pack for the locale.
@@ -203,13 +209,44 @@ pub fn locale_pack_for_emit(
     LocalePack::from_toml_path(&pack_path)
         .map(Some)
         .map_err(|err| {
-            format!(
+            Box::new(crate::package_diagnostic_error(format!(
                 "failed to load reader locale '{locale}' pack '{}': {err}\n\
                  next action: reinstall the matching faber dev kit so the pack ships at \
                  share/faber/locale/{locale}/pack.toml beside the faber binary",
                 pack_path.display()
-            )
+            )))
         })
+}
+
+/// Compatibility wrapper for library callers that only need the normalized
+/// message. The CLI uses [`locale_pack_for_emit_with_diagnostic`] so it can
+/// preserve structured package-path failures.
+#[allow(dead_code)]
+pub fn locale_pack_for_emit(
+    input: &[String],
+    cli_locale: Option<&str>,
+) -> Result<Option<LocalePack>, String> {
+    locale_pack_for_emit_with_diagnostic(input, cli_locale)
+        .map_err(|diagnostic| diagnostic.message.clone())
+}
+
+fn path_is_missing(path: &Path) -> bool {
+    matches!(
+        std::fs::metadata(path),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound
+    )
+}
+
+fn missing_package_path_diagnostic(path: &Path) -> Box<Diagnostic> {
+    Box::new(
+        crate::package_diagnostic_error(format!(
+            "package input path '{}' does not exist",
+            path.display()
+        ))
+        .with_file(path.display().to_string())
+        .with_arg("issue", "package_path_missing")
+        .with_arg("path", path.display().to_string()),
+    )
 }
 
 /// Installed reader-pack path for `locale` (env + exe + cwd resolution).
