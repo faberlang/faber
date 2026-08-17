@@ -235,11 +235,7 @@ functio keep() → numerus {
         "kept rust fn must be emitted:\n{}",
         output.code
     );
-    assert!(
-        !output.code.contains("fn loss"),
-        "AIR fn must be omitted:\n{}",
-        output.code
-    );
+    assert!(!output.code.contains("fn loss"), "AIR fn must be omitted:\n{}", output.code);
     assert!(
         !output.code.contains("fn wrapper"),
         "wrapper that reaches AIR must be omitted:\n{}",
