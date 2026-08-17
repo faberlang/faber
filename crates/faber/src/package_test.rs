@@ -11447,7 +11447,9 @@ rustc = ""
 /// fixtures lock this package as `tela`, so the origin verification runs
 /// against the tela provider identity without pulling the full tela source
 /// tree into the test build (the full tree's library TS emit is out of
-/// scope for U2 — see the U2 closeout residual).
+/// scope for U2 — see the U2 closeout residual). The web stem also has a tiny
+/// binding-backed export so product staging can materialize `tela-web.js`
+/// without invoking a separately built `faber` CLI from a lib test.
 fn write_synthetic_tela_lib(lib: &Path) {
     fs::create_dir_all(lib.join("src")).expect("lib src");
     fs::create_dir_all(lib.join("bindings")).expect("lib bindings");
@@ -11494,6 +11496,11 @@ class WebController {
     )
     .expect("web.fab");
     fs::write(
+        lib.join("runtime/web.ts"),
+        "export function webNoop(): void {}\n",
+    )
+    .expect("web shim");
+    fs::write(
         lib.join("src/dom.fab"),
         r#"+++
 locale = "en"
@@ -11523,6 +11530,12 @@ fn require(Scope scope, string selector) → Element {
         lib.join("bindings/ts.toml"),
         r#"[shim]
 path = "runtime/dom.ts"
+
+[shims.web]
+path = "runtime/web.ts"
+
+[functions."tela:web.noop"]
+symbol = "webNoop"
 
 [functions."tela:dom.scope"]
 symbol = "webDomScope"
@@ -12274,6 +12287,15 @@ fn shell(d.Scope scope) → void {}
     assert!(controllers.contains("\"selector\": \"[data-faber=shell]\""));
     assert!(controllers.contains("\"module\": \"./main.js\""));
     assert!(build.esm_entry.is_file());
+    let tela_web_js = build.out_dir.join("faber-esm/tela-web.js");
+    assert!(
+        tela_web_js.is_file(),
+        "Tela web module missing: {}",
+        tela_web_js.display()
+    );
+    assert!(fs::read_to_string(tela_web_js)
+        .expect("tela web module")
+        .contains("webNoop"));
     assert_eq!(build.controllers.len(), 1);
 }
 
