@@ -1,7 +1,7 @@
 # Faber Canonical MessagePack Profile 1
 
-**Status**: draft 1 — protocol review required before implementation
-**Profile version**: 1.0
+**Status**: draft 1 — amendments folded; protocol review re-check required before implementation or freeze
+**Profile version**: 1.0 (draft; not frozen)
 **Created**: 2026-08-16
 **Initial consumer**: FHIR unit and package artifacts
 
@@ -20,11 +20,11 @@ An FCMP document has:
 3. a document-specific value governed by a separately versioned schema.
 
 Canonical bytes are part of the contract. Two conforming encoders given the
-same schema value must emit identical bytes. A conforming artifact decoder
+same schema value MUST emit identical bytes. A conforming artifact decoder
 rejects alternate encodings even when a generic MessagePack decoder would
 produce an equivalent value.
 
-FHIR is the first registered FCMP document family. This profile is reusable
+FHIR is the first target FCMP document family. This profile is reusable
 protocol law, not an instruction to build a generic framework before a second
 consumer exists.
 
@@ -35,11 +35,15 @@ The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**,
 **OPTIONAL** are to be interpreted as described by BCP 14 when, and only when,
 they appear in all capitals.
 
-The base MessagePack syntax is the current MessagePack specification:
-<https://github.com/msgpack/msgpack/blob/master/spec.md>.
+The base MessagePack syntax is the MessagePack specification at revision
+`9aa092d6ca81f12005bd7dcbeb6488ad319e5133`:
+<https://github.com/msgpack/msgpack/blob/9aa092d6ca81f12005bd7dcbeb6488ad319e5133/spec.md>.
+A later change to the upstream specification is not part of FCMP until a
+profile revision explicitly adopts it.
 
-When the base specification permits several representations, this document
-selects exactly one. FCMP rules override implementation-library defaults.
+When the pinned base specification permits several representations, this
+document selects exactly one. FCMP rules override implementation-library
+defaults.
 
 ## Goals
 
@@ -107,7 +111,9 @@ Frame rules:
 6. After reading `kind`, a decoder MUST validate the declared length against
    that kind's limit before allocating or reading the full payload.
 7. Compression, encryption, and signatures are external containers or
-   transports. No FCMP 1.0 frame flag enables them.
+   transports. No FCMP 1.0 frame flag enables them. In-frame flags are
+   intentionally not reserved; adding them is a profile-major change, not an
+   unreviewed extension point.
 8. A payload without the FCMP magic is not FCMP. Product decoders MAY identify
    a known legacy format for a specific diagnostic, but MUST NOT silently
    reinterpret it as FCMP.
@@ -117,7 +123,8 @@ unrelated bytes without attempting multiple schema decoders.
 
 ## 2. Root document
 
-The payload root MUST be a MessagePack map with exactly these fields:
+The payload root MUST be a MessagePack map with exactly these named string
+fields:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
@@ -151,8 +158,11 @@ Root rules:
    `value`.
 5. Unknown root fields, duplicate root fields, unsupported kinds, and
    unsupported schema versions are errors.
+6. Named string fields are REQUIRED for the root. Numeric field IDs MUST NOT
+   be used as an alternate root representation.
 
-FHIR initially reserves `fhir.unit` and `fhir.package`.
+FHIR initially reserves `fhir.unit` and `fhir.package`; reservation does not
+register or admit either kind.
 
 ## 3. Canonical primitive encoding
 
@@ -181,16 +191,21 @@ language's in-memory integer width.
 ### 3.3 Floating-point numbers
 
 All floating-point values use MessagePack float64 (`0xcb`) followed by the
-IEEE-754 binary64 bits in network byte order.
+IEEE-754 binary64 bits in network byte order. FCMP 1.0 adopts this rule, with
+canonical NaN, for the current Faber FHIR carriers represented as `f64`.
 
 - MessagePack float32 (`0xca`) is noncanonical.
 - Positive and negative infinity retain their IEEE-754 encodings.
 - Negative zero retains the binary64 negative-zero bit pattern.
 - Every NaN is normalized to quiet NaN bits `0x7ff8000000000000`.
-- A document schema MAY forbid non-finite values.
+- The owning FHIR schema MUST define each numeric carrier's exact numeric
+  semantics and whether NaN and infinity are admitted.
+- A JSON-like numeric domain MUST reject non-finite values when its schema does
+  not admit them.
 
 The float64-only rule prevents language runtimes from changing the wire width
-during decode and re-encode.
+during decode and re-encode. It does not by itself define the meaning,
+exactness, range, or non-finite-value policy of a future FHIR numeric field.
 
 ### 3.4 Strings
 
@@ -237,17 +252,22 @@ explicitly specified fields.
 
 A record is a MessagePack map:
 
-- field names are stable schema identifiers, not implementation-language
-  member names discovered at runtime;
-- fields are emitted in canonical map-key order;
-- required fields are always present;
-- optional fields are omitted when absent;
-- an absent optional field uses the default named by the schema;
-- `nil` is emitted only when null is a legal, distinct field value; and
-- unknown fields are rejected after the document version has been admitted.
+- field names are stable named string schema identifiers, not
+  implementation-language member names discovered at runtime;
+- named string field keys are REQUIRED for records;
+- numeric field IDs MUST NOT be used as an alternate record representation;
+- fields MUST be emitted in canonical map-key order;
+- required fields MUST always be present;
+- optional fields MUST be omitted when absent;
+- an absent optional field MUST use the default named by the schema;
+- `nil` MUST be emitted only when null is a legal, distinct field value; and
+- unknown fields MUST be rejected after the document version has been
+  admitted.
 
-Adding a field in the middle of a source-language struct cannot affect FCMP
-bytes unless the document schema itself adds that field.
+Numeric positions are permitted only where a schema intentionally chooses a
+tuple or array and documents the resulting evolution cost. Adding a field in
+the middle of a source-language struct cannot affect FCMP bytes unless the
+document schema itself adds that field.
 
 ### 4.2 Enums and tagged unions
 
@@ -269,11 +289,11 @@ A variant with data is:
 Rules:
 
 - `tag` is a stable lowercase ASCII schema identifier;
-- `value` is absent for a unit variant;
-- `value` is present for a payload variant, even when its payload is an empty
-  record or array;
-- fields appear in canonical order (`tag`, then `value`);
-- unknown tags are rejected unless the document schema explicitly declares
+- `value` MUST be absent for a unit variant;
+- `value` MUST be present for a payload variant, even when its payload is an
+  empty record or array;
+- fields MUST appear in canonical order (`tag`, then `value`);
+- unknown tags MUST be rejected unless the document schema explicitly declares
   the union open; and
 - renaming, reusing, or changing the meaning of a tag is a breaking schema
   change.
@@ -311,7 +331,7 @@ A strict decoder MUST validate all of the following:
 3. document-kind resource limits;
 4. MessagePack syntax and primitive canonicality;
 5. map key type, uniqueness, and order;
-6. required, optional, and unknown fields;
+6. REQUIRED, OPTIONAL, and unknown fields;
 7. enum tags and payload shape;
 8. integer ranges and document field types;
 9. document structural and referential invariants; and
@@ -341,13 +361,13 @@ Every registered document kind MUST define finite limits for:
 
 A conforming decoder:
 
-- checks frame and container lengths before allocation;
-- rejects arithmetic overflow while computing lengths or budgets;
-- does not reserve memory directly from an untrusted length without applying
+- MUST check frame and container lengths before allocation;
+- MUST reject arithmetic overflow while computing lengths or budgets;
+- MUST NOT reserve memory directly from an untrusted length without applying
   the admitted limit;
-- fails before semantic reconstruction when a limit is exceeded;
-- does not recurse without a depth bound; and
-- reports the violated limit as structured data.
+- MUST fail before semantic reconstruction when a limit is exceeded;
+- MUST NOT recurse without a depth bound; and
+- MUST report the violated limit as structured data.
 
 FCMP does not assign one universal payload limit because a compiler unit, a
 package, and future document families have different legitimate sizes. Missing
@@ -357,7 +377,10 @@ kind-specific limits make a registration incomplete.
 
 ### 7.1 Profile version
 
-The frame carries profile `[major, minor]`.
+The frame carries FCMP profile `[major, minor]`. FCMP profile versions are a
+wire-protocol version and are separate from Faber product semantic versioning
+and from the odd/even Faber release-lane policy in
+`radix/docs/release/faber/policy.md`.
 
 - Increment profile major when framing or canonical representation changes.
 - Increment profile minor only for an additive rule that a newer decoder can
@@ -365,10 +388,24 @@ The frame carries profile `[major, minor]`.
   major.
 - A decoder accepts its supported profile major and any profile minor less
   than or equal to its implemented minor.
-- A decoder rejects a greater profile minor before decoding the root.
+- A decoder MUST reject a greater profile minor before decoding the root.
+- When a producer targets a consumer that implements an older minor, the
+  producer MUST select a minor the consumer supports or fail with an explicit
+  incompatibility. A producer MUST NOT claim that a newer minor is compatible
+  merely because the consumer can parse some of its bytes; downgrade requires
+  an explicit re-encode under the older minor's rules.
 
 Changing serializer-library output is not an evolution mechanism. If canonical
 bytes change, the responsible profile or document version changes.
+
+A profile-major migration MUST be handled at an explicit release boundary.
+The release record MUST name the old and new profile majors, migration and
+re-encoding behavior, reader and writer support, conformance vectors, and the
+retirement date for the old major. During migration, a product MAY retain
+readers for more than one profile major, but a document MUST NOT be relabeled
+or decoded across profile majors; conversion is an explicit validated
+re-encode. The current-plus-two document-major window in §7.3 does not cover
+profile-major retention.
 
 ### 7.2 Document schema version
 
@@ -397,16 +434,25 @@ equal to its implemented minor. It rejects a greater minor before decoding
 
 ### 7.3 Compatibility decoder policy
 
-The Faber product SHALL retain readers for the current stable FCMP document
-major and the two previous stable document majors. Each retained major has its
-own format-owned DTOs and validation; compatibility MUST NOT be simulated by
+For each registered document kind, the Faber product SHALL retain readers for
+that kind's current stable FCMP document major and the two previous stable
+document majors. This current-plus-two window is the FCMP support window; it is
+not an automatic consequence of Faber product semver. "Current stable" is
+resolved independently for each document kind by its registry entry. A draft
+major does not count as stable, and each retained major MUST have its own
+format-owned DTOs and validation. Compatibility MUST NOT be simulated by
 deserializing old bytes into current compiler structs.
 
-The support window begins with the first stable FCMP schema. Legacy postcard
-FHIR is not FCMP major zero and is not included in this window.
+The support window begins with the first stable FCMP schema for each kind.
+Legacy postcard FHIR is not FCMP major zero and is not included in this window.
+The release policy at `radix/docs/release/faber/policy.md` requires every
+release line to state a support window; the release record MUST explicitly
+carry this FCMP current-plus-two cost and its ownership rather than implying
+that product semver approves it automatically.
 
-Dropping the oldest supported major is a release-boundary change recorded in
-release notes and the document-kind registry.
+Dropping the oldest supported document major for a kind is a release-boundary
+change recorded in release notes and that kind's registry entry. It MUST NOT
+retire a profile major implicitly; profile-major retirement follows §7.1.
 
 ## 8. Schema ownership
 
@@ -446,28 +492,36 @@ Semantic equality does not replace byte identity for artifact hashes.
 
 ## 10. Document-kind registry
 
-The public Faber repository owns the FCMP document-kind registry. Every entry
-records:
+The public Faber repository owns the FCMP document-kind registry. Every
+registered entry MUST record:
 
 - stable kind string;
 - owning schema path;
 - current stable schema version;
 - supported schema-major window;
-- resource limits;
+- finite resource limits for that kind;
 - file extensions, if any;
 - reference implementation and independent conformance implementation; and
 - fixture-manifest path.
 
-Kind strings are never reused. A retired kind remains reserved.
+Kind strings are never reused. A retired kind remains reserved. A reservation
+is a namespace claim, not a registration: `fhir.unit` and `fhir.package` remain
+reserved names until their owning FHIR schemas publish concrete finite limits
+and the other registry fields. Registration without concrete limits MUST fail,
+and an implementation MUST NOT admit a reserved-but-unregistered kind.
 
 Initial reservations:
 
-| Kind | Purpose | Initial schema |
+| Kind | Purpose | Registration state |
 | --- | --- | --- |
-| `fhir.unit` | One analyzed-HIR compilation unit | draft `[1, 0]` |
-| `fhir.package` | FHIR package envelope and embedded units | draft `[1, 0]` |
+| `fhir.unit` | Post-RTR2 FHIR module contract: a stable module ID/record with schema-defined contents and import edges | reserved; schema and limits not published |
+| `fhir.package` | Post-RTR2/RTR3b FHIR analyzed-program graph with explicit roots, optional entry, stable module records, import edges, library identities, and graph-specific limits | reserved; schema and limits not published |
 
-This document reserves the names but does not freeze the FHIR schemas.
+This document reserves the names but does not register or freeze the FHIR
+schemas. The `fhir.unit` schema MUST be defined against the post-RTR2 module
+contract. The `fhir.package` schema MUST be defined against the post-RTR2/RTR3b
+`AnalyzedProgram` graph contract; neither schema may use a legacy vector-era
+envelope as its authoritative semantic shape.
 
 ## 11. Conformance
 
@@ -539,39 +593,61 @@ expected outcomes, but MUST NOT share encoding implementation code.
 
 The FHIR format goal that adopts FCMP follows this migration:
 
-1. Freeze FCMP 1.0 and the first FHIR FCMP unit/package schemas.
-2. Add format-owned FHIR wire DTOs and conversion boundaries.
-3. Add strict Rust encoding/decoding and generic profile fixtures.
-4. Add FHIR unit/package fixtures and an independent TypeScript decoder and
+1. After RTR2 establishes the module contract and RTR3b establishes the
+   analyzed-program graph contract, define the first FHIR FCMP schemas and
+   publish their concrete finite limits.
+2. Re-check this draft and make the separate operator-approved decision to
+   freeze FCMP 1.0; do not treat the current draft as frozen.
+3. Add format-owned FHIR wire DTOs and conversion boundaries.
+4. Add strict Rust encoding/decoding and generic profile fixtures.
+5. Add FHIR unit/package fixtures and an independent TypeScript decoder and
    encoder.
-5. Switch FHIR writers to FCMP only.
-6. Switch FHIR readers to FCMP only.
-7. Reject legacy postcard FHIR with a structured legacy-format diagnostic.
-8. Keep postcard only where independently required, including FMIR.
+6. Switch FHIR writers to FCMP only.
+7. Switch FHIR readers to FCMP only.
+8. Reject legacy postcard FHIR with a structured legacy-format diagnostic.
+9. Keep postcard only where independently required, including FMIR.
+
+The `fhir.unit` DTO MUST follow the post-RTR2 module contract. The
+`fhir.package` DTO MUST follow the post-RTR2/RTR3b `AnalyzedProgram` graph:
+explicit roots, an optional entry, stable module records, import edges,
+library identities, and graph-specific limits. Current compiler structs and
+vector-era envelopes are migration inputs, not DTO templates.
 
 There is no dual writer, codec negotiation, silent fallback, or indefinite
 postcard compatibility decoder.
 
 ## 14. Review gates before profile 1.0 freezes
 
-The profile is ready to freeze when review confirms:
+The profile is ready to freeze only when review confirms:
 
-- exact-byte canonicality is required;
-- named string fields are preferred over numeric field IDs;
-- strict artifact admission rejects rather than normalizes noncanonical bytes;
-- float64 and canonical-NaN rules cover FHIR's numeric domain;
-- the 20-byte frame and root map are sufficient without flags;
-- profile and document major/minor rules match release policy;
-- current-plus-two document-major retention is acceptable; and
-- FHIR supplies concrete per-kind resource limits in its own schema.
+- exact-byte canonicality is REQUIRED;
+- named string fields for records and roots are REQUIRED, and numeric field
+  IDs MUST NOT be alternate record representations;
+- strict artifact admission MUST reject rather than normalize noncanonical
+  bytes;
+- float64 with canonical NaN MUST cover current Faber FHIR `f64` carriers, and
+  each future FHIR schema MUST define numeric semantics and NaN/infinity
+  admission;
+- the 20-byte frame and root map are sufficient without flags, with any future
+  in-frame flags requiring a profile-major change;
+- profile versions are separate from Faber product semver and profile/document
+  major/minor rules match the release policy, including explicit newer-minor
+  rejection and profile-major migration boundaries;
+- current-plus-two document-major retention is recorded as the per-kind FCMP
+  support window and explicitly carried by the release policy record; and
+- `fhir.unit` and `fhir.package` remain reservations until their FHIR schemas
+  publish concrete finite per-kind limits, because registration without limits
+  MUST fail.
 
-No implementation should begin while one of these choices is still being
-treated as a serializer-library default.
+Implementation MUST NOT begin while one of these choices is still being
+treated as a serializer-library default, and the draft MUST NOT be declared
+frozen until this gate is re-checked after the amendments.
 
 ## References
 
-- MessagePack specification:
-  <https://github.com/msgpack/msgpack/blob/master/spec.md>
+- MessagePack specification, pinned at revision
+  `9aa092d6ca81f12005bd7dcbeb6488ad319e5133`:
+  <https://github.com/msgpack/msgpack/blob/9aa092d6ca81f12005bd7dcbeb6488ad319e5133/spec.md>
 - BCP 14 / RFC 2119:
   <https://www.rfc-editor.org/rfc/rfc2119>
 - BCP 14 / RFC 8174:
