@@ -43,15 +43,20 @@ impl Host for TrapHost<'_> {
         args: &[Value],
         span: radix::lexer::Span,
     ) -> Result<Value, RunnerError> {
-        // processus.exi must hit TrapHost::exit (HostTrap) rather than the
+        // processus.exit_process must hit TrapHost::exit (HostTrap) rather than the
         // inner BufferHost::exit panic, so embedders can return ExitCode.
-        if matches!(module, KernelModule::Processus) && verb == "exi" {
+        if matches!(module, KernelModule::Processus) && verb == "exit_process" {
             let [code] = args else {
-                return Err(RunnerError::internal(span, "exi provider arity"));
+                return Err(RunnerError::internal(span, "exit_process provider arity"));
             };
             let code = match code {
                 Value::Int(v) => i32::try_from(*v).unwrap_or(i32::MAX),
-                _ => return Err(RunnerError::internal(span, "exi code is not numerus")),
+                _ => {
+                    return Err(RunnerError::internal(
+                        span,
+                        "exit_process code is not numerus",
+                    ))
+                }
             };
             self.exit(code);
         }

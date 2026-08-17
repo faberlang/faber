@@ -70,7 +70,7 @@ fn trap_host_forwards_process_env_reads() {
 import from "faber:processus" processus
 
 main {
-    print processus.lege("FABER_TRAP_ENV")
+    print processus.read_env("FABER_TRAP_ENV")
 }
 "#,
         &mut host,
@@ -88,7 +88,7 @@ fn trap_host_forwards_virtual_cwd() {
 import from "faber:processus" processus
 
 main {
-    print processus.sedes()
+    print processus.cwd()
 }
 "#,
         &mut host,
@@ -106,7 +106,7 @@ fn run_source_returns_explicit_exit_code() {
 import from "faber:processus" processus
 
 main {
-    processus.exi(7)
+    processus.exit_process(7)
 }
 "#,
         &mut host,

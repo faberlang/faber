@@ -1,9 +1,9 @@
 //! `faber:toml` kernel module dispatch.
 //!
-//! Mirrors the `faber:json` module: `solve` (strict TOML → valor tree),
-//! `tempta` (lenient parse → `nihil` on failure), `pange` (valor tree →
+//! Mirrors the `faber:json` module: `parse` (strict TOML → valor tree),
+//! `try_parse` (lenient parse → `nihil` on failure), `stringify` (valor tree →
 //! TOML text). The verb surface matches the `norma:toml` public facade
-//! (`solve`/`pange`/`tempta`), enforced by the kernel-manifest parity test.
+//! (`parse`/`stringify`/`try_parse`), enforced by the kernel-manifest parity test.
 
 use super::super::value::MapKey;
 use super::super::{RunnerError, Value};
@@ -15,24 +15,24 @@ use std::rc::Rc;
 
 pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, RunnerError> {
     match verb {
-        "solve" => {
+        "parse" => {
             let [raw] = args else {
-                return Err(RunnerError::internal(span, "toml.solve provider arity"));
+                return Err(RunnerError::internal(span, "toml.parse provider arity"));
             };
-            let raw = expect_str(raw, span, "toml.solve input")?;
+            let raw = expect_str(raw, span, "toml.parse input")?;
             parse_toml(&raw, span)
         }
-        "pange" => {
+        "stringify" => {
             let [valor] = args else {
-                return Err(RunnerError::internal(span, "toml.pange provider arity"));
+                return Err(RunnerError::internal(span, "toml.stringify provider arity"));
             };
             serialize_toml(valor, span).map(Value::Str)
         }
-        "tempta" => {
+        "try_parse" => {
             let [raw] = args else {
-                return Err(RunnerError::internal(span, "toml.tempta provider arity"));
+                return Err(RunnerError::internal(span, "toml.try_parse provider arity"));
             };
-            let raw = expect_str(raw, span, "toml.tempta input")?;
+            let raw = expect_str(raw, span, "toml.try_parse input")?;
             Ok(parse_toml(&raw, span).unwrap_or(Value::Nil))
         }
         other => Err(RunnerError::unsupported(
@@ -47,7 +47,7 @@ fn parse_toml(raw: &str, span: Span) -> Result<Value, RunnerError> {
     // table headers (`[owner]`) and arrays of tables (`[[bin]]`) are
     // document-level constructs. A document root is always a table.
     let table: toml::Table = toml::from_str(raw)
-        .map_err(|err| RunnerError::internal(span, format!("toml.solve failed: {err}")))?;
+        .map_err(|err| RunnerError::internal(span, format!("toml.parse failed: {err}")))?;
     table_to_value(table, span)
 }
 
@@ -62,7 +62,7 @@ fn table_to_value(table: toml::Table, span: Span) -> Result<Value, RunnerError> 
 fn serialize_toml(value: &Value, span: Span) -> Result<String, RunnerError> {
     let table = value_to_toml_table(value, span)?;
     toml::to_string(&table)
-        .map_err(|err| RunnerError::internal(span, format!("toml.pange failed: {err}")))
+        .map_err(|err| RunnerError::internal(span, format!("toml.stringify failed: {err}")))
 }
 
 fn toml_to_value(value: toml::Value, span: Span) -> Result<Value, RunnerError> {
@@ -176,7 +176,10 @@ fn value_to_toml_table(value: &Value, span: Span) -> Result<toml::Table, RunnerE
             }
             Ok(table)
         }
-        _ => Err(RunnerError::internal(span, "toml.pange root must be a map")),
+        _ => Err(RunnerError::internal(
+            span,
+            "toml.stringify root must be a map",
+        )),
     }
 }
 

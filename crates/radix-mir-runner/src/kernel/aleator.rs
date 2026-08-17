@@ -29,26 +29,26 @@ fn with_rng<R>(f: impl FnOnce(&mut Rng) -> R) -> R {
 
 /// Dispatch for the `faber:aleator` kernel module.
 ///
-/// `fractum`/`sortire` draw from the seeded (or entropy-initialized) RNG;
-/// `octetos`/`uuid` read fresh OS entropy from `handroll::entropy::os_entropy`
-/// and are never influenced by `semina` (handroll U5b replaces the former
+/// `random_float`/`random_int` draw from the seeded (or entropy-initialized) RNG;
+/// `random_bytes`/`uuid` read fresh OS entropy from `handroll::entropy::os_entropy`
+/// and are never influenced by `seed` (handroll U5b replaces the former
 /// rand/getrandom paths; sequence values changed, semantics preserved).
 pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, RunnerError> {
     match verb {
-        "fractum" => {
+        "random_float" => {
             if !args.is_empty() {
                 return Err(RunnerError::internal(
                     span,
-                    "aleator.fractum provider arity",
+                    "aleator.random_float provider arity",
                 ));
             }
             Ok(Value::Float(with_rng(Rng::gen_f64)))
         }
-        "sortire" => {
+        "random_int" => {
             let [min, max] = args else {
                 return Err(RunnerError::internal(
                     span,
-                    "aleator.sortire provider arity",
+                    "aleator.random_int provider arity",
                 ));
             };
             let min = match min {
@@ -56,7 +56,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                 _ => {
                     return Err(RunnerError::internal(
                         span,
-                        "aleator.sortire min expects numerus",
+                        "aleator.random_int min expects numerus",
                     ))
                 }
             };
@@ -65,18 +65,18 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                 _ => {
                     return Err(RunnerError::internal(
                         span,
-                        "aleator.sortire max expects numerus",
+                        "aleator.random_int max expects numerus",
                     ))
                 }
             };
             let (lo, hi) = if min <= max { (min, max) } else { (max, min) };
             Ok(Value::Int(with_rng(|rng| rng.gen_i64_inclusive(lo, hi))))
         }
-        "octetos" => {
+        "random_bytes" => {
             let [n] = args else {
                 return Err(RunnerError::internal(
                     span,
-                    "aleator.octetos provider arity",
+                    "aleator.random_bytes provider arity",
                 ));
             };
             let n = match n {
@@ -84,16 +84,17 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                 _ => {
                     return Err(RunnerError::internal(
                         span,
-                        "aleator.octetos expects numerus",
+                        "aleator.random_bytes expects numerus",
                     ))
                 }
             };
-            let len = usize::try_from(n.max(0))
-                .map_err(|_| RunnerError::internal(span, "aleator.octetos length out of range"))?;
+            let len = usize::try_from(n.max(0)).map_err(|_| {
+                RunnerError::internal(span, "aleator.random_bytes length out of range")
+            })?;
             let mut bytes = vec![0_u8; len];
             if len > 0 {
                 entropy::os_entropy(&mut bytes).map_err(|err| {
-                    RunnerError::internal(span, format!("aleator.octetos failed: {err}"))
+                    RunnerError::internal(span, format!("aleator.random_bytes failed: {err}"))
                 })?;
             }
             Ok(Value::Octeti(bytes))
@@ -106,18 +107,13 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                 .map(Value::Str)
                 .map_err(|err| RunnerError::internal(span, format!("aleator.uuid failed: {err}")))
         }
-        "semina" => {
+        "seed" => {
             let [n] = args else {
-                return Err(RunnerError::internal(span, "aleator.semina provider arity"));
+                return Err(RunnerError::internal(span, "aleator.seed provider arity"));
             };
             let n = match n {
                 Value::Int(v) => *v,
-                _ => {
-                    return Err(RunnerError::internal(
-                        span,
-                        "aleator.semina expects numerus",
-                    ))
-                }
+                _ => return Err(RunnerError::internal(span, "aleator.seed expects numerus")),
             };
             let mut guard = rng_state();
             guard.seeded = u64::try_from(n).ok().map(Rng::seed_from_u64);

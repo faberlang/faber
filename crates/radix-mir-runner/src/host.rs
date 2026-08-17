@@ -37,7 +37,7 @@ pub trait Host {
     }
     fn exit(&mut self, code: i32) -> !;
 
-    /// Write text to stdout **without** appending a newline (`consolum.dic`).
+    /// Write text to stdout **without** appending a newline (`consolum.write_partial`).
     ///
     /// Default hosts reject the surface so callers fail closed until a real
     /// console-capable host opts in. `StdioHost` writes immediately;
@@ -50,7 +50,7 @@ pub trait Host {
     fn write_stdout_raw(&mut self, _text: &str) -> Result<(), RunnerError> {
         Err(RunnerError::unsupported(
             Span::default(),
-            "host write_stdout_raw (consolum.dic)",
+            "host write_stdout_raw (consolum.write_partial)",
         ))
     }
 
@@ -63,7 +63,7 @@ pub trait Host {
         Err(RunnerError::unsupported(Span::default(), "host argumenta"))
     }
 
-    /// Read an environment variable (`processus.lege`). Hosts that do not
+    /// Read an environment variable (`processus.read_env`). Hosts that do not
     /// expose process env return `Err`. `Ok(None)` means the variable is not
     /// set; `Ok(Some(v))` returns the value.
     ///
@@ -74,7 +74,7 @@ pub trait Host {
         Err(RunnerError::unsupported(Span::default(), "host env_get"))
     }
 
-    /// Write an environment variable (`processus.scribe`).
+    /// Write an environment variable (`processus.write_env`).
     ///
     /// # Errors
     ///
@@ -83,7 +83,7 @@ pub trait Host {
         Err(RunnerError::unsupported(Span::default(), "host env_set"))
     }
 
-    /// Current working directory (`processus.sedes`).
+    /// Current working directory (`processus.cwd`).
     ///
     /// # Errors
     ///
@@ -92,7 +92,7 @@ pub trait Host {
         Err(RunnerError::unsupported(Span::default(), "host cwd"))
     }
 
-    /// Change the current working directory (`processus.muta`).
+    /// Change the current working directory (`processus.chdir`).
     ///
     /// # Errors
     ///
@@ -101,7 +101,7 @@ pub trait Host {
         Err(RunnerError::unsupported(Span::default(), "host set_cwd"))
     }
 
-    /// Process id (`identitas`).
+    /// Process id (`processus.pid`).
     ///
     /// # Errors
     ///
@@ -121,7 +121,7 @@ pub struct BufferHost {
     pub stdout_lines: Vec<String>,
     pub stderr_lines: Vec<String>,
     /// Incomplete stdout from `write_stdout_raw` not yet closed by a newline
-    /// scribe (`nota` / `consolum.scribe`).
+    /// line writer (`nota` / `consolum.write_line`).
     pub pending_stdout: String,
     pub stdin_lines: VecDeque<String>,
     pub argumenta: Vec<String>,
@@ -140,14 +140,14 @@ impl BufferHost {
         }
     }
 
-    /// Seed an environment variable for `processus.lege` assertions.
+    /// Seed an environment variable for `processus.read_env` assertions.
     #[must_use]
     pub fn with_env(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.env.insert(name.into(), value.into());
         self
     }
 
-    /// Seed the virtual working directory returned by `processus.sedes`.
+    /// Seed the virtual working directory returned by `processus.cwd`.
     #[must_use]
     pub fn with_cwd(mut self, cwd: impl Into<String>) -> Self {
         self.cwd = cwd.into();
@@ -339,7 +339,7 @@ impl Host for StdioHost {
 
     fn set_cwd(&mut self, path: &str) -> Result<(), RunnerError> {
         std::env::set_current_dir(path).map_err(|err| {
-            RunnerError::internal(Span::default(), format!("processus.muta failed: {err}"))
+            RunnerError::internal(Span::default(), format!("processus.chdir failed: {err}"))
         })
     }
 

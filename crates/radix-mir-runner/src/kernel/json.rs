@@ -9,26 +9,26 @@ use std::rc::Rc;
 
 pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, RunnerError> {
     match verb {
-        "solve" => {
+        "parse" => {
             let [raw] = args else {
-                return Err(RunnerError::internal(span, "json.solve provider arity"));
+                return Err(RunnerError::internal(span, "json.parse provider arity"));
             };
-            let raw = expect_str(raw, span, "json.solve input")?;
+            let raw = expect_str(raw, span, "json.parse input")?;
             parse_json(&raw, span)
         }
-        "pange" => {
+        "stringify" => {
             let (valor, indentum) = match args {
                 [valor] => (valor, None),
                 [valor, indentum] => (valor, optional_usize(indentum)),
-                _ => return Err(RunnerError::internal(span, "json.pange provider arity")),
+                _ => return Err(RunnerError::internal(span, "json.stringify provider arity")),
             };
             serialize_json(valor, indentum, span).map(Value::Str)
         }
-        "tempta" => {
+        "try_parse" => {
             let [raw] = args else {
-                return Err(RunnerError::internal(span, "json.tempta provider arity"));
+                return Err(RunnerError::internal(span, "json.try_parse provider arity"));
             };
-            let raw = expect_str(raw, span, "json.tempta input")?;
+            let raw = expect_str(raw, span, "json.try_parse input")?;
             Ok(parse_json(&raw, span).unwrap_or(Value::Nil))
         }
         other => Err(RunnerError::unsupported(
@@ -40,7 +40,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
 
 fn parse_json(raw: &str, span: Span) -> Result<Value, RunnerError> {
     let value = serde_json::from_str(raw)
-        .map_err(|err| RunnerError::internal(span, format!("json.solve failed: {err}")))?;
+        .map_err(|err| RunnerError::internal(span, format!("json.parse failed: {err}")))?;
     json_to_value(value, span)
 }
 
@@ -55,7 +55,7 @@ fn serialize_json(
     } else {
         serde_json::to_string(&json)
     };
-    result.map_err(|err| RunnerError::internal(span, format!("json.pange failed: {err}")))
+    result.map_err(|err| RunnerError::internal(span, format!("json.stringify failed: {err}")))
 }
 
 fn json_to_value(value: serde_json::Value, span: Span) -> Result<Value, RunnerError> {
@@ -66,7 +66,7 @@ fn json_to_value(value: serde_json::Value, span: Span) -> Result<Value, RunnerEr
             if let Some(number) = value.as_i64() {
                 Ok(Value::Int(number))
             } else if let Some(number) = value.as_u64() {
-                // F-084: json.solve large u64 (e.g. u64::MAX) must surface as
+                // F-084: json.parse large u64 (e.g. u64::MAX) must surface as
                 // UInt, not fall through to the lossy as_f64() path.
                 Ok(Value::UInt(number))
             } else if let Some(number) = value.as_f64() {

@@ -25,8 +25,9 @@ pub const EMBED_SOURCE_NAME: &str = "<source>";
 
 /// Analyze, lower, and interpret Faber source; return a process-style exit code.
 ///
-/// Normal completion yields [`ExitCode::SUCCESS`]. Explicit `processus.exi(code)`
-/// (or the `exi` builtin) yields `code` masked to eight bits, matching common
+/// Normal completion yields [`ExitCode::SUCCESS`]. Explicit
+/// `processus.exit_process(code)` (or the `exi` builtin) yields `code` masked
+/// to eight bits, matching common
 /// Unix status encoding. Abort paths yield [`ExitCode::FAILURE`].
 ///
 /// Frontend, MIR, and runner failures return [`RunSourceError`] without running

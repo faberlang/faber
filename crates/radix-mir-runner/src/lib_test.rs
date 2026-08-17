@@ -1328,7 +1328,7 @@ impl Host for MinimalHost {
 #[test]
 fn test_host_kernel_call_default_rejects() {
     let mut host = MinimalHost;
-    let result = host.kernel_call(KernelModule::Processus, "exsequi", &[], Span::default());
+    let result = host.kernel_call(KernelModule::Processus, "exec", &[], Span::default());
     assert!(
         result.is_err(),
         "default kernel_call must reject unsupported"
@@ -2697,14 +2697,14 @@ fn test_f084_json_large_u64_not_lossy() {
     let result = kernel::dispatch_kernel(
         &mut crate::host::BufferHost::default(),
         KernelModule::Json,
-        "solve",
+        "parse",
         &[crate::Value::Str(raw)],
         radix_lexer::Span::default(),
     );
 
     assert!(
         result.is_ok(),
-        "F-084: json.solve of large u64 must succeed, got {result:?}"
+        "F-084: json.parse of large u64 must succeed, got {result:?}"
     );
     assert_eq!(
         result.unwrap(),
@@ -2722,14 +2722,14 @@ fn test_f084_json_small_i64_is_int() {
     let result = kernel::dispatch_kernel(
         &mut crate::host::BufferHost::default(),
         KernelModule::Json,
-        "solve",
+        "parse",
         &[crate::Value::Str("42".to_owned())],
         radix_lexer::Span::default(),
     );
 
     assert!(
         result.is_ok(),
-        "F-084: json.solve of small i64 must succeed, got {result:?}"
+        "F-084: json.parse of small i64 must succeed, got {result:?}"
     );
     assert_eq!(
         result.unwrap(),
@@ -2738,9 +2738,9 @@ fn test_f084_json_small_i64_is_int() {
     );
 }
 
-/// F-085: processus.exsequi must error on nonzero exit.
+/// F-085: processus.exec must error on nonzero exit.
 #[test]
-fn test_f085_processus_exsequi_nonzero_exit() {
+fn test_f085_processus_exec_nonzero_exit() {
     use crate::kernel;
     use radix_mir::KernelModule;
 
@@ -2748,14 +2748,14 @@ fn test_f085_processus_exsequi_nonzero_exit() {
     let result = kernel::dispatch_kernel(
         &mut crate::host::BufferHost::default(),
         KernelModule::Processus,
-        "exsequi",
+        "exec",
         &[crate::Value::Str("exit 1".to_owned())],
         radix_lexer::Span::default(),
     );
 
     assert!(
         result.is_err(),
-        "F-085: processus.exsequi nonzero exit must error, got {result:?}"
+        "F-085: processus.exec nonzero exit must error, got {result:?}"
     );
     let err = result.unwrap_err();
     assert!(
@@ -2765,28 +2765,28 @@ fn test_f085_processus_exsequi_nonzero_exit() {
     );
 }
 
-/// F-085: processus.exsequi must succeed on zero exit.
+/// F-085: processus.exec must succeed on zero exit.
 #[test]
-fn test_f085_processus_exsequi_zero_exit() {
+fn test_f085_processus_exec_zero_exit() {
     use crate::kernel;
     use radix_mir::KernelModule;
 
     let result = kernel::dispatch_kernel(
         &mut crate::host::BufferHost::default(),
         KernelModule::Processus,
-        "exsequi",
+        "exec",
         &[crate::Value::Str("echo hello".to_owned())],
         radix_lexer::Span::default(),
     );
 
     assert!(
         result.is_ok(),
-        "F-085: processus.exsequi zero exit must succeed, got {result:?}"
+        "F-085: processus.exec zero exit must succeed, got {result:?}"
     );
     assert_eq!(
         result.unwrap(),
         crate::Value::Str("hello\n".to_owned()),
-        "F-085: exsequi must return stdout"
+        "F-085: exec must return stdout"
     );
 }
 

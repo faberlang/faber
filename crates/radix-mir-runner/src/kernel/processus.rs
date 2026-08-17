@@ -21,9 +21,9 @@ pub(crate) fn dispatch<H: Host + ?Sized>(
     span: Span,
 ) -> Result<Value, RunnerError> {
     match verb {
-        "argumenta" => {
+        "argv" => {
             if !args.is_empty() {
-                return Err(RunnerError::internal(span, "argumenta provider arity"));
+                return Err(RunnerError::internal(span, "argv provider arity"));
             }
             let values = host
                 .argumenta()?
@@ -32,92 +32,97 @@ pub(crate) fn dispatch<H: Host + ?Sized>(
                 .collect::<Vec<_>>();
             Ok(Value::Array(Rc::new(RefCell::new(values))))
         }
-        "identitas" => {
+        "pid" => {
             if !args.is_empty() {
-                return Err(RunnerError::internal(span, "identitas provider arity"));
+                return Err(RunnerError::internal(span, "pid provider arity"));
             }
             Ok(Value::Int(host.pid()?))
         }
-        "exi" => {
+        "exit_process" => {
             let [code] = args else {
-                return Err(RunnerError::internal(span, "exi provider arity"));
+                return Err(RunnerError::internal(span, "exit_process provider arity"));
             };
             let code = match code {
                 Value::Int(v) => *v as i32,
-                _ => return Err(RunnerError::internal(span, "exi code is not numerus")),
+                _ => {
+                    return Err(RunnerError::internal(
+                        span,
+                        "exit_process code is not numerus",
+                    ))
+                }
             };
             host.exit(code);
         }
-        "lege" => {
+        "read_env" => {
             let [nomen] = args else {
-                return Err(RunnerError::internal(span, "processus.lege provider arity"));
+                return Err(RunnerError::internal(
+                    span,
+                    "processus.read_env provider arity",
+                ));
             };
-            let nomen = expect_str(nomen, span, "processus.lege name")?;
+            let nomen = expect_str(nomen, span, "processus.read_env name")?;
             match host.env_get(&nomen)? {
                 Some(valor) => Ok(Value::Str(valor)),
                 None => Err(RunnerError::internal_with_issue(
                     span,
-                    format!("processus.lege: environment variable `{nomen}` is not set"),
-                    "runner_processus_lege_env_missing",
+                    format!("processus.read_env: environment variable `{nomen}` is not set"),
+                    "runner_processus_read_env_env_missing",
                 )),
             }
         }
-        "scribe" => {
+        "write_env" => {
             let [nomen, valor] = args else {
                 return Err(RunnerError::internal(
                     span,
-                    "processus.scribe provider arity",
+                    "processus.write_env provider arity",
                 ));
             };
-            let nomen = expect_str(nomen, span, "processus.scribe name")?;
-            let valor = expect_str(valor, span, "processus.scribe value")?;
+            let nomen = expect_str(nomen, span, "processus.write_env name")?;
+            let valor = expect_str(valor, span, "processus.write_env value")?;
             host.env_set(&nomen, &valor)?;
             Ok(Value::Unit)
         }
-        "sedes" => {
+        "cwd" => {
             if !args.is_empty() {
-                return Err(RunnerError::internal(
-                    span,
-                    "processus.sedes provider arity",
-                ));
+                return Err(RunnerError::internal(span, "processus.cwd provider arity"));
             }
             Ok(Value::Str(host.cwd()?))
         }
-        "muta" => {
+        "chdir" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "processus.muta provider arity"));
+                return Err(RunnerError::internal(
+                    span,
+                    "processus.chdir provider arity",
+                ));
             };
-            let via = expect_str(via, span, "processus.muta path")?;
+            let via = expect_str(via, span, "processus.chdir path")?;
             host.set_cwd(&via)?;
             Ok(Value::Unit)
         }
-        "exsequi" => {
+        "exec" => {
             let [imperium] = args else {
-                return Err(RunnerError::internal(
-                    span,
-                    "processus.exsequi provider arity",
-                ));
+                return Err(RunnerError::internal(span, "processus.exec provider arity"));
             };
-            let imperium = expect_str(imperium, span, "processus.exsequi command")?;
+            let imperium = expect_str(imperium, span, "processus.exec command")?;
             execute_shell(&imperium, span).map(Value::Str)
         }
-        "genera" => {
+        "spawn" => {
             let [argumenta, directorium, ambitus] = args else {
                 return Err(RunnerError::internal(
                     span,
-                    "processus.genera provider arity",
+                    "processus.spawn provider arity",
                 ));
             };
             let command_args = value_lista_to_strings(argumenta, span)?;
             if command_args.is_empty() {
                 return Err(RunnerError::internal(
                     span,
-                    "processus.genera requires argumenta",
+                    "processus.spawn requires argumenta",
                 ));
             }
             let directorium = match directorium {
                 Value::Nil | Value::Unit => None,
-                other => Some(expect_str(other, span, "processus.genera directorium")?),
+                other => Some(expect_str(other, span, "processus.spawn directorium")?),
             };
             let env = match ambitus {
                 Value::Nil | Value::Unit => None,
@@ -127,12 +132,12 @@ pub(crate) fn dispatch<H: Host + ?Sized>(
                         let super::super::value::MapKey::Str(name) = key else {
                             return Err(RunnerError::internal(
                                 span,
-                                "processus.genera ambitus keys must be textus",
+                                "processus.spawn ambitus keys must be textus",
                             ));
                         };
                         out.insert(
                             name.clone(),
-                            expect_str(value, span, "processus.genera ambitus value")?,
+                            expect_str(value, span, "processus.spawn ambitus value")?,
                         );
                     }
                     Some(out)
@@ -140,7 +145,7 @@ pub(crate) fn dispatch<H: Host + ?Sized>(
                 _ => {
                     return Err(RunnerError::internal(
                         span,
-                        "processus.genera ambitus expects tabula",
+                        "processus.spawn ambitus expects tabula",
                     ))
                 }
             };
@@ -174,14 +179,14 @@ fn execute_shell(command: &str, span: Span) -> Result<String, RunnerError> {
         .arg("-c")
         .arg(command)
         .output()
-        .map_err(|err| RunnerError::internal(span, format!("processus.exsequi failed: {err}")))?;
+        .map_err(|err| RunnerError::internal(span, format!("processus.exec failed: {err}")))?;
     // F-085: propagate nonzero exit status so callers cannot silently ignore
     // script failures. stdout is still returned on success.
     if !output.status.success() {
         return Err(RunnerError::internal(
             span,
             format!(
-                "processus.exsequi exit non-zero ({}): {}",
+                "processus.exec exit non-zero ({}): {}",
                 output.status.code().unwrap_or(-1),
                 String::from_utf8_lossy(&output.stderr).trim()
             ),
@@ -209,10 +214,10 @@ fn spawn_attached(
     command.stderr(Stdio::inherit());
     let mut child = command
         .spawn()
-        .map_err(|err| RunnerError::internal(span, format!("processus.genera failed: {err}")))?;
+        .map_err(|err| RunnerError::internal(span, format!("processus.spawn failed: {err}")))?;
     let pid = child.id() as i64;
     let status = child.wait().map_err(|err| {
-        RunnerError::internal(span, format!("processus.genera wait failed: {err}"))
+        RunnerError::internal(span, format!("processus.spawn wait failed: {err}"))
     })?;
     let mut fields = FxHashMap::default();
     fields.insert(MapKey::Str("pid".to_owned()), Value::Int(pid));
