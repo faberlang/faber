@@ -18,7 +18,7 @@ use crate::{emit, KeywordSurface};
 use radix_hir::{
     DefId, HirAnnotation, HirBlock, HirBlockEnd, HirExpression, HirExpressionKind, HirField,
     HirFunction, HirId, HirItem, HirItemKind, HirLiteral, HirMethod, HirOwnerRef, HirPresentation,
-    HirProgram, HirProgramEnd, HirReceiver, HirSourceAnchorId, HirStatement, HirStatementKind,
+    HirModule, HirModuleEnd, HirReceiver, HirSourceAnchorId, HirStatement, HirStatementKind,
     HirStruct, HirTrivia, HirTriviaAttachment, HirTriviaOwner, HirTriviaOwnerKind,
 };
 use radix_lexer::{Interner, Span, TokenKind};
@@ -128,7 +128,7 @@ fn empty_presentation() -> HirPresentation {
         owners: Vec::new(),
         attachments: Vec::new(),
         block_ends: Vec::new(),
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: anchor(999),
             span: span(),
         },
@@ -200,8 +200,8 @@ fn function_item(
     }
 }
 
-fn program(items: Vec<HirItem>, entry: Option<HirBlock>) -> HirProgram {
-    HirProgram {
+fn program(items: Vec<HirItem>, entry: Option<HirBlock>) -> HirModule {
+    HirModule {
         items,
         entry,
         entry_annotations: Vec::new(),
@@ -210,7 +210,7 @@ fn program(items: Vec<HirItem>, entry: Option<HirBlock>) -> HirProgram {
     }
 }
 
-fn render(hir: &HirProgram, presentation: &HirPresentation, interner: &Interner) -> String {
+fn render(hir: &HirModule, presentation: &HirPresentation, interner: &Interner) -> String {
     let types = TypeTable::new();
     emit(
         hir,
@@ -264,7 +264,7 @@ fn emits_statement_trivia_before_each_statement() {
             attachment(2, comment_run(&mut interner, " second comment")),
         ],
         block_ends: Vec::new(),
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: anchor(999),
             span: span(),
         },
@@ -304,7 +304,7 @@ fn emits_block_end_trivia_before_closing_brace() {
             id: anchor(20),
             span: span(),
         }],
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: anchor(999),
             span: span(),
         },
@@ -339,7 +339,7 @@ fn emits_program_end_trivia_before_eof() {
             comment_run(&mut interner, " trailing comment"),
         )],
         block_ends: Vec::new(),
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: anchor(30),
             span: span(),
         },
@@ -375,7 +375,7 @@ fn emits_item_trivia_before_item() {
         )],
         attachments: vec![attachment(1, comment_run(&mut interner, " item comment"))],
         block_ends: Vec::new(),
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: anchor(999),
             span: span(),
         },
@@ -398,7 +398,7 @@ fn emits_entry_trivia_before_incipit_keyword() {
         owners: vec![owner(1, HirTriviaOwnerKind::Entry, None)],
         attachments: vec![attachment(1, comment_run(&mut interner, " entry comment"))],
         block_ends: Vec::new(),
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: anchor(999),
             span: span(),
         },
@@ -487,7 +487,7 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
             attachment(2, comment_run(&mut interner, " method comment")),
         ],
         block_ends: Vec::new(),
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: anchor(999),
             span: span(),
         },
@@ -545,7 +545,7 @@ fn emits_trivia_before_annotation_sequence() {
             comment_run(&mut interner, " before annotation"),
         )],
         block_ends: Vec::new(),
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: anchor(999),
             span: span(),
         },
@@ -610,7 +610,7 @@ fn comment_bearing_branch_stays_braced_not_ergo() {
         )],
         attachments: vec![attachment(2, comment_run(&mut interner, " keep braced"))],
         block_ends: Vec::new(),
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: anchor(999),
             span: span(),
         },
@@ -708,7 +708,7 @@ fn comment_bearing_branch_prevents_sic_secus_compaction() {
         )],
         attachments: vec![attachment(2, comment_run(&mut interner, " keep braced"))],
         block_ends: Vec::new(),
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: anchor(999),
             span: span(),
         },
@@ -818,7 +818,7 @@ fn boundary_newline_normalization_does_not_manufacture_blank_lines() {
             ),
         ],
         block_ends: Vec::new(),
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: anchor(999),
             span: span(),
         },
@@ -868,7 +868,7 @@ fn file_start_trivia_keeps_no_leading_blank_lines() {
         )],
         attachments: vec![attachment(5, leading)],
         block_ends: Vec::new(),
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: anchor(999),
             span: span(),
         },
@@ -915,7 +915,7 @@ fn explicit_tacet_prints_implicit_ends_do_not() {
             id: anchor(20),
             span: span(),
         }],
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: anchor(999),
             span: span(),
         },
@@ -968,7 +968,7 @@ fn rendering_is_deterministic() {
             id: anchor(20),
             span: span(),
         }],
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: anchor(999),
             span: span(),
         },

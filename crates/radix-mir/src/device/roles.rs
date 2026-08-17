@@ -1,7 +1,7 @@
 //! Shared MIR device roles and the per-function role context carried from HIR.
 
 use crate::{MirFunction, MirFunctionId, MirProgram};
-use radix_hir::{DefId, HirFunction, HirItemKind, HirProgram};
+use radix_hir::{DefId, HirFunction, HirItemKind, HirModule};
 use rustc_hash::FxHashMap;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MirDeviceRole {
@@ -50,7 +50,7 @@ impl MirDeviceContext {
 }
 
 #[must_use]
-pub fn device_roles_from_hir(hir: &HirProgram) -> FxHashMap<DefId, MirDeviceRole> {
+pub fn device_roles_from_hir(hir: &HirModule) -> FxHashMap<DefId, MirDeviceRole> {
     let mut roles_by_def = FxHashMap::default();
     for item in &hir.items {
         match &item.kind {

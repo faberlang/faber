@@ -9,7 +9,7 @@ use crate::artifact::{
     FunctionFactTableWire, HirArtifact, ResolverSnapshot, SourceIdentity, SCHEMA_VERSION,
 };
 use radix_hir::{
-    HirFunction, HirId, HirItem, HirItemKind, HirPresentation, HirProgram, HirProgramEnd,
+    HirFunction, HirId, HirItem, HirItemKind, HirPresentation, HirModule, HirModuleEnd,
     HirSourceAnchorId, LibraryRegistry,
 };
 use radix_lexer::{Span, Symbol};
@@ -40,7 +40,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
         })),
         span: Span::default(),
     };
-    let hir = HirProgram {
+    let hir = HirModule {
         items: vec![item],
         entry: None,
         entry_annotations: Vec::new(),
@@ -51,7 +51,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
         owners: Vec::new(),
         attachments: Vec::new(),
         block_ends: Vec::new(),
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: HirSourceAnchorId(0),
             span: Span::default(),
         },

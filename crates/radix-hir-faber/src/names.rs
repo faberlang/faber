@@ -11,7 +11,7 @@
 //! visible instead of silently borrowing an unrelated spelling.
 
 use radix_hir::visit::HirVisitor;
-use radix_hir::{DefId, HirProgram};
+use radix_hir::{DefId, HirModule};
 use radix_lexer::{Interner, Symbol};
 use rustc_hash::FxHashMap;
 
@@ -67,7 +67,7 @@ impl super::FaberCodegen {
     /// The collection pass keeps emission deterministic and cheap: expression,
     /// type, pattern, and declaration writers can print resolved references
     /// without walking surrounding HIR to rediscover names.
-    pub(super) fn collect_names(&self, hir: &HirProgram) -> FxHashMap<DefId, Symbol> {
+    pub(super) fn collect_names(&self, hir: &HirModule) -> FxHashMap<DefId, Symbol> {
         let mut collector = FaberNameCollector {
             names: FxHashMap::default(),
         };

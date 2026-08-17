@@ -9,7 +9,7 @@ use radix_codegen_shared::{CodeWriter, CodegenError};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{DefId, HirExpressionKind};
 use radix_hir::{
-    HirItem, HirItemKind, HirPresentation, HirProgram, HirProgramEnd, HirSourceAnchorId,
+    HirItem, HirItemKind, HirPresentation, HirModule, HirModuleEnd, HirSourceAnchorId,
 };
 use radix_lexer::{Interner, Span, TokenKind};
 use radix_types::{TypeId, TypeTable};
@@ -68,7 +68,7 @@ pub struct FaberCodegen {
 /// do not generalize over `BuildHasher` for call-site simplicity.
 #[allow(clippy::implicit_hasher)]
 pub fn emit(
-    hir: &HirProgram,
+    hir: &HirModule,
     presentation: &HirPresentation,
     types: &TypeTable,
     interner: &Interner,
@@ -95,7 +95,7 @@ pub fn empty_presentation() -> HirPresentation {
         owners: Vec::new(),
         attachments: Vec::new(),
         block_ends: Vec::new(),
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: HirSourceAnchorId(0),
             span: Span::default(),
         },
@@ -116,7 +116,7 @@ impl FaberCodegen {
     /// cannot be represented in canonical Faber output.
     pub fn generate(
         &mut self,
-        hir: &HirProgram,
+        hir: &HirModule,
         presentation: &HirPresentation,
         types: &TypeTable,
         interner: &Interner,
@@ -326,7 +326,7 @@ fn item_has_rendered_annotations(item: &HirItem) -> bool {
 /// distinct `Yield` HIR node; await forms must lower to `Reddet`, `Tacebit`, or
 /// await-local metadata. Re-emitting generic `Cede` would revive the old
 /// context-dependent await/yield ambiguity.
-fn reject_unsupported_legacy_hir(hir: &HirProgram) -> Result<(), CodegenError> {
+fn reject_unsupported_legacy_hir(hir: &HirModule) -> Result<(), CodegenError> {
     if let Some((issue, message, span)) = find_unsupported_legacy_expr_in_program(hir) {
         return Err(CodegenError {
             message: format!("cannot emit {message} at span {}..{}", span.start, span.end),
@@ -337,7 +337,7 @@ fn reject_unsupported_legacy_hir(hir: &HirProgram) -> Result<(), CodegenError> {
 }
 
 fn find_unsupported_legacy_expr_in_program(
-    hir: &HirProgram,
+    hir: &HirModule,
 ) -> Option<(&'static str, &'static str, radix_lexer::Span)> {
     let mut finder = UnsupportedLegacyExprFinder::default();
     radix_hir::visit::HirVisitor::visit_program(&mut finder, hir);
@@ -411,7 +411,7 @@ mod tests {
     #[test]
     fn emit_rejects_legacy_context_dependent_cede_hir() {
         let cede_span = Span { start: 10, end: 20 };
-        let hir = HirProgram {
+        let hir = HirModule {
             items: Vec::new(),
             entry: Some(HirBlock::simple(
                 vec![HirStatement {

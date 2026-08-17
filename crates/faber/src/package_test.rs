@@ -383,7 +383,7 @@ fn library_path_eq(actual: &[String], expected: &[&str]) -> bool {
 }
 
 fn library_binding_by_module<'a>(
-    analysis: &'a radix::driver::AnalyzedUnit,
+    analysis: &'a radix::driver::AnalyzedModule,
     module_path: &[&str],
 ) -> &'a LibraryBinding {
     analysis
@@ -395,7 +395,7 @@ fn library_binding_by_module<'a>(
 }
 
 fn library_item_by_export<'a>(
-    analysis: &'a radix::driver::AnalyzedUnit,
+    analysis: &'a radix::driver::AnalyzedModule,
     module_path: &[&str],
     exported_name: &str,
     kind: LibraryItemKind,

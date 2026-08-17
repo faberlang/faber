@@ -394,11 +394,11 @@ pub struct HirArtifact {
     pub source_identity: SourceIdentity,
 
     /// Full lowered HIR program (direct serde).
-    pub hir: radix_hir::HirProgram,
+    pub hir: radix_hir::HirModule,
 
     /// Presentation sidecar: trivia attachments, structural ends, and the
     /// entry-start anchor (schema v2). Inseparable from the HIR value it
-    /// annotates; never on [`HirProgram`](radix_hir::HirProgram).
+    /// annotates; never on [`HirModule`](radix_hir::HirModule).
     pub presentation: radix_hir::HirPresentation,
 
     /// CLI program contract when the unit declares `incipit argumenta` (`F17`, `F18`).

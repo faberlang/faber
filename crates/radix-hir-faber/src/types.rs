@@ -373,7 +373,7 @@ mod tests {
     use radix_hir::{
         DefId, HirAnnotation, HirBlock, HirCallArg, HirCape, HirCasuArm, HirEnum, HirExpression,
         HirExpressionKind, HirFunction, HirId, HirImport, HirImportItem, HirItem, HirItemKind,
-        HirLiteral, HirLocal, HirPattern, HirProgram, HirStatement, HirStatementKind, HirStruct,
+        HirLiteral, HirLocal, HirPattern, HirModule, HirStatement, HirStatementKind, HirStruct,
         HirVariant,
     };
     use radix_lexer::{Interner, Span, TokenKind};
@@ -551,7 +551,7 @@ mod tests {
 
     #[test]
     fn emit_empty_hir_program_succeeds() {
-        let hir = HirProgram {
+        let hir = HirModule {
             items: Vec::new(),
             entry: None,
             entry_annotations: Vec::new(),
@@ -689,7 +689,7 @@ mod tests {
         // emitted source must carry the probe marker, proving the Vacua arm
         // consults the surface instead of printing the literal "vacua".
         let interner = Interner::new();
-        let hir = HirProgram {
+        let hir = HirModule {
             items: Vec::new(),
             entry: Some(HirBlock::simple(
                 vec![HirStatement {
@@ -736,7 +736,7 @@ mod tests {
         Span::default()
     }
 
-    fn generate_faber(program: &HirProgram, types: &TypeTable, interner: &Interner) -> String {
+    fn generate_faber(program: &HirModule, types: &TypeTable, interner: &Interner) -> String {
         FaberCodegen::default()
             .generate(
                 program,
@@ -775,7 +775,7 @@ mod tests {
             ],
         };
 
-        let program = HirProgram {
+        let program = HirModule {
             items: vec![HirItem {
                 id: HirId(0),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE),
@@ -871,7 +871,7 @@ mod tests {
             test: None,
         };
 
-        let program = HirProgram {
+        let program = HirModule {
             items: vec![HirItem {
                 id: HirId(0),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE),
@@ -1002,7 +1002,7 @@ mod tests {
             test: None,
         };
 
-        let program = HirProgram {
+        let program = HirModule {
             items: vec![HirItem {
                 id: HirId(0),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE),
@@ -1133,7 +1133,7 @@ mod tests {
             test: None,
         };
 
-        let program = HirProgram {
+        let program = HirModule {
             items: vec![HirItem {
                 id: HirId(0),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE),
@@ -1279,7 +1279,7 @@ mod tests {
             test: None,
         };
 
-        let program = HirProgram {
+        let program = HirModule {
             items: vec![HirItem {
                 id: HirId(0),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE),
@@ -1432,7 +1432,7 @@ mod tests {
             test: None,
         };
 
-        let program = HirProgram {
+        let program = HirModule {
             items: vec![HirItem {
                 id: HirId(0),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE),
@@ -1483,7 +1483,7 @@ mod tests {
             }],
         };
 
-        let program = HirProgram {
+        let program = HirModule {
             items: vec![HirItem {
                 id: HirId(0),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE),
@@ -1536,7 +1536,7 @@ mod tests {
             ],
         };
 
-        let program = HirProgram {
+        let program = HirModule {
             items: vec![HirItem {
                 id: HirId(0),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE),
@@ -1585,7 +1585,7 @@ mod tests {
             span: span(),
         };
 
-        let program = HirProgram {
+        let program = HirModule {
             items: vec![struct_item],
             entry: None,
             entry_annotations: Vec::new(),
@@ -1634,7 +1634,7 @@ mod tests {
             span: span(),
         };
 
-        let program = HirProgram {
+        let program = HirModule {
             items: vec![enum_item],
             entry: None,
             entry_annotations: Vec::new(),
@@ -1749,7 +1749,7 @@ mod tests {
             test: None,
         };
 
-        let program = HirProgram {
+        let program = HirModule {
             items: vec![
                 HirItem {
                     id: HirId(0),
@@ -1857,7 +1857,7 @@ mod tests {
             test: None,
         };
 
-        let program = HirProgram {
+        let program = HirModule {
             items: vec![
                 HirItem {
                     id: HirId(0),
@@ -1975,7 +1975,7 @@ mod tests {
             test: None,
         };
 
-        let program = HirProgram {
+        let program = HirModule {
             items: vec![HirItem {
                 id: HirId(0),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE),
@@ -2107,7 +2107,7 @@ mod tests {
             test: None,
         };
 
-        let program = HirProgram {
+        let program = HirModule {
             items: vec![HirItem {
                 id: HirId(0),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE),

@@ -856,7 +856,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
 /// Validate every arena index in the deserialized artifact against its target
 /// arena bounds. Returns `Err(DanglingIndex)` on the first out-of-bounds index
 /// (fail-fast per CSO §F). Runs after arena reconstruction and before
-/// `Ok(AnalyzedUnit)` return so no codegen touches corrupt data (CSO E8).
+/// `Ok(AnalyzedModule)` return so no codegen touches corrupt data (CSO E8).
 pub(crate) fn validate_referential_integrity(
     artifact: &HirArtifact,
     type_count: usize,
@@ -1890,7 +1890,7 @@ pub(crate) fn validate_referential_integrity(
 
     // ── Top-level validation ───────────────────────────────────────────
 
-    // 1. HirProgram items and entry.
+    // 1. HirModule items and entry.
     validate_items(
         &artifact.hir.items,
         &check_symbol,

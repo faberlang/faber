@@ -11,7 +11,7 @@
 //! - postcard round trips preserve the new data.
 
 use crate::nodes::{
-    DefId, HirBlock, HirBlockEnd, HirId, HirOwnerRef, HirPresentation, HirProgramEnd,
+    DefId, HirBlock, HirBlockEnd, HirId, HirOwnerRef, HirPresentation, HirModuleEnd,
     HirSourceAnchorId, HirStatement, HirStatementKind, HirTrivia, HirTriviaAttachment,
     HirTriviaOwner, HirTriviaOwnerKind,
 };
@@ -68,7 +68,7 @@ fn sample_presentation() -> HirPresentation {
             id: HirSourceAnchorId(2),
             span: span(30),
         }],
-        program_end: HirProgramEnd {
+        program_end: HirModuleEnd {
             id: HirSourceAnchorId(3),
             span: span(90),
         },
@@ -261,7 +261,7 @@ fn presentation_equality_is_deterministic() {
     assert_eq!(first, second, "identical presentations must be equal");
 
     let mut changed_end = sample_presentation();
-    changed_end.program_end = HirProgramEnd {
+    changed_end.program_end = HirModuleEnd {
         id: HirSourceAnchorId(999),
         span: span(90),
     };
