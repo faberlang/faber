@@ -2418,6 +2418,57 @@ fn valid_tag_name(string name) → bool {
     );
 }
 
+#[test]
+fn nested_local_import_prepared_analyze_does_not_frontend_fail() {
+    // Mid imports leaf and names `leaf.Point` in a signature. Empty-contract
+    // analyze_source fail-closes on the qualified type; the program helper
+    // must discover leaf's interface so e2e/interpret paths do not
+    // frontend-fail solely from missing contracts.
+    let (_td, dir) = temp_dir("nested-local-analyze");
+    let leaf = dir.join("leaf.fab");
+    let mid = dir.join("mid.fab");
+    fs::write(
+        &leaf,
+        r"
+@ publica
+genus Point {
+    f32 x
+    f32 y
+}
+",
+    )
+    .expect("leaf");
+    fs::write(
+        &mid,
+        r#"
+importa ex "./leaf" leaf
+
+@ publica
+functio via() → leaf.Point {
+    redde leaf.Point { x = 0.0, y = 0.0 }
+}
+"#,
+    )
+    .expect("mid");
+    let source = fs::read_to_string(&mid).expect("read mid");
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let empty = crate::driver::analyze_source(&session, &mid.display().to_string(), &source);
+    assert!(
+        empty.is_err(),
+        "empty-contract analyze_source must frontend-fail nested imported type leaf.Point"
+    );
+    let unit = super::analyze_prepared_program_path(&session, &mid, &source)
+        .expect("prepared analyze must not frontend-fail nested local import");
+    assert!(
+        !unit.diagnostics.iter().any(crate::Diagnostic::is_error),
+        "prepared analyze diagnostics must be error-free: {:?}",
+        unit.diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), diag.message.as_str()))
+            .collect::<Vec<_>>()
+    );
+}
+
 fn write_demo_library_with_latin_pack(home: &Path) {
     let demo = home.join("demo");
     fs::create_dir_all(demo.join("src")).expect("demo src");

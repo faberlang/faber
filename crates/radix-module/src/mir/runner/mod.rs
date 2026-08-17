@@ -10,8 +10,9 @@ pub use radix_mir_runner::{
 };
 
 use crate::diagnostics::Diagnostic;
-use crate::driver::{analyze_source, AnalyzedModule, Session};
+use crate::driver::{AnalyzedModule, Session};
 use crate::mir::lower_analyzed_unit_with_context;
+use crate::tool::analyze_prepared_program_name;
 
 /// Failure modes for the analyzed-source run routes.
 ///
@@ -37,7 +38,7 @@ pub fn run_source<H: Host + ?Sized>(
     source: &str,
     host: &mut H,
 ) -> Result<(), RunSourceError> {
-    let mut analysis = analyze_source(session, name, source).map_err(RunSourceError::Frontend)?;
+    let mut analysis = analyze_prepared_program_name(session, name, source).map_err(RunSourceError::Frontend)?;
     run_analyzed(&mut analysis, host).map_err(RunSourceError::Stepper)
 }
 

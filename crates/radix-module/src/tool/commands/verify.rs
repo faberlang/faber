@@ -2,11 +2,12 @@
 //!
 //! Owns [`cmd_verify`], [`verify_source`], TLA+ checker configuration from
 //! environment, and aspect-coverage reporting. Delegates semantic analysis to
-//! `crate::driver::analyze_source` and TLA+ model emission / checking to
+//! `analyze_prepared_program_name` and TLA+ model emission / checking to
 //! `crate::aspect`. Exits with code 1 when verification fails, aspects are
 //! unproven, or the checker environment is misconfigured.
 
 use super::super::cli::VerifyCommand;
+use super::compile::analyze_prepared_program_name;
 use super::package::should_treat_as_package_from_input;
 use super::source::read_source;
 use crate::aspect::{
@@ -15,7 +16,7 @@ use crate::aspect::{
     TlaAspectCheckerConfig, TlaAspectVerifier,
 };
 use crate::diagnostics::{render_expanded_diagnostics, Diagnostic};
-use crate::driver::{analyze_source, AnalyzedModule, Config, Session};
+use crate::driver::{AnalyzedModule, Config, Session};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -69,7 +70,7 @@ pub struct VerifySourceResult {
 #[must_use]
 pub fn verify_source(name: &str, source: &str, checker_config: Option<TlaAspectCheckerConfig>) -> VerifySourceResult {
     let session = Session::new(Config::default().with_dev_stdlib());
-    let analysis = match analyze_source(&session, name, source) {
+    let analysis = match analyze_prepared_program_name(&session, name, source) {
         Ok(analysis) => analysis,
         Err(diagnostics) => return VerifySourceResult { coverage: None, diagnostics, success: false },
     };
