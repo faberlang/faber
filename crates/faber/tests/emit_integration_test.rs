@@ -446,6 +446,7 @@ fn emit_reader_locale_missing_package_path_surfaces_missing_path_error() {
         stdout.is_empty(),
         "missing package path should not write stdout: {stdout}"
     );
+    // ALLOW_DIAGNOSTIC_RENDER_TEXT: CLI stderr is the renderer contract for this integration test.
     assert!(
         stderr.contains("error[PKG001:package_path_missing]"),
         "expected structured missing path diagnostic, got:\n{stderr}"

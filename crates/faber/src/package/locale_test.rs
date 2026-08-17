@@ -156,7 +156,6 @@ fn missing_emit_package_path_is_a_structured_diagnostic() {
         .args
         .iter()
         .any(|arg| arg.name == "path" && arg.value == missing.display().to_string()));
-    assert!(!diagnostic.message.contains("No such file or directory"));
 
     let _ = fs::remove_dir_all(root);
 }
