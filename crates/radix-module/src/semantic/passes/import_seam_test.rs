@@ -242,7 +242,7 @@ fn module_analysis_does_not_derive_contracts_from_path_name() {
             compile_str
                 .diagnostics
                 .iter()
-                .map(|diag| (diag.code, diag.issue(), diag.message.as_str()))
+                .map(|diag| (diag.code, diag.issue()))
                 .collect::<Vec<_>>()
         ),
     }
@@ -280,7 +280,7 @@ incipit {
         result
             .diagnostics
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.as_str()))
+            .map(|diag| (diag.code, diag.issue()))
             .collect::<Vec<_>>()
     );
     let crate::Output::Rust(out) = result.output.as_ref().expect("rust output") else {

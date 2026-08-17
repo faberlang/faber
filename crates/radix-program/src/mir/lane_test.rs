@@ -398,7 +398,7 @@ fn prove_linked_bodies() {
             "self-provider package test must link: {:?}",
             diagnostics
                 .iter()
-                .map(|diag| diag.message.clone())
+                .map(|diag| (diag.code, diag.issue()))
                 .collect::<Vec<_>>()
         )
     });
