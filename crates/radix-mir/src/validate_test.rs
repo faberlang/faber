@@ -2669,6 +2669,91 @@ fn unary_scalar_collection_program(
     }
 }
 
+/// A three-operand scalar collection-op program for `approximata`: receiver,
+/// comparison value, and tolerance all share the selected scalar type.
+fn approximate_collection_program(
+    types: &mut TypeTable,
+    receiver_ty: MirType,
+    argument_ty: MirType,
+) -> MirProgram {
+    let return_ty = MirType::semantic(types.primitive(Primitive::Bivalens));
+    let locals = vec![
+        MirLocal {
+            id: MirLocalId(0),
+            ty: receiver_ty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        },
+        MirLocal {
+            id: MirLocalId(1),
+            ty: argument_ty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        },
+        MirLocal {
+            id: MirLocalId(2),
+            ty: argument_ty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        },
+        MirLocal {
+            id: MirLocalId(3),
+            ty: return_ty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        },
+    ];
+    let place = |id| {
+        MirOperand::Place(MirPlace {
+            base: MirPlaceBase::Local(MirLocalId(id)),
+            projections: vec![],
+        })
+    };
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals,
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(3)),
+                            projections: vec![],
+                        }),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::Approximate),
+                            args: vec![place(0), place(1), place(2)],
+                            return_ty,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    }
+}
+
 #[test]
 fn test_rms_norm_valid_rank2_consts_and_gamma() {
     let mut types = TypeTable::new();
@@ -2879,6 +2964,46 @@ fn test_rounding_rejects_numerus_receiver() {
             "expected the fractus-receiver diagnostic for {op:?}, got: {errors:?}"
         );
     }
+}
+
+// ── Approximate comparison: fractus-family receivers ───────────────────
+
+#[test]
+fn test_approximate_f32_receiver_valid() {
+    let mut types = TypeTable::new();
+    let receiver_ty = f32_receiver_mty(&mut types);
+    let program = approximate_collection_program(&mut types, receiver_ty, receiver_ty);
+    let errors = validate(&program, &types);
+    assert!(
+        errors.is_empty(),
+        "expected a valid f32 approximate receiver, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_approximate_plain_fractus_receiver_valid() {
+    let mut types = TypeTable::new();
+    let receiver_ty = fractus_mty(&mut types);
+    let program = approximate_collection_program(&mut types, receiver_ty, receiver_ty);
+    let errors = validate(&program, &types);
+    assert!(
+        errors.is_empty(),
+        "expected a valid fractus approximate receiver, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_approximate_rejects_numerus_receiver() {
+    let mut types = TypeTable::new();
+    let receiver_ty = numerus_mty(&mut types);
+    let program = approximate_collection_program(&mut types, receiver_ty, receiver_ty);
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("approximate comparison receiver is not fractus")),
+        "expected the fractus-receiver diagnostic, got: {errors:?}"
+    );
 }
 
 // ── Absolute/Signum intrinsics: fractus-family receivers ───────────────

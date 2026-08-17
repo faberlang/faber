@@ -1040,12 +1040,13 @@ impl Validator<'_, '_> {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };
-                self.require_exact(
-                    receiver_ty,
-                    self.primitive(Primitive::Fractus),
-                    span,
-                    "approximate comparison receiver is not fractus",
-                );
+                if !matches!(
+                    self.type_kind(receiver_ty),
+                    Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+                ) {
+                    self.error(span, "approximate comparison receiver is not fractus");
+                    return;
+                }
                 for arg in call.args.iter().skip(1).take(2) {
                     if let Some(arg_ty) = self.validate_operand(scope, arg, span) {
                         self.require_assignable(
