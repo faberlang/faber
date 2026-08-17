@@ -30,4 +30,4 @@ locale = "en"
 
 import from "norma:chorda"
 
-print "importa-minimal"
+print chorda.reverse("importa-minimal")
