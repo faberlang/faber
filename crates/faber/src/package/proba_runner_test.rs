@@ -277,3 +277,179 @@ probandum "suite_b" {
     assert_eq!(by_suite.results.len(), 1);
     assert_eq!(by_suite.results[0].name, "alpha");
 }
+
+/// Mirrors [`write_minimal_lib_package`] and adds the Triga-shaped
+/// `[reader] locale = "en"` manifest section so the rdx-s05-1 regressions also
+/// prove manifest reader-locale selection on the package-test route.
+fn write_reader_locale_lib_package(dir: &Path) {
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"[package]
+name = "runner_locale_fixture"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "runner_locale_fixture"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+
+[reader]
+locale = "en"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        dir.join("src/lib.fab"),
+        r#"fn identity(int n) → int {
+    return n
+}
+"#,
+    )
+    .expect("lib.fab");
+}
+
+/// Serializes the rdx-s05-1 chdir regressions: ambient CWD is process-global,
+/// so parallel tests cannot each chdir to their own temp package.
+static CWD_LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+
+fn with_package_cwd(dir: &Path, f: impl FnOnce()) {
+    let guard = CWD_LOCK
+        .get_or_init(|| std::sync::Mutex::new(()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let original_cwd = std::env::current_dir().expect("current dir");
+    std::env::set_current_dir(dir).expect("chdir");
+    f();
+    std::env::set_current_dir(original_cwd).expect("restore current dir");
+    drop(guard);
+}
+
+/// rdx-s05-1 regression: `faber test .` from a package root must resolve the
+/// manifest-backed package. A raw `.` is what `TestArgs` defaults to and what
+/// `cmd_test` now routes through the faber absolutization seam before package
+/// analysis; previously the lexical `normalize_path` collapsed `.` to an
+/// empty path and discovery reported `cannot read '.'`. The English probe is
+/// parsed only because the manifest `[reader] locale` selects the en pack.
+#[test]
+fn dot_input_from_package_root_analyzes_and_runs_colocated_proba() {
+    let dir = test_temp_dir("runner-dot-pkg");
+    write_reader_locale_lib_package(dir.path());
+    fs::write(
+        dir.join("src/math.proba"),
+        r#"
+test "math ok" {
+    assert 8 ≡ 8
+}
+"#,
+    )
+    .expect("math.proba");
+
+    let mut dot_input = PathBuf::new();
+    with_package_cwd(dir.path(), || {
+        dot_input = crate::package::absolutize_path(Path::new("."));
+    });
+
+    assert!(
+        dot_input.is_absolute(),
+        "`.` must absolutize to the package root, got {}",
+        dot_input.display()
+    );
+    let mut package = analyze_tests_with_faber_seams(&Config::default(), &dot_input, None)
+        .expect("analyze `faber test .` package");
+    assert!(
+        package.spec.manifest_backed,
+        "`.` must resolve the manifest-backed package"
+    );
+    assert!(
+        package.diagnostics.iter().all(|d| !d.is_error()),
+        "{:?}",
+        package.diagnostics
+    );
+
+    let mut passed = 0;
+    for unit in &mut package.units {
+        if proba::inventory_cases(&unit.analysis.hir, &unit.analysis.interner).is_empty() {
+            continue;
+        }
+        let report = run_proba_on_analyzed(
+            &mut unit.analysis,
+            &TestSelection::default(),
+            None,
+            false,
+            false,
+        )
+        .expect("run unit");
+        passed += report.passed();
+    }
+    assert!(
+        passed >= 1,
+        "co-located proba cases must run from the package-root `.` input"
+    );
+}
+
+/// rdx-s05-1 regression: `faber test triga` from a workspace parent and the
+/// absolute package path must enter the same manifest-backed package. The two
+/// spellings differ only before the shared faber absolutization seam.
+#[test]
+fn relative_and_absolute_package_paths_resolve_the_same_test_package() {
+    let dir = test_temp_dir("runner-relabs-pkg");
+    write_reader_locale_lib_package(dir.path());
+    fs::write(
+        dir.join("src/core.proba"),
+        r#"
+test "core ok" {
+    assert 1 ≡ 1
+}
+"#,
+    )
+    .expect("core.proba");
+
+    let package_name = dir.path().file_name().expect("temp package name").to_owned();
+    let parent = dir.path().parent().expect("temp parent").to_path_buf();
+
+    let mut relative = PathBuf::new();
+    let mut absolute = PathBuf::new();
+    with_package_cwd(&parent, || {
+        relative = crate::package::absolutize_path(Path::new(&package_name));
+        absolute = crate::package::absolutize_path(&dir.path());
+    });
+
+    assert!(
+        super::test_support::paths_equivalent(&relative, &absolute),
+        "both spellings must absolutize to the same directory: {} vs {}",
+        relative.display(),
+        absolute.display()
+    );
+
+    let pkg_relative = analyze_tests_with_faber_seams(&Config::default(), &relative, None)
+        .expect("relative package path must analyze");
+    let pkg_absolute = analyze_tests_with_faber_seams(&Config::default(), &absolute, None)
+        .expect("absolute package path must analyze");
+    for pkg in [&pkg_relative, &pkg_absolute] {
+        assert!(pkg.spec.manifest_backed, "package must be manifest-backed");
+    }
+    assert!(
+        super::test_support::paths_equivalent(
+            &pkg_relative.spec.package_root,
+            &pkg_absolute.spec.package_root,
+        ),
+        "relative and absolute inputs must land on the same package root"
+    );
+    let unit_names = |pkg: &radix_package::analyze::AnalyzedPackage| {
+        let mut names = pkg
+            .units
+            .iter()
+            .map(|u| u.path.file_name().unwrap_or_default().to_os_string())
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    };
+    assert_eq!(unit_names(&pkg_relative), unit_names(&pkg_absolute));
+}

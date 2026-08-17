@@ -203,7 +203,11 @@ pub(super) const MANIFEST_FILE: &str = "faber.toml";
 /// Resolve a product input against the caller's working directory before
 /// entering the explicit-input compiler API. Ambient CWD lookup is a Faber
 /// command concern, not a radix-package concern.
-fn absolutize_path(path: &Path) -> std::path::PathBuf {
+///
+/// `faber test` shares this seam because package discovery requires absolute
+/// inputs: a raw `.` lexically normalizes to an empty path and fails as
+/// `cannot read '.'` (rdx-s05-1).
+pub(crate) fn absolutize_path(path: &Path) -> std::path::PathBuf {
     let path = if path.is_absolute() {
         path.to_path_buf()
     } else {

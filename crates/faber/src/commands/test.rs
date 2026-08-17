@@ -9,12 +9,15 @@ use proba::{
     format_summary, inventory_cases, run_proba_on_analyzed, run_proba_source, CaseOutcome,
     CaseResult, ProbaReport, TestSelection,
 };
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Discover, select, and run proba cases exclusively on the MIR runner.
 pub(super) fn cmd_test(args: &TestArgs) {
     crate::commands::validate_deny_codes(&args.deny);
-    let input_path = PathBuf::from(&args.path);
+    // Package discovery requires absolute inputs; absolutizing here (same seam
+    // as the package build/check/run routes) keeps `.`, relative, and absolute
+    // paths resolving to one package root (rdx-s05-1).
+    let input_path = crate::package::absolutize_path(&args.path);
     if let Some(message) = locale_without_package_error(
         args.locale.as_deref(),
         &[args.path.display().to_string()],
