@@ -1,6 +1,6 @@
 # GOAL: FCMP profile 1 — amend the draft before a separate freeze decision
 
-**Status**: planned — draft; CTO `5a4e974a` holes locked in `amendment.md`; not frozen; §14 re-check is still not a freeze
+**Status**: planned — draft; U-2a landed `02327f9`; not frozen; §14 re-check `0dc52153` record_risk is still not a freeze
 **Created**: 2026-08-17
 **Campaign:** `—` (standalone)
 **Source:** operator intake: `faber/docs/faber-messagepack-profile-v1.md` (amended from commit `4878b6f`; review memo `604d6a30`; CTO `5a4e974a`)
@@ -103,7 +103,7 @@ freeze.
 | --- | --- | --- | --- |
 | 1 | Head protocol review of the draft: §14 gate list + BCP-14 clause audit + conflict-of-interest check against serializer-library defaults | — | memo `604d6a30` |
 | 2 | Fold the review verdicts into the draft; keep Status draft, preserve the RTR2/RTR3b gate, and keep `fhir.unit`/`fhir.package` as reservations until schemas publish concrete finite limits | 1 | handle `cfcb44be` |
-| 2a | Fold `amendment.md` into `docs/faber-messagepack-profile-v1.md` (identity + prefix limits only). Status stays draft. Not a freeze. | 2 | none |
+| 2a | Fold `amendment.md` into `docs/faber-messagepack-profile-v1.md` (identity + prefix limits only). Status stays draft. Not a freeze. | 2 | `02327f9` |
 | 3 | Rust reference: strict FCMP codec + generic profile vectors (frame, canonicality, limits) | separate profile freeze, RTR2 | none |
 | 4 | FHIR unit/package wire DTOs + fixtures + TS independent decoder/encoder (cross-language gate §11.3) | 3, RTR3b | none |
 | 5 | FHIR writer/reader switch + legacy postcard rejection with structured diagnostic | 4 | none |
@@ -124,7 +124,7 @@ classes. Unit 5: FHIR e2e on FCMP only; postcard rejected closed.
 | --- | --- | --- | --- |
 | 1 | complete | `604d6a30` | head-cto review verdicts received |
 | 2 | complete | `cfcb44be` | amendments folded; do not reopen |
-| 2a | planned | — | locks in `amendment.md`; protocol fold not started; not a freeze |
+| 2a | complete | `02327f9` | identity + prefix 64/3/2/256 folded; not a freeze |
 | 3 | blocked | — | freeze + RTR2; do not dispatch |
 
 ## Review disposition
@@ -151,7 +151,6 @@ The draft MUST be re-checked against §14 before a separate freeze decision.
 That re-check is still not a freeze.
 
 CTO `5a4e974a` (`correct_before_next_phase`): optional/default identity and
-envelope-prefix limits were unset. They are now locked as (a) omit-defaults
-and the 64 / 3 / 2 / 256 prefix table in `amendment.md`. Fold them into the
-protocol file as unit 2a. Do not freeze here. Do not reopen unit 2. Do not
-dispatch unit 3.
+envelope-prefix limits were unset. They are folded as (a) omit-defaults and
+the 64 / 3 / 2 / 256 prefix table in the protocol file (`02327f9`). Do not
+freeze here. Do not reopen unit 2. Do not dispatch unit 3.
