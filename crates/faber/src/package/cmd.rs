@@ -510,7 +510,8 @@ fn single_file_rust_runtime_plan(
     config: &radix_module::Config,
     input_path: &Path,
 ) -> Result<super::RustRuntimePlan, Vec<radix_module::Diagnostic>> {
-    use radix_module::driver::{analyze_source, Session};
+    use radix_module::driver::Session;
+    use radix_module::tool::analyze_prepared_program_path;
     use std::fs;
 
     let source = fs::read_to_string(input_path).map_err(|err| {
@@ -520,22 +521,17 @@ fn single_file_rust_runtime_plan(
         ))]
     })?;
     let session = Session::new(config.clone());
-    let name = input_path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("input.fab");
-    let analysis = analyze_source(&session, name, &source)?;
+    let analysis = analyze_prepared_program_path(&session, input_path, &source)?;
     let needs = radix_module::codegen::collect_rust_needs(
         &analysis.hir,
         &analysis.types,
         std::collections::BTreeSet::new(),
         None,
     );
-    let needs_tokio =
-        analysis.hir.entry_is_async
-            || analysis.hir.items.iter().any(
-                |item| matches!(&item.kind, radix_module::hir::HirItemKind::Function(f) if f.is_async),
-            );
+    let needs_tokio = analysis.hir.entry_is_async
+        || analysis.hir.items.iter().any(
+            |item| matches!(&item.kind, radix_module::hir::HirItemKind::Function(f) if f.is_async),
+        );
     Ok(super::RustRuntimePlan {
         needs_faber: needs.needs_faber_runtime,
         needs_tokio,
@@ -713,8 +709,10 @@ pub fn cmd_check_package(command: radix_module::tool::CheckCommand) {
     if command.diagnostic_mode == DiagnosticMode::Diagnostics && !diagnostics.is_empty() {
         match locale_pack.as_ref() {
             Some(pack) => {
-                match radix_module::diagnostics::render_expanded_diagnostics_with_pack(&diagnostics, pack)
-                {
+                match radix_module::diagnostics::render_expanded_diagnostics_with_pack(
+                    &diagnostics,
+                    pack,
+                ) {
                     Ok(rendered) => eprintln!("{rendered}"),
                     Err(err) => {
                         eprintln!("error: failed to render reader-pack diagnostics: {err}");

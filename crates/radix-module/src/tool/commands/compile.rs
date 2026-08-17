@@ -309,7 +309,7 @@ pub(crate) fn compile_prepared_program_path(
     }
 }
 
-pub(crate) struct PreparedProgramModule {
+pub struct PreparedProgramModule {
     pub session: crate::driver::Session,
     pub contract: crate::driver::ModuleImportContract,
     pub package_identities: Option<crate::driver::PackageImportIdentities>,
@@ -318,7 +318,7 @@ pub(crate) struct PreparedProgramModule {
 /// Build caller-supplied analysis inputs from a real file path.
 ///
 /// This is the program/discovery helper. Module analysis must not call it.
-pub(crate) fn prepare_program_module(
+pub fn prepare_program_module(
     path: &Path,
     source: &str,
     session: &crate::driver::Session,
@@ -361,7 +361,7 @@ pub(crate) fn prepare_program_module(
 
 /// Program/discovery helper keyed by diagnostic name: walk only when `name`
 /// is an existing file. In-memory names keep empty contracts.
-pub(crate) fn prepare_program_module_for_name(
+pub fn prepare_program_module_for_name(
     name: &str,
     source: &str,
     session: &crate::driver::Session,
@@ -376,6 +376,37 @@ pub(crate) fn prepare_program_module_for_name(
             package_identities: None,
         })
     }
+}
+
+/// Analyze one on-disk source after program-layer contract discovery.
+///
+/// Module analysis stays fail-closed. Path-shaped e2e / interpret / verify
+/// callers enter here instead of empty-contract [`crate::driver::analyze_source`].
+pub fn analyze_prepared_program_path(
+    session: &crate::driver::Session,
+    path: &Path,
+    source: &str,
+) -> Result<crate::driver::AnalyzedModule, Vec<crate::Diagnostic>> {
+    let prepared = prepare_program_module(path, source, session).map_err(|diagnostic| vec![*diagnostic])?;
+    crate::driver::analyze_source_with_module_import_contract(
+        &prepared.session,
+        &path.display().to_string(),
+        source,
+        None,
+        prepared.contract,
+    )
+}
+
+/// Analyze a diagnostic name after program-layer discovery when `name` is a file.
+///
+/// In-memory names keep empty contracts.
+pub fn analyze_prepared_program_name(
+    session: &crate::driver::Session,
+    name: &str,
+    source: &str,
+) -> Result<crate::driver::AnalyzedModule, Vec<crate::Diagnostic>> {
+    let prepared = prepare_program_module_for_name(name, source, session).map_err(|diagnostic| vec![*diagnostic])?;
+    crate::driver::analyze_source_with_module_import_contract(&prepared.session, name, source, None, prepared.contract)
 }
 
 /// Resolve and parse one import target through the session cache.

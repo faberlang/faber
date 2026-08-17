@@ -10,13 +10,14 @@
 #[path = "mod_test.rs"]
 mod tests;
 
-use radix_module::driver::{analyze_source, AnalyzedModule, Session};
+use radix_module::driver::{AnalyzedModule, Session};
 use radix_module::hir::{DefId, HirItemKind, HirModule, HirTestMetadata, HirTestModifier};
 use radix_module::lexer::Interner;
 use radix_module::mir::{
     lower_analyzed_unit_with_context, run_function, BufferHost, MirFunctionId, RunSourceError,
     RunnerError, ValidatedMir,
 };
+use radix_module::tool::analyze_prepared_program_name;
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
@@ -291,7 +292,8 @@ pub fn run_proba_source(
     exact: bool,
     include_ignored: bool,
 ) -> Result<ProbaReport, RunSourceError> {
-    let mut analysis = analyze_source(session, name, source).map_err(RunSourceError::Frontend)?;
+    let mut analysis =
+        analyze_prepared_program_name(session, name, source).map_err(RunSourceError::Frontend)?;
     run_proba_on_analyzed(
         &mut analysis,
         selection,
