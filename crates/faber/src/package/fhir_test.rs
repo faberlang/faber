@@ -442,7 +442,6 @@ fn local_library_locale_surface_resolves_through_package_loader() {
     let util = package
         .nodes
         .values()
-        .iter()
         .find(|unit| unit.module_segments == ["util".to_owned()])
         .expect("localized local utility unit");
     assert_eq!(
@@ -797,7 +796,6 @@ fn loaded_package_canonical_faber_parity() {
     let direct_by_path = direct
         .nodes
         .values()
-        .iter()
         .map(|unit| {
             (
                 unit.path

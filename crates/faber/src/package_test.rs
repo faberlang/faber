@@ -11677,7 +11677,6 @@ fn g10_web1_faber_web_package_exports_controller_contract() {
     let unit = package
         .nodes
         .values()
-        .iter()
         .find(|unit| unit.path.ends_with("web.fab"))
         .expect("web.fab unit");
     let export = unit
@@ -12734,7 +12733,6 @@ fn g9_api2_http_package_verifies_and_exports_http_application_contract() {
     let unit = package
         .nodes
         .values()
-        .iter()
         .find(|unit| unit.path.ends_with("http.fab"))
         .expect("http.fab unit");
     let export = unit
@@ -13447,7 +13445,6 @@ fn simple_loss(
     let gradient = package
         .nodes
         .values()
-        .iter()
         .find(|unit| unit.module_segments == vec!["gradient".to_owned()])
         .expect("gradient unit");
 

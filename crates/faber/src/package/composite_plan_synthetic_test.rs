@@ -265,7 +265,6 @@ fn expected_source_hashes(package: &AnalyzedProgram) -> Vec<(String, String)> {
     let mut hashes: Vec<(String, String)> = package
         .nodes
         .values()
-        .iter()
         .map(|unit| {
             let bytes = std::fs::read(&unit.path).expect("read fixture source unit");
             let relative = unit
