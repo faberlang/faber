@@ -25,8 +25,9 @@ locale = "en"
 
 # importa ex — minimal sugar
 #
-# Missing visibility defaults to privata. Missing binding defaults to the final
-# path segment, so this imports norma:chorda as chorda.
+# Omitted import visibility is private by default; the retired `privata` import
+# modifier is not written here. Missing binding defaults to the final path
+# segment, so this imports norma:chorda as chorda.
 
 import from "norma:chorda"
 
