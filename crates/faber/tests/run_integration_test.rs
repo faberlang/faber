@@ -48,6 +48,16 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
+fn faberlang_home() -> PathBuf {
+    let workspace = workspace_root();
+    for candidate in workspace.ancestors() {
+        if candidate.join("faber/runtime/rust/Cargo.toml").exists() {
+            return candidate.to_path_buf();
+        }
+    }
+    panic!("could not find faber/runtime/rust beside workspace");
+}
+
 fn norma_library_home() -> PathBuf {
     let workspace = workspace_root();
     for candidate in workspace.ancestors() {
@@ -383,12 +393,16 @@ fn build_reader_locale_accepts_direct_entry_file_input() {
 "#,
     );
 
-    let (stdout, stderr, ok) = run_faber(&[
-        "build",
-        "--locale",
-        "zh-Hans",
-        source.to_str().expect("utf8 source path"),
-    ]);
+    let workspace = faberlang_home();
+    let (stdout, stderr, ok) = run_faber_with_env(
+        &[
+            "build",
+            "--locale",
+            "zh-Hans",
+            source.to_str().expect("utf8 source path"),
+        ],
+        &[("FABER_SUPPORT_PATH_OVERRIDE", &workspace)],
+    );
 
     assert!(ok, "single-file build with reader locale failed:\n{stderr}");
     let binary = PathBuf::from(stdout.trim());
