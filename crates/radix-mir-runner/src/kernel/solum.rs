@@ -28,249 +28,284 @@ use std::time::UNIX_EPOCH;
 
 pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, RunnerError> {
     match verb {
-        "lege" => {
+        "read_file" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.lege provider arity"));
+                return Err(RunnerError::internal(
+                    span,
+                    "solum.read_file provider arity",
+                ));
             };
-            let path = expect_str(via, span, "solum.lege path")?;
+            let path = expect_str(via, span, "solum.read_file path")?;
             read_text(&path, span).map(Value::Str)
         }
-        "hauri" => {
+        "read_bytes" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.hauri provider arity"));
+                return Err(RunnerError::internal(
+                    span,
+                    "solum.read_bytes provider arity",
+                ));
             };
-            let path = expect_str(via, span, "solum.hauri path")?;
+            let path = expect_str(via, span, "solum.read_bytes path")?;
             read_bytes(&path, span).map(Value::Octeti)
         }
-        "partem" => {
+        "read_range" => {
             let [via, initium, longitudo] = args else {
-                return Err(RunnerError::internal(span, "solum.partem provider arity"));
+                return Err(RunnerError::internal(
+                    span,
+                    "solum.read_range provider arity",
+                ));
             };
-            let path = expect_str(via, span, "solum.partem path")?;
+            let path = expect_str(via, span, "solum.read_range path")?;
             let Value::Int(initium) = initium else {
                 return Err(RunnerError::internal(
                     span,
-                    "solum.partem initium expects numerus",
+                    "solum.read_range initium expects numerus",
                 ));
             };
             let Value::Int(longitudo) = longitudo else {
                 return Err(RunnerError::internal(
                     span,
-                    "solum.partem longitudo expects numerus",
+                    "solum.read_range longitudo expects numerus",
                 ));
             };
             read_byte_range(&path, *initium, *longitudo, span).map(Value::Octeti)
         }
-        "carpe" => {
+        "read_lines" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.carpe provider arity"));
+                return Err(RunnerError::internal(
+                    span,
+                    "solum.read_lines provider arity",
+                ));
             };
-            let path = expect_str(via, span, "solum.carpe path")?;
+            let path = expect_str(via, span, "solum.read_lines path")?;
             read_text(&path, span)
                 .map(|content| strings_to_value_lista(content.lines().map(str::to_owned).collect()))
         }
-        "scribe" => {
+        "write_file" => {
             let [via, data] = args else {
-                return Err(RunnerError::internal(span, "solum.scribe provider arity"));
+                return Err(RunnerError::internal(
+                    span,
+                    "solum.write_file provider arity",
+                ));
             };
-            let path = expect_str(via, span, "solum.scribe path")?;
-            let data = expect_str(data, span, "solum.scribe data")?;
+            let path = expect_str(via, span, "solum.write_file path")?;
+            let data = expect_str(data, span, "solum.write_file data")?;
             fs::write(&path, data).map_err(|err| {
-                RunnerError::internal(span, format!("solum.scribe failed: {err}"))
+                RunnerError::internal(span, format!("solum.write_file failed: {err}"))
             })?;
             Ok(Value::Unit)
         }
-        "funde" => {
+        "write_bytes" => {
             let [via, data] = args else {
-                return Err(RunnerError::internal(span, "solum.funde provider arity"));
+                return Err(RunnerError::internal(
+                    span,
+                    "solum.write_bytes provider arity",
+                ));
             };
-            let path = expect_str(via, span, "solum.funde path")?;
+            let path = expect_str(via, span, "solum.write_bytes path")?;
             let Value::Octeti(bytes) = data else {
                 return Err(RunnerError::internal(
                     span,
-                    "solum.funde data expects octeti",
+                    "solum.write_bytes data expects octeti",
                 ));
             };
-            fs::write(&path, bytes)
-                .map_err(|err| RunnerError::internal(span, format!("solum.funde failed: {err}")))?;
+            fs::write(&path, bytes).map_err(|err| {
+                RunnerError::internal(span, format!("solum.write_bytes failed: {err}"))
+            })?;
             Ok(Value::Unit)
         }
-        "appone" => {
+        "append" => {
             let [via, data] = args else {
-                return Err(RunnerError::internal(span, "solum.appone provider arity"));
+                return Err(RunnerError::internal(span, "solum.append provider arity"));
             };
-            let path = expect_str(via, span, "solum.appone path")?;
-            let data = expect_str(data, span, "solum.appone data")?;
+            let path = expect_str(via, span, "solum.append path")?;
+            let data = expect_str(data, span, "solum.append data")?;
             append_text(&path, &data, span)?;
             Ok(Value::Unit)
         }
-        "exstat" => {
+        "exists" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.exstat provider arity"));
+                return Err(RunnerError::internal(span, "solum.exists provider arity"));
             };
             Ok(Value::Bool(
-                Path::new(&expect_str(via, span, "solum.exstat path")?).exists(),
+                Path::new(&expect_str(via, span, "solum.exists path")?).exists(),
             ))
         }
-        "directoriumne" => {
+        "is_directory" => {
             let [via] = args else {
                 return Err(RunnerError::internal(
                     span,
-                    "solum.directoriumne provider arity",
+                    "solum.is_directory provider arity",
                 ));
             };
-            let path = expect_str(via, span, "solum.directoriumne path")?;
+            let path = expect_str(via, span, "solum.is_directory path")?;
             Ok(Value::Bool(
                 fs::metadata(path)
                     .map(|meta| meta.is_dir())
                     .unwrap_or(false),
             ))
         }
-        "regularene" => {
+        "is_regular" => {
             let [via] = args else {
                 return Err(RunnerError::internal(
                     span,
-                    "solum.regularene provider arity",
+                    "solum.is_regular provider arity",
                 ));
             };
-            let path = expect_str(via, span, "solum.regularene path")?;
+            let path = expect_str(via, span, "solum.is_regular path")?;
             Ok(Value::Bool(
                 fs::metadata(path)
                     .map(|meta| meta.is_file())
                     .unwrap_or(false),
             ))
         }
-        "vinculumne" => {
+        "is_symlink" => {
             let [via] = args else {
                 return Err(RunnerError::internal(
                     span,
-                    "solum.vinculumne provider arity",
+                    "solum.is_symlink provider arity",
                 ));
             };
-            let path = expect_str(via, span, "solum.vinculumne path")?;
+            let path = expect_str(via, span, "solum.is_symlink path")?;
             Ok(Value::Bool(
                 fs::symlink_metadata(path)
                     .map(|meta| meta.file_type().is_symlink())
                     .unwrap_or(false),
             ))
         }
-        "mensura" => {
+        "byte_length" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.mensura provider arity"));
+                return Err(RunnerError::internal(
+                    span,
+                    "solum.byte_length provider arity",
+                ));
             };
-            let path = expect_str(via, span, "solum.mensura path")?;
+            let path = expect_str(via, span, "solum.byte_length path")?;
             let size = fs::metadata(path)
                 .map(|meta| meta.len() as i64)
                 .map_err(|err| {
-                    RunnerError::internal(span, format!("solum.mensura failed: {err}"))
+                    RunnerError::internal(span, format!("solum.byte_length failed: {err}"))
                 })?;
             Ok(Value::Int(size))
         }
-        "modus" => {
+        "mode" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.modus provider arity"));
+                return Err(RunnerError::internal(span, "solum.mode provider arity"));
             };
-            let path = expect_str(via, span, "solum.modus path")?;
+            let path = expect_str(via, span, "solum.mode path")?;
             let mode = fs::symlink_metadata(path)
                 .map(|meta| (meta.mode() & 0o7777) as i64)
-                .map_err(|err| RunnerError::internal(span, format!("solum.modus failed: {err}")))?;
+                .map_err(|err| RunnerError::internal(span, format!("solum.mode failed: {err}")))?;
             Ok(Value::Int(mode))
         }
-        "enumera" => {
+        "list_dir" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.enumera provider arity"));
+                return Err(RunnerError::internal(span, "solum.list_dir provider arity"));
             };
-            let path = expect_str(via, span, "solum.enumera path")?;
+            let path = expect_str(via, span, "solum.list_dir path")?;
             list_dir(&path, span).map(strings_to_value_lista)
         }
-        "describe" => {
+        "stat" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.describe provider arity"));
+                return Err(RunnerError::internal(span, "solum.stat provider arity"));
             };
-            let path = expect_str(via, span, "solum.describe path")?;
-            describe(&path, span)
+            let path = expect_str(via, span, "solum.stat path")?;
+            stat(&path, span)
         }
-        "sequere" => {
+        "read_link" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.sequere provider arity"));
+                return Err(RunnerError::internal(
+                    span,
+                    "solum.read_link provider arity",
+                ));
             };
-            let path = expect_str(via, span, "solum.sequere path")?;
+            let path = expect_str(via, span, "solum.read_link path")?;
             read_link(&path, span).map(Value::Str)
         }
-        "vincula" => {
+        "create_link" => {
             let [fons, finis] = args else {
-                return Err(RunnerError::internal(span, "solum.vincula provider arity"));
+                return Err(RunnerError::internal(
+                    span,
+                    "solum.create_link provider arity",
+                ));
             };
-            let source = expect_str(fons, span, "solum.vincula source")?;
-            let destination = expect_str(finis, span, "solum.vincula destination")?;
+            let source = expect_str(fons, span, "solum.create_link source")?;
+            let destination = expect_str(finis, span, "solum.create_link destination")?;
             symlink(source, destination).map_err(|err| {
-                RunnerError::internal(span, format!("solum.vincula failed: {err}"))
+                RunnerError::internal(span, format!("solum.create_link failed: {err}"))
             })?;
             Ok(Value::Unit)
         }
-        "dele" => {
+        "delete" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.dele provider arity"));
+                return Err(RunnerError::internal(span, "solum.delete provider arity"));
             };
-            let path = expect_str(via, span, "solum.dele path")?;
+            let path = expect_str(via, span, "solum.delete path")?;
             remove_file(&path, span)?;
             Ok(Value::Unit)
         }
-        "exscribe" => {
+        "copy" => {
             let [origo, finis] = args else {
-                return Err(RunnerError::internal(span, "solum.exscribe provider arity"));
+                return Err(RunnerError::internal(span, "solum.copy provider arity"));
             };
-            let source = expect_str(origo, span, "solum.exscribe source")?;
-            let destination = expect_str(finis, span, "solum.exscribe destination")?;
+            let source = expect_str(origo, span, "solum.copy source")?;
+            let destination = expect_str(finis, span, "solum.copy destination")?;
             copy_file(&source, &destination, span)?;
             Ok(Value::Unit)
         }
-        "renomina" => {
+        "rename" => {
             let [origo, finis] = args else {
-                return Err(RunnerError::internal(span, "solum.renomina provider arity"));
+                return Err(RunnerError::internal(span, "solum.rename provider arity"));
             };
-            let source = expect_str(origo, span, "solum.renomina source")?;
-            let destination = expect_str(finis, span, "solum.renomina destination")?;
+            let source = expect_str(origo, span, "solum.rename source")?;
+            let destination = expect_str(finis, span, "solum.rename destination")?;
             rename_path(&source, &destination, span)?;
             Ok(Value::Unit)
         }
-        "tange" => {
+        "touch" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.tange provider arity"));
+                return Err(RunnerError::internal(span, "solum.touch provider arity"));
             };
-            let path = expect_str(via, span, "solum.tange path")?;
+            let path = expect_str(via, span, "solum.touch path")?;
             touch_file(&path, span)?;
             Ok(Value::Unit)
         }
-        "modum" => {
+        "set_mode" => {
             let [via, modus] = args else {
-                return Err(RunnerError::internal(span, "solum.modum provider arity"));
+                return Err(RunnerError::internal(span, "solum.set_mode provider arity"));
             };
-            let path = expect_str(via, span, "solum.modum path")?;
+            let path = expect_str(via, span, "solum.set_mode path")?;
             let mode = expect_mode(modus, span)?;
-            fs::set_permissions(path, fs::Permissions::from_mode(mode))
-                .map_err(|err| RunnerError::internal(span, format!("solum.modum failed: {err}")))?;
+            fs::set_permissions(path, fs::Permissions::from_mode(mode)).map_err(|err| {
+                RunnerError::internal(span, format!("solum.set_mode failed: {err}"))
+            })?;
             Ok(Value::Unit)
         }
-        "crea" => {
+        "create_dir" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.crea provider arity"));
+                return Err(RunnerError::internal(
+                    span,
+                    "solum.create_dir provider arity",
+                ));
             };
-            let path = expect_str(via, span, "solum.crea path")?;
+            let path = expect_str(via, span, "solum.create_dir path")?;
             create_dir_all(&path, span)?;
             Ok(Value::Unit)
         }
-        "amputa" => {
+        "remove_tree" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.amputa provider arity"));
+                return Err(RunnerError::internal(
+                    span,
+                    "solum.remove_tree provider arity",
+                ));
             };
-            let path = expect_str(via, span, "solum.amputa path")?;
+            let path = expect_str(via, span, "solum.remove_tree path")?;
             remove_dir_all(&path, span)?;
             Ok(Value::Unit)
         }
-        "iunge" => {
+        "join" => {
             let [partes] = args else {
-                return Err(RunnerError::internal(span, "solum.iunge provider arity"));
+                return Err(RunnerError::internal(span, "solum.join provider arity"));
             };
             let path_parts = value_lista_to_strings(partes, span)?;
             let mut path = PathBuf::new();
@@ -279,11 +314,11 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
             }
             Ok(Value::Str(path.to_string_lossy().into_owned()))
         }
-        "parens" => {
+        "parent" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.parens provider arity"));
+                return Err(RunnerError::internal(span, "solum.parent provider arity"));
             };
-            let path = expect_str(via, span, "solum.parens path")?;
+            let path = expect_str(via, span, "solum.parent path")?;
             Ok(Value::Str(
                 Path::new(&path)
                     .parent()
@@ -291,11 +326,14 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                     .unwrap_or_default(),
             ))
         }
-        "nomen" => {
+        "file_name" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.nomen provider arity"));
+                return Err(RunnerError::internal(
+                    span,
+                    "solum.file_name provider arity",
+                ));
             };
-            let path = expect_str(via, span, "solum.nomen path")?;
+            let path = expect_str(via, span, "solum.file_name path")?;
             Ok(Value::Str(
                 Path::new(&path)
                     .file_name()
@@ -303,11 +341,14 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                     .unwrap_or_default(),
             ))
         }
-        "suffixum" => {
+        "extension" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.suffixum provider arity"));
+                return Err(RunnerError::internal(
+                    span,
+                    "solum.extension provider arity",
+                ));
             };
-            let path = expect_str(via, span, "solum.suffixum path")?;
+            let path = expect_str(via, span, "solum.extension path")?;
             Ok(Value::Str(
                 Path::new(&path)
                     .extension()
@@ -315,11 +356,11 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                     .unwrap_or_default(),
             ))
         }
-        "absolve" => {
+        "resolve" => {
             let [via] = args else {
-                return Err(RunnerError::internal(span, "solum.absolve provider arity"));
+                return Err(RunnerError::internal(span, "solum.resolve provider arity"));
             };
-            let path = expect_str(via, span, "solum.absolve path")?;
+            let path = expect_str(via, span, "solum.resolve path")?;
             Ok(Value::Str(
                 fs::canonicalize(&path)
                     .unwrap_or_else(|_| PathBuf::from(path))
@@ -327,20 +368,17 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                     .into_owned(),
             ))
         }
-        "domus" => {
+        "home" => {
             let [] = args else {
-                return Err(RunnerError::internal(span, "solum.domus provider arity"));
+                return Err(RunnerError::internal(span, "solum.home provider arity"));
             };
             Ok(Value::Str(
                 std::env::var("HOME").unwrap_or_else(|_| "/".to_owned()),
             ))
         }
-        "temporarium" => {
+        "temp_dir" => {
             let [] = args else {
-                return Err(RunnerError::internal(
-                    span,
-                    "solum.temporarium provider arity",
-                ));
+                return Err(RunnerError::internal(span, "solum.temp_dir provider arity"));
             };
             Ok(Value::Str(
                 std::env::temp_dir().to_string_lossy().into_owned(),
@@ -355,11 +393,12 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
 
 fn read_text(path: &str, span: Span) -> Result<String, RunnerError> {
     fs::read_to_string(path)
-        .map_err(|err| RunnerError::internal(span, format!("solum.lege failed: {err}")))
+        .map_err(|err| RunnerError::internal(span, format!("solum.read_file failed: {err}")))
 }
 
 fn read_bytes(path: &str, span: Span) -> Result<Vec<u8>, RunnerError> {
-    fs::read(path).map_err(|err| RunnerError::internal(span, format!("solum.hauri failed: {err}")))
+    fs::read(path)
+        .map_err(|err| RunnerError::internal(span, format!("solum.read_bytes failed: {err}")))
 }
 
 fn read_byte_range(
@@ -369,24 +408,30 @@ fn read_byte_range(
     span: Span,
 ) -> Result<Vec<u8>, RunnerError> {
     const MAX_RANGE_READ_BYTES: usize = 64 * 1024 * 1024;
-    let start = u64::try_from(start)
-        .map_err(|_| RunnerError::internal(span, "solum.partem initium must be non-negative"))?;
-    let length = usize::try_from(length)
-        .map_err(|_| RunnerError::internal(span, "solum.partem longitudo must be non-negative"))?;
+    let start = u64::try_from(start).map_err(|_| {
+        RunnerError::internal(span, "solum.read_range initium must be non-negative")
+    })?;
+    let length = usize::try_from(length).map_err(|_| {
+        RunnerError::internal(span, "solum.read_range longitudo must be non-negative")
+    })?;
     if length > MAX_RANGE_READ_BYTES {
         return Err(RunnerError::internal(
             span,
-            format!("solum.partem longitudo must be at most {MAX_RANGE_READ_BYTES} bytes"),
+            format!("solum.read_range longitudo must be at most {MAX_RANGE_READ_BYTES} bytes"),
         ));
     }
-    let mut file = File::open(path)
-        .map_err(|err| RunnerError::internal(span, format!("solum.partem open failed: {err}")))?;
-    file.seek(SeekFrom::Start(start))
-        .map_err(|err| RunnerError::internal(span, format!("solum.partem seek failed: {err}")))?;
+    let mut file = File::open(path).map_err(|err| {
+        RunnerError::internal(span, format!("solum.read_range open failed: {err}"))
+    })?;
+    file.seek(SeekFrom::Start(start)).map_err(|err| {
+        RunnerError::internal(span, format!("solum.read_range seek failed: {err}"))
+    })?;
     let mut bytes = Vec::with_capacity(length);
     file.take(length as u64)
         .read_to_end(&mut bytes)
-        .map_err(|err| RunnerError::internal(span, format!("solum.partem read failed: {err}")))?;
+        .map_err(|err| {
+            RunnerError::internal(span, format!("solum.read_range read failed: {err}"))
+        })?;
     Ok(bytes)
 }
 
@@ -403,7 +448,7 @@ mod range_tests {
             .expect("system clock should follow the Unix epoch")
             .as_nanos();
         std::env::temp_dir().join(format!(
-            "radix-solum-partem-{}-{nonce}-{suffix}",
+            "radix-solum-read-range-{}-{nonce}-{suffix}",
             std::process::id()
         ))
     }
@@ -426,11 +471,11 @@ mod range_tests {
 fn expect_mode(value: &Value, span: Span) -> Result<u32, RunnerError> {
     match value {
         Value::Int(mode) => u32::try_from(*mode).map_err(|_| {
-            RunnerError::internal(span, "solum.modum mode expects non-negative numerus")
+            RunnerError::internal(span, "solum.set_mode mode expects non-negative numerus")
         }),
         _ => Err(RunnerError::internal(
             span,
-            "solum.modum mode expects non-negative numerus",
+            "solum.set_mode mode expects non-negative numerus",
         )),
     }
 }
@@ -440,31 +485,31 @@ fn append_text(path: &str, data: &str, span: Span) -> Result<(), RunnerError> {
         .create(true)
         .append(true)
         .open(path)
-        .map_err(|err| RunnerError::internal(span, format!("solum.appone open failed: {err}")))?;
+        .map_err(|err| RunnerError::internal(span, format!("solum.append open failed: {err}")))?;
     file.write_all(data.as_bytes())
-        .map_err(|err| RunnerError::internal(span, format!("solum.appone write failed: {err}")))
+        .map_err(|err| RunnerError::internal(span, format!("solum.append write failed: {err}")))
 }
 
 fn read_link(path: &str, span: Span) -> Result<String, RunnerError> {
     fs::read_link(path)
         .map(|target| target.to_string_lossy().into_owned())
-        .map_err(|err| RunnerError::internal(span, format!("solum.sequere failed: {err}")))
+        .map_err(|err| RunnerError::internal(span, format!("solum.read_link failed: {err}")))
 }
 
 fn remove_file(path: &str, span: Span) -> Result<(), RunnerError> {
     fs::remove_file(path)
-        .map_err(|err| RunnerError::internal(span, format!("solum.dele failed: {err}")))
+        .map_err(|err| RunnerError::internal(span, format!("solum.delete failed: {err}")))
 }
 
 fn copy_file(source: &str, destination: &str, span: Span) -> Result<(), RunnerError> {
     fs::copy(source, destination)
         .map(|_| ())
-        .map_err(|err| RunnerError::internal(span, format!("solum.exscribe failed: {err}")))
+        .map_err(|err| RunnerError::internal(span, format!("solum.copy failed: {err}")))
 }
 
 fn rename_path(source: &str, destination: &str, span: Span) -> Result<(), RunnerError> {
     fs::rename(source, destination)
-        .map_err(|err| RunnerError::internal(span, format!("solum.renomina failed: {err}")))
+        .map_err(|err| RunnerError::internal(span, format!("solum.rename failed: {err}")))
 }
 
 fn touch_file(path: &str, span: Span) -> Result<(), RunnerError> {
@@ -473,41 +518,41 @@ fn touch_file(path: &str, span: Span) -> Result<(), RunnerError> {
             .write(true)
             .open(path)
             .and_then(|file| file.sync_all())
-            .map_err(|err| RunnerError::internal(span, format!("solum.tange failed: {err}")))?;
+            .map_err(|err| RunnerError::internal(span, format!("solum.touch failed: {err}")))?;
     } else {
         fs::write(path, "")
-            .map_err(|err| RunnerError::internal(span, format!("solum.tange failed: {err}")))?;
+            .map_err(|err| RunnerError::internal(span, format!("solum.touch failed: {err}")))?;
     }
     Ok(())
 }
 
 fn create_dir_all(path: &str, span: Span) -> Result<(), RunnerError> {
     fs::create_dir_all(path)
-        .map_err(|err| RunnerError::internal(span, format!("solum.crea failed: {err}")))
+        .map_err(|err| RunnerError::internal(span, format!("solum.create_dir failed: {err}")))
 }
 
 fn remove_dir_all(path: &str, span: Span) -> Result<(), RunnerError> {
     fs::remove_dir_all(path)
-        .map_err(|err| RunnerError::internal(span, format!("solum.amputa failed: {err}")))
+        .map_err(|err| RunnerError::internal(span, format!("solum.remove_tree failed: {err}")))
 }
 
 fn list_dir(path: &str, span: Span) -> Result<Vec<String>, RunnerError> {
     let entries = fs::read_dir(path)
-        .map_err(|err| RunnerError::internal(span, format!("solum.enumera failed: {err}")))?;
+        .map_err(|err| RunnerError::internal(span, format!("solum.list_dir failed: {err}")))?;
     entries
         .map(|entry| {
             entry
                 .map(|entry| entry.file_name().to_string_lossy().into_owned())
                 .map_err(|err| {
-                    RunnerError::internal(span, format!("solum.enumera entry failed: {err}"))
+                    RunnerError::internal(span, format!("solum.list_dir entry failed: {err}"))
                 })
         })
         .collect()
 }
 
-fn describe(path: &str, span: Span) -> Result<Value, RunnerError> {
+fn stat(path: &str, span: Span) -> Result<Value, RunnerError> {
     let meta = fs::symlink_metadata(path)
-        .map_err(|err| RunnerError::internal(span, format!("solum.describe failed: {err}")))?;
+        .map_err(|err| RunnerError::internal(span, format!("solum.stat failed: {err}")))?;
     let modified = meta
         .modified()
         .ok()
@@ -516,32 +561,32 @@ fn describe(path: &str, span: Span) -> Result<Value, RunnerError> {
         .unwrap_or(0);
     let mut fields = FxHashMap::default();
     fields.insert(
-        MapKey::Str("modus".to_owned()),
+        MapKey::Str("mode".to_owned()),
         Value::Int(meta.mode() as i64),
     );
     fields.insert(
-        MapKey::Str("nexus".to_owned()),
+        MapKey::Str("link_count".to_owned()),
         Value::Int(meta.nlink() as i64),
     );
     fields.insert(
-        MapKey::Str("possessor".to_owned()),
+        MapKey::Str("owner".to_owned()),
         Value::Int(meta.uid() as i64),
     );
     fields.insert(
-        MapKey::Str("grex".to_owned()),
+        MapKey::Str("group".to_owned()),
         Value::Int(meta.gid() as i64),
     );
     fields.insert(
-        MapKey::Str("mensura".to_owned()),
+        MapKey::Str("byte_length".to_owned()),
         Value::Int(meta.len() as i64),
     );
-    fields.insert(MapKey::Str("modificatum".to_owned()), Value::Int(modified));
+    fields.insert(MapKey::Str("modified".to_owned()), Value::Int(modified));
     fields.insert(
-        MapKey::Str("directoriumne".to_owned()),
+        MapKey::Str("is_directory".to_owned()),
         Value::Bool(meta.is_dir()),
     );
     fields.insert(
-        MapKey::Str("vinculumne".to_owned()),
+        MapKey::Str("is_symlink".to_owned()),
         Value::Bool(meta.file_type().is_symlink()),
     );
     Ok(Value::Map(Rc::new(RefCell::new(fields))))
