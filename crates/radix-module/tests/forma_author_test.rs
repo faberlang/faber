@@ -211,7 +211,8 @@ fn author_direct_emit_matches_compile_path() {
     let (program, interner) = parse_program(source);
     let latin = radix_module::locale::latin_locale_pack();
     let surface = radix_module::locale::KeywordSurface::new(&latin);
-    let direct = radix_module::forma::emit_author(&program, &surface, &interner, &radix_module::forma::FormatOptions::author());
+    let direct =
+        radix_module::forma::emit_author(&program, &surface, &interner, &radix_module::forma::FormatOptions::author());
     let via_compile = compile_author_str("test.fab", source);
     assert!(via_compile.success(), "{:?}", via_compile.diagnostics);
     assert_eq!(direct.code, via_compile.output.expect("output").code);

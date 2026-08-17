@@ -15,11 +15,11 @@
 //! - **F7**: Fail-closed structured errors; never panic.
 //! - **CSO E5**: Adversarial fixtures required as gate; must run in CI.
 
-use radix_module::hir::artifact::load_fhir;
 use radix_hir::{HirFunction, HirId, HirItem, HirItemKind, HirModule, LibraryRegistry};
 use radix_hir_fhir::HirArtifactError;
 use radix_hir_fhir::{FunctionFactTableWire, ResolverSnapshot, SourceIdentity, SCHEMA_VERSION};
 use radix_lexer::Symbol;
+use radix_module::hir::artifact::load_fhir;
 use radix_types::{DefId, TypeId, TypeTable};
 
 // ── Shared helpers (duplicated from crates/radix/src/hir/artifact.rs tests) ──

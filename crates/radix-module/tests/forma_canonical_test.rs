@@ -595,7 +595,11 @@ fn canonical_si_continuations_start_on_new_lines() {
         span: span(),
     };
     let tacet_block = |id| HirBlock {
-        statements: vec![HirStatement { id: radix_module::hir::HirId(id), kind: HirStatementKind::Tacet, span: span() }],
+        statements: vec![HirStatement {
+            id: radix_module::hir::HirId(id),
+            kind: HirStatementKind::Tacet,
+            span: span(),
+        }],
         expr: None,
         span: span(),
         ..Default::default()
@@ -777,7 +781,11 @@ fn emits_canonical_operator_spellings_and_precedence() {
                     }),
                     span: span(),
                 },
-                HirStatement { id: radix_module::hir::HirId(18), kind: HirStatementKind::Expr(not_comparison), span: span() },
+                HirStatement {
+                    id: radix_module::hir::HirId(18),
+                    kind: HirStatementKind::Expr(not_comparison),
+                    span: span(),
+                },
                 inc_stmt,
             ],
             expr: None,
@@ -861,8 +869,16 @@ fn emits_shared_argument_spelling_for_optional_and_non_null_calls() {
                     }),
                     span: span(),
                 },
-                HirStatement { id: radix_module::hir::HirId(10), kind: HirStatementKind::Expr(optional_call), span: span() },
-                HirStatement { id: radix_module::hir::HirId(11), kind: HirStatementKind::Expr(non_null_call), span: span() },
+                HirStatement {
+                    id: radix_module::hir::HirId(10),
+                    kind: HirStatementKind::Expr(optional_call),
+                    span: span(),
+                },
+                HirStatement {
+                    id: radix_module::hir::HirId(11),
+                    kind: HirStatementKind::Expr(non_null_call),
+                    span: span(),
+                },
             ],
             expr: None,
             span: span(),

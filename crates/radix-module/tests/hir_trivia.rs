@@ -365,7 +365,9 @@ fn comment_before_genus_close_attaches_as_class_end_trivia() {
         .end_trivia
         .iter()
         .filter_map(|item| match item {
-            radix_module::syntax::Trivia::CommentLine(comment) => Some(parse_result.interner.resolve(comment.text).to_owned()),
+            radix_module::syntax::Trivia::CommentLine(comment) => {
+                Some(parse_result.interner.resolve(comment.text).to_owned())
+            }
             radix_module::syntax::Trivia::Newline(_) => None,
         })
         .collect();
