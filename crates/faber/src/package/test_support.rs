@@ -3,7 +3,7 @@
 //! Extracted from `package_test.rs` so that sibling test modules (e.g.
 //! `frontmatter_integration_test.rs`) can reuse them without duplication.
 
-use radix::diagnostics::{Diagnostic, DiagnosticArg};
+use radix_module::diagnostics::{Diagnostic, DiagnosticArg};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 

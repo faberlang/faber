@@ -28,8 +28,8 @@ pub(crate) const PACKAGE_DIAGNOSTIC_CODE: &str = "PKG001";
 
 pub(crate) fn package_diagnostic_error(
     message: impl Into<String>,
-) -> radix::diagnostics::Diagnostic {
-    radix::diagnostics::Diagnostic::error(message).with_code(PACKAGE_DIAGNOSTIC_CODE)
+) -> radix_module::diagnostics::Diagnostic {
+    radix_module::diagnostics::Diagnostic::error(message).with_code(PACKAGE_DIAGNOSTIC_CODE)
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
-use radix::codegen::Target;
-use radix::tool::DiagnosticMode;
-use radix::{CompileResult, Output};
+use radix_module::codegen::Target;
+use radix_module::tool::DiagnosticMode;
+use radix_module::{CompileResult, Output};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -28,18 +28,18 @@ fn fail(message: &str) -> ! {
 }
 
 /// Report a diagnostic's message and terminate.
-fn fail_with_diagnostic(diag: &radix::Diagnostic) -> ! {
+fn fail_with_diagnostic(diag: &radix_module::Diagnostic) -> ! {
     eprintln!("error: {}", diag.message);
     std::process::exit(1);
 }
 
 /// Print `diagnostics` in normal mode, then terminate with `message`.
 fn report_diagnostics_and_exit(
-    diagnostics: &[radix::Diagnostic],
-    locale_pack: Option<&radix::locale::LocalePack>,
+    diagnostics: &[radix_module::Diagnostic],
+    locale_pack: Option<&radix_module::locale::LocalePack>,
     message: &str,
 ) -> ! {
-    radix::tool::print_diagnostics(diagnostics, DiagnosticMode::Normal, locale_pack);
+    radix_module::tool::print_diagnostics(diagnostics, DiagnosticMode::Normal, locale_pack);
     eprintln!("{message}");
     std::process::exit(1);
 }
@@ -50,7 +50,7 @@ fn report_diagnostics_and_exit(
 /// production to Cargo. Direct-file builds and non-Rust targets keep the legacy
 /// single-output behavior so package ergonomics do not change unrelated command
 /// paths.
-pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool) {
+pub fn cmd_build(command: radix_module::tool::BuildCommand, format: bool, linter: bool) {
     if let Some(message) = locale_without_package_error(
         command.locale.as_deref(),
         std::slice::from_ref(&command.input),
@@ -63,7 +63,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     let input_path = PathBuf::from(&command.input);
     let target = resolve_build_target(&command, &input_path);
     let is_package = use_package_compiler(target, &input_path, command.package);
-    let warn_policy = radix::driver::WarnPolicy {
+    let warn_policy = radix_module::driver::WarnPolicy {
         deny_all_warnings: command.deny_warnings,
         deny_codes: command.deny_codes,
     };
@@ -290,7 +290,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     // G6 GO3/GO4: package Go builds write target/faber/go and invoke `go build`.
     // The multi-module file collection travels inside the compile result
     // itself (FBR-P2-003) — no hidden thread-local state.
-    if is_package && target == radix::codegen::Target::HirGo {
+    if is_package && target == radix_module::codegen::Target::HirGo {
         #[cfg(not(feature = "hir-go"))]
         {
             eprintln!(
@@ -305,7 +305,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
                 &input_path,
                 &super::faber_emission_seams(),
             );
-            radix::tool::print_diagnostics(
+            radix_module::tool::print_diagnostics(
                 &go_result.compile_result.diagnostics,
                 DiagnosticMode::Normal,
                 locale_pack.as_ref(),
@@ -341,11 +341,11 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     let result = if is_package {
         radix_package::emit::compile_package(&config, &input_path, &super::faber_emission_seams())
     } else {
-        let compiler = radix::Compiler::new(config.clone());
+        let compiler = radix_module::Compiler::new(config.clone());
         compiler.compile(&input_path)
     };
 
-    radix::tool::print_diagnostics(
+    radix_module::tool::print_diagnostics(
         &result.diagnostics,
         DiagnosticMode::Normal,
         locale_pack.as_ref(),
@@ -357,7 +357,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
 
     // Package Rust builds own a generated crate under target/faber/ and let
     // Cargo place artifacts in sibling debug/release directories.
-    if is_package && target == radix::codegen::Target::HirRust {
+    if is_package && target == radix_module::codegen::Target::HirRust {
         let layout = match discover_build_layout(&input_path) {
             Ok(l) => l,
             Err(d) => fail_with_diagnostic(&d),
@@ -425,7 +425,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     // Single-file Rust builds that need faber-runtime / tokio (from HIR facts,
     // not emitted-text sniffing) emit a generated Cargo crate under
     // `target/faber/`. Programs without those deps keep the bare `.rs` path.
-    if target == radix::codegen::Target::HirRust {
+    if target == radix_module::codegen::Target::HirRust {
         match single_file_rust_runtime_plan(&config, &input_path) {
             Ok(plan) if plan.requires_generated_crate() => {
                 let package_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -459,7 +459,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
 
     // Legacy single-file path (direct .fab files, other targets, or --out-dir override cases)
     let output_path =
-        radix::tool::build_output_path(&command.out_dir, &input_path, target, is_package);
+        radix_module::tool::build_output_path(&command.out_dir, &input_path, target, is_package);
 
     let code = crate::postprocess::postprocess_code(code, target, format, linter);
     write_output_file(&output_path, code.as_bytes());
@@ -507,10 +507,10 @@ fn write_output_file(output_path: &Path, bytes: &[u8]) {
 /// Structured runtime plan for a single `.fab` file (no package manifest).
 #[cfg(feature = "hir-rust")]
 fn single_file_rust_runtime_plan(
-    config: &radix::Config,
+    config: &radix_module::Config,
     input_path: &Path,
-) -> Result<super::RustRuntimePlan, Vec<radix::Diagnostic>> {
-    use radix::driver::{analyze_source, Session};
+) -> Result<super::RustRuntimePlan, Vec<radix_module::Diagnostic>> {
+    use radix_module::driver::{analyze_source, Session};
     use std::fs;
 
     let source = fs::read_to_string(input_path).map_err(|err| {
@@ -525,7 +525,7 @@ fn single_file_rust_runtime_plan(
         .and_then(|s| s.to_str())
         .unwrap_or("input.fab");
     let analysis = analyze_source(&session, name, &source)?;
-    let needs = radix::codegen::collect_rust_needs(
+    let needs = radix_module::codegen::collect_rust_needs(
         &analysis.hir,
         &analysis.types,
         std::collections::BTreeSet::new(),
@@ -534,7 +534,7 @@ fn single_file_rust_runtime_plan(
     let needs_tokio =
         analysis.hir.entry_is_async
             || analysis.hir.items.iter().any(
-                |item| matches!(&item.kind, radix::hir::HirItemKind::Function(f) if f.is_async),
+                |item| matches!(&item.kind, radix_module::hir::HirItemKind::Function(f) if f.is_async),
             );
     Ok(super::RustRuntimePlan {
         needs_faber: needs.needs_faber_runtime,
@@ -550,9 +550,9 @@ fn single_file_rust_runtime_plan(
 
 #[cfg(not(feature = "hir-rust"))]
 fn single_file_rust_runtime_plan(
-    _config: &radix::Config,
+    _config: &radix_module::Config,
     input_path: &Path,
-) -> Result<super::RustRuntimePlan, Vec<radix::Diagnostic>> {
+) -> Result<super::RustRuntimePlan, Vec<radix_module::Diagnostic>> {
     Err(vec![crate::package_diagnostic_error(
         "target `rust` is not available in this faber build; rebuild with feature `hir-rust`",
     )
@@ -564,7 +564,7 @@ fn single_file_rust_runtime_plan(
 /// Resolve the build target: an explicit CLI target wins, otherwise the
 /// package manifest's `build.target`. Unlike [`resolve_check_target`], a
 /// manifest read failure is fatal here rather than silently falling back.
-fn resolve_build_target(command: &radix::tool::BuildCommand, input_path: &Path) -> Target {
+fn resolve_build_target(command: &radix_module::tool::BuildCommand, input_path: &Path) -> Target {
     if command.target_explicit {
         return command.target;
     }
@@ -677,7 +677,7 @@ pub fn should_treat_as_package_from_args(input: &[String]) -> bool {
 /// The permissive mode intentionally downgrades only unresolved/import-driven
 /// semantic errors; manifest, I/O, parse, and package-policy errors remain
 /// fatal because they prevent reliable package graph construction.
-pub fn cmd_check_package(command: radix::tool::CheckCommand) {
+pub fn cmd_check_package(command: radix_module::tool::CheckCommand) {
     if command.input.is_empty() || command.input[0] == "-" {
         eprintln!("error: package checking requires a path input");
         std::process::exit(1);
@@ -696,7 +696,7 @@ pub fn cmd_check_package(command: radix::tool::CheckCommand) {
         command.diagnostics_locale.as_deref(),
     ) {
         Ok((config, pack)) => (
-            config.with_warn_policy(radix::driver::WarnPolicy {
+            config.with_warn_policy(radix_module::driver::WarnPolicy {
                 deny_all_warnings: command.deny_warnings,
                 deny_codes: command.deny_codes,
             }),
@@ -706,14 +706,14 @@ pub fn cmd_check_package(command: radix::tool::CheckCommand) {
     };
     let mut diagnostics =
         radix_package::analyze::check_package(&config, &input_path, &super::faber_analysis_seams());
-    radix::apply_warn_policy(&mut diagnostics, &config.warn_policy);
+    radix_module::apply_warn_policy(&mut diagnostics, &config.warn_policy);
 
     let mut fatal_errors = 0usize;
     let mut downgraded = 0usize;
     if command.diagnostic_mode == DiagnosticMode::Diagnostics && !diagnostics.is_empty() {
         match locale_pack.as_ref() {
             Some(pack) => {
-                match radix::diagnostics::render_expanded_diagnostics_with_pack(&diagnostics, pack)
+                match radix_module::diagnostics::render_expanded_diagnostics_with_pack(&diagnostics, pack)
                 {
                     Ok(rendered) => eprintln!("{rendered}"),
                     Err(err) => {
@@ -724,7 +724,7 @@ pub fn cmd_check_package(command: radix::tool::CheckCommand) {
             }
             None => eprintln!(
                 "{}",
-                radix::diagnostics::render_expanded_diagnostics(&diagnostics)
+                radix_module::diagnostics::render_expanded_diagnostics(&diagnostics)
             ),
         }
     }
@@ -735,11 +735,11 @@ pub fn cmd_check_package(command: radix::tool::CheckCommand) {
         if command.diagnostic_mode == DiagnosticMode::Normal {
             let display = if downgraded_error {
                 diag.clone()
-                    .with_severity(radix::diagnostics::Severity::Warning)
+                    .with_severity(radix_module::diagnostics::Severity::Warning)
             } else {
                 diag.clone()
             };
-            eprintln!("{}", radix::diagnostics::render_plain(&display));
+            eprintln!("{}", radix_module::diagnostics::render_plain(&display));
         }
         if diag.is_error() {
             if downgraded_error {
@@ -769,7 +769,7 @@ pub fn cmd_check_package(command: radix::tool::CheckCommand) {
 ///
 /// Unlike `cmd_build`, this command does not materialize the generated Cargo
 /// crate. It is a compiler-inspection surface for the assembled backend output.
-pub fn cmd_emit_package(command: radix::tool::EmitCommand, format: bool, linter: bool) {
+pub fn cmd_emit_package(command: radix_module::tool::EmitCommand, format: bool, linter: bool) {
     let (result, locale_pack) = compile_package_input(
         &command.input,
         command.package,
@@ -778,7 +778,7 @@ pub fn cmd_emit_package(command: radix::tool::EmitCommand, format: bool, linter:
         command.diagnostics_locale.as_deref(),
     );
 
-    radix::tool::print_diagnostics(
+    radix_module::tool::print_diagnostics(
         &result.diagnostics,
         command.diagnostic_mode,
         locale_pack.as_ref(),
@@ -789,7 +789,7 @@ pub fn cmd_emit_package(command: radix::tool::EmitCommand, format: bool, linter:
     };
 
     if command.reflection {
-        let reflection_json = match radix::tool::output_reflection_json(&output) {
+        let reflection_json = match radix_module::tool::output_reflection_json(&output) {
             Ok(Some(json)) => json,
             Ok(None) => {
                 eprintln!("error: target does not expose GPU reflection metadata");
@@ -801,7 +801,7 @@ pub fn cmd_emit_package(command: radix::tool::EmitCommand, format: bool, linter:
             }
         };
         if let Some(path) = command.output {
-            radix::tool::write_text_artifact(&path, &reflection_json);
+            radix_module::tool::write_text_artifact(&path, &reflection_json);
         } else {
             println!("{}", reflection_json);
         }
@@ -824,7 +824,7 @@ fn compile_package_input(
     target: Target,
     locale: Option<&str>,
     diagnostics_locale: Option<&str>,
-) -> (CompileResult, Option<radix::locale::LocalePack>) {
+) -> (CompileResult, Option<radix_module::locale::LocalePack>) {
     if input.is_empty() || input[0] == "-" {
         eprintln!("error: package compilation requires a path input");
         std::process::exit(1);

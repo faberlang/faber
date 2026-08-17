@@ -1,0 +1,598 @@
+//! Tests for file interface type introspection and snapshot.
+//! Proves: interface import/snapshot against radix-hir-rust bridges;
+//! nominal kinds, type params, and callables resolve correctly.
+
+use super::{
+    import_interface_type, snapshot_interface_type, FileExport, FileExportKind, FileInterface, FileInterfaceError,
+    InterfaceCallable, InterfaceIndexSnapshot, InterfaceLibraryIdentity, InterfaceNominalKind, InterfaceNominalType,
+    InterfaceParam, InterfaceStructExport, InterfaceStructField, InterfaceTypeParamConstraint, InterfaceTypeSnapshot,
+};
+use crate::lexer::Interner;
+use crate::semantic::{
+    IndexExpr, InstansPrecision, NumericWidth, ParamType, Primitive, SemanticMutability, SemanticParamMode, Type,
+    TypeParamConstraint, TypeTable,
+};
+use std::collections::BTreeMap;
+
+#[test]
+fn primitive_snapshot_imports_to_target_primitive_id() {
+    let source_types = TypeTable::new();
+    let source_interner = Interner::new();
+    let snapshot = snapshot_interface_type(source_types.primitive(Primitive::Textus), &source_types, &source_interner)
+        .expect("snapshot");
+
+    let mut target_types = TypeTable::new();
+    let mut target_interner = Interner::new();
+    let imported = import_interface_type(&snapshot, &mut target_types, &mut target_interner).expect("import");
+
+    assert_eq!(imported, target_types.primitive(Primitive::Textus));
+}
+
+#[test]
+fn tuple_snapshot_imports_to_target_tuple_type() {
+    // Companion signatures return a gradient tuple; the interface model must
+    // snapshot and import `Type::Tuple` so companion exports survive the
+    // cross-unit boundary (SEM004).
+    let mut source_types = TypeTable::new();
+    let source_interner = Interner::new();
+    let textus = source_types.primitive(Primitive::Textus);
+    let numerus = source_types.primitive(Primitive::Numerus);
+    let tuple_ty = source_types.tuple(vec![textus, numerus]);
+
+    let snapshot = snapshot_interface_type(tuple_ty, &source_types, &source_interner).expect("snapshot");
+    assert!(
+        matches!(snapshot, InterfaceTypeSnapshot::Tuple(_)),
+        "expected tuple snapshot, got {snapshot:?}"
+    );
+
+    let mut target_types = TypeTable::new();
+    let mut target_interner = Interner::new();
+    let imported = import_interface_type(&snapshot, &mut target_types, &mut target_interner).expect("import");
+
+    let Type::Tuple(elements) = target_types.get(imported) else {
+        panic!("expected tuple type");
+    };
+    assert_eq!(elements.as_slice(), &[textus, numerus]);
+}
+
+#[test]
+fn failable_generic_callable_round_trips() {
+    let mut source_types = TypeTable::new();
+    let mut source_interner = Interner::new();
+    let param_t = source_interner.intern("T");
+    let textus = source_types.primitive(Primitive::Textus);
+    let numerus = source_types.primitive(Primitive::Numerus);
+    let param_ty = source_types.intern(Type::Param(param_t));
+    let lista_t = source_types.array(param_ty);
+    let sig = crate::semantic::FuncSig {
+        type_params: vec![param_t],
+        type_param_constraints: vec![TypeParamConstraint::OneOf(vec![textus, numerus])],
+        params: vec![ParamType { ty: lista_t, mode: SemanticParamMode::Owned, optional: true }],
+        ret: param_ty,
+        err: Some(textus),
+        is_async: true,
+        is_generator: false,
+    };
+    let func_ty = source_types.intern(Type::Func(sig));
+
+    let snapshot = snapshot_interface_type(func_ty, &source_types, &source_interner).expect("snapshot");
+
+    let mut target_types = TypeTable::new();
+    let mut target_interner = Interner::new();
+    let imported = import_interface_type(&snapshot, &mut target_types, &mut target_interner).expect("import");
+
+    let Type::Func(imported_sig) = target_types.get(imported) else {
+        panic!("expected imported function type");
+    };
+    assert_eq!(imported_sig.type_params.len(), 1);
+    assert_eq!(target_interner.resolve(imported_sig.type_params[0]), "T");
+    assert_eq!(imported_sig.params.len(), 1);
+    assert!(imported_sig.params[0].optional);
+    assert_eq!(imported_sig.params[0].mode, SemanticParamMode::Owned);
+    assert_eq!(imported_sig.err, None);
+    let Type::PromissumFailable(success, alternate) = target_types.get(imported_sig.ret) else {
+        panic!("expected imported async failable return carrier");
+    };
+    assert!(matches!(target_types.get(*success), Type::Param(sym) if target_interner.resolve(*sym) == "T"));
+    assert_eq!(*alternate, target_types.primitive(Primitive::Textus));
+    assert!(imported_sig.is_async);
+    assert!(!imported_sig.is_generator);
+
+    let TypeParamConstraint::OneOf(options) = &imported_sig.type_param_constraints[0] else {
+        panic!("expected type param constraint");
+    };
+    assert_eq!(
+        options,
+        &vec![
+            target_types.primitive(Primitive::Textus),
+            target_types.primitive(Primitive::Numerus)
+        ]
+    );
+}
+
+#[test]
+fn structural_collection_and_index_shapes_round_trip() {
+    let mut source_types = TypeTable::new();
+    let mut source_interner = Interner::new();
+    let n = source_interner.intern("N");
+    let textus = source_types.primitive(Primitive::Textus);
+    let dim2 = source_types.intern_index(IndexExpr::Literal(2));
+    let dim_n = source_types.intern_index(IndexExpr::Param(n));
+    let shape = source_types.intern_index(IndexExpr::Tuple(vec![dim2, dim_n]));
+    let tensor = source_types.tensor_with_shape(textus, shape);
+    let option = source_types.option(tensor);
+    let reference = source_types.reference(SemanticMutability::Immutable, option);
+
+    let snapshot = snapshot_interface_type(reference, &source_types, &source_interner).expect("snapshot");
+
+    let mut target_types = TypeTable::new();
+    let mut target_interner = Interner::new();
+    let imported = import_interface_type(&snapshot, &mut target_types, &mut target_interner).expect("import");
+
+    let Type::Ref(SemanticMutability::Immutable, option_id) = target_types.get(imported) else {
+        panic!("expected ref type");
+    };
+    let Type::Option(tensor_id) = target_types.get(*option_id) else {
+        panic!("expected option type");
+    };
+    let Type::Tensor(element, shape_id) = target_types.get(*tensor_id) else {
+        panic!("expected tensor type");
+    };
+    assert_eq!(*element, target_types.primitive(Primitive::Textus));
+
+    let IndexExpr::Tuple(dims) = target_types.get_index(*shape_id) else {
+        panic!("expected tuple shape");
+    };
+    assert!(matches!(target_types.get_index(dims[0]), IndexExpr::Literal(2)));
+    assert!(matches!(target_types.get_index(dims[1]), IndexExpr::Param(sym) if target_interner.resolve(*sym) == "N"));
+}
+
+#[test]
+fn manual_snapshot_imports_records_unions_and_sized_types() {
+    let mut fields = BTreeMap::new();
+    fields.insert(
+        "value".to_owned(),
+        InterfaceTypeSnapshot::Union(vec![
+            InterfaceTypeSnapshot::SizedNumeric(Primitive::Fractus, NumericWidth::F32),
+            InterfaceTypeSnapshot::SizedInstans(InstansPrecision::Millis),
+        ]),
+    );
+    let snapshot = InterfaceTypeSnapshot::Record(fields);
+
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let imported = import_interface_type(&snapshot, &mut types, &mut interner).expect("import");
+
+    let Type::Record(fields) = types.get(imported) else {
+        panic!("expected record");
+    };
+    let value_sym = interner.intern("value");
+    let value_ty = fields.get(&value_sym).expect("value field");
+    let Type::Union(members) = types.get(*value_ty) else {
+        panic!("expected union");
+    };
+    assert!(matches!(
+        types.get(members[0]),
+        Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32)
+    ));
+    assert!(matches!(types.get(members[1]), Type::SizedInstans(InstansPrecision::Millis)));
+}
+
+#[test]
+fn callable_snapshot_can_be_constructed_without_source_type_table() {
+    let callable = InterfaceCallable {
+        type_params: vec!["T".to_owned()],
+        type_param_constraints: vec![InterfaceTypeParamConstraint::Any],
+        params: vec![InterfaceParam {
+            ty: InterfaceTypeSnapshot::Param("T".to_owned()),
+            mode: SemanticParamMode::Move,
+            optional: false,
+        }],
+        ret: Box::new(InterfaceTypeSnapshot::Param("T".to_owned())),
+        err: Some(Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus))),
+        is_async: false,
+        is_generator: true,
+    };
+    let snapshot = InterfaceTypeSnapshot::Func(callable);
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+
+    let imported = import_interface_type(&snapshot, &mut types, &mut interner).expect("import");
+
+    let Type::Func(sig) = types.get(imported) else {
+        panic!("expected callable");
+    };
+    assert!(sig.is_generator);
+    assert_eq!(sig.err, Some(types.primitive(Primitive::Textus)));
+}
+
+#[test]
+fn async_callable_import_wraps_declared_return_in_promissum() {
+    let callable = InterfaceCallable {
+        type_params: Vec::new(),
+        type_param_constraints: Vec::new(),
+        params: Vec::new(),
+        ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Vacuum)),
+        err: None,
+        is_async: true,
+        is_generator: false,
+    };
+    let snapshot = InterfaceTypeSnapshot::Func(callable);
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+
+    let imported = import_interface_type(&snapshot, &mut types, &mut interner).expect("import");
+
+    let Type::Func(sig) = types.get(imported) else {
+        panic!("expected callable");
+    };
+    let Type::Promissum(inner) = types.get(sig.ret) else {
+        panic!("expected async callable return to be promissum");
+    };
+    assert_eq!(*inner, types.primitive(Primitive::Vacuum));
+}
+
+#[test]
+fn async_generator_callable_import_wraps_declared_return_in_async_cursor() {
+    let callable = InterfaceCallable {
+        type_params: Vec::new(),
+        type_param_constraints: Vec::new(),
+        params: Vec::new(),
+        ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Numerus)),
+        err: Some(Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus))),
+        is_async: true,
+        is_generator: true,
+    };
+    let snapshot = InterfaceTypeSnapshot::Func(callable);
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+
+    let imported = import_interface_type(&snapshot, &mut types, &mut interner).expect("import");
+
+    let Type::Func(sig) = types.get(imported) else {
+        panic!("expected callable");
+    };
+    let Type::AsyncCursor(item, alternate) = types.get(sig.ret) else {
+        panic!("expected async generator callable return to be async cursor");
+    };
+    assert_eq!(*item, types.primitive(Primitive::Numerus));
+    assert_eq!(*alternate, types.primitive(Primitive::Textus));
+    assert_eq!(sig.err, None);
+    assert!(sig.is_async);
+    assert!(sig.is_generator);
+}
+
+#[test]
+fn nominal_type_import_fails_closed() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let snapshot = InterfaceTypeSnapshot::Nominal(InterfaceNominalType {
+        kind: InterfaceNominalKind::Struct,
+        name: "Terminus".to_owned(),
+        identity: None,
+        kind_guessed: false,
+    });
+
+    let err = import_interface_type(&snapshot, &mut types, &mut interner).expect_err("nominal unsupported");
+
+    assert_eq!(
+        err,
+        FileInterfaceError::NominalTypeUnsupported { kind: InterfaceNominalKind::Struct }
+    );
+}
+
+#[test]
+fn index_inference_snapshot_fails_closed() {
+    let mut types = TypeTable::new();
+    let interner = Interner::new();
+    let shape = types.intern_index(IndexExpr::Infer(crate::semantic::IndexVar(0)));
+    let textus = types.primitive(Primitive::Textus);
+    let tensor = types.tensor_with_shape(textus, shape);
+
+    let err = snapshot_interface_type(tensor, &types, &interner).expect_err("index inference unsupported");
+
+    assert_eq!(err, FileInterfaceError::IndexInferenceUnsupported);
+}
+
+#[test]
+fn index_snapshot_imports_unspecified_shape() {
+    let snapshot = InterfaceTypeSnapshot::Tensor(
+        Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus)),
+        InterfaceIndexSnapshot::Unspecified,
+    );
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+
+    let imported = import_interface_type(&snapshot, &mut types, &mut interner).expect("import");
+
+    let Type::Tensor(_, shape) = types.get(imported) else {
+        panic!("expected tensor");
+    };
+    assert!(matches!(types.get_index(*shape), IndexExpr::Unspecified));
+}
+
+#[test]
+fn conflicting_kind_snapshot_fails_closed_through_canonical_key() {
+    use crate::file_interface::{
+        import_interface_type_with_resolver, FileExport, FileExportKind, FileInterface, InterfaceLibraryIdentity,
+        InterfaceStructExport, InterfaceStructField,
+    };
+    use crate::semantic::Resolver;
+
+    let identity = InterfaceLibraryIdentity {
+        provider: "package".to_owned(),
+        package: Some("demo".to_owned()),
+        module_path: vec!["util".to_owned()],
+    };
+    let mut interface = FileInterface::new().with_identity(identity.clone());
+    interface.insert(FileExport {
+        name: "Terminus".to_owned(),
+        kind: FileExportKind::Struct(InterfaceStructExport {
+            name: "Terminus".to_owned(),
+            fields: vec![InterfaceStructField {
+                name: "gradus".to_owned(),
+                ty: InterfaceTypeSnapshot::Primitive(Primitive::Numerus),
+                optional: false,
+                required: true,
+            }],
+            methods: Vec::new(),
+            annotation_contract: None,
+        }),
+    });
+
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    resolver
+        .set_file_interfaces_from_snapshots(
+            &BTreeMap::from([("utilModule".to_owned(), interface)]),
+            &mut interner,
+            &mut types,
+        )
+        .expect("install struct interface");
+
+    // A snapshot that claims the resolved symbol is an enum (it is a struct)
+    // must fail closed through the canonical key — the identity-bearing
+    // snapshot's canonical key (Enum + identity + name) is unknown to the
+    // consumer, and the unknown-identity error fires instead of any silent
+    // fall-through to a name-keyed or local-symbol resolution.
+    let snapshot = InterfaceTypeSnapshot::Nominal(InterfaceNominalType {
+        kind: InterfaceNominalKind::Enum,
+        name: "Terminus".to_owned(),
+        identity: Some(identity),
+        kind_guessed: false,
+    });
+    let err = import_interface_type_with_resolver(&snapshot, &mut types, &mut interner, &resolver)
+        .expect_err("conflicting kind must fail closed");
+    assert_eq!(
+        err,
+        FileInterfaceError::NominalIdentityUnknown { kind: InterfaceNominalKind::Enum, name: "Terminus".to_owned() }
+    );
+}
+
+/// Fail-closed (council-11 correct_before_next_phase): an identity-bearing
+/// nominal snapshot whose canonical key the consumer's canonical table does
+/// not know must return an explicit unknown-identity error — NOT fall through
+/// to legacy short-name / local-symbol resolution, which could silently bind
+/// the unknown nominal to a DIFFERENT consumer nominal.
+#[test]
+fn identity_bearing_snapshot_canonical_miss_fails_closed() {
+    use crate::file_interface::{
+        import_interface_type_with_resolver, FileExport, FileExportKind, FileInterface, InterfaceLibraryIdentity,
+        InterfaceStructExport,
+    };
+    use crate::semantic::Resolver;
+
+    let identity = InterfaceLibraryIdentity {
+        provider: "package".to_owned(),
+        package: Some("demo".to_owned()),
+        module_path: vec!["util".to_owned()],
+    };
+    // The consumer installed a DIFFERENT module's interface: a same-name
+    // `Persona` exists, but under the `other` module identity — the
+    // identity-bearing key `util::Persona` is absent. Legacy name-based
+    // fallback would silently bind the snapshot to this unrelated nominal.
+    let other = FileInterface::new().with_identity(InterfaceLibraryIdentity {
+        provider: "package".to_owned(),
+        package: Some("demo".to_owned()),
+        module_path: vec!["other".to_owned()],
+    });
+    let other = {
+        let mut i = other;
+        i.insert(FileExport {
+            name: "Persona".to_owned(),
+            kind: FileExportKind::Struct(InterfaceStructExport {
+                name: "Persona".to_owned(),
+                fields: Vec::new(),
+                methods: Vec::new(),
+                annotation_contract: None,
+            }),
+        });
+        i
+    };
+
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    resolver
+        .set_file_interfaces_from_snapshots(
+            &BTreeMap::from([("otherModule".to_owned(), other)]),
+            &mut interner,
+            &mut types,
+        )
+        .expect("install interface");
+
+    let snapshot = InterfaceTypeSnapshot::Nominal(InterfaceNominalType {
+        kind: InterfaceNominalKind::Struct,
+        name: "Persona".to_owned(),
+        identity: Some(identity),
+        kind_guessed: false,
+    });
+    let err = import_interface_type_with_resolver(&snapshot, &mut types, &mut interner, &resolver)
+        .expect_err("canonical miss on identity-bearing snapshot must fail closed");
+    assert_eq!(
+        err,
+        FileInterfaceError::NominalIdentityUnknown { kind: InterfaceNominalKind::Struct, name: "Persona".to_owned() }
+    );
+}
+
+#[test]
+fn reexported_same_module_nominal_callable_remaps_through_parent_interface() {
+    use crate::file_interface::{
+        FileExport, FileExportKind, FileInterface, InterfaceLibraryIdentity, InterfaceStructExport,
+    };
+    use crate::semantic::Resolver;
+
+    let parent_identity = InterfaceLibraryIdentity {
+        provider: "package".to_owned(),
+        package: Some("triga".to_owned()),
+        module_path: vec!["geometry".to_owned()],
+    };
+    let child_identity = InterfaceLibraryIdentity {
+        provider: "package".to_owned(),
+        package: Some("triga".to_owned()),
+        module_path: vec!["geometry".to_owned(), "data".to_owned()],
+    };
+    let mut interface = FileInterface::new().with_identity(parent_identity);
+    interface.insert(FileExport {
+        name: "data.BufferGeometry".to_owned(),
+        kind: FileExportKind::Struct(InterfaceStructExport {
+            name: "BufferGeometry".to_owned(),
+            fields: Vec::new(),
+            methods: Vec::new(),
+            annotation_contract: None,
+        }),
+    });
+    interface.insert(FileExport {
+        name: "data.geometry_vertex_layout_matches".to_owned(),
+        kind: FileExportKind::Function(InterfaceCallable {
+            type_params: Vec::new(),
+            type_param_constraints: Vec::new(),
+            params: vec![InterfaceParam {
+                ty: InterfaceTypeSnapshot::Nominal(InterfaceNominalType {
+                    kind: InterfaceNominalKind::Struct,
+                    name: "BufferGeometry".to_owned(),
+                    identity: Some(child_identity),
+                    kind_guessed: false,
+                }),
+                mode: SemanticParamMode::Owned,
+                optional: false,
+            }],
+            ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Bivalens)),
+            err: None,
+            is_async: false,
+            is_generator: false,
+        }),
+    });
+
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let skipped = resolver
+        .set_file_interfaces_from_snapshots(
+            &BTreeMap::from([("geometry".to_owned(), interface)]),
+            &mut interner,
+            &mut types,
+        )
+        .expect("install re-exported interface");
+
+    assert!(
+        skipped.is_empty(),
+        "same-module nominal must not poison the callable: {skipped:?}"
+    );
+    assert!(resolver
+        .namespace_file_function(
+            interner.intern("geometry"),
+            interner.intern("data.geometry_vertex_layout_matches"),
+        )
+        .is_some());
+}
+
+#[test]
+fn strict_locale_pack_keeps_supported_struct_fields_without_field_rows() {
+    use crate::locale::LocalePack;
+    use crate::semantic::Resolver;
+
+    let identity = InterfaceLibraryIdentity {
+        provider: "package".to_owned(),
+        package: Some("triga".to_owned()),
+        module_path: vec!["geometry".to_owned(), "attribute".to_owned()],
+    };
+    let unknown = InterfaceTypeSnapshot::Nominal(InterfaceNominalType {
+        kind: InterfaceNominalKind::Struct,
+        name: "Missing".to_owned(),
+        identity: Some(InterfaceLibraryIdentity {
+            provider: "package".to_owned(),
+            package: Some("other".to_owned()),
+            module_path: vec!["geometry".to_owned()],
+        }),
+        kind_guessed: false,
+    });
+    let mut interface = FileInterface::new().with_identity(identity.clone());
+    interface.insert(FileExport {
+        name: "BufferAttribute".to_owned(),
+        kind: FileExportKind::Struct(InterfaceStructExport {
+            name: "BufferAttribute".to_owned(),
+            fields: vec![
+                InterfaceStructField {
+                    name: "name".to_owned(),
+                    ty: InterfaceTypeSnapshot::Primitive(Primitive::Textus),
+                    optional: false,
+                    required: true,
+                },
+                InterfaceStructField { name: "unsupported".to_owned(), ty: unknown, optional: false, required: true },
+            ],
+            methods: Vec::new(),
+            annotation_contract: None,
+        }),
+    });
+    let pack = LocalePack::from_toml_str(
+        r#"
+[pack]
+id = "en-test"
+schema_version = 1
+fallback = ["la"]
+
+[[library_members]]
+provider = "package"
+package = "triga"
+module_path = ["geometry", "attribute"]
+kind = "type"
+canonical = "BufferAttribute"
+surface = "BufferAttribute"
+
+[llm]
+system_prompt_snippet = "Emit test source"
+exemplars = ["test.fab"]
+"#,
+    )
+    .expect("library-member locale pack");
+
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let skipped = resolver
+        .set_file_interfaces_from_snapshots_with_locale(
+            &BTreeMap::from([("attribute".to_owned(), interface)]),
+            &mut interner,
+            &mut types,
+            Some(&pack),
+        )
+        .expect("install struct interface");
+
+    let fields = resolver
+        .imported_file_structs_for_namespace(interner.intern("attribute"))
+        .into_iter()
+        .next()
+        .expect("BufferAttribute")
+        .1;
+    assert_eq!(fields.len(), 1);
+    assert_eq!(interner.resolve(fields[0].name), "name");
+    let skipped_field = skipped
+        .iter()
+        .find(|skip| skip.canonical_name == "unsupported")
+        .expect("unsupported field should retain WARN014 provenance");
+    assert!(skipped_field
+        .remap_reason
+        .contains("NominalIdentityUnknown"));
+}

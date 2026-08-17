@@ -1,11 +1,11 @@
 //! `faber format` author pipeline: `compile_author`, normalization, re-parse.
 
 use super::format::{formatted_source_for_write, normalize_trailing_newline, source_for_compare};
-use radix::driver::{Config, Session};
-use radix::forma::test_gate::{
+use radix_module::driver::{Config, Session};
+use radix_module::forma::test_gate::{
     assert_author_reparses, assert_author_reparses_with, author_format_once_with_session,
 };
-use radix::locale::LocalePack;
+use radix_module::locale::LocalePack;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -28,7 +28,7 @@ fn english_session() -> Session {
 
 fn author_format_pipeline(name: &str, source: &str) -> String {
     let session = english_session();
-    let result = radix::forma::compile_author(&session, name, source);
+    let result = radix_module::forma::compile_author(&session, name, source);
     assert!(
         result.success(),
         "author format failed for {name}: {:?}",
@@ -797,7 +797,7 @@ fn format_write_reprepends_exact_frontmatter_slice() {
     let formatted_body = author_format_pipeline(&path.display().to_string(), &raw);
     let formatted =
         formatted_source_for_write(&path, &raw, &formatted_body).expect("format source");
-    let split = radix::driver::split_frontmatter(&raw).expect("split frontmatter");
+    let split = radix_module::driver::split_frontmatter(&raw).expect("split frontmatter");
     let body_start = split.body_byte_offset as usize;
 
     assert_eq!(

@@ -1,0 +1,370 @@
+//! HIR aspect recognition and report builder.
+//!
+//! Walks checked HIR to recognize aspect obligations (`discerne omnia`
+//! exhaustiveness, etc.) and assembles a deterministic [`HirAspectReport`].
+//! Recognition relies on checked HIR facts and the semantic [`TypeTable`]
+//! rather than re-resolving source names. Enum-variant facts are borrowed from
+//! the exhaustive-match pass so aspect recognition and pattern checking agree.
+
+use crate::hir::visit::{walk_expr, HirVisitor};
+use crate::hir::{DefId, HirCasuArm, HirExpression, HirExpressionKind, HirId, HirModule};
+use crate::lexer::Span;
+use crate::semantic::passes::exhaustive::{collect_enum_variants, enum_def_from_type, pattern_variant_id};
+use crate::semantic::TypeTable;
+use rustc_hash::{FxHashMap, FxHashSet};
+
+#[cfg(test)]
+#[path = "report_test.rs"]
+mod tests;
+
+/// Build a deterministic aspect report from checked HIR.
+///
+/// The caller provides the semantic type table so aspect recognition can rely on
+/// checked HIR facts instead of re-resolving source names.
+#[must_use]
+pub fn report_hir_aspects(hir: &HirModule, types: &TypeTable) -> HirAspectReport {
+    let enum_variants = collect_enum_variants(hir);
+    let mut collector = HirAspectCollector::new(types, enum_variants);
+    collector.visit_program(hir);
+    collector.finish()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HirAspectPrecondition {
+    /// The caller must provide HIR after the semantic pipeline has completed.
+    CheckedHir,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HirAspectReport {
+    pub precondition: HirAspectPrecondition,
+    records: Vec<HirAspectRecord>,
+}
+
+impl HirAspectReport {
+    // constructor: moves precondition into struct
+    fn new(precondition: HirAspectPrecondition) -> Self {
+        Self { precondition, records: Vec::new() }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn from_records(precondition: HirAspectPrecondition, records: Vec<HirAspectRecord>) -> Self {
+        let mut report = Self { precondition, records };
+        report.sort_records();
+        report
+    }
+
+    #[must_use]
+    pub fn records(&self) -> &[HirAspectRecord] {
+        &self.records
+    }
+
+    fn push(&mut self, record: HirAspectRecord) {
+        self.records.push(record);
+    }
+
+    fn sort_records(&mut self) {
+        self.records.sort_by_key(HirAspectRecord::sort_key);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HirAspectRecord {
+    pub aspect: HirAspectKind,
+    pub record_kind: HirAspectRecordKind,
+    pub span: HirAspectSpan,
+    pub node_id: Option<HirId>,
+    pub reason: HirAspectReason,
+    pub detail: HirAspectDetail,
+}
+
+impl HirAspectRecord {
+    #[must_use]
+    pub fn recognized(aspect: HirAspectKind, span: HirAspectSpan, node_id: Option<HirId>) -> Self {
+        Self {
+            aspect,
+            record_kind: HirAspectRecordKind::Recognized,
+            span,
+            node_id,
+            reason: HirAspectReason::Recognized,
+            detail: HirAspectDetail::None,
+        }
+    }
+
+    #[must_use]
+    pub fn skipped_candidate(
+        aspect: HirAspectKind,
+        span: HirAspectSpan,
+        node_id: Option<HirId>,
+        reason: HirAspectReason,
+    ) -> Self {
+        Self {
+            aspect,
+            record_kind: HirAspectRecordKind::SkippedCandidate,
+            span,
+            node_id,
+            reason,
+            detail: HirAspectDetail::None,
+        }
+    }
+
+    #[must_use]
+    pub fn not_proven(
+        aspect: HirAspectKind,
+        span: HirAspectSpan,
+        node_id: Option<HirId>,
+        reason: HirAspectReason,
+    ) -> Self {
+        Self {
+            aspect,
+            record_kind: HirAspectRecordKind::NotProven,
+            span,
+            node_id,
+            reason,
+            detail: HirAspectDetail::None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_detail(mut self, detail: HirAspectDetail) -> Self {
+        self.detail = detail;
+        self
+    }
+
+    fn sort_key(&self) -> HirAspectRecordSortKey {
+        HirAspectRecordSortKey {
+            span_start: self.span.sort_start(),
+            span_end: self.span.sort_end(),
+            aspect: self.aspect,
+            record_kind: self.record_kind,
+            node_id: self.node_id.map_or(u32::MAX, |id| id.0),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HirAspectDetail {
+    None,
+    DiscerneOmnia { variants: Vec<DefId>, covered: Vec<DefId> },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum HirAspectKind {
+    /// `discerne omnia` finite coverage over an enum-like scrutinee.
+    DiscerneOmnia,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum HirAspectRecordKind {
+    /// A concrete recognizer accepted this HIR candidate.
+    Recognized,
+
+    /// A concrete recognizer found the candidate but could not prove it.
+    NotProven,
+
+    /// HIR shape suggests a future aspect candidate, but this stage cannot
+    /// prove it yet.
+    SkippedCandidate,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HirAspectSpan {
+    /// Source span carried by the HIR node that produced the record.
+    Source(Span),
+
+    /// Explicit reason a record has no source span.
+    NoSpan(HirAspectNoSpanReason),
+}
+
+impl HirAspectSpan {
+    pub(crate) fn sort_start(&self) -> u32 {
+        match self {
+            HirAspectSpan::Source(span) => span.start,
+            HirAspectSpan::NoSpan(_) => u32::MAX,
+        }
+    }
+
+    pub(crate) fn sort_end(&self) -> u32 {
+        match self {
+            HirAspectSpan::Source(span) => span.end,
+            HirAspectSpan::NoSpan(_) => u32::MAX,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HirAspectNoSpanReason {
+    /// The record summarizes a whole HIR program rather than a specific node.
+    ProgramSummary,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HirAspectReason {
+    /// Placeholder used by future concrete recognizers.
+    Recognized,
+
+    /// The dispatch is not marked `omnia`.
+    NonOmniaDiscerne,
+
+    /// `omnia` was used with anything other than one scrutinee.
+    MultipleScrutinees,
+
+    /// The scrutinee is missing checked type information.
+    MissingScrutineeType,
+
+    /// The checked scrutinee type does not resolve to an enum definition.
+    NonEnumScrutinee,
+
+    /// The enum definition could not be found in the current HIR item table.
+    EnumVariantsUnavailable,
+
+    /// At least one reachable `omnia` arm used a non-variant pattern.
+    NonVariantPattern,
+
+    /// At least one enum variant is not covered by an unguarded explicit
+    /// variant pattern.
+    MissingExplicitVariants,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct HirAspectRecordSortKey {
+    span_start: u32,
+    span_end: u32,
+    aspect: HirAspectKind,
+    record_kind: HirAspectRecordKind,
+    node_id: u32,
+}
+
+struct HirAspectCollector<'a> {
+    types: &'a TypeTable,
+    enum_variants: FxHashMap<DefId, Vec<DefId>>,
+    report: HirAspectReport,
+}
+
+impl<'a> HirAspectCollector<'a> {
+    fn new(types: &'a TypeTable, enum_variants: FxHashMap<DefId, Vec<DefId>>) -> Self {
+        Self { types, enum_variants, report: HirAspectReport::new(HirAspectPrecondition::CheckedHir) }
+    }
+
+    fn push(&mut self, record: HirAspectRecord) {
+        self.report.push(record);
+    }
+
+    fn finish(mut self) -> HirAspectReport {
+        self.report.sort_records();
+        self.report
+    }
+
+    fn record_discerne(
+        &mut self,
+        expr: &HirExpression,
+        scrutinees: &[HirExpression],
+        arms: &[HirCasuArm],
+        exhaustive: bool,
+    ) {
+        if !exhaustive {
+            self.push_skipped(expr, HirAspectReason::NonOmniaDiscerne);
+            return;
+        }
+
+        if scrutinees.len() != 1 {
+            self.push_skipped(expr, HirAspectReason::MultipleScrutinees);
+            return;
+        }
+
+        let scrutinee = &scrutinees[0];
+        let Some(scrutinee_ty) = scrutinee.ty else {
+            self.push_skipped(expr, HirAspectReason::MissingScrutineeType);
+            return;
+        };
+        let Some(enum_def) = enum_def_from_type(scrutinee_ty, self.types) else {
+            self.push_skipped(expr, HirAspectReason::NonEnumScrutinee);
+            return;
+        };
+        let Some(expected_variants) = self.enum_variants.get(&enum_def) else {
+            self.push_skipped(expr, HirAspectReason::EnumVariantsUnavailable);
+            return;
+        };
+
+        let coverage = explicit_variant_coverage(arms);
+        let covered_variants = expected_variants
+            .iter()
+            .copied()
+            .filter(|variant| coverage.covered_variants.contains(variant))
+            .collect::<Vec<_>>();
+        let detail = HirAspectDetail::DiscerneOmnia { variants: expected_variants.clone(), covered: covered_variants };
+        let reason = if coverage.has_non_variant_pattern {
+            Some(HirAspectReason::NonVariantPattern)
+        } else if expected_variants
+            .iter()
+            .any(|variant| !coverage.covered_variants.contains(variant))
+        {
+            Some(HirAspectReason::MissingExplicitVariants)
+        } else {
+            None
+        };
+
+        match reason {
+            Some(reason) => self.push(
+                HirAspectRecord::not_proven(
+                    HirAspectKind::DiscerneOmnia,
+                    HirAspectSpan::Source(expr.span),
+                    Some(expr.id),
+                    reason,
+                )
+                .with_detail(detail),
+            ),
+            None => self.push(
+                HirAspectRecord::recognized(
+                    HirAspectKind::DiscerneOmnia,
+                    HirAspectSpan::Source(expr.span),
+                    Some(expr.id),
+                )
+                .with_detail(detail),
+            ),
+        }
+    }
+
+    fn push_skipped(&mut self, expr: &HirExpression, reason: HirAspectReason) {
+        self.push(HirAspectRecord::skipped_candidate(
+            HirAspectKind::DiscerneOmnia,
+            HirAspectSpan::Source(expr.span),
+            Some(expr.id),
+            reason,
+        ));
+    }
+}
+
+impl HirVisitor for HirAspectCollector<'_> {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if let HirExpressionKind::Discerne { scrutinees, arms, exhaustive } = &expr.kind {
+            self.record_discerne(expr, scrutinees, arms, *exhaustive);
+        }
+
+        walk_expr(self, expr);
+    }
+}
+
+struct ExplicitVariantCoverage {
+    covered_variants: FxHashSet<DefId>,
+    has_non_variant_pattern: bool,
+}
+
+fn explicit_variant_coverage(arms: &[HirCasuArm]) -> ExplicitVariantCoverage {
+    let mut covered_variants = FxHashSet::default();
+    let mut has_non_variant_pattern = false;
+
+    for arm in arms {
+        for pattern in &arm.patterns {
+            if let Some(variant) = pattern_variant_id(pattern) {
+                if arm.guard.is_none() {
+                    covered_variants.insert(variant);
+                }
+            } else {
+                has_non_variant_pattern = true;
+            }
+        }
+    }
+
+    ExplicitVariantCoverage { covered_variants, has_non_variant_pattern }
+}

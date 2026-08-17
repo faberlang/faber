@@ -7,7 +7,7 @@ use proba::{
     format_summary, inventory_cases, run_proba_on_validated_with_function_ids, run_proba_source,
     CaseOutcome, CaseResult, ProbaReport, TestSelection,
 };
-use radix::driver::{Config, Session};
+use radix_module::driver::{Config, Session};
 use radix_package::test_source_filter::TestSourceFilter;
 use std::path::Path;
 
@@ -35,7 +35,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         && !args.path.exists()
     {
         let diagnostic = package::missing_package_path_diagnostic(&args.path);
-        eprintln!("{}", radix::diagnostics::render_plain(&diagnostic));
+        eprintln!("{}", radix_module::diagnostics::render_plain(&diagnostic));
         std::process::exit(1);
     }
 
@@ -66,7 +66,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         std::process::exit(2);
     }
 
-    let warn_policy = radix::driver::WarnPolicy {
+    let warn_policy = radix_module::driver::WarnPolicy {
         deny_all_warnings: args.deny_warnings,
         deny_codes: args.deny.clone(),
     };
@@ -190,7 +190,7 @@ fn run_package(
     if package
         .diagnostics
         .iter()
-        .any(radix::diagnostics::Diagnostic::is_error)
+        .any(radix_module::diagnostics::Diagnostic::is_error)
     {
         super::eprint_compile_diagnostics(&package.diagnostics);
         eprintln!("error: package analysis failed");
@@ -286,9 +286,9 @@ fn print_report(report: &ProbaReport, _nocapture: bool) {
     println!("{}", format_summary(report));
 }
 
-fn print_run_error(error: &radix::mir::RunSourceError) {
+fn print_run_error(error: &radix_module::mir::RunSourceError) {
     match error {
-        radix::mir::RunSourceError::Frontend(diagnostics) => {
+        radix_module::mir::RunSourceError::Frontend(diagnostics) => {
             for diag in diagnostics {
                 if diag.is_error() {
                     eprintln!("error: {}", diag.message);
@@ -297,12 +297,12 @@ fn print_run_error(error: &radix::mir::RunSourceError) {
                 }
             }
         }
-        radix::mir::RunSourceError::Mir(errors) => {
+        radix_module::mir::RunSourceError::Mir(errors) => {
             for error in errors {
                 eprintln!("error: {}", error.message);
             }
         }
-        radix::mir::RunSourceError::Stepper(errors) => {
+        radix_module::mir::RunSourceError::Stepper(errors) => {
             for error in errors {
                 eprintln!("error: {}", error.message);
             }

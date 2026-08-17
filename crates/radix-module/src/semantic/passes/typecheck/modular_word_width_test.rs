@@ -1,0 +1,246 @@
+//! R0 red width-family contract: `modulus<W>` must admit exactly the unsigned
+//! widths u8/u16/u32/u64 under one width-parametric contract. The u32 rows are
+//! the shipped regression floor and stay green; the u8/u16/u64 rows fail until
+//! R3 replaces the `lower_modular_word` u32 allowlist with the unsigned-width
+//! gate.
+
+#[cfg(any(feature = "hir-rust", feature = "hir-faber"))]
+use crate::Compiler;
+use crate::{Config, Target};
+
+#[cfg(feature = "hir-rust")]
+fn compile(source: &str) -> crate::CompileResult {
+    Compiler::new(Config::default().with_target(Target::HirRust)).compile_str("test.fab", source)
+}
+
+#[cfg(feature = "hir-faber")]
+fn compile_for_target(source: &str, target: Target) -> crate::CompileResult {
+    Compiler::new(Config::default().with_target(target)).compile_str("test.fab", source)
+}
+
+fn analyze_diagnostics(source: &str) -> Vec<crate::Diagnostic> {
+    let session = crate::driver::Session::new(Config::default().with_target(Target::HirRust));
+    match crate::driver::analyze_source(&session, "test.fab", source) {
+        Ok(unit) => unit.diagnostics,
+        Err(diagnostics) => diagnostics,
+    }
+}
+
+fn analysis_accepts(source: &str) {
+    let diagnostics = analyze_diagnostics(source);
+    assert!(
+        !diagnostics
+            .iter()
+            .any(radix_diagnostics::Diagnostic::is_error),
+        "diagnostics: {diagnostics:?}"
+    );
+}
+
+fn analysis_rejects_with_issue(source: &str, issue: &str) {
+    let diagnostics = analyze_diagnostics(source);
+    assert!(
+        diagnostics
+            .iter()
+            .any(radix_diagnostics::Diagnostic::is_error),
+        "expected failure, got: {diagnostics:?}"
+    );
+    assert!(
+        diagnostics.iter().any(|diagnostic| diagnostic
+            .args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == issue)),
+        "expected diagnostic issue {issue:?}, got: {diagnostics:?}",
+    );
+}
+
+/// One row of the shared modular width vector table. `max` is 2^W - 1 and
+/// `max_plus_one` is the first out-of-range literal for the width.
+struct ModularWidthRow {
+    width: &'static str,
+    max: &'static str,
+    max_plus_one: &'static str,
+    #[cfg(feature = "hir-rust")]
+    rust_wrapping_add: &'static str,
+}
+
+const MODULAR_WIDTH_ROWS: &[ModularWidthRow] = &[
+    ModularWidthRow {
+        width: "u8",
+        max: "255",
+        max_plus_one: "256",
+        #[cfg(feature = "hir-rust")]
+        rust_wrapping_add: "u8::wrapping_add",
+    },
+    ModularWidthRow {
+        width: "u16",
+        max: "65535",
+        max_plus_one: "65536",
+        #[cfg(feature = "hir-rust")]
+        rust_wrapping_add: "u16::wrapping_add",
+    },
+    ModularWidthRow {
+        width: "u32",
+        max: "4294967295",
+        max_plus_one: "4294967296",
+        #[cfg(feature = "hir-rust")]
+        rust_wrapping_add: "u32::wrapping_add",
+    },
+    ModularWidthRow {
+        width: "u64",
+        max: "18446744073709551615",
+        // 2^64 cannot be spelled as a decimal literal under the u64 carrier;
+        // the u64 out-of-range proof is the lexer-level unsigned_integer gate.
+        max_plus_one: "",
+        #[cfg(feature = "hir-rust")]
+        rust_wrapping_add: "u64::wrapping_add",
+    },
+];
+
+#[test]
+fn modular_word_admits_every_unsigned_width() {
+    for row in MODULAR_WIDTH_ROWS {
+        let source = format!(
+            r"
+functio add(modulus<{w}> x, modulus<{w}> y) → modulus<{w}> {{
+    redde x + y
+}}
+",
+            w = row.width
+        );
+        analysis_accepts(&source);
+    }
+}
+
+#[test]
+fn modular_word_width_rows_reject_signed_and_float_widths() {
+    // These rows are the isolation floor and must stay green in every stage.
+    analysis_rejects_with_issue(
+        r"
+functio keep(modulus<i32> x) → modulus<i32> {
+    redde x
+}
+",
+        "unsupported_modular_word_width",
+    );
+    analysis_rejects_with_issue(
+        r"
+functio keep(modulus<f32> x) → modulus<f32> {
+    redde x
+}
+",
+        "modular_word_unsigned_width_required",
+    );
+}
+
+#[test]
+fn modular_word_accepts_max_literal_per_width() {
+    for row in MODULAR_WIDTH_ROWS {
+        let source = format!(
+            r"
+incipit {{
+    fixum modulus<{w}> max ← {max}
+    nota max
+}}
+",
+            w = row.width,
+            max = row.max
+        );
+        analysis_accepts(&source);
+    }
+}
+
+#[test]
+fn modular_word_rejects_max_plus_one_literal_per_width() {
+    for row in MODULAR_WIDTH_ROWS {
+        if row.max_plus_one.is_empty() {
+            continue;
+        }
+        let source = format!(
+            r"
+incipit {{
+    fixum modulus<{w}> tooBig ← {max_plus_one}
+    nota tooBig
+}}
+",
+            w = row.width,
+            max_plus_one = row.max_plus_one
+        );
+        analysis_rejects_with_issue(&source, "modular_word_literal_out_of_range");
+    }
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn modular_word_rust_codegen_uses_width_typed_wrapping_ops() {
+    for row in MODULAR_WIDTH_ROWS {
+        let source = format!(
+            r"
+functio add(modulus<{w}> x, modulus<{w}> y) → modulus<{w}> {{
+    redde x + y
+}}
+",
+            w = row.width
+        );
+        let result = compile(&source);
+        assert!(result.success(), "modulus<{}> diagnostics: {:?}", row.width, result.diagnostics);
+        let Some(crate::Output::Rust(output)) = result.output else {
+            panic!("expected Rust output")
+        };
+        assert!(
+            output.code.contains(row.rust_wrapping_add),
+            "modulus<{}> must emit {}:\n{}",
+            row.width,
+            row.rust_wrapping_add,
+            output.code
+        );
+    }
+}
+
+#[cfg(feature = "hir-faber")]
+#[test]
+fn modular_word_faber_codegen_roundtrips_every_width() {
+    for row in MODULAR_WIDTH_ROWS {
+        let source = format!(
+            r"
+functio add(modulus<{w}> x, modulus<{w}> y) → modulus<{w}> {{
+    redde x + y
+}}
+",
+            w = row.width
+        );
+        let result = compile_for_target(&source, Target::HirFaber);
+        assert!(result.success(), "modulus<{}> diagnostics: {:?}", row.width, result.diagnostics);
+        let Some(crate::Output::Faber(output)) = result.output else {
+            panic!("expected Faber output")
+        };
+        let spelling = format!("modulus<{}>", row.width);
+        assert!(
+            output.code.contains(&spelling),
+            "Faber output must preserve {spelling}:\n{}",
+            output.code
+        );
+    }
+}
+
+#[test]
+fn modular_word_cross_width_arithmetic_rejects_in_both_directions() {
+    // Width isolation: same family, different widths still requires an
+    // explicit conversion. u8 rows go red with admission in R3; the u32/u64
+    // direction proves isolation as soon as u64 lands.
+    for (left, right) in [("u8", "u16"), ("u32", "u64"), ("u64", "u32")] {
+        let source = format!(
+            r"
+functio add(modulus<{left}> x, modulus<{right}> y) → modulus<{left}> {{
+    redde x + y
+}}
+",
+        );
+        let diagnostics = analyze_diagnostics(&source);
+        assert!(
+            diagnostics
+                .iter()
+                .any(radix_diagnostics::Diagnostic::is_error),
+            "modulus<{left}> + modulus<{right}> must reject: {diagnostics:?}"
+        );
+    }
+}

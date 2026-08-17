@@ -18,12 +18,12 @@
 //! through the Faber analysis/MIR seams (ownership-freeze §5.3).
 #![allow(dead_code)] // Binary build/run and lib tests exercise different surfaces.
 
-use radix::diagnostics::Diagnostic;
-use radix::driver::Config;
-use radix::hir::package::{load_package, LoadedHirModule, LoadedHirPackage};
-use radix::lexer::Span;
-use radix::semantic::passes::visibility_annotation::VisibilityTier;
-use radix::syntax::Visibility;
+use radix_module::diagnostics::Diagnostic;
+use radix_module::driver::Config;
+use radix_module::hir::package::{load_package, LoadedHirModule, LoadedHirPackage};
+use radix_module::lexer::Span;
+use radix_module::semantic::passes::visibility_annotation::VisibilityTier;
+use radix_module::syntax::Visibility;
 use radix_package::analyze::{AnalyzedProgram, AnalyzedProgramNode, ModuleGraph, ModuleId};
 use radix_package::discovery::PackageSpec;
 use radix_package::library::LibraryResolver;
@@ -89,7 +89,7 @@ pub(crate) fn loaded_package_to_analyzed(
         .as_deref()
         .map(|text| {
             toml::from_str::<toml::Table>(text)
-                .map(radix::driver::FileFrontmatter::from_table)
+                .map(radix_module::driver::FileFrontmatter::from_table)
                 .map_err(|error| {
                     vec![crate::package_diagnostic_error(format!(
                         "invalid FHIR package entry frontmatter: {error}"
@@ -188,7 +188,7 @@ pub(crate) fn loaded_package_to_analyzed(
                 module_segments: module.module_segments,
                 is_entry: module.is_entry,
                 analysis: module.unit,
-                file_interface: radix::file_interface::FileInterface::new(),
+                file_interface: radix_module::file_interface::FileInterface::new(),
                 export_names: module.export_names,
                 namespace_exports: namespace_exports_all[index].clone(),
                 expanded_library_imports,
@@ -260,7 +260,7 @@ fn namespace_exports_for_loaded(
 /// Run a loaded FHIR package in-process: reconstruct the package from the
 /// envelope, lower to FMIR, and execute with `host` — no Rust, no source.
 /// Local imports resolve from the envelope's explicit link table.
-pub(crate) fn run_loaded_package_fhir<H: radix::mir::Host + ?Sized>(
+pub(crate) fn run_loaded_package_fhir<H: radix_module::mir::Host + ?Sized>(
     config: &Config,
     loaded: LoadedHirPackage,
     artifact_dir: &Path,

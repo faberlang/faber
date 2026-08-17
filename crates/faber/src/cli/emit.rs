@@ -106,19 +106,19 @@ impl FaberCliTarget {
     }
 
     /// Convert to the radix backend target.
-    pub fn to_radix(self) -> radix::codegen::Target {
+    pub fn to_radix(self) -> radix_module::codegen::Target {
         match self {
-            FaberCliTarget::HirFaber => radix::codegen::Target::HirFaber,
-            FaberCliTarget::HirRust => radix::codegen::Target::HirRust,
-            FaberCliTarget::HirTypeScript => radix::codegen::Target::HirTypeScript,
-            FaberCliTarget::HirGo => radix::codegen::Target::HirGo,
-            FaberCliTarget::HirPython => radix::codegen::Target::HirPython,
-            FaberCliTarget::HirHaskell => radix::codegen::Target::HirHaskell,
-            FaberCliTarget::MirWasm => radix::codegen::Target::MirWasm,
-            FaberCliTarget::MirLlvm => radix::codegen::Target::MirLlvm,
-            FaberCliTarget::MirMetal => radix::codegen::Target::MirMetal,
-            FaberCliTarget::MirWgsl => radix::codegen::Target::MirWgsl,
-            FaberCliTarget::MirSexp => radix::codegen::Target::MirSexp,
+            FaberCliTarget::HirFaber => radix_module::codegen::Target::HirFaber,
+            FaberCliTarget::HirRust => radix_module::codegen::Target::HirRust,
+            FaberCliTarget::HirTypeScript => radix_module::codegen::Target::HirTypeScript,
+            FaberCliTarget::HirGo => radix_module::codegen::Target::HirGo,
+            FaberCliTarget::HirPython => radix_module::codegen::Target::HirPython,
+            FaberCliTarget::HirHaskell => radix_module::codegen::Target::HirHaskell,
+            FaberCliTarget::MirWasm => radix_module::codegen::Target::MirWasm,
+            FaberCliTarget::MirLlvm => radix_module::codegen::Target::MirLlvm,
+            FaberCliTarget::MirMetal => radix_module::codegen::Target::MirMetal,
+            FaberCliTarget::MirWgsl => radix_module::codegen::Target::MirWgsl,
+            FaberCliTarget::MirSexp => radix_module::codegen::Target::MirSexp,
         }
     }
 }

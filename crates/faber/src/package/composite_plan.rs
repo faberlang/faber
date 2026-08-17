@@ -49,8 +49,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use radix::codegen::Target;
-use radix::diagnostics::Diagnostic;
+use radix_module::codegen::Target;
+use radix_module::diagnostics::Diagnostic;
 use radix_mir::abi::{
     MirKernelDispatchSize, MirKernelResourceAccess, MirKernelWorkgroupCount, MirWorkgroupSize,
     ReducedProjection,

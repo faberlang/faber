@@ -1,0 +1,10 @@
++++
+locale = "la"
++++
+
+# U4.1 fixture: hello-world
+# Single-item program — exercises HirItem, basic expression lowering.
+
+incipit {
+    nota "Salve, Munde!"
+}

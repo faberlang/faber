@@ -11,22 +11,22 @@ use radix_package::rust_target::generate_package_rust;
 fn analyze_with_faber_seams(
     config: &Config,
     input: &Path,
-) -> Result<AnalyzedProgram, Vec<radix::diagnostics::Diagnostic>> {
+) -> Result<AnalyzedProgram, Vec<radix_module::diagnostics::Diagnostic>> {
     radix_package::analyze::analyze_package(config, input, &crate::package::faber_analysis_seams())
 }
 
 fn build_fhir_with_faber_seams(
     config: &Config,
     input: &Path,
-) -> Result<radix_package::fhir::PackageFhir, Vec<radix::diagnostics::Diagnostic>> {
+) -> Result<radix_package::fhir::PackageFhir, Vec<radix_module::diagnostics::Diagnostic>> {
     radix_package::fhir::build_package_fhir(config, input, &crate::package::faber_analysis_seams())
 }
 
-fn run_mir_with_faber_seams<H: radix::mir::Host + ?Sized>(
+fn run_mir_with_faber_seams<H: radix_module::mir::Host + ?Sized>(
     config: &Config,
     input: &Path,
     host: &mut H,
-) -> Result<(), Vec<radix::diagnostics::Diagnostic>> {
+) -> Result<(), Vec<radix_module::diagnostics::Diagnostic>> {
     radix_package::mir::run_package_mir(
         config,
         input,
@@ -36,11 +36,11 @@ fn run_mir_with_faber_seams<H: radix::mir::Host + ?Sized>(
 }
 
 use faber_hir_rust::RustFieldNamePolicy;
-use radix::codegen::{generate_from_analyzed, Target};
-use radix::driver::Config;
-use radix::hir::{LibraryItemKind, LibraryProvider};
-use radix::locale::LocalePack;
-use radix::mir::BufferHost;
+use radix_module::codegen::{generate_from_analyzed, Target};
+use radix_module::driver::Config;
+use radix_module::hir::{LibraryItemKind, LibraryProvider};
+use radix_module::locale::LocalePack;
+use radix_module::mir::BufferHost;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -362,11 +362,11 @@ kind = "bin"
     src.join("main.fab")
 }
 
-/// Extract the code string from a codegen [`radix::Output`].
-fn output_code(output: &radix::Output) -> &str {
+/// Extract the code string from a codegen [`radix_module::Output`].
+fn output_code(output: &radix_module::Output) -> &str {
     match output {
-        radix::Output::Rust(o) => &o.code,
-        radix::Output::Faber(o) => &o.code,
+        radix_module::Output::Rust(o) => &o.code,
+        radix_module::Output::Faber(o) => &o.code,
         _ => panic!("unexpected output variant in FHIR parity test"),
     }
 }
@@ -414,7 +414,7 @@ fn local_library_locale_surface_resolves_through_package_loader() {
     let dir = test_temp_dir("fhir-local-locale");
     let entry = write_local_locale_package(&dir);
     let (config, _diagnostic_pack) = crate::package::config_with_locale(
-        radix::codegen::Target::HirRust,
+        radix_module::codegen::Target::HirRust,
         &entry,
         Some("en-local-library"),
         None,
@@ -446,7 +446,7 @@ fn local_library_locale_surface_resolves_through_package_loader() {
         .expect("localized local utility unit");
     assert_eq!(
         util.file_interface.identity,
-        Some(radix::file_interface::InterfaceLibraryIdentity {
+        Some(radix_module::file_interface::InterfaceLibraryIdentity {
             provider: "package".to_owned(),
             package: Some("local-locale-fixture".to_owned()),
             module_path: vec!["util".to_owned()],
@@ -503,7 +503,7 @@ fn strict_pack_rejects_unlisted_canonical_member_spelling() {
     )
     .expect("write canonical-spelling consumer");
     let (config, _diagnostic_pack) = crate::package::config_with_locale(
-        radix::codegen::Target::HirRust,
+        radix_module::codegen::Target::HirRust,
         &entry,
         Some("en-local-library"),
         None,
@@ -531,7 +531,7 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
     let dir = test_temp_dir("fhir-external-library-locale");
     let entry = write_external_library_locale_package(&dir, EXTERNAL_LIBRARY_LOCALE_MAIN);
     let (config, _diagnostic_pack) = crate::package::config_with_locale(
-        radix::codegen::Target::HirRust,
+        radix_module::codegen::Target::HirRust,
         &entry,
         Some("en"),
         None,
@@ -808,8 +808,8 @@ fn loaded_package_canonical_faber_parity() {
         })
         .collect::<BTreeMap<_, _>>();
 
-    let latin = radix::locale::latin_locale_pack();
-    let surface = radix::locale::KeywordSurface::new(&latin);
+    let latin = radix_module::locale::latin_locale_pack();
+    let surface = radix_module::locale::KeywordSurface::new(&latin);
     for loaded_module in &loaded.modules {
         let direct_unit = direct_by_path
             .get(&loaded_module.relative_path)
@@ -975,8 +975,8 @@ fn loaded_package_library_import_unit_parity() {
     // Per-unit codegen parity (Rust + canonical Faber) with the library
     // import intact. Full crate assembly inlines library module bodies, which
     // is the store-backed Stage 5 path; the unit surface is source-free here.
-    let latin = radix::locale::latin_locale_pack();
-    let surface = radix::locale::KeywordSurface::new(&latin);
+    let latin = radix_module::locale::latin_locale_pack();
+    let surface = radix_module::locale::KeywordSurface::new(&latin);
     for target in [Target::HirRust, Target::HirFaber] {
         let direct_code = output_code(
             &generate_from_analyzed(

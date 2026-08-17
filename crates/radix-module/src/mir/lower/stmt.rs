@@ -1,0 +1,103 @@
+//! Statement lowering into MIR block bodies and terminators.
+//!
+//! Statements are where expression lowering meets CFG construction. This file
+//! owns the HIR visitor hooks that keep the current MIR block well-formed:
+//! ordinary statements append work to the open block, `redde` seals it with a
+//! return terminator, and loop-control statements delegate to the active loop
+//! context. Once a terminator is emitted, later HIR in the same block is treated
+//! as a lowering error instead of being appended after a sealed block.
+//!
+//! INVARIANTS
+//! ==========
+//! - Every emitted MIR statement belongs to an open block.
+//! - Statement-level unsupported forms become diagnostics, not partial MIR.
+//! - Assignment expressions are routed through place-aware lowering so the LHS
+//!   remains addressable instead of becoming a value-only operand.
+
+#[allow(clippy::wildcard_imports)]
+// parent module provides shared imports for lowering
+use super::*;
+use crate::hir::visit::HirVisitor;
+
+impl HirVisitor for FunctionBuilder<'_> {
+    /// Lower a HIR block in source order until a MIR terminator seals the
+    /// current block.
+    fn visit_block(&mut self, block: &HirBlock) {
+        if block.breakable.is_some() {
+            self.lower_breakable_block(block, block.span);
+            return;
+        }
+
+        for stmt in &block.statements {
+            if !self.current_is_open() {
+                break;
+            }
+            self.visit_stmt(stmt);
+        }
+
+        if let Some(expr) = &block.expr {
+            if self.current_is_open() {
+                self.visit_expr(expr);
+            }
+        }
+    }
+
+    /// Lower one HIR statement into the current MIR block.
+    ///
+    /// The visitor only accepts statement forms whose MIR contracts are already
+    /// represented. Provider blocks still fail closed because they require later
+    /// effect lowering policy.
+    fn visit_stmt(&mut self, stmt: &HirStatement) {
+        if !self.current_is_open() {
+            self.errors
+                .push(MirError::unsupported(stmt.span, "statement after a MIR terminator"));
+            return;
+        }
+
+        match &stmt.kind {
+            HirStatementKind::Local(local) => {
+                self.lower_local(local, stmt.span);
+            }
+            HirStatementKind::Expr(expr) => self.visit_expr(expr),
+            HirStatementKind::Redde(Some(expr)) => {
+                if let Some(value) = self.lower_return_expr(expr) {
+                    self.terminate_current(MirTerminatorKind::Return(Some(value)), stmt.span);
+                }
+            }
+            HirStatementKind::Redde(None) => {
+                self.terminate_current(MirTerminatorKind::Return(None), stmt.span);
+            }
+            HirStatementKind::Rumpe => self.lower_rumpe(stmt.span),
+            HirStatementKind::Perge => self.lower_perge(stmt.span),
+            HirStatementKind::Tacet => {}
+            HirStatementKind::IncDec(inc_dec) => self.lower_inc_dec_stmt(stmt.span, inc_dec),
+            HirStatementKind::Custodi(custodi) => {
+                for clause in &custodi.clauses {
+                    if !self.current_is_open() {
+                        break;
+                    }
+                    self.lower_si_stmt(&clause.cond, &clause.body, None, None, clause.span);
+                }
+            }
+        }
+    }
+
+    /// Lower a value-position expression used as a statement.
+    ///
+    /// Assignments are special because their left-hand side must remain a
+    /// `MirPlace`; every other expression can be lowered for its value and then
+    /// discarded if the caller does not need the operand.
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        match expr.kind {
+            HirExpressionKind::Assign(_, _) => {
+                self.lower_assignment_expr(expr);
+            }
+            HirExpressionKind::ConversioAssign { .. } => {
+                self.lower_conversio_assign_expr(expr);
+            }
+            _ => {
+                self.lower_expr_value(expr);
+            }
+        }
+    }
+}

@@ -16,7 +16,7 @@ use std::process::{Command, Stdio};
 fn convert_resolves_imports_in_corpus_fixture() {
     let fixture = exempla("importa/default-minimal.fab");
     let home =
-        radix::paths::faberlang_home().expect("faber crate must sit in the faberlang container");
+        radix_module::paths::faberlang_home().expect("faber crate must sit in the faberlang container");
     let mut child = Command::new(faber_binary())
         .args(["convert", "--to", "la", "--stdout"])
         .arg(&fixture)
@@ -93,7 +93,7 @@ fn convert_is_not_affected_by_manifest_format_policy() {
 
 #[test]
 fn convert_thai_localizes_surface() {
-    let root = radix::paths::faberlang_home()
+    let root = radix_module::paths::faberlang_home()
         .expect("faberlang container root")
         .join("examples/reader-locale/th-TH");
     let thai = root.join("src/main.fab");
@@ -214,7 +214,7 @@ fn convert_preserves_template_application_sugar() {
 fn convert_localizes() {
     // A bare --locale=<X> selects the HIR-backed re-emit path with the
     // localized surface (author mode when --locale is absent).
-    let root = radix::paths::faberlang_home()
+    let root = radix_module::paths::faberlang_home()
         .expect("faberlang container root")
         .join("examples/reader-locale/th-TH");
     let thai = root.join("src/main.fab");

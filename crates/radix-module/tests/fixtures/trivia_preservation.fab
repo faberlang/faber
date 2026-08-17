@@ -1,0 +1,24 @@
++++
+locale = "la"
++++
+
+# U-6 fixture: trivia preservation through parse → lower → FHIR → load → inspect.
+# Every comment sits at a legal attachment position:
+#   item (before the genus), member (before the field), entry (before incipit),
+#   statement (before a statement), block end (before the closing brace),
+#   program end (before EOF).
+
+# item: comment before a genus declaration
+genus Salutatio {
+    # member: comment immediately before a field
+    textus nomen
+}
+
+# entry: comment before the entry block
+incipit {
+    # statement: comment before a statement
+    fixum Salutatio salutatio ← Salutatio { nomen = "Salve" }
+    nota salutatio.nomen
+    # block-end: comment immediately before the closing brace
+}
+# EOF: comment before the end of the file

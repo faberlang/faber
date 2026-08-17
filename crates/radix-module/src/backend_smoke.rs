@@ -1,0 +1,535 @@
+//! Shared smoke helpers for focused driver, codegen, and MIR probe tests.
+//!
+//! **Not an ordinary correctness gate.** These helpers mutate the host (temp
+//! projects, external compilers) and skip when toolchains are absent. Ordinary
+//! lanes (`./scripta/test`, `./scripta/ci`, `.github/workflows/pr.yml`) must not
+//! require them. Use the opt-in `./scripta/smoke-ci` lane when host tools may be
+//! installed and emission validity must hard-fail.
+//!
+//! **Family A (HIR codegen):** Faber source → analyze → HIR codegen → smoke with the
+//! target compiler (`rustc`, `go build`, `tsc` / `deno check`).
+//!
+//! **Family B (MIR probe):** Faber source → analyze → MIR lower → MIR emit → smoke with
+//! `wasm-tools` / `llvm-as`.
+//!
+//! Missing toolchains skip with traced `eprintln!` and return; present toolchains
+//! hard-fail on invalid artifacts via `assert!`. Skip/pass lines are also appended to
+//! `target/smoke-trace.logl` for verification captures.
+
+use crate::codegen::Target;
+use crate::test_support::test_temp_dir;
+use std::fs::{self, OpenOptions};
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
+
+/// Shared target directory for smoke-test cargo builds. Redirects compiled
+/// artifacts to the shared cache so temp project dirs stay small and cleanup
+/// is trivial. Falls back to a per-user cache dir when `CARGO_TARGET_DIR` is
+/// not set by `.cargo/config.toml`.
+/// Cargo target dir for emitted-Rust smoke builds. Lives under the
+/// cargo-managed temp root (`<target-dir>/tmp/smoke-target`) so `cargo clean`
+/// sweeps it; there is deliberately no system-temp fallback.
+fn smoke_cargo_target_dir() -> PathBuf {
+    crate::test_support::cargo_managed_temp_root().join("smoke-target")
+}
+
+/// Temp project directory with automatic cleanup via [`tempfile::TempDir`].
+fn smoke_temp_dir(label: &str) -> tempfile::TempDir {
+    test_temp_dir(&format!("smoke-{label}"))
+}
+
+fn smoke_trace_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/smoke-trace.logl")
+}
+
+fn trace_smoke_line(line: &str) {
+    eprintln!("{line}");
+    let path = smoke_trace_path();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).ok();
+    }
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&path) {
+        writeln!(file, "{line}").ok();
+    }
+}
+
+fn io_ok<T>(result: io::Result<T>, ctx: &str) -> T {
+    match result {
+        Ok(value) => value,
+        Err(err) => panic!("{ctx}: {err}"),
+    }
+}
+
+fn command_ok(result: io::Result<Output>, ctx: &str) -> Output {
+    match result {
+        Ok(output) => output,
+        Err(err) => panic!("{ctx}: {err}"),
+    }
+}
+
+fn command_available(command: &str, args: &[&str]) -> bool {
+    Command::new(command)
+        .args(args)
+        .output()
+        .is_ok_and(|output| output.status.success())
+}
+
+#[must_use]
+pub fn rustc_available() -> bool {
+    command_available("rustc", &["--version"])
+}
+
+#[must_use]
+pub fn cargo_available() -> bool {
+    command_available("cargo", &["--version"])
+}
+
+#[must_use]
+pub fn go_available() -> bool {
+    command_available("go", &["version"])
+}
+
+#[must_use]
+pub fn wasm_tools_available() -> bool {
+    command_available("wasm-tools", &["--version"])
+}
+
+#[must_use]
+pub fn llvm_as_available() -> bool {
+    command_available("llvm-as", &["--version"])
+}
+
+#[must_use]
+pub fn ts_typechecker_available() -> bool {
+    command_available("tsc", &["--version"]) || command_available("deno", &["--version"])
+}
+
+#[must_use]
+pub fn swiftc_available() -> bool {
+    command_available("swiftc", &["--version"])
+}
+
+#[must_use]
+pub fn python3_available() -> bool {
+    command_available(
+        "python3",
+        &[
+            "-c",
+            "import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)",
+        ],
+    )
+}
+
+fn generated_rust_needs_tokio(code: &str) -> bool {
+    code.contains("tokio::") || code.contains("__faber_block_on")
+}
+
+fn render_smoke_cargo_dependencies(code: &str, runtime: &Path) -> String {
+    let mut deps = format!("faber = {{ package = \"faber-runtime\", path = \"{}\" }}\n", runtime.display());
+    if generated_rust_needs_tokio(code) {
+        deps.push_str("tokio = { version = \"1\", features = [\"rt\", \"net\", \"time\"] }\n");
+    }
+    deps
+}
+
+fn write_rust_cargo_project(project_dir: &Path, package_name: &str, code: &str, runtime: &Path) -> PathBuf {
+    io_ok(fs::create_dir_all(project_dir.join("src")), "create cargo src dir");
+    io_ok(fs::write(project_dir.join("src/main.rs"), code), "write generated rust");
+    let manifest = format!(
+        r#"[package]
+name = "{package_name}"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "{package_name}"
+path = "src/main.rs"
+
+[workspace]
+
+[dependencies]
+{deps}"#,
+        deps = render_smoke_cargo_dependencies(code, runtime)
+    );
+    let manifest_path = project_dir.join("Cargo.toml");
+    io_ok(fs::write(&manifest_path, manifest), "write Cargo.toml");
+    manifest_path
+}
+
+const TSC_SMOKE_ARGS: &[&str] = &["--strict", "--noEmit", "--target", "ES2022", "--module", "commonjs"];
+const GO_MOD_CONTENT: &str = "module smoke\n\ngo 1.21\n";
+
+fn log_smoke_passed(label: &str, tool: &str) {
+    trace_smoke_line(&format!("smoke passed: {label} via {tool}"));
+}
+
+fn log_smoke_skip(tool: &str, label: &str, action: &str) {
+    trace_smoke_line(&format!("{tool} not found on PATH; skipping smoke {action} for {label}"));
+}
+
+/// Appends a deterministic syntax-breaking trailer to a real emitted artifact.
+#[must_use]
+pub fn mangle_emitted_text(code: &str) -> String {
+    format!("{code}\n/*smoke-regression-guard*/ __BROKEN_SYNTAX__((!!!")
+}
+
+/// Corrupts a byte offset inside a real emitted Wasm module.
+#[must_use]
+pub fn mangle_emitted_bytes(bytes: &[u8]) -> Vec<u8> {
+    let mut mangled = bytes.to_vec();
+    if mangled.len() > 10 {
+        mangled[9] = 0xFF;
+    } else {
+        mangled.extend_from_slice(b"\0GARBAGE");
+    }
+    mangled
+}
+
+/// Family A entry point: structural validation of full HIR-emitted source text.
+/// # Panics
+///
+/// Panics when an assertion or unwrap path fails (test/helper utilities).
+pub fn assert_hir_emitted_smoke(target: Target, code: &str, label: &str) {
+    match target {
+        Target::HirRust => assert_emitted_rust_typechecks(code, label),
+        Target::HirGo => assert_emitted_go_compiles(code, label),
+        Target::HirTypeScript => assert_emitted_ts_typechecks(code, label),
+        Target::HirSwift => assert_emitted_swift_typechecks(code, label),
+        Target::HirPython => assert_emitted_python_parses(code, label),
+        other => {
+            panic!("assert_hir_emitted_smoke called with non-Family-A target {other:?}; use MIR smoke helpers instead")
+        }
+    }
+}
+
+/// Type-checks emitted Rust via a mini-Cargo project when `cargo` is on PATH.
+/// # Panics
+///
+/// Panics when an assertion or unwrap path fails (test/helper utilities).
+pub fn assert_emitted_rust_typechecks(code: &str, label: &str) {
+    if !cargo_available() {
+        log_smoke_skip("cargo", label, "typecheck");
+        return;
+    }
+    let Some(runtime) = crate::test_support::faber_runtime_crate_path() else {
+        log_smoke_skip(
+            "Faber Rust runtime",
+            label,
+            &format!(
+                "typecheck (set {} to the faber/runtime/rust package)",
+                crate::test_support::FABER_RUNTIME_CRATE_ENV
+            ),
+        );
+        return;
+    };
+
+    let dir = smoke_temp_dir(label);
+    let package_name = format!("smoke_{}", label.replace(|c: char| !c.is_ascii_alphanumeric(), "_"));
+    let manifest_path = write_rust_cargo_project(dir.path(), &package_name, code, &runtime);
+    let target_dir = smoke_cargo_target_dir();
+    io_ok(fs::create_dir_all(&target_dir), "create smoke cargo target dir");
+
+    let output = command_ok(
+        Command::new("cargo")
+            .arg("check")
+            .arg("--manifest-path")
+            .arg(&manifest_path)
+            .arg("--target-dir")
+            .arg(&target_dir)
+            .output(),
+        "execute cargo check",
+    );
+    assert!(
+        output.status.success(),
+        "cargo smoke typecheck failed for {label}:\n{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    log_smoke_passed(label, "cargo check");
+}
+
+/// Builds emitted Rust as an executable via a mini-Cargo project and returns the binary path.
+/// # Panics
+///
+/// Panics when an assertion or unwrap path fails (test/helper utilities).
+#[must_use]
+pub fn compile_emitted_rust_binary(code: &str, label: &str) -> PathBuf {
+    assert!(
+        cargo_available(),
+        "cargo not found on PATH; required for executable Rust smoke {label}"
+    );
+    let runtime = crate::test_support::faber_runtime_crate_path().unwrap_or_else(|| {
+        panic!(
+            "{} must point at the faber/runtime/rust package for executable Rust smoke {label}",
+            crate::test_support::FABER_RUNTIME_CRATE_ENV
+        )
+    });
+
+    // Temp project source is cleaned up when `dir` drops. Compiled artifacts
+    // land in the shared smoke target dir so the returned binary path survives.
+    let dir = smoke_temp_dir(label);
+    let package_name = format!("smoke_{}", label.replace(|c: char| !c.is_ascii_alphanumeric(), "_"));
+    let manifest_path = write_rust_cargo_project(dir.path(), &package_name, code, &runtime);
+    let target_dir = smoke_cargo_target_dir();
+    io_ok(fs::create_dir_all(&target_dir), "create smoke cargo target dir");
+
+    let output = command_ok(
+        Command::new("cargo")
+            .arg("build")
+            .arg("--manifest-path")
+            .arg(&manifest_path)
+            .arg("--target-dir")
+            .arg(&target_dir)
+            .output(),
+        "execute cargo build",
+    );
+    assert!(
+        output.status.success(),
+        "cargo smoke executable build failed for {label}:\n{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    log_smoke_passed(label, "cargo build");
+
+    let binary = target_dir
+        .join("debug")
+        .join(format!("{package_name}{}", std::env::consts::EXE_SUFFIX));
+    assert!(
+        binary.exists(),
+        "cargo build did not produce expected binary {}",
+        binary.display()
+    );
+    binary
+}
+
+/// Compiles emitted Go in a temp module when `go` is on PATH.
+/// # Panics
+///
+/// Panics when an assertion or unwrap path fails (test/helper utilities).
+pub fn assert_emitted_go_compiles(code: &str, label: &str) {
+    if !go_available() {
+        log_smoke_skip("go", label, "compile");
+        return;
+    }
+
+    let dir = smoke_temp_dir(label);
+    io_ok(fs::write(dir.path().join("go.mod"), GO_MOD_CONTENT), "write go.mod");
+    io_ok(fs::write(dir.path().join("main.go"), code), "write generated go");
+
+    let output = command_ok(
+        Command::new("go")
+            // Generated smoke modules are temporary and have no VCS identity.
+            // Disable Go's repository stamping so detached/worktree runs stay hermetic.
+            .env("GOFLAGS", "-buildvcs=false")
+            .args(["build", "-o", "/dev/null", "."])
+            .current_dir(dir.path())
+            .output(),
+        "execute go build",
+    );
+    assert!(
+        output.status.success(),
+        "go smoke compile failed for {label}:\n{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    log_smoke_passed(label, "go build");
+}
+
+/// Type-checks emitted TypeScript with pinned flags when `tsc` or `deno` is on PATH.
+/// # Panics
+///
+/// Panics when an assertion or unwrap path fails (test/helper utilities).
+pub fn assert_emitted_ts_typechecks(code: &str, label: &str) {
+    if !ts_typechecker_available() {
+        log_smoke_skip("tsc/deno", label, "typecheck");
+        return;
+    }
+
+    let dir = smoke_temp_dir(label);
+    let source = dir.path().join("main.ts");
+    io_ok(fs::write(&source, code), "write generated typescript");
+
+    let (tool, output) = if command_available("tsc", &["--version"]) {
+        let mut command = Command::new("tsc");
+        command
+            .args(TSC_SMOKE_ARGS)
+            .arg("main.ts")
+            .current_dir(dir.path());
+        ("tsc --strict --noEmit", command_ok(command.output(), "execute tsc"))
+    } else {
+        (
+            "deno check",
+            command_ok(
+                Command::new("deno")
+                    .args(["check", "main.ts"])
+                    .current_dir(dir.path())
+                    .output(),
+                "execute deno check",
+            ),
+        )
+    };
+    assert!(
+        output.status.success(),
+        "TypeScript smoke typecheck failed for {label}:\n{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    log_smoke_passed(label, tool);
+}
+
+/// Compiles emitted Swift source with `swiftc` when it is on PATH.
+/// # Panics
+///
+/// Panics when an assertion or unwrap path fails (test/helper utilities).
+pub fn assert_emitted_swift_typechecks(code: &str, label: &str) {
+    if !swiftc_available() {
+        log_smoke_skip("swiftc", label, "compile");
+        return;
+    }
+
+    let dir = smoke_temp_dir(label);
+    let source = dir.path().join("main.swift");
+    io_ok(fs::write(&source, code), "write generated swift");
+
+    let output = command_ok(
+        Command::new("swiftc")
+            .args(["-typecheck", &source.to_string_lossy()])
+            .output(),
+        "execute swiftc -typecheck",
+    );
+    assert!(
+        output.status.success(),
+        "Swift smoke typecheck failed for {label}:\n{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    log_smoke_passed(label, "swiftc");
+}
+
+/// Parses and compiles emitted Python with `python3` ≥ 3.12 when it is on PATH.
+///
+/// # Panics
+///
+/// Panics when an assertion or unwrap path fails (test/helper utilities).
+pub fn assert_emitted_python_parses(code: &str, label: &str) {
+    if !python3_available() {
+        log_smoke_skip("python3>=3.12", label, "parse");
+        return;
+    }
+
+    let dir = smoke_temp_dir(label);
+    let source = dir.path().join("main.py");
+    io_ok(fs::write(&source, code), "write generated python");
+
+    let output = command_ok(
+        Command::new("python3")
+            .args([
+                "-c",
+                "import ast, pathlib, sys; p = pathlib.Path(sys.argv[1]); s = p.read_text(encoding='utf-8'); ast.parse(s); compile(s, str(p), 'exec')",
+                source.to_str().expect("temp python path is utf-8"),
+            ])
+            .output(),
+        "execute python3 ast.parse/compile",
+    );
+    assert!(
+        output.status.success(),
+        "Python smoke parse failed for {label}:\n{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    log_smoke_passed(label, "python3 ast.parse");
+}
+
+/// Family B entry point: validates Wasm module bytes with `wasm-tools validate`.
+/// # Panics
+///
+/// Panics when an assertion or unwrap path fails (test/helper utilities).
+pub fn assert_mir_wasm_smoke(bytes: &[u8], label: &str) {
+    if !wasm_tools_available() {
+        log_smoke_skip("wasm-tools", label, "validate");
+        return;
+    }
+
+    let dir = smoke_temp_dir(label);
+    let wasm_file = dir.path().join("module.wasm");
+    io_ok(fs::write(&wasm_file, bytes), "write wasm bytes");
+
+    let output = command_ok(
+        Command::new("wasm-tools")
+            .args(["validate", &wasm_file.to_string_lossy()])
+            .output(),
+        "execute wasm-tools validate",
+    );
+    assert!(
+        output.status.success(),
+        "wasm-tools validate failed for {label}:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    log_smoke_passed(label, "wasm-tools validate");
+}
+
+/// Family B entry point: round-trips WAT through `wasm-tools parse` then validates binary output.
+/// # Panics
+///
+/// Panics when an assertion or unwrap path fails (test/helper utilities).
+pub fn assert_mir_wasm_text_smoke(wat: &str, label: &str) {
+    if !wasm_tools_available() {
+        log_smoke_skip("wasm-tools", label, "text round-trip");
+        return;
+    }
+
+    let dir = smoke_temp_dir(label);
+    let wat_file = dir.path().join("module.wat");
+    let wasm_file = dir.path().join("module.wasm");
+    io_ok(fs::write(&wat_file, wat), "write wat");
+
+    let parse = command_ok(
+        Command::new("wasm-tools")
+            .args(["parse", &wat_file.to_string_lossy(), "-o", &wasm_file.to_string_lossy()])
+            .output(),
+        "execute wasm-tools parse",
+    );
+    assert!(
+        parse.status.success(),
+        "wasm-tools parse failed for {label}:\n{}",
+        String::from_utf8_lossy(&parse.stderr)
+    );
+
+    let bytes = io_ok(fs::read(&wasm_file), "read parsed wasm");
+    assert_mir_wasm_smoke(&bytes, label);
+}
+
+/// Family B entry point: assembles LLVM IR with `llvm-as` when available.
+/// # Panics
+///
+/// Panics when an assertion or unwrap path fails (test/helper utilities).
+pub fn assert_mir_llvm_smoke(ll: &str, label: &str) {
+    if !llvm_as_available() {
+        log_smoke_skip("llvm-as", label, "assemble");
+        return;
+    }
+
+    let dir = smoke_temp_dir(label);
+    let ll_file = dir.path().join("module.ll");
+    io_ok(fs::write(&ll_file, ll), "write llvm ir");
+
+    let output = command_ok(
+        Command::new("llvm-as")
+            .args([&ll_file.to_string_lossy(), "-o", "/dev/null"])
+            .output(),
+        "execute llvm-as",
+    );
+    assert!(
+        output.status.success(),
+        "llvm-as smoke failed for {label}:\n{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    log_smoke_passed(label, "llvm-as");
+}
+
+#[cfg(test)]
+#[cfg(feature = "mir-llvm")]
+#[path = "backend_smoke_test.rs"]
+mod tests;

@@ -3,9 +3,9 @@
 //! S4) and the `[format]` manifest policy + precedence chain (S5).
 //! Reader-locale conversion lives in `faber convert` (`commands/convert.rs`).
 
-use radix::codegen::Target;
-use radix::driver::{peel_raw_source, split_frontmatter, Config, Session};
-use radix::forma::{compile_author_with_policy, FormatCompileResult, FormatPolicy};
+use radix_module::codegen::Target;
+use radix_module::driver::{peel_raw_source, split_frontmatter, Config, Session};
+use radix_module::forma::{compile_author_with_policy, FormatCompileResult, FormatPolicy};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -212,7 +212,7 @@ pub(super) fn convert_single_doc(path: &Path, to: &str, source: &str) -> Result<
             return Err(());
         }
     };
-    let result = radix::forma::compile_canonical(&session, &name, source);
+    let result = radix_module::forma::compile_canonical(&session, &name, source);
     let mut had_error = false;
     for diag in &result.diagnostics {
         if diag.is_error() {

@@ -30,7 +30,7 @@ use crate::cli::Command;
 use crate::input_shape::{locale_without_package_error, verify_input_is_package_shaped};
 use crate::package;
 use clap::Parser;
-use radix::tool::{self, BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
+use radix_module::tool::{self, BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
 
 use convert::cmd_convert;
 use explain::cmd_explain;
@@ -56,7 +56,7 @@ fn diagnostic_mode(enabled: bool) -> DiagnosticMode {
 /// Exits with a clear message on the first unknown code.
 pub(super) fn validate_deny_codes(codes: &[String]) {
     for code in codes {
-        if !radix::is_known_diagnostic_code(code) {
+        if !radix_module::is_known_diagnostic_code(code) {
             eprintln!("error: unknown diagnostic code '{code}' passed to --deny");
             std::process::exit(1);
         }
@@ -64,7 +64,7 @@ pub(super) fn validate_deny_codes(codes: &[String]) {
 }
 
 /// Print package compile diagnostics in the normal CLI style.
-pub(super) fn eprint_compile_diagnostics(diagnostics: &[radix::diagnostics::Diagnostic]) {
+pub(super) fn eprint_compile_diagnostics(diagnostics: &[radix_module::diagnostics::Diagnostic]) {
     for diag in diagnostics {
         if diag.is_error() {
             eprintln!("error: {}", diag.message);
@@ -106,7 +106,7 @@ fn dispatch(command: Command) {
                     release: args.release,
                     target: args
                         .target
-                        .unwrap_or(radix::tool::CliTarget::HirRust)
+                        .unwrap_or(radix_module::tool::CliTarget::HirRust)
                         .into(),
                     target_explicit,
                     deny_warnings: args.deny_warnings,
@@ -189,7 +189,7 @@ fn dispatch(command: Command) {
                 diagnostics_locale_pack: None,
                 locale: args.locale,
                 diagnostics_locale: args.diagnostics_locale,
-                output_mode: radix::codegen::OutputMode::Application,
+                output_mode: radix_module::codegen::OutputMode::Application,
                 module_name: None,
                 #[cfg(feature = "mir-llvm")]
                 cuda_descriptor: None,

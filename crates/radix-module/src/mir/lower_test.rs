@@ -1,0 +1,4670 @@
+//! Tests for HIR-to-MIR lowering.
+//!
+//! Coverage-law W3-C: split with section headers, edge siblings,
+//! and tightened assertions.
+//!
+//! Section map:
+//!   A — Function shells, params, locals, entry prefix
+//!   B — Constants, literals, return values
+//!   C — Matrix / vector / tensor operations
+//!   D — Control flow: si, elige, dum, fac/cape, rumpe/perge, itera
+//!   E — Discerne & enum variant operations
+//!   F — Failable functions & error handlers
+//!   G — Direct calls, intrinsics, methods
+//!   H — Aggregate construction (struct, array, map, set, tensor)
+//!   I — Collection runtime methods
+//!   J — Closures, callable values, captured environments
+//!   K — Generic monomorphization & explicit type args
+//!   L — Builder-level unit tests (manual HIR construction)
+//!   M — Shader stage identity (compute / vertex / fragment)
+
+use super::*;
+use crate::codegen::Target;
+use crate::driver::{Config, Session};
+use crate::hir::HirId;
+use crate::mir::type_contains_param;
+use crate::mir::validate_program;
+use std::path::PathBuf;
+
+fn analyze(source: &str) -> AnalyzedModule {
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    crate::driver::analyze_source(&session, "test.fab", source).expect("analysis succeeds")
+}
+
+fn dump_source(source: &str) -> String {
+    let mut unit = analyze(source);
+    dump_analyzed_unit(&mut unit).expect("MIR lowering succeeds")
+}
+
+/// Return the body text of the first `bb0:` block in a MIR dump.
+///
+/// WHY: breakable-block CFG bugs seal the entry block with `unreachable` while
+/// still emitting stray `goto bb` edges elsewhere. Asserting on the entry block
+/// specifically catches regressions that whole-dump `contains` checks hide.
+fn first_block_body(dump: &str) -> String {
+    let start = dump.find("bb0:").expect("dump has an entry block");
+    let body_start = start + "bb0:".len();
+    let end = dump[body_start..]
+        .find("\n  bb")
+        .or_else(|| dump[body_start..].find("\n}"))
+        .map_or(dump.len(), |offset| body_start + offset);
+    dump[body_start..end].to_owned()
+}
+
+fn unsupported_range_expr(numerus: crate::semantic::TypeId, span: crate::lexer::Span, first_id: u32) -> HirExpression {
+    HirExpression {
+        id: HirId(first_id),
+        kind: HirExpressionKind::Intervallum {
+            start: Box::new(HirExpression {
+                id: HirId(first_id + 1),
+                kind: HirExpressionKind::Literal(HirLiteral::Int(0)),
+                ty: Some(numerus),
+                span,
+            }),
+            end: Box::new(HirExpression {
+                id: HirId(first_id + 2),
+                kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
+                ty: Some(numerus),
+                span,
+            }),
+            step: Some(Box::new(HirExpression {
+                id: HirId(first_id + 3),
+                kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
+                ty: Some(numerus),
+                span,
+            })),
+            kind: HirRangeKind::Exclusive,
+        },
+        ty: Some(numerus),
+        span,
+    }
+}
+
+// ===========================================================================
+// Section A: Function shells, params, locals, entry prefix
+// ===========================================================================
+
+#[test]
+fn lowers_empty_function_shell_to_mir_dump() {
+    let dump = dump_source("functio saluta() {}");
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#5 {
+  bb0:
+    return
+}
+"
+    );
+}
+
+// ===========================================================================
+// Section B: Constants, literals, return values
+// ===========================================================================
+
+#[test]
+fn lowers_top_level_const_as_entry_prefix_local() {
+    let dump = dump_source(
+        r"
+fixum _ age ← 25
+
+incipit {
+    nota age
+}
+",
+    );
+
+    assert!(dump.contains("let _0: ty#1"));
+    assert!(dump.contains("_0 = const int 25: ty#1"));
+    assert!(dump.contains("runtime diagnostic nota(_0)"));
+    assert!(!dump.contains("top-level const"));
+}
+
+#[test]
+fn lowers_top_level_const_paths_inside_functions() {
+    let dump = dump_source(
+        r"
+fixum numerus answer ← 42
+
+functio readAnswer() → numerus {
+    redde answer
+}
+",
+    );
+
+    assert!(dump.contains("let _0: ty#1"));
+    assert!(dump.contains("_0 = const int 42: ty#1"));
+    assert!(dump.contains("return _0"));
+    assert!(!dump.contains("path that does not resolve to a local value"));
+}
+
+#[test]
+fn lowers_atomic_methods_to_dedicated_mir_intrinsics() {
+    let dump = dump_source(
+        r"
+functio atomic_ops(atomic<i32> cell, i32 value) → bivalens {
+    fixum i32 loaded ← cell.load()
+    cell.store(value)
+    fixum i32 old ← cell.exchange(loaded)
+    redde cell.compare_exchange(old, value)
+}
+",
+    );
+
+    assert!(dump.contains("runtime atomic load(_0)"));
+    assert!(dump.contains("runtime atomic store(_0, _1)"));
+    assert!(dump.contains("runtime atomic exchange(_0, _2)"));
+    assert!(dump.contains("runtime atomic compare_exchange(_0, _3, _1)"));
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+}
+
+#[test]
+fn lowers_function_params_into_mir_params() {
+    let dump = dump_source("functio saluta(textus nomen, numerus aetas) {}");
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#5 {
+  params:
+    _0: ty#0
+    _1: ty#1
+  locals:
+    let _0: ty#0
+    let _1: ty#1
+  bb0:
+    return
+}
+"
+    );
+}
+
+#[test]
+fn lowers_function_params_as_mir_locals() {
+    let mut unit = analyze("functio saluta(textus nomen, numerus aetas) {}");
+    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let function = &program.functions[0];
+
+    assert_eq!(function.params.len(), 2);
+    assert_eq!(function.locals.len(), 2);
+    assert_eq!(function.params[0].local, function.locals[0].id);
+    assert_eq!(function.params[1].local, function.locals[1].id);
+    assert!(!function.locals[0].mutable);
+    assert!(!function.locals[1].mutable);
+}
+
+// ===========================================================================
+// Section C: Matrix / vector / tensor operations
+// ===========================================================================
+
+#[test]
+fn lowers_matrix_elementwise_method_to_matrix_cells() {
+    let dump = dump_source(
+        r"
+functio matrix_ops(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<f32, [2, 2]> {
+    redde a.addita(b)
+}
+",
+    );
+
+    assert!(dump.contains("_0.cell0_0 + _1.cell0_0"), "{dump}");
+    assert!(dump.contains("_0.cell0_1 + _1.cell0_1"), "{dump}");
+    assert!(dump.contains("_0.cell1_0 + _1.cell1_0"), "{dump}");
+    assert!(dump.contains("_0.cell1_1 + _1.cell1_1"), "{dump}");
+    assert!(dump.contains("construct matrix"), "{dump}");
+    assert!(!dump.contains("matrix method before MIR lowering"), "{dump}");
+}
+
+#[test]
+fn lowers_matrix_matmul_to_cell_mul_add() {
+    let dump = dump_source(
+        r"
+functio product(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<f32, [2, 2]> {
+    redde a.matmul(b)
+}
+",
+    );
+
+    assert!(dump.contains("_0.cell0_0 * _1.cell0_0"), "{dump}");
+    assert!(dump.contains("_0.cell0_1 * _1.cell1_0"), "{dump}");
+    assert!(dump.contains("construct matrix"), "{dump}");
+    assert!(!dump.contains("matrix method before MIR lowering"), "{dump}");
+}
+
+#[test]
+fn lowers_matrix_applica_to_cell_lane_mul_add() {
+    let dump = dump_source(
+        r"
+functio apply(matrix<f32, [2, 2]> m, vector<f32, 2> v) → vector<f32, 2> {
+    redde m.applica(v)
+}
+",
+    );
+
+    assert!(dump.contains("_0.cell0_0 * _1.lane0"), "{dump}");
+    assert!(dump.contains("_0.cell0_1 * _1.lane1"), "{dump}");
+    assert!(dump.contains("construct vector"), "{dump}");
+    assert!(!dump.contains("matrix method before MIR lowering"), "{dump}");
+}
+
+#[test]
+fn lowers_vector_longitudo_to_sqrt_of_dot() {
+    // R-W3-lane (wave3 residual C-1): assert the full sum-of-squares structure.
+    // The prior `contains(".lane0")` OR-fallback was near-vacuous for any vector dump.
+    let dump = dump_source(
+        r"
+functio length(vector<f32, 3> v) → f32 {
+    redde v.longitudo()
+}
+",
+    );
+    assert!(dump.contains("sqrt"), "longitudo must lower through sqrt\n{dump}");
+    assert!(
+        dump.contains("_0.lane0 * _0.lane0"),
+        "longitudo must square lane0 for dot(v,v)\n{dump}"
+    );
+    assert!(
+        dump.contains("_0.lane1 * _0.lane1"),
+        "longitudo must square lane1 for vector<f32,3>\n{dump}"
+    );
+    assert!(
+        dump.contains("_0.lane2 * _0.lane2"),
+        "longitudo must square lane2 for vector<f32,3>\n{dump}"
+    );
+}
+
+#[test]
+fn lowers_matrix_inversa_2x2_to_det_and_option() {
+    let dump = dump_source(
+        r"
+functio inv(matrix<f32, [2, 2]> m) → matrix<f32, [2, 2]> ∪ nihil {
+    redde m.inversa()
+}
+",
+    );
+    assert!(
+        dump.contains("construct matrix"),
+        "inversa must build a matrix in the some arm\n{dump}"
+    );
+    assert!(dump.contains("some("), "inversa must wrap the matrix in option some\n{dump}");
+    assert!(
+        dump.contains("none"),
+        "inversa must produce option none for singular input\n{dump}"
+    );
+}
+
+#[test]
+fn lowers_matrix_materialize_from_nested_lista() {
+    let dump = dump_source(
+        r"
+functio identitas() → matrix<f32, [2, 2]> {
+    redde [[1.0, 0.0], [0.0, 1.0]] ↦ matrix<f32, [2, 2]>
+}
+",
+    );
+
+    assert!(dump.contains("construct matrix"), "{dump}");
+    assert!(dump.contains("const float 1.0") || dump.contains("const float 1"), "{dump}");
+}
+
+#[test]
+fn lowers_explicit_no_value_redde_as_trivial_return() {
+    let dump = dump_source("functio saluta() → vacuum { redde }");
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#5 {
+  bb0:
+    return
+}
+"
+    );
+}
+
+#[test]
+fn gpu_builtin_call_lowers_to_mir_intrinsic() {
+    let dump = dump_source(
+        r"
+@ nucleum
+functio index() → u32 {
+    redde global_invocation_x()
+}
+",
+    );
+
+    assert!(dump.contains("runtime gpu_builtin global_invocation_x"), "{dump}");
+    assert!(!dump.contains("call def#"), "{dump}");
+}
+
+#[test]
+fn lowers_primitive_constants_and_explicit_redde() {
+    let dump = dump_source(
+        r#"functio constantes() → bivalens {
+  varia textus t ← "salve"
+  varia fractus f ← 1.5
+  varia bivalens b ← verum
+  redde b
+}"#,
+    );
+
+    assert_eq!(
+        dump,
+        // `varia` (Batch E) and `verum` (Batch C) are tokenless, so they are
+        // interned as identifiers and shift the string constant's symbol
+        // index (sym#6 rather than sym#4).
+        "\
+function f0 -> ty#3 {
+  locals:
+    var _0: ty#0
+    var _1: ty#2
+    var _2: ty#3
+  bb0:
+    _0 = const string sym#6: ty#0
+    _1 = const float 1.5: ty#2
+    _2 = const bool true: ty#3
+    return _2
+}
+"
+    );
+}
+
+#[test]
+fn lowers_vacua_to_empty_collection_aggregates() {
+    let dump = dump_source(
+        r"functio inanes() → numerus {
+  fixum lista<numerus> numeri ← vacua
+  fixum tabula<textus, numerus> pondera ← vacua
+  fixum copia<textus> nomina ← vacua
+  redde 0
+}",
+    );
+
+    assert!(dump.contains("construct array:"));
+    assert!(dump.contains("construct map:"));
+    assert!(dump.contains("construct set:"));
+    assert!(dump.contains("[]"));
+    assert!(dump.contains("{}"));
+}
+
+#[test]
+fn lowers_tensor_vacua_to_rank_zero_aggregate() {
+    let dump = dump_source(
+        r"functio empty_tensor() → numerus {
+  fixum tensor<fractus<f32>, []> grid ← vacua
+  redde 0
+}",
+    );
+
+    assert!(dump.contains("construct tensor:"));
+}
+
+#[test]
+fn lowers_genus_method_calls_with_explicit_receiver_param() {
+    let dump = dump_source(
+        r"genus Capsa {
+  numerus n = 1
+  functio value() → numerus { redde ego.n }
+}
+
+incipit {
+  fixum _ c ← Capsa { n = 4 }
+  nota c.value()
+}",
+    );
+
+    assert!(dump.contains("function f0 -> ty#1 {\n  params:\n    _0:"));
+    assert!(dump.contains("return _0.sym#"));
+    assert!(dump.contains("%1 = call def#"));
+    assert!(dump.contains("runtime diagnostic nota(%1)"));
+}
+
+#[test]
+fn lowers_non_nullable_coalesce_without_requiring_nullable_lhs() {
+    let dump = dump_source(
+        r"incipit {
+  fixum _ zero ← 0
+  nota zero vel 999
+}",
+    );
+
+    assert!(dump.contains("option coalesce("));
+    assert!(dump.contains("runtime diagnostic nota("));
+}
+
+#[test]
+fn lowers_optional_chain_on_known_present_base() {
+    let dump = dump_source(
+        r#"genus Address {
+  textus city
+}
+
+genus User {
+  textus name
+  Address address sponte
+}
+
+incipit {
+  fixum _ alice ← User { name = "Alice", address = Address { city = "Roma" } }
+  nota alice?.address?.city
+}"#,
+    );
+
+    assert!(dump.contains("option chain("));
+    assert!(dump.contains("runtime diagnostic nota("));
+}
+
+// WHY: lowers_field_projection_from_object_literal_map_shape was removed in
+// literal-family Stage 6. It tested field projection (`.x`) from anonymous
+// object literals, a retired feature now that bare `{ }` is JSON valor.
+#[test]
+fn materializes_constant_int_redde_with_type() {
+    let dump = dump_source("functio unum() → numerus { redde 1 }");
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#1 {
+  temps:
+    %0: ty#1
+  bb0:
+    %0 = const int 1: ty#1
+    return %0
+}
+"
+    );
+}
+
+#[test]
+fn materializes_constant_nil_redde_with_type() {
+    let dump = dump_source("functio nullum() → nihil { redde nihil }");
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#4 {
+  temps:
+    %0: ty#4
+  bb0:
+    %0 = const nil: ty#4
+    return %0
+}
+"
+    );
+}
+
+#[test]
+fn allows_no_value_return_for_nihil_side_effect_function() {
+    let dump = dump_source(
+        r#"
+functio log() → nihil {
+    nota "ok"
+}
+"#,
+    );
+
+    assert!(dump.contains("runtime diagnostic nota"));
+    assert!(dump.contains("return\n"));
+}
+
+#[test]
+// ===========================================================================
+// Section F: Failable functions — iace, return_error, mori, handlers
+// ===========================================================================
+
+fn failable_function_dump_renders_alternate_exit_type() {
+    let dump = dump_source(r#"functio fail() → numerus ⇥ textus { iace "bad" }"#);
+
+    assert!(dump.starts_with("function f0 -> ty#1 ⇥ ty#0 {\n"));
+    assert!(dump.contains("  temps:\n    %0: ty#0\n"));
+    assert!(dump.contains("    %0 = const string sym#"));
+    assert!(dump.contains("    return_error %0\n"));
+}
+
+#[test]
+fn lowers_iace_to_return_error() {
+    let dump = dump_source(
+        r#"functio divide(numerus a, numerus b) → numerus ⇥ textus {
+  si b ≡ 0 ergo iace "division by zero"
+  redde a / b
+}"#,
+    );
+
+    assert!(dump.contains("function f0 -> ty#1 ⇥ ty#0 {\n"));
+    assert!(dump.contains("branch %0 bb1 bb2"));
+    assert!(dump.contains("return_error %1"));
+    assert!(dump.contains("return %2"));
+}
+
+#[test]
+fn lowers_failable_call_in_alternate_exit_function_to_return_error_edge() {
+    let dump = dump_source(
+        r#"
+functio fail() → numerus ⇥ textus { iace "bad" }
+
+functio caller() → numerus ⇥ textus {
+    fixum numerus x ← fail()
+    redde x + 1
+}
+"#,
+    );
+
+    assert!(dump.contains("function f1 -> ty#1 ⇥ ty#0 {\n"));
+    assert!(dump.contains("try_call def#4096()"));
+    assert!(dump.contains("error %0 -> bb"));
+    assert!(dump.contains("return_error %0"));
+}
+
+#[test]
+fn lowers_mori_to_panic_runtime_call_and_unreachable() {
+    let dump = dump_source(r#"functio impossible() → vacuum { mori "impossible state" }"#);
+
+    assert!(dump.contains("function f0 -> ty#5 {\n"));
+    assert!(dump.contains("runtime panic(const string sym#"));
+    assert!(dump.contains(") -> ty#6\n"));
+    assert!(dump.contains("    unreachable\n"));
+}
+
+#[test]
+fn lowers_params_and_local_reads_into_places() {
+    let dump = dump_source("functio idem(numerus n) → numerus { redde n }");
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#1 {
+  params:
+    _0: ty#1
+  locals:
+    let _0: ty#1
+  bb0:
+    return _0
+}
+"
+    );
+}
+
+#[test]
+fn lowers_locals_assignment_and_binary_ops() {
+    let dump = dump_source("functio computa() → numerus { varia numerus x ← 1 x ← x + 2 redde x }");
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#1 {
+  locals:
+    var _0: ty#1
+  temps:
+    %0: ty#1
+  bb0:
+    _0 = const int 1: ty#1
+    %0 = _0 + const int 2: ty#1
+    _0 = %0: ty#1
+    return _0
+}
+"
+    );
+}
+
+#[test]
+fn lowers_postfix_increment_and_decrement() {
+    let dump = dump_source("functio computa() → numerus { varia numerus x ← 1 x ↑ x ↓ redde x }");
+
+    assert!(dump.contains("%0 = _0 + const int 1: ty#1"));
+    assert!(dump.contains("_0 = %0: ty#1"));
+    assert!(dump.contains("%1 = _0 - const int 1: ty#1"));
+    assert!(dump.contains("_0 = %1: ty#1"));
+}
+
+#[test]
+fn lowers_postfix_increment_evaluates_index_once() {
+    let dump = dump_source(
+        r"functio f() → numerus { redde 0 }
+functio bump(in lista<numerus> xs) {
+  xs[f()] ↑
+}",
+    );
+
+    let f1_body = dump
+        .split("function f1")
+        .nth(1)
+        .expect("missing f1 lowering");
+    let f_calls = f1_body.matches("call def#").count();
+    assert_eq!(f_calls, 1, "index expression must be evaluated once: {dump}");
+}
+
+#[test]
+fn lowers_unary_ops_to_typed_temps() {
+    let dump = dump_source("functio logicum(bivalens a) → bivalens { redde non a }");
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#3 {
+  params:
+    _0: ty#3
+  locals:
+    let _0: ty#3
+  temps:
+    %0: ty#3
+  bb0:
+    %0 = not _0: ty#3
+    return %0
+}
+"
+    );
+}
+
+#[test]
+fn lowers_canonical_predicate_replacements_to_mir_primitives() {
+    let dump = dump_source(
+        r"
+functio pred(numerus n, fractus f, bivalens flag, textus ∪ nihil maybe) → bivalens {
+    fixum _ positive ← n > 0
+    fixum _ negative ← f < 0
+    fixum _ enabled ← flag est verum
+    fixum _ disabled ← flag est falsum
+    fixum _ absent ← maybe est nihil
+    redde positive et negative et enabled et disabled et absent
+}
+",
+    );
+
+    assert!(dump.contains("%0 = _0 > const int 0: ty#3"));
+    assert!(dump.contains("%1 = _1 < const int 0: ty#3"));
+    assert!(dump.contains("%2 = _2 == const bool true: ty#3"));
+    assert!(dump.contains("%3 = _2 == const bool false: ty#3"));
+    assert!(dump.contains("%4 = is_nil _3: ty#3"));
+    assert!(!dump.contains("unary operator without a MIR primitive"));
+    assert!(!dump.contains("binary operator without a MIR primitive"));
+}
+
+#[test]
+fn lowers_est_type_check_to_runner_dispatched_variant_tag_intrinsic() {
+    // F-023: `est numerus` must NOT lower to `<inner> == false`.
+    // Since S5-U3, `est`/`non est` lower to the runner-dispatched
+    // MirIntrinsic::TypeCheck carrying the target type instead of the older
+    // IsNil/IsNotNil nullity approximation.
+    let dump = dump_source(
+        r"
+functio check(valor v) → bivalens {
+    fixum _ positive ← v est numerus
+    fixum _ negative ← v non est numerus
+    redde positive et negative
+}
+",
+    );
+
+    // est numerus must NOT approximate as v == false
+    assert!(!dump.contains("== const bool false"), "F-023: est must not lower to == false");
+    // est numerus lowers to a positive variant-tag type check
+    assert!(
+        dump.contains("type_check positive=true"),
+        "est numerus should lower to a positive type check"
+    );
+    // non est numerus lowers to a negated variant-tag type check
+    assert!(
+        dump.contains("type_check positive=false"),
+        "non est numerus should lower to a negated type check"
+    );
+}
+
+#[test]
+// ===========================================================================
+// Section G: Direct calls, intrinsics, methods
+// ===========================================================================
+
+fn lowers_direct_calls_to_definition_callees() {
+    let dump =
+        dump_source("functio duplex(numerus n) → numerus { redde n * 2 } functio usa() → numerus { redde duplex(4) }");
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#1 {
+  params:
+    _0: ty#1
+  locals:
+    let _0: ty#1
+  temps:
+    %0: ty#1
+  bb0:
+    %0 = _0 * const int 2: ty#1
+    return %0
+}
+
+function f1 -> ty#1 {
+  temps:
+    %0: ty#1
+  bb0:
+    %0 = call def#4096(const int 4)
+    return %0
+}
+"
+    );
+}
+
+#[test]
+fn lowers_vacuum_direct_calls_without_destinations() {
+    let dump = dump_source("functio ping() → vacuum { redde } functio usa() → vacuum { ping() redde }");
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#5 {
+  bb0:
+    return
+}
+
+function f1 -> ty#5 {
+  bb0:
+    call def#4096()
+    return
+}
+"
+    );
+}
+
+#[test]
+fn lowers_empty_entry_block_as_synthetic_function() {
+    let dump = dump_source("incipit {}");
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#5 {
+  bb0:
+    return
+}
+"
+    );
+}
+
+#[test]
+fn lowers_non_empty_entry_block_as_synthetic_function_body() {
+    let dump = dump_source(r"incipit { fixum numerus n ← 1 + 2 }");
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#5 {
+  locals:
+    let _0: ty#1
+  temps:
+    %0: ty#1
+  bb0:
+    %0 = const int 1 + const int 2: ty#1
+    _0 = %0: ty#1
+    return
+}
+"
+    );
+}
+
+#[test]
+fn lowers_tacet_to_noop() {
+    let dump = dump_source(r"incipit { tacet }");
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#5 {
+  bb0:
+    return
+}
+"
+    );
+}
+
+#[test]
+// ===========================================================================
+// Section L: Builder-level unit tests (L4 — manual HIR construction)
+// ===========================================================================
+
+fn failed_local_initializer_does_not_bind_local() {
+    use crate::hir::{DefId, HirLocal};
+    use crate::lexer::{Span, Symbol};
+    use crate::semantic::{Primitive, TypeTable};
+
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let span = Span::default();
+    let mut builder = FunctionBuilder::new(&types);
+    let entry = builder.fresh_block(span);
+    builder.switch_to(entry);
+    let local = HirLocal {
+        def_id: DefId(9),
+        name: Symbol(9),
+        ty: Some(numerus),
+        init: Some(unsupported_range_expr(numerus, span, 0)),
+        mutable: false,
+        is_await: false,
+        runtime_provided: false,
+    };
+
+    assert!(builder.lower_local(&local, span).is_none());
+    assert!(!builder.bindings.contains_key(&DefId(9)));
+    assert_eq!(builder.errors.len(), 1);
+    assert_eq!(
+        builder.errors[0].issue,
+        "unsupported_mir_lowering_stepped_interval_value_before_interval_mir_lowering"
+    );
+
+    let deferred = HirLocal {
+        def_id: DefId(10),
+        name: Symbol(10),
+        ty: Some(numerus),
+        init: None,
+        mutable: false,
+        is_await: false,
+        runtime_provided: false,
+    };
+    assert!(builder.lower_local(&deferred, span).is_some());
+    assert!(builder.bindings.contains_key(&DefId(10)));
+}
+
+#[test]
+fn failed_top_level_const_initializer_does_not_bind_const() {
+    use crate::hir::{DefId, HirConst};
+    use crate::lexer::{Span, Symbol};
+    use crate::semantic::{Primitive, TypeTable};
+
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let span = Span::default();
+    let mut builder = FunctionBuilder::new(&types);
+    let entry = builder.fresh_block(span);
+    builder.switch_to(entry);
+    let konst = HirConst {
+        name: Symbol(7),
+        ty: Some(numerus),
+        value: unsupported_range_expr(numerus, span, 0),
+        is_await: false,
+        mutable: false,
+    };
+
+    assert!(builder
+        .lower_const_binding(DefId(7), &konst, span)
+        .is_none());
+    assert!(!builder.bindings.contains_key(&DefId(7)));
+    assert_eq!(builder.errors.len(), 1);
+    assert_eq!(
+        builder.errors[0].issue,
+        "unsupported_mir_lowering_stepped_interval_value_before_interval_mir_lowering"
+    );
+}
+
+#[test]
+fn ignores_top_level_type_metadata_items() {
+    let mut unit =
+        analyze("genus Persona { textus nomen } discretio Eventus { Bonum { textus nuntius } } functio salve() {}");
+    let program = lower_analyzed_unit(&mut unit).expect("type metadata should not block MIR lowering");
+
+    assert_eq!(program.functions.len(), 1);
+}
+
+#[test]
+// ===========================================================================
+// Section D: Control flow — si, elige, dum, fac/cape, rumpe/perge, itera
+// ===========================================================================
+
+fn lowers_si_to_branch_and_join_blocks() {
+    let dump = dump_source("functio signum(numerus n) → numerus { si n > 0 ergo redde n redde 0 }");
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#1 {
+  params:
+    _0: ty#1
+  locals:
+    let _0: ty#1
+  temps:
+    %0: ty#3
+    %1: ty#1
+  bb0:
+    %0 = _0 > const int 0: ty#3
+    branch %0 bb1 bb2
+  bb1:
+    return _0
+  bb2:
+    %1 = const int 0: ty#1
+    return %1
+}
+"
+    );
+}
+
+#[test]
+fn lowers_expression_valued_si_into_shared_destination() {
+    let dump = dump_source("functio positum(numerus n) → numerus { fixum numerus x ← n > 0 sic 1 secus 0 redde x }");
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#1 {
+  params:
+    _0: ty#1
+  locals:
+    let _0: ty#1
+    let _1: ty#1
+  temps:
+    %0: ty#3
+  bb0:
+    %0 = _0 > const int 0: ty#3
+    branch %0 bb1 bb2
+  bb1:
+    _1 = const int 1: ty#1
+    goto bb3
+  bb2:
+    _1 = const int 0: ty#1
+    goto bb3
+  bb3:
+    return _1
+}
+"
+    );
+}
+
+#[test]
+fn lowers_literal_elige_to_switch_terminator() {
+    let dump = dump_source(
+        r#"
+functio status(numerus code) → textus {
+    elige code {
+        casu 200 { redde "ok" }
+        casu 404 { redde "missing" }
+        ceterum { redde "other" }
+    }
+}
+"#,
+    );
+
+    assert!(dump.contains("switch _0 [const int 200: bb"));
+    assert!(dump.contains("const int 404: bb"));
+    assert!(dump.contains("default bb"));
+    assert!(!dump.contains("discerne before switch MIR lowering"));
+}
+
+#[test]
+// ===========================================================================
+// Section E: Discerne & enum variant operations
+// ===========================================================================
+
+fn lowers_unit_variant_discerne_to_branch_chain() {
+    let dump = dump_source(
+        r#"discretio Status {
+  Active,
+  Inactive
+}
+
+functio describe(Status status) → vacuum {
+  discerne status {
+    casu Active { nota "active" }
+    casu Inactive { nota "inactive" }
+  }
+}"#,
+    );
+
+    assert!(dump.contains("construct variant def#"));
+    assert!(dump.contains("branch %"));
+    assert!(dump.contains("runtime diagnostic nota("));
+}
+
+#[test]
+fn lowers_payload_variant_discerne_to_branch_chain_and_field_bindings() {
+    let dump = dump_source(
+        r#"discretio Event {
+  Click { numerus x, numerus y },
+  Quit
+}
+
+functio handle(Event event) → vacuum {
+  discerne event {
+    casu Click fixum x, y {
+      nota x
+      nota y
+    }
+    casu Quit {
+      nota "quit"
+    }
+  }
+}"#,
+    );
+
+    assert!(dump.contains("construct variant def#"));
+    assert!(dump.contains(".def#"));
+    assert!(dump.contains("runtime diagnostic nota(_1)"));
+    assert!(dump.contains("runtime diagnostic nota(_2)"));
+    assert!(!dump.contains("non-literal discerne pattern"));
+}
+
+#[test]
+fn lowers_dum_to_condition_body_and_after_blocks() {
+    let dump = dump_source(
+        "functio totalis(numerus n) → numerus { varia numerus i ← 0 varia numerus total ← 0 dum i < n { total ← total + i i ← i + 1 } redde total }",
+    );
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#1 {
+  params:
+    _0: ty#1
+  locals:
+    let _0: ty#1
+    var _1: ty#1
+    var _2: ty#1
+  temps:
+    %0: ty#3
+    %1: ty#1
+    %2: ty#1
+  bb0:
+    _1 = const int 0: ty#1
+    _2 = const int 0: ty#1
+    goto bb1
+  bb1:
+    %0 = _1 < _0: ty#3
+    branch %0 bb2 bb3
+  bb2:
+    %1 = _2 + _1: ty#1
+    _2 = %1: ty#1
+    %2 = _1 + const int 1: ty#1
+    _1 = %2: ty#1
+    goto bb1
+  bb3:
+    return _2
+}
+"
+    );
+}
+
+#[test]
+fn lowers_rumpe_inside_fac_to_breakable_exit() {
+    let dump = dump_source("functio exemplo() → numerus { fac { rumpe } cape err { redde 0 } redde 1 }");
+    // WHY: the entry block must reach the after-block via the rumpe goto edge,
+    // not be sealed unreachable. A broken CFG leaves the entry block dead and
+    // the after-block unreachable.
+    let entry = first_block_body(&dump);
+    assert!(entry.contains("goto bb"), "fac rumpe entry must emit a goto exit edge: {dump}");
+    assert!(
+        !entry.contains("unreachable"),
+        "fac entry must not be sealed unreachable: {dump}"
+    );
+    assert!(dump.contains("const int 1"), "fac rumpe must reach redde 1: {dump}");
+}
+
+#[test]
+fn rejects_statement_level_stream_ad_for_mir() {
+    let result = crate::driver::compile(
+        &crate::Session::new(crate::Config::default()),
+        "stream-ad.fab",
+        r"functio f() → vacuum { ad 'noop:ping' { tuus { rumpe } } }",
+    );
+    assert!(
+        !result.success(),
+        "statement-level ad should fail parse: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn loop_rumpe_target_wins_over_enclosing_fac() {
+    let dump = dump_source(
+        "functio praecedentia() → numerus { fac { varia numerus x ← 0 dum x < 3 { x ← x + 1 si x ≡ 2 ergo rumpe } redde x } cape err { redde 0 } }",
+    );
+    // The rumpe inside the dum loop must resolve to the dum loop's exit (the
+    // `redde x` after the loop, which is bb6 in this dump), not to the enclosing
+    // fac's cape/error path (bb1/bb2/bb3).  We verify by checking that the block
+    // containing the rumpe targets the loop-exit block, not any fac-internal block.
+    assert!(
+        dump.contains("bb7:\n    goto bb6"),
+        "rumpe must break to the dum loop exit, not the enclosing fac catch\n{dump}"
+    );
+}
+
+#[test]
+fn lowers_rumpe_and_perge_to_loop_targets() {
+    let dump = dump_source(
+        "functio primus(numerus n) → numerus { varia numerus i ← 0 dum i < n { i ← i + 1 si i < 3 ergo perge rumpe } redde i }",
+    );
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#1 {
+  params:
+    _0: ty#1
+  locals:
+    let _0: ty#1
+    var _1: ty#1
+  temps:
+    %0: ty#3
+    %1: ty#1
+    %2: ty#3
+  bb0:
+    _1 = const int 0: ty#1
+    goto bb1
+  bb1:
+    %0 = _1 < _0: ty#3
+    branch %0 bb2 bb3
+  bb2:
+    %1 = _1 + const int 1: ty#1
+    _1 = %1: ty#1
+    %2 = _1 < const int 3: ty#3
+    branch %2 bb4 bb5
+  bb3:
+    return _1
+  bb4:
+    goto bb1
+  bb5:
+    goto bb3
+}
+"
+    );
+}
+
+#[test]
+fn closed_si_arms_do_not_emit_spurious_join_edges() {
+    let dump = dump_source(
+        "functio opta(numerus n) → numerus { varia numerus x ← n si x > 0 { redde x } secus { x ← x + 1 } redde x }",
+    );
+
+    assert_eq!(
+        dump,
+        "\
+function f0 -> ty#1 {
+  params:
+    _0: ty#1
+  locals:
+    let _0: ty#1
+    var _1: ty#1
+  temps:
+    %0: ty#3
+    %1: ty#1
+  bb0:
+    _1 = _0: ty#1
+    %0 = _1 > const int 0: ty#3
+    branch %0 bb1 bb2
+  bb1:
+    return _1
+  bb2:
+    %1 = _1 + const int 1: ty#1
+    _1 = %1: ty#1
+    goto bb3
+  bb3:
+    return _1
+}
+"
+    );
+}
+
+#[test]
+fn edge_si_no_secus_lowers_to_single_arm_branch_and_join() {
+    let dump = dump_source("functio noop_if_zero(numerus n) → vacuum { si n > 0 ergo nota \"positive\" }");
+
+    assert!(
+        dump.contains("branch %0 bb1 bb2"),
+        "si without secus must branch to body and continue: {dump}"
+    );
+    assert!(
+        dump.contains("runtime diagnostic nota(const string sym#"),
+        "body must emit the nota: {dump}"
+    );
+    assert!(dump.contains("goto bb2"), "body must jump to the join block: {dump}");
+    assert!(dump.contains("bb2:\n    return"), "join block after si arm must return: {dump}");
+    assert!(!dump.contains("bb3"), "si without secus must not produce a third block: {dump}");
+}
+
+#[test]
+fn lowers_numeric_range_itera_ab_to_loop_cfg() {
+    let dump = dump_source(
+        r"functio range_sum() → numerus {
+  varia numerus total ← 0
+  itera ab 0‥4 fixum i {
+    total ← total + i
+  }
+  redde total
+}",
+    );
+
+    assert!(dump.contains("var _1: ty#1"));
+    assert!(dump.contains("_1 = const int 0: ty#1"));
+    assert!(dump.contains("_2 = const int 4: ty#1"));
+    assert!(dump.contains("_3 = const int 1: ty#1"));
+    assert!(dump.contains("_1 < _2: ty#3"));
+    assert!(dump.contains("_0 + _1: ty#1"));
+    assert!(dump.contains("_1 + _3: ty#1"));
+    assert!(!dump.contains("itera before iterator MIR lowering"));
+}
+
+#[test]
+fn range_itera_stops_when_bounds_fail_to_lower() {
+    use crate::hir::{DefId, HirBlock, HirExpression, HirExpressionKind, HirId, HirLiteral, HirRangeKind};
+    use crate::lexer::Symbol;
+    use crate::semantic::{Primitive, TypeTable};
+
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let vacuum = types.primitive(Primitive::Vacuum);
+    let span = crate::lexer::Span::default();
+    let mut builder = FunctionBuilder::new(&types);
+    let entry = builder.fresh_block(span);
+    builder.switch_to(entry);
+
+    let unsupported_start = unsupported_range_expr(numerus, span, 0);
+    let end =
+        HirExpression { id: HirId(3), kind: HirExpressionKind::Literal(HirLiteral::Int(4)), ty: Some(numerus), span };
+    let iter = HirExpression {
+        id: HirId(4),
+        kind: HirExpressionKind::Intervallum {
+            start: Box::new(unsupported_start),
+            end: Box::new(end),
+            step: None,
+            kind: HirRangeKind::Exclusive,
+        },
+        ty: Some(numerus),
+        span,
+    };
+    let expr = HirExpression { id: HirId(5), kind: HirExpressionKind::Vacua, ty: Some(vacuum), span };
+    let body = HirBlock { statements: Vec::new(), expr: None, span, ..Default::default() };
+
+    assert!(builder
+        .lower_itera_expr(crate::hir::HirIteraMode::Ab, DefId(0), Symbol(0), &iter, &body, &expr)
+        .is_none());
+    assert_eq!(builder.blocks.len(), 1);
+    assert_eq!(builder.errors.len(), 1);
+    assert_eq!(
+        builder.errors[0].issue,
+        "unsupported_mir_lowering_stepped_interval_value_before_interval_mir_lowering"
+    );
+}
+
+#[test]
+fn edge_empty_range_itera_ab_skips_loop_body() {
+    let dump = dump_source(
+        r"functio noop() → numerus {
+  varia numerus total ← 0
+  itera ab 0‥0 fixum i {
+    total ← total + i
+  }
+  redde total
+}",
+    );
+
+    assert!(dump.contains("_0 = const int 0: ty#1"), "total must be initialized: {dump}");
+    assert!(dump.contains("return _0"), "must return the unchanged total: {dump}");
+    // The range itera lowering generates a loop CFG even for 0‥0; the
+    // condition check ensures the body never executes at runtime.
+    assert!(dump.contains("branch %"), "range itera must produce branches: {dump}");
+}
+
+#[test]
+fn lowers_array_itera_ex_and_de_to_index_loops() {
+    let ex_dump = dump_source(
+        r"functio sumArray(lista<numerus> nums) → numerus {
+  varia numerus total ← 0
+  itera ex nums fixum n {
+    total ← total + n
+  }
+  redde total
+}",
+    );
+
+    assert!(ex_dump.contains("runtime collection length(_0)"));
+    assert!(ex_dump.contains("_3 = _0[_2]: ty#1"));
+    assert!(ex_dump.contains("_1 + _3: ty#1"));
+    assert!(!ex_dump.contains("itera collection before iterator MIR lowering"));
+
+    let de_dump = dump_source(
+        r"functio firstIndex(lista<numerus> nums) → numerus {
+  itera de nums fixum index {
+    redde index
+  }
+  redde 0
+}",
+    );
+
+    assert!(de_dump.contains("runtime collection length(_0)"));
+    assert!(de_dump.contains("_2 = _1: ty#1"));
+    assert!(de_dump.contains("return _2"));
+    assert!(!de_dump.contains("itera collection before iterator MIR lowering"));
+}
+
+#[test]
+fn rejects_deferred_control_flow_constructs_with_explicit_diagnostics() {
+    let mut iter_de_unit = analyze(
+        r"functio iterare(tabula<textus, numerus> nums) → vacuum {
+            itera de nums fixum key { nota key }
+        }",
+    );
+    let iter_de_dump = dump_analyzed_unit(&mut iter_de_unit).expect("map itera de lowers");
+    assert!(iter_de_dump.contains("runtime collection keys("));
+    assert!(iter_de_dump.contains("runtime collection length("));
+
+    let mut iter_ex_unit = analyze(
+        r"functio sumValues(tabula<textus, numerus> nums) → numerus {
+            varia numerus total ← 0
+            itera ex nums fixum value {
+                total ← total + value
+            }
+            redde total
+        }",
+    );
+    let iter_ex_dump = dump_analyzed_unit(&mut iter_ex_unit).expect("map itera ex lowers");
+    assert!(iter_ex_dump.contains("runtime collection values("));
+    assert!(iter_ex_dump.contains("runtime collection length("));
+    assert!(!iter_ex_dump.contains("itera ex over tabula before map value iteration MIR lowering"));
+
+    let mut discerne_unit = analyze("functio handle(numerus n) → vacuum { discerne n { casu x { nota x } } }");
+    let discerne_errors = lower_analyzed_unit(&mut discerne_unit).expect_err("binding discerne is deferred");
+    assert_eq!(discerne_errors.len(), 1);
+    assert_eq!(
+        discerne_errors[0].issue,
+        "unsupported_mir_lowering_non_literal_discerne_pattern_before_switch_mir_lowering"
+    );
+}
+
+#[test]
+fn rejects_fabricated_iace_without_alternate_exit_type() {
+    use crate::hir::{HirExpression, HirExpressionKind, HirId, HirLiteral, HirStatement, HirStatementKind};
+
+    let mut unit = analyze("functio fail() → numerus { redde 0 }");
+    let textus = unit.types.primitive(crate::semantic::Primitive::Textus);
+    let span = crate::lexer::Span::default();
+    let crate::hir::HirItemKind::Function(function) = &mut unit.hir.items[0].kind else {
+        panic!("expected function");
+    };
+    function.err_ty = None;
+    function.body = Some(crate::hir::HirBlock {
+        statements: vec![HirStatement {
+            id: HirId(10),
+            kind: HirStatementKind::Expr(HirExpression {
+                id: HirId(11),
+                kind: HirExpressionKind::Throw(Box::new(HirExpression {
+                    id: HirId(12),
+                    kind: HirExpressionKind::Literal(HirLiteral::String(crate::lexer::Symbol(99))),
+                    ty: Some(textus),
+                    span,
+                })),
+                ty: Some(unit.types.primitive(crate::semantic::Primitive::Vacuum)),
+                span,
+            }),
+            span,
+        }],
+        expr: None,
+        span,
+        ..Default::default()
+    });
+
+    let errors = lower_analyzed_unit(&mut unit).expect_err("fabricated iace without ⇥ should fail");
+    assert_eq!(errors.len(), 1);
+    assert_eq!(
+        errors[0].issue,
+        "unsupported_mir_lowering_iace_without_a_declared_alternate_exit_type"
+    );
+}
+
+#[test]
+fn lowers_fac_cape_iace_to_local_handler_edge() {
+    let dump = dump_source(r#"functio handled() → numerus { fac { iace "bad" } cape err { redde 0 } redde 1 }"#);
+
+    assert!(dump.starts_with("function f0 -> ty#1 {\n"));
+    assert!(dump.contains("locals:\n    let _0: ty#0\n"));
+    assert!(dump.contains("%0 = const string sym#"));
+    assert!(dump.contains("_0 = %0: ty#0\n    goto bb1"));
+    assert!(dump.contains("bb1:\n    %1 = const int 0: ty#1\n    return %1"));
+    assert!(!dump.contains("return_error"));
+}
+
+#[test]
+fn lowers_fac_cape_failable_call_to_try_call_edge() {
+    let dump = dump_source(
+        r#"
+functio fail() → numerus ⇥ textus { iace "bad" }
+functio safe() → numerus { fac { redde fail() } cape err { redde 0 } }
+"#,
+    );
+
+    assert!(dump.contains("function f0 -> ty#1 ⇥ ty#0"));
+    assert!(dump.contains("function f1 -> ty#1"));
+    assert!(
+        dump.contains("try_call def#4096()"),
+        "fac body should still lower the failable call through try_call: {dump}"
+    );
+    assert!(
+        dump.contains("error _0 -> bb"),
+        "cape handler should receive the propagated error binding: {dump}"
+    );
+    assert!(
+        dump.contains("const int 0: ty#1"),
+        "cape handler should still return the recovery literal: {dump}"
+    );
+}
+
+#[test]
+fn lowers_dum_cape_iace_to_handler_and_loop_exit() {
+    let dump = dump_source(
+        r#"functio loop(bivalens ready) → numerus { varia numerus x ← 0 dum ready { iace "bad" } cape err { x ← 1 } redde x }"#,
+    );
+
+    assert!(dump.contains("branch _0 bb4 bb5"));
+    assert!(dump.contains("_2 = %0: ty#0\n    goto bb1"));
+    assert!(dump.contains("bb1:\n    _1 = const int 1: ty#1\n    goto bb2"));
+    assert!(dump.contains("bb2:\n    return _1"));
+}
+
+#[test]
+fn lowers_si_arm_cape_iace_to_arm_handler() {
+    let dump = dump_source(
+        r#"functio choose(bivalens ready) → numerus { si ready { iace "bad" } cape err { redde 0 } secus { redde 2 } redde 1 }"#,
+    );
+
+    assert!(dump.contains("branch _0 bb1 bb2"));
+    assert!(dump.contains("_1 = %0: ty#0\n    goto bb4"));
+    assert!(dump.contains("bb2:\n    %2 = const int 2: ty#1\n    return %2"));
+    assert!(dump.contains("bb4:\n    %1 = const int 0: ty#1\n    return %1"));
+    assert!(!dump.contains("return_error"));
+}
+
+#[test]
+fn lowers_si_chain_inside_cape_handler_to_reachable_blocks() {
+    let dump = dump_source(
+        r#"
+discretio FormaError {
+    FormaInvalida { textus causa }
+}
+discretio NnError {
+    DimensioNegativa { textus causa },
+    DimensioSupraLimitem { textus causa },
+    ProductumSupraLimitem { textus causa },
+    GradusMismatch { textus causa },
+    Incompatibilis { textus causa },
+    FormaMismatch { textus causa },
+    TypoMismatch { textus causa },
+    ElementaMismatch { textus causa }
+}
+functio causa(FormaError e) → textus {
+    discerne e {
+        casu FormaInvalida fixum causa { redde causa }
+    }
+}
+functio mensura(lista<numerus> x, lista<numerus> w) → numerus ⇥ FormaError {
+    si x.longitudo() ≠ 2 {
+        iace finge FormaInvalida { causa = "matmul requires rank-2 operands" }
+    }
+    redde w.longitudo()
+}
+functio addendum(numerus a, numerus b) → numerus ⇥ FormaError {
+    si a < 0 {
+        iace finge FormaInvalida { causa = "shapes not broadcastable" }
+    }
+    redde a + b
+}
+functio typo_par_tres(lista<numerus> a, lista<numerus> b, lista<numerus> c) → bivalens ⇥ NnError {
+    fixum textus ta ← "f32"
+    fixum textus tb ← "f32"
+    fixum textus tc ← "f32"
+    si ta ≠ tb aut tb ≠ tc {
+        iace finge TypoMismatch { causa = "dtype mismatch" }
+    }
+    si ta ≠ "f32" {
+        iace finge TypoMismatch { causa = "unsupported dtype for nn primitive" }
+    }
+    redde verum
+}
+functio linear(lista<numerus> x, lista<numerus> w, lista<numerus> b) → numerus ⇥ NnError {
+    fixum lista<numerus> fx ← x
+    fixum lista<numerus> fw ← w
+    si fx.longitudo() ≠ 2 {
+        iace finge GradusMismatch { causa = "linear requires rank-2 input" }
+    }
+    si fw.longitudo() ≠ 2 {
+        iace finge GradusMismatch { causa = "linear requires rank-2 weight" }
+    }
+    fixum numerus m ← fx.accipe(0) vel 1
+    fixum numerus k ← fx.accipe(1) vel 1
+    fixum numerus n ← fw.accipe(1) vel 1
+    si k ≠ (fw.accipe(0) vel 1) {
+        iace finge Incompatibilis { causa = "inner dimensions mismatch" }
+    }
+    fixum bivalens _ ← typo_par_tres(x, w, b)
+    fixum lista<numerus> fb ← b
+    si fb.longitudo() ≡ 1 {
+        si (fb.accipe(0) vel 1) ≠ n {
+            iace finge FormaMismatch { causa = "bias does not match output width" }
+        }
+    }
+    secus {
+        si fb.longitudo() ≡ 2 {
+            si (fb.accipe(0) vel 1) ≠ m aut (fb.accipe(1) vel 1) ≠ n {
+                iace finge FormaMismatch { causa = "bias does not match output shape" }
+            }
+        }
+        secus {
+            iace finge FormaMismatch { causa = "bias must be per-channel or output-shaped" }
+        }
+    }
+    fac {
+        fixum numerus prediction ← mensura(x, w)
+        redde addendum(prediction, n)
+    }
+    cape err {
+        fixum textus c ← causa(err)
+        si c ≡ "matmul requires rank-2 operands" {
+            iace finge GradusMismatch { causa = c }
+        }
+        si c ≡ "inner dimensions mismatch" {
+            iace finge Incompatibilis { causa = c }
+        }
+        si c ≡ "dtype mismatch" {
+            iace finge TypoMismatch { causa = c }
+        }
+        si c ≡ "element count above ceiling" {
+            iace finge ProductumSupraLimitem { causa = c }
+        }
+        si c ≡ "dimension above ceiling" {
+            iace finge DimensioSupraLimitem { causa = c }
+        }
+        si c ≡ "negative dimension" {
+            iace finge DimensioNegativa { causa = c }
+        }
+        si c ≡ "shapes not broadcastable" {
+            iace finge FormaMismatch { causa = c }
+        }
+        iace finge FormaMismatch { causa = c }
+    }
+}
+"#,
+    );
+    assert!(dump.contains("bb0:"), "{dump}");
+    assert!(!dump.contains("not reachable from entry"), "{dump}");
+}
+
+#[test]
+fn synthetic_path_callee_inside_cape_loses_failable_try_call() {
+    // Bug shape: the callee's function type is dropped (`ty: None`), so the
+    // direct-def path cannot recover failable-ness and emits a plain `Call`;
+    // the cape handler is never referenced and its si-chain orphans.
+    let errors = synthetic_path_cape_lowering(false).expect_err("expected the orphaned-handler reachability error");
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.issue.contains("not_reachable_from_entry")),
+        "expected an orphaned-handler reachability error, got {errors:?}"
+    );
+}
+
+#[test]
+fn synthetic_path_callee_with_type_inside_cape_lowers_failable() {
+    // Fix shape: the rewritten callee keeps its function type, so the
+    // direct-def path falls back to the callee type and emits the try-call —
+    // the handler stays reachable and the MIR validates.
+    let dump = synthetic_path_cape_lowering(true).expect("synthetic-path cape lowering should succeed");
+    assert!(
+        dump.contains("try_call"),
+        "expected a try_call to the synthetic callee, got {dump}"
+    );
+}
+
+/// Lower the gradus `_quantitas_valid` shape with the fac-body callee rewritten
+/// to a synthetic `Path` — simulating faber's package-MIR namespace rewrite
+/// with (`preserve_ty`) or without (`!preserve_ty`) the callee function type.
+fn synthetic_path_cape_lowering(preserve_ty: bool) -> Result<String, Vec<crate::mir::MirError>> {
+    let source = r#"
+discretio FormaError {
+    FormaInvalida { textus causa }
+}
+discretio NnError {
+    DimensioNegativa { textus causa },
+    DimensioSupraLimitem { textus causa },
+    ProductumSupraLimitem { textus causa },
+    FormaMismatch { textus causa }
+}
+functio causa(FormaError e) → textus {
+    discerne e {
+        casu FormaInvalida fixum causa { redde causa }
+    }
+}
+functio quantitas(lista<numerus> f) → numerus ⇥ NnError {
+    fac {
+        redde mensura(f)
+    }
+    cape err {
+        fixum textus c ← causa(err)
+        si c ≡ "negative dimension" {
+            iace finge DimensioNegativa { causa = c }
+        }
+        iace finge FormaMismatch { causa = c }
+    }
+}
+functio mensura(lista<numerus> f) → numerus ⇥ FormaError {
+    si f.longitudo() > 100 {
+        iace finge FormaInvalida { causa = "too many" }
+    }
+    redde f.longitudo()
+}
+"#;
+    let mut unit = analyze(source);
+
+    let mensura_def = unit
+        .hir
+        .items
+        .iter()
+        .find_map(|item| {
+            if let HirItemKind::Function(function) = &item.kind {
+                (unit.interner.resolve(function.name) == "mensura").then_some(item.def_id)
+            } else {
+                None
+            }
+        })
+        .expect("mensura function def");
+
+    use crate::hir::visit::{walk_expr_mut, HirVisitorMut};
+    // The analyzer leaves direct-call callee paths untyped; the package
+    // rewrite must COMPUTE the function type (here from the HIR signature,
+    // in faber from the resolver's file-interface `FuncSig`).
+    let mensura_item = unit
+        .hir
+        .items
+        .iter()
+        .find(|item| item.def_id == mensura_def)
+        .expect("mensura item");
+    let HirItemKind::Function(mensura_function) = &mensura_item.kind else {
+        unreachable!("mensura is a function item");
+    };
+    let mensura_function_ty = unit.types.function(crate::semantic::FuncSig {
+        type_params: Vec::new(),
+        type_param_constraints: Vec::new(),
+        params: mensura_function
+            .params
+            .iter()
+            .map(|param| crate::semantic::ParamType {
+                ty: param.ty,
+                mode: crate::semantic::SemanticParamMode::Owned,
+                optional: param.optional,
+            })
+            .collect(),
+        ret: mensura_function.ret_ty.expect("mensura return type"),
+        err: mensura_function.err_ty,
+        is_async: false,
+        is_generator: false,
+    });
+    struct SyntheticCalleeRewriter {
+        mensura_def: DefId,
+        function_ty: Option<TypeId>,
+    }
+    impl HirVisitorMut for SyntheticCalleeRewriter {
+        fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
+            if let HirExpressionKind::Call(callee, ..) = &mut expr.kind {
+                if let HirExpressionKind::Path(def_id) = callee.kind {
+                    if def_id == self.mensura_def {
+                        callee.kind = HirExpressionKind::Path(DefId(2_000_000_000));
+                        callee.ty = self.function_ty;
+                    }
+                }
+            }
+            walk_expr_mut(self, expr);
+        }
+    }
+    crate::hir::visit::walk_program_mut(
+        &mut SyntheticCalleeRewriter { mensura_def, function_ty: preserve_ty.then_some(mensura_function_ty) },
+        &mut unit.hir,
+    );
+
+    match lower_analyzed_unit(&mut unit) {
+        Ok(program) => Ok(crate::mir::dump_program(&program)),
+        Err(errors) => Err(errors),
+    }
+}
+
+#[test]
+// ===========================================================================
+// Section H: Aggregate construction — struct, array, map, set, tensor
+// ===========================================================================
+
+fn lowers_struct_construction_and_field_read() {
+    let dump = dump_source(
+        r#"
+genus Persona { textus nomen numerus aetas }
+functio nomen() → textus {
+    fixum Persona p ← Persona { nomen = "Ada", aetas = 36 }
+    redde p.nomen
+}
+"#,
+    );
+
+    assert!(dump.contains("construct struct def#"));
+    assert!(dump.contains("sym#"));
+    assert!(dump.contains("const string sym#"));
+    assert!(dump.contains("const int 36"));
+    assert!(dump.contains("return _0.sym#"));
+}
+
+#[test]
+fn lowers_struct_construction_field_defaults() {
+    let dump = dump_source(
+        r#"
+genus Persona { textus nomen numerus aetas = 0 }
+functio aetas() → numerus {
+    fixum Persona p ← Persona { nomen = "Ada" }
+    redde p.aetas
+}
+"#,
+    );
+
+    assert!(dump.contains("construct struct def#"));
+    assert!(dump.contains("const string sym#"));
+    assert!(dump.contains("const int 0"));
+    assert!(dump.contains("return _0.sym#"));
+}
+
+#[test]
+fn lowers_array_spread_and_index_read() {
+    let dump = dump_source(
+        r"
+functio primus() → numerus {
+    fixum lista<numerus> xs ← [1, 2]
+    fixum lista<numerus> ys ← [0, sparge xs]
+    redde ys[0]
+}
+",
+    );
+
+    assert!(dump.contains("construct array"));
+    assert!(dump.contains("[const int 0, ..._0]"));
+    assert!(dump.contains("return _1[const int 0]"));
+}
+
+#[test]
+fn lowers_nested_json_valor_literal() {
+    let dump = dump_source(
+        r#"
+incipit {
+    fixum valor nidum ← { "extra": { "medium": 1 }, "items": [1, { "x": 2 }] } ↦ valor
+    nota nidum
+}
+"#,
+    );
+
+    assert!(dump.contains("construct map"));
+    assert!(dump.contains("construct array"));
+    assert!(dump.contains("=> const int 1"));
+    assert!(dump.contains("=> const int 2"));
+    assert!(!dump.contains("nested JSON valor before nested aggregate MIR lowering"));
+    assert!(!dump.contains("path that does not resolve to a local value"));
+}
+
+#[ignore = "MIR JsonValor — map/set construction lowering not yet implemented"]
+#[test]
+fn lowers_map_and_set_construction() {
+    let map_dump = dump_source(
+        r#"
+functio lectio() → numerus {
+    fixum tabula<textus, numerus> xs ← { "a": 1, "b": 2 }
+    redde xs["a"]
+}
+"#,
+    );
+    assert!(map_dump.contains("construct map"));
+    assert!(map_dump.contains("=> const int 1"));
+    assert!(map_dump.contains("return _0[const string sym#"));
+
+    let set_dump = dump_source("functio setum() → copia<numerus> { redde [1, 2] ∷ copia<numerus> }");
+    assert!(set_dump.contains("construct set"));
+    assert!(set_dump.contains("[const int 1, const int 2]"));
+}
+
+#[test]
+fn lowers_field_and_index_assignment_places() {
+    let field_dump = dump_source(
+        r#"
+genus Persona { textus nomen numerus aetas }
+functio muta() → numerus {
+    varia Persona p ← Persona { nomen = "Ada", aetas = 36 }
+    p.aetas ← 37
+    redde p.aetas
+}
+"#,
+    );
+    assert!(field_dump.contains("_0.sym#"));
+    assert!(field_dump.contains("= const int 37"));
+
+    let index_dump = dump_source(
+        r"
+functio muta() → numerus {
+    varia lista<numerus> xs ← [1, 2]
+    xs[0] ← 5
+    redde xs[0]
+}
+",
+    );
+    assert!(index_dump.contains("_0[const int 0] = const int 5"));
+    assert!(index_dump.contains("return _0[const int 0]"));
+}
+
+#[test]
+fn lowers_tensor_bracket_access_to_tensor_runtime_ops() {
+    let dump = dump_source(
+        r"
+functio muta(tf32[4] input, tf32[4] output, u32 id) → f32 {
+    fixum f32 value ← input[id] vel 0.0
+    output[id] ← value
+    redde value
+}
+",
+    );
+
+    assert!(dump.contains("construct array"));
+    assert!(dump.contains("runtime collection tensor_get"));
+    assert!(dump.contains("runtime collection tensor_set"));
+    assert!(!dump.contains("Tensor"));
+}
+
+#[test]
+fn lowers_tensor_activatio_relu_to_tensor_relu_runtime_call() {
+    let dump = dump_source(
+        r"
+functio muta(tf32[2] input) → tf32[2] {
+    redde input.activatio_relu()
+}
+",
+    );
+
+    assert!(dump.contains("runtime collection tensor_relu"));
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+}
+
+#[test]
+fn indexed_tensor_view_kernel_lowers_device_brackets_to_projections() {
+    let dump = dump_source(
+        r"
+@ nucleum
+functio copy(tf32[4] input, tf32[4] output, u32 id) → vacuum {
+    output[id] ← input[id]
+}
+",
+    );
+
+    assert!(dump.contains("_1[_2] = _0[_2]"));
+    assert!(!dump.contains("runtime collection tensor_get"));
+    assert!(!dump.contains("runtime collection tensor_set"));
+}
+
+#[test]
+fn lowers_optional_chain_non_null_and_coalesce() {
+    let chain_dump = dump_source(
+        r"
+genus Persona { textus nomen }
+functio maybe(Persona ∪ nihil p) → textus ∪ nihil {
+    redde p?.nomen
+}
+",
+    );
+    assert!(chain_dump.contains("option chain(_0, .sym#"));
+
+    let non_null_dump = dump_source(
+        r"
+genus Persona { textus nomen }
+functio certum(Persona ∪ nihil p) → textus {
+    redde p!.nomen
+}
+",
+    );
+    assert!(non_null_dump.contains("option unwrap_assert(_0)"));
+    assert!(non_null_dump.contains("return %0.sym#"));
+
+    let coalesce_dump = dump_source(r#"functio maybe(textus ∪ nihil name) → textus { redde name vel "ignotus" }"#);
+    assert!(coalesce_dump.contains("option coalesce(_0, const string sym#"));
+}
+
+#[test]
+fn lowers_enum_variant_construction() {
+    let dump = dump_source(
+        r#"
+discretio Eventus { Bonum { textus nuntius } }
+functio crea() → Eventus {
+    redde finge Bonum { nuntius = "ok" } ∷ Eventus
+}
+"#,
+    );
+
+    assert!(dump.contains("construct variant def#"));
+    assert!(dump.contains("{sym#"));
+    assert!(dump.contains("const string sym#"));
+}
+
+#[test]
+fn lowers_unit_enum_variant_path_values() {
+    let source = r"
+ordo Color { rubrum, viridis }
+functio elige_color() → Color {
+    redde Color.rubrum
+}
+";
+    let dump = dump_source(source);
+
+    assert!(dump.contains("construct variant def#"));
+    assert!(dump.contains("return %"));
+    assert!(!dump.contains("path that does not resolve to a local value"));
+
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    let (enum_def, variants) = lowered
+        .validated
+        .validation()
+        .enum_variants
+        .iter()
+        .next()
+        .expect("unit enum metadata");
+    assert_eq!(variants.len(), 2);
+    for variant in variants {
+        assert_eq!(lowered.validated.validation().variant_parents.get(variant), Some(enum_def));
+        assert!(lowered
+            .validated
+            .validation()
+            .variant_fields
+            .get(variant)
+            .is_some_and(std::collections::HashMap::is_empty));
+    }
+}
+
+#[test]
+fn varia_nominal_struct_with_tagged_union_field_gets_recursive_zero_init() {
+    // M-007 no-initializer `varia` of a nominal struct whose fields include a
+    // tagged union without a `nihil` member (mirrors `varia parametrum.Parametrum
+    // p2` in gradus/src/optimize.fab:390). The decl-site zero must recurse:
+    // struct → f32 zero temp + enum zero (first variant) instead of falling
+    // through to the `_ =>` unsupported arm.
+    let dump = dump_source(
+        r"
+discretio Statio { Trainabilis, Gelida }
+genus Parametrum {
+    numerus versio
+    f32 lentus
+    Statio statio
+}
+functio f() → numerus {
+    varia Parametrum p2
+    redde 1
+}
+",
+    );
+
+    assert!(
+        dump.contains("construct struct def#"),
+        "struct zero must construct a struct aggregate"
+    );
+    assert!(
+        dump.contains("construct variant def#"),
+        "statio field zero must construct the first variant"
+    );
+    assert!(dump.contains("const int 0"), "numerus field zero");
+    assert!(dump.contains("const float 0.0"), "f32 field zero through the sized typed temp");
+    assert!(!dump.contains("type zero-init before MIR lowering completed"));
+}
+
+#[test]
+fn lowers_sized_numeric_varia_zero_init_through_typed_temp() {
+    // LIB-MIR fire-22 F2 regression: lock the SizedNumeric zero-init arms in
+    // type_zero_operand (radix 43c0102ba). `varia` of a sized numerus/fractus
+    // (e.g. f32, numerus<u8>) must wrap its zero in a typed temp carrying the
+    // sized type via assign_temp — a bare constant carries the primitive
+    // numerus/fractus type, which the validator rejects against a sized
+    // destination. Without the arms the decl falls to the unsupported
+    // "type zero-init before MIR lowering completed" diagnostic.
+    let dump = dump_source(
+        r"
+functio f() → numerus {
+    varia f32 x
+    varia numerus<u8> y
+    redde 1
+}
+",
+    );
+
+    assert!(
+        dump.contains("%0 = const float 0.0"),
+        "f32 zero must go through the sized typed temp: {dump}"
+    );
+    assert!(
+        dump.contains("%1 = const int 0"),
+        "numerus<u8> zero must go through the sized typed temp: {dump}"
+    );
+    assert!(!dump.contains("type zero-init before MIR lowering completed"), "{dump}");
+    assert!(dump.contains("return"), "lowering must reach return: {dump}");
+}
+
+#[test]
+fn lowers_ordo_elige_statement_continues_after_match() {
+    let dump = dump_source(
+        r#"
+ordo Color { rubrum, viridis }
+incipit {
+    fixum _ color ← Color.rubrum
+    elige color {
+        casu Color.rubrum { nota "rubrum" }
+        casu Color.viridis { nota "viridis" }
+    }
+    nota "finis"
+}
+"#,
+    );
+
+    assert_eq!(
+        dump.matches("runtime diagnostic nota(const string sym#")
+            .count(),
+        3
+    );
+    assert!(dump.contains("unreachable"));
+    assert!(
+        dump.contains("return"),
+        "statement after exhaustive unit-variant elige must remain reachable: {dump}"
+    );
+}
+
+#[test]
+fn lowers_all_returning_variant_discerne_without_fallthrough_return() {
+    let dump = dump_source(
+        r#"
+discretio Condicio { Agens, Iners }
+functio nomina(Condicio s) → textus {
+    discerne s {
+        casu Agens { redde "agens" }
+        casu Iners { redde "iners" }
+    }
+}
+"#,
+    );
+
+    assert!(dump.contains("return %"));
+    assert!(
+        !dump.contains("return\n"),
+        "all-returning variant discerne must not synthesize a no-value return: {dump}"
+    );
+}
+
+#[test]
+fn lowers_scalar_verte_as_target_typed_passthrough() {
+    let dump = dump_source(
+        r"
+functio absent() → textus ∪ nihil {
+    redde nihil ∷ textus ∪ nihil
+}
+",
+    );
+
+    assert!(dump.contains("const nil: ty#"));
+    assert!(dump.contains("return %"));
+    assert!(!dump.contains("verte cast before aggregate MIR lowering"));
+}
+
+#[test]
+fn lowers_inter_membership_to_collection_contains() {
+    let dump = dump_source(
+        r#"
+functio validum(textus status) → bivalens {
+    redde status inter ["pending", "active"]
+}
+"#,
+    );
+
+    assert!(dump.contains("runtime collection contains"));
+    assert!(!dump.contains("binary operator without a MIR primitive"));
+}
+
+// WHY: rejects_unsupported_map_spread_shape was removed in literal-family
+// Stage 6. It tested MIR rejection of `sparge` on anonymous objects, a retired
+// feature. JSON valor literals reject `sparge` at parse time, so the MIR-level
+// rejection no longer has a producer.
+
+#[test]
+fn lowers_diagnostic_verbs_to_runtime_intrinsics() {
+    let dump = dump_source(
+        r#"
+functio log(textus name) → vacuum {
+    nota "salve"
+    vide name
+    mone "cave"
+}
+"#,
+    );
+
+    assert!(dump.contains("runtime diagnostic nota(const string sym#"));
+    assert!(dump.contains("runtime diagnostic vide(_0)"));
+    assert!(dump.contains("runtime diagnostic mone(const string sym#"));
+}
+
+#[test]
+fn lowers_multi_arg_diagnostics_to_unary_runtime_calls() {
+    let dump = dump_source(
+        r#"
+functio log(textus name, numerus age) → vacuum {
+    nota "Name:", name, "Age:", age
+}
+"#,
+    );
+
+    assert_eq!(dump.matches("runtime diagnostic nota(").count(), 1, "{dump}");
+    assert!(dump.contains("runtime convert runtime ty#"), "{dump}");
+    assert!(!dump.contains(", _0,"));
+}
+
+#[test]
+fn lowers_adfirma_to_assert_runtime_intrinsics() {
+    let dump = dump_source(
+        r#"
+functio check(textus name, numerus count) → vacuum {
+    adfirma count > 0
+    adfirma name ≠ "" secus "name must not be empty"
+}
+"#,
+    );
+
+    assert!(dump.contains("runtime assert(%0) -> ty#"));
+    assert!(dump.contains("runtime assert(%1, const string sym#"));
+    assert!(!dump.contains("adfirma before assert intrinsic MIR lowering"));
+}
+
+#[test]
+fn lowers_format_conversion_collection_and_provider_runtime_intrinsics() {
+    let format_dump = dump_source(r#"functio greet(textus name) → textus { redde "Salve, §!"(name) }"#);
+    assert!(format_dump.contains("runtime format_string template sym#"));
+    assert!(!format_dump.contains("format!"));
+
+    let conversion_dump =
+        dump_source(r"functio parse(textus raw) → numerus<i32> { redde raw ↦ numerus<i32, Hex> ⇥ 0 ∷ numerus<i32> }");
+    assert!(conversion_dump.contains("runtime convert runtime ty#"));
+    assert!(conversion_dump.contains(" -> ty#"));
+    assert!(conversion_dump.contains("hints [sym#"));
+    assert!(conversion_dump.contains("recovery"));
+
+    let collection_dump = dump_source(r"functio count(lista<numerus> xs) → numerus { redde xs.longitudo() }");
+    assert!(collection_dump.contains("runtime collection length(_0)"));
+    assert!(!collection_dump.contains(".len"));
+
+    let provider_dump = dump_source(
+        r#"
+importa ex "norma:consolum" consolum
+functio read() → ignotum {
+    redde consolum.lege()
+}
+"#,
+    );
+    assert!(provider_dump.contains("runtime provider sym#"));
+    assert!(provider_dump.contains("::sym#"));
+}
+
+#[test]
+fn lowers_expression_ad_to_sermo_runtime_intrinsics() {
+    let dump = dump_source(
+        r#"
+incipit {
+    fixum textus t ← ad 'runtime:echo' ("salve") ↦ textus
+    adfirma t ≡ "salve"
+}
+"#,
+    );
+
+    assert!(dump.contains("runtime sermo_open(const string sym#"));
+    assert!(dump.contains("runtime convert runtime ty#"));
+    assert!(dump.contains(" -> ty#"));
+    assert!(dump.contains("runtime sermo_set_opener(%0, %1)"));
+    assert!(!dump.contains("ad expression before stream conversation MIR lowering"));
+}
+
+#[test]
+fn lowers_numeric_operator_methods_to_binary_mir() {
+    let dump = dump_source(
+        r"
+incipit {
+    fixum fractus x ← 2.0
+    fixum fractus chained ← x.addita(1.0).multiplicata(3.0)
+    varia fractus acc ← 10.0
+    acc.adde(5.0)
+    fixum numerus mask ← 12
+    fixum numerus bits ← mask.coniuncta(10)
+    nota chained
+    nota acc
+    nota bits
+}
+",
+    );
+
+    assert!(dump.contains("%0 = _0 + const float 1.0"));
+    assert!(dump.contains("%1 = %0 * const float 3.0"));
+    assert!(dump.contains("%2 = _2 + const float 5.0"));
+    assert!(dump.contains("_2 = %2"));
+    assert!(dump.contains("%3 = _3 & const int 10"));
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+}
+
+#[test]
+fn lowers_logical_operators_to_short_circuit_branches() {
+    let dump = dump_source(
+        r#"
+functio side() → bivalens {
+    nota "bad"
+    redde verum
+}
+
+incipit {
+    sit left_false ← falsum et side()
+    sit left_true ← verum aut side()
+    nota left_false
+    nota left_true
+}
+"#,
+    );
+
+    assert!(dump.contains("branch const bool false"));
+    assert!(dump.contains("branch const bool true"));
+    assert!(!dump.contains("const bool false and"));
+    assert!(!dump.contains("const bool true or"));
+}
+
+#[test]
+fn rejects_unsupported_runtime_method_shapes() {
+    let mut unit = analyze(r"functio malum(lista<numerus> xs) → numerus { redde xs.praepone(1) }");
+    let errors = lower_analyzed_unit(&mut unit).expect_err("unsupported method remains fail-closed");
+
+    assert!(errors
+        .iter()
+        .any(|err| err.issue == "unsupported_mir_lowering_method_call_before_runtime_provider_mir_lowering"));
+}
+
+#[test]
+fn lowers_imported_nominal_method_to_provider_runtime_call() {
+    use crate::file_interface::{
+        FileExport, FileExportKind, FileInterface, InterfaceCallable, InterfaceMethodExport, InterfaceStructExport,
+        InterfaceTypeSnapshot,
+    };
+    let mut interface = FileInterface::new();
+    interface.insert(FileExport {
+        name: "Sample".to_owned(),
+        kind: FileExportKind::Struct(InterfaceStructExport {
+            name: "Sample".to_owned(),
+            fields: Vec::new(),
+            methods: vec![InterfaceMethodExport {
+                name: "metire".to_owned(),
+                callable: InterfaceCallable {
+                    type_params: Vec::new(),
+                    type_param_constraints: Vec::new(),
+                    params: Vec::new(),
+                    ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Numerus)),
+                    err: None,
+                    is_async: false,
+                    is_generator: false,
+                },
+            }],
+            annotation_contract: None,
+        }),
+    });
+
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let mut unit = crate::driver::analyze_source_with_cli_program_and_import_contract(
+        &session,
+        "test.fab",
+        r#"
+importa ex "demo:lib" demo
+functio legebatur(demo.Sample value) → numerus {
+    redde value.metire()
+}
+"#,
+        None,
+        std::collections::BTreeMap::new(),
+        std::collections::BTreeMap::from([("demo".to_owned(), interface)]),
+    )
+    .expect("imported nominal method source analyzes");
+    let dump = dump_analyzed_unit(&mut unit).expect("imported nominal method lowers");
+
+    assert!(dump.contains("runtime provider"), "expected provider MIR, got:\n{dump}");
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+}
+
+#[test]
+// ===========================================================================
+// Section I: Collection runtime methods — lista, tabula, copia, textus, intervallum
+// ===========================================================================
+
+fn lowers_collection_runtime_methods_to_intrinsics() {
+    let dump = dump_source(
+        r"
+incipit {
+    varia lista<numerus> items ← vacua
+    items.appende(1)
+    nota items.longitudo()
+    nota items.primus()
+}
+",
+    );
+
+    assert!(dump.contains("runtime collection append"));
+    assert!(dump.contains("runtime collection length"));
+    assert!(dump.contains("runtime collection first"));
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+}
+
+#[test]
+fn lowers_lista_mutatio_methods() {
+    let dump = dump_source(
+        r"
+incipit {
+    varia _ res ← [3, 1, 2] ∷ lista<numerus>
+    res.appende(4)
+    fixum _ primusremotus ← res.decapita()
+    fixum _ ultimusremotus ← res.detrahe()
+    res.inverte()
+    res.ordina()
+    nota res, primusremotus, ultimusremotus
+}
+",
+    );
+
+    assert!(dump.contains("runtime collection append"));
+    assert!(dump.contains("runtime collection remove_first"));
+    assert!(dump.contains("runtime collection reverse_in_place"));
+    assert!(dump.contains("runtime collection sort"));
+    assert!(dump.contains("_0 = %"));
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+    assert!(!dump.contains("path that does not resolve to a local value"));
+}
+
+#[test]
+fn lowers_lista_copy_view_methods() {
+    let dump = dump_source(
+        r"
+incipit {
+    fixum _ res ← [1, 2, 3, 4, 5] ∷ lista<numerus>
+    fixum _ sectio ← res.sectio(1, 4)
+    fixum _ primaduo ← res.prima(2)
+    fixum _ ultimaduo ← res.ultima(2)
+    fixum _ omissaduo ← res.omissa(2)
+    nota sectio, primaduo, ultimaduo, omissaduo
+}
+",
+    );
+
+    assert!(dump.contains("runtime collection slice"));
+    assert!(dump.contains("runtime collection take"));
+    assert!(dump.contains("runtime collection take_last"));
+    assert!(dump.contains("runtime collection drop_first"));
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+    assert!(!dump.contains("path that does not resolve to a local value"));
+}
+
+#[test]
+fn lowers_tensor_longitudo_to_collection_length() {
+    let dump = dump_source(
+        r"
+incipit {
+    fixum tensor<fractus<f32>, []> empty ← vacua
+    nota empty.longitudo()
+}
+",
+    );
+
+    assert!(dump.contains("runtime collection length"));
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+}
+
+#[test]
+fn lowers_tensor_intrinsic_methods_to_collection_ops() {
+    let dump = dump_source(
+        r"
+incipit {
+    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    fixum tf32[] seed ← vacua
+    varia tf32[2, 2] grid ← seed.strue(flat, [2, 2])
+    nota grid.magnitudines()
+    fixum tf32[4] reshaped ← grid.forma([4])
+    grid.ponde([0, 0], 9.0)
+    fixum f32 corner ← grid.accipe([0, 0]) vel 0.0
+    varia tf32[2, 2] filler ← grid.crea(1.0, [2, 2])
+    filler.reple(4.0)
+    fixum tf32[1, 2] slice ← grid.sectio(0, 1)
+    fixum lista<f32> out ← slice.planata()
+    fixum tf32[2, 2] sum ← grid.addita(filler)
+    fixum tf32[2, 2] diff ← sum.subtrahe(filler)
+    fixum tf32[2, 2] prod ← diff.multiplica(grid)
+    nota prod.summa()
+    nota prod.media()
+    nota reshaped.longitudo()
+    nota corner
+    nota out.longitudo()
+}
+",
+    );
+
+    for op in [
+        "tensor_from_flat",
+        "tensor_shape",
+        "tensor_reshape",
+        "tensor_set",
+        "tensor_get",
+        "tensor_create",
+        "tensor_fill",
+        "tensor_slice",
+        "tensor_flatten",
+        "tensor_add",
+        "tensor_sub",
+        "tensor_mul",
+        "sum",
+        "tensor_mean",
+    ] {
+        assert!(dump.contains(&format!("runtime collection {op}")), "missing {op} in:\n{dump}");
+    }
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+}
+
+fn assert_lista_to_tensor_conversio_lowers_to_tensor_from_flat(source: &str) {
+    let dump = dump_source(source);
+    assert!(
+        dump.contains("runtime collection tensor_from_flat"),
+        "missing tensor_from_flat in:\n{dump}"
+    );
+    assert!(
+        !dump.contains("runtime convert runtime"),
+        "unexpected generic convert in:\n{dump}"
+    );
+}
+
+#[test]
+fn lowers_shaped_lista_to_tensor_conversio_to_tensor_from_flat() {
+    assert_lista_to_tensor_conversio_lowers_to_tensor_from_flat(
+        r"
+incipit {
+    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    fixum tf32[2, 2] grid ← flat ↦ tf32[2, 2]
+    nota grid.magnitudines()
+}
+",
+    );
+}
+
+#[test]
+fn lowers_rectangular_lista_literal_to_tensor_conversio_to_tensor_from_flat() {
+    assert_lista_to_tensor_conversio_lowers_to_tensor_from_flat(
+        r"
+incipit {
+    fixum tf32[2, 2] grid ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
+    nota grid.magnitudines()
+}
+",
+    );
+}
+
+#[test]
+fn lowers_copia_runtime_methods_to_intrinsics() {
+    let dump = dump_source(
+        r"
+incipit {
+    varia copia<numerus> left ← vacua
+    varia copia<numerus> right ← vacua
+    left.adde(1)
+    right.adde(2)
+    nota left.habet(1)
+    nota left.dele(1)
+    nota left.vacua()
+    nota left.unio(right)
+    nota left.intersectio(right)
+    nota left.differentia(right)
+    nota left.symmetrica(right)
+    nota left.subcopia(right)
+    nota left.supercopia(right)
+}
+",
+    );
+
+    assert!(dump.contains("runtime collection append"));
+    assert!(dump.contains("runtime collection contains"));
+    assert!(dump.contains("runtime collection delete"));
+    assert!(dump.contains("runtime collection is_empty"));
+    assert!(dump.contains("runtime collection union"));
+    assert!(dump.contains("runtime collection intersection"));
+    assert!(dump.contains("runtime collection difference"));
+    assert!(dump.contains("runtime collection symmetric_difference"));
+    assert!(dump.contains("runtime collection is_subset"));
+    assert!(dump.contains("runtime collection is_superset"));
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+}
+
+#[test]
+fn lowers_intervallum_coercere_to_interval_clamp() {
+    let dump = dump_source(
+        r"
+incipit {
+    fixum intervallum<numerus> wide ← 0‥10
+    nota wide.coercere(2…8)
+}
+",
+    );
+
+    assert!(dump.contains("runtime collection interval_clamp"));
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+}
+
+#[test]
+fn lowers_tabula_runtime_methods_to_intrinsics() {
+    let dump = dump_source(
+        r#"
+incipit {
+    varia tabula<textus, numerus> items ← vacua
+    items.pone("a", 1)
+    nota items.accipe("a")
+    nota items.habet("a")
+    nota items.dele("a")
+    nota items.claves()
+    nota items.valores()
+    nota items.longitudo()
+    nota items.vacua()
+}
+"#,
+    );
+
+    assert!(dump.contains("runtime collection put"));
+    assert!(dump.contains("runtime collection index"));
+    assert!(dump.contains("runtime collection contains"));
+    assert!(dump.contains("runtime collection delete"));
+    assert!(dump.contains("runtime collection keys"));
+    assert!(dump.contains("runtime collection values"));
+    assert!(dump.contains("runtime collection length"));
+    assert!(dump.contains("runtime collection is_empty"));
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+}
+
+#[test]
+fn edge_empty_tabula_habet_lowers_to_collection_contains() {
+    let dump = dump_source(
+        r#"
+incipit {
+    fixum tabula<textus, numerus> items ← vacua
+    nota items.habet("a")
+}
+"#,
+    );
+
+    assert!(
+        dump.contains("runtime collection contains"),
+        "habet on empty tabula must lower to contains: {dump}"
+    );
+    assert!(
+        dump.contains("construct map:"),
+        "empty tabula init must lower to construct map: {dump}"
+    );
+}
+
+#[test]
+fn lowers_textus_runtime_methods_to_intrinsics() {
+    let dump = dump_source(
+        r#"
+incipit {
+    fixum _ nuntius ← " Ave Roma "
+    nota nuntius.longitudo()
+    nota nuntius.sectio(1, 4)
+    nota nuntius.continet("Roma")
+    nota nuntius.initium(" Ave")
+    nota nuntius.finis(" ")
+    nota nuntius.maiuscula()
+    nota nuntius.minuscula()
+    nota nuntius.recide()
+    nota nuntius.divide(" ")
+    nota nuntius.muta("Roma", "Munde")
+}
+"#,
+    );
+
+    assert!(dump.contains("runtime collection length"));
+    assert!(dump.contains("runtime collection slice"));
+    assert!(dump.contains("runtime collection contains"));
+    assert!(dump.contains("runtime collection starts_with"));
+    assert!(dump.contains("runtime collection ends_with"));
+    assert!(dump.contains("runtime collection uppercase"));
+    assert!(dump.contains("runtime collection lowercase"));
+    assert!(dump.contains("runtime collection trim"));
+    assert!(dump.contains("runtime collection split"));
+    assert!(dump.contains("runtime collection replace"));
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+}
+
+#[test]
+fn lowers_textus_accipe_to_collection_index_intrinsic() {
+    // LIB-MIR fire-22 F2 regression: lock the Textus `accipe` registry row
+    // (radix 43c0102ba). Without the row, collection_method_op → lookup
+    // for (Textus, accipe, 1) → None, and the call fails with the deferred
+    // "method call before runtime/provider MIR lowering" diagnostic.
+    let dump = dump_source(
+        r#"
+incipit {
+    fixum textus nuntius ← "Ave Roma"
+    nota nuntius.accipe(0)
+}
+"#,
+    );
+
+    assert!(
+        dump.contains("runtime collection index"),
+        "textus.accipe must lower to the collection Index intrinsic: {dump}"
+    );
+    assert!(
+        !dump.contains("method call before runtime/provider MIR lowering"),
+        "textus.accipe must not fall through to the deferred method-call diagnostic: {dump}"
+    );
+    assert!(dump.contains("return"), "lowering must reach return: {dump}");
+}
+
+#[test]
+fn edge_empty_textus_longitudo_lowers_to_collection_length() {
+    let dump = dump_source(
+        r#"
+incipit {
+    fixum _ len ← "".longitudo()
+    nota len
+}
+"#,
+    );
+
+    assert!(
+        dump.contains("runtime collection length(const string sym#"),
+        "empty string len must lower to collection length on const: {dump}"
+    );
+    assert!(dump.contains("return"), "lowering must reach return: {dump}");
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"), "{dump}");
+}
+
+#[test]
+fn lowers_numeric_runtime_methods_to_intrinsics() {
+    let dump = dump_source(
+        r"
+incipit {
+    fixum numerus n ← -7
+    nota n.absolutum()
+    nota n.signum()
+    nota n.minimus(3)
+    nota n.maximus(3)
+
+    fixum fractus f ← -3.75
+    nota f.absolutum()
+    nota f.signum()
+    nota f.minimus(2.5)
+    nota f.maximus(2.5)
+    nota f.approximata(3.8, 0.1)
+    nota f.rotunda()
+    nota f.pavimentum()
+    nota f.tectum()
+    nota f.trunca()
+}
+",
+    );
+
+    assert!(dump.contains("runtime collection absolute"));
+    assert!(dump.contains("runtime collection signum"));
+    assert!(dump.contains("runtime collection minimum"));
+    assert!(dump.contains("runtime collection maximum"));
+    assert!(dump.contains("runtime collection approximate"));
+    assert!(dump.contains("runtime collection round"));
+    assert!(dump.contains("runtime collection floor"));
+    assert!(dump.contains("runtime collection ceiling"));
+    assert!(dump.contains("runtime collection truncate"));
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+}
+
+#[test]
+fn lowers_potentia_to_exponentiation_identity() {
+    // `potentia` is a CodegenOnly numeric registry row (no `MirCollectionOp`
+    // surface). It lowers to the codegen-lane exponentiation identity
+    // (`base ≤ 0 → 0`, else `(exp · ln(base)).exp()`) composed from existing
+    // MIR ops plus a guard branch — no new MIR op. Regression for the PKG001
+    // "method call before runtime/provider MIR lowering" the gradus nn.fab
+    // `_exponens` (`(2.718281828459045 ∷ f32).potentia(x)`) tripped on the
+    // PML4 FMIR lane (fails on revert of the `lower_potentia` arm).
+    let source = r"
+functio _exponens(f32 x) → f32 {
+    redde (2.718281828459045 ∷ f32).potentia(x)
+}
+";
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    validate_program(&lowered.program, lowered.validated.validation())
+        .expect("the exponentiation-identity MIR must validate (guard/power/join blocks reachable)");
+    let dump = dump_program(&lowered.program);
+    assert!(
+        !dump.contains("method call before runtime/provider MIR lowering"),
+        "potentia must not trip the unsupported-method fallthrough: {dump}"
+    );
+    assert!(
+        dump.contains("log ") && dump.contains("exp "),
+        "the exponentiation identity (exp(exp·ln(base))) must compose from MIR unary ops: {dump}"
+    );
+    assert!(dump.contains("branch "), "the base ≤ 0 guard branch must appear: {dump}");
+}
+
+#[test]
+fn lowers_collection_higher_order_methods_with_synthetic_closures() {
+    let dump =
+        dump_source(r"functio evens(lista<numerus> xs) → lista<numerus> { redde xs.filtrata(numerus x ∴ x % 2 ≡ 0) }");
+
+    assert!(dump.contains("runtime collection length"));
+    assert!(dump.contains("runtime collection append"));
+    assert!(dump.contains("call f1"));
+    assert!(!dump.contains("collection higher-order methods before callable-value MIR lowering"));
+}
+
+#[test]
+fn lowers_nested_collection_higher_order_synthetic_closures() {
+    let dump = dump_source(
+        r"functio counts(lista<numerus> xs) → lista<numerus> {
+  redde xs.mappata(numerus x ∴ [x].filtrata(numerus y ∴ y ≥ 0).longitudo())
+}",
+    );
+
+    assert!(dump.contains("function f1"));
+    assert!(dump.contains("function f2"));
+    assert!(dump.contains("call f2"));
+    assert!(dump.contains("call f1"));
+}
+
+#[test]
+fn lowers_mappata_callback_to_result_element_type() {
+    let dump = dump_source(
+        r#"functio labels(lista<numerus> xs) → lista<textus> {
+  redde xs.mappata(numerus x → textus ∴ "§"(x))
+}"#,
+    );
+
+    assert!(dump.contains("function f1 -> ty#0"));
+    assert!(dump.contains("call f1"));
+    assert!(dump.contains("runtime collection append"));
+}
+
+#[test]
+fn lowers_captured_collection_callback_environment() {
+    let dump = dump_source(
+        r"functio scale(lista<numerus> xs, numerus factor) → lista<numerus> {
+  redde xs.mappata(numerus x ∴ x * factor)
+}",
+    );
+
+    assert!(dump.contains("construct closure_env env"), "{dump}");
+    assert!(dump.contains("call closure f"), "{dump}");
+    assert!(dump.contains(".env"), "{dump}");
+    assert!(!dump.contains("path that does not resolve to a local value"), "{dump}");
+}
+
+#[test]
+fn lowers_lista_reducta_with_synthetic_reducer() {
+    let dump = dump_source(
+        r"functio total(lista<numerus> xs) → numerus {
+  redde xs.reducta((numerus acc, numerus x) ∴ acc + x, 0)
+}",
+    );
+
+    assert!(dump.contains("runtime collection length"));
+    assert!(dump.contains("function f1"));
+    assert!(dump.contains("call f1"));
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+    assert!(!dump.contains("path that does not resolve to a local value"));
+}
+
+#[test]
+fn collection_callback_errors_do_not_publish_synthetic_functions() {
+    use crate::hir::{DefId, HirExpression, HirExpressionKind, HirId, HirParam, HirParamMode};
+    use crate::lexer::{Span, Symbol};
+    use crate::semantic::{Primitive, TypeTable};
+
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let list = types.array(numerus);
+    let span = Span::default();
+    let mut builder = FunctionBuilder::new(&types);
+    builder.add_param(DefId(0), Symbol(0), list, crate::hir::HirParamMode::Owned, span);
+
+    let receiver = HirExpression { id: HirId(0), kind: HirExpressionKind::Path(DefId(0)), ty: Some(list), span };
+    let callback_body = unsupported_range_expr(numerus, span, 1);
+    let closure = HirExpression {
+        id: HirId(4),
+        kind: HirExpressionKind::Clausura(
+            vec![HirParam {
+                def_id: DefId(1),
+                name: Symbol(1),
+                ty: numerus,
+                mode: HirParamMode::Owned,
+                optional: false,
+                sponte: false,
+                default: None,
+                span,
+            }],
+            Some(numerus),
+            None,
+            Box::new(callback_body),
+        ),
+        ty: None,
+        span,
+    };
+    let expr = HirExpression { id: HirId(5), kind: HirExpressionKind::Vacua, ty: Some(list), span };
+
+    assert!(builder.lower_mappata(&receiver, &closure, &expr).is_none());
+    assert_eq!(builder.take_synthetic_functions().len(), 0);
+    assert_eq!(builder.errors.len(), 1);
+    assert_eq!(
+        builder.errors[0].issue,
+        "unsupported_mir_lowering_stepped_interval_value_before_interval_mir_lowering"
+    );
+}
+
+#[test]
+fn rejects_assignment_targets_that_are_not_places() {
+    use crate::hir::{DefId, HirExpression, HirExpressionKind, HirId, HirLiteral};
+    use crate::lexer::Symbol;
+    use crate::semantic::{Primitive, TypeTable};
+
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let span = crate::lexer::Span::default();
+    let mut builder = FunctionBuilder::new(&types);
+    builder.add_param(DefId(0), Symbol(0), numerus, crate::hir::HirParamMode::Owned, span);
+    let entry = builder.fresh_block(span);
+    builder.switch_to(entry);
+
+    let path = HirExpression { id: HirId(0), kind: HirExpressionKind::Path(DefId(0)), ty: Some(numerus), span };
+    let one =
+        HirExpression { id: HirId(1), kind: HirExpressionKind::Literal(HirLiteral::Int(1)), ty: Some(numerus), span };
+    let lhs = HirExpression {
+        id: HirId(2),
+        kind: HirExpressionKind::Binary(crate::hir::HirBinOp::Add, Box::new(path), Box::new(one)),
+        ty: Some(numerus),
+        span,
+    };
+    let rhs =
+        HirExpression { id: HirId(3), kind: HirExpressionKind::Literal(HirLiteral::Int(2)), ty: Some(numerus), span };
+    let assignment = HirExpression {
+        id: HirId(4),
+        kind: HirExpressionKind::Assign(Box::new(lhs), Box::new(rhs)),
+        ty: Some(numerus),
+        span,
+    };
+
+    assert!(builder.lower_assignment_expr(&assignment).is_none());
+    assert!(builder.blocks[0].statements.is_empty());
+    assert_eq!(builder.errors.len(), 1);
+    assert_eq!(
+        builder.errors[0].issue,
+        "unsupported_mir_lowering_assignment_target_that_is_not_an_addressable_place"
+    );
+}
+
+#[test]
+fn function_builder_hir_visitor_lowers_statement_blocks() {
+    use crate::hir::{HirBlock, HirExpression, HirExpressionKind, HirId, HirLiteral, HirStatement, HirStatementKind};
+    use crate::semantic::{Primitive, TypeTable};
+
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let span = crate::lexer::Span::default();
+    let mut builder = FunctionBuilder::new(&types);
+    let entry = builder.fresh_block(span);
+    builder.switch_to(entry);
+
+    let block = HirBlock {
+        statements: vec![HirStatement {
+            id: HirId(0),
+            kind: HirStatementKind::Redde(Some(HirExpression {
+                id: HirId(1),
+                kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
+                ty: Some(numerus),
+                span,
+            })),
+            span,
+        }],
+        expr: None,
+        span,
+        ..Default::default()
+    };
+
+    <FunctionBuilder as HirVisitor>::visit_block(&mut builder, &block);
+
+    assert!(builder.errors.is_empty());
+    assert_eq!(builder.temps.len(), 1);
+    assert_eq!(builder.blocks[0].statements.len(), 1);
+    assert!(matches!(
+        builder.blocks[0]
+            .terminator
+            .as_ref()
+            .map(|terminator| &terminator.kind),
+        Some(MirTerminatorKind::Return(Some(MirOperand::Temp(MirTempId(0)))))
+    ));
+}
+
+#[test]
+fn function_builder_expr_visitor_emits_value_mir() {
+    use crate::hir::{HirBinOp, HirExpression, HirExpressionKind, HirId, HirLiteral};
+    use crate::mir::MirPlaceBase;
+    use crate::semantic::{Primitive, TypeTable};
+
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let span = crate::lexer::Span::default();
+    let mut builder = FunctionBuilder::new(&types);
+    let entry = builder.fresh_block(span);
+    builder.switch_to(entry);
+
+    let lhs =
+        HirExpression { id: HirId(0), kind: HirExpressionKind::Literal(HirLiteral::Int(1)), ty: Some(numerus), span };
+    let rhs =
+        HirExpression { id: HirId(1), kind: HirExpressionKind::Literal(HirLiteral::Int(2)), ty: Some(numerus), span };
+    let expr = HirExpression {
+        id: HirId(2),
+        kind: HirExpressionKind::Binary(HirBinOp::Add, Box::new(lhs), Box::new(rhs)),
+        ty: Some(numerus),
+        span,
+    };
+
+    let operand = <FunctionBuilder as HirExpressionLoweringVisitor>::lower_expr_value(&mut builder, &expr);
+
+    assert_eq!(operand, Some(MirOperand::Temp(MirTempId(0))));
+    assert!(builder.errors.is_empty());
+    assert_eq!(builder.temps.len(), 1);
+    assert!(matches!(
+        builder.blocks[0].statements.first().map(|stmt| &stmt.kind),
+        Some(MirStatementKind::Assign { place: MirPlace { base: MirPlaceBase::Temp(MirTempId(0)), .. }, value })
+            if matches!(value.kind, MirValueKind::Binary { op: MirBinOp::Add, .. })
+    ));
+}
+
+#[test]
+fn lowers_fac_cape_handler_nuntius_projection() {
+    let dump = dump_source(
+        r#"
+incipit {
+    fac {
+        iace "simulated failure"
+    } cape err {
+        nota "Caught error: §"(err.nuntius)
+    }
+}
+"#,
+    );
+    assert!(dump.contains("_0 = %0: ty#0\n    goto bb1"));
+    assert!(dump.contains("runtime diagnostic nota"));
+    assert!(!dump.contains("field sym#"));
+}
+
+#[test]
+fn fixum_deferred_local_declares_without_zero_init() {
+    let dump = dump_source(
+        r"
+functio scale(bivalens compact, numerus base) → numerus {
+    fixum numerus factor
+    si compact { factor ← 10 } secus { factor ← 100 }
+    redde base * factor
+}
+",
+    );
+    assert!(dump.contains("let _"));
+    assert!(!dump.contains("_0 = const int 0"));
+}
+
+#[test]
+fn lowers_sponte_struct_field_with_type_zero() {
+    let source = r#"
+genus User {
+    textus name
+    textus email sponte
+}
+incipit {
+    fixum User u ← User { name = "Ada" }
+    nota u.name
+}
+"#;
+    let mut unit = analyze(source);
+    let name_field = unit.interner.intern("name");
+    let email_field = unit.interner.intern("email");
+    let ada = unit.interner.intern("Ada");
+    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+
+    let fields = program
+        .functions
+        .iter()
+        .flat_map(|function| &function.blocks)
+        .flat_map(|block| &block.statements)
+        .find_map(|statement| match &statement.kind {
+            MirStatementKind::Construct { aggregate, .. } if matches!(aggregate.kind, MirAggregateKind::Struct(_)) => {
+                match &aggregate.fields {
+                    MirAggregateFields::Named(named) => Some(named.as_slice()),
+                    _ => None,
+                }
+            }
+            _ => None,
+        })
+        .expect("struct literal lowers to construct struct");
+
+    assert_eq!(fields.len(), 2, "expected explicit name plus sponte email fill");
+
+    let name = fields
+        .iter()
+        .find(|field| field.name == name_field)
+        .expect("name field present in struct construct");
+    let email = fields
+        .iter()
+        .find(|field| field.name == email_field)
+        .expect("email sponte field present in struct construct");
+
+    assert_eq!(
+        name.value,
+        MirOperand::Constant(MirConstant::String(ada)),
+        "provided name literal must lower unchanged"
+    );
+    assert_eq!(
+        email.value,
+        MirOperand::Constant(MirConstant::Nil),
+        "omitted sponte email must receive nihil"
+    );
+}
+
+#[test]
+fn lowers_multi_arm_nullable_sponte_struct_field_to_nil_zero() {
+    let source = r#"
+genus User {
+    textus name
+    textus ∪ numerus ∪ nihil tag sponte
+}
+incipit {
+    fixum User u ← User { name = "Ada" }
+    nota u.name
+}
+"#;
+    let mut unit = analyze(source);
+    let tag_field = unit.interner.intern("tag");
+    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+
+    let fields = program
+        .functions
+        .iter()
+        .flat_map(|function| &function.blocks)
+        .flat_map(|block| &block.statements)
+        .find_map(|statement| match &statement.kind {
+            MirStatementKind::Construct { aggregate, .. } if matches!(aggregate.kind, MirAggregateKind::Struct(_)) => {
+                match &aggregate.fields {
+                    MirAggregateFields::Named(named) => Some(named.as_slice()),
+                    _ => None,
+                }
+            }
+            _ => None,
+        })
+        .expect("struct literal lowers to construct struct");
+
+    let tag = fields
+        .iter()
+        .find(|field| field.name == tag_field)
+        .expect("tag sponte field present in struct construct");
+
+    assert_eq!(
+        tag.value,
+        MirOperand::Constant(MirConstant::Nil),
+        "multi-arm unions that include nihil keep the MIR zero-init policy"
+    );
+}
+
+#[test]
+fn lowers_optional_prefix_before_defaulted_param() {
+    let dump = dump_source(
+        r"
+functio f(textus a sponte, numerus b sponte vel 1) → numerus {
+    redde b
+}
+incipit {
+    nota f()
+}
+",
+    );
+    assert!(dump.contains("const nil"));
+    assert!(dump.contains("const int 1"));
+}
+
+#[test]
+// ===========================================================================
+// Section J: Closures, callable values, captured environments
+// ===========================================================================
+
+fn lowers_callable_closure_values_and_indirect_calls() {
+    let dump = dump_source(
+        r"incipit {
+  fixum _ duplica ← numerus x ∴ x * 2
+  nota duplica(5)
+}",
+    );
+    assert!(dump.contains("const function"));
+    assert!(dump.contains("%0 = const function f1"), "{dump}");
+    assert!(dump.contains("_0 = %0"), "{dump}");
+    assert!(dump.contains("call _0(const int 5)"));
+    assert!(!dump.contains("closures before callable-value MIR lowering"));
+    assert!(!dump.contains("indirect calls before callable-value MIR lowering"));
+}
+
+#[test]
+fn lowers_captured_closure_environment_layout() {
+    let dump = dump_source(
+        r"incipit {
+  fixum _ base ← 10
+  fixum _ adde ← numerus x ∴ x + base
+  nota adde(5)
+}",
+    );
+    assert!(dump.contains("construct closure_env env"), "{dump}");
+    assert!(dump.contains("closure f"), "{dump}");
+    assert!(dump.contains(".env"), "{dump}");
+    assert!(dump.contains("call closure f"), "{dump}");
+    assert!(dump.contains("env env1 via %0(const int 5)"), "{dump}");
+    assert!(!dump.contains("path that does not resolve to a local value"), "{dump}");
+}
+
+#[test]
+fn lowers_failable_captured_closure_call_to_try_call() {
+    let dump = dump_source(
+        r"incipit {
+  fixum _ base ← 10
+  fixum _ adde ← (numerus x) → numerus ⇥ textus ∴ x + base
+  fac {
+    fixum _ value ← adde(5)
+    nota value
+  }
+  cape err {
+    nota err
+  }
+}",
+    );
+    assert!(dump.contains("call closure f"), "{dump}");
+    assert!(dump.contains("try_call closure f"), "{dump}");
+    assert!(dump.contains("error"), "{dump}");
+}
+
+#[test]
+fn validates_captured_closure_callee_environment_function_match() {
+    let mut unit = analyze(
+        r"incipit {
+  fixum _ base ← 10
+  fixum _ adde ← numerus x ∴ x + base
+  nota adde(5)
+}",
+    );
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    let mut corrupted_context = lowered.validated.validation().clone();
+    let environment_id = corrupted_context
+        .closure_environments
+        .keys()
+        .next()
+        .copied()
+        .expect("captured closure environment recorded");
+    corrupted_context
+        .closure_environments
+        .get_mut(&environment_id)
+        .expect("captured closure environment metadata")
+        .function = MirFunctionId(999);
+
+    let errors = validate_program(&lowered.program, &corrupted_context).expect_err("corrupt closure metadata fails");
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.issue == "mir_validation_closure_callee_function_does_not_match_environment_metadata"),
+        "{errors:#?}"
+    );
+}
+
+#[test]
+fn lowers_nested_captured_closure_environment_layout() {
+    let dump = dump_source(
+        r"incipit {
+  fixum _ base ← 10
+  fixum _ maker ← numerus y ∴ numerus z ∴ z + y + base
+  fixum _ adde ← maker(2)
+  nota adde(5)
+}",
+    );
+    assert!(dump.matches("construct closure_env env").count() >= 2, "{dump}");
+    assert!(dump.contains(".env"), "{dump}");
+    assert!(dump.contains("call closure f"), "{dump}");
+    assert!(dump.contains("env env1 via %0(const int 2)"), "{dump}");
+    assert!(dump.contains("call _2(const int 5)"), "{dump}");
+    assert!(!dump.contains("path that does not resolve to a local value"), "{dump}");
+}
+
+#[test]
+fn rejects_legacy_typed_ad_statement_for_mir() {
+    let result = crate::driver::compile(
+        &crate::Session::new(crate::Config::default()),
+        "legacy-ad.fab",
+        r#"incipit {
+  ad "fasciculus:lege" ("salve.txt") → textus textus ⇥ textus {
+    nota textus
+  }
+}"#,
+    );
+    assert!(
+        !result.success(),
+        "legacy typed ad statement should fail parse: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn lowers_cede_yield_in_cursor_function() {
+    let dump = dump_source(
+        r"functio stream() fiunt → numerus {
+  cede 1
+  cede 2
+}
+incipit {
+  nota stream()
+}",
+    );
+    assert!(dump.contains("runtime cede"));
+    assert!(!dump.contains("cede before async MIR lowering"));
+}
+
+#[test]
+// ===========================================================================
+// Section K: Generic monomorphization & explicit type args
+// ===========================================================================
+
+fn generic_call_with_explicit_type_args_lowers_and_validates() {
+    let source = r#"
+functio identitas<T>(T x) → T {
+    redde x
+}
+
+incipit {
+    nota identitas<textus>("creata")
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    validate_program(&lowered.program, lowered.validated.validation()).expect("generic call-site MIR validates");
+}
+
+#[test]
+fn generic_enum_payload_binding_lowers_with_concrete_type() {
+    let source = r#"
+discretio Resultatus<T> {
+    Ok { T valor },
+    Err { textus nuntius }
+}
+
+functio describe(Resultatus<numerus> r) → textus {
+    discerne r {
+        casu Ok fixum valor { redde "ok: §"(valor) }
+        casu Err fixum nuntius { redde "err: §"(nuntius) }
+    }
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("generic enum payload MIR lowers");
+    validate_program(&lowered.program, lowered.validated.validation()).expect("generic enum payload MIR validates");
+}
+
+#[test]
+// Sparse tensor operations (interleaved with generic monomorphization above).
+fn sparsa_nonnihil_lowers_to_distinct_runtime_operation() {
+    let dump = dump_source(
+        r"incipit {
+    fixum tf32[2, 2] dense ← [[1.0, 0.0], [0.0, 2.0]] ↦ tf32[2, 2]
+    fixum sf32[2, 2] sparse ← dense ↦ sf32[2, 2]
+    nota sparse.nonnihil()
+}",
+    );
+    assert!(dump.contains("runtime collection sparse_nonzero_count("), "{dump}");
+}
+
+#[test]
+fn sparse_representation_vacua_access_and_densify_lower_distinctly() {
+    let dump = dump_source(
+        r"incipit {
+    varia sf32[2, 3] sparse ← vacua
+    sparse.ponde([0, 1], 4.0)
+    fixum _ value ← sparse.accipe([0, 1])
+    fixum tf32[2, 3] dense ← sparse.densata()
+    nota value, dense.longitudo()
+}",
+    );
+    assert!(dump.contains("construct sparse_tensor:"), "{dump}");
+    assert!(dump.contains("runtime collection sparse_set("), "{dump}");
+    assert!(dump.contains("runtime collection sparse_get("), "{dump}");
+    assert!(dump.contains("runtime collection sparse_densify("), "{dump}");
+    assert!(!dump.contains("construct tensor:"), "{dump}");
+}
+
+#[test]
+fn sparsa_shape_lowers_to_tensor_shape_and_validates() {
+    let source = r"incipit {
+    fixum sf32[2, 3] sparse ← vacua
+    fixum _ shape ← sparse.magnitudines()
+    nota shape
+}";
+    let dump = dump_source(source);
+    assert!(dump.contains("runtime collection tensor_shape("), "{dump}");
+
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("sparsa shape MIR lowers");
+    validate_program(&lowered.program, lowered.validated.validation()).expect("sparsa shape MIR validates");
+}
+
+#[test]
+fn stage3_mir_closeout_preserves_interval_and_sermo_operations() {
+    let interval = dump_source(
+        r"incipit {
+    fixum intervallum<numerus> left ← 0‥6
+    fixum intervallum<numerus> right ← 4…10
+    fixum _ overlap ← left.inter(right)
+    fixum _ values ← left ↦ lista<numerus>
+    nota overlap, values
+}",
+    );
+    assert!(interval.contains("construct interval_exclusive:"), "{interval}");
+    assert!(interval.contains("runtime collection interval_intersect("), "{interval}");
+    assert!(interval.contains("runtime collection interval_materialize("), "{interval}");
+
+    let sermo = dump_source(
+        r#"incipit {
+    fixum sermo stream ← ad 'runtime:echo' ("salve")
+    itera ex stream.tuus<textus>().cursor() fixum frame {
+        adfirma frame.data ≡ "salve"
+    }
+}"#,
+    );
+    assert!(sermo.contains("runtime sermo_view_tuus("), "{sermo}");
+    assert!(sermo.contains("runtime sermo_cursor("), "{sermo}");
+    assert!(sermo.contains("runtime sermo_drain_cursor("), "{sermo}");
+}
+
+#[test]
+fn mir_generic_call_with_composite_explicit_type_args_lowers_and_validates() {
+    let source = r#"
+functio identitas_lista<T>(lista<T> xs) → lista<T> {
+    redde xs
+}
+
+incipit {
+    fixum lista<textus> xs ← ["creata"]
+    fixum lista<textus> ys ← identitas_lista<textus>(xs)
+    nota ys
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    validate_program(&lowered.program, lowered.validated.validation())
+        .expect("composite generic call-site MIR validates");
+}
+
+#[test]
+fn mir_generic_call_with_nullable_return_lowers_and_validates() {
+    let source = r#"
+functio fortasse<T>(T x) → T ∪ nihil {
+    redde x
+}
+
+incipit {
+    fixum textus ∪ nihil value ← fortasse<textus>("creata")
+    nota value
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    validate_program(&lowered.program, lowered.validated.validation()).expect("nullable generic return MIR validates");
+}
+
+#[test]
+fn collection_length_keeps_numerus_call_result_when_context_is_nullable() {
+    let source = r#"
+functio count(lista<fractus> values) → numerus ∪ nihil {
+    redde values.longitudo()
+}
+"#;
+    let mut unit = analyze(source);
+    let numerus = unit.types.primitive(Primitive::Numerus);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("nullable collection length lowers");
+    validate_program(&lowered.program, lowered.validated.validation()).expect("nullable collection length validates");
+
+    let function = lowered
+        .program
+        .functions
+        .iter()
+        .find(|function| function.source.is_some())
+        .expect("count function is lowered");
+    let length_return_ty = function
+        .blocks
+        .iter()
+        .flat_map(|block| &block.statements)
+        .find_map(|statement| {
+            let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                return None;
+            };
+            matches!(call.intrinsic, MirIntrinsic::Collection(MirCollectionOp::Length)).then_some(call.return_ty)
+        });
+    assert_eq!(length_return_ty, Some(MirType::semantic(numerus)));
+
+    let return_value = function.blocks.iter().find_map(|block| {
+        let MirTerminatorKind::Return(Some(value)) = &block.terminator.kind else {
+            return None;
+        };
+        Some(value)
+    });
+    let Some(MirOperand::Temp(temp)) = return_value else {
+        panic!("nullable return wraps the collection length in an option temp");
+    };
+    let returned_ty = function
+        .temps
+        .iter()
+        .find(|candidate| candidate.id == *temp)
+        .map(|candidate| candidate.ty);
+    assert_eq!(returned_ty, Some(function.return_ty));
+}
+
+#[test]
+fn narrowed_nullable_collection_projection_emits_valid_mir() {
+    let source = r#"
+functio first(lista<numerus> ∪ nihil values) → numerus {
+    si values non est nihil {
+        redde values[0]
+    }
+    redde 0
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("narrowed collection lowers");
+    validate_program(&lowered.program, lowered.validated.validation())
+        .expect("narrowed collection projection validates");
+}
+
+#[test]
+fn mir_generic_explicit_type_arg_for_nil_lowers_and_validates() {
+    let source = r"
+functio consume<T>(T ∪ nihil x) → vacuum {}
+
+incipit {
+    consume<textus>(nihil)
+}
+";
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    validate_program(&lowered.program, lowered.validated.validation()).expect("explicit nil generic call validates");
+}
+
+#[test]
+fn mir_generic_call_with_projected_struct_field_lowers_and_validates() {
+    let source = r#"
+genus Capsa {
+    textus nomen
+}
+
+functio identitas<T>(T x) → T {
+    redde x
+}
+
+incipit {
+    fixum Capsa capsa ← Capsa { nomen = "creata" }
+    fixum textus nomen ← identitas(capsa.nomen)
+    nota nomen
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    validate_program(&lowered.program, lowered.validated.validation())
+        .expect("projected struct field generic call validates");
+}
+
+#[test]
+fn mir_generic_call_with_indexed_list_element_lowers_and_validates() {
+    let source = r#"
+functio identitas<T>(T x) → T {
+    redde x
+}
+
+incipit {
+    fixum lista<textus> verba ← ["creata"]
+    fixum textus verbum ← identitas(verba![0])
+    nota verbum
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    validate_program(&lowered.program, lowered.validated.validation())
+        .expect("indexed list element generic call validates");
+}
+
+#[test]
+fn mir_generic_monomorphization_deduplicates_and_rewrites_direct_calls() {
+    let source = r#"
+functio identitas<T>(T x) → T {
+    redde x
+}
+
+incipit {
+    fixum _ a ← identitas<textus>("creata")
+    fixum _ b ← identitas<textus>("iterum")
+    fixum _ c ← identitas<numerus>(7)
+    nota a
+    nota b
+    nota c
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+
+    assert_eq!(lowered.monomorphizations.len(), 2);
+    let textus_instance = lowered.monomorphizations[0].function;
+    let numerus_instance = lowered.monomorphizations[1].function;
+    assert_ne!(textus_instance, numerus_instance);
+
+    let direct_calls = lowered
+        .program
+        .functions
+        .iter()
+        .flat_map(|function| function.blocks.iter())
+        .flat_map(|block| block.statements.iter())
+        .filter_map(|statement| match &statement.kind {
+            MirStatementKind::Call { callee: MirCallee::Function(id), .. } => Some(*id),
+            MirStatementKind::Call { callee: MirCallee::Definition { .. }, .. } => {
+                panic!("generic definition callee leaked after monomorphization")
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        direct_calls
+            .iter()
+            .filter(|id| **id == textus_instance)
+            .count(),
+        2
+    );
+    assert_eq!(
+        direct_calls
+            .iter()
+            .filter(|id| **id == numerus_instance)
+            .count(),
+        1
+    );
+    assert!(lowered.program.functions.iter().all(|function| {
+        function
+            .params
+            .iter()
+            .all(|param| !type_contains_param(&unit.types, param.ty.semantic_id()))
+            && function
+                .locals
+                .iter()
+                .all(|local| !type_contains_param(&unit.types, local.ty.semantic_id()))
+            && function
+                .temps
+                .iter()
+                .all(|temp| !type_contains_param(&unit.types, temp.ty.semantic_id()))
+            && !type_contains_param(&unit.types, function.return_ty.semantic_id())
+    }));
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// 4A — magnitudo shape params monomorphize at concrete call sites.
+// ──────────────────────────────────────────────────────────────────────
+
+/// Every tensor dimension of `ty` (through the type table) is a literal.
+fn assert_tensor_dims_literal(types: &TypeTable, ty: MirType) {
+    match types.get(ty.semantic_id()) {
+        Type::Tensor(_, shape) | Type::Matrix(_, shape) | Type::Sparsa(_, shape) => {
+            let IndexExpr::Tuple(dims) = types.get_index(*shape) else {
+                panic!("shape is not a rank-n tuple: {shape:?}");
+            };
+            for dim in dims {
+                assert!(
+                    matches!(types.get_index(*dim), IndexExpr::Literal(_)),
+                    "dimension {dim:?} is not literal after monomorphization"
+                );
+            }
+        }
+        _ => {}
+    }
+}
+
+#[test]
+fn mir_generic_shape_params_monomorphize_to_literal_dims() {
+    let source = r#"
+functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32, [B, D]> b) → tensor<f32, [B, D]> {
+    redde a.addita(b)
+}
+
+incipit {
+    fixum tensor<f32, [2, 8]> x ← vacua
+    fixum tensor<f32, [2, 8]> y ← vacua
+    fixum tensor<f32, [2, 8]> z ← add_tensors(x, y)
+    nota z
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+
+    assert_eq!(lowered.monomorphizations.len(), 1);
+    let instance_id = lowered.monomorphizations[0].function;
+
+    // The call site rewrites to the concrete instance.
+    let direct_calls = lowered
+        .program
+        .functions
+        .iter()
+        .flat_map(|function| function.blocks.iter())
+        .flat_map(|block| block.statements.iter())
+        .filter_map(|statement| match &statement.kind {
+            MirStatementKind::Call { callee: MirCallee::Function(id), .. } => Some(*id),
+            MirStatementKind::Call { callee: MirCallee::Definition { .. }, .. } => {
+                panic!("generic definition callee leaked after monomorphization")
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(direct_calls, vec![instance_id]);
+
+    // Instance signature carries concrete shapes: no params remain, and every
+    // tensor shape is literal dims.
+    let instance = lowered
+        .program
+        .functions
+        .iter()
+        .find(|function| function.id == instance_id)
+        .expect("monomorphized instance exists");
+    assert!(instance
+        .params
+        .iter()
+        .all(|param| !type_contains_param(&unit.types, param.ty.semantic_id())));
+    assert!(!type_contains_param(&unit.types, instance.return_ty.semantic_id()));
+    for param in &instance.params {
+        assert_tensor_dims_literal(&unit.types, param.ty);
+    }
+    assert_tensor_dims_literal(&unit.types, instance.return_ty);
+}
+
+#[test]
+fn mir_generic_shape_params_distinct_shapes_produce_distinct_instances() {
+    let source = r#"
+functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32, [B, D]> b) → tensor<f32, [B, D]> {
+    redde a.addita(b)
+}
+
+incipit {
+    fixum tensor<f32, [2, 8]> x ← vacua
+    fixum tensor<f32, [2, 8]> y ← vacua
+    fixum tensor<f32, [4, 4]> p ← vacua
+    fixum tensor<f32, [4, 4]> q ← vacua
+    fixum tensor<f32, [2, 8]> z ← add_tensors(x, y)
+    fixum tensor<f32, [4, 4]> r ← add_tensors(p, q)
+    nota z
+    nota r
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+
+    assert_eq!(lowered.monomorphizations.len(), 2);
+    let first = lowered.monomorphizations[0].function;
+    let second = lowered.monomorphizations[1].function;
+    assert_ne!(first, second, "distinct shapes must produce distinct instances");
+
+    // Same shape again deduplicates to the existing instance (2 instances for
+    // 3 call sites across two shapes is exercised by the key's shape args).
+    let param_ty = lowered
+        .program
+        .functions
+        .iter()
+        .find(|function| function.id == first)
+        .map(|function| function.params[0].ty)
+        .expect("instance param");
+    assert_tensor_dims_literal(&unit.types, param_ty);
+}
+
+#[test]
+fn mir_generic_shape_params_same_shape_deduplicates_instances() {
+    let source = r#"
+functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32, [B, D]> b) → tensor<f32, [B, D]> {
+    redde a.addita(b)
+}
+
+incipit {
+    fixum tensor<f32, [2, 8]> x ← vacua
+    fixum tensor<f32, [2, 8]> y ← vacua
+    fixum tensor<f32, [2, 8]> p ← vacua
+    fixum tensor<f32, [2, 8]> q ← vacua
+    fixum tensor<f32, [2, 8]> z ← add_tensors(x, y)
+    fixum tensor<f32, [2, 8]> r ← add_tensors(p, q)
+    nota z
+    nota r
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    assert_eq!(
+        lowered.monomorphizations.len(),
+        1,
+        "two same-shape call sites share one monomorphized instance"
+    );
+}
+
+fn assert_literal_shape_arg(types: &TypeTable, shape: crate::semantic::IndexId) {
+    match types.get_index(shape) {
+        IndexExpr::Literal(_) => {}
+        IndexExpr::Tuple(dims) => {
+            for dim in dims {
+                assert_literal_shape_arg(types, *dim);
+            }
+        }
+        other => panic!("nested monomorphization key kept symbolic shape {other:?}"),
+    }
+}
+
+#[test]
+fn mir_nested_shape_generic_monomorphization_direct_calls_use_concrete_child_keys() {
+    let source = r#"
+functio inner<magnitudo N>(tensor<f32, [N]> x) → tensor<f32, [N]> {
+    redde x
+}
+
+functio outer<magnitudo N>(tensor<f32, [N]> x) → tensor<f32, [N]> {
+    redde inner(x)
+}
+
+incipit {
+    fixum tensor<f32, [4]> a ← vacua
+    fixum tensor<f32, [4]> b ← vacua
+    fixum tensor<f32, [8]> c ← vacua
+    fixum tensor<f32, [4]> first ← outer(a)
+    fixum tensor<f32, [4]> duplicate ← outer(b)
+    fixum tensor<f32, [8]> distinct ← outer(c)
+    nota first
+    nota duplicate
+    nota distinct
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("nested generic lowering succeeds");
+
+    assert_eq!(
+        lowered.monomorphizations.len(),
+        4,
+        "outer and inner each form one deduplicated instance per concrete shape"
+    );
+    let mut instances_per_source = std::collections::HashMap::new();
+    for monomorphization in &lowered.monomorphizations {
+        assert_eq!(monomorphization.key.shape_args.len(), 1);
+        assert_literal_shape_arg(lowered.validated.validation().types, monomorphization.key.shape_args[0]);
+        *instances_per_source
+            .entry(monomorphization.key.source)
+            .or_insert(0usize) += 1;
+    }
+    assert_eq!(instances_per_source.len(), 2);
+    assert!(instances_per_source.values().all(|count| *count == 2));
+}
+
+#[test]
+fn mir_nested_shape_generic_monomorphization_try_calls_use_concrete_child_keys() {
+    let source = r#"
+functio inner<magnitudo N>(tensor<f32, [N]> x) → tensor<f32, [N]> ⇥ textus {
+    redde x
+}
+
+functio outer<magnitudo N>(tensor<f32, [N]> x) → tensor<f32, [N]> ⇥ textus {
+    redde inner(x)
+}
+
+incipit {
+    fixum tensor<f32, [4]> x ← vacua
+    fac {
+        fixum tensor<f32, [4]> y ← outer(x)
+        nota y
+    } cape err {
+        nota err
+    }
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("nested failable generic lowering succeeds");
+
+    assert_eq!(lowered.monomorphizations.len(), 2);
+    for monomorphization in &lowered.monomorphizations {
+        assert_eq!(monomorphization.key.shape_args.len(), 1);
+        assert_literal_shape_arg(lowered.validated.validation().types, monomorphization.key.shape_args[0]);
+    }
+    assert!(lowered.program.functions.iter().all(|function| {
+        function.blocks.iter().all(|block| {
+            !matches!(
+                block.terminator.kind,
+                MirTerminatorKind::TryCall { callee: MirCallee::Definition { .. }, .. }
+            )
+        })
+    }));
+}
+
+#[test]
+fn mir_nested_shape_generic_monomorphization_still_rejects_truly_unbound_child() {
+    let source = r#"
+functio inner<magnitudo N>() → numerus {
+    redde 1
+}
+
+functio outer<magnitudo N>(tensor<f32, [N]> x) → numerus {
+    redde inner()
+}
+
+incipit {
+    fixum tensor<f32, [4]> x ← vacua
+    fixum numerus value ← outer(x)
+    nota value
+}
+"#;
+    let mut unit = analyze(source);
+    let Err(errors) = lower_analyzed_unit_with_context(&mut unit) else {
+        panic!("unbound child shape must fail closed");
+    };
+    assert!(errors
+        .iter()
+        .any(|error| { error.issue == "invalid_mir_generic_call_signature_has_unresolved_type_parameter" }));
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Shader stage identity (MirKernelShaderStage) assigned during HIR→MIR
+// lowering. Stage 4 seam: @ nucleum → Compute, @ vertex → Vertex,
+// @ fragment → Fragment. Conflicting annotations fail-closed to None.
+// MirDeviceRole stays compute-only (Kernel/Device) — shader stage identity
+// is a separate axis.
+// ──────────────────────────────────────────────────────────────────────
+
+#[test]
+// ===========================================================================
+// Section M: Shader stage identity — compute, vertex, fragment
+// ===========================================================================
+
+fn lowers_nucleum_annotation_to_compute_shader_stage() {
+    let mut unit = analyze("@ nucleum\nfunctio kernel_entry() → vacuum { redde }");
+    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let function = &program.functions[0];
+    assert_eq!(
+        function.shader_stage,
+        Some(MirKernelShaderStage::Compute),
+        "@ nucleum must lower to MirKernelShaderStage::Compute"
+    );
+}
+
+#[test]
+fn lowers_vertex_annotation_to_vertex_shader_stage() {
+    let mut unit = analyze("@ vertex\nfunctio vertex_entry() → vacuum { redde }");
+    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let function = &program.functions[0];
+    assert_eq!(
+        function.shader_stage,
+        Some(MirKernelShaderStage::Vertex),
+        "@ vertex must lower to MirKernelShaderStage::Vertex"
+    );
+}
+
+#[test]
+fn lowers_fragment_annotation_to_fragment_shader_stage() {
+    let mut unit = analyze("@ fragment\nfunctio fragment_entry() → vacuum { redde }");
+    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let function = &program.functions[0];
+    assert_eq!(
+        function.shader_stage,
+        Some(MirKernelShaderStage::Fragment),
+        "@ fragment must lower to MirKernelShaderStage::Fragment"
+    );
+}
+
+#[test]
+fn lowers_plain_function_without_shader_stage() {
+    let mut unit = analyze("functio plain() → vacuum { redde }");
+    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let function = &program.functions[0];
+    assert_eq!(function.shader_stage, None, "plain function must have no shader stage");
+}
+
+#[test]
+fn shader_stage_rejects_conflicting_annotations() {
+    // CTO a7c616ed: one function must not simultaneously carry compute and
+    // graphics annotations. Fail-closed: conflicting annotations produce no
+    // shader stage.
+    use crate::hir::HirFunction;
+    use crate::lexer::Symbol;
+
+    fn make_func(is_kernel: bool, is_vertex: bool, is_fragment: bool) -> HirFunction {
+        HirFunction {
+            name: Symbol(0),
+            type_params: Vec::new(),
+            params: Vec::new(),
+            cli_args: None,
+            ret_ty: None,
+            err_ty: None,
+            body: None,
+            posture: radix_syntax::CallablePosture::SyncFinite,
+            is_async: false,
+            is_generator: false,
+            is_kernel,
+            is_device: false,
+            is_vertex,
+            is_fragment,
+            annotations: Vec::new(),
+            test: None,
+        }
+    }
+
+    // Kernel-only → Compute.
+    assert_eq!(
+        shader_stage_for_function(&make_func(true, false, false)),
+        Some(MirKernelShaderStage::Compute)
+    );
+
+    // Vertex-only → Vertex.
+    assert_eq!(
+        shader_stage_for_function(&make_func(false, true, false)),
+        Some(MirKernelShaderStage::Vertex)
+    );
+
+    // Fragment-only → Fragment.
+    assert_eq!(
+        shader_stage_for_function(&make_func(false, false, true)),
+        Some(MirKernelShaderStage::Fragment)
+    );
+
+    // Conflicting kernel + vertex: fail-closed, no stage.
+    assert_eq!(shader_stage_for_function(&make_func(true, true, false)), None);
+
+    // Conflicting vertex + fragment: fail-closed, no stage.
+    assert_eq!(shader_stage_for_function(&make_func(false, true, true)), None);
+}
+
+#[test]
+fn conflicting_shader_annotations_emit_diagnostic() {
+    // @vertex + @fragment on a single function must produce a diagnostic.
+    let mut unit = analyze("@ vertex\n@ fragment\nfunctio conflict() → vacuum { redde }");
+    let errors = lower_analyzed_unit(&mut unit).unwrap_err();
+    assert_eq!(errors.len(), 1, "expected exactly one error for conflicting annotations");
+    assert!(
+        errors[0].issue.contains("conflicting"),
+        "error issue must mention conflicting: {}",
+        errors[0].issue
+    );
+}
+
+#[test]
+fn conflicting_shader_annotations_with_nucleum_emit_diagnostic() {
+    // @nucleum + @vertex must also produce a diagnostic.
+    let mut unit = analyze("@ nucleum\n@ vertex\nfunctio conflict() → vacuum { redde }");
+    let errors = lower_analyzed_unit(&mut unit).unwrap_err();
+    assert_eq!(errors.len(), 1, "expected exactly one error for @nucleum + @vertex");
+    assert!(
+        errors[0].issue.contains("conflicting"),
+        "error issue must mention conflicting: {}",
+        errors[0].issue
+    );
+}
+
+#[test]
+fn lowers_vertex_method_inside_genus_to_shader_stage() {
+    let mut unit = analyze(
+        "genus Renderer {\n  numerus dummy = 0\n  @ vertex\n  functio draw() → vacuum { redde }\n}\n\nincipit {\n  fixum _ r ← Renderer {}\n}",
+    );
+    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let draw = program
+        .functions
+        .iter()
+        .find(|f| f.name.is_some())
+        .expect("genus method must be lowered with a name");
+    assert_eq!(
+        draw.shader_stage,
+        Some(MirKernelShaderStage::Vertex),
+        "genus method with @vertex must lower to MirKernelShaderStage::Vertex"
+    );
+}
+
+#[test]
+fn lowers_fragment_method_inside_genus_to_shader_stage() {
+    let mut unit = analyze(
+        "genus Renderer {\n  numerus dummy = 0\n  @ fragment\n  functio shade() → vacuum { redde }\n}\n\nincipit {\n  fixum _ r ← Renderer {}\n}",
+    );
+    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let shade = program
+        .functions
+        .iter()
+        .find(|f| f.name.is_some())
+        .expect("genus method must be lowered with a name");
+    assert_eq!(
+        shade.shader_stage,
+        Some(MirKernelShaderStage::Fragment),
+        "genus method with @fragment must lower to MirKernelShaderStage::Fragment"
+    );
+}
+
+#[test]
+fn vertex_function_injects_out_position_local_for_empty_body() {
+    // Even a @vertex function with an empty body must have out_position
+    // injected as a synthetic local during MIR lowering.
+    let mut unit = analyze("@ vertex\nfunctio v() → vacuum { redde }");
+    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let function = &program.functions[0];
+    assert_eq!(
+        function.shader_stage,
+        Some(MirKernelShaderStage::Vertex),
+        "@ vertex must lower to MirKernelShaderStage::Vertex"
+    );
+
+    let out_position = function
+        .locals
+        .iter()
+        .find(|l| {
+            l.name
+                .is_some_and(|n| n == unit.interner.intern("out_position"))
+        })
+        .expect("out_position local must be injected for @vertex function");
+    assert!(out_position.mutable, "out_position must be writable (mutable=true)");
+}
+
+#[test]
+fn lowers_vertex_vec3_to_vec4_widen() {
+    use crate::hir::{DefId, HirBinOp, HirExpression, HirExpressionKind, HirId, HirLiteral};
+    use crate::mir::{
+        MirAggregateFields, MirAggregateItem, MirAggregateKind, MirOperand, MirPlaceBase, MirStatementKind,
+    };
+    use crate::semantic::{IndexExpr, NumericWidth, Primitive, TypeTable};
+
+    let mut types = TypeTable::new();
+    let f32_id = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let vec3_id = {
+        let width = types.intern_index(IndexExpr::Literal(3));
+        types.vector_with_width(f32_id, width)
+    };
+    let vec4_id = {
+        let width = types.intern_index(IndexExpr::Literal(4));
+        types.vector_with_width(f32_id, width)
+    };
+
+    let vec3_mir = MirType::semantic(vec3_id);
+    let vec4_mir = MirType::semantic(vec4_id);
+    let span = Span::default();
+
+    let mut builder = FunctionBuilder::new(&types);
+    builder.shader_stage = Some(MirKernelShaderStage::Vertex);
+
+    // Set up bindings: position → vec3 (read-only), out_position → vec4 (writable)
+    let position_def = DefId(100);
+    let out_def = DefId(101);
+    builder.add_test_binding(position_def, vec3_mir, false);
+    let out_local = builder.add_test_binding(out_def, vec4_mir, true);
+
+    // Create HIR expression: position * 0.5  (type = vec3)
+    let position_expr =
+        HirExpression { id: HirId(0), kind: HirExpressionKind::Path(position_def), ty: Some(vec3_id), span };
+    let half_expr = HirExpression {
+        id: HirId(1),
+        kind: HirExpressionKind::Literal(HirLiteral::Float(0.5)),
+        ty: Some(f32_id),
+        span,
+    };
+    let mul_expr = HirExpression {
+        id: HirId(2),
+        kind: HirExpressionKind::Binary(HirBinOp::Mul, Box::new(position_expr), Box::new(half_expr)),
+        ty: Some(vec3_id),
+        span,
+    };
+
+    // Lower: out_position ← position * 0.5
+    let entry = builder.fresh_block(span);
+    builder.switch_to(entry);
+    let result = builder.lower_expr_to_destination(&mul_expr, MirPlace::local(out_local), vec4_mir);
+
+    assert!(result.is_some(), "lowering should succeed");
+    assert!(builder.errors.is_empty(), "unexpected errors: {:?}", builder.errors);
+
+    // Check that a Construct(Vector) statement was emitted
+    let stmts = &builder.blocks[0].statements;
+    // Expected: lower_expr_value emits temp = position * 0.5 (Assign),
+    // then emit_vec3_to_vec4_construct emits Construct out_position = vec4(temp, 1.0)
+    let construct_stmt = stmts
+        .iter()
+        .find(|s| matches!(s.kind, MirStatementKind::Construct { .. }))
+        .expect("must have a Construct statement");
+    let MirStatementKind::Construct { destination, aggregate } = &construct_stmt.kind else {
+        panic!("unreachable: find already matched Construct");
+    };
+    assert_eq!(
+        destination.base,
+        MirPlaceBase::Local(out_local),
+        "destination should be out_position local"
+    );
+    assert_eq!(aggregate.kind, MirAggregateKind::Vector, "aggregate kind must be Vector");
+    assert_eq!(aggregate.ty, vec4_mir, "aggregate type must be vec4<f32>");
+
+    let MirAggregateFields::Ordered(items) = &aggregate.fields else {
+        panic!("expected Ordered fields, got {:?}", aggregate.fields);
+    };
+    // Scalar-per-lane widening: four scalar elements, not the old mixed [vec3, scalar].
+    assert_eq!(items.len(), 4, "construct should have 4 scalar-lane operands");
+    // lanes 0..2 are VectorLane projections of the vec3 source.
+    for (lane, item) in items.iter().take(3).enumerate() {
+        let MirAggregateItem::Operand(MirOperand::Place(place)) = item else {
+            panic!("lane {lane} should be a Place operand, got {item:?}");
+        };
+        assert!(
+            place
+                .projections
+                .iter()
+                .any(|p| matches!(p, MirProjection::VectorLane(n) if *n as usize == lane)),
+            "lane {lane} should project VectorLane({lane}), got {place:?}"
+        );
+    }
+    // lane 3 is the materialized 1.0 w-component (assigned to a temp).
+    assert!(
+        matches!(items[3], MirAggregateItem::Operand(MirOperand::Temp(_))),
+        "fourth operand must be the materialized 1.0 w-component (temp), got {:?}",
+        items[3]
+    );
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// F-024: variant_payload must report errors for missing metadata or arity
+// mismatch instead of silently falling back to Ordered fields.
+// ──────────────────────────────────────────────────────────────────────
+
+#[test]
+fn variant_payload_errors_on_missing_field_metadata() {
+    let types = TypeTable::new();
+    let span = Span::default();
+    let mut builder = FunctionBuilder::new(&types);
+
+    // No variant field metadata in the empty context — must error, not silently Ordered.
+    let fields = builder.variant_payload(DefId(999), vec![MirOperand::Constant(MirConstant::Nil)], span);
+
+    assert!(
+        matches!(fields, MirAggregateFields::Ordered(_)),
+        "degraded output must still be Ordered"
+    );
+    assert_eq!(builder.errors.len(), 1, "must report one error, got: {:?}", builder.errors);
+    assert!(
+        builder.errors[0]
+            .issue
+            .contains("variant_payload_field_metadata_missing"),
+        "error issue must encode missing variant payload metadata, got: {}",
+        builder.errors[0].issue
+    );
+}
+
+#[test]
+fn variant_payload_errors_on_arity_mismatch() {
+    let types = TypeTable::new();
+    let span = Span::default();
+    let mut builder = FunctionBuilder::new(&types);
+
+    // Inject a variant with 2 field names into the context.
+    let variant = DefId(200);
+    let field_a = Symbol(1);
+    let field_b = Symbol(2);
+    let variant_fields_map = {
+        let mut map = FxHashMap::default();
+        map.insert(variant, vec![field_a, field_b]);
+        Arc::new(map)
+    };
+    builder.context.variant_fields = variant_fields_map;
+
+    // Call with 1 arg when 2 are expected — must error, not silently Ordered.
+    let fields = builder.variant_payload(variant, vec![MirOperand::Constant(MirConstant::Nil)], span);
+
+    assert!(
+        matches!(fields, MirAggregateFields::Ordered(_)),
+        "degraded output must still be Ordered"
+    );
+    assert_eq!(builder.errors.len(), 1, "must report one error, got: {:?}", builder.errors);
+    assert!(
+        builder.errors[0]
+            .issue
+            .contains("variant_payload_arity_mismatch"),
+        "error issue must encode variant payload arity mismatch, got: {}",
+        builder.errors[0].issue
+    );
+}
+
+#[test]
+fn variant_payload_produces_named_fields_when_metadata_and_arity_match() {
+    let types = TypeTable::new();
+    let span = Span::default();
+    let mut builder = FunctionBuilder::new(&types);
+
+    // Inject a variant with 2 field names into the context.
+    let variant = DefId(300);
+    let field_a = Symbol(11);
+    let field_b = Symbol(12);
+    let variant_fields_map = {
+        let mut map = FxHashMap::default();
+        map.insert(variant, vec![field_a, field_b]);
+        Arc::new(map)
+    };
+    builder.context.variant_fields = variant_fields_map;
+
+    let fields = builder.variant_payload(
+        variant,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Int(2)),
+        ],
+        span,
+    );
+
+    assert!(
+        matches!(fields, MirAggregateFields::Named(_)),
+        "must produce Named fields when metadata and arity match, got {fields:?}"
+    );
+    assert!(builder.errors.is_empty(), "no errors expected, got: {:?}", builder.errors);
+}
+
+// ---------------------------------------------------------------------------
+// N — Shared MIR CLI-program lowering (wasm-host-parity promotion packet P1)
+// ---------------------------------------------------------------------------
+
+fn analyze_exemplum_for_mir(rel: &str) -> AnalyzedModule {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus")
+        .join(rel);
+    let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read {}: {err}", path.display()));
+    analyze(&source)
+}
+
+/// Collect the field names of every `record` aggregate construct in the
+/// lowered program, resolved against the lowering interner.
+fn record_aggregate_fields(program: &MirProgram, interner: &Interner) -> Vec<Vec<String>> {
+    let mut surfaces = Vec::new();
+    for function in &program.functions {
+        for block in &function.blocks {
+            for statement in &block.statements {
+                let MirStatementKind::Construct { aggregate, .. } = &statement.kind else {
+                    continue;
+                };
+                let MirAggregateFields::Named(items) = &aggregate.fields else {
+                    continue;
+                };
+                if !matches!(aggregate.kind, MirAggregateKind::Record) {
+                    continue;
+                }
+                let names = items
+                    .iter()
+                    .map(|item| interner.resolve(item.name).to_owned())
+                    .collect::<Vec<_>>();
+                surfaces.push(names);
+            }
+        }
+    }
+    surfaces
+}
+
+/// Locate the field value for `field` in the first record aggregate that
+/// carries it.
+fn record_field_value<'a>(function: &'a MirFunction, field: &str, interner: &Interner) -> Option<&'a MirOperand> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let MirStatementKind::Construct { aggregate, .. } = &statement.kind else {
+                continue;
+            };
+            let MirAggregateFields::Named(items) = &aggregate.fields else {
+                continue;
+            };
+            if let Some(item) = items
+                .iter()
+                .find(|item| interner.resolve(item.name) == field)
+            {
+                return Some(&item.value);
+            }
+        }
+    }
+    None
+}
+
+/// All ten `shared-mir` CLI-family rows (promotion packet P1 §2) must lower
+/// through the default `lower_analyzed_unit_with_context` path — the
+/// `allow_cli_program` gate is lifted and the shared lowering derives the
+/// complete `argumenta` record surface from the CLI descriptor.
+#[test]
+fn cli_fixture_family_lowers_through_default_path() {
+    let fixtures = [
+        "cli/cli.fab",
+        "argumenta/argumenta.fab",
+        "descriptio/descriptio.fab",
+        "exitus/exitus.fab",
+        "meta/versio.fab",
+        "operandus/operandus.fab",
+        "optio/optio.fab",
+        "ubique/ubique.fab",
+        "annotation-sugar/cli-braced.fab",
+        "annotation-sugar/optio-braced.fab",
+    ];
+    for fixture in fixtures {
+        let mut analysis = analyze_exemplum_for_mir(fixture);
+        let lowered = lower_analyzed_unit_with_context(&mut analysis)
+            .unwrap_or_else(|errors| panic!("{fixture} must lower through the default path: {errors:?}"));
+        let surfaces = record_aggregate_fields(&lowered.program, &lowered.interner);
+        assert!(
+            !surfaces.is_empty(),
+            "{fixture} must construct the CLI `argumenta` record aggregate through the default path, got: {surfaces:?}"
+        );
+    }
+}
+
+/// The shared entry/args contract carries the option/operand binding: the
+/// entry `argumenta` record (global surface) and the `greet` command record
+/// (global + command-local) are both constructed from the descriptor.
+#[test]
+fn cli_fab_subcommand_records_carry_option_and_operand_binding() {
+    let mut analysis = analyze_exemplum_for_mir("cli/cli.fab");
+    let lowered = lower_analyzed_unit_with_context(&mut analysis).expect("lower cli/cli.fab");
+    let surfaces = record_aggregate_fields(&lowered.program, &lowered.interner);
+    assert!(
+        surfaces.contains(&vec!["verbose".to_owned()]),
+        "entry record must bind the global verbose option, got: {surfaces:?}"
+    );
+    assert!(
+        surfaces.contains(&vec!["verbose".to_owned(), "nomen".to_owned()]),
+        "greet record must bind the global verbose option and the nomen operand, got: {surfaces:?}"
+    );
+
+    let greet = lowered
+        .program
+        .functions
+        .iter()
+        .find(|function| {
+            function
+                .name
+                .is_some_and(|name| lowered.interner.resolve(name) == "greet")
+        })
+        .expect("greet command function");
+    // Global flag default: false. Required operand placeholder: empty textus.
+    let verbose = record_field_value(greet, "verbose", &lowered.interner).expect("greet record binds verbose");
+    assert!(
+        matches!(verbose, MirOperand::Constant(MirConstant::Bool(false))),
+        "verbose flag must carry its typed default false, got: {verbose:?}"
+    );
+    let nomen = record_field_value(greet, "nomen", &lowered.interner).expect("greet record binds nomen");
+    let MirOperand::Constant(MirConstant::String(symbol)) = nomen else {
+        panic!("nomen must carry a textus placeholder, got: {nomen:?}");
+    };
+    assert_eq!(lowered.interner.resolve(*symbol), "", "nomen placeholder is the empty textus");
+}
+
+/// Option/operand binding semantics through the shared path: flags default to
+/// false, undefaulted value options to `nihil`, rest operands to an empty
+/// array aggregate.
+#[test]
+fn cli_option_and_operand_binding_typed_defaults() {
+    let mut optio = analyze_exemplum_for_mir("optio/optio.fab");
+    let lowered = lower_analyzed_unit_with_context(&mut optio).expect("lower optio/optio.fab");
+    let surfaces = record_aggregate_fields(&lowered.program, &lowered.interner);
+    assert!(
+        surfaces.contains(&vec!["verbose".to_owned(), "count".to_owned()]),
+        "optio record must bind verbose and count, got: {surfaces:?}"
+    );
+    let entry = lowered
+        .program
+        .functions
+        .iter()
+        .find(|function| function.source.is_none() && function.name.is_none())
+        .expect("synthetic entry function");
+    let verbose = record_field_value(entry, "verbose", &lowered.interner).expect("verbose binding");
+    assert!(
+        matches!(verbose, MirOperand::Constant(MirConstant::Bool(false))),
+        "verbose flag default false, got: {verbose:?}"
+    );
+    let count = record_field_value(entry, "count", &lowered.interner).expect("count binding");
+    assert!(
+        matches!(count, MirOperand::Constant(MirConstant::Nil)),
+        "undefaulted value option is nihil, got: {count:?}"
+    );
+
+    let mut operandus = analyze_exemplum_for_mir("operandus/operandus.fab");
+    let lowered = lower_analyzed_unit_with_context(&mut operandus).expect("lower operandus/operandus.fab");
+    let entry = lowered
+        .program
+        .functions
+        .iter()
+        .find(|function| function.source.is_none() && function.name.is_none())
+        .expect("synthetic entry function");
+    let files = record_field_value(entry, "files", &lowered.interner).expect("files rest binding");
+    assert!(
+        matches!(files, MirOperand::Temp(_)),
+        "rest operand must bind an empty array aggregate temp, got: {files:?}"
+    );
+    let input = record_field_value(entry, "input", &lowered.interner).expect("input binding");
+    assert!(
+        matches!(input, MirOperand::Constant(MirConstant::String(_))),
+        "required operand carries a textus placeholder, got: {input:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// O — P3 frontend async/promissum fixtures (wasm-host-parity packet P3)
+// ---------------------------------------------------------------------------
+
+/// Shared analysis path: derive the import contract and analyze a corpus
+/// fixture through the driver, exactly like the tool/wasm lane session.
+fn analyze_exemplum_for_mir_async(rel: &str) -> AnalyzedModule {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus")
+        .join(rel);
+    let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read {}: {err}", path.display()));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::MirLlvm)
+            .with_dev_stdlib(),
+    );
+    crate::driver::analyze_source(&session, &path.display().to_string(), &source).unwrap_or_else(|diagnostics| {
+        let facts: Vec<String> = diagnostics
+            .iter()
+            .map(|d| format!("{:?} {:?} {:?}", d.code, d.issue(), d.args))
+            .collect();
+        panic!("{rel} must analyze: {facts:?}")
+    })
+}
+
+/// The three `frontend_analysis_failed` rows (promotion packet P3 §2) must
+/// analyze through the shared driver session (import contract derived) and
+/// lower to non-empty MIR without the await/yield rejection — closing the
+/// SEM010/SEM011 analysis gap and the `unsupported_mir_lowering_await_yield_expression`
+/// lowering gap in one shared path.
+#[test]
+fn async_fixture_family_analyzes_and_lowers_through_shared_path() {
+    for fixture in [
+        "ad/async-solum-leget.fab",
+        "ad/async-tempus-dormiet.fab",
+        "ad/solum-lege-generic.fab",
+    ] {
+        let mut analysis = analyze_exemplum_for_mir_async(fixture);
+        assert!(
+            !analysis
+                .diagnostics
+                .iter()
+                .any(|d| d.issue() == Some("await_bind_requires_promissum")
+                    || d.issue() == Some("cede_requires_promissum")
+                    || d.issue() == Some("dynamic_receiver_method_type_args")),
+            "{fixture} must not reject await/cede on promissum-returning receivers: {:?}",
+            analysis.diagnostics
+        );
+        let lowered = lower_analyzed_unit_with_context(&mut analysis)
+            .unwrap_or_else(|errors| panic!("{fixture} must lower: {errors:?}"));
+        assert!(
+            !lowered.program.functions.is_empty(),
+            "{fixture} must lower to a non-empty MIR program"
+        );
+    }
+}
+
+/// `await tempus.dormiet(ms)` lowers the awaited provider call (the promissum
+/// carrier temp) and discards the payload; the tempus:dormiet route survives.
+#[test]
+fn async_tempus_tacebit_lowers_provider_call_and_discards_payload() {
+    let mut analysis = analyze_exemplum_for_mir_async("ad/async-tempus-dormiet.fab");
+    let lowered = lower_analyzed_unit_with_context(&mut analysis).expect("lower async tempus");
+    let dump = crate::mir::dump_program(&lowered.program);
+    let provider_calls = dump.matches("runtime provider").count();
+    assert!(
+        provider_calls >= 2,
+        "tempus expectet + dormiet routes must lower through the shared provider intrinsic ({provider_calls} calls):\n{dump}"
+    );
+    assert!(
+        !dump.contains("unsupported"),
+        "no unsupported surface in the async tempus unit:\n{dump}"
+    );
+}
+
+/// `await_const` on a promissum-returning receiver binds the payload carrier
+/// into the awaited local (the shared payload-carrier fact).
+#[test]
+fn async_solum_await_const_binds_payload_carrier() {
+    let mut analysis = analyze_exemplum_for_mir_async("ad/async-solum-leget.fab");
+    let lowered = lower_analyzed_unit_with_context(&mut analysis).expect("lower async solum leget");
+    let dump = crate::mir::dump_program(&lowered.program);
+    assert!(
+        dump.matches("runtime provider").count() >= 2,
+        "solum scribe + leget routes must lower through the shared provider intrinsic:\n{dump}"
+    );
+    assert!(
+        !dump.contains("unsupported"),
+        "no unsupported surface in the async solum leget unit:\n{dump}"
+    );
+}
+
+/// `reddet future` (await-and-return) materializes the awaited payload into the
+/// enclosing function's declared return carrier so the return terminator
+/// validates against the declared (payload) return type.
+#[test]
+fn reddet_awaits_promissum_and_returns_payload() {
+    let source = r"
+functio fetch() fiet → numerus {
+    redde 42
+}
+functio forward() fiet → numerus {
+    reddet fetch()
+}
+incipiet {
+    nota 1
+}
+";
+    let mut analysis = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut analysis).expect("lower reddet unit");
+    assert!(
+        lowered.program.functions.iter().any(|function| function
+            .name
+            .is_some_and(|name| lowered.interner.resolve(name) == "forward")),
+        "forward function must lower"
+    );
+    let dump = crate::mir::dump_program(&lowered.program);
+    assert!(
+        !dump.contains("unsupported"),
+        "no unsupported surface in the reddet unit:\n{dump}"
+    );
+}
+
+// ===========================================================================
+// Section N — CDA-U6: `↤` conversion-directed assignment lowering
+// ===========================================================================
+
+fn count_occurrences(haystack: &str, needle: &str) -> usize {
+    haystack.matches(needle).count()
+}
+
+#[test]
+fn conversio_assign_lowers_through_shared_conversion_owner() {
+    // `count ↤ "42"` must lower through the shared `↦` conversion owner
+    // (`lower_conversio`) exactly once, then store into the destination place
+    // exactly once — no codegen-only rewrite duplicating evaluation.
+    let dump = dump_source("incipit {\n  varia numerus count ← 0\n  count ↤ \"42\"\n}\n");
+    assert!(
+        dump.contains("runtime convert runtime"),
+        "↤ must lower through the shared conversion owner:\n{dump}"
+    );
+    assert_eq!(
+        count_occurrences(&dump, "runtime convert runtime"),
+        1,
+        "conversion must happen exactly once:\n{dump}"
+    );
+    assert_eq!(
+        count_occurrences(&dump, " = %"),
+        1,
+        "the converted value must be stored into the destination exactly once:\n{dump}"
+    );
+    assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
+}
+
+#[test]
+fn conversio_assign_typed_init_lowers_single_convert_then_store() {
+    // `fixum numerus n ↤ "42"`: the destination is the local being declared;
+    // convert the source to the written type once, store once.
+    let dump = dump_source("incipit {\n  fixum numerus n ↤ \"42\"\n}\n");
+    assert_eq!(
+        count_occurrences(&dump, "runtime convert runtime"),
+        1,
+        "typed ↤ init must convert exactly once:\n{dump}"
+    );
+    assert_eq!(
+        count_occurrences(&dump, " = %"),
+        1,
+        "typed ↤ init must store into the local exactly once:\n{dump}"
+    );
+    assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
+}
+
+#[test]
+fn conversio_assign_recovery_lowers_through_conversion_recovery_slot() {
+    // `⇥` recovery travels through the same conversion intrinsic as `↦`.
+    let dump = dump_source("incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⇥ 0\n}\n");
+    assert!(
+        dump.contains("runtime convert runtime"),
+        "↤ with recovery must lower through the conversion owner:\n{dump}"
+    );
+    assert!(
+        dump.contains("recovery"),
+        "⇥ recovery must be carried by the conversion:\n{dump}"
+    );
+}
+
+#[test]
+fn conversio_assign_call_recovery_is_deferred_out_of_the_main_flow() {
+    // CTO-3: a side-effecting `⇥ fb()` recovery CALL is lowered into an
+    // orphan block — NOT into the main (bb0) flow — so it cannot run when the
+    // conversion succeeds (fallback-not-run-on-success; the runner invokes it
+    // lazily at the failure point).
+    let dump = dump_source(
+        "functio fb() → numerus {\n  redde 0\n}\nincipit {\n  varia numerus count ← 0\n  count ↤ \"42\" ⇥ fb()\n}\n",
+    );
+    let body = first_block_body(&dump);
+    assert!(
+        !body.contains("call def#"),
+        "the side-effecting recovery call must not be in the main flow (it would run on success):\n{dump}"
+    );
+    assert!(
+        dump.contains("runtime convert runtime") && dump.contains("recovery"),
+        "the conversion must still carry the deferred recovery:\n{dump}"
+    );
+}
+
+#[test]
+fn conversio_assign_chain_lowers_inner_then_outer_conversion() {
+    // Right-associated chain `a ↤ b ↤ "42"`: the inner conversion feeds the
+    // outer conversion; exactly two conversions, one store per link.
+    let dump = dump_source("incipit {\n  varia numerus a ← 0\n  varia numerus b ← 0\n  a ↤ b ↤ \"42\"\n}\n");
+    assert_eq!(
+        count_occurrences(&dump, "runtime convert runtime"),
+        2,
+        "chain must convert inner-to-outer exactly once per link:\n{dump}"
+    );
+    assert_eq!(count_occurrences(&dump, " = %"), 2, "chain must store once per link:\n{dump}");
+    assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
+}
+
+// ── MIR emit targets (CDA-U7): claimed `↦` routes lower `↤` ─────────────────
+
+#[cfg(feature = "mir-wasm")]
+#[test]
+fn wasm_text_emits_conversio_assign_via_runtime_convert() {
+    let output = crate::mir::test_support::compile_wasm_text(
+        "incipit {\n  varia numerus count ← 0\n  count ↤ \"42\"\n  nota count\n}",
+    );
+    assert!(
+        output.contains("convert") || output.contains("parse") || output.contains("stoi"),
+        "wasm-text must emit the ↦ conversion for ↤:\n{output}"
+    );
+    assert!(!output.contains("↤"), "raw ↤ must not leak into emitted wasm-text:\n{output}");
+}

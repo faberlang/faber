@@ -1,6 +1,6 @@
 use super::*;
 use crate::cli::{BackendSelection, RunArgs};
-use radix::mir::RunSourceError;
+use radix_module::mir::RunSourceError;
 use radix_package::mir::DeviceSelection;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -222,9 +222,9 @@ fn package_mir_run_with_selection_auto_stays_on_cpu_route() {
     let entry = dir.join("main.fab");
     std::fs::write(&entry, "main { print \"cpu\" }\n").expect("write entry");
 
-    let mut host = radix::mir::BufferHost::default();
+    let mut host = radix_module::mir::BufferHost::default();
     radix_package::mir::run_package_mir_with_selection(
-        &radix::driver::Config::default(),
+        &radix_module::driver::Config::default(),
         &entry,
         DeviceSelection::Auto,
         &crate::package::mir::faber_mir_seams(),
@@ -241,8 +241,8 @@ fn package_mir_run_with_selection_auto_stays_on_cpu_route() {
 fn run_single_file(path: &Path) -> Result<ExitCode, RunSourceError> {
     let source = std::fs::read_to_string(path).expect("read single-file source");
     let config = script_package_config(path, None, None).expect("single-file config");
-    let session = radix::driver::Session::new(config);
-    let mut host = radix::mir::BufferHost::default();
+    let session = radix_module::driver::Session::new(config);
+    let mut host = radix_module::mir::BufferHost::default();
     crate::script::run_with_session(&session, &path.display().to_string(), &source, &mut host)
 }
 

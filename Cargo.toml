@@ -2,7 +2,7 @@
 members = [
     "crates/hygiene-ratchet",
     "crates/handroll",
-    "crates/radix",
+    "crates/radix-module",
     "crates/radix-codegen-shared",
     "crates/radix-hir-faber",
     "crates/radix-mir",
@@ -29,7 +29,7 @@ resolver = "2"
 default-members = [
     "crates/hygiene-ratchet",
     "crates/handroll",
-    "crates/radix",
+    "crates/radix-module",
     "crates/radix-codegen-shared",
     "crates/radix-hir-faber",
     "crates/radix-mir",

@@ -46,7 +46,7 @@ pub enum Command {
     Check(CheckArgs),
 
     /// Run aspect verification on a single file
-    Verify(radix::tool::VerifyArgs),
+    Verify(radix_module::tool::VerifyArgs),
 
     /// Verify a library package's target binding manifest
     VerifyLibrary(VerifyLibraryArgs),
@@ -71,19 +71,19 @@ pub enum Command {
     FmirRun(FmirRunArgs),
 
     /// Tokenize source and output JSON (compatibility alias for `radix lex`)
-    Lex(radix::tool::InputArgs),
+    Lex(radix_module::tool::InputArgs),
 
     /// Parse source and output AST as JSON (compatibility alias for `radix parse`)
-    Parse(radix::tool::InputArgs),
+    Parse(radix_module::tool::InputArgs),
 
     /// Lower AST to HIR and output as JSON (compatibility alias for `radix hir`)
-    Hir(radix::tool::InputArgs),
+    Hir(radix_module::tool::InputArgs),
 
     /// Lower checked HIR to MIR and output a deterministic text dump (compatibility alias for `radix mir`)
-    Mir(radix::tool::InputArgs),
+    Mir(radix_module::tool::InputArgs),
 
     /// Validate and output normalized CLI IR as JSON (compatibility alias for `radix cli-ir`)
-    CliIr(radix::tool::InputArgs),
+    CliIr(radix_module::tool::InputArgs),
 
     /// Compile to target for stdout (compatibility alias for `radix emit`)
     Emit(EmitArgs),
@@ -188,7 +188,7 @@ pub struct ConvertArgs {
 pub struct BuildArgs {
     /// Output target language
     #[arg(short = 't', long = "target", value_enum)]
-    pub target: Option<radix::tool::CliTarget>,
+    pub target: Option<radix_module::tool::CliTarget>,
 
     /// Output directory for generated files
     #[arg(short = 'o', long = "out-dir", default_value = ".")]

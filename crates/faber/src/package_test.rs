@@ -33,7 +33,7 @@ fn check_with_faber_seams(config: &Config, input: &Path) -> Vec<Diagnostic> {
     radix_package::analyze::check_package(config, input, &faber_analysis_seams())
 }
 
-fn compile_with_faber_seams(config: &Config, input: &Path) -> radix::CompileResult {
+fn compile_with_faber_seams(config: &Config, input: &Path) -> radix_module::CompileResult {
     compile_package_compiler(config, input, &faber_emission_seams())
 }
 
@@ -64,7 +64,7 @@ fn discover_package(input: &Path) -> Result<PackageSpec, Box<Diagnostic>> {
 fn load_with_faber_seams(
     spec: &PackageSpec,
     resolver: &LibraryResolver,
-    locale_pack: Option<&radix::locale::LocalePack>,
+    locale_pack: Option<&radix_module::locale::LocalePack>,
     include_proba: bool,
     filter: Option<&TestSourceFilter>,
 ) -> Result<Vec<radix_package::PackageFile>, Vec<Diagnostic>> {
@@ -169,13 +169,13 @@ fn run_mir_artifact_for_faber<H: Host + ?Sized>(
         host,
     )
 }
-use radix::codegen::Target;
-use radix::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase};
-use radix::driver::Config;
-use radix::file_interface::FileExportKind;
-use radix::hir::{HirItemKind, LibraryBinding, LibraryItem, LibraryItemKind, LibraryProvider};
-use radix::mir::{BufferHost, Host, MirDiagnosticKind, MirProvider, RunnerError, Value};
-use radix::Output;
+use radix_module::codegen::Target;
+use radix_module::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase};
+use radix_module::driver::Config;
+use radix_module::file_interface::FileExportKind;
+use radix_module::hir::{HirItemKind, LibraryBinding, LibraryItem, LibraryItemKind, LibraryProvider};
+use radix_module::mir::{BufferHost, Host, MirDiagnosticKind, MirProvider, RunnerError, Value};
+use radix_module::Output;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -333,9 +333,9 @@ fn dev_norma_library_home() -> PathBuf {
 /// directly; they must pass the same default pack the `compile_package*` /
 /// `analyze_package` routes apply — not the pack-less (registry-direct)
 /// lexing `load_package` would select.
-fn english_pack() -> radix::locale::LocalePack {
+fn english_pack() -> radix_module::locale::LocalePack {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
-    radix::locale::LocalePack::from_toml_path(path).expect("load English locale pack")
+    radix_module::locale::LocalePack::from_toml_path(path).expect("load English locale pack")
 }
 
 struct CoreutilsLikePackage {
@@ -383,7 +383,7 @@ fn library_path_eq(actual: &[String], expected: &[&str]) -> bool {
 }
 
 fn library_binding_by_module<'a>(
-    analysis: &'a radix::driver::AnalyzedModule,
+    analysis: &'a radix_module::driver::AnalyzedModule,
     module_path: &[&str],
 ) -> &'a LibraryBinding {
     analysis
@@ -395,7 +395,7 @@ fn library_binding_by_module<'a>(
 }
 
 fn library_item_by_export<'a>(
-    analysis: &'a radix::driver::AnalyzedModule,
+    analysis: &'a radix_module::driver::AnalyzedModule,
     module_path: &[&str],
     exported_name: &str,
     kind: LibraryItemKind,
@@ -1140,7 +1140,7 @@ entry = "main.fab"
 "#,
         )
         .expect("write manifest");
-        let workspace_root = radix::paths::faberlang_home().expect("faberlang container root");
+        let workspace_root = radix_module::paths::faberlang_home().expect("faberlang container root");
         let touch_source = workspace_root.join("examples/coreutils/packages/touch/src/main.fab");
         let touch_source_text = fs::read_to_string(&touch_source).expect("read coreutils touch");
         fs::write(
@@ -2055,7 +2055,7 @@ fn assert_package_corpus_llvm_smoke(relative: &str, label: &str) {
             .validation()
             .interner
             .expect("package MIR carries interner");
-        radix::mir::emit_llvm_text_probe(&lowered.validated, interner)
+        radix_module::mir::emit_llvm_text_probe(&lowered.validated, interner)
     })
     .expect("corpus package lowers to MIR")
     .expect("corpus package emits LLVM");
@@ -7131,7 +7131,7 @@ locale = "zh-Hans"
 
 #[test]
 fn installed_reader_locale_reference_examples_compile_from_installed_packs() {
-    let root = radix::paths::faberlang_home()
+    let root = radix_module::paths::faberlang_home()
         .expect("faberlang container root")
         .join("examples/reader-locale");
 
@@ -7411,7 +7411,7 @@ locale = "zh-Hans"
 
 #[test]
 fn thai_reader_locale_example_compiles_from_manifest() {
-    let example = radix::paths::faberlang_home()
+    let example = radix_module::paths::faberlang_home()
         .expect("faberlang container root")
         .join("examples/reader-locale/th-TH");
 
@@ -8322,7 +8322,7 @@ entry = "main.fab"
         .output
         .expect("compile explicit entry");
     let rust = match output {
-        radix::Output::Rust(output) => output.code,
+        radix_module::Output::Rust(output) => output.code,
         _ => panic!("expected Rust output"),
     };
     assert!(
@@ -8402,7 +8402,7 @@ entry = "main.fab"
     let compile_result = compile_with_faber_seams(&Config::default(), &pkg);
     assert!(compile_result.success(), "compile should succeed");
     let code = match &compile_result.output {
-        Some(radix::Output::Rust(r)) => r.code.clone(),
+        Some(radix_module::Output::Rust(r)) => r.code.clone(),
         _ => panic!("expected rust output"),
     };
 
@@ -8692,7 +8692,7 @@ entry = "main.fab"
     let compile_result = compile_with_faber_seams(&Config::default(), &pkg);
     assert!(compile_result.success(), "compile should succeed");
     let code = match &compile_result.output {
-        Some(radix::Output::Rust(r)) => r.code.clone(),
+        Some(radix_module::Output::Rust(r)) => r.code.clone(),
         _ => panic!("expected rust output"),
     };
     // Emit uses the plan, not a text scan of `code`.
@@ -8734,7 +8734,7 @@ entry = "main.fab"
     let compile_result = compile_with_faber_seams(&Config::default(), &pkg);
     assert!(compile_result.success(), "compile should succeed");
     let code = match &compile_result.output {
-        Some(radix::Output::Rust(r)) => r.code.clone(),
+        Some(radix_module::Output::Rust(r)) => r.code.clone(),
         _ => panic!("expected rust output"),
     };
     let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
@@ -8861,7 +8861,7 @@ main {{
     let compile_result = compile_with_faber_seams(&Config::default(), &pkg);
     assert!(compile_result.success(), "compile should succeed");
     let code = match &compile_result.output {
-        Some(radix::Output::Rust(r)) => r.code.clone(),
+        Some(radix_module::Output::Rust(r)) => r.code.clone(),
         _ => panic!("expected rust output"),
     };
     let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
@@ -8980,7 +8980,7 @@ async_main {{
         compile_result.diagnostics
     );
     let code = match &compile_result.output {
-        Some(radix::Output::Rust(r)) => r.code.clone(),
+        Some(radix_module::Output::Rust(r)) => r.code.clone(),
         _ => panic!("expected rust output"),
     };
     let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
@@ -9280,7 +9280,7 @@ main {
 }
 
 fn transitive_test_diagnostic_facts(
-    result: &radix::CompileResult,
+    result: &radix_module::CompileResult,
 ) -> Vec<(Option<&str>, Option<&str>)> {
     result
         .diagnostics
@@ -9606,8 +9606,8 @@ main {
         .iter()
         .find(|import| import.binding == "parent")
         .expect("parent import");
-    assert_eq!(child.visibility, radix::syntax::Visibility::Publica);
-    assert_eq!(parent.visibility, radix::syntax::Visibility::Privata);
+    assert_eq!(child.visibility, radix_module::syntax::Visibility::Publica);
+    assert_eq!(parent.visibility, radix_module::syntax::Visibility::Privata);
 }
 
 #[test]
@@ -11341,7 +11341,7 @@ fn go_compile_concurrent_calls_do_not_exchange_modules() {
 // ---------------------------------------------------------------------------
 
 fn sibling_faber_web_lib() -> PathBuf {
-    radix::paths::faberlang_home()
+    radix_module::paths::faberlang_home()
         .expect("faberlang container root")
         .join("faber-web")
 }
@@ -13428,12 +13428,12 @@ fn simple_loss(
     .expect("write module");
 
     let config = Config {
-        target: radix::codegen::Target::MirFmirBinary,
+        target: radix_module::codegen::Target::MirFmirBinary,
         ..Config::default()
     };
     let package = analyze_with_faber_seams(&config, &dir).expect("analyze library package");
     assert!(
-        !package.diagnostics.iter().any(radix::Diagnostic::is_error),
+        !package.diagnostics.iter().any(radix_module::Diagnostic::is_error),
         "expected no analysis errors, got {:?}",
         package
             .diagnostics
@@ -13482,7 +13482,7 @@ fn simple_loss(
     assert!(
         matches!(
             callable.ret.as_ref(),
-            radix::file_interface::InterfaceTypeSnapshot::Tuple(_)
+            radix_module::file_interface::InterfaceTypeSnapshot::Tuple(_)
         ),
         "companion return should snapshot as a tuple, got {:?}",
         callable.ret
@@ -13558,8 +13558,8 @@ main {
     )
     .expect("write entry");
 
-    let config = radix::driver::Config::default()
-        .with_target(radix::codegen::Target::MirFmirBinary)
+    let config = radix_module::driver::Config::default()
+        .with_target(radix_module::codegen::Target::MirFmirBinary)
         .with_stdlib(lib_root);
     let mut host = BufferHost::default();
     let result = run_mir_for_faber(&config, &entry, &mut host);
@@ -13641,8 +13641,8 @@ main {
     )
     .expect("write entry");
 
-    let config = radix::driver::Config::default()
-        .with_target(radix::codegen::Target::MirFmirBinary)
+    let config = radix_module::driver::Config::default()
+        .with_target(radix_module::codegen::Target::MirFmirBinary)
         .with_stdlib(lib_root);
     let mut host = BufferHost::default();
     let diagnostics = run_mir_for_faber(&config, &entry, &mut host)
@@ -13814,8 +13814,8 @@ main {
     )
     .expect("write entry");
 
-    let config = radix::driver::Config::default()
-        .with_target(radix::codegen::Target::MirFmirBinary)
+    let config = radix_module::driver::Config::default()
+        .with_target(radix_module::codegen::Target::MirFmirBinary)
         .with_stdlib(lib_root);
     let mut host = BufferHost::default();
     let result = run_mir_for_faber(&config, &entry, &mut host);
@@ -13920,8 +13920,8 @@ main {
     )
     .expect("write entry");
 
-    let config = radix::driver::Config::default()
-        .with_target(radix::codegen::Target::MirFmirBinary)
+    let config = radix_module::driver::Config::default()
+        .with_target(radix_module::codegen::Target::MirFmirBinary)
         .with_stdlib(lib_root);
     let mut host = BufferHost::default();
     let result = run_mir_for_faber(&config, &entry, &mut host);

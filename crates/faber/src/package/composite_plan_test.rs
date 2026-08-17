@@ -8,8 +8,8 @@
 
 use super::*;
 use crate::package::PackageSpec;
-use radix::codegen::Target;
-use radix::diagnostics::{Diagnostic, DiagnosticArg};
+use radix_module::codegen::Target;
+use radix_module::diagnostics::{Diagnostic, DiagnosticArg};
 use radix_mir::abi::{
     MirKernelDispatchSize, MirKernelResourceAccess, MirKernelWorkgroupCount, MirWorkgroupSize,
 };

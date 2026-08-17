@@ -1,0 +1,82 @@
++++
+term = "shader-contract-local-structs"
+kind = "concept"
+category = "library"
+canonical = true
+summary = "Current-compiler-clean local structures and stage entries for the generic shader-contract surface."
+locale = "la"
++++
+
+# =============================================================================
+# shader-contract-local-structs — compilable-now generic fixture subset (U4-A)
+# =============================================================================
+#
+# The language-level subset of the generic WGSL shader-contract surface that
+# parses and typechecks with the current compiler (verified with `radix parse`
+# and `radix check`):
+#
+#   * local geometry-like structures — no `triga:` imports, no sibling
+#     checkout resolution
+#   * @ vertex / @ fragment stage entries with empty bodies (the explicit
+#     empty-body default path of shader-lighting-lowering)
+#   * contract-role function bodies using `adfirma` against the local
+#     structures
+#
+# The only part NOT exercised here is decision D1's
+# `@ shader_contract "<role>"` annotation — the full-surface fixture is
+# `shader-contract-source-facts.fab`. This file proves the surrounding
+# surface (structures + stage entries + contract-role bodies) stays green
+# while U2/U3 are in flight.
+# =============================================================================
+
+# Local geometry-like structure: one vertex-buffer attribute (shader input).
+genus BufferAttribute {
+    textus semantic
+    numerus location
+    numerus format
+    numerus offset_bytes
+    numerus stride_bytes
+    numerus step_mode
+}
+
+# Local geometry-like structure: a vertex-buffer layout holding attributes.
+genus BufferLayout {
+    textus name
+    numerus array_stride
+    lista<BufferAttribute> attributes
+}
+
+# Local geometry-like structure: a fragment render-target output.
+genus FragmentOutput {
+    textus semantic
+    numerus location
+    numerus format
+}
+
+# Contract-role function body (annotation added by U2's recognition).
+functio declare_vertex_layout(BufferLayout layout) → bivalens {
+    adfirma layout.name ≡ "position" secus "vertex layout fixes the position attribute"
+    redde verum
+}
+
+# Contract-role function body (annotation added by U2's recognition).
+functio declare_fragment_output(FragmentOutput output) → bivalens {
+    adfirma output.location ≡ 0 secus "fragment output fixes location 0"
+    redde verum
+}
+
+@ vertex
+functio shader_plane_vertex() → vacuum {
+}
+
+@ fragment
+functio shader_plane_fragment() → vacuum {
+}
+
+incipit {
+    fixum _ position ← BufferAttribute { semantic = "position", location = 0, format = 3, offset_bytes = 0, stride_bytes = 12, step_mode = 1 }
+    fixum _ layout ← BufferLayout { name = "position", array_stride = 12, attributes = [position] }
+    fixum _ color_output ← FragmentOutput { semantic = "color", location = 0, format = 4 }
+    adfirma declare_vertex_layout(layout) secus "vertex layout contract declares position facts"
+    adfirma declare_fragment_output(color_output) secus "fragment output contract declares location-0 facts"
+}

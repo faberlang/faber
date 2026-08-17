@@ -6,7 +6,7 @@
 
 use crate::explain::ExplainError;
 use crate::io_buf::writeln_buf;
-use radix::locale::{DiagnosticTemplate, LocalePack};
+use radix_module::locale::{DiagnosticTemplate, LocalePack};
 use serde::Serialize;
 use std::path::PathBuf;
 

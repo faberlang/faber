@@ -1,0 +1,19 @@
++++
+locale = "la"
++++
+
+# U4.1 fixture: multi-item
+# Two functions where one calls the other — exercises cross-references in HirItem graph.
+
+functio add(numerus a, numerus b) → numerus {
+    redde a + b
+}
+
+functio double(numerus x) → numerus {
+    redde add(x, x)
+}
+
+incipit {
+    fixum numerus result ← double(7)
+    nota result
+}

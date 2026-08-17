@@ -1,20 +1,20 @@
 //! In-process Faber scripting via the runner (`faber run`, `-c`, REPL).
 //!
 //! Absorbs the former `scena` crate: analyze, lower, and interpret Faber source
-//! through `radix::mir`. Custom hosts implement [`Host`] for diagnostics,
+//! through `radix_module::mir`. Custom hosts implement [`Host`] for diagnostics,
 //! stdin, argv, and capability expansion.
 
 mod trap;
 
-use radix::codegen::Target;
-use radix::driver::Session;
-use radix::mir::run_source as radix_run_source;
+use radix_module::codegen::Target;
+use radix_module::driver::Session;
+use radix_module::mir::run_source as radix_run_source;
 use std::panic::AssertUnwindSafe;
 use std::process::ExitCode;
 
 #[cfg(test)]
-pub use radix::mir::BufferHost;
-pub use radix::mir::{Host, RunSourceError, StdioHost};
+pub use radix_module::mir::BufferHost;
+pub use radix_module::mir::{Host, RunSourceError, StdioHost};
 pub use trap::raw_exit_code;
 
 /// Default diagnostic identity for [`run_source`].

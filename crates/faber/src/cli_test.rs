@@ -269,7 +269,7 @@ fn cli_parses_scena_target_for_build() {
     let Some(crate::cli::Command::Build(args)) = build.command else {
         panic!("expected build subcommand");
     };
-    assert_eq!(args.target, Some(radix::tool::CliTarget::MirScena));
+    assert_eq!(args.target, Some(radix_module::tool::CliTarget::MirScena));
     assert_eq!(args.input, "pkg");
 }
 
@@ -359,7 +359,7 @@ fn cli_parses_fmir_text_target_for_build() {
     let Some(crate::cli::Command::Build(args)) = build.command else {
         panic!("expected build subcommand");
     };
-    assert_eq!(args.target, Some(radix::tool::CliTarget::MirFmir));
+    assert_eq!(args.target, Some(radix_module::tool::CliTarget::MirFmir));
     assert_eq!(args.input, "pkg");
 }
 
@@ -370,7 +370,7 @@ fn cli_parses_fmir_target_for_build() {
     let Some(crate::cli::Command::Build(args)) = build.command else {
         panic!("expected build subcommand");
     };
-    assert_eq!(args.target, Some(radix::tool::CliTarget::MirFmirBinary));
+    assert_eq!(args.target, Some(radix_module::tool::CliTarget::MirFmirBinary));
     assert_eq!(args.input, "pkg");
 }
 
@@ -381,7 +381,7 @@ fn cli_parses_fmir_bin_target_for_build() {
     let Some(crate::cli::Command::Build(args)) = build.command else {
         panic!("expected build subcommand");
     };
-    assert_eq!(args.target, Some(radix::tool::CliTarget::MirFmirBundle));
+    assert_eq!(args.target, Some(radix_module::tool::CliTarget::MirFmirBundle));
     assert_eq!(args.input, "pkg");
 }
 

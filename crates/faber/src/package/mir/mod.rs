@@ -24,8 +24,8 @@ mod manifest;
 #[path = "mir_test.rs"]
 mod tests;
 
-use radix::diagnostics::Diagnostic;
-use radix::driver::Config;
+use radix_module::diagnostics::Diagnostic;
+use radix_module::driver::Config;
 use std::fs;
 use std::path::Path;
 
@@ -58,7 +58,7 @@ pub(crate) fn faber_mir_seams() -> radix_package::mir::MirSeams {
 /// when this build compiles no `device-runtime`.
 fn device_section_builder(
     prepared: &radix_package::mir::PreparedPackageMir<'_>,
-    lowered: &radix::mir::LoweredMirUnit<'_>,
+    lowered: &radix_module::mir::LoweredMirUnit<'_>,
     diagnostic_path: &Path,
 ) -> Result<Option<radix_mir_fmir::FmirDeviceSection>, Vec<Diagnostic>> {
     // DDPP1-U2 (C2 feature isolation): the device-section builder compiles
@@ -254,7 +254,7 @@ fn host_route(
 pub fn with_lowered_package_mir<R>(
     config: &Config,
     input: &Path,
-    run: impl for<'a> FnOnce(&radix::mir::LoweredMirUnit<'a>) -> R,
+    run: impl for<'a> FnOnce(&radix_module::mir::LoweredMirUnit<'a>) -> R,
 ) -> Result<R, Vec<Diagnostic>> {
     radix_package::mir::with_lowered_package_mir(config, input, &faber_mir_seams(), run)
 }
@@ -264,7 +264,7 @@ pub fn with_lowered_package_mir<R>(
 pub(crate) fn with_interpreted_lowered_package_mir<R>(
     config: &Config,
     input: &Path,
-    run: impl for<'a> FnOnce(&radix::mir::LoweredMirUnit<'a>) -> R,
+    run: impl for<'a> FnOnce(&radix_module::mir::LoweredMirUnit<'a>) -> R,
 ) -> Result<R, Vec<Diagnostic>> {
     radix_package::mir::with_interpreted_lowered_package_mir(config, input, &faber_mir_seams(), run)
 }
@@ -276,7 +276,7 @@ pub(crate) fn with_linked_test_package_mir<R>(
     package: radix_package::analyze::AnalyzedProgram,
     scope: &radix_package::mir::TestPackageScope,
     config: &Config,
-    run: impl for<'a> FnOnce(&radix::mir::ValidatedMir<'a>, &radix_package::mir::TestFunctionIds) -> R,
+    run: impl for<'a> FnOnce(&radix_module::mir::ValidatedMir<'a>, &radix_package::mir::TestFunctionIds) -> R,
 ) -> Result<R, Vec<Diagnostic>> {
     radix_package::mir::with_linked_test_package_mir(
         package,

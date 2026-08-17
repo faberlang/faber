@@ -1,0 +1,798 @@
+//! Tests for Lean checker integration (lake build + axiom/sorry audit).
+//! Proves: normalization (proven, failed, error, toolchain-missing,
+//! timeout); axiom allowlist (propext, Classical.choice, Quot.sound);
+//! sorry detection; combined verdict priority.
+
+use super::{
+    combined_verdict, normalize_result, parse_axiom_output, AxiomAudit, AxiomDependency, AxiomVerdict, LakeResult,
+    LeanAspectChecker, LeanAspectCheckerConfig, SorryVerdict,
+};
+use crate::aspect::verifier::{HirAspectCheckResult, HirAspectCheckStatus, HirAspectEvidence, HirAspectVerifier};
+use crate::aspect::{
+    HirAspectBackendKind, HirAspectKind, HirAspectPrecondition, HirAspectRecord, HirAspectReport, HirAspectSpan,
+};
+use crate::lexer::Span;
+use std::path::PathBuf;
+use std::time::Duration;
+
+// ---------------------------------------------------------------------------
+// normalization tests (no Lean required)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lean_checker_normalization_valid_build_is_proven() {
+    let lake = LakeResult {
+        exit_code: Some(0),
+        stdout: "Build completed successfully.\n".to_owned(),
+        stderr: String::new(),
+        timed_out: false,
+    };
+
+    let result = normalize_result(lake);
+
+    assert_eq!(result.status, HirAspectCheckStatus::Proven);
+    assert_eq!(result.backend, HirAspectBackendKind::Lean);
+    assert!(result.evidence.0.contains("Build completed"));
+}
+
+#[test]
+fn lean_checker_normalization_syntax_error_is_failed() {
+    let lake = LakeResult {
+        exit_code: Some(1),
+        stdout: String::new(),
+        stderr: "error: syntax error at MyModule.lean:3:1: unexpected token ';'\n".to_owned(),
+        timed_out: false,
+    };
+
+    let result = normalize_result(lake);
+
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+    assert_eq!(result.backend, HirAspectBackendKind::Lean);
+    assert!(result.evidence.0.contains("syntax error"));
+}
+
+#[test]
+fn lean_checker_normalization_type_error_is_failed() {
+    let lake = LakeResult {
+        exit_code: Some(1),
+        stdout: String::new(),
+        stderr: "error: type mismatch\n  has type\n    Nat\n  but is expected to have type\n    String\n".to_owned(),
+        timed_out: false,
+    };
+
+    let result = normalize_result(lake);
+
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+    assert_eq!(result.backend, HirAspectBackendKind::Lean);
+    assert!(result.evidence.0.contains("type mismatch"));
+}
+
+#[test]
+fn lean_checker_normalization_nonzero_exit_is_failed() {
+    let lake = LakeResult {
+        exit_code: Some(2),
+        stdout: String::new(),
+        stderr: "error: unknown identifier 'foo'\n".to_owned(),
+        timed_out: false,
+    };
+
+    let result = normalize_result(lake);
+
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+}
+
+#[test]
+fn lean_checker_normalization_launch_failure_is_error() {
+    let lake = LakeResult {
+        exit_code: None,
+        stdout: String::new(),
+        stderr: "failed to launch lake: permission denied".to_owned(),
+        timed_out: false,
+    };
+
+    let result = normalize_result(lake);
+
+    assert_eq!(result.status, HirAspectCheckStatus::Error);
+    assert_eq!(result.backend, HirAspectBackendKind::Lean);
+}
+
+#[test]
+fn lean_checker_normalization_empty_stdout_zero_exit_is_proven() {
+    let lake = LakeResult { exit_code: Some(0), stdout: String::new(), stderr: String::new(), timed_out: false };
+
+    let result = normalize_result(lake);
+
+    assert_eq!(result.status, HirAspectCheckStatus::Proven);
+}
+
+#[test]
+fn lean_checker_normalization_no_exit_code_without_toolchain_evidence_is_error() {
+    let lake = LakeResult {
+        exit_code: None,
+        stdout: String::new(),
+        stderr: "segmentation fault".to_owned(),
+        timed_out: false,
+    };
+
+    let result = normalize_result(lake);
+
+    assert_eq!(result.status, HirAspectCheckStatus::Error);
+    assert_eq!(result.backend, HirAspectBackendKind::Lean);
+}
+
+// ---------------------------------------------------------------------------
+// missing toolchain tests (no Lean required)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lean_checker_missing_toolchain_detects_missing_binary() {
+    // Construct a checker that points to clearly non-existent binaries.
+    let temp_dir = crate::test_support::test_temp_dir("lean-missing-toolchain");
+    let temp = temp_dir.path().to_path_buf();
+    let config = LeanAspectCheckerConfig {
+        lake_bin: temp.join("nonexistent-lake"),
+        lean_bin: temp.join("nonexistent-lean"),
+        timeout: Duration::from_secs(5),
+    };
+
+    let checker = LeanAspectChecker::new(config, temp.clone());
+
+    let lake = checker.run_lake_build(&temp);
+    assert!(!lake.timed_out);
+    assert_eq!(lake.exit_code, None);
+    assert!(lake.stderr.contains("not found on PATH"));
+
+    let result = normalize_result(lake);
+    assert_eq!(result.status, HirAspectCheckStatus::ToolchainMissing);
+    assert_eq!(result.backend, HirAspectBackendKind::Lean);
+}
+
+#[test]
+fn lean_checker_missing_toolchain_normalizes_prebuilt_lake_result() {
+    let lake = LakeResult {
+        exit_code: None,
+        stdout: String::new(),
+        stderr: "lake (lake) or lean (lean) not found on PATH".to_owned(),
+        timed_out: false,
+    };
+
+    let result = normalize_result(lake);
+
+    assert_eq!(result.status, HirAspectCheckStatus::ToolchainMissing);
+    assert_eq!(result.backend, HirAspectBackendKind::Lean);
+    assert!(result.evidence.0.contains("not found on PATH"));
+}
+
+// ---------------------------------------------------------------------------
+// timeout tests (no Lean required)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lean_checker_timeout_normalizes_to_timeout_status() {
+    let lake = LakeResult {
+        exit_code: None,
+        stdout: String::new(),
+        stderr: "lake build timed out after 5s".to_owned(),
+        timed_out: true,
+    };
+
+    let result = normalize_result(lake);
+
+    assert_eq!(result.status, HirAspectCheckStatus::Timeout);
+    assert_eq!(result.backend, HirAspectBackendKind::Lean);
+    assert!(result.evidence.0.contains("timed out"));
+}
+
+#[test]
+fn lean_checker_timeout_overrides_exit_code() {
+    let lake = LakeResult {
+        exit_code: Some(0),
+        stdout: "Build completed successfully.\n".to_owned(),
+        stderr: "lake build timed out after 30s".to_owned(),
+        timed_out: true,
+    };
+
+    let result = normalize_result(lake);
+
+    assert_eq!(result.status, HirAspectCheckStatus::Timeout);
+}
+
+// ---------------------------------------------------------------------------
+// toolchain detection tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lean_checker_config_default_uses_bare_commands() {
+    let config = LeanAspectCheckerConfig::default();
+    assert_eq!(config.lake_bin, PathBuf::from("lake"));
+    assert_eq!(config.lean_bin, PathBuf::from("lean"));
+    assert_eq!(config.timeout, Duration::from_secs(super::DEFAULT_TIMEOUT_SECS));
+}
+
+#[test]
+fn lean_checker_config_custom_timeout() {
+    let config = LeanAspectCheckerConfig { timeout: Duration::from_secs(10), ..LeanAspectCheckerConfig::default() };
+
+    let checker = LeanAspectChecker::new(config, PathBuf::from("/tmp/lean-project"));
+    assert_eq!(checker.config().timeout, Duration::from_secs(10));
+}
+
+#[test]
+fn lean_checker_config_exposes_project_dir() {
+    let dir = PathBuf::from("/tmp/lean-project");
+    let checker = LeanAspectChecker::new(LeanAspectCheckerConfig::default(), dir.clone());
+    assert_eq!(checker.project_dir(), dir);
+}
+
+// ---------------------------------------------------------------------------
+// axiom audit + allowlist tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lean_checker_axiom_parse_output_with_dependencies() {
+    let output = "'myThm' depends on axioms: [propext, Classical.choice]\n";
+    let audit = parse_axiom_output(output);
+
+    assert_eq!(audit.dependencies.len(), 2);
+    assert_eq!(audit.dependencies[0].axiom_name, "propext");
+    assert_eq!(audit.dependencies[0].declaration, "myThm");
+    assert_eq!(audit.dependencies[1].axiom_name, "Classical.choice");
+    assert_eq!(audit.dependencies[1].declaration, "myThm");
+}
+
+#[test]
+fn lean_checker_axiom_parse_output_no_axioms() {
+    let output = "'simpleThm' does not depend on any axioms\n";
+    let audit = parse_axiom_output(output);
+    assert!(audit.dependencies.is_empty());
+}
+
+#[test]
+fn lean_checker_axiom_parse_output_multiple_decls() {
+    let output = concat!(
+        "'thm1' depends on axioms: [propext]\n",
+        "'thm2' depends on axioms: [Quot.sound]\n",
+        "'thm3' does not depend on any axioms\n",
+    );
+    let audit = parse_axiom_output(output);
+
+    assert_eq!(audit.dependencies.len(), 2);
+    assert_eq!(audit.dependencies[0].axiom_name, "propext");
+    assert_eq!(audit.dependencies[0].declaration, "thm1");
+    assert_eq!(audit.dependencies[1].axiom_name, "Quot.sound");
+    assert_eq!(audit.dependencies[1].declaration, "thm2");
+}
+
+#[test]
+fn lean_checker_axiom_parse_output_empty() {
+    let audit = parse_axiom_output("");
+    assert!(audit.dependencies.is_empty());
+}
+
+#[test]
+fn lean_checker_axiom_parse_output_malformed_is_empty() {
+    let audit = parse_axiom_output("some random garbage\nnot axiom output\n");
+    assert!(audit.dependencies.is_empty());
+}
+
+#[test]
+fn lean_checker_axiom_parse_output_all_clean() {
+    let output = concat!(
+        "'thm1' does not depend on any axioms\n",
+        "'thm2' does not depend on any axioms\n",
+    );
+    let audit = parse_axiom_output(output);
+    assert!(audit.dependencies.is_empty());
+}
+
+#[test]
+fn lean_checker_axiom_allowlist_accepts_propext() {
+    let audit =
+        AxiomAudit { dependencies: vec![AxiomDependency { axiom_name: "propext".into(), declaration: "thm".into() }] };
+    assert_eq!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::Allowed);
+}
+
+#[test]
+fn lean_checker_axiom_allowlist_accepts_classical_choice() {
+    let audit = AxiomAudit {
+        dependencies: vec![AxiomDependency { axiom_name: "Classical.choice".into(), declaration: "thm".into() }],
+    };
+    assert_eq!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::Allowed);
+}
+
+#[test]
+fn lean_checker_axiom_allowlist_accepts_quot_sound() {
+    let audit = AxiomAudit {
+        dependencies: vec![AxiomDependency { axiom_name: "Quot.sound".into(), declaration: "thm".into() }],
+    };
+    assert_eq!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::Allowed);
+}
+
+#[test]
+fn lean_checker_axiom_allowlist_accepts_all_allowed() {
+    let audit = AxiomAudit {
+        dependencies: vec![
+            AxiomDependency { axiom_name: "propext".into(), declaration: "thm1".into() },
+            AxiomDependency { axiom_name: "Classical.choice".into(), declaration: "thm1".into() },
+            AxiomDependency { axiom_name: "Quot.sound".into(), declaration: "thm2".into() },
+        ],
+    };
+    assert_eq!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::Allowed);
+}
+
+#[test]
+fn lean_checker_axiom_allowlist_rejects_custom_axiom() {
+    let audit = AxiomAudit {
+        dependencies: vec![AxiomDependency { axiom_name: "myCustomAxiom".into(), declaration: "thm".into() }],
+    };
+    let verdict = LeanAspectChecker::classify_axioms(&audit);
+    match verdict {
+        AxiomVerdict::Rejected { disallowed } => {
+            assert_eq!(disallowed.len(), 1);
+            assert_eq!(disallowed[0].axiom_name, "myCustomAxiom");
+        }
+        AxiomVerdict::Allowed => panic!("expected Rejected"),
+    }
+}
+
+#[test]
+fn lean_checker_axiom_allowlist_rejects_mixed() {
+    let audit = AxiomAudit {
+        dependencies: vec![
+            AxiomDependency { axiom_name: "propext".into(), declaration: "thm".into() },
+            AxiomDependency { axiom_name: "userAxiom".into(), declaration: "thm".into() },
+        ],
+    };
+    let verdict = LeanAspectChecker::classify_axioms(&audit);
+    match verdict {
+        AxiomVerdict::Rejected { disallowed } => {
+            assert_eq!(disallowed.len(), 1);
+            assert_eq!(disallowed[0].axiom_name, "userAxiom");
+        }
+        AxiomVerdict::Allowed => panic!("expected Rejected for mixed allowed+disallowed"),
+    }
+}
+
+#[test]
+fn lean_checker_axiom_allowlist_no_axioms_is_allowed() {
+    let audit = AxiomAudit { dependencies: vec![] };
+    assert_eq!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::Allowed);
+}
+
+// ---------------------------------------------------------------------------
+// sorry detection tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lean_checker_sorry_detects_token() {
+    let source = "theorem foo : 1 = 1 := by\n  sorry\n";
+    let verdict = LeanAspectChecker::scan_for_sorry(source);
+    assert_eq!(verdict, SorryVerdict::Found { line_numbers: vec![2] });
+}
+
+#[test]
+fn lean_checker_sorry_detects_multiple() {
+    let source = "theorem foo : 1 = 1 := by\n  sorry\n\ntheorem bar : 1 = 2 := by\n  sorry\n";
+    let verdict = LeanAspectChecker::scan_for_sorry(source);
+    assert_eq!(verdict, SorryVerdict::Found { line_numbers: vec![2, 5] });
+}
+
+#[test]
+fn lean_checker_sorry_clean_when_no_sorry() {
+    let source = "theorem foo : 1 = 1 := rfl\n";
+    let verdict = LeanAspectChecker::scan_for_sorry(source);
+    assert_eq!(verdict, SorryVerdict::Clean);
+}
+
+#[test]
+fn lean_checker_sorry_ignores_commented_sorry() {
+    let source = "theorem foo : 1 = 1 := rfl\n-- sorry this was a placeholder\n";
+    let verdict = LeanAspectChecker::scan_for_sorry(source);
+    assert_eq!(verdict, SorryVerdict::Clean);
+}
+
+#[test]
+fn lean_checker_sorry_detects_inline_sorry() {
+    let source = "theorem foo : 1 = 1 := by\n  apply?; sorry\n";
+    let verdict = LeanAspectChecker::scan_for_sorry(source);
+    assert_eq!(verdict, SorryVerdict::Found { line_numbers: vec![2] });
+}
+
+#[test]
+fn lean_checker_sorry_empty_source() {
+    let source = "";
+    let verdict = LeanAspectChecker::scan_for_sorry(source);
+    assert_eq!(verdict, SorryVerdict::Clean);
+}
+
+#[test]
+fn lean_checker_sorry_detects_in_string_literal() {
+    // `sorry` inside a string literal is still a token match (strings are
+    // not stripped before token-splitting).
+    let source = "def msg := \"sorry about that\"\n";
+    let verdict = LeanAspectChecker::scan_for_sorry(source);
+    assert_eq!(verdict, SorryVerdict::Found { line_numbers: vec![1] });
+}
+
+// ---------------------------------------------------------------------------
+// combined verdict tests
+// ---------------------------------------------------------------------------
+
+fn proven_result() -> HirAspectCheckResult {
+    HirAspectCheckResult {
+        status: HirAspectCheckStatus::Proven,
+        evidence: HirAspectEvidence("Build completed successfully.\n".into()),
+        backend: HirAspectBackendKind::Lean,
+    }
+}
+
+fn failed_result() -> HirAspectCheckResult {
+    HirAspectCheckResult {
+        status: HirAspectCheckStatus::Failed,
+        evidence: HirAspectEvidence("error: syntax error\n".into()),
+        backend: HirAspectBackendKind::Lean,
+    }
+}
+
+#[test]
+fn lean_checker_axiom_combined_proven_when_all_clean() {
+    let lake = proven_result();
+    let axiom_verdict = AxiomVerdict::Allowed;
+    let sorry_verdict = SorryVerdict::Clean;
+
+    let result = combined_verdict(lake, &axiom_verdict, &sorry_verdict);
+    assert_eq!(result.status, HirAspectCheckStatus::Proven);
+}
+
+#[test]
+fn lean_checker_axiom_combined_fails_on_sorry() {
+    let lake = proven_result();
+    let axiom_verdict = AxiomVerdict::Allowed;
+    let sorry_verdict = SorryVerdict::Found { line_numbers: vec![3] };
+
+    let result = combined_verdict(lake, &axiom_verdict, &sorry_verdict);
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+    assert!(result.evidence.0.contains("sorry"));
+}
+
+#[test]
+fn lean_checker_axiom_combined_fails_on_disallowed_axiom() {
+    let lake = proven_result();
+    let axiom_verdict = AxiomVerdict::Rejected {
+        disallowed: vec![AxiomDependency { axiom_name: "badAxiom".into(), declaration: "thm".into() }],
+    };
+    let sorry_verdict = SorryVerdict::Clean;
+
+    let result = combined_verdict(lake, &axiom_verdict, &sorry_verdict);
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+    assert!(result.evidence.0.contains("badAxiom"));
+}
+
+#[test]
+fn lean_checker_axiom_combined_passes_through_non_proven() {
+    let lake = failed_result();
+    let axiom_verdict = AxiomVerdict::Allowed;
+    let sorry_verdict = SorryVerdict::Clean;
+
+    let result = combined_verdict(lake, &axiom_verdict, &sorry_verdict);
+    // Even though axioms are clean and no sorry, the original Failed
+    // result takes precedence.
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+}
+
+#[test]
+fn lean_checker_axiom_combined_sorry_takes_priority_over_axioms() {
+    let lake = proven_result();
+    let axiom_verdict = AxiomVerdict::Rejected {
+        disallowed: vec![AxiomDependency { axiom_name: "badAxiom".into(), declaration: "thm".into() }],
+    };
+    let sorry_verdict = SorryVerdict::Found { line_numbers: vec![5] };
+
+    let result = combined_verdict(lake, &axiom_verdict, &sorry_verdict);
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+    // sorry is checked first
+    assert!(result.evidence.0.contains("sorry"));
+}
+
+#[test]
+fn lean_checker_sorry_combined_fails_when_sorry_present() {
+    let lake = proven_result();
+    let axiom_verdict = AxiomVerdict::Allowed;
+    let sorry_verdict = SorryVerdict::Found { line_numbers: vec![1, 3] };
+
+    let result = combined_verdict(lake, &axiom_verdict, &sorry_verdict);
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+    assert!(result.evidence.0.contains("[1, 3]"));
+}
+
+#[test]
+fn lean_checker_sorry_combined_passes_when_no_sorry_and_axioms_allowed() {
+    let lake = proven_result();
+    let axiom_verdict = AxiomVerdict::Allowed;
+    let sorry_verdict = SorryVerdict::Clean;
+
+    let result = combined_verdict(lake, &axiom_verdict, &sorry_verdict);
+    assert_eq!(result.status, HirAspectCheckStatus::Proven);
+    assert_eq!(result.backend, HirAspectBackendKind::Lean);
+}
+
+// ---------------------------------------------------------------------------
+// lake integration tests (Lean on PATH required — #[ignore] by default)
+// ---------------------------------------------------------------------------
+
+fn fixtures_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/aspect/testdata/lean")
+}
+
+fn fixture_path(name: &str) -> PathBuf {
+    fixtures_dir().join(name)
+}
+
+fn default_checker() -> LeanAspectChecker {
+    LeanAspectChecker::new(LeanAspectCheckerConfig::default(), fixtures_dir())
+}
+
+#[test]
+#[ignore = "tracking: bulk-test-cleanup — requires Lean toolchain CI matrix step"]
+fn lake_integration_valid_theorem_proven() {
+    let checker = default_checker();
+    let lake = checker.run_lake_build(&fixtures_dir());
+    let result = normalize_result(lake);
+
+    assert_eq!(result.status, HirAspectCheckStatus::Proven);
+    assert_eq!(result.backend, HirAspectBackendKind::Lean);
+    assert!(!result.evidence.0.is_empty());
+}
+
+#[test]
+#[ignore = "tracking: bulk-test-cleanup — requires Lean toolchain CI matrix step"]
+fn lake_integration_syntax_error_failed() {
+    let checker = default_checker();
+    let lake = checker.run_lake_build(&fixtures_dir());
+    let result = normalize_result(lake);
+
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+    assert_eq!(result.backend, HirAspectBackendKind::Lean);
+    assert!(
+        result.evidence.0.to_lowercase().contains("error"),
+        "expected error evidence, got: {}",
+        result.evidence.0
+    );
+}
+
+#[test]
+#[ignore = "tracking: bulk-test-cleanup — requires Lean toolchain CI matrix step"]
+fn lake_integration_type_error_failed() {
+    let checker = default_checker();
+    let lake = checker.run_lake_build(&fixtures_dir());
+    let result = normalize_result(lake);
+
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+    assert_eq!(result.backend, HirAspectBackendKind::Lean);
+    assert!(
+        result.evidence.0.to_lowercase().contains("error"),
+        "expected error evidence, got: {}",
+        result.evidence.0
+    );
+}
+
+#[test]
+#[ignore = "tracking: bulk-test-cleanup — requires Lean toolchain CI matrix step"]
+fn lake_integration_direct_sorry_failed() {
+    let checker = default_checker();
+    let lake = checker.run_lake_build(&fixtures_dir());
+
+    // Lake build succeeds (sorry is a valid term), but trust check
+    // catches the sorry token.
+    let source = std::fs::read_to_string(fixture_path("direct_sorry.lean")).expect("failed to read direct_sorry.lean");
+    let sorry_verdict = LeanAspectChecker::scan_for_sorry(&source);
+
+    let build_result = normalize_result(lake);
+    // Lake build should succeed (sorry type-checks).
+    assert_eq!(build_result.status, HirAspectCheckStatus::Proven);
+
+    // Combined verdict: sorry detection must fail the proof.
+    let axiom_verdict = AxiomVerdict::Allowed;
+    let result = combined_verdict(build_result, &axiom_verdict, &sorry_verdict);
+
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+    assert!(
+        result.evidence.0.to_lowercase().contains("sorry"),
+        "expected sorry evidence, got: {}",
+        result.evidence.0
+    );
+}
+
+#[test]
+#[ignore = "tracking: bulk-test-cleanup — requires Lean toolchain CI matrix step"]
+fn lake_integration_transitive_sorry_ax_failed() {
+    let checker = default_checker();
+    let lake = checker.run_lake_build(&fixtures_dir());
+
+    // Lake build succeeds (sorry type-checks), but #print axioms
+    // should reveal sorryAx as a transitive dependency.
+    let module_path = fixture_path("transitive_sorry_ax.lean");
+    let axiom_audit = checker.audit_axioms(&module_path);
+
+    let build_result = normalize_result(lake);
+    assert_eq!(build_result.status, HirAspectCheckStatus::Proven);
+
+    // Classify axioms — sorryAx is not in the allowlist.
+    let axiom_verdict = LeanAspectChecker::classify_axioms(&axiom_audit);
+    let sorry_verdict = SorryVerdict::Clean;
+
+    let result = combined_verdict(build_result, &axiom_verdict, &sorry_verdict);
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+    assert!(
+        result.evidence.0.contains("sorryAx") || result.evidence.0.to_lowercase().contains("disallowed"),
+        "expected sorryAx or disallowed evidence, got: {}",
+        result.evidence.0
+    );
+}
+
+#[test]
+#[ignore = "tracking: bulk-test-cleanup — requires Lean toolchain CI matrix step"]
+fn lake_integration_custom_axiom_failed() {
+    let checker = default_checker();
+    let lake = checker.run_lake_build(&fixtures_dir());
+
+    // my_custom_axiom is not in the allowlist.
+    let module_path = fixture_path("custom_axiom.lean");
+    let axiom_audit = checker.audit_axioms(&module_path);
+    let axiom_verdict = LeanAspectChecker::classify_axioms(&axiom_audit);
+
+    let build_result = normalize_result(lake);
+    assert_eq!(build_result.status, HirAspectCheckStatus::Proven);
+
+    let sorry_verdict = SorryVerdict::Clean;
+    let result = combined_verdict(build_result, &axiom_verdict, &sorry_verdict);
+
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+    assert!(
+        result.evidence.0.contains("my_custom_axiom") || result.evidence.0.to_lowercase().contains("disallowed"),
+        "expected axiom-rejection evidence, got: {}",
+        result.evidence.0
+    );
+}
+
+#[test]
+#[ignore = "tracking: bulk-test-cleanup — requires Lean toolchain CI matrix step"]
+fn lake_integration_allowed_axioms_proven() {
+    let checker = default_checker();
+    let lake = checker.run_lake_build(&fixtures_dir());
+
+    // propext, Classical.choice, Quot.sound are all allowed.
+    let module_path = fixture_path("allowed_axioms.lean");
+    let axiom_audit = checker.audit_axioms(&module_path);
+    let axiom_verdict = LeanAspectChecker::classify_axioms(&axiom_audit);
+
+    let build_result = normalize_result(lake);
+    assert_eq!(build_result.status, HirAspectCheckStatus::Proven);
+
+    let source = std::fs::read_to_string(&module_path).expect("failed to read allowed_axioms.lean");
+    let sorry_verdict = LeanAspectChecker::scan_for_sorry(&source);
+    assert_eq!(sorry_verdict, SorryVerdict::Clean);
+
+    let result = combined_verdict(build_result, &axiom_verdict, &sorry_verdict);
+    assert_eq!(result.status, HirAspectCheckStatus::Proven);
+    assert_eq!(result.backend, HirAspectBackendKind::Lean);
+}
+
+#[test]
+#[ignore = "tracking: bulk-test-cleanup — requires Lean toolchain CI matrix step"]
+fn lake_integration_timeout() {
+    // Use a sub-millisecond timeout to force a timeout on any real lake build.
+    let config = LeanAspectCheckerConfig { timeout: Duration::from_millis(1), ..LeanAspectCheckerConfig::default() };
+    let checker = LeanAspectChecker::new(config, fixtures_dir());
+    let lake = checker.run_lake_build(&fixtures_dir());
+
+    // With a 1ms timeout, lake should either time out or fail to start.
+    // Either way, normalize_result should produce Timeout or Error.
+    let result = normalize_result(lake);
+
+    // If timed_out is true, we get Timeout.  If the process never spawned
+    // (exit_code is None, timed_out is false), that's OK in CI — the
+    // timeout mechanism is unit-tested separately.
+    assert!(
+        result.status == HirAspectCheckStatus::Timeout || result.status == HirAspectCheckStatus::Error,
+        "expected Timeout or Error with 1ms deadline, got {:?}",
+        result.status
+    );
+}
+
+// ---------------------------------------------------------------------------
+// HirAspectVerifier integration tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lean_checker_verifier_empty_report_returns_empty() {
+    let config = LeanAspectCheckerConfig::default();
+    let checker = LeanAspectChecker::new(config, PathBuf::from("/tmp/nonexistent"));
+    let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, vec![]);
+    let results = checker.verify(&report);
+    assert!(results.is_empty());
+}
+
+#[test]
+fn lean_checker_verifier_no_toolchain_returns_toolchain_missing() {
+    // Point to non-existent binaries so toolchain check fails.
+    let temp_dir = crate::test_support::test_temp_dir("lean-verifier-no-tc");
+    let temp = temp_dir.path().to_path_buf();
+    let config = LeanAspectCheckerConfig {
+        lake_bin: temp.join("nonexistent-lake"),
+        lean_bin: temp.join("nonexistent-lean"),
+        timeout: Duration::from_secs(5),
+    };
+    let checker = LeanAspectChecker::new(config, temp);
+
+    let record =
+        HirAspectRecord::recognized(HirAspectKind::DiscerneOmnia, HirAspectSpan::Source(Span::new(0, 10)), None);
+    let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, vec![record]);
+
+    let results = checker.verify(&report);
+    assert_eq!(results.len(), 1, "expected one result per recognized record");
+    // Without a real Lean toolchain, status must be ToolchainMissing or Error.
+    assert!(
+        results[0].status == HirAspectCheckStatus::ToolchainMissing || results[0].status == HirAspectCheckStatus::Error,
+        "expected ToolchainMissing or Error, got {:?}",
+        results[0].status
+    );
+    assert_eq!(results[0].backend, HirAspectBackendKind::Lean);
+}
+
+#[test]
+fn lean_checker_verifier_multiple_records_each_get_result() {
+    // Point to non-existent binaries so toolchain check fails.
+    let temp_dir = crate::test_support::test_temp_dir("lean-verifier-multi");
+    let temp = temp_dir.path().to_path_buf();
+    let config = LeanAspectCheckerConfig {
+        lake_bin: temp.join("nonexistent-lake"),
+        lean_bin: temp.join("nonexistent-lean"),
+        timeout: Duration::from_secs(5),
+    };
+    let checker = LeanAspectChecker::new(config, temp);
+
+    let records: Vec<HirAspectRecord> = (0..3)
+        .map(|i| {
+            HirAspectRecord::recognized(
+                HirAspectKind::DiscerneOmnia,
+                HirAspectSpan::Source(Span::new(i * 10, i * 10 + 10)),
+                None,
+            )
+        })
+        .collect();
+    let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, records);
+
+    let results = checker.verify(&report);
+    assert_eq!(results.len(), 3, "expected one result per recognized record");
+    for result in &results {
+        assert_eq!(result.backend, HirAspectBackendKind::Lean);
+        assert!(
+            result.status == HirAspectCheckStatus::ToolchainMissing || result.status == HirAspectCheckStatus::Error,
+            "expected ToolchainMissing or Error, got {:?}",
+            result.status
+        );
+    }
+}
+
+#[test]
+#[ignore = "tracking: bulk-test-cleanup — requires Lean toolchain CI matrix step"]
+fn lean_checker_verifier_integration_full_verify() {
+    let config = LeanAspectCheckerConfig::default();
+    let fixtures = fixtures_dir();
+    let checker = LeanAspectChecker::new(config, fixtures.clone());
+
+    let record =
+        HirAspectRecord::recognized(HirAspectKind::DiscerneOmnia, HirAspectSpan::Source(Span::new(0, 10)), None);
+    let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, vec![record]);
+
+    // verify() generates Lean source, writes a temp project, runs lake build,
+    // and runs trust checks.  The generated theorem uses `trivial` which is
+    // always provable, so the result should be Proven (when Lean is on PATH).
+    let results = checker.verify(&report);
+    assert!(!results.is_empty(), "expected at least one result");
+    // The generated source uses `trivial` — lake build should succeed.
+    // (If lake is not on PATH, the test is #[ignore] anyway.)
+    assert_eq!(results[0].status, HirAspectCheckStatus::Proven);
+    assert_eq!(results[0].backend, HirAspectBackendKind::Lean);
+}
