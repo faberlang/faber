@@ -111,8 +111,13 @@ fn plan_base_url_override_wins() {
 fn plan_missing_receipt_fails_closed() {
     let tmp = tempfile::tempdir().expect("tmp");
     let exe = tmp.path().join("bin/faber");
-    let err = plan_self_update(&args("1.6.0"), Some(&exe), None).expect_err("no receipt");
-    assert!(err.contains("no faber install found"), "{err}");
+    let mut update_args = args("1.6.0");
+    // Pin the fixture so a developer's ~/.faber receipt cannot satisfy the
+    // product's user-local fallback and hide the missing receipt.
+    update_args.prefix = Some(tmp.path().to_path_buf());
+    let err = plan_self_update(&update_args, Some(&exe), None).expect_err("no receipt");
+    assert!(err.contains("cannot read install receipt"), "{err}");
+    assert!(err.contains("missing-launcher-metadata"), "{err}");
 }
 
 #[test]
@@ -122,7 +127,9 @@ fn plan_missing_receipt_classifies_missing_launcher_metadata() {
     // action — re-run the bootstrap without --update, then re-run update.
     let tmp = tempfile::tempdir().expect("tmp");
     let exe = tmp.path().join("bin/faber");
-    let err = plan_self_update(&args("1.6.0"), Some(&exe), None).expect_err("no receipt");
+    let mut update_args = args("1.6.0");
+    update_args.prefix = Some(tmp.path().to_path_buf());
+    let err = plan_self_update(&update_args, Some(&exe), None).expect_err("no receipt");
     assert!(err.contains("missing-launcher-metadata"), "{err}");
     assert!(err.contains("cause:"), "{err}");
     assert!(err.contains("next:"), "{err}");
@@ -395,7 +402,11 @@ fn plan_uninstall_missing_receipt_fails_closed() {
     // prefix at an explicit --prefix).
     let tmp = tempfile::tempdir().expect("tmp");
     let exe = tmp.path().join("bin/faber");
-    let err = plan_self_uninstall(&uninstall_args(), Some(&exe), None).expect_err("no receipt");
+    let mut uninstall = uninstall_args();
+    // Pin the fixture so a developer's ~/.faber receipt cannot satisfy the
+    // product's user-local fallback and hide the missing receipt.
+    uninstall.prefix = Some(tmp.path().to_path_buf());
+    let err = plan_self_uninstall(&uninstall, Some(&exe), None).expect_err("no receipt");
     assert!(err.contains("missing-launcher-metadata"), "{err}");
     assert!(err.contains("cause:"), "{err}");
     assert!(err.contains("next:"), "{err}");
