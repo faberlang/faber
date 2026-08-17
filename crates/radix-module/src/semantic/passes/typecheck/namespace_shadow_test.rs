@@ -52,11 +52,7 @@ fn shape_namespace_interface() -> FileInterface {
         kind: FileExportKind::Function(InterfaceCallable {
             type_params: Vec::new(),
             type_param_constraints: Vec::new(),
-            params: vec![InterfaceParam {
-                ty: shape_error,
-                mode: SemanticParamMode::Owned,
-                optional: false,
-            }],
+            params: vec![InterfaceParam { ty: shape_error, mode: SemanticParamMode::Owned, optional: false }],
             ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus)),
             err: None,
             is_async: false,
@@ -66,9 +62,7 @@ fn shape_namespace_interface() -> FileInterface {
     interface
 }
 
-fn analyze_shape_consumer(
-    source: &str,
-) -> Result<crate::driver::AnalyzedModule, Vec<crate::diagnostics::Diagnostic>> {
+fn analyze_shape_consumer(source: &str) -> Result<crate::driver::AnalyzedModule, Vec<crate::diagnostics::Diagnostic>> {
     let publica = crate::semantic::passes::visibility_annotation::VisibilityTier::Publica;
     let session = driver::Session::new(driver::Config::default().with_target(Target::HirRust));
     driver::analyze_source_with_cli_program_and_import_contract(
@@ -138,10 +132,7 @@ functio _numel_forma(lista<numerus> forma) → numerus ⇥ TensorError {
         panic!("shadowed and unshadowed namespace wrappers should analyze green: {diagnostics:?}")
     });
     let errors: Vec<_> = unit.diagnostics.iter().filter(|d| d.is_error()).collect();
-    assert!(
-        errors.is_empty(),
-        "expected no typecheck errors, got: {errors:?}"
-    );
+    assert!(errors.is_empty(), "expected no typecheck errors, got: {errors:?}");
 
     let shape = unit.interner.intern("shape");
     let shape_error_name = unit.interner.intern("ShapeError");
