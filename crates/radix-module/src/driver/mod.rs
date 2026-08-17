@@ -42,7 +42,11 @@ pub use source::{peel_raw_source, source_load_diagnostic, PeeledSource, SourceFi
 use crate::codegen::{self, Target};
 use crate::diagnostics::DiagnosticConvert;
 use crate::diagnostics::{locale_unknown_spec, Diagnostic, DiagnosticArg, DiagnosticPhase, Severity, Span};
-use crate::hir::{HirBlock, HirFunction, HirModule, HirModuleEnd, HirPresentation, HirSourceAnchorId, LibraryRegistry};
+use crate::hir::visit::{walk_expr, HirVisitor};
+use crate::hir::{
+    DefId, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirModule, HirModuleEnd,
+    HirPresentation, HirSourceAnchorId, LibraryRegistry,
+};
 use crate::lexer;
 use crate::lexer::Interner;
 use crate::locale::{latin_locale_pack, KeywordSurface, LocalePack};
@@ -2799,8 +2803,9 @@ pub fn analyze_source_with_module_import_contract(
         return Err(diagnostics);
     };
 
-    collect_lane_policy_diagnostics(
+    let rust_omit = collect_lane_policy_diagnostics(
         &semantic_result.radix_lanes,
+        semantic_result.hir.as_ref(),
         session.config.target,
         name,
         &mut diagnostics,
@@ -2812,6 +2817,9 @@ pub fn analyze_source_with_module_import_contract(
 
     let mut unit = analyzed_unit_from_semantic(interner, cli_program, semantic_result, name, &mut diagnostics)
         .map_err(|()| diagnostics)?;
+    if !rust_omit.is_empty() {
+        unit.hir.items.retain(|item| !rust_omit.contains(&item.def_id));
+    }
 
     // Rust-only borrow/lifetime checks are target qualification, not base analysis.
     if session.config.target == Target::HirRust {
@@ -3180,24 +3188,136 @@ fn analyze_semantic_program(input: SemanticAnalysisInput<'_>) -> Result<semantic
 
 fn collect_lane_policy_diagnostics(
     lanes: &RadixLaneMetadata,
+    hir: Option<&HirModule>,
     target: Target,
     name: &str,
     diagnostics: &mut Vec<Diagnostic>,
     cli_program: Option<&crate::cli::CliProgram>,
-) {
+) -> rustc_hash::FxHashSet<DefId> {
     // CLI codegen on HIR-direct targets (Rust, Go) never needs MIR lowering.
     // Skip lane policy checks that would reject MIR/AIR lane annotations
-    // when the CLI codegen path is active (F-109).
+    // when the CLI codegen path is active (F-109). Do not expand this skip
+    // to libraries — omit is a separate HirRust library path.
     if cli_program.is_some() && matches!(target, Target::HirRust | Target::HirGo) {
-        return;
+        return rustc_hash::FxHashSet::default();
     }
     // Faber-surface emit (canonical re-emit, `faber format`, `radix emit -t
     // faber`) preserves lane annotations as annotations and never lowers to
     // MIR, so the MIR-backed-target policy (a codegen gate) does not apply.
     if matches!(target, Target::HirFaber) {
-        return;
+        return rustc_hash::FxHashSet::default();
+    }
+    // HirRust library / package units omit AIR-lane items, companions, and
+    // same-unit wrappers that reach them instead of TARGETLANE001. Single-file
+    // AIR-as-rust and a kept rust-emitted caller of an omitted item still reject.
+    if target == Target::HirRust {
+        if let Some(hir) = hir {
+            let omit = rust_library_omit_defs(lanes, hir);
+            if rust_library_omit_applies(hir, &omit) {
+                if rust_kept_item_reaches_omit(hir, &omit) {
+                    if let Some(diag) = radix_lane_target_error(RadixLane::Air, target, name) {
+                        diagnostics.push(diag);
+                    }
+                    return rustc_hash::FxHashSet::default();
+                }
+                return omit;
+            }
+        }
     }
     diagnostics.extend(collect_radix_lane_target_errors(lanes, target, name));
+    rustc_hash::FxHashSet::default()
+}
+
+/// Strip AIR-lane items, `@ radix backward` companions, and same-unit rust
+/// wrappers that reach them. Used again at rust crate assembly so emit cannot
+/// keep an item analysis already classified as omitted.
+pub fn omit_rust_library_air_items(hir: &mut HirModule, lanes: &RadixLaneMetadata) {
+    let omit = rust_library_omit_defs(lanes, hir);
+    if omit.is_empty() {
+        return;
+    }
+    hir.items.retain(|item| !omit.contains(&item.def_id));
+}
+
+fn rust_library_omit_defs(lanes: &RadixLaneMetadata, hir: &HirModule) -> rustc_hash::FxHashSet<DefId> {
+    let mut omit = rustc_hash::FxHashSet::default();
+    for (def_id, lane) in lanes.iter() {
+        if lane == RadixLane::Air {
+            omit.insert(def_id);
+        }
+    }
+    for (_, backward) in lanes.iter_backward() {
+        omit.insert(backward.companion_def_id);
+    }
+    if omit.is_empty() {
+        return omit;
+    }
+
+    let mut callees_by_fn = rustc_hash::FxHashMap::default();
+    for item in &hir.items {
+        let HirItemKind::Function(function) = &item.kind else {
+            continue;
+        };
+        callees_by_fn.insert(item.def_id, function_path_defs(function));
+    }
+
+    let mut grew = true;
+    while grew {
+        grew = false;
+        for (def_id, callees) in &callees_by_fn {
+            if omit.contains(def_id) {
+                continue;
+            }
+            if callees.iter().any(|callee| omit.contains(callee)) {
+                omit.insert(*def_id);
+                grew = true;
+            }
+        }
+    }
+    omit
+}
+
+fn rust_library_omit_applies(hir: &HirModule, omit: &rustc_hash::FxHashSet<DefId>) -> bool {
+    if omit.is_empty() || hir.entry.is_some() {
+        return false;
+    }
+    hir.items.iter().any(|item| {
+        !omit.contains(&item.def_id) && !matches!(item.kind, HirItemKind::Import(_))
+    })
+}
+
+fn rust_kept_item_reaches_omit(hir: &HirModule, omit: &rustc_hash::FxHashSet<DefId>) -> bool {
+    hir.items.iter().any(|item| {
+        if omit.contains(&item.def_id) {
+            return false;
+        }
+        let HirItemKind::Function(function) = &item.kind else {
+            return false;
+        };
+        function_path_defs(function).iter().any(|callee| omit.contains(callee))
+    })
+}
+
+fn function_path_defs(function: &HirFunction) -> rustc_hash::FxHashSet<DefId> {
+    struct PathCollector {
+        defs: rustc_hash::FxHashSet<DefId>,
+    }
+
+    impl HirVisitor for PathCollector {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if let HirExpressionKind::Path(def_id) = expr.kind {
+                self.defs.insert(def_id);
+            }
+            walk_expr(self, expr);
+        }
+    }
+
+    let Some(body) = &function.body else {
+        return rustc_hash::FxHashSet::default();
+    };
+    let mut collector = PathCollector { defs: rustc_hash::FxHashSet::default() };
+    collector.visit_block(body);
+    collector.defs
 }
 
 fn analyzed_unit_from_semantic(
