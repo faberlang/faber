@@ -27,8 +27,8 @@
 use crate::nodes::{
     DefId, HirAnnotation, HirAnnotationValue, HirArrayElement, HirBlock, HirCallArg, HirCape,
     HirCasuArm, HirConversioTarget, HirExpression, HirExpressionKind, HirField, HirFunction,
-    HirImportItem, HirItem, HirItemKind, HirLocal, HirMethod, HirNonNullKind, HirObjectField,
-    HirObjectKey, HirOptionalChainKind, HirParam, HirPattern, HirModule, HirStatement,
+    HirImportItem, HirItem, HirItemKind, HirLocal, HirMethod, HirModule, HirNonNullKind,
+    HirObjectField, HirObjectKey, HirOptionalChainKind, HirParam, HirPattern, HirStatement,
     HirStatementKind, HirTypeParam, HirVariant,
 };
 use radix_lexer::Symbol;

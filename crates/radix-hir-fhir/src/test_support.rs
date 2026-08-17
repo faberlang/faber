@@ -9,7 +9,7 @@ use crate::artifact::{
     FunctionFactTableWire, HirArtifact, ResolverSnapshot, SourceIdentity, SCHEMA_VERSION,
 };
 use radix_hir::{
-    HirFunction, HirId, HirItem, HirItemKind, HirPresentation, HirModule, HirModuleEnd,
+    HirFunction, HirId, HirItem, HirItemKind, HirModule, HirModuleEnd, HirPresentation,
     HirSourceAnchorId, LibraryRegistry,
 };
 use radix_lexer::{Span, Symbol};

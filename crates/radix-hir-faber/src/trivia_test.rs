@@ -17,8 +17,8 @@ use crate::surface::TypeBindingKind;
 use crate::{emit, KeywordSurface};
 use radix_hir::{
     DefId, HirAnnotation, HirBlock, HirBlockEnd, HirExpression, HirExpressionKind, HirField,
-    HirFunction, HirId, HirItem, HirItemKind, HirLiteral, HirMethod, HirOwnerRef, HirPresentation,
-    HirModule, HirModuleEnd, HirReceiver, HirSourceAnchorId, HirStatement, HirStatementKind,
+    HirFunction, HirId, HirItem, HirItemKind, HirLiteral, HirMethod, HirModule, HirModuleEnd,
+    HirOwnerRef, HirPresentation, HirReceiver, HirSourceAnchorId, HirStatement, HirStatementKind,
     HirStruct, HirTrivia, HirTriviaAttachment, HirTriviaOwner, HirTriviaOwnerKind,
 };
 use radix_lexer::{Interner, Span, TokenKind};

@@ -11,7 +11,7 @@
 //! - postcard round trips preserve the new data.
 
 use crate::nodes::{
-    DefId, HirBlock, HirBlockEnd, HirId, HirOwnerRef, HirPresentation, HirModuleEnd,
+    DefId, HirBlock, HirBlockEnd, HirId, HirModuleEnd, HirOwnerRef, HirPresentation,
     HirSourceAnchorId, HirStatement, HirStatementKind, HirTrivia, HirTriviaAttachment,
     HirTriviaOwner, HirTriviaOwnerKind,
 };

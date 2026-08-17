@@ -373,7 +373,7 @@ mod tests {
     use radix_hir::{
         DefId, HirAnnotation, HirBlock, HirCallArg, HirCape, HirCasuArm, HirEnum, HirExpression,
         HirExpressionKind, HirFunction, HirId, HirImport, HirImportItem, HirItem, HirItemKind,
-        HirLiteral, HirLocal, HirPattern, HirModule, HirStatement, HirStatementKind, HirStruct,
+        HirLiteral, HirLocal, HirModule, HirPattern, HirStatement, HirStatementKind, HirStruct,
         HirVariant,
     };
     use radix_lexer::{Interner, Span, TokenKind};
