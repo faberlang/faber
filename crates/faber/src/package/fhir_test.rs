@@ -80,7 +80,9 @@ const CONST_MEMBER_CALL_MAIN: &str =
 const LOCAL_LOCALE_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() → string {\n    return utilModule.greet()\n}\n\nmain {\n    print utilModule.greet()\n}\n";
 const LOCAL_LOCALE_UTIL: &str = "@ publica\nfn salutare() → string {\n    return \"salve\"\n}\n";
 
-const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:chorda\" chorda\n\nfn run() → string {\n    const math.Vec3 canonical ← math.make_vector(1.0, 0.0, 0.0)\n    const math.Vec3 canonical_shifted ← canonical.add(math.make_vector(0.0, 1.0, 0.0))\n    const float canonical_length ← canonical_shifted.length()\n    const math.Vec3 original ← math.make_vector(1.0, 0.0, 0.0)\n    const math.Vec3 shifted ← original.add(math.make_vector(0.0, 2.0, 0.0))\n    const math.Vec3 normalized ← shifted.normalize()\n    const float length ← normalized.length()\n    const string reversed ← chorda.reverse(\"abc\")\n    const string decoded ← chorda.decode(chorda.encode(\"abc\"))\n    const list<string> parts ← chorda.split_n(\"a,b\", \",\", 2)\n    print canonical_length\n    print length\n    print parts\n    return decoded\n}\n\nmain {\n    print run()\n}\n";
+// Live Triga names are source-canonical. The retired en-pack English
+// projection (`Vec3`, `make_vector`) is gone with 80b59a6c(a).
+const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:chorda\" chorda\n\nfn run() → string {\n    const math.Vector3 origin ← math.vector3(1.0, 0.0, 0.0)\n    const string reversed ← chorda.reverse(\"abc\")\n    const string decoded ← chorda.decode(chorda.encode(\"abc\"))\n    const list<string> parts ← chorda.split_n(\"a,b\", \",\", 2)\n    print parts\n    return decoded\n}\n\nmain {\n    print run()\n}\n";
 const NORMA_LATIN_COMPATIBILITY_MAIN: &str = "importa ex \"norma:chorda\" chorda\n\nfunctio run() → textus {\n    redde chorda.retorta(\"abc\")\n}\n\nincipit {\n    nota run()\n}\n";
 
 /// Two-module package with a local import and a namespace call in the entry.
@@ -528,6 +530,8 @@ fn strict_pack_rejects_unlisted_canonical_member_spelling() {
 
 #[test]
 fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
+    // 80b59a6c(a) / CTO e2ca2b57 F2: en pack has zero triga library_members;
+    // analysis projects live Triga exports. Norma surfaces stay the en identity rows.
     let dir = test_temp_dir("fhir-external-library-locale");
     let entry = write_external_library_locale_package(&dir, EXTERNAL_LIBRARY_LOCALE_MAIN);
     let (config, _diagnostic_pack) = crate::package::config_with_locale(
@@ -538,15 +542,26 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
     )
     .expect("load installed English library locale");
     let config = config.with_stdlib(dev_norma_library_home());
+    let en_pack = config
+        .locale_pack
+        .as_ref()
+        .expect("en pack selected for analysis");
+    assert!(
+        en_pack
+            .library_members
+            .keys()
+            .all(|identity| identity.package.as_deref() != Some("triga")),
+        "ruling 80b59a6c(a): en pack must have zero triga library_members"
+    );
     let package =
-        analyze_with_faber_seams(&config, &entry).expect("analyze localized external libraries");
+        analyze_with_faber_seams(&config, &entry).expect("analyze ruled external library surfaces");
 
     assert!(
         package
             .diagnostics
             .iter()
             .all(|diagnostic| !diagnostic.is_error()),
-        "localized external library diagnostics: {:?}",
+        "ruled external library diagnostics: {:?}",
         package.diagnostics
     );
     let entry_unit = package.entry_node().expect("external library entry unit");
@@ -562,13 +577,17 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
         .values()
         .collect::<Vec<_>>();
     assert!(
+        library_items.iter().all(|item| item.exported_name != "Vec3"),
+        "retired en-pack Vec3 must not be projected: {library_items:?}"
+    );
+    assert!(
         library_items.iter().any(|item| {
             item.identity.provider == LibraryProvider::Package("triga".to_owned())
                 && item.identity.module_path == ["math".to_owned()]
                 && item.exported_name == "vector3"
                 && item.kind == LibraryItemKind::Function
         }),
-        "library provenance: {library_items:?}"
+        "live-projected triga vector3: {library_items:?}"
     );
     assert!(
         library_items.iter().any(|item| {
@@ -577,7 +596,7 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
                 && item.exported_name == "Vector3"
                 && item.kind == LibraryItemKind::Struct
         }),
-        "library provenance: {library_items:?}"
+        "live-projected triga Vector3: {library_items:?}"
     );
     assert!(
         library_items.iter().any(|item| {
@@ -586,7 +605,7 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
                 && item.exported_name == "reverse"
                 && item.kind == LibraryItemKind::Function
         }),
-        "library provenance: {library_items:?}"
+        "en-pack norma reverse: {library_items:?}"
     );
 }
 
