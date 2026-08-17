@@ -165,7 +165,6 @@ test "math ok" {
         for_tests
             .nodes
             .values()
-            .iter()
             .any(|u| u.path.extension().and_then(|e| e.to_str()) == Some("proba")),
         "test analysis must include .proba units"
     );
@@ -175,7 +174,6 @@ test "math ok" {
         production
             .nodes
             .values()
-            .iter()
             .all(|u| u.path.extension().and_then(|e| e.to_str()) != Some("proba")),
         "production analysis must exclude .proba"
     );
@@ -538,7 +536,6 @@ test "core ok" {
         let mut names = pkg
             .nodes
             .values()
-            .iter()
             .map(|u| u.path.file_name().unwrap_or_default().to_os_string())
             .collect::<Vec<_>>();
         names.sort();
