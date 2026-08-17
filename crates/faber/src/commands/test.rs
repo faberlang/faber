@@ -26,6 +26,18 @@ pub(super) fn cmd_test(args: &TestArgs) {
         eprintln!("error: {message}");
         std::process::exit(1);
     }
+    // Keep an explicit reader-locale missing path on the stable package
+    // diagnostic identity instead of leaking the raw discovery I/O error.
+    if args
+        .locale
+        .as_deref()
+        .is_some_and(|locale| !locale.trim().is_empty())
+        && !args.path.exists()
+    {
+        let diagnostic = package::missing_package_path_diagnostic(&args.path);
+        eprintln!("{}", radix::diagnostics::render_plain(&diagnostic));
+        std::process::exit(1);
+    }
 
     let selection = TestSelection {
         name: args.name.clone(),

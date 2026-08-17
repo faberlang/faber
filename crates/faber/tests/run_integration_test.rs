@@ -691,12 +691,16 @@ fn test_reader_locale_missing_package_path_surfaces_missing_path_error() {
         "missing package path should not write stdout: {stdout}"
     );
     assert!(
-        !stderr.contains("--locale th-TH requires a package path or .fab entry file"),
-        "missing package path should reach the underlying filesystem error, got:\n{stderr}"
+        stderr.contains("error[PKG001:package_path_missing]"),
+        "expected structured missing path diagnostic, got:\n{stderr}"
     );
     assert!(
-        stderr.contains("cannot read 'missing-package': No such file or directory"),
-        "expected missing path error, got:\n{stderr}"
+        stderr.contains("missing-package"),
+        "structured missing path diagnostic should name the input, got:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("No such file or directory"),
+        "missing package path should not leak the raw filesystem error, got:\n{stderr}"
     );
 }
 
@@ -2301,7 +2305,7 @@ entry = "main.fab"
         r#"import from "norma:processus" processus
 
 main args args {
-  print processus.argumenta()[0]
+  print processus.argv()[0]
 }
 "#,
     )

@@ -199,7 +199,9 @@ pub(crate) fn locale_pack_for_emit_with_diagnostic(
     if let Some(path) = input.iter().find(|s| !s.is_empty() && s.as_str() != "-") {
         let path = Path::new(path);
         return match load_locale_pack_for_input(path, Some(locale)) {
-            Err(_diagnostic) if path_is_missing(path) => Err(missing_package_path_diagnostic(path)),
+            Err(_diagnostic) if path_is_missing(path) => {
+                Err(super::missing_package_path_diagnostic(path))
+            }
             result => result,
         };
     }
@@ -234,18 +236,6 @@ fn path_is_missing(path: &Path) -> bool {
     matches!(
         std::fs::metadata(path),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound
-    )
-}
-
-fn missing_package_path_diagnostic(path: &Path) -> Box<Diagnostic> {
-    Box::new(
-        crate::package_diagnostic_error(format!(
-            "package input path '{}' does not exist",
-            path.display()
-        ))
-        .with_file(path.display().to_string())
-        .with_arg("issue", "package_path_missing")
-        .with_arg("path", path.display().to_string()),
     )
 }
 

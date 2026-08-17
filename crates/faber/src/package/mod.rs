@@ -204,6 +204,18 @@ pub(crate) use locale::{
 
 pub(super) const MANIFEST_FILE: &str = "faber.toml";
 
+pub(crate) fn missing_package_path_diagnostic(path: &Path) -> Box<Diagnostic> {
+    Box::new(
+        crate::package_diagnostic_error(format!(
+            "package input path '{}' does not exist",
+            path.display()
+        ))
+        .with_file(path.display().to_string())
+        .with_arg("issue", "package_path_missing")
+        .with_arg("path", path.display().to_string()),
+    )
+}
+
 /// Resolve a product input against the caller's working directory before
 /// entering the explicit-input compiler API. Ambient CWD lookup is a Faber
 /// command concern, not a radix-package concern.
