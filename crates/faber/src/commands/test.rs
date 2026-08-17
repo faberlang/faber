@@ -3,12 +3,12 @@
 use crate::cli::TestArgs;
 use crate::input_shape::locale_without_package_error;
 use crate::package;
-use radix_package::test_source_filter::TestSourceFilter;
-use radix::driver::{Config, Session};
 use proba::{
-    format_summary, inventory_cases, run_proba_on_analyzed, run_proba_source, CaseOutcome,
-    CaseResult, ProbaReport, TestSelection,
+    format_summary, inventory_cases, run_proba_on_validated_with_function_ids, run_proba_source,
+    CaseOutcome, CaseResult, ProbaReport, TestSelection,
 };
+use radix::driver::{Config, Session};
+use radix_package::test_source_filter::TestSourceFilter;
 use std::path::Path;
 
 /// Discover, select, and run proba cases exclusively on the MIR runner.
@@ -161,7 +161,7 @@ fn run_package(
     exact: bool,
     include_ignored: bool,
 ) -> ProbaReport {
-    let mut package = match radix_package::analyze::analyze_package_for_tests(
+    let package = match radix_package::analyze::analyze_package_for_tests(
         config,
         input,
         proba_filter,
@@ -185,45 +185,69 @@ fn run_package(
         std::process::exit(1);
     }
 
-    let mut combined = ProbaReport::default();
-    // Per-unit lower + run for units that inventory at least one proba case.
-    // Product-only units are skipped (no runner lower) so packages with
-    // unsupported product MIR still run self-contained test units. Cross-unit
-    // imports that need package MIR linking fail closed — never Rust fallback.
-    for unit in &mut package.units {
-        let unit_path = unit.path.display().to_string();
+    let mut test_units = Vec::new();
+    let mut roots = Vec::new();
+    let mut functions = Vec::new();
+    for unit in &package.units {
         let cases = inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
         if cases.is_empty() {
             continue;
         }
-        match run_proba_on_analyzed(
-            &mut unit.analysis,
-            selection,
-            harness_filter,
-            exact,
-            include_ignored,
-        ) {
-            Ok(report) => {
-                combined.results.extend(report.results);
-            }
-            Err(error) => {
-                eprintln!("error: failed to lower/run tests in {unit_path}");
-                print_run_error(&error);
-                // Fail closed for units that own proba cases.
-                for case in cases {
-                    combined.results.push(CaseResult {
-                        name: case.name,
-                        suite_path: case.suite_path,
-                        outcome: CaseOutcome::Failed {
-                            message: format!(
-                                "unit failed to lower for runner proba execution ({unit_path})"
-                            ),
-                        },
-                    });
+        roots.push(unit.path.clone());
+        functions.extend(cases.iter().map(|case| (unit.path.clone(), case.def_id)));
+        test_units.push((unit.path.clone(), cases));
+    }
+
+    let combined = if test_units.is_empty() {
+        ProbaReport::default()
+    } else {
+        let scope = radix_package::mir::TestPackageScope { roots, functions };
+        let failed_units = test_units.clone();
+        match package::mir::with_linked_test_package_mir(
+            package,
+            &scope,
+            config,
+            |validated, function_ids| {
+                let mut combined = ProbaReport::default();
+                for (unit_path, cases) in &test_units {
+                    let report = run_proba_on_validated_with_function_ids(
+                        validated,
+                        unit_path,
+                        cases,
+                        function_ids,
+                        selection,
+                        harness_filter,
+                        exact,
+                        include_ignored,
+                    );
+                    combined.results.extend(report.results);
                 }
+                combined
+            },
+        ) {
+            Ok(report) => report,
+            Err(diagnostics) => {
+                super::eprint_compile_diagnostics(&diagnostics);
+                eprintln!("error: package MIR test link failed");
+                let mut failed = ProbaReport::default();
+                for (unit_path, cases) in failed_units {
+                    for case in cases {
+                        failed.results.push(CaseResult {
+                            name: case.name,
+                            suite_path: case.suite_path,
+                            outcome: CaseOutcome::Failed {
+                                message: format!(
+                                    "package failed to link for runner proba execution ({})",
+                                    unit_path.display()
+                                ),
+                            },
+                        });
+                    }
+                }
+                failed
             }
         }
-    }
+    };
 
     if combined.results.is_empty() {
         eprintln!("warning: no proba cases discovered");

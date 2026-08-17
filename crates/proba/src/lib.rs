@@ -17,7 +17,9 @@ use radix::mir::{
     lower_analyzed_unit_with_context, run_function, BufferHost, MirFunctionId, RunSourceError,
     RunnerError, ValidatedMir,
 };
+use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::path::{Path, PathBuf};
 
 /// User-facing test filter requested by the package or CLI layer.
 ///
@@ -335,6 +337,59 @@ pub fn run_proba_on_validated(
     exact: bool,
     include_ignored: bool,
 ) -> ProbaReport {
+    run_proba_cases(
+        validated,
+        cases,
+        selection,
+        harness_filter,
+        exact,
+        include_ignored,
+        |case| mir_function_id_for_def(validated, case.def_id),
+    )
+}
+
+/// Execute one package module's cases against a linked MIR program.
+///
+/// The caller supplies the linker-owned identity map because package lowering
+/// rewrites source and function IDs while merging modules. `module_path` keeps
+/// the original HIR `DefId` scoped to its source module, preserving report
+/// identity and the existing per-unit `solum` selection behavior.
+#[must_use]
+pub fn run_proba_on_validated_with_function_ids(
+    validated: &ValidatedMir<'_>,
+    module_path: &Path,
+    cases: &[ProbaCase],
+    function_ids: &HashMap<(PathBuf, DefId), MirFunctionId>,
+    selection: &TestSelection,
+    harness_filter: Option<&str>,
+    exact: bool,
+    include_ignored: bool,
+) -> ProbaReport {
+    let module_path = module_path.to_path_buf();
+    run_proba_cases(
+        validated,
+        cases,
+        selection,
+        harness_filter,
+        exact,
+        include_ignored,
+        |case| {
+            function_ids
+                .get(&(module_path.clone(), case.def_id))
+                .copied()
+        },
+    )
+}
+
+fn run_proba_cases(
+    validated: &ValidatedMir<'_>,
+    cases: &[ProbaCase],
+    selection: &TestSelection,
+    harness_filter: Option<&str>,
+    exact: bool,
+    include_ignored: bool,
+    function_id_for_case: impl Fn(&ProbaCase) -> Option<MirFunctionId>,
+) -> ProbaReport {
     let has_solum = has_solum_cases(cases);
     let mut results = Vec::with_capacity(cases.len());
 
@@ -366,7 +421,7 @@ pub fn run_proba_on_validated(
             continue;
         }
 
-        let outcome = match mir_function_id_for_def(validated, case.def_id) {
+        let outcome = match function_id_for_case(case) {
             Some(function_id) => execute_case(validated, function_id),
             None => CaseOutcome::Failed {
                 message: format!(

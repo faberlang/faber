@@ -6,11 +6,14 @@
 
 use super::test_support::test_temp_dir;
 use super::{discover_package, library_resolver_from_config};
-use radix_package::analyze::{analyze_package as analyze_package_direct, analyze_package_for_tests as analyze_package_for_tests_direct, AnalysisSeams};
-use radix_package::discovery::PackageSpec;
-use radix_package::library::LibraryResolver;
 use radix::driver::{Config, Session};
 use radix::locale::LocalePack;
+use radix_package::analyze::{
+    analyze_package as analyze_package_direct,
+    analyze_package_for_tests as analyze_package_for_tests_direct, AnalysisSeams,
+};
+use radix_package::discovery::PackageSpec;
+use radix_package::library::LibraryResolver;
 
 fn seams() -> AnalysisSeams {
     crate::package::faber_analysis_seams()
@@ -47,7 +50,10 @@ fn load_with_faber_seams(
         &seams(),
     )
 }
-use proba::{run_proba_on_analyzed, run_proba_source, CaseOutcome, TestSelection};
+use proba::{
+    run_proba_on_analyzed, run_proba_on_validated_with_function_ids, run_proba_source, CaseOutcome,
+    TestSelection,
+};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -153,7 +159,8 @@ test "math ok" {
     .expect("proba");
 
     let config = Config::default();
-    let for_tests = analyze_tests_with_faber_seams(&config, dir.path(), None).expect("analyze tests");
+    let for_tests =
+        analyze_tests_with_faber_seams(&config, dir.path(), None).expect("analyze tests");
     assert!(
         for_tests
             .units
@@ -175,14 +182,13 @@ test "math ok" {
     // en pack explicitly (a `None` pack would select registry-direct lexing).
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&config);
-    let files = load_with_faber_seams(&spec, &resolver, Some(&english_pack()), false, None)
-        .expect("load");
+    let files =
+        load_with_faber_seams(&spec, &resolver, Some(&english_pack()), false, None).expect("load");
     assert!(files
         .iter()
         .all(|f| f.path.extension().and_then(|e| e.to_str()) != Some("proba")));
-    let test_files =
-        load_with_faber_seams(&spec, &resolver, Some(&english_pack()), true, None)
-            .expect("load tests");
+    let test_files = load_with_faber_seams(&spec, &resolver, Some(&english_pack()), true, None)
+        .expect("load tests");
     assert!(test_files
         .iter()
         .any(|f| f.path.extension().and_then(|e| e.to_str()) == Some("proba")));
@@ -231,6 +237,82 @@ test "identity holds" {
         }
     }
     assert!(any, "expected at least one proba case in package");
+}
+
+#[test]
+fn entryless_package_proba_roots_link_once_and_run_with_original_ids() {
+    let dir = test_temp_dir("runner-linked-roots");
+    write_minimal_lib_package(dir.path());
+    fs::write(
+        dir.join("src/lib.fab"),
+        r#"@ public
+fn double(int n) → int {
+    return n + n
+}
+"#,
+    )
+    .expect("lib.fab");
+    fs::write(
+        dir.join("src/first.proba"),
+        r#"import from "./lib" lib
+
+test "double" {
+    assert lib.double(3) ≡ 6
+}
+"#,
+    )
+    .expect("first.proba");
+    fs::write(
+        dir.join("src/second.proba"),
+        r#"test "literal" {
+    assert 2 ≡ 2
+}
+"#,
+    )
+    .expect("second.proba");
+
+    let package = analyze_tests_with_faber_seams(&Config::default(), dir.path(), None)
+        .expect("analyze entryless package tests");
+    let mut roots = Vec::new();
+    let mut functions = Vec::new();
+    let mut test_units = Vec::new();
+    for unit in &package.units {
+        let cases = proba::inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
+        if cases.is_empty() {
+            continue;
+        }
+        roots.push(unit.path.clone());
+        functions.extend(cases.iter().map(|case| (unit.path.clone(), case.def_id)));
+        test_units.push((unit.path.clone(), cases));
+    }
+    let scope = radix_package::mir::TestPackageScope { roots, functions };
+    let report = crate::package::mir::with_linked_test_package_mir(
+        package,
+        &scope,
+        &Config::default(),
+        |validated, function_ids| {
+            let mut report = proba::ProbaReport::default();
+            for (path, cases) in &test_units {
+                report.results.extend(
+                    run_proba_on_validated_with_function_ids(
+                        validated,
+                        path,
+                        cases,
+                        function_ids,
+                        &TestSelection::default(),
+                        None,
+                        false,
+                        false,
+                    )
+                    .results,
+                );
+            }
+            report
+        },
+    )
+    .expect("link entryless package test roots");
+    assert_eq!(report.passed(), 2, "{report:?}");
+    assert_eq!(report.failed(), 0, "{report:?}");
 }
 
 #[test]
@@ -411,7 +493,11 @@ test "core ok" {
     )
     .expect("core.proba");
 
-    let package_name = dir.path().file_name().expect("temp package name").to_owned();
+    let package_name = dir
+        .path()
+        .file_name()
+        .expect("temp package name")
+        .to_owned();
     let parent = dir.path().parent().expect("temp parent").to_path_buf();
 
     let mut relative = PathBuf::new();

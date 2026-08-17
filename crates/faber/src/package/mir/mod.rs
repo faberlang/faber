@@ -131,9 +131,9 @@ fn device_section_builder(
             };
             let has_anonymous_param = function.params.iter().any(|param| {
                 param.name.is_none()
-                    || param
-                        .name
-                        .is_some_and(|symbol| (symbol.0 as usize) >= lowered.interner.strings().len())
+                    || param.name.is_some_and(|symbol| {
+                        (symbol.0 as usize) >= lowered.interner.strings().len()
+                    })
             });
             if has_anonymous_param {
                 for program_name in kernel.resources.iter().filter(|resource| {
@@ -154,11 +154,9 @@ fn device_section_builder(
             else {
                 continue;
             };
-            for program_name in kernel
-                .resources
-                .iter()
-                .filter(|resource| resource.buffer.role == radix_mir::device_program::BufferRole::Input)
-            {
+            for program_name in kernel.resources.iter().filter(|resource| {
+                resource.buffer.role == radix_mir::device_program::BufferRole::Input
+            }) {
                 if has_anonymous_param && program_name.version.element_count == 1 {
                     continue;
                 }
@@ -230,9 +228,10 @@ fn host_route(
             Err(diagnostic) => Err(vec![diagnostic]),
             Ok(None) => Ok(None),
             Ok(Some(backend)) => {
-                let device = image.device.as_ref().ok_or_else(|| {
-                    vec![super::host_factory::missing_device_descriptor(backend)]
-                })?;
+                let device = image
+                    .device
+                    .as_ref()
+                    .ok_or_else(|| vec![super::host_factory::missing_device_descriptor(backend)])?;
                 super::device::execute_device_route(device, backend, &image.source_hashes)?;
                 Ok(Some(()))
             }
@@ -260,14 +259,32 @@ pub fn with_lowered_package_mir<R>(
     radix_package::mir::with_lowered_package_mir(config, input, &faber_mir_seams(), run)
 }
 
-/// The interpreted-consumer probe used by faber's device tests.
-#[cfg(test)]
+/// The interpreted-consumer probe used by faber's package consumers.
+#[cfg(feature = "runner")]
 pub(crate) fn with_interpreted_lowered_package_mir<R>(
     config: &Config,
     input: &Path,
     run: impl for<'a> FnOnce(&radix::mir::LoweredMirUnit<'a>) -> R,
 ) -> Result<R, Vec<Diagnostic>> {
     radix_package::mir::with_interpreted_lowered_package_mir(config, input, &faber_mir_seams(), run)
+}
+
+/// Link an already-analyzed package test scope once, then lend its validated
+/// MIR and original test-function identity map to the runner consumer.
+#[cfg(feature = "runner")]
+pub(crate) fn with_linked_test_package_mir<R>(
+    package: radix_package::analyze::AnalyzedPackage,
+    scope: &radix_package::mir::TestPackageScope,
+    config: &Config,
+    run: impl for<'a> FnOnce(&radix::mir::ValidatedMir<'a>, &radix_package::mir::TestFunctionIds) -> R,
+) -> Result<R, Vec<Diagnostic>> {
+    radix_package::mir::with_linked_test_package_mir(
+        package,
+        scope,
+        config,
+        &faber_mir_seams(),
+        run,
+    )
 }
 
 /// Generated fmir-bin runner crates consume this public API (the stdio
