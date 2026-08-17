@@ -1326,6 +1326,43 @@ impl Host for MinimalHost {
 }
 
 #[test]
+fn provider_failure_uses_stable_identity() {
+    let mut interner = Interner::new();
+    let module = interner.intern("camera");
+    let item = interner.intern("include");
+    let provider = MirProvider {
+        kind: radix_mir::MirProviderKind::Package,
+        module: vec![module],
+        name: item,
+    };
+    let identity = super::host::provider_identity(&provider, &interner);
+    let error =
+        RunnerError::unsupported(Span::default(), "provider").with_provider_identity(&identity);
+
+    assert_eq!(identity, "package:camera::include");
+    assert_eq!(
+        error.message,
+        "FaberScript unsupported: provider package:camera::include"
+    );
+    assert!(!error.message.contains("sym#"));
+}
+
+#[test]
+fn host_provider_failure_does_not_expose_symbol_index() {
+    let mut host = BufferHost::default();
+    let provider = MirProvider {
+        kind: radix_mir::MirProviderKind::Package,
+        module: vec![radix_lexer::Symbol(30)],
+        name: radix_lexer::Symbol(31),
+    };
+    let error = host
+        .provider(&provider)
+        .expect_err("provider must fail closed");
+
+    assert!(!error.message.contains("sym#"));
+}
+
+#[test]
 fn test_host_kernel_call_default_rejects() {
     let mut host = MinimalHost;
     let result = host.kernel_call(KernelModule::Processus, "exec", &[], Span::default());

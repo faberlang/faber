@@ -1,12 +1,46 @@
 #![allow(clippy::needless_lifetimes)]
 
 use super::{kernel, RunnerError, Value};
-use radix_lexer::Span;
+use radix_lexer::{Interner, Span};
 use radix_mir::KernelModule;
-use radix_mir::{MirDiagnosticKind, MirProvider};
+use radix_mir::{MirDiagnosticKind, MirProvider, MirProviderKind};
 use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
 use std::io::{self, BufRead, Write};
+
+/// Render a provider route without exposing interner allocation numbers.
+///
+/// Provider MIR stores interned symbols, but those numeric ids are an
+/// implementation detail and change with source load order. The runner owns
+/// the interner, so resolve the route at the boundary where failures become
+/// user-visible.
+#[must_use]
+pub(crate) fn provider_identity(provider: &MirProvider, interner: &Interner) -> String {
+    let mut route = provider
+        .module
+        .iter()
+        .map(|symbol| interner.resolve(*symbol).to_owned())
+        .collect::<Vec<_>>();
+    route.push(interner.resolve(provider.name).to_owned());
+    let route = route.join("::");
+    match provider.kind {
+        MirProviderKind::Package => format!("package:{route}"),
+        MirProviderKind::Kernel(module) => format!("kernel:{}:{route}", module.name()),
+    }
+}
+
+impl RunnerError {
+    /// Replace the legacy numeric provider diagnostic with its stable route.
+    pub(crate) fn with_provider_identity(mut self, identity: &str) -> Self {
+        if self.message == "FaberScript unsupported: provider"
+            || self.message.contains("provider sym#")
+        {
+            self.message = format!("FaberScript unsupported: provider {identity}");
+            self.issue = super::runner_issue(&self.message);
+        }
+        self
+    }
+}
 
 /// Host seam for diagnostics and capability expansion.
 ///
@@ -187,10 +221,10 @@ impl Host for BufferHost {
         panic!("runner abort: {reason}");
     }
 
-    fn provider(&mut self, provider: &MirProvider) -> Result<Value, RunnerError> {
+    fn provider(&mut self, _provider: &MirProvider) -> Result<Value, RunnerError> {
         Err(RunnerError::unsupported(
             Span::default(),
-            &format!("provider sym#{}", provider.name.0),
+            "provider",
         ))
     }
 
@@ -289,10 +323,10 @@ impl Host for StdioHost {
         std::process::exit(1);
     }
 
-    fn provider(&mut self, provider: &MirProvider) -> Result<Value, RunnerError> {
+    fn provider(&mut self, _provider: &MirProvider) -> Result<Value, RunnerError> {
         Err(RunnerError::unsupported(
             Span::default(),
-            &format!("provider sym#{}", provider.name.0),
+            "provider",
         ))
     }
 

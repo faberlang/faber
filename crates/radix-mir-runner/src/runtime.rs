@@ -34,7 +34,7 @@ use super::value::{
     uint_width_checked_add, values_equal, width_checked_add, GradientStorage, MapKey, SermoValue,
     TensorValue, Value,
 };
-use super::{gelu_f64, Runner, RunnerError};
+use super::{gelu_f64, host::provider_identity, Runner, RunnerError};
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_mir::{
@@ -3362,15 +3362,21 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         args: &[MirOperand],
         span: Span,
     ) -> Result<Value, RunnerError> {
+        let identity = provider_identity(provider, self.interner);
         if let MirProviderKind::Kernel(module) = provider.kind {
             let mut evaluated = Vec::with_capacity(args.len());
             for arg in args {
                 evaluated.push(self.eval_operand(arg, span)?);
             }
             let verb = self.interner.resolve(provider.name);
-            return self.host.kernel_call(module, verb, &evaluated, span);
+            return self
+                .host
+                .kernel_call(module, verb, &evaluated, span)
+                .map_err(|error| error.with_provider_identity(&identity));
         }
-        self.host.provider(provider)
+        self.host
+            .provider(provider)
+            .map_err(|error| error.with_provider_identity(&identity))
     }
 
     fn eval_set_algebra(
