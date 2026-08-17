@@ -2818,7 +2818,9 @@ pub fn analyze_source_with_module_import_contract(
     let mut unit = analyzed_unit_from_semantic(interner, cli_program, semantic_result, name, &mut diagnostics)
         .map_err(|()| diagnostics)?;
     if !rust_omit.is_empty() {
-        unit.hir.items.retain(|item| !rust_omit.contains(&item.def_id));
+        unit.hir
+            .items
+            .retain(|item| !rust_omit.contains(&item.def_id));
     }
 
     // Rust-only borrow/lifetime checks are target qualification, not base analysis.
@@ -3281,9 +3283,9 @@ fn rust_library_omit_applies(hir: &HirModule, omit: &rustc_hash::FxHashSet<DefId
     if omit.is_empty() || hir.entry.is_some() {
         return false;
     }
-    hir.items.iter().any(|item| {
-        !omit.contains(&item.def_id) && !matches!(item.kind, HirItemKind::Import(_))
-    })
+    hir.items
+        .iter()
+        .any(|item| !omit.contains(&item.def_id) && !matches!(item.kind, HirItemKind::Import(_)))
 }
 
 fn rust_kept_item_reaches_omit(hir: &HirModule, omit: &rustc_hash::FxHashSet<DefId>) -> bool {
@@ -3294,7 +3296,9 @@ fn rust_kept_item_reaches_omit(hir: &HirModule, omit: &rustc_hash::FxHashSet<Def
         let HirItemKind::Function(function) = &item.kind else {
             return false;
         };
-        function_path_defs(function).iter().any(|callee| omit.contains(callee))
+        function_path_defs(function)
+            .iter()
+            .any(|callee| omit.contains(callee))
     })
 }
 
