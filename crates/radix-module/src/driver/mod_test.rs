@@ -130,6 +130,124 @@ functio loss() → numerus {
 }
 
 #[test]
+#[cfg(feature = "hir-rust")]
+fn radix_lane_air_library_unit_omits_air_fn_on_hir_rust() {
+    // Library-shaped: a keepable rust fn that does not reach AIR, plus an
+    // AIR-lane fn. HirRust succeeds; rust emit keeps the non-AIR fn and omits AIR.
+    let source = r#"
+@ radix lane "air"
+functio loss() → numerus {
+    redde 1
+}
+
+functio keep() → numerus {
+    redde 2
+}
+"#;
+
+    let result = compile(&test_session(Target::HirRust), "lane.fab", source);
+
+    assert!(
+        result.success(),
+        "library-shaped unit must omit AIR instead of TARGETLANE001: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.code == Some("TARGETLANE001")),
+        "omitted AIR must not diagnose TARGETLANE001: {:?}",
+        result.diagnostics
+    );
+    let output = rust_output(result);
+    assert!(
+        output.code.contains("fn keep"),
+        "kept rust fn must be emitted:\n{}",
+        output.code
+    );
+    assert!(
+        !output.code.contains("fn loss"),
+        "AIR fn must be omitted from rust emit:\n{}",
+        output.code
+    );
+}
+
+#[test]
+fn radix_lane_kept_rust_caller_of_air_still_targetlane001() {
+    // Not library-shaped: the only rust-emitted fn calls AIR, so it is kept
+    // and TARGETLANE001 still fires. Do not use gradientes_simple_loss here.
+    let source = r#"
+@ radix lane "air"
+functio loss() → numerus {
+    redde 1
+}
+
+functio wrapper() → numerus {
+    redde loss()
+}
+"#;
+
+    let result = compile(&test_session(Target::HirRust), "lane.fab", source);
+
+    assert!(!result.success(), "expected lane/target failure");
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.code == Some("TARGETLANE001")
+            && diag.args
+                == vec![
+                    DiagnosticArg::new("issue", "lane_requires_mir_backed_target"),
+                    DiagnosticArg::new("lane", "air"),
+                    DiagnosticArg::new("target", "rust"),
+                ]
+    }));
+}
+
+#[test]
+#[cfg(feature = "hir-rust")]
+fn radix_lane_air_library_unit_omits_wrapper_that_reaches_air() {
+    // Transitive omit: keepable API remains, so AIR and the same-unit wrapper
+    // that calls it are both omitted from rust emit.
+    let source = r#"
+@ radix lane "air"
+functio loss() → numerus {
+    redde 1
+}
+
+functio wrapper() → numerus {
+    redde loss()
+}
+
+functio keep() → numerus {
+    redde 2
+}
+"#;
+
+    let result = compile(&test_session(Target::HirRust), "lane.fab", source);
+
+    assert!(
+        result.success(),
+        "library-shaped transitive omit must succeed: {:?}",
+        result.diagnostics
+    );
+    let output = rust_output(result);
+    assert!(
+        output.code.contains("fn keep"),
+        "kept rust fn must be emitted:\n{}",
+        output.code
+    );
+    assert!(
+        !output.code.contains("fn loss"),
+        "AIR fn must be omitted:\n{}",
+        output.code
+    );
+    assert!(
+        !output.code.contains("fn wrapper"),
+        "wrapper that reaches AIR must be omitted:\n{}",
+        output.code
+    );
+}
+
+#[test]
 fn radix_lane_air_rejects_hir_direct_swift_target() {
     let source = r#"
 @ radix lane "air"
