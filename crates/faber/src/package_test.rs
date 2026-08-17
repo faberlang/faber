@@ -11400,7 +11400,7 @@ version = "0.1.0"
 entry = "main.fab"
 
 [reader]
-locale = "la"
+locale = "en"
 
 [build]
 target = "ts"
@@ -11472,36 +11472,50 @@ targets = ["ts"]
 bindings = "bindings/ts.toml"
 
 [reader]
-locale = "la"
+locale = "en"
 "#,
     )
     .expect("tela manifest");
     fs::write(
         lib.join("src/web.fab"),
-        r#"# tela:web fixture — the WebController annotation contract (la surface,
-# mirroring faber-web/src/web.fab's shape for the tela provider).
+        r#"+++
+locale = "en"
++++
 
-@ annotatio
-genus WebController {
-    textus selector
+# tela:web fixture — the WebController annotation contract (en surface,
+# mirroring tela/src/web.fab's shape for the tela provider).
+
+@ public
+@ annotatio { target = fn }
+class WebController {
+    string selector
 }
 "#,
     )
     .expect("web.fab");
     fs::write(
         lib.join("src/dom.fab"),
-        r#"# tela:dom fixture — the DOM Scope genus (la surface, mirroring
-# faber-web/src/dom.fab's shape for the tela provider).
+        r#"+++
+locale = "en"
++++
 
-genus Scope {
-    textus selector = ""
+# tela:dom fixture — the DOM Scope class (en surface, mirroring
+# tela/src/dom.fab's shape for the tela provider).
+
+@ public
+class Scope {
+    string selector = ""
 }
 
-genus Element {
-    textus selector = ""
+@ public
+class Element {
+    string selector = ""
 }
 
-functio require(Scope scope, textus selector) → Element
+@ public
+fn require(Scope scope, string selector) → Element {
+    return Element { selector = selector }
+}
 "#,
     )
     .expect("dom.fab");
@@ -12234,13 +12248,11 @@ fn g10_web3_builds_tela_origin_controllers_json_and_browser_esm() {
         &app,
         &lib,
         r#"
-importa ex "tela:web" web
-importa ex "tela:dom" dom
+import from "tela:web" web
+import from "tela:dom" d
 
 @ WebController { selector = "[data-faber=shell]" }
-functio shell(dom.Scope scope) → vacuum {
-  nota dom.require(scope, "button")
-}
+fn shell(d.Scope scope) → void {}
 "#,
     );
     write_static_asset_roots(&app);
@@ -12279,15 +12291,15 @@ fn g10_web3_rejects_local_web_controller_shadowing_with_tela_import() {
         &app,
         &lib,
         r##"
-importa ex "tela:dom" dom
+import from "tela:dom" d
 
-@ annotatio
-genus WebController {
-    textus selector
+@ annotatio { target = fn }
+class WebController {
+    string selector
 }
 
 @ WebController { selector = "#shell" }
-functio shell(dom.Scope scope) → vacuum {}
+fn shell(d.Scope scope) → void {}
 "##,
     );
     write_static_asset_roots(&app);
@@ -12317,12 +12329,10 @@ fn g10_web3_rejects_missing_controllers_with_tela_import() {
         &app,
         &lib,
         r#"
-importa ex "tela:web" web
-importa ex "tela:dom" dom
+import from "tela:web" web
+import from "tela:dom" d
 
-functio helper(dom.Scope scope) → vacuum {
-  nota dom.require(scope, "button")
-}
+fn helper(d.Scope scope) → void {}
 "#,
     );
     write_static_asset_roots(&app);
