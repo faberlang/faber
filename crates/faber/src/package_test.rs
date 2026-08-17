@@ -6432,8 +6432,8 @@ rusqlite = "0.32"
     .expect("write shim");
     fs::write(
         dir.join("bindings/rust.toml"),
-        r#"[functions."sqlite:sqlite.exsequi"]
-symbol = "crate::shim::exsequi"
+        r#"[functions."sqlite:sqlite.exec"]
+symbol = "crate::shim::exec"
 
 [shim]
 path = "rust/shim.rs"
