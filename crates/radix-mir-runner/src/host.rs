@@ -52,6 +52,26 @@ pub(crate) fn is_vertex_layout_count_provider(provider: &MirProvider, interner: 
     )
 }
 
+/// The package-provider constructor implemented directly by the script runner.
+///
+/// WHY: `float32_attribute` only assembles the typed CPU-side carrier. It does
+/// not cross a host or device boundary, so the runner can execute this named
+/// route without opening a general package ABI or accepting arbitrary routes.
+#[must_use]
+pub(crate) fn is_float32_attribute_provider(provider: &MirProvider, interner: &Interner) -> bool {
+    if provider.kind != MirProviderKind::Package
+        || interner.resolve(provider.name) != "float32_attribute"
+    {
+        return false;
+    }
+    let module = provider
+        .module
+        .iter()
+        .map(|symbol| interner.resolve(*symbol))
+        .collect::<Vec<_>>();
+    matches!(module.as_slice(), ["triga:geometry/attribute", "attribute"])
+}
+
 impl RunnerError {
     /// Replace the legacy numeric provider diagnostic with its stable route.
     pub(crate) fn with_provider_identity(mut self, identity: &str) -> Self {

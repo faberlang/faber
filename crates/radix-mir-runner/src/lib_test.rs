@@ -1424,6 +1424,149 @@ fn vertex_layout_count_package_provider_reads_geometry_attributes() {
 }
 
 #[test]
+fn float32_attribute_package_provider_constructs_buffer_attribute() {
+    use radix_hir::DefId;
+    use radix_lexer::Interner;
+    use radix_mir::{MirOperand, MirProviderKind, MirValidationContext};
+    use radix_types::{Primitive, Type, TypeTable};
+    use rustc_hash::FxHashMap;
+
+    let mut interner = Interner::new();
+    let module = interner.intern("triga:geometry/attribute");
+    let module_name = interner.intern("attribute");
+    let provider_name = interner.intern("float32_attribute");
+    let field_names = [
+        interner.intern("name"),
+        interner.intern("shader_location"),
+        interner.intern("component_width"),
+        interner.intern("element_count"),
+        interner.intern("normalized"),
+        interner.intern("usage"),
+        interner.intern("data"),
+    ];
+    let values_field = interner.intern("values");
+
+    let buffer_attribute = DefId(10);
+    let usage_enum = DefId(11);
+    let static_variant = DefId(12);
+    let dynamic_variant = DefId(13);
+    let stream_variant = DefId(14);
+    let data_enum = DefId(15);
+    let float32_variant = DefId(16);
+
+    let mut types = TypeTable::default();
+    let f32_type = types.primitive(Primitive::Fractus);
+    let values_type = types.ensure_array(f32_type);
+    let usage_type = types.intern(Type::Enum(usage_enum));
+    let data_type = types.intern(Type::Enum(data_enum));
+    let buffer_type = types.intern(Type::Struct(buffer_attribute));
+
+    let mut context = MirValidationContext::new(&types);
+    let mut buffer_fields = FxHashMap::default();
+    buffer_fields.insert(
+        field_names[0],
+        MirType::semantic(types.primitive(Primitive::Textus)),
+    );
+    buffer_fields.insert(
+        field_names[1],
+        MirType::semantic(types.primitive(Primitive::Numerus)),
+    );
+    buffer_fields.insert(
+        field_names[2],
+        MirType::semantic(types.primitive(Primitive::Numerus)),
+    );
+    buffer_fields.insert(
+        field_names[3],
+        MirType::semantic(types.primitive(Primitive::Numerus)),
+    );
+    buffer_fields.insert(
+        field_names[4],
+        MirType::semantic(types.primitive(Primitive::Bivalens)),
+    );
+    buffer_fields.insert(field_names[5], MirType::semantic(usage_type));
+    buffer_fields.insert(field_names[6], MirType::semantic(data_type));
+    context
+        .struct_fields
+        .insert(buffer_attribute, buffer_fields);
+    context.enum_variants.insert(
+        usage_enum,
+        vec![static_variant, dynamic_variant, stream_variant],
+    );
+    for variant in [static_variant, dynamic_variant, stream_variant] {
+        context.variant_fields.insert(variant, FxHashMap::default());
+    }
+    context
+        .enum_variants
+        .insert(data_enum, vec![float32_variant]);
+    let mut float32_fields = FxHashMap::default();
+    float32_fields.insert(values_field, MirType::semantic(values_type));
+    context
+        .variant_fields
+        .insert(float32_variant, float32_fields);
+
+    let mut host = BufferHost::default();
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    let values = Value::Array(Rc::new(RefCell::new(vec![
+        Value::Float(0.25),
+        Value::Float(0.5),
+        Value::Float(0.75),
+    ])));
+    for (id, value) in [
+        (0, Value::Str("position".to_owned())),
+        (1, Value::Int(0)),
+        (2, Value::Int(3)),
+        (3, Value::Int(1)),
+        (4, values.clone()),
+    ] {
+        runner
+            .frames
+            .last_mut()
+            .expect("test frame")
+            .values
+            .insert(MirValueId(id), value);
+    }
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Provider(MirProvider {
+            kind: MirProviderKind::Package,
+            module: vec![module, module_name],
+            name: provider_name,
+        }),
+        args: (0..5).map(MirValueId).map(MirOperand::Value).collect(),
+        return_ty: MirType::semantic(buffer_type),
+    };
+    let Value::Struct(actual_def, fields) = runner
+        .eval_runtime_call(&call, Span::default())
+        .expect("float32_attribute route should execute")
+    else {
+        panic!("expected BufferAttribute struct carrier");
+    };
+    assert_eq!(actual_def, buffer_attribute);
+    assert_eq!(
+        fields.borrow().get(&field_names[0]),
+        Some(&Value::Str("position".to_owned()))
+    );
+    assert_eq!(fields.borrow().get(&field_names[1]), Some(&Value::Int(0)));
+    assert_eq!(
+        fields.borrow().get(&field_names[4]),
+        Some(&Value::Bool(false))
+    );
+    let fields_borrow = fields.borrow();
+    let Some(Value::EnumVariant(actual_variant, payload)) = fields_borrow.get(&field_names[6])
+    else {
+        panic!("expected Float32Attribute variant carrier");
+    };
+    assert_eq!(*actual_variant, float32_variant);
+    assert_eq!(payload.borrow().get(&values_field), Some(&values));
+    assert!(
+        matches!(fields.borrow().get(&field_names[5]), Some(Value::EnumVariant(variant, _)) if *variant == static_variant)
+    );
+}
+
+#[test]
 fn test_host_kernel_call_default_rejects() {
     let mut host = MinimalHost;
     let result = host.kernel_call(KernelModule::Processus, "exec", &[], Span::default());

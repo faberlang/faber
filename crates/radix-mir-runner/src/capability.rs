@@ -27,7 +27,7 @@
 //! never reaches — is acceptable and conservative: the structural tier is a
 //! lower bound on run-tier capability, never an upper bound.
 
-use super::host::is_vertex_layout_count_provider;
+use super::host::{is_float32_attribute_provider, is_vertex_layout_count_provider};
 use radix_lexer::Interner;
 use radix_mir::names::MirNames;
 use radix_mir::{
@@ -248,7 +248,10 @@ fn classify_intrinsic(
 ) {
     if let MirIntrinsic::Provider(provider) = intrinsic {
         if provider.kind == MirProviderKind::Package
-            && interner.is_some_and(|interner| is_vertex_layout_count_provider(provider, interner))
+            && interner.is_some_and(|interner| {
+                is_vertex_layout_count_provider(provider, interner)
+                    || is_float32_attribute_provider(provider, interner)
+            })
         {
             return;
         }
