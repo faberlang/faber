@@ -74,7 +74,7 @@ use radix_package::artifact_plan::plan_package;
 pub const COMPOSITE_PLAN_SCHEMA: &str = "composite-plan v1";
 
 /// Gradus content identity, mirroring `gradus:model/artifact`
-/// `IdentitasContenuti` and carried as data (algorithm, digest, byte
+/// `ContentIdentity` and carried as data (algorithm, digest, byte
 /// length) — never artifact bytes (EXEC-01 local-corpus boundary).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ContentIdentity {
@@ -100,7 +100,7 @@ pub struct PackageIdentity {
 /// Model identity facts carried verbatim from the Gradus model graph.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ModelIdentity {
-    /// The model artifact's content identity (`IdentitasContenuti`).
+    /// The model artifact's content identity (`ContentIdentity`).
     pub content: ContentIdentity,
     /// Architecture id (e.g. `qwen35moe`).
     pub architecture: String,
@@ -242,7 +242,7 @@ pub struct CompositePlanFacts {
 /// typed source of truth; verification fails closed on the first divergence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IdentityDomain {
-    /// Gradus model identity (`IdentitasContenuti` + architecture +
+    /// Gradus model identity (`ContentIdentity` + architecture +
     /// tokenizer identity + admission facts).
     Model,
     /// Backend selection + device artifacts (digests, stage, provenance).
@@ -459,7 +459,7 @@ pub(crate) fn verify_identity_preservation(
 }
 
 /// Model domain: exact agreement with the expected Gradus model identity,
-/// then canonical well-formedness of the carried `IdentitasContenuti` facts
+/// then canonical well-formedness of the carried `ContentIdentity` facts
 /// (the `gradus:model/artifact` admission rules) so a digest mutated away
 /// from canonical form is rejected even when the expected facts agree.
 fn verify_model_identity(

@@ -1,7 +1,7 @@
 # Bounded synthetic public-Gradus graph fixture (EXEC-01-M3).
 #
 # Mechanism prerequisite — evidence tier T1 fixture, NOT campaign evidence.
-# This fixture declares its own synthetic `IdentitasContenuti`; it never
+# This fixture declares its own synthetic `ContentIdentity`; it never
 # reads or commits real artifact bytes and never claims the EXEC-01/Qwen
 # campaign oracle (M4 owns the first real-graph campaign-evidence proof).
 importa ex "gradus:model/artifact" artifact
@@ -10,11 +10,11 @@ importa ex "gradus:model/gguf_manifest" manifestum
 # The synthetic model identity the composite plan's model domain carries: a
 # bounded declared fact mirroring the pinned Qwen3.6 identity SHAPE
 # (algorithm, digest, byte length) with clearly synthetic values.
-functio identitas_synthetica() → artifact.IdentitasContenuti {
-    redde artifact.IdentitasContenuti {
-        algorithmus = "sha-256",
-        digestio = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        longitudo = 123456789
+functio identitas_synthetica() → artifact.ContentIdentity {
+    redde artifact.ContentIdentity {
+        algorithm = "sha-256",
+        digest = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        length = 123456789
     }
 }
 

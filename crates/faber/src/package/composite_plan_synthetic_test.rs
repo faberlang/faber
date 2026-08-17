@@ -5,7 +5,7 @@
 //! evidence. The fixture (`crates/faber/test-fixtures/composite-plan-synthetic`)
 //! is a small `.fab` package importing `gradus:model/artifact` /
 //! `gradus:model/gguf_manifest` and declaring its own synthetic
-//! `IdentitasContenuti`. This suite executes the M1/M2 composite-plan
+//! `ContentIdentity`. This suite executes the M1/M2 composite-plan
 //! construction + identity-preservation machinery over that package-shaped
 //! fixture, prints the five identity domains with their preserved values,
 //! and proves each mutation probe fails closed with a typed first-divergence
