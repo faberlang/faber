@@ -36,6 +36,7 @@ radix-mir-fmir = { path = "../radix-mir-fmir" }
 # DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `mir-metal`.
 # DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `mir-llvm`.
 radix-mir-runner = { path = "../radix-mir-runner", optional = true }
+proba = { path = "../proba", default-features = false, optional = true }
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1"
@@ -54,7 +55,7 @@ full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "runner"]
 hir-faber = ["radix/hir-faber"]
 hir-fhir = ["radix/hir-fhir"]
 mir-fmir = ["radix/mir-fmir"]
-runner = ["radix/runner", "dep:radix-mir-runner"]
+runner = ["radix/runner", "dep:radix-mir-runner", "dep:proba", "proba/runner"]
 host-macos-arm64 = []
 
 [lints]

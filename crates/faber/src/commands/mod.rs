@@ -23,6 +23,7 @@ pub(crate) mod self_update;
 #[path = "self_update_test.rs"]
 mod self_update_test;
 pub(crate) mod targets;
+#[cfg(feature = "runner")]
 mod test;
 
 use crate::cli::Command;
@@ -40,6 +41,7 @@ use model::cmd_model;
 use run::{cmd_eval, cmd_fmir_run_image, cmd_repl, cmd_run};
 use self_update::cmd_self;
 use targets::cmd_targets;
+#[cfg(feature = "runner")]
 use test::cmd_test;
 
 fn diagnostic_mode(enabled: bool) -> DiagnosticMode {
@@ -164,7 +166,13 @@ fn dispatch(command: Command) {
         Command::Run(args) => cmd_run(args),
         Command::FmirRun(args) => cmd_fmir_run_image(args),
         Command::Repl(args) => cmd_repl(args),
+        #[cfg(feature = "runner")]
         Command::Test(args) => cmd_test(&args),
+        #[cfg(not(feature = "runner"))]
+        Command::Test(_) => {
+            eprintln!("error: test requires the runner feature");
+            std::process::exit(1);
+        }
         Command::Lex(args) => tool::cmd_lex(&args.input),
         Command::Parse(args) => tool::cmd_parse(&args.input),
         Command::Hir(args) => tool::cmd_hir(&args.input, None),

@@ -3,6 +3,8 @@
 //! WHY: the hygiene ratchet bans inline `#[cfg(test)] mod tests` in production
 //! sources; tests live in dedicated `*_test.rs` files.
 
+#![cfg(feature = "runner")]
+
 use radix::driver::{Config, Session};
 use proba::{run_proba_source, TestSelection};
 use std::fs;

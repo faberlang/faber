@@ -2,6 +2,8 @@
 //!
 //! Proves `faber test` definition: MIR interpretation, not Cargo/Rust harness.
 
+#![cfg(feature = "runner")]
+
 use super::test_support::test_temp_dir;
 use super::{discover_package, library_resolver_from_config};
 use radix_package::analyze::{analyze_package as analyze_package_direct, analyze_package_for_tests as analyze_package_for_tests_direct, AnalysisSeams};
