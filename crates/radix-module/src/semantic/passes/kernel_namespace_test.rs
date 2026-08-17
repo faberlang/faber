@@ -1,0 +1,126 @@
+//! Coverage for kernel-namespace import validation.
+//!
+//! These tests prove that known `faber:*` modules and glob imports pass,
+//! while unknown modules, invalid paths, glob re-exports, and legacy
+//! `norma:json` in script mode are rejected.
+
+use super::{validate_kernel_imports, validate_script_kernel_library_imports};
+use crate::parser;
+use crate::semantic::{SemanticError, SemanticErrorKind};
+use crate::test_support::args_have_no_legacy_message;
+
+fn parse_program(source: &str) -> (crate::syntax::Program, crate::lexer::Interner) {
+    let lex = crate::lexer::lex(source);
+    let parse = parser::parse(lex);
+    let interner = parse.interner;
+    let program = parse.program.expect("parse");
+    (program, interner)
+}
+
+fn analyze_imports(source: &str) -> Vec<SemanticError> {
+    let (program, interner) = parse_program(source);
+    validate_kernel_imports(&program, &interner)
+        .err()
+        .unwrap_or_default()
+}
+
+fn analyze_script_kernel_library_imports(source: &str) -> Vec<SemanticError> {
+    let (program, interner) = parse_program(source);
+    validate_script_kernel_library_imports(&program, &interner)
+        .err()
+        .unwrap_or_default()
+}
+
+fn expect_structured_error<'a>(
+    errors: &'a [SemanticError],
+    kind: SemanticErrorKind,
+    expected_args: &[(&str, &str)],
+) -> &'a SemanticError {
+    let err = errors
+        .iter()
+        .find(|err| {
+            err.kind == kind
+                && expected_args.iter().all(|(name, value)| {
+                    err.args
+                        .iter()
+                        .any(|arg| arg.name == *name && arg.value == *value)
+                })
+        })
+        .expect("structured semantic diagnostic");
+    assert!(
+        args_have_no_legacy_message(&err.args),
+        "migrated diagnostic should not choose prose at emit site"
+    );
+    err
+}
+
+#[test]
+fn known_kernel_imports_pass_validation() {
+    let errors = analyze_imports(
+        r#"
+importa ex "faber:solum" solum
+importa ex "faber:json" json
+importa ex "faber:processus" processus
+importa ex "faber:aleator" aleator
+"#,
+    );
+    assert!(errors.is_empty(), "unexpected errors: {errors:?}");
+}
+
+#[test]
+fn kernel_glob_import_passes_validation() {
+    let errors = analyze_imports(r#"importa ex "faber:*" faber"#);
+    assert!(errors.is_empty(), "unexpected errors: {errors:?}");
+}
+
+#[test]
+fn kernel_glob_import_rejects_re_export() {
+    let errors = analyze_imports(r#"importa ex "faber:*" publica faber"#);
+    assert_eq!(errors.len(), 1);
+    expect_structured_error(
+        &errors,
+        SemanticErrorKind::ImportNotFound,
+        &[("issue", "kernel_glob_reexport"), ("path", "faber:*")],
+    );
+}
+
+#[test]
+fn unknown_kernel_import_emits_kernel_diagnostic() {
+    let errors = analyze_imports(r#"importa ex "faber:nihil" knox"#);
+    assert_eq!(errors.len(), 1);
+    expect_structured_error(
+        &errors,
+        SemanticErrorKind::ImportNotFound,
+        &[("issue", "kernel_unknown_module"), ("module", "nihil")],
+    );
+}
+
+#[test]
+fn nested_faber_path_is_invalid() {
+    let errors = analyze_imports(r#"importa ex "faber:hal/solum" solum"#);
+    assert_eq!(errors.len(), 1);
+    expect_structured_error(
+        &errors,
+        SemanticErrorKind::ImportNotFound,
+        &[
+            ("issue", "kernel_invalid_path"),
+            ("path", "faber:hal/solum"),
+            ("reason", "kernel import paths are flat (`faber:<module>` only)"),
+        ],
+    );
+}
+
+#[test]
+fn script_mode_rejects_norma_json_with_kernel_replacement() {
+    let errors = analyze_script_kernel_library_imports(r#"importa ex "norma:json" json"#);
+    assert_eq!(errors.len(), 1);
+    expect_structured_error(
+        &errors,
+        SemanticErrorKind::ImportNotFound,
+        &[
+            ("issue", "kernel_norma_json_in_script"),
+            ("script_path", "faber:json"),
+            ("library_path", "norma:json"),
+        ],
+    );
+}

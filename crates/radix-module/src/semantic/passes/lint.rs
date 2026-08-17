@@ -1,0 +1,565 @@
+//! Final semantic lint pass over typed HIR.
+//!
+//! Linting is the last non-codegen semantic pass. It runs after collection,
+//! resolution, lowering, typechecking, and any target-enabled borrow and
+//! exhaustiveness checks. Its job is to turn fully resolved HIR identity and
+//! `TypeTable` facts into user-facing diagnostics for suspicious but often
+//! recoverable code: unused declarations, unreachable statements, redundant
+//! casts, and explicit `ignotum` annotations.
+//!
+//! The pass is target-configurable through `PassConfig`. When enabled, it
+//! returns both warning-kind diagnostics and hard semantic errors through the
+//! same vector because the semantic result owns final severity policy. In
+//! particular, shadowing is intentionally a hard error here: resolved `DefId`s
+//! make the program unambiguous to the compiler, but the source remains
+//! misleading enough that the language rejects it.
+//!
+//! INVARIANTS
+//! ==========
+//! - Usage is tracked by `DefId`, never by spelling, so imports, functions, and
+//!   locals follow the resolver's identity model.
+//! - Scope shadowing checks use a lightweight lexical stack local to this pass;
+//!   they do not mutate resolver scopes or type information.
+//! - The `TypeTable` is read-only and used only where lint policy needs type
+//!   facts, such as redundant `verte` casts or explicit `ignotum` annotations.
+//! - Warnings produced here should not block compilation unless the surrounding
+//!   diagnostic policy promotes warning-kind diagnostics.
+
+use crate::hir::visit::{walk_expr, HirVisitor};
+use crate::hir::{
+    HirBinOp, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirImport, HirItem, HirItemKind, HirLiteral,
+    HirLocal, HirModule, HirStatement, HirStatementKind,
+};
+use crate::intrinsics::{
+    is_numeric_imperativus_operator, lookup_method_for_type, mir_collection_op, IntrinsicReturnKind,
+};
+use crate::lexer::{Interner, Span};
+use crate::semantic::{error::WarningKind, Primitive, Resolver, SemanticError, SemanticErrorKind, Type, TypeTable};
+use radix_types::MirCollectionOp;
+use rustc_hash::FxHashSet;
+
+const ISSUE_EXPLICIT_IGNOTUM_ANNOTATION: &str = "explicit_ignotum_annotation";
+const ISSUE_PREFER_STRING_TEMPLATE: &str = "prefer_string_template";
+const ISSUE_SHADOWED_VARIABLE: &str = "shadowed_variable";
+const ISSUE_UNNECESSARY_CAST: &str = "unnecessary_cast";
+const ISSUE_UNNECESSARY_VARIA: &str = "unnecessary_varia";
+const ISSUE_UNREACHABLE_CODE: &str = "unreachable_code";
+const ISSUE_UNUSED_BINDING: &str = "unused_binding";
+const ISSUE_UNUSED_FUNCTION: &str = "unused_function";
+const ISSUE_UNUSED_IMPORT: &str = "unused_import";
+const ISSUE_UNUSED_VARIABLE: &str = "unused_variable";
+
+/// Run the target-enabled semantic lint suite.
+///
+/// Returns shadowing, unused declarations, and other lint findings as a list
+/// of [`SemanticError`]s. Warning-kind diagnostics are non-fatal: they are
+/// carried as [`SemanticErrorKind::Warning`] and callers decide fatality via
+/// [`SemanticError::is_error`]. Shadowing remains a hard semantic error.
+pub fn lint(hir: &HirModule, resolver: &Resolver, types: &TypeTable, interner: &Interner) -> Vec<SemanticError> {
+    let mut ctx = LintContext::new(resolver, types, interner);
+    ctx.collect_items(hir);
+    ctx.check_program(hir);
+
+    let mut errors = ctx.errors;
+
+    // Convert warnings to findings (with warning kind). They are non-fatal by
+    // kind; fatality is decided downstream via `SemanticError::is_error`.
+    errors.extend(ctx.warnings.into_iter().map(
+        |(kind, issue, span, suggestion): (WarningKind, &'static str, Span, Option<String>)| {
+            let error = SemanticError::structured(SemanticErrorKind::Warning(kind), span).with_arg("issue", issue);
+            match suggestion {
+                Some(text) => error.with_arg("suggestion", text),
+                None => error,
+            }
+        },
+    ));
+
+    errors
+}
+
+struct LintContext<'a> {
+    resolver: &'a Resolver,
+    /// Read-only semantic type facts for lints that need more than identity,
+    /// such as redundant casts and explicit `ignotum` annotations.
+    types: &'a TypeTable,
+    interner: &'a Interner,
+    warnings: Vec<(WarningKind, &'static str, Span, Option<String>)>,
+    errors: Vec<SemanticError>,
+    used: FxHashSet<crate::hir::DefId>,
+    mutated: FxHashSet<crate::hir::DefId>,
+    defs: Vec<(crate::hir::DefId, Span, WarningKind)>,
+    mutable_locals: Vec<(crate::hir::DefId, Span)>,
+    mutable_local_defs: FxHashSet<crate::hir::DefId>,
+    imports: Vec<(crate::hir::DefId, Span)>,
+    functions: Vec<(crate::hir::DefId, Span)>,
+    scope: Vec<rustc_hash::FxHashMap<crate::lexer::Symbol, crate::hir::DefId>>,
+    /// Declaration names by `DefId`, so suggestions can render path operands
+    /// back to their source spellings.
+    def_names: rustc_hash::FxHashMap<crate::hir::DefId, crate::lexer::Symbol>,
+    /// True while the visitor descends into the left operand of a `+`: that
+    /// operand belongs to the enclosing `+` chain and must not evaluate the
+    /// chain itself.
+    inside_add_left_child: bool,
+    in_loop: bool,
+}
+
+impl<'a> LintContext<'a> {
+    fn new(resolver: &'a Resolver, types: &'a TypeTable, interner: &'a Interner) -> Self {
+        Self {
+            resolver,
+            types,
+            interner,
+            warnings: Vec::new(),
+            errors: Vec::new(),
+            used: FxHashSet::default(),
+            mutated: FxHashSet::default(),
+            defs: Vec::new(),
+            mutable_locals: Vec::new(),
+            mutable_local_defs: FxHashSet::default(),
+            imports: Vec::new(),
+            functions: Vec::new(),
+            scope: Vec::new(),
+            def_names: rustc_hash::FxHashMap::default(),
+            inside_add_left_child: false,
+            in_loop: false,
+        }
+    }
+
+    fn collect_items(&mut self, hir: &HirModule) {
+        for item in &hir.items {
+            match &item.kind {
+                HirItemKind::Import(import) => self.collect_import(import),
+                HirItemKind::Function(func) if item.def_id.0 < 1_000_000 => {
+                    self.functions
+                        .push((item.def_id, func.body.as_ref().map_or(item.span, |b| b.span)));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn collect_import(&mut self, import: &HirImport) {
+        for item in &import.items {
+            let binding = item.alias.unwrap_or(item.name);
+            if self.resolver.namespace_used(binding) {
+                self.used.insert(item.def_id);
+            }
+            self.imports.push((item.def_id, Span::default()));
+        }
+    }
+
+    fn check_program(&mut self, hir: &HirModule) {
+        for item in &hir.items {
+            self.check_item(item);
+        }
+
+        if let Some(entry) = &hir.entry {
+            self.check_block(entry, false);
+        }
+
+        for (def_id, span, kind) in &self.defs {
+            if !self.used.contains(def_id) {
+                let issue = match kind {
+                    WarningKind::UnusedVariable => ISSUE_UNUSED_VARIABLE,
+                    _ => ISSUE_UNUSED_BINDING,
+                };
+                self.warnings.push((*kind, issue, *span, None));
+            }
+        }
+
+        for (def_id, span) in &self.mutable_locals {
+            if self.used.contains(def_id) && !self.mutated.contains(def_id) {
+                self.warnings
+                    .push((WarningKind::UnnecessaryVaria, ISSUE_UNNECESSARY_VARIA, *span, None));
+            }
+        }
+
+        for (def_id, span) in &self.imports {
+            if !self.used.contains(def_id) {
+                self.warnings
+                    .push((WarningKind::UnusedImport, ISSUE_UNUSED_IMPORT, *span, None));
+            }
+        }
+
+        for (def_id, span) in &self.functions {
+            if !self.used.contains(def_id) {
+                self.warnings
+                    .push((WarningKind::UnusedFunction, ISSUE_UNUSED_FUNCTION, *span, None));
+            }
+        }
+    }
+
+    fn check_item(&mut self, item: &HirItem) {
+        match &item.kind {
+            HirItemKind::Function(func) => self.check_function(func),
+            HirItemKind::Struct(strukt) => {
+                for method in &strukt.methods {
+                    self.check_function(&method.func);
+                }
+            }
+            HirItemKind::Constant(const_item) => self.check_expr(&const_item.value, false),
+            _ => {}
+        }
+    }
+
+    fn check_function(&mut self, func: &HirFunction) {
+        self.push_scope();
+        for param in &func.params {
+            self.def_names.insert(param.def_id, param.name);
+            self.defs
+                .push((param.def_id, param.span, WarningKind::UnusedVariable));
+            self.check_shadowing(param.name, param.def_id, param.span);
+            self.insert_name(param.name, param.def_id);
+            self.warn_on_explicit_ignotum(param.ty, param.span);
+        }
+        if let Some(body) = &func.body {
+            self.check_block(body, false);
+        }
+        self.pop_scope();
+    }
+
+    fn check_block(&mut self, block: &HirBlock, in_loop: bool) {
+        self.push_scope();
+        let mut terminated = false;
+        for stmt in &block.statements {
+            if terminated {
+                self.warnings
+                    .push((WarningKind::UnreachableCode, ISSUE_UNREACHABLE_CODE, stmt.span, None));
+                continue;
+            }
+            self.check_stmt(stmt, in_loop);
+            if matches!(stmt.kind, HirStatementKind::Redde(_))
+                || (in_loop && matches!(stmt.kind, HirStatementKind::Rumpe | HirStatementKind::Perge))
+            {
+                terminated = true;
+            }
+        }
+        if let Some(expr) = &block.expr {
+            self.check_expr(expr, in_loop);
+        }
+        self.pop_scope();
+    }
+
+    fn check_stmt(&mut self, stmt: &HirStatement, in_loop: bool) {
+        match &stmt.kind {
+            HirStatementKind::Local(local) => self.check_local(local, stmt.span),
+            HirStatementKind::Expr(expr) => self.check_expr(expr, in_loop),
+            HirStatementKind::Redde(value) => {
+                if let Some(expr) = value {
+                    self.check_expr(expr, in_loop);
+                }
+            }
+            HirStatementKind::Rumpe | HirStatementKind::Perge | HirStatementKind::Tacet => {}
+            HirStatementKind::IncDec(inc_dec) => {
+                self.mark_place_mutated(&inc_dec.target);
+                self.check_expr(&inc_dec.target, in_loop);
+            }
+            HirStatementKind::Custodi(custodi) => {
+                for clause in &custodi.clauses {
+                    self.check_expr(&clause.cond, in_loop);
+                    self.check_block(&clause.body, in_loop);
+                }
+            }
+        }
+    }
+
+    fn check_local(&mut self, local: &HirLocal, span: Span) {
+        self.def_names.insert(local.def_id, local.name);
+        self.defs
+            .push((local.def_id, span, WarningKind::UnusedVariable));
+        self.check_shadowing(local.name, local.def_id, span);
+        self.insert_name(local.name, local.def_id);
+        if let Some(ty) = local.ty {
+            self.warn_on_explicit_ignotum(ty, span);
+        }
+        if local.mutable {
+            self.mutable_locals.push((local.def_id, span));
+            self.mutable_local_defs.insert(local.def_id);
+        }
+        if let Some(init) = &local.init {
+            self.check_expr(init, false);
+        }
+    }
+
+    fn check_expr(&mut self, expr: &HirExpression, in_loop: bool) {
+        let previous = self.in_loop;
+        self.in_loop = in_loop;
+        self.visit_expr(expr);
+        self.in_loop = previous;
+    }
+
+    fn check_shadowing(&mut self, name: crate::lexer::Symbol, def_id: crate::hir::DefId, span: Span) {
+        for scope in self.scope.iter().rev() {
+            if let Some(existing) = scope.get(&name) {
+                if existing != &def_id {
+                    self.errors.push(
+                        SemanticError::structured(SemanticErrorKind::ShadowedVariable, span)
+                            .with_arg("issue", ISSUE_SHADOWED_VARIABLE),
+                    );
+                }
+                break;
+            }
+        }
+    }
+
+    fn insert_name(&mut self, name: crate::lexer::Symbol, def_id: crate::hir::DefId) {
+        if let Some(scope) = self.scope.last_mut() {
+            scope.insert(name, def_id);
+        }
+    }
+
+    fn push_scope(&mut self) {
+        self.scope.push(rustc_hash::FxHashMap::default());
+    }
+
+    fn pop_scope(&mut self) {
+        self.scope.pop();
+    }
+
+    fn warn_on_explicit_ignotum(&mut self, ty: crate::semantic::TypeId, span: Span) {
+        if matches!(self.types.get(ty), Type::Primitive(Primitive::Ignotum)) {
+            self.warnings.push((
+                WarningKind::ExplicitIgnotumAnnotation,
+                ISSUE_EXPLICIT_IGNOTUM_ANNOTATION,
+                span,
+                None,
+            ));
+        }
+    }
+
+    fn mark_place_mutated(&mut self, expr: &HirExpression) {
+        if let Some(def_id) = root_place_def_id(expr) {
+            self.mutated.insert(def_id);
+        }
+    }
+
+    fn mark_receiver_mutated_if_needed(
+        &mut self,
+        receiver: &HirExpression,
+        method: crate::lexer::Symbol,
+        arg_count: usize,
+    ) {
+        let Some(def_id) = root_place_def_id(receiver) else {
+            return;
+        };
+        if !self.mutable_local_defs.contains(&def_id) {
+            return;
+        }
+
+        let method_name = self.interner.resolve(method);
+        let Some(receiver_ty) = receiver.ty.map(|ty| self.types.get(ty)) else {
+            self.mutated.insert(def_id);
+            return;
+        };
+        let Some(intrinsic) = lookup_method_for_type(receiver_ty, method_name, arg_count) else {
+            self.mutated.insert(def_id);
+            return;
+        };
+
+        if intrinsic.return_kind == IntrinsicReturnKind::Vacuum
+            || is_numeric_imperativus_operator(method_name)
+            || mir_collection_op(intrinsic).is_some_and(is_mutating_collection_op)
+        {
+            self.mutated.insert(def_id);
+        }
+    }
+
+    /// Flag a string-typed `+` chain of 3+ operands that contains at least one
+    /// string-literal operand (threshold B). The outermost node of the chain
+    /// evaluates it once; left-child nodes of a `+` defer to their enclosing
+    /// node via `is_add_left_child`.
+    fn check_string_concat_chain(&mut self, expr: &HirExpression, is_add_left_child: bool) {
+        if is_add_left_child {
+            return;
+        }
+        let Some(ty) = expr.ty else {
+            return;
+        };
+        if !matches!(self.types.get(ty), Type::Primitive(Primitive::Textus)) {
+            return;
+        }
+        let mut operands = Vec::new();
+        add_chain_operands(expr, &mut operands);
+        if operands.len() < 3 {
+            return;
+        }
+        if !operands.iter().any(|op| is_string_literal(op)) {
+            return;
+        }
+        let suggestion = self.render_template_suggestion(&operands);
+        self.warnings.push((
+            WarningKind::PreferStringTemplate,
+            ISSUE_PREFER_STRING_TEMPLATE,
+            expr.span,
+            Some(suggestion),
+        ));
+    }
+
+    /// Render the `"…§…"(args)` template rewrite of a chain, folding literal
+    /// text into the template body and turning every other operand into a `§`
+    /// hole.
+    fn render_template_suggestion(&self, operands: &[&HirExpression]) -> String {
+        let mut body = String::new();
+        let mut args: Vec<String> = Vec::new();
+        for operand in operands {
+            if let HirExpressionKind::Literal(HirLiteral::String(symbol) | HirLiteral::Ascii(symbol)) = &operand.kind {
+                let text = self.interner.resolve(*symbol);
+                if text.contains('"') || text.contains('§') || text.contains('\\') {
+                    // Literal text would corrupt the template rendering;
+                    // degrade the segment to a hole.
+                    body.push('§');
+                    args.push(self.render_operand(operand));
+                } else {
+                    body.push_str(text);
+                }
+            } else {
+                body.push('§');
+                args.push(self.render_operand(operand));
+            }
+        }
+        if args.is_empty() {
+            format!("\"{body}\"")
+        } else {
+            format!("\"{body}\"({})", args.join(", "))
+        }
+    }
+
+    /// Render one operand back to approximate source text for a suggestion.
+    fn render_operand(&self, expr: &HirExpression) -> String {
+        match &expr.kind {
+            HirExpressionKind::Path(def_id) => self
+                .def_names
+                .get(def_id)
+                .map_or_else(|| "_".to_owned(), |symbol| self.interner.resolve(*symbol).to_owned()),
+            HirExpressionKind::Field(base, name) => {
+                format!("{}.{}", self.render_operand(base), self.interner.resolve(*name))
+            }
+            HirExpressionKind::Literal(HirLiteral::String(symbol) | HirLiteral::Ascii(symbol)) => {
+                format!("\"{}\"", self.interner.resolve(*symbol))
+            }
+            _ => "_".to_owned(),
+        }
+    }
+}
+
+/// Flatten a `+` chain into its operand list in source order.
+fn add_chain_operands<'x>(expr: &'x HirExpression, operands: &mut Vec<&'x HirExpression>) {
+    match &expr.kind {
+        HirExpressionKind::Binary(HirBinOp::Add, lhs, rhs) => {
+            add_chain_operands(lhs, operands);
+            operands.push(rhs);
+        }
+        _ => operands.push(expr),
+    }
+}
+
+/// Whether an operand is a string or ascii literal (threshold-B trigger and
+/// suggestion-folding candidate).
+fn is_string_literal(expr: &HirExpression) -> bool {
+    matches!(
+        &expr.kind,
+        HirExpressionKind::Literal(HirLiteral::String(_) | HirLiteral::Ascii(_))
+    )
+}
+
+impl HirVisitor for LintContext<'_> {
+    fn visit_block(&mut self, block: &HirBlock) {
+        self.check_block(block, self.in_loop);
+    }
+
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        match &expr.kind {
+            HirExpressionKind::Path(def_id) => {
+                self.used.insert(*def_id);
+            }
+            HirExpressionKind::Loop(block) => self.check_block(block, true),
+            HirExpressionKind::Dum(cond, block) => {
+                self.visit_expr(cond);
+                self.check_block(block, true);
+            }
+            HirExpressionKind::Itera(_, _, _, iter, block) => {
+                self.visit_expr(iter);
+                self.check_block(block, true);
+            }
+            HirExpressionKind::Verte { source, target, entries } => {
+                if entries.is_none() {
+                    if let Some(inner_ty) = source.ty {
+                        if self.types.equals(inner_ty, *target) {
+                            self.warnings
+                                .push((WarningKind::UnnecessaryCast, ISSUE_UNNECESSARY_CAST, expr.span, None));
+                        }
+                    }
+                }
+                walk_expr(self, expr);
+            }
+            HirExpressionKind::Assign(target, value) => {
+                self.mark_place_mutated(target);
+                self.visit_expr(target);
+                self.visit_expr(value);
+            }
+            // String-typed `+` chains: the outermost node of a left-spine run
+            // evaluates the whole chain once; nested nodes defer to it.
+            HirExpressionKind::Binary(HirBinOp::Add, lhs, rhs) => {
+                let was_add_left_child = self.inside_add_left_child;
+                self.inside_add_left_child = false;
+                self.check_string_concat_chain(expr, was_add_left_child);
+                self.inside_add_left_child = true;
+                self.visit_expr(lhs);
+                self.inside_add_left_child = false;
+                self.visit_expr(rhs);
+                self.inside_add_left_child = was_add_left_child;
+            }
+            // `↤` mutates its target place exactly like ordinary assignment:
+            // lint's mutation tracking must see the store.
+            HirExpressionKind::ConversioAssign { target, source, recovery } => {
+                self.mark_place_mutated(target);
+                self.visit_expr(target);
+                self.visit_expr(source);
+                if let Some(recovery) = recovery {
+                    self.visit_expr(recovery);
+                }
+            }
+            HirExpressionKind::MethodCall(receiver, method, _, args) => {
+                self.mark_receiver_mutated_if_needed(receiver, *method, args.len());
+                self.visit_expr(receiver);
+                for arg in args {
+                    self.visit_expr(&arg.expr);
+                }
+            }
+            HirExpressionKind::Adfirma(cond, message) => {
+                self.visit_expr(cond);
+                if let Some(message) = message {
+                    self.visit_expr(message);
+                }
+            }
+            _ => walk_expr(self, expr),
+        }
+    }
+}
+
+fn root_place_def_id(expr: &HirExpression) -> Option<crate::hir::DefId> {
+    match &expr.kind {
+        HirExpressionKind::Path(def_id) => Some(*def_id),
+        HirExpressionKind::Field(base, _) | HirExpressionKind::Deref(base) => root_place_def_id(base),
+        HirExpressionKind::Index(base, _) => root_place_def_id(base),
+        HirExpressionKind::OptionalChain(base, _) | HirExpressionKind::NonNull(base, _) => root_place_def_id(base),
+        _ => None,
+    }
+}
+
+fn is_mutating_collection_op(op: MirCollectionOp) -> bool {
+    matches!(
+        op,
+        MirCollectionOp::Append
+            | MirCollectionOp::Put
+            | MirCollectionOp::Delete
+            | MirCollectionOp::RemoveFirst
+            | MirCollectionOp::ReverseInPlace
+            | MirCollectionOp::TensorSet
+            | MirCollectionOp::TensorFill
+    )
+}
+
+#[cfg(test)]
+#[path = "lint_test.rs"]
+mod tests;

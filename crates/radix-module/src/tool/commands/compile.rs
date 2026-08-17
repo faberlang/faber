@@ -1,0 +1,1680 @@
+//! CLI compilation helpers, import-contract resolution, and package-mode policy.
+//!
+//! This file is the radix CLI compile boundary: read a single-file input,
+//! resolve its import contract and package identities, and compile through
+//! [`crate::Compiler`] / [`crate::driver::Session`]. Package inputs are rejected
+//! with a message pointing at the `faber` CLI.
+
+use super::source::read_source;
+use crate::file_interface::{
+    FileExport, FileExportKind, FileInterface, InterfaceAnnotationContract, InterfaceAnnotationContractField,
+    InterfaceCallable, InterfaceEnumVariant, InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport,
+    InterfaceNominalKind, InterfaceNominalType, InterfaceParam, InterfaceStructExport, InterfaceStructField,
+    InterfaceTypeSnapshot,
+};
+use crate::semantic::passes::visibility_annotation::VisibilityTier;
+use crate::semantic::{ContractFieldType, InstansPrecision, NumericWidth, Primitive, SemanticParamMode};
+use crate::syntax::{
+    Annotation, AnnotationFieldValue, AnnotationKind, AstParamMode, ClassDecl, ClassMemberKind, ExprKind, ImportKind,
+    Literal, Program, Stmt, StmtKind, TypeExpr, TypeExprKind,
+};
+use rustc_hash::FxHashMap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
+
+/// Session import-target memo: `(reader-pack id, target path)` → export
+/// surface, full declaration tiers (including module-private), interface, and
+/// the resolved target path.
+#[derive(Clone)]
+struct CachedImportTarget {
+    exports: BTreeMap<String, VisibilityTier>,
+    declarations: BTreeMap<String, VisibilityTier>,
+    interface: FileInterface,
+    /// Path the target resolved to when this entry was filled. Retained so
+    /// consumers can recompute the package seam relative to the *current*
+    /// consumer without a fresh filesystem resolution, which would fail once
+    /// the target has been deleted and change the contract across calls.
+    target_path: PathBuf,
+}
+
+type ImportTargetCache = FxHashMap<(Option<String>, PathBuf), CachedImportTarget>;
+
+thread_local! {
+    /// Session-scoped memo for import-target exports and interfaces.
+    ///
+    /// Keyed by `(reader-pack id, target path)`. Each unique import target is
+    /// read+parsed at most once per process session; later imports of the same
+    /// physical file return the cached exports and [`FileInterface`].
+    /// Mirrors `PACKAGE_ROOT_CACHE` in `import_resolve.rs`.
+    static IMPORT_TARGET_CACHE: RefCell<ImportTargetCache> =
+        RefCell::new(FxHashMap::default());
+}
+
+/// Clear the import-target memo (tests only).
+#[cfg(test)]
+pub(crate) fn clear_import_target_cache() {
+    IMPORT_TARGET_CACHE.with(|cache| cache.borrow_mut().clear());
+}
+
+type ReaderPackRef<'a> = Option<&'a crate::locale::LocalePack>;
+
+pub use crate::import_resolve::FABER_LIBRARY_HOME_ENV;
+
+/// Return whether an input path syntactically names package mode.
+#[must_use]
+pub fn should_treat_as_package(path: &Path) -> bool {
+    path.is_dir() || path.file_name().and_then(|name| name.to_str()) == Some("faber.toml")
+}
+
+/// Combine explicit package mode with path-based package detection.
+#[must_use]
+pub fn resolve_package_mode(path: &Path, force_package: bool) -> bool {
+    force_package || should_treat_as_package(path)
+}
+
+/// Compile command input after applying stdin and package-mode policy.
+#[must_use]
+pub fn compile_cli_input(input: &[String], package: bool, target: crate::codegen::Target) -> crate::CompileResult {
+    compile_cli_input_with_locale_pack(input, package, target, None, crate::codegen::OutputMode::Application, None)
+}
+
+/// Compile command input with optional reader-pack source tokenization.
+#[must_use]
+pub fn compile_cli_input_with_locale_pack(
+    input: &[String],
+    package: bool,
+    target: crate::codegen::Target,
+    code_pack: ReaderPackRef<'_>,
+    output_mode: crate::codegen::OutputMode,
+    module_name: Option<&str>,
+) -> crate::CompileResult {
+    compile_cli_input_with_locale_pack_inner(input, package, target, code_pack, output_mode, module_name, false)
+}
+
+/// Compile command input with an explicit reader pack that must win over any
+/// source frontmatter locale (radix CLI `--locale` semantics).
+#[must_use]
+pub fn compile_cli_input_with_locale_pack_explicit(
+    input: &[String],
+    package: bool,
+    target: crate::codegen::Target,
+    code_pack: ReaderPackRef<'_>,
+    output_mode: crate::codegen::OutputMode,
+    module_name: Option<&str>,
+) -> crate::CompileResult {
+    compile_cli_input_with_locale_pack_inner(input, package, target, code_pack, output_mode, module_name, true)
+}
+
+fn compile_cli_input_with_locale_pack_inner(
+    input: &[String],
+    package: bool,
+    target: crate::codegen::Target,
+    code_pack: ReaderPackRef<'_>,
+    output_mode: crate::codegen::OutputMode,
+    module_name: Option<&str>,
+    explicit: bool,
+) -> crate::CompileResult {
+    if input.is_empty() || input[0] == "-" {
+        if package {
+            eprintln!("error: package compilation requires a path input");
+            std::process::exit(1);
+        }
+
+        let (name, source) = read_source(input);
+        return compile_cli_source_with_locale_pack_inner(
+            &name,
+            &source,
+            target,
+            code_pack,
+            output_mode,
+            module_name,
+            explicit,
+        );
+    }
+
+    let path = PathBuf::from(&input[0]);
+    compile_cli_path_with_locale_pack_inner(
+        &path,
+        resolve_package_mode(&path, package),
+        target,
+        code_pack,
+        output_mode,
+        module_name,
+        explicit,
+    )
+}
+
+/// Compile a single file path through the public compiler API.
+#[must_use]
+pub fn compile_cli_path(path: &Path, package: bool, target: crate::codegen::Target) -> crate::CompileResult {
+    compile_cli_path_with_locale_pack(path, package, target, None, crate::codegen::OutputMode::Application, None)
+}
+
+/// Compile a single file path with optional reader-pack source tokenization.
+#[must_use]
+pub fn compile_cli_path_with_locale_pack(
+    path: &Path,
+    package: bool,
+    target: crate::codegen::Target,
+    code_pack: ReaderPackRef<'_>,
+    output_mode: crate::codegen::OutputMode,
+    module_name: Option<&str>,
+) -> crate::CompileResult {
+    compile_cli_path_with_locale_pack_inner(path, package, target, code_pack, output_mode, module_name, false)
+}
+
+fn compile_cli_path_with_locale_pack_inner(
+    path: &Path,
+    package: bool,
+    target: crate::codegen::Target,
+    code_pack: ReaderPackRef<'_>,
+    output_mode: crate::codegen::OutputMode,
+    module_name: Option<&str>,
+    explicit: bool,
+) -> crate::CompileResult {
+    if package || should_treat_as_package(path) {
+        eprintln!("error: package compilation is owned by the `faber` tool; rerun with `faber build` or `faber emit`");
+        std::process::exit(1);
+    }
+
+    let source = match std::fs::read_to_string(path) {
+        Ok(source) => source,
+        Err(err) => {
+            return crate::CompileResult { output: None, diagnostics: vec![crate::Diagnostic::io_error(path, &err)] };
+        }
+    };
+    let name = path.display().to_string();
+    let session = crate::driver::Session::new(config_for_target(target, code_pack, output_mode, module_name, explicit));
+    let mut result = compile_prepared_program_path(&session, path, &source);
+
+    if target == crate::codegen::Target::HirFaber && result.success() {
+        result.output = Some(crate::Output::Faber(crate::FaberOutput {
+            code: peeled_source_body(&name, &source).unwrap_or(source),
+        }));
+    }
+
+    result
+}
+
+/// Compile in-memory command source through the public compiler API.
+#[must_use]
+pub fn compile_cli_source(name: &str, source: &str, target: crate::codegen::Target) -> crate::CompileResult {
+    compile_cli_source_with_locale_pack(name, source, target, None, crate::codegen::OutputMode::Application, None)
+}
+
+/// Compile in-memory command source with optional reader-pack source tokenization.
+#[must_use]
+pub fn compile_cli_source_with_locale_pack(
+    name: &str,
+    source: &str,
+    target: crate::codegen::Target,
+    code_pack: ReaderPackRef<'_>,
+    output_mode: crate::codegen::OutputMode,
+    module_name: Option<&str>,
+) -> crate::CompileResult {
+    compile_cli_source_with_locale_pack_inner(name, source, target, code_pack, output_mode, module_name, false)
+}
+
+fn compile_cli_source_with_locale_pack_inner(
+    name: &str,
+    source: &str,
+    target: crate::codegen::Target,
+    code_pack: ReaderPackRef<'_>,
+    output_mode: crate::codegen::OutputMode,
+    module_name: Option<&str>,
+    explicit: bool,
+) -> crate::CompileResult {
+    compiler_for_target(target, code_pack, output_mode, module_name, explicit).compile_str(name, source)
+}
+
+fn compiler_for_target(
+    target: crate::codegen::Target,
+    code_pack: ReaderPackRef<'_>,
+    output_mode: crate::codegen::OutputMode,
+    module_name: Option<&str>,
+    explicit: bool,
+) -> crate::Compiler {
+    crate::Compiler::new(config_for_target(target, code_pack, output_mode, module_name, explicit))
+}
+
+fn config_for_target(
+    target: crate::codegen::Target,
+    code_pack: ReaderPackRef<'_>,
+    output_mode: crate::codegen::OutputMode,
+    module_name: Option<&str>,
+    explicit: bool,
+) -> crate::driver::Config {
+    let config = crate::driver::Config::default()
+        .with_target(target)
+        .with_output_mode(output_mode)
+        .with_dev_stdlib();
+    let config = match module_name {
+        Some(name) => config.with_module_name(Some(name.to_owned())),
+        None => config,
+    };
+    match code_pack {
+        Some(pack) if explicit => config
+            .with_locale_pack(pack.clone())
+            .with_locale_pack_explicit(),
+        Some(pack) => config.with_locale_pack(pack.clone()),
+        None => config,
+    }
+}
+
+#[derive(Debug, Default, PartialEq)]
+pub(crate) struct ImportContract {
+    /// Importable names per binding, with their visibility tier. `@ interna`
+    /// names stay in this surface (tier preserved — the seam check decides
+    /// cross-package importability); unmarked and `@ privata` declarations
+    /// are absent.
+    pub(crate) namespace_exports: BTreeMap<String, BTreeMap<String, VisibilityTier>>,
+    /// Per-binding same-package flag from `find_package_root`.
+    pub(crate) namespace_seams: BTreeMap<String, bool>,
+    /// All target top-level names including module-private, keyed by binding.
+    pub(crate) namespace_declarations: BTreeMap<String, BTreeMap<String, VisibilityTier>>,
+    pub(crate) file_interfaces: BTreeMap<String, FileInterface>,
+    /// Package roots of resolved `provider:module` imports. Used to load
+    /// library-owned `locale/<consumer-locale>/pack.toml` fragments.
+    pub(crate) library_package_roots: BTreeSet<PathBuf>,
+}
+
+impl ImportContract {
+    fn into_module_contract(self) -> crate::driver::ModuleImportContract {
+        crate::driver::ModuleImportContract {
+            namespace_exports: self.namespace_exports,
+            file_interfaces: self.file_interfaces,
+            namespace_seams: self.namespace_seams,
+            namespace_declarations: self.namespace_declarations,
+        }
+    }
+}
+
+/// Program-layer compile of one on-disk source: discover contracts, then
+/// fail-closed module analysis.
+pub(crate) fn compile_prepared_program_path(
+    session: &crate::driver::Session,
+    path: &Path,
+    source: &str,
+) -> crate::CompileResult {
+    match prepare_program_module(path, source, session) {
+        Ok(prepared) => crate::driver::compile_with_module_import_contract(
+            &prepared.session,
+            &path.display().to_string(),
+            source,
+            prepared.contract,
+            prepared.package_identities,
+        ),
+        Err(diagnostic) => crate::CompileResult { output: None, diagnostics: vec![*diagnostic] },
+    }
+}
+
+pub(crate) struct PreparedProgramModule {
+    pub session: crate::driver::Session,
+    pub contract: crate::driver::ModuleImportContract,
+    pub package_identities: Option<crate::driver::PackageImportIdentities>,
+}
+
+/// Build caller-supplied analysis inputs from a real file path.
+///
+/// This is the program/discovery helper. Module analysis must not call it.
+pub(crate) fn prepare_program_module(
+    path: &Path,
+    source: &str,
+    session: &crate::driver::Session,
+) -> Result<PreparedProgramModule, Box<crate::Diagnostic>> {
+    let templates = session.config.import_path_templates.as_ref();
+    let mut pack = if session.config.locale_pack_explicit {
+        session.config.locale_pack.clone()
+    } else {
+        frontmatter_locale_pack_from_source(&path.display().to_string(), source)
+            .or_else(|| session.config.locale_pack.clone())
+    };
+    if let Some(ref mut pack) = pack {
+        merge_library_locale_packs_for_source(pack, path, source, templates).map_err(|err| {
+            Box::new(
+                crate::Diagnostic::error(format!(
+                    "failed to load library locale pack: {}",
+                    crate::locale::format_locale_pack_load_error(&err)
+                ))
+                .with_phase(crate::diagnostics::DiagnosticPhase::Lex)
+                .with_file(path.display().to_string()),
+            )
+        })?;
+    }
+    let import = import_contract_for_file(path, source, pack.as_ref(), templates);
+    let mut config = session.config.clone();
+    if let Some(pack) = pack {
+        config = config.with_locale_pack(pack).with_locale_pack_explicit();
+    }
+    Ok(PreparedProgramModule {
+        session: crate::driver::Session::new(config),
+        contract: import.into_module_contract(),
+        package_identities: package_import_identities_for_file(
+            path,
+            source,
+            session.config.locale_pack.as_ref(),
+            templates,
+        ),
+    })
+}
+
+/// Program/discovery helper keyed by diagnostic name: walk only when `name`
+/// is an existing file. In-memory names keep empty contracts.
+pub(crate) fn prepare_program_module_for_name(
+    name: &str,
+    source: &str,
+    session: &crate::driver::Session,
+) -> Result<PreparedProgramModule, Box<crate::Diagnostic>> {
+    let path = Path::new(name);
+    if path.is_file() {
+        prepare_program_module(path, source, session)
+    } else {
+        Ok(PreparedProgramModule {
+            session: crate::driver::Session::new(session.config.clone()),
+            contract: crate::driver::ModuleImportContract::default(),
+            package_identities: None,
+        })
+    }
+}
+
+/// Resolve and parse one import target through the session cache.
+///
+/// Returns the cached exports and `FileInterface` when available. Relative
+/// imports are probed before resolution (key = joined spelling, mirroring
+/// `resolve_fab_file`'s extension normalization), so a previously parsed
+/// target is served even if the target file has since been deleted — no I/O
+/// and no parse on the hit path. On a miss the target is resolved, looked up
+/// under the raw and canonical path keys, and read+parsed once, with both
+/// keys inserted on success.
+fn cached_import_target(
+    from_file: &Path,
+    import_path: &str,
+    pack_key: Option<&String>,
+    code_pack: ReaderPackRef<'_>,
+    templates: Option<&BTreeMap<String, String>>,
+) -> Option<CachedImportTarget> {
+    if import_path.starts_with("./") {
+        // Fast path: derive the would-be resolved target without touching the
+        // filesystem, so a session-cached target is served after deletion.
+        let candidate = from_file.parent()?.join(import_path);
+        let probe_key = (pack_key.cloned(), candidate.with_extension("fab"));
+        let cached = IMPORT_TARGET_CACHE.with(|cache| cache.borrow().get(&probe_key).cloned());
+        if cached.is_some() {
+            return cached;
+        }
+    }
+    let Ok(target_path) = resolve_namespace_import(from_file, import_path, templates) else {
+        return None;
+    };
+    let raw_key = (pack_key.cloned(), target_path.clone());
+    let cached = IMPORT_TARGET_CACHE.with(|cache| cache.borrow().get(&raw_key).cloned());
+    if cached.is_some() {
+        return cached;
+    }
+    let canonical_key = std::fs::canonicalize(&target_path)
+        .ok()
+        .map(|canonical| (pack_key.cloned(), canonical));
+    if let Some(key) = &canonical_key {
+        let cached = IMPORT_TARGET_CACHE.with(|cache| cache.borrow().get(key).cloned());
+        if cached.is_some() {
+            return cached;
+        }
+    }
+    let target_source = std::fs::read_to_string(&target_path).ok()?;
+    let target_pack = import_target_locale_pack(&target_path, &target_source, code_pack);
+    let (target_program, target_interner) =
+        parse_program_for_namespace_exports(&target_path.display().to_string(), &target_source, target_pack.as_ref())?;
+    let exports = sorted_export_surface(&target_program, &target_interner);
+    let declarations = sorted_declaration_surface(&target_program, &target_interner);
+    let module_identity = import_target_identity(import_path, None);
+    let interface = file_interface_for_program(&target_program, &target_interner, module_identity.as_ref());
+    let cached = CachedImportTarget { exports, declarations, interface, target_path };
+    IMPORT_TARGET_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        cache.insert(raw_key, cached.clone());
+        if let Some(key) = canonical_key {
+            cache.insert(key, cached.clone());
+        }
+    });
+    Some(cached)
+}
+
+/// Build namespace export names and typed file interfaces for a source file's imports.
+///
+/// Resolves relative paths, `norma:*`, and other `provider:module` imports via
+/// [`FABER_LIBRARY_HOME_ENV`].
+pub(crate) fn import_contract_for_file(
+    path: &Path,
+    source: &str,
+    code_pack: ReaderPackRef<'_>,
+    templates: Option<&BTreeMap<String, String>>,
+) -> ImportContract {
+    // The analysis driver resolves a source's `+++ locale = "…" +++` frontmatter
+    // into a reader pack before lexing, so the import contract must recognize
+    // the same keyword surface or English-surface `import from …` / `const`
+    // spellings are missed and module exports never install (corpus converted
+    // to the default English locale). Explicit caller packs still win.
+    let resolved_pack = code_pack
+        .map(ToOwned::to_owned)
+        .or_else(|| frontmatter_locale_pack_from_source(&path.display().to_string(), source));
+    let Some((program, interner)) =
+        parse_program_for_namespace_exports(&path.display().to_string(), source, resolved_pack.as_ref())
+    else {
+        return ImportContract::default();
+    };
+
+    let mut contract = ImportContract::default();
+    let pack_key = resolved_pack.as_ref().map(|pack| pack.metadata.id.clone());
+    for stmt in &program.statements {
+        let StmtKind::Import(decl) = &stmt.kind else {
+            continue;
+        };
+        let Some(binding) = import_binding(&interner, &decl.kind) else {
+            continue;
+        };
+        let import_path = interner.resolve(decl.path);
+        // Do not open targets `validate_import_paths` would later reject.
+        if !import_contract_path_allowed(import_path, templates) {
+            continue;
+        }
+        let Some(target) =
+            cached_import_target(path, import_path, pack_key.as_ref(), resolved_pack.as_ref(), templates)
+        else {
+            continue;
+        };
+        contract
+            .namespace_exports
+            .insert(binding.clone(), target.exports);
+        contract
+            .namespace_declarations
+            .insert(binding.clone(), target.declarations);
+        contract
+            .file_interfaces
+            .insert(binding.clone(), target.interface);
+        // The seam is recomputed relative to the *current* consumer on the
+        // retained target path, not through a fresh resolution: the second
+        // call must serve the same contract even after the target is deleted.
+        let target_path = &target.target_path;
+        contract
+            .namespace_seams
+            .insert(binding, crate::import_resolve::same_package(path, target_path));
+        if import_path.contains(':') {
+            if let Some(root) = crate::import_resolve::find_package_root(target_path) {
+                contract.library_package_roots.insert(root);
+            }
+        }
+    }
+    contract
+}
+
+/// Overlay library-owned member fragments for the consumer locale onto `pack`.
+///
+/// # Errors
+///
+/// Returns [`crate::locale::LocalePackLoadError`] when a present library pack
+/// cannot be loaded. Missing library packs are not an error.
+pub(crate) fn merge_library_locale_packs_for_source(
+    pack: &mut crate::locale::LocalePack,
+    source_path: &Path,
+    source: &str,
+    templates: Option<&BTreeMap<String, String>>,
+) -> Result<(), crate::locale::LocalePackLoadError> {
+    let contract = import_contract_for_file(source_path, source, Some(pack), templates);
+    crate::locale::merge_library_locale_packs(pack, &contract.library_package_roots)
+}
+
+/// Resolve the frontmatter `locale` reader pack when the caller supplied none.
+///
+/// Returns `None` when the source declares no locale or the declared pack
+/// cannot be loaded from the discovered workspace stdlib; the analysis driver
+/// surfaces the authoritative diagnostic for a malformed locale during the
+/// real compile.
+pub(crate) fn frontmatter_locale_pack_from_source(name: &str, source: &str) -> Option<crate::locale::LocalePack> {
+    let peeled = crate::driver::peel_raw_source(name, source).ok()?;
+    frontmatter_locale_pack_from_frontmatter(peeled.frontmatter.as_ref())
+}
+
+/// Resolve the frontmatter `locale` reader pack from already-peeled metadata.
+///
+/// Shared by the tool surfaces that hold a [`crate::driver::SourceFile`] (whose
+/// `content` is already frontmatter-stripped) and by source-level callers that
+/// re-peel first. Returns `None` when no locale is declared or the declared
+/// pack cannot be loaded from the discovered workspace stdlib.
+pub(crate) fn frontmatter_locale_pack_from_frontmatter(
+    frontmatter: Option<&crate::driver::FileFrontmatter>,
+) -> Option<crate::locale::LocalePack> {
+    let locale_id = frontmatter?.locale_result()?.ok()?;
+    let config = crate::driver::Config::default();
+    crate::driver::resolve_frontmatter_locale_pack(&config, locale_id).ok()
+}
+
+/// Resolve an explicit `--locale <name>` to its reader pack via stdlib.
+///
+/// Mirrors the frontmatter-locale resolver, but an explicit CLI locale that
+/// cannot be resolved exits with the resolver's diagnostic instead of falling
+/// back silently. Returns `None` when no locale was given.
+pub(crate) fn explicit_locale_pack(locale: Option<&str>) -> Option<crate::locale::LocalePack> {
+    let locale = locale.map(str::trim).filter(|s| !s.is_empty())?;
+    let config = crate::driver::Config::default();
+    match crate::driver::resolve_frontmatter_locale_pack(&config, locale) {
+        Ok(pack) => Some(pack),
+        Err(diag) => {
+            eprintln!("error: {} (from --locale '{locale}')", diag.message);
+            std::process::exit(1);
+        }
+    }
+}
+
+/// Resolve the reader pack a cross-package import target must be parsed under.
+///
+/// A provider module is lexed in its own reader surface, not the importing
+/// module's. Resolution chain:
+///
+/// 1. The target's own `+++ locale = "…" +++` frontmatter.
+/// 2. The target package's `faber.toml` locale (no frontmatter).
+/// 3. The importing module's pack (loose same-locale files keep the session
+///    `--locale` behavior).
+/// 4. `None` — the built-in Latin surface.
+pub(crate) fn import_target_locale_pack(
+    target_path: &Path,
+    target_source: &str,
+    reader_pack: ReaderPackRef<'_>,
+) -> Option<crate::locale::LocalePack> {
+    frontmatter_locale_pack_from_source(&target_path.display().to_string(), target_source)
+        .or_else(|| package_reader_locale_pack(target_path))
+        .or_else(|| reader_pack.cloned())
+}
+
+/// Resolve the `[reader] locale` reader pack declared by the package
+/// `faber.toml` containing `path`, when present.
+pub(crate) fn package_reader_locale_pack(path: &Path) -> Option<crate::locale::LocalePack> {
+    let package_root = crate::import_resolve::find_package_root(path)?;
+    let manifest_path = package_root.join("faber.toml");
+    let manifest = std::fs::read_to_string(manifest_path).ok()?;
+    let locale_id = parse_reader_locale_from_toml(&manifest)?;
+    let config = crate::driver::Config::default();
+    crate::driver::resolve_frontmatter_locale_pack(&config, &locale_id).ok()
+}
+
+/// Parse the `locale = "…"` value from a `faber.toml` manifest source.
+///
+/// Accepts the canonical `[locale]` table and the legacy `[reader]` alias (the
+/// faber manifest deserializes `reader` as an alias of `locale`). Returns
+/// `None` when the manifest has neither table or no `locale` key. Bare-spelling
+/// scan (no TOML crate dependency) mirroring
+/// [`crate::import_resolve::parse_paths_config`].
+#[must_use]
+fn parse_reader_locale_from_toml(toml_source: &str) -> Option<String> {
+    let mut in_locale_table = false;
+    for line in toml_source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_locale_table = trimmed == "[locale]" || trimmed == "[reader]";
+            continue;
+        }
+        if in_locale_table {
+            if let Some(rest) = trimmed.strip_prefix("locale") {
+                let rest = rest.trim_start();
+                if let Some(value) = rest.strip_prefix('=') {
+                    let value = value.trim().trim_matches('"').trim_matches('\'');
+                    if !value.is_empty() {
+                        return Some(value.to_owned());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Package-local import identity facts for a source file path.
+///
+/// Computes the canonical package identity (`product` + this file's module
+/// segments) and the resolved local sibling import targets (`binding → target
+/// file's canonical module segments`) for the file, mirroring the package
+/// machinery (`module_segments_for_file` / `package_identity` /
+/// `resolve_import`). Returns `None` when the file has no local sibling
+/// imports, so plain single-file compiles keep the legacy provider routing.
+#[must_use]
+pub fn package_import_identities_for_path(path: &Path) -> Option<crate::driver::PackageImportIdentities> {
+    let facts = package_identity_facts_for_path(path)?;
+    (!facts.imports.is_empty()).then_some(facts)
+}
+
+/// Package identity facts for a source file path, regardless of local imports.
+///
+/// Package harnesses compiling a sibling LIBRARY unit (a file with no local
+/// imports of its own, e.g. `auxilium.fab`) need the product + module segments
+/// to record the canonical identity on the unit's own exported functions so
+/// the emitted module defines the external symbol its consumers call.
+///
+/// The file is re-parsed under its package's effective reader pack (frontmatter
+/// locale > package `faber.toml` locale > product-default `en`) — mirroring the
+/// pack the package graph analyzed the unit under — so en-surface local
+/// imports (`import from "./x"`) register as same-package identities instead of
+/// falling through to the registry-direct Latin parse. Packages whose units
+/// carry a Latin frontmatter/manifest locale keep the registry-direct Latin
+/// surface; `None` pack (registry-direct) remains the fallback when no pack
+/// resolves (no stdlib configured).
+#[must_use]
+pub fn package_identity_facts_for_path(path: &Path) -> Option<crate::driver::PackageImportIdentities> {
+    let source = std::fs::read_to_string(path).ok()?;
+    let code_pack = package_effective_reader_pack(path, &source);
+    package_identity_facts_for_file(path, &source, code_pack.as_ref(), None)
+}
+
+/// Product-default code-locale id (mirror of the faber package machinery's
+/// `DEFAULT_CODE_LOCALE`): packages without a declared locale read under `en`.
+const DEFAULT_CODE_LOCALE: &str = "en";
+
+/// Resolve the reader pack a package source file parses under, mirroring the
+/// faber package machinery (`effective_package_config` plus the analysis
+/// front-end's `resolve_peeled_lex_pack` chain): the file's own
+/// `+++ locale = "…" +++` frontmatter wins, then the package's declared reader
+/// locale (`faber.toml` `[locale] locale`, legacy `[reader] locale`), then the
+/// product-default `en` pack. Returns `None` when no pack resolves (no stdlib
+/// configured), keeping registry-direct Latin parsing as the final fallback.
+fn package_effective_reader_pack(path: &Path, source: &str) -> Option<crate::locale::LocalePack> {
+    let path = absolute_cli_path(path);
+    frontmatter_locale_pack_from_source(&path.display().to_string(), source)
+        .or_else(|| package_reader_locale_pack(&path))
+        .or_else(default_code_locale_pack)
+}
+
+fn default_code_locale_pack() -> Option<crate::locale::LocalePack> {
+    let config = crate::driver::Config::default();
+    crate::driver::resolve_frontmatter_locale_pack(&config, DEFAULT_CODE_LOCALE).ok()
+}
+
+/// Compute package-local import identity facts for one compiled file.
+///
+/// Local sibling imports are the `./rel` form only: `norma:*` and other
+/// provider-module imports are library identities, not user-code cross-module
+/// calls.
+fn package_import_identities_for_file(
+    path: &Path,
+    source: &str,
+    code_pack: ReaderPackRef<'_>,
+    templates: Option<&BTreeMap<String, String>>,
+) -> Option<crate::driver::PackageImportIdentities> {
+    let facts = package_identity_facts_for_file(path, source, code_pack, templates)?;
+    if facts.imports.is_empty() {
+        return None;
+    }
+    Some(facts)
+}
+
+fn package_identity_facts_for_file(
+    path: &Path,
+    source: &str,
+    code_pack: ReaderPackRef<'_>,
+    templates: Option<&BTreeMap<String, String>>,
+) -> Option<crate::driver::PackageImportIdentities> {
+    let path = absolute_cli_path(path);
+    let (program, interner) = parse_program_for_namespace_exports(&path.display().to_string(), source, code_pack)?;
+    let package_root = match crate::import_resolve::find_package_root(&path) {
+        Some(root) => root,
+        None => path.parent()?.to_path_buf(),
+    };
+    let product = package_root
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())?;
+    let module_segments = module_segments_relative_to(&package_root, &path);
+    let mut imports = BTreeMap::new();
+    for stmt in &program.statements {
+        let StmtKind::Import(decl) = &stmt.kind else {
+            continue;
+        };
+        let Some(binding) = import_binding(&interner, &decl.kind) else {
+            continue;
+        };
+        let import_path = interner.resolve(decl.path);
+        if !import_path.starts_with("./") {
+            continue;
+        }
+        if !import_contract_path_allowed(import_path, templates) {
+            continue;
+        }
+        let Ok(target) = crate::import_resolve::resolve_namespace_import(&path, import_path, templates) else {
+            continue;
+        };
+        imports.insert(binding.clone(), module_segments_relative_to(&package_root, &target));
+    }
+    Some(crate::driver::PackageImportIdentities { product, module_segments, imports })
+}
+
+/// Normalize a CLI path against the process CWD so package-root discovery from
+/// a relative input (`importa.fab`, parent = "") uses the real directory.
+fn absolute_cli_path(path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir().map_or_else(|_| path.to_path_buf(), |cwd| cwd.join(path))
+    }
+}
+
+/// Canonical module segments for a file under a source root — mirror of the
+/// package machinery's `module_segments_for_file` (frontmatter `group`, else
+/// source-root-relative path with `.fab`/`main.fab`/`mod.fab` normalization).
+fn module_segments_relative_to(root: &Path, file: &Path) -> Vec<String> {
+    let relative = file.strip_prefix(root).unwrap_or(file);
+    let mut parts: Vec<String> = relative
+        .components()
+        .filter_map(|component| match component {
+            std::path::Component::Normal(part) => Some(part.to_string_lossy().into_owned()),
+            _ => None,
+        })
+        .collect();
+    if let Some(last) = parts.last_mut() {
+        if last == "main.fab" || last == "mod.fab" {
+            parts.pop();
+        } else if let Some(stripped) = last.strip_suffix(".fab") {
+            *last = stripped.to_string();
+        } else if let Some(stripped) = last.strip_suffix(".proba") {
+            *last = format!("{stripped}_proba");
+        }
+    }
+    parts
+        .into_iter()
+        .map(|segment| sanitize_module_segment(&segment))
+        .collect()
+}
+
+/// Map a filesystem path segment to a valid module identifier — mirror of the
+/// package machinery's `sanitize_rust_module_ident` (ASCII alphanumeric +
+/// `_` kept, everything else `_`, leading digit prefixed, empty → `m`).
+fn sanitize_module_segment(segment: &str) -> String {
+    let mut out = String::with_capacity(segment.len().max(1));
+    for c in segment.chars() {
+        if c.is_ascii_alphanumeric() || c == '_' {
+            out.push(c);
+        } else {
+            out.push('_');
+        }
+    }
+    let trimmed = out.trim_matches('_');
+    let mut ident = if trimmed.is_empty() {
+        "m".to_owned()
+    } else {
+        trimmed.to_owned()
+    };
+    if ident.chars().next().is_some_and(|c| c.is_ascii_digit()) {
+        ident = format!("m_{ident}");
+    }
+    ident
+}
+
+/// Snapshot context for one import target's export interface.
+///
+/// `module_identity` is the target module's own canonical identity (derived
+/// from its `provider:module` import path), and `bindings` maps each import
+/// binding the module declares to its target module's identity. Nominal
+/// references in exported signatures resolve through these identities at the
+/// consumer: local names bind to the module's own identity, qualified names
+/// (`visus.Visus`) bind to the qualifier target's identity — no short-name
+/// ambiguity when multiple namespaces export the same name, and no WARN014
+/// skip when the referenced sibling is itself imported by the consumer.
+#[derive(Default, Clone)]
+struct SnapshotContext {
+    module_identity: Option<InterfaceLibraryIdentity>,
+    bindings: BTreeMap<String, InterfaceLibraryIdentity>,
+}
+
+impl SnapshotContext {
+    fn for_program(
+        program: &Program,
+        interner: &crate::lexer::Interner,
+        module_identity: Option<&InterfaceLibraryIdentity>,
+    ) -> Self {
+        let mut ctx = SnapshotContext { module_identity: module_identity.cloned(), bindings: BTreeMap::new() };
+        for stmt in &program.statements {
+            let StmtKind::Import(decl) = &stmt.kind else {
+                continue;
+            };
+            let Some(binding) = import_binding(interner, &decl.kind) else {
+                continue;
+            };
+            let import_path = interner.resolve(decl.path);
+            if let Some(identity) = import_target_identity(import_path, ctx.module_identity.as_ref()) {
+                ctx.bindings.insert(binding, identity);
+            }
+        }
+        ctx
+    }
+}
+
+/// Derive a module's canonical identity from its `provider:module` import
+/// path. Relative (`./sibling`) and `§template` imports have no derivable
+/// provider identity; those snapshots stay on the legacy name-keyed path.
+fn import_target_identity(
+    import_path: &str,
+    module_identity: Option<&InterfaceLibraryIdentity>,
+) -> Option<InterfaceLibraryIdentity> {
+    if let Some((provider, module)) = import_path.split_once(':') {
+        if !provider.is_empty() && !module.is_empty() && !module.contains(':') {
+            let module_path = module.split('/').map(str::to_owned).collect();
+            return Some(InterfaceLibraryIdentity { provider: provider.to_owned(), package: None, module_path });
+        }
+    }
+    if let Some(relative) = import_path.strip_prefix("./") {
+        // Relative sibling import: shares the exporting module's provider and
+        // package, extending its module path by the relative segments.
+        let identity = module_identity?;
+        let mut module_path = identity.module_path.clone();
+        module_path.extend(
+            relative
+                .split('/')
+                .filter(|segment| !segment.is_empty() && *segment != ".")
+                .map(str::to_owned),
+        );
+        return Some(InterfaceLibraryIdentity {
+            provider: identity.provider.clone(),
+            package: identity.package.clone(),
+            module_path,
+        });
+    }
+    None
+}
+
+fn file_interface_for_program(
+    program: &Program,
+    interner: &crate::lexer::Interner,
+    module_identity: Option<&InterfaceLibraryIdentity>,
+) -> FileInterface {
+    let mut interface = FileInterface::new();
+    if let Some(identity) = module_identity {
+        interface = interface.with_identity(identity.clone());
+    }
+    let nominal_kinds = nominal_kinds_for_program(program, interner);
+    let ctx = SnapshotContext::for_program(program, interner, module_identity);
+    for stmt in &program.statements {
+        // Keep the legacy unmarked-exported surface for interface snapshots
+        // (mirror of the package path's `program_export_surface`): a public
+        // callable's signature may reference an unmarked nominal of the same
+        // module, and dropping that nominal from the interface poisons the
+        // callable's import (WARN014 skip → false SEM010s in consumers).
+        // Explicit `@ privata` declarations stay excluded.
+        if crate::semantic::passes::visibility_annotation::has_private_visibility_annotation(stmt, interner) {
+            continue;
+        }
+        // Skip constructs we cannot snapshot yet; do not drop the whole interface.
+        let Some(export) = file_export_from_stmt(stmt, interner, &nominal_kinds, &ctx) else {
+            continue;
+        };
+        interface.insert(export);
+    }
+    interface
+}
+
+fn peeled_source_body(name: &str, source: &str) -> Option<String> {
+    crate::driver::peel_raw_source(name, source)
+        .ok()
+        .map(|peeled| peeled.body.to_owned())
+}
+
+fn nominal_kinds_for_program(
+    program: &Program,
+    interner: &crate::lexer::Interner,
+) -> BTreeMap<String, InterfaceNominalKind> {
+    let mut kinds = BTreeMap::new();
+    for stmt in &program.statements {
+        match &stmt.kind {
+            StmtKind::Class(decl) => {
+                kinds.insert(interner.resolve(decl.name.name).to_owned(), InterfaceNominalKind::Struct);
+            }
+            StmtKind::Enum(decl) => {
+                kinds.insert(interner.resolve(decl.name.name).to_owned(), InterfaceNominalKind::Enum);
+            }
+            StmtKind::Union(decl) => {
+                kinds.insert(interner.resolve(decl.name.name).to_owned(), InterfaceNominalKind::Enum);
+            }
+            StmtKind::Interface(decl) => {
+                kinds.insert(interner.resolve(decl.name.name).to_owned(), InterfaceNominalKind::Interface);
+            }
+            _ => {}
+        }
+    }
+    kinds
+}
+
+fn file_export_from_stmt(
+    stmt: &Stmt,
+    interner: &crate::lexer::Interner,
+    nominal_kinds: &BTreeMap<String, InterfaceNominalKind>,
+    ctx: &SnapshotContext,
+) -> Option<FileExport> {
+    match &stmt.kind {
+        StmtKind::Func(decl) => {
+            let name = interner.resolve(decl.name.name).to_owned();
+            let type_params: Vec<String> = decl
+                .type_params
+                .iter()
+                .map(|tp| interner.resolve(tp.name.name).to_owned())
+                .collect();
+            let type_param_names: BTreeSet<&str> = type_params.iter().map(String::as_str).collect();
+            let mut params = Vec::new();
+            for param in &decl.params {
+                params.push(InterfaceParam {
+                    ty: interface_type_from_type_expr(&param.ty, interner, &type_param_names, nominal_kinds, ctx)?,
+                    mode: semantic_param_mode(param.mode),
+                    optional: param.sponte || param.default.is_some(),
+                });
+            }
+            let ret = match &decl.ret {
+                Some(ret) => interface_type_from_type_expr(ret, interner, &type_param_names, nominal_kinds, ctx)?,
+                None => InterfaceTypeSnapshot::Primitive(Primitive::Vacuum),
+            };
+            let err = match &decl.err {
+                Some(err_ty) => Some(Box::new(interface_type_from_type_expr(
+                    err_ty,
+                    interner,
+                    &type_param_names,
+                    nominal_kinds,
+                    ctx,
+                )?)),
+                None => None,
+            };
+            let is_async =
+                decl.posture.is_async() || annotations_include_callable_family(&stmt.annotations, interner, "futura");
+            let is_generator =
+                decl.posture.is_stream() || annotations_include_callable_family(&stmt.annotations, interner, "cursor");
+            Some(FileExport {
+                name,
+                kind: FileExportKind::Function(InterfaceCallable {
+                    type_params,
+                    type_param_constraints: Vec::new(),
+                    params,
+                    ret: Box::new(ret),
+                    err,
+                    is_async,
+                    is_generator,
+                }),
+            })
+        }
+        StmtKind::Class(decl) => {
+            let name = interner.resolve(decl.name.name).to_owned();
+            let no_params = BTreeSet::new();
+            let fields = decl
+                .members
+                .iter()
+                .filter_map(|member| {
+                    let ClassMemberKind::Field(field) = &member.kind else {
+                        return None;
+                    };
+                    Some(InterfaceStructField {
+                        name: interner.resolve(field.name.name).to_owned(),
+                        ty: interface_type_from_type_expr(&field.ty, interner, &no_params, nominal_kinds, ctx)?,
+                        optional: field.sponte,
+                        required: !field.sponte && field.init.is_none(),
+                    })
+                })
+                .collect::<Vec<_>>();
+            let methods = decl
+                .members
+                .iter()
+                .filter_map(|member| {
+                    let ClassMemberKind::Method(method) = &member.kind else {
+                        return None;
+                    };
+                    let type_params: Vec<String> = method
+                        .type_params
+                        .iter()
+                        .map(|tp| interner.resolve(tp.name.name).to_owned())
+                        .collect();
+                    let type_param_names: BTreeSet<&str> = type_params.iter().map(String::as_str).collect();
+                    let mut params = Vec::new();
+                    for param in &method.params {
+                        params.push(InterfaceParam {
+                            ty: interface_type_from_type_expr(
+                                &param.ty,
+                                interner,
+                                &type_param_names,
+                                nominal_kinds,
+                                ctx,
+                            )?,
+                            mode: semantic_param_mode(param.mode),
+                            optional: param.sponte || param.default.is_some(),
+                        });
+                    }
+                    let ret = match &method.ret {
+                        Some(ret) => {
+                            interface_type_from_type_expr(ret, interner, &type_param_names, nominal_kinds, ctx)?
+                        }
+                        None => InterfaceTypeSnapshot::Primitive(Primitive::Vacuum),
+                    };
+                    let err = match &method.err {
+                        Some(err_ty) => Some(Box::new(interface_type_from_type_expr(
+                            err_ty,
+                            interner,
+                            &type_param_names,
+                            nominal_kinds,
+                            ctx,
+                        )?)),
+                        None => None,
+                    };
+                    let is_async = method.posture.is_async()
+                        || annotations_include_callable_family(&member.annotations, interner, "futura");
+                    let is_generator = method.posture.is_stream()
+                        || annotations_include_callable_family(&member.annotations, interner, "cursor");
+                    Some(InterfaceMethodExport {
+                        name: interner.resolve(method.name.name).to_owned(),
+                        callable: InterfaceCallable {
+                            type_params,
+                            type_param_constraints: Vec::new(),
+                            params,
+                            ret: Box::new(ret),
+                            err,
+                            is_async,
+                            is_generator,
+                        },
+                    })
+                })
+                .collect::<Vec<_>>();
+            let annotation_contract = annotation_contract_from_stmt(stmt, decl, interner);
+            Some(FileExport {
+                name: name.clone(),
+                kind: FileExportKind::Struct(InterfaceStructExport { name, fields, methods, annotation_contract }),
+            })
+        }
+        StmtKind::Enum(decl) => {
+            let name = interner.resolve(decl.name.name).to_owned();
+            // `ordo` members are unit variants: project their names so
+            // consumers can reference `module.MEMBER` values and match them.
+            // Only identity-bearing snapshots project (module-boundary rows
+            // 1/9 pin the identity-less relative-import surface to the
+            // legacy empty-variant fail-closed behavior).
+            let variants = if ctx.module_identity.is_some() {
+                decl.members
+                    .iter()
+                    .map(|member| InterfaceEnumVariant {
+                        name: interner.resolve(member.name.name).to_owned(),
+                        fields: Vec::new(),
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            Some(FileExport {
+                name: name.clone(),
+                kind: FileExportKind::Enum(InterfaceNominalExport { name, methods: Vec::new(), variants }),
+            })
+        }
+        StmtKind::Union(decl) => {
+            let name = interner.resolve(decl.name.name).to_owned();
+            // Mirror the package path's enum snapshot: `discretio` variants
+            // ride the file interface (name + payload fields) so imported
+            // union patterns (`module.VARIANT` in `discerne` arms) resolve
+            // instead of failing SEM001. Identity-bearing snapshots only —
+            // identity-less relative-import targets keep the legacy
+            // empty-variant surface the module-boundary + error-masking
+            // diagnostics pin (SEM001.unknown_variant / SEM008 on imported
+            // union refs).
+            let variants = if ctx.module_identity.is_some() {
+                let type_param_names: BTreeSet<&str> = decl
+                    .type_params
+                    .iter()
+                    .map(|tp| interner.resolve(tp.name.name))
+                    .collect();
+                decl.variants
+                    .iter()
+                    .map(|variant| {
+                        let fields = variant
+                            .fields
+                            .iter()
+                            .filter_map(|field| {
+                                Some(InterfaceStructField {
+                                    name: interner.resolve(field.name.name).to_owned(),
+                                    ty: interface_type_from_type_expr(
+                                        &field.ty,
+                                        interner,
+                                        &type_param_names,
+                                        nominal_kinds,
+                                        ctx,
+                                    )?,
+                                    optional: false,
+                                    required: true,
+                                })
+                            })
+                            .collect::<Vec<_>>();
+                        InterfaceEnumVariant { name: interner.resolve(variant.name.name).to_owned(), fields }
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            };
+            Some(FileExport {
+                name: name.clone(),
+                kind: FileExportKind::Enum(InterfaceNominalExport { name, methods: Vec::new(), variants }),
+            })
+        }
+        StmtKind::Interface(decl) => {
+            let name = interner.resolve(decl.name.name).to_owned();
+            Some(FileExport {
+                name: name.clone(),
+                kind: FileExportKind::Interface(InterfaceNominalExport {
+                    name,
+                    methods: Vec::new(),
+                    variants: Vec::new(),
+                }),
+            })
+        }
+        StmtKind::TypeAlias(decl) => {
+            let name = interner.resolve(decl.name.name).to_owned();
+            let no_params = BTreeSet::new();
+            Some(FileExport {
+                name,
+                kind: FileExportKind::TypeAlias(interface_type_from_type_expr(
+                    &decl.ty,
+                    interner,
+                    &no_params,
+                    nominal_kinds,
+                    ctx,
+                )?),
+            })
+        }
+        StmtKind::Var(var) => {
+            // Typed `fixum` consts ride the interface as value exports
+            // (`module.CONST`), mirroring the package path's const library
+            // items. Untyped or mutable declarations are left out.
+            if var.mutability != crate::syntax::AstMutability::Immutable {
+                return None;
+            }
+            let crate::syntax::BindingPattern::Ident(ident) = &var.binding else {
+                return None;
+            };
+            let name = interner.resolve(ident.name).to_owned();
+            let no_params = BTreeSet::new();
+            Some(FileExport {
+                name,
+                kind: FileExportKind::Const(interface_type_from_type_expr(
+                    var.ty.as_ref()?,
+                    interner,
+                    &no_params,
+                    nominal_kinds,
+                    ctx,
+                )?),
+            })
+        }
+        _ => None,
+    }
+}
+
+fn semantic_param_mode(mode: AstParamMode) -> SemanticParamMode {
+    match mode {
+        AstParamMode::Owned => SemanticParamMode::Owned,
+        AstParamMode::De => SemanticParamMode::Ref,
+        AstParamMode::In => SemanticParamMode::MutRef,
+        AstParamMode::Ex => SemanticParamMode::Move,
+    }
+}
+
+fn interface_type_from_type_expr(
+    ty: &TypeExpr,
+    interner: &crate::lexer::Interner,
+    type_params: &BTreeSet<&str>,
+    nominal_kinds: &BTreeMap<String, InterfaceNominalKind>,
+    ctx: &SnapshotContext,
+) -> Option<InterfaceTypeSnapshot> {
+    match &ty.kind {
+        TypeExprKind::Named(name, params) => {
+            let base = interner.resolve(name.name);
+            if params.is_empty() {
+                // Callable type parameters must be Param, not guessed nominals.
+                if type_params.contains(base) {
+                    return Some(InterfaceTypeSnapshot::Param(base.to_owned()));
+                }
+                return match base {
+                    "ascii" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Ascii)),
+                    "textus" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Textus)),
+                    "numerus" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Numerus)),
+                    "fractus" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Fractus)),
+                    "bivalens" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Bivalens)),
+                    "nihil" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Nihil)),
+                    "vacuum" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Vacuum)),
+                    "octeti" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Octeti)),
+                    // Formal language type (faber::Json); not a guessed genus shell.
+                    "json" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Json)),
+                    "valor" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Valor)),
+                    "instans" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Instans)),
+                    // Width sugar used in numeric modules.
+                    "i8" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Numerus, NumericWidth::I8)),
+                    "i16" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Numerus, NumericWidth::I16)),
+                    "i32" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Numerus, NumericWidth::I32)),
+                    "i64" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Numerus, NumericWidth::I64)),
+                    "u8" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Numerus, NumericWidth::U8)),
+                    "u16" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Numerus, NumericWidth::U16)),
+                    "u32" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Numerus, NumericWidth::U32)),
+                    "u64" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Numerus, NumericWidth::U64)),
+                    "f16" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Fractus, NumericWidth::F16)),
+                    "f32" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Fractus, NumericWidth::F32)),
+                    "f64" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Fractus, NumericWidth::F64)),
+                    name => Some(nominal_snapshot(name, nominal_kinds, ctx.module_identity.as_ref())),
+                };
+            }
+            if params.len() == 1 && base == "lista" {
+                let elem = interface_type_from_type_expr(&params[0], interner, type_params, nominal_kinds, ctx)?;
+                return Some(InterfaceTypeSnapshot::Array(Box::new(elem)));
+            }
+            if params.len() == 2 && (base == "tabula" || base == "dictum") {
+                let key = interface_type_from_type_expr(&params[0], interner, type_params, nominal_kinds, ctx)?;
+                let val = interface_type_from_type_expr(&params[1], interner, type_params, nominal_kinds, ctx)?;
+                return Some(InterfaceTypeSnapshot::Map(Box::new(key), Box::new(val)));
+            }
+            if params.len() == 1 && base == "copia" {
+                let elem = interface_type_from_type_expr(&params[0], interner, type_params, nominal_kinds, ctx)?;
+                return Some(InterfaceTypeSnapshot::Set(Box::new(elem)));
+            }
+            if params.len() == 1 {
+                // Applied form `numerus<u32>` / `int<u32>` / `fractus<f32>` /
+                // `float<f32>` (bare width markers are handled above).
+                if let TypeExprKind::Named(width_ident, width_params) = &params[0].kind {
+                    if width_params.is_empty() {
+                        let width_name = interner.resolve(width_ident.name);
+                        let family = match base {
+                            "numerus" | "int" => Some(Primitive::Numerus),
+                            "fractus" | "float" => Some(Primitive::Fractus),
+                            _ => None,
+                        };
+                        if let Some(prim) = family {
+                            if let Ok(width) = NumericWidth::from_marker(width_name, prim) {
+                                return Some(InterfaceTypeSnapshot::SizedNumeric(prim, width));
+                            }
+                        }
+                    }
+                }
+            }
+            if params.len() == 1 && base == "instans" {
+                if let TypeExprKind::Named(marker_ident, marker_params) = &params[0].kind {
+                    if marker_params.is_empty() {
+                        if let Ok(precision) = InstansPrecision::from_marker(interner.resolve(marker_ident.name)) {
+                            return Some(InterfaceTypeSnapshot::SizedInstans(precision));
+                        }
+                    }
+                }
+            }
+            // Tuple type `iuncta<A, B, …>`. Callables returning tuples (and
+            // signatures containing them) otherwise fail the whole export, so
+            // the convert-path snapshot must carry the element list.
+            if base == "iuncta" && params.len() >= 2 {
+                let elements = params
+                    .iter()
+                    .map(|element| interface_type_from_type_expr(element, interner, type_params, nominal_kinds, ctx))
+                    .collect::<Option<Vec<_>>>()?;
+                return Some(InterfaceTypeSnapshot::Tuple(elements));
+            }
+            // Unknown applied form — fail this export only.
+            None
+        }
+        TypeExprKind::Func(func) => {
+            // Function-type reference (`(A, B) → Ret`), e.g. a closure-valued
+            // parameter. Keep the callable contract so the export installs.
+            let no_params = BTreeSet::new();
+            let mut params = Vec::new();
+            for param in &func.params {
+                params.push(InterfaceParam {
+                    ty: interface_type_from_type_expr(param, interner, &no_params, nominal_kinds, ctx)?,
+                    mode: SemanticParamMode::Owned,
+                    optional: false,
+                });
+            }
+            let ret = interface_type_from_type_expr(&func.ret, interner, &no_params, nominal_kinds, ctx)?;
+            let err = match &func.err {
+                Some(err_ty) => Some(Box::new(interface_type_from_type_expr(
+                    err_ty,
+                    interner,
+                    &no_params,
+                    nominal_kinds,
+                    ctx,
+                )?)),
+                None => None,
+            };
+            Some(InterfaceTypeSnapshot::Func(InterfaceCallable {
+                type_params: Vec::new(),
+                type_param_constraints: Vec::new(),
+                params,
+                ret: Box::new(ret),
+                err,
+                is_async: false,
+                is_generator: false,
+            }))
+        }
+        TypeExprKind::PromissumFailable(success, alternate) => {
+            let success = interface_type_from_type_expr(success, interner, type_params, nominal_kinds, ctx)?;
+            let alternate = interface_type_from_type_expr(alternate, interner, type_params, nominal_kinds, ctx)?;
+            Some(InterfaceTypeSnapshot::PromissumFailable(Box::new(success), Box::new(alternate)))
+        }
+        TypeExprKind::Qualified(path, params) if params.is_empty() => {
+            let name = path.last().map(|segment| interner.resolve(segment.name))?;
+            // The leading path segment is the importing module's binding for
+            // the sibling module (`visus.Visus`); resolve it to the sibling's
+            // canonical identity so the consumer binds the nominal through
+            // its own canonical key.
+            let qualifier_identity = path
+                .first()
+                .map(|segment| interner.resolve(segment.name))
+                .and_then(|binding| ctx.bindings.get(binding))
+                .cloned();
+            Some(nominal_snapshot_qualified(name, nominal_kinds, qualifier_identity))
+        }
+        TypeExprKind::Union(members) if members.len() == 2 => {
+            let left = interface_type_from_type_expr(&members[0], interner, type_params, nominal_kinds, ctx)?;
+            let right = interface_type_from_type_expr(&members[1], interner, type_params, nominal_kinds, ctx)?;
+            match (left, right) {
+                (InterfaceTypeSnapshot::Primitive(Primitive::Nihil), other)
+                | (other, InterfaceTypeSnapshot::Primitive(Primitive::Nihil)) => {
+                    Some(InterfaceTypeSnapshot::Option(Box::new(other)))
+                }
+                (left, right) => Some(InterfaceTypeSnapshot::Union(vec![left, right])),
+            }
+        }
+        TypeExprKind::Union(members) if members.len() > 2 => {
+            let mut parts = Vec::new();
+            for member in members {
+                parts.push(interface_type_from_type_expr(
+                    member,
+                    interner,
+                    type_params,
+                    nominal_kinds,
+                    ctx,
+                )?);
+            }
+            Some(InterfaceTypeSnapshot::Union(parts))
+        }
+        _ => None,
+    }
+}
+
+/// Nominal snapshot for a name declared in the snapshotting module itself
+/// (or unknown): local names bind to the module's own canonical identity so
+/// same-named classes across providers never collide in the consumer's
+/// name-keyed table.
+fn nominal_snapshot(
+    name: &str,
+    nominal_kinds: &BTreeMap<String, InterfaceNominalKind>,
+    module_identity: Option<&InterfaceLibraryIdentity>,
+) -> InterfaceTypeSnapshot {
+    let is_local = nominal_kinds.contains_key(name);
+    InterfaceTypeSnapshot::Nominal(InterfaceNominalType {
+        kind: nominal_kinds
+            .get(name)
+            .copied()
+            .unwrap_or(InterfaceNominalKind::Struct),
+        name: name.to_owned(),
+        identity: if is_local { module_identity.cloned() } else { None },
+        // Local names have an exact kind; names the module does not declare
+        // locally fall back to a Struct guess (kind_guessed).
+        kind_guessed: !is_local,
+    })
+}
+
+/// Nominal snapshot for a module-qualified type reference: the nominal belongs
+/// to the qualifier target's module, so the snapshot carries that module's
+/// identity when the exporting module's import binding resolves (else the
+/// legacy name-keyed path applies). The kind of a qualified name is a guess
+/// unless it happens to match a locally-declared name.
+fn nominal_snapshot_qualified(
+    name: &str,
+    nominal_kinds: &BTreeMap<String, InterfaceNominalKind>,
+    qualifier_identity: Option<InterfaceLibraryIdentity>,
+) -> InterfaceTypeSnapshot {
+    InterfaceTypeSnapshot::Nominal(InterfaceNominalType {
+        kind: nominal_kinds
+            .get(name)
+            .copied()
+            .unwrap_or(InterfaceNominalKind::Struct),
+        name: name.to_owned(),
+        identity: qualifier_identity,
+        kind_guessed: !nominal_kinds.contains_key(name),
+    })
+}
+
+fn parse_program_for_namespace_exports(
+    name: &str,
+    source: &str,
+    code_pack: ReaderPackRef<'_>,
+) -> Option<(Program, crate::lexer::Interner)> {
+    let peeled = crate::driver::peel_raw_source(name, source).ok()?;
+    let lex_result = match code_pack {
+        Some(pack) => crate::lexer::lex_with_locale_pack(peeled.body, pack),
+        None => crate::lexer::lex(peeled.body),
+    };
+    if !lex_result.success() {
+        return None;
+    }
+
+    let parse_result = crate::parser::parse(lex_result);
+    if !parse_result.success() {
+        return None;
+    }
+
+    let crate::parser::ParseResult { program, interner, .. } = parse_result;
+    Some((program?, interner))
+}
+
+fn import_binding(interner: &crate::lexer::Interner, kind: &ImportKind) -> Option<String> {
+    match kind {
+        ImportKind::Named { name, alias, .. } => Some(
+            interner
+                .resolve(alias.as_ref().unwrap_or(name).name)
+                .to_owned(),
+        ),
+        ImportKind::Wildcard { alias } => Some(interner.resolve(alias.name).to_owned()),
+    }
+}
+
+pub(crate) use crate::import_resolve::resolve_namespace_import;
+
+/// The export surface of one file: every importable name with its tier.
+///
+/// `@ publica` and `@ interna` declarations (plus `publica` re-export imports)
+/// join the surface with their tier preserved; unmarked and `@ privata`
+/// declarations are module-private and absent. The import-seam policy decides
+/// whether an `@ interna` name is actually importable.
+fn sorted_export_surface(program: &Program, interner: &crate::lexer::Interner) -> BTreeMap<String, VisibilityTier> {
+    let mut surface = BTreeMap::new();
+    for stmt in &program.statements {
+        let tier = if let StmtKind::Import(decl) = &stmt.kind {
+            if decl.visibility == crate::syntax::Visibility::Publica {
+                Some(VisibilityTier::Publica)
+            } else {
+                None
+            }
+        } else {
+            crate::semantic::passes::visibility_annotation::statement_export_tier(stmt, interner)
+        };
+        if let Some(tier) = tier {
+            if let Some(name) = export_name(stmt, interner) {
+                surface.insert(name, tier);
+            }
+        }
+    }
+    surface
+}
+
+/// Every named top-level declaration, including module-private names.
+///
+/// Used by the import-seam validator to distinguish "does not exist" from
+/// "exists but is not importable".
+fn sorted_declaration_surface(
+    program: &Program,
+    interner: &crate::lexer::Interner,
+) -> BTreeMap<String, VisibilityTier> {
+    let mut surface = BTreeMap::new();
+    for stmt in &program.statements {
+        let tier = if let StmtKind::Import(decl) = &stmt.kind {
+            if decl.visibility == crate::syntax::Visibility::Publica {
+                Some(VisibilityTier::Publica)
+            } else {
+                None
+            }
+        } else {
+            Some(
+                crate::semantic::passes::visibility_annotation::statement_export_tier(stmt, interner)
+                    .unwrap_or(VisibilityTier::Privata),
+            )
+        };
+        if let Some(tier) = tier {
+            if let Some(name) = export_name(stmt, interner) {
+                surface.insert(name, tier);
+            }
+        }
+    }
+    surface
+}
+
+fn annotations_include_callable_family(
+    annotations: &[Annotation],
+    interner: &crate::lexer::Interner,
+    family: &str,
+) -> bool {
+    annotations.iter().any(|annotation| match &annotation.kind {
+        AnnotationKind::Futura => family == "futura",
+        AnnotationKind::Cursor => family == "cursor",
+        AnnotationKind::Statement(stmt) => interner.resolve(stmt.name.name) == family,
+        AnnotationKind::Braced(braced) => interner.resolve(braced.name.name) == family,
+        _ => false,
+    })
+}
+
+fn annotation_contract_from_stmt(
+    stmt: &Stmt,
+    decl: &ClassDecl,
+    interner: &crate::lexer::Interner,
+) -> Option<InterfaceAnnotationContract> {
+    let marker = stmt
+        .annotations
+        .iter()
+        .find(|annotation| is_annotatio(annotation, interner))?;
+    let target = annotatio_target(marker, interner).unwrap_or_else(|| "functio".to_owned());
+    let fields = decl
+        .members
+        .iter()
+        .filter_map(|member| {
+            let ClassMemberKind::Field(field) = &member.kind else {
+                return None;
+            };
+            let (ty, optional_union) = contract_field_type_spelling(&field.ty, interner)?;
+            Some(InterfaceAnnotationContractField {
+                name: interner.resolve(field.name.name).to_owned(),
+                ty,
+                optional: field.sponte || optional_union || field.init.is_some(),
+            })
+        })
+        .collect();
+    Some(InterfaceAnnotationContract { target, fields, qualified_identity: None })
+}
+
+fn is_annotatio(annotation: &Annotation, interner: &crate::lexer::Interner) -> bool {
+    match &annotation.kind {
+        AnnotationKind::Braced(braced) => interner.resolve(braced.name.name) == "annotatio",
+        AnnotationKind::Statement(stmt) => interner.resolve(stmt.name.name) == "annotatio",
+        _ => false,
+    }
+}
+
+fn annotatio_target(annotation: &Annotation, interner: &crate::lexer::Interner) -> Option<String> {
+    match &annotation.kind {
+        AnnotationKind::Statement(stmt) if stmt.args.is_empty() => Some("functio".to_owned()),
+        AnnotationKind::Braced(braced) if braced.fields.is_empty() => Some("functio".to_owned()),
+        AnnotationKind::Braced(braced) => braced
+            .fields
+            .iter()
+            .find(|field| interner.resolve(field.name.name) == "target")
+            .and_then(|field| annotatio_target_field_value(&field.value, interner))
+            .or_else(|| Some("functio".to_owned())),
+        _ => None,
+    }
+}
+
+fn annotatio_target_field_value(value: &AnnotationFieldValue, interner: &crate::lexer::Interner) -> Option<String> {
+    match value {
+        AnnotationFieldValue::Expr(expr) => match &expr.kind {
+            ExprKind::Ident(ident) => Some(interner.resolve(ident.name).to_owned()),
+            ExprKind::Literal(Literal::String(sym)) => Some(interner.resolve(*sym).to_owned()),
+            _ => None,
+        },
+        AnnotationFieldValue::Type(ty) => match &ty.kind {
+            TypeExprKind::Named(name, params) if params.is_empty() => Some(interner.resolve(name.name).to_owned()),
+            _ => None,
+        },
+    }
+}
+
+fn contract_field_type_spelling(ty: &TypeExpr, interner: &crate::lexer::Interner) -> Option<(String, bool)> {
+    match &ty.kind {
+        TypeExprKind::Named(name, params) if params.is_empty() => {
+            let text = interner.resolve(name.name);
+            ContractFieldType::from_type_name(text).map(|_ty| (text.to_owned(), false))
+        }
+        TypeExprKind::Union(members) => {
+            let mut core = None;
+            let mut saw_nihil = false;
+            for member in members {
+                match &member.kind {
+                    TypeExprKind::Named(name, params) if params.is_empty() => {
+                        let text = interner.resolve(name.name);
+                        if text == "nihil" {
+                            saw_nihil = true;
+                        } else if ContractFieldType::from_type_name(text).is_some() {
+                            if core.is_some() {
+                                return None;
+                            }
+                            core = Some(text.to_owned());
+                        } else {
+                            return None;
+                        }
+                    }
+                    _ => return None,
+                }
+            }
+            core.map(|ty| (ty, saw_nihil))
+        }
+        _ => None,
+    }
+}
+
+fn export_name(stmt: &Stmt, interner: &crate::lexer::Interner) -> Option<String> {
+    let name = match &stmt.kind {
+        StmtKind::Func(decl) => decl.name.name,
+        StmtKind::Class(decl) => decl.name.name,
+        StmtKind::Interface(decl) => decl.name.name,
+        StmtKind::TypeAlias(decl) => decl.name.name,
+        StmtKind::Enum(decl) => decl.name.name,
+        StmtKind::Union(decl) => decl.name.name,
+        StmtKind::Import(decl) if decl.visibility == crate::syntax::Visibility::Publica => {
+            return import_binding(interner, &decl.kind);
+        }
+        _ => return None,
+    };
+    Some(interner.resolve(name).to_owned())
+}
+
+/// Pre-check: reject import specifiers that validate_import_paths would later
+/// reject, so resolution + filesystem I/O never touch policy-illegal targets.
+///
+/// Mirrors the checks in `crate::semantic::passes::import_path::validate_import_paths`.
+fn import_contract_path_allowed(path: &str, templates: Option<&BTreeMap<String, String>>) -> bool {
+    if path == ".." || path.starts_with("../") || path.contains("/../") || path.ends_with("/..") {
+        return false;
+    }
+    if path.starts_with('/') || path.chars().nth(1) == Some(':') {
+        return false;
+    }
+    if path.starts_with('§') {
+        return templates.is_some();
+    }
+    if let Some((provider, module)) = path.split_once(':') {
+        if !provider.is_empty() && !module.is_empty() && !module.contains(':') {
+            return true;
+        }
+    }
+    if path.starts_with("./") {
+        return true;
+    }
+    false
+}
+
+#[cfg(test)]
+#[path = "compile_test.rs"]
+mod tests;

@@ -6,8 +6,8 @@
 
 use super::test_support::test_temp_dir;
 use super::{discover_package, library_resolver_from_config};
-use radix::driver::{Config, Session};
-use radix::locale::LocalePack;
+use radix_module::driver::{Config, Session};
+use radix_module::locale::LocalePack;
 use radix_package::analyze::{
     analyze_package as analyze_package_direct,
     analyze_package_for_tests as analyze_package_for_tests_direct, AnalysisSeams,
@@ -22,7 +22,7 @@ fn seams() -> AnalysisSeams {
 fn analyze_with_faber_seams(
     config: &Config,
     input: &Path,
-) -> Result<radix_package::analyze::AnalyzedProgram, Vec<radix::diagnostics::Diagnostic>> {
+) -> Result<radix_package::analyze::AnalyzedProgram, Vec<radix_module::diagnostics::Diagnostic>> {
     analyze_package_direct(config, input, &seams())
 }
 
@@ -30,7 +30,7 @@ fn analyze_tests_with_faber_seams(
     config: &Config,
     input: &Path,
     filter: Option<&radix_package::test_source_filter::TestSourceFilter>,
-) -> Result<radix_package::analyze::AnalyzedProgram, Vec<radix::diagnostics::Diagnostic>> {
+) -> Result<radix_package::analyze::AnalyzedProgram, Vec<radix_module::diagnostics::Diagnostic>> {
     analyze_package_for_tests_direct(config, input, filter, &seams())
 }
 
@@ -40,7 +40,7 @@ fn load_with_faber_seams(
     locale_pack: Option<&LocalePack>,
     include_proba: bool,
     filter: Option<&radix_package::test_source_filter::TestSourceFilter>,
-) -> Result<Vec<radix_package::PackageFile>, Vec<radix::diagnostics::Diagnostic>> {
+) -> Result<Vec<radix_package::PackageFile>, Vec<radix_module::diagnostics::Diagnostic>> {
     radix_package::analyze::load_package_with_locale_pack(
         spec,
         resolver,

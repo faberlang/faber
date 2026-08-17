@@ -33,7 +33,7 @@
 use super::*;
 use crate::package::device::DEVICE_RUN_PLAN_VERSION;
 use crate::package::test_support::{test_temp_dir, TestDir};
-use radix::codegen::Target;
+use radix_module::codegen::Target;
 use radix_mir::boundary_abi::HOST_CALL_ABI_VERSION;
 use radix_mir::device_program::{
     BufferLifetime, BufferRole, DeviceProgramLifetime, ObservationCadence,
@@ -59,12 +59,12 @@ incipit {
     nota run_scale(3.0 ∷ fractus<f32>)
 }"#;
 
-fn llvm_host_config() -> radix::Config {
-    radix::Config::default().with_target(Target::MirLlvmHost)
+fn llvm_host_config() -> radix_module::Config {
+    radix_module::Config::default().with_target(Target::MirLlvmHost)
 }
 
 fn toolchain_available() -> bool {
-    radix::llvm_host::LlvmHostToolchain::discover().is_ok()
+    radix_module::llvm_host::LlvmHostToolchain::discover().is_ok()
 }
 
 /// Write the single-unit fixture under a temp package dir and return the

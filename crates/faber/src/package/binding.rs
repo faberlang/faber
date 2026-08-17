@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use radix::diagnostics::{Diagnostic, DiagnosticPhase};
-use radix::driver::Config;
+use radix_module::diagnostics::{Diagnostic, DiagnosticPhase};
+use radix_module::driver::Config;
 use serde::Deserialize;
 
 use super::{faber_analysis_seams, read_manifest, validate_manifest};
@@ -43,10 +43,10 @@ struct ShimBinding {
 struct BindingContract {
     key: String,
     file: PathBuf,
-    span: radix::lexer::Span,
-    callable: radix::file_interface::InterfaceCallable,
+    span: radix_module::lexer::Span,
+    callable: radix_module::file_interface::InterfaceCallable,
     has_body: bool,
-    def_id: radix::hir::DefId,
+    def_id: radix_module::hir::DefId,
 }
 
 #[derive(Debug, Eq, PartialEq)]

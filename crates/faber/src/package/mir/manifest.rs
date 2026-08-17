@@ -9,7 +9,7 @@
 
 use std::path::Path;
 
-use radix::diagnostics::Diagnostic;
+use radix_module::diagnostics::Diagnostic;
 
 use radix_package::mir::DeviceManifestConfig;
 

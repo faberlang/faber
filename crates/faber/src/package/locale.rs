@@ -1,7 +1,7 @@
-use radix::codegen::Target;
-use radix::diagnostics::Diagnostic;
-use radix::driver::Config;
-use radix::locale::LocalePack;
+use radix_module::codegen::Target;
+use radix_module::diagnostics::Diagnostic;
+use radix_module::driver::Config;
+use radix_module::locale::LocalePack;
 use std::path::{Path, PathBuf};
 
 use super::discover_package;

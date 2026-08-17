@@ -292,10 +292,10 @@ dependencies = [
  "hygiene-ratchet",
  "postcard",
  "proba",
- "radix",
  "radix-mir",
  "radix-mir-fmir",
  "radix-mir-runner",
+ "radix-module",
  "radix-types",
  "serde",
  "serde_json",
@@ -527,7 +527,7 @@ dependencies = [
 name = "proba"
 version = "0.1.0"
 dependencies = [
- "radix",
+ "radix-module",
 ]
 
 [[package]]
@@ -584,39 +584,6 @@ name = "r-efi"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
-
-[[package]]
-name = "radix"
-version = "0.82.0"
-dependencies = [
- "ariadne",
- "clap",
- "handroll",
- "hygiene-ratchet",
- "insta",
- "postcard",
- "radix-codegen-shared",
- "radix-diagnostics",
- "radix-hir",
- "radix-hir-faber",
- "radix-hir-fhir",
- "radix-host-abi",
- "radix-lexer",
- "radix-mir",
- "radix-mir-runner",
- "radix-parser",
- "radix-runtime-contract",
- "radix-syntax",
- "radix-types",
- "rustc-hash",
- "serde",
- "serde_json",
- "tempfile",
- "toml",
- "unicode-ident",
- "unicode-normalization",
- "wait-timeout",
-]
 
 [[package]]
 name = "radix-codegen-shared"
@@ -735,6 +702,39 @@ dependencies = [
  "rustc-hash",
  "serde_json",
  "toml",
+]
+
+[[package]]
+name = "radix-module"
+version = "0.82.0"
+dependencies = [
+ "ariadne",
+ "clap",
+ "handroll",
+ "hygiene-ratchet",
+ "insta",
+ "postcard",
+ "radix-codegen-shared",
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-hir-faber",
+ "radix-hir-fhir",
+ "radix-host-abi",
+ "radix-lexer",
+ "radix-mir",
+ "radix-mir-runner",
+ "radix-parser",
+ "radix-runtime-contract",
+ "radix-syntax",
+ "radix-types",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+ "unicode-ident",
+ "unicode-normalization",
+ "wait-timeout",
 ]
 
 [[package]]

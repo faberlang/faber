@@ -1,0 +1,7 @@
+name = "LeanCheckerFixtures"
+defaultTargets = ["LeanCheckerFixtures"]
+
+[leanOptions]
+
+[[leanLib]]
+name = "LeanCheckerFixtures"

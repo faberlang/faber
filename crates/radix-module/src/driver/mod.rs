@@ -1,0 +1,3572 @@
+//! Compilation pipeline boundary for `radix`.
+//!
+//! The driver is the narrow public entrypoint that turns one Faber source unit
+//! plus a [`Session`] into either target code or diagnostics. It owns phase
+//! ordering, diagnostic accumulation, target-policy checks that require parsed
+//! syntax, and the CLI-program handoff used by package builds. Individual
+//! compiler phases still own their domain models; this module decides when a
+//! later phase has enough trustworthy input to run.
+//!
+//! INVARIANTS
+//! ==========
+//! - Lexing, parsing, CLI analysis, semantic analysis, and codegen run in that
+//!   order; later phases are skipped after errors from their prerequisites.
+//! - Diagnostics are accumulated through successful phases so warnings survive
+//!   into a successful [`CompileResult`].
+//! - Target-specific policy that depends on syntax is enforced before semantic
+//!   lowering, keeping unsupported constructs out of backends that cannot model
+//!   them safely.
+//! - CLI overrides supplied by package compilation are retargeted into the
+//!   current parser interner before semantic analysis observes them.
+//!
+//! ERROR STRATEGY
+//! ==============
+//! The driver returns diagnostics rather than panicking when a phase rejects user
+//! input. A "successful" phase that violates its internal contract, such as a
+//! parse result without a program, is converted into an explicit diagnostic so
+//! callers still receive the same failure surface.
+
+mod file_frontmatter;
+mod frontmatter;
+mod session;
+#[cfg(feature = "mir-core")]
+mod shader_contract;
+mod source;
+mod target_policy;
+
+pub use file_frontmatter::{parse_file_frontmatter, FileFrontmatter};
+pub use frontmatter::{split_frontmatter, FrontmatterError, SplitFrontmatter};
+pub use session::{Config, Session, WarnPolicy};
+pub use source::{peel_raw_source, source_load_diagnostic, PeeledSource, SourceFile, SourceLoadError};
+
+use crate::codegen::{self, Target};
+use crate::diagnostics::DiagnosticConvert;
+use crate::diagnostics::{locale_unknown_spec, Diagnostic, DiagnosticArg, DiagnosticPhase, Severity, Span};
+use crate::hir::{HirBlock, HirFunction, HirModule, HirModuleEnd, HirPresentation, HirSourceAnchorId, LibraryRegistry};
+use crate::lexer;
+use crate::lexer::Interner;
+use crate::locale::{latin_locale_pack, KeywordSurface, LocalePack};
+use crate::parser;
+use crate::semantic::{self, PassConfig, Primitive, RadixLane, RadixLaneMetadata, Resolver, Type};
+#[allow(clippy::wildcard_imports)]
+// syntax is a pure re-export barrel from radix-syntax
+use crate::syntax::*;
+use crate::CompileResult;
+use std::collections::BTreeMap;
+
+const MISSING_PARSE_PROGRAM_MESSAGE: &str = "successful parse result missing program";
+const MISSING_SEMANTIC_HIR_MESSAGE: &str = "successful semantic result missing lowered HIR";
+
+/// Promote warning diagnostics to errors according to a [`WarnPolicy`].
+///
+/// This is the boundary-promotion step: phases keep emitting `Severity::Warning`
+/// unchanged, and this function reclassifies matching warnings to
+/// `Severity::Error` in place. Code, span, and help text are preserved; only
+/// severity flips. `Severity::Info` and `Severity::Error` are never changed.
+pub fn apply_warn_policy(diags: &mut [Diagnostic], policy: &WarnPolicy) {
+    for d in diags.iter_mut() {
+        if policy.promotes(d.severity, d.code) {
+            d.severity = Severity::Error;
+        }
+    }
+}
+
+/// Run analysis and code generation for one source unit.
+///
+/// This is the user-facing driver contract used by CLIs and package tooling
+/// when they want emitted target code. It delegates the shared front half to
+/// `analyze_source` so callers that only need HIR, type tables, or CLI
+/// analysis can stop before backend generation.
+///
+/// Errors from any phase are returned as diagnostics with no output. Warnings
+/// collected before codegen are preserved on success.
+#[must_use]
+pub fn compile(session: &Session, name: &str, source: &str) -> CompileResult {
+    compile_with_namespace_exports(session, name, source, BTreeMap::new())
+}
+
+/// Run analysis and code generation with caller-supplied file namespace exports.
+///
+/// Package and command frontends that have already resolved direct imports can
+/// feed the resolver's namespace table here without making the core driver own
+/// package discovery or stdlib provider policy.
+#[must_use]
+pub fn compile_with_namespace_exports(
+    session: &Session,
+    name: &str,
+    source: &str,
+    namespace_exports: BTreeMap<
+        String,
+        BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>,
+    >,
+) -> CompileResult {
+    compile_with_import_contract(session, name, source, namespace_exports, BTreeMap::new())
+}
+
+/// Run analysis and code generation with caller-supplied namespace exports and typed file interfaces.
+#[must_use]
+pub fn compile_with_import_contract(
+    session: &Session,
+    name: &str,
+    source: &str,
+    namespace_exports: BTreeMap<
+        String,
+        BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>,
+    >,
+    file_interfaces: BTreeMap<String, crate::file_interface::FileInterface>,
+) -> CompileResult {
+    compile_with_import_contract_and_package_identities(session, name, source, namespace_exports, file_interfaces, None)
+}
+
+/// Caller-supplied import contracts for fail-closed module analysis.
+///
+/// Empty maps stay empty. Module analysis never derives seams, exports, or
+/// file interfaces from a path-shaped name.
+#[derive(Debug, Clone, Default)]
+pub struct ModuleImportContract {
+    /// Importable names per binding, with their visibility tier.
+    pub namespace_exports:
+        BTreeMap<String, BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>>,
+    /// Portable typed export interfaces keyed by import binding name.
+    pub file_interfaces: BTreeMap<String, crate::file_interface::FileInterface>,
+    /// Per-binding same-package flag. Missing bindings are cross-package.
+    pub namespace_seams: BTreeMap<String, bool>,
+    /// All target top-level names including module-private, keyed by binding.
+    pub namespace_declarations:
+        BTreeMap<String, BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>>,
+}
+
+/// Run analysis and code generation with caller-supplied namespace exports,
+/// typed file interfaces, and package-local import identity facts.
+///
+/// Package-aware callers (the CLI compile path, package harnesses) that have
+/// already resolved local sibling imports feed the canonical identity facts
+/// here so MIR lowering records `(product, module_path, item)` identities for
+/// user-code cross-module calls instead of the raw import spelling.
+///
+/// Seams and declarations stay empty on this wrapper. Callers that already
+/// computed a full contract should use [`compile_with_module_import_contract`].
+#[must_use]
+pub fn compile_with_import_contract_and_package_identities(
+    session: &Session,
+    name: &str,
+    source: &str,
+    namespace_exports: BTreeMap<
+        String,
+        BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>,
+    >,
+    file_interfaces: BTreeMap<String, crate::file_interface::FileInterface>,
+    package_identities: Option<PackageImportIdentities>,
+) -> CompileResult {
+    compile_with_module_import_contract(
+        session,
+        name,
+        source,
+        ModuleImportContract { namespace_exports, file_interfaces, ..ModuleImportContract::default() },
+        package_identities,
+    )
+}
+
+/// Run analysis and code generation with a complete caller-supplied import contract.
+#[must_use]
+pub fn compile_with_module_import_contract(
+    session: &Session,
+    name: &str,
+    source: &str,
+    contract: ModuleImportContract,
+    package_identities: Option<PackageImportIdentities>,
+) -> CompileResult {
+    let mut analysis = match analyze_source_with_module_import_contract(session, name, source, None, contract) {
+        Ok(mut analysis) => {
+            analysis.package_import_identities = package_identities;
+            analysis
+        }
+        Err(mut diagnostics) => {
+            apply_warn_policy(&mut diagnostics, &session.config.warn_policy);
+            return CompileResult { output: None, diagnostics };
+        }
+    };
+
+    // Promote warnings to errors per the session's deny policy before any
+    // downstream path assembles a CompileResult from analysis.diagnostics.
+    apply_warn_policy(&mut analysis.diagnostics, &session.config.warn_policy);
+    if analysis.diagnostics.iter().any(Diagnostic::is_error) {
+        return CompileResult { output: None, diagnostics: analysis.diagnostics };
+    }
+
+    if analysis.cli_program.is_some() {
+        return compile_cli_program(session.config.target, name, analysis, session.config.no_fuse);
+    }
+
+    // -------------------------------------------------------------------------
+    // PHASE 4: CODE GENERATION
+    // Emit target-specific source code
+    // -------------------------------------------------------------------------
+    let latin_pack;
+    let surface = KeywordSurface::new(if let Some(pack) = &session.config.locale_pack {
+        pack
+    } else {
+        latin_pack = latin_locale_pack();
+        &latin_pack
+    });
+    match generate_output(
+        session.config.target,
+        &mut analysis,
+        &surface,
+        session.config.output_mode,
+        session.config.module_name.as_deref(),
+        session.config.no_fuse,
+    ) {
+        Ok(output) => CompileResult { output: Some(output), diagnostics: analysis.diagnostics },
+        Err(err) => compile_codegen_error(analysis, name, err),
+    }
+}
+
+fn compile_cli_program(target: Target, name: &str, analysis: AnalyzedModule, no_fuse: bool) -> CompileResult {
+    if let Some(diagnostic) = cli_codegen_diagnostic(target, name, &analysis) {
+        return compile_error(analysis, diagnostic);
+    }
+
+    match target {
+        // Wasm text: the shared MIR CLI-program lowering (P1, a5e4b69f1)
+        // already produced the CLI entry/argv/exit shapes in MIR, so the
+        // CLI program routes through the ordinary wasm emit path
+        // (wasm-host-parity P1 residual — the ten CLI fixtures emit and
+        // wasm-tools validate). The emitter fails closed on any shape it
+        // does not support.
+        #[cfg(feature = "mir-wasm")]
+        Target::MirWasm => {
+            let mut analysis = analysis;
+            match generate_wasm_text_output(&mut analysis, no_fuse) {
+                Ok(output) => CompileResult { output: Some(output), diagnostics: analysis.diagnostics },
+                Err(err) => compile_codegen_error(analysis, name, err),
+            }
+        }
+        Target::HirRust | Target::HirGo => {
+            let Some(cli_program) = analysis.cli_program.as_ref() else {
+                return compile_error(
+                    analysis,
+                    codegen_diagnostic(name, "CODEGEN003", "CLI code generation requires an analyzed CLI program"),
+                );
+            };
+            match target {
+                Target::HirRust => {
+                    match codegen::generate_rust_cli(&analysis.hir, &analysis.types, &analysis.interner, cli_program) {
+                        Ok(output) => CompileResult {
+                            output: Some(crate::Output::Rust(output)),
+                            diagnostics: analysis.diagnostics,
+                        },
+                        Err(err) => compile_codegen_error(analysis, name, err.into()),
+                    }
+                }
+                Target::HirGo => {
+                    if let Err(err) = reject_modular_word_target(&analysis, "Go") {
+                        return compile_codegen_error(analysis, name, err.into());
+                    }
+                    match codegen::generate_go_cli(&analysis.hir, &analysis.types, &analysis.interner, cli_program) {
+                        Ok(output) => {
+                            CompileResult { output: Some(crate::Output::Go(output)), diagnostics: analysis.diagnostics }
+                        }
+                        Err(err) => compile_codegen_error(analysis, name, err.into()),
+                    }
+                }
+                _ => unreachable!("match target above narrowed to Rust | Go"),
+            }
+        }
+        _ => compile_error(
+            analysis,
+            codegen_diagnostic(
+                name,
+                "CODEGEN002",
+                "runnable CLI code generation is not implemented for this target",
+            )
+            .with_args(vec![
+                DiagnosticArg::new("issue", "cli_codegen_rust_only"),
+                DiagnosticArg::new("target", target_display_name(target)),
+            ]),
+        ),
+    }
+}
+
+fn cli_codegen_diagnostic(target: Target, name: &str, analysis: &AnalyzedModule) -> Option<Diagnostic> {
+    let cli_program = analysis.cli_program.as_ref()?;
+
+    match target {
+        Target::HirRust => {
+            if matches!(cli_program.exit, Some(crate::cli::CliExit::Unsupported)) {
+                return Some(codegen_diagnostic(
+                    name,
+                    "CODEGEN004",
+                    "CLI exitus code generation supports numeric literals, bindings, and args fields in Phase 03",
+                ));
+            }
+            phase03_cli_codegen_gap(cli_program).map(|message| codegen_diagnostic(name, "CODEGEN005", message))
+        }
+        Target::HirGo => go_cli_codegen_diagnostic(name, cli_program),
+        // Wasm text routes CLI programs through the ordinary emit path (the
+        // shared MIR CLI lowering already produced the entry/argv/exit
+        // shapes); the emitter fails closed on unsupported shapes itself.
+        Target::MirWasm => None,
+        _ => Some(
+            codegen_diagnostic(
+                name,
+                "CODEGEN002",
+                "runnable CLI code generation is only implemented for Rust and the Go narrow slice",
+            )
+            .with_args(vec![
+                DiagnosticArg::new("issue", "cli_codegen_rust_only"),
+                DiagnosticArg::new("target", target_display_name(target)),
+            ]),
+        ),
+    }
+}
+
+#[cfg(feature = "hir-go")]
+fn go_cli_codegen_diagnostic(name: &str, cli_program: &crate::cli::CliProgram) -> Option<Diagnostic> {
+    match codegen::go::qualify_go_cli(Some(cli_program)) {
+        codegen::go::GoCliQualification::SupportedNarrow { .. } => None,
+        codegen::go::GoCliQualification::NotCli => Some(
+            codegen_diagnostic(name, "CODEGEN003", "CLI code generation requires an analyzed CLI program")
+                .with_args(vec![DiagnosticArg::new("issue", "go_cli_missing_program")]),
+        ),
+        codegen::go::GoCliQualification::Rejected(rejections) => {
+            let first = rejections.first().map_or("go_cli_unsupported", |r| r.issue);
+            let surfaces = rejections
+                .iter()
+                .map(|r| format!("{} ({})", r.issue, r.surface))
+                .collect::<Vec<_>>()
+                .join("; ");
+            Some(
+                codegen_diagnostic(name, "CODEGEN002", format!("Go CLI surface rejected: {surfaces}")).with_args(vec![
+                    DiagnosticArg::new("issue", first),
+                    DiagnosticArg::new("target", "go"),
+                    DiagnosticArg::new("surface", surfaces),
+                ]),
+            )
+        }
+    }
+}
+
+#[cfg(not(feature = "hir-go"))]
+fn go_cli_codegen_diagnostic(name: &str, _cli_program: &crate::cli::CliProgram) -> Option<Diagnostic> {
+    Some(
+        codegen_diagnostic(name, "CODEGEN002", "Go target is not available in this radix build").with_args(vec![
+            DiagnosticArg::new("issue", "target_unavailable"),
+            DiagnosticArg::new("target", "go"),
+            DiagnosticArg::new("feature", "hir-go"),
+        ]),
+    )
+}
+
+fn codegen_diagnostic(name: &str, code: &'static str, message: impl Into<String>) -> Diagnostic {
+    Diagnostic::error(message)
+        .with_phase(DiagnosticPhase::Codegen)
+        .with_code(code)
+        .with_file(name.to_owned())
+}
+
+// consumes both values into CompileResult
+fn compile_error(mut analysis: AnalyzedModule, diagnostic: Diagnostic) -> CompileResult {
+    analysis.diagnostics.push(diagnostic);
+    CompileResult { output: None, diagnostics: analysis.diagnostics }
+}
+
+/// Codegen error with an optional source span recovered from MIR/AIR lowering.
+pub struct SpannedCodegenError {
+    pub message: String,
+    pub args: Vec<DiagnosticArg>,
+    pub span: Option<Span>,
+}
+
+impl From<codegen::CodegenError> for SpannedCodegenError {
+    fn from(err: codegen::CodegenError) -> Self {
+        Self { message: err.message, args: err.args, span: None }
+    }
+}
+
+// `not(feature = "mir-amd")` included because the MirAmd fail-closed arm is
+// gated only on that feature, while faber's full-targets enables the other
+// four emitters without mir-amd (P1: E0425 without this condition).
+#[cfg(any(
+    not(feature = "mir-amd"),
+    not(feature = "mir-llvm"),
+    not(feature = "mir-metal"),
+    not(feature = "mir-sexp"),
+    not(feature = "mir-wasm"),
+    not(feature = "mir-wgsl")
+))]
+fn unavailable_target_spanned(target: Target) -> SpannedCodegenError {
+    let feature = target.required_feature().unwrap_or("full-targets");
+    SpannedCodegenError {
+        message: format!("target `{target}` is not available in this radix build; rebuild with feature `{feature}`"),
+        args: vec![
+            DiagnosticArg::new("issue", "target_unavailable"),
+            DiagnosticArg::new("target", target.to_string()),
+            DiagnosticArg::new("feature", feature),
+        ],
+        span: None,
+    }
+}
+
+#[cfg(feature = "mir-core")]
+fn mir_errors_to_spanned(errors: Vec<crate::mir::MirError>) -> SpannedCodegenError {
+    let span = errors.first().map(|e| e.span);
+    let message = errors
+        .iter()
+        .map(|e| e.message.clone())
+        .collect::<Vec<_>>()
+        .join("; ");
+    let args = errors
+        .iter()
+        .map(|e| DiagnosticArg::new("issue", e.issue.clone()))
+        .collect();
+    SpannedCodegenError { message, args, span }
+}
+
+#[cfg(feature = "device")]
+fn air_lower_errors_to_spanned(errors: Vec<crate::air::AirLowerError>) -> SpannedCodegenError {
+    let span = errors.first().map(|e| e.span);
+    let message = errors
+        .iter()
+        .map(|e| e.message.clone())
+        .collect::<Vec<_>>()
+        .join("; ");
+    let args = errors
+        .iter()
+        .map(|e| DiagnosticArg::new("issue", e.issue.clone()))
+        .collect();
+    SpannedCodegenError { message, args, span }
+}
+
+#[cfg(feature = "device")]
+fn air_validation_errors_to_spanned(errors: Vec<crate::air::AirValidationError>) -> SpannedCodegenError {
+    let span = errors.first().map(|e| e.span);
+    let message = errors
+        .iter()
+        .map(|e| e.message.clone())
+        .collect::<Vec<_>>()
+        .join("; ");
+    let args = errors
+        .iter()
+        .map(|e| DiagnosticArg::new("issue", e.issue))
+        .collect();
+    SpannedCodegenError { message, args, span }
+}
+
+#[cfg(feature = "device")]
+fn air_to_mir_errors_to_spanned(errors: Vec<crate::air::AirToMirError>) -> SpannedCodegenError {
+    let span = errors.first().map(|e| e.span);
+    let message = errors
+        .iter()
+        .map(|e| e.message.clone())
+        .collect::<Vec<_>>()
+        .join("; ");
+    let args = errors
+        .iter()
+        .map(|e| DiagnosticArg::new("issue", e.issue.clone()))
+        .collect();
+    SpannedCodegenError { message, args, span }
+}
+
+#[cfg(feature = "mir-core")]
+fn mir_validation_errors_to_spanned(errors: Vec<crate::mir::MirValidationError>) -> SpannedCodegenError {
+    let span = errors.first().map(|e| e.span);
+    let message = errors
+        .iter()
+        .map(|e| e.message.clone())
+        .collect::<Vec<_>>()
+        .join("; ");
+    let args = errors
+        .iter()
+        .map(|e| DiagnosticArg::new("issue", e.issue.clone()))
+        .collect();
+    SpannedCodegenError { message, args, span }
+}
+
+// consumes both values into error path
+fn compile_codegen_error(analysis: AnalyzedModule, name: &str, err: SpannedCodegenError) -> CompileResult {
+    let mut diagnostic = Diagnostic::codegen_error(&err.message)
+        .with_args(err.args)
+        .with_file(name);
+    if let Some(span) = err.span {
+        diagnostic = diagnostic.with_span(span);
+    }
+    compile_error(analysis, diagnostic)
+}
+
+fn generate_output(
+    target: Target,
+    analysis: &mut AnalyzedModule,
+    surface: &KeywordSurface<'_>,
+    output_mode: codegen::OutputMode,
+    module_name: Option<&str>,
+    no_fuse: bool,
+) -> Result<crate::Output, SpannedCodegenError> {
+    match target {
+        Target::MirStepper => Err(codegen::CodegenError {
+            message: "stepper is the core interpreter target; run through the MIR stepper, not codegen emit".to_owned(),
+            args: Vec::new(),
+        }
+        .into()),
+        #[cfg(feature = "mir-wasm")]
+        Target::MirWasm => {
+            // wasm-host-parity emit boundary: the Wasm text target now lowers
+            // the modular-word family (modulus<u8|u16|u32|u64>) through the
+            // sized-numeric carrier policy (see radix-mir-wasm operand.rs
+            // `scalar_ty`); the shared MIR layout classifies ModularWord with
+            // `int_layout`. All other unsupported targets keep the gate.
+            generate_wasm_text_output(analysis, no_fuse)
+        }
+        #[cfg(not(feature = "mir-wasm"))]
+        Target::MirWasm => Err(unavailable_target_spanned(Target::MirWasm)),
+        #[cfg(feature = "mir-llvm")]
+        Target::MirLlvm | Target::MirLlvmHost => {
+            // llvm-host-parity emit boundary: the LLVM text target now lowers
+            // the modular-word family (modulus<u8|u16|u32|u64>) as unsigned
+            // integral scalars. All other unsupported targets keep the gate.
+            // `llvm-host` is the product routing name for the SAME emitter.
+            generate_llvm_text_output(analysis, no_fuse)
+        }
+        #[cfg(not(feature = "mir-llvm"))]
+        Target::MirLlvm | Target::MirLlvmHost => Err(unavailable_target_spanned(Target::MirLlvm)),
+        Target::MirAmd => {
+            // AMD-A2 fail-closed lane diagnostic (goal AC1 / DDCP0
+            // feature-gate policy): without the `mir-amd` feature the AMD
+            // lane is not compiled and fails closed with the stable
+            // `target_unavailable` diagnostic naming the missing feature —
+            // never a silent fallback. With the feature, the emit route is a
+            // follow-on unit (the leaf emitter is the leaf-probe surface);
+            // the driver still fails closed honestly instead of emitting
+            // nothing.
+            #[cfg(not(feature = "mir-amd"))]
+            {
+                return Err(unavailable_target_spanned(Target::MirAmd));
+            }
+            #[cfg(feature = "mir-amd")]
+            {
+                Err(codegen::CodegenError {
+                    message: "the amdgpu emit lane is not yet wired into the radix driver (the `mir-amd` leaf compiles under the feature; the emit route is a follow-on unit)".to_owned(),
+                    args: Vec::new(),
+                }
+                .into())
+            }
+        }
+        #[cfg(feature = "mir-metal")]
+        Target::MirMetal => {
+            reject_modular_word_target(analysis, "Metal text")?;
+            generate_metal_text_output(analysis, no_fuse)
+        }
+        #[cfg(not(feature = "mir-metal"))]
+        Target::MirMetal => Err(unavailable_target_spanned(Target::MirMetal)),
+        #[cfg(feature = "mir-wgsl")]
+        Target::MirWgsl => {
+            reject_modular_word_target(analysis, "WGSL text")?;
+            generate_wgsl_text_output(analysis, no_fuse)
+        }
+        #[cfg(not(feature = "mir-wgsl"))]
+        Target::MirWgsl => Err(unavailable_target_spanned(Target::MirWgsl)),
+        #[cfg(feature = "mir-sexp")]
+        Target::MirSexp => {
+            reject_modular_word_target(analysis, "S-expression")?;
+            generate_sexp_output(analysis, no_fuse)
+        }
+        #[cfg(not(feature = "mir-sexp"))]
+        Target::MirSexp => Err(unavailable_target_spanned(Target::MirSexp)),
+        Target::MirScena => Err(codegen::CodegenError {
+            message: "scena package artifacts must be built through `faber build --target scena`".to_owned(),
+            args: Vec::new(),
+        }
+        .into()),
+        Target::MirFmir => Err(codegen::CodegenError {
+            message: "fmir-text package images must be built through `faber build --target fmir-text`".to_owned(),
+            args: Vec::new(),
+        }
+        .into()),
+        Target::MirFmirBinary => Err(codegen::CodegenError {
+            message: "fmir package images must be built through `faber build --target fmir`".to_owned(),
+            args: Vec::new(),
+        }
+        .into()),
+        Target::MirFmirBundle => Err(codegen::CodegenError {
+            message: "fmir-bin bundles must be built through `faber build --target fmir-bin`".to_owned(),
+            args: Vec::new(),
+        }
+        .into()),
+        Target::HirFhir => Err(codegen::CodegenError {
+            message: "Target::HirFhir is a serialization dispatch, not a codegen backend. Use the emit workflow."
+                .to_owned(),
+            args: Vec::new(),
+        }
+        .into()),
+        Target::HirRust => codegen::generate_rust_from_analyzed(analysis).map_err(std::convert::Into::into),
+        Target::HirFaber => {
+            codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
+                .map_err(std::convert::Into::into)
+        }
+        Target::HirGo => {
+            reject_modular_word_target(analysis, "Go")?;
+            codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
+                .map_err(std::convert::Into::into)
+        }
+        Target::HirSwift => {
+            // S7-U5: modulus<W> is now emitted by the Swift leaf (fixed-width
+            // UInt8/16/32/64 carriers + wrapping `&+`/`&<<` etc.), so the
+            // modular-word gate no longer applies to Swift. Go/Wasm/LLVM/
+            // Metal/WGSL still reject (matrix cells R).
+            codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
+                .map_err(std::convert::Into::into)
+        }
+        Target::HirHaskell => {
+            codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
+                .map_err(std::convert::Into::into)
+        }
+        Target::HirTypeScript => {
+            // S7-U6 sweep (hand-5 S7-U5 residual): the matrix claims TS=S for
+            // modulus<W> (TS4-1 `0ad139a55` — the six modular-word fixtures
+            // typecheck/run/match on the exempla TS lane via driver::Session),
+            // but this emit path still gated. The gate is stale — lifted to
+            // match the matrix (the TS emitter emits per-width wrapping).
+            codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
+                .map_err(std::convert::Into::into)
+        }
+        Target::HirPython => {
+            codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
+                .map_err(std::convert::Into::into)
+        }
+    }
+}
+
+fn reject_modular_word_target(analysis: &AnalyzedModule, target_name: &str) -> Result<(), codegen::CodegenError> {
+    // BO-D-7: O(1) first-modular-word probe (tracked at TypeTable::intern).
+    if let Some(width) = analysis.types.first_modular_word_width() {
+        let marker = width.faber_marker();
+        return Err(codegen::CodegenError {
+            message: format!(
+                "modulus<{marker}> is not supported by the {target_name} target until modular edge-vector parity is landed"
+            ),
+            args: vec![DiagnosticArg::new("issue", "modular_word_target_unsupported")],
+        });
+    }
+    Ok(())
+}
+
+#[cfg_attr(not(feature = "mir-wasm"), allow(unused_variables))]
+#[cfg(feature = "mir-wasm")]
+fn generate_wasm_text_output(
+    analysis: &mut AnalyzedModule,
+    no_fuse: bool,
+) -> Result<crate::Output, SpannedCodegenError> {
+    #[cfg(not(feature = "mir-wasm"))]
+    {
+        return Err(unavailable_target_spanned(Target::MirWasm));
+    }
+    #[cfg(feature = "mir-wasm")]
+    {
+        prepare_mir_lowering_interner(analysis);
+        let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
+        let code = crate::mir::emit_wasm_text_probe(&mir.validated, &mir.interner).map_err(wasm_text_codegen_error)?;
+        Ok(crate::Output::WasmText(crate::WasmTextOutput { code }))
+    }
+}
+
+#[cfg_attr(not(feature = "mir-llvm"), allow(unused_variables))]
+#[cfg(feature = "mir-llvm")]
+fn generate_llvm_text_output(
+    analysis: &mut AnalyzedModule,
+    no_fuse: bool,
+) -> Result<crate::Output, SpannedCodegenError> {
+    #[cfg(not(feature = "mir-llvm"))]
+    {
+        return Err(unavailable_target_spanned(Target::MirLlvm));
+    }
+    #[cfg(feature = "mir-llvm")]
+    {
+        prepare_mir_lowering_interner(analysis);
+        let device_roles = crate::mir::device_roles_from_hir(&analysis.hir);
+        let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
+        // DDCP3-U2 (b) mixed-path disambiguation: `llvm-text`/`llvm-host` is the
+        // CPU-module path. A package that carries device roles routes through the
+        // HOST-PARTITION lane (direct declarations/calls, no device bodies) —
+        // `emit_llvm_text_probe_with_device_roles` remains the NVVM device-
+        // artifact probe path (the CUDA descriptor machinery), never a CPU
+        // module. No route silently emits device bodies into a CPU module.
+        let code = if device_roles.is_empty() {
+            crate::mir::emit_llvm_text_probe_with_device_roles(&device_roles, &mir.validated, &mir.interner)
+                .map_err(llvm_text_codegen_error)?
+        } else {
+            // DDCP3-U5 (gate 6): the host-partition lane runs the pre-emission
+            // reject gate BEFORE any output byte — unsupported callsite shapes,
+            // unresolved region symbols, effect-crossing regions, missing
+            // layout/argument facts, and invalid cross-boundary values fail with
+            // stable structured diagnostics naming the rule; a rejected package
+            // produces zero output bytes. The legality facts (effect-crossing
+            // regions) ride the DDPP1-U6 materializer seam — empty-default here,
+            // the gate + record stay live regardless. The fmir→ArtifactPacketFacts
+            // adapter (crate::mir::fmir_artifact_packet_facts, U4 residual) is
+            // available to that seam at this route.
+            crate::mir::emit_llvm_text_probe_host_partition_with_legality(
+                &device_roles,
+                &mir.validated,
+                &mir.interner,
+                None,
+                &crate::mir::device_semantics::DeviceLegalityFacts::default(),
+            )
+            .map_err(llvm_text_codegen_error)?
+        };
+        Ok(crate::Output::LlvmText(crate::LlvmTextOutput { code }))
+    }
+}
+
+/// Build the NVVM kernel descriptor JSON sidecar for a source unit targeting
+/// `llvm-text` (CUDA lane C4-3).
+///
+/// The sidecar is re-derived from the same source through the public
+/// front-half pipeline (`analyze_source` → MIR lowering → device context), so
+/// `radix emit --cuda-descriptor <path>` can write it without the compiled
+/// [`crate::Output`] carrying MIR; analysis is deterministic, so the
+/// descriptor matches the emitted text. Fail closed: a session whose target is
+/// not `llvm-text`, a failed analysis/lowering, or a module with no
+/// kernel-role functions rejects with diagnostics.
+///
+/// # Errors
+///
+/// Returns diagnostics when the session target is not `llvm-text`, when the
+/// front half fails to analyze or lower the unit, when no `@ nucleum` kernel
+/// is present, or when the descriptor cannot be serialized.
+#[cfg(feature = "mir-llvm")]
+#[cfg(feature = "mir-core")]
+pub fn cuda_kernel_descriptor_json(session: &Session, name: &str, source: &str) -> Result<String, Vec<Diagnostic>> {
+    if session.config.target != Target::MirLlvm {
+        return Err(vec![codegen_diagnostic(
+            name,
+            "CUDA_DESCRIPTOR_TARGET",
+            "--cuda-descriptor requires the llvm-text target",
+        )]);
+    }
+
+    let mut analysis = analyze_source(session, name, source)?;
+
+    // Mirror the llvm-text emit path exactly (generate_llvm_text_output) so
+    // the descriptor is built from the same MIR snapshot as the emitted code.
+    prepare_mir_lowering_interner(&mut analysis);
+    let device_roles = crate::mir::device_roles_from_hir(&analysis.hir);
+    let mir = match lower_mir_with_context_for_target(&mut analysis, session.config.no_fuse) {
+        Ok(mir) => mir,
+        Err(err) => return Err(compile_codegen_error(analysis, name, err).diagnostics),
+    };
+
+    let mut device = crate::mir::MirDeviceContext::from_hir_roles(device_roles);
+    device.attach_program(mir.validated.program());
+    let descriptor = radix_mir_llvm::nvvm_kernel_descriptor(&mir.validated, &mir.interner, &device)
+        .map_err(|error| vec![codegen_diagnostic(name, "CUDA_DESCRIPTOR_BUILD", error.message)])?;
+    serde_json::to_string_pretty(&descriptor)
+        .map_err(|error| vec![codegen_diagnostic(name, "CUDA_DESCRIPTOR_SERIALIZE", error.to_string())])
+}
+
+/// DDCP3-U3 (c) — derive the typed partition/callsite record for an analyzed
+/// unit and serialize it as the JSON compiler artifact (the evidence for DDCP3
+/// gate bullets 1 + 2: exact membership + callsite mapping + explicit effect
+/// boundaries). The record rides the revised FMIR packet **read-only** — no
+/// packet schema change here; a missing typed field routes through U4, never a
+/// silent schema extension. The legality input is empty at this radix driver
+/// entry until the DDPP1-U6 materializer seam wires MIR-body inspection into
+/// `DeviceLegalityFacts` (DDCP1 closeout §5.1 residual) — the record's
+/// effect-boundary section and the named-rule gate stay live regardless.
+///
+/// # Errors
+///
+/// Returns diagnostics when analysis/lowering fails, the record derivation
+/// fails the legality gate, or the record cannot be serialized.
+#[cfg(feature = "mir-core")]
+pub fn partition_record_json(session: &Session, name: &str, source: &str) -> Result<String, Vec<Diagnostic>> {
+    let mut analysis = analyze_source(session, name, source)?;
+    prepare_mir_lowering_interner(&mut analysis);
+    let mir = match lower_mir_with_context_for_target(&mut analysis, session.config.no_fuse) {
+        Ok(mir) => mir,
+        Err(err) => return Err(compile_codegen_error(analysis, name, err).diagnostics),
+    };
+    let legality = crate::mir::device_semantics::DeviceLegalityFacts::default();
+    let record = crate::mir::derive_partition_record(&mir.validated, &mir.interner, name, &legality)
+        .map_err(|error| vec![codegen_diagnostic(name, "PARTITION_RECORD", error.to_string())])?;
+    serde_json::to_string_pretty(&record).map_err(|error| {
+        vec![codegen_diagnostic(
+            name,
+            "PARTITION_RECORD_SERIALIZE",
+            error.to_string(),
+        )]
+    })
+}
+
+#[cfg_attr(not(feature = "mir-metal"), allow(unused_variables))]
+#[cfg(feature = "mir-metal")]
+fn generate_metal_text_output(
+    analysis: &mut AnalyzedModule,
+    no_fuse: bool,
+) -> Result<crate::Output, SpannedCodegenError> {
+    #[cfg(not(feature = "mir-metal"))]
+    {
+        return Err(unavailable_target_spanned(Target::MirMetal));
+    }
+    #[cfg(feature = "mir-metal")]
+    {
+        prepare_mir_lowering_interner(analysis);
+        let device_roles = crate::mir::device_roles_from_hir(&analysis.hir);
+        let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
+        let output = crate::mir::emit_metal_text_probe_with_reflection_and_device_roles(
+            &device_roles,
+            &mir.validated,
+            &mir.interner,
+        )
+        .map_err(|error| codegen::CodegenError {
+            message: error.message,
+            args: vec![
+                DiagnosticArg::new("issue", error.issue),
+                DiagnosticArg::new("shape", error.shape),
+            ],
+        })?;
+        Ok(crate::Output::MetalText(crate::MetalTextOutput {
+            code: output.source,
+            reflection: Some(output.reflection),
+        }))
+    }
+}
+
+#[cfg_attr(not(feature = "mir-wgsl"), allow(unused_variables))]
+#[cfg(feature = "mir-wgsl")]
+fn generate_wgsl_text_output(
+    analysis: &mut AnalyzedModule,
+    no_fuse: bool,
+) -> Result<crate::Output, SpannedCodegenError> {
+    #[cfg(not(feature = "mir-wgsl"))]
+    {
+        return Err(unavailable_target_spanned(Target::MirWgsl));
+    }
+    #[cfg(feature = "mir-wgsl")]
+    {
+        let graphics_source = analysis.graphics_source.clone();
+        let has_vertex = !graphics_source.vertex_entries.is_empty();
+        let has_fragment = !graphics_source.fragment_entries.is_empty();
+
+        if has_vertex || has_fragment {
+            // Run MIR lowering for the graphics path so lowered MirFunctions
+            // are available for body emission. If the source has a non-empty
+            // vertex or fragment body, a lowering failure is a structured
+            // diagnostic — never a silent fallback to reflection defaults.
+            // Truly empty bodies may still select reflection-generated bodies.
+            prepare_mir_lowering_interner(analysis);
+            let has_non_empty_vertex = graphics_source
+                .vertex_entries
+                .iter()
+                .any(|e| e.body_shape == GraphicsVertexBodyShape::Unsupported);
+            let has_non_empty_fragment = graphics_source
+                .fragment_entries
+                .iter()
+                .any(|e| e.body_shape == GraphicsVertexBodyShape::Unsupported);
+            let mir_result = lower_graphics_mir_with_context_for_target(analysis);
+            let (vertex_mir, fragment_mir, mir_validation, mir_interner) = match &mir_result {
+                Ok(mir) => {
+                    let v = mir
+                        .program
+                        .functions
+                        .iter()
+                        .find(|f| f.shader_stage == Some(crate::mir::MirKernelShaderStage::Vertex));
+                    let f = mir
+                        .program
+                        .functions
+                        .iter()
+                        .find(|f| f.shader_stage == Some(crate::mir::MirKernelShaderStage::Fragment));
+                    (v, f, Some(&mir.validated), Some(&mir.interner))
+                }
+                Err(error) if has_non_empty_vertex || has_non_empty_fragment => {
+                    return Err(SpannedCodegenError {
+                        message: error.message.clone(),
+                        args: error.args.clone(),
+                        span: error.span,
+                    });
+                }
+                Err(_) => (None, None, None, None),
+            };
+
+            if has_non_empty_vertex && vertex_mir.is_none() {
+                return Err(mir_errors_to_spanned(vec![crate::mir::MirError {
+                    message: "MIR lowering produced no vertex function for a non-empty graphics shader body".to_owned(),
+                    issue: "mir_lower_graphics_body_missing".to_owned(),
+                    span: crate::lexer::Span::default(),
+                }]));
+            }
+            if has_non_empty_fragment && fragment_mir.is_none() {
+                return Err(mir_errors_to_spanned(vec![crate::mir::MirError {
+                    message: "MIR lowering produced no fragment function for a non-empty graphics shader body"
+                        .to_owned(),
+                    issue: "mir_lower_graphics_body_missing".to_owned(),
+                    span: crate::lexer::Span::default(),
+                }]));
+            }
+
+            if has_vertex && has_fragment {
+                let output = emit_wgsl_graphics_pipeline_output(
+                    &graphics_source,
+                    vertex_mir,
+                    fragment_mir,
+                    mir_validation,
+                    mir_interner,
+                )
+                .map_err(wgsl_text_codegen_error)?;
+                return Ok(crate::Output::WgslText(crate::WgslTextOutput {
+                    code: output.source,
+                    reflection: Some(output.reflection),
+                }));
+            }
+            if has_vertex {
+                let output = emit_wgsl_vertex_source_output(&graphics_source, vertex_mir, mir_validation, mir_interner)
+                    .map_err(wgsl_text_codegen_error)?;
+                return Ok(crate::Output::WgslText(crate::WgslTextOutput {
+                    code: output.source,
+                    reflection: Some(output.reflection),
+                }));
+            }
+            if has_fragment {
+                let output =
+                    emit_wgsl_fragment_source_output(&graphics_source, fragment_mir, mir_validation, mir_interner)
+                        .map_err(wgsl_text_codegen_error)?;
+                return Ok(crate::Output::WgslText(crate::WgslTextOutput {
+                    code: output.source,
+                    reflection: Some(output.reflection),
+                }));
+            }
+        }
+
+        prepare_mir_lowering_interner(analysis);
+        let device_roles = crate::mir::device_roles_from_hir(&analysis.hir);
+        let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
+        let output = crate::mir::emit_wgsl_text_probe_with_reflection_and_device_roles(
+            &device_roles,
+            &mir.validated,
+            &mir.interner,
+        )
+        .map_err(|error| codegen::CodegenError {
+            message: error.message,
+            args: vec![
+                DiagnosticArg::new("issue", error.issue),
+                DiagnosticArg::new("shape", error.shape),
+            ],
+        })?;
+        Ok(crate::Output::WgslText(crate::WgslTextOutput {
+            code: output.source,
+            reflection: Some(output.reflection),
+        }))
+    }
+}
+
+#[cfg(feature = "mir-wgsl")]
+#[cfg(feature = "mir-wgsl")]
+fn emit_wgsl_vertex_source_output(
+    graphics_source: &GraphicsSourceFacts,
+    vertex_mir: Option<&crate::mir::MirFunction>,
+    mir_validation: Option<&crate::mir::ValidatedMir<'_>>,
+    mir_interner: Option<&crate::lexer::Interner>,
+) -> Result<crate::mir::MirWgslTextProbeOutput, crate::mir::MirWgslTextProbeError> {
+    if graphics_source.vertex_entries.len() != 1 {
+        return Err(wgsl_vertex_source_error(
+            "wgsl-text source vertex path requires exactly one @ vertex function",
+            "mir_wgsl_vertex_source_entry_count",
+        ));
+    }
+    if graphics_source.shader_vertex_attributes.is_empty() {
+        return Err(wgsl_vertex_source_error(
+            "wgsl vertex entry requires source vertex layout facts",
+            "mir_wgsl_vertex_source_layout_missing",
+        ));
+    }
+
+    let entry = &graphics_source.vertex_entries[0];
+    validate_wgsl_vertex_source_entry(entry)?;
+    let varyings: Vec<crate::mir::MirVaryingReflection> = graphics_source
+        .shader_varyings
+        .iter()
+        .map(radix_mir::varying_reflection_from_shader_contract)
+        .collect();
+    let resources: Vec<crate::mir::MirKernelResourceReflection> = graphics_source
+        .shader_resource_bindings
+        .iter()
+        .map(radix_mir::resource_reflection_from_shader_contract)
+        .collect();
+    let vertex = radix_mir::source_vertex_entry_from_shader_contract(
+        entry.def_id,
+        entry.entry_name.clone(),
+        &graphics_source.shader_vertex_attributes,
+        resources,
+    )
+    .map_err(wgsl_vertex_abi_error)?;
+    let vertex_with_varyings = crate::mir::MirKernelReflection { varyings, ..vertex };
+    let source =
+        crate::mir::emit_wgsl_vertex_entry_contract(&vertex_with_varyings, vertex_mir, mir_validation, mir_interner)?;
+    Ok(crate::mir::MirWgslTextProbeOutput {
+        source,
+        reflection: crate::mir::MirGpuReflection { kernels: vec![vertex_with_varyings], pipeline: None },
+    })
+}
+
+#[cfg(feature = "mir-wgsl")]
+#[cfg(feature = "mir-wgsl")]
+fn emit_wgsl_fragment_source_output(
+    graphics_source: &GraphicsSourceFacts,
+    fragment_mir: Option<&crate::mir::MirFunction>,
+    mir_validation: Option<&crate::mir::ValidatedMir<'_>>,
+    mir_interner: Option<&crate::lexer::Interner>,
+) -> Result<crate::mir::MirWgslTextProbeOutput, crate::mir::MirWgslTextProbeError> {
+    if graphics_source.fragment_entries.len() != 1 {
+        return Err(wgsl_vertex_source_error(
+            "wgsl-text source fragment path requires exactly one @ fragment function",
+            "mir_wgsl_fragment_source_entry_count",
+        ));
+    }
+
+    let entry = &graphics_source.fragment_entries[0];
+    validate_wgsl_fragment_source_entry(entry)?;
+    let fragment_outputs: Vec<crate::mir::MirFragmentOutputReflection> = graphics_source
+        .shader_fragment_outputs
+        .iter()
+        .map(radix_mir::fragment_output_reflection_from_shader_contract)
+        .collect();
+    if fragment_outputs.is_empty() {
+        return Err(wgsl_vertex_source_error(
+            "wgsl fragment entry requires at least one fragment output fact",
+            "mir_wgsl_fragment_output_missing",
+        ));
+    }
+    let resources: Vec<crate::mir::MirKernelResourceReflection> = graphics_source
+        .shader_resource_bindings
+        .iter()
+        .map(radix_mir::resource_reflection_from_shader_contract)
+        .collect();
+    let fragment = radix_mir::source_fragment_entry_from_shader_contract(
+        entry.def_id,
+        entry.entry_name.clone(),
+        &graphics_source.shader_varyings,
+        &graphics_source.shader_fragment_outputs,
+        resources,
+    )
+    .map_err(wgsl_vertex_abi_error)?;
+    let source = crate::mir::emit_wgsl_fragment_entry_contract(&fragment, fragment_mir, mir_validation, mir_interner)?;
+    Ok(crate::mir::MirWgslTextProbeOutput {
+        source,
+        reflection: crate::mir::MirGpuReflection { kernels: vec![fragment], pipeline: None },
+    })
+}
+
+#[cfg(feature = "mir-wgsl")]
+#[cfg(feature = "mir-wgsl")]
+fn emit_wgsl_graphics_pipeline_output(
+    graphics_source: &GraphicsSourceFacts,
+    vertex_mir: Option<&crate::mir::MirFunction>,
+    fragment_mir: Option<&crate::mir::MirFunction>,
+    mir_validation: Option<&crate::mir::ValidatedMir<'_>>,
+    mir_interner: Option<&crate::lexer::Interner>,
+) -> Result<crate::mir::MirWgslTextProbeOutput, crate::mir::MirWgslTextProbeError> {
+    let vertex_output = emit_wgsl_vertex_source_output(graphics_source, vertex_mir, mir_validation, mir_interner)?;
+    let fragment_output =
+        emit_wgsl_fragment_source_output(graphics_source, fragment_mir, mir_validation, mir_interner)?;
+
+    let pipeline = graphics_source
+        .shader_pipeline_states
+        .first()
+        .map(|state| {
+            radix_mir::graphics_pipeline_from_shader_contract(
+                &vertex_output.reflection.kernels[0],
+                &fragment_output.reflection.kernels[0],
+                state,
+            )
+        })
+        .transpose()
+        .map_err(|err| wgsl_vertex_source_error_with_detail("wgsl pipeline fact invalid", err.issue, &err.message))?;
+
+    let mut kernels = vertex_output.reflection.kernels;
+    kernels.extend(fragment_output.reflection.kernels);
+
+    Ok(crate::mir::MirWgslTextProbeOutput {
+        source: format!("{}\n{}\n", vertex_output.source, fragment_output.source),
+        reflection: crate::mir::MirGpuReflection { kernels, pipeline },
+    })
+}
+
+#[cfg(feature = "mir-wgsl")]
+#[cfg(feature = "mir-wgsl")]
+fn validate_wgsl_vertex_source_entry(entry: &GraphicsVertexEntry) -> Result<(), crate::mir::MirWgslTextProbeError> {
+    if entry.annotation_payload_count != 0 {
+        return Err(wgsl_vertex_source_error(
+            "wgsl vertex entry annotation must not carry payload fields or arguments",
+            "mir_wgsl_vertex_source_annotation_payload",
+        ));
+    }
+    if entry.param_count != 0 {
+        return Err(wgsl_vertex_source_error(
+            "wgsl vertex entry requires zero source parameters",
+            "mir_wgsl_vertex_source_params",
+        ));
+    }
+    if !entry.returns_vacuum {
+        return Err(wgsl_vertex_source_error(
+            "wgsl vertex entry requires vacuum return type",
+            "mir_wgsl_vertex_source_return",
+        ));
+    }
+    if entry.has_error_type {
+        return Err(wgsl_vertex_source_error(
+            "wgsl vertex entry must not declare an error type",
+            "mir_wgsl_vertex_source_error_type",
+        ));
+    }
+    // Non-empty vertex bodies are now supported via MIR lowering (U4).
+    Ok(())
+}
+
+#[cfg(feature = "mir-wgsl")]
+#[cfg(feature = "mir-wgsl")]
+fn wgsl_vertex_source_error(shape: &'static str, issue: &'static str) -> crate::mir::MirWgslTextProbeError {
+    crate::mir::MirWgslTextProbeError {
+        message: format!("MIR-to-WGSL unsupported: {shape}"),
+        issue,
+        shape: shape.to_owned(),
+    }
+}
+
+#[cfg(feature = "mir-wgsl")]
+#[cfg(feature = "mir-wgsl")]
+fn wgsl_vertex_abi_error(error: crate::mir::MirAbiError) -> crate::mir::MirWgslTextProbeError {
+    crate::mir::MirWgslTextProbeError {
+        message: format!("MIR-to-WGSL unsupported: {}", error.message),
+        issue: error.issue,
+        shape: error.message,
+    }
+}
+
+#[cfg(feature = "mir-wgsl")]
+#[cfg(feature = "mir-wgsl")]
+fn wgsl_text_codegen_error(error: crate::mir::MirWgslTextProbeError) -> codegen::CodegenError {
+    codegen::CodegenError {
+        message: error.message,
+        args: vec![
+            DiagnosticArg::new("issue", error.issue),
+            DiagnosticArg::new("shape", error.shape),
+        ],
+    }
+}
+
+#[cfg(feature = "mir-wgsl")]
+#[cfg(feature = "mir-wgsl")]
+#[cfg(feature = "mir-wgsl")]
+fn wgsl_vertex_source_error_with_detail(
+    shape: &'static str,
+    issue: &'static str,
+    detail: &str,
+) -> crate::mir::MirWgslTextProbeError {
+    crate::mir::MirWgslTextProbeError {
+        message: format!("MIR-to-WGSL unsupported: {shape}: {detail}"),
+        issue,
+        shape: format!("{shape}: {detail}"),
+    }
+}
+
+#[cfg(feature = "mir-wgsl")]
+#[cfg(feature = "mir-wgsl")]
+fn validate_wgsl_fragment_source_entry(entry: &GraphicsFragmentEntry) -> Result<(), crate::mir::MirWgslTextProbeError> {
+    if entry.annotation_payload_count != 0 {
+        return Err(wgsl_vertex_source_error(
+            "wgsl fragment entry annotation must not carry payload fields or arguments",
+            "mir_wgsl_fragment_source_annotation_payload",
+        ));
+    }
+    if entry.param_count != 0 {
+        return Err(wgsl_vertex_source_error(
+            "wgsl fragment entry requires zero source parameters",
+            "mir_wgsl_fragment_source_params",
+        ));
+    }
+    if !entry.returns_vacuum {
+        return Err(wgsl_vertex_source_error(
+            "wgsl fragment entry requires vacuum return type",
+            "mir_wgsl_fragment_source_return",
+        ));
+    }
+    if entry.has_error_type {
+        return Err(wgsl_vertex_source_error(
+            "wgsl fragment entry must not declare an error type",
+            "mir_wgsl_fragment_source_error_type",
+        ));
+    }
+    // Non-empty fragment bodies are no longer rejected (mir_wgsl_fragment_source_body gate removed U4).
+    Ok(())
+}
+
+#[cfg_attr(not(feature = "mir-sexp"), allow(unused_variables))]
+#[cfg(feature = "mir-sexp")]
+fn generate_sexp_output(analysis: &mut AnalyzedModule, no_fuse: bool) -> Result<crate::Output, SpannedCodegenError> {
+    #[cfg(not(feature = "mir-sexp"))]
+    {
+        return Err(unavailable_target_spanned(Target::MirSexp));
+    }
+    #[cfg(feature = "mir-sexp")]
+    {
+        prepare_mir_lowering_interner(analysis);
+        let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
+        let code = crate::mir::emit_sexp_text(&mir.validated, &mir.interner).map_err(|error| {
+            codegen::CodegenError { message: error.message, args: vec![DiagnosticArg::new("category", error.category)] }
+        })?;
+        Ok(crate::Output::Sexp(crate::SexpOutput { code }))
+    }
+}
+
+/// Keep the cloned interner used by target emitters in lockstep with MIR-only
+/// symbols that lowering may intern for synthesized format templates.
+#[cfg(feature = "mir-core")]
+fn prepare_mir_lowering_interner(analysis: &mut AnalyzedModule) {
+    crate::mir::prepare_mir_lowering_interner(&mut analysis.interner);
+}
+
+/// Pre-lowered AIR MIR program and backward-generation snapshots, bundled
+/// for installation after HIR→MIR lowering completes.  Separating preparation
+/// from installation avoids the NLL conflict where `LoweredMirUnit` borrows
+/// `analysis.types` while the backward snapshots still need mutable access
+/// to the type table for gradient-tuple interning.
+#[cfg(feature = "device")]
+pub struct AirBackwardBundle {
+    pub air_mir: crate::mir::MirProgram,
+    pub air_program: crate::air::AirProgram,
+    pub snapshots: Vec<AirBackwardSnapshot>,
+    /// Global `(operand_ty → transposed_ty)` map for MatMul VJP operand
+    /// types, merged from every AIR function (annotated primals + unannotated
+    /// callees). The reverse-AD transform resolves the transposed type in
+    /// O(1) via this map instead of scanning the whole `TypeTable`
+    /// (D-BO-M-4-1).
+    pub matmul_transpose_types: rustc_hash::FxHashMap<crate::semantic::TypeId, crate::semantic::TypeId>,
+}
+
+/// Prepare AIR backward companion data *before* HIR→MIR lowering.
+///
+/// Returns `None` when the unit has no AIR lane or no backward annotations.
+/// Callers that skip this phase (or that receive `None`) have no companions
+/// to install later; the lowered MIR program is complete as-is.
+///
+/// # Errors
+///
+/// Returns a [`SpannedCodegenError`] when AIR lowering or backward companion
+/// preparation fails.
+#[cfg(feature = "device")]
+pub fn prepare_air_backward_bundle(
+    analysis: &mut AnalyzedModule,
+) -> Result<Option<AirBackwardBundle>, SpannedCodegenError> {
+    let has_air = analysis
+        .radix_lanes
+        .iter()
+        .any(|(_, lane)| lane == RadixLane::Air);
+
+    let has_backward = analysis.radix_lanes.has_backward();
+
+    if !has_air || !has_backward {
+        return Ok(None);
+    }
+
+    let (air_program, air_mir) = air_mir_from_analysis(analysis)?;
+
+    // Pre-intern gradient-tuple types for every AIR function so that
+    // `transform_reverse_ad` can find them via `find_tuple` when it runs
+    // inside `generate_companions_bottom_up` (which receives an immutable
+    // `&TypeTable` that cannot intern new tuples itself).
+    //
+    // Without this, `find_tuple` returns None for interprocedural callees
+    // whose parameter-type combinations have never been interned, and the
+    // sentinel `TypeId(u32::MAX)` stored in `CalleeCompanionInfo::func_sig_ret`
+    // later panics in `walk_block_reverse` when `types.get(sentinel)` is
+    // called.
+    for function in &air_program.functions {
+        let tensor_param_tys: Vec<crate::semantic::TypeId> = function
+            .params
+            .iter()
+            .filter(|p| crate::semantic::tensor_type_directed::is_tensor_type(p.ty, &analysis.types))
+            .map(|p| p.ty)
+            .collect();
+        if !tensor_param_tys.is_empty() {
+            analysis.types.tuple(tensor_param_tys);
+        }
+    }
+
+    // Pre-intern transposed tensor types for MatMul operands across ALL
+    // functions (annotated primals + unannotated callees) so the reverse-AD
+    // transform can resolve them during bottom-up companion generation
+    // (D-BO-M-4-1). This replaces the per-annotated-function call that used
+    // to run inside `prepare_air_backward_snapshots`; covering every function
+    // makes MatMul VJP coverage deterministic for unannotated callees that
+    // today only succeed when a whole-table scan finds the type by accident.
+    // Each function's map merges into one global (operand_ty → transposed_ty)
+    // map carried on the bundle; TypeIds are globally interned in the shared
+    // TypeTable, so a single keyed map is valid across the whole call DAG.
+    let mut matmul_transpose_types: rustc_hash::FxHashMap<crate::semantic::TypeId, crate::semantic::TypeId> =
+        rustc_hash::FxHashMap::default();
+    for function in &air_program.functions {
+        matmul_transpose_types.extend(crate::air::reverse_ad::ensure_matmul_transpose_types(
+            function,
+            &mut analysis.types,
+        ));
+        // Pre-intern the intermediate tensor types produced by broadcast
+        // cotangent reductions (SumAxis chains and the Fill re-broadcast)
+        // for the same reason as the matmul transpose types above: the
+        // reverse-AD walk holds only `&TypeTable` and must resolve every
+        // intermediate reduced shape already interned. A broadcast-using
+        // primal (bias-broadcast body) otherwise hits
+        // `reverse_ad_broadcast_reduction_missing_type` during companion
+        // generation (shape-generics P3 unit-3B).
+        crate::air::reverse_ad::ensure_broadcast_reduction_types(function, &mut analysis.types);
+    }
+
+    let snapshots = prepare_air_backward_snapshots(analysis, Some(&air_program))?;
+
+    Ok(Some(AirBackwardBundle {
+        air_mir,
+        air_program,
+        snapshots,
+        matmul_transpose_types,
+    }))
+}
+
+/// Install AIR-lane MIR replacements and backward companion functions into
+/// an already-lowered [`LoweredMirUnit`].
+///
+/// Call this *after* [`lower_analyzed_unit_with_context`] (or the CLI-aware
+/// variant) has produced the HIR→MIR program and validation context.
+///
+/// # Errors
+///
+/// Returns a [`SpannedCodegenError`] when AIR replacement or companion
+/// generation fails.
+#[cfg(feature = "device")]
+pub fn apply_air_backward_bundle(
+    lowered: &mut crate::mir::LoweredMirUnit<'_>,
+    bundle: AirBackwardBundle,
+    no_fuse: bool,
+) -> Result<(), SpannedCodegenError> {
+    use crate::air::reverse_ad_callgraph::generate_companions_bottom_up;
+    use rustc_hash::FxHashMap;
+
+    replace_air_lane_mir(lowered, bundle.air_mir)?;
+    let mut fresh_ids = FreshMirFunctionIds::after(lowered.program.functions.iter().map(|function| function.id));
+
+    // Build maps for bottom-up companion generation from the snapshots.
+    let backward_def_ids: Vec<crate::hir::DefId> = bundle.snapshots.iter().map(|s| s.primal_def_id).collect();
+
+    let companion_names: FxHashMap<crate::hir::DefId, crate::lexer::Symbol> = bundle
+        .snapshots
+        .iter()
+        .map(|s| (s.primal_def_id, s.companion_name))
+        .collect();
+
+    let predeclared_companions: FxHashMap<crate::hir::DefId, crate::hir::DefId> = bundle
+        .snapshots
+        .iter()
+        .map(|s| (s.primal_def_id, s.companion_def_id))
+        .collect();
+
+    // Run bottom-up companion generation.  This produces companions for all
+    // functions in the call DAG (annotated primals + unannotated callees) and
+    // a populated callee_info map so Call bindings are resolved.
+    let mut names = crate::air::AirNameAllocator::new();
+    let generated = generate_companions_bottom_up(
+        &bundle.air_program,
+        &backward_def_ids,
+        &companion_names,
+        &predeclared_companions,
+        &mut names,
+        lowered.validated.validation().types,
+        &bundle.matmul_transpose_types,
+        &mut lowered.interner,
+    )
+    .map_err(|errors| {
+        let messages: Vec<String> = errors.iter().map(|e| e.message.clone()).collect();
+        SpannedCodegenError {
+            message: format!("call-graph companion generation failed: {}", messages.join("; ")),
+            args: vec![],
+            span: None,
+        }
+    })?;
+
+    // Index annotated companions by primal DefId for snapshot matching.
+    let annotated_by_primal: FxHashMap<crate::hir::DefId, &crate::air::AirFunction> = {
+        // Companions use their own DefId as `source` (not the primal's). Build an
+        // O(1) source→companion map once (BO-D-6), then resolve each snapshot.
+        let companions_by_source: FxHashMap<crate::hir::DefId, &crate::air::AirFunction> = generated
+            .annotated_companions
+            .iter()
+            .map(|companion| (companion.source, companion))
+            .collect();
+        let mut map = FxHashMap::default();
+        for snapshot in &bundle.snapshots {
+            let companion_def_id = snapshot.companion_def_id;
+            if let Some(&companion) = companions_by_source.get(&companion_def_id) {
+                map.insert(snapshot.primal_def_id, companion);
+            }
+        }
+        map
+    };
+
+    // For each annotated primal, run the validation/installation chain using the
+    // generated companion and the populated callee_info map.
+    for snapshot in &bundle.snapshots {
+        let Some(companion) = annotated_by_primal.get(&snapshot.primal_def_id) else {
+            return Err(SpannedCodegenError {
+                message: format!("companion not found for annotated primal DefId({})", snapshot.primal_def_id.0),
+                args: vec![],
+                span: None,
+            });
+        };
+        let companion = (*companion).clone();
+        // S3-A2: the returned entry carries the primal→companion facts onto
+        // the lowered unit (the owned carrier), so the device-program
+        // constructor can materialize the companion as device kernels.
+        let entry = generate_air_lane_backward_with_companion(snapshot, companion, lowered, &mut fresh_ids, no_fuse)?;
+        // Fail-closed carrier insertion (Stage 3R F4): duplicate or
+        // contradictory relation rows for one primal are a hard error, never
+        // a silent overwrite.
+        lowered
+            .companions
+            .try_insert(entry)
+            .map_err(|error| SpannedCodegenError {
+                message: format!("companion relation carrier rejected: {error}"),
+                args: vec![],
+                span: None,
+            })?;
+    }
+
+    // Emit unannotated callee companions into the MIR program.  These are
+    // companions for functions that are called but not themselves annotated
+    // with @ radix backward.  They must be lowered to MIR so the backward
+    // sub-companion Call targets are available at link time.
+    for companion in &generated.unannotated_companions {
+        let companion_program = crate::air::AirProgram { functions: vec![companion.clone()] };
+        crate::air::validate_program(&companion_program).map_err(|errors| {
+            let messages: Vec<String> = errors.iter().map(|e| format!("{e:?}")).collect();
+            SpannedCodegenError {
+                message: format!("unannotated callee companion AIR validation failed: {}", messages.join("; ")),
+                args: vec![],
+                span: None,
+            }
+        })?;
+        let companion_mir = crate::air::to_mir_program(
+            &companion_program,
+            &crate::air::AirToMirContext::with_interner_and_types(
+                &lowered.interner,
+                lowered.validated.validation().types,
+            ),
+        )
+        .map_err(|errors| {
+            let messages: Vec<String> = errors.iter().map(|e| format!("{e:?}")).collect();
+            SpannedCodegenError {
+                message: format!("unannotated callee companion MIR lowering failed: {}", messages.join("; ")),
+                args: vec![],
+                span: None,
+            }
+        })?;
+        for mut function in companion_mir.functions {
+            function.id = fresh_ids.next();
+            lowered.program.functions.push(function);
+        }
+    }
+
+    finalize_air_backward_shapes(lowered)
+}
+
+/// Apply concrete shape bindings from existing call-site monomorphizations to
+/// AIR-generated backward MIR after the bundle has been installed.
+///
+/// AIR companions are generated after ordinary HIR→MIR monomorphization, so
+/// they cannot participate in that earlier pass. The generated companion and
+/// primal carry the same symbolic tensor shapes. Matching each companion
+/// against a concrete primal instance therefore recovers the exact
+/// `magnitudo` bindings without a backend-specific policy.
+#[cfg(feature = "device")]
+fn finalize_air_backward_shapes(lowered: &mut crate::mir::LoweredMirUnit<'_>) -> Result<(), SpannedCodegenError> {
+    use crate::mir::generic::MirShapeBindings;
+    use crate::mir::MirMonomorphizationKey;
+
+    const UNRESOLVED_SHAPE_SIZE_SURVIVOR: &str = "unresolved shape-size constant survives monomorphization";
+
+    let companion_sources = lowered
+        .companions
+        .iter()
+        .map(|entry| entry.companion)
+        .collect::<rustc_hash::FxHashSet<_>>();
+    let mut companion_templates = lowered
+        .program
+        .functions
+        .iter()
+        .filter(|function| {
+            function
+                .source
+                .is_some_and(|source| companion_sources.contains(&source))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    if companion_templates.is_empty() {
+        return reject_shape_size_survivors(&mut lowered.program.functions, UNRESOLVED_SHAPE_SIZE_SURVIVOR);
+    }
+
+    let concrete_shapes = lowered
+        .monomorphizations
+        .iter()
+        .filter(|monomorphization| !monomorphization.key.shape_args.is_empty())
+        .map(|monomorphization| monomorphization.key.shape_args.clone())
+        .collect::<rustc_hash::FxHashSet<_>>();
+    if concrete_shapes.is_empty() {
+        // A symbolic companion with no concrete call-site instance is a
+        // template, not executable MIR. It stays available for later package
+        // linking and is outside the whole-executable-program survivor net.
+        return Ok(());
+    }
+
+    let types = lowered.validated.validation().types;
+    let types = radix_types::TypeTable::from_snapshot(types.snapshot()).map_err(|message| SpannedCodegenError {
+        message: format!("MIR type metadata clone failed: {message}"),
+        args: vec![],
+        span: None,
+    })?;
+    // Generated concrete tuple/index carriers must outlive the returned
+    // `ValidatedMir` token. The analyzed unit owns the original table, but AIR
+    // insertion occurs after lowering has borrowed it immutably. Leak this one
+    // append-only clone for the compilation lifetime rather than teaching
+    // backends to rebuild semantic metadata.
+    let types: &'static mut crate::semantic::TypeTable = Box::leak(Box::new(types));
+    let mut next_ids = FreshMirFunctionIds::after(lowered.program.functions.iter().map(|function| function.id));
+    let mut instances = Vec::new();
+    let mut monomorphizations = Vec::new();
+    let mut instance_ids = rustc_hash::FxHashMap::default();
+    let mut instance_return_types = rustc_hash::FxHashMap::default();
+
+    for template in &mut companion_templates {
+        let symbols = companion_shape_symbols(types, template);
+        for shape_args in &concrete_shapes {
+            if symbols.len() != shape_args.len() {
+                continue;
+            }
+            let bindings = symbols
+                .iter()
+                .copied()
+                .zip(shape_args.iter().copied())
+                .collect::<MirShapeBindings>();
+            let Some(mut instance) = finalize_air_backward_instance(types, template, &bindings) else {
+                continue;
+            };
+            instance.id = next_ids.next();
+            let source = instance.source.expect("AIR companion has source identity");
+            let key = MirMonomorphizationKey { source, type_args: Vec::new(), shape_args: shape_args.clone() };
+            instance_ids.insert(key.clone(), instance.id);
+            instance_return_types.insert(key.clone(), instance.return_ty);
+            monomorphizations.push(crate::mir::MirMonomorphization { key, function: instance.id });
+            instances.push(instance);
+        }
+    }
+
+    if instances.is_empty() {
+        return reject_shape_size_survivors(&mut lowered.program.functions, UNRESOLVED_SHAPE_SIZE_SURVIVOR);
+    }
+
+    let template_ids = companion_templates
+        .iter()
+        .map(|function| function.id)
+        .collect::<rustc_hash::FxHashSet<_>>();
+    rewrite_air_backward_calls(
+        &mut lowered.program.functions,
+        types,
+        &companion_sources,
+        &instance_ids,
+        &instance_return_types,
+    )?;
+    let concrete_validation = lowered.validated.validation().with_types(types);
+    lowered
+        .program
+        .functions
+        .retain(|function| !template_ids.contains(&function.id));
+    lowered.program.functions.extend(instances);
+    lowered.monomorphizations.extend(monomorphizations);
+    lowered.validated =
+        crate::mir::ValidatedMir::new(lowered.program.clone(), concrete_validation).map_err(|errors| {
+            let messages = errors
+                .iter()
+                .map(|error| error.message.clone())
+                .collect::<Vec<_>>();
+            SpannedCodegenError {
+                message: format!(
+                    "MIR validation after backward shape finalization failed: {}",
+                    messages.join("; ")
+                ),
+                args: vec![],
+                span: errors.first().map(|error| error.span),
+            }
+        })?;
+    reject_shape_size_survivors(&mut lowered.program.functions, UNRESOLVED_SHAPE_SIZE_SURVIVOR)
+}
+
+#[cfg(feature = "device")]
+fn rewrite_air_backward_calls(
+    functions: &mut [crate::mir::MirFunction],
+    types: &crate::semantic::TypeTable,
+    companion_sources: &rustc_hash::FxHashSet<crate::hir::DefId>,
+    instances: &rustc_hash::FxHashMap<crate::mir::MirMonomorphizationKey, crate::mir::MirFunctionId>,
+    instance_return_types: &rustc_hash::FxHashMap<crate::mir::MirMonomorphizationKey, crate::mir::MirType>,
+) -> Result<(), SpannedCodegenError> {
+    use crate::mir::generic::{bind_generic_type_witness_with_shapes, canonical_index, MirShapeBindings};
+    use crate::mir::{
+        MirCallee, MirGenericBindings, MirMonomorphizationKey, MirOperand, MirPlaceBase, MirStatementKind,
+        MirTerminatorKind,
+    };
+
+    fn operand_ty(
+        function: &crate::mir::MirFunction,
+        values: &rustc_hash::FxHashMap<crate::mir::MirValueId, crate::mir::MirType>,
+        operand: &MirOperand,
+    ) -> Option<crate::mir::MirType> {
+        match operand {
+            MirOperand::Place(place) => match place.base {
+                MirPlaceBase::Local(id) => function
+                    .locals
+                    .iter()
+                    .find(|local| local.id == id)
+                    .map(|local| local.ty),
+                MirPlaceBase::Temp(id) => function
+                    .temps
+                    .iter()
+                    .find(|temp| temp.id == id)
+                    .map(|temp| temp.ty),
+            },
+            MirOperand::Temp(id) => function
+                .temps
+                .iter()
+                .find(|temp| temp.id == *id)
+                .map(|temp| temp.ty),
+            MirOperand::Value(id) => values.get(id).copied(),
+            MirOperand::Constant(_) => None,
+        }
+    }
+
+    let templates = functions
+        .iter()
+        .filter_map(|function| function.source.map(|source| (source, function.clone())))
+        .filter(|(source, _)| companion_sources.contains(source))
+        .collect::<rustc_hash::FxHashMap<_, _>>();
+
+    for function in functions {
+        let function_snapshot = function.clone();
+        for block in &mut function.blocks {
+            let mut values = rustc_hash::FxHashMap::default();
+            for statement in &mut block.statements {
+                if let MirStatementKind::Assign { value, .. } = &statement.kind {
+                    values.insert(value.id, value.ty);
+                }
+                let MirStatementKind::Call { destination, callee, args } = &mut statement.kind else {
+                    continue;
+                };
+                let MirCallee::Definition { source, .. } = callee else {
+                    continue;
+                };
+                let Some(template) = templates.get(source) else {
+                    continue;
+                };
+                let mut bindings = MirShapeBindings::default();
+                let mut type_bindings = MirGenericBindings::default();
+                for (expected, argument) in template.params.iter().zip(args.iter()) {
+                    let Some(actual) = operand_ty(&function_snapshot, &values, argument) else {
+                        continue;
+                    };
+                    if !bind_generic_type_witness_with_shapes(
+                        types,
+                        expected.ty,
+                        actual,
+                        &mut type_bindings,
+                        &mut bindings,
+                    ) {
+                        return Err(SpannedCodegenError {
+                            message: "call argument type mismatch".to_owned(),
+                            args: vec![],
+                            span: Some(statement.span),
+                        });
+                    }
+                }
+                let symbols = companion_shape_symbols(types, template);
+                let shape_args = symbols
+                    .iter()
+                    .filter_map(|symbol| {
+                        bindings
+                            .get(symbol)
+                            .copied()
+                            .map(|shape| canonical_index(types, shape))
+                    })
+                    .collect::<Vec<_>>();
+                let key = MirMonomorphizationKey { source: *source, type_args: Vec::new(), shape_args };
+                let Some(&target) = instances.get(&key) else {
+                    return Err(SpannedCodegenError {
+                        message: "generic call signature has unresolved type parameter".to_owned(),
+                        args: vec![],
+                        span: Some(statement.span),
+                    });
+                };
+                if let Some(destination) = destination {
+                    let Some(&concrete_return) = instance_return_types.get(&key) else {
+                        return Err(SpannedCodegenError {
+                            message: "generic companion instance is missing".to_owned(),
+                            args: vec![],
+                            span: Some(statement.span),
+                        });
+                    };
+                    match destination.base {
+                        MirPlaceBase::Local(id) => {
+                            if let Some(local) = function.locals.iter_mut().find(|local| local.id == id) {
+                                local.ty = concrete_return;
+                            }
+                        }
+                        MirPlaceBase::Temp(id) => {
+                            if let Some(temp) = function.temps.iter_mut().find(|temp| temp.id == id) {
+                                temp.ty = concrete_return;
+                            }
+                        }
+                    }
+                }
+                *callee = MirCallee::Function(target);
+            }
+
+            if let MirTerminatorKind::TryCall { callee: MirCallee::Definition { source, .. }, .. } =
+                &block.terminator.kind
+            {
+                if templates.contains_key(source) {
+                    return Err(SpannedCodegenError {
+                        message: "generic call signature has unresolved type parameter".to_owned(),
+                        args: vec![],
+                        span: Some(block.terminator.span),
+                    });
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "device")]
+fn companion_shape_symbols(
+    types: &crate::semantic::TypeTable,
+    function: &crate::mir::MirFunction,
+) -> Vec<crate::lexer::Symbol> {
+    fn collect_index(
+        types: &crate::semantic::TypeTable,
+        index: crate::semantic::IndexId,
+        symbols: &mut Vec<crate::lexer::Symbol>,
+    ) {
+        match types.get_index(index) {
+            crate::semantic::IndexExpr::Param(symbol) => {
+                if !symbols.contains(symbol) {
+                    symbols.push(*symbol);
+                }
+            }
+            crate::semantic::IndexExpr::Tuple(dims) => {
+                for dim in dims {
+                    collect_index(types, *dim, symbols);
+                }
+            }
+            crate::semantic::IndexExpr::Literal(_)
+            | crate::semantic::IndexExpr::Infer(_)
+            | crate::semantic::IndexExpr::Unspecified => {}
+        }
+    }
+
+    fn collect_type(
+        types: &crate::semantic::TypeTable,
+        ty: crate::semantic::TypeId,
+        symbols: &mut Vec<crate::lexer::Symbol>,
+    ) {
+        match types.get(ty) {
+            crate::semantic::Type::Tensor(inner, shape)
+            | crate::semantic::Type::Vector(inner, shape)
+            | crate::semantic::Type::Matrix(inner, shape)
+            | crate::semantic::Type::Sparsa(inner, shape) => {
+                collect_type(types, *inner, symbols);
+                collect_index(types, *shape, symbols);
+            }
+            crate::semantic::Type::Tuple(elements) => {
+                for element in elements {
+                    collect_type(types, *element, symbols);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let mut symbols = Vec::new();
+    for param in &function.params {
+        collect_type(types, param.ty.semantic_id(), &mut symbols);
+    }
+    collect_type(types, function.return_ty.semantic_id(), &mut symbols);
+    symbols
+}
+
+#[cfg(feature = "device")]
+fn finalize_air_backward_instance(
+    types: &mut crate::semantic::TypeTable,
+    template: &crate::mir::MirFunction,
+    bindings: &crate::mir::generic::MirShapeBindings,
+) -> Option<crate::mir::MirFunction> {
+    use crate::mir::generic::substitute_shape_size_constants;
+
+    let mut function = template.clone();
+    let span = function.span;
+    for param in &mut function.params {
+        param.ty = instantiate_air_backward_type(types, param.ty, bindings, span)?;
+    }
+    for local in &mut function.locals {
+        local.ty = instantiate_air_backward_type(types, local.ty, bindings, span)?;
+    }
+    for temp in &mut function.temps {
+        temp.ty = instantiate_air_backward_type(types, temp.ty, bindings, span)?;
+    }
+    function.return_ty = instantiate_air_backward_type(types, function.return_ty, bindings, span)?;
+    function.error_ty = match function.error_ty {
+        Some(ty) => Some(instantiate_air_backward_type(types, ty, bindings, span)?),
+        None => None,
+    };
+    for block in &mut function.blocks {
+        for statement in &mut block.statements {
+            match &mut statement.kind {
+                crate::mir::MirStatementKind::Assign { value, .. } => {
+                    value.ty = instantiate_air_backward_type(types, value.ty, bindings, span)?;
+                }
+                crate::mir::MirStatementKind::RuntimeCall { call, .. } => {
+                    call.return_ty = instantiate_air_backward_type(types, call.return_ty, bindings, span)?;
+                    if let crate::mir::MirIntrinsic::Convert(conversion) = &mut call.intrinsic {
+                        conversion.source_ty =
+                            instantiate_air_backward_type(types, conversion.source_ty, bindings, span)?;
+                        conversion.target_ty =
+                            instantiate_air_backward_type(types, conversion.target_ty, bindings, span)?;
+                    }
+                }
+                crate::mir::MirStatementKind::Construct { aggregate, .. } => {
+                    aggregate.ty = instantiate_air_backward_type(types, aggregate.ty, bindings, span)?;
+                }
+                crate::mir::MirStatementKind::Call { .. } => {}
+            }
+        }
+    }
+    substitute_shape_size_constants(types, &mut function, bindings).then_some(function)
+}
+
+#[cfg(feature = "device")]
+fn instantiate_air_backward_type(
+    types: &mut crate::semantic::TypeTable,
+    ty: crate::mir::MirType,
+    bindings: &crate::mir::generic::MirShapeBindings,
+    span: crate::lexer::Span,
+) -> Option<crate::mir::MirType> {
+    if let crate::semantic::Type::Tuple(elements) = types.get(ty.semantic_id()).clone() {
+        let elements = elements
+            .into_iter()
+            .map(|element| {
+                instantiate_air_backward_type(types, crate::mir::MirType::semantic(element), bindings, span)
+                    .map(crate::mir::MirType::semantic_id)
+            })
+            .collect::<Option<Vec<_>>>()?;
+        return Some(crate::mir::MirType::semantic(
+            types.intern(crate::semantic::Type::Tuple(elements)),
+        ));
+    }
+    crate::mir::generic::instantiate_generic_type_with_shapes(
+        types,
+        ty,
+        &crate::mir::MirGenericBindings::default(),
+        bindings,
+        span,
+    )
+    .ok()
+}
+
+#[cfg(feature = "device")]
+fn reject_shape_size_survivors(
+    functions: &mut [crate::mir::MirFunction],
+    message: &str,
+) -> Result<(), SpannedCodegenError> {
+    for function in functions {
+        if crate::mir::generic::function_contains_shape_size(function) {
+            return Err(SpannedCodegenError {
+                message: message.to_owned(),
+                args: vec![DiagnosticArg::new(
+                    "issue",
+                    "unresolved_shape_size_constant_survives_monomorphization",
+                )],
+                span: Some(function.span),
+            });
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "mir-wgsl")]
+#[cfg(feature = "mir-core")]
+fn lower_graphics_mir_with_context_for_target(
+    analysis: &mut AnalyzedModule,
+) -> Result<crate::mir::LoweredMirUnit<'_>, SpannedCodegenError> {
+    // Do NOT filter the HIR to shader-only entries — the graphics path only
+    // extracts vertex/fragment MIR functions from the lowered result, and an
+    // in-place HIR mutation would corrupt the program for any fallback path
+    // that continues to compute lowering (F-107). The full HIR lowers safely
+    // to target-neutral MIR; graphics-specific filtering is a selection on
+    // the output, not a precondition on the input.
+    crate::mir::lower_analyzed_unit_with_context(analysis).map_err(mir_errors_to_spanned)
+}
+
+#[cfg_attr(not(feature = "device"), allow(unused_variables))]
+#[cfg(feature = "mir-core")]
+fn lower_mir_with_context_for_target(
+    analysis: &mut AnalyzedModule,
+    no_fuse: bool,
+) -> Result<crate::mir::LoweredMirUnit<'_>, SpannedCodegenError> {
+    #[cfg(feature = "device")]
+    let bundle = prepare_air_backward_bundle(analysis)?;
+    #[cfg_attr(not(feature = "device"), allow(unused_mut))]
+    let mut lowered = crate::mir::lower_analyzed_unit_with_context(analysis).map_err(mir_errors_to_spanned)?;
+    #[cfg(feature = "device")]
+    if let Some(bundle) = bundle {
+        apply_air_backward_bundle(&mut lowered, bundle, no_fuse)?;
+        // Re-construct ValidatedMir after backward companions were added to lowered.program.
+        let context = lowered.validated.validation().clone();
+        let program = lowered.program.clone();
+        lowered.validated = crate::mir::ValidatedMir::new(program, context).map_err(|errors| {
+            let messages: Vec<String> = errors.iter().map(|e| e.message.clone()).collect();
+            SpannedCodegenError {
+                message: format!(
+                    "MIR validation after backward companion addition failed: {}",
+                    messages.join("; ")
+                ),
+                args: vec![],
+                span: None,
+            }
+        })?;
+    }
+    Ok(lowered)
+}
+
+#[cfg(feature = "device")]
+fn air_mir_from_analysis(
+    analysis: &AnalyzedModule,
+) -> Result<(crate::air::AirProgram, crate::mir::MirProgram), SpannedCodegenError> {
+    let air = crate::air::lower_program(&analysis.hir, &analysis.radix_lanes, &analysis.interner, &analysis.types)
+        .map_err(air_lower_errors_to_spanned)?;
+    crate::air::validate_program(&air).map_err(air_validation_errors_to_spanned)?;
+    let air_mir = crate::air::to_mir_program(
+        &air,
+        &crate::air::AirToMirContext::with_interner_and_types(&analysis.interner, &analysis.types),
+    )
+    .map_err(air_to_mir_errors_to_spanned)?;
+
+    Ok((air, air_mir))
+}
+
+struct FreshMirFunctionIds {
+    next: u64,
+}
+
+#[cfg(feature = "device")]
+impl FreshMirFunctionIds {
+    fn after(ids: impl IntoIterator<Item = crate::mir::MirFunctionId>) -> Self {
+        let next = ids
+            .into_iter()
+            .map(|id| u64::from(id.0))
+            .max()
+            .map_or(0, |id| id + 1);
+        Self { next }
+    }
+
+    fn next(&mut self) -> crate::mir::MirFunctionId {
+        let id = crate::mir::MirFunctionId(u32::try_from(self.next).expect("MIR function id space exhausted"));
+        self.next += 1;
+        id
+    }
+}
+
+#[cfg(feature = "device")]
+fn replace_air_lane_mir(
+    lowered: &mut crate::mir::LoweredMirUnit<'_>,
+    air_mir: crate::mir::MirProgram,
+) -> Result<(), SpannedCodegenError> {
+    let mut fresh_ids = FreshMirFunctionIds::after(lowered.program.functions.iter().map(|function| function.id));
+    for mut function in air_mir.functions {
+        let Some(source) = function.source else {
+            continue;
+        };
+        if let Some(index) = lowered
+            .program
+            .functions
+            .iter()
+            .position(|candidate| candidate.source == Some(source))
+        {
+            function.id = lowered.program.functions[index].id;
+            // S3-A2: a differentiable device kernel (nucleum + `@ radix
+            // backward`) is replaced by its AIR-lowered form but must KEEP its
+            // kernel shader stage — the forward kernel is the primal itself.
+            if function.shader_stage.is_none() {
+                function.shader_stage = lowered.program.functions[index].shader_stage;
+            }
+            lowered.program.functions[index] = function;
+        } else {
+            function.id = fresh_ids.next();
+            lowered.program.functions.push(function);
+        }
+    }
+
+    crate::mir::validate_program(&lowered.program, lowered.validated.validation())
+        .map_err(mir_validation_errors_to_spanned)
+}
+
+/// Snapshot of a backward-annotated function's metadata, captured before MIR
+/// lowering borrows `analysis`. This avoids the NLL conflict where
+/// `LoweredMirUnit` holds a reference to `analysis.types` through
+/// `MirValidationContext`.
+#[cfg(feature = "device")]
+pub struct AirBackwardSnapshot {
+    pub primal_def_id: crate::hir::DefId,
+    pub companion_def_id: crate::hir::DefId,
+    /// Types of selected differentiable inputs, in parameter declaration order.
+    pub selected_input_types: Vec<crate::semantic::TypeId>,
+    /// DefIds of selected differentiable input parameters, in declaration order.
+    pub selected_param_sources: Vec<crate::hir::DefId>,
+    pub ret_ty: crate::semantic::TypeId,
+    /// The already-lowered primal AirFunction for reverse AD transform.
+    pub air_function: crate::air::AirFunction,
+    /// Annotated companion name from @ radix backward "name".
+    pub companion_name: crate::lexer::Symbol,
+    /// The primal is an explicitly device-resident forward kernel (S3-A2,
+    /// placement fact A5): recorded from the primal's HIR device role so the
+    /// companion-aware materializer can join the companion to the same
+    /// `DeviceProgram`.
+    pub device_resident: bool,
+}
+
+/// Pre-extract backward-generation data from `analysis` for every
+/// backward-annotated function before lowering consumes the mutable borrow.
+/// Returns an empty `Vec` when no backward-annotated AIR function meets the
+/// same-shape elementwise shape requirements.
+///
+/// Stage 2 replaces the Stage 1 hardcoded "first AIR-lane function" lookup
+/// with metadata-driven iteration over all `@ radix backward "name"` annotated
+/// functions.
+#[cfg(feature = "device")]
+fn prepare_air_backward_snapshots(
+    analysis: &mut AnalyzedModule,
+    air_program: Option<&crate::air::AirProgram>,
+) -> Result<Vec<AirBackwardSnapshot>, codegen::CodegenError> {
+    use crate::hir::HirItemKind;
+
+    let mut snapshots = Vec::new();
+
+    // Pre-intern types needed by the reverse AD transform.
+    // Unit type (empty tuple) for the residual bundle parameter.
+    analysis.types.unit();
+    // The gradient tuple for each snapshot will be interned below.
+
+    // Build a lookup from DefId to AirFunction from the already-lowered AIR.
+    let air_functions: rustc_hash::FxHashMap<crate::hir::DefId, &crate::air::AirFunction> =
+        if let Some(air_program) = air_program {
+            air_program
+                .functions
+                .iter()
+                .map(|f| (f.source, f))
+                .collect()
+        } else {
+            rustc_hash::FxHashMap::default()
+        };
+
+    for (primal_def_id, backward) in analysis.radix_lanes.iter_backward() {
+        // Look up the AirFunction by primal DefId.
+        let Some(air_function) = air_functions.get(&primal_def_id).copied() else {
+            continue;
+        };
+
+        // Get the HIR function for this backward-annotated def.
+        let hir_function = analysis
+            .hir
+            .items
+            .iter()
+            .find(|item| item.def_id == primal_def_id)
+            .and_then(|item| match &item.kind {
+                HirItemKind::Function(f) => Some(f),
+                _ => None,
+            });
+
+        let Some(hir_function) = hir_function else {
+            continue;
+        };
+
+        // Same-shape elementwise requires a return type, at least 1 tensor param.
+        let Some(ret_ty) = hir_function.ret_ty else {
+            continue;
+        };
+        if hir_function.params.is_empty() {
+            continue;
+        }
+
+        // Collect differentiable tensor params dynamically.
+        let mut selected_input_types = Vec::new();
+        let mut selected_param_sources = Vec::new();
+        for param in &hir_function.params {
+            if crate::semantic::tensor_type_directed::is_tensor_type(param.ty, &analysis.types) {
+                selected_input_types.push(param.ty);
+                selected_param_sources.push(param.def_id);
+            }
+        }
+        if selected_input_types.is_empty() {
+            continue;
+        }
+
+        // Pre-intern the gradient tuple type for the reverse AD transform.
+        analysis.types.tuple(selected_input_types.clone());
+
+        snapshots.push(AirBackwardSnapshot {
+            primal_def_id,
+            companion_def_id: backward.companion_def_id,
+            selected_input_types,
+            selected_param_sources,
+            ret_ty,
+            air_function: air_function.clone(),
+            companion_name: backward.companion_name,
+            device_resident: hir_function.is_kernel,
+        });
+    }
+
+    Ok(snapshots)
+}
+
+/// Accepts a pre-built companion (from [`generate_companions_bottom_up`])
+/// and runs the validation/installation chain instead of calling
+/// [`transform_reverse_ad`] directly.
+///
+/// Interprocedural Call bindings were already resolved by bottom-up companion
+/// generation in the caller, so this function receives the finished companion
+/// and needs no callee map of its own.
+#[cfg(feature = "device")]
+fn generate_air_lane_backward_with_companion(
+    snapshot: &AirBackwardSnapshot,
+    companion: crate::air::AirFunction,
+    lowered: &mut crate::mir::LoweredMirUnit<'_>,
+    fresh_ids: &mut FreshMirFunctionIds,
+    no_fuse: bool,
+) -> Result<crate::mir::device::LosslessMirCompanionEntry, codegen::CodegenError> {
+    use crate::air::{
+        admit_generated_gradient_check, air_gradient_check_eligibility_witness,
+        validate_generated_backward_to_mir_from_function, validate_mir_backward_result_contract,
+        AirCompanionDerivativeKind, AirCompanionOracleRef, AirCompanionRelation, AirCompanionSelectedInput,
+        AirCompanionSelectedOutput, AirGradientCheckAdmissionInputs,
+    };
+
+    let types_ref = lowered.validated.validation().types;
+
+    // Run fusion pass on the companion body (unless disabled).
+    use crate::air::fusion::{fuse_companion, FusionTable};
+    let (fused_body, fusion_table) = if no_fuse {
+        (companion.body, FusionTable::default())
+    } else {
+        fuse_companion(companion.body, false)
+    };
+    let companion = crate::air::AirFunction { body: fused_body, ..companion };
+    let air_to_mir_context = crate::air::AirToMirContext {
+        interner: None,
+        types: Some(types_ref),
+        fusion_table: if fusion_table.is_empty() {
+            None
+        } else {
+            Some(&fusion_table)
+        },
+    };
+
+    // Build selected inputs dynamically from the snapshot.
+    let selected_inputs: Vec<AirCompanionSelectedInput> = snapshot
+        .selected_param_sources
+        .iter()
+        .zip(snapshot.selected_input_types.iter())
+        .enumerate()
+        .map(|(position, (&source, &ty))| AirCompanionSelectedInput {
+            source,
+            position: u32::try_from(position).expect("selected parameter count fits u32"),
+            ty,
+            gradient_ty: ty,
+        })
+        .collect();
+    let selected_inputs: &'static [AirCompanionSelectedInput] = selected_inputs.leak();
+
+    let selected_outputs: &'static [AirCompanionSelectedOutput] =
+        vec![AirCompanionSelectedOutput { position: 0, ty: snapshot.ret_ty, upstream_gradient_ty: snapshot.ret_ty }]
+            .leak();
+
+    let relation = AirCompanionRelation {
+        primal: snapshot.primal_def_id,
+        companion: snapshot.companion_def_id,
+        derivative: AirCompanionDerivativeKind::ReverseModeVjp,
+        selected_inputs,
+        selected_outputs,
+        return_ty: companion.return_ty,
+        oracle: AirCompanionOracleRef { packet: "air-same-shape-derivative-oracle", case_family: "reverse_ad" },
+    };
+
+    // Run the validation chain: AIR-to-MIR → result contract → gradient check.
+    let mir_validation =
+        validate_generated_backward_to_mir_from_function(&companion, &relation, types_ref, &air_to_mir_context)
+            .map_err(|errors| air_proof_errors_to_codegen("AIR-to-MIR backward validation", &errors))?;
+
+    let result_contract = validate_mir_backward_result_contract(&mir_validation, &relation, types_ref)
+        .map_err(|errors| air_proof_errors_to_codegen("MIR backward result contract", &errors))?;
+
+    let eligibility = air_gradient_check_eligibility_witness()
+        .map_err(|errors| air_proof_errors_to_codegen("gradient check eligibility", &errors))?;
+
+    // Build a dummy AirSameShapeTransformProof for the admission gate.
+    let dummy_proof = crate::air::AirSameShapeTransformProof {
+        relation,
+        oracle_case: "",
+        function: companion,
+        output_value: crate::air::AirValueId(0),
+        lhs_gradient_value: crate::air::AirValueId(0),
+        rhs_gradient_value: crate::air::AirValueId(0),
+        result_value: crate::air::AirValueId(0),
+        expected_output: vec![],
+        expected_lhs_gradient: vec![],
+        expected_rhs_gradient: vec![],
+    };
+
+    let admission_inputs = AirGradientCheckAdmissionInputs {
+        generated_differentiable_eligibility: Some(&eligibility),
+        transform: Some(&dummy_proof),
+        mir_validation: Some(&mir_validation),
+        result_contract: Some(&result_contract),
+    };
+    admit_generated_gradient_check(admission_inputs)
+        .map_err(|errors| air_proof_errors_to_codegen("gradient check admission", &errors))?;
+
+    // Merge the generated backward MIR functions into the lowered unit.
+    let backward_mir = mir_validation.mir;
+    for mut function in backward_mir.functions {
+        function.id = fresh_ids.next();
+        lowered.program.functions.push(function);
+    }
+
+    // S3-A2 / Stage 3R F4: the relation facts are CARRIED forward (not
+    // discarded with the dummy proof) as the LOSSLESS entry — selected
+    // inputs (with the gradient-to-primal identity: each parameter names the
+    // companion result-tuple slot that carries its gradient), selected
+    // outputs, and device-residency — so the companion-aware materializer
+    // can lower the generated companion into a multi-output device kernel
+    // without reconstructing the relation from names, shapes, or positions.
+    // The selected-input positions reuse the checked conversions already
+    // performed for the AIR relation (no new `expect` sites).
+    use crate::mir::device::{
+        LosslessMirCompanionEntry, MirCompanionDerivativeKind, MirCompanionSelectedInput, MirCompanionSelectedOutput,
+    };
+    let selected_inputs: Vec<MirCompanionSelectedInput> = selected_inputs
+        .iter()
+        .map(|air| MirCompanionSelectedInput {
+            param: air.source,
+            position: air.position,
+            ty: air.ty,
+            gradient_slot: air.position,
+        })
+        .collect();
+    let selected_outputs: Vec<MirCompanionSelectedOutput> =
+        vec![MirCompanionSelectedOutput { position: 0, ty: snapshot.ret_ty, upstream_gradient_ty: snapshot.ret_ty }];
+    Ok(LosslessMirCompanionEntry {
+        primal: snapshot.primal_def_id,
+        companion: snapshot.companion_def_id,
+        derivative: MirCompanionDerivativeKind::ReverseModeVjp,
+        device_resident: snapshot.device_resident,
+        selected_inputs,
+        selected_outputs,
+    })
+}
+
+/// Convert AIR proof-chain error vectors into a single `CodegenError`.
+///
+/// Each error type in the proof chain has a `kind` with a `label()` method
+/// and a `detail` field. This helper joins them into a diagnostic message.
+fn air_proof_errors_to_codegen<E: std::fmt::Debug>(phase: &str, errors: &[E]) -> codegen::CodegenError {
+    let messages: Vec<String> = errors.iter().map(|error| format!("{error:?}")).collect();
+    codegen::CodegenError {
+        message: format!("{phase} failed: {}", messages.join("; ")),
+        args: messages
+            .iter()
+            .map(|m| DiagnosticArg::new("issue", m.as_str()))
+            .collect(),
+    }
+}
+
+#[cfg(feature = "mir-wasm")]
+#[cfg(feature = "mir-core")]
+fn wasm_text_codegen_error(error: crate::mir::MirWasmTextProbeError) -> codegen::CodegenError {
+    codegen::CodegenError {
+        message: error.message,
+        args: vec![
+            DiagnosticArg::new("issue", error.issue),
+            DiagnosticArg::new("shape", error.shape),
+        ],
+    }
+}
+
+#[cfg(feature = "mir-llvm")]
+#[cfg(feature = "mir-core")]
+fn llvm_text_codegen_error(error: crate::mir::MirLlvmTextProbeError) -> codegen::CodegenError {
+    codegen::CodegenError {
+        message: error.message,
+        args: vec![
+            DiagnosticArg::new("category", error.category),
+            DiagnosticArg::new("shape", error.shape),
+            DiagnosticArg::new("detail", error.detail),
+        ],
+    }
+}
+
+// CLI analysis can already describe more surface than the Phase 03 Rust CLI
+// generator accepts. Keep the gap explicit here so unsupported programs fail
+// with CLI-shaped diagnostics instead of leaking backend assumptions.
+fn phase03_cli_codegen_gap(program: &crate::cli::CliProgram) -> Option<String> {
+    for option in program
+        .global_options
+        .iter()
+        .chain(program.options.iter())
+        .chain(
+            program
+                .commands
+                .iter()
+                .flat_map(|command| command.options.iter()),
+        )
+    {
+        if !is_cli_scalar_type(&option.ty) {
+            return Some(format!(
+                "Phase 03 Rust CLI code generation does not support option '{}' with type {:?}",
+                option.binding, option.ty
+            ));
+        }
+    }
+
+    for operand in program
+        .global_operands
+        .iter()
+        .chain(program.operands.iter())
+        .chain(
+            program
+                .commands
+                .iter()
+                .flat_map(|command| command.operands.iter()),
+        )
+    {
+        let supported_scalar = is_cli_scalar_type(&operand.ty);
+        let supported_rest_list =
+            operand.rest && matches!(operand.ty, crate::cli::CliType::ListaTextus | crate::cli::CliType::ListaNumerus);
+        if !supported_scalar && !supported_rest_list {
+            return Some(format!(
+                "Phase 03 Rust CLI code generation does not support operand '{}' with type {:?}",
+                operand.binding, operand.ty
+            ));
+        }
+    }
+
+    None
+}
+
+/// The scalar CLI types the Phase 03 Rust CLI generator supports.
+///
+/// Options and operands of any other type are rejected by
+/// [`phase03_cli_codegen_gap`] with a CLI-shaped diagnostic.
+fn is_cli_scalar_type(ty: &crate::cli::CliType) -> bool {
+    matches!(
+        ty,
+        crate::cli::CliType::Textus
+            | crate::cli::CliType::Numerus
+            | crate::cli::CliType::Fractus
+            | crate::cli::CliType::Bivalens
+    )
+}
+
+/// Package-local import identity facts for user-code cross-module calls.
+///
+/// Supplied by package-aware callers (the CLI compile path, package harnesses)
+/// so MIR lowering can resolve user-code provider imports to their canonical
+/// `(product, module_path, item)` identities (campaign D-PA1). `None` keeps
+/// the legacy provider routing: raw import spelling + interner indices, which
+/// are meaningless across the module boundary.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PackageImportIdentities {
+    /// Package identity: manifest `package.name`, or package-root-derived
+    /// fallback (the package root directory name).
+    pub product: String,
+    /// This file's canonical module segments (frontmatter `group`, else
+    /// source-root-relative path with `.fab`/`main.fab`/`mod.fab`
+    /// normalization) — mirror of `module_segments_for_file`.
+    pub module_segments: Vec<String>,
+    /// Resolved target module segments per import binding (`binding →
+    /// target file's canonical module segments`) for local sibling imports —
+    /// mirror of `resolve_import` + `module_segments_for_file`.
+    pub imports: BTreeMap<String, Vec<String>>,
+}
+
+/// One coherent module analysis shared by codegen and package-level tooling.
+///
+/// This is the driver-facing carrier for a single source module: HIR, types,
+/// resolver, annotation metadata, function effects, resolved uses, qualified
+/// identities, CLI entry, and diagnostics from one analysis stamp. Consumers
+/// must not mix fields across source modules or analysis runs.
+pub struct AnalyzedModule {
+    /// Coherence stamp shared by every fact family on this unit.
+    pub analysis_stamp: semantic::AnalysisStamp,
+
+    /// Symbol table that owns names referenced by the parsed and lowered forms.
+    pub interner: Interner,
+
+    /// Type information produced by semantic analysis.
+    pub types: semantic::TypeTable,
+
+    /// Resolver metadata produced by semantic analysis.
+    pub resolver: Resolver,
+
+    /// Lowered program consumed by backend code generators.
+    pub hir: HirModule,
+
+    /// Presentation sidecar produced by the same lowering pass that produced
+    /// `hir`: source anchors, typed trivia owners, attachments, structural
+    /// block ends, the program end, and the explicit entry-start anchor.
+    /// Inseparable from the HIR value passed to codegen; semantic consumers
+    /// stay trivia-blind by construction.
+    pub presentation: HirPresentation,
+
+    /// Runnable CLI contract discovered from source or supplied by package mode.
+    pub cli_program: Option<crate::cli::CliProgram>,
+
+    /// Target-neutral provenance for library imports and imported declarations.
+    pub libraries: LibraryRegistry,
+
+    /// Normalized annotation-contract registry and applications for this unit.
+    pub annotation_contracts: semantic::AnnotationContractMetadata,
+
+    /// Upstream function effect/capture/call facts for HIR backends.
+    pub function_facts: semantic::FunctionFactTable,
+
+    /// Target-neutral resolved definition and import-use index.
+    pub resolved_uses: semantic::ResolvedUseIndex,
+
+    /// Portable qualified identities for imported declarations.
+    pub qualified_identities: semantic::QualifiedIdentityTable,
+
+    /// Package-local import identity facts for user-code cross-module calls
+    /// (see [`PackageImportIdentities`]). `None` for plain single-file
+    /// compiles.
+    pub package_import_identities: Option<PackageImportIdentities>,
+
+    /// Compiler lane metadata collected from `@ radix lane ...` annotations.
+    pub radix_lanes: RadixLaneMetadata,
+
+    /// Compiler-owned GPU builtin call identities keyed by resolved definition.
+    pub gpu_builtins: Vec<(crate::hir::DefId, radix_types::MirKernelBuiltin)>,
+
+    /// Source-stage graphics facts collected before backend emission.
+    #[cfg(feature = "mir-core")]
+    pub graphics_source: GraphicsSourceFacts,
+
+    /// Warnings and informational diagnostics accumulated before codegen.
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+impl AnalyzedModule {
+    /// Construct an [`AnalyzedModule`] from individually reconstructed arenas.
+    ///
+    /// This is the non-analysis entry point used by the HIR artifact loader
+    /// (U2.1–U2.4). Each arena is assembled by the loader from its wire
+    /// snapshot and then passed here; this constructor performs no
+    /// deserialization, parsing, or semantic analysis.
+    #[must_use]
+    pub fn from_loaded(
+        analysis_stamp: semantic::AnalysisStamp,
+        interner: Interner,
+        types: semantic::TypeTable,
+        resolver: Resolver,
+        hir: HirModule,
+        cli_program: Option<crate::cli::CliProgram>,
+        libraries: LibraryRegistry,
+        annotation_contracts: semantic::AnnotationContractMetadata,
+        function_facts: semantic::FunctionFactTable,
+        resolved_uses: semantic::ResolvedUseIndex,
+        qualified_identities: semantic::QualifiedIdentityTable,
+        radix_lanes: RadixLaneMetadata,
+        gpu_builtins: Vec<(crate::hir::DefId, radix_types::MirKernelBuiltin)>,
+        #[cfg(feature = "mir-core")] graphics_source: GraphicsSourceFacts,
+        diagnostics: Vec<Diagnostic>,
+    ) -> Self {
+        Self::from_loaded_with_presentation(
+            analysis_stamp,
+            interner,
+            types,
+            resolver,
+            hir,
+            empty_presentation(),
+            cli_program,
+            libraries,
+            annotation_contracts,
+            function_facts,
+            resolved_uses,
+            qualified_identities,
+            radix_lanes,
+            gpu_builtins,
+            #[cfg(feature = "mir-core")]
+            graphics_source,
+            diagnostics,
+        )
+    }
+
+    /// Construct an [`AnalyzedModule`] from individually reconstructed arenas
+    /// plus the presentation sidecar.
+    ///
+    /// This is the artifact-loader constructor (U-4): the loader reconstructs
+    /// HIR and its presentation together so the unit always carries both.
+    #[must_use]
+    pub fn from_loaded_with_presentation(
+        analysis_stamp: semantic::AnalysisStamp,
+        interner: Interner,
+        types: semantic::TypeTable,
+        resolver: Resolver,
+        hir: HirModule,
+        presentation: HirPresentation,
+        cli_program: Option<crate::cli::CliProgram>,
+        libraries: LibraryRegistry,
+        annotation_contracts: semantic::AnnotationContractMetadata,
+        function_facts: semantic::FunctionFactTable,
+        resolved_uses: semantic::ResolvedUseIndex,
+        qualified_identities: semantic::QualifiedIdentityTable,
+        radix_lanes: RadixLaneMetadata,
+        gpu_builtins: Vec<(crate::hir::DefId, radix_types::MirKernelBuiltin)>,
+        #[cfg(feature = "mir-core")] graphics_source: GraphicsSourceFacts,
+        diagnostics: Vec<Diagnostic>,
+    ) -> Self {
+        Self {
+            analysis_stamp,
+            interner,
+            types,
+            resolver,
+            hir,
+            presentation,
+            cli_program,
+            libraries,
+            annotation_contracts,
+            function_facts,
+            resolved_uses,
+            qualified_identities,
+            package_import_identities: None,
+            radix_lanes,
+            gpu_builtins,
+            #[cfg(feature = "mir-core")]
+            graphics_source,
+            diagnostics,
+        }
+    }
+
+    /// Borrow the coherent analyzed-application fact families on this unit.
+    #[must_use]
+    pub fn application_view(&self) -> AnalyzedModuleApplicationView<'_> {
+        AnalyzedModuleApplicationView {
+            stamp: self.analysis_stamp,
+            hir: &self.hir,
+            types: &self.types,
+            resolver: &self.resolver,
+            annotation_contracts: &self.annotation_contracts,
+            libraries: &self.libraries,
+            function_facts: &self.function_facts,
+            resolved_uses: &self.resolved_uses,
+            qualified_identities: &self.qualified_identities,
+            radix_lanes: &self.radix_lanes,
+            gpu_builtins: &self.gpu_builtins,
+            cli_program: self.cli_program.as_ref(),
+            interner: &self.interner,
+        }
+    }
+}
+
+/// Source graphics metadata admitted through the ordinary frontend before MIR-backed emission.
+///
+/// Contract facts are the generic [`radix_mir::shader_contract`] records,
+/// ingested from resolved contract-role calls (see [`shader_contract`]); no
+/// Triga-shaped types or invented defaults live here.
+#[derive(Debug, Clone, Default)]
+#[cfg(feature = "mir-core")]
+pub struct GraphicsSourceFacts {
+    pub vertex_entries: Vec<GraphicsVertexEntry>,
+    pub fragment_entries: Vec<GraphicsFragmentEntry>,
+    pub shader_vertex_attributes: Vec<radix_mir::ShaderVertexAttribute>,
+    pub shader_varyings: Vec<radix_mir::ShaderVarying>,
+    pub shader_fragment_outputs: Vec<radix_mir::ShaderFragmentOutput>,
+    pub shader_pipeline_states: Vec<radix_mir::ShaderPipelineState>,
+    pub shader_resource_bindings: Vec<radix_mir::ShaderResourceBinding>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphicsVertexEntry {
+    pub def_id: crate::hir::DefId,
+    pub entry_name: String,
+    pub annotation_payload_count: usize,
+    pub param_count: usize,
+    pub returns_vacuum: bool,
+    pub has_error_type: bool,
+    pub body_shape: GraphicsVertexBodyShape,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GraphicsVertexBodyShape {
+    EmptyBlock,
+    Missing,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphicsFragmentEntry {
+    pub def_id: crate::hir::DefId,
+    pub entry_name: String,
+    pub annotation_payload_count: usize,
+    pub param_count: usize,
+    pub returns_vacuum: bool,
+    pub has_error_type: bool,
+    pub body_shape: GraphicsVertexBodyShape,
+}
+
+/// Borrowed view of the HIR v1 analyzed application contract on an [`AnalyzedModule`].
+pub struct AnalyzedModuleApplicationView<'a> {
+    pub stamp: semantic::AnalysisStamp,
+    pub hir: &'a HirModule,
+    pub types: &'a semantic::TypeTable,
+    pub resolver: &'a Resolver,
+    pub annotation_contracts: &'a semantic::AnnotationContractMetadata,
+    pub libraries: &'a LibraryRegistry,
+    pub function_facts: &'a semantic::FunctionFactTable,
+    pub resolved_uses: &'a semantic::ResolvedUseIndex,
+    pub qualified_identities: &'a semantic::QualifiedIdentityTable,
+    pub radix_lanes: &'a RadixLaneMetadata,
+    pub gpu_builtins: &'a [(crate::hir::DefId, radix_types::MirKernelBuiltin)],
+    pub cli_program: Option<&'a crate::cli::CliProgram>,
+    pub interner: &'a Interner,
+}
+
+/// Run the frontend pipeline without emitting target code.
+///
+/// This is the analysis-only contract for compiler internals that need the
+/// typed HIR and diagnostics but not a backend artifact. It performs the same
+/// lex, parse, target-policy, CLI, and semantic phases as [`compile`].
+///
+/// # Errors
+///
+/// Returns diagnostic errors when lexing, parsing, target-policy checks,
+/// CLI analysis, or semantic analysis fail. Internal phase-contract violations
+/// are also reported as diagnostics.
+pub fn analyze_source(session: &Session, name: &str, source: &str) -> Result<AnalyzedModule, Vec<Diagnostic>> {
+    analyze_source_with_cli_program(session, name, source, None)
+}
+
+/// Analyze source while optionally supplying a package-level CLI program.
+///
+/// Package compilation may discover mounted CLI commands while assembling the
+/// import graph. When it passes that contract here, the driver interns the CLI
+/// symbols into this source unit before semantic analysis so CLI bindings and
+/// lowered HIR share the same symbol space.
+///
+/// Returns [`AnalyzedModule`] on success. User-source failures return diagnostics;
+/// internal phase-contract failures are also reported as diagnostics to keep the
+/// driver surface uniform.
+///
+/// # Errors
+///
+/// Returns diagnostic errors when any frontend phase fails. See [`analyze_source`]
+/// for the full error surface.
+pub fn analyze_source_with_cli_program(
+    session: &Session,
+    name: &str,
+    source: &str,
+    cli_program_override: Option<crate::cli::CliProgram>,
+) -> Result<AnalyzedModule, Vec<Diagnostic>> {
+    analyze_source_with_cli_program_and_namespace_exports(session, name, source, cli_program_override, BTreeMap::new())
+}
+
+/// Analyze source while supplying package-level namespace exports.
+///
+/// # Errors
+///
+/// Returns diagnostic errors when any frontend phase fails. See [`analyze_source`]
+/// for the full error surface.
+pub fn analyze_source_with_cli_program_and_namespace_exports(
+    session: &Session,
+    name: &str,
+    source: &str,
+    cli_program_override: Option<crate::cli::CliProgram>,
+    namespace_exports: BTreeMap<
+        String,
+        BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>,
+    >,
+) -> Result<AnalyzedModule, Vec<Diagnostic>> {
+    analyze_source_with_cli_program_and_import_contract(
+        session,
+        name,
+        source,
+        cli_program_override,
+        namespace_exports,
+        BTreeMap::new(),
+    )
+}
+
+/// Analyze source while supplying package-level namespace exports and typed file interfaces.
+///
+/// Seams and declarations stay empty. Callers that already computed a full
+/// contract should use [`analyze_source_with_module_import_contract`].
+///
+/// # Errors
+///
+/// Returns diagnostic errors when any frontend phase fails. See [`analyze_source`]
+/// for the full error surface.
+pub fn analyze_source_with_cli_program_and_import_contract(
+    session: &Session,
+    name: &str,
+    source: &str,
+    cli_program_override: Option<crate::cli::CliProgram>,
+    namespace_exports: BTreeMap<
+        String,
+        BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>,
+    >,
+    file_interfaces: BTreeMap<String, crate::file_interface::FileInterface>,
+) -> Result<AnalyzedModule, Vec<Diagnostic>> {
+    analyze_source_with_module_import_contract(
+        session,
+        name,
+        source,
+        cli_program_override,
+        ModuleImportContract { namespace_exports, file_interfaces, ..ModuleImportContract::default() },
+    )
+}
+
+/// Analyze one already-selected source with caller-supplied import contracts.
+///
+/// Empty contracts stay empty. This path does not open import files, probe a
+/// package root, or walk `FABER_LIBRARY_HOME`.
+///
+/// # Errors
+///
+/// Returns diagnostic errors when any frontend phase fails. See [`analyze_source`]
+/// for the full error surface.
+pub fn analyze_source_with_module_import_contract(
+    session: &Session,
+    name: &str,
+    source: &str,
+    cli_program_override: Option<crate::cli::CliProgram>,
+    contract: ModuleImportContract,
+) -> Result<AnalyzedModule, Vec<Diagnostic>> {
+    let mut diagnostics = Vec::new();
+
+    let Ok(ParsedSourceBody { body, program, mut interner, lex_pack }) =
+        parse_frontend_source(session, name, source, &mut diagnostics)
+    else {
+        return Err(diagnostics);
+    };
+
+    collect_target_policy_diagnostics(session.config.target, &program, name, &interner, &mut diagnostics);
+    // Recovered-parse continuation: parse-phase diagnostics must not stop the
+    // pipeline before semantic analysis — the recovered items' semantic errors
+    // co-report with them. Target-policy (and below, CLI) errors still stop.
+    if has_non_parse_diagnostic_errors(&diagnostics) {
+        return Err(diagnostics);
+    }
+
+    let Ok(cli_program) =
+        analyze_cli_program_for_source(cli_program_override, &program, &mut interner, name, body, &mut diagnostics)
+    else {
+        return Err(diagnostics);
+    };
+
+    let ModuleImportContract { namespace_exports, file_interfaces, namespace_seams, namespace_declarations } = contract;
+
+    let Ok(semantic_result) = analyze_semantic_program(SemanticAnalysisInput {
+        session,
+        program: &program,
+        interner: &mut interner,
+        cli_program: cli_program.as_ref(),
+        namespace_exports,
+        namespace_seams,
+        namespace_declarations,
+        file_interfaces,
+        name,
+        body,
+        diagnostics: &mut diagnostics,
+        lex_pack,
+    }) else {
+        return Err(diagnostics);
+    };
+
+    collect_lane_policy_diagnostics(
+        &semantic_result.radix_lanes,
+        session.config.target,
+        name,
+        &mut diagnostics,
+        cli_program.as_ref(),
+    );
+    if has_diagnostic_errors(&diagnostics) {
+        return Err(diagnostics);
+    }
+
+    let mut unit = analyzed_unit_from_semantic(interner, cli_program, semantic_result, name, &mut diagnostics)
+        .map_err(|()| diagnostics)?;
+
+    // Rust-only borrow/lifetime checks are target qualification, not base analysis.
+    if session.config.target == Target::HirRust {
+        if let Err(borrow_errors) = semantic::qualify_rust_borrow(&unit.hir, &unit.resolver, &unit.types) {
+            for err in &borrow_errors {
+                unit.diagnostics
+                    .push(Diagnostic::from_semantic_error(name, body, err));
+            }
+            if unit.diagnostics.iter().any(Diagnostic::is_error) {
+                return Err(unit.diagnostics);
+            }
+        }
+    }
+
+    Ok(unit)
+}
+
+/// Resolve a frontmatter `locale` id to a `LocalePack` via stdlib.
+///
+/// # Errors
+///
+/// Returns a `Diagnostic` when `stdlib_path` is not configured or the pack
+/// cannot be loaded.
+pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) -> Result<LocalePack, Box<Diagnostic>> {
+    // Reject empty locale ids
+    if locale_id.is_empty() {
+        return Err(Box::new(
+            Diagnostic::error("frontmatter declares an empty locale")
+                .with_phase(DiagnosticPhase::Lex)
+                .with_code(locale_unknown_spec().code),
+        ));
+    }
+
+    // Reject locale ids that look like paths: absolute, relative traversal, or
+    // containing path separators.  PathBuf::join replaces the base when the
+    // appended component is absolute, so an id like "/etc" would resolve to
+    // /etc/pack.toml instead of <stdlib>/reader/etc/pack.toml.
+    if locale_id.starts_with('/')
+        || locale_id.starts_with('\\')
+        || locale_id.contains('/')
+        || locale_id.contains('\\')
+        || locale_id == "."
+        || locale_id == ".."
+        || locale_id.starts_with("../")
+        || locale_id.contains("/../")
+        || locale_id.ends_with("/..")
+    {
+        return Err(Box::new(
+            Diagnostic::error(format!(
+                "frontmatter locale '{locale_id}' is not a valid locale identifier; locale ids must be simple directory names"
+            ))
+            .with_phase(DiagnosticPhase::Lex)
+            .with_code(locale_unknown_spec().code),
+        ));
+    }
+
+    let root = config.stdlib_path.as_ref().ok_or_else(|| {
+        Box::new(
+            Diagnostic::error(format!(
+                "frontmatter declares locale '{locale_id}' but no standard library path is configured"
+            ))
+            .with_phase(DiagnosticPhase::Lex)
+            .with_code(locale_unknown_spec().code),
+        )
+    })?;
+
+    let reader_root = root.join("locale");
+    let pack_path = reader_root.join(locale_id).join("pack.toml");
+
+    // Defense-in-depth containment check: verify the resolved path stays within
+    // the reader directory after symlink resolution.  Input filtering already
+    // blocks '/' and '..', so the primary remaining escape is a symlink inside
+    // the stdlib reader directory.
+    if let Ok(canonical_reader_root) = std::fs::canonicalize(&reader_root) {
+        if let Ok(canonical_pack_path) = std::fs::canonicalize(&pack_path) {
+            if !canonical_pack_path.starts_with(&canonical_reader_root) {
+                return Err(Box::new(
+                    Diagnostic::error(format!(
+                        "frontmatter locale '{locale_id}' resolves outside the reader directory"
+                    ))
+                    .with_phase(DiagnosticPhase::Lex)
+                    .with_code(locale_unknown_spec().code),
+                ));
+            }
+        }
+    }
+
+    LocalePack::from_toml_path(&pack_path).map_err(|err| {
+        Box::new(
+            Diagnostic::error(format!("unknown reader locale '{locale_id}' in frontmatter: {err}"))
+                .with_phase(DiagnosticPhase::Lex)
+                .with_code(locale_unknown_spec().code),
+        )
+    })
+}
+
+struct ParsedSourceBody<'a> {
+    body: &'a str,
+    program: Program,
+    interner: Interner,
+    /// The reader pack used for lexing this source (frontmatter locale > session config).
+    /// Threaded to the semantic analyzer so type spellings match the input locale.
+    lex_pack: Option<LocalePack>,
+}
+
+/// Resolve the reader pack for a peeled source body: frontmatter locale >
+/// session config > Latin default.
+///
+/// Shared by the analysis front end and the forma author path so both honor a
+/// source's `+++ locale = "…" +++` declaration (e.g. the English exempla
+/// corpus). Pushes diagnostics and returns `Err(())` when the frontmatter
+/// locale key is malformed or the declared pack cannot be loaded; `Ok(None)`
+/// means no pack (Latin default lexing).
+pub(crate) fn resolve_peeled_lex_pack(
+    session: &Session,
+    peeled: &PeeledSource,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Result<Option<LocalePack>, ()> {
+    // An explicitly caller-selected pack (CLI `--locale`) is authoritative and
+    // wins over a source-declared frontmatter locale.
+    if session.config.locale_pack_explicit {
+        return Ok(session.config.locale_pack.clone());
+    }
+    match peeled
+        .frontmatter
+        .as_ref()
+        .and_then(FileFrontmatter::locale_result)
+    {
+        Some(Err(())) => {
+            diagnostics.push(
+                Diagnostic::error("frontmatter 'locale' key must be a string")
+                    .with_phase(DiagnosticPhase::Lex)
+                    .with_code(locale_unknown_spec().code),
+            );
+            Err(())
+        }
+        Some(Ok(locale_id)) => match resolve_frontmatter_locale_pack(&session.config, locale_id) {
+            Ok(pack) => Ok(Some(pack)),
+            Err(diagnostic) => {
+                diagnostics.push(*diagnostic);
+                Err(())
+            }
+        },
+        None => Ok(session.config.locale_pack.clone()),
+    }
+}
+
+fn parse_frontend_source<'a>(
+    session: &Session,
+    name: &str,
+    source: &'a str,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Result<ParsedSourceBody<'a>, ()> {
+    let peeled = match peel_raw_source(name, source) {
+        Ok(peeled) => peeled,
+        Err(error) => {
+            diagnostics.push(source_load_diagnostic(name, &error));
+            return Err(());
+        }
+    };
+    let body = peeled.body;
+
+    // Resolve reader pack: frontmatter locale > session config > Latin default.
+    let Ok(lex_pack) = resolve_peeled_lex_pack(session, &peeled, diagnostics) else {
+        return Err(());
+    };
+
+    let lex_result = match lex_pack.as_ref() {
+        Some(pack) => lexer::lex_with_locale_pack(body, pack),
+        None => lexer::lex(body),
+    };
+    diagnostics.extend(
+        lex_result
+            .locale_suggestions
+            .iter()
+            .map(|suggestion| Diagnostic::from_locale_suggestion(name, body, suggestion)),
+    );
+    if !lex_result.success() {
+        for err in &lex_result.errors {
+            diagnostics.push(Diagnostic::from_lex_error(name, body, err));
+        }
+        return Err(());
+    }
+
+    let parse_result = parser::parse_with_options(
+        lex_result,
+        parser::ParseOptions { allow_bodyless_functions: session.config.allow_bodyless_functions },
+    );
+    for err in &parse_result.errors {
+        diagnostics.push(Diagnostic::from_parse_error(name, body, err));
+    }
+    let had_parse_errors = !parse_result.success();
+    let parse_error_spans: Vec<Span> = parse_result.errors.iter().map(|err| err.span).collect();
+    let parser::ParseResult { program, interner, .. } = parse_result;
+    let Some(program) = program else {
+        diagnostics.push(
+            Diagnostic::error(MISSING_PARSE_PROGRAM_MESSAGE)
+                .with_phase(DiagnosticPhase::Parse)
+                .with_code("INTERNAL001")
+                .with_args(vec![DiagnosticArg::new("issue", "parse_result_missing_program")])
+                .with_file(name.to_owned()),
+        );
+        return Err(());
+    };
+    // Recovered-parse continuation (em-u3): when the parser recovered a partial
+    // AST, keep the successfully-parsed top-level items for semantic analysis
+    // so parse diagnostics and the recovered items' semantic diagnostics
+    // co-report instead of the parse error masking the rest of the module.
+    // Items whose span contains a parse-error span are dropped — their AST is
+    // cascade-corrupted (e.g. `make_beta` survives with a partial body) and
+    // analyzing them would report duplicate/cascade diagnostics.
+    let program = if had_parse_errors {
+        recovered_program_items(program, &parse_error_spans)
+    } else {
+        program
+    };
+
+    Ok(ParsedSourceBody { body, program, interner, lex_pack })
+}
+
+/// Keep only the recovered program's successfully-parsed top-level items.
+///
+/// A recovered parse (`success() == false`, `program.is_some()`) preserves
+/// statements whose parse succeeded plus whatever survived the error recovery.
+/// A top-level item whose span contains a parse-error span is cascade-
+/// corrupted (its body/signature may hold partial constructs that never
+/// existed in source), so semantic analysis of it would emit spurious
+/// diagnostics. Dropping those items lets the analysis entry run the clean
+/// remainder — parse errors co-report with the clean items' semantic
+/// diagnostics (the em-u3 continuation).
+pub(crate) fn recovered_program_items(mut program: Program, parse_error_spans: &[Span]) -> Program {
+    program.statements.retain(|stmt| {
+        !parse_error_spans
+            .iter()
+            .any(|err| err.start >= stmt.span.start && err.end <= stmt.span.end)
+    });
+    program
+}
+
+fn collect_target_policy_diagnostics(
+    target: Target,
+    program: &Program,
+    name: &str,
+    interner: &Interner,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match target {
+        Target::HirGo => diagnostics.extend(target_policy::collect_go_unsupported_errors(program, name, interner)),
+        Target::HirRust => {
+            diagnostics.extend(target_policy::collect_rust_unsupported_errors(program, name));
+            diagnostics.extend(target_policy::collect_rust_noop_warnings(program, name));
+        }
+        // Remaining targets have no syntax-level target-policy checks yet.
+        // Listed explicitly so new Target variants force consideration here.
+        Target::HirFaber
+        | Target::HirFhir
+        | Target::MirStepper
+        | Target::MirFmirBinary
+        | Target::MirFmirBundle
+        | Target::MirFmir
+        | Target::MirLlvm
+        | Target::MirLlvmHost
+        | Target::MirAmd
+        | Target::MirMetal
+        | Target::MirScena
+        | Target::MirSexp
+        | Target::HirSwift
+        | Target::HirPython
+        | Target::HirHaskell
+        | Target::HirTypeScript
+        | Target::MirWasm
+        | Target::MirWgsl => {}
+    }
+}
+
+fn analyze_cli_program_for_source(
+    cli_program_override: Option<crate::cli::CliProgram>,
+    program: &Program,
+    interner: &mut Interner,
+    name: &str,
+    body: &str,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Result<Option<crate::cli::CliProgram>, ()> {
+    let cli_program = if let Some(cli_program) = cli_program_override {
+        Some(retarget_cli_program_symbols(cli_program, interner))
+    } else {
+        let cli_analysis = crate::cli::analyze(program, interner);
+        for err in &cli_analysis.errors {
+            diagnostics.push(Diagnostic::from_semantic_error(name, body, err));
+        }
+
+        cli_analysis.program
+    };
+
+    // Recovered-parse continuation: parse-phase diagnostics already collected
+    // (the recovered program's PARSE errors) must not stop analysis here;
+    // CLI-analysis errors still do.
+    if has_non_parse_diagnostic_errors(diagnostics) {
+        return Err(());
+    }
+
+    Ok(cli_program)
+}
+
+struct SemanticAnalysisInput<'a> {
+    session: &'a Session,
+    program: &'a Program,
+    interner: &'a mut Interner,
+    cli_program: Option<&'a crate::cli::CliProgram>,
+    namespace_exports:
+        BTreeMap<String, BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>>,
+    namespace_seams: BTreeMap<String, bool>,
+    namespace_declarations:
+        BTreeMap<String, BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>>,
+    file_interfaces: BTreeMap<String, crate::file_interface::FileInterface>,
+    name: &'a str,
+    body: &'a str,
+    diagnostics: &'a mut Vec<Diagnostic>,
+    /// The reader pack used for lexing (frontmatter locale > session config).
+    /// Used for type-spelling registration and HIR lowering so they match the
+    /// input locale, not the output locale.
+    lex_pack: Option<LocalePack>,
+}
+
+fn analyze_semantic_program(input: SemanticAnalysisInput<'_>) -> Result<semantic::SemanticResult, ()> {
+    let SemanticAnalysisInput {
+        session,
+        program,
+        interner,
+        cli_program,
+        namespace_exports,
+        namespace_seams,
+        namespace_declarations,
+        file_interfaces,
+        name,
+        body,
+        diagnostics,
+        lex_pack,
+    } = input;
+
+    // Shared analysis without Rust-only borrow. `target` is still recorded so
+    // existing target-tagged checks (e.g. `@ nondum rs`) keep their authority
+    // until G2/G5 move them fully into TargetQualification. Borrow analysis is
+    // applied after the analyzed-application snapshot via `qualify_rust_borrow`.
+    let mut pass_config = PassConfig::base();
+    pass_config.target = session.config.target;
+    pass_config.namespace_exports = namespace_exports;
+    pass_config.namespace_seams = namespace_seams;
+    pass_config.namespace_declarations = namespace_declarations;
+    pass_config.file_interfaces = file_interfaces;
+    pass_config.locale_pack = lex_pack;
+    pass_config.script_kernel_mode = PassConfig::for_target(session.config.target).script_kernel_mode;
+    pass_config.import_path_templates = session.config.import_path_templates.clone();
+    let semantic_result = semantic::analyze_with_cli(program, &pass_config, interner, cli_program);
+
+    for err in &semantic_result.diagnostics {
+        diagnostics.push(Diagnostic::from_semantic_error(name, body, err));
+    }
+
+    if !semantic_result.success() {
+        return Err(());
+    }
+
+    Ok(semantic_result)
+}
+
+fn collect_lane_policy_diagnostics(
+    lanes: &RadixLaneMetadata,
+    target: Target,
+    name: &str,
+    diagnostics: &mut Vec<Diagnostic>,
+    cli_program: Option<&crate::cli::CliProgram>,
+) {
+    // CLI codegen on HIR-direct targets (Rust, Go) never needs MIR lowering.
+    // Skip lane policy checks that would reject MIR/AIR lane annotations
+    // when the CLI codegen path is active (F-109).
+    if cli_program.is_some() && matches!(target, Target::HirRust | Target::HirGo) {
+        return;
+    }
+    // Faber-surface emit (canonical re-emit, `faber format`, `radix emit -t
+    // faber`) preserves lane annotations as annotations and never lowers to
+    // MIR, so the MIR-backed-target policy (a codegen gate) does not apply.
+    if matches!(target, Target::HirFaber) {
+        return;
+    }
+    diagnostics.extend(collect_radix_lane_target_errors(lanes, target, name));
+}
+
+fn analyzed_unit_from_semantic(
+    interner: Interner,
+    cli_program: Option<crate::cli::CliProgram>,
+    semantic_result: semantic::SemanticResult,
+    name: &str,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Result<AnalyzedModule, ()> {
+    let Some(hir) = semantic_result.hir else {
+        diagnostics.push(
+            Diagnostic::error(MISSING_SEMANTIC_HIR_MESSAGE)
+                .with_phase(DiagnosticPhase::Lower)
+                .with_code("INTERNAL001")
+                .with_args(vec![DiagnosticArg::new("issue", "semantic_result_missing_hir")])
+                .with_file(name.to_owned()),
+        );
+        return Err(());
+    };
+
+    let libraries = LibraryRegistry::default();
+    let parts = semantic::AnalyzedApplicationParts {
+        hir,
+        types: semantic_result.types,
+        resolver: semantic_result.resolver,
+        annotation_contracts: semantic_result.annotation_contracts,
+        libraries,
+        radix_lanes: semantic_result.radix_lanes,
+        gpu_builtins: semantic_result.gpu_builtins,
+        semantic_diagnostics: semantic_result.diagnostics,
+    };
+
+    let application = match semantic::AnalyzedApplication::build(parts, &interner) {
+        Ok(application) => application,
+        Err(err) => {
+            diagnostics.push(
+                Diagnostic::error(err.to_string())
+                    .with_phase(DiagnosticPhase::Analysis)
+                    .with_file(name.to_owned())
+                    .with_args(vec![DiagnosticArg::new("issue", "analyzed_application_incomplete")]),
+            );
+            return Err(());
+        }
+    };
+
+    let fields = application.into_driver_fields();
+    #[cfg(feature = "mir-core")]
+    let graphics_source = collect_graphics_source_facts(&fields.hir, &fields.types, &interner, name, diagnostics);
+    Ok(AnalyzedModule {
+        analysis_stamp: fields.stamp,
+        interner,
+        types: fields.types,
+        resolver: fields.resolver,
+        cli_program,
+        libraries: fields.libraries,
+        annotation_contracts: fields.annotation_contracts,
+        function_facts: fields.function_facts,
+        resolved_uses: fields.resolved_uses,
+        qualified_identities: fields.qualified_identities,
+        package_import_identities: None,
+        radix_lanes: fields.radix_lanes,
+        gpu_builtins: fields.gpu_builtins,
+        #[cfg(feature = "mir-core")]
+        graphics_source,
+        hir: fields.hir,
+        presentation: semantic_result.presentation,
+        diagnostics: std::mem::take(diagnostics),
+    })
+}
+
+/// A presentation for a unit with no trivia data.
+///
+/// Used by `from_loaded` before the artifact loader reconstructs the sidecar
+/// (schema-v1 artifacts carry no presentation; U-4 switches the loader to
+/// `from_loaded_with_presentation`). No real program-end boundary exists here,
+/// so the sidecar is deliberately empty.
+fn empty_presentation() -> HirPresentation {
+    HirPresentation {
+        owners: Vec::new(),
+        attachments: Vec::new(),
+        block_ends: Vec::new(),
+        program_end: HirModuleEnd { id: HirSourceAnchorId(0), span: crate::lexer::Span::default() },
+        entry_start_anchor: None,
+    }
+}
+
+#[cfg(feature = "mir-core")]
+fn collect_graphics_source_facts(
+    hir: &HirModule,
+    types: &semantic::TypeTable,
+    interner: &Interner,
+    name: &str,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> GraphicsSourceFacts {
+    let contract = shader_contract::collect_shader_contract_facts(hir, types, interner, name, diagnostics);
+    GraphicsSourceFacts {
+        vertex_entries: collect_vertex_entries(hir, types, interner),
+        fragment_entries: collect_fragment_entries(hir, types, interner),
+        shader_vertex_attributes: contract.vertex_attributes,
+        shader_varyings: contract.varyings,
+        shader_fragment_outputs: contract.fragment_outputs,
+        shader_pipeline_states: contract.pipeline_states,
+        shader_resource_bindings: contract.resource_bindings,
+    }
+}
+
+fn collect_vertex_entries(
+    hir: &HirModule,
+    types: &semantic::TypeTable,
+    interner: &Interner,
+) -> Vec<GraphicsVertexEntry> {
+    let mut entries = Vec::new();
+    for item in &hir.items {
+        let crate::hir::HirItemKind::Function(function) = &item.kind else {
+            continue;
+        };
+        let vertex_payload_count: usize = function
+            .annotations
+            .iter()
+            .filter(|annotation| interner.resolve(annotation.family) == "vertex")
+            .map(|annotation| annotation.fields.len() + annotation.raw_args.len())
+            .sum();
+        if function
+            .annotations
+            .iter()
+            .any(|annotation| interner.resolve(annotation.family) == "vertex")
+        {
+            entries.push(GraphicsVertexEntry {
+                def_id: item.def_id,
+                entry_name: interner.resolve(function.name).to_owned(),
+                annotation_payload_count: vertex_payload_count,
+                param_count: function.params.len() + usize::from(function.cli_args.is_some()),
+                returns_vacuum: function_returns_vacuum(function, types),
+                has_error_type: function.err_ty.is_some(),
+                body_shape: vertex_body_shape(function.body.as_ref()),
+            });
+        }
+    }
+    entries
+}
+
+fn function_returns_vacuum(function: &HirFunction, types: &semantic::TypeTable) -> bool {
+    matches!(
+        function.ret_ty.map(|ty| types.get(ty)),
+        Some(Type::Primitive(Primitive::Vacuum))
+    )
+}
+
+fn collect_fragment_entries(
+    hir: &HirModule,
+    types: &semantic::TypeTable,
+    interner: &Interner,
+) -> Vec<GraphicsFragmentEntry> {
+    let mut entries = Vec::new();
+    for item in &hir.items {
+        let crate::hir::HirItemKind::Function(function) = &item.kind else {
+            continue;
+        };
+        if !function
+            .annotations
+            .iter()
+            .any(|annotation| interner.resolve(annotation.family) == "fragment")
+        {
+            continue;
+        }
+        let fragment_payload_count: usize = function
+            .annotations
+            .iter()
+            .filter(|annotation| interner.resolve(annotation.family) == "fragment")
+            .map(|annotation| annotation.fields.len() + annotation.raw_args.len())
+            .sum();
+        entries.push(GraphicsFragmentEntry {
+            def_id: item.def_id,
+            entry_name: interner.resolve(function.name).to_owned(),
+            annotation_payload_count: fragment_payload_count,
+            param_count: function.params.len() + usize::from(function.cli_args.is_some()),
+            returns_vacuum: function_returns_vacuum(function, types),
+            has_error_type: function.err_ty.is_some(),
+            body_shape: vertex_body_shape(function.body.as_ref()),
+        });
+    }
+    entries
+}
+
+fn vertex_body_shape(body: Option<&HirBlock>) -> GraphicsVertexBodyShape {
+    let Some(body) = body else {
+        return GraphicsVertexBodyShape::Missing;
+    };
+    // Ignore compiler-injected synthetic locals (runtime_provided) when
+    // deciding whether a source body is empty. HIR lowering injects shader
+    // implicit inputs as synthetic locals; they do not make an empty source
+    // body "authored."
+    let has_user_statements = body
+        .statements
+        .iter()
+        .any(|stmt| !matches!(&stmt.kind, crate::hir::HirStatementKind::Local(l) if l.runtime_provided));
+    if has_user_statements || body.expr.is_some() || body.breakable.is_some() {
+        return GraphicsVertexBodyShape::Unsupported;
+    }
+    GraphicsVertexBodyShape::EmptyBlock
+}
+
+fn has_diagnostic_errors(diagnostics: &[Diagnostic]) -> bool {
+    diagnostics.iter().any(Diagnostic::is_error)
+}
+
+/// Whether any *non-parse* error diagnostic is present.
+///
+/// The recovered-parse continuation (em-u3) lets parse diagnostics co-report
+/// with the recovered items' semantic diagnostics, so the pre-semantic early
+/// exits must not trip on parse-phase errors. Non-parse errors still stop the
+/// pipeline as before.
+fn has_non_parse_diagnostic_errors(diagnostics: &[Diagnostic]) -> bool {
+    diagnostics
+        .iter()
+        .any(|diag| diag.is_error() && diag.phase != DiagnosticPhase::Parse)
+}
+
+fn collect_radix_lane_target_errors(lanes: &RadixLaneMetadata, target: Target, file: &str) -> Vec<Diagnostic> {
+    lanes
+        .iter()
+        .filter_map(|(_, lane)| radix_lane_target_error(lane, target, file))
+        .collect()
+}
+
+fn radix_lane_target_error(lane: RadixLane, target: Target, file: &str) -> Option<Diagnostic> {
+    let target_name = target_display_name(target);
+    let (message, issue, lane_name) = match (lane, target) {
+        (
+            RadixLane::Air,
+            Target::HirRust | Target::HirFaber | Target::HirTypeScript | Target::HirGo | Target::HirSwift,
+        ) => Some((
+            format!(
+                "@ radix lane \"air\" requires a MIR-backed target; target '{target_name}' is currently HIR-direct"
+            ),
+            "lane_requires_mir_backed_target",
+            "air",
+        )),
+        (
+            RadixLane::Mir,
+            Target::HirRust | Target::HirFaber | Target::HirTypeScript | Target::HirGo | Target::HirSwift,
+        ) => Some((
+            format!(
+                "@ radix lane \"mir\" requires a MIR-backed target; target '{target_name}' is currently HIR-direct"
+            ),
+            "lane_requires_mir_backed_target",
+            "mir",
+        )),
+        _ => None,
+    }?;
+
+    Some(
+        Diagnostic::error(message)
+            .with_phase(DiagnosticPhase::Analysis)
+            .with_code("TARGETLANE001")
+            .with_args(vec![
+                DiagnosticArg::new("issue", issue),
+                DiagnosticArg::new("lane", lane_name),
+                DiagnosticArg::new("target", target_name),
+            ])
+            .with_file(file.to_owned()),
+    )
+}
+
+fn target_display_name(target: Target) -> &'static str {
+    match target {
+        Target::MirStepper => "stepper",
+        Target::HirRust => "rust",
+        Target::HirFaber => "faber",
+        Target::HirTypeScript => "ts",
+        Target::HirGo => "go",
+        Target::HirSwift => "swift",
+        Target::HirPython => "python",
+        Target::HirHaskell => "haskell",
+        Target::MirWasm => "wasm-text",
+        Target::MirLlvm => "llvm-text",
+        Target::MirLlvmHost => "llvm-host",
+        Target::MirAmd => "amd",
+        Target::MirMetal => "metal-text",
+        Target::MirWgsl => "wgsl-text",
+        Target::MirSexp => "sexp",
+        Target::MirScena => "scena",
+        Target::MirFmir => "fmir-text",
+        Target::MirFmirBinary => "fmir",
+        Target::MirFmirBundle => "fmir-bin",
+        Target::HirFhir => "fhir",
+    }
+}
+
+fn retarget_cli_program_symbols(
+    mut cli_program: crate::cli::CliProgram,
+    interner: &mut Interner,
+) -> crate::cli::CliProgram {
+    for option in cli_program
+        .global_options
+        .iter_mut()
+        .chain(cli_program.options.iter_mut())
+        .chain(
+            cli_program
+                .commands
+                .iter_mut()
+                .flat_map(|command| command.options.iter_mut()),
+        )
+    {
+        option.binding_symbol = interner.intern(&option.binding);
+    }
+    for operand in cli_program
+        .global_operands
+        .iter_mut()
+        .chain(cli_program.operands.iter_mut())
+        .chain(
+            cli_program
+                .commands
+                .iter_mut()
+                .flat_map(|command| command.operands.iter_mut()),
+        )
+    {
+        operand.binding_symbol = interner.intern(&operand.binding);
+    }
+    for command in &mut cli_program.commands {
+        command.function_symbol = interner.intern(&command.function);
+    }
+    cli_program
+}
+
+#[cfg(test)]
+#[cfg(feature = "mir-core")]
+#[path = "mod_test.rs"]
+mod tests;
+
+#[cfg(test)]
+#[cfg(feature = "hir-faber")]
+#[path = "locale_fanout_test.rs"]
+mod locale_fanout_tests;
+
+#[cfg(test)]
+#[cfg(feature = "device")]
+#[path = "backward_integration_test.rs"]
+mod backward_integration_tests;
+
+#[cfg(test)]
+#[cfg(feature = "device")]
+#[path = "generic_backward_integration_test.rs"]
+mod generic_backward_integration_tests;
+
+#[cfg(test)]
+#[cfg(feature = "device")]
+#[path = "bias_broadcast_test.rs"]
+mod bias_broadcast_tests;
+
+#[cfg(test)]
+#[cfg(feature = "device")]
+#[path = "gather_intrinsic_test.rs"]
+mod gather_intrinsic_tests;
+
+#[cfg(test)]
+#[cfg(feature = "device")]
+#[path = "rms_norm_intrinsic_test.rs"]
+mod rms_norm_intrinsic_tests;
+
+#[cfg(test)]
+#[cfg(feature = "device")]
+#[path = "rope_norm_intrinsic_test.rs"]
+mod rope_norm_intrinsic_tests;
+
+#[cfg(test)]
+#[path = "type_hole_union_deny_test.rs"]
+mod type_hole_union_deny_tests;
+
+#[cfg(test)]
+#[path = "amd_target_test.rs"]
+mod amd_target_tests;

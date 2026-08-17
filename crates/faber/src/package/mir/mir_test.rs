@@ -122,14 +122,14 @@ fn copy_package_dir_skipping_target(src: &Path, dest: &Path) {
 fn package_fmir_image_provisions_decomposed_companion_upstream_seed() {
     use radix_mir_fmir::schema::{WireBufferLifetime, WireBufferRole};
 
-    let workspace = radix::paths::faberlang_home().expect("faberlang container root");
+    let workspace = radix_module::paths::faberlang_home().expect("faberlang container root");
     let exemplum = workspace.join("examples/training/bert-tiny-fragment");
     let dir = crate::package::test_support::test_temp_dir("bert-tiny-seed");
     copy_package_dir_skipping_target(&exemplum, dir.path());
 
-    let config = radix::driver::Config::default()
+    let config = radix_module::driver::Config::default()
         .with_stdlib(workspace)
-        .with_target(radix::codegen::Target::MirFmirBinary);
+        .with_target(radix_module::codegen::Target::MirFmirBinary);
     let image = radix_package::mir::build_package_fmir_image(
         &config,
         dir.path(),

@@ -10,14 +10,14 @@ use crate::package::faber_analysis_seams;
 use radix_package::analyze::check_package as check_package_direct;
 
 fn check_with_faber_seams(
-    config: &radix::driver::Config,
+    config: &radix_module::driver::Config,
     input: &std::path::Path,
-) -> Vec<radix::diagnostics::Diagnostic> {
+) -> Vec<radix_module::diagnostics::Diagnostic> {
     check_package_direct(config, input, &faber_analysis_seams())
 }
-use radix::codegen::Target;
-use radix::diagnostics::{Diagnostic, DiagnosticArg};
-use radix::locale::LocalePack;
+use radix_module::codegen::Target;
+use radix_module::diagnostics::{Diagnostic, DiagnosticArg};
+use radix_module::locale::LocalePack;
 use std::path::PathBuf;
 
 const ISSUE_INITIALIZER_ANNOTATION_MISMATCH: &str = "initializer_annotation_mismatch";
@@ -25,7 +25,7 @@ const BIDI_ISOLATE_START: &str = "\u{2068}";
 const BIDI_ISOLATE_END: &str = "\u{2069}";
 
 fn locale_examples_root() -> PathBuf {
-    radix::paths::faberlang_home()
+    radix_module::paths::faberlang_home()
         .expect("faberlang container root")
         .join("examples/reader-locale")
 }
@@ -43,7 +43,7 @@ fn diagnostics_with_issue<'a>(diagnostics: &[&'a Diagnostic], issue: &str) -> Ve
 }
 
 fn render_plain(diag: &Diagnostic, pack: &LocalePack) -> String {
-    radix::diagnostics::render_plain_with_pack(diag, pack).expect("render diagnostic")
+    radix_module::diagnostics::render_plain_with_pack(diag, pack).expect("render diagnostic")
 }
 
 fn assert_plain_render_contract(rendered: &str, header: &str) {
@@ -457,7 +457,7 @@ fn package_render_emits_sem001_suggestion_for_vietnamese_name() {
         "expected LOCALE002 diagnostics: {diagnostics:?}"
     );
     assert!(
-        diagnostics.iter().any(radix::Diagnostic::is_error),
+        diagnostics.iter().any(radix_module::Diagnostic::is_error),
         "misspelled identifier must not be accepted as valid source: {diagnostics:?}"
     );
 
@@ -495,7 +495,7 @@ fn package_render_emits_reader002_accented_keyword_suggestion() {
         "expected LOCALE002 diagnostics: {diagnostics:?}"
     );
     assert!(
-        diagnostics.iter().any(radix::Diagnostic::is_error),
+        diagnostics.iter().any(radix_module::Diagnostic::is_error),
         "misspelled keyword must not be accepted as valid source: {diagnostics:?}"
     );
 
@@ -531,7 +531,7 @@ fn package_render_emits_reader002_typo_keyword_suggestion() {
         "expected LOCALE002 diagnostics: {diagnostics:?}"
     );
     assert!(
-        diagnostics.iter().any(radix::Diagnostic::is_error),
+        diagnostics.iter().any(radix_module::Diagnostic::is_error),
         "misspelled keyword must not be accepted as valid source: {diagnostics:?}"
     );
 

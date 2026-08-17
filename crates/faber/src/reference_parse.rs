@@ -1,7 +1,7 @@
 //! Parse exempla `.fab` files into [`crate::explain::Entry`] values.
 
 use crate::explain::{Entry, ExplainError, Kind};
-use radix::driver::split_frontmatter;
+use radix_module::driver::split_frontmatter;
 use serde::Deserialize;
 use std::path::Path;
 

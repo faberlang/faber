@@ -1,0 +1,271 @@
+use super::*;
+use crate::codegen::Target;
+use crate::lexer::Symbol;
+use crate::semantic::TypeParamConstraint;
+
+// F-009: common_type must preserve optionality when one branch is Option<T>
+// and the other is T or nihil.
+#[test]
+fn common_type_preserves_optionality_on_join() {
+    let mut types = TypeTable::new();
+    let resolver = Resolver::new();
+    let mut checker = TypeChecker::new(&resolver, &mut types, None, Target::HirRust);
+
+    let numerus = checker.numerus_type();
+    let opt_numerus = checker.types.option(numerus);
+    let nihil = checker.types.primitive(Primitive::Nihil);
+    let vacuous_span = crate::lexer::Span::default();
+
+    // Option<T> + T → Option<T> (not T)
+    let joined = checker.common_type(opt_numerus, numerus, vacuous_span);
+    let resolved = checker.resolve_inferred_type(joined);
+    assert!(
+        matches!(checker.types.get(resolved), Type::Option(inner) if *inner == numerus),
+        "F-009: common_type(Option<Numerus>, Numerus) must return Option<Numerus>, got {:?}",
+        checker.types.get(resolved),
+    );
+
+    // T + Option<T> → Option<T>
+    let joined = checker.common_type(numerus, opt_numerus, vacuous_span);
+    let resolved = checker.resolve_inferred_type(joined);
+    assert!(
+        matches!(checker.types.get(resolved), Type::Option(inner) if *inner == numerus),
+        "F-009: common_type(Numerus, Option<Numerus>) must return Option<Numerus>, got {:?}",
+        checker.types.get(resolved),
+    );
+
+    // Option<T> + nihil → Option<T> (not nihil)
+    let joined = checker.common_type(opt_numerus, nihil, vacuous_span);
+    let resolved = checker.resolve_inferred_type(joined);
+    assert!(
+        matches!(checker.types.get(resolved), Type::Option(inner) if *inner == numerus),
+        "F-009: common_type(Option<Numerus>, nihil) must return Option<Numerus>, got {:?}",
+        checker.types.get(resolved),
+    );
+
+    // nihil + Option<T> → Option<T>
+    let joined = checker.common_type(nihil, opt_numerus, vacuous_span);
+    let resolved = checker.resolve_inferred_type(joined);
+    assert!(
+        matches!(checker.types.get(resolved), Type::Option(inner) if *inner == numerus),
+        "F-009: common_type(nihil, Option<Numerus>) must return Option<Numerus>, got {:?}",
+        checker.types.get(resolved),
+    );
+}
+
+// F-010: structural unify for Vector/Matrix/Sparsa/Atomic/Intervallum.
+#[test]
+fn unify_with_policy_handles_vector_matrix_sparsa_atomic_intervallum() {
+    let mut types = TypeTable::new();
+    let resolver = Resolver::new();
+
+    // Create all type constructors before the checker borrows types.
+    let f32_id = types.intern(Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32));
+    let width_4 = types.intern_index(IndexExpr::Literal(4));
+    let shape_2x2 = {
+        let lit2 = types.intern_index(IndexExpr::Literal(2));
+        types.intern_index(IndexExpr::Tuple(vec![lit2, lit2]))
+    };
+    let vec_a = types.vector_with_width(f32_id, width_4);
+    let mat_a = types.matrix_with_shape(f32_id, shape_2x2);
+    let sp_a = types.sparsa_with_shape(f32_id, shape_2x2);
+    let atom_a = types.atomic(f32_id);
+    let int_a = types.intervallum(f32_id);
+
+    let mut checker = TypeChecker::new(&resolver, &mut types, None, Target::HirRust);
+    let numerus = checker.numerus_type();
+    let vacuous_span = crate::lexer::Span::default();
+
+    // Create second set via checker.types
+    let vec_b = checker.types.vector_with_width(numerus, width_4);
+    let mat_b = checker.types.matrix_with_shape(numerus, shape_2x2);
+    let sp_b = checker.types.sparsa_with_shape(numerus, shape_2x2);
+    let atom_b = checker.types.atomic(numerus);
+    let int_b = checker.types.intervallum(numerus);
+
+    // Vector: unify element types, width must match
+    let joined = checker.unify_join(vec_a, vec_b, vacuous_span, "test");
+    let resolved = checker.resolve_inferred_type(joined);
+    assert!(
+        matches!(checker.types.get(resolved), Type::Vector(_, _)),
+        "F-010: unify_join(Vector<f32,4>, Vector<numerus,4>) must produce a Vector, got {:?}",
+        checker.types.get(resolved),
+    );
+
+    // Matrix: unify element types, shape must match
+    let joined = checker.unify_join(mat_a, mat_b, vacuous_span, "test");
+    let resolved = checker.resolve_inferred_type(joined);
+    assert!(
+        matches!(checker.types.get(resolved), Type::Matrix(_, _)),
+        "F-010: unify_join(Matrix<f32,[2,2]>, Matrix<numerus,[2,2]>) must produce a Matrix, got {:?}",
+        checker.types.get(resolved),
+    );
+
+    // Sparsa: unify element types, shape must match
+    let joined = checker.unify_join(sp_a, sp_b, vacuous_span, "test");
+    let resolved = checker.resolve_inferred_type(joined);
+    assert!(
+        matches!(checker.types.get(resolved), Type::Sparsa(_, _)),
+        "F-010: unify_join(Sparsa<f32,[2,2]>, Sparsa<numerus,[2,2]>) must produce a Sparsa, got {:?}",
+        checker.types.get(resolved),
+    );
+
+    // Atomic: unify inner types
+    let joined = checker.unify_join(atom_a, atom_b, vacuous_span, "test");
+    let resolved = checker.resolve_inferred_type(joined);
+    assert!(
+        matches!(checker.types.get(resolved), Type::Atomic(_)),
+        "F-010: unify_join(Atomic<f32>, Atomic<numerus>) must produce an Atomic, got {:?}",
+        checker.types.get(resolved),
+    );
+
+    // Intervallum: unify inner types
+    let joined = checker.unify_join(int_a, int_b, vacuous_span, "test");
+    let resolved = checker.resolve_inferred_type(joined);
+    assert!(
+        matches!(checker.types.get(resolved), Type::Intervallum(_)),
+        "F-010: unify_join(Intervallum<f32>, Intervallum<numerus>) must produce an Intervallum, got {:?}",
+        checker.types.get(resolved),
+    );
+}
+
+// F-012: function type join must treat params contravariantly under Join.
+#[test]
+fn function_type_join_uses_contravariant_params() {
+    let mut types = TypeTable::new();
+    let resolver = Resolver::new();
+
+    let f32_id = types.intern(Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32));
+    let fractus = types.primitive(Primitive::Fractus);
+    let vacuum = types.primitive(Primitive::Vacuum);
+
+    // f1: (f32) → void  (narrower param)
+    let sig_a = FuncSig {
+        type_params: vec![],
+        type_param_constraints: vec![],
+        params: vec![ParamType { ty: f32_id, mode: SemanticParamMode::Owned, optional: false }],
+        ret: vacuum,
+        err: None,
+        is_async: false,
+        is_generator: false,
+    };
+    let func_a = types.function(sig_a.clone());
+
+    // f2: (fractus) → void  (wider param)
+    let sig_b = FuncSig {
+        type_params: vec![],
+        type_param_constraints: vec![],
+        params: vec![ParamType { ty: fractus, mode: SemanticParamMode::Owned, optional: false }],
+        ret: vacuum,
+        err: None,
+        is_async: false,
+        is_generator: false,
+    };
+    let func_b = types.function(sig_b);
+
+    // f3: (f32) → void (same param types, join should succeed)
+    // Pre-create before checker borrow so the join test below does not
+    // double-borrow `types`.
+    let func_c = types.function(FuncSig {
+        type_params: vec![],
+        type_param_constraints: vec![],
+        params: vec![ParamType { ty: f32_id, mode: SemanticParamMode::Owned, optional: false }],
+        ret: vacuum,
+        err: None,
+        is_async: false,
+        is_generator: false,
+    });
+
+    let mut checker = TypeChecker::new(&resolver, &mut types, None, Target::HirRust);
+    let vacuous_span = crate::lexer::Span::default();
+
+    // Sanity: f32 is assignable to fractus (widening), but not vice versa.
+    let f32_resolved = checker.resolve_inferred_type(f32_id);
+    let fractus_resolved = checker.resolve_inferred_type(fractus);
+    assert!(
+        !checker.types.assignable(fractus_resolved, f32_resolved),
+        "F-012 precondition: fractus must not be assignable to f32 (narrowing)"
+    );
+    assert!(
+        checker.types.assignable(f32_resolved, fractus_resolved),
+        "F-012 precondition: f32 must be assignable to fractus (widening)"
+    );
+
+    // Under the old covariant Join, (f32)→void and (fractus)→void would
+    // unsoundly join to (fractus)→void (wider param). Under the fixed
+    // contravariant Join using Assign for params, incompatible param types
+    // cause the join to fail because Assign checks assignable(param_b, param_a)
+    // = assignable(fractus, f32) = false.
+    // unsoundly join to (fractus)→void. Under the fixed contravariant Join,
+    // incompatible param types cause the join to fail (error type), because
+    // there is no single param type safe for both functions.
+    let joined = checker.unify_join(func_a, func_b, vacuous_span, "test");
+    let resolved = checker.resolve_inferred_type(joined);
+    assert!(
+        matches!(checker.types.get(resolved), Type::Error),
+        "F-012: function join with incompatible param types must fail (was unsoundly covariant); got {:?}",
+        checker.types.get(resolved),
+    );
+
+    // When params are the same, join should succeed contravariantly.
+    let joined = checker.unify_join(func_a, func_c, vacuous_span, "test");
+    let resolved = checker.resolve_inferred_type(joined);
+    assert!(
+        !matches!(checker.types.get(resolved), Type::Error),
+        "F-012: function join with same param types must succeed",
+    );
+}
+
+// PRP-076: occurs_in must traverse type_param_constraints.
+#[test]
+fn occurs_in_detects_var_in_type_param_constraints() {
+    let mut types = TypeTable::new();
+    let resolver = Resolver::new();
+    let mut checker = TypeChecker::new(&resolver, &mut types, None, Target::HirRust);
+
+    let infer = checker.fresh_infer();
+    let numerus = checker.numerus_type();
+
+    let sig = FuncSig {
+        type_params: vec![Symbol(0)],
+        type_param_constraints: vec![TypeParamConstraint::OneOf(vec![infer, numerus])],
+        params: vec![],
+        ret: numerus,
+        err: None,
+        is_async: false,
+        is_generator: false,
+    };
+    let func_ty = checker.types.function(sig);
+
+    assert!(
+        checker.occurs_in(InferVar(0), func_ty),
+        "occurs_in must detect var inside type_param_constraints::OneOf",
+    );
+}
+
+#[test]
+fn occurs_in_ignores_any_constraint() {
+    let mut types = TypeTable::new();
+    let resolver = Resolver::new();
+    let mut checker = TypeChecker::new(&resolver, &mut types, None, Target::HirRust);
+
+    let numerus = checker.numerus_type();
+
+    // Create a FuncSig with TypeParamConstraint::Any (no TypeId references).
+    let sig = FuncSig {
+        type_params: vec![Symbol(0)],
+        type_param_constraints: vec![TypeParamConstraint::Any],
+        params: vec![],
+        ret: numerus,
+        err: None,
+        is_async: false,
+        is_generator: false,
+    };
+    let func_ty = checker.types.function(sig);
+
+    // var 999 does not occur anywhere — confirms Any never produces a false positive.
+    assert!(
+        !checker.occurs_in(InferVar(999), func_ty),
+        "occurs_in must not false-positive through TypeParamConstraint::Any",
+    );
+}

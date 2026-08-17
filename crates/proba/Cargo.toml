@@ -9,11 +9,11 @@ license = "MIT"
 # The proba runner consumes compiler analysis and MIR values but does not own
 # another compiler pipeline. Keep the dependency downward and core builds
 # runner-free.
-radix = { path = "../radix", default-features = false }
+radix-module = { path = "../radix-module", default-features = false }
 
 [features]
 default = []
-runner = ["radix/runner"]
+runner = ["radix-module/runner"]
 
 [lints]
 workspace = true

@@ -20,9 +20,9 @@ use super::composite_plan::{
     SubmissionRegionFact,
 };
 use super::test_support::{test_temp_dir, TestDir};
-use radix::codegen::Target;
-use radix::diagnostics::{Diagnostic, DiagnosticArg};
-use radix::driver::Config;
+use radix_module::codegen::Target;
+use radix_module::diagnostics::{Diagnostic, DiagnosticArg};
+use radix_module::driver::Config;
 use radix_mir::abi::{
     MirKernelDispatchSize, MirKernelResourceAccess, MirKernelWorkgroupCount, MirWorkgroupSize,
 };

@@ -1,6 +1,6 @@
 //! Subprocess checks for `faber format --stdout` (requires built `faber` binary).
 
-use radix::forma::test_gate::{assert_author_idempotent, assert_author_reparses_with};
+use radix_module::forma::test_gate::{assert_author_idempotent, assert_author_reparses_with};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -18,9 +18,9 @@ fn exempla(path: &str) -> PathBuf {
 
 /// English reader pack — the product-default surface the CLI uses for
 /// untagged sources and `locale = "en"` frontmatter files.
-fn english_pack() -> radix::locale::LocalePack {
+fn english_pack() -> radix_module::locale::LocalePack {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
-    radix::locale::LocalePack::from_toml_path(path).expect("load English locale pack")
+    radix_module::locale::LocalePack::from_toml_path(path).expect("load English locale pack")
 }
 
 fn normalize_trailing_newline(text: &str) -> String {
@@ -33,7 +33,7 @@ fn normalize_trailing_newline(text: &str) -> String {
 }
 
 fn body_for_parse(source: &str) -> &str {
-    radix::driver::split_frontmatter(source)
+    radix_module::driver::split_frontmatter(source)
         .expect("split formatted source")
         .body
 }

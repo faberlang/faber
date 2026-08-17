@@ -1,0 +1,37 @@
++++
+locale = "la"
++++
+
+# U4.1 fixture: patterns
+# Match expression with multiple arms — exercises HirArm, pattern lowering.
+# Uses elige (value switch) and discerne (variant pattern matching).
+
+discretio Color {
+    Rubrum
+    Viridis
+    Caeruleum
+}
+
+functio elige_describe(numerus x) → textus {
+    elige x {
+        casu 0 { redde "zero" }
+        casu 1 { redde "one" }
+        ceterum { redde "many" }
+    }
+}
+
+functio discerne_describe(Color c) → textus {
+    discerne c {
+        casu Rubrum { redde "red" }
+        casu Viridis { redde "green" }
+        casu Caeruleum { redde "blue" }
+    }
+}
+
+incipit {
+    nota elige_describe(0)
+    nota elige_describe(1)
+    nota elige_describe(42)
+    fixum Color col ← Viridis
+    nota discerne_describe(col)
+}

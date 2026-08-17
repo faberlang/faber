@@ -1,0 +1,171 @@
+//! HIR v1 G2: target-neutral mode and access policy integration tests.
+
+use crate::codegen::Target;
+use crate::driver::{analyze_source, Config, Session};
+use crate::semantic::{analyze, PassConfig};
+
+fn analyze_base(source: &str) -> crate::semantic::SemanticResult {
+    let lex = crate::lexer::lex(source);
+    let mut parsed = crate::parser::parse(lex);
+    assert!(parsed.success(), "parse: {:?}", parsed.errors);
+    let program = parsed.program.take().expect("program");
+    // Base config: modes on, no Rust lifetime.
+    let config = PassConfig::base();
+    analyze(&program, &config, &mut parsed.interner)
+}
+
+#[test]
+fn mode_assign_to_de_rejects_on_base_analysis() {
+    let source = r"
+functio mutate(de numerus x) → vacuum {
+  x ← 2
+}
+incipit { }
+";
+    let result = analyze_base(source);
+    assert!(
+        !result.success(),
+        "base analysis should reject assign through de: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result.diagnostics.iter().any(|err| {
+            err.args
+                .iter()
+                .any(|a| a.name == "issue" && a.value == "assign_to_de_parameter")
+        }),
+        "missing assign_to_de_parameter: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn mode_assign_to_de_rejects_for_ts_go_targets() {
+    let source = r"
+functio mutate(de numerus x) → vacuum {
+  x ← 2
+}
+incipit { }
+";
+    for target in [Target::HirTypeScript, Target::HirGo] {
+        let lex = crate::lexer::lex(source);
+        let mut parsed = crate::parser::parse(lex);
+        let program = parsed.program.take().expect("program");
+        let mut config = PassConfig::for_target(target);
+        config.borrow_analysis = false;
+        let result = analyze(&program, &config, &mut parsed.interner);
+        assert!(
+            !result.success(),
+            "target {target:?} should reject assign through de: {:?}",
+            result.diagnostics
+        );
+        assert!(
+            result.diagnostics.iter().any(|err| {
+                err.args
+                    .iter()
+                    .any(|a| a.name == "issue" && a.value == "assign_to_de_parameter")
+            }),
+            "target {target:?}: {:?}",
+            result.diagnostics
+        );
+    }
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn rust_access_plain_lista_traps_not_silent_default() {
+    let session = Session::new(Config::default().with_target(Target::HirRust));
+    let unit = analyze_source(
+        &session,
+        "access.fab",
+        r"
+incipit {
+  fixum lista<numerus> xs ← [1, 2]
+  fixum numerus v ← xs[0]
+  nota v
+}
+",
+    )
+    .expect("analyze");
+    let latin = crate::locale::latin_locale_pack();
+    let surface = crate::locale::KeywordSurface::new(&latin);
+    let out = crate::codegen::generate_from_analyzed(Target::HirRust, &unit, &surface).expect("emit");
+    let crate::Output::Rust(rust) = out else {
+        panic!("expected rust");
+    };
+    assert!(
+        rust.code.contains("lista index trap") || rust.code.contains(".get("),
+        "expected checked lista get, got:\n{}",
+        rust.code
+    );
+    assert!(
+        !rust.code.contains("unwrap_or_default()"),
+        "plain lista must not use unwrap_or_default:\n{}",
+        rust.code
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn rust_access_plain_tabula_traps_missing_key() {
+    let session = Session::new(Config::default().with_target(Target::HirRust));
+    let unit = analyze_source(
+        &session,
+        "map.fab",
+        r#"
+incipit {
+  fixum tabula<textus, numerus> m ← { "a": 1 }
+  fixum numerus v ← m["a"]
+  nota v
+}
+"#,
+    )
+    .expect("analyze");
+    let latin = crate::locale::latin_locale_pack();
+    let surface = crate::locale::KeywordSurface::new(&latin);
+    let out = crate::codegen::generate_from_analyzed(Target::HirRust, &unit, &surface).expect("emit");
+    let crate::Output::Rust(rust) = out else {
+        panic!("expected rust");
+    };
+    assert!(
+        rust.code.contains("tabula missing key"),
+        "expected tabula trap, got:\n{}",
+        rust.code
+    );
+}
+
+#[test]
+fn rust_regex_conversio_is_carrier_not_engine_compile() {
+    // G2 S4: pattern conversion builds a carrier; MustCompile-style validation is not
+    // the conversion's job (engine ops own that).
+    let session = Session::new(Config::default().with_target(Target::HirRust));
+    let unit = analyze_source(
+        &session,
+        "regex.fab",
+        r#"
+incipit {
+  fixum textus s ← "\\d+"
+  fixum regularene r ← s ↦ regularene
+  nota r
+}
+"#,
+    );
+    // If grammar uses `regex` rather than regularene, accept either green or typed fail.
+    if let Ok(unit) = unit {
+        let latin = crate::locale::latin_locale_pack();
+        let surface = crate::locale::KeywordSurface::new(&latin);
+        let out = crate::codegen::generate_from_analyzed(Target::HirRust, &unit, &surface).expect("emit");
+        if let crate::Output::Rust(rust) = out {
+            assert!(
+                !rust.code.contains("regex::Regex::new") || rust.code.contains("faber::Regex::new"),
+                "regex conversion should use carrier construction: {}",
+                rust.code
+            );
+            assert!(
+                !rust.code.contains("MustCompile"),
+                "conversion must not MustCompile: {}",
+                rust.code
+            );
+        }
+    }
+}

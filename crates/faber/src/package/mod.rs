@@ -125,9 +125,9 @@ pub use mir::with_lowered_package_mir;
 pub(crate) use product::build_browser_product_with_postprocess;
 #[cfg(test)]
 pub(crate) use product::{build_browser_product, build_browser_product_static_assets};
-use radix::codegen::Target;
-use radix::diagnostics::Diagnostic;
-use radix::driver::Config;
+use radix_module::codegen::Target;
+use radix_module::diagnostics::Diagnostic;
+use radix_module::driver::Config;
 use radix_package::discovery::PackageSpec;
 use radix_package::library::{LibraryInterfaceCache, LibraryResolver, LockedLibraryPackage};
 use std::path::Path;
@@ -266,7 +266,7 @@ pub(crate) fn library_cache_default() -> LibraryInterfaceCache {
     LibraryInterfaceCache::default().with_locale_loader(load_locale_pack_for_input)
 }
 
-pub(crate) fn library_resolver_from_config(config: &radix::driver::Config) -> LibraryResolver {
+pub(crate) fn library_resolver_from_config(config: &radix_module::driver::Config) -> LibraryResolver {
     // The library home (provider repos such as `norma/` and `triga/`) is
     // independent of the reader-pack stdlib path (`stdlib/locale/<id>/pack.toml`).
     // Precedence: an explicit custom stdlib roots the library home; otherwise
@@ -287,7 +287,7 @@ pub(crate) fn library_resolver_from_config(config: &radix::driver::Config) -> Li
 /// Build a library resolver for a package root, attaching `faber.toml`
 /// dependencies and `faber.lock` interface roots when present.
 pub(crate) fn library_resolver_for_package(
-    config: &radix::driver::Config,
+    config: &radix_module::driver::Config,
     package_root: &std::path::Path,
 ) -> Result<LibraryResolver, Vec<Diagnostic>> {
     let mut resolver = library_resolver_from_config(config);

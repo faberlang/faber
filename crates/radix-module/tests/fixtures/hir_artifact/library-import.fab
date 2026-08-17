@@ -1,0 +1,18 @@
++++
+locale = "la"
++++
+
+# U4.1 fixture: library-import
+# Imports a library module — exercises LibraryRegistry, ResolverSnapshot, ResolvedUseIndex.
+# Gating fixture per CTM F2: must run first in any test suite.
+
+importa ex "norma:chorda" chorda
+
+functio salve() → textus {
+    redde "Salve, Munde!"
+}
+
+incipit {
+    fixum textus msg ← salve()
+    nota msg
+}

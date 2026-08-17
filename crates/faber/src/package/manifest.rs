@@ -13,9 +13,9 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-use radix::codegen::Target;
-use radix::diagnostics::Diagnostic;
-use radix::forma::FormatPolicy;
+use radix_module::codegen::Target;
+use radix_module::diagnostics::Diagnostic;
+use radix_module::forma::FormatPolicy;
 use serde::Deserialize;
 
 // DDPP1-U2 (C2 feature isolation): the shared route-selection request type.

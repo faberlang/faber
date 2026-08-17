@@ -1,7 +1,7 @@
 //! `faber emit -t faber` policy wrapper.
 
 use crate::cli::FaberCliTarget;
-use radix::tool::EmitCommand;
+use radix_module::tool::EmitCommand;
 
 pub fn cmd_emit_faber(command: EmitCommand, format: bool, linter: bool) {
     if command.package {
@@ -12,9 +12,9 @@ pub fn cmd_emit_faber(command: EmitCommand, format: bool, linter: bool) {
     cmd_emit_with_locale(command, format, linter);
 }
 
-fn report_locale_diagnostic(diagnostic: &radix::diagnostics::Diagnostic) -> ! {
+fn report_locale_diagnostic(diagnostic: &radix_module::diagnostics::Diagnostic) -> ! {
     if diagnostic.issue() == Some("package_path_missing") {
-        eprintln!("{}", radix::diagnostics::render_plain(diagnostic));
+        eprintln!("{}", radix_module::diagnostics::render_plain(diagnostic));
     } else {
         eprintln!("error: {}", diagnostic.message);
     }
@@ -54,7 +54,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
         None => code_pack.clone(),
     };
 
-    let result = radix::tool::compile_cli_input_with_locale_pack(
+    let result = radix_module::tool::compile_cli_input_with_locale_pack(
         &command.input,
         command.package,
         command.target,
@@ -63,7 +63,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
         command.module_name.as_deref(),
     );
 
-    radix::tool::print_diagnostics(
+    radix_module::tool::print_diagnostics(
         &result.diagnostics,
         command.diagnostic_mode,
         diagnostic_pack.as_ref(),
@@ -75,7 +75,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
     };
 
     if command.reflection {
-        let reflection_json = match radix::tool::output_reflection_json(&output) {
+        let reflection_json = match radix_module::tool::output_reflection_json(&output) {
             Ok(Some(json)) => json,
             Ok(None) => {
                 eprintln!("error: target does not expose GPU reflection metadata");
@@ -87,7 +87,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
             }
         };
         if let Some(path) = command.output {
-            radix::tool::write_text_artifact(&path, &reflection_json);
+            radix_module::tool::write_text_artifact(&path, &reflection_json);
         } else {
             println!("{reflection_json}");
         }
@@ -100,7 +100,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
     }
 
     let code = crate::postprocess::postprocess_code(
-        radix::tool::output_code(output),
+        radix_module::tool::output_code(output),
         command.target,
         format,
         linter,

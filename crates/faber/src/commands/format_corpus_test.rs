@@ -19,7 +19,7 @@
 //! (`--policy` + `--locale` are rejected at the CLI boundary).
 
 use super::format::{format_session, formatted_source_for_write};
-use radix::forma::{compile_author_with_policy, FormatPolicy};
+use radix_module::forma::{compile_author_with_policy, FormatPolicy};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -71,7 +71,7 @@ fn pretty_v1_pipeline(path: &Path, source: &str) -> String {
 fn locale_pipeline(path: &Path, source: &str, locale: &str) -> String {
     let session = format_session(path, Some(locale), source).expect("locale session");
     let name = path.display().to_string();
-    let result = radix::forma::compile_canonical(&session, &name, source);
+    let result = radix_module::forma::compile_canonical(&session, &name, source);
     assert!(
         result.success(),
         "reader-locale {locale} re-emit failed on {}: {:?}",

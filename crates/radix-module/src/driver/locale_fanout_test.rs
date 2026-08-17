@@ -1,0 +1,372 @@
+//! Bidirectional locale fan-out tests.
+//!
+//! Verifies that every supported reader-locale pack can serve as both input
+//! (frontmatter `locale`) and output (session `locale_pack`) surface.
+//!
+//! Four phases:
+//! 1. **Emit** — compile canonical Latin source to all 7 locales (output direction)
+//! 2. **Round-trip** — re-compile each localized output in its own locale (stability)
+//!    3a. **Latin → all** — Latin input compiled to every locale output
+//!    3b. **All → Latin** — every locale input compiled to Latin output
+//! 4. **Full fan-out** — every input locale × every output locale (7×7 = 49 pairs)
+
+use crate::codegen::Target;
+use crate::driver::{Config, Session};
+use crate::forma::compile_canonical;
+use crate::locale::LocalePack;
+use crate::locale::TypeBindingKind;
+use crate::semantic::{CollectionKind, Primitive, TensorFamilyKind};
+use std::path::PathBuf;
+
+/// All locale ids with installed reader packs in the workspace stdlib.
+const LOCALES: &[&str] = &["la", "zh-Hans", "zh-Hant", "vi", "ar", "hi", "th-TH", "en"];
+
+/// Canonical Latin source: a small program with enough keywords to prove
+/// localization actually happened (functio, redde, fixum, nota, incipit,
+/// textus type).
+const CANONICAL_SOURCE: &str = "\
+functio saluta(textus phr) → textus {
+  redde phr
+}
+
+incipit {
+  fixum _ greeting ← saluta(\"Salve\")
+  nota greeting
+}
+";
+
+/// Standard stdlib path for pack resolution in tests.
+fn stdlib_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib")
+}
+
+/// Load a reader pack from the workspace stdlib.
+fn load_pack(locale: &str) -> LocalePack {
+    let pack_path = stdlib_path().join("locale").join(locale).join("pack.toml");
+    LocalePack::from_toml_path(&pack_path).unwrap_or_else(|err| panic!("failed to load pack for {locale}: {err}"))
+}
+
+/// Build a session that emits in `output_locale`.
+fn session_for(output_locale: &str) -> Session {
+    let config = Config::default()
+        .with_target(Target::HirFaber)
+        .with_stdlib(stdlib_path())
+        .with_locale_pack(load_pack(output_locale));
+    Session::new(config)
+}
+
+/// Prepend frontmatter locale to a source body.
+fn with_frontmatter(locale: &str, body: &str) -> String {
+    format!("+++\nlocale = \"{locale}\"\n+++\n{body}")
+}
+
+/// Emit canonical Latin source to every locale. Returns (locale, emitted_code) pairs.
+///
+/// The Latin input is compiled under `la` frontmatter (the la identity
+/// surface), so its keywords claim under la authority while the session pack
+/// drives the localized emit surface — the S2-U2 pack-authoritative shape.
+fn emit_to_all_locales() -> Vec<(&'static str, String)> {
+    let mut emitted = Vec::with_capacity(LOCALES.len());
+    for &locale in LOCALES {
+        let session = session_for(locale);
+        let source = with_frontmatter("la", CANONICAL_SOURCE);
+        let result = compile_canonical(&session, "canonical.fab", &source);
+        assert!(result.success(), "emit la → {locale} failed: {:?}", result.diagnostics);
+        let code = result.output.expect("emit should produce output").code;
+        assert!(!code.is_empty(), "emit to {locale} produced empty output");
+        emitted.push((locale, code));
+    }
+    emitted
+}
+
+// ── Phase 1: emit canonical Latin source to every locale ──
+
+#[test]
+fn phase1_emit_canonical_to_every_locale() {
+    let emitted = emit_to_all_locales();
+
+    // Verify each locale produced different output (keywords were localized).
+    let latin = &emitted[0].1;
+    for (locale, code) in &emitted[1..] {
+        assert!(
+            code != latin,
+            "emit to {locale} is identical to Latin — keywords were not localized"
+        );
+    }
+
+    // Verify each output contains expected keyword from the locale's pack.
+    for (locale, code) in &emitted {
+        let pack = load_pack(locale);
+        // The 'functio' keyword should be localized in the emitted output.
+        let functio_surface = pack.contextual_keyword_surface("functio");
+        assert!(
+            code.contains(functio_surface),
+            "emit to {locale} missing localized 'functio' keyword '{functio_surface}'",
+        );
+    }
+}
+
+// ── Phase 2: same-locale round-trip (stability) ──
+
+#[test]
+fn phase2_roundtrip_every_locale() {
+    let emitted = emit_to_all_locales();
+
+    for (locale, body) in &emitted {
+        let source = with_frontmatter(locale, body);
+        let session = session_for(locale);
+        let result = compile_canonical(&session, "roundtrip.fab", &source);
+        assert!(
+            result.success(),
+            "round-trip {locale} → {locale} failed: {:?}",
+            result.diagnostics
+        );
+
+        let re_emitted = result.output.expect("round-trip output").code;
+        assert_eq!(
+            body, &re_emitted,
+            "round-trip {locale} → {locale} is not stable (emit changed on re-compile)"
+        );
+    }
+}
+
+// ── Phase 3a: Latin input → every locale output ──
+// Latin types are always registered as builtins, so la → X always works. The
+// Latin input is declared under `la` frontmatter (la identity surface): its
+// keywords claim under la authority, and the session pack is the emit surface.
+
+#[test]
+fn phase3a_latin_input_to_every_output() {
+    for &output_locale in LOCALES {
+        let session = session_for(output_locale);
+        let source = with_frontmatter("la", CANONICAL_SOURCE);
+        let result = compile_canonical(&session, "latin.fab", &source);
+        assert!(result.success(), "la → {output_locale} failed: {:?}", result.diagnostics);
+        assert!(result.output.is_some(), "la → {output_locale} produced no output");
+    }
+}
+
+// ── Phase 3b: every locale input → Latin output ──
+// This tests the frontmatter input direction: localized source compiled with
+// a Latin output session. The frontmatter-resolved input pack provides
+// type spellings for the semantic analyzer.
+
+#[test]
+fn phase3b_every_input_to_latin_output() {
+    let emitted = emit_to_all_locales();
+
+    for (input_locale, body) in &emitted {
+        let source = with_frontmatter(input_locale, body);
+        // Latin output session (no locale_pack → Latin emit)
+        let session = Session::new(
+            Config::default()
+                .with_target(Target::HirFaber)
+                .with_stdlib(stdlib_path()),
+        );
+        let result = compile_canonical(&session, "fanout.fab", &source);
+        assert!(result.success(), "{input_locale} → la failed: {:?}", result.diagnostics);
+        assert!(result.output.is_some(), "{input_locale} → la produced no output");
+    }
+}
+
+// ── Phase 4: full cross-locale fan-out (every input → every output) ──
+
+#[test]
+fn phase4_full_cross_locale_fanout() {
+    let emitted = emit_to_all_locales();
+    let mut failures = Vec::new();
+
+    for (input_locale, body) in &emitted {
+        for &output_locale in LOCALES {
+            let source = with_frontmatter(input_locale, body);
+            let session = session_for(output_locale);
+            let result = compile_canonical(&session, "fanout.fab", &source);
+
+            if !result.success() {
+                let errors: Vec<&str> = result
+                    .diagnostics
+                    .iter()
+                    .filter(|d| d.is_error())
+                    .map(|d| d.message.as_str())
+                    .collect();
+                failures.push(format!("{input_locale} → {output_locale}: {}", errors.join("; ")));
+            }
+        }
+    }
+
+    assert!(
+        failures.is_empty(),
+        "{} of {} locale pairs failed:\n{}",
+        failures.len(),
+        LOCALES.len() * LOCALES.len(),
+        failures.join("\n")
+    );
+}
+
+// ── Phase 2 minimum proof: tensor family + vacua under en ──
+// The `en` pack owns explicit loanword rows for the tensor family and `vacua`
+// (no inherits = "la" substitute). This test proves format under `en` prints
+// pack-mapped heads (equal to the pack rows, not a literal list) and that the
+// emitted program re-parses stably under `en`.
+
+/// Latin source exercising tensor + vacua + a collection + a bare primitive,
+/// shaped like the corpus `conversio/tensor.fab` and `sparsa/*` vacua fixtures.
+/// Compiled under `la` frontmatter (the la identity surface): the Latin
+/// keywords claim under la authority while the session pack drives the
+/// localized emit surface.
+const TENSOR_VACUA_SOURCE: &str = "\
+incipit {
+  fixum tensor<fractus<f32>, []> empty ← vacua
+  fixum lista<fractus<f32>> xs ← vacua
+  fixum numerus n ← 0
+  nota n
+}
+";
+
+#[test]
+fn en_tensor_vacua_roundtrip_uses_pack_surface() {
+    let en_pack = load_pack("en");
+    let session = session_for("en");
+
+    let source = with_frontmatter("la", TENSOR_VACUA_SOURCE);
+    let result = compile_canonical(&session, "tensor-vacua.fab", &source);
+    assert!(result.success(), "en tensor+vacua emit failed: {:?}", result.diagnostics);
+    let body = result.output.expect("emit should produce output").code;
+    assert!(!body.is_empty(), "en tensor+vacua emit produced empty output");
+
+    // Every head used by the fixture must equal the installed en pack row —
+    // asserting the pack surface, never a hardcoded literal list. Sized
+    // `fractus<f32>` emits as the `f32` width marker, so the bare `numerus`
+    // binding carries the primitive pack-surface proof.
+    for (head, expected) in [
+        (
+            "tensor",
+            en_pack.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Tensor)),
+        ),
+        ("vacua", en_pack.contextual_keyword_surface("vacua")),
+        ("list", en_pack.type_surface(TypeBindingKind::Collection(CollectionKind::Lista))),
+        ("int", en_pack.type_surface(TypeBindingKind::Primitive(Primitive::Numerus))),
+    ] {
+        assert!(
+            body.contains(expected),
+            "emitted en output is missing pack surface {head:?} ({expected:?}):\n{body}"
+        );
+    }
+
+    // Re-parse the emitted (English-surface) program under the en session and
+    // require stable re-emission (phase-2 same-HIR stability proof).
+    let source = with_frontmatter("en", &body);
+    let re_result = compile_canonical(&session, "tensor-vacua-roundtrip.fab", &source);
+    assert!(
+        re_result.success(),
+        "en re-parse of emitted tensor+vacua failed: {:?}",
+        re_result.diagnostics
+    );
+    let re_emitted = re_result.output.expect("round-trip output").code;
+    assert_eq!(
+        re_emitted, body,
+        "en tensor+vacua re-emission is not stable (emit changed on re-compile)"
+    );
+}
+
+/// Goal done-when proof under a non-Latin locale: Latin tensor + `vacua`
+/// source → emit under `th-TH` shows Thai heads → re-parse under `th-TH`
+/// yields the same HIR (stable re-emission). Mirrors the en test; the th-TH
+/// pack surface is Thai script, so `contains` also proves the emitted heads
+/// are non-Latin (Latin `tensor`/`vacua` would not appear). The Latin input
+/// is declared under `la` frontmatter (la identity surface); the session pack
+/// drives the localized emit surface.
+#[test]
+fn th_tensor_vacua_roundtrip_uses_pack_surface() {
+    let th_pack = load_pack("th-TH");
+    let session = session_for("th-TH");
+
+    // 1. Emit under th-TH: la-frontmatter Latin source compiles and prints
+    // pack surfaces.
+    let source = with_frontmatter("la", TENSOR_VACUA_SOURCE);
+    let result = compile_canonical(&session, "tensor-vacua.fab", &source);
+    assert!(result.success(), "th-TH tensor+vacua emit failed: {:?}", result.diagnostics);
+    let body = result.output.expect("emit should produce output").code;
+    assert!(!body.is_empty(), "th-TH tensor+vacua emit produced empty output");
+
+    // 2. Non-hardcode proof extended to th-TH: every head used by the fixture
+    // must equal the installed th-TH pack row — pack-driven, never a literal
+    // list. Sized `fractus<f32>` emits as the `f32` width marker (D5), so the
+    // bare `numerus` binding carries the primitive pack-surface proof.
+    for (head, expected) in [
+        (
+            "tensor",
+            th_pack.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Tensor)),
+        ),
+        ("vacua", th_pack.contextual_keyword_surface("vacua")),
+        ("list", th_pack.type_surface(TypeBindingKind::Collection(CollectionKind::Lista))),
+        ("int", th_pack.type_surface(TypeBindingKind::Primitive(Primitive::Numerus))),
+    ] {
+        assert!(
+            body.contains(expected),
+            "emitted th-TH output is missing pack surface {head:?} ({expected:?}):\n{body}"
+        );
+    }
+    // The th-TH tensor/vacua surfaces are Thai script; Latin heads must not
+    // leak into the emitted program.
+    assert!(
+        !body.contains("tensor"),
+        "emitted th-TH output leaks the Latin tensor head:\n{body}"
+    );
+    assert!(
+        !body.contains("vacua"),
+        "emitted th-TH output leaks the Latin vacua head:\n{body}"
+    );
+
+    // 3. Re-parse the emitted (Thai-surface) program under the th-TH session
+    // and require stable re-emission — the goal's "same HIR" proof: the parser
+    // canonicalizes the Thai surface to Latin identity before semantics, so
+    // lowering is unchanged.
+    let source = with_frontmatter("th-TH", &body);
+    let re_result = compile_canonical(&session, "tensor-vacua-roundtrip.fab", &source);
+    assert!(
+        re_result.success(),
+        "th-TH re-parse of emitted tensor+vacua failed: {:?}",
+        re_result.diagnostics
+    );
+    let re_emitted = re_result.output.expect("round-trip output").code;
+    assert_eq!(
+        re_emitted, body,
+        "th-TH tensor+vacua re-emission is not stable (emit changed on re-compile)"
+    );
+}
+
+/// Bounded acceptance (delivery unit 2 §2.1): the parser accepts localized
+/// surface **only** for spellings mapped in the active pack under a declared
+/// locale. An owned `vacua` gloss parses as the empty-collection marker; an
+/// unmapped spelling keeps current behavior — it lexes as an ordinary
+/// identifier and falls through to ordinary identifier semantics (undefined
+/// variable), with no new implicit acceptance.
+#[test]
+fn th_locale_vacua_acceptance_is_bounded_to_owned_rows() {
+    let session = session_for("th-TH");
+
+    // Owned row: the th-TH `vacua` gloss (`เซตว่าง`) parses as the
+    // empty-collection marker. The fixture uses the declared th-TH surface
+    // for its support keywords (`เริ่ม` incipit, `คงที่` fixum, `บันทึก` nota,
+    // `เทนเซอร์` tensor, `เศษ` fractus) — pack-authoritative, no Latin
+    // support vocabulary under the non-la pack.
+    let owned = "เริ่ม {\n  คงที่ เทนเซอร์<เศษ<f32>, []> empty ← เซตว่าง\n  บันทึก empty\n}\n";
+    let result = compile_canonical(&session, "vacua-owned.fab", owned);
+    assert!(
+        result.success(),
+        "owned th-TH vacua gloss should compile as the empty-collection marker: {:?}",
+        result.diagnostics
+    );
+
+    // Unmapped spelling in expression position: lexes as an ordinary
+    // identifier and is NOT claimed as `vacua` — the initializer is an
+    // undefined variable reference, so compilation fails. If the parser
+    // started accepting unmapped spellings, this would (wrongly) succeed.
+    let unmapped = "เริ่ม {\n  คงที่ เทนเซอร์<เศษ<f32>, []> empty ← หุ่นจำลอง\n  บันทึก empty\n}\n";
+    let result = compile_canonical(&session, "vacua-unmapped.fab", unmapped);
+    assert!(
+        !result.success(),
+        "unmapped th-TH spelling must not be implicitly accepted as vacua"
+    );
+}

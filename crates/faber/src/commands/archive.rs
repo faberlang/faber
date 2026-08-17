@@ -1,4 +1,4 @@
-use radix::diagnostics::Diagnostic;
+use radix_module::diagnostics::Diagnostic;
 use std::collections::BTreeSet;
 use std::fs;
 use std::io;

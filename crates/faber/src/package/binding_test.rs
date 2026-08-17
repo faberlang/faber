@@ -38,8 +38,8 @@ bindings = "bindings/rust.toml"
     root
 }
 
-fn has_issue(diagnostics: &[radix::diagnostics::Diagnostic], issue: &str) -> bool {
-    let expected = radix::diagnostics::DiagnosticArg::new("issue", issue);
+fn has_issue(diagnostics: &[radix_module::diagnostics::Diagnostic], issue: &str) -> bool {
+    let expected = radix_module::diagnostics::DiagnosticArg::new("issue", issue);
     diagnostics
         .iter()
         .any(|diagnostic| diagnostic.args.contains(&expected))

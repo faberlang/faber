@@ -16,8 +16,8 @@ use crate::package;
 use crate::script::{
     interpret_source, interpret_source_or_exit, print_run_source_error, raw_exit_code,
 };
-use radix::diagnostics::Diagnostic;
-use radix::mir::StdioHost;
+use radix_module::diagnostics::Diagnostic;
+use radix_module::mir::StdioHost;
 use radix_package::mir::DeviceSelection;
 use std::fs;
 use std::io;
@@ -148,7 +148,7 @@ pub(super) fn interpret_path(
             std::process::exit(1);
         }
     };
-    let session = radix::driver::Session::new(config);
+    let session = radix_module::driver::Session::new(config);
     let mut host = StdioHost::with_argumenta(program_args.to_vec());
     let result =
         crate::script::run_with_session(&session, &path.display().to_string(), &source, &mut host);
@@ -160,7 +160,7 @@ pub(super) fn interpret_path(
 /// Success yields `0`. An explicit `processus.exit_process(code)` yields that
 /// Unix-masked code. Frontend / MIR / runner failures yield `1`.
 pub(super) fn single_file_run_process_code(
-    result: Result<ExitCode, radix::mir::RunSourceError>,
+    result: Result<ExitCode, radix_module::mir::RunSourceError>,
 ) -> i32 {
     match result {
         Ok(status) => raw_exit_code(status),
@@ -168,7 +168,7 @@ pub(super) fn single_file_run_process_code(
     }
 }
 
-fn exit_interpreted(result: Result<ExitCode, radix::mir::RunSourceError>) {
+fn exit_interpreted(result: Result<ExitCode, radix_module::mir::RunSourceError>) {
     if let Err(error) = &result {
         print_run_source_error(error);
     }
@@ -187,9 +187,9 @@ fn script_package_config(
     input: &Path,
     locale: Option<&str>,
     diagnostics_locale: Option<&str>,
-) -> Result<radix::driver::Config, Box<Diagnostic>> {
+) -> Result<radix_module::driver::Config, Box<Diagnostic>> {
     package::config_with_locale(
-        radix::Target::HirTypeScript,
+        radix_module::Target::HirTypeScript,
         input,
         locale,
         diagnostics_locale,
@@ -213,25 +213,25 @@ fn manifestless_file_declares_non_kernel_import(path: &Path) -> bool {
         return false;
     };
     let display_name = path.display().to_string();
-    let Ok(peeled) = radix::driver::peel_raw_source(&display_name, &raw_source) else {
+    let Ok(peeled) = radix_module::driver::peel_raw_source(&display_name, &raw_source) else {
         return false;
     };
-    let lex = match package::default_config_with_locale(radix::Target::HirTypeScript) {
+    let lex = match package::default_config_with_locale(radix_module::Target::HirTypeScript) {
         Ok(config) => match config.locale_pack.as_ref() {
-            Some(pack) => radix::lexer::lex_with_locale_pack(peeled.body, pack),
-            None => radix::lexer::lex(peeled.body),
+            Some(pack) => radix_module::lexer::lex_with_locale_pack(peeled.body, pack),
+            None => radix_module::lexer::lex(peeled.body),
         },
-        Err(_) => radix::lexer::lex(peeled.body),
+        Err(_) => radix_module::lexer::lex(peeled.body),
     };
-    let parse = radix::parser::parse(lex);
+    let parse = radix_module::parser::parse(lex);
     let Some(program) = parse.program else {
         return false;
     };
     program.statements.iter().any(|statement| {
-        let radix::syntax::StmtKind::Import(import) = &statement.kind else {
+        let radix_module::syntax::StmtKind::Import(import) = &statement.kind else {
             return false;
         };
-        !radix::kernel::is_kernel_import_path(parse.interner.resolve(import.path))
+        !radix_module::kernel::is_kernel_import_path(parse.interner.resolve(import.path))
     })
 }
 

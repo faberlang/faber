@@ -1,0 +1,2796 @@
+//! Provider-import contract tests (Triga SEM002 residual).
+
+use super::clear_import_target_cache;
+use super::import_contract_for_file;
+use crate::import_resolve::library_home_test_support;
+use crate::import_resolve::resolve_namespace_import;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+fn temp_dir(label: &str) -> (tempfile::TempDir, PathBuf) {
+    let dir = crate::test_support::test_temp_dir(&format!("provider-{label}"));
+    let path = dir.path().to_path_buf();
+    (dir, path)
+}
+
+/// Thread-local library home override: isolates provider-import tests
+/// without mutating the process-global `FABER_LIBRARY_HOME` env var,
+/// so parallel vertex-source tests never see a transient temp path.
+struct LibraryHomeGuard {
+    previous: Option<PathBuf>,
+}
+
+impl LibraryHomeGuard {
+    fn set(home: &Path) -> Self {
+        let previous = library_home_test_support::set_thread_library_home(Some(home.to_path_buf()));
+        Self { previous }
+    }
+}
+
+impl Drop for LibraryHomeGuard {
+    fn drop(&mut self) {
+        library_home_test_support::set_thread_library_home(self.previous.take());
+    }
+}
+
+#[test]
+fn resolves_provider_module_via_library_home_manifest() {
+    let (_td, home) = temp_dir("libhome");
+    let provider = home.join("triga");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "triga"
+[library]
+provider = "triga"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/triga.fab"),
+        "genus Vector3 { f32 x f32 y f32 z }\nfunctio vector3(f32 x, f32 y, f32 z) → Vector3 { redde Vector3 { x = x, y = y, z = z } }\n",
+    )
+    .expect("source");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let resolved = resolve_namespace_import(PathBuf::from("/tmp/app.fab").as_path(), "triga:triga", None);
+    let path = resolved.expect("triga:triga should resolve");
+    assert!(path.ends_with("triga/src/triga.fab"), "got {}", path.display());
+}
+
+#[test]
+fn import_contract_installs_struct_and_function_exports() {
+    let (_td, home) = temp_dir("contract");
+    let provider = home.join("triga");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "triga"
+[library]
+provider = "triga"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/triga.fab"),
+        r"
+@ publica
+genus Vector3 {
+    f32 x
+    f32 y
+    f32 z
+}
+@ publica
+genus Matrix4 {
+    lista<f32> elements
+}
+@ publica
+functio vector3(f32 x, f32 y, f32 z) → Vector3 {
+    redde Vector3 { x = x, y = y, z = z }
+}
+@ publica
+functio matrix4_inversa_affinis(de Matrix4 matrix) → Matrix4 ∪ nihil {
+    redde nihil
+}
+",
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "triga:triga" triga
+incipit {
+  fixum triga.Vector3 zero ← triga.vector3(0.0, 0.0, 0.0)
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let contract = import_contract_for_file(&app, &source, None, None);
+
+    let interface = contract
+        .file_interfaces
+        .get("triga")
+        .expect("triga interface installed");
+    assert!(
+        interface.exports.contains_key("Vector3"),
+        "expected Vector3 export, got {:?}",
+        interface.exports.keys().collect::<Vec<_>>()
+    );
+    assert!(interface.exports.contains_key("Matrix4"));
+    assert!(interface.exports.contains_key("vector3"));
+    assert!(interface.exports.contains_key("matrix4_inversa_affinis"));
+}
+
+#[test]
+fn export_surface_preserves_name_tier_for_interna_and_publica() {
+    // VM-U2 (CTO 29b629dc): the export surface carries {name, tier}, not an
+    // untyped name set. `@ publica` and `@ interna` names both join the
+    // surface with their tiers preserved for the VM-U4 seam check.
+    let (_td, home) = temp_dir("surface-tiers");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/probe.fab"),
+        r#"
+@ publica
+functio aperta() → vacuum {
+}
+@ interna
+functio machina() → vacuum {
+}
+"#,
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(&app, "importa ex \"probe:probe\" probe\n").expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let contract = import_contract_for_file(&app, &source, None, None);
+    let surface = contract
+        .namespace_exports
+        .get("probe")
+        .expect("probe export surface");
+    use crate::semantic::passes::visibility_annotation::VisibilityTier;
+    assert_eq!(surface.get("aperta"), Some(&VisibilityTier::Publica));
+    assert_eq!(surface.get("machina"), Some(&VisibilityTier::Interna));
+    assert_eq!(surface.len(), 2, "untyped name set would flatten interna away");
+}
+
+#[test]
+fn interna_export_fails_closed_to_cross_package_consumer() {
+    // VM-U2 (CTO 29b629dc): `@ interna` must fail closed to cross-package
+    // consumers until VM-U4. The single-file tool path has no package context,
+    // so every consumer is treated as cross-package.
+    let (_td, home) = temp_dir("interna-fail-closed");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/probe.fab"),
+        r#"
+@ interna
+functio machina() → vacuum {
+}
+"#,
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:probe" probe
+incipit {
+  probe.machina()
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        !result.success,
+        "interna import must fail closed to a cross-package consumer: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.issue() == Some("import_interna_cross_package")),
+        "interna member must surface as a cross-package seam error: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn publica_export_stays_importable_cross_package() {
+    // Control for the fail-closed rule: `@ publica` members remain
+    // importable to the same cross-package consumer.
+    let (_td, home) = temp_dir("publica-importable");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/probe.fab"),
+        r#"
+@ publica
+functio aperta() → vacuum {
+}
+"#,
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:probe" probe
+incipit {
+  probe.aperta()
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "publica import must stay importable: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn interna_type_export_fails_closed_to_cross_package_consumer() {
+    // VM-U2 (CTO 29b629dc): the fail-closed rule covers type members too —
+    // an `@ interna` genus is not nameable cross-package.
+    let (_td, home) = temp_dir("interna-type-fail-closed");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/probe.fab"),
+        r#"
+@ interna
+genus Machina {
+    textus nomen = ""
+}
+"#,
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:probe" probe
+incipit {
+  fixum probe.Machina m ← probe.Machina { nomen = "x" }
+  nota m.nomen
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        !result.success,
+        "interna type import must fail closed cross-package: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn publica_type_alias_is_importable_cross_package() {
+    // MB-U1 / tela U5 parity control: an `@ publica` type alias joins the
+    // import surface like a genus — the qualified alias resolves in both
+    // return and parameter positions under a cross-package consumer.
+    let (_td, home) = temp_dir("publica-alias-importable");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/probe.fab"),
+        r#"
+@ publica
+typus Nomen = textus
+"#,
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:probe" probe
+functio e(probe.Nomen nomen) → probe.Nomen {
+    redde nomen
+}
+incipit {
+  nota e("x")
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "publica type alias must stay importable: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|d| d.issue() == Some("qualified_type_not_exported")),
+        "SEM002.qualified_type_not_exported must not fire for an imported publica alias"
+    );
+}
+
+#[test]
+fn interna_type_alias_fails_closed_to_cross_package_consumer() {
+    // VM-U2 mirror for aliases: an `@ interna` type alias is not nameable
+    // cross-package (same-package consumers are allowed).
+    let (_td, home) = temp_dir("interna-alias-fail-closed");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/probe.fab"),
+        r#"
+@ interna
+typus Nomen = textus
+"#,
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:probe" probe
+functio e() → probe.Nomen {
+    redde "x"
+}
+incipit {
+  nota e()
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        !result.success,
+        "interna type alias must fail closed to a cross-package consumer: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.issue() == Some("import_interna_cross_package")),
+        "interna alias must surface as a cross-package seam error: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn unmarked_type_alias_is_module_private() {
+    // An alias without a visibility annotation stays module-private: the
+    // member is declared but never joins the export surface, so a consumer
+    // reference is an import_module_private seam error.
+    let (_td, home) = temp_dir("unmarked-alias-private");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/probe.fab"),
+        r#"
+typus Nomen = textus
+"#,
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:probe" probe
+functio e() → probe.Nomen {
+    redde "x"
+}
+incipit {
+  nota e()
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        !result.success,
+        "unmarked type alias must be module-private: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.issue() == Some("import_module_private")),
+        "unmarked alias must surface as an import_module_private seam error: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn wildcard_relative_import_resolves_publica_type_alias() {
+    // MB-U1 / tela U5 repro shape: a consumer importing `./lib_alias` as `la`
+    // resolves `la.Nomen` (an `@ publica` type alias) in return AND parameter
+    // positions. This is the module-boundary fixture's parity control.
+    let (_td, home) = temp_dir("wildcard-alias");
+    let fixture =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../radix-module-boundary/tests/fixtures/lib_alias.fab");
+    fs::write(home.join("lib_alias.fab"), fs::read_to_string(&fixture).expect("fixture")).expect("copy lib_alias");
+    let app = home.join("consumer.fab");
+    fs::write(
+        &app,
+        r#"import from "./lib_alias" * as la
+fn e(la.Nomen nomen) → la.Nomen {
+    return nomen
+}
+main {
+    print "ok"
+}
+"#,
+    )
+    .expect("write consumer");
+    let source = fs::read_to_string(&app).expect("read consumer");
+
+    // Same seam as `radix check`: the en reader pack drives lexing of both the
+    // consumer and its relative import target.
+    let en_pack = en_locale_pack();
+    let result = crate::tool::check_diagnostics_for_source_with_locale_pack(
+        &app.display().to_string(),
+        &source,
+        false,
+        Some(&en_pack),
+        None,
+    );
+    assert!(
+        result.success,
+        "wildcard import must resolve the publica type alias: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|d| d.issue() == Some("qualified_type_not_exported")),
+        "SEM002.qualified_type_not_exported must not fire for the imported alias"
+    );
+}
+
+#[test]
+fn import_contract_preserves_callable_posture_words_and_legacy_annotations() {
+    let (_td, home) = temp_dir("posture-contract");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/probe.fab"),
+        r"
+@ publica
+functio later() fiet → numerus {
+    redde 1
+}
+
+@ publica
+functio stream() fiunt → numerus {
+    cede 1
+}
+
+@ futura
+@ publica
+functio annotated_later() → numerus {
+    redde 2
+}
+
+@ cursor
+@ publica
+functio annotated_stream() → numerus {
+    cede 2
+}
+",
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:probe" probe
+incipit {
+  nota 1
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let contract = import_contract_for_file(&app, &source, None, None);
+    let interface = contract
+        .file_interfaces
+        .get("probe")
+        .expect("probe interface installed");
+
+    let later = interface.exports.get("later").expect("later export");
+    let crate::file_interface::FileExportKind::Function(later) = &later.kind else {
+        panic!("later should export as function");
+    };
+    assert!(later.is_async);
+    assert!(!later.is_generator);
+
+    let annotated_later = interface
+        .exports
+        .get("annotated_later")
+        .expect("annotated_later export");
+    let crate::file_interface::FileExportKind::Function(annotated_later) = &annotated_later.kind else {
+        panic!("annotated_later should export as function");
+    };
+    assert!(annotated_later.is_async);
+    assert!(!annotated_later.is_generator);
+
+    let stream = interface.exports.get("stream").expect("stream export");
+    let crate::file_interface::FileExportKind::Function(stream) = &stream.kind else {
+        panic!("stream should export as function");
+    };
+    assert!(!stream.is_async);
+    assert!(stream.is_generator);
+
+    let annotated_stream = interface
+        .exports
+        .get("annotated_stream")
+        .expect("annotated_stream export");
+    let crate::file_interface::FileExportKind::Function(annotated_stream) = &annotated_stream.kind else {
+        panic!("annotated_stream should export as function");
+    };
+    assert!(!annotated_stream.is_async);
+    assert!(annotated_stream.is_generator);
+}
+
+#[test]
+fn check_accepts_tacebit_on_imported_legacy_futura_function() {
+    let (_td, home) = temp_dir("legacy-futura-await");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/probe.fab"),
+        r"
+@ futura
+@ publica
+functio sleep() → vacuum {
+}
+",
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:probe" probe
+incipiet {
+  tacebit probe.sleep()
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "legacy @ futura import must typecheck as promissum for tacebit: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn check_accepts_tacebit_on_imported_failable_futura_function() {
+    let (_td, home) = temp_dir("failable-futura-await");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/probe.fab"),
+        r#"
+@ futura
+@ publica
+functio sleep() → vacuum ⇥ textus {
+    iace "bad"
+}
+"#,
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:probe" probe
+functio caller() fiet → vacuum ⇥ textus {
+  tacebit probe.sleep()
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "imported failable @ futura function must expose promissum<T ⇥ E> for tacebit: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn check_resolves_imported_qualified_types_without_sem002() {
+    let (_td, home) = temp_dir("check");
+    let provider = home.join("triga");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "triga"
+[library]
+provider = "triga"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/triga.fab"),
+        r"
+@ publica
+genus Vector3 {
+    f32 x
+    f32 y
+    f32 z
+}
+@ publica
+functio vector3(f32 x, f32 y, f32 z) → Vector3 {
+    redde Vector3 { x = x, y = y, z = z }
+}
+@ publica
+functio vector3_normalizata(de Vector3 v) → Vector3 {
+    redde v
+}
+",
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "triga:triga" triga
+incipit {
+  fixum triga.Vector3 zero ← triga.vector3(0.0, 0.0, 0.0)
+  fixum triga.Vector3 n ← triga.vector3_normalizata(zero)
+  adfirma n.x ≡ (0.0 ∷ f32) secus "ok"
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+
+    assert!(
+        result.success,
+        "expected check success, diagnostics={:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|d| d.issue() == Some("unknown_qualified_type")),
+        "SEM002.unknown_qualified_type must not fire for imported triga types"
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn provider_emit_uses_rust_module_paths_not_unresolved_def() {
+    let (_td, home) = temp_dir("emit");
+    let provider = home.join("triga");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "triga"
+[library]
+provider = "triga"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/triga.fab"),
+        r"
+@ publica
+genus Vector3 {
+    f32 x
+    f32 y
+    f32 z
+}
+@ publica
+functio vector3(f32 x, f32 y, f32 z) → Vector3 {
+    redde Vector3 { x = x, y = y, z = z }
+}
+@ publica
+functio vector3_normalizata(de Vector3 v) → Vector3 {
+    redde v
+}
+",
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "triga:triga" triga
+incipit {
+  fixum triga.Vector3 zero ← triga.vector3(0.0, 0.0, 0.0)
+  fixum triga.Vector3 n ← triga.vector3_normalizata(zero)
+  adfirma n.x ≡ (0.0 ∷ f32) secus "ok"
+}
+"#,
+    )
+    .expect("app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::compile_cli_path(&app, false, crate::codegen::Target::HirRust);
+
+    assert!(
+        result.success(),
+        "emit should succeed: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    let Some(crate::Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    assert!(
+        output.code.contains("pub mod triga"),
+        "expected provider module, got:\n{}",
+        output.code
+    );
+    assert!(
+        output.code.contains("crate::triga::Vector3") || output.code.contains("crate::triga::vector3"),
+        "expected crate::triga paths, got:\n{}",
+        output.code
+    );
+    assert!(
+        !output.code.contains("unresolved_def"),
+        "must not emit unresolved_def:\n{}",
+        output.code
+    );
+    assert!(
+        !output.code.contains("triga.vector3"),
+        "must not emit value-style triga. calls:\n{}",
+        output.code
+    );
+}
+
+/// SEM002 residual (correctness 859d68a): one unsupported/generic export must not
+/// fail-all the provider namespace — plain siblings stay importable.
+#[test]
+fn generic_export_does_not_poison_sibling_plain_exports() {
+    let (_td, home) = temp_dir("poison");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    // Generic lege + plain carpe — historically fail-all SEM002 on file interface install.
+    fs::write(
+        provider.join("src/probe.fab"),
+        r#"
+@ radix typus T in textus lista<textus> octeti
+@ publica
+functio lege<T>(textus via) → T {
+    mori "lege deferred in probe"
+}
+@ publica
+functio carpe(textus via) → lista<textus> {
+    redde [via]
+}
+@ publica
+functio exstat(textus via) → bivalens {
+    redde verum
+}
+"#,
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:probe" probe
+incipit {
+  fixum bivalens ok ← probe.exstat("x")
+  fixum lista<textus> lines ← probe.carpe("y")
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let contract = import_contract_for_file(&app, &source, None, None);
+    let interface = contract
+        .file_interfaces
+        .get("probe")
+        .expect("probe interface");
+    assert!(
+        interface.exports.contains_key("carpe"),
+        "carpe must export, got {:?}",
+        interface.exports.keys().collect::<Vec<_>>()
+    );
+    assert!(
+        interface.exports.contains_key("exstat"),
+        "exstat must export, got {:?}",
+        interface.exports.keys().collect::<Vec<_>>()
+    );
+    assert!(
+        interface.exports.contains_key("lege"),
+        "lege generic should snapshot with Param, got {:?}",
+        interface.exports.keys().collect::<Vec<_>>()
+    );
+
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "check must succeed without SEM002.file_interface_import_failed: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !result.diagnostics.iter().any(|d| {
+            d.issue()
+                .is_some_and(|issue| issue.starts_with("file_interface_import_failed"))
+        }),
+        "file_interface_import_failed must not fire: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn unknown_nominal_param_export_is_skipped_not_fail_all() {
+    let (_td, home) = temp_dir("json-poison");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    // Unknown applied type (not a formal primitive) still poisons one export only.
+    fs::write(
+        provider.join("src/probe.fab"),
+        r#"
+@ publica
+functio pange(ignotum_genus x) → textus {
+    redde ""
+}
+@ publica
+functio salve() → textus {
+    redde "ok"
+}
+"#,
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:probe" probe
+incipit {
+  fixum textus s ← probe.salve()
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let contract = import_contract_for_file(&app, &source, None, None);
+    let interface = contract
+        .file_interfaces
+        .get("probe")
+        .expect("probe interface");
+    // pange may still be present in the snapshot; install must skip it and keep salve.
+    assert!(interface.exports.contains_key("salve"));
+
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "salve must remain usable when pange is poison: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    // P2 residual: skipped poison export must be observable (WARN014), not silent.
+    let skip = result
+        .diagnostics
+        .iter()
+        .find(|d| d.issue() == Some("file_interface_export_skipped") && d.code == Some("WARN014"));
+    assert!(
+        skip.is_some(),
+        "expected file_interface_export_skipped for pange, diagnostics={:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    let skip = skip.expect("skip diagnostic");
+    assert!(
+        skip.args
+            .iter()
+            .any(|arg| arg.name == "export" && arg.value == "pange"),
+        "skip diagnostic should identify pange: {:?}",
+        skip.args
+    );
+}
+
+/// gradus S1 regression: a public callable whose signature references an
+/// UNMARKED nominal of the same module (e.g. tensor.fab's `causa(TensorError
+/// e) → textus` with unannotated `discretio TensorError`) must export cleanly
+/// through the import-contract interface. The interface snapshot keeps the
+/// legacy unmarked-exported surface (mirror of the package path's
+/// `program_export_surface`); dropping the nominal poisoned the callable's
+/// install (WARN014 skip) and produced false SEM010s during `faber convert`.
+#[test]
+fn unmarked_nominal_referenced_by_public_callable_exports_cleanly() {
+    let (_td, home) = temp_dir("unmarked-nominal");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    // The error enum is UNMARKED (module-private default under the radix seam,
+    // but the package path keeps unmarked declarations exported). The public
+    // callables reference it, so the interface must still install them.
+    fs::write(
+        provider.join("src/probe.fab"),
+        r#"
+discretio ProbeError {
+    Perperam { textus causa }
+}
+
+@ publica
+functio perperam(textus causa) → ProbeError {
+    redde finge Perperam { causa = causa }
+}
+
+@ publica
+functio causa(ProbeError e) → textus {
+    redde "err"
+}
+"#,
+    )
+    .expect("probe source");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:probe" probe
+incipit {
+  fixum textus s ← probe.causa(probe.perperam("x"))
+  nota s
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let contract = import_contract_for_file(&app, &source, None, None);
+    let interface = contract
+        .file_interfaces
+        .get("probe")
+        .expect("probe interface");
+    assert!(
+        interface.exports.contains_key("causa") && interface.exports.contains_key("perperam"),
+        "callables referencing an unmarked nominal must still install, got: {:?}",
+        interface.exports.keys().collect::<Vec<_>>()
+    );
+
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|d| { d.code == Some("WARN014") && d.issue() == Some("file_interface_export_skipped") }),
+        "no export may be skipped when the referenced nominal is local-unmarked: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn direct_provider_interface_preserves_enum_params_and_qualified_fields() {
+    let (_td, home) = temp_dir("scene-interface");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/math.fab"),
+        r"
+@ publica
+genus Matrix4 {
+    f32 m00
+}
+",
+    )
+    .expect("math");
+    fs::write(
+        provider.join("src/scene.fab"),
+        r#"
+importa ex "probe:math" math
+
+@ publica
+discretio SceneNodeKind {
+    SceneGroup { },
+}
+
+@ publica
+genus SceneNode {
+    textus name
+    SceneNodeKind kind
+    math.Matrix4 local_matrix
+}
+
+@ publica
+functio scene_node(textus name, SceneNodeKind kind) → SceneNode {
+    mori "deferred"
+}
+
+@ publica
+functio scene_group(textus name) → SceneNode {
+    mori "deferred"
+}
+"#,
+    )
+    .expect("scene");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:math" math
+importa ex "probe:scene" scene
+
+incipit {
+  fixum scene.SceneNode node ← scene.scene_group("root")
+  fixum math.Matrix4 local ← node.local_matrix
+  nota node.name
+  nota local.m00
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "provider scene interface should install enum params and qualified fields: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !result.diagnostics.iter().any(|d| {
+            d.code == Some("WARN014")
+                && d.issue() == Some("file_interface_export_skipped")
+                && d.args
+                    .iter()
+                    .any(|arg| arg.name == "export" && arg.value == "scene_node")
+        }),
+        "scene_node should no longer be skipped: {:?}",
+        result.diagnostics
+    );
+}
+
+/// cds-u6 G4 (browser.fab seam shape): a provider module that imports a
+/// sibling and exports a callable whose public signature references the
+/// imported sibling type (`fn mount(...) → Mounted ∪ null` with
+/// `visus.Visus`/`visus.Thema` params) must export cleanly for a consumer
+/// that imports the referenced sibling too — no WARN014 skip, the callable
+/// usable, and both qualified type names nameable.
+#[test]
+fn imported_sibling_typed_callable_exports_cleanly() {
+    let (_td, home) = temp_dir("g4-seam");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    // Sibling module: the imported view types (browser.fab's tela:visus shape).
+    fs::write(
+        provider.join("src/visus.fab"),
+        r#"
+@ publica
+discretio Visus {
+    Textus { textus valor }
+}
+
+@ publica
+genus Thema {
+    textus nomen
+}
+
+@ publica
+functio textus_visus(textus valor) → Visus {
+    mori "deferred"
+}
+"#,
+    )
+    .expect("visus");
+    // The seam module: imports the sibling and exports a callable whose
+    // signature references the imported types (browser.fab's mount shape).
+    fs::write(
+        provider.join("src/browser.fab"),
+        r#"
+importa ex "probe:visus" visus
+
+@ publica
+genus Scope {
+    textus selector
+}
+
+@ publica
+genus Mounted {
+    Scope scopus
+    visus.Visus visus
+    visus.Thema thema
+}
+
+@ publica
+functio mount(Scope scopus, visus.Visus visus, visus.Thema thema) → Mounted ∪ nihil {
+    mori "deferred"
+}
+"#,
+    )
+    .expect("browser");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r##"
+importa ex "probe:browser" browser
+importa ex "probe:visus" visus
+
+incipit {
+  fixum visus.Thema t ← visus.Thema { nomen = "lumen" }
+  fixum browser.Scope s ← browser.Scope { selector = "#root" }
+  fixum browser.Mounted ∪ nihil m ← browser.mount(s, visus.textus_visus("hi"), t)
+  nota m
+}
+"##,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    // (a) the imported-sibling-typed export appears in the snapshot.
+    let contract = import_contract_for_file(&app, &source, None, None);
+    let interface = contract
+        .file_interfaces
+        .get("browser")
+        .expect("browser interface");
+    assert!(
+        interface.exports.contains_key("mount"),
+        "mount must appear in the snapshot, got {:?}",
+        interface.exports.keys().collect::<Vec<_>>()
+    );
+    let crate::file_interface::FileExportKind::Function(mount) = &interface.exports["mount"].kind else {
+        panic!("mount must be a function export");
+    };
+    let ret = mount.ret.as_ref();
+    assert!(
+        matches!(ret, crate::file_interface::InterfaceTypeSnapshot::Option(inner)
+            if matches!(inner.as_ref(), crate::file_interface::InterfaceTypeSnapshot::Nominal(n)
+                if n.name == "Mounted" && n.identity.is_some())),
+        "mount ret must snapshot Mounted with a module identity, got {ret:?}"
+    );
+
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "browser seam shape must typecheck: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !result.diagnostics.iter().any(|d| {
+            d.code == Some("WARN014")
+                && d.issue() == Some("file_interface_export_skipped")
+                && d.args
+                    .iter()
+                    .any(|arg| arg.name == "export" && arg.value == "mount")
+        }),
+        "mount must not be export-skipped: {:?}",
+        result.diagnostics
+    );
+}
+
+/// cds-u6 snapshot-nomen-collision (extension-lib `Scopulum` shape): two
+/// providers each export a same-named class and class-returning functions.
+/// Same-named local classes must not cascade-skip both providers' exports
+/// (WARN014), and each qualified type name must be nameable (SEM002 gone).
+#[test]
+fn same_named_local_classes_do_not_cascade_skip() {
+    let (_td, home) = temp_dir("nomen-collision");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    // Kernel module: exports Scopulum + a class-returning function.
+    fs::write(
+        provider.join("src/tela.fab"),
+        r#"
+@ publica
+genus Scopulum {
+    textus nomen
+    textus valor
+}
+
+@ publica
+functio scopulum(textus nomen, textus valor) → Scopulum {
+    mori "deferred"
+}
+"#,
+    )
+    .expect("tela");
+    // Extension module: declares its OWN Scopulum (the original `Scopulum`
+    // name that collided with the kernel's type in the shared snapshot).
+    fs::write(
+        provider.join("src/extension.fab"),
+        r#"
+@ publica
+genus Scopulum {
+    textus nomen
+    textus valor
+}
+
+@ publica
+functio chart_axis_muted() → Scopulum {
+    mori "deferred"
+}
+"#,
+    )
+    .expect("extension");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:tela" tela
+importa ex "probe:extension" ext
+
+incipit {
+  fixum tela.Scopulum k ← tela.scopulum("a", "b")
+  fixum ext.Scopulum e ← ext.chart_axis_muted()
+  nota k.nomen
+  nota e.nomen
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "same-named local classes must typecheck: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    let skipped = result
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == Some("WARN014") && d.issue() == Some("file_interface_export_skipped"))
+        .map(|d| {
+            d.args
+                .iter()
+                .find(|arg| arg.name == "export")
+                .map_or_else(|| "?".to_owned(), |arg| arg.value.clone())
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        skipped.is_empty(),
+        "no export may be cascade-skipped on a name collision, got: {skipped:?}"
+    );
+}
+
+/// Tool-path `norma:json` must install the formal-json facade (not hollow WARN014-all).
+#[cfg(feature = "hir-rust")]
+#[test]
+fn norma_json_tool_path_installs_facade_exports() {
+    let (_td_nj, dir_nj) = temp_dir("norma-json");
+    let app = dir_nj.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "norma:json" json
+incipit {
+  fixum json ∪ nihil maybe ← json.try_parse("{}")
+  nota maybe
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+    // crates/radix → radix repo → faberlang container (norma/ sibling of radix/).
+    let home = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../..")
+        .canonicalize()
+        .expect("faberlang root");
+    assert!(
+        home.join("norma/src/json.fab").is_file(),
+        "expected norma json under {}",
+        home.display()
+    );
+    let _guard = LibraryHomeGuard::set(&home);
+    let contract = import_contract_for_file(&app, &source, None, None);
+    let interface = contract
+        .file_interfaces
+        .get("json")
+        .expect("json file interface");
+    for name in ["stringify", "parse", "try_parse"] {
+        assert!(
+            interface.exports.contains_key(name),
+            "expected {name} in interface, got {:?}",
+            interface.exports.keys().collect::<Vec<_>>()
+        );
+    }
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "norma:json facade must typecheck on tool path: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !result.diagnostics.iter().any(|d| {
+            d.issue()
+                .is_some_and(|issue| issue.starts_with("file_interface_export_skipped"))
+        }),
+        "must not hollow-skip json exports: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn import_contract_rejects_parent_traversal_before_read() {
+    // P2-A regression: import_contract_for_file must reject `..` imports
+    // without opening the target file.
+    let (_td, home) = temp_dir("reject-dotdot");
+    let app_file = home.join("app.fab");
+    let sibling_file = home.join("sibling.fab");
+
+    // Create a sibling file that would resolve if read were attempted.
+    fs::write(&sibling_file, "functio salve() → textus { redde \"hi\" }\n").expect("write sibling");
+
+    // Write the app with a `../` import that points to the sibling.
+    fs::write(
+        &app_file,
+        r#"
+importa ex "../sibling" sibling
+importa ex "./good" good
+incipit {}
+"#,
+    )
+    .expect("write app");
+    let source = fs::read_to_string(&app_file).expect("read app");
+
+    let contract = import_contract_for_file(&app_file, &source, None, None);
+
+    // The `../sibling` import must NOT be resolved — it's a `..` traversal.
+    assert!(
+        !contract.namespace_exports.contains_key("sibling"),
+        ".. traversal import must be rejected before resolution"
+    );
+    assert!(
+        !contract.file_interfaces.contains_key("sibling"),
+        ".. traversal must not produce a file interface"
+    );
+    // `./good` is a valid relative import; its missing-file resolution is fine.
+    assert!(!contract.namespace_exports.contains_key("good"));
+}
+
+#[test]
+fn import_contract_for_nonexistent_file_returns_empty() {
+    let (_td, home) = temp_dir("missing");
+    let app = home.join("nonexistent.fab");
+    // Non-existent file path but we still call contract — expect no panic, clean result.
+    let contract = import_contract_for_file(&app, "", None, None);
+    assert!(contract.file_interfaces.is_empty());
+    assert!(contract.namespace_exports.is_empty());
+}
+
+#[test]
+fn import_contract_session_cache_dedups_across_calls() {
+    // BO-D-2 U2: the session-scoped import-target cache must survive across
+    // `import_contract_for_file` calls. Deleting the target between the two
+    // calls proves the second contract was served from the session cache:
+    // the import binding survives without the target file on disk.
+    clear_import_target_cache();
+    let (_td, home) = temp_dir("session-cache");
+    fs::write(home.join("util.fab"), "functio salve() → textus { redde \"salve\" }\n").expect("write util");
+    let app_file = home.join("app.fab");
+    fs::write(
+        &app_file,
+        r#"
+importa ex "./util" util
+incipit {}
+"#,
+    )
+    .expect("write app");
+    let source = fs::read_to_string(&app_file).expect("read app");
+
+    let contract_a = import_contract_for_file(&app_file, &source, None, None);
+    fs::remove_file(home.join("util.fab")).expect("delete target");
+    let contract_b = import_contract_for_file(&app_file, &source, None, None);
+
+    assert_eq!(
+        contract_a, contract_b,
+        "contract must survive target deletion via the session cache"
+    );
+    assert!(
+        contract_b.namespace_exports.contains_key("util"),
+        "second call must serve the import binding from the session cache"
+    );
+}
+
+/// P4 instans/json oracle reconciliation: a provider module whose exports
+/// name the `instans` precision family (bare `instans` and `instans<ns>` in
+/// params and returns) must snapshot its function exports instead of dropping
+/// them, so importers typecheck `module.nunc()` against `instans<ns>`.
+#[test]
+fn import_contract_preserves_sized_and_bare_instans_exports() {
+    clear_import_target_cache();
+    let (_td, home) = temp_dir("instans-contract");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/probe.fab"),
+        r"
+@ publica
+functio nunc() → instans<ns> {
+    redde ad 'probe:nunc' ↦ instans<ns>
+}
+@ publica
+functio solve(textus wire) → instans {
+    redde ad 'probe:solve' ↦ instans
+}
+@ publica
+functio wire(instans<ns> t) → textus {
+    redde t ↦ textus
+}
+",
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:probe" probe
+incipit {
+  fixum instans<ns> nanos ← probe.nunc()
+  fixum instans parsed ← probe.solve("1979-05-27T07:32:00Z")
+  fixum textus w ← probe.wire(nanos)
+  nota parsed
+  nota w
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let contract = import_contract_for_file(&app, &source, None, None);
+    let interface = contract
+        .file_interfaces
+        .get("probe")
+        .expect("probe interface installed");
+    for export in ["nunc", "solve", "wire"] {
+        assert!(
+            interface.exports.contains_key(export),
+            "instans-typed export `{export}` must survive snapshot, got {:?}",
+            interface.exports.keys().collect::<Vec<_>>()
+        );
+    }
+
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "imported instans-typed exports must typecheck, diagnostics={:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+// ── cds-u5-provider-locale ──
+//
+// Cross-package locale propagation (fix:web-dom-locale / fix:codegen001):
+// a provider module is analyzed in ITS OWN reader surface — frontmatter
+// locale > package `[reader] locale` > the importing module's pack > Latin
+// default — and a provider directory may be located through its manifest's
+// `[library] provider` segment (web:dom → the faber-web checkout).
+
+fn en_locale_pack() -> crate::locale::LocalePack {
+    let stdlib = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
+    crate::locale::LocalePack::from_toml_path(stdlib.join("locale/en/pack.toml"))
+        .expect("installed en pack should load")
+}
+
+fn la_locale_pack() -> crate::locale::LocalePack {
+    let stdlib = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
+    crate::locale::LocalePack::from_toml_path(stdlib.join("locale/la/pack.toml"))
+        .expect("installed la pack should load")
+}
+
+/// The la-locale provider source, mirroring the faber-web/src/dom.fab seam
+/// shape (Scope genus + scoped query/require).
+const LA_DOM_SOURCE: &str = r#"@ publica
+genus Scope {
+    textus selector = ""
+}
+
+@ publica
+genus Element {
+    textus selector = ""
+}
+
+@ publica
+functio scope(textus selector) → Scope {
+    redde Scope { selector = selector }
+}
+
+@ publica
+functio query(Scope scope, textus selector) → Element ∪ nihil {
+    nota scope
+    nota selector
+    redde nihil
+}
+
+@ publica
+functio require(Scope scope, textus selector) → Element {
+    nota scope
+    redde Element { selector = selector }
+}
+"#;
+
+/// Write a package manifest declaring an `[library] provider` segment that
+/// differs from the checkout directory name (the faber-web shape).
+fn write_provider_manifest(dir: &Path, provider: &str, locale: &str) {
+    fs::write(
+        dir.join("faber.toml"),
+        format!(
+            r#"[package]
+name = "provider-package"
+[library]
+provider = "{provider}"
+[reader]
+locale = "{locale}"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#
+        ),
+    )
+    .expect("manifest");
+}
+
+#[test]
+fn resolve_provider_segment_via_manifest_provider_name() {
+    // `web:dom` must resolve when the checkout directory is `faber-web` and
+    // the manifest declares `[library] provider = "web"` — the directory-name
+    // convention (`home/web`) misses, and the manifest scan must find it.
+    crate::import_resolve::clear_provider_name_memo();
+    let (_td, home) = temp_dir("provider-name");
+    let provider = home.join("faber-web");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    write_provider_manifest(&provider, "web", "la");
+    fs::write(provider.join("src/dom.fab"), LA_DOM_SOURCE).expect("source");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let resolved = resolve_namespace_import(PathBuf::from("/tmp/app.fab").as_path(), "web:dom", None);
+    let path = resolved.expect("web:dom should resolve via the manifest provider name");
+    assert!(path.ends_with("faber-web/src/dom.fab"), "got {}", path.display());
+}
+
+#[test]
+fn check_en_reader_imports_la_provider_cross_package() {
+    // The tela/faber-web shape (done_when (a)): an en-locale module imports
+    // the la-locale `web:dom` provider. The provider directory is `faber-web`
+    // (manifest-declared `web` segment), the provider source is Latin, the
+    // reader is en, and the reader consumes `web.Scope` in a class-field type
+    // plus `web.scope(…)` at a call site. Must check green with no
+    // SEM002.unknown_qualified_type.
+    //
+    // S2-U2 reconciliation: the reader-side app source uses the declared en
+    // surface for its import keyword (`as`, not the Latin `ut`) — the en pack
+    // owns `ut → as`. The provider source keeps its la identity: the
+    // fix:web-dom-locale mechanism parses the target with its OWN package
+    // locale (`[reader] locale = "la"`), so the Latin provider body claims
+    // under la authority. Cross-package intent preserved on both sides.
+    let (_td, home) = temp_dir("en-la");
+    let tela = home.join("tela");
+    fs::create_dir_all(tela.join("src")).expect("tela src");
+    fs::write(
+        tela.join("faber.toml"),
+        r#"[package]
+name = "tela"
+[reader]
+locale = "en"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    let web = home.join("faber-web");
+    fs::create_dir_all(web.join("src")).expect("web src");
+    write_provider_manifest(&web, "web", "la");
+    fs::write(web.join("src/dom.fab"), LA_DOM_SOURCE).expect("source");
+
+    let app = tela.join("src/reader.fab");
+    fs::write(
+        &app,
+        r#"
+import from "web:dom" public * as web
+
+class Mounted {
+    string selector
+    web.Scope scopus
+}
+
+fn mount(string selector) → Mounted {
+    return Mounted {
+        selector = selector,
+        scopus = web.scope(selector)
+    }
+}
+
+fn probe(string selector) → string {
+    var web.Scope s ← web.scope(selector)
+    return s.selector
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+    let en_pack = en_locale_pack();
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source_with_locale_pack(
+        &app.display().to_string(),
+        &source,
+        false,
+        Some(&en_pack),
+        None,
+    );
+    assert!(
+        result.success,
+        "en reader importing the la web:dom provider must check green, diagnostics={:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|d| d.issue() == Some("unknown_qualified_type")),
+        "SEM002.unknown_qualified_type must not fire for the imported web.Scope type"
+    );
+}
+
+#[test]
+fn import_contract_parses_en_provider_under_own_package_locale() {
+    // Target-locale propagation at the contract level: an en-surface provider
+    // (English keywords, no frontmatter) in a package declaring
+    // `[reader] locale = "en"`, imported by a Latin-default reader. The
+    // target must be parsed with its OWN en pack, not the reader's Latin
+    // default — otherwise `fn`/`return`/`string` fail to lex and no exports
+    // install (the fix:web-dom-locale mechanism).
+    let (_td, home) = temp_dir("en-target");
+    let tela = home.join("tela");
+    fs::create_dir_all(tela.join("src")).expect("tela src");
+    fs::write(
+        tela.join("faber.toml"),
+        r#"[package]
+name = "tela"
+[reader]
+locale = "en"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        tela.join("src/valida.fab"),
+        r#"
+@ public
+fn valida_nomen_tag(string nomen) → bool {
+    return nomen ≠ ""
+}
+"#,
+    )
+    .expect("provider source");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "tela:valida" valida
+incipit {
+  fixum bivalens ok ← valida.valida_nomen_tag("a")
+  nota ok
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let contract = import_contract_for_file(&app, &source, None, None);
+    let interface = contract
+        .file_interfaces
+        .get("valida")
+        .expect("en provider interface must install under its own package locale");
+    assert!(
+        interface.exports.contains_key("valida_nomen_tag"),
+        "expected the en provider's export, got {:?}",
+        interface.exports.keys().collect::<Vec<_>>()
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn rust_emit_across_import_uses_provider_package_locale() {
+    // CODEGEN001 (done_when (b)): Rust emit of an import-bearing module
+    // re-analyzes the imported provider. The provider is an en-surface module
+    // in an en package; the re-analysis session must pick up the package's
+    // `[reader] locale = "en"` instead of the Latin default, so the provider
+    // emits as a `pub mod` instead of failing PARSE001.
+    let (_td, home) = temp_dir("emit-locale");
+    let tela = home.join("tela");
+    fs::create_dir_all(tela.join("src")).expect("tela src");
+    fs::write(
+        tela.join("faber.toml"),
+        r#"[package]
+name = "tela"
+[reader]
+locale = "en"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        tela.join("src/valida.fab"),
+        r#"
+@ public
+fn valida_nomen_tag(string nomen) → bool {
+    return nomen ≠ ""
+}
+"#,
+    )
+    .expect("provider source");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "tela:valida" valida
+incipit {
+  fixum bivalens ok ← valida.valida_nomen_tag("a")
+  nota ok
+}
+"#,
+    )
+    .expect("app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::compile_cli_path(&app, false, crate::codegen::Target::HirRust);
+
+    assert!(
+        result.success(),
+        "import-bearing Rust emit must succeed: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    let Some(crate::Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    assert!(
+        output.code.contains("pub mod valida"),
+        "expected the en provider module, got:\n{}",
+        output.code
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn rust_emit_lowers_library_locale_surface_to_canonical() {
+    // A Latin consumer may call library members by the library pack's
+    // Latin surface. Generated Rust must name the library's English
+    // exports: the provider module is emitted from native source.
+    let (_td, home) = temp_dir("emit-surface-canonical");
+    let lib = home.join("canvas");
+    fs::create_dir_all(lib.join("src")).expect("canvas src");
+    fs::create_dir_all(lib.join("locale/la")).expect("canvas locale");
+    fs::write(
+        lib.join("faber.toml"),
+        r#"[package]
+name = "canvas"
+[library]
+provider = "canvas"
+[reader]
+locale = "en"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        lib.join("src/canvas.fab"),
+        r#"
+@ public
+class Point {
+    int x
+}
+
+@ public
+fn make_point(int x) → Point {
+    return Point { x = x }
+}
+"#,
+    )
+    .expect("provider source");
+    fs::write(
+        lib.join("locale/la/pack.toml"),
+        r#"
+[pack]
+id = "la"
+schema_version = 1
+
+[[library_members]]
+provider = "canvas"
+module_path = ["canvas"]
+kind = "type"
+canonical = "Point"
+surface = "Punctum"
+
+[[library_members]]
+provider = "canvas"
+module_path = ["canvas"]
+kind = "function"
+canonical = "make_point"
+surface = "fac_punctum"
+"#,
+    )
+    .expect("library locale pack");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"+++
+locale = "la"
++++
+
+importa ex "canvas:canvas" * ut canvas
+
+incipit {
+  fixum canvas.Punctum punctum ← canvas.fac_punctum(1)
+  nota punctum
+}
+"#,
+    )
+    .expect("app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::compile_cli_path(&app, false, crate::codegen::Target::HirRust);
+
+    assert!(
+        result.success(),
+        "Latin-surface library calls must rust-emit: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    let Some(crate::Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    assert!(
+        output.code.contains("make_point"),
+        "expected canonical function name, got:\n{}",
+        output.code
+    );
+    assert!(
+        output.code.contains("Point"),
+        "expected canonical type name, got:\n{}",
+        output.code
+    );
+    assert!(
+        !output.code.contains("fac_punctum"),
+        "consumer-locale function surface leaked into Rust:\n{}",
+        output.code
+    );
+    assert!(
+        !output.code.contains("Punctum"),
+        "consumer-locale type surface leaked into Rust:\n{}",
+        output.code
+    );
+}
+
+#[test]
+fn package_identity_facts_registers_en_surface_local_imports() {
+    // En-surface local sibling imports (`import from "./x"`) in a manifestless
+    // package must register as SAME-PACKAGE identities: the re-parse resolves
+    // the package's effective reader pack (product-default en) instead of
+    // registry-direct Latin, so the English `import from` keyword lexes and
+    // the sibling call stays an in-package call (never a provider call).
+    let (_td, home) = temp_dir("identity-en");
+    let package_dir = home.join("geminus");
+    fs::create_dir_all(&package_dir).expect("package dir");
+    fs::write(
+        package_dir.join("adiutor.fab"),
+        r#"fn greeting(string nomen) → string {
+    return "Salve, §!"(nomen)
+}
+"#,
+    )
+    .expect("write sibling");
+    let entry = package_dir.join("geminus.fab");
+    fs::write(
+        &entry,
+        r#"import from "./adiutor" adiutor
+
+main {
+    print adiutor.greeting("Tullia")
+}
+"#,
+    )
+    .expect("write entry");
+
+    let identities = crate::tool::package_identity_facts_for_path(&entry)
+        .expect("en-surface local imports must register identity facts");
+    assert_eq!(identities.product, "geminus", "product derives from the package root");
+    assert_eq!(
+        identities.module_segments,
+        vec!["geminus".to_owned()],
+        "entry canonical module segments"
+    );
+    assert_eq!(
+        identities.imports.get("adiutor"),
+        Some(&vec!["adiutor".to_owned()]),
+        "`import from \"./adiutor\"` must resolve to the sibling's same-package module segments"
+    );
+}
+
+#[test]
+fn package_identity_facts_keeps_registry_direct_latin_package() {
+    // A package declaring the Latin reader locale (`[reader] locale = "la"`)
+    // keeps registry-direct parsing: Latin local imports (`importa ex "./x"`)
+    // still register same-package identities (no behavior change for
+    // registry-direct packages).
+    let (_td, home) = temp_dir("identity-la");
+    let package_dir = home.join("adiutorium");
+    fs::create_dir_all(&package_dir).expect("package dir");
+    fs::write(
+        package_dir.join("faber.toml"),
+        r#"[package]
+name = "adiutorium"
+[reader]
+locale = "la"
+[paths]
+source = "src"
+"#,
+    )
+    .expect("manifest");
+    let source_dir = package_dir.join("src");
+    fs::create_dir_all(&source_dir).expect("source dir");
+    fs::write(
+        source_dir.join("adiutor.fab"),
+        "functio salutatio(textus nomen) → textus {\n    redde \"Salve, §!\"(nomen)\n}\n",
+    )
+    .expect("write sibling");
+    let entry = source_dir.join("adiutorium.fab");
+    fs::write(
+        &entry,
+        r#"importa ex "./adiutor" adiutor
+
+incipit {
+    nota adiutor.salutatio("Tullia")
+}
+"#,
+    )
+    .expect("write entry");
+
+    let identities = crate::tool::package_identity_facts_for_path(&entry)
+        .expect("Latin local imports must register identity facts under the la pack");
+    assert_eq!(identities.product, "adiutorium", "product derives from the package root");
+    assert_eq!(
+        identities.imports.get("adiutor"),
+        Some(&vec!["src".to_owned(), "adiutor".to_owned()]),
+        "`importa ex \"./adiutor\"` must resolve to the sibling's same-package module segments"
+    );
+}
+
+// ── SEM014 en-surface contains inference (radix-lane residual) ──
+//
+// The tela validate.fab shape (check-compile): under the en reader pack the
+// CLI check must infer `contains` with a NON-LITERAL string arg exactly like
+// the canonical `continet` — the en surface spelling is rewritten to the
+// canonical intrinsic before arg checking, so a method-call arg
+// (`name.slice(0, 1)`) in a condition position must not leave an unresolved
+// inference hole (SEM014.cannot_infer_expression_type).
+#[test]
+fn en_surface_contains_infers_with_non_literal_string_arg() {
+    let source = r#"
+fn valid_tag_name(string name) → bool {
+    const string litterae ← "abcdefghijklmnopqrstuvwxyz"
+    if name.length() ≡ 0 then return false
+    if not litterae.contains(name.slice(0, 1)) then return false
+    return true
+}
+"#;
+    let en_pack = en_locale_pack();
+    let result = crate::tool::check_diagnostics_for_source_with_locale_pack(
+        "en_contains_infer.fab",
+        source,
+        false,
+        Some(&en_pack),
+        None,
+    );
+    assert!(
+        result.success,
+        "en-surface `contains` with a non-literal string arg must check green: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !result.diagnostics.iter().any(|d| d.code == Some("SEM014")),
+        "no SEM014 may fire for the en-surface `contains` call: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+fn write_demo_library_with_latin_pack(home: &Path) {
+    let demo = home.join("demo");
+    fs::create_dir_all(demo.join("src")).expect("demo src");
+    fs::create_dir_all(demo.join("locale/la")).expect("demo locale");
+    fs::write(
+        demo.join("faber.toml"),
+        r#"[package]
+name = "demo"
+[library]
+provider = "demo"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("demo manifest");
+    fs::write(
+        demo.join("src/canvas.fab"),
+        r#"
+@ publica
+genus Point {
+    textus value = ""
+}
+@ publica
+functio make_point(textus value) → Point {
+    redde Point { value = value }
+}
+@ publica
+functio show(Point p) → textus {
+    redde p.value
+}
+"#,
+    )
+    .expect("demo source");
+    fs::write(
+        demo.join("locale/la/pack.toml"),
+        r#"
+[pack]
+id = "la"
+schema_version = 1
+
+[[library_members]]
+provider = "demo"
+module_path = ["canvas"]
+kind = "type"
+canonical = "Point"
+surface = "Punctum"
+
+[[library_members]]
+provider = "demo"
+module_path = ["canvas"]
+kind = "function"
+canonical = "make_point"
+surface = "fac_punctum"
+
+[[library_members]]
+provider = "demo"
+module_path = ["canvas"]
+kind = "function"
+canonical = "show"
+surface = "monstra"
+"#,
+    )
+    .expect("demo latin pack");
+}
+
+#[test]
+fn latin_consumer_resolves_library_owned_pack() {
+    let (_td, home) = temp_dir("lib-locale");
+    write_demo_library_with_latin_pack(&home);
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "demo:canvas" canvas
+incipit {
+    fixum canvas.Punctum p ← canvas.fac_punctum("salve")
+    nota p
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+    let la_pack = la_locale_pack();
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source_with_locale_pack(
+        &app.display().to_string(),
+        &source,
+        false,
+        Some(&la_pack),
+        None,
+    );
+    assert!(
+        result.success,
+        "latin consumer must resolve library locale/<id> members, diagnostics={:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn latin_consumer_still_accepts_canonical_library_names() {
+    let (_td, home) = temp_dir("lib-locale-canonical");
+    write_demo_library_with_latin_pack(&home);
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "demo:canvas" canvas
+incipit {
+    fixum canvas.Point p ← canvas.make_point("salve")
+    nota p
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+    let la_pack = la_locale_pack();
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source_with_locale_pack(
+        &app.display().to_string(),
+        &source,
+        false,
+        Some(&la_pack),
+        None,
+    );
+    assert!(
+        result.success,
+        "canonical fallback must remain, diagnostics={:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn latin_consumer_rejects_unmapped_library_surface() {
+    let (_td, home) = temp_dir("lib-locale-invented");
+    write_demo_library_with_latin_pack(&home);
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "demo:canvas" canvas
+incipit {
+    fixum canvas.Punctum fictum ← canvas.fac_ignotum("salve")
+    nota fictum
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+    let la_pack = la_locale_pack();
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source_with_locale_pack(
+        &app.display().to_string(),
+        &source,
+        false,
+        Some(&la_pack),
+        None,
+    );
+    assert!(!result.success, "invented library surface must fail");
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("SEM002") || d.code == Some("SEM004")),
+        "expected SEM002/SEM004, diagnostics={:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// S1-U2 convert-path repair regressions (variant projection)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn interface_snapshot_projects_union_and_enum_variants() {
+    // S1-U2 defect: the convert-path interface snapshot (`file_interface_for_program`)
+    // exported Union/Enum nominals with `variants: Vec::new()`, so imported union
+    // patterns (`module.VARIANT` in `discerne` arms) failed SEM001. The snapshot
+    // must project the variant list (name + payload fields) like the package path —
+    // for identity-bearing targets (library/package imports). Identity-less
+    // relative-import targets keep the legacy empty-variant surface the
+    // module-boundary rows 1/9 and the error-masking diagnostics pin
+    // (SEM001.unknown_variant / SEM008 on imported union refs).
+    let (program, interner) = super::parse_program_for_namespace_exports(
+        "producer.fab",
+        r#"
+@ publica
+discretio Eventum {
+    Ictus { numerus vis }
+    Sonitus
+}
+
+@ publica
+ordo Gradus {
+    Parvus
+    Magnus
+}
+"#,
+        None,
+    )
+    .expect("parse producer source");
+
+    let identity = crate::file_interface::InterfaceLibraryIdentity {
+        provider: "probe".to_owned(),
+        package: None,
+        module_path: vec!["eventum".to_owned()],
+    };
+    let interface = super::file_interface_for_program(&program, &interner, Some(&identity));
+
+    let eventum = interface.exports.get("Eventum").expect("Eventum export");
+    let crate::file_interface::FileExportKind::Enum(nominal) = &eventum.kind else {
+        panic!("discretio must export as an Enum-kind nominal, got {:?}", eventum.kind);
+    };
+    assert_eq!(nominal.variants.len(), 2, "union variants must be projected");
+    assert_eq!(nominal.variants[0].name, "Ictus");
+    assert_eq!(nominal.variants[0].fields.len(), 1);
+    assert_eq!(nominal.variants[0].fields[0].name, "vis");
+    assert_eq!(
+        nominal.variants[0].fields[0].ty,
+        crate::file_interface::InterfaceTypeSnapshot::Primitive(crate::semantic::Primitive::Numerus)
+    );
+    assert_eq!(nominal.variants[1].name, "Sonitus");
+    assert!(nominal.variants[1].fields.is_empty(), "unit variant carries no fields");
+
+    let gradus = interface.exports.get("Gradus").expect("Gradus export");
+    let crate::file_interface::FileExportKind::Enum(nominal) = &gradus.kind else {
+        panic!("ordo must export as an Enum-kind nominal, got {:?}", gradus.kind);
+    };
+    assert_eq!(nominal.variants.len(), 2, "enum members must be projected");
+    assert_eq!(nominal.variants[0].name, "Parvus");
+    assert_eq!(nominal.variants[1].name, "Magnus");
+
+    // Identity-less snapshot (relative-import target outside a package):
+    // variants stay empty so the fail-closed surface is preserved.
+    let legacy = super::file_interface_for_program(&program, &interner, None);
+    let legacy_eventum = legacy.exports.get("Eventum").expect("Eventum export");
+    let crate::file_interface::FileExportKind::Enum(legacy_nominal) = &legacy_eventum.kind else {
+        panic!("discretio must export as an Enum-kind nominal, got {:?}", legacy_eventum.kind);
+    };
+    assert!(
+        legacy_nominal.variants.is_empty(),
+        "identity-less snapshots must keep the empty-variant fail-closed surface"
+    );
+}
+
+#[test]
+fn interface_snapshot_snaps_consts_and_tuple_returns() {
+    // S1-U2 done_when surfaces: the convert-path interface must also carry
+    // typed `fixum` consts (`module.CONST` values) and tuple return types
+    // (`iuncta<A, B>`); dropping them blocked gradus gguf/safetensors/tensor_view
+    // conversion with SEM010 at the call sites.
+    let (program, interner) = super::parse_program_for_namespace_exports(
+        "producer.fab",
+        r#"
+@ publica
+fixum textus schema_versio ← "2.0.0"
+
+@ publica
+functio limes() → iuncta<numerus, numerus> {
+    redde iuncta<numerus, numerus> [1, 2]
+}
+"#,
+        None,
+    )
+    .expect("parse producer source");
+
+    let interface = super::file_interface_for_program(&program, &interner, None);
+
+    let schema_versio = interface
+        .exports
+        .get("schema_versio")
+        .expect("const export");
+    let crate::file_interface::FileExportKind::Const(snapshot) = &schema_versio.kind else {
+        panic!("typed fixum must export as a Const snapshot, got {:?}", schema_versio.kind);
+    };
+    assert_eq!(
+        *snapshot,
+        crate::file_interface::InterfaceTypeSnapshot::Primitive(crate::semantic::Primitive::Textus)
+    );
+
+    let limes = interface.exports.get("limes").expect("function export");
+    let crate::file_interface::FileExportKind::Function(callable) = &limes.kind else {
+        panic!("functio must export as a Function, got {:?}", limes.kind);
+    };
+    assert_eq!(
+        *callable.ret,
+        crate::file_interface::InterfaceTypeSnapshot::Tuple(vec![
+            crate::file_interface::InterfaceTypeSnapshot::Primitive(crate::semantic::Primitive::Numerus),
+            crate::file_interface::InterfaceTypeSnapshot::Primitive(crate::semantic::Primitive::Numerus),
+        ])
+    );
+}
+
+#[test]
+fn converted_union_consumer_discernes_imported_variants() {
+    // S1-U2 defect end-to-end: a consumer importing a provider `discretio`
+    // must be able to match its variants (`casu provider.Union.Variant`) and
+    // reference them as values. Before the variant projection, the empty
+    // snapshot surfaced SEM001 unknown_identifier / unknown_variant cascades.
+    let (_td, home) = temp_dir("union-interface");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/eventum.fab"),
+        r#"
+@ publica
+discretio Eventum {
+    Ictus { numerus vis }
+    Sonitus
+}
+"#,
+    )
+    .expect("eventum");
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:eventum" eventum
+
+functio describe(eventum.Eventum e) → textus {
+    discerne e {
+        casu eventum.Eventum.Ictus fixum vis { redde vis ↦ textus }
+        casu eventum.Eventum.Sonitus { redde "sonitus" }
+    }
+}
+
+incipit {
+    fixum eventum.Eventum a ← finge eventum.Eventum.Ictus { vis = 3 } ∷ eventum.Eventum
+    fixum eventum.Eventum b ← eventum.Eventum.Sonitus
+    nota describe(a) + describe(b)
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "imported union consumer must check green through the convert snapshot: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+}

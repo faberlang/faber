@@ -26,12 +26,12 @@ fn write_plain_file(label: &str, contents: &str) -> TempPath {
 }
 
 /// Container `examples/` root: `FABER_EXAMPLES_HOME` override, then the
-/// faberlang container root via `radix::paths::faberlang_home()`.
+/// faberlang container root via `radix_module::paths::faberlang_home()`.
 fn examples_home() -> PathBuf {
     if let Ok(home) = std::env::var("FABER_EXAMPLES_HOME") {
         return PathBuf::from(home);
     }
-    radix::paths::faberlang_home()
+    radix_module::paths::faberlang_home()
         .expect("faberlang container root")
         .join("examples")
 }

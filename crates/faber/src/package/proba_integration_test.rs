@@ -5,9 +5,9 @@
 
 use super::library_resolver_from_config;
 use super::test_support::{diagnostic_has_issue, test_temp_dir};
-use radix::driver::Config;
-use radix::locale::LocalePack;
-use radix::Output;
+use radix_module::driver::Config;
+use radix_module::locale::LocalePack;
+use radix_module::Output;
 use radix_package::analyze::AnalysisSeams;
 use radix_package::discovery::PackageSpec;
 use radix_package::emit::{
@@ -23,7 +23,7 @@ fn seams() -> AnalysisSeams {
     crate::package::faber_analysis_seams()
 }
 
-fn compile_with_faber_seams(config: &Config, input: &Path) -> radix::CompileResult {
+fn compile_with_faber_seams(config: &Config, input: &Path) -> radix_module::CompileResult {
     compile_package_direct(config, input, &crate::package::faber_emission_seams())
 }
 
@@ -32,7 +32,7 @@ fn compile_with_test_options(
     input: &Path,
     selection: Option<&radix_package::frontmatter::RustTestSelection>,
     filter: Option<&TestSourceFilter>,
-) -> radix::CompileResult {
+) -> radix_module::CompileResult {
     compile_package_with_test_options_direct(
         config,
         input,
@@ -42,7 +42,7 @@ fn compile_with_test_options(
     )
 }
 
-fn discover_package(input: &Path) -> Result<PackageSpec, Box<radix::diagnostics::Diagnostic>> {
+fn discover_package(input: &Path) -> Result<PackageSpec, Box<radix_module::diagnostics::Diagnostic>> {
     crate::package::discover_package(input)
 }
 
@@ -52,7 +52,7 @@ fn load_with_faber_seams(
     locale_pack: Option<&LocalePack>,
     include_proba: bool,
     filter: Option<&TestSourceFilter>,
-) -> Result<Vec<radix_package::PackageFile>, Vec<radix::diagnostics::Diagnostic>> {
+) -> Result<Vec<radix_package::PackageFile>, Vec<radix_module::diagnostics::Diagnostic>> {
     radix_package::analyze::load_package_with_locale_pack(
         spec,
         resolver,
@@ -442,7 +442,7 @@ describe "helpers" {
 
 #[test]
 fn norma_src_proba_is_discovered_beside_product_sources() {
-    let norma_src = radix::paths::faberlang_home()
+    let norma_src = radix_module::paths::faberlang_home()
         .expect("faberlang container root")
         .join("norma/src");
     assert!(

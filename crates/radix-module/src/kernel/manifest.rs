@@ -1,0 +1,180 @@
+//! Compile-time kernel manifest (v1 module set).
+//!
+//! **Parity contract:** each `verbs` list is a **subset** of the matching
+//! `$FABER_LIBRARY_HOME/norma/src/<module>.fab` public file-scope surface. Spellings must match
+//! `norma:*` exactly. Verified by
+//! `kernel_manifest_verbs_are_subset_of_norma_public_surface` in
+//! `kernel_namespace_test.rs`. Application packages use `norma:*`; script mode
+//! uses `faber:*` against this manifest.
+
+/// Kernel import prefix for author paths.
+pub const KERNEL_PREFIX: &str = "faber:";
+
+/// Kernel glob import path for manifest expansion.
+pub const KERNEL_GLOB_IMPORT: &str = "faber:*";
+
+/// Manifest schema version (matches introducing `faber` release).
+pub const KERNEL_MANIFEST_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+pub use radix_types::KernelModule;
+
+/// One row in the kernel manifest table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KernelManifestEntry {
+    pub module: KernelModule,
+    pub import_path: &'static str,
+    pub provider_module: &'static str,
+    pub verbs: &'static [&'static str],
+    pub since: &'static str,
+}
+
+const V1_SINCE: &str = env!("CARGO_PKG_VERSION");
+
+const MANIFEST: &[KernelManifestEntry] = &[
+    KernelManifestEntry {
+        module: KernelModule::Json,
+        import_path: "faber:json",
+        provider_module: "faber/kernel/json",
+        // English canonicals (Pass B): solve→parse, pange→stringify,
+        // tempta→try_parse. The runner dispatch speaks the same names.
+        verbs: &["parse", "stringify", "try_parse"],
+        since: V1_SINCE,
+    },
+    KernelManifestEntry {
+        module: KernelModule::Solum,
+        import_path: "faber:solum",
+        provider_module: "faber/kernel/solum",
+        // English canonicals (Pass B): lege→read_file, carpe→read_lines,
+        // hauri→read_bytes, partem→read_range, scribe→write_file,
+        // funde→write_bytes, appone→append, exstat→exists,
+        // directoriumne→is_directory, regularene→is_regular,
+        // vinculumne→is_symlink, mensura→byte_length, modus→mode,
+        // enumera→list_dir, describe→stat, sequere→read_link,
+        // vincula→create_link, dele→delete, exscribe→copy,
+        // renomina→rename, tange→touch, modum→set_mode, crea→create_dir,
+        // amputa→remove_tree, iunge→join, parens→parent, nomen→file_name,
+        // suffixum→extension, absolve→resolve, domus→home,
+        // temporarium→temp_dir. The runner dispatch speaks the same names.
+        verbs: &[
+            "read_file",
+            "read_lines",
+            "read_bytes",
+            "read_range",
+            "write_file",
+            "write_bytes",
+            "append",
+            "exists",
+            "is_directory",
+            "is_regular",
+            "is_symlink",
+            "byte_length",
+            "mode",
+            "list_dir",
+            "stat",
+            "read_link",
+            "create_link",
+            "delete",
+            "copy",
+            "rename",
+            "touch",
+            "set_mode",
+            "create_dir",
+            "remove_tree",
+            "join",
+            "parent",
+            "file_name",
+            "extension",
+            "resolve",
+            "home",
+            "temp_dir",
+        ],
+        since: V1_SINCE,
+    },
+    KernelManifestEntry {
+        module: KernelModule::Processus,
+        import_path: "faber:processus",
+        provider_module: "faber/kernel/processus",
+        // English canonicals (Pass B): argumenta→argv, lege→read_env,
+        // scribe→write_env, sedes→cwd, muta→chdir, identitas→pid,
+        // exi→exit_process, exsequi→exec, genera→spawn. The runner
+        // dispatch speaks the same names.
+        verbs: &[
+            "argv",
+            "read_env",
+            "write_env",
+            "cwd",
+            "chdir",
+            "pid",
+            "exit_process",
+            "exec",
+            "spawn",
+        ],
+        since: V1_SINCE,
+    },
+    KernelManifestEntry {
+        module: KernelModule::Aleator,
+        import_path: "faber:aleator",
+        provider_module: "faber/kernel/aleator",
+        // English canonicals (Pass B): fractum→random_float, sortire→random_int,
+        // octetos→random_bytes, uuid→uuid, semina→seed. The runner dispatch
+        // speaks the same names.
+        verbs: &["random_float", "random_int", "random_bytes", "uuid", "seed"],
+        since: V1_SINCE,
+    },
+    KernelManifestEntry {
+        module: KernelModule::Consolum,
+        import_path: "faber:consolum",
+        provider_module: "faber/kernel/consolum",
+        // English canonicals (Pass B): dic→write_partial, scribe→write_line,
+        // mone→warn_line. Raw/partial stdout (`write_partial`) unblocks
+        // package-MIR coreutils such as `echo -n` and GNU `printf` without an
+        // implicit newline. The runner dispatch speaks the same names.
+        verbs: &["write_partial", "write_line", "warn_line"],
+        since: V1_SINCE,
+    },
+    KernelManifestEntry {
+        module: KernelModule::Toml,
+        import_path: "faber:toml",
+        provider_module: "faber/kernel/toml",
+        // English canonicals (Pass B): solve→parse, pange→stringify,
+        // tempta→try_parse. The runner dispatch speaks the same names.
+        // Mirrors the `norma:toml` wire-floor facade; TOML datetimes lower to
+        // `Valor::Instans` and TOML trees never contain `Valor::Nihil`.
+        verbs: &["parse", "stringify", "try_parse"],
+        since: V1_SINCE,
+    },
+];
+
+/// Return the locked v1 kernel manifest rows.
+#[must_use]
+pub fn kernel_manifest_entries() -> &'static [KernelManifestEntry] {
+    MANIFEST
+}
+
+/// Return the number of v1 kernel modules.
+#[must_use]
+pub fn kernel_module_count() -> usize {
+    MANIFEST.len()
+}
+
+/// Look up a kernel module by its short name (`solum`, `json`, …).
+pub fn lookup_module(name: &str) -> Option<KernelModule> {
+    MANIFEST
+        .iter()
+        .find(|entry| entry.module.name() == name)
+        .map(|entry| entry.module)
+}
+
+/// Whether `verb` is in the manifest-supported subset for `module`.
+///
+/// Drives the interpreted-package host bridge (see
+/// `docs/factory/faber-script-runtime/stage1b-package-host-bridge.md`): a
+/// `norma:<module>` call routes to the in-process kernel only when the verb is
+/// in this subset. The subset itself is the script/package parity contract,
+/// verified by `kernel_manifest_verbs_are_subset_of_norma_public_surface`.
+#[must_use]
+pub fn kernel_module_supports_verb(module: KernelModule, verb: &str) -> bool {
+    MANIFEST
+        .iter()
+        .any(|entry| entry.module == module && entry.verbs.contains(&verb))
+}

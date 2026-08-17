@@ -10,10 +10,10 @@
 #[path = "mod_test.rs"]
 mod tests;
 
-use radix::driver::{analyze_source, AnalyzedModule, Session};
-use radix::hir::{DefId, HirItemKind, HirModule, HirTestMetadata, HirTestModifier};
-use radix::lexer::Interner;
-use radix::mir::{
+use radix_module::driver::{analyze_source, AnalyzedModule, Session};
+use radix_module::hir::{DefId, HirItemKind, HirModule, HirTestMetadata, HirTestModifier};
+use radix_module::lexer::Interner;
+use radix_module::mir::{
     lower_analyzed_unit_with_context, run_function, BufferHost, MirFunctionId, RunSourceError,
     RunnerError, ValidatedMir,
 };
@@ -47,7 +47,7 @@ pub struct ProbaCase {
     /// Nested `probandum` path joined with `/` (empty when top-level).
     pub suite_path: String,
     /// Source span of the case.
-    pub span: radix::lexer::Span,
+    pub span: radix_module::lexer::Span,
     /// Skip / schedule modifiers preserved from source.
     pub modifiers: Vec<ProbaModifierView>,
 }
