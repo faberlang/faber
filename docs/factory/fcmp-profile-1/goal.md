@@ -1,11 +1,12 @@
 # GOAL: FCMP profile 1 — amend the draft before a separate freeze decision
 
-**Status**: planned — amendments folded into the draft; protocol review re-check required before implementation or freeze
+**Status**: planned — draft; CTO `5a4e974a` holes locked in `amendment.md`; not frozen; §14 re-check is still not a freeze
 **Created**: 2026-08-17
 **Campaign:** `—` (standalone)
-**Source:** operator intake: `faber/docs/faber-messagepack-profile-v1.md` (amended from commit `4878b6f`; review memo `604d6a30`)
+**Source:** operator intake: `faber/docs/faber-messagepack-profile-v1.md` (amended from commit `4878b6f`; review memo `604d6a30`; CTO `5a4e974a`)
 **Repos:** `faber` (spec + registry); `radix` (reference implementation — deferred, see Sequencing)
 **Related:** `radix/docs/factory/radix-top-level-recomposition/goal.md` (hard sequencing dependency — operator flagged 2026-08-17); FHIR artifact format goal (unwritten, follows the freeze)
+**Amendment spec:** `docs/factory/fcmp-profile-1/amendment.md`
 
 ---
 
@@ -15,7 +16,16 @@ Faber durable artifacts (FHIR unit/package first) have exactly one byte-determin
 
 ## Problem
 
-FHIR artifacts today serialize compiler structs through `rmp-serde` defaults (see the doc's non-normative reference): field order, enum ordinals, and map iteration order are implementation accidents, not a contract. There is no framing, no schema versioning, no limits, no canonical-byte admission. Cross-language consumers (TS first, per §11.3) cannot rely on bytes or hashes.
+FHIR artifacts today serialize mixed compiler structs through postcard + serde
+(`radix-hir-fhir` `decode.rs` / `package.rs`: `postcard::to_allocvec` /
+`from_bytes`). Field order, enum ordinals, and map iteration order are
+serializer accidents, not a contract. A u32 ratchet exists (`SCHEMA_VERSION =
+3` on the unit, `PACKAGE_SCHEMA_VERSION = 1` on the envelope) and rejects
+mismatch with no compatibility decoder; that is not FCMP schema versioning (no
+framing, no named fields, no canonical-byte admission, no limits, no
+independent profile/document majors). Cross-language consumers (TS first, per
+§11.3) cannot rely on bytes or hashes. The live wire is not rmp-serde; the
+protocol's rmp-serde citation is non-normative evidence of a rejected path.
 
 ## Proposal
 
@@ -55,14 +65,37 @@ This goal's implementation **conflicts with radix-top-level-recomposition in fli
   program graph stability). The protocol review and amendment phase has no code
   surface and runs now.
 
+### Draft locks (CTO `5a4e974a`; planner `3fc06e37`)
+
+These close the two freeze holes. They are not a freeze. Full BCP-14 fold-in
+text is in `amendment.md`.
+
+1. **Optional vs default identity — (a).** Absence of an OPTIONAL field and a
+   present encoding equal to that field's schema default are the same schema
+   value. Encoders MUST omit defaults. Present-at-default is `noncanonical`.
+   `nil` stays distinct and is never the omitted-optional encoding. OPTIONAL
+   fields MUST NOT use implicit-null as the default; nullable types are
+   REQUIRED fields that always carry the key.
+2. **Envelope-prefix limits.** Before kind admission: kind-string ≤ 64 bytes;
+   root map exactly 3 entries; schema array exactly 2 elements. A decoder with
+   no enabled kind MUST reject a declared payload length > 256 bytes and MUST
+   NOT allocate `value`. Root keys are read in canonical order so `value` is
+   not allocated to learn `kind`.
+
+A later §14 re-check after these land in the protocol file is still not a
+freeze.
+
 ### Non-goals
 
 - No implementation while the profile is draft (doc §14: review gates before freeze).
+- No freeze in this amend. Status stays planned/draft.
 - No generic framework before a second consumer exists (doc Abstract).
 - No FMIR codec changes (doc Non-goals).
 - No FHIR schema definition inside this goal — this draft reserves names only;
   schemas and registration come with the FHIR format goal after the RTR2/RTR3b
   contracts and publication of concrete finite limits.
+- No postcard → rmp-serde swap.
+- Do not reopen unit 2. Do not dispatch unit 3.
 
 ## Units (lowering sketch — refine via `$delivery`)
 
@@ -70,6 +103,7 @@ This goal's implementation **conflicts with radix-top-level-recomposition in fli
 | --- | --- | --- | --- |
 | 1 | Head protocol review of the draft: §14 gate list + BCP-14 clause audit + conflict-of-interest check against serializer-library defaults | — | memo `604d6a30` |
 | 2 | Fold the review verdicts into the draft; keep Status draft, preserve the RTR2/RTR3b gate, and keep `fhir.unit`/`fhir.package` as reservations until schemas publish concrete finite limits | 1 | handle `cfcb44be` |
+| 2a | Fold `amendment.md` into `docs/faber-messagepack-profile-v1.md` (identity + prefix limits only). Status stays draft. Not a freeze. | 2 | none |
 | 3 | Rust reference: strict FCMP codec + generic profile vectors (frame, canonicality, limits) | separate profile freeze, RTR2 | none |
 | 4 | FHIR unit/package wire DTOs + fixtures + TS independent decoder/encoder (cross-language gate §11.3) | 3, RTR3b | none |
 | 5 | FHIR writer/reader switch + legacy postcard rejection with structured diagnostic | 4 | none |
@@ -77,7 +111,9 @@ This goal's implementation **conflicts with radix-top-level-recomposition in fli
 ## Validation
 
 Unit 1–2: review memo + amended draft commit, with Status still draft and the
-review gate re-checked before any freeze decision. Unit 3: generic conformance
+review gate re-checked before any freeze decision. Unit 2a: protocol file
+contains the identity rule and the four prefix limits; Status still draft.
+A §14 re-check after 2a is still not a freeze. Unit 3: generic conformance
 vectors all green in Rust. Unit 4: TS implementation re-encodes every positive
 fixture byte-identically; shared negative fixtures rejected with expected error
 classes. Unit 5: FHIR e2e on FCMP only; postcard rejected closed.
@@ -87,7 +123,9 @@ classes. Unit 5: FHIR e2e on FCMP only; postcard rejected closed.
 | Unit | Status | Receipt | Notes |
 | --- | --- | --- | --- |
 | 1 | complete | `604d6a30` | head-cto review verdicts received |
-| 2 | complete | `cfcb44be` | amendments folded; draft remains unfrozen pending review re-check |
+| 2 | complete | `cfcb44be` | amendments folded; do not reopen |
+| 2a | planned | — | locks in `amendment.md`; protocol fold not started; not a freeze |
+| 3 | blocked | — | freeze + RTR2; do not dispatch |
 
 ## Review disposition
 
@@ -110,3 +148,10 @@ The head-cto review is folded into the draft and closes the prior open questions
    program graph contracts.
 
 The draft MUST be re-checked against §14 before a separate freeze decision.
+That re-check is still not a freeze.
+
+CTO `5a4e974a` (`correct_before_next_phase`): optional/default identity and
+envelope-prefix limits were unset. They are now locked as (a) omit-defaults
+and the 64 / 3 / 2 / 256 prefix table in `amendment.md`. Fold them into the
+protocol file as unit 2a. Do not freeze here. Do not reopen unit 2. Do not
+dispatch unit 3.
