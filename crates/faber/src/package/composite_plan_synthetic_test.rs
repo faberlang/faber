@@ -39,7 +39,7 @@ use radix_mir_fmir::{
     DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId, FmirDeviceArtifact,
     FmirDeviceBackend, MaterializationStage,
 };
-use radix_package::analyze::AnalyzedPackage;
+use radix_package::analyze::AnalyzedProgram;
 use radix_types::TypeId;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -47,7 +47,7 @@ use std::path::{Path, PathBuf};
 fn analyze_with_faber_seams(
     config: &Config,
     input: &Path,
-) -> Result<radix_package::analyze::AnalyzedPackage, Vec<Diagnostic>> {
+) -> Result<radix_package::analyze::AnalyzedProgram, Vec<Diagnostic>> {
     radix_package::analyze::analyze_package(config, input, &crate::package::faber_analysis_seams())
 }
 
@@ -80,7 +80,7 @@ fn copy_package_dir_skipping_target(src: &Path, dest: &Path) {
 }
 
 /// Analyze a fresh copy of the synthetic fixture package.
-fn analyze_fixture() -> (TestDir, AnalyzedPackage) {
+fn analyze_fixture() -> (TestDir, AnalyzedProgram) {
     let dir = copy_fixture();
     let config = Config::default();
     let package =
@@ -261,9 +261,10 @@ fn fixture_facts() -> CompositePlanFacts {
 /// The A10 source half of the analyzed fixture, computed with the same
 /// FNV-1a idiom the composite-plan assembly uses (the fixture files are the
 /// typed source of truth for the source domain).
-fn expected_source_hashes(package: &AnalyzedPackage) -> Vec<(String, String)> {
+fn expected_source_hashes(package: &AnalyzedProgram) -> Vec<(String, String)> {
     let mut hashes: Vec<(String, String)> = package
-        .units
+        .nodes
+        .values()
         .iter()
         .map(|unit| {
             let bytes = std::fs::read(&unit.path).expect("read fixture source unit");
@@ -280,7 +281,7 @@ fn expected_source_hashes(package: &AnalyzedPackage) -> Vec<(String, String)> {
     hashes
 }
 
-fn fixture_identity_source(package: &AnalyzedPackage) -> IdentitySource {
+fn fixture_identity_source(package: &AnalyzedProgram) -> IdentitySource {
     IdentitySource {
         model: fixture_model(),
         backend: fixture_backend(),
@@ -344,14 +345,14 @@ fn synthetic_fixture_package_analyzes_with_gradus_imports() {
     // model identity surface; it must analyze through the ordinary package
     // path before the composite-plan machinery runs over it.
     let (_dir, package) = analyze_fixture();
-    assert!(!package.units.is_empty(), "fixture must carry source units");
+    assert!(!package.nodes.is_empty(), "fixture must carry source units");
     assert!(
-        package.units.iter().any(|unit| unit.is_entry),
+        package.nodes.values().any(|unit| unit.is_entry),
         "fixture must carry an entry unit"
     );
     println!(
         "PASS synthetic fixture package analyzes ({} source unit(s), gradus:model imports)",
-        package.units.len()
+        package.nodes.len()
     );
 }
 

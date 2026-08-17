@@ -7,7 +7,7 @@ use radix::driver::Config;
 use serde::Deserialize;
 
 use super::{faber_analysis_seams, read_manifest, validate_manifest};
-use radix_package::analyze::AnalyzedPackage;
+use radix_package::analyze::AnalyzedProgram;
 use radix_package::discovery::resolve_source_root;
 use radix_package::file_interface::extract_callable_contracts;
 use radix_package::member_path::resolve_package_member;
@@ -45,7 +45,6 @@ struct BindingContract {
     span: radix::lexer::Span,
     callable: radix::file_interface::InterfaceCallable,
     has_body: bool,
-    unit_index: usize,
     def_id: radix::hir::DefId,
 }
 
@@ -185,7 +184,7 @@ fn read_binding_manifest(path: &Path) -> Result<BindingManifest, Vec<Diagnostic>
 fn collect_binding_contracts(
     provider: &str,
     package_root: &Path,
-) -> Result<(AnalyzedPackage, Vec<BindingContract>), Vec<Diagnostic>> {
+) -> Result<(AnalyzedProgram, Vec<BindingContract>), Vec<Diagnostic>> {
     let package = radix_package::analyze::analyze_package(
         &Config::default().with_bodyless_functions(),
         package_root,
@@ -194,7 +193,7 @@ fn collect_binding_contracts(
     let mut declarations = Vec::new();
     let mut keys = BTreeSet::new();
     let mut diagnostics = Vec::new();
-    for (unit_index, unit) in package.units.iter().enumerate() {
+    for unit in package.nodes.values() {
         let module = unit.module_segments.join("/");
         let contracts = match extract_callable_contracts(
             &unit.analysis,
@@ -228,7 +227,6 @@ fn collect_binding_contracts(
                 span: contract.span,
                 callable: contract.callable,
                 has_body: contract.has_body,
-                unit_index,
                 def_id: contract.def_id,
             });
         }
@@ -333,7 +331,7 @@ fn prove_rust_bindings(
     shim: Option<&Path>,
     manifest: &BindingManifest,
     declarations: &[BindingContract],
-    package: &AnalyzedPackage,
+    package: &AnalyzedProgram,
     probe_mode: BindingProbeMode,
 ) -> Result<(), Vec<Diagnostic>> {
     if manifest.functions.is_empty() {
@@ -357,7 +355,9 @@ fn prove_rust_bindings(
         let Some(declaration) = by_key.get(key.as_str()).copied() else {
             continue;
         };
-        let unit = &package.units[declaration.unit_index];
+        let Some((_, unit)) = package.node_by_path(&declaration.file) else {
+            continue;
+        };
         match render_binding_probe(
             &unit.analysis,
             declaration.def_id,
@@ -414,7 +414,7 @@ fn prove_rust_bindings(
     _shim: Option<&Path>,
     manifest: &BindingManifest,
     _declarations: &[BindingContract],
-    _package: &AnalyzedPackage,
+    _package: &AnalyzedProgram,
     _probe_mode: BindingProbeMode,
 ) -> Result<(), Vec<Diagnostic>> {
     if manifest.functions.is_empty() {

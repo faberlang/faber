@@ -6,7 +6,7 @@
 //!
 //! - [`load_package_fhir`] loads a `.fhirpkg` envelope in a fresh process
 //!   with no lexer/parser/resolver/analyzer pass;
-//! - [`loaded_package_to_analyzed`] rehydrates an [`AnalyzedPackage`] so the
+//! - [`loaded_package_to_analyzed`] rehydrates an [`AnalyzedProgram`] so the
 //!   existing Rust/FMIR/canonical-Faber assembly paths consume loaded units —
 //!   local imports resolve from the envelope's explicit link table, never
 //!   from the filesystem;
@@ -24,8 +24,9 @@ use radix::hir::package::{load_package, LoadedHirModule, LoadedHirPackage};
 use radix::lexer::Span;
 use radix::semantic::passes::visibility_annotation::VisibilityTier;
 use radix::syntax::Visibility;
-use radix_package::analyze::{AnalyzedPackage, AnalyzedPackageUnit};
+use radix_package::analyze::{AnalyzedProgram, AnalyzedProgramNode, ModuleGraph, ModuleId};
 use radix_package::discovery::PackageSpec;
+use radix_package::library::LibraryResolver;
 use radix_package::library::ResolvedLibraryModule;
 use radix_package::LibraryImportBinding;
 use std::collections::{BTreeMap, BTreeSet};
@@ -62,7 +63,7 @@ pub(crate) fn load_package_fhir(path: &Path) -> Result<LoadedHirPackage, Vec<Dia
 // Loaded-package adapter
 // ---------------------------------------------------------------------------
 
-/// Rehydrate an [`AnalyzedPackage`] from a loaded FHIR package.
+/// Rehydrate an [`AnalyzedProgram`] from a loaded FHIR package.
 ///
 /// Local imports resolve from the envelope's explicit link table (binding →
 /// target module path), so the reconstructed package feeds the existing Rust,
@@ -73,7 +74,7 @@ pub(crate) fn load_package_fhir(path: &Path) -> Result<LoadedHirPackage, Vec<Dia
 pub(crate) fn loaded_package_to_analyzed(
     loaded: LoadedHirPackage,
     artifact_dir: &Path,
-) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
+) -> Result<AnalyzedProgram, Vec<Diagnostic>> {
     let package_root = artifact_dir.to_path_buf();
     let spec = PackageSpec {
         package_root: package_root.clone(),
@@ -138,9 +139,22 @@ pub(crate) fn loaded_package_to_analyzed(
         .map(|module| namespace_exports_for_loaded(module, &loaded.modules, &units_by_module_path))
         .collect::<Vec<_>>();
 
-    let mut units = Vec::with_capacity(loaded.modules.len());
+    let path_to_id = loaded
+        .modules
+        .iter()
+        .map(|module| {
+            (
+                package_root.join(&module.relative_path),
+                ModuleId::for_spec(&spec, module.module_segments.clone()),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let mut imports = ModuleGraph::default();
+    let mut nodes = BTreeMap::new();
+    let mut entry = None;
     for (index, module) in loaded.modules.into_iter().enumerate() {
         let path = package_root.join(&module.relative_path);
+        let module_id = ModuleId::for_spec(&spec, module.module_segments.clone());
         let expanded_library_imports = module
             .library_imports
             .iter()
@@ -154,24 +168,47 @@ pub(crate) fn loaded_package_to_analyzed(
                     package_root.join("libs").join(&import.package),
                 ),
             })
-            .collect();
-        units.push(AnalyzedPackageUnit {
-            path,
-            module_segments: module.module_segments,
-            is_entry: module.is_entry,
-            analysis: module.unit,
-            file_interface: radix::file_interface::FileInterface::new(),
-            export_names: module.export_names,
-            namespace_exports: namespace_exports_all[index].clone(),
-            expanded_library_imports,
-        });
+            .collect::<Vec<_>>();
+        for link in &module.local_links {
+            let target_path = package_root.join(&link.target);
+            if let Some(to) = path_to_id.get(&target_path) {
+                imports.insert_local(module_id.clone(), link.binding.clone(), to.clone());
+            }
+        }
+        for import in &expanded_library_imports {
+            imports.insert_library(module_id.clone(), import.clone());
+        }
+        if module.is_entry {
+            entry = Some(module_id.clone());
+        }
+        nodes.insert(
+            module_id,
+            AnalyzedProgramNode {
+                path,
+                module_segments: module.module_segments,
+                is_entry: module.is_entry,
+                analysis: module.unit,
+                file_interface: radix::file_interface::FileInterface::new(),
+                export_names: module.export_names,
+                namespace_exports: namespace_exports_all[index].clone(),
+                expanded_library_imports,
+            },
+        );
     }
+    let roots = entry
+        .clone()
+        .map(|id| vec![id])
+        .unwrap_or_else(|| nodes.keys().cloned().collect());
 
-    Ok(AnalyzedPackage {
+    Ok(AnalyzedProgram {
         spec,
-        units,
+        entry,
+        roots,
+        nodes,
+        imports,
         entry_frontmatter,
         diagnostics: Vec::new(),
+        library_resolver: LibraryResolver::with_optional_home(None),
     })
 }
 

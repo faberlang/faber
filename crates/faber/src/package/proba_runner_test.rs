@@ -22,7 +22,7 @@ fn seams() -> AnalysisSeams {
 fn analyze_with_faber_seams(
     config: &Config,
     input: &Path,
-) -> Result<radix_package::analyze::AnalyzedPackage, Vec<radix::diagnostics::Diagnostic>> {
+) -> Result<radix_package::analyze::AnalyzedProgram, Vec<radix::diagnostics::Diagnostic>> {
     analyze_package_direct(config, input, &seams())
 }
 
@@ -30,7 +30,7 @@ fn analyze_tests_with_faber_seams(
     config: &Config,
     input: &Path,
     filter: Option<&radix_package::test_source_filter::TestSourceFilter>,
-) -> Result<radix_package::analyze::AnalyzedPackage, Vec<radix::diagnostics::Diagnostic>> {
+) -> Result<radix_package::analyze::AnalyzedProgram, Vec<radix::diagnostics::Diagnostic>> {
     analyze_package_for_tests_direct(config, input, filter, &seams())
 }
 
@@ -163,7 +163,8 @@ test "math ok" {
         analyze_tests_with_faber_seams(&config, dir.path(), None).expect("analyze tests");
     assert!(
         for_tests
-            .units
+            .nodes
+            .values()
             .iter()
             .any(|u| u.path.extension().and_then(|e| e.to_str()) == Some("proba")),
         "test analysis must include .proba units"
@@ -172,7 +173,8 @@ test "math ok" {
     let production = analyze_with_faber_seams(&config, dir.path()).expect("analyze production");
     assert!(
         production
-            .units
+            .nodes
+            .values()
             .iter()
             .all(|u| u.path.extension().and_then(|e| e.to_str()) != Some("proba")),
         "production analysis must exclude .proba"
@@ -221,7 +223,7 @@ test "identity holds" {
     );
 
     let mut any = false;
-    for unit in &mut package.units {
+    for unit in package.nodes.values_mut() {
         let report = run_proba_on_analyzed(
             &mut unit.analysis,
             &TestSelection::default(),
@@ -276,7 +278,7 @@ test "double" {
     let mut roots = Vec::new();
     let mut functions = Vec::new();
     let mut test_units = Vec::new();
-    for unit in &package.units {
+    for unit in package.nodes.values() {
         let cases = proba::inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
         if cases.is_empty() {
             continue;
@@ -285,7 +287,11 @@ test "double" {
         functions.extend(cases.iter().map(|case| (unit.path.clone(), case.def_id)));
         test_units.push((unit.path.clone(), cases));
     }
-    let scope = radix_package::mir::TestPackageScope { roots, functions };
+    let remap_anchor = roots.into_iter().next().expect("test units are non-empty");
+    let scope = radix_package::mir::TestPackageScope {
+        remap_anchor,
+        functions,
+    };
     let report = crate::package::mir::with_linked_test_package_mir(
         package,
         &scope,
@@ -456,7 +462,7 @@ test "math ok" {
     );
 
     let mut passed = 0;
-    for unit in &mut package.units {
+    for unit in package.nodes.values_mut() {
         if proba::inventory_cases(&unit.analysis.hir, &unit.analysis.interner).is_empty() {
             continue;
         }
@@ -528,9 +534,10 @@ test "core ok" {
         ),
         "relative and absolute inputs must land on the same package root"
     );
-    let unit_names = |pkg: &radix_package::analyze::AnalyzedPackage| {
+    let unit_names = |pkg: &radix_package::analyze::AnalyzedProgram| {
         let mut names = pkg
-            .units
+            .nodes
+            .values()
             .iter()
             .map(|u| u.path.file_name().unwrap_or_default().to_os_string())
             .collect::<Vec<_>>();

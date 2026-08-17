@@ -273,7 +273,7 @@ pub(crate) fn with_interpreted_lowered_package_mir<R>(
 /// MIR and original test-function identity map to the runner consumer.
 #[cfg(feature = "runner")]
 pub(crate) fn with_linked_test_package_mir<R>(
-    package: radix_package::analyze::AnalyzedPackage,
+    package: radix_package::analyze::AnalyzedProgram,
     scope: &radix_package::mir::TestPackageScope,
     config: &Config,
     run: impl for<'a> FnOnce(&radix::mir::ValidatedMir<'a>, &radix_package::mir::TestFunctionIds) -> R,

@@ -4,14 +4,14 @@
 use super::*;
 use crate::package::library_resolver_from_config;
 use crate::package::test_support::test_temp_dir;
-use radix_package::analyze::AnalyzedPackage;
+use radix_package::analyze::AnalyzedProgram;
 use radix_package::codegen::assemble_crate;
 use radix_package::rust_target::generate_package_rust;
 
 fn analyze_with_faber_seams(
     config: &Config,
     input: &Path,
-) -> Result<AnalyzedPackage, Vec<radix::diagnostics::Diagnostic>> {
+) -> Result<AnalyzedProgram, Vec<radix::diagnostics::Diagnostic>> {
     radix_package::analyze::analyze_package(config, input, &crate::package::faber_analysis_seams())
 }
 
@@ -440,7 +440,8 @@ fn local_library_locale_surface_resolves_through_package_loader() {
     );
 
     let util = package
-        .units
+        .nodes
+        .values()
         .iter()
         .find(|unit| unit.module_segments == ["util".to_owned()])
         .expect("localized local utility unit");
@@ -549,7 +550,7 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
         "localized external library diagnostics: {:?}",
         package.diagnostics
     );
-    let entry_unit = package.entry_unit().expect("external library entry unit");
+    let entry_unit = package.entry_node().expect("external library entry unit");
     assert_eq!(
         entry_unit.expanded_library_imports.len(),
         2,
@@ -615,7 +616,7 @@ fn latin_norma_consumer_keeps_canonical_surface_compatibility() {
         "Latin Norma compatibility diagnostics: {:?}",
         package.diagnostics
     );
-    let entry_unit = package.entry_unit().expect("Latin Norma entry unit");
+    let entry_unit = package.entry_node().expect("Latin Norma entry unit");
     assert_eq!(
         entry_unit.expanded_library_imports.len(),
         1,
@@ -788,13 +789,14 @@ fn loaded_package_canonical_faber_parity() {
     let direct = analyze_with_faber_seams(&config, &entry).expect("direct analysis");
     let artifact = build_fhir_with_faber_seams(&config, &entry).expect("build FHIR package");
     let loaded = load_package_fhir(&artifact.package_path).expect("load FHIR package");
-    assert_eq!(direct.units.len(), loaded.modules.len());
+    assert_eq!(direct.nodes.len(), loaded.modules.len());
 
     // Direct units are in analysis (dependency-first) order; loaded modules
     // are sorted by canonical path — align by package-relative path.
     let package_root = &direct.spec.package_root;
     let direct_by_path = direct
-        .units
+        .nodes
+        .values()
         .iter()
         .map(|unit| {
             (
@@ -979,8 +981,12 @@ fn loaded_package_library_import_unit_parity() {
     let surface = radix::locale::KeywordSurface::new(&latin);
     for target in [Target::HirRust, Target::HirFaber] {
         let direct_code = output_code(
-            &generate_from_analyzed(target, &direct.units[0].analysis, &surface)
-                .expect("direct emit"),
+            &generate_from_analyzed(
+                target,
+                &direct.nodes.values().next().expect("node").analysis,
+                &surface,
+            )
+            .expect("direct emit"),
         )
         .to_owned();
         let loaded_code = output_code(
