@@ -529,7 +529,9 @@ use radix_module::hir::{
 };
 use radix_module::lexer::Interner;
 use radix_module::parser;
-use radix_module::semantic::passes::visibility_annotation::{statement_export_tier, VisibilityTier};
+use radix_module::semantic::passes::visibility_annotation::{
+    has_private_visibility_annotation, statement_export_tier, VisibilityTier,
+};
 use radix_module::syntax::{
     walk_expr, AnnotationKind, Expr, ExprKind, Program, StmtKind, Visibility, Visitor,
 };
@@ -641,17 +643,10 @@ pub fn library_interface_declaration_surface(
     library_resolver: &LibraryResolver,
     library_cache: &mut LibraryInterfaceCache,
 ) -> Result<BTreeMap<String, VisibilityTier>, Diagnostic> {
-    let cached = load_cached_library_interface(&import.module, library_cache)?;
-    let mut surface = program_declaration_surface(&cached.program, &cached.interner);
-    for child in public_library_imports(import, library_resolver, library_cache)? {
-        surface.insert(child.binding.clone(), VisibilityTier::Publica);
-        for (child_member, tier) in
-            library_interface_declaration_surface(&child, library_resolver, library_cache)?
-        {
-            surface.insert(format!("{}.{}", child.binding, child_member), tier);
-        }
-    }
-    Ok(surface)
+    // Library interfaces are export-only. Private names are not declarations
+    // at this boundary, so later `namespace_missing_export` /
+    // `qualified_type_not_exported` fire instead of SEM006.
+    library_interface_export_surface(import, library_resolver, library_cache)
 }
 
 fn library_module_label(import: &LibraryImportBinding) -> String {
@@ -1639,7 +1634,15 @@ pub fn program_declaration_surface(
 ) -> BTreeMap<String, VisibilityTier> {
     let mut surface = BTreeMap::new();
     for stmt in &program.statements {
-        let tier = statement_export_tier(stmt, interner).unwrap_or(VisibilityTier::Privata);
+        // Package-path declaration surface: unmarked stays exported (the
+        // module-private default is radix-scoped in VM-U2; the package-path
+        // flip is a follow-on). Explicit `@ privata` remains module-private
+        // so same-package consumers get SEM006 instead of a missing-export.
+        let tier = if has_private_visibility_annotation(stmt, interner) {
+            VisibilityTier::Privata
+        } else {
+            statement_export_tier(stmt, interner).unwrap_or(VisibilityTier::Publica)
+        };
         if let Some(name) = stmt_export_name(stmt, interner) {
             surface.insert(name, tier);
         }
@@ -1680,7 +1683,10 @@ pub fn program_export_surface(
 
 /// Companion export names from `@ radix backward "name"` annotations on a
 /// function statement.
-fn backward_companion_export_names(stmt: &radix_module::syntax::Stmt, interner: &Interner) -> Vec<String> {
+fn backward_companion_export_names(
+    stmt: &radix_module::syntax::Stmt,
+    interner: &Interner,
+) -> Vec<String> {
     let StmtKind::Func(decl) = &stmt.kind else {
         return Vec::new();
     };
@@ -1693,14 +1699,16 @@ fn backward_companion_export_names(stmt: &radix_module::syntax::Stmt, interner: 
             continue;
         }
         let mut args = annotation_stmt.args.iter();
-        let Some(radix_module::lexer::TokenKind::Ident(directive)) = args.next().map(|arg| &arg.kind)
+        let Some(radix_module::lexer::TokenKind::Ident(directive)) =
+            args.next().map(|arg| &arg.kind)
         else {
             continue;
         };
         if interner.resolve(*directive) != "backward" {
             continue;
         }
-        let Some(radix_module::lexer::TokenKind::String(name)) = args.next().map(|arg| &arg.kind) else {
+        let Some(radix_module::lexer::TokenKind::String(name)) = args.next().map(|arg| &arg.kind)
+        else {
             continue;
         };
         names.push(interner.resolve(*name).to_owned());

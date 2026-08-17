@@ -176,37 +176,20 @@ impl AnalyzedProgram {
 
     /// Named remapping/type-identity host for a package test MIR link.
     ///
-    /// Declared package entry wins; otherwise the remapping host is a
-    /// non-`.proba` module in the test-root closure; otherwise the remapping
-    /// host is the explicit root with the least [`ModuleId`]. Missing hosts
-    /// fall back to [`PackageSpec::entry`] so the linker can fail closed.
+    /// Declared package entry wins. Otherwise the remapping host is a test
+    /// root ([`Self::roots`], least [`ModuleId`]). A non-test library module
+    /// must not be the host: `lower_package_units` treats the host as the
+    /// merge entry (original DefIds), while sibling namespace calls are
+    /// rewritten to synthetics — using the callee as host leaves those
+    /// synthetics without a MIR function.
+    ///
+    /// Missing hosts fall back to [`PackageSpec::entry`] so the linker can
+    /// fail closed.
     pub fn test_remap_anchor(&self) -> PathBuf {
         if let Some(node) = self.entry_node() {
             return node.path.clone();
         }
         if let Some((_, node)) = self.node_by_path(&self.spec.entry) {
-            return node.path.clone();
-        }
-        let included = self.imports.local_closure(self.roots.iter());
-        let mut host: Option<&AnalyzedProgramNode> = None;
-        for id in &included {
-            let Some(node) = self.nodes.get(id) else {
-                continue;
-            };
-            if is_proba_source_path(&node.path) {
-                continue;
-            }
-            host = Some(match host {
-                Some(current)
-                    if (node.module_segments.len(), node.path.as_os_str())
-                        >= (current.module_segments.len(), current.path.as_os_str()) =>
-                {
-                    current
-                }
-                _ => node,
-            });
-        }
-        if let Some(node) = host {
             return node.path.clone();
         }
         if let Some(id) = self.roots.iter().min() {

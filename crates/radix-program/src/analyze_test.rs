@@ -93,7 +93,10 @@ fn label() → string {
         analyze_package(&Config::default(), &entry, &test_seams()).expect("analyze package");
 
     assert!(
-        !package.diagnostics.iter().any(radix_module::Diagnostic::is_error),
+        !package
+            .diagnostics
+            .iter()
+            .any(radix_module::Diagnostic::is_error),
         "expected no analysis errors, got {:?}",
         package
             .diagnostics
