@@ -1351,7 +1351,10 @@ fn provider_identity_names_buffer_attribute_member() {
     let mut interner = Interner::new();
     let provider = MirProvider {
         kind: radix_mir::MirProviderKind::Package,
-        module: vec![interner.intern("BufferAttribute"), interner.intern("return")],
+        module: vec![
+            interner.intern("BufferAttribute"),
+            interner.intern("return"),
+        ],
         name: interner.intern("dele"),
     };
 

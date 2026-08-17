@@ -291,10 +291,7 @@ impl Host for BufferHost {
     }
 
     fn provider(&mut self, _provider: &MirProvider) -> Result<Value, RunnerError> {
-        Err(RunnerError::unsupported(
-            Span::default(),
-            "provider",
-        ))
+        Err(RunnerError::unsupported(Span::default(), "provider"))
     }
 
     fn exit(&mut self, code: i32) -> ! {
@@ -393,10 +390,7 @@ impl Host for StdioHost {
     }
 
     fn provider(&mut self, _provider: &MirProvider) -> Result<Value, RunnerError> {
-        Err(RunnerError::unsupported(
-            Span::default(),
-            "provider",
-        ))
+        Err(RunnerError::unsupported(Span::default(), "provider"))
     }
 
     fn exit(&mut self, code: i32) -> ! {
