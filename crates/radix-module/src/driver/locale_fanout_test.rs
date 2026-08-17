@@ -183,11 +183,11 @@ fn phase4_full_cross_locale_fanout() {
             let result = compile_canonical(&session, "fanout.fab", &source);
 
             if !result.success() {
-                let errors: Vec<&str> = result
+                let errors: Vec<String> = result
                     .diagnostics
                     .iter()
                     .filter(|d| d.is_error())
-                    .map(|d| d.message.as_str())
+                    .map(|d| format!("{:?}:{:?}", d.code, d.issue()))
                     .collect();
                 failures.push(format!("{input_locale} → {output_locale}: {}", errors.join("; ")));
             }

@@ -2464,7 +2464,7 @@ functio via() → leaf.Point {
         "prepared analyze diagnostics must be error-free: {:?}",
         unit.diagnostics
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.as_str()))
+            .map(|diag| (diag.code, diag.issue()))
             .collect::<Vec<_>>()
     );
 }

@@ -323,7 +323,10 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
     rel == "crates/hygiene-ratchet/tests/hygiene.rs"
         || rel == "crates/radix/src/diagnostics/render_test.rs"
         || rel == "crates/radix/src/diagnostics/diagnostic_test.rs"
-        || rel == "crates/radix/src/locale_test.rs"
+        // Renderer-contract: pack template interpolation, issue-vs-code
+        // fallback, and localized row resolution. Followed the crate split
+        // from crates/radix/src/locale_test.rs.
+        || rel == "crates/radix-module/src/locale_test.rs"
         || rel == "crates/faber/src/diagnostic_explain_test.rs"
         || rel == "crates/faber/src/explain_test.rs"
         || rel == "crates/faber-cli/src/reference_test.rs"
@@ -358,11 +361,6 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         // Residual text assertions scheduled for issue/code migration.
         || rel == "crates/radix-mir/tests/validated_mir_reject.rs"
         || rel == "crates/radix/src/driver/mod_test.rs"
-        || rel == "crates/radix/src/driver/locale_fanout_test.rs"
-        || rel == "crates/radix/src/mir/wgsl_text_test.rs"
-        || rel == "crates/radix/src/mir/wasm_text_test.rs"
-        || rel == "crates/radix/src/mir/llvm_text_test.rs"
-        || rel == "crates/radix/src/mir/metal_text_test.rs"
         || rel == "crates/radix-air/src/reverse_ad_test.rs"
         // Pre-3R S3-era residual text assertions (device-program plan +
         // device-artifact surfaces), allowlisted for issue/code migration.
