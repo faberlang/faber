@@ -12,7 +12,7 @@ use super::{
     verify_library_bindings, with_lowered_package_mir, ManifestProductEmit, ManifestProductKind,
 };
 use super::{cmd::use_package_compiler, faber_analysis_seams, faber_emission_seams};
-use radix_package::analyze::AnalyzedPackage;
+use radix_package::analyze::AnalyzedProgram;
 use radix_package::discovery::{
     discover_build_layout, sanitize_crate_name, BuildLayout, PackageSpec,
 };
@@ -25,7 +25,7 @@ use radix_package::test_source_filter::TestSourceFilter;
 fn analyze_with_faber_seams(
     config: &Config,
     input: &Path,
-) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
+) -> Result<AnalyzedProgram, Vec<Diagnostic>> {
     radix_package::analyze::analyze_package(config, input, &faber_analysis_seams())
 }
 
@@ -5784,7 +5784,7 @@ main {
     .expect("write entry");
 
     let package = analyze_with_faber_seams(&Config::default(), &entry).expect("analyze package");
-    let analysis = &package.entry_unit().expect("entry unit").analysis;
+    let analysis = &package.entry_node().expect("entry unit").analysis;
 
     let yaml_item =
         library_item_by_export(analysis, &["yaml"], "stringify", LibraryItemKind::Function);
@@ -5890,7 +5890,7 @@ async_main {
     .expect("write entry");
 
     let package = analyze_with_faber_seams(&Config::default(), &entry).expect("analyze package");
-    let analysis = &package.entry_unit().expect("entry unit").analysis;
+    let analysis = &package.entry_node().expect("entry unit").analysis;
 
     let binding = library_binding_by_module(analysis, &["http"]);
     assert_eq!(
@@ -9536,7 +9536,7 @@ main {
     assert_eq!(shared_d_count, 1, "shared_d should appear once in closure");
 
     let package = analyze_with_faber_seams(&config, &entry).expect("analyze package");
-    let analysis = &package.entry_unit().expect("entry unit").analysis;
+    let analysis = &package.entry_node().expect("entry unit").analysis;
     let leaf_a = library_binding_by_module(analysis, &["leaf_a"]);
     assert_eq!(leaf_a.identity.module_path, vec!["leaf_a"]);
 
@@ -9758,7 +9758,7 @@ main {
     assert_eq!(file.expanded_library_imports.len(), 2);
 
     let package = analyze_with_faber_seams(&config, &entry).expect("analyze package");
-    let analysis = &package.entry_unit().expect("entry unit").analysis;
+    let analysis = &package.entry_node().expect("entry unit").analysis;
 
     let csv_binding = library_binding_by_module(analysis, &["csv"]);
     assert_eq!(csv_binding.identity.module_path, vec!["csv"]);
@@ -11675,7 +11675,8 @@ fn g10_web1_faber_web_package_exports_controller_contract() {
     let package =
         analyze_with_faber_seams(&Config::default(), &lib).expect("analyze faber-web package");
     let unit = package
-        .units
+        .nodes
+        .values()
         .iter()
         .find(|unit| unit.path.ends_with("web.fab"))
         .expect("web.fab unit");
@@ -12605,7 +12606,7 @@ incipit {
 
     let package =
         analyze_with_faber_seams(&Config::default(), &app).expect("analyze web app package graph");
-    let entry = package.entry_unit().expect("entry unit");
+    let entry = package.entry_node().expect("entry unit");
     let application = entry
         .analysis
         .annotation_contracts
@@ -12731,7 +12732,8 @@ fn g9_api2_http_package_verifies_and_exports_http_application_contract() {
     let package = analyze_with_faber_seams(&Config::default().with_bodyless_functions(), &lib)
         .expect("analyze http package");
     let unit = package
-        .units
+        .nodes
+        .values()
         .iter()
         .find(|unit| unit.path.ends_with("http.fab"))
         .expect("http.fab unit");
@@ -12783,7 +12785,7 @@ main {
 
     let package =
         analyze_with_faber_seams(&Config::default(), &app).expect("analyze package graph");
-    let entry = package.entry_unit().expect("entry unit");
+    let entry = package.entry_node().expect("entry unit");
     let application = entry
         .analysis
         .annotation_contracts
@@ -13443,7 +13445,8 @@ fn simple_loss(
     );
 
     let gradient = package
-        .units
+        .nodes
+        .values()
         .iter()
         .find(|unit| unit.module_segments == vec!["gradient".to_owned()])
         .expect("gradient unit");

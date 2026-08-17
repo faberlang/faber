@@ -24,7 +24,7 @@
 //!
 //! # Assembly rule (DDPP0 §ProductShape)
 //!
-//! Assembly composes typed facts only: `AnalyzedPackage` → per-target
+//! Assembly composes typed facts only: `AnalyzedProgram` → per-target
 //! [`ArtifactPlan`](radix_package::artifact_plan::ArtifactPlan) (package identity),
 //! the target-neutral `DeviceProgram` plus its carried `DeviceSemantics`
 //! (prepared regions are derived from the carried dependency graph), FMIR
@@ -67,7 +67,7 @@ use radix_mir::MirType;
 use radix_mir_fmir::{DeviceTargetId, FmirDeviceArtifact, FmirDeviceBackend};
 use serde::Serialize;
 
-use radix_package::analyze::AnalyzedPackage;
+use radix_package::analyze::AnalyzedProgram;
 use radix_package::artifact_plan::plan_package;
 
 /// The versioned composite-plan document schema.
@@ -382,7 +382,7 @@ pub struct IdentitySource {
 /// source half (the same rule as the FMIR image path), or when identity
 /// verification rejects the plan.
 pub(crate) fn assemble_composite_plan(
-    package: &AnalyzedPackage,
+    package: &AnalyzedProgram,
     target: Target,
     facts: CompositePlanFacts,
     source: &IdentitySource,
@@ -813,10 +813,10 @@ pub(crate) fn render_composite_plan_v1(plan: &CompositePlan) -> Result<String, S
 /// hashes over the analyzed package's source units (same spelling as the
 /// FMIR image path), sorted by path.
 fn package_source_hashes(
-    package: &AnalyzedPackage,
+    package: &AnalyzedProgram,
 ) -> Result<Vec<(String, String)>, Vec<Diagnostic>> {
     let mut hashes = Vec::new();
-    for unit in &package.units {
+    for unit in package.nodes.values() {
         let bytes = std::fs::read(&unit.path).map_err(|error| {
             vec![crate::package_diagnostic_error(format!(
                 "could not read composite-plan source identity for {}: {error}",

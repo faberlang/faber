@@ -32,19 +32,14 @@ use std::path::PathBuf;
 
 /// An empty analyzed package with no source units (the A10 source half is
 /// empty; package identity falls back to the root name).
-fn empty_package(label: &str) -> AnalyzedPackage {
-    AnalyzedPackage {
-        spec: PackageSpec {
-            package_root: PathBuf::from(label),
-            source_root: PathBuf::from(label).join("src"),
-            entry: PathBuf::from(label).join("src/main.fab"),
-            templates: BTreeMap::new(),
-            manifest_backed: false,
-        },
-        units: Vec::new(),
-        entry_frontmatter: None,
-        diagnostics: Vec::new(),
-    }
+fn empty_package(label: &str) -> AnalyzedProgram {
+    AnalyzedProgram::from_spec(PackageSpec {
+        package_root: PathBuf::from(label),
+        source_root: PathBuf::from(label).join("src"),
+        entry: PathBuf::from(label).join("src/main.fab"),
+        templates: BTreeMap::new(),
+        manifest_backed: false,
+    })
 }
 
 fn weights_identity() -> BufferIdentity {
