@@ -8,7 +8,7 @@ use proba::{
     CaseOutcome, CaseResult, ProbaReport, TestSelection,
 };
 use radix_module::driver::{Config, Session};
-use radix_package::test_source_filter::TestSourceFilter;
+use radix_program::test_source_filter::TestSourceFilter;
 use std::path::Path;
 
 /// Discover, select, and run proba cases exclusively on the MIR runner.
@@ -173,7 +173,7 @@ fn run_package(
     exact: bool,
     include_ignored: bool,
 ) -> ProbaReport {
-    let package = match radix_package::analyze::analyze_package_for_tests(
+    let package = match radix_program::analyze::analyze_package_for_tests(
         config,
         input,
         proba_filter,
@@ -211,7 +211,7 @@ fn run_package(
     let combined = if test_units.is_empty() {
         ProbaReport::default()
     } else {
-        let scope = radix_package::mir::TestPackageScope::for_program(&package, functions);
+        let scope = radix_program::mir::TestPackageScope::for_program(&package, functions);
         let failed_units = test_units.clone();
         match package::mir::with_linked_test_package_mir(
             package,

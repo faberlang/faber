@@ -7,7 +7,7 @@
 
 use super::config_with_locale;
 use crate::package::faber_analysis_seams;
-use radix_package::analyze::check_package as check_package_direct;
+use radix_program::analyze::check_package as check_package_direct;
 
 fn check_with_faber_seams(
     config: &radix_module::driver::Config,

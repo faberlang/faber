@@ -18,7 +18,7 @@ use crate::script::{
 };
 use radix_module::diagnostics::Diagnostic;
 use radix_module::mir::StdioHost;
-use radix_package::mir::DeviceSelection;
+use radix_program::mir::DeviceSelection;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -83,7 +83,7 @@ pub(super) fn interpret_path(
                 }
             };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
-        if let Err(mut diagnostics) = radix_package::mir::run_package_mir_with_selection(
+        if let Err(mut diagnostics) = radix_program::mir::run_package_mir_with_selection(
             &config,
             archive.package_input(),
             selection,
@@ -108,7 +108,7 @@ pub(super) fn interpret_path(
             }
         };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
-        if let Err(diagnostics) = radix_package::mir::run_package_mir_with_selection(
+        if let Err(diagnostics) = radix_program::mir::run_package_mir_with_selection(
             &config,
             path,
             selection,
@@ -385,7 +385,7 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
     // the image's device section decides whether the route carries a device
     // program, and the selection request is the CLI `--backend` override
     // falling back to the image's recorded selection.
-    let decision = match radix_package::mir::fmir_image_route_decision(
+    let decision = match radix_program::mir::fmir_image_route_decision(
         &args.image,
         &package::mir::faber_mir_seams(),
     ) {
@@ -404,7 +404,7 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
     // The route function applies the one host-construction policy: a
     // device-bearing image runs through the composite host's device route
     // (S1-6 launch seam); anything else runs the CPU/FMIR runner.
-    if let Err(diagnostics) = radix_package::mir::run_fmir_image_path_with_selection(
+    if let Err(diagnostics) = radix_program::mir::run_fmir_image_path_with_selection(
         &args.image,
         Some(selection),
         &package::mir::faber_mir_seams(),

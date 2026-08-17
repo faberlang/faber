@@ -1,0 +1,52 @@
+[package]
+name = "radix-program"
+version = "0.1.0"
+edition = "2021"
+description = "Compiler-owned multi-file package compilation surface"
+license = "MIT"
+
+[dependencies]
+# Private compiler workspace (local org layout). Not published with this crate.
+# radix-program sits above the radix facade and composes its existing
+# single-unit analysis/codegen — never a second pipeline (package-api.md §5).
+# `mod mir` is always compiled (llvm/wasm share canonicalize + lowering).
+# It uses `radix-module::mir` (mir-core) and runner types (`Host`, `run_entry`).
+# AIR (`prepare_air_backward_bundle`, reverse-AD tensor tests) stays behind
+# the `device` feature — see `mir/air_backward.rs`.
+radix-module = { path = "../radix-module", default-features = false, features = ["mir-core", "runner"] }
+# RP2a: the compiler view of faber.toml and faber.lock parses here (toml)
+# with the same serde derive surface faber's product view uses.
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1"
+toml = "1.1.2"
+# RP4: Rust package assembly (rust_target.rs) consumes the Rust HIR target
+# support crate. Workspace-internal (depends only on radix), same pattern as
+# faber's optional `faber-hir-rust`; pulled only under `hir-rust`.
+# RP5: the moved package-MIR/FMIR subset consumes the FMIR codec and schema
+# types directly (image construction/loading, route decisions, test support).
+radix-mir-fmir = { path = "../radix-mir-fmir" }
+# RP5: the moved package-MIR linker works with the shared semantic TypeId
+# surface directly (mirroring faber's own direct radix-types dependency).
+radix-types = { path = "../radix-types" }
+# RP5: `build_package_fhir` computes content hashes through the workspace
+# handroll sha256 surface (same helper faber used before the move). Pulled
+# only under `hir-fhir` like faber's own dependency posture.
+handroll = { path = "../handroll", optional = true }
+# RP5: the moved mir test-support summaries decode FMIR images (postcard wire
+# format); faber's package test suite consumes the summaries as a dependent.
+postcard = { version = "1.1.3", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+# RP5: moved mir tests build temp package fixtures (`test_temp_dir`).
+tempfile = "3"
+
+[features]
+default = ["full-targets"]
+full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "runner"]
+hir-faber = ["radix-module/hir-faber"]
+hir-fhir = ["radix-module/hir-fhir", "dep:handroll"]
+mir-fmir = ["radix-module/mir-fmir"]
+runner = ["radix-module/runner"]
+
+[lints]
+workspace = true

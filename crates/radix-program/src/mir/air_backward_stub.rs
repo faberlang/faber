@@ -1,0 +1,18 @@
+//! No-op AIR backward bundle when the `device` feature is off.
+
+use radix_module::driver::AnalyzedModule;
+use radix_module::mir::LoweredMirUnit;
+
+pub(super) type AirBundle = ();
+
+pub(super) fn prepare(_analysis: &mut AnalyzedModule) -> Result<Option<AirBundle>, String> {
+    Ok(None)
+}
+
+pub(super) fn apply(
+    _lowered: &mut LoweredMirUnit<'_>,
+    _bundle: AirBundle,
+    _no_fuse: bool,
+) -> Result<(), String> {
+    Ok(())
+}

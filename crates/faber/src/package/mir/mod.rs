@@ -29,7 +29,7 @@ use radix_module::driver::Config;
 use std::fs;
 use std::path::Path;
 
-use radix_package::mir::{mir_diag, DeviceSelection};
+use radix_program::mir::{mir_diag, DeviceSelection};
 
 // Faber's fmir-bin runner writer is the seam body radix-package's binary
 // bundle builder receives (`MirSeams::bin_runner_writer`).
@@ -38,8 +38,8 @@ use bin_runner::write_fmir_bin_runner;
 /// The faber-supplied package-MIR seams (RP5). Every faber product input the
 /// moved compiler subset needs enters as an explicit function — no ambient
 /// reads inside `radix-package`.
-pub(crate) fn faber_mir_seams() -> radix_package::mir::MirSeams {
-    radix_package::mir::MirSeams {
+pub(crate) fn faber_mir_seams() -> radix_program::mir::MirSeams {
+    radix_program::mir::MirSeams {
         analysis: super::faber_analysis_seams(),
         executed_lane_target: super::executed_lane_analysis_target,
         library_resolver_for_config: super::library_resolver_from_config,
@@ -57,7 +57,7 @@ pub(crate) fn faber_mir_seams() -> radix_package::mir::MirSeams {
 /// payload. `Ok(None)` when the package declares no `[device]` surface or
 /// when this build compiles no `device-runtime`.
 fn device_section_builder(
-    prepared: &radix_package::mir::PreparedPackageMir<'_>,
+    prepared: &radix_program::mir::PreparedPackageMir<'_>,
     lowered: &radix_module::mir::LoweredMirUnit<'_>,
     diagnostic_path: &Path,
 ) -> Result<Option<radix_mir_fmir::FmirDeviceSection>, Vec<Diagnostic>> {
@@ -211,7 +211,7 @@ const S1_6_PTX_TARGET: &str = "sm_90";
 /// the device route when selected. `Ok(None)` runs the CPU route with the
 /// caller's host; `Ok(Some(()))` means the device route already executed.
 fn host_route(
-    image: &radix_package::mir::FmirPackageImage,
+    image: &radix_program::mir::FmirPackageImage,
     selection: DeviceSelection,
 ) -> Result<Option<()>, Vec<Diagnostic>> {
     let requires_device = image.device.is_some();
@@ -256,7 +256,7 @@ pub fn with_lowered_package_mir<R>(
     input: &Path,
     run: impl for<'a> FnOnce(&radix_module::mir::LoweredMirUnit<'a>) -> R,
 ) -> Result<R, Vec<Diagnostic>> {
-    radix_package::mir::with_lowered_package_mir(config, input, &faber_mir_seams(), run)
+    radix_program::mir::with_lowered_package_mir(config, input, &faber_mir_seams(), run)
 }
 
 /// The interpreted-consumer probe used by faber's package consumers.
@@ -266,19 +266,19 @@ pub(crate) fn with_interpreted_lowered_package_mir<R>(
     input: &Path,
     run: impl for<'a> FnOnce(&radix_module::mir::LoweredMirUnit<'a>) -> R,
 ) -> Result<R, Vec<Diagnostic>> {
-    radix_package::mir::with_interpreted_lowered_package_mir(config, input, &faber_mir_seams(), run)
+    radix_program::mir::with_interpreted_lowered_package_mir(config, input, &faber_mir_seams(), run)
 }
 
 /// Link an already-analyzed package test scope once, then lend its validated
 /// MIR and original test-function identity map to the runner consumer.
 #[cfg(feature = "runner")]
 pub(crate) fn with_linked_test_package_mir<R>(
-    package: radix_package::analyze::AnalyzedProgram,
-    scope: &radix_package::mir::TestPackageScope,
+    package: radix_program::analyze::AnalyzedProgram,
+    scope: &radix_program::mir::TestPackageScope,
     config: &Config,
-    run: impl for<'a> FnOnce(&radix_module::mir::ValidatedMir<'a>, &radix_package::mir::TestFunctionIds) -> R,
+    run: impl for<'a> FnOnce(&radix_module::mir::ValidatedMir<'a>, &radix_program::mir::TestFunctionIds) -> R,
 ) -> Result<R, Vec<Diagnostic>> {
-    radix_package::mir::with_linked_test_package_mir(
+    radix_program::mir::with_linked_test_package_mir(
         package,
         scope,
         config,
@@ -294,7 +294,7 @@ pub fn run_fmir_image_bytes_with_stdio(
     diagnostic_path: &Path,
     argumenta: Vec<String>,
 ) -> Result<(), Vec<Diagnostic>> {
-    radix_package::mir::run_fmir_image_bytes_with_stdio(
+    radix_program::mir::run_fmir_image_bytes_with_stdio(
         image_bytes,
         diagnostic_path,
         argumenta,

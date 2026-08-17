@@ -1,7 +1,7 @@
 use super::*;
 use crate::cli::{BackendSelection, RunArgs};
 use radix_module::mir::RunSourceError;
-use radix_package::mir::DeviceSelection;
+use radix_program::mir::DeviceSelection;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -223,7 +223,7 @@ fn package_mir_run_with_selection_auto_stays_on_cpu_route() {
     std::fs::write(&entry, "main { print \"cpu\" }\n").expect("write entry");
 
     let mut host = radix_module::mir::BufferHost::default();
-    radix_package::mir::run_package_mir_with_selection(
+    radix_program::mir::run_package_mir_with_selection(
         &radix_module::driver::Config::default(),
         &entry,
         DeviceSelection::Auto,

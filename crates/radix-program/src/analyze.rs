@@ -1,0 +1,1155 @@
+//! Multi-unit package analysis composing Radix single-unit analysis (RP3).
+//!
+//! This is the production analysis spine for a package source graph: load
+//! package files, resolve imports/libraries, extract cross-unit file
+//! interfaces, and analyze every unit through the radix driver
+//! (`analyze_source_with_cli_program_and_import_contract` → [`AnalyzedModule`]).
+//! The production [`AnalyzedProgram`] contract is radix-program-owned; Faber's
+//! package consumers use it directly.
+//!
+//! Product orchestration stays faber-side and enters here through explicit
+//! [`AnalysisSeams`] (the RP2c `LocaleLoader` posture): reader-locale pack
+//! loading, strict product-view manifest validation, `FABER_LIBRARY_HOME` /
+//! workspace probing, and the G4 linked-crate map from faber's artifact plan.
+//! Nothing here reads the ambient environment.
+
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::path::{Path, PathBuf};
+
+use radix_module::diagnostics::Diagnostic;
+use radix_module::driver::{
+    analyze_source_with_module_import_contract, AnalyzedModule, Config, ModuleImportContract,
+    Session,
+};
+use radix_module::lexer::Interner;
+use radix_module::semantic::passes::visibility_annotation::VisibilityTier;
+use radix_module::syntax::{ImportDecl, ImportKind, StmtKind};
+
+use crate::discovery::{discover_build_layout, discover_package, PackageSpec};
+use crate::frontmatter::manifest_path_for_spec;
+use crate::import_graph::{
+    build_mount_plan, detect_import_cycles, import_unsupported_diagnostic, library_import_binding,
+    library_import_kind_diagnostic, resolve_import, ImportResolution,
+};
+use crate::library::{
+    analysis_source_for_file, attach_library_provenance_with_links, expand_library_imports,
+    library_cached_file_interface, library_interface_declaration_surface,
+    library_interface_export_surface, library_interface_has_module, program_declaration_surface,
+    LibraryInterfaceCache, LibraryResolver, LocaleLoader,
+};
+use crate::manifest::read_manifest;
+use crate::modules::module_segments_for_file;
+use crate::paths::normalize_path;
+use crate::source_files::{is_proba_source_path, load_package_source, package_source_files};
+use crate::test_source_filter::TestSourceFilter;
+use crate::{LibraryImportBinding, PackageFile};
+
+/// Reused [`artifact_plan::ModuleId`] — the one module identity in this crate.
+pub use crate::artifact_plan::ModuleId;
+
+/// Resolved local and library import edges for an [`AnalyzedProgram`].
+///
+/// Edges are recorded at analysis time from the same `resolve_import` walk
+/// that schedules units. Target assembly and MIR linking consume this graph
+/// instead of reconstructing it from path scans or unit-vector order.
+#[derive(Clone, Default)]
+pub struct ModuleGraph {
+    /// Local source edges: importer → `(binding, imported module)`.
+    local: BTreeMap<ModuleId, Vec<(String, ModuleId)>>,
+    /// Library edges: importer → expanded library bindings.
+    library: BTreeMap<ModuleId, Vec<LibraryImportBinding>>,
+}
+
+impl ModuleGraph {
+    pub fn insert_local(&mut self, from: ModuleId, binding: String, to: ModuleId) {
+        let edges = self.local.entry(from).or_default();
+        if !edges
+            .iter()
+            .any(|(existing, target)| existing == &binding && target == &to)
+        {
+            edges.push((binding, to));
+        }
+    }
+
+    pub fn insert_library(&mut self, from: ModuleId, binding: LibraryImportBinding) {
+        let edges = self.library.entry(from).or_default();
+        if !edges.iter().any(|existing| {
+            existing.binding == binding.binding && existing.module == binding.module
+        }) {
+            edges.push(binding);
+        }
+    }
+
+    /// Local import targets from `from`, in recorded order.
+    pub fn local_edges(&self, from: &ModuleId) -> &[(String, ModuleId)] {
+        self.local.get(from).map(Vec::as_slice).unwrap_or(&[])
+    }
+
+    /// Library import bindings from `from`, in recorded order.
+    pub fn library_edges(&self, from: &ModuleId) -> &[LibraryImportBinding] {
+        self.library.get(from).map(Vec::as_slice).unwrap_or(&[])
+    }
+
+    /// Local successors of `from`.
+    pub fn local_successors(&self, from: &ModuleId) -> impl Iterator<Item = &ModuleId> {
+        self.local_edges(from).iter().map(|(_, target)| target)
+    }
+
+    /// Module ids reachable from `roots` along local edges, roots first.
+    pub fn local_closure<'a, I>(&self, roots: I) -> BTreeSet<ModuleId>
+    where
+        I: IntoIterator<Item = &'a ModuleId>,
+    {
+        let mut seen = BTreeSet::new();
+        let mut pending = VecDeque::new();
+        for root in roots {
+            if seen.insert(root.clone()) {
+                pending.push_back(root.clone());
+            }
+        }
+        while let Some(id) = pending.pop_front() {
+            for successor in self.local_successors(&id) {
+                if seen.insert(successor.clone()) {
+                    pending.push_back(successor.clone());
+                }
+            }
+        }
+        seen
+    }
+}
+
+/// The analyzed whole-program graph: every local module analyzed once, keyed
+/// by the reused [`ModuleId`], with explicit entry/roots and import edges.
+///
+/// `library_resolver` is the resolver analysis already built — not a second
+/// stored constructor. Downstream linking threads this value instead of
+/// calling `library_resolver_for_config` after `analyze_package*`.
+pub struct AnalyzedProgram {
+    pub spec: PackageSpec,
+    pub entry: Option<ModuleId>,
+    pub roots: Vec<ModuleId>,
+    pub nodes: BTreeMap<ModuleId, AnalyzedProgramNode>,
+    pub imports: ModuleGraph,
+    // Entry frontmatter feeds the hir-rust test-selection merge (rust_target)
+    // and the hir-fhir writer. `allow(dead_code)`: dead only in builds with
+    // neither `hir-rust` nor `hir-fhir` enabled (minimal target leaves).
+    #[allow(dead_code)]
+    pub entry_frontmatter: Option<radix_module::driver::FileFrontmatter>,
+    pub diagnostics: Vec<Diagnostic>,
+    /// Analysis-prepared library resolver (lock + home). Threaded into MIR
+    /// linking; not reconstructed from config after analyze.
+    pub library_resolver: LibraryResolver,
+}
+
+impl AnalyzedProgram {
+    /// Empty program for the given spec (tests and FHIR rehydration).
+    pub fn from_spec(spec: PackageSpec) -> Self {
+        Self {
+            spec,
+            entry: None,
+            roots: Vec::new(),
+            nodes: BTreeMap::new(),
+            imports: ModuleGraph::default(),
+            entry_frontmatter: None,
+            diagnostics: Vec::new(),
+            library_resolver: LibraryResolver::with_optional_home(None),
+        }
+    }
+
+    // Go package assembly (`generate_package_go_result`) consumes the entry
+    // node directly. `allow(dead_code)`: dead only in builds without `hir-go`.
+    #[allow(dead_code)]
+    pub fn entry_node(&self) -> Option<&AnalyzedProgramNode> {
+        self.entry.as_ref().and_then(|id| self.nodes.get(id))
+    }
+
+    pub fn node_by_path(&self, path: &Path) -> Option<(&ModuleId, &AnalyzedProgramNode)> {
+        self.nodes.iter().find(|(_, node)| node.path == path)
+    }
+
+    pub fn node_by_path_mut(
+        &mut self,
+        path: &Path,
+    ) -> Option<(&ModuleId, &mut AnalyzedProgramNode)> {
+        self.nodes.iter_mut().find(|(_, node)| node.path == path)
+    }
+
+    /// Named remapping/type-identity host for a package test MIR link.
+    ///
+    /// Declared package entry wins; otherwise the remapping host is a
+    /// non-`.proba` module in the test-root closure; otherwise the remapping
+    /// host is the explicit root with the least [`ModuleId`]. Missing hosts
+    /// fall back to [`PackageSpec::entry`] so the linker can fail closed.
+    pub fn test_remap_anchor(&self) -> PathBuf {
+        if let Some(node) = self.entry_node() {
+            return node.path.clone();
+        }
+        if let Some((_, node)) = self.node_by_path(&self.spec.entry) {
+            return node.path.clone();
+        }
+        let included = self.imports.local_closure(self.roots.iter());
+        let mut host: Option<&AnalyzedProgramNode> = None;
+        for id in &included {
+            let Some(node) = self.nodes.get(id) else {
+                continue;
+            };
+            if is_proba_source_path(&node.path) {
+                continue;
+            }
+            host = Some(match host {
+                Some(current)
+                    if (node.module_segments.len(), node.path.as_os_str())
+                        >= (current.module_segments.len(), current.path.as_os_str()) =>
+                {
+                    current
+                }
+                _ => node,
+            });
+        }
+        if let Some(node) = host {
+            return node.path.clone();
+        }
+        if let Some(id) = self.roots.iter().min() {
+            if let Some(node) = self.nodes.get(id) {
+                return node.path.clone();
+            }
+        }
+        self.spec.entry.clone()
+    }
+}
+
+/// One graph node inside an [`AnalyzedProgram`].
+///
+/// This is the program-node (the graph node, not a second analysis stamp).
+/// Path/entry/export/library-import metadata stays here; [`AnalyzedModule`]
+/// remains the module-coherent analysis.
+pub struct AnalyzedProgramNode {
+    pub path: PathBuf,
+    pub module_segments: Vec<String>,
+    pub is_entry: bool,
+    pub analysis: AnalyzedModule,
+    pub file_interface: radix_module::file_interface::FileInterface,
+    pub export_names: Vec<String>,
+    pub namespace_exports: BTreeMap<String, BTreeMap<String, VisibilityTier>>,
+    pub expanded_library_imports: Vec<LibraryImportBinding>,
+}
+
+/// Strict product-view manifest validation seam (FBR-P1-001).
+///
+/// The product-view parse that rejects unknown product fields is faber product
+/// policy; the loader receives the validator instead of duplicating it.
+pub type ManifestValidator = fn(&PackageSpec) -> Result<(), Box<Diagnostic>>;
+
+/// Package library-resolver construction seam. `FABER_LIBRARY_HOME` env
+/// reading and the workspace-ancestor probe stay faber-side; analysis receives
+/// the resolved resolver.
+pub type LibraryResolverForPackage = fn(&Config, &Path) -> Result<LibraryResolver, Vec<Diagnostic>>;
+
+/// Faber-supplied package-orchestration seams for multi-unit analysis (RP3).
+///
+/// Every seam is an explicit function input — no ambient env, locale, or
+/// toolchain reads happen inside `radix-program` (package-api.md §3/§5).
+#[derive(Clone, Copy)]
+pub struct AnalysisSeams {
+    pub locale_loader: LocaleLoader,
+    pub manifest_validator: ManifestValidator,
+    pub resolver_for_package: LibraryResolverForPackage,
+}
+
+/// Analyze a package source graph.
+///
+/// RP3: moved from `crates/faber/src/package/compile.rs`; the seam bundle is
+/// the faber product-orchestration input.
+pub fn analyze_package(
+    config: &Config,
+    input: &Path,
+    seams: &AnalysisSeams,
+) -> Result<AnalyzedProgram, Vec<Diagnostic>> {
+    let config = effective_package_config(config, input, seams.locale_loader)?;
+    let spec = discover_package(input).map_err(|diag| vec![*diag])?;
+    let package_root = package_root_for_input(input);
+    let library_resolver = (seams.resolver_for_package)(&config, &package_root)?;
+    analyze_package_spec(&config, spec, &library_resolver, false, None, seams)
+}
+
+/// Check every loaded package module and return diagnostics without codegen.
+///
+/// The checker mirrors package compilation discovery and CLI mount analysis so
+/// `faber check` reports the same import, manifest, and mounted-command policy
+/// errors that a package build would encounter.
+///
+/// RP6: moved from `crates/faber/src/package/compile.rs` (the command-entry
+/// adapter); the faber command consumes this entry directly with the product
+/// seams.
+pub fn check_package(config: &Config, input: &Path, seams: &AnalysisSeams) -> Vec<Diagnostic> {
+    match analyze_package(config, input, seams) {
+        Ok(package) => package.diagnostics,
+        Err(diagnostics) => diagnostics,
+    }
+}
+
+/// Analyze a package for `faber test`: includes `*.proba` and optional path filters.
+///
+/// Production [`analyze_package`] keeps `include_proba = false` so build/run graphs
+/// stay free of test sources.
+///
+/// RP3: moved from `crates/faber/src/package/compile.rs`.
+pub fn analyze_package_for_tests(
+    config: &Config,
+    input: &Path,
+    proba_filter: Option<&TestSourceFilter>,
+    seams: &AnalysisSeams,
+) -> Result<AnalyzedProgram, Vec<Diagnostic>> {
+    let config = effective_package_config(config, input, seams.locale_loader)?;
+    let spec = discover_package(input).map_err(|diag| vec![*diag])?;
+    let package_root = package_root_for_input(input);
+    let library_resolver = (seams.resolver_for_package)(&config, &package_root)?;
+    analyze_package_spec(&config, spec, &library_resolver, true, proba_filter, seams)
+}
+
+/// Apply the package's reader-locale pack when the config has none yet.
+///
+/// RP3: moved from `crates/faber/src/package/compile.rs`; the locale-pack
+/// loader is the caller-supplied product seam.
+pub fn effective_package_config(
+    config: &Config,
+    input: &Path,
+    locale_loader: LocaleLoader,
+) -> Result<Config, Vec<Diagnostic>> {
+    if config.locale_pack.is_some() {
+        return Ok(config.clone());
+    }
+    match locale_loader(input, None) {
+        Ok(Some(pack)) => Ok(config.clone().with_locale_pack(pack)),
+        Ok(None) => Ok(config.clone()),
+        Err(diag) => Err(vec![*diag]),
+    }
+}
+
+/// Resolve the package root for a package input, falling back to the input
+/// path shape when no build layout is discoverable.
+///
+/// RP3: moved from `crates/faber/src/package/compile.rs`; consumed by faber's
+/// emission half through the package-module adapter.
+pub fn package_root_for_input(input: &Path) -> PathBuf {
+    match discover_build_layout(input) {
+        Ok(layout) => layout.package_root,
+        Err(_) => {
+            if input.is_file() {
+                input
+                    .parent()
+                    .unwrap_or_else(|| Path::new("."))
+                    .to_path_buf()
+            } else {
+                input.to_path_buf()
+            }
+        }
+    }
+}
+
+/// Analyze a package spec that discovery already resolved: load package
+/// files, then run the per-unit analysis loop.
+///
+/// RP3: moved from `crates/faber/src/package/compile.rs` (the multi-unit
+/// analysis core — composing radix single-unit analysis, never a duplicated
+/// compiler phase).
+pub fn analyze_package_spec(
+    config: &Config,
+    spec: PackageSpec,
+    library_resolver: &LibraryResolver,
+    include_proba: bool,
+    proba_filter: Option<&TestSourceFilter>,
+    seams: &AnalysisSeams,
+) -> Result<AnalyzedProgram, Vec<Diagnostic>> {
+    let files = match config.locale_pack.as_ref() {
+        Some(pack) => load_package_with_locale_pack(
+            &spec,
+            library_resolver,
+            Some(pack),
+            include_proba,
+            proba_filter,
+            seams,
+        )?,
+        None => load_package_with_locale_pack(
+            &spec,
+            library_resolver,
+            None,
+            include_proba,
+            proba_filter,
+            seams,
+        )?,
+    };
+    let entry_frontmatter = files
+        .iter()
+        .find(|file| file.path == spec.entry)
+        .and_then(|file| file.frontmatter.clone());
+    // Install [paths.templates] into the driver config so SEM006 accepts §name/…
+    // and validation matches package resolution.
+    let mut config = config.clone();
+    if !spec.templates.is_empty() {
+        let mut templates = BTreeMap::new();
+        for (name, path) in &spec.templates {
+            templates.insert(name.clone(), path.display().to_string());
+        }
+        config.import_path_templates = Some(templates);
+    }
+    let session = Session::new(config);
+    let mount_plan = build_mount_plan(&spec, &files)?;
+    let mut diagnostics = Vec::new();
+    let mut library_cache =
+        LibraryInterfaceCache::with_config(&session.config).with_locale_loader(seams.locale_loader);
+    let mut nodes = BTreeMap::new();
+    let mut analyzed_interfaces_by_path = BTreeMap::new();
+    // Native-binding crates are derived from the package root and lockfile at
+    // the compiler-owned consumer; no product seam or analyzed-package shell
+    // is needed to carry this artifact-plan fact.
+    let linked_library_crates = crate::artifact_plan::linked_library_crate_map(&spec.package_root);
+    let path_to_id = files
+        .iter()
+        .map(|file| {
+            (
+                file.path.clone(),
+                ModuleId::for_spec(&spec, file.module_segments.clone()),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let imports = build_module_graph(&spec, &files, &path_to_id, library_resolver);
+
+    for file in package_analysis_order(&spec, &files, library_resolver) {
+        let file_cli = mount_plan.module_cli.get(&file.path).cloned();
+        let namespace_exports = match namespace_exports_for_file(
+            &spec,
+            file,
+            &files,
+            library_resolver,
+            &mut library_cache,
+        ) {
+            Ok(exports) => exports,
+            Err(diag) => {
+                diagnostics.push(diag);
+                continue;
+            }
+        };
+        let file_interfaces = match file_interfaces_for_file(
+            &spec,
+            file,
+            library_resolver,
+            &mut library_cache,
+            &analyzed_interfaces_by_path,
+        ) {
+            Ok(interfaces) => interfaces,
+            Err(diag) => {
+                diagnostics.push(diag);
+                continue;
+            }
+        };
+        let analysis_source =
+            match analysis_source_for_file(file, library_resolver, &mut library_cache) {
+                Ok(source) => source,
+                Err(diag) => {
+                    diagnostics.push(diag);
+                    continue;
+                }
+            };
+        let namespace_seams = match namespace_seams_for_file(&spec, file, library_resolver) {
+            Ok(seams) => seams,
+            Err(diag) => {
+                diagnostics.push(diag);
+                continue;
+            }
+        };
+        let namespace_declarations = match namespace_declarations_for_file(
+            &spec,
+            file,
+            &files,
+            library_resolver,
+            &mut library_cache,
+        ) {
+            Ok(declarations) => declarations,
+            Err(diag) => {
+                diagnostics.push(diag);
+                continue;
+            }
+        };
+        let mut analysis = match analyze_source_with_module_import_contract(
+            &session,
+            &file.path.display().to_string(),
+            &analysis_source,
+            file_cli,
+            ModuleImportContract {
+                namespace_exports: namespace_exports.clone(),
+                file_interfaces,
+                namespace_seams,
+                namespace_declarations,
+            },
+        ) {
+            Ok(analysis) => analysis,
+            Err(file_diagnostics) => {
+                diagnostics.extend(file_diagnostics);
+                continue;
+            }
+        };
+        let provenance_imports = file.library_imports.clone();
+        if let Err(diag) = attach_library_provenance_with_links(
+            &mut analysis,
+            &provenance_imports,
+            library_resolver,
+            &mut library_cache,
+            Some(&linked_library_crates),
+        ) {
+            diagnostics.push(diag);
+            continue;
+        }
+
+        let is_entry = file.path == spec.entry;
+        if !is_entry {
+            analysis.hir.entry = None;
+        }
+        if is_entry {
+            if let Some(root_cli) = mount_plan.root_cli.clone() {
+                analysis.cli_program = Some(root_cli);
+            }
+        }
+
+        let export_names = crate::library::program_export_surface(&file.program, &file.interner)
+            .into_keys()
+            .collect::<Vec<_>>();
+        let package_name = manifest_path_for_spec(&spec)
+            .and_then(|path| read_manifest(&path).ok())
+            .map(|manifest| manifest.package.name);
+        let export_identity = crate::file_interface::ExportIdentityContext {
+            provider: "package".to_owned(),
+            package: package_name,
+            module_path: file.module_segments.clone(),
+        };
+        let file_interface = match crate::file_interface::extract_file_interface_with_identity(
+            &analysis,
+            &export_names,
+            &file.path.display().to_string(),
+            Some(&export_identity),
+        ) {
+            Ok(interface) => interface,
+            Err(diag) => {
+                diagnostics.push(diag);
+                continue;
+            }
+        };
+        analyzed_interfaces_by_path.insert(file.path.clone(), file_interface.clone());
+
+        diagnostics.extend(std::mem::take(&mut analysis.diagnostics));
+        analysis.package_import_identities = Some(package_import_identities_for_file(
+            &spec,
+            file,
+            &files,
+            library_resolver,
+        ));
+        let module_id = ModuleId::for_spec(&spec, file.module_segments.clone());
+        nodes.insert(
+            module_id,
+            AnalyzedProgramNode {
+                path: file.path.clone(),
+                module_segments: file.module_segments.clone(),
+                is_entry,
+                analysis,
+                file_interface,
+                export_names,
+                namespace_exports,
+                expanded_library_imports: file.expanded_library_imports.clone(),
+            },
+        );
+    }
+
+    if diagnostics.iter().any(|diag| diag.is_error()) {
+        return Err(diagnostics);
+    }
+
+    let entry = files
+        .iter()
+        .find(|file| file.path == spec.entry)
+        .map(|file| ModuleId::for_spec(&spec, file.module_segments.clone()))
+        .filter(|id| nodes.get(id).is_some_and(|node| node.is_entry));
+    let roots = program_roots(&spec, &nodes, include_proba);
+    Ok(AnalyzedProgram {
+        spec,
+        entry,
+        roots,
+        nodes,
+        imports,
+        entry_frontmatter,
+        diagnostics,
+        library_resolver: library_resolver.clone(),
+    })
+}
+
+fn program_roots(
+    spec: &PackageSpec,
+    nodes: &BTreeMap<ModuleId, AnalyzedProgramNode>,
+    include_proba: bool,
+) -> Vec<ModuleId> {
+    if include_proba {
+        return nodes
+            .iter()
+            .filter(|(_, node)| node_is_test_root(node))
+            .map(|(id, _)| id.clone())
+            .collect();
+    }
+    if let Some((id, _)) = nodes.iter().find(|(_, node)| node.is_entry) {
+        return vec![id.clone()];
+    }
+    if spec.entry.is_file() {
+        if let Some((id, _)) = nodes.iter().find(|(_, node)| node.path == spec.entry) {
+            return vec![id.clone()];
+        }
+    }
+    nodes.keys().cloned().collect()
+}
+
+fn node_is_test_root(node: &AnalyzedProgramNode) -> bool {
+    if is_proba_source_path(&node.path) {
+        return true;
+    }
+    node.analysis.hir.items.iter().any(|item| {
+        matches!(
+            &item.kind,
+            radix_module::hir::HirItemKind::Function(function) if function.test.is_some()
+        )
+    })
+}
+
+fn build_module_graph(
+    spec: &PackageSpec,
+    files: &[PackageFile],
+    path_to_id: &BTreeMap<PathBuf, ModuleId>,
+    library_resolver: &LibraryResolver,
+) -> ModuleGraph {
+    let mut graph = ModuleGraph::default();
+    for file in files {
+        let Some(from) = path_to_id.get(&file.path).cloned() else {
+            continue;
+        };
+        for stmt in &file.program.statements {
+            let StmtKind::Import(decl) = &stmt.kind else {
+                continue;
+            };
+            let Some(binding) = import_binding(&file.interner, decl) else {
+                continue;
+            };
+            let import_path = file.interner.resolve(decl.path);
+            match resolve_import(spec, library_resolver, &file.path, import_path) {
+                ImportResolution::Local(target) => {
+                    if let Some(to) = path_to_id.get(&target).cloned() {
+                        graph.insert_local(from.clone(), binding, to);
+                    }
+                }
+                ImportResolution::Library(module) => {
+                    if let Some(library) = library_import_binding(&file.interner, decl, module) {
+                        graph.insert_library(from.clone(), library);
+                    }
+                }
+                ImportResolution::Unsupported | ImportResolution::Error(_) => {}
+            }
+        }
+        for import in &file.expanded_library_imports {
+            graph.insert_library(from.clone(), import.clone());
+        }
+    }
+    graph
+}
+
+fn package_import_identities_for_file(
+    spec: &PackageSpec,
+    file: &PackageFile,
+    files: &[PackageFile],
+    library_resolver: &LibraryResolver,
+) -> radix_module::driver::PackageImportIdentities {
+    let product = crate::artifact_plan::package_id_from_spec(spec).name;
+    let mut imports = BTreeMap::new();
+    for stmt in &file.program.statements {
+        let StmtKind::Import(decl) = &stmt.kind else {
+            continue;
+        };
+        let Some(binding) = import_binding(&file.interner, decl) else {
+            continue;
+        };
+        let import_path = file.interner.resolve(decl.path);
+        let ImportResolution::Local(target) =
+            resolve_import(spec, library_resolver, &file.path, import_path)
+        else {
+            continue;
+        };
+        let Some(target_file) = files.iter().find(|candidate| candidate.path == target) else {
+            continue;
+        };
+        imports.insert(binding, target_file.module_segments.clone());
+    }
+    radix_module::driver::PackageImportIdentities {
+        product,
+        module_segments: file.module_segments.clone(),
+        imports,
+    }
+}
+
+/// Load a package's source graph as [`PackageFile`]s.
+///
+/// RP3: moved from `crates/faber/src/package/mod.rs` (the loader
+/// composition). Manifests are validated through the caller-supplied product
+/// seam; source loading, import resolution, library expansion, and cycle
+/// detection are compiler-owned here.
+pub fn load_package_with_locale_pack(
+    spec: &PackageSpec,
+    library_resolver: &LibraryResolver,
+    locale_pack: Option<&radix_module::locale::LocalePack>,
+    include_proba: bool,
+    proba_filter: Option<&TestSourceFilter>,
+    seams: &AnalysisSeams,
+) -> Result<Vec<PackageFile>, Vec<Diagnostic>> {
+    // Manifest presence is validated at load (FBR-P1-001: a validated manifest
+    // that later disappears or becomes unreadable is a diagnostic, never a
+    // silent default); the strict product-view parse also rejects unknown
+    // product fields here (faber product seam).
+    if let Err(diag) = (seams.manifest_validator)(spec) {
+        return Err(vec![*diag]);
+    }
+    // Compiler-view manifest for source loading (RP2b: frontmatter conflict
+    // validation and lib-bodyless parsing moved with `load_package_source`).
+    let compiler_manifest = match manifest_path_for_spec(spec) {
+        Some(manifest_path) => Some(read_manifest(&manifest_path).map_err(|diag| vec![*diag])?),
+        None => None,
+    };
+    let source_root_for_filter = if spec.source_root.is_dir() {
+        spec.source_root.clone()
+    } else {
+        spec.entry
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf()
+    };
+    let proba_allowed = |path: &Path| -> bool {
+        if !is_proba_source_path(path) {
+            return true;
+        }
+        match proba_filter {
+            Some(filter) if !filter.is_empty() => filter.allows_path(&source_root_for_filter, path),
+            _ => true,
+        }
+    };
+    let initial_files = if spec.entry.is_dir() {
+        let all = package_source_files(&spec.entry, include_proba)?;
+        // When `faber test --include/--exclude` selects proba files, seed only
+        // those tests. Product modules enter via local import edges, so a
+        // focused math.proba run does not compile the whole library graph.
+        let proba_only_seed =
+            include_proba && proba_filter.is_some_and(|filter| !filter.is_empty());
+        if proba_only_seed {
+            all.into_iter()
+                .filter(|path| is_proba_source_path(path) && proba_allowed(path))
+                .collect::<Vec<_>>()
+        } else {
+            all.into_iter()
+                .filter(|path| proba_allowed(path))
+                .collect::<Vec<_>>()
+        }
+    } else {
+        // Single-file entry: allow an explicit `.proba` path on the test path only.
+        if is_proba_source_path(&spec.entry) && !include_proba {
+            return Err(vec![crate::package_diagnostic_error(
+                ".proba files are test sources; use `faber test` to load them",
+            )
+            .with_file(spec.entry.display().to_string())
+            .with_arg("issue", "proba_source_build_forbidden")]);
+        }
+        // Product graph starts at the entry file. For `faber test`, also walk
+        // `source_root` for `*.proba` so colocated test files are not orphaned
+        // when nothing imports them (they must not be importable).
+        let mut files = vec![spec.entry.clone()];
+        if include_proba {
+            for path in package_source_files(&source_root_for_filter, true)? {
+                if is_proba_source_path(&path) && proba_allowed(&path) {
+                    files.push(path);
+                }
+            }
+        }
+        files
+    };
+    let mut queue = VecDeque::from(initial_files);
+    let mut seen = BTreeSet::new();
+    let mut files = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    while let Some(path) = queue.pop_front() {
+        let canonical = normalize_path(&path);
+        if !seen.insert(canonical.clone()) {
+            continue;
+        }
+
+        let Some(loaded) = load_package_source(
+            &canonical,
+            compiler_manifest.as_ref(),
+            locale_pack,
+            &mut diagnostics,
+        ) else {
+            continue;
+        };
+
+        let mut library_imports = Vec::new();
+        for stmt in &loaded.program.statements {
+            let StmtKind::Import(decl) = &stmt.kind else {
+                continue;
+            };
+            let import_path = loaded.interner.resolve(decl.path);
+            match resolve_import(spec, library_resolver, &canonical, import_path) {
+                ImportResolution::Local(target) => {
+                    // Test sources may import product `.fab` modules; never the reverse.
+                    if is_proba_source_path(&target) {
+                        diagnostics.push(
+                            crate::package_diagnostic_error(
+                                ".proba files are test sources and cannot be imported; move shared helpers to a .fab module",
+                            )
+                            .with_file(canonical.display().to_string())
+                            .with_span(decl.span)
+                            .with_arg("issue", "proba_import_forbidden")
+                            .with_arg("import", import_path.to_owned()),
+                        );
+                    } else {
+                        queue.push_back(target);
+                    }
+                }
+                ImportResolution::Library(module) => {
+                    if let Some(binding) = library_import_binding(&loaded.interner, decl, module) {
+                        library_imports.push(binding);
+                    } else {
+                        diagnostics.push(library_import_kind_diagnostic(
+                            &canonical,
+                            decl,
+                            import_path,
+                        ));
+                    }
+                }
+                ImportResolution::Unsupported => {
+                    diagnostics.push(import_unsupported_diagnostic(&canonical, decl, import_path));
+                }
+                ImportResolution::Error(diag) => {
+                    diagnostics.push(diag.with_span(decl.span));
+                }
+            }
+        }
+
+        files.push(PackageFile {
+            module_segments: module_segments_for_file(
+                &spec.source_root,
+                &canonical,
+                loaded.frontmatter.as_ref(),
+            ),
+            path: canonical,
+            raw_source: loaded.raw_source,
+            source: loaded.body,
+            frontmatter: loaded.frontmatter,
+            program: loaded.program,
+            interner: loaded.interner,
+            library_imports,
+            expanded_library_imports: Vec::new(),
+        });
+    }
+
+    if diagnostics.iter().any(|diag| diag.is_error()) {
+        Err(diagnostics)
+    } else {
+        let mut library_cache =
+            LibraryInterfaceCache::default().with_locale_loader(seams.locale_loader);
+        for file in &mut files {
+            file.expanded_library_imports = expand_library_imports(
+                &file.library_imports,
+                library_resolver,
+                &mut library_cache,
+                &mut diagnostics,
+            );
+        }
+        files.sort_by(|a, b| a.path.cmp(&b.path));
+        diagnostics.extend(detect_import_cycles(spec, &files));
+        if diagnostics.iter().any(|diag| diag.is_error()) {
+            return Err(diagnostics);
+        }
+        Ok(files)
+    }
+}
+
+/// Order package files for analysis: dependencies before importers.
+///
+/// RP3: moved from `crates/faber/src/package/compile.rs`.
+fn package_analysis_order<'a>(
+    spec: &PackageSpec,
+    files: &'a [PackageFile],
+    library_resolver: &LibraryResolver,
+) -> Vec<&'a PackageFile> {
+    let files_by_path = files
+        .iter()
+        .map(|file| (file.path.clone(), file))
+        .collect::<BTreeMap<_, _>>();
+    let mut seen = BTreeSet::new();
+    let mut ordered = Vec::new();
+    for file in files {
+        visit_package_analysis_file(
+            spec,
+            file,
+            &files_by_path,
+            library_resolver,
+            &mut seen,
+            &mut ordered,
+        );
+    }
+    ordered
+}
+
+/// Depth-first visit of a package file and its local-import dependencies.
+///
+/// RP3: moved from `crates/faber/src/package/compile.rs`.
+fn visit_package_analysis_file<'a>(
+    spec: &PackageSpec,
+    file: &'a PackageFile,
+    files_by_path: &BTreeMap<PathBuf, &'a PackageFile>,
+    library_resolver: &LibraryResolver,
+    seen: &mut BTreeSet<PathBuf>,
+    ordered: &mut Vec<&'a PackageFile>,
+) {
+    if !seen.insert(file.path.clone()) {
+        return;
+    }
+    for stmt in &file.program.statements {
+        let StmtKind::Import(decl) = &stmt.kind else {
+            continue;
+        };
+        let import_path = file.interner.resolve(decl.path);
+        let ImportResolution::Local(target) =
+            resolve_import(spec, library_resolver, &file.path, import_path)
+        else {
+            continue;
+        };
+        if let Some(target_file) = files_by_path.get(&target).copied() {
+            visit_package_analysis_file(
+                spec,
+                target_file,
+                files_by_path,
+                library_resolver,
+                seen,
+                ordered,
+            );
+        }
+    }
+    ordered.push(file);
+}
+
+/// Resolve every import binding's cross-unit interface for a file.
+///
+/// RP3: moved from `crates/faber/src/package/compile.rs`.
+fn file_interfaces_for_file(
+    spec: &PackageSpec,
+    file: &PackageFile,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+    analyzed_interfaces_by_path: &BTreeMap<PathBuf, radix_module::file_interface::FileInterface>,
+) -> Result<BTreeMap<String, radix_module::file_interface::FileInterface>, Diagnostic> {
+    let mut interfaces = BTreeMap::new();
+    for stmt in &file.program.statements {
+        let StmtKind::Import(decl) = &stmt.kind else {
+            continue;
+        };
+        let Some(binding) = import_binding(&file.interner, decl) else {
+            continue;
+        };
+        let import_path = file.interner.resolve(decl.path);
+        match resolve_import(spec, library_resolver, &file.path, import_path) {
+            ImportResolution::Local(target) => {
+                let Some(interface) = analyzed_interfaces_by_path.get(&target).cloned() else {
+                    return Err(crate::package_diagnostic_error(format!(
+                        "local import `{import_path}` interface was not analyzed before importer"
+                    ))
+                    .with_file(file.path.display().to_string())
+                    .with_span(decl.span));
+                };
+                interfaces.insert(binding, interface);
+            }
+            ImportResolution::Library(module) => {
+                let Some(import) = library_import_binding(&file.interner, decl, module) else {
+                    continue;
+                };
+                if library_interface_has_module(&import, library_cache)? {
+                    continue;
+                }
+                interfaces.insert(
+                    binding,
+                    library_cached_file_interface(&import, library_resolver, library_cache)?,
+                );
+            }
+            ImportResolution::Unsupported | ImportResolution::Error(_) => {}
+        }
+    }
+    for import in &file.expanded_library_imports {
+        if library_interface_has_module(import, library_cache)? {
+            continue;
+        }
+        interfaces.insert(
+            import.binding.clone(),
+            library_cached_file_interface(import, library_resolver, library_cache)?,
+        );
+    }
+    Ok(interfaces)
+}
+
+/// Resolve every import binding's exported namespace surface for a file.
+///
+/// RP3: moved from `crates/faber/src/package/compile.rs`.
+fn namespace_exports_for_file(
+    spec: &PackageSpec,
+    file: &PackageFile,
+    files: &[PackageFile],
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+) -> Result<BTreeMap<String, BTreeMap<String, VisibilityTier>>, Diagnostic> {
+    let mut exports = BTreeMap::new();
+    for stmt in &file.program.statements {
+        let StmtKind::Import(decl) = &stmt.kind else {
+            continue;
+        };
+        let Some(binding) = import_binding(&file.interner, decl) else {
+            continue;
+        };
+        let import_path = file.interner.resolve(decl.path);
+        match resolve_import(spec, library_resolver, &file.path, import_path) {
+            ImportResolution::Local(target) => {
+                let Some(target_file) = files.iter().find(|candidate| candidate.path == target)
+                else {
+                    continue;
+                };
+                exports.insert(
+                    binding,
+                    crate::library::program_export_surface(
+                        &target_file.program,
+                        &target_file.interner,
+                    ),
+                );
+            }
+            ImportResolution::Library(module) => {
+                let Some(import) = library_import_binding(&file.interner, decl, module) else {
+                    continue;
+                };
+                exports.insert(
+                    binding,
+                    library_interface_export_surface(&import, library_resolver, library_cache)?,
+                );
+            }
+            ImportResolution::Unsupported | ImportResolution::Error(_) => {}
+        }
+    }
+    for import in &file.expanded_library_imports {
+        exports.insert(
+            import.binding.clone(),
+            library_interface_export_surface(import, library_resolver, library_cache)?,
+        );
+    }
+    Ok(exports)
+}
+
+/// Per-binding same-package flags from the already-resolved import graph.
+///
+/// Local package files are same-package. Library bindings are cross-package.
+/// This does not walk `faber.toml` or `FABER_LIBRARY_HOME`.
+fn namespace_seams_for_file(
+    spec: &PackageSpec,
+    file: &PackageFile,
+    library_resolver: &LibraryResolver,
+) -> Result<BTreeMap<String, bool>, Diagnostic> {
+    let mut seams = BTreeMap::new();
+    for stmt in &file.program.statements {
+        let StmtKind::Import(decl) = &stmt.kind else {
+            continue;
+        };
+        let Some(binding) = import_binding(&file.interner, decl) else {
+            continue;
+        };
+        let import_path = file.interner.resolve(decl.path);
+        match resolve_import(spec, library_resolver, &file.path, import_path) {
+            ImportResolution::Local(_) => {
+                seams.insert(binding, true);
+            }
+            ImportResolution::Library(_) => {
+                seams.insert(binding, false);
+            }
+            ImportResolution::Unsupported | ImportResolution::Error(_) => {}
+        }
+    }
+    for import in &file.expanded_library_imports {
+        seams.insert(import.binding.clone(), false);
+    }
+    Ok(seams)
+}
+
+/// Per-binding declaration surfaces, including module-private names.
+fn namespace_declarations_for_file(
+    spec: &PackageSpec,
+    file: &PackageFile,
+    files: &[PackageFile],
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+) -> Result<BTreeMap<String, BTreeMap<String, VisibilityTier>>, Diagnostic> {
+    let mut declarations = BTreeMap::new();
+    for stmt in &file.program.statements {
+        let StmtKind::Import(decl) = &stmt.kind else {
+            continue;
+        };
+        let Some(binding) = import_binding(&file.interner, decl) else {
+            continue;
+        };
+        let import_path = file.interner.resolve(decl.path);
+        match resolve_import(spec, library_resolver, &file.path, import_path) {
+            ImportResolution::Local(target) => {
+                let Some(target_file) = files.iter().find(|candidate| candidate.path == target)
+                else {
+                    continue;
+                };
+                declarations.insert(
+                    binding,
+                    program_declaration_surface(&target_file.program, &target_file.interner),
+                );
+            }
+            ImportResolution::Library(module) => {
+                let Some(import) = library_import_binding(&file.interner, decl, module) else {
+                    continue;
+                };
+                declarations.insert(
+                    binding,
+                    library_interface_declaration_surface(
+                        &import,
+                        library_resolver,
+                        library_cache,
+                    )?,
+                );
+            }
+            ImportResolution::Unsupported | ImportResolution::Error(_) => {}
+        }
+    }
+    for import in &file.expanded_library_imports {
+        declarations.insert(
+            import.binding.clone(),
+            library_interface_declaration_surface(import, library_resolver, library_cache)?,
+        );
+    }
+    Ok(declarations)
+}
+
+/// The namespace binding an import declaration introduces.
+///
+/// RP3: moved from `crates/faber/src/package/compile.rs`.
+fn import_binding(interner: &Interner, decl: &ImportDecl) -> Option<String> {
+    match &decl.kind {
+        ImportKind::Named { name, alias, .. } => Some(
+            interner
+                .resolve(alias.as_ref().unwrap_or(name).name)
+                .to_owned(),
+        ),
+        ImportKind::Wildcard { alias } => Some(interner.resolve(alias.name).to_owned()),
+    }
+}
+
+#[cfg(test)]
+#[path = "analyze_test.rs"]
+mod tests;

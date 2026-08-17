@@ -128,8 +128,8 @@ pub(crate) use product::{build_browser_product, build_browser_product_static_ass
 use radix_module::codegen::Target;
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::Config;
-use radix_package::discovery::PackageSpec;
-use radix_package::library::{LibraryInterfaceCache, LibraryResolver, LockedLibraryPackage};
+use radix_program::discovery::PackageSpec;
+use radix_program::library::{LibraryInterfaceCache, LibraryResolver, LockedLibraryPackage};
 use std::path::Path;
 
 /// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 executed-lane
@@ -231,11 +231,11 @@ pub(crate) fn absolutize_path(path: &Path) -> std::path::PathBuf {
             .unwrap_or_else(|_| std::path::PathBuf::from("."))
             .join(path)
     };
-    radix_package::paths::normalize_path(&path)
+    radix_program::paths::normalize_path(&path)
 }
 
 pub(crate) fn discover_package(input: &Path) -> Result<PackageSpec, Box<Diagnostic>> {
-    let spec = radix_package::discovery::discover_package(&absolutize_path(input))?;
+    let spec = radix_program::discovery::discover_package(&absolutize_path(input))?;
     if spec.manifest_backed {
         let manifest_path = spec.package_root.join(MANIFEST_FILE);
         if manifest_path.exists() {
@@ -248,13 +248,13 @@ pub(crate) fn discover_package(input: &Path) -> Result<PackageSpec, Box<Diagnost
 
 pub(crate) fn discover_build_layout(
     input: &Path,
-) -> Result<radix_package::discovery::BuildLayout, Box<Diagnostic>> {
-    radix_package::discovery::discover_build_layout(&absolutize_path(input))
+) -> Result<radix_program::discovery::BuildLayout, Box<Diagnostic>> {
+    radix_program::discovery::discover_build_layout(&absolutize_path(input))
 }
 
 #[allow(dead_code)]
 pub(crate) fn is_manifest_backed_or_directory_package_input(input: &Path) -> bool {
-    radix_package::discovery::is_manifest_backed_or_directory_package_input(&absolutize_path(input))
+    radix_program::discovery::is_manifest_backed_or_directory_package_input(&absolutize_path(input))
 }
 
 /// Build the explicit library cache seam used by product MIR route plumbing.
@@ -299,11 +299,11 @@ pub(crate) fn library_resolver_for_package(
         Ok(manifest) => manifest,
         Err(diag) => return Err(vec![*diag]),
     };
-    let lock = match radix_package::lockfile::read_lock(package_root) {
+    let lock = match radix_program::lockfile::read_lock(package_root) {
         Ok(lock) => lock,
         Err(diag) => return Err(vec![*diag]),
     };
-    let mut lock_diags = radix_package::lockfile::validate_dependencies_against_lock(
+    let mut lock_diags = radix_program::lockfile::validate_dependencies_against_lock(
         package_root,
         &manifest.dependencies,
         lock.as_ref(),
@@ -316,8 +316,8 @@ pub(crate) fn library_resolver_for_package(
 
     let mut locked = std::collections::BTreeMap::new();
     if let Some(lock) = lock.as_ref() {
-        let lock_index = radix_package::lockfile::lock_index(
-            &package_root.join(radix_package::lockfile::LOCK_FILE),
+        let lock_index = radix_program::lockfile::lock_index(
+            &package_root.join(radix_program::lockfile::LOCK_FILE),
             lock,
         )?;
         for package in lock_index.values() {
@@ -354,8 +354,8 @@ pub(crate) fn library_resolver_for_package(
 // loading, strict product-view manifest validation (FBR-P1-001), and
 // `FABER_LIBRARY_HOME` / workspace probing — while keeping the faber-internal
 // entry signatures.
-pub(crate) fn faber_analysis_seams() -> radix_package::analyze::AnalysisSeams {
-    radix_package::analyze::AnalysisSeams {
+pub(crate) fn faber_analysis_seams() -> radix_program::analyze::AnalysisSeams {
+    radix_program::analyze::AnalysisSeams {
         locale_loader: load_locale_pack_for_input,
         manifest_validator: validate_product_manifest_for_spec,
         resolver_for_package: library_resolver_for_package,
@@ -365,8 +365,8 @@ pub(crate) fn faber_analysis_seams() -> radix_package::analyze::AnalysisSeams {
 /// Faber-supplied package-emission seams. Go source assembly remains a product
 /// helper because it owns the generated multi-file package shape; the shared
 /// dispatch and Rust assembly live in `radix-package`.
-pub fn faber_emission_seams() -> radix_package::emit::EmissionSeams {
-    radix_package::emit::EmissionSeams {
+pub fn faber_emission_seams() -> radix_program::emit::EmissionSeams {
+    radix_program::emit::EmissionSeams {
         analysis: faber_analysis_seams(),
         #[cfg(feature = "hir-go")]
         emit_go: go_build::generate_package_go_result,

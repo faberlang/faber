@@ -8,12 +8,12 @@ use super::test_support::test_temp_dir;
 use super::{discover_package, library_resolver_from_config};
 use radix_module::driver::{Config, Session};
 use radix_module::locale::LocalePack;
-use radix_package::analyze::{
+use radix_program::analyze::{
     analyze_package as analyze_package_direct,
     analyze_package_for_tests as analyze_package_for_tests_direct, AnalysisSeams,
 };
-use radix_package::discovery::PackageSpec;
-use radix_package::library::LibraryResolver;
+use radix_program::discovery::PackageSpec;
+use radix_program::library::LibraryResolver;
 
 fn seams() -> AnalysisSeams {
     crate::package::faber_analysis_seams()
@@ -22,15 +22,15 @@ fn seams() -> AnalysisSeams {
 fn analyze_with_faber_seams(
     config: &Config,
     input: &Path,
-) -> Result<radix_package::analyze::AnalyzedProgram, Vec<radix_module::diagnostics::Diagnostic>> {
+) -> Result<radix_program::analyze::AnalyzedProgram, Vec<radix_module::diagnostics::Diagnostic>> {
     analyze_package_direct(config, input, &seams())
 }
 
 fn analyze_tests_with_faber_seams(
     config: &Config,
     input: &Path,
-    filter: Option<&radix_package::test_source_filter::TestSourceFilter>,
-) -> Result<radix_package::analyze::AnalyzedProgram, Vec<radix_module::diagnostics::Diagnostic>> {
+    filter: Option<&radix_program::test_source_filter::TestSourceFilter>,
+) -> Result<radix_program::analyze::AnalyzedProgram, Vec<radix_module::diagnostics::Diagnostic>> {
     analyze_package_for_tests_direct(config, input, filter, &seams())
 }
 
@@ -39,9 +39,9 @@ fn load_with_faber_seams(
     resolver: &LibraryResolver,
     locale_pack: Option<&LocalePack>,
     include_proba: bool,
-    filter: Option<&radix_package::test_source_filter::TestSourceFilter>,
-) -> Result<Vec<radix_package::PackageFile>, Vec<radix_module::diagnostics::Diagnostic>> {
-    radix_package::analyze::load_package_with_locale_pack(
+    filter: Option<&radix_program::test_source_filter::TestSourceFilter>,
+) -> Result<Vec<radix_program::PackageFile>, Vec<radix_module::diagnostics::Diagnostic>> {
+    radix_program::analyze::load_package_with_locale_pack(
         spec,
         resolver,
         locale_pack,
@@ -283,7 +283,7 @@ test "double" {
         functions.extend(cases.iter().map(|case| (unit.path.clone(), case.def_id)));
         test_units.push((unit.path.clone(), cases));
     }
-    let scope = radix_package::mir::TestPackageScope::for_program(&package, functions);
+    let scope = radix_program::mir::TestPackageScope::for_program(&package, functions);
     let report = crate::package::mir::with_linked_test_package_mir(
         package,
         &scope,
@@ -526,7 +526,7 @@ test "core ok" {
         ),
         "relative and absolute inputs must land on the same package root"
     );
-    let unit_names = |pkg: &radix_package::analyze::AnalyzedProgram| {
+    let unit_names = |pkg: &radix_program::analyze::AnalyzedProgram| {
         let mut names = pkg
             .nodes
             .values()

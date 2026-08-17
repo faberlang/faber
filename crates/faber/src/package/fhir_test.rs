@@ -4,22 +4,22 @@
 use super::*;
 use crate::package::library_resolver_from_config;
 use crate::package::test_support::test_temp_dir;
-use radix_package::analyze::AnalyzedProgram;
-use radix_package::codegen::assemble_crate;
-use radix_package::rust_target::generate_package_rust;
+use radix_program::analyze::AnalyzedProgram;
+use radix_program::codegen::assemble_crate;
+use radix_program::rust_target::generate_package_rust;
 
 fn analyze_with_faber_seams(
     config: &Config,
     input: &Path,
 ) -> Result<AnalyzedProgram, Vec<radix_module::diagnostics::Diagnostic>> {
-    radix_package::analyze::analyze_package(config, input, &crate::package::faber_analysis_seams())
+    radix_program::analyze::analyze_package(config, input, &crate::package::faber_analysis_seams())
 }
 
 fn build_fhir_with_faber_seams(
     config: &Config,
     input: &Path,
-) -> Result<radix_package::fhir::PackageFhir, Vec<radix_module::diagnostics::Diagnostic>> {
-    radix_package::fhir::build_package_fhir(config, input, &crate::package::faber_analysis_seams())
+) -> Result<radix_program::fhir::PackageFhir, Vec<radix_module::diagnostics::Diagnostic>> {
+    radix_program::fhir::build_package_fhir(config, input, &crate::package::faber_analysis_seams())
 }
 
 fn run_mir_with_faber_seams<H: radix_module::mir::Host + ?Sized>(
@@ -27,7 +27,7 @@ fn run_mir_with_faber_seams<H: radix_module::mir::Host + ?Sized>(
     input: &Path,
     host: &mut H,
 ) -> Result<(), Vec<radix_module::diagnostics::Diagnostic>> {
-    radix_package::mir::run_package_mir(
+    radix_program::mir::run_package_mir(
         config,
         input,
         &crate::package::mir::faber_mir_seams(),

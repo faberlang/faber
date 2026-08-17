@@ -296,6 +296,7 @@ dependencies = [
  "radix-mir-fmir",
  "radix-mir-runner",
  "radix-module",
+ "radix-program",
  "radix-types",
  "serde",
  "serde_json",
@@ -745,6 +746,21 @@ dependencies = [
  "radix-lexer",
  "radix-syntax",
  "radix-types",
+]
+
+[[package]]
+name = "radix-program"
+version = "0.1.0"
+dependencies = [
+ "handroll",
+ "postcard",
+ "radix-mir-fmir",
+ "radix-module",
+ "radix-types",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
 ]
 
 [[package]]

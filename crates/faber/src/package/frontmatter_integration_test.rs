@@ -10,16 +10,16 @@ use super::library_resolver_from_config;
 use super::test_support::{diagnostic_has_arg, diagnostic_has_issue, test_temp_dir};
 use radix_module::driver::Config;
 use radix_module::Output;
-use radix_package::analyze::AnalysisSeams;
-use radix_package::discovery::PackageSpec;
-use radix_package::emit::{
+use radix_program::analyze::AnalysisSeams;
+use radix_program::discovery::PackageSpec;
+use radix_program::emit::{
     compile_package as compile_package_direct,
     compile_package_with_test_options as compile_package_with_test_options_direct,
     compile_package_with_test_selection as compile_package_with_test_selection_direct,
 };
-use radix_package::frontmatter::RustTestSelection as TestSelection;
-use radix_package::library::LibraryResolver;
-use radix_package::test_source_filter::TestSourceFilter;
+use radix_program::frontmatter::RustTestSelection as TestSelection;
+use radix_program::library::LibraryResolver;
+use radix_program::test_source_filter::TestSourceFilter;
 use std::fs;
 use std::path::Path;
 
@@ -66,8 +66,8 @@ fn discover_package(input: &Path) -> Result<PackageSpec, Box<radix_module::diagn
 fn load_with_faber_seams(
     spec: &PackageSpec,
     resolver: &LibraryResolver,
-) -> Result<Vec<radix_package::PackageFile>, Vec<radix_module::diagnostics::Diagnostic>> {
-    radix_package::analyze::load_package_with_locale_pack(
+) -> Result<Vec<radix_program::PackageFile>, Vec<radix_module::diagnostics::Diagnostic>> {
+    radix_program::analyze::load_package_with_locale_pack(
         spec,
         resolver,
         None,

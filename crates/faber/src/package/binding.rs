@@ -7,12 +7,12 @@ use radix_module::driver::Config;
 use serde::Deserialize;
 
 use super::{faber_analysis_seams, read_manifest, validate_manifest};
-use radix_package::analyze::AnalyzedProgram;
-use radix_package::discovery::resolve_source_root;
-use radix_package::file_interface::extract_callable_contracts;
-use radix_package::member_path::resolve_package_member;
+use radix_program::analyze::AnalyzedProgram;
+use radix_program::discovery::resolve_source_root;
+use radix_program::file_interface::extract_callable_contracts;
+use radix_program::member_path::resolve_package_member;
 #[cfg(feature = "hir-rust")]
-use radix_package::rust_target::render_binding_probe;
+use radix_program::rust_target::render_binding_probe;
 
 #[cfg(feature = "hir-rust")]
 use super::binding_probe::run_rust_binding_probe;
@@ -186,7 +186,7 @@ fn collect_binding_contracts(
     provider: &str,
     package_root: &Path,
 ) -> Result<(AnalyzedProgram, Vec<BindingContract>), Vec<Diagnostic>> {
-    let package = radix_package::analyze::analyze_package(
+    let package = radix_program::analyze::analyze_package(
         &Config::default().with_bodyless_functions(),
         package_root,
         &faber_analysis_seams(),

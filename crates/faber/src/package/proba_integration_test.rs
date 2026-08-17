@@ -8,14 +8,14 @@ use super::test_support::{diagnostic_has_issue, test_temp_dir};
 use radix_module::driver::Config;
 use radix_module::locale::LocalePack;
 use radix_module::Output;
-use radix_package::analyze::AnalysisSeams;
-use radix_package::discovery::PackageSpec;
-use radix_package::emit::{
+use radix_program::analyze::AnalysisSeams;
+use radix_program::discovery::PackageSpec;
+use radix_program::emit::{
     compile_package as compile_package_direct,
     compile_package_with_test_options as compile_package_with_test_options_direct,
 };
-use radix_package::library::LibraryResolver;
-use radix_package::test_source_filter::TestSourceFilter;
+use radix_program::library::LibraryResolver;
+use radix_program::test_source_filter::TestSourceFilter;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -30,7 +30,7 @@ fn compile_with_faber_seams(config: &Config, input: &Path) -> radix_module::Comp
 fn compile_with_test_options(
     config: &Config,
     input: &Path,
-    selection: Option<&radix_package::frontmatter::RustTestSelection>,
+    selection: Option<&radix_program::frontmatter::RustTestSelection>,
     filter: Option<&TestSourceFilter>,
 ) -> radix_module::CompileResult {
     compile_package_with_test_options_direct(
@@ -52,8 +52,8 @@ fn load_with_faber_seams(
     locale_pack: Option<&LocalePack>,
     include_proba: bool,
     filter: Option<&TestSourceFilter>,
-) -> Result<Vec<radix_package::PackageFile>, Vec<radix_module::diagnostics::Diagnostic>> {
-    radix_package::analyze::load_package_with_locale_pack(
+) -> Result<Vec<radix_program::PackageFile>, Vec<radix_module::diagnostics::Diagnostic>> {
+    radix_program::analyze::load_package_with_locale_pack(
         spec,
         resolver,
         locale_pack,
@@ -464,12 +464,12 @@ fn norma_src_proba_is_discovered_beside_product_sources() {
     );
 
     let files =
-        radix_package::source_files::package_source_files(&norma_src, true).expect("discover");
+        radix_program::source_files::package_source_files(&norma_src, true).expect("discover");
     assert!(
         files.iter().any(|p| p.ends_with("mathesis.proba")),
         "include_proba=true must find mathesis.proba under norma/src"
     );
-    let prod = radix_package::source_files::package_source_files(&norma_src, false).expect("prod");
+    let prod = radix_program::source_files::package_source_files(&norma_src, false).expect("prod");
     assert!(
         !prod.iter().any(|p| p.ends_with(".proba")),
         "production discovery must skip *.proba under norma/src"

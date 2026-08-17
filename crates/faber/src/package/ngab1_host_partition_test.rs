@@ -208,10 +208,10 @@ fn ngab1_host_partition_executes_boundary_call_via_llvm_host() {
     // CPU module ("no physical execution" is the lane's frozen non-goal), so
     // the build proof here is the emitted host module contract — the same
     // contract the radix-mir-llvm vertical fixture proves.
-    let build = radix_package::llvm::build_package_llvm(
+    let build = radix_program::llvm::build_package_llvm(
         &llvm_host_config(),
         &entry,
-        &radix_package::llvm::PackageLlvmOptions::new(
+        &radix_program::llvm::PackageLlvmOptions::new(
             dir.as_ref().join("target/faber-llvm/debug/modules"),
         ),
         &crate::package::faber_analysis_seams(),

@@ -1,0 +1,281 @@
+use super::*;
+use crate::discovery::PackageSpec;
+use crate::library::LibraryResolver;
+use radix_module::file_interface::FileExportKind;
+use radix_module::semantic::passes::visibility_annotation::VisibilityTier;
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+fn temp_root(label: &str) -> PathBuf {
+    let path = std::env::temp_dir().join(format!(
+        "radix-program-analyze-{label}-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("time")
+            .as_nanos()
+    ));
+    fs::create_dir_all(&path).expect("mkdir");
+    path
+}
+
+// Test seams: no product manifest validation, no library home, no linked
+// crates — the compiler-owned analysis path exercised standalone (faber
+// supplies the real product seams in production). The locale seam mirrors the
+// faber product default: the product-default English pack is loaded when the
+// caller selects no locale (pack-less registry-direct lexing is not the
+// package analysis route).
+fn default_locale_pack(
+    _input: &Path,
+    _locale: Option<&str>,
+) -> Result<Option<radix_module::locale::LocalePack>, Box<Diagnostic>> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack = radix_module::locale::LocalePack::from_toml_path(path).map_err(|err| {
+        Box::new(
+            Diagnostic::error(format!("failed to load English locale pack: {err}"))
+                .with_phase(radix_module::diagnostics::DiagnosticPhase::Lex),
+        )
+    })?;
+    Ok(Some(pack))
+}
+
+fn accept_manifest(_spec: &PackageSpec) -> Result<(), Box<Diagnostic>> {
+    Ok(())
+}
+
+fn empty_resolver_for_package(
+    _config: &Config,
+    _package_root: &Path,
+) -> Result<LibraryResolver, Vec<Diagnostic>> {
+    Ok(LibraryResolver::with_optional_home(None))
+}
+
+fn test_seams() -> AnalysisSeams {
+    AnalysisSeams {
+        locale_loader: default_locale_pack,
+        manifest_validator: accept_manifest,
+        resolver_for_package: empty_resolver_for_package,
+    }
+}
+
+/// Moved from `crates/faber/src/package_test.rs`
+/// (`package_analysis_api_exposes_multifile_units_without_rust_emit`): the
+/// production analysis API exposes multi-unit shape (entry identity, module
+/// segments, export surface, namespace exports) without any backend emit.
+#[test]
+fn analyze_package_exposes_multifile_units_without_rust_emit() {
+    let dir = temp_root("analysis-api");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r##"
+import from "./thing" thing
+
+main {
+  print thing.label()
+}
+"##,
+    )
+    .expect("write entry");
+    let module = dir.join("thing.fab");
+    fs::write(
+        &module,
+        r#"
+@ public
+fn label() → string {
+  return "ok"
+}
+"#,
+    )
+    .expect("write module");
+
+    let package =
+        analyze_package(&Config::default(), &entry, &test_seams()).expect("analyze package");
+
+    assert!(
+        !package.diagnostics.iter().any(radix_module::Diagnostic::is_error),
+        "expected no analysis errors, got {:?}",
+        package
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(package.nodes.len(), 2);
+    assert_eq!(package.roots.len(), 1);
+    assert!(package.entry.is_some());
+    let entry_unit = package.entry_node().expect("entry unit");
+    assert_eq!(entry_unit.path, entry);
+    assert!(entry_unit.analysis.hir.entry.is_some());
+    assert_eq!(
+        entry_unit.namespace_exports.get("thing"),
+        Some(&BTreeMap::from([(
+            "label".to_owned(),
+            VisibilityTier::Publica
+        )]))
+    );
+
+    let module_unit = package
+        .nodes
+        .values()
+        .find(|unit| !unit.is_entry)
+        .expect("module unit");
+    assert_eq!(module_unit.path, module);
+    assert_eq!(module_unit.module_segments, vec!["thing".to_owned()]);
+    assert!(module_unit.analysis.hir.entry.is_none());
+    assert_eq!(module_unit.export_names, vec!["label".to_owned()]);
+    assert!(matches!(
+        module_unit
+            .file_interface
+            .exports
+            .get("label")
+            .map(|export| &export.kind),
+        Some(FileExportKind::Function(_))
+    ));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// Negative parity for the analysis diagnostics: a semantic error in a
+/// sibling unit surfaces through multi-unit analysis as a package failure
+/// (cross-file diagnostic propagation, not a silent skip).
+#[test]
+fn analyze_package_surfaces_sibling_unit_diagnostics() {
+    let dir = temp_root("sibling-diag");
+    fs::write(
+        dir.join("main.fab"),
+        r#"
+import from "./lib" lib
+
+main {
+  print lib.broken()
+}
+"#,
+    )
+    .expect("write entry");
+    fs::write(
+        dir.join("lib.fab"),
+        r#"
+@ public
+fn broken() → int {
+  return nonexistent_value
+}
+"#,
+    )
+    .expect("write module");
+
+    let entry = dir.join("main.fab");
+    let Err(diagnostics) = analyze_package(&Config::default(), &entry, &test_seams()) else {
+        panic!("sibling semantic error must fail multi-unit analysis");
+    };
+    assert!(
+        diagnostics.iter().any(radix_module::Diagnostic::is_error),
+        "expected the sibling error diagnostic, got {:?}",
+        diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// Binary programs expose one entry ModuleId, one root, and local import edges.
+#[test]
+fn analyze_package_records_entry_roots_and_local_import_edges() {
+    let dir = temp_root("program-graph");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r##"
+import from "./thing" thing
+
+main {
+  print thing.label()
+}
+"##,
+    )
+    .expect("write entry");
+    fs::write(
+        dir.join("thing.fab"),
+        r#"
+@ public
+fn label() → string {
+  return "ok"
+}
+"#,
+    )
+    .expect("write module");
+
+    let program =
+        analyze_package(&Config::default(), &entry, &test_seams()).expect("analyze package");
+    let entry_id = program.entry.clone().expect("binary entry");
+    assert_eq!(program.roots, vec![entry_id.clone()]);
+    assert!(program.nodes.get(&entry_id).expect("entry node").is_entry);
+    let thing_id = program
+        .nodes
+        .iter()
+        .find(|(_, node)| node.module_segments == ["thing".to_owned()])
+        .map(|(id, _)| id.clone())
+        .expect("thing node");
+    let local = program.imports.local_edges(&entry_id);
+    assert_eq!(local.len(), 1);
+    assert_eq!(local[0].0, "thing");
+    assert_eq!(local[0].1, thing_id);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// Entry-less library packages keep multiple roots and no executable entry.
+#[test]
+fn analyze_package_library_roots_have_no_entry() {
+    let dir = temp_root("library-roots");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "libroots"
+version = "0.1.0"
+
+[library]
+provider = "libroots"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["fhir"]
+"#,
+    )
+    .expect("write manifest");
+    fs::create_dir_all(dir.join("src")).expect("mkdir src");
+    fs::write(
+        dir.join("src/alpha.fab"),
+        r#"
+@ public
+fn alpha() → int {
+  return 1
+}
+"#,
+    )
+    .expect("write alpha");
+    fs::write(
+        dir.join("src/beta.fab"),
+        r#"
+@ public
+fn beta() → int {
+  return 2
+}
+"#,
+    )
+    .expect("write beta");
+
+    let program =
+        analyze_package(&Config::default(), &dir, &test_seams()).expect("analyze library");
+    assert!(program.entry.is_none(), "library has no executable entry");
+    assert!(
+        program.roots.len() >= 2,
+        "library keeps multiple roots, got {:?}",
+        program.roots
+    );
+    assert!(program.nodes.values().all(|node| !node.is_entry));
+    let _ = fs::remove_dir_all(&dir);
+}

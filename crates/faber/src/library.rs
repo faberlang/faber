@@ -14,7 +14,7 @@ mod tests;
 
 use std::path::{Path, PathBuf};
 
-use radix_package::library::LibraryResolver;
+use radix_program::library::LibraryResolver;
 
 pub(crate) const FABER_LIBRARY_HOME_ENV: &str = "FABER_LIBRARY_HOME";
 /// Env flag exercised by library probe tests; production probe path is not wired yet.

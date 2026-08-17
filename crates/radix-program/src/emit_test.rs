@@ -1,0 +1,183 @@
+//! Emission assembly tests (RP4, moved from faber's `compile_test.rs` Rust
+//! cases). Each test drives the full package emission path through explicit
+//! test seams — no ambient locale, manifest, or library-home reads.
+
+use std::fs;
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use radix_module::codegen::Target;
+use radix_module::diagnostics::Diagnostic;
+use radix_module::driver::Config;
+use radix_module::Output;
+
+use super::*;
+use crate::test_support::test_analysis_seams;
+
+/// Minimal emission seams for the Rust emission tests: no product manifest
+/// validation, no ambient library home, and a never-exercised Go emitter
+/// (these tests only run the Rust path).
+fn test_seams() -> EmissionSeams {
+    EmissionSeams {
+        analysis: test_analysis_seams(),
+        #[cfg(feature = "hir-go")]
+        emit_go: never_exercised_go_emission,
+    }
+}
+
+#[cfg(feature = "hir-go")]
+fn never_exercised_go_emission(_package: &AnalyzedProgram, _input: &Path) -> PackageCompileResult {
+    unreachable!("go emission is a faber-side seam; radix-program tests only run the Rust path")
+}
+
+fn temp_dir(label: &str) -> PathBuf {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!("radix-program-emit-{label}-{nonce}"));
+    fs::create_dir_all(&path).expect("create temp dir");
+    path
+}
+
+#[test]
+fn compile_package_deny_warnings_suppresses_output_after_promotion() {
+    let dir = temp_dir("package-deny-warnings");
+    fs::create_dir_all(dir.join("src")).expect("create src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "package-deny-warnings"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(dir.join("src/main.fab"), "main { const int unused ← 1 }\n").expect("write entry");
+
+    let config = Config::default().with_warn_policy(radix_module::driver::WarnPolicy {
+        deny_all_warnings: true,
+        deny_codes: vec![],
+    });
+    let result = compile_package(&config, &dir, &test_seams());
+
+    assert!(
+        result.output.is_none(),
+        "promoted package warnings must stop generated output"
+    );
+    assert!(
+        result.diagnostics.iter().any(Diagnostic::is_error),
+        "expected at least one promoted warning diagnostic"
+    );
+}
+
+#[test]
+fn rust_multi_unit_sibling_exports_resolve_via_package_index() {
+    // FBR-P2-007: Rust sibling export resolution must use one package-wide
+    // normalized path index (built once, current unit excluded by identity)
+    // instead of rebuilding a candidate map per unit. A multi-unit package
+    // with a cross-module call proves the sibling set is complete and
+    // deterministic: the generated entry references the imported module.
+    let dir = temp_dir("rust-sibling-index");
+    fs::write(
+        dir.join("main.fab"),
+        r#"
+import from "./lib" lib
+
+main {
+    print lib.answer()
+}
+"#,
+    )
+    .expect("write entry");
+    fs::write(
+        dir.join("lib.fab"),
+        r#"
+@ public
+fn answer() → int {
+    return 42
+}
+"#,
+    )
+    .expect("write lib");
+
+    let result = compile_package(&Config::default(), &dir.join("main.fab"), &test_seams());
+    assert!(
+        result.success(),
+        "expected Rust multi-unit compile success, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    assert!(
+        output.code.contains("pub mod lib"),
+        "expected sibling module declaration in generated rust code"
+    );
+}
+
+#[test]
+fn compile_package_rust_targets_plan_go_and_ts() {
+    // Target-neutral planning parity: the Rust emission entry must reject
+    // non-HIR package targets through the same plan gates the dispatcher
+    // applies (plan-supported targets reach the assembly-pending diagnostic;
+    // unsupported targets are rejected).
+    let dir = temp_dir("plan-gates");
+    fs::create_dir_all(dir.join("src")).expect("create src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "plan-gates"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(dir.join("src/main.fab"), "main { }\n").expect("write entry");
+
+    let unsupported = compile_package(
+        &Config::default().with_target(Target::MirWgsl),
+        &dir,
+        &test_seams(),
+    );
+    assert!(
+        unsupported
+            .diagnostics
+            .iter()
+            .any(|diag| diag.issue() == Some("package_target_unsupported")),
+        "expected package_target_unsupported, got {:?}",
+        unsupported
+            .diagnostics
+            .iter()
+            .map(|diag| diag.issue())
+            .collect::<Vec<_>>()
+    );
+
+    let pending = compile_package(
+        &Config::default().with_target(Target::HirTypeScript),
+        &dir,
+        &test_seams(),
+    );
+    assert!(
+        pending
+            .diagnostics
+            .iter()
+            .any(|diag| diag.issue() == Some("package_target_assembly_pending")),
+        "expected package_target_assembly_pending, got {:?}",
+        pending
+            .diagnostics
+            .iter()
+            .map(|diag| diag.issue())
+            .collect::<Vec<_>>()
+    );
+}

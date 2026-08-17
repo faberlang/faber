@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 /// while retaining lexical normalization for paths that do not exist yet.
 pub fn paths_equivalent(left: &Path, right: &Path) -> bool {
     fn comparison_path(path: &Path) -> PathBuf {
-        std::fs::canonicalize(path).unwrap_or_else(|_| radix_package::paths::normalize_path(path))
+        std::fs::canonicalize(path).unwrap_or_else(|_| radix_program::paths::normalize_path(path))
     }
 
     comparison_path(left) == comparison_path(right)

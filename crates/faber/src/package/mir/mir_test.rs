@@ -19,7 +19,7 @@ use std::path::Path;
 
 #[test]
 fn fmir_bin_entrypoint_and_runner_names_are_configured() {
-    assert_eq!(radix_package::mir::FMIR_BIN_ENTRYPOINT_FILE, "run");
+    assert_eq!(radix_program::mir::FMIR_BIN_ENTRYPOINT_FILE, "run");
     assert_eq!(FMIR_BIN_RUNNER_CRATE_DIR, "runner");
     assert_eq!(FMIR_BIN_RUNNER_PACKAGE_NAME, "faber-fmir-bin-runner");
 }
@@ -130,7 +130,7 @@ fn package_fmir_image_provisions_decomposed_companion_upstream_seed() {
     let config = radix_module::driver::Config::default()
         .with_stdlib(workspace)
         .with_target(radix_module::codegen::Target::MirFmirBinary);
-    let image = radix_package::mir::build_package_fmir_image(
+    let image = radix_program::mir::build_package_fmir_image(
         &config,
         dir.path(),
         &[],
@@ -138,7 +138,7 @@ fn package_fmir_image_provisions_decomposed_companion_upstream_seed() {
     )
     .expect("the BERT-tiny image builds");
     let bytes = std::fs::read(&image.image_path).expect("read the image");
-    let loaded = radix_package::mir::load_fmir_image(
+    let loaded = radix_program::mir::load_fmir_image(
         &bytes,
         &image.image_path,
         PACKAGE_MIR_TOOLCHAIN_VERSION,

@@ -12,7 +12,7 @@
 //!   from the filesystem;
 //! - [`run_loaded_package_fhir`] runs a loaded package in-process.
 //!
-//! RP5: the writer half ([`radix_package::fhir::build_package_fhir`]) moved to
+//! RP5: the writer half ([`radix_program::fhir::build_package_fhir`]) moved to
 //! `radix-package/src/fhir.rs` (compiler-owned). This module keeps only the
 //! Faber-side loader and execution adapter, which consume the typed artifact
 //! through the Faber analysis/MIR seams (ownership-freeze §5.3).
@@ -24,11 +24,11 @@ use radix_module::hir::package::{load_package, LoadedHirModule, LoadedHirPackage
 use radix_module::lexer::Span;
 use radix_module::semantic::passes::visibility_annotation::VisibilityTier;
 use radix_module::syntax::Visibility;
-use radix_package::analyze::{AnalyzedProgram, AnalyzedProgramNode, ModuleGraph, ModuleId};
-use radix_package::discovery::PackageSpec;
-use radix_package::library::LibraryResolver;
-use radix_package::library::ResolvedLibraryModule;
-use radix_package::LibraryImportBinding;
+use radix_program::analyze::{AnalyzedProgram, AnalyzedProgramNode, ModuleGraph, ModuleId};
+use radix_program::discovery::PackageSpec;
+use radix_program::library::LibraryResolver;
+use radix_program::library::ResolvedLibraryModule;
+use radix_program::LibraryImportBinding;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -268,7 +268,7 @@ pub(crate) fn run_loaded_package_fhir<H: radix_module::mir::Host + ?Sized>(
 ) -> Result<(), Vec<Diagnostic>> {
     let links = loaded_links_by_unit_path(&loaded, artifact_dir);
     let package = loaded_package_to_analyzed(loaded, artifact_dir)?;
-    radix_package::mir::run_package_mir_from_loaded(
+    radix_program::mir::run_package_mir_from_loaded(
         config,
         package,
         &links,

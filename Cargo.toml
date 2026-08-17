@@ -8,6 +8,7 @@ members = [
     "crates/radix-mir",
     "crates/radix-mir-fmir",
     "crates/radix-mir-runner",
+    "crates/radix-program",
     "crates/proba",
     "crates/radix-parser",
     "crates/radix-host-abi",

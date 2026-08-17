@@ -19,6 +19,7 @@ radix-module = { path = "../radix-module", default-features = false }
 # RP2a (radix-package goal): faber forwards the compiler view of the package
 # manifest + faber.lock consumption through `package/manifest.rs` and
 # `package/lockfile.rs`; product-only manifest interpretation stays here.
+radix-program = { path = "../radix-program", default-features = false }
 # M7 (code review 2026-08-12): the shared library-module naming rule
 # (`decl::library_module_dash_name`). The TS product layer derives emitted
 # `.ts` file names and `.js` relative ESM paths from the same stem the
@@ -53,8 +54,8 @@ tempfile = "3"
 default = ["full-targets"]
 full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "runner"]
 hir-faber = ["radix-module/hir-faber"]
-hir-fhir = ["radix-module/hir-fhir"]
-mir-fmir = ["radix-module/mir-fmir"]
+hir-fhir = ["radix-module/hir-fhir", "radix-program/hir-fhir"]
+mir-fmir = ["radix-module/mir-fmir", "radix-program/mir-fmir"]
 runner = ["radix-module/runner", "dep:radix-mir-runner", "dep:proba", "proba/runner"]
 host-macos-arm64 = []
 
