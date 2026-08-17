@@ -4438,8 +4438,9 @@ fn cli_option_and_operand_binding_typed_defaults() {
 // O — P3 frontend async/promissum fixtures (wasm-host-parity packet P3)
 // ---------------------------------------------------------------------------
 
-/// Shared analysis path: derive the import contract and analyze a corpus
-/// fixture through the driver, exactly like the tool/wasm lane session.
+/// Shared analysis path: prepare the program-layer import contract and
+/// analyze a corpus fixture. Bare `analyze_source` stays fail-closed
+/// (empty contracts); on-disk async providers need the prepared path.
 fn analyze_exemplum_for_mir_async(rel: &str) -> AnalyzedModule {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../corpus")
@@ -4450,7 +4451,7 @@ fn analyze_exemplum_for_mir_async(rel: &str) -> AnalyzedModule {
             .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     );
-    crate::driver::analyze_source(&session, &path.display().to_string(), &source).unwrap_or_else(|diagnostics| {
+    crate::tool::analyze_prepared_program_path(&session, &path, &source).unwrap_or_else(|diagnostics| {
         let facts: Vec<String> = diagnostics
             .iter()
             .map(|d| format!("{:?} {:?} {:?}", d.code, d.issue(), d.args))
@@ -4460,8 +4461,8 @@ fn analyze_exemplum_for_mir_async(rel: &str) -> AnalyzedModule {
 }
 
 /// The three `frontend_analysis_failed` rows (promotion packet P3 §2) must
-/// analyze through the shared driver session (import contract derived) and
-/// lower to non-empty MIR without the await/yield rejection — closing the
+/// analyze through the prepared program-layer contract (RTR1b) and lower
+/// to non-empty MIR without the await/yield rejection — closing the
 /// SEM010/SEM011 analysis gap and the `unsupported_mir_lowering_await_yield_expression`
 /// lowering gap in one shared path.
 #[test]
