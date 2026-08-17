@@ -41,8 +41,8 @@ fn convert_resolves_imports_in_corpus_fixture() {
         "faber convert --to la failed on importing fixture: {stderr}"
     );
     assert!(
-        !stderr.contains("SEM002"),
-        "imports must resolve via the import contract: {stderr}"
+        stderr.is_empty(),
+        "imports must resolve without diagnostics: {stderr}"
     );
     assert!(
         stdout.contains("importa ex \"norma:chorda\""),

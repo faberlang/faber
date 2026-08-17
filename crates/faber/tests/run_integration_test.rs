@@ -1193,10 +1193,10 @@ fn secretum() → int {
 
     assert!(!ok, "private namespace package should fail");
     assert_eq!(stdout, "");
-    // ALLOW_DIAGNOSTIC_RENDER_TEXT: subprocess CLI stderr renderer contract.
     // Under VM-U2 a `@ private` member imported through a file-namespace
     // alias fails at the import seam (SEM006) instead of typecheck
     // namespace_missing_export (SEM004).
+    // ALLOW_DIAGNOSTIC_RENDER_TEXT: subprocess CLI stderr renderer contract.
     assert!(
         stderr.contains("SEM006.import_module_private"),
         "expected private namespace diagnostic:\n{stderr}"
@@ -2079,9 +2079,9 @@ fn secretum() → int {
         stderr.contains("!/main.fab"),
         "expected archive member diagnostic path:\n{stderr}"
     );
-    // ALLOW_DIAGNOSTIC_RENDER_TEXT: subprocess CLI stderr renderer contract.
     // Under VM-U2 a `@ private` member imported through a file-namespace
     // alias fails at the import seam (SEM006).
+    // ALLOW_DIAGNOSTIC_RENDER_TEXT: subprocess CLI stderr renderer contract.
     assert!(
         stderr.contains("SEM006.import_module_private"),
         "expected private namespace diagnostic:\n{stderr}"
