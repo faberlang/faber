@@ -2,6 +2,7 @@
 members = [
     "crates/hygiene-ratchet",
     "crates/handroll",
+    "crates/radix",
     "crates/radix-module",
     "crates/radix-codegen-shared",
     "crates/radix-hir-faber",
@@ -23,17 +24,15 @@ members = [
 ]
 resolver = "2"
 
-# RTR3a: version-source stub for assemble-dev-kit / generate-release-manifest.
-# Not a workspace member. The thin façade lands here in RTR3c.
-exclude = ["crates/radix"]
-
 # Package-selection freeze (destination-map §10.3.3): bare `cargo build` /
-# `cargo check` stay compiler-cheap. The default set is exactly the pre-import
-# 32-member compiler set; the product (faber / exempla / faber-hir-rust) is
-# never a default member and is reached only via explicit `-p` selection.
+# `cargo check` stay compiler-cheap. The default set is the compiler crates
+# including the `radix` library façade; the product (faber / exempla /
+# faber-hir-rust) is never a default member and is reached only via explicit
+# `-p` selection.
 default-members = [
     "crates/hygiene-ratchet",
     "crates/handroll",
+    "crates/radix",
     "crates/radix-module",
     "crates/radix-codegen-shared",
     "crates/radix-hir-faber",

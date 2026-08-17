@@ -2,6 +2,24 @@
 name = "radix"
 version = "0.82.0"
 edition = "2021"
-description = "Version-source stub. Compiler lives in crates/radix-module until RTR3c births the thin façade here."
+description = "Thin complete compiler façade over radix-module and radix-program"
 license = "MIT"
-publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+radix-module = { path = "../radix-module", default-features = false }
+radix-program = { path = "../radix-program", default-features = false }
+
+[features]
+default = ["full-targets"]
+full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "runner"]
+hir-faber = ["radix-module/hir-faber", "radix-program/hir-faber"]
+hir-fhir = ["radix-module/hir-fhir", "radix-program/hir-fhir"]
+mir-fmir = ["mir-core", "radix-module/mir-fmir", "radix-program/mir-fmir"]
+mir-core = ["radix-module/mir-core"]
+runner = ["mir-core", "radix-module/runner", "radix-program/runner"]
+ts-import = ["radix-module/ts-import"]
+hir-lean = ["radix-module/hir-lean"]
+
