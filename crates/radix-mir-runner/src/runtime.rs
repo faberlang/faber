@@ -36,7 +36,10 @@ use super::value::{
 };
 use super::{
     gelu_f64,
-    host::{is_float32_attribute_provider, is_vertex_layout_count_provider, provider_identity},
+    host::{
+        is_camera_children_provider, is_float32_attribute_provider,
+        is_vertex_layout_count_provider, provider_identity,
+    },
     Runner, RunnerError,
 };
 use radix_hir::DefId;
@@ -3387,6 +3390,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         if is_float32_attribute_provider(provider, self.interner) {
             return self.eval_float32_attribute(args, return_ty, span);
         }
+        if is_camera_children_provider(provider, self.interner) {
+            return self.eval_camera_children(args, span);
+        }
         self.host
             .provider(provider)
             .map_err(|error| error.with_provider_identity(&identity))
@@ -3419,6 +3425,37 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let count = i64::try_from(attributes.borrow().len())
             .map_err(|_| RunnerError::internal(span, "vertex_layout_count overflow"))?;
         Ok(Value::Int(count))
+    }
+
+    fn eval_camera_children(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(
+                span,
+                "camera children provider arity",
+            ));
+        };
+        let receiver = self.eval_operand(receiver, span)?;
+        let Value::Struct(_, _) = receiver else {
+            return Err(RunnerError::internal(
+                span,
+                "camera children requires camera struct",
+            ));
+        };
+        if let Some(children) = named_struct_field(&receiver, self.interner, "children") {
+            return Ok(children);
+        }
+        let Some(base) = named_struct_field(&receiver, self.interner, "base") else {
+            return Err(RunnerError::internal(
+                span,
+                "camera children base field missing",
+            ));
+        };
+        named_struct_field(&base, self.interner, "children")
+            .ok_or_else(|| RunnerError::internal(span, "camera children field missing"))
     }
 
     fn eval_float32_attribute(
@@ -3628,6 +3665,20 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
 }
 
 // LOCAL VALUE HELPERS
+
+fn named_struct_field(
+    value: &Value,
+    interner: &radix_lexer::Interner,
+    name: &str,
+) -> Option<Value> {
+    let Value::Struct(_, fields) = value else {
+        return None;
+    };
+    fields
+        .borrow()
+        .iter()
+        .find_map(|(symbol, value)| (interner.resolve(*symbol) == name).then_some(value.clone()))
+}
 
 fn require_rank1_extent(
     tensor: &TensorValue,

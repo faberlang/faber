@@ -1567,6 +1567,63 @@ fn float32_attribute_package_provider_constructs_buffer_attribute() {
 }
 
 #[test]
+fn camera_children_package_provider_projects_embedded_object3d_children() {
+    use radix_hir::DefId;
+    use radix_lexer::Interner;
+    use radix_mir::{MirOperand, MirProviderKind, MirValidationContext};
+    use radix_types::TypeTable;
+    use rustc_hash::FxHashMap;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let mut interner = Interner::new();
+    let base_field = interner.intern("base");
+    let children_field = interner.intern("children");
+    let module = interner.intern("triga:graph/camera");
+    let module_name = interner.intern("camera");
+    let provider_name = interner.intern("children");
+    let children = Value::Array(Rc::new(RefCell::new(vec![Value::Unit, Value::Unit])));
+
+    let mut base_fields = FxHashMap::default();
+    base_fields.insert(children_field, children.clone());
+    let base = Value::Struct(DefId(1), Rc::new(RefCell::new(base_fields)));
+
+    let mut camera_fields = FxHashMap::default();
+    camera_fields.insert(base_field, base);
+    let camera = Value::Struct(DefId(2), Rc::new(RefCell::new(camera_fields)));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .expect("test frame")
+        .values
+        .insert(MirValueId(0), camera);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Provider(MirProvider {
+            kind: MirProviderKind::Package,
+            module: vec![module, module_name],
+            name: provider_name,
+        }),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    assert_eq!(
+        runner
+            .eval_runtime_call(&call, Span::default())
+            .expect("camera children route should execute"),
+        children
+    );
+}
+
+#[test]
 fn test_host_kernel_call_default_rejects() {
     let mut host = MinimalHost;
     let result = host.kernel_call(KernelModule::Processus, "exec", &[], Span::default());

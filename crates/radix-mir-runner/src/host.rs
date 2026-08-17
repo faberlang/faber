@@ -72,6 +72,25 @@ pub(crate) fn is_float32_attribute_provider(provider: &MirProvider, interner: &I
     matches!(module.as_slice(), ["triga:geometry/attribute", "attribute"])
 }
 
+/// The camera provider route used to project the embedded Object3D children.
+///
+/// WHY: camera package values carry their graph object in `base`, while the
+/// package link preserves the public `children` member as a provider call.
+/// This is a pure value projection, so the script runner can execute it
+/// without opening a general package ABI.
+#[must_use]
+pub(crate) fn is_camera_children_provider(provider: &MirProvider, interner: &Interner) -> bool {
+    if provider.kind != MirProviderKind::Package || interner.resolve(provider.name) != "children" {
+        return false;
+    }
+    let module = provider
+        .module
+        .iter()
+        .map(|symbol| interner.resolve(*symbol))
+        .collect::<Vec<_>>();
+    matches!(module.as_slice(), ["triga:graph/camera", "camera"])
+}
+
 impl RunnerError {
     /// Replace the legacy numeric provider diagnostic with its stable route.
     pub(crate) fn with_provider_identity(mut self, identity: &str) -> Self {
