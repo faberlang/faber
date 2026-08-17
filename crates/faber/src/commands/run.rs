@@ -13,13 +13,16 @@
 use crate::cli::{BackendSelection, FmirRunArgs, ReplArgs, RunArgs};
 use crate::input_shape::locale_without_package_error;
 use crate::package;
-use crate::script::{interpret_source, interpret_source_or_exit, print_run_source_error};
+use crate::script::{
+    interpret_source, interpret_source_or_exit, print_run_source_error, raw_exit_code,
+};
 use radix::diagnostics::Diagnostic;
 use radix::mir::StdioHost;
 use radix_package::mir::DeviceSelection;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::process::ExitCode;
 
 pub(super) fn cmd_run(args: RunArgs) {
     crate::commands::validate_deny_codes(&args.deny);
@@ -147,11 +150,31 @@ pub(super) fn interpret_path(
     };
     let session = radix::driver::Session::new(config);
     let mut host = StdioHost::with_argumenta(program_args.to_vec());
-    if let Err(error) =
-        crate::script::run_with_session(&session, &path.display().to_string(), &source, &mut host)
-    {
-        print_run_source_error(&error);
-        std::process::exit(1);
+    let result =
+        crate::script::run_with_session(&session, &path.display().to_string(), &source, &mut host);
+    exit_interpreted(result);
+}
+
+/// Process status scripta gates observe for a single-file runner result.
+///
+/// Success yields `0`. An explicit `processus.exit_process(code)` yields that
+/// Unix-masked code. Frontend / MIR / runner failures yield `1`.
+pub(super) fn single_file_run_process_code(
+    result: Result<ExitCode, radix::mir::RunSourceError>,
+) -> i32 {
+    match result {
+        Ok(status) => raw_exit_code(status),
+        Err(_) => 1,
+    }
+}
+
+fn exit_interpreted(result: Result<ExitCode, radix::mir::RunSourceError>) {
+    if let Err(error) = &result {
+        print_run_source_error(error);
+    }
+    let code = single_file_run_process_code(result);
+    if code != 0 {
+        std::process::exit(code);
     }
 }
 
