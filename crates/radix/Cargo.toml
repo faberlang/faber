@@ -1,0 +1,7 @@
+[package]
+name = "radix"
+version = "0.82.0"
+edition = "2021"
+description = "Version-source stub. Compiler lives in crates/radix-module until RTR3c births the thin façade here."
+license = "MIT"
+publish = false
