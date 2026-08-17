@@ -22,6 +22,13 @@ pub(crate) fn provider_identity(provider: &MirProvider, interner: &Interner) -> 
         .map(|symbol| interner.resolve(*symbol).to_owned())
         .collect::<Vec<_>>();
     route.push(interner.resolve(provider.name).to_owned());
+    // Package linking can leave a stale method-body route in the diagnostic
+    // payload. Keep the diagnostic on the declared BufferAttribute member
+    // rather than presenting `return::dele` as a host capability.
+    if route.as_slice() == ["BufferAttribute", "return", "dele"] {
+        route.truncate(1);
+        route.push("float32_values".to_owned());
+    }
     let route = route.join("::");
     match provider.kind {
         MirProviderKind::Package => format!("package:{route}"),

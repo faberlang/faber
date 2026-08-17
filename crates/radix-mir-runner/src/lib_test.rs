@@ -1348,6 +1348,21 @@ fn provider_failure_uses_stable_identity() {
 }
 
 #[test]
+fn provider_identity_names_buffer_attribute_member() {
+    let mut interner = Interner::new();
+    let provider = MirProvider {
+        kind: radix_mir::MirProviderKind::Package,
+        module: vec![interner.intern("BufferAttribute"), interner.intern("return")],
+        name: interner.intern("dele"),
+    };
+
+    assert_eq!(
+        super::host::provider_identity(&provider, &interner),
+        "package:BufferAttribute::float32_values"
+    );
+}
+
+#[test]
 fn host_provider_failure_does_not_expose_symbol_index() {
     let mut host = BufferHost::default();
     let provider = MirProvider {
