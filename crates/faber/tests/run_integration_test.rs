@@ -2222,7 +2222,7 @@ entry = "main.fab"
             r#"import from "norma:solum" fileio
 
 main {{
-  print fileio.lege<string>("{payload_str}")
+  print fileio.read_file<string>("{payload_str}")
 }}
 "#
         ),
@@ -2262,7 +2262,7 @@ entry = "main.fab"
         r#"import from "norma:solum" fileio
 
 main {
-  const bool readable ← fileio.legibilene("/nonexistent")
+  fileio.read_file_async<string>("/nonexistent")
 }
 "#,
     )
@@ -2273,7 +2273,7 @@ main {
     assert!(!ok, "unsupported norma:solum verb should fail closed");
     assert_eq!(stdout, "");
     assert!(
-        stderr.contains("package MIR kernel bridge does not support `norma:solum.legibilene`"),
+        stderr.contains("package MIR kernel bridge does not support `norma:solum.read_file_async`"),
         "expected kernel bridge fail-closed diagnostic:\n{stderr}"
     );
     assert_no_generated_rust(&package);
