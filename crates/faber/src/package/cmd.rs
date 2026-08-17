@@ -862,10 +862,15 @@ fn output_code(output: Output) -> String {
         Output::TypeScript(out) => out.code,
         Output::Go(out) => out.code,
         Output::Python(out) => out.code,
+        #[cfg(feature = "mir-wasm")]
         Output::WasmText(out) => out.code,
+        #[cfg(feature = "mir-llvm")]
         Output::LlvmText(out) => out.code,
+        #[cfg(feature = "mir-metal")]
         Output::MetalText(out) => out.code,
+        #[cfg(feature = "mir-wgsl")]
         Output::WgslText(out) => out.code,
+        #[cfg(feature = "mir-sexp")]
         Output::Sexp(out) => out.code,
         Output::Swift(out) => out.code,
         Output::Haskell(out) => out.code,

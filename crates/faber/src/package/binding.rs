@@ -11,6 +11,7 @@ use radix_package::analyze::AnalyzedProgram;
 use radix_package::discovery::resolve_source_root;
 use radix_package::file_interface::extract_callable_contracts;
 use radix_package::member_path::resolve_package_member;
+#[cfg(feature = "hir-rust")]
 use radix_package::rust_target::render_binding_probe;
 
 #[cfg(feature = "hir-rust")]

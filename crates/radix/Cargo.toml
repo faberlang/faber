@@ -64,7 +64,7 @@ default = ["full-targets"]
 full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "runner"]
 hir-faber = ["dep:radix-hir-faber"]
 hir-fhir = ["dep:radix-hir-fhir"]
-mir-fmir = []
+mir-fmir = ["mir-core"]
 mir-core = ["dep:radix-mir"]
 runner = ["mir-core", "dep:radix-mir-runner"]
 
