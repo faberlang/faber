@@ -69,6 +69,30 @@ fn assert_en_output_compiles(name: &str, code: &str) {
 }
 
 #[test]
+fn compile_canonical_real_file_emits_session_pack_not_frontmatter() {
+    // RTR1b (`prepare_program_module`) overwrites the session pack with
+    // source frontmatter on a real path. Convert must still emit the
+    // requested session pack (en), not the input locale (la).
+    let td = crate::test_support::test_temp_dir("canonical-emit-pack");
+    let path = td.path().join("locale.fab");
+    let source = "+++\nlocale = \"la\"\n+++\nfunctio monstra() {\n    nota \"salve\"\n}\n";
+    fs::write(&path, source).expect("write locale fixture");
+    let code = convert_to_en_named(&path.display().to_string(), source);
+    assert!(
+        code.contains("fn monstra"),
+        "real-file convert must emit the session pack (en), not frontmatter (la):\n{code}"
+    );
+    assert!(
+        code.contains("print \"salve\""),
+        "real-file convert must localize nota→print:\n{code}"
+    );
+    assert!(
+        !code.contains("functio"),
+        "frontmatter la must not steal the en emit surface:\n{code}"
+    );
+}
+
+#[test]
 fn convert_shift_cast_operand_parenthesizes() {
     // S1-U2 defect 1: `(n ⇒ 24) ↦ numerus<u8>` re-emitted without the operand
     // parens binds as `n ⇒ (24 ↦ numerus<u8>)` on re-parse (the conversio is
