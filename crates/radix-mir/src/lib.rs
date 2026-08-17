@@ -114,9 +114,9 @@ pub use inference_blocker_matrix::{
 };
 pub use kernel_decomposition::{decompose_kernel_function, KernelDecomposition, KernelSubchain};
 pub use kernel_plan::{
-    BarrierPhase, BarrierPoint, CollectionKernelPlan, MatMulPlan, OobPaddingPolicy,
-    PlanValidationError, ReduceOp, ReductionPlan, SharedMemoryLayout, TransposePlan,
-    TRANSPOSE_WORKGROUP_X,
+    BarrierPhase, BarrierPoint, CollectionKernelPlan, GroupedMatMulPlan, MatMulPlan,
+    OobPaddingPolicy, PlanValidationError, QuantizedMatMulPlan, ReduceOp, ReductionPlan,
+    SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan, TRANSPOSE_WORKGROUP_X,
 };
 pub use layout::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout,

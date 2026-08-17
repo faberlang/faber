@@ -1,14 +1,16 @@
 use super::plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, CollectionKernelPlan,
-    GatherPlan, LayerNormalizationPlan, MatMulPlan, MatMulShapes, MatMulSharedMemory,
-    OobPaddingPolicy, ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, RowSoftmaxPlan,
-    SharedMemoryLayout, TransposePlan, F32_ELEMENT_BYTE_WIDTH, MATMUL_SHARED_A_BUFFER_NAME,
+    GatherPlan, GroupedMatMulPlan, LayerNormalizationPlan, MatMulPlan, MatMulShapes,
+    MatMulSharedMemory, OobPaddingPolicy, QuantizedMatMulPlan, ReduceOp, ReductionPlan,
+    RmsNormalizationPlan, RopePlan, RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan,
+    TransposePlan, F32_ELEMENT_BYTE_WIDTH, MATMUL_SHARED_A_BUFFER_NAME,
     MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE, REDUCTION_SHARED_BUFFER_NAME, TRANSPOSE_WORKGROUP_X,
 };
 use super::validate::{
     validate_axis_reduction_plan, validate_causal_masked_softmax_plan, validate_gather_plan,
-    validate_matmul_plan, validate_reduction_plan, validate_rms_normalization_plan,
-    validate_rope_plan, validate_transpose_plan, PlanValidationError,
+    validate_grouped_matmul_plan, validate_matmul_plan, validate_quantized_matmul_plan,
+    validate_reduction_plan, validate_rms_normalization_plan, validate_rope_plan,
+    validate_ssm_conv1d_plan, validate_ssm_scan_plan, validate_transpose_plan, PlanValidationError,
 };
 use crate::abi::{CollectionOpContract, MirKernelSignature};
 use crate::{
@@ -180,6 +182,102 @@ impl CollectionKernelPlan {
                     n,
                     workgroup_x: signature.workgroup.x,
                     dispatch_x: signature.dispatch_size.x,
+                }))
+            }
+            CollectionOpContract::QuantizedMatMul {
+                dispatch_x,
+                dispatch_y,
+                m,
+                k,
+                n,
+                layout,
+            } => {
+                if op != MirCollectionOp::TensorQuantizedMatMul {
+                    return None;
+                }
+                let shapes = MatMulShapes { m, k, n };
+                if !shapes_match_matmul_dispatch(shapes, dispatch_x, dispatch_y, MATMUL_TILE) {
+                    return None;
+                }
+                if !signature_matches_matmul(signature, dispatch_x, dispatch_y, shapes) {
+                    return None;
+                }
+                Some(CollectionKernelPlan::QuantizedMatMul(QuantizedMatMulPlan {
+                    m,
+                    k,
+                    n,
+                    layout,
+                    tile: MATMUL_TILE,
+                    workgroup_x: signature.workgroup.x,
+                    workgroup_y: signature.workgroup.y,
+                }))
+            }
+            CollectionOpContract::GroupedMatMul {
+                dispatch_x,
+                dispatch_y,
+                m,
+                k,
+                n,
+                groups,
+                layout,
+            } => {
+                if op != MirCollectionOp::TensorGroupedMatMul {
+                    return None;
+                }
+                let shapes = MatMulShapes { m, k, n };
+                if !shapes_match_matmul_dispatch(shapes, dispatch_x, dispatch_y, MATMUL_TILE) {
+                    return None;
+                }
+                if !signature_matches_grouped_matmul(
+                    signature, dispatch_x, dispatch_y, shapes, groups,
+                ) {
+                    return None;
+                }
+                Some(CollectionKernelPlan::GroupedMatMul(GroupedMatMulPlan {
+                    m,
+                    k,
+                    n,
+                    groups,
+                    layout,
+                    tile: MATMUL_TILE,
+                    workgroup_x: signature.workgroup.x,
+                    workgroup_y: signature.workgroup.y,
+                }))
+            }
+            CollectionOpContract::SsmConv1d {
+                length,
+                channels,
+                kernel_width,
+                layout,
+            } => {
+                if op != MirCollectionOp::TensorSsmConv1d {
+                    return None;
+                }
+                if !signature_matches_ssm_extent(signature, length.saturating_mul(channels)) {
+                    return None;
+                }
+                Some(CollectionKernelPlan::SsmConv1d(SsmConv1dPlan {
+                    length,
+                    channels,
+                    kernel_width,
+                    layout,
+                }))
+            }
+            CollectionOpContract::SsmScan {
+                length,
+                state_dim,
+                layout,
+            } => {
+                if op != MirCollectionOp::TensorSsmScan {
+                    return None;
+                }
+                if !signature_matches_ssm_extent(signature, length.saturating_mul(state_dim)) {
+                    return None;
+                }
+                Some(CollectionKernelPlan::SsmScan(SsmScanPlan {
+                    length,
+                    state_dim,
+                    layout,
                 }))
             }
         }
@@ -382,6 +480,10 @@ impl CollectionKernelPlan {
             CollectionKernelPlan::CausalMaskedSoftmax(plan) => {
                 validate_causal_masked_softmax_plan(plan)
             }
+            CollectionKernelPlan::QuantizedMatMul(plan) => validate_quantized_matmul_plan(plan),
+            CollectionKernelPlan::GroupedMatMul(plan) => validate_grouped_matmul_plan(plan),
+            CollectionKernelPlan::SsmConv1d(plan) => validate_ssm_conv1d_plan(plan),
+            CollectionKernelPlan::SsmScan(plan) => validate_ssm_scan_plan(plan),
         }
     }
 }
@@ -478,6 +580,39 @@ fn signature_matches_matmul(
 /// `(TRANSPOSE_WORKGROUP_X, 1, 1)`, dispatch `(M·N, 1, 1)`, and the input and
 /// output buffers each hold the flat `M·N` element count (the transposed
 /// `[N,M]` tensor has the same element count as the `[M,N]` source).
+fn signature_matches_grouped_matmul(
+    signature: &MirKernelSignature,
+    dispatch_x: u64,
+    dispatch_y: u64,
+    shapes: MatMulShapes,
+    groups: u64,
+) -> bool {
+    signature.workgroup.x == MATMUL_TILE
+        && signature.workgroup.y == MATMUL_TILE
+        && signature.workgroup.z == 1
+        && signature.dispatch_size.x == dispatch_x
+        && signature.dispatch_size.y == dispatch_y
+        && signature.dispatch_size.z == 1
+        && signature.input.element_count == shapes.m.saturating_mul(shapes.k)
+        && signature.output.element_count == shapes.m.saturating_mul(shapes.n)
+        && signature.extra_inputs.len() == 1
+        && signature.extra_inputs[0].element_count
+            == groups
+                .saturating_mul(shapes.k)
+                .saturating_mul(shapes.n)
+}
+
+fn signature_matches_ssm_extent(signature: &MirKernelSignature, extent: u64) -> bool {
+    signature.workgroup.x == TRANSPOSE_WORKGROUP_X
+        && signature.workgroup.y == 1
+        && signature.workgroup.z == 1
+        && signature.dispatch_size.x == extent
+        && signature.dispatch_size.y == 1
+        && signature.dispatch_size.z == 1
+        && signature.input.element_count == extent
+        && signature.output.element_count == extent
+}
+
 fn signature_matches_transpose(signature: &MirKernelSignature, m: u64, n: u64) -> bool {
     let count = m.saturating_mul(n);
     signature.workgroup.x == TRANSPOSE_WORKGROUP_X

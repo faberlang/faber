@@ -258,6 +258,20 @@ pub enum MirCollectionOp {
     /// columns `j > i`). No mask tensor input (the causal structure is the
     /// recipe's semantics); the diagonal is included.
     TensorCausalMaskedSoftmax,
+    /// Packed quantized GEMM (R-PACK-01A: name frozen). Operands are a
+    /// rank-2 activation and a packed weight plus a trailing GGML type-id
+    /// const (`[left, right, layout_id]`). In-kernel block dequant; f32
+    /// accumulate. No whole-model F32 expansion.
+    TensorQuantizedMatMul,
+    /// Grouped/segmented packed GEMM over rank-3 expert slices (R-PACK-01A:
+    /// name frozen). Trailing GGML type-id const (`[left, right, layout_id]`).
+    TensorGroupedMatMul,
+    /// Hybrid SSM conv1d (R-PACK-01A: name frozen). Trailing GGML type-id
+    /// const (`[input, kernel, layout_id]`).
+    TensorSsmConv1d,
+    /// Hybrid SSM linear-recurrence scan / state update (R-PACK-01A: name
+    /// frozen). Trailing GGML type-id const (`[input, layout_id]`).
+    TensorSsmScan,
     TensorDiv,
     TensorNeg,
     /// Gaussian Error Linear Unit using the tanh approximation:

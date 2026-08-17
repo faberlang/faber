@@ -353,6 +353,14 @@ pub enum RecipeKind {
     Rope,
     /// Causal masked-row softmax recipe (GI3-1).
     CausalMaskedSoftmax,
+    /// Packed quantized GEMM recipe (R-PACK-01A).
+    QuantizedMatMul,
+    /// Grouped packed GEMM recipe (R-PACK-01A).
+    GroupedMatMul,
+    /// SSM conv1d recipe (R-PACK-01A).
+    SsmConv1d,
+    /// SSM linear-recurrence scan recipe (R-PACK-01A).
+    SsmScan,
 }
 
 impl RecipeKind {
@@ -369,6 +377,10 @@ impl RecipeKind {
             CollectionKernelPlan::RmsNormalization(_) => Self::RmsNormalization,
             CollectionKernelPlan::Rope(_) => Self::Rope,
             CollectionKernelPlan::CausalMaskedSoftmax(_) => Self::CausalMaskedSoftmax,
+            CollectionKernelPlan::QuantizedMatMul(_) => Self::QuantizedMatMul,
+            CollectionKernelPlan::GroupedMatMul(_) => Self::GroupedMatMul,
+            CollectionKernelPlan::SsmConv1d(_) => Self::SsmConv1d,
+            CollectionKernelPlan::SsmScan(_) => Self::SsmScan,
         }
     }
 }
@@ -558,7 +570,11 @@ fn plan_shared_memory_bytes(plan: &CollectionKernelPlan) -> u64 {
         | CollectionKernelPlan::Gather(_)
         | CollectionKernelPlan::RmsNormalization(_)
         | CollectionKernelPlan::Rope(_)
-        | CollectionKernelPlan::CausalMaskedSoftmax(_) => 0,
+        | CollectionKernelPlan::CausalMaskedSoftmax(_)
+        | CollectionKernelPlan::QuantizedMatMul(_)
+        | CollectionKernelPlan::GroupedMatMul(_)
+        | CollectionKernelPlan::SsmConv1d(_)
+        | CollectionKernelPlan::SsmScan(_) => 0,
         CollectionKernelPlan::TreeReduction(plan) => {
             shared_memory_layout_bytes(&plan.shared_memory)
         }
@@ -628,6 +644,10 @@ pub fn is_recipe_op(op: MirCollectionOp) -> bool {
             | MirCollectionOp::TensorRope
             | MirCollectionOp::TensorGather
             | MirCollectionOp::TensorCausalMaskedSoftmax
+            | MirCollectionOp::TensorQuantizedMatMul
+            | MirCollectionOp::TensorGroupedMatMul
+            | MirCollectionOp::TensorSsmConv1d
+            | MirCollectionOp::TensorSsmScan
     )
 }
 
@@ -938,6 +958,109 @@ pub fn contract_shape_signature(
             };
             signature.dispatch_size = MirKernelDispatchSize {
                 x: m.saturating_mul(n),
+                y: 1,
+                z: 1,
+            };
+        }
+        CollectionOpContract::QuantizedMatMul {
+            dispatch_x,
+            dispatch_y,
+            m,
+            k,
+            n,
+            ..
+        } => {
+            let left_ty = recipe_operand_ty(function, MirCollectionOp::TensorQuantizedMatMul)?;
+            let element_ty = tensor_element_ty(left_ty, validation)?;
+            signature.input = storage_input(0, element_ty, m.saturating_mul(k));
+            signature.extra_inputs.push(storage_input(
+                1,
+                element_ty,
+                k.saturating_mul(n),
+            ));
+            signature.output = storage_output(2, element_ty, m.saturating_mul(n));
+            signature.output.source_local =
+                recipe_destination_local_for(function, MirCollectionOp::TensorQuantizedMatMul);
+            signature.workgroup = MirWorkgroupSize {
+                x: crate::kernel_plan::MATMUL_TILE,
+                y: crate::kernel_plan::MATMUL_TILE,
+                z: 1,
+            };
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: dispatch_x,
+                y: dispatch_y,
+                z: 1,
+            };
+        }
+        CollectionOpContract::GroupedMatMul {
+            dispatch_x,
+            dispatch_y,
+            m,
+            k,
+            n,
+            groups,
+            ..
+        } => {
+            let left_ty = recipe_operand_ty(function, MirCollectionOp::TensorGroupedMatMul)?;
+            let element_ty = tensor_element_ty(left_ty, validation)?;
+            signature.input = storage_input(0, element_ty, m.saturating_mul(k));
+            signature.extra_inputs.push(storage_input(
+                1,
+                element_ty,
+                groups.saturating_mul(k).saturating_mul(n),
+            ));
+            signature.output = storage_output(2, element_ty, m.saturating_mul(n));
+            signature.output.source_local =
+                recipe_destination_local_for(function, MirCollectionOp::TensorGroupedMatMul);
+            signature.workgroup = MirWorkgroupSize {
+                x: crate::kernel_plan::MATMUL_TILE,
+                y: crate::kernel_plan::MATMUL_TILE,
+                z: 1,
+            };
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: dispatch_x,
+                y: dispatch_y,
+                z: 1,
+            };
+        }
+        CollectionOpContract::SsmConv1d {
+            length, channels, ..
+        } => {
+            let operand_ty = recipe_operand_ty(function, MirCollectionOp::TensorSsmConv1d)?;
+            let element_ty = tensor_element_ty(operand_ty, validation)?;
+            let extent = length.saturating_mul(channels);
+            signature.input = storage_input(0, element_ty, extent);
+            signature.output = storage_output(1, element_ty, extent);
+            signature.output.source_local =
+                recipe_destination_local_for(function, MirCollectionOp::TensorSsmConv1d);
+            signature.workgroup = MirWorkgroupSize {
+                x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+                y: 1,
+                z: 1,
+            };
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: extent,
+                y: 1,
+                z: 1,
+            };
+        }
+        CollectionOpContract::SsmScan {
+            length, state_dim, ..
+        } => {
+            let operand_ty = recipe_operand_ty(function, MirCollectionOp::TensorSsmScan)?;
+            let element_ty = tensor_element_ty(operand_ty, validation)?;
+            let extent = length.saturating_mul(state_dim);
+            signature.input = storage_input(0, element_ty, extent);
+            signature.output = storage_output(1, element_ty, extent);
+            signature.output.source_local =
+                recipe_destination_local_for(function, MirCollectionOp::TensorSsmScan);
+            signature.workgroup = MirWorkgroupSize {
+                x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+                y: 1,
+                z: 1,
+            };
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: extent,
                 y: 1,
                 z: 1,
             };

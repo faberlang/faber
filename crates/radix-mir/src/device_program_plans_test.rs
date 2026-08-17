@@ -22,9 +22,10 @@ use crate::kernel_plan::{
 use crate::layout::MirTensorStorageLayout;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock,
-    MirBlockId, MirConstant, MirFunction, MirFunctionId, MirIntrinsic, MirLocal, MirLocalId,
-    MirOperand, MirParam, MirParamMode, MirPlace, MirRuntimeCall, MirStatement, MirStatementKind,
-    MirTerminator, MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId, MirValueKind,
+    MirBlockId, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirIntrinsic, MirLocal,
+    MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirRuntimeCall, MirStatement,
+    MirStatementKind, MirTerminator, MirTerminatorKind, MirType, MirUnOp, MirValidationContext,
+    MirValue, MirValueId, MirValueKind,
 };
 use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
@@ -3323,4 +3324,96 @@ fn underfilled_output_fails_closed() {
             dispatched: 2,
         })
     ));
+}
+
+fn quantized_matmul_function(types: &mut TypeTable) -> MirFunction {
+    let left = rank2_tensor_ty(types, [8, 16]);
+    let right = rank2_tensor_ty(types, [16, 16]);
+    let out = rank2_tensor_ty(types, [8, 16]);
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: left,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: None,
+                ty: right,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+        ],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: left,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: right,
+                mutable: false,
+                span: test_span(),
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(2))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorQuantizedMatMul),
+                        args: vec![
+                            MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                            MirOperand::Constant(MirConstant::Int(12)),
+                        ],
+                        return_ty: out,
+                    },
+                },
+                span: test_span(),
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(2),
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: out,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
+}
+
+#[test]
+fn kernel_plan_for_function_derives_q4k_quantized_matmul_plan() {
+    let mut types = TypeTable::new();
+    let function = quantized_matmul_function(&mut types);
+    let shapes = MatMulShapes { m: 8, k: 16, n: 16 };
+    let signature = matmul_signature(shapes, 2, 1);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("Q4_K function facts resolve")
+        .expect("Q4_K function carries a packed recipe plan");
+    let CollectionKernelPlan::QuantizedMatMul(plan) = &derived else {
+        panic!("Q4_K fixture must resolve QuantizedMatMul, got {derived:?}");
+    };
+    assert_eq!(plan.layout, crate::abi::PackedStorageLayout::Q4_K);
+    assert_eq!((plan.m, plan.k, plan.n), (8, 16, 16));
 }

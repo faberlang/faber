@@ -508,6 +508,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorMatMul
             | MirCollectionOp::TensorCruxEntropia
             | MirCollectionOp::TensorGather
+            | MirCollectionOp::TensorSsmScan
             | MirCollectionOp::TensorDiv
             | MirCollectionOp::RegexMatches
             | MirCollectionOp::SparseGet
@@ -524,6 +525,9 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorFromFlat
             | MirCollectionOp::TensorSlice
             | MirCollectionOp::TensorRope
+            | MirCollectionOp::TensorQuantizedMatMul
+            | MirCollectionOp::TensorGroupedMatMul
+            | MirCollectionOp::TensorSsmConv1d
             | MirCollectionOp::SparseSet => 3,
             MirCollectionOp::TensorRmsNorm => 4,
             MirCollectionOp::TensorLayerNorm => 0,
@@ -1134,7 +1138,11 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorRelu
             | MirCollectionOp::TensorSoftmax
             | MirCollectionOp::TensorTranspose
-            | MirCollectionOp::TensorCausalMaskedSoftmax => {
+            | MirCollectionOp::TensorCausalMaskedSoftmax
+            | MirCollectionOp::TensorQuantizedMatMul
+            | MirCollectionOp::TensorGroupedMatMul
+            | MirCollectionOp::TensorSsmConv1d
+            | MirCollectionOp::TensorSsmScan => {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };

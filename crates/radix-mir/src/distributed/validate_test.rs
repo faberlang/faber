@@ -1080,6 +1080,10 @@ fn collection_kernel_plan_carries_no_communication_variant() {
             CollectionKernelPlan::RmsNormalization(_) => true,
             CollectionKernelPlan::Rope(_) => true,
             CollectionKernelPlan::CausalMaskedSoftmax(_) => true,
+            CollectionKernelPlan::QuantizedMatMul(_) => true,
+            CollectionKernelPlan::GroupedMatMul(_) => true,
+            CollectionKernelPlan::SsmConv1d(_) => true,
+            CollectionKernelPlan::SsmScan(_) => true,
         }
     }
 
