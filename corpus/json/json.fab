@@ -13,7 +13,7 @@ locale = "en"
 # What this teaches:
 #   • JSON type conversions using `↦` — converting between `json`, `valor`, and concrete Faber types
 #   • the `@json` annotation for custom field naming and genus-level JSON configuration
-#   • roundtrip serialization with `json.pange()` and deserialization with `json.solve()`
+#   • roundtrip serialization with `json.stringify()` and deserialization with `json.parse()`
 #
 # Common mistakes:
 #   • Applying @ json to a non-genus declaration — @ json is only supported on genus declarations and their fields.
@@ -36,15 +36,15 @@ main {
 
     const Payload payload ← narrowed ↦ Payload
     const json encoded ← payload ↦ json
-    const string wire ← json.pange(encoded)
-    const json ∪ null tentativa ← json.tempta(wire)
+    const string wire ← json.stringify(encoded)
+    const json ∪ null tentativa ← json.try_parse(wire)
 
     print payload.name
     print wire
     print tentativa
 
     do {
-        const json reparsed ← json.solve(wire)
+        const json reparsed ← json.parse(wire)
         const Payload roundtrip ← reparsed ↦ Payload
         print roundtrip.name
     }

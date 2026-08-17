@@ -3,32 +3,32 @@ term = "async solum leget"
 kind = "concept"
 category = "ad"
 canonical = true
-summary = "Async solum.leget<T> uses the same solum:lege route as sync solum.lege<T>."
-syntax = "solum.leget<textus>(via)"
+summary = "Async solum.read_file_async<T> uses the same solum:lege route as sync solum.read_file<T>."
+syntax = "solum.read_file_async<textus>(via)"
 related = ["ad", "solum", "futura", "sermo"]
 locale = "en"
 +++
 
 # =============================================================================
-# async solum leget — async solum.leget<T> uses the same solum:lege route as
-# sync solum.lege<T>.
+# async solum leget — async solum.read_file_async<T> uses the same solum:lege route as
+# sync solum.read_file<T>.
 # =============================================================================
 #
 # What this teaches:
-#   • Async/sync proof pair — `solum.leget<T>` and `solum.lege<T>` share the
+#   • Async/sync proof pair — `solum.read_file_async<T>` and `solum.read_file<T>` share the
 #     same host route; the async callable posture selects the async receive path
 #   • Import syntax — `importa ex "norma:solum"` brings in standard library
 #     modules
 #
 # Common mistakes:
-#   • using an ad expression outside the AIR lane or confusing the async route syntax — `solum.leget<T>` must be awaited from `incipiet`
+#   • using an ad expression outside the AIR lane or confusing the async route syntax — `solum.read_file_async<T>` must be awaited from `incipiet`
 #
 # See also: ad, solum, futura, sermo
 # =============================================================================
 
 # Async `ad` materialization through a standard-library proof pair.
 #
-# `solum.leget<T>` is the async-posture twin of `solum.lege<T>`. Norma currently
+# `solum.read_file_async<T>` is the async-posture twin of `solum.read_file<T>`. Norma currently
 # declares the wrapper with compatibility `@ futura`; callers consume it through
 # the explicit morphology forms such as `figendum`.
 
@@ -36,8 +36,8 @@ import from "norma:solum" solum
 
 async_main {
     const string textPath ← "/tmp/faber-async-solum-leget.txt"
-    solum.scribe(textPath, "async solum\n")
+    solum.write_file(textPath, "async solum\n")
 
-    await_const string body ← solum.leget<string>(textPath)
+    await_const string body ← solum.read_file_async<string>(textPath)
     assert body ≡ "async solum\n"
 }

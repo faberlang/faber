@@ -1226,7 +1226,7 @@ fn run() → void {}
 #[test]
 fn run_norma_library_import_executes_without_rust_emit() {
     // LIB-MIR: non-bridged `norma:*` source libraries link into the
-    // interpreted script path (chorda.retorta runs). The script must execute
+    // interpreted script path (chorda.reverse runs). The script must execute
     // without emitting Rust artifacts.
     let package = temp_dir("norma-linked");
     fs::write(
@@ -1235,7 +1235,7 @@ fn run_norma_library_import_executes_without_rust_emit() {
 import from "norma:chorda" chorda
 
 main {
-  print chorda.retorta("roma")
+  print chorda.reverse("roma")
 }
 "#,
     )

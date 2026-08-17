@@ -3,14 +3,14 @@ term = "async tempus dormiet"
 kind = "concept"
 category = "ad"
 canonical = true
-summary = "Async tempus.dormiet and sync tempus.expectet share the tempus:dormiet route."
-syntax = "tempus.expectet(ms) | tacebit tempus.dormiet(ms)"
+summary = "Async tempus.sleep_async and sync tempus.sleep share the tempus:dormiet route."
+syntax = "tempus.sleep(ms) | tacebit tempus.sleep_async(ms)"
 related = ["ad", "tempus", "futura", "sermo"]
 locale = "en"
 +++
 
 # =============================================================================
-# async tempus dormiet — async tempus.dormiet and sync tempus.expectet share
+# async tempus dormiet — async tempus.sleep_async and sync tempus.sleep share
 # the tempus:dormiet route.
 # =============================================================================
 #
@@ -34,7 +34,7 @@ locale = "en"
 import from "norma:tempus" tempus
 
 async_main {
-    tempus.expectet(0)
-    await tempus.dormiet(0)
+    tempus.sleep(0)
+    await tempus.sleep_async(0)
     assert true
 }

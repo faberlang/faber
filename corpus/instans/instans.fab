@@ -26,7 +26,7 @@ locale = "en"
 #
 # GRAMMAR:
 #   instans | instans<ms> | instans<us> | instans<ns>
-#   tempus.nunc() → instans<ns>; downconvert at use site
+#   tempus.now() → instans<ns>; downconvert at use site
 #   valor ↦ instans<N> | instans ↦ textus
 #
 # EXPECTED OUTPUT:
@@ -42,7 +42,7 @@ fn epoch_wire(instant t) → string {
 
 main {
     # --- precision declarations from canonical nanosecond wall clock ---
-    const instant<ns> nanos ← tempus.nunc()
+    const instant<ns> nanos ← tempus.now()
     const instant secunda ← nanos ↦ instant
     const instant<ms> millis ← nanos ↦ instant<ms>
     const instant<us> micros ← nanos ↦ instant<us>
@@ -56,8 +56,8 @@ main {
     assert parsed ≡ normalized else "offset ingest normalizes to UTC instant"
 
     # --- TOML datetime provenance (Valor::Instans carrier, not textus) ---
-    const valor doc ← toml.solve("creatus = 1979-05-27T07:32:00.123456Z")
-    const valor carrier ← valor.cape(doc, "creatus")
+    const valor doc ← toml.parse("creatus = 1979-05-27T07:32:00.123456Z")
+    const valor carrier ← valor.get(doc, "creatus")
     const instant<us> fromToml ← carrier ↦ instant<us>
     assert fromToml ↦ string ≡ "1979-05-27T07:32:00.123456Z" else "emit honors micros contract"
 
@@ -82,8 +82,8 @@ main {
 
     # --- wire emit and parse-back via TOML (same instant) ---
     const string wire ← epoch_wire(parsed)
-    const valor replayDoc ← toml.solve("creatus = 1979-05-27T07:32:00Z")
-    const valor replayCarrier ← valor.cape(replayDoc, "creatus")
+    const valor replayDoc ← toml.parse("creatus = 1979-05-27T07:32:00Z")
+    const valor replayCarrier ← valor.get(replayDoc, "creatus")
     const instant roundtrip ← replayCarrier ↦ instant
     assert roundtrip ≡ parsed else "TOML ingest roundtrip matches UTC valor extract"
     assert wire ≡ "1979-05-27T07:32:00Z" else "seconds-precision wire emit"

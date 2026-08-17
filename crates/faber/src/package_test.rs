@@ -524,7 +524,7 @@ import from "norma:json/solve" solve as json_solve
 
 main {
   do {
-    const json parsed ← json_solve.solve("{}")
+    const json parsed ← json_solve.parse("{}")
     print parsed
   }
   catch err {
@@ -549,8 +549,8 @@ main {
         panic!("expected rust output");
     };
 
-    assert!(output.code.contains("fn solve"));
-    assert!(!output.code.contains("norma::json::solve"));
+    assert!(output.code.contains("fn parse"));
+    assert!(!output.code.contains("norma::json::parse"));
     assert!(!output.code.contains("crate::norma::json"));
 }
 
@@ -565,10 +565,10 @@ import from "norma:json" json
 
 main {
   do {
-    const json arr ← json.solve("[1]")
-    const string arr_wire ← json.pange(arr)
-    const json obj ← json.solve("{\"a\":1}")
-    const string obj_wire ← json.pange(obj)
+    const json arr ← json.parse("[1]")
+    const string arr_wire ← json.stringify(arr)
+    const json obj ← json.parse("{\"a\":1}")
+    const string obj_wire ← json.stringify(obj)
     print arr_wire
     print obj_wire
   }
@@ -593,14 +593,14 @@ main {
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
     };
-    assert!(output.code.contains("fn solve"));
-    assert!(output.code.contains("fn pange"));
+    assert!(output.code.contains("fn parse"));
+    assert!(output.code.contains("fn stringify"));
     assert!(output
         .code
         .contains("deferred pending runtime codec dispatch"));
     assert!(!output.code.contains("faber::Json::parse"));
     assert!(!output.code.contains(".to_wire()"));
-    assert!(!output.code.contains("norma::json::solve"));
+    assert!(!output.code.contains("norma::json::parse"));
     assert!(!output.code.contains("crate::norma::json"));
 }
 
@@ -656,11 +656,11 @@ class Payload {
 main {
   do {
     const string original ← "{\"counts\":[1,2],\"name\":\"Ada\"}"
-    const json parsed ← json.solve(original)
+    const json parsed ← json.parse(original)
     const Payload payload ← parsed ↦ Payload
-    const json encoded ← json.solve(original)
-    const string wire ← json.pange(encoded)
-    const json reparsed ← json.solve(wire)
+    const json encoded ← json.parse(original)
+    const string wire ← json.stringify(encoded)
+    const json reparsed ← json.parse(wire)
     const Payload roundtrip ← reparsed ↦ Payload
     print payload.name
     print payload.counts.longitudo()
@@ -959,7 +959,7 @@ import from "norma:solum" solum
 @ operand string root
 main args args {
   var list<string> partes ← [args.root, "nested"]
-  print solum.iunge(partes)
+  print solum.join(partes)
 }
 "#,
     )
@@ -978,7 +978,7 @@ main args args {
         "requirement = \"host:argv\"",
         "requirement = \"host:fs\"",
         "requirement = \"host:stdout\"",
-        "requirement = \"kernel:solum.iunge\"",
+        "requirement = \"kernel:solum.join\"",
     ] {
         assert!(
             manifest.contains(requirement),
@@ -1130,6 +1130,9 @@ fn package_mir_artifact_harness_coreutils_touch() {
 [package]
 name = "touch-artifact-floor"
 
+[locale]
+locale = "la"
+
 [paths]
 source = "src"
 entry = "main.fab"
@@ -1138,9 +1141,10 @@ entry = "main.fab"
         .expect("write manifest");
         let workspace_root = radix::paths::faberlang_home().expect("faberlang container root");
         let touch_source = workspace_root.join("examples/coreutils/packages/touch/src/main.fab");
+        let touch_source_text = fs::read_to_string(&touch_source).expect("read coreutils touch");
         fs::write(
             src.join("main.fab"),
-            fs::read_to_string(&touch_source).expect("read coreutils touch"),
+            format!("+++\nlocale = \"la\"\n+++\n{touch_source_text}"),
         )
         .expect("write touch source copy");
         let input = dir.to_path_buf();
@@ -1985,7 +1989,7 @@ import from "norma:solum" solum
 import from "norma:toml" toml
 
 main {
-  solum.scribe("/tmp/faber-package-mir-callback.txt", "salve")
+  solum.write_file("/tmp/faber-package-mir-callback.txt", "salve")
 }
 "#,
     )
@@ -2054,7 +2058,7 @@ fn assert_package_corpus_llvm_smoke(relative: &str, label: &str) {
 
 #[test]
 fn package_mir_bridges_norma_solum_crea_iunge_exstat_amputa() {
-    let dir = test_temp_dir("package-mir-solum-crea-dele");
+    let dir = test_temp_dir("package-mir-solum-create_dir-delete");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
@@ -2065,11 +2069,11 @@ import from "norma:solum" solum
 @ operand string root
 main args args {
   var list<string> partes ← [args.root, "nested"]
-  const string nested ← solum.iunge(partes)
-  solum.crea(nested)
-  print solum.exstat(nested)
-  solum.amputa(nested)
-  print solum.exstat(nested)
+  const string nested ← solum.join(partes)
+  solum.create_dir(nested)
+  print solum.exists(nested)
+  solum.remove_tree(nested)
+  print solum.exists(nested)
 }
 "#,
     )
@@ -2085,7 +2089,7 @@ main args args {
 
     assert!(
         result.is_ok(),
-        "expected solum crea/iunge/exstat/amputa bridge success, got {:?}",
+        "expected solum create_dir/join/exists/remove_tree bridge success, got {:?}",
         result
             .err()
             .unwrap_or_default()
@@ -2101,7 +2105,7 @@ main args args {
 
 #[test]
 fn package_mir_bridges_norma_solum_tange_scribe_lege() {
-    let dir = test_temp_dir("package-mir-solum-tange-scribe");
+    let dir = test_temp_dir("package-mir-solum-touch-write_file");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
@@ -2112,15 +2116,15 @@ import from "norma:solum" solum
 @ operand string root
 main args args {
   var list<string> partes ← [args.root]
-  const string dir ← solum.iunge(partes)
-  solum.crea(dir)
+  const string dir ← solum.join(partes)
+  solum.create_dir(dir)
   partes ← [dir, "target.txt"]
-  const string target ← solum.iunge(partes)
-  solum.tange(target)
-  solum.scribe(target, "alpha")
-  print solum.lege<string>(target)
-  solum.dele(target)
-  solum.amputa(dir)
+  const string target ← solum.join(partes)
+  solum.touch(target)
+  solum.write_file(target, "alpha")
+  print solum.read_file<string>(target)
+  solum.delete(target)
+  solum.remove_tree(dir)
 }
 "#,
     )
@@ -2136,7 +2140,7 @@ main args args {
 
     assert!(
         result.is_ok(),
-        "expected solum tange/scribe/lege bridge success, got {:?}",
+        "expected solum touch/write_file/read_file bridge success, got {:?}",
         result
             .err()
             .unwrap_or_default()
@@ -2149,7 +2153,7 @@ main args args {
 
 #[test]
 fn package_mir_bridges_norma_solum_exscribe_renomina() {
-    let dir = test_temp_dir("package-mir-solum-exscribe-renomina");
+    let dir = test_temp_dir("package-mir-solum-copy-rename");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
@@ -2160,22 +2164,22 @@ import from "norma:solum" solum
 @ operand string root
 main args args {
   var list<string> partes ← [args.root]
-  const string dir ← solum.iunge(partes)
-  solum.crea(dir)
+  const string dir ← solum.join(partes)
+  solum.create_dir(dir)
   partes ← [dir, "source.txt"]
-  const string source ← solum.iunge(partes)
+  const string source ← solum.join(partes)
   partes ← [dir, "copy.txt"]
-  const string copy ← solum.iunge(partes)
+  const string copy ← solum.join(partes)
   partes ← [dir, "moved.txt"]
-  const string moved ← solum.iunge(partes)
-  solum.tange(source)
-  solum.scribe(source, "alpha")
-  solum.exscribe(source, copy)
-  solum.renomina(copy, moved)
-  print solum.lege<string>(moved)
-  solum.dele(source)
-  solum.dele(moved)
-  solum.amputa(dir)
+  const string moved ← solum.join(partes)
+  solum.touch(source)
+  solum.write_file(source, "alpha")
+  solum.copy(source, copy)
+  solum.rename(copy, moved)
+  print solum.read_file<string>(moved)
+  solum.delete(source)
+  solum.delete(moved)
+  solum.remove_tree(dir)
 }
 "#,
     )
@@ -2191,7 +2195,7 @@ main args args {
 
     assert!(
         result.is_ok(),
-        "expected solum exscribe/renomina bridge success, got {:?}",
+        "expected solum copy/rename bridge success, got {:?}",
         result
             .err()
             .unwrap_or_default()
@@ -2204,7 +2208,7 @@ main args args {
 
 #[test]
 fn package_mir_bridges_norma_solum_mensura_regularene_directoriumne() {
-    let dir = test_temp_dir("package-mir-solum-mensura");
+    let dir = test_temp_dir("package-mir-solum-byte_length");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
@@ -2215,16 +2219,16 @@ import from "norma:solum" solum
 @ operand string root
 main args args {
   var list<string> partes ← [args.root, "nested"]
-  const string nested ← solum.iunge(partes)
-  solum.crea(nested)
+  const string nested ← solum.join(partes)
+  solum.create_dir(nested)
   partes ← [nested, "source.bin"]
-  const string source ← solum.iunge(partes)
-  solum.tange(source)
-  print solum.mensura(source)
-  print solum.regularene(source)
-  print solum.directoriumne(nested)
-  solum.dele(source)
-  solum.amputa(nested)
+  const string source ← solum.join(partes)
+  solum.touch(source)
+  print solum.byte_length(source)
+  print solum.is_regular(source)
+  print solum.is_directory(nested)
+  solum.delete(source)
+  solum.remove_tree(nested)
 }
 "#,
     )
@@ -2240,7 +2244,7 @@ main args args {
 
     assert!(
         result.is_ok(),
-        "expected solum mensura/regularene/directoriumne bridge success, got {:?}",
+        "expected solum byte_length/is_regular/is_directory bridge success, got {:?}",
         result
             .err()
             .unwrap_or_default()
@@ -2257,7 +2261,7 @@ main args args {
 
 #[test]
 fn package_mir_bridges_norma_solum_modus_mode_verbs() {
-    let dir = test_temp_dir("package-mir-solum-modus");
+    let dir = test_temp_dir("package-mir-solum-mode");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
@@ -2268,15 +2272,15 @@ import from "norma:solum" solum
 @ operand string root
 main args args {
   var list<string> partes ← [args.root, "nested"]
-  const string nested ← solum.iunge(partes)
-  solum.crea(nested)
+  const string nested ← solum.join(partes)
+  solum.create_dir(nested)
   partes ← [nested, "target.bin"]
-  const string target ← solum.iunge(partes)
-  solum.tange(target)
-  solum.modum(target, 384)
-  print solum.modus(target)
-  solum.dele(target)
-  solum.amputa(nested)
+  const string target ← solum.join(partes)
+  solum.touch(target)
+  solum.set_mode(target, 384)
+  print solum.mode(target)
+  solum.delete(target)
+  solum.remove_tree(nested)
 }
 "#,
     )
@@ -2292,7 +2296,7 @@ main args args {
 
     assert!(
         result.is_ok(),
-        "expected solum modus bridge success, got {:?}",
+        "expected solum mode bridge success, got {:?}",
         result
             .err()
             .unwrap_or_default()
@@ -2316,20 +2320,20 @@ import from "norma:solum" solum
 @ operand string root
 main args args {
   var list<string> partes ← [args.root, "nested"]
-  const string nested ← solum.iunge(partes)
-  solum.crea(nested)
+  const string nested ← solum.join(partes)
+  solum.create_dir(nested)
   partes ← [nested, "source.bin"]
-  const string source ← solum.iunge(partes)
+  const string source ← solum.join(partes)
   partes ← [nested, "source-link"]
-  const string link ← solum.iunge(partes)
+  const string link ← solum.join(partes)
   const bytes payload ← |41 42|
-  solum.funde(source, payload)
-  solum.vincula(source, link)
-  print solum.vinculumne(link)
-  print solum.sequere(link)
-  solum.dele(link)
-  solum.dele(source)
-  solum.amputa(nested)
+  solum.write_bytes(source, payload)
+  solum.create_link(source, link)
+  print solum.is_symlink(link)
+  print solum.read_link(link)
+  solum.delete(link)
+  solum.delete(source)
+  solum.remove_tree(nested)
 }
 "#,
     )
@@ -2363,7 +2367,7 @@ main args args {
 
 #[test]
 fn package_mir_bridges_norma_solum_funde_octeti() {
-    let dir = test_temp_dir("package-mir-solum-funde");
+    let dir = test_temp_dir("package-mir-solum-write_bytes");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
@@ -2374,15 +2378,15 @@ import from "norma:solum" solum
 @ operand string root
 main args args {
   var list<string> partes ← [args.root, "dir"]
-  const string dir ← solum.iunge(partes)
-  solum.crea(dir)
+  const string dir ← solum.join(partes)
+  solum.create_dir(dir)
   partes ← [dir, "data.bin"]
-  const string target ← solum.iunge(partes)
+  const string target ← solum.join(partes)
   const bytes payload ← |41 42 43|
-  solum.funde(target, payload)
-  print solum.mensura(target)
-  solum.dele(target)
-  solum.amputa(dir)
+  solum.write_bytes(target, payload)
+  print solum.byte_length(target)
+  solum.delete(target)
+  solum.remove_tree(dir)
 }
 "#,
     )
@@ -2398,7 +2402,7 @@ main args args {
 
     assert!(
         result.is_ok(),
-        "expected solum funde/octeti bridge success, got {:?}",
+        "expected solum write_bytes/octeti bridge success, got {:?}",
         result
             .err()
             .unwrap_or_default()
@@ -4584,11 +4588,11 @@ main {
         panic!("expected rust output");
     };
 
-    assert!(output.code.contains("fn retorta"));
-    assert!(output.code.contains("retorta(\"roma\".to_string())"));
+    assert!(output.code.contains("fn reverse"));
+    assert!(output.code.contains("reverse(\"roma\".to_string())"));
     assert!(output.code.contains("pub mod chorda"));
-    assert!(output.code.contains("crate::chorda::retorta"));
-    assert!(!output.code.contains("norma::chorda::retorta"));
+    assert!(output.code.contains("crate::chorda::reverse"));
+    assert!(!output.code.contains("norma::chorda::reverse"));
     assert!(!output.code.contains("panic!(\"unimplemented\")"));
 }
 
@@ -4602,11 +4606,11 @@ fn compile_package_resolves_type_only_norma_file_namespace_import() {
 import from "norma:caelum/terminus" terminus
 
 main {
-  const terminus.Terminus endpoint ← terminus.Terminus {
-    hospes = "localhost",
-    portus = 8080
+  const terminus.Endpoint endpoint ← terminus.Endpoint {
+    host = "localhost",
+    port = 8080
   }
-  print endpoint.hospes
+  print endpoint.host
 }
 "#,
     )
@@ -4632,9 +4636,9 @@ main {
 
     assert!(output.code.contains("pub mod caelum"));
     assert!(output.code.contains("pub mod terminus"));
-    assert!(output.code.contains("pub struct Terminus"));
+    assert!(output.code.contains("pub struct Endpoint"));
     assert!(output.code.contains(
-        "let endpoint: crate::caelum::terminus::Terminus = crate::caelum::terminus::Terminus"
+        "let endpoint: crate::caelum::terminus::Endpoint = crate::caelum::terminus::Endpoint"
     ));
 }
 
@@ -4750,7 +4754,7 @@ import from "norma:chorda" chorda
 
 main {
   do {
-    const [meta, corpus] ← chorda.diducta("+++\na = 1\n+++\nbody", "+++")
+    const [meta, corpus] ← chorda.split_frontmatter("+++\na = 1\n+++\nbody", "+++")
     print meta, corpus
   } catch err {
     warn err
@@ -4774,9 +4778,9 @@ main {
         panic!("expected rust output");
     };
 
-    assert!(output.code.contains("fn diducta"));
-    assert!(output.code.contains("fn _finis_delimitris"));
-    assert!(!output.code.contains("norma::chorda::diducta"));
+    assert!(output.code.contains("fn split_frontmatter"));
+    assert!(output.code.contains("fn _delimiter_end"));
+    assert!(!output.code.contains("norma::chorda::split_frontmatter"));
     assert!(!output.code.contains("faber::frame::sermo_open"));
 }
 
@@ -4790,9 +4794,9 @@ fn compile_package_chorda_retenta_filters_codegen() {
 import from "norma:chorda" chorda
 
 main {
-  print chorda.retenta("hello7!", "a", "z")
-  print chorda.retenta_iudicio("hello7!", string c ∴ c ≥ 'a' and c ≤ 'z')
-  print chorda.expurgata("hello7!", "0", "9")
+  print chorda.keep_between("hello7!", "a", "z")
+  print chorda.keep_if("hello7!", string c ∴ c ≥ 'a' and c ≤ 'z')
+  print chorda.drop_between("hello7!", "0", "9")
 }
 "#,
     )
@@ -4813,12 +4817,12 @@ main {
     };
 
     assert!(
-        output.code.contains("fn retenta("),
+        output.code.contains("fn keep_between("),
         "interval filter should export retenta: {}",
         output.code
     );
     assert!(
-        output.code.contains("fn retenta_iudicio("),
+        output.code.contains("fn keep_if("),
         "predicate filter should export retenta_iudicio: {}",
         output.code
     );
@@ -4860,10 +4864,9 @@ main {
     };
 
     assert!(output.code.contains("pub mod tensor"));
-    assert!(output.code.contains("fn planata"));
-    assert!(output.code.contains("fn structa"));
-    assert!(output.code.contains("grid.planata()"));
-    assert!(!output.code.contains("norma::tensor::planata"));
+    assert!(output.code.contains("fn flatten"));
+    assert!(output.code.contains("fn construct"));
+    assert!(!output.code.contains("norma::tensor::flatten"));
 }
 
 #[test]
@@ -4876,8 +4879,8 @@ fn compile_package_resolves_builtin_norma_chorda_mixed_native_and_runtime_backed
 import from "norma:chorda" chorda
 
 main {
-  const bytes raw ← chorda.pange("Salve")
-  print chorda.solve(raw)
+  const bytes raw ← chorda.encode("Salve")
+  print chorda.decode(raw)
 }
 "#,
     )
@@ -4897,11 +4900,11 @@ main {
         panic!("expected rust output");
     };
 
-    assert!(output.code.contains("fn retorta"));
+    assert!(output.code.contains("fn reverse"));
     assert!(output.code.contains("pub mod chorda"));
-    assert!(output.code.contains("crate::chorda::pange"));
-    assert!(output.code.contains("crate::chorda::solve"));
-    assert!(output.code.contains("pub(crate) fn pange"));
+    assert!(output.code.contains("crate::chorda::encode"));
+    assert!(output.code.contains("crate::chorda::decode"));
+    assert!(output.code.contains("pub(crate) fn encode"));
 }
 
 #[test]
@@ -4914,7 +4917,7 @@ fn compile_package_resolves_builtin_norma_toml_library_imports() {
 import from "norma:toml" toml
 
 main {
-  const _ parsed ← toml.solve("name = \"faber\"")
+  const _ parsed ← toml.parse("name = \"faber\"")
 }
 "#,
     )
@@ -4934,9 +4937,9 @@ main {
         panic!("expected rust output");
     };
 
-    assert!(output.code.contains("crate::toml::solve"));
-    assert!(output.code.contains("pub(crate) fn solve"));
-    assert!(!output.code.contains("norma::toml::solve"));
+    assert!(output.code.contains("crate::toml::parse"));
+    assert!(output.code.contains("pub(crate) fn parse"));
+    assert!(!output.code.contains("norma::toml::parse"));
 }
 
 #[test]
@@ -4950,9 +4953,9 @@ import from "norma:toml" toml
 import from "norma:valor" value
 
 main {
-  const value doc ← toml.solve("id = \"sample\"")
+  const value doc ← toml.parse("id = \"sample\"")
   do {
-    const string id ← value.exige(doc, "id")
+    const string id ← value.require_string(doc, "id")
     print id
   } catch err {
     warn err
@@ -4976,10 +4979,10 @@ main {
         panic!("expected rust output");
     };
 
-    assert!(output.code.contains("fn cape"));
-    assert!(output.code.contains("fn exige"));
-    assert!(!output.code.contains("norma::toml::cape"));
-    assert!(!output.code.contains("norma::toml::exige"));
+    assert!(output.code.contains("fn get"));
+    assert!(output.code.contains("fn require_string"));
+    assert!(!output.code.contains("norma::valor::get"));
+    assert!(!output.code.contains("norma::valor::require_string"));
 }
 
 #[test]
@@ -4993,9 +4996,9 @@ import from "norma:toml" toml
 import from "norma:valor" value
 
 main {
-  const value doc ← toml.solve("id = \"sample\"")
+  const value doc ← toml.parse("id = \"sample\"")
   do {
-    value.exige_claves(doc, ["id", "name"])
+    value.require_strings(doc, ["id", "name"])
     print "ok"
   } catch err {
     warn err
@@ -5019,8 +5022,8 @@ main {
         panic!("expected rust output");
     };
 
-    assert!(output.code.contains("fn exige_claves"));
-    assert!(!output.code.contains("norma::toml::exige_claves"));
+    assert!(output.code.contains("fn require_strings"));
+    assert!(!output.code.contains("norma::valor::require_strings"));
 }
 
 #[test]
@@ -5053,8 +5056,8 @@ main {
         panic!("expected rust output");
     };
 
-    assert!(output.code.contains("fn explora"));
-    assert!(!output.code.contains("norma::solum::explora"));
+    assert!(output.code.contains("fn glob"));
+    assert!(!output.code.contains("norma::solum::glob"));
 }
 
 #[test]
@@ -5067,9 +5070,9 @@ fn compile_package_resolves_builtin_norma_consolum_ad_wrapped_imports() {
 import from "norma:consolum" consolum
 
 main {
-  consolum.dic("salve")
-  const _ tty ← consolum.audit()
-  consolum.funde(|48 65 6c 6c 6f|)
+  consolum.write_partial("salve")
+  const _ tty ← consolum.stdin_is_tty()
+  consolum.write_bytes(|48 65 6c 6c 6f|)
 }
 "#,
     )
@@ -5092,12 +5095,12 @@ main {
     assert!(output.code.contains("consolum:dic"));
     assert!(output.code.contains("consolum:audit"));
     assert!(output.code.contains("faber::frame::sermo_open"));
-    assert!(output.code.contains("fn dic"));
-    assert!(output.code.contains("crate::consolum::funde"));
-    assert!(output.code.contains("pub(crate) fn funde"));
-    assert!(!output.code.contains("norma::consolum::funde"));
-    assert!(!output.code.contains("norma::consolum::dic"));
-    assert!(!output.code.contains("norma::consolum::audit"));
+    assert!(output.code.contains("fn write_partial"));
+    assert!(output.code.contains("crate::consolum::write_bytes"));
+    assert!(output.code.contains("pub(crate) fn write_bytes"));
+    assert!(!output.code.contains("norma::consolum::write_bytes"));
+    assert!(!output.code.contains("norma::consolum::write_partial"));
+    assert!(!output.code.contains("norma::consolum::stdin_is_tty"));
     assert!(!output.code.contains("crate::norma::hal::consolum"));
 }
 
@@ -5111,9 +5114,9 @@ fn compile_package_resolves_builtin_norma_solum_ad_wrapped_imports() {
 import from "norma:solum" solum as terra
 
 async_main {
-  const _ exists ← terra.exstat(".")
-  const _ parent ← terra.parens("a/b")
-  await terra.fundet("fundet.bin", |41 42 43|)
+  const _ exists ← terra.exists(".")
+  const _ parent ← terra.parent("a/b")
+  await terra.write_bytes_async("fundet.bin", |41 42 43|)
 }
 "#,
     )
@@ -5137,12 +5140,12 @@ async_main {
     assert!(output.code.contains("solum:parens"));
     assert!(output.code.contains("solum:funde"));
     assert!(output.code.contains("faber::frame::sermo_open"));
-    assert!(output.code.contains("fn exstat"));
-    assert!(output.code.contains("crate::solum::fundet"));
+    assert!(output.code.contains("fn exists"));
+    assert!(output.code.contains("crate::solum::write_bytes_async"));
     assert!(output.code.contains(".await"));
     assert!(!output.code.contains("solum:fundet"));
-    assert!(!output.code.contains("norma::solum::exstat"));
-    assert!(!output.code.contains("norma::solum::parens"));
+    assert!(!output.code.contains("norma::solum::exists"));
+    assert!(!output.code.contains("norma::solum::parent"));
     assert!(!output.code.contains("crate::norma::hal::solum"));
 }
 
@@ -5156,9 +5159,9 @@ fn compile_package_resolves_builtin_norma_processus_ad_wrapped_imports() {
 import from "norma:processus" processus as proc
 
 main {
-  const _ out ← proc.exsequi("echo hi")
-  const _ env ← proc.lege("PATH")
-  const _ _ ← proc.genera(["true"])
+  const _ out ← proc.exec("echo hi")
+  const _ env ← proc.read_env("PATH")
+  const _ _ ← proc.spawn(["true"])
 }
 "#,
     )
@@ -5181,12 +5184,12 @@ main {
     assert!(output.code.contains("processus:exsequi"));
     assert!(output.code.contains("processus:lege"));
     assert!(output.code.contains("faber::frame::sermo_open"));
-    assert!(output.code.contains("fn exsequi"));
-    assert!(output.code.contains("crate::processus::genera"));
-    assert!(output.code.contains("pub(crate) fn genera"));
-    assert!(!output.code.contains("norma::processus::genera"));
-    assert!(!output.code.contains("norma::processus::exsequi"));
-    assert!(!output.code.contains("norma::processus::lege"));
+    assert!(output.code.contains("fn exec"));
+    assert!(output.code.contains("crate::processus::spawn"));
+    assert!(output.code.contains("pub(crate) fn spawn"));
+    assert!(!output.code.contains("norma::processus::spawn"));
+    assert!(!output.code.contains("norma::processus::exec"));
+    assert!(!output.code.contains("norma::processus::read_env"));
     assert!(!output.code.contains("crate::norma::hal::processus"));
 }
 
@@ -5200,11 +5203,11 @@ fn compile_package_resolves_builtin_norma_tempus_ad_wrapped_imports() {
 import from "norma:tempus" tempus
 
 async_main {
-  const _ now ← tempus.nunc()
-  const _ mono ← tempus.monotonicum()
-  const _ active ← tempus.activum()
-  const _ ms ← tempus.MILLISECUNDUM()
-  await tempus.dormiet(0)
+  const _ now ← tempus.now()
+  const _ mono ← tempus.monotonic()
+  const _ active ← tempus.active()
+  const _ ms ← tempus.MILLISECOND()
+  await tempus.sleep_async(0)
 }
 "#,
     )
@@ -5228,12 +5231,12 @@ async_main {
     assert!(output.code.contains("tempus:monotonicum"));
     assert!(output.code.contains("tempus:activum"));
     assert!(output.code.contains("faber::frame::sermo_open"));
-    assert!(output.code.contains("fn nunc"));
-    assert!(output.code.contains("crate::tempus::dormiet(0).await"));
-    assert!(!output.code.contains("crate::tempus::dormiet(0).expect"));
-    assert!(!output.code.contains("norma::tempus::nunc"));
-    assert!(!output.code.contains("norma::tempus::monotonicum"));
-    assert!(!output.code.contains("norma::tempus::millisecundum"));
+    assert!(output.code.contains("fn now"));
+    assert!(output.code.contains("crate::tempus::sleep_async(0).await"));
+    assert!(!output.code.contains("crate::tempus::sleep_async(0).expect"));
+    assert!(!output.code.contains("norma::tempus::now"));
+    assert!(!output.code.contains("norma::tempus::monotonic"));
+    assert!(!output.code.contains("norma::tempus::millisecond"));
     assert!(!output.code.contains("crate::norma::hal::tempus"));
 }
 
@@ -5247,11 +5250,11 @@ fn compile_package_resolves_builtin_norma_aleator_ad_wrapped_imports() {
 import from "norma:aleator" aleator
 
 main {
-  const _ f ← aleator.fractum()
-  const _ n ← aleator.sortire(1, 6)
+  const _ f ← aleator.random_float()
+  const _ n ← aleator.random_int(1, 6)
   const _ id ← aleator.uuid()
-  const _ bytes ← aleator.octetos(8)
-  aleator.semina(42)
+  const _ bytes ← aleator.random_bytes(8)
+  aleator.seed(42)
 }
 "#,
     )
@@ -5277,9 +5280,9 @@ main {
     assert!(output.code.contains("aleator:uuid"));
     assert!(output.code.contains("aleator:semina"));
     assert!(output.code.contains("faber::frame::sermo_open"));
-    assert!(output.code.contains("fn fractum"));
-    assert!(!output.code.contains("norma::aleator::fractum"));
-    assert!(!output.code.contains("norma::aleator::sortire"));
+    assert!(output.code.contains("fn random_float"));
+    assert!(!output.code.contains("norma::aleator::random_float"));
+    assert!(!output.code.contains("norma::aleator::random_int"));
     assert!(!output.code.contains("norma::aleator::uuid"));
     assert!(!output.code.contains("crate::norma::hal::aleator"));
 }
@@ -5294,8 +5297,8 @@ fn compile_package_resolves_builtin_norma_yaml_imports() {
 import from "norma:yaml" yaml
 
 main {
-  const value doc ← yaml.solve("count: 1")
-  const _ text ← yaml.pange(doc)
+  const value doc ← yaml.parse("count: 1")
+  const _ text ← yaml.stringify(doc)
 }
 "#,
     )
@@ -5315,10 +5318,10 @@ main {
         panic!("expected rust output");
     };
 
-    assert!(output.code.contains("crate::yaml::solve"));
-    assert!(output.code.contains("crate::yaml::pange"));
+    assert!(output.code.contains("crate::yaml::parse"));
+    assert!(output.code.contains("crate::yaml::stringify"));
     assert!(
-        output.code.contains("crate::yaml::solve")
+        output.code.contains("crate::yaml::parse")
             && (output.code.contains("faber::Valor")
                 || output.code.contains("use faber::Valor as valor;")
                 || output.code.contains(": valor")),
@@ -5421,12 +5424,12 @@ entry = "main.fab"
 import from "norma:http" http
 
 async_main {
-    await_const _ responsum ← http.petet("http://127.0.0.1:9/test")
+    await_const _ responsum ← http.get("http://127.0.0.1:9/test")
     print responsum.status()
-    const _ caput ← responsum.caput("x-faber-test")
+    const _ caput ← responsum.header("x-faber-test")
     if caput is null { print "header:missing" } else { print "header:present" }
-    print responsum.corpus()
-    const _ data ← responsum.corpus_json()
+    print responsum.body()
+    const _ data ← responsum.body_json()
     if data.is_nihil() { print "json:missing" } else { print "json:present" }
 }
 "#,
@@ -5447,17 +5450,17 @@ async_main {
     let Some(Output::Rust(output)) = compile_result.output else {
         panic!("expected rust output");
     };
-    assert!(output.code.contains("faber::http::petet"));
+    assert!(output.code.contains("crate::http::get"));
     assert!(output
         .code
-        .contains("tokio::runtime::Builder::new_current_thread"));
-    assert!(output.code.contains(".corpus_json()"));
+        .contains("fn __faber_block_on"));
+    assert!(output.code.contains(".body_json()"));
     assert!(
-        output.code.contains(".corpus_json()")
+        output.code.contains(".body_json()")
             && (output.code.contains("faber::Valor")
                 || output.code.contains("use faber::Valor as valor;")
                 || output.code.contains(": valor")),
-        "expected corpus_json valor binding via faber::Valor, got:\n{}",
+        "expected body_json valor binding via faber::Valor, got:\n{}",
         output.code
     );
     assert!(
@@ -5466,7 +5469,7 @@ async_main {
         output.code
     );
     assert!(
-        output.code.contains("faber::http::Replicatio"),
+        output.code.contains("crate::http::Response"),
         "expected runtime HTTP response carrier, got:\n{}",
         output.code
     );
@@ -5570,7 +5573,7 @@ entry = "main.fab"
 import from "norma:solum/path" public * as path
 
 main {
-    const string name ← path.nomen("/usr/bin/faber")
+    const string name ← path.file_name("/usr/bin/faber")
     print name
 }
 "#,
@@ -5741,11 +5744,11 @@ fn dual_norma_format_imports_scope_provenance_by_binding() {
 import from "norma:json" json_mod
 
 main {
-  const value yaml_doc ← yaml_mod.solve("count: 1")
-  const _ yaml_text ← yaml_mod.pange(yaml_doc)
+  const value yaml_doc ← yaml_mod.parse("count: 1")
+  const _ yaml_text ← yaml_mod.stringify(yaml_doc)
   do {
-    const json json_doc ← json_mod.solve("{\"count\": 1}")
-    const _ json_text ← json_mod.pange(json_doc)
+    const json json_doc ← json_mod.parse("{\"count\": 1}")
+    const _ json_text ← json_mod.stringify(json_doc)
   }
   catch err {
     print err
@@ -5759,16 +5762,16 @@ main {
     let package = analyze_with_faber_seams(&Config::default(), &entry).expect("analyze package");
     let analysis = &package.entry_unit().expect("entry unit").analysis;
 
-    let yaml_item = library_item_by_export(analysis, &["yaml"], "pange", LibraryItemKind::Function);
-    let json_item = library_item_by_export(analysis, &["json"], "pange", LibraryItemKind::Function);
+    let yaml_item = library_item_by_export(analysis, &["yaml"], "stringify", LibraryItemKind::Function);
+    let json_item = library_item_by_export(analysis, &["json"], "stringify", LibraryItemKind::Function);
     assert_ne!(
         yaml_item.def_id, json_item.def_id,
         "overlapping function names must keep distinct DefIds"
     );
     assert_eq!(yaml_item.identity.module_path, vec!["yaml"]);
     assert_eq!(json_item.identity.module_path, vec!["json"]);
-    assert_eq!(yaml_item.exported_name, "pange");
-    assert_eq!(json_item.exported_name, "pange");
+    assert_eq!(yaml_item.exported_name, "stringify");
+    assert_eq!(json_item.exported_name, "stringify");
 
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
@@ -5783,14 +5786,14 @@ main {
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
     };
-    assert!(output.code.contains("crate::yaml::pange"));
-    assert!(output.code.contains("crate::yaml::solve"));
-    assert!(output.code.contains("pub(crate) fn pange"));
-    assert!(output.code.contains("pub(crate) fn solve"));
-    assert!(!output.code.contains("norma::yaml::pange"));
-    assert!(!output.code.contains("norma::yaml::solve"));
-    assert!(!output.code.contains("norma::json::pange"));
-    assert!(!output.code.contains("norma::json::solve"));
+    assert!(output.code.contains("crate::yaml::stringify"));
+    assert!(output.code.contains("crate::yaml::parse"));
+    assert!(output.code.contains("pub(crate) fn stringify"));
+    assert!(output.code.contains("pub(crate) fn parse"));
+    assert!(!output.code.contains("norma::yaml::stringify"));
+    assert!(!output.code.contains("norma::yaml::parse"));
+    assert!(!output.code.contains("norma::json::stringify"));
+    assert!(!output.code.contains("norma::json::parse"));
 }
 
 #[test]
@@ -5805,11 +5808,11 @@ import from "norma:valor" value
 
 main {
     const json doc ← { "wire_name": "Ada" }
-    const string wire ← json.pange(doc)
+    const string wire ← json.stringify(doc)
     const value tree ← { "wire_name": "Ada" } ↦ value
-    const value child ← value.cape(tree, "wire_name")
+    const value child ← value.get(tree, "wire_name")
     do {
-        const json parsed ← json.solve(wire)
+        const json parsed ← json.parse(wire)
         print parsed, child
     }
     catch err {
@@ -5836,12 +5839,12 @@ main {
     assert!(!output.code.contains("use faber::Valor as valor;"));
     assert!(output.code.contains("let tree: faber::Valor"));
     assert!(
-        output.code.contains("crate::json::solve") || output.code.contains("json::solve"),
-        "expected json::solve in generated code"
+        output.code.contains("crate::json::parse") || output.code.contains("json::parse"),
+        "expected json::parse in generated code"
     );
     assert!(output
         .code
-        .contains("crate::chorda::discissa(via.clone(), \".\".to_string()"));
+        .contains("crate::chorda::split_n(via.clone(), \".\".to_string()"));
 }
 
 #[test]
@@ -5854,7 +5857,7 @@ fn aliased_norma_import_preserves_provider_identity_in_analysis() {
 import from "norma:http" http as rete
 
 async_main {
-  await_const _ responsum ← rete.petet("http://127.0.0.1:9")
+  await_const _ responsum ← rete.get("http://127.0.0.1:9")
 }
 "#,
     )
@@ -5876,14 +5879,14 @@ async_main {
             let HirItemKind::Interface(interface) = &item.kind else {
                 return true;
             };
-            analysis.interner.resolve(interface.name) != "Replicatio"
+            analysis.interner.resolve(interface.name) != "Response"
         }),
         "library interfaces should not be source-spliced into importer HIR"
     );
     let item = library_item_by_export(
         analysis,
         &["http"],
-        "Replicatio",
+        "Response",
         LibraryItemKind::Interface,
     );
     assert_eq!(
@@ -5891,11 +5894,11 @@ async_main {
         LibraryProvider::Builtin("norma".to_owned())
     );
     assert_eq!(item.identity.module_path, vec!["http"]);
-    assert_eq!(item.exported_name, "Replicatio");
+    assert_eq!(item.exported_name, "Response");
     assert_eq!(item.kind, LibraryItemKind::Interface);
     assert_eq!(
         item.rust_runtime_type.as_deref(),
-        Some("faber::http::Replicatio")
+        None
     );
     assert!(item.elide_rust_decl);
 }
@@ -5910,7 +5913,7 @@ fn aliased_norma_http_import_lowers_by_provider_identity() {
 import from "norma:http" http as rete
 
 async_main {
-  await_const _ responsum ← rete.petet("http://127.0.0.1:9")
+  await_const _ responsum ← rete.get("http://127.0.0.1:9")
 }
 "#,
     )
@@ -5932,12 +5935,12 @@ async_main {
 
     assert!(output
         .code
-        .contains("faber::http::petet(\"http://127.0.0.1:9\".to_string()).await"));
+        .contains("crate::http::get(\"http://127.0.0.1:9\".to_string()).await"));
     assert!(output
         .code
-        .contains("let responsum: faber::http::Replicatio ="));
-    assert!(!output.code.contains("rete.petet"));
-    assert!(!output.code.contains("pub trait Replicatio"));
+        .contains("let responsum: Box<dyn crate::http::Response> ="));
+    assert!(!output.code.contains("rete.get"));
+    assert!(!output.code.contains("pub trait Response"));
 }
 
 #[test]
@@ -6419,12 +6422,12 @@ rusqlite = "0.32"
     .expect("write manifest");
     fs::write(
         dir.join("src/sqlite.fab"),
-        "fn exsequi(string via) → string\nfn local() → string { return \"ok\" }\n",
+        "fn exec(string via) → string\nfn local() → string { return \"ok\" }\n",
     )
     .expect("write source");
     fs::write(
         dir.join("rust/shim.rs"),
-        "pub fn exsequi(via: String) -> String { via }\n",
+        "pub fn exec(via: String) -> String { via }\n",
     )
     .expect("write shim");
     fs::write(
@@ -6471,7 +6474,7 @@ bindings = "bindings/rust.toml"
     .expect("write manifest");
     fs::write(
         dir.join("src/sqlite.fab"),
-        "fn exsequi(string via) → string\n",
+        "fn exec(string via) → string\n",
     )
     .expect("write source");
     fs::write(dir.join("bindings/rust.toml"), "").expect("write bindings");
@@ -7698,7 +7701,7 @@ fn check_package_types_norma_solum_path_namespace_call() {
 import from "norma:solum/path" path
 
 main {
-    const string name ← path.nomen("/usr/bin/faber")
+    const string name ← path.file_name("/usr/bin/faber")
     print name
 }
 "#,
@@ -8558,7 +8561,7 @@ entry = "main.fab"
 import from "norma:tempus" tempus
 
 main {
-  tempus.expectet(0)
+  tempus.sleep(0)
 }
 "#,
     )
@@ -9053,7 +9056,7 @@ import from "norma:json" json
 
 main {
     do {
-        const json duplicate ← json.solve("{\"id\": 1, \"id\": 2}")
+        const json duplicate ← json.parse("{\"id\": 1, \"id\": 2}")
         print duplicate
     }
     catch err {
@@ -9061,8 +9064,8 @@ main {
     }
 
     do {
-        const json unicode ← json.solve("{\"music\": \"\\uD834\\uDD1E\"}")
-        print json.pange(unicode)
+        const json unicode ← json.parse("{\"music\": \"\\uD834\\uDD1E\"}")
+        print json.stringify(unicode)
     }
     catch err {
         print err
@@ -9319,7 +9322,7 @@ importa ex "norma:chorda" chorda
 
 @ publica
 functio split_fields(textus row) → lista<textus> {
-    redde chorda.discissa(row, ",", row.length() + 1)
+    redde chorda.split_n(row, ",", row.length() + 1)
 }
 "#,
     );
@@ -9350,7 +9353,7 @@ main {
         panic!("expected rust output");
     };
     assert!(output.code.contains("pub mod chorda"));
-    assert!(output.code.contains("crate::chorda::discissa"));
+    assert!(output.code.contains("crate::chorda::split_n"));
     assert!(output.code.contains("pub mod transitive_fixture"));
     assert!(!output.code.contains("unresolved_def"));
 }
@@ -9425,7 +9428,7 @@ import from "norma:csv" csv
 import from "norma:chorda" chorda as ropes
 
 main {
-    print csv.solve("a,b").longitudo()
+    print csv.parse("a,b").longitudo()
 }
 "#,
     )
@@ -9720,8 +9723,8 @@ fn transitive_csv_chorda_closure_compiles_with_mixed_provenance() {
 import from "norma:csv" csv
 
 main {
-    const list<list<string>> grid ← csv.solve("name,count\nalpha,1")
-    const string wire ← csv.pange(grid)
+    const list<list<string>> grid ← csv.parse("name,count\nalpha,1")
+    const string wire ← csv.stringify(grid)
     print wire
 }
 "#,
@@ -9757,8 +9760,8 @@ main {
     };
     assert!(output.code.contains("pub mod csv"));
     assert!(output.code.contains("pub mod chorda"));
-    assert!(output.code.contains("pub(crate) fn discissa"));
-    assert!(output.code.contains("pub(crate) fn nexa"));
+    assert!(output.code.contains("pub(crate) fn split_n"));
+    assert!(output.code.contains("pub(crate) fn join"));
 
     let layout = discover_build_layout(&entry).expect("layout");
     emit_generated_crate(&layout, &output.code, None).expect("emit generated crate");
@@ -9776,7 +9779,7 @@ fn transitive_csv_solve_empty_input_returns_vacua() {
 import from "norma:csv" csv
 
 main {
-    const list<list<string>> grid ← csv.solve("")
+    const list<list<string>> grid ← csv.parse("")
     print grid.length()
 }
 "#,
@@ -9801,7 +9804,7 @@ fn transitive_csv_solve_preserves_trailing_row() {
 import from "norma:csv" csv
 
 main {
-    const list<list<string>> grid ← csv.solve("a,b\n")
+    const list<list<string>> grid ← csv.parse("a,b\n")
     print grid.length()
 }
 "#,
@@ -10737,7 +10740,7 @@ import from "norma:consolum" consolum
 
 @ public
 fn shout(string s) → void {
-  consolum.scribe(s)
+  consolum.write_line(s)
 }
 "#,
     )
@@ -10752,7 +10755,7 @@ import from "./helper" helper
 @ operand rest string ignored
 main args args exit 0 {
   helper.shout("hi")
-  consolum.dic("x")
+  consolum.write_partial("x")
 }
 "#,
     )
@@ -10940,26 +10943,26 @@ import from "norma:consolum" consolum
 @ cli "tool"
 @ operand rest string ignored
 main args args exit 0 {
-  if consolum.audit() {
-    consolum.dic("tty")
+  if consolum.stdin_is_tty() {
+    consolum.write_partial("tty")
   }
   else {
-    consolum.dic("notty")
+    consolum.write_partial("notty")
   }
-  consolum.scribet(":")
-  consolum.dicet(consolum.leget())
-  consolum.scribe("")
-  const bytes sync_bytes ← consolum.hauri(4)
-  consolum.fundet(sync_bytes)
-  const bytes async_bytes ← consolum.hauriet(4)
-  consolum.funde(async_bytes)
-  consolum.monet("warn")
-  consolum.videbit("debug")
-  if consolum.loquitur() {
-    consolum.dic("stdout-tty")
+  consolum.write_line_async(":")
+  consolum.write_partial_async(consolum.read_line_async())
+  consolum.write_line("")
+  const bytes sync_bytes ← consolum.read_bytes(4)
+  consolum.write_bytes_async(sync_bytes)
+  const bytes async_bytes ← consolum.read_bytes_async(4)
+  consolum.write_bytes(async_bytes)
+  consolum.warn_line_async("warn")
+  consolum.debug_line_async("debug")
+  if consolum.stdout_is_tty() {
+    consolum.write_partial("stdout-tty")
   }
-  if consolum.admonet() {
-    consolum.dic("stderr-tty")
+  if consolum.stderr_is_tty() {
+    consolum.write_partial("stderr-tty")
   }
 }
 "#,

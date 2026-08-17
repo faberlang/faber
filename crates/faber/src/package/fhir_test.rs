@@ -88,7 +88,7 @@ const CONST_MEMBER_CALL_MAIN: &str =
 const LOCAL_LOCALE_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() → string {\n    return utilModule.greet()\n}\n\nmain {\n    print utilModule.greet()\n}\n";
 const LOCAL_LOCALE_UTIL: &str = "@ publica\nfn salutare() → string {\n    return \"salve\"\n}\n";
 
-const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:chorda\" chorda\n\nfn run() → string {\n    const math.Vec3 canonical ← math.make_vector(1.0, 0.0, 0.0)\n    const math.Vec3 canonical_shifted ← canonical.add(math.make_vector(0.0, 1.0, 0.0))\n    const float canonical_length ← canonical_shifted.length()\n    const math.Vec3 original ← math.make_vector(1.0, 0.0, 0.0)\n    const math.Vec3 shifted ← original.add(math.make_vector(0.0, 2.0, 0.0))\n    const math.Vec3 normalized ← shifted.normalize()\n    const float length ← normalized.length()\n    const string reversed ← chorda.reverse(\"abc\")\n    const string decoded ← chorda.solve(chorda.pange(\"abc\"))\n    const list<string> parts ← chorda.discissa(\"a,b\", \",\", 2)\n    print canonical_length\n    print length\n    print parts\n    return decoded\n}\n\nmain {\n    print run()\n}\n";
+const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:chorda\" chorda\n\nfn run() → string {\n    const math.Vec3 canonical ← math.make_vector(1.0, 0.0, 0.0)\n    const math.Vec3 canonical_shifted ← canonical.add(math.make_vector(0.0, 1.0, 0.0))\n    const float canonical_length ← canonical_shifted.length()\n    const math.Vec3 original ← math.make_vector(1.0, 0.0, 0.0)\n    const math.Vec3 shifted ← original.add(math.make_vector(0.0, 2.0, 0.0))\n    const math.Vec3 normalized ← shifted.normalize()\n    const float length ← normalized.length()\n    const string reversed ← chorda.reverse(\"abc\")\n    const string decoded ← chorda.decode(chorda.encode(\"abc\"))\n    const list<string> parts ← chorda.split_n(\"a,b\", \",\", 2)\n    print canonical_length\n    print length\n    print parts\n    return decoded\n}\n\nmain {\n    print run()\n}\n";
 const NORMA_LATIN_COMPATIBILITY_MAIN: &str = "importa ex \"norma:chorda\" chorda\n\nfunctio run() → textus {\n    redde chorda.retorta(\"abc\")\n}\n\nincipit {\n    nota run()\n}\n";
 
 /// Two-module package with a local import and a namespace call in the entry.
@@ -364,7 +364,7 @@ kind = "bin"
     fs::write(dir.join("faber.toml"), manifest).expect("write faber.toml");
     fs::write(
         src.join("main.fab"),
-        "import from \"norma:solum\" solum\n\nfn scinde(string s) → int {\n    const list<string> partes ← solum.carpe(s)\n    return partes.length()\n}\n\nmain {\n    print scinde(\"a,b,c\")\n}\n",
+        "import from \"norma:solum\" solum\n\nfn scinde(string s) → int {\n    const list<string> partes ← solum.read_lines(s)\n    return partes.length()\n}\n\nmain {\n    print scinde(\"a,b,c\")\n}\n",
     )
     .expect("write main.fab");
     src.join("main.fab")
@@ -588,7 +588,7 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
         library_items.iter().any(|item| {
             item.identity.provider == LibraryProvider::Builtin("norma".to_owned())
                 && item.identity.module_path == ["chorda".to_owned()]
-                && item.exported_name == "retorta"
+                && item.exported_name == "reverse"
                 && item.kind == LibraryItemKind::Function
         }),
         "library provenance: {library_items:?}"
@@ -630,7 +630,7 @@ fn latin_norma_consumer_keeps_canonical_surface_compatibility() {
         entry_unit.analysis.libraries.items.values().any(|item| {
             item.identity.provider == LibraryProvider::Builtin("norma".to_owned())
                 && item.identity.module_path == ["chorda".to_owned()]
-                && item.exported_name == "retorta"
+                && item.exported_name == "reverse"
                 && item.kind == LibraryItemKind::Function
         }),
         "library provenance: {:?}",

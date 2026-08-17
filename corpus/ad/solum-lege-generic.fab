@@ -4,7 +4,7 @@ kind = "concept"
 category = "ad"
 canonical = true
 summary = "solum file reads are shape-specific: lege<textus>, carpe (lista<textus>), hauri (octeti)."
-syntax = "solum.lege<textus>(via) | call 'solum:carpe' (via) ↦ lista<textus> | call 'solum:hauri' (via) ↦ octeti"
+syntax = "solum.read_file<textus>(via) | call 'solum:carpe' (via) ↦ lista<textus> | call 'solum:hauri' (via) ↦ octeti"
 related = ["ad", "solum", "lege", "carpe", "hauri"]
 locale = "en"
 +++
@@ -14,13 +14,13 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Shape-specific reads — `solum.lege<textus>` reads a file as text;
+#   • Shape-specific reads — `solum.read_file<textus>` reads a file as text;
 #     `solum:carpe` reads it as a line list; `solum:hauri` reads raw bytes
 #   • Manifest-backed surface — each route declares exactly one result shape in
 #     the solum provider manifest, so the materialized target always matches
 #
 # Common mistakes:
-#   • assuming one generic `solum.lege<T>` reads every shape — `lege` is
+#   • assuming one generic `solum.read_file<T>` reads every shape — `lege` is
 #     text-only; use `carpe` for `lista<textus>` and `hauri` for `octeti`
 #
 # See also: ad, solum, lege, carpe, hauri
@@ -33,9 +33,9 @@ locale = "en"
 # `solum:hauri` → octeti. The `norma:solum` wrappers `carpe`/`hauri` are
 # module-private this release, so this fixture reaches the line/byte routes
 # directly through the manifest-backed `ad` surface; the compiler's
-# `@ radix typus` metadata on `norma:solum.lege<T>` still admits the broader
+# `@ radix typus` metadata on `norma:solum.read_file<T>` still admits the broader
 # targets, which the provider rejects (recorded residual). Generic
-# `solum.lege<T>` across all three shapes is separate future provider work.
+# `solum.read_file<T>` across all three shapes is separate future provider work.
 #
 # Runtime check: files are prepared under /tmp so each read route can prove its
 # accepted result shape independently of the harness working directory.
@@ -44,9 +44,9 @@ import from "norma:solum" solum
 
 main {
     const string textPath ← "/tmp/faber-solum-lege-generic.txt"
-    solum.scribe(textPath, "prima\nsecunda\n")
+    solum.write_file(textPath, "prima\nsecunda\n")
 
-    const string body ← solum.lege<string>(textPath)
+    const string body ← solum.read_file<string>(textPath)
     assert body ≡ "prima\nsecunda\n"
 
     const list<string> lineae ← call 'solum:carpe' (textPath) ↦ list<string>
