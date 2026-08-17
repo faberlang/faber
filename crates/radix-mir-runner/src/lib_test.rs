@@ -1341,10 +1341,9 @@ fn provider_failure_uses_stable_identity() {
 
     assert_eq!(identity, "package:camera::include");
     assert_eq!(
-        error.message,
-        "FaberScript unsupported: provider package:camera::include"
+        error.issue,
+        "runner_faberscript_unsupported_provider_package_camera_include"
     );
-    assert!(!error.message.contains("sym#"));
 }
 
 #[test]
@@ -1374,7 +1373,7 @@ fn host_provider_failure_does_not_expose_symbol_index() {
         .provider(&provider)
         .expect_err("provider must fail closed");
 
-    assert!(!error.message.contains("sym#"));
+    assert_eq!(error.issue, "runner_faberscript_unsupported_provider");
 }
 
 #[test]
