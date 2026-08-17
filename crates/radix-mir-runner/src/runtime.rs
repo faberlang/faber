@@ -34,14 +34,7 @@ use super::value::{
     uint_width_checked_add, values_equal, width_checked_add, GradientStorage, MapKey, SermoValue,
     TensorValue, Value,
 };
-use super::{
-    gelu_f64,
-    host::{
-        is_camera_children_provider, is_float32_attribute_provider,
-        is_vertex_layout_count_provider, provider_identity,
-    },
-    Runner, RunnerError,
-};
+use super::{gelu_f64, host::provider_identity, Runner, RunnerError};
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_mir::{
@@ -3369,7 +3362,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         &mut self,
         provider: &MirProvider,
         args: &[MirOperand],
-        return_ty: MirType,
+        _return_ty: MirType,
         span: Span,
     ) -> Result<Value, RunnerError> {
         let identity = provider_identity(provider, self.interner);
@@ -3384,237 +3377,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 .kernel_call(module, verb, &evaluated, span)
                 .map_err(|error| error.with_provider_identity(&identity));
         }
-        if is_vertex_layout_count_provider(provider, self.interner) {
-            return self.eval_vertex_layout_count(args, span);
-        }
-        if is_float32_attribute_provider(provider, self.interner) {
-            return self.eval_float32_attribute(args, return_ty, span);
-        }
-        if is_camera_children_provider(provider, self.interner) {
-            return self.eval_camera_children(args, span);
-        }
         self.host
             .provider(provider)
             .map_err(|error| error.with_provider_identity(&identity))
-    }
-
-    fn eval_vertex_layout_count(
-        &mut self,
-        args: &[MirOperand],
-        span: Span,
-    ) -> Result<Value, RunnerError> {
-        let [receiver] = args else {
-            return Err(RunnerError::internal(
-                span,
-                "vertex_layout_count provider arity",
-            ));
-        };
-        let receiver = self.eval_operand(receiver, span)?;
-        let Value::Struct(_, fields) = receiver else {
-            return Err(RunnerError::internal(
-                span,
-                "vertex_layout_count requires BufferGeometry",
-            ));
-        };
-        let attributes = fields.borrow().iter().find_map(|(symbol, value)| {
-            (self.interner.resolve(*symbol) == "attributes").then_some(value.clone())
-        });
-        let Some(Value::Array(attributes)) = attributes else {
-            return Ok(Value::Nil);
-        };
-        let count = i64::try_from(attributes.borrow().len())
-            .map_err(|_| RunnerError::internal(span, "vertex_layout_count overflow"))?;
-        Ok(Value::Int(count))
-    }
-
-    fn eval_camera_children(
-        &mut self,
-        args: &[MirOperand],
-        span: Span,
-    ) -> Result<Value, RunnerError> {
-        let [receiver] = args else {
-            return Err(RunnerError::internal(
-                span,
-                "camera children provider arity",
-            ));
-        };
-        let receiver = self.eval_operand(receiver, span)?;
-        let Value::Struct(_, _) = receiver else {
-            return Err(RunnerError::internal(
-                span,
-                "camera children requires camera struct",
-            ));
-        };
-        if let Some(children) = named_struct_field(&receiver, self.interner, "children") {
-            return Ok(children);
-        }
-        let Some(base) = named_struct_field(&receiver, self.interner, "base") else {
-            return Err(RunnerError::internal(
-                span,
-                "camera children base field missing",
-            ));
-        };
-        named_struct_field(&base, self.interner, "children")
-            .ok_or_else(|| RunnerError::internal(span, "camera children field missing"))
-    }
-
-    fn eval_float32_attribute(
-        &mut self,
-        args: &[MirOperand],
-        return_ty: MirType,
-        span: Span,
-    ) -> Result<Value, RunnerError> {
-        let [name, shader_location, component_width, element_count, values] = args else {
-            return Err(RunnerError::internal(
-                span,
-                "float32_attribute provider arity",
-            ));
-        };
-        let name = self.eval_operand(name, span)?;
-        let shader_location = self.eval_operand(shader_location, span)?;
-        let component_width = self.eval_operand(component_width, span)?;
-        let element_count = self.eval_operand(element_count, span)?;
-        let values = self.eval_operand(values, span)?;
-        if !matches!(name, Value::Str(_)) {
-            return Err(RunnerError::internal(
-                span,
-                "float32_attribute name requires textus",
-            ));
-        }
-        if !matches!(shader_location, Value::Int(_) | Value::UInt(_))
-            || !matches!(component_width, Value::Int(_) | Value::UInt(_))
-            || !matches!(element_count, Value::Int(_) | Value::UInt(_))
-        {
-            return Err(RunnerError::internal(
-                span,
-                "float32_attribute metadata requires numerus",
-            ));
-        }
-        if !matches!(values, Value::Array(_)) {
-            return Err(RunnerError::internal(
-                span,
-                "float32_attribute values requires lista",
-            ));
-        }
-
-        let Type::Struct(buffer_attribute) = self.types.get(return_ty.semantic_id()) else {
-            return Err(RunnerError::internal(
-                span,
-                "float32_attribute return type mismatch",
-            ));
-        };
-        let struct_fields = self
-            .context
-            .struct_fields
-            .get(buffer_attribute)
-            .ok_or_else(|| {
-                RunnerError::internal(span, "float32_attribute BufferAttribute metadata missing")
-            })?;
-        let field = |name: &str| {
-            struct_fields.iter().find_map(|(symbol, ty)| {
-                (self.interner.resolve(*symbol) == name).then_some((*symbol, *ty))
-            })
-        };
-        let (name_field, _) = field("name").ok_or_else(|| {
-            RunnerError::internal(span, "float32_attribute name field metadata missing")
-        })?;
-        let (shader_location_field, _) = field("shader_location").ok_or_else(|| {
-            RunnerError::internal(
-                span,
-                "float32_attribute shader_location field metadata missing",
-            )
-        })?;
-        let (component_width_field, _) = field("component_width").ok_or_else(|| {
-            RunnerError::internal(
-                span,
-                "float32_attribute component_width field metadata missing",
-            )
-        })?;
-        let (element_count_field, _) = field("element_count").ok_or_else(|| {
-            RunnerError::internal(
-                span,
-                "float32_attribute element_count field metadata missing",
-            )
-        })?;
-        let (normalized_field, _) = field("normalized").ok_or_else(|| {
-            RunnerError::internal(span, "float32_attribute normalized field metadata missing")
-        })?;
-        let (usage_field, usage_ty) = field("usage").ok_or_else(|| {
-            RunnerError::internal(span, "float32_attribute usage field metadata missing")
-        })?;
-        let (data_field, data_ty) = field("data").ok_or_else(|| {
-            RunnerError::internal(span, "float32_attribute data field metadata missing")
-        })?;
-
-        let Type::Enum(usage_enum) = self.types.get(usage_ty.semantic_id()) else {
-            return Err(RunnerError::internal(
-                span,
-                "float32_attribute usage type mismatch",
-            ));
-        };
-        let static_variant = self
-            .context
-            .enum_variants
-            .get(usage_enum)
-            .and_then(|variants| {
-                variants.iter().copied().find(|variant| {
-                    self.context
-                        .variant_fields
-                        .get(variant)
-                        .is_some_and(|fields| fields.is_empty())
-                })
-            })
-            .ok_or_else(|| {
-                RunnerError::internal(span, "float32_attribute StaticAttribute variant missing")
-            })?;
-
-        let Type::Enum(data_enum) = self.types.get(data_ty.semantic_id()) else {
-            return Err(RunnerError::internal(
-                span,
-                "float32_attribute data type mismatch",
-            ));
-        };
-        let (float32_variant, values_field) = self
-            .context
-            .enum_variants
-            .get(data_enum)
-            .and_then(|variants| {
-                variants.iter().copied().find_map(|variant| {
-                    self.context
-                        .variant_fields
-                        .get(&variant)
-                        .and_then(|fields| {
-                            fields.iter().find_map(|(symbol, _)| {
-                                (self.interner.resolve(*symbol) == "values")
-                                    .then_some((variant, *symbol))
-                            })
-                        })
-                })
-            })
-            .ok_or_else(|| {
-                RunnerError::internal(span, "float32_attribute Float32Attribute variant missing")
-            })?;
-
-        let mut data_fields = FxHashMap::default();
-        data_fields.insert(values_field, values);
-        let mut fields = FxHashMap::default();
-        fields.insert(name_field, name);
-        fields.insert(shader_location_field, shader_location);
-        fields.insert(component_width_field, component_width);
-        fields.insert(element_count_field, element_count);
-        fields.insert(normalized_field, Value::Bool(false));
-        fields.insert(
-            usage_field,
-            Value::EnumVariant(static_variant, Rc::new(RefCell::new(FxHashMap::default()))),
-        );
-        fields.insert(
-            data_field,
-            Value::EnumVariant(float32_variant, Rc::new(RefCell::new(data_fields))),
-        );
-        Ok(Value::Struct(
-            *buffer_attribute,
-            Rc::new(RefCell::new(fields)),
-        ))
     }
 
     fn eval_set_algebra(
@@ -3665,20 +3430,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
 }
 
 // LOCAL VALUE HELPERS
-
-fn named_struct_field(
-    value: &Value,
-    interner: &radix_lexer::Interner,
-    name: &str,
-) -> Option<Value> {
-    let Value::Struct(_, fields) = value else {
-        return None;
-    };
-    fields
-        .borrow()
-        .iter()
-        .find_map(|(symbol, value)| (interner.resolve(*symbol) == name).then_some(value.clone()))
-}
 
 fn require_rank1_extent(
     tensor: &TensorValue,

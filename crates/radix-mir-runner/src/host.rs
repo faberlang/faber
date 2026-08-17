@@ -22,80 +22,11 @@ pub(crate) fn provider_identity(provider: &MirProvider, interner: &Interner) -> 
         .map(|symbol| interner.resolve(*symbol).to_owned())
         .collect::<Vec<_>>();
     route.push(interner.resolve(provider.name).to_owned());
-    // Package linking can leave a stale method-body route in the diagnostic
-    // payload. Keep the diagnostic on the declared BufferAttribute member
-    // rather than presenting `return::dele` as a host capability.
-    if route.as_slice() == ["BufferAttribute", "return", "dele"] {
-        route.truncate(1);
-        route.push("float32_values".to_owned());
-    }
     let route = route.join("::");
     match provider.kind {
         MirProviderKind::Package => format!("package:{route}"),
         MirProviderKind::Kernel(module) => format!("kernel:{}:{route}", module.name()),
     }
-}
-
-/// The package-provider route implemented directly by the script runner.
-///
-/// WHY: package MIR normally belongs to a compiled package host. This one
-/// geometry query is pure over the runner's value carrier, so it can execute
-/// without opening a general package ABI or accepting arbitrary route names.
-#[must_use]
-pub(crate) fn is_vertex_layout_count_provider(provider: &MirProvider, interner: &Interner) -> bool {
-    if provider.kind != MirProviderKind::Package
-        || interner.resolve(provider.name) != "vertex_layout_count"
-    {
-        return false;
-    }
-    let module = provider
-        .module
-        .iter()
-        .map(|symbol| interner.resolve(*symbol))
-        .collect::<Vec<_>>();
-    matches!(
-        module.as_slice(),
-        ["triga:geometry/layout", "layout"] | ["indexed_geometry", "BufferGeometry"]
-    )
-}
-
-/// The package-provider constructor implemented directly by the script runner.
-///
-/// WHY: `float32_attribute` only assembles the typed CPU-side carrier. It does
-/// not cross a host or device boundary, so the runner can execute this named
-/// route without opening a general package ABI or accepting arbitrary routes.
-#[must_use]
-pub(crate) fn is_float32_attribute_provider(provider: &MirProvider, interner: &Interner) -> bool {
-    if provider.kind != MirProviderKind::Package
-        || interner.resolve(provider.name) != "float32_attribute"
-    {
-        return false;
-    }
-    let module = provider
-        .module
-        .iter()
-        .map(|symbol| interner.resolve(*symbol))
-        .collect::<Vec<_>>();
-    matches!(module.as_slice(), ["triga:geometry/attribute", "attribute"])
-}
-
-/// The camera provider route used to project the embedded Object3D children.
-///
-/// WHY: camera package values carry their graph object in `base`, while the
-/// package link preserves the public `children` member as a provider call.
-/// This is a pure value projection, so the script runner can execute it
-/// without opening a general package ABI.
-#[must_use]
-pub(crate) fn is_camera_children_provider(provider: &MirProvider, interner: &Interner) -> bool {
-    if provider.kind != MirProviderKind::Package || interner.resolve(provider.name) != "children" {
-        return false;
-    }
-    let module = provider
-        .module
-        .iter()
-        .map(|symbol| interner.resolve(*symbol))
-        .collect::<Vec<_>>();
-    matches!(module.as_slice(), ["triga:graph/camera", "camera"])
 }
 
 impl RunnerError {
