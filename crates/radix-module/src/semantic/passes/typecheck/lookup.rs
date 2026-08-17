@@ -144,6 +144,11 @@ impl TypeChecker<'_> {
         self.binding_shadow.get(&def_id).copied()
     }
 
+    /// Record the source spelling of a HIR-local binding (param/local).
+    pub(super) fn record_binding_name(&mut self, def_id: DefId, name: Symbol) {
+        self.binding_names.insert(def_id, name);
+    }
+
     /// Insert a binding into the current lexical scope.
     pub(super) fn insert_binding(&mut self, def_id: DefId, ty: TypeId) {
         self.insert_binding_with_scalar(def_id, ty, false, false);

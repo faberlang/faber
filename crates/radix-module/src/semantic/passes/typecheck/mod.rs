@@ -208,6 +208,11 @@ struct TypeChecker<'a> {
     /// Updated on insert; restored or removed on pop.
     binding_shadow: FxHashMap<DefId, BindingInfo>,
 
+    /// Source spelling for HIR-local bindings (params/locals). Their DefIds
+    /// start at 1_000_000 and are not in the resolver symbol table, so a
+    /// Path that shadows an imported namespace must recover the name here.
+    binding_names: FxHashMap<DefId, Symbol>,
+
     /// Function signatures collected before body checking so calls can be
     /// checked regardless of declaration order.
     functions: FxHashMap<DefId, FuncSig>,
@@ -401,6 +406,7 @@ impl<'a> TypeChecker<'a> {
             errors: Vec::new(),
             scopes: Vec::new(),
             binding_shadow: FxHashMap::default(),
+            binding_names: FxHashMap::default(),
             functions: FxHashMap::default(),
             consts: FxHashMap::default(),
             structs: FxHashMap::default(),
@@ -581,6 +587,10 @@ mod union_pattern_test;
 #[cfg(test)]
 #[path = "union_construction_test.rs"]
 mod union_construction_test;
+
+#[cfg(test)]
+#[path = "namespace_shadow_test.rs"]
+mod namespace_shadow_test;
 
 #[cfg(test)]
 #[path = "union_value_test.rs"]

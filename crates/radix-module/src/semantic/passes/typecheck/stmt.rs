@@ -124,6 +124,7 @@ impl TypeChecker<'_> {
             .init
             .as_ref()
             .is_some_and(|init| self.is_provably_single_scalar_text(init));
+        self.record_binding_name(local.def_id, local.name);
         self.insert_binding_with_scalar(local.def_id, inferred, scalar_text, local.mutable);
     }
 
@@ -165,6 +166,7 @@ impl TypeChecker<'_> {
             .init
             .as_ref()
             .is_some_and(|init| self.is_provably_single_scalar_text(init));
+        self.record_binding_name(local.def_id, local.name);
         self.insert_binding_with_scalar(local.def_id, local_ty, scalar_text, local.mutable);
     }
 

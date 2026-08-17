@@ -263,6 +263,47 @@ impl TypeChecker<'_> {
             self.unify_assign_issue(arg_ty, param.ty, arg.span, ISSUE_ARGUMENT_TYPE_MISMATCH);
         }
     }
+    /// Typecheck a Path receiver as an imported namespace function, if it is one.
+    ///
+    /// The HIR Path DefId is the nearest value binding. A local parameter can
+    /// therefore own the Path while the member is still a namespace export
+    /// (`shape.numel` with parameter `shape`). Lookup is by the Path's source
+    /// spelling so the callee signature — including its error channel — is the
+    /// imported function, not a method on the local value.
+    fn check_namespace_function_call_from_path(
+        &mut self,
+        receiver: &HirExpression,
+        name: crate::lexer::Symbol,
+        explicit_type_args: &[TypeId],
+        args: &mut [HirCallArg],
+        expected: Option<TypeId>,
+    ) -> Option<TypeId> {
+        let HirExpressionKind::Path(module_def_id) = &receiver.kind else {
+            return None;
+        };
+        let namespace = self.path_namespace_name(*module_def_id)?;
+        let sig = self
+            .resolver
+            .namespace_file_function_canonical(namespace, name)
+            .cloned()?;
+        self.set_chorda_scalar_closure_context(name);
+        let ret = self.check_instantiated_call(&sig, explicit_type_args, args, receiver.span, expected);
+        self.validate_interval_bound_call_args(name, &sig, args);
+        Some(ret)
+    }
+
+    /// Namespace spelling for a Path DefId.
+    ///
+    /// Import modules live in the resolver symbol table. A local parameter that
+    /// shadows the import uses a HIR-local DefId (1_000_000+) and is recovered
+    /// from [`TypeChecker::binding_names`].
+    fn path_namespace_name(&self, def_id: crate::hir::DefId) -> Option<crate::lexer::Symbol> {
+        self.resolver
+            .get_symbol(def_id)
+            .map(|symbol| symbol.name)
+            .or_else(|| self.binding_names.get(&def_id).copied())
+    }
+
     /// Checks method-call syntax after the receiver has been synthesized.
     ///
     /// Declared/interface methods are preferred. The array branch preserves a
@@ -278,6 +319,11 @@ impl TypeChecker<'_> {
         args: &mut [HirCallArg],
         expected: Option<TypeId>,
     ) -> TypeId {
+        if let Some(ret) =
+            self.check_namespace_function_call_from_path(receiver, *name, explicit_type_args, args, expected)
+        {
+            return ret;
+        }
         let receiver_ty = self
             .check_non_null_method_receiver(receiver, *name)
             .unwrap_or_else(|| self.check_expr(receiver));
@@ -357,21 +403,16 @@ impl TypeChecker<'_> {
         }
 
         if let HirExpressionKind::Path(module_def_id) = &receiver.kind {
+            if let Some(ret) =
+                self.check_namespace_function_call_from_path(receiver, *name, explicit_type_args, args, expected)
+            {
+                return ret;
+            }
             if let Some(namespace) = self
                 .resolver
                 .get_symbol(*module_def_id)
                 .map(|symbol| symbol.name)
             {
-                if let Some(sig) = self
-                    .resolver
-                    .namespace_file_function_canonical(namespace, *name)
-                    .cloned()
-                {
-                    self.set_chorda_scalar_closure_context(*name);
-                    let ret = self.check_instantiated_call(&sig, explicit_type_args, args, receiver.span, expected);
-                    self.validate_interval_bound_call_args(*name, &sig, args);
-                    return ret;
-                }
                 if !self
                     .resolver
                     .namespace_exports_member_canonical(namespace, *name)
