@@ -12,22 +12,14 @@ fn analyze_with_faber_seams(
     config: &Config,
     input: &Path,
 ) -> Result<AnalyzedPackage, Vec<radix::diagnostics::Diagnostic>> {
-    radix_package::analyze::analyze_package(
-        config,
-        input,
-        &crate::package::faber_analysis_seams(),
-    )
+    radix_package::analyze::analyze_package(config, input, &crate::package::faber_analysis_seams())
 }
 
 fn build_fhir_with_faber_seams(
     config: &Config,
     input: &Path,
 ) -> Result<radix_package::fhir::PackageFhir, Vec<radix::diagnostics::Diagnostic>> {
-    radix_package::fhir::build_package_fhir(
-        config,
-        input,
-        &crate::package::faber_analysis_seams(),
-    )
+    radix_package::fhir::build_package_fhir(config, input, &crate::package::faber_analysis_seams())
 }
 
 fn run_mir_with_faber_seams<H: radix::mir::Host + ?Sized>(
@@ -387,7 +379,8 @@ fn output_code(output: &radix::Output) -> &str {
 fn build_load_round_trip_with_local_import() {
     let dir = test_temp_dir("fhir-pkg");
     let entry = write_local_package(&dir);
-    let artifact = build_fhir_with_faber_seams(&Config::default(), &entry).expect("build FHIR package");
+    let artifact =
+        build_fhir_with_faber_seams(&Config::default(), &entry).expect("build FHIR package");
     assert!(artifact.package_path.is_file(), "package artifact written");
 
     let loaded = load_package_fhir(&artifact.package_path).expect("load FHIR package");
@@ -434,7 +427,8 @@ fn local_library_locale_surface_resolves_through_package_loader() {
             .map(|pack| pack.metadata.id.as_str()),
         Some("en-local-library")
     );
-    let mut package = analyze_with_faber_seams(&config, &entry).expect("analyze localized local package");
+    let mut package =
+        analyze_with_faber_seams(&config, &entry).expect("analyze localized local package");
 
     assert!(
         package
@@ -544,7 +538,8 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
     )
     .expect("load installed English library locale");
     let config = config.with_stdlib(dev_norma_library_home());
-    let package = analyze_with_faber_seams(&config, &entry).expect("analyze localized external libraries");
+    let package =
+        analyze_with_faber_seams(&config, &entry).expect("analyze localized external libraries");
 
     assert!(
         package
@@ -609,8 +604,8 @@ fn latin_norma_consumer_keeps_canonical_surface_compatibility() {
     let config = Config::default()
         .with_stdlib(dev_norma_library_home())
         .with_locale_pack(la_pack);
-    let package =
-        analyze_with_faber_seams(&config, &entry).expect("analyze Latin Norma compatibility consumer");
+    let package = analyze_with_faber_seams(&config, &entry)
+        .expect("analyze Latin Norma compatibility consumer");
 
     assert!(
         package

@@ -8,15 +8,13 @@ use super::{
     build_browser_product, build_browser_product_static_assets, config_with_locale,
     emit_generated_crate, emit_generated_crate_with_runtime_plan, invoke_cargo_build,
     library_resolver_from_config, package_host_selection_diagnostic, read_manifest,
-    use_package_compiler_from_args, validate_manifest,
-    verify_library_binding_shapes, verify_library_bindings, with_lowered_package_mir,
-    ManifestProductEmit, ManifestProductKind,
+    use_package_compiler_from_args, validate_manifest, verify_library_binding_shapes,
+    verify_library_bindings, with_lowered_package_mir, ManifestProductEmit, ManifestProductKind,
 };
 use super::{cmd::use_package_compiler, faber_analysis_seams, faber_emission_seams};
 use radix_package::analyze::AnalyzedPackage;
 use radix_package::discovery::{
-    discover_build_layout, sanitize_crate_name,
-    BuildLayout, PackageSpec,
+    discover_build_layout, sanitize_crate_name, BuildLayout, PackageSpec,
 };
 use radix_package::emit::{
     compile_package as compile_package_compiler, compile_package_result,
@@ -24,7 +22,10 @@ use radix_package::emit::{
 };
 use radix_package::manifest::ManifestRustHost;
 use radix_package::test_source_filter::TestSourceFilter;
-fn analyze_with_faber_seams(config: &Config, input: &Path) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
+fn analyze_with_faber_seams(
+    config: &Config,
+    input: &Path,
+) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
     radix_package::analyze::analyze_package(config, input, &faber_analysis_seams())
 }
 
@@ -77,8 +78,8 @@ fn load_with_faber_seams(
     )
 }
 
-use radix_package::mir::test_support::{fmir_image_test_summary, fmir_text_image_test_summary};
 use radix_package::library::{LibraryResolveError, LibraryResolver, ResolvedLibraryModule};
+use radix_package::mir::test_support::{fmir_image_test_summary, fmir_text_image_test_summary};
 
 fn build_fmir_image_for_faber(
     config: &Config,
@@ -1288,9 +1289,12 @@ main {
     )
     .expect("write entry");
 
-    let image =
-        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
-            .expect("build fmir-text image");
+    let image = build_fmir_text_image_for_faber(
+        &Config::default().with_target(Target::MirFmir),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read fmir text");
 
     assert_eq!(
@@ -1345,7 +1349,8 @@ fn text() → string {
     .expect("write module");
 
     let config = Config::default().with_target(Target::MirFmir);
-    let first = build_fmir_text_image_for_faber(&config, &entry, &[]).expect("first fmir-text build");
+    let first =
+        build_fmir_text_image_for_faber(&config, &entry, &[]).expect("first fmir-text build");
     let first_image = fs::read_to_string(&first.image_path).expect("read first image");
     let second =
         build_fmir_text_image_for_faber(&config, &entry, &[]).expect("second fmir-text build");
@@ -1398,9 +1403,12 @@ fn text() → string {
     )
     .expect("write module");
 
-    let image =
-        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
-            .expect("build fmir-text image");
+    let image = build_fmir_text_image_for_faber(
+        &Config::default().with_target(Target::MirFmir),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
 
     assert!(
@@ -1452,17 +1460,20 @@ fn package_fmir_text_image_rejects_bad_version_without_source_fallback() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
-    let image =
-        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
-            .expect("build fmir-text image");
+    let image = build_fmir_text_image_for_faber(
+        &Config::default().with_target(Target::MirFmir),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image");
     let mut image_text = fs::read_to_string(&image.image_path).expect("read image");
     image_text = rewrite_text_image_version(&image_text, 999);
     fs::write(&image.image_path, image_text).expect("write corrupt image");
     fs::remove_file(&entry).expect("remove source after corrupting image");
 
     let mut host = BufferHost::default();
-    let diagnostics =
-        run_fmir_text_image_for_faber(&image, &mut host).expect_err("bad version should fail closed");
+    let diagnostics = run_fmir_text_image_for_faber(&image, &mut host)
+        .expect_err("bad version should fail closed");
 
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_text_image_version_unsupported")
@@ -1478,9 +1489,12 @@ fn package_fmir_text_image_rejects_unknown_records_without_source_fallback() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
-    let image =
-        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
-            .expect("build fmir-text image");
+    let image = build_fmir_text_image_for_faber(
+        &Config::default().with_target(Target::MirFmir),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image");
     let mut image_text = fs::read_to_string(&image.image_path).expect("read image");
     image_text.push_str("\nunsupported = true\n");
     fs::write(&image.image_path, image_text).expect("write image with unknown record");
@@ -1502,9 +1516,12 @@ fn package_fmir_text_image_rejects_unknown_runtime_requirement_without_source_fa
     let entry = dir.join("main.fab");
     fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
-    let image =
-        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
-            .expect("build fmir-text image");
+    let image = build_fmir_text_image_for_faber(
+        &Config::default().with_target(Target::MirFmir),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     let image_text = image_text.replacen(
         r#"requirement = ["host:stdout"]"#,
@@ -1585,9 +1602,12 @@ main args args {
     )
     .expect("write entry");
 
-    let image =
-        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
-            .expect("build fmir-text image");
+    let image = build_fmir_text_image_for_faber(
+        &Config::default().with_target(Target::MirFmir),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     assert!(
         !image_text.contains("runtime-value"),
@@ -1618,9 +1638,12 @@ main args args {
     )
     .expect("write entry");
 
-    let image =
-        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
-            .expect("build fmir-text image");
+    let image = build_fmir_text_image_for_faber(
+        &Config::default().with_target(Target::MirFmir),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     assert!(
         !image_text.contains("alpha"),
@@ -1754,9 +1777,12 @@ main args args exit 7 {
     )
     .expect("write entry");
 
-    let image =
-        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
-            .expect("build fmir-text image");
+    let image = build_fmir_text_image_for_faber(
+        &Config::default().with_target(Target::MirFmir),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     assert!(
         image_text.contains("exit_code = 7"),
@@ -1884,8 +1910,8 @@ fn package_fmir_image_rejects_bad_version_without_source_fallback() {
     fs::remove_file(&entry).expect("remove source after corrupting image");
 
     let mut host = BufferHost::default();
-    let diagnostics =
-        run_fmir_image_for_faber(&image, &mut host).expect_err("bad fmir version should fail closed");
+    let diagnostics = run_fmir_image_for_faber(&image, &mut host)
+        .expect_err("bad fmir version should fail closed");
 
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_image_version_unsupported")
@@ -5451,9 +5477,7 @@ async_main {
         panic!("expected rust output");
     };
     assert!(output.code.contains("crate::http::get"));
-    assert!(output
-        .code
-        .contains("fn __faber_block_on"));
+    assert!(output.code.contains("fn __faber_block_on"));
     assert!(output.code.contains(".body_json()"));
     assert!(
         output.code.contains(".body_json()")
@@ -5762,8 +5786,10 @@ main {
     let package = analyze_with_faber_seams(&Config::default(), &entry).expect("analyze package");
     let analysis = &package.entry_unit().expect("entry unit").analysis;
 
-    let yaml_item = library_item_by_export(analysis, &["yaml"], "stringify", LibraryItemKind::Function);
-    let json_item = library_item_by_export(analysis, &["json"], "stringify", LibraryItemKind::Function);
+    let yaml_item =
+        library_item_by_export(analysis, &["yaml"], "stringify", LibraryItemKind::Function);
+    let json_item =
+        library_item_by_export(analysis, &["json"], "stringify", LibraryItemKind::Function);
     assert_ne!(
         yaml_item.def_id, json_item.def_id,
         "overlapping function names must keep distinct DefIds"
@@ -5883,12 +5909,7 @@ async_main {
         }),
         "library interfaces should not be source-spliced into importer HIR"
     );
-    let item = library_item_by_export(
-        analysis,
-        &["http"],
-        "Response",
-        LibraryItemKind::Interface,
-    );
+    let item = library_item_by_export(analysis, &["http"], "Response", LibraryItemKind::Interface);
     assert_eq!(
         item.identity.provider,
         LibraryProvider::Builtin("norma".to_owned())
@@ -5896,10 +5917,7 @@ async_main {
     assert_eq!(item.identity.module_path, vec!["http"]);
     assert_eq!(item.exported_name, "Response");
     assert_eq!(item.kind, LibraryItemKind::Interface);
-    assert_eq!(
-        item.rust_runtime_type.as_deref(),
-        None
-    );
+    assert_eq!(item.rust_runtime_type.as_deref(), None);
     assert!(item.elide_rust_decl);
 }
 
@@ -6472,11 +6490,7 @@ bindings = "bindings/rust.toml"
 "#,
     )
     .expect("write manifest");
-    fs::write(
-        dir.join("src/sqlite.fab"),
-        "fn exec(string via) → string\n",
-    )
-    .expect("write source");
+    fs::write(dir.join("src/sqlite.fab"), "fn exec(string via) → string\n").expect("write source");
     fs::write(dir.join("bindings/rust.toml"), "").expect("write bindings");
 
     let diagnostics = verify_library_bindings(&dir, "rust").expect_err("missing binding");
@@ -7747,7 +7761,8 @@ main {
     )
     .expect("write entry");
 
-    let diagnostics = check_with_faber_seams(&config_with_library_home(library_home.path()), &entry);
+    let diagnostics =
+        check_with_faber_seams(&config_with_library_home(library_home.path()), &entry);
     assert!(
         !diagnostics.iter().any(|diag| diag.is_error()),
         "expected typed top-level json/solve namespace call, got {:?}",
@@ -11224,7 +11239,8 @@ fn go_compile_repeated_and_nested_calls_do_not_exchange_modules() {
 fn go_compile_modules_stay_scoped_across_non_go_compiles() {
     let go_dir = test_temp_dir("go-fbr-scope");
     write_go_module_package(&go_dir, "go-fbr-scope", "alpha");
-    let go_result = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &go_dir);
+    let go_result =
+        compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &go_dir);
     assert!(go_result.compile_result.success());
     assert!(
         !go_result.go_modules.is_empty(),
@@ -11656,7 +11672,8 @@ fn g10_web1_faber_web_package_exports_controller_contract() {
     let lib = sibling_faber_web_lib();
     assert!(lib.is_dir(), "faber-web missing at {}", lib.display());
 
-    let package = analyze_with_faber_seams(&Config::default(), &lib).expect("analyze faber-web package");
+    let package =
+        analyze_with_faber_seams(&Config::default(), &lib).expect("analyze faber-web package");
     let unit = package
         .units
         .iter()
@@ -12586,7 +12603,8 @@ incipit {
 "#,
     );
 
-    let package = analyze_with_faber_seams(&Config::default(), &app).expect("analyze web app package graph");
+    let package =
+        analyze_with_faber_seams(&Config::default(), &app).expect("analyze web app package graph");
     let entry = package.entry_unit().expect("entry unit");
     let application = entry
         .analysis
@@ -12763,7 +12781,8 @@ main {
 "#,
     );
 
-    let package = analyze_with_faber_seams(&Config::default(), &app).expect("analyze package graph");
+    let package =
+        analyze_with_faber_seams(&Config::default(), &app).expect("analyze package graph");
     let entry = package.entry_unit().expect("entry unit");
     let application = entry
         .analysis
@@ -13125,9 +13144,12 @@ fn package_fmir_text_image_is_artifact_version_7() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "main { print \"v7\" }").expect("write entry");
 
-    let image =
-        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
-            .expect("build fmir-text image");
+    let image = build_fmir_text_image_for_faber(
+        &Config::default().with_target(Target::MirFmir),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
 
     assert!(
@@ -13163,9 +13185,12 @@ fn package_fmir_text_image_rejects_version_2_images() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
-    let image =
-        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
-            .expect("build fmir-text image");
+    let image = build_fmir_text_image_for_faber(
+        &Config::default().with_target(Target::MirFmir),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     fs::write(
         &image.image_path,
@@ -13192,9 +13217,12 @@ fn package_fmir_text_image_rejects_future_versions() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
-    let image =
-        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
-            .expect("build fmir-text image");
+    let image = build_fmir_text_image_for_faber(
+        &Config::default().with_target(Target::MirFmir),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     fs::write(
         &image.image_path,
@@ -13294,9 +13322,12 @@ main {
     )
     .expect("write entry");
 
-    let image =
-        build_fmir_text_image_for_faber(&Config::default().with_target(Target::MirFmir), &entry, &[])
-            .expect("build fmir-text image with upper-half u64 constants");
+    let image = build_fmir_text_image_for_faber(
+        &Config::default().with_target(Target::MirFmir),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image with upper-half u64 constants");
     fs::remove_file(&entry).expect("remove source after image build");
 
     let mut host = BufferHost::default();

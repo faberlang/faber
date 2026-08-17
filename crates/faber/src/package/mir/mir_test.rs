@@ -7,10 +7,10 @@
 //! generated fmir-bin runner crate (`bin_runner.rs`) and the `[device]`
 //! payload (the `MirSeams::device_section_builder` seam body).
 
-use super::*;
 use super::bin_runner::{
     make_fmir_bin_entrypoint_executable, render_fmir_bin_runner_main_rs, toml_basic_string_path,
 };
+use super::*;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -130,17 +130,20 @@ fn package_fmir_image_provisions_decomposed_companion_upstream_seed() {
     let config = radix::driver::Config::default()
         .with_stdlib(workspace)
         .with_target(radix::codegen::Target::MirFmirBinary);
-    let image =
-        radix_package::mir::build_package_fmir_image(
-            &config,
-            dir.path(),
-            &[],
-            &super::faber_mir_seams(),
-        )
-        .expect("the BERT-tiny image builds");
+    let image = radix_package::mir::build_package_fmir_image(
+        &config,
+        dir.path(),
+        &[],
+        &super::faber_mir_seams(),
+    )
+    .expect("the BERT-tiny image builds");
     let bytes = std::fs::read(&image.image_path).expect("read the image");
-    let loaded = radix_package::mir::load_fmir_image(&bytes, &image.image_path, PACKAGE_MIR_TOOLCHAIN_VERSION)
-        .expect("the image loads");
+    let loaded = radix_package::mir::load_fmir_image(
+        &bytes,
+        &image.image_path,
+        PACKAGE_MIR_TOOLCHAIN_VERSION,
+    )
+    .expect("the image loads");
     let device = loaded
         .device
         .as_ref()

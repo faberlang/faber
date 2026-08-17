@@ -18,16 +18,16 @@
 //! through the Faber analysis/MIR seams (ownership-freeze §5.3).
 #![allow(dead_code)] // Binary build/run and lib tests exercise different surfaces.
 
-use radix_package::analyze::{AnalyzedPackage, AnalyzedPackageUnit};
-use radix_package::discovery::PackageSpec;
-use radix_package::LibraryImportBinding;
-use radix_package::library::ResolvedLibraryModule;
 use radix::diagnostics::Diagnostic;
 use radix::driver::Config;
 use radix::hir::package::{load_package, LoadedHirModule, LoadedHirPackage};
 use radix::lexer::Span;
 use radix::semantic::passes::visibility_annotation::VisibilityTier;
 use radix::syntax::Visibility;
+use radix_package::analyze::{AnalyzedPackage, AnalyzedPackageUnit};
+use radix_package::discovery::PackageSpec;
+use radix_package::library::ResolvedLibraryModule;
+use radix_package::LibraryImportBinding;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};

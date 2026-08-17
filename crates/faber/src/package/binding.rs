@@ -6,12 +6,12 @@ use radix::diagnostics::{Diagnostic, DiagnosticPhase};
 use radix::driver::Config;
 use serde::Deserialize;
 
+use super::{faber_analysis_seams, read_manifest, validate_manifest};
 use radix_package::analyze::AnalyzedPackage;
 use radix_package::discovery::resolve_source_root;
 use radix_package::file_interface::extract_callable_contracts;
 use radix_package::member_path::resolve_package_member;
 use radix_package::rust_target::render_binding_probe;
-use super::{faber_analysis_seams, read_manifest, validate_manifest};
 
 #[cfg(feature = "hir-rust")]
 use super::binding_probe::run_rust_binding_probe;
@@ -129,14 +129,11 @@ pub fn verify_library_bindings_with_probe_mode(
     // FBR-P1-001: the supported source-root set is `src` (default) and `.`
     // (package root). Reuse discovery's resolution so bindings follow the same
     // contract; `resolve_package_member` rejects a bare `.` as naming nothing.
-    let source_root = match resolve_source_root(
-        package_root,
-        &manifest.paths.source,
-        &manifest_path,
-    ) {
-        Ok(path) => path,
-        Err(diagnostic) => return Err(vec![*diagnostic]),
-    };
+    let source_root =
+        match resolve_source_root(package_root, &manifest.paths.source, &manifest_path) {
+            Ok(path) => path,
+            Err(diagnostic) => return Err(vec![*diagnostic]),
+        };
     if !source_root.is_dir() {
         return Err(vec![diagnostic(
             &manifest_path,

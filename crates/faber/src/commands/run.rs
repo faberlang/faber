@@ -13,10 +13,10 @@
 use crate::cli::{BackendSelection, FmirRunArgs, ReplArgs, RunArgs};
 use crate::input_shape::locale_without_package_error;
 use crate::package;
-use radix_package::mir::DeviceSelection;
 use crate::script::{interpret_source, interpret_source_or_exit, print_run_source_error};
 use radix::diagnostics::Diagnostic;
 use radix::mir::StdioHost;
+use radix_package::mir::DeviceSelection;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};

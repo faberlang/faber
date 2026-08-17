@@ -6,18 +6,22 @@
 //!
 //! Unit-level frontmatter tests live in `frontmatter_test.rs`.
 
-use super::test_support::{diagnostic_has_arg, diagnostic_has_issue, test_temp_dir};
 use super::library_resolver_from_config;
-use radix_package::analyze::AnalysisSeams;
-use radix_package::discovery::PackageSpec;
-use radix_package::library::LibraryResolver;
-use radix_package::emit::{compile_package as compile_package_direct, compile_package_with_test_options as compile_package_with_test_options_direct, compile_package_with_test_selection as compile_package_with_test_selection_direct};
-use radix_package::frontmatter::RustTestSelection as TestSelection;
-use radix_package::test_source_filter::TestSourceFilter;
+use super::test_support::{diagnostic_has_arg, diagnostic_has_issue, test_temp_dir};
 use radix::driver::Config;
 use radix::Output;
-use std::path::Path;
+use radix_package::analyze::AnalysisSeams;
+use radix_package::discovery::PackageSpec;
+use radix_package::emit::{
+    compile_package as compile_package_direct,
+    compile_package_with_test_options as compile_package_with_test_options_direct,
+    compile_package_with_test_selection as compile_package_with_test_selection_direct,
+};
+use radix_package::frontmatter::RustTestSelection as TestSelection;
+use radix_package::library::LibraryResolver;
+use radix_package::test_source_filter::TestSourceFilter;
 use std::fs;
+use std::path::Path;
 
 fn seams() -> AnalysisSeams {
     crate::package::faber_analysis_seams()

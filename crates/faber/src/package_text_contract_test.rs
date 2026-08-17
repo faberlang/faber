@@ -9,7 +9,10 @@ use super::config_with_locale;
 use crate::package::faber_analysis_seams;
 use radix_package::analyze::check_package as check_package_direct;
 
-fn check_with_faber_seams(config: &radix::driver::Config, input: &std::path::Path) -> Vec<radix::diagnostics::Diagnostic> {
+fn check_with_faber_seams(
+    config: &radix::driver::Config,
+    input: &std::path::Path,
+) -> Vec<radix::diagnostics::Diagnostic> {
     check_package_direct(config, input, &faber_analysis_seams())
 }
 use radix::codegen::Target;

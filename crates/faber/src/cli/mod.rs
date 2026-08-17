@@ -3,8 +3,8 @@
 mod emit;
 
 use clap::{Parser, Subcommand};
-use radix_package::mir::DeviceSelection;
 pub use emit::{EmitArgs, FaberCliTarget};
+use radix_package::mir::DeviceSelection;
 use std::path::PathBuf;
 
 const FABER_AFTER_HELP: &str = include_str!("../../docs/help/faber-after-help.md");

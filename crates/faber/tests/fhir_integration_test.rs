@@ -150,8 +150,7 @@ entry = "main.fab"
     .expect("write manifest");
     fs::write(src.join("main.fab"), "main { print \"salve\" }\n").expect("write entry");
 
-    let (stdout, stderr, ok) =
-        run_faber(&["run", package.to_str().expect("utf8 package path")]);
+    let (stdout, stderr, ok) = run_faber(&["run", package.to_str().expect("utf8 package path")]);
     assert!(ok, "fhir run failed:\n{stderr}");
     assert_eq!(
         stdout, "salve\n",

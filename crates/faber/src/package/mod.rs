@@ -76,14 +76,38 @@ pub use cmd::{
     cmd_build, cmd_check_package, cmd_emit_package, should_treat_as_package_from_args,
     use_package_compiler_from_args,
 };
+#[cfg(feature = "device-runtime")]
+#[allow(unused_imports)]
+pub(crate) use device::host_partition_for_lowered;
+#[cfg(feature = "device-runtime")]
+#[allow(unused_imports)]
+pub(crate) use device::{
+    admit_device_program_section, device_program_for_lowered, device_section_for_program,
+    execute_device_route,
+};
 pub(crate) use dispatch::{
     load_provider_manifests, selected_providers_for_routes, ProviderManifest,
 };
 #[cfg(feature = "hir-go")]
 #[allow(unused_imports)]
 pub(crate) use go_build::{emit_go_module, invoke_go_build, GoBuildLayout};
+#[cfg(feature = "device-runtime")]
+#[allow(unused_imports)]
+pub(crate) use host_factory::{
+    admitted_backends, construct_composite_host, create_program_session, discovery_receipt,
+    effective_backend_selection, execute_device_descriptor, host_error_diagnostic,
+    missing_backend_artifact, missing_device_descriptor, resolve_backend_selection,
+    BackendDiscoveryReceipt, E_BACKEND_UNAVAILABLE, E_DEVICE_ABI_MISMATCH, E_DEVICE_DESCRIPTOR,
+    E_DEVICE_DTYPE_MISMATCH, E_DEVICE_ENTRY_MISMATCH, E_DEVICE_SHAPE_MISMATCH, E_NO_DEVICE_PROGRAM,
+};
 #[allow(unused_imports)]
 pub(crate) use library_link::emit_linked_library_crates;
+#[cfg(feature = "mir-llvm")]
+#[allow(unused_imports)]
+pub use llvm_host::{
+    build_host_program, discover_llvm_host_toolchain, ensure_llvm_runtime_archive,
+    host_llvm_target_triple, host_triple_for, LlvmHostBuild, LlvmHostProfile,
+};
 pub(crate) use manifest::validate_manifest;
 #[allow(unused_imports)]
 pub(crate) use manifest::{
@@ -94,42 +118,18 @@ pub use manifest::{
     read_manifest, FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
     ManifestProductShaders,
 };
-pub(crate) use product::build_browser_product_with_postprocess;
-#[cfg(test)]
-pub(crate) use product::{build_browser_product, build_browser_product_static_assets};
-#[cfg(feature = "device-runtime")]
-#[allow(unused_imports)]
-pub(crate) use device::{
-    admit_device_program_section, device_program_for_lowered, device_section_for_program,
-    execute_device_route,
-};
-#[cfg(feature = "device-runtime")]
-#[allow(unused_imports)]
-pub(crate) use device::host_partition_for_lowered;
-#[cfg(feature = "device-runtime")]
-#[allow(unused_imports)]
-pub(crate) use host_factory::{
-    admitted_backends, construct_composite_host, create_program_session, discovery_receipt,
-    effective_backend_selection, execute_device_descriptor, host_error_diagnostic,
-    missing_backend_artifact, missing_device_descriptor, resolve_backend_selection,
-    BackendDiscoveryReceipt, E_BACKEND_UNAVAILABLE, E_DEVICE_ABI_MISMATCH, E_DEVICE_DESCRIPTOR,
-    E_DEVICE_DTYPE_MISMATCH, E_DEVICE_ENTRY_MISMATCH, E_DEVICE_SHAPE_MISMATCH, E_NO_DEVICE_PROGRAM,
-};
-#[cfg(feature = "mir-llvm")]
-#[allow(unused_imports)]
-pub use llvm_host::{
-    build_host_program, discover_llvm_host_toolchain, ensure_llvm_runtime_archive,
-    host_llvm_target_triple, host_triple_for, LlvmHostBuild, LlvmHostProfile,
-};
 #[allow(unused_imports)]
 pub use mir::run_fmir_image_bytes_with_stdio;
 #[allow(unused_imports)]
 pub use mir::with_lowered_package_mir;
-use radix_package::discovery::PackageSpec;
-use radix_package::library::{LibraryInterfaceCache, LibraryResolver, LockedLibraryPackage};
+pub(crate) use product::build_browser_product_with_postprocess;
+#[cfg(test)]
+pub(crate) use product::{build_browser_product, build_browser_product_static_assets};
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 use radix::driver::Config;
+use radix_package::discovery::PackageSpec;
+use radix_package::library::{LibraryInterfaceCache, LibraryResolver, LockedLibraryPackage};
 use std::path::Path;
 
 /// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 executed-lane
@@ -187,6 +187,8 @@ fn is_mir_backed_target(target: Target) -> bool {
     )
 }
 
+#[allow(unused_imports)]
+pub use locale::available_locales;
 /// Installed reader-pack path resolution shared by lib surfaces
 /// (`diagnostic_explain`) and package code-locale lookup. Used by the lib
 /// crate only; the bin's copy is legitimately unused.
@@ -194,8 +196,6 @@ fn is_mir_backed_target(target: Target) -> bool {
 pub(crate) use locale::installed_locale_pack_path;
 #[allow(unused_imports)]
 pub use locale::locale_pack_for_emit;
-#[allow(unused_imports)]
-pub use locale::available_locales;
 #[allow(unused_imports)]
 pub(crate) use locale::{
     config_with_locale, default_config_with_locale, load_locale_pack_for_input,
@@ -337,13 +337,13 @@ pub(crate) fn library_resolver_for_package(
     // a provider repo whose checkout name differs from its provider name
     // (`faber-web` vs `web`) still analyzes; a lock entry always wins.
     if let Some(library) = manifest.library.as_ref() {
-        locked.entry(library.provider.clone()).or_insert_with(|| {
-            LockedLibraryPackage {
+        locked
+            .entry(library.provider.clone())
+            .or_insert_with(|| LockedLibraryPackage {
                 name: manifest.package.name.clone(),
                 version: manifest.package.version.clone(),
                 interface_root: package_root.join(&manifest.paths.source),
-            }
-        });
+            });
     }
     resolver = resolver.with_package_lock(manifest.dependencies, locked);
     Ok(resolver)
@@ -373,11 +373,9 @@ pub fn faber_emission_seams() -> radix_package::emit::EmissionSeams {
     }
 }
 
-
 fn validate_product_manifest_for_spec(spec: &PackageSpec) -> Result<(), Box<Diagnostic>> {
     manifest::manifest_for_spec(spec).map(|_| ())
 }
-
 
 #[cfg(test)]
 mod test_support;

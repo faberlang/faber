@@ -12,14 +12,14 @@ use super::cargo::{
 #[cfg(feature = "hir-go")]
 use super::go_build::{emit_go_module_with_postprocess, invoke_go_build, GoBuildLayout};
 use super::manifest::FaberManifest;
-use radix_package::discovery::BuildLayout;
-use radix_package::manifest::manifest_build_target;
 #[cfg(feature = "mir-llvm")]
 use super::{build_host_program, LlvmHostProfile};
 use super::{
     config_with_locale, discover_build_layout, package_host_selection_diagnostic, read_manifest,
     MANIFEST_FILE,
 };
+use radix_package::discovery::BuildLayout;
+use radix_package::manifest::manifest_build_target;
 
 /// Print `message` and terminate.
 fn fail(message: &str) -> ! {
@@ -148,13 +148,13 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
             command.release,
             &super::mir::faber_mir_seams(),
         ) {
-                Ok(bundle) => bundle,
-                Err(diagnostics) => report_diagnostics_and_exit(
-                    &diagnostics,
-                    locale_pack.as_ref(),
-                    "fmir-bin bundle build failed",
-                ),
-            };
+            Ok(bundle) => bundle,
+            Err(diagnostics) => report_diagnostics_and_exit(
+                &diagnostics,
+                locale_pack.as_ref(),
+                "fmir-bin bundle build failed",
+            ),
+        };
         println!("{}", bundle.entrypoint_path.display());
         return;
     }
@@ -531,12 +531,11 @@ fn single_file_rust_runtime_plan(
         std::collections::BTreeSet::new(),
         None,
     );
-    let needs_tokio = analysis.hir.entry_is_async
-        || analysis
-            .hir
-            .items
-            .iter()
-            .any(|item| matches!(&item.kind, radix::hir::HirItemKind::Function(f) if f.is_async));
+    let needs_tokio =
+        analysis.hir.entry_is_async
+            || analysis.hir.items.iter().any(
+                |item| matches!(&item.kind, radix::hir::HirItemKind::Function(f) if f.is_async),
+            );
     Ok(super::RustRuntimePlan {
         needs_faber: needs.needs_faber_runtime,
         needs_tokio,
@@ -705,11 +704,8 @@ pub fn cmd_check_package(command: radix::tool::CheckCommand) {
         ),
         Err(diag) => fail_with_diagnostic(&diag),
     };
-    let mut diagnostics = radix_package::analyze::check_package(
-        &config,
-        &input_path,
-        &super::faber_analysis_seams(),
-    );
+    let mut diagnostics =
+        radix_package::analyze::check_package(&config, &input_path, &super::faber_analysis_seams());
     radix::apply_warn_policy(&mut diagnostics, &config.warn_policy);
 
     let mut fatal_errors = 0usize;

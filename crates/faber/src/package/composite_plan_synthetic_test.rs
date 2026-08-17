@@ -20,7 +20,6 @@ use super::composite_plan::{
     SubmissionRegionFact,
 };
 use super::test_support::{test_temp_dir, TestDir};
-use radix_package::analyze::AnalyzedPackage;
 use radix::codegen::Target;
 use radix::diagnostics::{Diagnostic, DiagnosticArg};
 use radix::driver::Config;
@@ -40,6 +39,7 @@ use radix_mir_fmir::{
     DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId, FmirDeviceArtifact,
     FmirDeviceBackend, MaterializationStage,
 };
+use radix_package::analyze::AnalyzedPackage;
 use radix_types::TypeId;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -48,11 +48,7 @@ fn analyze_with_faber_seams(
     config: &Config,
     input: &Path,
 ) -> Result<radix_package::analyze::AnalyzedPackage, Vec<Diagnostic>> {
-    radix_package::analyze::analyze_package(
-        config,
-        input,
-        &crate::package::faber_analysis_seams(),
-    )
+    radix_package::analyze::analyze_package(config, input, &crate::package::faber_analysis_seams())
 }
 
 /// The checked-in synthetic fixture package (analyzed via a tempdir copy so
@@ -87,7 +83,8 @@ fn copy_package_dir_skipping_target(src: &Path, dest: &Path) {
 fn analyze_fixture() -> (TestDir, AnalyzedPackage) {
     let dir = copy_fixture();
     let config = Config::default();
-    let package = analyze_with_faber_seams(&config, dir.path()).expect("synthetic fixture package analyzes");
+    let package =
+        analyze_with_faber_seams(&config, dir.path()).expect("synthetic fixture package analyzes");
     (dir, package)
 }
 
