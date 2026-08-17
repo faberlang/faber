@@ -1363,6 +1363,67 @@ fn host_provider_failure_does_not_expose_symbol_index() {
 }
 
 #[test]
+fn vertex_layout_count_package_provider_reads_geometry_attributes() {
+    use radix_hir::DefId;
+    use radix_lexer::Interner;
+    use radix_mir::{MirOperand, MirProviderKind, MirValidationContext};
+    use radix_types::TypeTable;
+    use rustc_hash::FxHashMap;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let mut interner = Interner::new();
+    let attributes = interner.intern("attributes");
+    let canonical_module = interner.intern("triga:geometry/layout");
+    let layout_module = interner.intern("layout");
+    let indexed_module = interner.intern("indexed_geometry");
+    let buffer_geometry_module = interner.intern("BufferGeometry");
+    let name = interner.intern("vertex_layout_count");
+
+    let mut fields = FxHashMap::default();
+    fields.insert(
+        attributes,
+        Value::Array(Rc::new(RefCell::new(vec![Value::Unit, Value::Unit]))),
+    );
+    let geometry = Value::Struct(DefId(0), Rc::new(RefCell::new(fields)));
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .expect("test frame")
+        .values
+        .insert(MirValueId(0), geometry);
+
+    for module in [
+        vec![canonical_module, layout_module],
+        vec![indexed_module, buffer_geometry_module],
+    ] {
+        let call = MirRuntimeCall {
+            intrinsic: MirIntrinsic::Provider(MirProvider {
+                kind: MirProviderKind::Package,
+                module,
+                name,
+            }),
+            args: vec![MirOperand::Value(MirValueId(0))],
+            return_ty: MirType::semantic(TypeId(0)),
+        };
+        assert_eq!(
+            runner
+                .eval_runtime_call(&call, Span::default())
+                .expect("vertex_layout_count route should execute"),
+            Value::Int(2)
+        );
+    }
+}
+
+#[test]
 fn test_host_kernel_call_default_rejects() {
     let mut host = MinimalHost;
     let result = host.kernel_call(KernelModule::Processus, "exec", &[], Span::default());

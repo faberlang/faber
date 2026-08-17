@@ -29,6 +29,29 @@ pub(crate) fn provider_identity(provider: &MirProvider, interner: &Interner) -> 
     }
 }
 
+/// The package-provider route implemented directly by the script runner.
+///
+/// WHY: package MIR normally belongs to a compiled package host. This one
+/// geometry query is pure over the runner's value carrier, so it can execute
+/// without opening a general package ABI or accepting arbitrary route names.
+#[must_use]
+pub(crate) fn is_vertex_layout_count_provider(provider: &MirProvider, interner: &Interner) -> bool {
+    if provider.kind != MirProviderKind::Package
+        || interner.resolve(provider.name) != "vertex_layout_count"
+    {
+        return false;
+    }
+    let module = provider
+        .module
+        .iter()
+        .map(|symbol| interner.resolve(*symbol))
+        .collect::<Vec<_>>();
+    matches!(
+        module.as_slice(),
+        ["triga:geometry/layout", "layout"] | ["indexed_geometry", "BufferGeometry"]
+    )
+}
+
 impl RunnerError {
     /// Replace the legacy numeric provider diagnostic with its stable route.
     pub(crate) fn with_provider_identity(mut self, identity: &str) -> Self {

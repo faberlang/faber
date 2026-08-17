@@ -34,7 +34,11 @@ use super::value::{
     uint_width_checked_add, values_equal, width_checked_add, GradientStorage, MapKey, SermoValue,
     TensorValue, Value,
 };
-use super::{gelu_f64, host::provider_identity, Runner, RunnerError};
+use super::{
+    gelu_f64,
+    host::{is_vertex_layout_count_provider, provider_identity},
+    Runner, RunnerError,
+};
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_mir::{
@@ -3374,9 +3378,41 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 .kernel_call(module, verb, &evaluated, span)
                 .map_err(|error| error.with_provider_identity(&identity));
         }
+        if is_vertex_layout_count_provider(provider, self.interner) {
+            return self.eval_vertex_layout_count(args, span);
+        }
         self.host
             .provider(provider)
             .map_err(|error| error.with_provider_identity(&identity))
+    }
+
+    fn eval_vertex_layout_count(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(
+                span,
+                "vertex_layout_count provider arity",
+            ));
+        };
+        let receiver = self.eval_operand(receiver, span)?;
+        let Value::Struct(_, fields) = receiver else {
+            return Err(RunnerError::internal(
+                span,
+                "vertex_layout_count requires BufferGeometry",
+            ));
+        };
+        let attributes = fields.borrow().iter().find_map(|(symbol, value)| {
+            (self.interner.resolve(*symbol) == "attributes").then_some(value.clone())
+        });
+        let Some(Value::Array(attributes)) = attributes else {
+            return Ok(Value::Nil);
+        };
+        let count = i64::try_from(attributes.borrow().len())
+            .map_err(|_| RunnerError::internal(span, "vertex_layout_count overflow"))?;
+        Ok(Value::Int(count))
     }
 
     fn eval_set_algebra(
