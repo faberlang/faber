@@ -107,9 +107,17 @@ Frame rules:
 3. The file or stream MUST end immediately after the declared payload.
 4. A decoder MUST reject truncated payloads and trailing bytes.
 5. Before the kind is known, a decoder MUST reject a declared length above the
-   greatest limit of its enabled document kinds.
+   greatest limit of its enabled document kinds. When the enabled-kind set is
+   empty, that declared-payload cap is 256 bytes. A decoder with no enabled
+   document kind MUST reject a declared payload length greater than 256 bytes
+   and MUST NOT allocate `value`.
 6. After reading `kind`, a decoder MUST validate the declared length against
    that kind's limit before allocating or reading the full payload.
+   A decoder MUST check `kind`, the root map, and the schema array against
+   the envelope-prefix limits (kind-string 64 bytes, root map exactly 3
+   entries, schema array exactly 2 elements) from their MessagePack headers
+   before allocation. Root keys MUST be read in canonical order (`kind`,
+   then `schema`, then `value`) so `value` is not allocated to learn `kind`.
 7. Compression, encryption, and signatures are external containers or
    transports. No FCMP 1.0 frame flag enables them. In-frame flags are
    intentionally not reserved; adding them is a profile-major change, not an
@@ -138,6 +146,20 @@ The fields appear in canonical key order:
 2. `schema`
 3. `value`
 
+These envelope-prefix limits apply before kind admission. They are not
+kind-specific and exist even when no kind is enabled:
+
+| Limit | Value | Rule |
+| --- | ---: | --- |
+| Kind-string bytes | 64 | A decoder MUST reject a longer `kind` from the string header and MUST NOT allocate the string payload. |
+| Root map entries | 3 (exact) | A decoder MUST reject any other count from the map header and MUST NOT allocate entries. |
+| Schema array elements | 2 (exact) | A decoder MUST reject any other count from the array header and MUST NOT allocate elements. |
+| No-enabled-kind payload | 256 | A decoder with no enabled document kind MUST reject a declared payload length greater than 256 bytes. It MUST NOT allocate `value`. |
+
+A decoder MUST read root fields in canonical order (`kind`, then `schema`,
+then `value`). If the first key is not `kind` or the second is not `schema`,
+that is an error before `value` allocation.
+
 Example in diagnostic notation:
 
 ```text
@@ -155,7 +177,9 @@ Root rules:
    `[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+`.
 3. Schema major and minor values MUST fit unsigned 16-bit integers.
 4. A decoder MUST admit `kind` and `schema` before allocating or interpreting
-   `value`.
+   `value`. `kind` MUST be at most 64 bytes, the root map MUST have exactly
+   3 entries, and `schema` MUST have exactly 2 elements; those counts MUST
+   be checked from the MessagePack headers before allocation.
 5. Unknown root fields, duplicate root fields, unsupported kinds, and
    unsupported schema versions are errors.
 6. Named string fields are REQUIRED for the root. Numeric field IDs MUST NOT
@@ -170,8 +194,23 @@ register or admit either kind.
 
 - Null is MessagePack `nil`.
 - Boolean values use the MessagePack `false` and `true` opcodes.
-- A schema MUST state where null is a legal value. Null is never an implicit
-  substitute for an absent optional field.
+- A schema MUST state where null is a legal value.
+- OPTIONAL fields MUST be omitted when the schema value equals the named
+  default, including when the field is absent.
+- Absence of an OPTIONAL field and a present encoding equal to that default
+  MUST be treated as the same schema value.
+- A present OPTIONAL field whose decoded value equals the schema default
+  MUST be rejected as `noncanonical`.
+- An absent OPTIONAL field MUST use the default named by the schema.
+- A decoder MUST NOT rewrite a present field into an absent field, or an
+  absent field into a present field, except by applying the named default in
+  the schema value (never on the admitted bytes).
+- `nil` MUST be emitted only when null is a legal, distinct field value.
+- A decoder MUST NOT treat `nil` as the encoding of an omitted OPTIONAL
+  field.
+- FCMP 1.0 OPTIONAL fields MUST name a default that is not implicit null.
+- A field whose type admits null MUST be REQUIRED and MUST always carry
+  the key.
 
 ### 3.2 Integers
 
@@ -258,9 +297,22 @@ A record is a MessagePack map:
 - numeric field IDs MUST NOT be used as an alternate record representation;
 - fields MUST be emitted in canonical map-key order;
 - required fields MUST always be present;
-- optional fields MUST be omitted when absent;
-- an absent optional field MUST use the default named by the schema;
-- `nil` MUST be emitted only when null is a legal, distinct field value; and
+- OPTIONAL fields MUST be omitted when the schema value equals the named
+  default, including when the field is absent;
+- absence of an OPTIONAL field and a present encoding equal to that default
+  MUST be treated as the same schema value;
+- a present OPTIONAL field whose decoded value equals the schema default
+  MUST be rejected as `noncanonical`;
+- an absent OPTIONAL field MUST use the default named by the schema;
+- a decoder MUST NOT rewrite a present field into an absent field, or an
+  absent field into a present field, except by applying the named default in
+  the schema value (never on the admitted bytes);
+- `nil` MUST be emitted only when null is a legal, distinct field value;
+- a decoder MUST NOT treat `nil` as the encoding of an omitted OPTIONAL
+  field;
+- FCMP 1.0 OPTIONAL fields MUST name a default that is not implicit null;
+- a field whose type admits null MUST be REQUIRED and MUST always carry
+  the key; and
 - unknown fields MUST be rejected after the document version has been
   admitted.
 
@@ -347,6 +399,28 @@ decoding. A permissive normalizer, if one exists, is an explicit developer tool
 and never an implicit fallback.
 
 ## 6. Resource limits
+
+These profile-level envelope-prefix limits apply to every decoder before
+kind admission. They are not kind-specific and exist even when no kind is
+enabled:
+
+| Limit | Value | Rule |
+| --- | ---: | --- |
+| Kind-string bytes | 64 | A decoder MUST reject a longer `kind` from the string header and MUST NOT allocate the string payload. |
+| Root map entries | 3 (exact) | A decoder MUST reject any other count from the map header and MUST NOT allocate entries. |
+| Schema array elements | 2 (exact) | A decoder MUST reject any other count from the array header and MUST NOT allocate elements. |
+| No-enabled-kind payload | 256 | A decoder with no enabled document kind MUST reject a declared payload length greater than 256 bytes. It MUST NOT allocate `value`. |
+
+A decoder MUST check `kind`, the root map, and the schema array against
+those limits from their MessagePack headers before allocation. A decoder
+MUST read root keys in canonical order (`kind`, then `schema`, then
+`value`) so `value` is not allocated to learn `kind`.
+
+Enabled-kind declared-length checks stay as in §1 rules 5–6 (greatest
+enabled kind, then the admitted kind). The 256-byte figure is only the
+empty-set cap and a sufficient window to parse `kind`+`schema` under the
+table above (canonical prefix is 85 bytes when `kind` is 64 bytes and
+schema integers use uint16).
 
 Every registered document kind MUST define finite limits for:
 
@@ -534,7 +608,13 @@ The profile suite MUST include canonical-byte vectors for:
 - string, binary, array, and map header-width boundaries;
 - sorted and unsorted maps;
 - duplicate map keys;
-- records with absent optional fields and explicit nullable values;
+- records with absent OPTIONAL fields and explicit nullable values;
+- a positive pair: a record whose OPTIONAL field is omitted (schema value
+  equals the named default) and the same record with that field present and
+  equal to the default (`noncanonical`);
+- a `kind` string longer than 64 bytes (header-only reject);
+- a declared payload length greater than 256 bytes with no enabled kind;
+- a root map entry count other than 3, or a schema array length other than 2;
 - unit and payload enum variants;
 - logical maps with non-string keys;
 - sets with competing element encodings;
