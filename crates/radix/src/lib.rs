@@ -73,7 +73,7 @@ pub mod forma;
 #[cfg(test)]
 pub mod forma_render;
 pub mod hir;
-pub mod import_resolve;
+pub(crate) mod import_resolve;
 pub mod intrinsics;
 pub mod kernel;
 pub mod lexer;
@@ -275,9 +275,10 @@ impl Compiler {
 
     /// Compile a file from disk.
     ///
-    /// File I/O errors are reported through [`CompileResult::diagnostics`] so
-    /// callers can handle all compile failures through the same diagnostic
-    /// channel.
+    /// This is a program-layer entry: it builds import contracts from the path,
+    /// then calls fail-closed module analysis. File I/O errors are reported
+    /// through [`CompileResult::diagnostics`] so callers can handle all compile
+    /// failures through the same diagnostic channel.
     #[must_use]
     pub fn compile(&self, path: &Path) -> CompileResult {
         let source = match std::fs::read_to_string(path) {
@@ -286,8 +287,7 @@ impl Compiler {
                 return CompileResult { output: None, diagnostics: vec![Diagnostic::io_error(path, &e)] };
             }
         };
-        let name = path.display().to_string();
-        self.compile_str(&name, &source)
+        crate::tool::commands::compile::compile_prepared_program_path(&self.session, path, &source)
     }
 
     /// Compile source code from a string.
