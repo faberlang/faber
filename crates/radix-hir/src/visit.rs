@@ -28,7 +28,7 @@ use crate::nodes::{
     DefId, HirAnnotation, HirAnnotationValue, HirArrayElement, HirBlock, HirCallArg, HirCape,
     HirCasuArm, HirConversioTarget, HirExpression, HirExpressionKind, HirField, HirFunction,
     HirImportItem, HirItem, HirItemKind, HirLocal, HirMethod, HirNonNullKind, HirObjectField,
-    HirObjectKey, HirOptionalChainKind, HirParam, HirPattern, HirProgram, HirStatement,
+    HirObjectKey, HirOptionalChainKind, HirParam, HirPattern, HirModule, HirStatement,
     HirStatementKind, HirTypeParam, HirVariant,
 };
 use radix_lexer::Symbol;
@@ -44,7 +44,7 @@ use radix_lexer::Symbol;
 /// definitions, or only a specific declaration kind without duplicating the
 /// rest of the tree traversal.
 pub trait HirVisitor: Sized {
-    fn visit_program(&mut self, program: &HirProgram) {
+    fn visit_program(&mut self, program: &HirModule) {
         walk_program(self, program);
     }
 
@@ -129,7 +129,7 @@ pub trait HirVisitor: Sized {
 }
 
 /// Walk a whole HIR program in item order, then entry-block order.
-pub fn walk_program<V: HirVisitor>(visitor: &mut V, program: &HirProgram) {
+pub fn walk_program<V: HirVisitor>(visitor: &mut V, program: &HirModule) {
     for item in &program.items {
         visitor.visit_item(item);
     }
@@ -544,7 +544,7 @@ fn walk_call_args<V: HirVisitor>(visitor: &mut V, args: &[HirCallArg]) {
 /// identity and tree shape contracts; rebuilding IDs or redefining semantic
 /// ownership belongs in lowering or a dedicated transformation phase.
 pub trait HirVisitorMut: Sized {
-    fn visit_program_mut(&mut self, program: &mut HirProgram) {
+    fn visit_program_mut(&mut self, program: &mut HirModule) {
         walk_program_mut(self, program);
     }
 
@@ -628,7 +628,7 @@ pub trait HirVisitorMut: Sized {
 }
 
 /// Mutably walk a whole HIR program in item order, then entry-block order.
-pub fn walk_program_mut<V: HirVisitorMut>(visitor: &mut V, program: &mut HirProgram) {
+pub fn walk_program_mut<V: HirVisitorMut>(visitor: &mut V, program: &mut HirModule) {
     for item in &mut program.items {
         visitor.visit_item_mut(item);
     }
@@ -1111,7 +1111,7 @@ mod tests {
 
     // PRP-016 integration: walk_item/walk_function must drive function
     // .annotations through visit_program, not just the standalone helper.
-    fn program_with_annotated_function() -> HirProgram {
+    fn program_with_annotated_function() -> HirModule {
         use crate::nodes::{HirItem, HirItemKind};
         let func = HirFunction {
             name: Symbol(0),
@@ -1131,7 +1131,7 @@ mod tests {
             test: None,
             annotations: vec![annotation_expr()],
         };
-        HirProgram {
+        HirModule {
             items: vec![HirItem {
                 id: HirId(0),
                 def_id: DefId(0),
@@ -1180,8 +1180,8 @@ mod tests {
     }
 
     // PRP-075: walk_program/walk_program_mut must visit entry_annotations.
-    fn program_with_entry_annotations() -> HirProgram {
-        HirProgram {
+    fn program_with_entry_annotations() -> HirModule {
+        HirModule {
             items: Vec::new(),
             entry: None,
             entry_annotations: vec![annotation_expr()],
@@ -1252,7 +1252,7 @@ mod tests {
                 span: Span::default(),
             }),
         };
-        let program = HirProgram {
+        let program = HirModule {
             items: Vec::new(),
             entry: Some(entry),
             entry_annotations: Vec::new(),
@@ -1313,13 +1313,13 @@ mod tests {
     }
 
     // Type-alias generic parameters introduce DefIds, same as struct/enum/interface.
-    fn program_with_generic_type_alias() -> HirProgram {
+    fn program_with_generic_type_alias() -> HirModule {
         use crate::nodes::{
             HirItem, HirItemKind, HirTypeAlias, HirTypeParam, HirTypeParamConstraint,
         };
         use radix_syntax::GenericParamKind;
         use radix_types::TypeId;
-        HirProgram {
+        HirModule {
             items: vec![HirItem {
                 id: HirId(0),
                 def_id: DefId(1),

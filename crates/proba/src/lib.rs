@@ -10,8 +10,8 @@
 #[path = "mod_test.rs"]
 mod tests;
 
-use radix::driver::{analyze_source, AnalyzedUnit, Session};
-use radix::hir::{DefId, HirItemKind, HirProgram, HirTestMetadata, HirTestModifier};
+use radix::driver::{analyze_source, AnalyzedModule, Session};
+use radix::hir::{DefId, HirItemKind, HirModule, HirTestMetadata, HirTestModifier};
 use radix::lexer::Interner;
 use radix::mir::{
     lower_analyzed_unit_with_context, run_function, BufferHost, MirFunctionId, RunSourceError,
@@ -134,7 +134,7 @@ impl ProbaReport {
 
 /// Enumerate proba cases from a lowered HIR program (source order).
 #[must_use]
-pub fn inventory_cases(hir: &HirProgram, interner: &Interner) -> Vec<ProbaCase> {
+pub fn inventory_cases(hir: &HirModule, interner: &Interner) -> Vec<ProbaCase> {
     let mut cases = Vec::new();
     for item in &hir.items {
         let HirItemKind::Function(func) = &item.kind else {
@@ -307,7 +307,7 @@ pub fn run_proba_source(
 ///
 /// Returns MIR / runner setup errors when lowering fails.
 pub fn run_proba_on_analyzed(
-    unit: &mut AnalyzedUnit,
+    unit: &mut AnalyzedModule,
     selection: &TestSelection,
     harness_filter: Option<&str>,
     exact: bool,

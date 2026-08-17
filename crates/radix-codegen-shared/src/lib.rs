@@ -32,7 +32,7 @@ pub use text_literal::unescape_faber_text;
 pub mod validation;
 
 use radix_diagnostics::DiagnosticArg;
-use radix_hir::HirProgram;
+use radix_hir::HirModule;
 use radix_lexer::Interner;
 use radix_types::TypeTable;
 
@@ -228,7 +228,7 @@ pub trait Codegen {
     /// emission.
     fn generate(
         &self,
-        hir: &HirProgram,
+        hir: &HirModule,
         types: &TypeTable,
         interner: &Interner,
     ) -> Result<Self::Output, CodegenError>;

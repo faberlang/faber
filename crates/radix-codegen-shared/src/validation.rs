@@ -8,14 +8,14 @@
 use crate::CodegenError;
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::visit::{walk_expr, HirVisitor};
-use radix_hir::{HirExpressionKind, HirProgram};
+use radix_hir::{HirExpressionKind, HirModule};
 use radix_lexer::Span;
 
 /// # Errors
 ///
 /// Returns `CodegenError` if the HIR program contains error recovery expressions
 /// that must not reach codegen.
-pub fn reject_hir_errors(hir: &HirProgram) -> Result<(), CodegenError> {
+pub fn reject_hir_errors(hir: &HirModule) -> Result<(), CodegenError> {
     if let Some(span) = find_error_expr_in_program(hir) {
         return Err(CodegenError {
             message: format!(
@@ -33,7 +33,7 @@ pub fn reject_hir_errors(hir: &HirProgram) -> Result<(), CodegenError> {
 
 /// Walk the HIR program and return the span of the first error expression found.
 #[must_use]
-pub fn find_error_expr_in_program(hir: &HirProgram) -> Option<Span> {
+pub fn find_error_expr_in_program(hir: &HirModule) -> Option<Span> {
     struct Finder {
         span: Option<Span>,
     }

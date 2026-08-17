@@ -15,7 +15,7 @@
 //!   [`Interner`] owned by the compile session.
 
 use radix_hir::visit::HirVisitor;
-use radix_hir::{DefId, HirProgram};
+use radix_hir::{DefId, HirModule};
 use radix_lexer::{Interner, Symbol};
 use rustc_hash::FxHashMap;
 
@@ -49,7 +49,7 @@ pub struct NameCatalog<'a> {
 impl<'a> NameCatalog<'a> {
     /// Build a catalog from the definition-bearing nodes in one HIR program.
     #[must_use]
-    pub fn new(hir: &HirProgram, interner: &'a Interner) -> Self {
+    pub fn new(hir: &HirModule, interner: &'a Interner) -> Self {
         Self {
             names: collect_names(hir),
             interner,
@@ -103,7 +103,7 @@ impl<'a> NameCatalog<'a> {
 
 /// Collect names from top-level HIR items.
 #[must_use]
-pub fn collect_names(hir: &HirProgram) -> FxHashMap<DefId, Symbol> {
+pub fn collect_names(hir: &HirModule) -> FxHashMap<DefId, Symbol> {
     let mut collector = NameCollector {
         names: FxHashMap::default(),
     };
@@ -124,13 +124,13 @@ impl HirVisitor for NameCollector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use radix_hir::HirProgram;
+    use radix_hir::HirModule;
 
     // PRP-025: resolve_def must return Err for unknown DefId, not a sentinel.
     #[test]
     fn resolve_def_fails_for_missing() {
         let interner = Interner::new();
-        let hir = HirProgram {
+        let hir = HirModule {
             items: Vec::new(),
             entry: None,
             entry_annotations: Vec::new(),
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn empty_catalog_fails_resolve() {
         let interner = Interner::new();
-        let hir = HirProgram {
+        let hir = HirModule {
             items: Vec::new(),
             entry: None,
             entry_annotations: Vec::new(),
@@ -168,7 +168,7 @@ mod tests {
     #[test]
     fn resolve_symbol_roundtrip() {
         let mut interner = Interner::new();
-        let hir = HirProgram {
+        let hir = HirModule {
             items: Vec::new(),
             entry: None,
             entry_annotations: Vec::new(),

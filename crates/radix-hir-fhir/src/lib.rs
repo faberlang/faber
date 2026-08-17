@@ -4,7 +4,7 @@
 //! portable schema types, the deterministic `postcard` codec, schema/version
 //! checks, and fail-closed referential-integrity validation.
 //!
-//! This is a format crate, not a compiler driver: `AnalyzedUnit`
+//! This is a format crate, not a compiler driver: `AnalyzedModule`
 //! reconstruction and driver orchestration stay in the `radix` package, which
 //! calls [`decode`] and rebuilds arenas from the returned [`HirArtifact`].
 //! Schema evolution and package/library requirements remain the authority of

@@ -54,16 +54,17 @@ pub struct HirId(pub u32);
 // Program and library surface
 // ---------------------------------------------------------------------------
 
-/// Lowered program split into declarations and executable entry code.
+/// HIR for one source module: declarations, import bindings, and one optional
+/// executable entry block.
 ///
-/// HIR makes the source/package distinction explicit: declarations are always
-/// top-level items, while implicit top-level execution and explicit entry forms
-/// become one optional entry block.
+/// `entry` is the executable block of this source module (`incipit` or implicit
+/// top-level statements). It is not a package or program root.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct HirProgram {
+pub struct HirModule {
     pub items: Vec<HirItem>,
 
-    /// Executable entry from `incipit` or implicit package-level statements.
+    /// Executable block of this source module (`incipit` or implicit top-level
+    /// statements). Not a package or program root.
     pub entry: Option<HirBlock>,
 
     /// Normalized metadata attached to the `incipit` statement.
@@ -1447,7 +1448,7 @@ pub struct HirTriviaAttachment {
 
 /// The durable, serializable presentation layer for one analyzed unit.
 ///
-/// Lives in the analyzed-unit/artifact envelope — never on `HirProgram` — so
+/// Lives in the analyzed-unit/artifact envelope — never on `HirModule` — so
 /// semantic consumers stay trivia-blind while the HIR value and its
 /// presentation always travel together.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1459,7 +1460,7 @@ pub struct HirPresentation {
     pub block_ends: Vec<HirBlockEnd>,
 
     /// The program's single structural end.
-    pub program_end: HirProgramEnd,
+    pub program_end: HirModuleEnd,
 
     /// Anchor for the explicit entry (`incipit`) leading trivia, when present.
     pub entry_start_anchor: Option<HirSourceAnchorId>,
@@ -1475,11 +1476,11 @@ pub struct HirBlockEnd {
     pub span: Span,
 }
 
-/// Structural end of the program.
+/// Structural end of one source module.
 ///
-/// Owned by the presentation sidecar — `HirProgram` carries no end field.
+/// Owned by the presentation sidecar — `HirModule` carries no end field.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct HirProgramEnd {
+pub struct HirModuleEnd {
     pub id: HirSourceAnchorId,
     pub span: Span,
 }
