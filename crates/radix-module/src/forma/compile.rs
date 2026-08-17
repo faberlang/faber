@@ -77,6 +77,17 @@ pub fn compile_canonical(session: &Session, name: &str, source: &str) -> FormatC
         session
     };
 
+    // Session pack is the emit surface (`faber convert --to`, requested reader
+    // locale). `prepare_program_module` overwrites that pack with source
+    // frontmatter so lex/analysis match the input locale; emit must keep the
+    // incoming pack. In-memory names skip the overwrite (locale_fanout);
+    // real file paths do not (`faber convert`, format corpus).
+    let emit_pack = session
+        .config
+        .locale_pack
+        .clone()
+        .expect("compile_canonical installs the Latin pack on the no-pack path before reaching here");
+
     // Path-shaped names enter the program/discovery helper; in-memory names
     // keep empty contracts. Module analysis itself never walks the filesystem.
     let prepared = match prepare_program_module_for_name(name, source, session) {
@@ -92,15 +103,7 @@ pub fn compile_canonical(session: &Session, name: &str, source: &str) -> FormatC
 
     // An explicit reader pack drives a reader-locale emit: keywords localize
     // but glyph-shape sugar (e.g. template application `"…"(args)`) is kept.
-    // The legacy no-pack path installed the Latin pack above, so the emit
-    // surface always matches the parse surface for the round-trip.
-    let surface = KeywordSurface::locale(
-        session
-            .config
-            .locale_pack
-            .as_ref()
-            .expect("compile_canonical installs the Latin pack on the no-pack path before reaching here"),
-    );
+    let surface = KeywordSurface::locale(&emit_pack);
     // Imported nominal types have no local definition name; carry their
     // qualified source spelling (`base.Vector3`) so the re-emit prints the
     // namespace instead of the `def_N` fallback. Compiler-generated backward
