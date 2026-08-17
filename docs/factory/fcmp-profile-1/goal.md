@@ -37,7 +37,7 @@ vectors → cross-language gate).
 module ID/record with schema-defined contents and import edges. `fhir.package`
 remains a reservation for the post-RTR2/RTR3b `AnalyzedProgram` graph with
 explicit roots, optional entry, stable module records, import edges, library
-identities, and graph-specific limits. Neither kind may be registered without
+identities, and graph-specific limits. A kind MUST NOT be registered without
 its owning schema's concrete finite limits.
 
 ### Sequencing (operator ruling, 2026-08-17)

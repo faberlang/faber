@@ -520,7 +520,7 @@ Initial reservations:
 This document reserves the names but does not register or freeze the FHIR
 schemas. The `fhir.unit` schema MUST be defined against the post-RTR2 module
 contract. The `fhir.package` schema MUST be defined against the post-RTR2/RTR3b
-`AnalyzedProgram` graph contract; neither schema may use a legacy vector-era
+`AnalyzedProgram` graph contract; each schema MUST NOT use a legacy vector-era
 envelope as its authoritative semantic shape.
 
 ## 11. Conformance
