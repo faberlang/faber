@@ -9,7 +9,7 @@ use radix_codegen_shared::{CodeWriter, CodegenError};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{DefId, HirExpressionKind};
 use radix_hir::{
-    HirItem, HirItemKind, HirPresentation, HirModule, HirModuleEnd, HirSourceAnchorId,
+    HirItem, HirItemKind, HirModule, HirModuleEnd, HirPresentation, HirSourceAnchorId,
 };
 use radix_lexer::{Interner, Span, TokenKind};
 use radix_types::{TypeId, TypeTable};
