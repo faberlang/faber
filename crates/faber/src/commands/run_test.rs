@@ -1,7 +1,9 @@
 use super::*;
 use crate::cli::{BackendSelection, RunArgs};
+use radix::mir::RunSourceError;
 use radix_package::mir::DeviceSelection;
 use std::path::{Path, PathBuf};
+use std::process::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn temp_dir(label: &str) -> PathBuf {
@@ -232,4 +234,52 @@ fn package_mir_run_with_selection_auto_stays_on_cpu_route() {
 
     assert_eq!(host.stdout_lines, vec!["cpu".to_owned()]);
     assert!(!dir.join("target/faber/Cargo.toml").exists());
+}
+
+// ── single-file runner ExitCode ──────────────────────────────────────────
+
+fn run_single_file(path: &Path) -> Result<ExitCode, RunSourceError> {
+    let source = std::fs::read_to_string(path).expect("read single-file source");
+    let config = script_package_config(path, None, None).expect("single-file config");
+    let session = radix::driver::Session::new(config);
+    let mut host = radix::mir::BufferHost::default();
+    crate::script::run_with_session(&session, &path.display().to_string(), &source, &mut host)
+}
+
+#[test]
+fn single_file_run_process_code_propagates_runner_exit() {
+    let dir = temp_dir("single-file-exit");
+    let entry = dir.join("gate.fab");
+    std::fs::write(
+        &entry,
+        r#"
+import from "faber:processus" processus
+
+main {
+    processus.exit_process(7)
+}
+"#,
+    )
+    .expect("write single-file gate");
+
+    assert!(!is_package_interpret_input(&entry));
+    let result = run_single_file(&entry);
+    assert_eq!(single_file_run_process_code(result), 7);
+}
+
+#[test]
+fn single_file_run_process_code_success_is_zero() {
+    let dir = temp_dir("single-file-success");
+    let entry = dir.join("ok.fab");
+    std::fs::write(&entry, "main { print 1 }\n").expect("write single-file success");
+
+    assert!(!is_package_interpret_input(&entry));
+    let result = run_single_file(&entry);
+    assert_eq!(single_file_run_process_code(result), 0);
+}
+
+#[test]
+fn single_file_run_process_code_frontend_error_is_one() {
+    let error = RunSourceError::Frontend(Vec::new());
+    assert_eq!(single_file_run_process_code(Err(error)), 1);
 }
