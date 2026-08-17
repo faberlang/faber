@@ -1,8 +1,8 @@
 //! Unit tests for proba inventory and MIR-runner case runner.
 
 use super::*;
-use radix_module::driver::{Config, Session};
-use radix_module::tool::analyze_prepared_program_name;
+use radix::module::{Config, Session};
+use radix::program::analyze_prepared_program_name;
 
 fn session() -> Session {
     Session::new(Config::default())

@@ -1,10 +1,12 @@
-# crates/radix (RTR3a stub)
+# crates/radix
 
-This directory is a **workspace-excluded version-source stub**.
+Thin library-only compiler façade over [`crates/radix-module`](../radix-module/)
+and [`crates/radix-program`](../radix-program/).
 
-The module compiler lives in [`crates/radix-module`](../radix-module/).
-`scripta/assemble-dev-kit` and `scripta/generate-release-manifest` still
-read the component version from `crates/radix/Cargo.toml`.
+Admitted entries live under `radix::module`, `radix::program`, and
+`radix::services`. This package has no `[[bin]]`, no clap, and no process
+exit. The developer binary `radix` and `tool` stay in `radix-module` until
+RTR4.
 
-RTR3c replaces this stub with the thin library-only `radix` façade.
-The developer binary `radix` and `tool` stay in `radix-module` until RTR4.
+`scripta/assemble-dev-kit` and `scripta/generate-release-manifest` read the
+component version from this `Cargo.toml`.
