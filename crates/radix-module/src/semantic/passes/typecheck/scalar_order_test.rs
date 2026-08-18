@@ -197,3 +197,87 @@ incipit {
 "#,
     ));
 }
+
+// SEM011 / BB-2: char literals are BoundedAscii{1}. Relational compare is
+// code-point order for char pairs; mixed char/string stays rejected unless the
+// live single-scalar convention already accepts it.
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn bounded_ascii_one_literals_ge_typechecks() {
+    accepts(&compile("incipit { si 'c' ≥ 'a' { nota \"ok\" } }"));
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn ascii_one_params_relational_typechecks() {
+    accepts(&compile(
+        r#"
+functio after(ascii<1> left, ascii<1> right) → bivalens {
+    redde left ≥ right
+}
+"#,
+    ));
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn bare_ascii_params_relational_typechecks() {
+    accepts(&compile(
+        r#"
+functio after(ascii left, ascii right) → bivalens {
+    redde left ≥ right
+}
+"#,
+    ));
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn mixed_ascii_and_ascii_one_relational_typechecks() {
+    accepts(&compile(
+        r#"
+functio after(ascii left, ascii<1> right) → bivalens {
+    redde left ≥ right
+}
+"#,
+    ));
+}
+
+#[test]
+fn char_to_multi_char_string_relational_rejects() {
+    rejects_with_issue(
+        &compile("incipit { si 'a' ≥ \"hello\" { nota \"bad\" } }"),
+        "numeric_operands_required",
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn char_to_single_char_string_follows_scalar_convention() {
+    accepts(&compile("incipit { si 'a' ≥ \"x\" { nota \"ok\" } }"));
+}
+
+#[test]
+fn numerus_to_char_relational_rejects() {
+    rejects_with_issue(
+        &compile("incipit { si 1 ≥ 'a' { nota \"bad\" } }"),
+        "numeric_operands_required",
+    );
+}
+
+#[test]
+fn char_to_numerus_relational_rejects() {
+    rejects_with_issue(
+        &compile("incipit { si 'a' ≥ 1 { nota \"bad\" } }"),
+        "numeric_operands_required",
+    );
+}
+
+#[test]
+fn multi_char_ascii_literal_relational_stays_rejected() {
+    rejects_with_issue(
+        &compile("incipit { si 'ab' ≥ 'cd' { nota \"bad\" } }"),
+        "numeric_operands_required",
+    );
+}
