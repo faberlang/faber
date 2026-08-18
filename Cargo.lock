@@ -285,7 +285,7 @@ dependencies = [
 
 [[package]]
 name = "faber"
-version = "1.7.0"
+version = "1.8.0"
 dependencies = [
  "clap",
  "handroll",
@@ -588,7 +588,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "radix"
-version = "0.82.0"
+version = "0.83.0"
 dependencies = [
  "radix-module",
  "radix-program",
@@ -596,7 +596,7 @@ dependencies = [
 
 [[package]]
 name = "radix-codegen-shared"
-version = "0.82.0"
+version = "0.83.0"
 dependencies = [
  "radix-diagnostics",
  "radix-hir",
@@ -607,14 +607,14 @@ dependencies = [
 
 [[package]]
 name = "radix-diagnostics"
-version = "0.82.0"
+version = "0.83.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "radix-hir"
-version = "0.82.0"
+version = "0.83.0"
 dependencies = [
  "postcard",
  "radix-lexer",
@@ -626,7 +626,7 @@ dependencies = [
 
 [[package]]
 name = "radix-hir-faber"
-version = "0.82.0"
+version = "0.83.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -639,7 +639,7 @@ dependencies = [
 
 [[package]]
 name = "radix-hir-fhir"
-version = "0.82.0"
+version = "0.83.0"
 dependencies = [
  "postcard",
  "radix-hir",
@@ -652,11 +652,11 @@ dependencies = [
 
 [[package]]
 name = "radix-host-abi"
-version = "0.82.0"
+version = "0.83.0"
 
 [[package]]
 name = "radix-lexer"
-version = "0.82.0"
+version = "0.83.0"
 dependencies = [
  "proptest",
  "radix-diagnostics",
@@ -668,7 +668,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir"
-version = "0.82.0"
+version = "0.83.0"
 dependencies = [
  "handroll",
  "radix-codegen-shared",
@@ -684,7 +684,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-fmir"
-version = "0.82.0"
+version = "0.83.0"
 dependencies = [
  "handroll",
  "postcard",
@@ -699,7 +699,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-runner"
-version = "0.82.0"
+version = "0.83.0"
 dependencies = [
  "handroll",
  "radix-hir",
@@ -715,7 +715,7 @@ dependencies = [
 
 [[package]]
 name = "radix-module"
-version = "0.82.0"
+version = "0.83.0"
 dependencies = [
  "ariadne",
  "clap",
@@ -748,7 +748,7 @@ dependencies = [
 
 [[package]]
 name = "radix-parser"
-version = "0.82.0"
+version = "0.83.0"
 dependencies = [
  "radix-diagnostics",
  "radix-lexer",
@@ -773,11 +773,11 @@ dependencies = [
 
 [[package]]
 name = "radix-runtime-contract"
-version = "0.82.0"
+version = "0.83.0"
 
 [[package]]
 name = "radix-syntax"
-version = "0.82.0"
+version = "0.83.0"
 dependencies = [
  "radix-lexer",
  "serde",
@@ -785,7 +785,7 @@ dependencies = [
 
 [[package]]
 name = "radix-types"
-version = "0.82.0"
+version = "0.83.0"
 dependencies = [
  "radix-lexer",
  "radix-syntax",

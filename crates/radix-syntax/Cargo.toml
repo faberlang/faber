@@ -1,6 +1,6 @@
 [package]
 name = "radix-syntax"
-version = "0.82.0"
+version = "0.83.0"
 edition = "2021"
 description = "Parsed syntax tree surface for the Radix compiler"
 license = "MIT"
