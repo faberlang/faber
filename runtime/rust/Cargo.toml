@@ -1,14 +1,13 @@
 [package]
-name = "faber-runtime"
+name = "faber"
 version = "0.1.0"
 edition = "2021"
-description = "Faber language runtime types for generated Rust (crate name: faber)"
+description = "Faber language runtime types for generated Rust"
 license = "MIT"
 
-# S1-U4 package identity (faber-target-runtime inventory §7): the recorded
-# default is the Cargo package at `faber/runtime/rust/`, published optional.
-# The lib target keeps the `faber` crate name so generated-Rust manifests
-# (alias `faber = { package = "faber-runtime", ... }`) resolve unchanged.
+# Public generated-Rust carriers at `faber/runtime/rust/`. Package name and
+# lib target are both `faber`, so generated `use faber::…` and the dependency
+# key stay aligned.
 #
 # This package is a standalone workspace root so each public target package can
 # build without the private compiler workspace.

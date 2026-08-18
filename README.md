@@ -114,7 +114,7 @@ rendered, localized grammar is published on
 
 | Target | Public source | Package identity |
 | --- | --- | --- |
-| Rust | [`runtime/rust/`](runtime/rust/) | package `faber-runtime`, crate `faber` |
+| Rust | [`runtime/rust/`](runtime/rust/) | package `faber`, crate `faber` |
 | TypeScript | [`runtime/typescript/`](runtime/typescript/) | `@faber/runtime` |
 | Go | [`runtime/go/`](runtime/go/) | `faber/rt` |
 | Swift | [`runtime/swift/`](runtime/swift/) | `FaberRuntime` |
@@ -133,7 +133,7 @@ The [HTTP package](packages/http/) and
 flowchart TB
     subgraph faberrepo["faber — public repo"]
         Home["home: grammar, matrices, docs"]
-        Runtime["runtime/\ngenerated-code carriers (faber-runtime package)"]
+        Runtime["runtime/\ngenerated-code carriers (faber package)"]
     end
     Radix["radix\nprivate compiler + faber CLI"]
     Hosts["hosts\nABI consumers and platform/browser hosts"]
