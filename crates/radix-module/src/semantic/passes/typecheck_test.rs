@@ -929,7 +929,7 @@ fn rejects_requirit_without_declared_alternate_exit() {
     // The desugared `iace` payload inherits iace's error-channel rule: a
     // `requirit` statement in a ⇥-less function is a compile error.
     test_support::assert_rejects_with_issue(
-        "functio f() → numerus {\n  requirit verum secus \"bad\"\n  redde 1\n}",
+        "functio f() → numerus {\n  requirit verum iace \"bad\"\n  redde 1\n}",
         "iace_requires_alternate_exit",
     );
 }
@@ -937,7 +937,7 @@ fn rejects_requirit_without_declared_alternate_exit() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn typechecks_requirit_against_declared_alternate_exit() {
-    test_support::assert_accepts("functio f() → numerus ⇥ textus {\n  requirit verum secus \"bad\"\n  redde 1\n}");
+    test_support::assert_accepts("functio f() → numerus ⇥ textus {\n  requirit verum iace \"bad\"\n  redde 1\n}");
 }
 
 #[test]
