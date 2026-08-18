@@ -2193,6 +2193,7 @@ fn packed_section5_layouts_decompose_to_quantized_matmul() {
         (PackedStorageLayout::Q5_K, 13),
         (PackedStorageLayout::Q6_K, 14),
         (PackedStorageLayout::Q5_0, 6),
+        (PackedStorageLayout::MXFP4, 39),
     ];
     for (layout, id) in rows {
         let mut types = TypeTable::new();

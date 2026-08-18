@@ -5,10 +5,10 @@ use crate::{
 use radix_lexer::Interner;
 
 use super::{
-    device_view_element_count, require_u32_index, MirAbiError, MirKernelBufferBindingType,
-    MirKernelBuiltin, MirKernelBuiltinInput, MirKernelDispatchSize, MirKernelResourceAccess,
-    MirKernelShaderAccess, MirKernelSignature, MirWorkgroupSize, ERR_KERNEL_BUILTIN_DUPLICATE_NAME,
-    ERR_KERNEL_BUILTIN_UNKNOWN_NAME,
+    ERR_KERNEL_BUILTIN_DUPLICATE_NAME, ERR_KERNEL_BUILTIN_UNKNOWN_NAME, MirAbiError,
+    MirKernelBufferBindingType, MirKernelBuiltin, MirKernelBuiltinInput, MirKernelDispatchSize,
+    MirKernelResourceAccess, MirKernelShaderAccess, MirKernelSignature, MirWorkgroupSize,
+    device_view_element_count, require_u32_index,
 };
 
 pub(crate) fn combined_builtin_dependencies(
@@ -176,6 +176,11 @@ pub enum PackedStorageLayout {
     Q6_K,
     /// f16 scale + 5-bit, 32 elements / 22 bytes (dense-rung SmolLM2).
     Q5_0,
+    /// MXFP4: E8M0 group scale + packed 4-bit values, 32 elements / 17 bytes.
+    ///
+    /// llama.cpp `block_mxfp4` (`ggml-common.h:214-219`): one E8M0 byte
+    /// plus `QK_MXFP4/2` packed nibbles. Type id 39 (`ggml.h:429`).
+    MXFP4,
 }
 
 impl PackedStorageLayout {
@@ -191,6 +196,7 @@ impl PackedStorageLayout {
             Self::Q5_K => 13,
             Self::Q6_K => 14,
             Self::Bf16 => 30,
+            Self::MXFP4 => 39,
         }
     }
 
@@ -207,6 +213,7 @@ impl PackedStorageLayout {
             13 => Some(Self::Q5_K),
             14 => Some(Self::Q6_K),
             30 => Some(Self::Bf16),
+            39 => Some(Self::MXFP4),
             _ => None,
         }
     }
@@ -216,7 +223,7 @@ impl PackedStorageLayout {
     pub const fn block_elements(self) -> u32 {
         match self {
             Self::F32 | Self::F16 | Self::Bf16 => 1,
-            Self::Q8_0 | Self::Q5_0 => 32,
+            Self::Q8_0 | Self::Q5_0 | Self::MXFP4 => 32,
             Self::Q4_K | Self::Q5_K | Self::Q6_K => 256,
         }
     }
@@ -232,6 +239,7 @@ impl PackedStorageLayout {
             Self::Q5_K => 176,
             Self::Q6_K => 210,
             Self::Q5_0 => 22,
+            Self::MXFP4 => 17,
         }
     }
 }
@@ -483,7 +491,7 @@ fn packed_layout_from_operand(operand: &MirOperand) -> Result<PackedStorageLayou
         .ok_or_else(|| {
             MirAbiError::new(
                 "packed kernel layout must be an admitted GGML type id \
-                 (F32, F16, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0)",
+                 (F32, F16, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0, MXFP4)",
             )
         })
 }

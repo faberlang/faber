@@ -302,9 +302,11 @@ fn sum_reduction_plan_is_fully_populated() {
             after: BarrierPhase::SharedMemoryLoad
         })
     );
-    assert!(reduction.barriers[1..]
-        .iter()
-        .all(|point| point.after == BarrierPhase::ReductionStep));
+    assert!(
+        reduction.barriers[1..]
+            .iter()
+            .all(|point| point.after == BarrierPhase::ReductionStep)
+    );
     plan.validate().expect("built plan validates");
 }
 
@@ -1526,6 +1528,7 @@ fn packed_storage_layout_binds_pinned_ggml_block_geometry() {
         (PackedStorageLayout::Q5_K, 13, 256, 176),
         (PackedStorageLayout::Q6_K, 14, 256, 210),
         (PackedStorageLayout::Q5_0, 6, 32, 22),
+        (PackedStorageLayout::MXFP4, 39, 32, 17),
     ];
     for (layout, id, elements, bytes) in rows {
         assert_eq!(layout.ggml_type_id(), id);
@@ -1627,7 +1630,7 @@ fn section5_packed_layouts() -> [(
     PackedDequantClass,
     u32,
     u32,
-); 7] {
+); 8] {
     use crate::abi::PackedStorageLayout;
     [
         (
@@ -1662,6 +1665,12 @@ fn section5_packed_layouts() -> [(
             210,
         ),
         (PackedStorageLayout::Q5_0, PackedDequantClass::Block, 32, 22),
+        (
+            PackedStorageLayout::MXFP4,
+            PackedDequantClass::ScaledE8M0Group,
+            32,
+            17,
+        ),
     ]
 }
 
@@ -1754,6 +1763,33 @@ fn f16_ggml_id_admits_quantized_matmul_with_native_f16_convert() {
             quantized.dequant_resolution().block_bytes
         ),
         (1, 2)
+    );
+}
+
+#[test]
+fn mxfp4_ggml_id_admits_quantized_matmul_with_scaled_e8m0_group() {
+    // W5c-U7 first-failing oracle: GGML type id 39 (MXFP4) is outside the
+    // closed set today. After admission it must resolve ScaledE8M0Group
+    // (one E8M0 scale over a 32-element group) and a QuantizedMatMul plan.
+    // Geometry is llama.cpp block_mxfp4: 32 elems / 17 bytes
+    // (ggml.h:429 GGML_TYPE_MXFP4=39; ggml-common.h:214-219).
+    let shapes = MatMulShapes { m: 8, k: 16, n: 16 };
+    let plan = admit_quantized_matmul_from_ggml_type_id(39, shapes)
+        .expect("MXFP4 type id 39 is an admitted packed layout");
+    let CollectionKernelPlan::QuantizedMatMul(quantized) = &plan else {
+        panic!("MXFP4 must admit QuantizedMatMul, got {plan:?}");
+    };
+    assert_eq!(quantized.layout, crate::abi::PackedStorageLayout::MXFP4);
+    assert_eq!(
+        quantized.dequant_resolution().class,
+        PackedDequantClass::ScaledE8M0Group
+    );
+    assert_eq!(
+        (
+            quantized.dequant_resolution().block_elements,
+            quantized.dequant_resolution().block_bytes
+        ),
+        (32, 17)
     );
 }
 
