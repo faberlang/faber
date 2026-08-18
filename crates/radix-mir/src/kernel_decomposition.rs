@@ -54,6 +54,7 @@ use crate::device_program_plans::{
     data_flow_element_ty_and_count, is_elementwise_collection_op, is_recipe_op,
     resolve_subchain_plan, PlanMappingError,
 };
+use crate::elementwise_plan::{plan_elementwise, ElementwisePlan};
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirFunction,
@@ -72,7 +73,7 @@ use std::collections::BTreeSet;
 /// One decomposed kernel subchain: a contiguous statement slice of the
 /// source function carrying exactly one recipe (or an elementwise-only
 /// body), plus the data-flow edges that connect it to the rest of the chain.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct KernelSubchain {
     /// Statement indices into the source function's single block, in order
     /// (the slice this kernel lowers from).
@@ -80,6 +81,12 @@ pub struct KernelSubchain {
     /// The single plan this subchain carries (elementwise-only subchains
     /// carry [`CollectionKernelPlan::Elementwise`]).
     pub plan: CollectionKernelPlan,
+    /// Typed elementwise expression plan for a legal elementwise-only
+    /// subchain. `None` when [`Self::plan`] is a recipe or when the slice
+    /// hits a typed [`crate::elementwise_plan::ElementwiseBarrier`]. The
+    /// collection-plan classification is unchanged: this is additive
+    /// payload, not a replacement for [`CollectionKernelPlan::Elementwise`].
+    pub elementwise_plan: Option<ElementwisePlan>,
     /// Indices into [`KernelDecomposition::subchains`] whose produced local
     /// this subchain reads — its explicit carried data-flow inputs.
     pub consumes: Vec<usize>,
@@ -102,6 +109,17 @@ pub struct KernelSubchain {
     pub outputs: Vec<MirLocalId>,
 }
 
+impl Eq for KernelSubchain {}
+
+impl KernelSubchain {
+    /// The typed elementwise expression plan when this subchain is a legal
+    /// elementwise-only candidate.
+    #[must_use]
+    pub fn expression_plan(&self) -> Option<&ElementwisePlan> {
+        self.elementwise_plan.as_ref()
+    }
+}
+
 /// The ordered subchain kernels of one decomposed device-resident function.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct KernelDecomposition {
@@ -117,8 +135,9 @@ pub struct KernelDecomposition {
 /// The pass slices the statement stream at recipe-op boundaries, folds
 /// elementwise statements into the adjacent subchain, drops dead recipe
 /// statements (S3-A5), resolves each subchain's plan through the shared
-/// plan pass, and records the explicit data-flow edges (which earlier
-/// subchain's produced local each subchain consumes).
+/// plan pass, attaches a typed [`ElementwisePlan`] to a legal
+/// elementwise-only subchain, and records the explicit data-flow edges
+/// (which earlier subchain's produced local each subchain consumes).
 ///
 /// Fail-closed: a multi-block (control-flow) body, a statement with a
 /// collection op that is neither recipe nor elementwise, or a recipe
@@ -206,6 +225,15 @@ pub fn decompose_kernel_function(
         let plan = resolve_subchain_plan(&synthetic, function, validation)?;
         crate::kernel_plan::confirm_packed_admission(&synthetic, &plan)
             .map_err(|error| PlanMappingError::mapping(error.to_string()))?;
+        // Additive payload: a legal elementwise-only subchain carries the
+        // OF-1 expression plan. Recipe classification stays
+        // `resolve_subchain_plan` / `kernel_plan/` — this never re-derives
+        // it, and a typed `ElementwiseBarrier` leaves the collection plan
+        // as payload-less `Elementwise` (existing gates stay closed).
+        let elementwise_plan = match &plan {
+            CollectionKernelPlan::Elementwise => plan_elementwise(&synthetic, validation).ok(),
+            _ => None,
+        };
         let produced = indices.iter().rev().find_map(|&index| {
             crate::read_analysis::statement_destination(&block.statements[index])
         });
@@ -244,6 +272,7 @@ pub fn decompose_kernel_function(
         subchains.push(KernelSubchain {
             statements: indices.clone(),
             plan,
+            elementwise_plan,
             consumes,
             produced,
             outputs: Vec::new(),
