@@ -35,7 +35,7 @@ use crate::library::{
     analysis_source_for_file, attach_library_provenance_with_links, expand_library_imports,
     library_cached_file_interface, library_interface_declaration_surface,
     library_interface_export_surface, library_interface_has_module, program_declaration_surface,
-    LibraryInterfaceCache, LibraryResolver, LocaleLoader,
+    program_export_surface, LibraryInterfaceCache, LibraryResolver, LocaleLoader,
 };
 use crate::manifest::read_manifest;
 use crate::modules::module_segments_for_file;
@@ -396,14 +396,39 @@ pub fn analyze_package_spec(
             )
         })
         .collect::<BTreeMap<_, _>>();
+    let files_by_path = files
+        .iter()
+        .map(|file| (file.path.clone(), file))
+        .collect::<BTreeMap<_, _>>();
+    let export_surfaces_by_path = files
+        .iter()
+        .map(|file| {
+            (
+                file.path.clone(),
+                program_export_surface(&file.program, &file.interner),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let declaration_surfaces_by_path = files
+        .iter()
+        .map(|file| {
+            (
+                file.path.clone(),
+                program_declaration_surface(&file.program, &file.interner),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let package_name = manifest_path_for_spec(&spec)
+        .and_then(|path| read_manifest(&path).ok())
+        .map(|manifest| manifest.package.name);
     let imports = build_module_graph(&spec, &files, &path_to_id, library_resolver);
 
-    for file in package_analysis_order(&spec, &files, library_resolver) {
+    for file in package_analysis_order(&spec, &files, &files_by_path, library_resolver) {
         let file_cli = mount_plan.module_cli.get(&file.path).cloned();
         let namespace_exports = match namespace_exports_for_file(
             &spec,
             file,
-            &files,
+            &export_surfaces_by_path,
             library_resolver,
             &mut library_cache,
         ) {
@@ -444,7 +469,7 @@ pub fn analyze_package_spec(
         let namespace_declarations = match namespace_declarations_for_file(
             &spec,
             file,
-            &files,
+            &declaration_surfaces_by_path,
             library_resolver,
             &mut library_cache,
         ) {
@@ -494,15 +519,13 @@ pub fn analyze_package_spec(
             }
         }
 
-        let export_names = crate::library::program_export_surface(&file.program, &file.interner)
-            .into_keys()
-            .collect::<Vec<_>>();
-        let package_name = manifest_path_for_spec(&spec)
-            .and_then(|path| read_manifest(&path).ok())
-            .map(|manifest| manifest.package.name);
+        let export_names = export_surfaces_by_path
+            .get(&file.path)
+            .map(|surface| surface.keys().cloned().collect::<Vec<_>>())
+            .unwrap_or_default();
         let export_identity = crate::file_interface::ExportIdentityContext {
             provider: "package".to_owned(),
-            package: package_name,
+            package: package_name.clone(),
             module_path: file.module_segments.clone(),
         };
         let file_interface = match crate::file_interface::extract_file_interface_with_identity(
@@ -523,7 +546,7 @@ pub fn analyze_package_spec(
         analysis.package_import_identities = Some(package_import_identities_for_file(
             &spec,
             file,
-            &files,
+            &files_by_path,
             library_resolver,
         ));
         let module_id = ModuleId::for_spec(&spec, file.module_segments.clone());
@@ -658,7 +681,7 @@ fn build_module_graph(
 fn package_import_identities_for_file(
     spec: &PackageSpec,
     file: &PackageFile,
-    files: &[PackageFile],
+    files_by_path: &BTreeMap<PathBuf, &PackageFile>,
     library_resolver: &LibraryResolver,
 ) -> radix_module::driver::PackageImportIdentities {
     let product = crate::artifact_plan::package_id_from_spec(spec).name;
@@ -676,7 +699,7 @@ fn package_import_identities_for_file(
         else {
             continue;
         };
-        let Some(target_file) = files.iter().find(|candidate| candidate.path == target) else {
+        let Some(target_file) = files_by_path.get(&target).copied() else {
             continue;
         };
         imports.insert(binding, target_file.module_segments.clone());
@@ -878,19 +901,16 @@ pub fn load_package_with_locale_pack(
 fn package_analysis_order<'a>(
     spec: &PackageSpec,
     files: &'a [PackageFile],
+    files_by_path: &BTreeMap<PathBuf, &'a PackageFile>,
     library_resolver: &LibraryResolver,
 ) -> Vec<&'a PackageFile> {
-    let files_by_path = files
-        .iter()
-        .map(|file| (file.path.clone(), file))
-        .collect::<BTreeMap<_, _>>();
     let mut seen = BTreeSet::new();
     let mut ordered = Vec::new();
     for file in files {
         visit_package_analysis_file(
             spec,
             file,
-            &files_by_path,
+            files_by_path,
             library_resolver,
             &mut seen,
             &mut ordered,
@@ -1000,7 +1020,7 @@ fn file_interfaces_for_file(
 fn namespace_exports_for_file(
     spec: &PackageSpec,
     file: &PackageFile,
-    files: &[PackageFile],
+    export_surfaces_by_path: &BTreeMap<PathBuf, BTreeMap<String, VisibilityTier>>,
     library_resolver: &LibraryResolver,
     library_cache: &mut LibraryInterfaceCache,
 ) -> Result<BTreeMap<String, BTreeMap<String, VisibilityTier>>, Diagnostic> {
@@ -1015,17 +1035,10 @@ fn namespace_exports_for_file(
         let import_path = file.interner.resolve(decl.path);
         match resolve_import(spec, library_resolver, &file.path, import_path) {
             ImportResolution::Local(target) => {
-                let Some(target_file) = files.iter().find(|candidate| candidate.path == target)
-                else {
+                let Some(surface) = export_surfaces_by_path.get(&target).cloned() else {
                     continue;
                 };
-                exports.insert(
-                    binding,
-                    crate::library::program_export_surface(
-                        &target_file.program,
-                        &target_file.interner,
-                    ),
-                );
+                exports.insert(binding, surface);
             }
             ImportResolution::Library(module) => {
                 let Some(import) = library_import_binding(&file.interner, decl, module) else {
@@ -1086,7 +1099,7 @@ fn namespace_seams_for_file(
 fn namespace_declarations_for_file(
     spec: &PackageSpec,
     file: &PackageFile,
-    files: &[PackageFile],
+    declaration_surfaces_by_path: &BTreeMap<PathBuf, BTreeMap<String, VisibilityTier>>,
     library_resolver: &LibraryResolver,
     library_cache: &mut LibraryInterfaceCache,
 ) -> Result<BTreeMap<String, BTreeMap<String, VisibilityTier>>, Diagnostic> {
@@ -1101,14 +1114,10 @@ fn namespace_declarations_for_file(
         let import_path = file.interner.resolve(decl.path);
         match resolve_import(spec, library_resolver, &file.path, import_path) {
             ImportResolution::Local(target) => {
-                let Some(target_file) = files.iter().find(|candidate| candidate.path == target)
-                else {
+                let Some(surface) = declaration_surfaces_by_path.get(&target).cloned() else {
                     continue;
                 };
-                declarations.insert(
-                    binding,
-                    program_declaration_surface(&target_file.program, &target_file.interner),
-                );
+                declarations.insert(binding, surface);
             }
             ImportResolution::Library(module) => {
                 let Some(import) = library_import_binding(&file.interner, decl, module) else {
