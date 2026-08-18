@@ -322,6 +322,27 @@ fn valor_to_fractus_conversio_emits_from_valor_with_widen() {
 }
 
 #[test]
+fn valor_to_octeti_conversio_emits_octeti_match() {
+    let session = test_session(Target::HirRust);
+    let source = r"
+functio request_body_bytes(valor body) → octeti {
+    redde body ↦ octeti
+}
+
+incipit {
+    nota request_body_bytes({} ↦ valor).longitudo()
+}
+";
+    let result = compile(&session, "test.fab", source);
+    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
+    let code = super::rust_output(result).code;
+    assert!(
+        code.contains("faber::Valor::Octeti(__bytes)") && code.contains("valor to octeti conversion failed"),
+        "expected valor octeti extraction, got:\n{code}"
+    );
+}
+
+#[test]
 fn valor_to_textus_conversio_emits_from_valor() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {

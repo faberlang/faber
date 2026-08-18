@@ -181,3 +181,43 @@ entry = "main.fab"
             .collect::<Vec<_>>()
     );
 }
+
+#[test]
+fn valor_octeti_body_extraction_emits_octeti_match() {
+    // Inferentia HTTP body seam: the provider delivers valor octeti; `value ↦
+    // bytes` must extract `Valor::Octeti` (not the generic FromValor lista path).
+    let dir = temp_dir("valor-octeti-extract");
+    fs::write(
+        dir.join("main.fab"),
+        r"
+fn request_body_bytes(value body) → bytes {
+    return body ↦ bytes
+}
+
+main {
+    print request_body_bytes({} ↦ value).length()
+}
+",
+    )
+    .expect("write entry");
+
+    let result = compile_package(&Config::default(), &dir.join("main.fab"), &test_seams());
+    assert!(
+        result.success(),
+        "expected valor ↦ octeti compile success, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    assert!(
+        output.code.contains("faber::Valor::Octeti(__bytes)")
+            && output.code.contains("valor to octeti conversion failed"),
+        "expected valor octeti extraction, got:\n{}",
+        output.code
+    );
+}

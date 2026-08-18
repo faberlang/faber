@@ -547,7 +547,7 @@ fn rust_dedicated_composite_arm(src: ConversioTypeFamily, tgt: ConversioTypeFami
     }
 
     // Scalar `valor ↦ T` extraction (nihil is not a matrix family).
-    if src == Valor && matches!(tgt, Bivalens | Numerus | Fractus | Textus | Ascii) {
+    if src == Valor && matches!(tgt, Bivalens | Numerus | Fractus | Textus | Ascii | Octeti) {
         return true;
     }
 

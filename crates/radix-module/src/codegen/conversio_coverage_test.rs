@@ -212,6 +212,7 @@ fn rust_valor_extraction_and_boxing_are_dedicated() {
     assert_eq!(classify_conversio_coverage(Valor, Numerus, Rust), ConversioCoverage::Dedicated);
     assert_eq!(classify_conversio_coverage(Valor, Fractus, Rust), ConversioCoverage::Dedicated);
     assert_eq!(classify_conversio_coverage(Valor, Ascii, Rust), ConversioCoverage::Dedicated);
+    assert_eq!(classify_conversio_coverage(Valor, Octeti, Rust), ConversioCoverage::Dedicated);
     // `valor ↦ instans` precision bridge.
     assert_eq!(classify_conversio_coverage(Valor, Instans, Rust), ConversioCoverage::Dedicated);
     // `T ↦ valor` boxing.
