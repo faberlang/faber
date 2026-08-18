@@ -94,6 +94,21 @@ pub enum CollectionKernelPlan {
     /// scores, zero probability above the diagonal. See
     /// [`CausalMaskedSoftmaxPlan`].
     CausalMaskedSoftmax(CausalMaskedSoftmaxPlan),
+    /// Packed quantized GEMM recipe (R-PACK-01A: name frozen; admission of
+    /// per-layout dequant resolution is R-PACK-02A). In-kernel block/superblock
+    /// dequant, f32 accumulate — never a whole-model F32 materialization.
+    /// See [`QuantizedMatMulPlan`].
+    QuantizedMatMul(QuantizedMatMulPlan),
+    /// Grouped/segmented packed GEMM over rank-3 expert slices (R-PACK-01A:
+    /// name frozen; admission/resolution is R-PACK-03A). See
+    /// [`GroupedMatMulPlan`].
+    GroupedMatMul(GroupedMatMulPlan),
+    /// Hybrid SSM conv1d recipe (R-PACK-01A: name frozen; admission is
+    /// R-PACK-04A). See [`SsmConv1dPlan`].
+    SsmConv1d(SsmConv1dPlan),
+    /// Hybrid SSM linear-recurrence scan / state-update recipe (R-PACK-01A:
+    /// name frozen; admission is R-PACK-04A). See [`SsmScanPlan`].
+    SsmScan(SsmScanPlan),
 }
 
 /// Axis-reduction recipe plan (name frozen by S6-N1; admission, resolution,
@@ -203,6 +218,78 @@ pub struct CausalMaskedSoftmaxPlan {
     pub rows: u64,
     /// Column (key) extent.
     pub cols: u64,
+}
+
+/// Packed quantized GEMM plan (R-PACK-01A: name frozen). The layout class
+/// is a typed fact from the trailing GGML type-id const — never inferred
+/// from a filename or wire text (A3). Dequant happens in-kernel per
+/// block/tile; the plan does not admit a whole-model F32 expansion path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuantizedMatMulPlan {
+    /// Left matrix rows `M`.
+    pub m: u64,
+    /// Contracted inner dimension `K`.
+    pub k: u64,
+    /// Right matrix columns `N`.
+    pub n: u64,
+    /// Stored weight layout (the packed operand).
+    pub layout: crate::abi::PackedStorageLayout,
+    /// Square tile edge; the contract dispatches one workgroup per
+    /// `tile × tile` output tile (same grid as [`MatMulPlan`]).
+    pub tile: u32,
+    /// Workgroup lane count on `x`; must equal `tile`.
+    pub workgroup_x: u32,
+    /// Workgroup lane count on `y`; must equal `tile`.
+    pub workgroup_y: u32,
+}
+
+/// Grouped packed GEMM over rank-3 expert slices (R-PACK-01A: name frozen).
+/// `groups` is the expert-axis extent resolved from the rank-3 operand —
+/// never assumed from a model name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GroupedMatMulPlan {
+    /// Left matrix rows `M` (the ungrouped activation rows).
+    pub m: u64,
+    /// Contracted inner dimension `K`.
+    pub k: u64,
+    /// Right matrix columns `N`.
+    pub n: u64,
+    /// Expert / group count (the leading rank-3 axis).
+    pub groups: u64,
+    /// Stored expert-weight layout.
+    pub layout: crate::abi::PackedStorageLayout,
+    /// Square tile edge (same grid as [`MatMulPlan`]).
+    pub tile: u32,
+    /// Workgroup lane count on `x`; must equal `tile`.
+    pub workgroup_x: u32,
+    /// Workgroup lane count on `y`; must equal `tile`.
+    pub workgroup_y: u32,
+}
+
+/// SSM conv1d plan (R-PACK-01A: name frozen). Length, channel, and kernel
+/// width come from the operand tensor dims — never invented (MODEL-03).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SsmConv1dPlan {
+    /// Sequence length.
+    pub length: u64,
+    /// Channel extent.
+    pub channels: u64,
+    /// Convolution kernel width.
+    pub kernel_width: u64,
+    /// Stored kernel/state layout.
+    pub layout: crate::abi::PackedStorageLayout,
+}
+
+/// SSM linear-recurrence scan / state-update plan (R-PACK-01A: name frozen).
+/// Length and state dim come from the operand tensor dims — never invented.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SsmScanPlan {
+    /// Sequence length.
+    pub length: u64,
+    /// Recurrence state dimension.
+    pub state_dim: u64,
+    /// Stored state/weight layout.
+    pub layout: crate::abi::PackedStorageLayout,
 }
 
 /// Matmul operand shapes `(M, K, N)`, resolved from the rank-2 tensor types

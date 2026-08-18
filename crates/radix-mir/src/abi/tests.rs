@@ -1,9 +1,9 @@
 use super::*;
 use crate::{
-    MirBlock, MirBlockId, MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic, MirLayoutKind,
-    MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirRuntimeCall,
-    MirScalarLayout, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirType,
-    MirValidationContext,
+    MirBlock, MirBlockId, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirIntrinsic,
+    MirLayoutKind, MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace,
+    MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind, MirTerminator,
+    MirTerminatorKind, MirType, MirValidationContext,
 };
 use radix_hir::DefId;
 use radix_lexer::Span;
@@ -1294,4 +1294,146 @@ fn abi_rejects_invalid_broadcast_pair_fail_closed() {
         error.message
     );
     assert_eq!(error.issue, "mir_abi_error");
+}
+
+fn rank2_ty(types: &mut TypeTable, dims: [u64; 2]) -> MirType {
+    let f32_id = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let dim_ids = dims
+        .iter()
+        .map(|&dim| types.intern_index(IndexExpr::Literal(dim)))
+        .collect::<Vec<_>>();
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    MirType::semantic(types.intern(Type::Tensor(f32_id, shape)))
+}
+
+fn packed_binary_function(
+    types: &mut TypeTable,
+    left_dims: [u64; 2],
+    right_dims: [u64; 2],
+    out_dims: [u64; 2],
+    op: MirCollectionOp,
+    layout_id: i64,
+) -> MirFunction {
+    let left = rank2_ty(types, left_dims);
+    let right = rank2_ty(types, right_dims);
+    let out = rank2_ty(types, out_dims);
+    let span = Span::default();
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: left,
+                mode: MirParamMode::Owned,
+                span,
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: None,
+                ty: right,
+                mode: MirParamMode::Owned,
+                span,
+            },
+        ],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: left,
+                mutable: false,
+                span,
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: right,
+                mutable: false,
+                span,
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(2))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(op),
+                        args: vec![
+                            MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                            MirOperand::Constant(MirConstant::Int(layout_id)),
+                        ],
+                        return_ty: out,
+                    },
+                },
+                span,
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(2),
+                )))),
+                span,
+            },
+            span,
+        }],
+        return_ty: out,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
+#[test]
+fn quantized_matmul_contract_resolves_q4k_layout() {
+    let mut types = TypeTable::new();
+    let function = packed_binary_function(
+        &mut types,
+        [8, 16],
+        [16, 16],
+        [8, 16],
+        MirCollectionOp::TensorQuantizedMatMul,
+        12,
+    );
+    let validation = MirValidationContext::new(&types);
+    let contract = collection_op_contract(&function, &validation)
+        .expect("Q4_K facts resolve")
+        .expect("Q4_K body carries a packed contract");
+    assert_eq!(
+        contract,
+        CollectionOpContract::QuantizedMatMul {
+            dispatch_x: 2,
+            dispatch_y: 1,
+            m: 8,
+            k: 16,
+            n: 16,
+            layout: PackedStorageLayout::Q4_K,
+        }
+    );
+}
+
+#[test]
+fn quantized_matmul_contract_rejects_unknown_layout() {
+    let mut types = TypeTable::new();
+    let function = packed_binary_function(
+        &mut types,
+        [8, 16],
+        [16, 16],
+        [8, 16],
+        MirCollectionOp::TensorQuantizedMatMul,
+        99,
+    );
+    let validation = MirValidationContext::new(&types);
+    let error = collection_op_contract(&function, &validation)
+        .expect_err("unknown GGML type id must fail closed");
+    assert!(
+        error.message.contains("admitted GGML type id"),
+        "typed diagnostic expected, got: {}",
+        error.message
+    );
 }

@@ -1,6 +1,7 @@
 use super::plan::{
-    AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, GatherPlan, MatMulPlan,
-    ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, SharedMemoryLayout, TransposePlan,
+    AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, GatherPlan,
+    GroupedMatMulPlan, MatMulPlan, QuantizedMatMulPlan, ReduceOp, ReductionPlan,
+    RmsNormalizationPlan, RopePlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
     MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
 };
 use std::fmt;
@@ -265,6 +266,78 @@ pub(super) fn validate_causal_masked_softmax_plan(
     Ok(())
 }
 
+/// Packed quantized GEMM validation (R-PACK-01A). Positive M/K/N and a
+/// non-zero tile; the workgroup must equal the tile on both axes (same
+/// coupling as [`validate_matmul_plan`]).
+pub(super) fn validate_quantized_matmul_plan(
+    plan: &QuantizedMatMulPlan,
+) -> Result<(), PlanValidationError> {
+    if plan.m == 0 || plan.k == 0 || plan.n == 0 || plan.tile == 0 {
+        return Err(PlanValidationError::QuantizedMatMulZeroDimension {
+            m: plan.m,
+            k: plan.k,
+            n: plan.n,
+            tile: plan.tile,
+        });
+    }
+    if plan.workgroup_x != plan.tile || plan.workgroup_y != plan.tile {
+        return Err(PlanValidationError::MatMulWorkgroupMismatch {
+            workgroup_x: plan.workgroup_x,
+            workgroup_y: plan.workgroup_y,
+            tile: plan.tile,
+        });
+    }
+    Ok(())
+}
+
+/// Grouped packed GEMM validation (R-PACK-01A). Positive M/K/N/groups and a
+/// non-zero tile; the workgroup must equal the tile on both axes.
+pub(super) fn validate_grouped_matmul_plan(
+    plan: &GroupedMatMulPlan,
+) -> Result<(), PlanValidationError> {
+    if plan.m == 0 || plan.k == 0 || plan.n == 0 || plan.groups == 0 || plan.tile == 0 {
+        return Err(PlanValidationError::GroupedMatMulZeroDimension {
+            m: plan.m,
+            k: plan.k,
+            n: plan.n,
+            groups: plan.groups,
+            tile: plan.tile,
+        });
+    }
+    if plan.workgroup_x != plan.tile || plan.workgroup_y != plan.tile {
+        return Err(PlanValidationError::MatMulWorkgroupMismatch {
+            workgroup_x: plan.workgroup_x,
+            workgroup_y: plan.workgroup_y,
+            tile: plan.tile,
+        });
+    }
+    Ok(())
+}
+
+/// SSM conv1d validation (R-PACK-01A). Positive length, channels, and kernel
+/// width (a zero extent dispatches an empty grid).
+pub(super) fn validate_ssm_conv1d_plan(plan: &SsmConv1dPlan) -> Result<(), PlanValidationError> {
+    if plan.length == 0 || plan.channels == 0 || plan.kernel_width == 0 {
+        return Err(PlanValidationError::SsmConv1dZeroDimension {
+            length: plan.length,
+            channels: plan.channels,
+            kernel_width: plan.kernel_width,
+        });
+    }
+    Ok(())
+}
+
+/// SSM scan validation (R-PACK-01A). Positive length and state dim.
+pub(super) fn validate_ssm_scan_plan(plan: &SsmScanPlan) -> Result<(), PlanValidationError> {
+    if plan.length == 0 || plan.state_dim == 0 {
+        return Err(PlanValidationError::SsmScanZeroDimension {
+            length: plan.length,
+            state_dim: plan.state_dim,
+        });
+    }
+    Ok(())
+}
+
 /// Workgroup coupling (L12 / PRP-004 U2): tile-local addressing derives from
 /// workgroup-local ids, so the shared-memory tile is only correct when the
 /// workgroup equals the tile grid on both axes — the pre-fix `id % 8` aliased
@@ -508,6 +581,24 @@ pub enum PlanValidationError {
     /// The causal masked-softmax recipe requires positive row/column extents
     /// (a zero extent dispatches an empty grid).
     CausalMaskedSoftmaxZeroDimension { rows: u64, cols: u64 },
+    /// Packed quantized GEMM requires positive M/K/N and a non-zero tile.
+    QuantizedMatMulZeroDimension { m: u64, k: u64, n: u64, tile: u32 },
+    /// Grouped packed GEMM requires positive M/K/N/groups and a non-zero tile.
+    GroupedMatMulZeroDimension {
+        m: u64,
+        k: u64,
+        n: u64,
+        groups: u64,
+        tile: u32,
+    },
+    /// SSM conv1d requires positive length, channels, and kernel width.
+    SsmConv1dZeroDimension {
+        length: u64,
+        channels: u64,
+        kernel_width: u64,
+    },
+    /// SSM scan requires positive length and state dim.
+    SsmScanZeroDimension { length: u64, state_dim: u64 },
 }
 
 impl fmt::Display for PlanValidationError {
@@ -628,6 +719,32 @@ impl fmt::Display for PlanValidationError {
             Self::CausalMaskedSoftmaxZeroDimension { rows, cols } => write!(
                 f,
                 "causal masked-softmax requires positive row/column extents, got rows={rows}, cols={cols}"
+            ),
+            Self::QuantizedMatMulZeroDimension { m, k, n, tile } => write!(
+                f,
+                "quantized matmul requires positive M/K/N and a non-zero tile, got M={m}, K={k}, N={n}, tile={tile}"
+            ),
+            Self::GroupedMatMulZeroDimension {
+                m,
+                k,
+                n,
+                groups,
+                tile,
+            } => write!(
+                f,
+                "grouped matmul requires positive M/K/N/groups and a non-zero tile, got M={m}, K={k}, N={n}, groups={groups}, tile={tile}"
+            ),
+            Self::SsmConv1dZeroDimension {
+                length,
+                channels,
+                kernel_width,
+            } => write!(
+                f,
+                "ssm conv1d requires positive length, channels, and kernel width, got length={length}, channels={channels}, kernel_width={kernel_width}"
+            ),
+            Self::SsmScanZeroDimension { length, state_dim } => write!(
+                f,
+                "ssm scan requires positive length and state dim, got length={length}, state_dim={state_dim}"
             ),
         }
     }

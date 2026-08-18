@@ -1,6 +1,6 @@
 use crate::{
-    MirCollectionOp, MirFunction, MirIntrinsic, MirParam, MirRuntimeCall, MirStatementKind,
-    MirValidationContext,
+    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirOperand, MirParam, MirRuntimeCall,
+    MirStatementKind, MirValidationContext,
 };
 use radix_lexer::Interner;
 
@@ -97,6 +97,139 @@ pub enum CollectionOpContract {
         /// Source columns `N` of the rank-2 operand (output rows).
         n: u64,
     },
+    /// Packed quantized GEMM (R-PACK-01A). Same tile grid as [`Self::MatMul`];
+    /// the layout class is a typed GGML type-id fact.
+    QuantizedMatMul {
+        /// Output tile grid `(ceil(N/8), ceil(M/8))`.
+        dispatch_x: u64,
+        dispatch_y: u64,
+        /// Left matrix rows `M`.
+        m: u64,
+        /// Contracted inner dimension `K`.
+        k: u64,
+        /// Right matrix columns `N`.
+        n: u64,
+        /// Stored weight layout.
+        layout: PackedStorageLayout,
+    },
+    /// Grouped packed GEMM over rank-3 expert slices (R-PACK-01A).
+    GroupedMatMul {
+        /// Output tile grid `(ceil(N/8), ceil(M/8))`.
+        dispatch_x: u64,
+        dispatch_y: u64,
+        /// Left matrix rows `M`.
+        m: u64,
+        /// Contracted inner dimension `K`.
+        k: u64,
+        /// Right matrix columns `N`.
+        n: u64,
+        /// Expert / group count (leading rank-3 axis).
+        groups: u64,
+        /// Stored expert-weight layout.
+        layout: PackedStorageLayout,
+    },
+    /// SSM conv1d (R-PACK-01A). 1D elementwise-style dispatch over
+    /// `length · channels`.
+    SsmConv1d {
+        /// Sequence length.
+        length: u64,
+        /// Channel extent.
+        channels: u64,
+        /// Convolution kernel width.
+        kernel_width: u64,
+        /// Stored kernel/state layout.
+        layout: PackedStorageLayout,
+    },
+    /// SSM linear-recurrence scan (R-PACK-01A). 1D elementwise-style dispatch
+    /// over `length · state_dim`.
+    SsmScan {
+        /// Sequence length.
+        length: u64,
+        /// Recurrence state dimension.
+        state_dim: u64,
+        /// Stored state/weight layout.
+        layout: PackedStorageLayout,
+    },
+}
+
+/// Admitted packed storage layouts for native kernel execution (R-PACK-01A).
+///
+/// Type ids and block geometries bind to the pinned Gradus GGUF-A3 facts
+/// (`gguf_manifest` / `dequant` @ the GI2-1 ggml pin) — never re-derived
+/// from a filename. An id outside this closed set is unrepresentable.
+#[allow(non_camel_case_types)] // GGUF type names are the layout authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackedStorageLayout {
+    /// Plain f32 passthrough (existing `TiledMatMul` / gather surface).
+    F32,
+    /// Native 2-byte bfloat16; in-kernel f32 convert.
+    Bf16,
+    /// f16 scale + int8, 32 elements / 34 bytes.
+    Q8_0,
+    /// 6-bit superblock, 256 elements / 144 bytes.
+    Q4_K,
+    /// 6-bit superblock, 256 elements / 176 bytes.
+    Q5_K,
+    /// 6-bit superblock, 256 elements / 210 bytes.
+    Q6_K,
+    /// f16 scale + 5-bit, 32 elements / 22 bytes (dense-rung SmolLM2).
+    Q5_0,
+}
+
+impl PackedStorageLayout {
+    /// GGML type id (`ggml.h` / Gradus `GGML_*` constants).
+    #[must_use]
+    pub const fn ggml_type_id(self) -> u32 {
+        match self {
+            Self::F32 => 0,
+            Self::Q5_0 => 6,
+            Self::Q8_0 => 8,
+            Self::Q4_K => 12,
+            Self::Q5_K => 13,
+            Self::Q6_K => 14,
+            Self::Bf16 => 30,
+        }
+    }
+
+    /// Resolve a closed layout from a GGML type id. Unknown ids are `None`
+    /// (fail closed — never a guessed block geometry).
+    #[must_use]
+    pub const fn from_ggml_type_id(id: u32) -> Option<Self> {
+        match id {
+            0 => Some(Self::F32),
+            6 => Some(Self::Q5_0),
+            8 => Some(Self::Q8_0),
+            12 => Some(Self::Q4_K),
+            13 => Some(Self::Q5_K),
+            14 => Some(Self::Q6_K),
+            30 => Some(Self::Bf16),
+            _ => None,
+        }
+    }
+
+    /// Logical elements per stored block (pinned Gradus `dequant` table).
+    #[must_use]
+    pub const fn block_elements(self) -> u32 {
+        match self {
+            Self::F32 | Self::Bf16 => 1,
+            Self::Q8_0 | Self::Q5_0 => 32,
+            Self::Q4_K | Self::Q5_K | Self::Q6_K => 256,
+        }
+    }
+
+    /// Packed bytes per stored block (pinned Gradus `dequant` table).
+    #[must_use]
+    pub const fn block_bytes(self) -> u32 {
+        match self {
+            Self::F32 => 4,
+            Self::Bf16 => 2,
+            Self::Q8_0 => 34,
+            Self::Q4_K => 144,
+            Self::Q5_K => 176,
+            Self::Q6_K => 210,
+            Self::Q5_0 => 22,
+        }
+    }
 }
 
 /// Apply the collection-op dispatch contract to a kernel signature in place.
@@ -150,6 +283,51 @@ pub(crate) fn apply_collection_op_contract(
             };
             signature.dispatch_size = MirKernelDispatchSize {
                 x: m.saturating_mul(n),
+                y: 1,
+                z: 1,
+            };
+        }
+        CollectionOpContract::QuantizedMatMul {
+            dispatch_x,
+            dispatch_y,
+            ..
+        }
+        | CollectionOpContract::GroupedMatMul {
+            dispatch_x,
+            dispatch_y,
+            ..
+        } => {
+            signature.workgroup = MirWorkgroupSize { x: 8, y: 8, z: 1 };
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: dispatch_x,
+                y: dispatch_y,
+                z: 1,
+            };
+        }
+        CollectionOpContract::SsmConv1d {
+            length, channels, ..
+        } => {
+            signature.workgroup = MirWorkgroupSize {
+                x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+                y: 1,
+                z: 1,
+            };
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: length.saturating_mul(channels),
+                y: 1,
+                z: 1,
+            };
+        }
+        CollectionOpContract::SsmScan {
+            length, state_dim, ..
+        } => {
+            signature.workgroup = MirWorkgroupSize {
+                x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+                y: 1,
+                z: 1,
+            };
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: length.saturating_mul(state_dim),
                 y: 1,
                 z: 1,
             };
@@ -262,11 +440,246 @@ pub fn collection_op_contract(
                         n: dims[1],
                     }));
                 }
+                MirCollectionOp::TensorQuantizedMatMul => {
+                    let (left_dims, right_dims, layout) =
+                        packed_rank2_matmul_operands(function, args, validation)?;
+                    let tile: u64 = 8;
+                    return Ok(Some(CollectionOpContract::QuantizedMatMul {
+                        dispatch_x: right_dims[1].div_ceil(tile),
+                        dispatch_y: left_dims[0].div_ceil(tile),
+                        m: left_dims[0],
+                        k: left_dims[1],
+                        n: right_dims[1],
+                        layout,
+                    }));
+                }
+                MirCollectionOp::TensorGroupedMatMul => {
+                    return Ok(Some(grouped_matmul_contract(function, args, validation)?));
+                }
+                MirCollectionOp::TensorSsmConv1d => {
+                    return Ok(Some(ssm_conv1d_contract(function, args, validation)?));
+                }
+                MirCollectionOp::TensorSsmScan => {
+                    return Ok(Some(ssm_scan_contract(function, args, validation)?));
+                }
                 _ => {}
             }
         }
     }
     Ok(None)
+}
+
+fn packed_layout_from_operand(operand: &MirOperand) -> Result<PackedStorageLayout, MirAbiError> {
+    let id = match operand {
+        MirOperand::Constant(MirConstant::Int(value)) => u32::try_from(*value).ok(),
+        MirOperand::Constant(MirConstant::UInt(value)) => u32::try_from(*value).ok(),
+        _ => None,
+    };
+    id.and_then(PackedStorageLayout::from_ggml_type_id)
+        .ok_or_else(|| {
+            MirAbiError::new(
+                "packed kernel layout must be an admitted GGML type id \
+                 (F32, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0)",
+            )
+        })
+}
+
+fn packed_rank2_matmul_operands(
+    function: &MirFunction,
+    args: &[MirOperand],
+    validation: &MirValidationContext<'_>,
+) -> Result<([u64; 2], [u64; 2], PackedStorageLayout), MirAbiError> {
+    let Some(left_ty) = args
+        .first()
+        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+    else {
+        return Err(MirAbiError::new(
+            "quantized matmul requires a rank-2 left tensor operand",
+        ));
+    };
+    let Some(right_ty) = args
+        .get(1)
+        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+    else {
+        return Err(MirAbiError::new(
+            "quantized matmul requires a rank-2 right tensor operand",
+        ));
+    };
+    let Some(layout_operand) = args.get(2) else {
+        return Err(MirAbiError::new(
+            "quantized matmul requires a trailing GGML type-id const",
+        ));
+    };
+    let left_dims = crate::tensor_type::tensor_literal_dims(left_ty, validation)
+        .map_err(MirAbiError::new)?;
+    let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)
+        .map_err(MirAbiError::new)?;
+    if left_dims.len() != 2 || right_dims.len() != 2 {
+        return Err(MirAbiError::new(
+            "quantized matmul dispatch contract requires rank-2 tensor operands",
+        ));
+    }
+    if left_dims[1] != right_dims[0] {
+        return Err(MirAbiError::new(
+            "quantized matmul inner dimensions must match",
+        ));
+    }
+    if left_dims[0] == 0 || left_dims[1] == 0 || right_dims[1] == 0 {
+        return Err(MirAbiError::new(
+            "quantized matmul dispatch contract requires non-zero dimensions",
+        ));
+    }
+    let layout = packed_layout_from_operand(layout_operand)?;
+    Ok(([left_dims[0], left_dims[1]], [right_dims[0], right_dims[1]], layout))
+}
+
+fn grouped_matmul_contract(
+    function: &MirFunction,
+    args: &[MirOperand],
+    validation: &MirValidationContext<'_>,
+) -> Result<CollectionOpContract, MirAbiError> {
+    let Some(left_ty) = args
+        .first()
+        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+    else {
+        return Err(MirAbiError::new(
+            "grouped matmul requires a left tensor operand",
+        ));
+    };
+    let Some(right_ty) = args
+        .get(1)
+        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+    else {
+        return Err(MirAbiError::new(
+            "grouped matmul requires a rank-3 right tensor operand",
+        ));
+    };
+    let Some(layout_operand) = args.get(2) else {
+        return Err(MirAbiError::new(
+            "grouped matmul requires a trailing GGML type-id const",
+        ));
+    };
+    let left_dims = crate::tensor_type::tensor_literal_dims(left_ty, validation)
+        .map_err(MirAbiError::new)?;
+    let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)
+        .map_err(MirAbiError::new)?;
+    if right_dims.len() != 3 {
+        return Err(MirAbiError::new(
+            "grouped matmul dispatch contract requires a rank-3 right operand",
+        ));
+    }
+    if left_dims.len() != 2 {
+        return Err(MirAbiError::new(
+            "grouped matmul dispatch contract requires a rank-2 left operand",
+        ));
+    }
+    let groups = right_dims[0];
+    let k = right_dims[1];
+    let n = right_dims[2];
+    if left_dims[1] != k {
+        return Err(MirAbiError::new(
+            "grouped matmul inner dimensions must match",
+        ));
+    }
+    if groups == 0 || left_dims[0] == 0 || k == 0 || n == 0 {
+        return Err(MirAbiError::new(
+            "grouped matmul dispatch contract requires non-zero dimensions",
+        ));
+    }
+    let tile: u64 = 8;
+    Ok(CollectionOpContract::GroupedMatMul {
+        dispatch_x: n.div_ceil(tile),
+        dispatch_y: left_dims[0].div_ceil(tile),
+        m: left_dims[0],
+        k,
+        n,
+        groups,
+        layout: packed_layout_from_operand(layout_operand)?,
+    })
+}
+
+fn ssm_conv1d_contract(
+    function: &MirFunction,
+    args: &[MirOperand],
+    validation: &MirValidationContext<'_>,
+) -> Result<CollectionOpContract, MirAbiError> {
+    let Some(input_ty) = args
+        .first()
+        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+    else {
+        return Err(MirAbiError::new("ssm conv1d requires an input tensor"));
+    };
+    let Some(kernel_ty) = args
+        .get(1)
+        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+    else {
+        return Err(MirAbiError::new("ssm conv1d requires a kernel tensor"));
+    };
+    let Some(layout_operand) = args.get(2) else {
+        return Err(MirAbiError::new(
+            "ssm conv1d requires a trailing GGML type-id const",
+        ));
+    };
+    let input_dims = crate::tensor_type::tensor_literal_dims(input_ty, validation)
+        .map_err(MirAbiError::new)?;
+    let kernel_dims = crate::tensor_type::tensor_literal_dims(kernel_ty, validation)
+        .map_err(MirAbiError::new)?;
+    if input_dims.len() != 2 {
+        return Err(MirAbiError::new(
+            "ssm conv1d dispatch contract requires a rank-2 input",
+        ));
+    }
+    if kernel_dims.is_empty() {
+        return Err(MirAbiError::new(
+            "ssm conv1d dispatch contract requires a kernel operand with a width axis",
+        ));
+    }
+    if input_dims[0] == 0 || input_dims[1] == 0 || kernel_dims[0] == 0 {
+        return Err(MirAbiError::new(
+            "ssm conv1d dispatch contract requires non-zero dimensions",
+        ));
+    }
+    Ok(CollectionOpContract::SsmConv1d {
+        length: input_dims[0],
+        channels: input_dims[1],
+        kernel_width: kernel_dims[0],
+        layout: packed_layout_from_operand(layout_operand)?,
+    })
+}
+
+fn ssm_scan_contract(
+    function: &MirFunction,
+    args: &[MirOperand],
+    validation: &MirValidationContext<'_>,
+) -> Result<CollectionOpContract, MirAbiError> {
+    let Some(input_ty) = args
+        .first()
+        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+    else {
+        return Err(MirAbiError::new("ssm scan requires an input tensor"));
+    };
+    let Some(layout_operand) = args.get(1) else {
+        return Err(MirAbiError::new(
+            "ssm scan requires a trailing GGML type-id const",
+        ));
+    };
+    let input_dims = crate::tensor_type::tensor_literal_dims(input_ty, validation)
+        .map_err(MirAbiError::new)?;
+    if input_dims.len() != 2 {
+        return Err(MirAbiError::new(
+            "ssm scan dispatch contract requires a rank-2 input",
+        ));
+    }
+    if input_dims[0] == 0 || input_dims[1] == 0 {
+        return Err(MirAbiError::new(
+            "ssm scan dispatch contract requires non-zero dimensions",
+        ));
+    }
+    Ok(CollectionOpContract::SsmScan {
+        length: input_dims[0],
+        state_dim: input_dims[1],
+        layout: packed_layout_from_operand(layout_operand)?,
+    })
 }
 
 /// Power-of-two workgroup lane count for a reduction: `min(256, next_pow2(n))`

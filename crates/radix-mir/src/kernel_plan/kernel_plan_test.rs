@@ -1496,3 +1496,129 @@ fn multi_output_contract_rejects_colliding_output_slots() {
     signature.extra_outputs[0].binding = 2;
     assert!(multi_output_contract_valid(&signature));
 }
+
+// ── R-PACK-01A packed plan/op surface freeze ─────────────────────────────
+
+fn packed_layout_fixture(layout: crate::abi::PackedStorageLayout) -> CollectionOpContract {
+    CollectionOpContract::QuantizedMatMul {
+        dispatch_x: 2,
+        dispatch_y: 1,
+        m: 8,
+        k: 16,
+        n: 16,
+        layout,
+    }
+}
+
+fn quantized_matmul_signature(m: u64, k: u64, n: u64) -> MirKernelSignature {
+    matmul_signature(MatMulShapes { m, k, n }, n.div_ceil(8), m.div_ceil(8))
+}
+
+#[test]
+fn packed_storage_layout_binds_pinned_ggml_block_geometry() {
+    use crate::abi::PackedStorageLayout;
+    let rows = [
+        (PackedStorageLayout::F32, 0, 1, 4),
+        (PackedStorageLayout::Bf16, 30, 1, 2),
+        (PackedStorageLayout::Q8_0, 8, 32, 34),
+        (PackedStorageLayout::Q4_K, 12, 256, 144),
+        (PackedStorageLayout::Q5_K, 13, 256, 176),
+        (PackedStorageLayout::Q6_K, 14, 256, 210),
+        (PackedStorageLayout::Q5_0, 6, 32, 22),
+    ];
+    for (layout, id, elements, bytes) in rows {
+        assert_eq!(layout.ggml_type_id(), id);
+        assert_eq!(PackedStorageLayout::from_ggml_type_id(id), Some(layout));
+        assert_eq!(layout.block_elements(), elements);
+        assert_eq!(layout.block_bytes(), bytes);
+    }
+    assert_eq!(PackedStorageLayout::from_ggml_type_id(99), None);
+}
+
+#[test]
+fn q4k_quantized_matmul_resolves_typed_packed_plan() {
+    use crate::abi::PackedStorageLayout;
+    let signature = quantized_matmul_signature(8, 16, 16);
+    let contract = packed_layout_fixture(PackedStorageLayout::Q4_K);
+    let plan = CollectionKernelPlan::from_contract(
+        &signature,
+        &contract,
+        MirCollectionOp::TensorQuantizedMatMul,
+        None,
+    )
+    .expect("Q4_K quantized matmul resolves a typed packed plan");
+    let CollectionKernelPlan::QuantizedMatMul(quantized) = &plan else {
+        panic!("Q4_K fixture must resolve QuantizedMatMul, got {plan:?}");
+    };
+    assert_eq!(
+        (quantized.m, quantized.k, quantized.n, quantized.layout),
+        (8, 16, 16, PackedStorageLayout::Q4_K)
+    );
+    assert_eq!(quantized.tile, MATMUL_TILE);
+    plan.validate().expect("Q4_K packed plan validates");
+}
+
+#[test]
+fn grouped_and_ssm_plans_resolve_typed_variants() {
+    use crate::abi::PackedStorageLayout;
+    let mut signature = quantized_matmul_signature(8, 16, 16);
+    signature.extra_inputs[0].element_count = 4 * 16 * 16;
+    let grouped = CollectionKernelPlan::from_contract(
+        &signature,
+        &CollectionOpContract::GroupedMatMul {
+            dispatch_x: 2,
+            dispatch_y: 1,
+            m: 8,
+            k: 16,
+            n: 16,
+            groups: 4,
+            layout: PackedStorageLayout::Q4_K,
+        },
+        MirCollectionOp::TensorGroupedMatMul,
+        None,
+    )
+    .expect("grouped matmul resolves");
+    assert!(matches!(grouped, CollectionKernelPlan::GroupedMatMul(_)));
+    grouped.validate().expect("grouped plan validates");
+
+    let ssm_signature = transformer_signature(32, 32);
+    let mut ssm_signature = ssm_signature;
+    ssm_signature.workgroup = MirWorkgroupSize {
+        x: TRANSPOSE_WORKGROUP_X,
+        y: 1,
+        z: 1,
+    };
+    ssm_signature.dispatch_size = MirKernelDispatchSize {
+        x: 32,
+        y: 1,
+        z: 1,
+    };
+    let conv = CollectionKernelPlan::from_contract(
+        &ssm_signature,
+        &CollectionOpContract::SsmConv1d {
+            length: 8,
+            channels: 4,
+            kernel_width: 3,
+            layout: PackedStorageLayout::F32,
+        },
+        MirCollectionOp::TensorSsmConv1d,
+        None,
+    )
+    .expect("ssm conv1d resolves");
+    assert!(matches!(conv, CollectionKernelPlan::SsmConv1d(_)));
+    conv.validate().expect("ssm conv1d validates");
+
+    let scan = CollectionKernelPlan::from_contract(
+        &ssm_signature,
+        &CollectionOpContract::SsmScan {
+            length: 8,
+            state_dim: 4,
+            layout: PackedStorageLayout::F32,
+        },
+        MirCollectionOp::TensorSsmScan,
+        None,
+    )
+    .expect("ssm scan resolves");
+    assert!(matches!(scan, CollectionKernelPlan::SsmScan(_)));
+    scan.validate().expect("ssm scan validates");
+}
