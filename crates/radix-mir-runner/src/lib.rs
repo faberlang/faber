@@ -861,7 +861,13 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             MirConstant::Float(value) => Value::Float(*value),
             MirConstant::Bool(value) => Value::Bool(*value),
             MirConstant::String(symbol) => Value::Str(self.interned_textus(*symbol)),
-            MirConstant::Ascii(symbol) => Value::Str(self.interned_ascii(*symbol)),
+            MirConstant::Ascii(symbol) => {
+                let text = self.interned_ascii(*symbol);
+                match text.as_bytes() {
+                    [b] => Value::Ascii(*b),
+                    _ => Value::Str(text),
+                }
+            }
             MirConstant::Nil => Value::Nil,
             MirConstant::Unit => Value::Unit,
             MirConstant::Octeti(bytes) => Value::Octeti(bytes.clone()),
@@ -1419,6 +1425,9 @@ fn constant_equals_value(constant: &MirConstant, value: &Value, interner: &Inter
             crate::textus_literal::decode_textus_literal(interner.resolve(*symbol)) == *right
         }
         (MirConstant::Ascii(symbol), Value::Str(right)) => interner.resolve(*symbol) == right,
+        (MirConstant::Ascii(symbol), Value::Ascii(right)) => {
+            interner.resolve(*symbol).as_bytes() == [*right]
+        }
         (MirConstant::Regex { pattern, flags }, Value::Regex(right)) => {
             regex_pattern(
                 &crate::textus_literal::decode_textus_literal(interner.resolve(*pattern)),
@@ -1528,3 +1537,7 @@ pub(crate) fn runtime_regex_pattern(pattern: &str) -> String {
 #[cfg(test)]
 #[path = "lib_test.rs"]
 mod lib_test;
+
+#[cfg(test)]
+#[path = "ascii1_index_test.rs"]
+mod ascii1_index_test;

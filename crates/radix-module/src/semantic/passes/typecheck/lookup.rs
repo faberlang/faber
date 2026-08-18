@@ -20,14 +20,6 @@ use super::*;
 const ISSUE_ASCII_LITERAL_INVALID_ESCAPE: &str = "ascii_literal_invalid_escape";
 const ISSUE_ASCII_LITERAL_NON_ASCII_SCALAR: &str = "ascii_literal_non_ascii_scalar";
 const ISSUE_ASCII_LITERAL_UNESCAPED_CONTROL: &str = "ascii_literal_unescaped_control";
-const ISSUE_ASCII_LITERAL_TOO_LONG: &str = "ascii_literal_too_long";
-/// Maximum decoded payload length in bytes for a single-quoted `ascii` literal.
-///
-/// Mirrors the runtime `faber::Ascii` inline-buffer capacity (default 64 per
-/// the ascii-char-index delivery §3a). A1/A3 keep the runtime constant and
-/// this typecheck gate in sync; literals beyond the buffer cannot be carried
-/// by a Copy `ascii` value.
-const ASCII_LITERAL_MAX_PAYLOAD_BYTES: usize = 64;
 const ISSUE_JSON_DUPLICATE_KEY: &str = "json_duplicate_key";
 const ISSUE_JSON_MAP_KEY_MUST_BE_TEXTUS: &str = "json_map_key_must_be_textus";
 const ISSUE_JSON_NESTED_VALUE_REQUIRES_VALOR: &str = "json_nested_value_requires_valor";
@@ -249,6 +241,12 @@ impl TypeChecker<'_> {
 
     pub(super) fn ascii_type(&mut self) -> TypeId {
         self.types.primitive(Primitive::Ascii)
+    }
+
+    /// Scalar-index / one-byte char type: `ascii<1>` (`BoundedAscii { 1 }`).
+    pub(super) fn ascii_one_type(&mut self) -> TypeId {
+        let capacity = self.types.intern_index(IndexExpr::Literal(1));
+        self.types.bounded_ascii(capacity)
     }
 
     pub(super) fn octeti_type(&mut self) -> TypeId {
@@ -481,13 +479,10 @@ impl TypeChecker<'_> {
         };
         match crate::ascii_literal::decode_ascii_literal(raw) {
             Ok(decoded) => {
-                if decoded.len() > ASCII_LITERAL_MAX_PAYLOAD_BYTES {
-                    self.invalid_operand_types(ISSUE_ASCII_LITERAL_TOO_LONG, span);
-                    return self.error_type;
-                }
+                // Bare ascii is unbounded: `ascii_literal_too_long` is reserved
+                // for `ascii<N>` (BB-4). One-byte payloads stay `ascii<1>`.
                 if decoded.len() == 1 {
-                    let capacity = self.types.intern_index(IndexExpr::Literal(1));
-                    return self.types.bounded_ascii(capacity);
+                    return self.ascii_one_type();
                 }
                 self.ascii_type()
             }

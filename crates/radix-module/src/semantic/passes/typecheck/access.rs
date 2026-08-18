@@ -98,11 +98,8 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         let resolved = self.resolve_inferred_type(object_ty);
         let resolved_kind = self.types.get(resolved).clone();
-        // WHY: textus and ascii scalar index returns a single-character
-        // `ascii` value (the type of `'x'` literals), not the Unicode scalar
-        // value as numerus. `ascii` is Copy/byte-backed at the runtime level,
-        // so the return keeps the zero-allocation property of the numerus
-        // workaround without leaking the representation into the type system.
+        // WHY: textus and ascii scalar index returns `ascii<1>` (D14 / D17),
+        // the type of `'x'`. Emit stays `Ascii::from_byte` (zero-alloc).
         // Range indices (e.g. textus[0‥5]) still return a textus substring.
         if matches!(resolved_kind, Type::Primitive(Primitive::Textus | Primitive::Ascii)) {
             if !self.is_textus_index_type(idx_ty) {
@@ -111,7 +108,7 @@ impl TypeChecker<'_> {
             if self.is_range_index(idx_ty) {
                 return self.types.primitive(Primitive::Textus);
             }
-            return self.types.primitive(Primitive::Ascii);
+            return self.ascii_one_type();
         }
         if let Type::Tensor(elem, shape) = resolved_kind {
             return self.check_tensor_bracket_index(elem, shape, idx_ty, object_span, index_span);

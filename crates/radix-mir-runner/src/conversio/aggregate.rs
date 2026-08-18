@@ -552,6 +552,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 )),
             },
             Type::Primitive(Primitive::Ascii) => match value {
+                Value::Ascii(b) => Ok(Value::Ascii(b)),
                 Value::Str(value) if value.is_ascii() => Ok(Value::Str(value)),
                 _ => Err(RunnerError::internal(
                     span,
