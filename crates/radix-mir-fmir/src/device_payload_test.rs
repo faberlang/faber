@@ -26,13 +26,14 @@ use crate::schema::{
     WireBufferLifetime, WireBufferRole, WireBufferVersion, WireCausalMaskedSoftmaxPlan,
     WireCollectionKernelPlan, WireCompanionDerivativeKind, WireCompanionRelation,
     WireCompanionSelectedInput, WireCompanionSelectedOutput, WireDependencyEdge, WireDeviceProgram,
-    WireDeviceResource, WireDispatchSize, WireGatherPlan, WireInitializationPolicy,
-    WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit, WireLayerNormalizationPlan,
-    WireObservationCadence, WireObservationFact, WireProgramLifetime, WireReduceOp,
+    WireDeviceResource, WireDispatchSize, WireGatherPlan, WireGroupedMatMulPlan,
+    WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit,
+    WireLayerNormalizationPlan, WireObservationCadence, WireObservationFact,
+    WirePackedStorageLayout, WireProgramLifetime, WireQuantizedMatMulPlan, WireReduceOp,
     WireReducedProjection, WireResourceAccess, WireResultBuffer, WireRmsNormalizationPlan,
     WireRopePlan, WireRowSoftmaxPlan, WireSemanticValue, WireSemanticValueOrigin,
-    WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize, ARTIFACT_ABI_VERSION,
-    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
+    WireSsmConv1dPlan, WireSsmScanPlan, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
+    ARTIFACT_ABI_VERSION, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
     WIRE_DEVICE_PROGRAM_VERSION,
 };
 use radix_mir::MirProgram;
@@ -2797,6 +2798,61 @@ fn gi3_inference_recipe_plans_round_trip_on_the_wire() {
             decoded.device.unwrap().device_program.program.kernels[0].plan,
             plan,
             "the recipe plan survives the wire round-trip"
+        );
+    }
+}
+
+/// R-PACK-01C: packed-kernel wire mirrors (QuantizedMatMul / GroupedMatMul /
+/// SsmConv1d / SsmScan) serialize and round-trip through the text codec on
+/// the accepted wire version — mechanical field-for-field arms, no extra
+/// semantic facts, no version bump.
+#[test]
+fn r_pack_packed_kernel_plans_round_trip_on_the_wire() {
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 8);
+    let plans = [
+        WireCollectionKernelPlan::QuantizedMatMul(WireQuantizedMatMulPlan {
+            m: 8,
+            k: 16,
+            n: 16,
+            layout: WirePackedStorageLayout::Q4_K,
+            tile: 8,
+            workgroup_x: 8,
+            workgroup_y: 8,
+        }),
+        WireCollectionKernelPlan::GroupedMatMul(WireGroupedMatMulPlan {
+            m: 8,
+            k: 16,
+            n: 16,
+            groups: 4,
+            layout: WirePackedStorageLayout::Q4_K,
+            tile: 8,
+            workgroup_x: 8,
+            workgroup_y: 8,
+        }),
+        WireCollectionKernelPlan::SsmConv1d(WireSsmConv1dPlan {
+            length: 8,
+            channels: 4,
+            kernel_width: 3,
+            layout: WirePackedStorageLayout::F32,
+        }),
+        WireCollectionKernelPlan::SsmScan(WireSsmScanPlan {
+            length: 8,
+            state_dim: 4,
+            layout: WirePackedStorageLayout::F32,
+        }),
+    ];
+    for plan in plans {
+        let mut program = sample_wire_program();
+        program.kernels[0].plan = plan.clone();
+        let mut section = sample_device_section();
+        section.device_program.program = program;
+        let image = text_image_with_device(Some(section));
+        let decoded = decode_text_image(&encode_text_image(&image).unwrap(), TOOLCHAIN)
+            .unwrap_or_else(|error| panic!("packed plan {plan:?} must admit cleanly: {error}"));
+        assert_eq!(
+            decoded.device.unwrap().device_program.program.kernels[0].plan,
+            plan,
+            "the packed-kernel plan survives the wire round-trip"
         );
     }
 }

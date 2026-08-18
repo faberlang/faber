@@ -513,6 +513,22 @@ pub enum WireCollectionKernelPlan {
     /// above the diagonal. Mirrors `kernel_plan::CausalMaskedSoftmaxPlan`;
     /// admission/resolution is GI3-1.
     CausalMaskedSoftmax(WireCausalMaskedSoftmaxPlan),
+    /// Packed quantized GEMM recipe (R-PACK-01C mechanical mirror of
+    /// `kernel_plan::QuantizedMatMulPlan`). Plan fields only; accepted wire
+    /// version unchanged.
+    QuantizedMatMul(WireQuantizedMatMulPlan),
+    /// Grouped packed GEMM recipe (R-PACK-01C mechanical mirror of
+    /// `kernel_plan::GroupedMatMulPlan`). Plan fields only; accepted wire
+    /// version unchanged.
+    GroupedMatMul(WireGroupedMatMulPlan),
+    /// SSM conv1d recipe (R-PACK-01C mechanical mirror of
+    /// `kernel_plan::SsmConv1dPlan`). Plan fields only; accepted wire
+    /// version unchanged.
+    SsmConv1d(WireSsmConv1dPlan),
+    /// SSM linear-recurrence scan recipe (R-PACK-01C mechanical mirror of
+    /// `kernel_plan::SsmScanPlan`). Plan fields only; accepted wire version
+    /// unchanged.
+    SsmScan(WireSsmScanPlan),
 }
 
 /// Axis-reduction recipe plan (wire mirror of `kernel_plan::AxisReductionPlan`,
@@ -627,6 +643,100 @@ pub struct WireCausalMaskedSoftmaxPlan {
     pub rows: u64,
     /// Column (key) extent.
     pub cols: u64,
+}
+
+/// Admitted packed storage layouts (R-PACK-01C mechanical mirror of
+/// `radix_mir::abi::PackedStorageLayout`). GGUF spellings are the layout
+/// authority; the mirror carries the closed enum, never a filename.
+#[allow(non_camel_case_types)] // GGUF type names are the layout authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum WirePackedStorageLayout {
+    /// Plain f32 passthrough.
+    F32,
+    /// Native 2-byte bfloat16.
+    Bf16,
+    /// f16 scale + int8.
+    Q8_0,
+    /// 6-bit superblock Q4_K.
+    Q4_K,
+    /// 6-bit superblock Q5_K.
+    Q5_K,
+    /// 6-bit superblock Q6_K.
+    Q6_K,
+    /// f16 scale + 5-bit (dense-rung).
+    Q5_0,
+}
+
+/// Packed quantized GEMM plan (R-PACK-01C mechanical mirror of
+/// `kernel_plan::QuantizedMatMulPlan`). Field-for-field; no extra facts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireQuantizedMatMulPlan {
+    /// Left matrix rows `M`.
+    pub m: u64,
+    /// Contracted inner dimension `K`.
+    pub k: u64,
+    /// Right matrix columns `N`.
+    pub n: u64,
+    /// Stored weight layout.
+    pub layout: WirePackedStorageLayout,
+    /// Square tile edge.
+    pub tile: u32,
+    /// Workgroup lane count on `x`.
+    pub workgroup_x: u32,
+    /// Workgroup lane count on `y`.
+    pub workgroup_y: u32,
+}
+
+/// Grouped packed GEMM plan (R-PACK-01C mechanical mirror of
+/// `kernel_plan::GroupedMatMulPlan`). Field-for-field; no extra facts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireGroupedMatMulPlan {
+    /// Left matrix rows `M`.
+    pub m: u64,
+    /// Contracted inner dimension `K`.
+    pub k: u64,
+    /// Right matrix columns `N`.
+    pub n: u64,
+    /// Expert / group count.
+    pub groups: u64,
+    /// Stored expert-weight layout.
+    pub layout: WirePackedStorageLayout,
+    /// Square tile edge.
+    pub tile: u32,
+    /// Workgroup lane count on `x`.
+    pub workgroup_x: u32,
+    /// Workgroup lane count on `y`.
+    pub workgroup_y: u32,
+}
+
+/// SSM conv1d plan (R-PACK-01C mechanical mirror of
+/// `kernel_plan::SsmConv1dPlan`). Field-for-field; no extra facts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireSsmConv1dPlan {
+    /// Sequence length.
+    pub length: u64,
+    /// Channel extent.
+    pub channels: u64,
+    /// Convolution kernel width.
+    pub kernel_width: u64,
+    /// Stored kernel/state layout.
+    pub layout: WirePackedStorageLayout,
+}
+
+/// SSM linear-recurrence scan plan (R-PACK-01C mechanical mirror of
+/// `kernel_plan::SsmScanPlan`). Field-for-field; no extra facts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireSsmScanPlan {
+    /// Sequence length.
+    pub length: u64,
+    /// Recurrence state dimension.
+    pub state_dim: u64,
+    /// Stored state/weight layout.
+    pub layout: WirePackedStorageLayout,
 }
 
 /// Rank-2 transpose recipe (`[M,N] → [N,M]`), the wire mirror of
