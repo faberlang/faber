@@ -126,6 +126,10 @@ mod type_hole_union_infer_test;
 #[path = "null_narrowing_test.rs"]
 mod null_narrowing_tests;
 
+#[cfg(test)]
+#[path = "octeti_index_test.rs"]
+mod octeti_index_test;
+
 /// Type information for a value currently visible in lexical scope.
 #[derive(Clone, Copy)]
 struct BindingInfo {

@@ -862,6 +862,7 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
         "object_field_requires_value" => Some("object field requires value".to_owned()),
         "vacua_requires_collection_type" => Some("vacua requires a collection type".to_owned()),
         "textus_index_must_be_numerus_or_range" => Some("textus index must be numerus or range".to_owned()),
+        "octeti_index_must_be_numerus_or_range" => Some("octeti index must be numerus or range".to_owned()),
         "array_index_must_be_numerus" => Some("array index must be numerus".to_owned()),
         "indexing_requires_array_or_map" => Some("indexing requires array or map".to_owned()),
         "tensor_index_vector_integer_elements" => Some(crate::semantic::TENSOR_INDEX_VECTOR_MSG.to_owned()),
@@ -1037,6 +1038,7 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             Some("give vacua a lista, tabula, copia, tensor, or sparsa context".to_owned())
         }
         "textus_index_must_be_numerus_or_range" => Some("index textus with numerus or an integer range".to_owned()),
+        "octeti_index_must_be_numerus_or_range" => Some("index octeti with numerus or an integer range".to_owned()),
         "array_index_must_be_numerus" => Some("index lista values with numerus".to_owned()),
         "indexing_requires_array_or_map" => {
             Some("index only lista, tabula, tensor, textus, or ignotum values".to_owned())
@@ -1773,6 +1775,7 @@ fn semantic_type_mismatch_message(args: &[DiagnosticArg]) -> Option<String> {
         "vector_element_type_mismatch" => Some("vector element type mismatch".to_owned()),
         "vector_incomplete" => Some("vector requires element type and width; use vector<T, N>".to_owned()),
         "vector_missing_width" => Some("vector requires a width; use vector<T, 4> or vf32[4]".to_owned()),
+        "octeti_index_out_of_bounds" => Some("octeti index out of bounds".to_owned()),
         _ => None,
     }
 }

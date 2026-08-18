@@ -19,6 +19,8 @@
 use super::*;
 
 const ISSUE_TEXTUS_INDEX_MUST_BE_NUMERUS_OR_RANGE: &str = "textus_index_must_be_numerus_or_range";
+const ISSUE_OCTETI_INDEX_MUST_BE_NUMERUS_OR_RANGE: &str = "octeti_index_must_be_numerus_or_range";
+const ISSUE_OCTETI_INDEX_OUT_OF_BOUNDS: &str = "octeti_index_out_of_bounds";
 const ISSUE_ARRAY_INDEX_MUST_BE_NUMERUS: &str = "array_index_must_be_numerus";
 const ISSUE_INDEXING_REQUIRES_ARRAY_OR_MAP: &str = "indexing_requires_array_or_map";
 const ISSUE_MAP_INDEX_TYPE_MISMATCH: &str = "map_index_type_mismatch";
@@ -112,6 +114,18 @@ impl TypeChecker<'_> {
                 return self.types.primitive(Primitive::Textus);
             }
             return self.types.primitive(Primitive::Ascii);
+        }
+        // WHY: octeti[i] is one byte (`numerus<u8>`), O(1). octeti[lo‥hi] is a
+        // half-open window that stays `octeti`. Do not reuse the textus return
+        // (`ascii` / substring). BoundedOcteti index is a later unit.
+        if matches!(resolved_kind, Type::Primitive(Primitive::Octeti)) {
+            if !self.is_textus_index_type(idx_ty) {
+                self.invalid_operand_types(ISSUE_OCTETI_INDEX_MUST_BE_NUMERUS_OR_RANGE, index_span);
+            }
+            if self.is_range_index(idx_ty) {
+                return self.types.primitive(Primitive::Octeti);
+            }
+            return self.types.sized_numeric(Primitive::Numerus, NumericWidth::U8);
         }
         if let Type::Tensor(elem, shape) = resolved_kind {
             return self.check_tensor_bracket_index(elem, shape, idx_ty, object_span, index_span);
@@ -386,7 +400,9 @@ impl TypeChecker<'_> {
             return self.check_tuple_index(&elements, index, object.span, index.span, idx_ty);
         }
         let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
-        self.check_index_from_type(obj_ty, idx_ty, object.span, index.span)
+        let result = self.check_index_from_type(obj_ty, idx_ty, object.span, index.span);
+        self.reject_static_octeti_index_oob(object, index);
+        result
     }
 
     /// Resolve a `Type::Tuple` index access to the element at the given position.
@@ -432,7 +448,36 @@ impl TypeChecker<'_> {
         if let Type::Tuple(elements) = self.types.get(resolved).clone() {
             return self.check_tuple_index(&elements, index, object.span, index.span, idx_ty);
         }
-        self.check_index_from_type(obj_ty, idx_ty, object.span, index.span)
+        let result = self.check_index_from_type(obj_ty, idx_ty, object.span, index.span);
+        self.reject_static_octeti_index_oob(object, index);
+        result
+    }
+
+    /// Reject a compile-time-provable out-of-range index on an octeti literal.
+    ///
+    /// Runtime OOB still traps. This only fires when both the payload length
+    /// and the index (scalar or `lo‥hi`) are constants. A range must lie fully
+    /// inside the payload — no short slice, no pad.
+    fn reject_static_octeti_index_oob(&mut self, object: &HirExpression, index: &HirExpression) {
+        let HirExpressionKind::Literal(HirLiteral::Octeti(sym)) = object.kind else {
+            return;
+        };
+        let Some(raw) = self.interned_literal_payload(sym) else {
+            return;
+        };
+        let Ok(bytes) = crate::octeti_literal::decode_octeti_hex(raw) else {
+            return;
+        };
+        let len = bytes.len();
+        if let Some((start, end)) = static_octeti_index_window(index) {
+            if start > end || end > len {
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_OCTETI_INDEX_OUT_OF_BOUNDS,
+                    index.span,
+                );
+            }
+        }
     }
     /// Checks ordinary field syntax by synthesizing the receiver first.
     pub(super) fn check_field(&mut self, object: &mut HirExpression, name: Symbol) -> TypeId {
@@ -537,6 +582,38 @@ impl TypeChecker<'_> {
 
         self.error_issue(SemanticErrorKind::UndefinedVariable, "unknown_identifier", span);
         self.error_type
+    }
+}
+
+/// Exclusive `[start, end)` window for a constant octeti index, when both
+/// endpoints (or the scalar index) are integer literals.
+///
+/// A scalar `i` is the window `[i, i+1)`. Exclusive `lo‥hi` is `[lo, hi)`.
+/// Inclusive `lo…hi` is `[lo, hi+1)`. `None` means the index is not a
+/// compile-time integer window.
+fn static_octeti_index_window(index: &HirExpression) -> Option<(usize, usize)> {
+    match &index.kind {
+        HirExpressionKind::Literal(HirLiteral::Int(n)) => {
+            let start = usize::try_from(*n).ok()?;
+            let end = start.checked_add(1)?;
+            Some((start, end))
+        }
+        HirExpressionKind::Intervallum { start, end, kind, .. } => {
+            let HirExpressionKind::Literal(HirLiteral::Int(start)) = start.kind else {
+                return None;
+            };
+            let HirExpressionKind::Literal(HirLiteral::Int(end)) = end.kind else {
+                return None;
+            };
+            let start = usize::try_from(start).ok()?;
+            let end = usize::try_from(end).ok()?;
+            let end = match kind {
+                crate::hir::HirRangeKind::Exclusive => end,
+                crate::hir::HirRangeKind::Inclusive => end.checked_add(1)?,
+            };
+            Some((start, end))
+        }
+        _ => None,
     }
 }
 
