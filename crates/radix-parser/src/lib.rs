@@ -833,7 +833,16 @@ impl Parser {
     }
 
     /// Parse an identifier allowed for the given keyword-ownership context.
+    ///
+    /// Keyword spellings lex as `Ident`. The owner gate decides whether that
+    /// spelling may occupy this name slot; allowed names keep their surface
+    /// spelling.
     fn parse_contextual_ident(&mut self, owner: KeywordOwner) -> Result<Ident, ParseError> {
+        if let Some(kind) = self.current_keyword_ident() {
+            if keyword_allowed_as_ident(owner, &kind).is_none() {
+                return Err(Self::expected_error("identifier", self.current_span()));
+            }
+        }
         let token = self.advance();
         let span = token.span;
         match &token.kind {

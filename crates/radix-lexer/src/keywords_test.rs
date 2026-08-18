@@ -69,13 +69,43 @@ fn token_spelling_lookup_uses_registry_text() {
 
 #[test]
 fn contextual_keywords_are_identifier_like_only_for_owners() {
+    // Structural/modifier owners keep per-keyword gating.
     assert_eq!(
         keyword_allowed_as_ident(KeywordOwner::ParameterMode, &TokenKind::De),
         Some("de")
     );
     assert_eq!(
-        keyword_allowed_as_ident(KeywordOwner::DeclarationName, &TokenKind::De),
+        keyword_allowed_as_ident(KeywordOwner::FunctionModifier, &TokenKind::De),
         None
+    );
+
+    // Name-slot owners accept every keyword spelling, including those
+    // whose Contextual list does not name that owner.
+    for owner in [
+        KeywordOwner::DeclarationName,
+        KeywordOwner::ParameterName,
+        KeywordOwner::MemberIdentifier,
+        KeywordOwner::BindingTarget,
+    ] {
+        assert_eq!(keyword_allowed_as_ident(owner, &TokenKind::De), Some("de"));
+        assert_eq!(
+            keyword_allowed_as_ident(owner, &TokenKind::Lege),
+            Some("lege")
+        );
+        assert_eq!(
+            keyword_allowed_as_ident(owner, &TokenKind::Nota),
+            Some("nota")
+        );
+    }
+
+    // TypeName stays out of the name-slot policy.
+    assert_eq!(
+        keyword_allowed_as_ident(KeywordOwner::TypeName, &TokenKind::Lege),
+        None
+    );
+    assert_eq!(
+        keyword_allowed_as_ident(KeywordOwner::TypeName, &TokenKind::Iuncta),
+        Some("iuncta")
     );
 }
 
@@ -137,6 +167,7 @@ fn identifier_like_owner_policy_is_shared_across_keyword_scopes() {
         KeywordOwner::DeclarationName,
         KeywordOwner::ParameterName,
         KeywordOwner::MemberIdentifier,
+        KeywordOwner::BindingTarget,
     ] {
         assert_eq!(
             keyword_allowed_as_ident(owner, &TokenKind::Scribe),
@@ -170,7 +201,7 @@ fn nonnihil_remains_predicate_and_member_identifier() {
     );
     assert_eq!(
         keyword_allowed_as_ident(KeywordOwner::DeclarationName, &TokenKind::Nonnihil),
-        None
+        Some("nonnihil")
     );
 }
 

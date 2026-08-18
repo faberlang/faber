@@ -365,7 +365,7 @@ impl Parser {
             return Ok(BindingPattern::Wildcard(span));
         }
 
-        let ident = self.parse_ident()?;
+        let ident = self.parse_contextual_ident(KeywordOwner::BindingTarget)?;
         Ok(BindingPattern::Ident(ident))
     }
 
