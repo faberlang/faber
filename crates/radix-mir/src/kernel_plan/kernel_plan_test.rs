@@ -1519,6 +1519,7 @@ fn packed_storage_layout_binds_pinned_ggml_block_geometry() {
     use crate::abi::PackedStorageLayout;
     let rows = [
         (PackedStorageLayout::F32, 0, 1, 4),
+        (PackedStorageLayout::F16, 1, 1, 2),
         (PackedStorageLayout::Bf16, 30, 1, 2),
         (PackedStorageLayout::Q8_0, 8, 32, 34),
         (PackedStorageLayout::Q4_K, 12, 256, 144),
@@ -1626,9 +1627,15 @@ fn section5_packed_layouts() -> [(
     PackedDequantClass,
     u32,
     u32,
-); 6] {
+); 7] {
     use crate::abi::PackedStorageLayout;
     [
+        (
+            PackedStorageLayout::F16,
+            PackedDequantClass::NativeF16Convert,
+            1,
+            2,
+        ),
         (
             PackedStorageLayout::Bf16,
             PackedDequantClass::NativeBf16Convert,
@@ -1722,6 +1729,31 @@ fn q4k_ggml_id_admits_quantized_matmul_with_superblock_dequant() {
     assert_eq!(
         quantized.dequant_resolution().class,
         PackedDequantClass::Superblock
+    );
+}
+
+#[test]
+fn f16_ggml_id_admits_quantized_matmul_with_native_f16_convert() {
+    // W1-U1 first-failing oracle: GGML type id 1 (F16) is outside the
+    // closed set today. After admission it must resolve NativeF16Convert
+    // and a QuantizedMatMul plan (same shape as NativeBf16Convert).
+    let shapes = MatMulShapes { m: 8, k: 16, n: 16 };
+    let plan = admit_quantized_matmul_from_ggml_type_id(1, shapes)
+        .expect("F16 type id 1 is an admitted packed layout");
+    let CollectionKernelPlan::QuantizedMatMul(quantized) = &plan else {
+        panic!("F16 must admit QuantizedMatMul, got {plan:?}");
+    };
+    assert_eq!(quantized.layout, crate::abi::PackedStorageLayout::F16);
+    assert_eq!(
+        quantized.dequant_resolution().class,
+        PackedDequantClass::NativeF16Convert
+    );
+    assert_eq!(
+        (
+            quantized.dequant_resolution().block_elements,
+            quantized.dequant_resolution().block_bytes
+        ),
+        (1, 2)
     );
 }
 
