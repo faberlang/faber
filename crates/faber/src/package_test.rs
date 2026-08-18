@@ -11405,72 +11405,12 @@ fn go_compile_concurrent_calls_do_not_exchange_modules() {
 }
 
 // ---------------------------------------------------------------------------
-// G10 WEB1 — faber-web framework package contract
+// G10 WEB1 — tela framework package contract
 // ---------------------------------------------------------------------------
 
-fn sibling_faber_web_lib() -> PathBuf {
-    radix_module::paths::faberlang_home()
-        .expect("faberlang container root")
-        .join("faber-web")
-}
-
-fn write_web_consumer_app(app: &Path, lib: &Path, entry_body: &str) {
-    fs::create_dir_all(app.join("src")).expect("app src");
-    let interface_root = lib.join("src");
-    fs::write(
-        app.join("faber.toml"),
-        r#"[package]
-name = "g10-web-app"
-version = "0.1.0"
-
-[paths]
-entry = "main.fab"
-
-[reader]
-locale = "la"
-
-[build]
-target = "ts"
-kind = "bin"
-
-[product]
-kind = "browser-app"
-emit = "typescript"
-
-[dependencies]
-web = "0.1.0"
-"#,
-    )
-    .expect("app manifest");
-    fs::write(
-        app.join("faber.lock"),
-        format!(
-            r#"
-[[package]]
-name = "web"
-version = "0.1.0"
-source = "path"
-package_root = "{package_root}"
-kind = "lib"
-target_language = "ts"
-target_triple = "browser"
-target_manifest = ""
-interface_root = "{interface_root}"
-artifact = ""
-crate = "web"
-rustc = ""
-"#,
-            package_root = lib.display(),
-            interface_root = interface_root.display(),
-        ),
-    )
-    .expect("lock");
-    fs::write(app.join("src/main.fab"), entry_body).expect("entry");
-}
-
-/// Like `write_web_consumer_app` but locks the `tela` provider (web-mig U2):
+/// Lock a consumer app against a `tela` provider (web-mig U2):
 /// the `WebController` annotation contract and the DOM `Scope` genus come
-/// from `tela:web` / `tela:dom` instead of `web:web` / `web:dom`.
+/// from `tela:web` / `tela:dom`.
 fn write_tela_consumer_app(app: &Path, lib: &Path, entry_body: &str) {
     fs::create_dir_all(app.join("src")).expect("app src");
     let interface_root = lib.join("src");
@@ -11525,15 +11465,17 @@ rustc = ""
     fs::write(app.join("src/main.fab"), entry_body).expect("entry");
 }
 
-/// Write a minimal `tela` provider package (web-mig U2 fixture): the
-/// `WebController` annotation contract (`tela:web`) and the DOM `Scope`
-/// genus (`tela:dom`) with a TS binding shim for the dom stem. Consumer
-/// fixtures lock this package as `tela`, so the origin verification runs
-/// against the tela provider identity without pulling the full tela source
-/// tree into the test build (the full tree's library TS emit is out of
-/// scope for U2 — see the U2 closeout residual). The web stem also has a tiny
-/// binding-backed export so product staging can materialize `tela-web.js`
-/// without invoking a separately built `faber` CLI from a lib test.
+/// Write a minimal `tela` provider package: the `WebController` annotation
+/// contract (`tela:web`) and the DOM surface (`tela:dom`) with a TS binding
+/// shim. Consumer fixtures lock this package as `tela`, so origin verification
+/// runs against the tela provider identity without a live tela or faber-web
+/// checkout.
+///
+/// Public marks: `WebController`, `Scope`, `Element`, `FrameState`,
+/// `SubmitOptions`, `scope`, `require`, `text_set`, `on_submit`, `on_frame`.
+/// That is the post-U1 tela public set these fixtures need. Live tela in this
+/// packet (pre-U1) marks only `Scope` + `WebController`; the extra marks here
+/// are the documented delta, not a byte-mirror of the checkout.
 fn write_synthetic_tela_lib(lib: &Path) {
     fs::create_dir_all(lib.join("src")).expect("lib src");
     fs::create_dir_all(lib.join("bindings")).expect("lib bindings");
@@ -11590,8 +11532,8 @@ class WebController {
 locale = "en"
 +++
 
-# tela:dom fixture — the DOM Scope class (en surface, mirroring
-# tela/src/dom.fab's shape for the tela provider).
+# tela:dom fixture — the DOM surface (en), mirroring tela/src/dom.fab's
+# shape for the symbols these product tests import.
 
 @ public
 class Scope {
@@ -11604,8 +11546,53 @@ class Element {
 }
 
 @ public
+class FrameState {
+    int frame = 0
+    f32 time_ms = 0.0
+    f32 delta_ms = 0.0
+}
+
+@ public
+class SubmitOptions {
+    bool prevent_default = true
+}
+
+class Subscription {
+    int id = 0
+}
+
+type SubmitHandler = (Element) → void
+
+type FrameHandler = (FrameState) → void
+
+@ public
+fn scope(string selector) → Scope {
+    return Scope { selector = selector }
+}
+
+@ public
 fn require(Scope scope, string selector) → Element {
     return Element { selector = selector }
+}
+
+@ public
+fn text_set(Element element, string value) → void {
+    print element
+    print value
+}
+
+@ public
+fn on_submit(Element element, SubmitOptions options, SubmitHandler handler) → Subscription {
+    print element
+    print options
+    print handler
+    return Subscription { id = 0 }
+}
+
+@ public
+fn on_frame(FrameHandler handler) → Subscription {
+    print handler
+    return Subscription { id = 0 }
 }
 "#,
     )
@@ -11626,6 +11613,15 @@ symbol = "webDomScope"
 
 [functions."tela:dom.require"]
 symbol = "webDomRequire"
+
+[functions."tela:dom.text_set"]
+symbol = "webDomTextSet"
+
+[functions."tela:dom.on_submit"]
+symbol = "webDomOnSubmit"
+
+[functions."tela:dom.on_frame"]
+symbol = "webDomOnFrame"
 "#,
     )
     .expect("ts.toml");
@@ -11641,7 +11637,7 @@ export type WebDomPointerState = { readonly x: number };
 export type WebDomFocusState = { readonly focused: boolean };
 export type WebDomPointerLockState = { readonly locked: boolean };
 export type WebDomSubscription = { unsubscribe(): void };
-export type WebDomSubmitOptions = { readonly disabled: boolean };
+export type WebDomSubmitOptions = { readonly prevent_default: boolean };
 export type WebDomFetchRequest = { readonly url: string };
 export type WebDomFetchResponse = { readonly status: number };
 export type WebDomEventHandler = (event: WebDomEvent) => void;
@@ -11661,87 +11657,57 @@ export function webDomScope(selector: string): WebDomScope {
 export function webDomRequire(scope: WebDomScope, selector: string): WebDomElement {
     return { selector };
 }
+
+export function webDomTextSet(element: WebDomElement, value: string): void {
+    void element;
+    void value;
+}
+
+export function webDomOnSubmit(
+    form: WebDomElement,
+    options: WebDomSubmitOptions,
+    handler: WebDomSubmitHandler,
+): WebDomSubscription {
+    void form;
+    void options;
+    void handler;
+    return { unsubscribe() {} };
+}
+
+export function webDomOnFrame(handler: WebDomFrameHandler): WebDomSubscription {
+    void handler;
+    return { unsubscribe() {} };
+}
 "#,
     )
     .expect("dom shim");
 }
 
-/// Like `write_web_consumer_app` but imports only web:web (not web:dom) and
-/// defines a local Scope genus for shadowing tests.
-fn write_web_consumer_app_with_only_web_import(app: &Path, lib: &Path) {
-    fs::create_dir_all(app.join("src")).expect("app src");
-    let interface_root = lib.join("src");
-    fs::write(
-        app.join("faber.toml"),
-        r#"[package]
-name = "g10-web-local-scope"
-version = "0.1.0"
-
-[paths]
-entry = "main.fab"
-
-[reader]
-locale = "la"
-
-[build]
-target = "ts"
-kind = "bin"
-
-[product]
-kind = "browser-app"
-emit = "typescript"
-
-[dependencies]
-web = "0.1.0"
-"#,
-    )
-    .expect("app manifest");
-    fs::write(
-        app.join("faber.lock"),
-        format!(
-            r#"
-[[package]]
-name = "web"
-version = "0.1.0"
-source = "path"
-package_root = "{package_root}"
-kind = "lib"
-target_language = "ts"
-target_triple = "browser"
-target_manifest = ""
-interface_root = "{interface_root}"
-artifact = ""
-crate = "web"
-rustc = ""
-"#,
-            package_root = lib.display(),
-            interface_root = interface_root.display(),
-        ),
-    )
-    .expect("lock");
-    fs::write(
-        app.join("src/main.fab"),
+/// Import only `tela:web` and define a local `Scope` for shadowing tests.
+fn write_tela_consumer_app_with_only_web_import(app: &Path, lib: &Path) {
+    write_tela_consumer_app(
+        app,
+        lib,
         r##"
-importa ex "web:web" web
+import from "tela:web" web
 
-genus Scope {
-    textus selector = ""
+class Scope {
+    string selector = ""
 }
 
 @ WebController { selector = "#shell" }
-functio shell(Scope scope) → vacuum {}
+fn shell(Scope scope) → void {}
 "##,
-    )
-    .expect("entry");
+    );
 }
 
 #[test]
-fn g10_web1_faber_web_package_exports_controller_contract() {
-    let lib = sibling_faber_web_lib();
-    assert!(lib.is_dir(), "faber-web missing at {}", lib.display());
+fn g10_web1_tela_package_exports_controller_contract() {
+    let root = test_temp_dir("g10-web1-tela-contract");
+    let lib = root.join("tela");
+    write_synthetic_tela_lib(&lib);
 
-    let package =
-        analyze_with_faber_seams(&Config::default(), &lib).expect("analyze faber-web package");
+    let package = analyze_with_faber_seams(&Config::default(), &lib).expect("analyze tela package");
     let unit = package
         .nodes
         .values()
@@ -11759,6 +11725,8 @@ fn g10_web1_faber_web_package_exports_controller_contract() {
         .annotation_contract
         .as_ref()
         .expect("WebController must carry annotation_contract");
+    // Annotation contracts store the Latin identity surface (`functio` /
+    // `textus`), even when the package is authored in en.
     assert_eq!(contract.target, "functio");
     assert_eq!(contract.fields.len(), 1);
     assert_eq!(contract.fields[0].name, "selector");
@@ -11768,7 +11736,7 @@ fn g10_web1_faber_web_package_exports_controller_contract() {
         .as_ref()
         .expect("WebController identity must be qualified");
     assert_eq!(identity.provider, "package");
-    assert_eq!(identity.package.as_deref(), Some("faber-web"));
+    assert_eq!(identity.package.as_deref(), Some("tela"));
     assert_eq!(identity.export_name, "WebController");
 }
 
@@ -12103,19 +12071,20 @@ fn g10_web3_builds_controllers_json_and_browser_esm() {
         eprintln!("tsc not found on PATH; skipping WEB3 browser ESM test");
         return;
     }
-    let lib = sibling_faber_web_lib();
     let root = test_temp_dir("g10-web3-browser-esm");
+    let lib = root.join("tela-lib");
+    write_synthetic_tela_lib(&lib);
     let app = root.join("app");
-    write_web_consumer_app(
+    write_tela_consumer_app(
         &app,
         &lib,
         r#"
-importa ex "web:web" web
-importa ex "web:dom" dom
+import from "tela:web" web
+import from "tela:dom" d
 
 @ WebController { selector = "[data-faber=shell]" }
-functio shell(dom.Scope scope) → vacuum {
-  nota dom.require(scope, "button")
+fn shell(d.Scope scope) → void {
+  print d.require(scope, "button")
 }
 "#,
     );
@@ -12143,8 +12112,8 @@ functio shell(dom.Scope scope) → vacuum {
     assert!(esm.contains("export function mountControllers"));
     assert!(esm.contains("failures.push"));
     assert!(esm.contains("disposeCleanup"));
-    let ambient = fs::read_to_string(build.out_dir.join("faber-ts/faber-web.d.ts"))
-        .expect("ambient web declarations");
+    let ambient = fs::read_to_string(build.out_dir.join("faber-ts/faber-browser-ambient.d.ts"))
+        .expect("ambient browser declarations");
     assert!(ambient.contains("export class FrameState"));
     assert!(ambient.contains("on_frame(handler: FrameHandler): Subscription"));
     assert_eq!(build.controllers.len(), 1);
@@ -12163,21 +12132,22 @@ functio shell(dom.Scope scope) → vacuum {
 
 #[test]
 fn g10_web3_rejects_duplicate_mount_and_invalid_selector() {
-    let lib = sibling_faber_web_lib();
     let root = test_temp_dir("g10-web3-controller-rejects");
+    let lib = root.join("tela-lib");
+    write_synthetic_tela_lib(&lib);
     let dup = root.join("dup");
-    write_web_consumer_app(
+    write_tela_consumer_app(
         &dup,
         &lib,
         r##"
-importa ex "web:web" web
-importa ex "web:dom" dom
+import from "tela:web" web
+import from "tela:dom" d
 
 @ WebController { selector = "#shell" }
-functio one(dom.Scope scope) → vacuum {}
+fn one(d.Scope scope) → void {}
 
 @ WebController { selector = "#shell" }
-functio two(dom.Scope scope) → vacuum {}
+fn two(d.Scope scope) → void {}
 "##,
     );
     write_static_asset_roots(&dup);
@@ -12191,15 +12161,15 @@ functio two(dom.Scope scope) → vacuum {}
     assert!(diagnostic_has_issue(&err, "product_duplicate_mount"));
 
     let invalid = root.join("invalid");
-    write_web_consumer_app(
+    write_tela_consumer_app(
         &invalid,
         &lib,
         r#"
-importa ex "web:web" web
-importa ex "web:dom" dom
+import from "tela:web" web
+import from "tela:dom" d
 
 @ WebController { selector = "main shell" }
-functio shell(dom.Scope scope) → vacuum {}
+fn shell(d.Scope scope) → void {}
 "#,
     );
     write_static_asset_roots(&invalid);
@@ -12277,12 +12247,13 @@ functio shell(Scope scope) → vacuum {}
 
 #[test]
 fn g10_web3_rejects_local_scope_shadowing() {
-    // Package imports web:web legitimately for WebController, but defines its
-    // own Scope genus locally instead of importing web:dom Scope.
-    let lib = sibling_faber_web_lib();
+    // Package imports tela:web legitimately for WebController, but defines its
+    // own Scope genus locally instead of importing tela:dom Scope.
     let root = test_temp_dir("g10-web3-local-scope");
+    let lib = root.join("tela-lib");
+    write_synthetic_tela_lib(&lib);
     let app = root.join("app");
-    write_web_consumer_app_with_only_web_import(&app, &lib);
+    write_tela_consumer_app_with_only_web_import(&app, &lib);
     write_static_asset_roots(&app);
     let manifest = read_manifest(&app.join("faber.toml")).expect("manifest");
     let err = build_browser_product(
@@ -12299,22 +12270,23 @@ fn g10_web3_rejects_local_scope_shadowing() {
 
 #[test]
 fn g10_web3_rejects_missing_controllers() {
-    // Package imports web:web legitimately but declares no `@ WebController`
+    // Package imports tela:web legitimately but declares no `@ WebController`
     // function at all — controller discovery must fail closed with
     // `product_controller_missing` rather than emitting an empty browser
     // product.
-    let lib = sibling_faber_web_lib();
     let root = test_temp_dir("g10-web3-missing-controllers");
+    let lib = root.join("tela-lib");
+    write_synthetic_tela_lib(&lib);
     let app = root.join("app");
-    write_web_consumer_app(
+    write_tela_consumer_app(
         &app,
         &lib,
         r#"
-importa ex "web:web" web
-importa ex "web:dom" dom
+import from "tela:web" web
+import from "tela:dom" d
 
-functio helper(dom.Scope scope) → vacuum {
-  nota dom.require(scope, "button")
+fn helper(d.Scope scope) → void {
+  print d.require(scope, "button")
 }
 "#,
     );
@@ -12464,26 +12436,27 @@ fn g10_web3_rewrites_unresolved_def_controller_typescript() {
         eprintln!("tsc not found on PATH; skipping WEB3 unresolved_def test");
         return;
     }
-    let lib = sibling_faber_web_lib();
     let root = test_temp_dir("g10-web3-unresolved-def");
+    let lib = root.join("tela-lib");
+    write_synthetic_tela_lib(&lib);
     let app = root.join("app");
-    write_web_consumer_app(
+    write_tela_consumer_app(
         &app,
         &lib,
         r##"
-importa ex "web:web" web
-importa ex "web:dom" dom
+import from "tela:web" web
+import from "tela:dom" d
 
 @ WebController { selector = "#frame-demo" }
-functio frame_controller(dom.Scope scope) → vacuum {
-  fixum dom.Element status ← dom.require(scope, ".frame-status")
-  nota dom.on_frame((dom.FrameState frame) → vacuum ∴ dom.text_set(status, "frame-seen"))
+fn frame_controller(d.Scope scope) → void {
+  const d.Element status ← d.require(scope, ".frame-status")
+  print d.on_frame((d.FrameState frame) → void ∴ d.text_set(status, "frame-seen"))
 }
 
 @ WebController { selector = "#submit-demo" }
-functio submit_controller(dom.Scope scope) → vacuum {
-  fixum dom.Element form ← dom.require(scope, ".submit-form")
-  nota dom.on_submit(form, dom.SubmitOptions { prevent_default = verum }, (dom.Element el) → vacuum ∴ dom.text_set(el, "submitted"))
+fn submit_controller(d.Scope scope) → void {
+  const d.Element form ← d.require(scope, ".submit-form")
+  print d.on_submit(form, d.SubmitOptions { prevent_default = true }, (d.Element el) → void ∴ d.text_set(el, "submitted"))
 }
 "##,
     );
@@ -12527,19 +12500,20 @@ fn assert_no_product_staging_temps(app: &Path, out_name: &str) {
 }
 
 fn sample_web_app() -> (TestDir, PathBuf) {
-    let lib = sibling_faber_web_lib();
     let root = test_temp_dir("g10-web3-transaction");
+    let lib = root.join("tela-lib");
+    write_synthetic_tela_lib(&lib);
     let app = root.join("app");
-    write_web_consumer_app(
+    write_tela_consumer_app(
         &app,
         &lib,
         r#"
-importa ex "web:web" web
-importa ex "web:dom" dom
+import from "tela:web" web
+import from "tela:dom" d
 
 @ WebController { selector = "[data-faber=shell]" }
-functio shell(dom.Scope scope) → vacuum {
-  nota dom.require(scope, "button")
+fn shell(d.Scope scope) → void {
+  print d.require(scope, "button")
 }
 "#,
     );
@@ -12649,24 +12623,24 @@ fn g10_web3_first_build_failure_leaves_no_partial_product() {
 
 #[test]
 fn g10_web1_imported_web_controller_survives_package_graph_extract() {
-    let lib = sibling_faber_web_lib();
     let root = test_temp_dir("g10-web-imported-controller");
+    let lib = root.join("tela-lib");
+    write_synthetic_tela_lib(&lib);
     let app = root.join("app");
-    write_web_consumer_app(
+    write_tela_consumer_app(
         &app,
         &lib,
         r#"
-importa ex "web:web" web
-importa ex "web:dom" dom
+import from "tela:web" web
+import from "tela:dom" d
 
 @ WebController { selector = "[data-faber=shell]" }
-functio shell(dom.Scope scope) → vacuum {
-  nota web.mount("[data-faber=shell]")
-  nota dom.require(scope, "button")
+fn shell(d.Scope scope) → void {
+  print d.require(scope, "button")
 }
 
-incipit {
-  shell(dom.scope("[data-faber=shell]"))
+main {
+  shell(d.scope("[data-faber=shell]"))
 }
 "#,
     );
