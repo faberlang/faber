@@ -43,6 +43,8 @@ pub enum Value {
     Float(f64),
     Bool(bool),
     Str(String),
+    /// One-byte `ascii<1>` (`'x'`, `s[i]`). Not a heap `String`.
+    Ascii(u8),
     Nil,
     Unit,
     Octeti(Vec<u8>),
@@ -162,6 +164,11 @@ impl Value {
             Value::Float(v) => display_fractus(*v),
             Value::Bool(v) => display_bivalens(*v).to_owned(),
             Value::Str(v) => display_text_payload(v).to_owned(),
+            Value::Ascii(b) => {
+                let ch = char::from(*b);
+                let mut buf = [0u8; 4];
+                display_text_payload(ch.encode_utf8(&mut buf)).to_owned()
+            }
             Value::Nil => "nihil".to_owned(),
             Value::Unit => String::new(),
             Value::Octeti(bytes) => String::from_utf8_lossy(bytes).into_owned(),
@@ -197,6 +204,7 @@ impl Value {
             Value::UInt(v) => Ok(MapKey::UInt(*v)),
             Value::Bool(v) => Ok(MapKey::Bool(*v)),
             Value::Str(v) => Ok(MapKey::Str(v.clone())),
+            Value::Ascii(b) => Ok(MapKey::Str(char::from(*b).to_string())),
             Value::Unit => Ok(MapKey::Unit),
             _ => Err(RunnerError::internal(
                 span,
@@ -213,6 +221,7 @@ impl Value {
             Value::Map(cell) => cell.borrow().is_empty(),
             Value::Set(cell) => cell.borrow().is_empty(),
             Value::Str(value) => value.is_empty(),
+            Value::Ascii(_) => false,
             Value::Octeti(bytes) => bytes.is_empty(),
             _ => false,
         }
@@ -778,6 +787,7 @@ pub fn compare_values(
             .partial_cmp(b)
             .ok_or_else(|| RunnerError::internal(span, "float compare"))?,
         (Value::Str(a), Value::Str(b)) => a.cmp(b),
+        (Value::Ascii(a), Value::Ascii(b)) => a.cmp(b),
         (Value::Bool(a), Value::Bool(b)) => a.cmp(b),
         (Value::Instans(a), Value::Instans(b)) => a
             .partial_cmp_at_coarser(*b)
@@ -824,6 +834,23 @@ pub fn values_equal(left: &Value, right: &Value) -> bool {
             .is_some_and(std::cmp::Ordering::is_eq),
         _ => left == right,
     }
+}
+
+/// One-byte `ascii<1>` from a Unicode scalar. Non-ASCII fails closed.
+pub fn ascii1_from_scalar(ch: char, span: Span) -> Result<Value, RunnerError> {
+    if u32::from(ch) > 0x7f {
+        return Err(RunnerError::internal(span, "textus index trap"));
+    }
+    Ok(Value::Ascii(ch as u8))
+}
+
+/// Scalar `[i]` on a textus/ascii payload as `ascii<1>`, not a heap `String`.
+pub fn scalar_text_index(text: &str, index: usize, span: Span) -> Result<Value, RunnerError> {
+    let ch = text
+        .chars()
+        .nth(index)
+        .ok_or_else(|| RunnerError::internal(span, "text index out of bounds"))?;
+    ascii1_from_scalar(ch, span)
 }
 
 pub fn format_template(

@@ -780,8 +780,9 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
             Some(format!("ascii literal contains unescaped control character U+{codepoint}"))
         }
         "ascii_literal_too_long" => {
-            // Mirrors ASCII_LITERAL_MAX_PAYLOAD_BYTES in typecheck/lookup.rs.
-            Some("ascii literal exceeds the maximum payload of 64 bytes".to_owned())
+            // Fires on `ascii<N>` literals with `len > N` (BB-4). Bare ascii
+            // is unbounded and no longer uses this issue.
+            Some("ascii<N> literal exceeds the declared capacity".to_owned())
         }
         "boolean_operands_required" => Some("boolean operands required".to_owned()),
         "atomic_method_requires_atomic_receiver" => Some("atomic operation requires an atomic receiver".to_owned()),
@@ -968,7 +969,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             Some("use textus for Unicode text or keep ascii payloads ASCII-only".to_owned())
         }
         "ascii_literal_unescaped_control" => Some("escape control characters in ascii literals".to_owned()),
-        "ascii_literal_too_long" => Some("shorten the ascii literal or use a textus literal instead".to_owned()),
+        "ascii_literal_too_long" => {
+            Some("shorten the ascii literal to fit N, or use unbounded ascii".to_owned())
+        }
         "boolean_operands_required" => Some("use bivalens operands for this operator".to_owned()),
         "atomic_method_requires_atomic_receiver" => {
             Some("call load/store/exchange/compare_exchange on atomic<T>".to_owned())

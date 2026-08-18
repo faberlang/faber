@@ -872,6 +872,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     Value::Str(_),
                     Type::Primitive(Primitive::Textus | Primitive::Ascii)
                 )
+                | (
+                    Value::Ascii(_),
+                    Type::Primitive(Primitive::Ascii) | Type::BoundedAscii { .. }
+                )
                 | (Value::Octeti(_), Type::Primitive(Primitive::Octeti))
                 | (Value::Array(_), Type::Array(_))
                 | (Value::Map(_), Type::Map(_, _))
@@ -933,6 +937,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     Value::Set(cell) => cell.borrow().len(),
                     Value::Tensor(cell) => cell.borrow().shape.len(),
                     Value::Str(text) => text.chars().count(),
+                    Value::Ascii(_) => 1,
                     Value::Octeti(bytes) => bytes.len(),
                     _ => return Err(RunnerError::internal(span, "length receiver type mismatch")),
                 };
@@ -2850,11 +2855,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             Value::Str(text) => {
                 let idx = index.as_index(span)?;
-                let ch = text
-                    .chars()
-                    .nth(idx)
-                    .ok_or_else(|| RunnerError::internal(span, "text index out of bounds"))?;
-                Ok(Value::Str(ch.to_string()))
+                crate::value::scalar_text_index(&text, idx, span)
+            }
+            Value::Ascii(byte) => {
+                let idx = index.as_index(span)?;
+                if idx == 0 {
+                    Ok(Value::Ascii(byte))
+                } else {
+                    Err(RunnerError::internal(span, "text index out of bounds"))
+                }
             }
             Value::Octeti(bytes) => {
                 if let Ok((start, end, inclusive)) = interval_parts(&index, span) {
@@ -2902,8 +2911,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 .and_then(|idx| cell.borrow().get(idx).cloned())
                 .unwrap_or(Value::Nil)),
             Value::Str(text) => Ok(optional_index
-                .and_then(|idx| text.chars().nth(idx))
-                .map(|ch| Value::Str(ch.to_string()))
+                .and_then(|idx| crate::value::scalar_text_index(&text, idx, span).ok())
+                .unwrap_or(Value::Nil)),
+            Value::Ascii(byte) => Ok(optional_index
+                .and_then(|idx| (idx == 0).then_some(Value::Ascii(byte)))
                 .unwrap_or(Value::Nil)),
             Value::Octeti(bytes) => Ok(optional_index
                 .and_then(|idx| bytes.get(idx).copied())

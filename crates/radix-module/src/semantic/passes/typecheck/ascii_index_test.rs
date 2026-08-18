@@ -1,16 +1,18 @@
-//! Typecheck probes for scalar textus/ascii index returning `ascii` (A2).
+//! Typecheck probes for scalar textus/ascii index returning `ascii<1>` (BB-3R).
 //!
-//! `s[i]` / `ascii[i]` scalar index infers the single-character `ascii` type
-//! (the type of `'x'` literals); range index `s[i‥j]` stays `textus`.
+//! `s[i]` / `ascii[i]` scalar index infers `BoundedAscii { 1 }` (the type of
+//! `'x'` literals); range index `s[i‥j]` stays `textus`.
 //! Comparisons `s[i] ≡ 'a'` and `s[i] ≡ '\n'` typecheck naturally; the
 //! chars-as-ints comparison `s[i] ≡ 97` remains a strict SEM010 exact-types
 //! error pointing at the `↦ numerus` conversio (see also
-//! `equality_exact_types_test.rs` for the message-pointer proof). Ascii
-//! literals beyond the inline-buffer capacity reject with
-//! `ascii_literal_too_long`.
+//! `equality_exact_types_test.rs` for the message-pointer proof). Bare ascii
+//! literals of any length typecheck; `ascii_literal_too_long` is reserved for
+//! `ascii<N>` (BB-4).
 
+use super::TypeChecker;
 use crate::diagnostics::semantic_message;
-use crate::semantic::SemanticErrorKind;
+use crate::lexer::{Interner, Span};
+use crate::semantic::{IndexExpr, Primitive, Resolver, SemanticErrorKind, Type, TypeTable};
 use crate::{Compiler, Config, Target};
 
 const EXACT_EQ_ISSUE: &str = "equality_exact_types_required";
@@ -39,31 +41,68 @@ fn rejects_with_issue(source: &str, issue: &str) {
     );
 }
 
-/// A scalar index on `textus` is the `ascii` type: binding the result to an
-/// `ascii`-annotated local only typechecks once the scalar return is `ascii`
-/// (the previous `numerus` return rejected this annotation).
+/// A scalar index on `textus` is `ascii<1>`: binding the result to an
+/// `ascii<1>`-annotated local only typechecks once the scalar return is
+/// `BoundedAscii { 1 }` (the previous `numerus` / bare-`ascii` return
+/// rejected this annotation).
 #[cfg(feature = "hir-rust")]
 #[test]
 fn scalar_textus_index_infers_ascii() {
     accepts(
         r#"incipit {
     fixum textus s ← "ab"
-    fixum ascii c ← s[0]
+    fixum ascii<1> c ← s[0]
     nota c
 }"#,
     );
 }
 
-/// A scalar index on an `ascii` value is also the `ascii` type.
+/// A scalar index on an `ascii` value is also `ascii<1>`.
 #[cfg(feature = "hir-rust")]
 #[test]
 fn scalar_ascii_index_infers_ascii() {
     accepts(
         r"incipit {
     fixum ascii s ← 'ab'
-    fixum ascii c ← s[1]
+    fixum ascii<1> c ← s[1]
     nota c
 }",
+    );
+}
+
+/// Direct type pin: `s[i]` on bare `textus` / `ascii` is `BoundedAscii { 1 }`.
+#[test]
+fn scalar_index_type_is_bounded_ascii_one() {
+    let mut types = TypeTable::new();
+    let resolver = Resolver::new();
+    let interner = Interner::new();
+    let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+    let textus = checker.textus_type();
+    let ascii = checker.ascii_type();
+    let numerus = checker.numerus_type();
+    let span = Span::default();
+    let from_textus = checker.check_index_from_type(textus, numerus, span, span);
+    let from_ascii = checker.check_index_from_type(ascii, numerus, span, span);
+    let n1 = checker.types.intern_index(IndexExpr::Literal(1));
+    assert!(
+        matches!(
+            checker.types.get(from_textus),
+            Type::BoundedAscii { capacity } if checker.types.index_equals(*capacity, n1)
+        ),
+        "textus[i] is BoundedAscii {{ 1 }}, got {:?}",
+        checker.types.get(from_textus)
+    );
+    assert!(
+        matches!(
+            checker.types.get(from_ascii),
+            Type::BoundedAscii { capacity } if checker.types.index_equals(*capacity, n1)
+        ),
+        "ascii[i] is BoundedAscii {{ 1 }}, got {:?}",
+        checker.types.get(from_ascii)
+    );
+    assert!(
+        !matches!(checker.types.get(from_textus), Type::Primitive(Primitive::Ascii)),
+        "scalar index must not stay bare Primitive::Ascii"
     );
 }
 
@@ -129,14 +168,11 @@ fn scalar_index_eq_numerus_rejects_with_sem010_pointer() {
     );
 }
 
-/// Ascii literals at the inline-buffer capacity boundary: exactly 64 bytes
-/// typechecks; one byte over rejects with `ascii_literal_too_long`.
+/// Bare ascii is unbounded: 64-byte and 65-byte literals both typecheck.
+/// `ascii_literal_too_long` no longer fires on the bare form.
 #[cfg(feature = "hir-rust")]
 #[test]
 fn ascii_literal_capacity_boundary() {
     accepts(&format!("incipit {{ fixum ascii ok ← '{}' nota ok }}", "a".repeat(64)));
-    rejects_with_issue(
-        &format!("incipit {{ fixum ascii big ← '{}' }}", "a".repeat(65)),
-        "ascii_literal_too_long",
-    );
+    accepts(&format!("incipit {{ fixum ascii big ← '{}' nota big }}", "a".repeat(65)));
 }
