@@ -171,8 +171,22 @@ fn bit_operator_constrains_inferred_operand() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn annotated_const_provides_context_for_vacua() {
-    // Top-level fixum with lista type and vacua initializer — collection context
-    test_support::assert_accepts("fixum lista<numerus> name ← vacua");
+    // ER-2/3/5: const lista + vacua is not a literal list initializer;
+    // Rust static-slice emission rejects it as CODEGEN001.
+    let result = test_support::compile_and_get_result("fixum lista<numerus> name ← vacua");
+    assert!(
+        !result.success(),
+        "const vacua must not emit a static slice, got: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.is_error() && diag.code == Some("CODEGEN001")),
+        "expected CODEGEN001, got: {:?}",
+        result.diagnostics
+    );
 }
 
 #[cfg(feature = "hir-rust")]
