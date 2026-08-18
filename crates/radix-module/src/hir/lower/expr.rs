@@ -884,9 +884,7 @@ impl Lowerer<'_> {
         node: crate::syntax::NodeId,
         name: crate::lexer::Symbol,
     ) -> Option<HirExpressionKind> {
-        if self.resolver.shadowed_builtin(node).is_none() {
-            return None;
-        }
+        self.resolver.shadowed_builtin(node)?;
         Some(if let Some(def_id) = self.lookup_name(name) {
             HirExpressionKind::Path(def_id)
         } else {
