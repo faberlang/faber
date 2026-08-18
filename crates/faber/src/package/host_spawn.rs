@@ -515,16 +515,22 @@ fn f32_to_json(value: f32) -> serde_json::Value {
 
 fn sibling_hosts_dir() -> Result<PathBuf, HostSpawnError> {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let packet = manifest.join("../../..");
-    let hosts = packet.join("hosts");
-    if hosts.join("Cargo.toml").is_file() {
-        return Ok(hosts);
+    // Packet `…/worktrees/<lane>/radix/crates/faber` → packet/hosts.
+    // Radix-only packets have no hosts member; walk up to the container
+    // `faberlang/hosts` checkout so spawn can still build the CLI.
+    let mut dir = manifest.clone();
+    for _ in 0..6 {
+        dir.pop();
+        let hosts = dir.join("hosts");
+        if hosts.join("Cargo.toml").is_file() {
+            return Ok(hosts);
+        }
     }
     Err(HostSpawnError {
         code: "E_HOST_SPAWN".to_owned(),
         message: format!(
-            "sibling hosts crate not found at {} (expected packet or workspace layout)",
-            hosts.display()
+            "sibling hosts crate not found from {} (expected packet or workspace layout)",
+            manifest.display()
         ),
     })
 }
