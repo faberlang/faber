@@ -1,28 +1,36 @@
 //! Named unroll pass for AIR-lane `itera ab` range loops.
 //!
 //! Post-typecheck, pre-`air_purity`. Eligible concrete-`N` `itera ab` loops in
-//! `@ radix lane "air"` functions become straight-line bindings so the
-//! full-prefix (`len == N`) subset reaches reverse AD as a guard-free DAG.
+//! `@ radix lane "air"` functions become straight-line bindings so the two
+//! admissible differentiable subsets reach reverse AD:
+//!
+//! - full-prefix (`len == N`): guard-free straight line (unit-3E);
+//! - guard-as-mask (`len ≤ N`): all `N` lanes run; every reduction exit is
+//!   multiplied by a caller-built 0/1 mask operand (unit-3F).
 //!
 //! The pass owns:
 //! - the unroll budget (64, the `MAX_MONOMORPHIZATIONS` convention);
 //! - the `len`-guard preservation proof (a proven-exact iteration count emits
 //!   no `If`);
+//! - mask-mode admit conditions (mask-as-operand, dead-lane NaN safety, body
+//!   purity, every exit masked) — fail-closed with a `causa`;
 //! - evaluation-order and failure-behavior preservation (lanes splice in
 //!   source order);
 //! - fail-closed decline through `SEM059.itera_loop` plus a `causa` arg.
 //!
 //! Non-AIR-lane functions are untouched. Generic-`N` and unknown bounds
-//! decline. Guard-as-mask (`len ≤ N`) is unit-3F.
+//! decline. In-region mask construction (`Fill` / runtime comparison) never
+//! admits.
 
 use crate::hir::visit::{
     walk_block, walk_expr, walk_expr_mut, walk_item, walk_program, walk_stmt, walk_stmt_mut, HirVisitor, HirVisitorMut,
 };
 use crate::hir::{
-    DefId, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirId, HirItemKind, HirIteraMode, HirLiteral,
-    HirLocal, HirModule, HirRangeKind, HirStatement, HirStatementKind, HirUnOp,
+    DefId, HirBinOp, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirId, HirItemKind, HirIteraMode,
+    HirLiteral, HirLocal, HirModule, HirParam, HirRangeKind, HirStatement, HirStatementKind, HirUnOp,
 };
 use crate::lexer::{Interner, Span, Symbol};
+use crate::semantic::tensor_type_directed::is_tensor_type;
 use crate::semantic::{RadixLane, RadixLaneMetadata, SemanticError, SemanticErrorKind, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -33,6 +41,9 @@ const CAUSA_BUDGET: &str = "budget";
 const CAUSA_IMPURE: &str = "impure";
 const CAUSA_UNSUPPORTED_CONTROL: &str = "unsupported_control";
 const CAUSA_NOT_CONCRETE: &str = "not_concrete";
+const CAUSA_IN_REGION_MASK: &str = "in_region_mask";
+const CAUSA_NAN_UNSAFE: &str = "nan_unsafe";
+const CAUSA_UNMASKED_EXIT: &str = "unmasked_exit";
 
 /// Rewrite eligible AIR-lane `itera ab` range loops into straight-line bindings.
 ///
@@ -45,7 +56,7 @@ pub fn unroll(
     hir: &mut HirModule,
     lanes: &RadixLaneMetadata,
     interner: &mut Interner,
-    _types: &TypeTable,
+    types: &TypeTable,
 ) -> Result<(), Vec<SemanticError>> {
     let mut ids = IdGen::from_module(hir);
     let mut errors = Vec::new();
@@ -57,7 +68,7 @@ pub fn unroll(
         let HirItemKind::Function(function) = &mut item.kind else {
             continue;
         };
-        unroll_function(function, lanes, interner, &mut ids, &mut errors);
+        unroll_function(function, lanes, interner, types, &mut ids, &mut errors);
     }
 
     if errors.is_empty() {
@@ -71,13 +82,20 @@ fn unroll_function(
     function: &mut HirFunction,
     lanes: &RadixLaneMetadata,
     interner: &mut Interner,
+    types: &TypeTable,
     ids: &mut IdGen,
     errors: &mut Vec<SemanticError>,
 ) {
+    let mask = {
+        let Some(body) = &function.body else {
+            return;
+        };
+        MaskAnalysis::analyze(&function.params, body, types, interner)
+    };
     let Some(body) = &mut function.body else {
         return;
     };
-    rewrite_block(body, lanes, interner, ids, errors);
+    rewrite_block(body, lanes, interner, ids, errors, &mask);
 }
 
 fn rewrite_block(
@@ -86,15 +104,16 @@ fn rewrite_block(
     interner: &mut Interner,
     ids: &mut IdGen,
     errors: &mut Vec<SemanticError>,
+    mask: &MaskAnalysis,
 ) {
     let mut index = 0;
     while index < block.statements.len() {
         // Classify `itera` before walking into it so a nested range loop is
         // still visible to the outer decline check.
-        if classify_itera_stmt(&block.statements[index], block, lanes, interner).is_none() {
-            rewrite_nested_stmt(&mut block.statements[index], lanes, interner, ids, errors);
+        if classify_itera_stmt(&block.statements[index], block, lanes, interner, mask).is_none() {
+            rewrite_nested_stmt(&mut block.statements[index], lanes, interner, ids, errors, mask);
         }
-        let Some(plan) = classify_itera_stmt(&block.statements[index], block, lanes, interner) else {
+        let Some(plan) = classify_itera_stmt(&block.statements[index], block, lanes, interner, mask) else {
             index += 1;
             continue;
         };
@@ -121,8 +140,8 @@ fn rewrite_block(
     }
 
     if let Some(mut expr) = block.expr.take() {
-        rewrite_nested_expr(&mut expr, lanes, interner, ids, errors);
-        match classify_itera_expr(&expr, block, lanes, interner) {
+        rewrite_nested_expr(&mut expr, lanes, interner, ids, errors, mask);
+        match classify_itera_expr(&expr, block, lanes, interner, mask) {
             Some(UnrollPlan::Decline { span, causa }) => {
                 errors.push(decline(span, causa));
                 block.expr = Some(expr);
@@ -151,20 +170,21 @@ fn rewrite_nested_stmt(
     interner: &mut Interner,
     ids: &mut IdGen,
     errors: &mut Vec<SemanticError>,
+    mask: &MaskAnalysis,
 ) {
     match &mut stmt.kind {
         HirStatementKind::Local(local) => {
             if let Some(init) = &mut local.init {
-                rewrite_nested_expr(init, lanes, interner, ids, errors);
+                rewrite_nested_expr(init, lanes, interner, ids, errors, mask);
             }
         }
         HirStatementKind::Expr(expr) | HirStatementKind::Redde(Some(expr)) => {
-            rewrite_nested_expr(expr, lanes, interner, ids, errors);
+            rewrite_nested_expr(expr, lanes, interner, ids, errors, mask);
         }
         HirStatementKind::Custodi(custodi) => {
             for clause in &mut custodi.clauses {
-                rewrite_nested_expr(&mut clause.cond, lanes, interner, ids, errors);
-                rewrite_block(&mut clause.body, lanes, interner, ids, errors);
+                rewrite_nested_expr(&mut clause.cond, lanes, interner, ids, errors, mask);
+                rewrite_block(&mut clause.body, lanes, interner, ids, errors, mask);
             }
         }
         HirStatementKind::Redde(None)
@@ -181,40 +201,41 @@ fn rewrite_nested_expr(
     interner: &mut Interner,
     ids: &mut IdGen,
     errors: &mut Vec<SemanticError>,
+    mask: &MaskAnalysis,
 ) {
     match &mut expr.kind {
-        HirExpressionKind::Block(block) => rewrite_block(block, lanes, interner, ids, errors),
+        HirExpressionKind::Block(block) => rewrite_block(block, lanes, interner, ids, errors, mask),
         HirExpressionKind::Si { cond, then_block, then_catch, else_block } => {
-            rewrite_nested_expr(cond, lanes, interner, ids, errors);
-            rewrite_block(then_block, lanes, interner, ids, errors);
+            rewrite_nested_expr(cond, lanes, interner, ids, errors, mask);
+            rewrite_block(then_block, lanes, interner, ids, errors, mask);
             if let Some(catch) = then_catch {
-                rewrite_block(&mut catch.body, lanes, interner, ids, errors);
+                rewrite_block(&mut catch.body, lanes, interner, ids, errors, mask);
             }
             if let Some(else_block) = else_block {
-                rewrite_block(else_block, lanes, interner, ids, errors);
+                rewrite_block(else_block, lanes, interner, ids, errors, mask);
             }
         }
         HirExpressionKind::Discerne { scrutinees, arms, .. } => {
             for scrutinee in scrutinees {
-                rewrite_nested_expr(scrutinee, lanes, interner, ids, errors);
+                rewrite_nested_expr(scrutinee, lanes, interner, ids, errors, mask);
             }
             for arm in arms {
                 if let Some(guard) = &mut arm.guard {
-                    rewrite_nested_expr(guard, lanes, interner, ids, errors);
+                    rewrite_nested_expr(guard, lanes, interner, ids, errors, mask);
                 }
-                rewrite_nested_expr(&mut arm.body, lanes, interner, ids, errors);
+                rewrite_nested_expr(&mut arm.body, lanes, interner, ids, errors, mask);
             }
         }
         HirExpressionKind::Loop(block) | HirExpressionKind::Itera(_, _, _, _, block) => {
-            rewrite_block(block, lanes, interner, ids, errors);
+            rewrite_block(block, lanes, interner, ids, errors, mask);
         }
         HirExpressionKind::Dum(cond, block) => {
-            rewrite_nested_expr(cond, lanes, interner, ids, errors);
-            rewrite_block(block, lanes, interner, ids, errors);
+            rewrite_nested_expr(cond, lanes, interner, ids, errors, mask);
+            rewrite_block(block, lanes, interner, ids, errors, mask);
         }
         HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
-            rewrite_nested_expr(lhs, lanes, interner, ids, errors);
-            rewrite_nested_expr(rhs, lanes, interner, ids, errors);
+            rewrite_nested_expr(lhs, lanes, interner, ids, errors, mask);
+            rewrite_nested_expr(rhs, lanes, interner, ids, errors, mask);
         }
         HirExpressionKind::Unary(_, operand)
         | HirExpressionKind::Field(operand, _)
@@ -226,22 +247,22 @@ fn rewrite_nested_expr(
         | HirExpressionKind::Tacebit(operand)
         | HirExpressionKind::Yield(operand)
         | HirExpressionKind::TypeCheck { expr: operand, .. } => {
-            rewrite_nested_expr(operand, lanes, interner, ids, errors);
+            rewrite_nested_expr(operand, lanes, interner, ids, errors, mask);
         }
         HirExpressionKind::Index(object, index) => {
-            rewrite_nested_expr(object, lanes, interner, ids, errors);
-            rewrite_nested_expr(index, lanes, interner, ids, errors);
+            rewrite_nested_expr(object, lanes, interner, ids, errors, mask);
+            rewrite_nested_expr(index, lanes, interner, ids, errors, mask);
         }
         HirExpressionKind::Call(callee, _, args) => {
-            rewrite_nested_expr(callee, lanes, interner, ids, errors);
+            rewrite_nested_expr(callee, lanes, interner, ids, errors, mask);
             for arg in args {
-                rewrite_nested_expr(&mut arg.expr, lanes, interner, ids, errors);
+                rewrite_nested_expr(&mut arg.expr, lanes, interner, ids, errors, mask);
             }
         }
         HirExpressionKind::MethodCall(receiver, _, _, args) => {
-            rewrite_nested_expr(receiver, lanes, interner, ids, errors);
+            rewrite_nested_expr(receiver, lanes, interner, ids, errors, mask);
             for arg in args {
-                rewrite_nested_expr(&mut arg.expr, lanes, interner, ids, errors);
+                rewrite_nested_expr(&mut arg.expr, lanes, interner, ids, errors, mask);
             }
         }
         _ => {}
@@ -270,11 +291,12 @@ fn classify_itera_stmt(
     block: &HirBlock,
     lanes: &RadixLaneMetadata,
     interner: &Interner,
+    mask: &MaskAnalysis,
 ) -> Option<UnrollPlan> {
     let HirStatementKind::Expr(expr) = &stmt.kind else {
         return None;
     };
-    classify_itera_expr(expr, block, lanes, interner)
+    classify_itera_expr(expr, block, lanes, interner, mask)
 }
 
 fn classify_itera_expr(
@@ -282,6 +304,7 @@ fn classify_itera_expr(
     block: &HirBlock,
     lanes: &RadixLaneMetadata,
     interner: &Interner,
+    mask: &MaskAnalysis,
 ) -> Option<UnrollPlan> {
     let HirExpressionKind::Itera(mode, index_def, _, source, body) = &expr.kind else {
         return None;
@@ -289,7 +312,9 @@ fn classify_itera_expr(
     if *mode != HirIteraMode::Ab {
         return Some(UnrollPlan::Decline { span: expr.span, causa: CAUSA_NOT_CONCRETE });
     }
-    Some(classify_ab_loop(expr.span, *index_def, source, body, block, lanes, interner))
+    Some(classify_ab_loop(
+        expr.span, *index_def, source, body, block, lanes, interner, mask,
+    ))
 }
 
 fn classify_ab_loop(
@@ -300,12 +325,19 @@ fn classify_ab_loop(
     block: &HirBlock,
     lanes: &RadixLaneMetadata,
     interner: &Interner,
+    mask: &MaskAnalysis,
 ) -> UnrollPlan {
     let Some(values) = concrete_range_values(source) else {
         return UnrollPlan::Decline { span, causa: CAUSA_NOT_CONCRETE };
     };
     if values.len() > UNROLL_BUDGET {
         return UnrollPlan::Decline { span, causa: CAUSA_BUDGET };
+    }
+    if has_runtime_len_guard(body, index_def) {
+        return UnrollPlan::Decline { span, causa: CAUSA_IN_REGION_MASK };
+    }
+    if let Some(causa) = mask.decline() {
+        return UnrollPlan::Decline { span, causa };
     }
     if let Some(causa) = body_decline(body, block, index_def, lanes, interner) {
         return UnrollPlan::Decline { span, causa };
@@ -813,6 +845,392 @@ fn decline(span: Span, causa: &'static str) -> SemanticError {
         .with_arg("issue", "itera_loop")
         .with_arg("lane", "air")
         .with_arg("causa", causa)
+}
+
+/// Function-level facts for the guard-as-mask admit (unit-3F).
+///
+/// A tensor parameter that is never used as data (only as a `multiplica`
+/// operand, or unused beside a data tensor) is a mask operand. Mask mode
+/// then fail-closes on in-region construction, dead-lane-unsafe `divisio`,
+/// and unmasked reduction exits.
+struct MaskAnalysis {
+    mask_defs: FxHashSet<DefId>,
+    in_region_mask: bool,
+    nan_unsafe: bool,
+    unmasked_exit: bool,
+}
+
+impl MaskAnalysis {
+    fn analyze(params: &[HirParam], body: &HirBlock, types: &TypeTable, interner: &Interner) -> Self {
+        let tensor_params: FxHashSet<DefId> = params
+            .iter()
+            .filter(|param| is_tensor_type(param.ty, types))
+            .map(|param| param.def_id)
+            .collect();
+        let mut analysis = MaskCollector {
+            interner,
+            tensor_params: tensor_params.clone(),
+            aliases: FxHashMap::default(),
+            local_inits: FxHashMap::default(),
+            fill_defs: FxHashSet::default(),
+            data_use: FxHashSet::default(),
+            reductions: Vec::new(),
+            in_region_mask: false,
+            nan_unsafe: false,
+        };
+        analysis.scan_block(body);
+        let mask_defs: FxHashSet<DefId> = tensor_params
+            .iter()
+            .copied()
+            .filter(|def| !analysis.data_use.contains(def))
+            .collect();
+        let unmasked_exit = !mask_defs.is_empty()
+            && analysis
+                .reductions
+                .iter()
+                .any(|operand| !is_masked_exit(operand, &mask_defs, &analysis.local_inits, interner));
+        Self { mask_defs, in_region_mask: analysis.in_region_mask, nan_unsafe: analysis.nan_unsafe, unmasked_exit }
+    }
+
+    fn decline(&self) -> Option<&'static str> {
+        if self.in_region_mask {
+            return Some(CAUSA_IN_REGION_MASK);
+        }
+        if self.mask_defs.is_empty() {
+            return None;
+        }
+        if self.nan_unsafe {
+            return Some(CAUSA_NAN_UNSAFE);
+        }
+        if self.unmasked_exit {
+            return Some(CAUSA_UNMASKED_EXIT);
+        }
+        None
+    }
+}
+
+struct MaskCollector<'a> {
+    interner: &'a Interner,
+    tensor_params: FxHashSet<DefId>,
+    aliases: FxHashMap<DefId, DefId>,
+    local_inits: FxHashMap<DefId, HirExpression>,
+    fill_defs: FxHashSet<DefId>,
+    data_use: FxHashSet<DefId>,
+    reductions: Vec<HirExpression>,
+    in_region_mask: bool,
+    nan_unsafe: bool,
+}
+
+impl MaskCollector<'_> {
+    fn resolve(&self, def: DefId) -> DefId {
+        self.aliases.get(&def).copied().unwrap_or(def)
+    }
+
+    fn note_data(&mut self, expr: &HirExpression) {
+        if let Some(def) = path_def(expr) {
+            let resolved = self.resolve(def);
+            if self.tensor_params.contains(&resolved) {
+                self.data_use.insert(resolved);
+            }
+        }
+    }
+
+    fn is_fill_built(&self, expr: &HirExpression) -> bool {
+        match &expr.kind {
+            HirExpressionKind::MethodCall(recv, method, _, _) => {
+                is_fill_method(self.interner.resolve(*method)) || self.is_fill_built(recv)
+            }
+            HirExpressionKind::Path(def) => {
+                self.fill_defs.contains(def)
+                    || self
+                        .local_inits
+                        .get(def)
+                        .is_some_and(|init| self.is_fill_built(init))
+            }
+            _ => false,
+        }
+    }
+
+    fn scan_block(&mut self, block: &HirBlock) {
+        for stmt in &block.statements {
+            self.scan_stmt(stmt);
+        }
+        if let Some(expr) = &block.expr {
+            self.scan_expr(expr);
+        }
+    }
+
+    fn scan_stmt(&mut self, stmt: &HirStatement) {
+        match &stmt.kind {
+            HirStatementKind::Local(local) => {
+                if let Some(init) = &local.init {
+                    self.scan_expr(init);
+                    self.local_inits.insert(local.def_id, init.clone());
+                    if let Some(src) = path_def(init) {
+                        let resolved = self.resolve(src);
+                        self.aliases.insert(local.def_id, resolved);
+                        if self.fill_defs.contains(&src) || self.is_fill_built(init) {
+                            self.fill_defs.insert(local.def_id);
+                        }
+                    } else if self.is_fill_built(init) {
+                        self.fill_defs.insert(local.def_id);
+                    }
+                    if let HirExpressionKind::Path(def) = init.kind {
+                        let resolved = self.resolve(def);
+                        if self.tensor_params.contains(&resolved) {
+                            self.data_use.insert(resolved);
+                        }
+                    }
+                }
+            }
+            HirStatementKind::Expr(expr) | HirStatementKind::Redde(Some(expr)) => self.scan_expr(expr),
+            HirStatementKind::Custodi(custodi) => {
+                for clause in &custodi.clauses {
+                    self.scan_expr(&clause.cond);
+                    self.scan_block(&clause.body);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn scan_expr(&mut self, expr: &HirExpression) {
+        match &expr.kind {
+            HirExpressionKind::MethodCall(recv, method, _, args) => {
+                let name = self.interner.resolve(*method);
+                self.scan_expr(recv);
+                for arg in args {
+                    self.scan_expr(&arg.expr);
+                }
+                if is_fill_method(name) {
+                    self.in_region_mask = true;
+                }
+                if name == "multiplica" {
+                    if let Some(arg) = args.first() {
+                        if self.is_fill_built(recv)
+                            || self.is_fill_built(&arg.expr)
+                            || is_comparison(&arg.expr)
+                            || is_comparison(recv)
+                        {
+                            self.in_region_mask = true;
+                        }
+                    } else if self.is_fill_built(recv) || is_comparison(recv) {
+                        self.in_region_mask = true;
+                    }
+                } else if name == "divisio" {
+                    self.note_data(recv);
+                    let denom_ok = args
+                        .first()
+                        .is_some_and(|arg| is_nonzero_literal(&arg.expr));
+                    if !denom_ok {
+                        self.nan_unsafe = true;
+                    }
+                } else if is_reduction_method(name) {
+                    self.reductions.push(recv.as_ref().clone());
+                    self.note_data(recv);
+                } else {
+                    self.note_data(recv);
+                    for arg in args {
+                        self.note_data(&arg.expr);
+                    }
+                }
+            }
+            HirExpressionKind::Binary(op, lhs, rhs) => {
+                self.scan_expr(lhs);
+                self.scan_expr(rhs);
+                if matches!(*op, HirBinOp::Mul | HirBinOp::Hadamard) {
+                    if self.is_fill_built(lhs) || self.is_fill_built(rhs) || is_comparison(lhs) || is_comparison(rhs) {
+                        self.in_region_mask = true;
+                    }
+                } else if *op == HirBinOp::Div {
+                    if !is_nonzero_literal(rhs) {
+                        self.nan_unsafe = true;
+                    }
+                    self.note_data(lhs);
+                    self.note_data(rhs);
+                } else if !is_cmp(*op) {
+                    self.note_data(lhs);
+                    self.note_data(rhs);
+                }
+            }
+            HirExpressionKind::Assign(lhs, rhs) => {
+                self.scan_expr(rhs);
+                self.note_data(lhs);
+            }
+            HirExpressionKind::Si { cond, then_block, else_block, .. } => {
+                self.scan_expr(cond);
+                self.scan_block(then_block);
+                if let Some(else_block) = else_block {
+                    self.scan_block(else_block);
+                }
+            }
+            HirExpressionKind::Block(block) => self.scan_block(block),
+            HirExpressionKind::Loop(block) | HirExpressionKind::Itera(_, _, _, _, block) => self.scan_block(block),
+            HirExpressionKind::Dum(cond, block) => {
+                self.scan_expr(cond);
+                self.scan_block(block);
+            }
+            HirExpressionKind::Call(callee, _, args) => {
+                self.scan_expr(callee);
+                for arg in args {
+                    self.scan_expr(&arg.expr);
+                    self.note_data(&arg.expr);
+                }
+            }
+            HirExpressionKind::Unary(_, operand)
+            | HirExpressionKind::Field(operand, _)
+            | HirExpressionKind::Index(operand, _)
+            | HirExpressionKind::Praefixum(operand) => self.scan_expr(operand),
+            _ => {}
+        }
+    }
+}
+
+fn is_masked_exit(
+    expr: &HirExpression,
+    mask_defs: &FxHashSet<DefId>,
+    local_inits: &FxHashMap<DefId, HirExpression>,
+    interner: &Interner,
+) -> bool {
+    match &expr.kind {
+        HirExpressionKind::Path(def) => local_inits
+            .get(def)
+            .is_some_and(|init| is_masked_exit(init, mask_defs, local_inits, interner)),
+        HirExpressionKind::MethodCall(recv, method, _, args) if interner.resolve(*method) == "multiplica" => {
+            is_mask_ref(recv, mask_defs, local_inits)
+                || args
+                    .first()
+                    .is_some_and(|arg| is_mask_ref(&arg.expr, mask_defs, local_inits))
+        }
+        HirExpressionKind::Binary(op, lhs, rhs) if matches!(*op, HirBinOp::Mul | HirBinOp::Hadamard) => {
+            is_mask_ref(lhs, mask_defs, local_inits) || is_mask_ref(rhs, mask_defs, local_inits)
+        }
+        _ => false,
+    }
+}
+
+fn is_mask_ref(
+    expr: &HirExpression,
+    mask_defs: &FxHashSet<DefId>,
+    local_inits: &FxHashMap<DefId, HirExpression>,
+) -> bool {
+    match &expr.kind {
+        HirExpressionKind::Path(def) => {
+            mask_defs.contains(def)
+                || local_inits
+                    .get(def)
+                    .is_some_and(|init| is_mask_ref(init, mask_defs, local_inits))
+        }
+        _ => false,
+    }
+}
+
+fn path_def(expr: &HirExpression) -> Option<DefId> {
+    match &expr.kind {
+        HirExpressionKind::Path(def) => Some(*def),
+        _ => None,
+    }
+}
+
+fn is_fill_method(name: &str) -> bool {
+    matches!(name, "reple" | "fill")
+}
+
+fn is_reduction_method(name: &str) -> bool {
+    matches!(name, "media" | "summa" | "crux_entropia" | "summa_axis")
+}
+
+fn is_cmp(op: HirBinOp) -> bool {
+    matches!(
+        op,
+        HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq | HirBinOp::Eq | HirBinOp::NotEq
+    )
+}
+
+fn is_comparison(expr: &HirExpression) -> bool {
+    matches!(&expr.kind, HirExpressionKind::Binary(op, _, _) if is_cmp(*op))
+}
+
+fn is_nonzero_literal(expr: &HirExpression) -> bool {
+    match &expr.kind {
+        HirExpressionKind::Literal(HirLiteral::Float(value)) => *value != 0.0,
+        HirExpressionKind::Literal(HirLiteral::Int(value)) => *value != 0,
+        HirExpressionKind::Unary(HirUnOp::Neg, inner) => is_nonzero_literal(inner),
+        _ => false,
+    }
+}
+
+fn has_runtime_len_guard(body: &HirBlock, index_def: DefId) -> bool {
+    let mut found = RuntimeLenGuard { index_def, hit: false };
+    found.scan_block(body);
+    found.hit
+}
+
+struct RuntimeLenGuard {
+    index_def: DefId,
+    hit: bool,
+}
+
+impl RuntimeLenGuard {
+    fn scan_block(&mut self, block: &HirBlock) {
+        for stmt in &block.statements {
+            if let HirStatementKind::Expr(expr) | HirStatementKind::Redde(Some(expr)) = &stmt.kind {
+                self.scan_expr(expr);
+            }
+        }
+        if let Some(expr) = &block.expr {
+            self.scan_expr(expr);
+        }
+    }
+
+    fn scan_expr(&mut self, expr: &HirExpression) {
+        match &expr.kind {
+            HirExpressionKind::Si { cond, then_block, else_block, .. } => {
+                if is_runtime_len_guard(cond, self.index_def) {
+                    self.hit = true;
+                }
+                self.scan_expr(cond);
+                self.scan_block(then_block);
+                if let Some(else_block) = else_block {
+                    self.scan_block(else_block);
+                }
+            }
+            HirExpressionKind::Block(block) => self.scan_block(block),
+            HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
+                self.scan_expr(lhs);
+                self.scan_expr(rhs);
+            }
+            HirExpressionKind::MethodCall(recv, _, _, args) => {
+                self.scan_expr(recv);
+                for arg in args {
+                    self.scan_expr(&arg.expr);
+                }
+            }
+            HirExpressionKind::Unary(_, operand) | HirExpressionKind::Field(operand, _) => self.scan_expr(operand),
+            _ => {}
+        }
+    }
+}
+
+fn is_runtime_len_guard(cond: &HirExpression, index_def: DefId) -> bool {
+    match &cond.kind {
+        HirExpressionKind::Binary(op, lhs, rhs) if is_cmp(*op) => {
+            foldable_after_index(lhs, index_def) != foldable_after_index(rhs, index_def)
+        }
+        _ => false,
+    }
+}
+
+fn foldable_after_index(expr: &HirExpression, index_def: DefId) -> bool {
+    match &expr.kind {
+        HirExpressionKind::Literal(_) => true,
+        HirExpressionKind::Path(def) => *def == index_def,
+        HirExpressionKind::Unary(_, inner) => foldable_after_index(inner, index_def),
+        HirExpressionKind::Binary(_, lhs, rhs) => {
+            foldable_after_index(lhs, index_def) && foldable_after_index(rhs, index_def)
+        }
+        _ => false,
+    }
 }
 
 fn is_allowed_tensor_intrinsic(method: &str) -> bool {

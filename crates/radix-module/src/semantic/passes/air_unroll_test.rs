@@ -3,6 +3,10 @@
 //! Pins the unit-3E contract: concrete-`N` `itera ab` range loops admit as
 //! guard-free straight line; declines stay on `SEM059.itera_loop` with a
 //! visible `causa`; non-AIR-lane loops are left for MIR lowering.
+//!
+//! Unit-3F extends the same pass with the guard-as-mask subset: a caller-built
+//! 0/1 mask operand, fail-closed in-region / NaN-unsafe / unmasked-exit
+//! causae, and a still-green full-prefix path.
 
 use crate::codegen::Target;
 use crate::hir::visit::{walk_expr, walk_program, HirVisitor};
@@ -322,4 +326,130 @@ functio host_loop() → numerus {
     );
     let hir = result.hir.as_ref().expect("typed HIR");
     assert!(has_itera(hir), "non-AIR-lane itera must remain for MIR lowering");
+}
+
+const MASKED_LANE_MEAN: &str = r#"
+@ radix lane "air"
+@ radix backward "masked_mean_backward"
+functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
+    varia tensor<f32, [4]> acc ← x
+    itera ab 0‥4 fixum i {
+        acc ← acc.addita(x)
+    }
+    redde acc.multiplica(mask).media()
+}
+"#;
+
+#[test]
+fn masked_len_lt_n_unrolls_guard_free() {
+    let result = analyze(MASKED_LANE_MEAN);
+    assert!(
+        result.success(),
+        "mask-mode route must unroll and admit: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "mask-mode unroll must erase the range loop");
+    assert!(!has_si(hir), "mask-mode runs all N lanes: no If reaches later AIR");
+}
+
+#[test]
+fn two_data_tensors_stay_full_prefix() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+@ radix backward "pair_backward"
+functio pair_sum(tensor<f32, [4]> a, tensor<f32, [4]> b) → f32 {
+    varia tensor<f32, [4]> acc ← a
+    itera ab 0‥4 fixum i {
+        acc ← acc.addita(b)
+    }
+    redde acc.media()
+}
+"#,
+    );
+    assert!(
+        result.success(),
+        "two data tensors are not a mask pair: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "full-prefix pair must still unroll");
+    assert!(!has_si(hir), "full-prefix pair stays guard-free");
+}
+
+#[test]
+fn in_region_fill_mask_declines_with_causa() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+@ radix backward "fill_backward"
+functio fill_mask(tensor<f32, [4]> x) → f32 {
+    fixum tensor<f32, [4]> mask ← x.reple(1.0)
+    varia tensor<f32, [4]> acc ← x
+    itera ab 0‥4 fixum i {
+        acc ← acc.addita(x)
+    }
+    redde acc.multiplica(mask).media()
+}
+"#,
+    );
+    expect_decline_causa(&errors, "in_region_mask");
+}
+
+#[test]
+fn in_region_scalar_comparison_declines_with_causa() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+@ radix backward "cmp_backward"
+functio cmp_mask(tensor<f32, [4]> x, numerus len) → f32 ⇥ textus {
+    varia tensor<f32, [4]> acc ← x
+    itera ab 0‥4 fixum i {
+        si i < len {
+            iace "pad"
+        }
+        acc ← acc.addita(x)
+    }
+    redde acc.media()
+}
+"#,
+    );
+    expect_decline_causa(&errors, "in_region_mask");
+}
+
+#[test]
+fn nan_unsafe_unclamped_div_declines_with_causa() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+@ radix backward "div_backward"
+functio unsafe_div(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
+    varia tensor<f32, [4]> acc ← x.divisio(mask)
+    itera ab 0‥4 fixum i {
+        acc ← acc.addita(x)
+    }
+    redde acc.multiplica(mask).media()
+}
+"#,
+    );
+    expect_decline_causa(&errors, "nan_unsafe");
+}
+
+#[test]
+fn unmasked_reduction_exit_declines_with_causa() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+@ radix backward "leak_backward"
+functio unmasked_exit(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
+    varia tensor<f32, [4]> acc ← x
+    itera ab 0‥4 fixum i {
+        acc ← acc.addita(x)
+    }
+    redde acc.media()
+}
+"#,
+    );
+    expect_decline_causa(&errors, "unmasked_exit");
 }

@@ -422,3 +422,58 @@ functio lane_sum(tensor<f32, [4]> x) → f32 {
         "primal 'lane_sum' must remain in the lowered MIR; got functions: {names:?}"
     );
 }
+
+// ── unit-3F: masked len ≤ N unrolled body generates a companion ──
+
+#[test]
+fn unrolled_masked_route_generates_companion_through_driver() {
+    let source = r#"
+@ radix lane "air"
+@ radix backward "masked_mean_backward"
+functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
+    varia tensor<f32, [4]> acc ← x
+    itera ab 0‥4 fixum i {
+        acc ← acc.addita(x)
+    }
+    redde acc.multiplica(mask).media()
+}
+"#;
+
+    let session = test_session(Target::MirLlvm);
+    let mut analysis =
+        analyze_source(&session, "unroll_masked_mean.fab", source).expect("mask-mode unrolled range loop must analyze");
+
+    let bundle = expect_codegen_ok(
+        prepare_air_backward_bundle(&mut analysis),
+        "masked AIR-lane primal must lower to AIR and prepare a backward bundle",
+    )
+    .expect("an AIR lane with backward annotations must produce a bundle");
+
+    let primal_symbol = analysis.interner.intern("masked_lane_mean");
+    let primal = bundle
+        .air_program
+        .functions
+        .iter()
+        .find(|f| f.name == primal_symbol)
+        .expect("primal masked_lane_mean must be present in the AIR program");
+    assert!(
+        !primal
+            .body
+            .bindings
+            .iter()
+            .any(|binding| matches!(binding.expr, crate::air::AirExpr::If { .. })),
+        "mask-mode unroll must reach reverse_ad as a guard-free straight line"
+    );
+
+    let mut lowered = lower_analyzed_unit_with_context(&mut analysis).expect("masked primal should lower to MIR");
+    expect_codegen_ok(
+        apply_air_backward_bundle(&mut lowered, bundle, false),
+        "masked unrolled body must generate a reverse_ad companion",
+    );
+
+    let names = mir_function_names(&lowered.program, &lowered.interner);
+    assert!(
+        names.iter().any(|name| name == "masked_mean_backward"),
+        "companion 'masked_mean_backward' must be installed in the lowered MIR; got functions: {names:?}"
+    );
+}
