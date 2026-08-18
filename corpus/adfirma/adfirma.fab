@@ -4,7 +4,7 @@ kind = "keyword"
 category = "testing"
 canonical = true
 summary = "Asserts that a condition is true at runtime."
-syntax = "adfirma <expression> [, <message>]"
+syntax = "adfirma <expression> [mori <expression>]"
 aliases = ["assert"]
 related = ["proba", "fac", "cape"]
 locale = "en"
@@ -18,7 +18,7 @@ locale = "en"
 # What this teaches:
 #   • Runtime assertions — `adfirma <condition>` validates invariants during
 #     program execution
-#   • Custom messages — `adfirma <condition>, "message"` adds descriptive
+#   • Custom messages — `adfirma <condition> mori "message"` adds descriptive
 #     diagnostic text on failure
 #   • Testing category — adfirma is the primary assertion keyword for test
 #     and verification code
@@ -32,10 +32,10 @@ locale = "en"
 # adfirma — runtime assertions
 #
 # adfirma <condition>
-# adfirma <condition>, "nuntius"
+# adfirma <condition> mori "nuntius"
 #
 # GRAMMAR:
-#   adfirmaStmt :← 'adfirma' expr (',' stringLit)?
+#   adfirmaStmt :← 'adfirma' expr ('mori' expr)?
 #
 # EXPECTED OUTPUT:
 #   empty — adfirma only (adfirma.expected)
@@ -47,29 +47,29 @@ main {
     assert x > 0
 
     # Assertion with custom message
-    assert x ≡ 10 else "x decem esse debet"
+    assert x ≡ 10 panic "x decem esse debet"
 
     # Multiple assertions
     const _ nomen ← "Marcus"
     assert nomen ≡ "Marcus"
-    assert nomen ≠ "" else "nomen vacuum non sit"
+    assert nomen ≠ "" panic "nomen vacuum non sit"
 
     # Boolean assertions
     const _ viget ← true
     assert viget
-    assert viget ≡ true else "vigere debet"
+    assert viget ≡ true panic "vigere debet"
 }
 
 test "assertions validate invariants" {
     const _ x ← 10
     assert x > 0
-    assert x ≡ 10 else "x decem esse debet"
+    assert x ≡ 10 panic "x decem esse debet"
 
     const _ nomen ← "Marcus"
     assert nomen ≡ "Marcus"
-    assert nomen ≠ "" else "nomen vacuum non sit"
+    assert nomen ≠ "" panic "nomen vacuum non sit"
 
     const _ viget ← true
     assert viget
-    assert viget ≡ true else "vigere debet"
+    assert viget ≡ true panic "vigere debet"
 }

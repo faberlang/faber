@@ -436,6 +436,9 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
     if let Some(issue) = arg_value(args, "issue") {
         match issue {
             "secus_si_else_if" => return Some("use 'sin' for else-if".to_owned()),
+            "requirit_iace" => return Some("expected 'iace' after the requirit condition".to_owned()),
+            "requirit_else_rejected" => return Some("'secus' is not the particle on requirit".to_owned()),
+            "adfirma_else_rejected" => return Some("'secus' is not the particle on adfirma".to_owned()),
             "itera_mode" | "allocator_kind" | "mutability_marker" => {
                 let expected = arg_value(args, "expected")?;
                 return Some(format!("expected {expected}"));
@@ -499,6 +502,9 @@ fn expected_help(args: &[DiagnosticArg]) -> Option<String> {
     if let Some(issue) = arg_value(args, "issue") {
         match issue {
             "secus_si_else_if" => return Some("replace secus si with sin".to_owned()),
+            "requirit_iace" => return Some("write requirit cond iace err".to_owned()),
+            "requirit_else_rejected" => return Some("use 'iace' for the recoverable payload".to_owned()),
+            "adfirma_else_rejected" => return Some("use 'mori' for the optional panic message".to_owned()),
             "itera_mode" => return Some("choose one iteration mode before the iterable expression".to_owned()),
             "allocator_kind" => return Some("use \"arena\" or \"page\" as the allocator kind".to_owned()),
             "annotation_name" => return Some("add an annotation name after @".to_owned()),

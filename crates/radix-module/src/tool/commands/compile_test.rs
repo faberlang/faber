@@ -871,7 +871,7 @@ importa ex "triga:triga" triga
 incipit {
   fixum triga.Vector3 zero ← triga.vector3(0.0, 0.0, 0.0)
   fixum triga.Vector3 n ← triga.vector3_normalizata(zero)
-  adfirma n.x ≡ (0.0 ∷ f32) secus "ok"
+  adfirma n.x ≡ (0.0 ∷ f32) mori "ok"
 }
 "#,
     )
@@ -948,7 +948,7 @@ importa ex "triga:triga" triga
 incipit {
   fixum triga.Vector3 zero ← triga.vector3(0.0, 0.0, 0.0)
   fixum triga.Vector3 n ← triga.vector3_normalizata(zero)
-  adfirma n.x ≡ (0.0 ∷ f32) secus "ok"
+  adfirma n.x ≡ (0.0 ∷ f32) mori "ok"
 }
 "#,
     )

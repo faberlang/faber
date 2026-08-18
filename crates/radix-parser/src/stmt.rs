@@ -538,17 +538,22 @@ impl Parser {
     /// Parse `adfirma`.
     ///
     /// GRAMMAR:
-    ///   adfirma-stmt := `adfirma` expr ['secus' expr]
+    ///   adfirma-stmt := `adfirma` expr ['mori' expr]
     ///
-    /// `secus` introduces the failure payload, matching `si/secus` and the
-    /// `sic/secus` ternary. A comma would collide with the grammar's
-    /// homogeneous list separator.
+    /// `mori` (en `panic`) introduces the optional failure payload. Leftover
+    /// `secus` / `else` on this statement is rejected — the particle names
+    /// the action. A comma would collide with the grammar's homogeneous
+    /// list separator.
     pub(super) fn parse_adfirma_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Adfirma, "expected 'adfirma'")?;
 
         let cond = Box::new(self.parse_expression()?);
 
-        let message = if self.eat_keyword_ident(TokenKind::Secus) {
+        if self.check_keyword_ident(TokenKind::Secus) {
+            return Err(self.expected_statement_error("adfirma_else_rejected"));
+        }
+
+        let message = if self.eat_keyword_ident(TokenKind::Mori) {
             Some(Box::new(self.parse_expression()?))
         } else {
             None
@@ -560,20 +565,23 @@ impl Parser {
     /// Parse `requirit` / `require`.
     ///
     /// GRAMMAR:
-    ///   requirit-stmt := `requirit` expr 'secus' expr
+    ///   requirit-stmt := `requirit` expr 'iace' expr
     ///
-    /// The `secus` separator claims the latin identity; the en surface `else`
-    /// resolves to the same identity through the reader pack. The error
-    /// expression is mandatory — the recoverable guard always names its
-    /// false-path payload. The statement stays a first-class syntax node;
-    /// lowering desugars it to `si non (cond) { iace err }`.
+    /// The `iace` particle (en `throw`) names the recoverable action. The
+    /// error expression is mandatory — the guard always names its payload.
+    /// Leftover `secus` / `else` is rejected. Lowering desugars the node to
+    /// `si non (cond) { iace err }`.
     pub(super) fn parse_require_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Requirit, "expected 'requirit'")?;
 
         let cond = Box::new(self.parse_expression()?);
 
-        if !self.eat_keyword_ident(TokenKind::Secus) {
-            return Err(self.expected_statement_error("requirit_secus"));
+        if self.check_keyword_ident(TokenKind::Secus) {
+            return Err(self.expected_statement_error("requirit_else_rejected"));
+        }
+
+        if !self.eat_keyword_ident(TokenKind::Iace) {
+            return Err(self.expected_statement_error("requirit_iace"));
         }
 
         let error = Box::new(self.parse_expression()?);

@@ -7,7 +7,8 @@ use crate::test_support::{
     assert_parse_error_has_no_legacy_message, assert_parse_error_issue, assert_parse_error_matches,
     has_arg, parse_ok, parse_program, span_for, symbol_name, ParseExpectation,
 };
-use crate::ParseErrorKind;
+use crate::{parse, ParseErrorKind, ParseResult};
+use radix_lexer::{lex_with_locale_pack, KeywordPack};
 use radix_syntax::{
     AnnotationKind, AstMutability, AstParamMode, BindingPattern, CallablePosture, ClassMemberKind,
     ClausuraBody, CuraKind, ExprKind, IfBody, ImportKind, IteraMode, JsonValue, Literal, Pattern,
@@ -2213,15 +2214,78 @@ fn parses_fac_do_while() {
     assert!(fac_stmt.while_.is_some());
 }
 
+/// Minimal en surface for guard-particle pins (`throw`/`panic`/`else`).
+struct EnGuardPack;
+
+impl KeywordPack for EnGuardPack {
+    fn pack_id(&self) -> &'static str {
+        "en-guard"
+    }
+
+    fn keyword_token_kind(&self, _text: &str) -> Option<radix_lexer::TokenKind> {
+        None
+    }
+
+    fn keyword_latin_key(&self, text: &str) -> Option<&str> {
+        match text {
+            "assert" => Some("adfirma"),
+            "require" => Some("requirit"),
+            "throw" => Some("iace"),
+            "panic" => Some("mori"),
+            "else" => Some("secus"),
+            "true" => Some("verum"),
+            _ => None,
+        }
+    }
+
+    fn keyword_suggestion(&self, _text: &str) -> Option<String> {
+        None
+    }
+}
+
+fn parse_en(source: &str) -> ParseResult {
+    parse(lex_with_locale_pack(source, &EnGuardPack))
+}
+
+fn parse_ok_en(source: &str) -> ParseResult {
+    let result = parse_en(source);
+    assert!(
+        result.success(),
+        "expected en-surface parse success, got errors: {:?}",
+        result.errors
+    );
+    result
+}
+
+fn assert_en_parse_error_issue(source: &str, issue: &str) {
+    let result = parse_en(source);
+    let errors = result.errors.iter().collect::<Vec<_>>();
+    assert!(
+        result.errors.iter().any(|err| has_arg(err, "issue", issue)),
+        "expected en-surface parse error issue {issue:?}, got {errors:?}"
+    );
+}
+
 #[test]
 fn parses_adfirma_assert() {
-    let result = parse_ok("adfirma verum secus \"msg\"");
+    let result = parse_ok("adfirma verum mori \"msg\"");
     let program = result
         .program
         .as_ref()
         .expect("parser should produce a program");
     assert_eq!(program.statements.len(), 1);
     assert!(matches!(program.statements[0].kind, StmtKind::Adfirma(_)));
+
+    let en = parse_ok_en("assert true panic \"msg\"");
+    let en_program = en
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(en_program.statements.len(), 1);
+    assert!(matches!(
+        en_program.statements[0].kind,
+        StmtKind::Adfirma(_)
+    ));
 }
 
 #[test]
@@ -2242,7 +2306,7 @@ fn parses_adfirma_without_message() {
 
 #[test]
 fn parses_requirit_statement() {
-    let result = parse_ok("requirit verum secus \"bad\"");
+    let result = parse_ok("requirit verum iace \"bad\"");
     let program = result.program.as_ref().expect("program");
     assert_eq!(program.statements.len(), 1);
     let StmtKind::Require(require_stmt) = &program.statements[0].kind else {
@@ -2256,12 +2320,20 @@ fn parses_requirit_statement() {
         "cond should be the boolean literal verum"
     );
     assert!(matches!(require_stmt.error.kind, ExprKind::Literal(_)));
+
+    let en = parse_ok_en("require true throw \"bad\"");
+    let en_program = en.program.as_ref().expect("program");
+    assert_eq!(en_program.statements.len(), 1);
+    assert!(matches!(
+        en_program.statements[0].kind,
+        StmtKind::Require(_)
+    ));
 }
 
 #[test]
 fn parses_requirit_error_expression_forms() {
     let result =
-        parse_ok(r#"requirit conditio.finita secus finge SchedulaInvalida { causa = "bad" }"#);
+        parse_ok(r#"requirit conditio.finita iace finge SchedulaInvalida { causa = "bad" }"#);
     let program = result.program.as_ref().expect("program");
     assert_eq!(program.statements.len(), 1);
     assert!(matches!(program.statements[0].kind, StmtKind::Require(_)));
@@ -2271,8 +2343,26 @@ fn parses_requirit_error_expression_forms() {
 fn rejects_requirit_without_secus_payload() {
     assert_parse_error_matches(
         "requirit verum",
-        ParseExpectation::Args(&[("issue", "requirit_secus")]),
+        ParseExpectation::Args(&[("issue", "requirit_iace")]),
     );
+}
+
+#[test]
+fn rejects_requirit_else() {
+    assert_parse_error_matches(
+        "requirit verum secus \"bad\"",
+        ParseExpectation::Args(&[("issue", "requirit_else_rejected")]),
+    );
+    assert_en_parse_error_issue("require true else \"bad\"", "requirit_else_rejected");
+}
+
+#[test]
+fn rejects_adfirma_else() {
+    assert_parse_error_matches(
+        "adfirma verum secus \"msg\"",
+        ParseExpectation::Args(&[("issue", "adfirma_else_rejected")]),
+    );
+    assert_en_parse_error_issue("assert true else \"msg\"", "adfirma_else_rejected");
 }
 
 #[test]

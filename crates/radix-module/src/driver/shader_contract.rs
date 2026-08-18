@@ -769,8 +769,8 @@ functio shader_vertex() → vacuum {{
 }}
 
 incipit {{
-    adfirma vertex_layout_matches(0, 0, "position", 0, 3, 0, 12, 1, 1) secus "position layout"
-    adfirma vertex_layout_matches(0, 2, "uv", 2, 2, 0, 8, 1, 4) secus "uv layout"
+    adfirma vertex_layout_matches(0, 0, "position", 0, 3, 0, 12, 1, 1) mori "position layout"
+    adfirma vertex_layout_matches(0, 2, "uv", 2, 2, 0, 8, 1, 4) mori "uv layout"
 }}
 "#
         );
@@ -839,12 +839,12 @@ functio shader_fragment() → vacuum {{
 }}
 
 incipit {{
-    adfirma vertex_layout_matches(0, 0, "position", 0, 3, 0, 12, 1, 1) secus "position"
-    adfirma vertex_layout_matches(0, 1, "color", 1, 4, 12, 12, 1, 2) secus "color"
-    adfirma varying_matches("color", 0, 4, 1, 2) secus "color varying"
-    adfirma fragment_output_matches(0, 4, 2) secus "color output"
-    adfirma pipeline_matches(1, 1, 1, 1, 36) secus "pipeline"
-    adfirma resource_binding_matches(0, 0, 1, 1, 1, 64, 1, "transform", 3) secus "transform buffer"
+    adfirma vertex_layout_matches(0, 0, "position", 0, 3, 0, 12, 1, 1) mori "position"
+    adfirma vertex_layout_matches(0, 1, "color", 1, 4, 12, 12, 1, 2) mori "color"
+    adfirma varying_matches("color", 0, 4, 1, 2) mori "color varying"
+    adfirma fragment_output_matches(0, 4, 2) mori "color output"
+    adfirma pipeline_matches(1, 1, 1, 1, 36) mori "pipeline"
+    adfirma resource_binding_matches(0, 0, 1, 1, 1, 64, 1, "transform", 3) mori "transform buffer"
 }}
 "#
         );
@@ -918,7 +918,7 @@ functio contract_fn() → bivalens {
 {VERTEX_LAYOUT_FN}
 incipit {{
     fixum numerus location ← 0
-    adfirma vertex_layout_matches(0, 0, "position", location, 3, 0, 12, 1, 1) secus "position layout"
+    adfirma vertex_layout_matches(0, 0, "position", location, 3, 0, 12, 1, 1) mori "position layout"
 }}
 "#
         );
@@ -936,8 +936,8 @@ incipit {{
             r#"
 {VERTEX_LAYOUT_FN}
 incipit {{
-    adfirma vertex_layout_matches(0, 0, "position", 0, 3, 0, 12, 1, 1) secus "position layout"
-    adfirma vertex_layout_matches(0, 0, "position", 0, 4, 0, 16, 1, 1) secus "conflicting position layout"
+    adfirma vertex_layout_matches(0, 0, "position", 0, 3, 0, 12, 1, 1) mori "position layout"
+    adfirma vertex_layout_matches(0, 0, "position", 0, 4, 0, 16, 1, 1) mori "conflicting position layout"
 }}
 "#
         );
@@ -955,7 +955,7 @@ incipit {{
             r#"
 {VERTEX_LAYOUT_FN}
 incipit {{
-    adfirma vertex_layout_matches(0, 0, "position", 0, 99, 0, 12, 1, 1) secus "bogus format code"
+    adfirma vertex_layout_matches(0, 0, "position", 0, 99, 0, 12, 1, 1) mori "bogus format code"
 }}
 "#
         );
@@ -986,7 +986,7 @@ functio vertex_layout_matches(
 }
 
 incipit {
-    adfirma vertex_layout_matches(0, 0, "position", 0, 3, 0, 12) secus "missing step mode code"
+    adfirma vertex_layout_matches(0, 0, "position", 0, 3, 0, 12) mori "missing step mode code"
 }
 "#;
         let result = compile_source(source);

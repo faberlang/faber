@@ -832,8 +832,8 @@ pub struct AdfirmaStmt {
     pub message: Option<Box<Expr>>,
 }
 
-/// `requirit <cond> secus <err>` — recoverable guard statement (en surface
-/// `require <cond> else <err>`).
+/// `requirit <cond> iace <err>` — recoverable guard statement (en surface
+/// `require <cond> throw <err>`).
 ///
 /// Desugars to `si non (cond) { iace err }` at lowering; the thrown value
 /// enters the enclosing function's `⇥ E` channel, unlike `adfirma` (fatal).

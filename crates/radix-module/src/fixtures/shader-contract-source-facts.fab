@@ -67,7 +67,7 @@ functio shader_plane_vertex() → vacuum {
 # ---------------------------------------------------------------------------
 
 incipit {
-    adfirma vertex_layout_matches(0, 0, "position", 0, 3, 0, 12, 1, 1) secus "position layout fixes location 0, Float32x3, zero offset, 12-byte stride, and vertex step mode"
-    adfirma vertex_layout_matches(0, 1, "normal", 1, 3, 0, 12, 1, 4) secus "normal layout fixes location 1, Float32x3, zero offset, 12-byte stride, and vertex step mode"
-    adfirma vertex_layout_matches(0, 2, "uv", 2, 2, 0, 8, 1, 4) secus "uv layout fixes location 2, Float32x2, zero offset, 8-byte stride, and vertex step mode"
+    adfirma vertex_layout_matches(0, 0, "position", 0, 3, 0, 12, 1, 1) mori "position layout fixes location 0, Float32x3, zero offset, 12-byte stride, and vertex step mode"
+    adfirma vertex_layout_matches(0, 1, "normal", 1, 3, 0, 12, 1, 4) mori "normal layout fixes location 1, Float32x3, zero offset, 12-byte stride, and vertex step mode"
+    adfirma vertex_layout_matches(0, 2, "uv", 2, 2, 0, 8, 1, 4) mori "uv layout fixes location 2, Float32x2, zero offset, 8-byte stride, and vertex step mode"
 }
