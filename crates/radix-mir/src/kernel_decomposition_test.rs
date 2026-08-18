@@ -1,4 +1,5 @@
 use super::*;
+use crate::elementwise_plan::{ElementwiseExpr, ElementwiseOp};
 use crate::validate::ValidatedMir;
 use crate::{
     MirBinOp, MirBlock, MirBlockId, MirCallee, MirConstant, MirFunctionId, MirLocal, MirLocalId,
@@ -389,6 +390,37 @@ fn elementwise_mul_function(types: &mut TypeTable) -> MirFunction {
         )],
         Some(2),
         r1,
+    )
+}
+
+/// An elementwise-only mul→add chain: `t = mul(x, w); r = add(t, b)`.
+fn elementwise_mul_add_function(types: &mut TypeTable) -> MirFunction {
+    let r1 = rank1_tensor_ty(types, 8);
+    device_function(
+        &[(0, r1), (1, r1), (2, r1)],
+        vec![
+            collection_statement(MirCollectionOp::TensorMul, &[0, 1], 3, r1),
+            collection_statement(MirCollectionOp::TensorAdd, &[3, 2], 4, r1),
+        ],
+        Some(4),
+        r1,
+    )
+}
+
+/// Interleaved recipe: `t = add(x, y); m = matmul(t, w); r = mul(m, s)`.
+/// The matmul is a fusion barrier — surrounding elementwise ops fold into
+/// the recipe subchain; the body must not classify as elementwise.
+fn interleaved_add_matmul_mul_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [4, 4]);
+    device_function(
+        &[(0, r2), (1, r2), (3, r2), (5, r2)],
+        vec![
+            collection_statement(MirCollectionOp::TensorAdd, &[0, 1], 2, r2),
+            collection_statement(MirCollectionOp::TensorMatMul, &[2, 3], 4, r2),
+            collection_statement(MirCollectionOp::TensorMul, &[4, 5], 6, r2),
+        ],
+        Some(6),
+        r2,
     )
 }
 
@@ -843,6 +875,118 @@ fn elementwise_only_body_is_one_elementwise_subchain() {
         CollectionKernelPlan::Elementwise
     );
     assert_eq!(decomposition.subchains[0].statements, vec![0]);
+}
+
+/// OF-2: an elementwise-only subchain exposes the typed expression plan
+/// (today `subchain.plan` is the payload-less `Elementwise` variant).
+#[test]
+fn elementwise_subchain_carries_explicit_expression_plan() {
+    let mut types = TypeTable::new();
+    let function = elementwise_mul_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("elementwise body decomposes");
+
+    assert_eq!(decomposition.subchains.len(), 1);
+    let subchain = &decomposition.subchains[0];
+    assert_eq!(subchain.plan, CollectionKernelPlan::Elementwise);
+    assert_eq!(subchain.statements, vec![0]);
+    assert!(subchain.consumes.is_empty());
+    assert_eq!(subchain.produced, Some(MirLocalId(2)));
+    assert_eq!(subchain.outputs, vec![MirLocalId(2)]);
+
+    let plan = subchain
+        .expression_plan()
+        .expect("elementwise-only subchain must carry a typed expression plan");
+    assert_eq!(plan.output.local, MirLocalId(2));
+    assert_eq!(plan.shape.dims, vec![4]);
+    assert_eq!(plan.output.shape, vec![4]);
+    match &plan.expression {
+        ElementwiseExpr::Binary {
+            op: ElementwiseOp::Mul,
+            ..
+        } => {}
+        other => panic!("expected Mul expression, got {other:?}"),
+    }
+    assert_eq!(
+        plan.inputs
+            .iter()
+            .map(|input| input.local)
+            .collect::<Vec<_>>(),
+        vec![MirLocalId(0), MirLocalId(1)]
+    );
+}
+
+/// OF-2: a mul→add elementwise chain is one subchain with a source-order
+/// composed expression; topology (slice / consume / produce / outputs)
+/// stays a single elementwise kernel.
+#[test]
+fn elementwise_mul_add_chain_carries_composed_expression_plan() {
+    let mut types = TypeTable::new();
+    let function = elementwise_mul_add_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("mul+add body decomposes");
+
+    assert_eq!(decomposition.subchains.len(), 1);
+    let subchain = &decomposition.subchains[0];
+    assert_eq!(subchain.plan, CollectionKernelPlan::Elementwise);
+    assert_eq!(subchain.statements, vec![0, 1]);
+    assert!(subchain.consumes.is_empty());
+    assert_eq!(subchain.produced, Some(MirLocalId(4)));
+    assert_eq!(subchain.outputs, vec![MirLocalId(4)]);
+
+    let plan = subchain
+        .expression_plan()
+        .expect("elementwise chain must carry a typed expression plan");
+    assert_eq!(plan.output.local, MirLocalId(4));
+    match &plan.expression {
+        ElementwiseExpr::Binary {
+            op: ElementwiseOp::Add,
+            lhs,
+            ..
+        } => match lhs.as_ref() {
+            ElementwiseExpr::Binary {
+                op: ElementwiseOp::Mul,
+                ..
+            } => {}
+            other => panic!("expected inner Mul, got {other:?}"),
+        },
+        other => panic!("expected Add(Mul(..), ..), got {other:?}"),
+    }
+}
+
+/// OF-2: an interleaved recipe remains a recipe barrier — surrounding
+/// elementwise ops fold into the matmul subchain; the recipe is sliced
+/// out, not reclassified as elementwise.
+#[test]
+fn interleaved_recipe_slices_out_and_is_not_elementwise() {
+    let mut types = TypeTable::new();
+    let function = interleaved_add_matmul_mul_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("interleaved add/matmul/mul decomposes");
+
+    assert_eq!(
+        decomposition.subchains.len(),
+        1,
+        "elementwise ops fold into the adjacent recipe, got {:?}",
+        decomposition.subchains
+    );
+    let subchain = &decomposition.subchains[0];
+    assert!(
+        matches!(subchain.plan, CollectionKernelPlan::TiledMatMul(_)),
+        "the interleaved matmul is a recipe barrier, got {:?}",
+        subchain.plan
+    );
+    assert_eq!(subchain.statements, vec![0, 1, 2]);
+    assert!(
+        subchain.expression_plan().is_none(),
+        "a recipe subchain must not carry an elementwise expression plan"
+    );
+    assert!(subchain.consumes.is_empty());
+    assert_eq!(subchain.produced, Some(MirLocalId(6)));
+    assert_eq!(subchain.outputs, vec![MirLocalId(6)]);
 }
 
 /// A temp-forward `_dest = %temp` copy (the real lowering's shape: a
