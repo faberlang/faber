@@ -4,6 +4,11 @@
 //! chorda interval bound parameters and predicate helpers under both the
 //! canonical Latin names (`retenta` / `expurgata`) and the English canonicals
 //! (`keep_between` / `drop_between`, `keep_if` / `drop_if`).
+//!
+//! After BB-2, `'x'` is `BoundedAscii{1}`. Relational compare accepts that
+//! char pair (and bare `ascii` / `ascii<1>`) by code-point order. Mixed
+//! char/string still uses the single-scalar convention; full cords stay
+//! rejected.
 
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
@@ -153,7 +158,37 @@ impl TypeChecker<'_> {
     }
 
     pub(super) fn is_text_family(&self, ty: TypeId) -> bool {
-        self.is_textus(ty) || self.is_ascii(ty)
+        self.is_textus(ty) || self.is_ascii(ty) || self.is_bounded_ascii_one(ty)
+    }
+
+    /// Char-order types: `BoundedAscii{1}`, `ascii<1>`, and bare `ascii`.
+    ///
+    /// WHY: BB-2 types `'x'` as `BoundedAscii{1}`. Relational compare is
+    /// code-point order for those pairs; multi-char ascii literals stay
+    /// rejected by [`Self::char_order_operand_ok`].
+    pub(super) fn is_char_order_type(&self, ty: TypeId) -> bool {
+        self.is_bounded_ascii_one(ty) || self.is_ascii(ty)
+    }
+
+    fn is_bounded_ascii_one(&self, ty: TypeId) -> bool {
+        match self.types.get(self.resolve_inferred_type(ty)) {
+            Type::BoundedAscii { capacity } => matches!(self.types.get_index(*capacity), IndexExpr::Literal(1)),
+            _ => false,
+        }
+    }
+
+    fn char_order_operand_ok(&mut self, expr: &HirExpression, ty: TypeId) -> bool {
+        if self.is_bounded_ascii_one(ty) {
+            return true;
+        }
+        if self.is_ascii(ty) {
+            // Multi-char ascii literals (`'ab'`) stay rejected.
+            if matches!(&expr.kind, HirExpressionKind::Literal(_)) {
+                return self.is_provably_single_scalar_text(expr);
+            }
+            return true;
+        }
+        false
     }
 
     pub(super) fn scalar_ordered_text_bin(
@@ -164,6 +199,13 @@ impl TypeChecker<'_> {
         rhs_ty: TypeId,
         span: crate::lexer::Span,
     ) -> bool {
+        if self.is_char_order_type(lhs_ty)
+            && self.is_char_order_type(rhs_ty)
+            && self.char_order_operand_ok(lhs, lhs_ty)
+            && self.char_order_operand_ok(rhs, rhs_ty)
+        {
+            return true;
+        }
         if !self.is_text_family(lhs_ty) || !self.is_text_family(rhs_ty) {
             return false;
         }
