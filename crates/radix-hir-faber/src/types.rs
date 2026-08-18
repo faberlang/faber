@@ -239,6 +239,29 @@ impl super::FaberCodegen {
                 self.format_union_type(members, types, names, interner, surface)
             }
             Type::Error => "<error>".to_owned(),
+            Type::BoundedArray { element, capacity } => format!(
+                "lista<{}, {}>",
+                self.type_to_faber(*element, types, names, interner, surface),
+                crate::figura::format_figura(*capacity, types, interner)
+            ),
+            Type::BoundedTextus { capacity } => {
+                format!(
+                    "textus<{}>",
+                    crate::figura::format_figura(*capacity, types, interner)
+                )
+            }
+            Type::BoundedAscii { capacity } => {
+                format!(
+                    "ascii<{}>",
+                    crate::figura::format_figura(*capacity, types, interner)
+                )
+            }
+            Type::BoundedOcteti { capacity } => {
+                format!(
+                    "octeti<{}>",
+                    crate::figura::format_figura(*capacity, types, interner)
+                )
+            }
         }
     }
 

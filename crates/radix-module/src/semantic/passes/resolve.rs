@@ -85,6 +85,7 @@ const ISSUE_OCTET_PARAMS: &str = "octet_params";
 const ISSUE_PRECISION_MARKER_PARAMS: &str = "precision_marker_params";
 const ISSUE_PRECISION_MARKER_SHAPE: &str = "precision_marker_shape";
 const ISSUE_PRIMITIVE_PARAMS: &str = "primitive_params";
+const ISSUE_BOUNDED_CAPACITY_NOT_NATURAL: &str = "bounded_capacity_not_natural";
 const ISSUE_QUALIFIED_TYPE_NOT_EXPORTED: &str = "qualified_type_not_exported";
 const ISSUE_QUALIFIED_TYPE_MIDDLE_NOT_NAMESPACE: &str = "qualified_type_middle_not_namespace";
 const ISSUE_QUALIFIED_TYPE_PREFIX_NOT_NAMESPACE: &str = "qualified_type_prefix_not_namespace";
@@ -1232,6 +1233,29 @@ fn resolve_type_expr(resolver: &mut Resolver, interner: &Interner, ty: &TypeExpr
                     }
                     return;
                 }
+                if matches!(prim, Primitive::Ascii | Primitive::Textus | Primitive::Octeti) {
+                    match params.as_slice() {
+                        [] => {}
+                        [capacity] => validate_capacity_index_param(resolver, interner, capacity, errors),
+                        _ => errors.push(lowering_error(ISSUE_PRIMITIVE_PARAMS, name.span)),
+                    }
+                    return;
+                }
+            }
+            if CollectionKind::from_name(name_str) == Some(CollectionKind::Lista) {
+                match params.as_slice() {
+                    [elem] => resolve_type_expr(resolver, interner, elem, errors),
+                    [elem, capacity] => {
+                        resolve_type_expr(resolver, interner, elem, errors);
+                        validate_capacity_index_param(resolver, interner, capacity, errors);
+                    }
+                    _ => {
+                        for param in params {
+                            resolve_type_expr(resolver, interner, param, errors);
+                        }
+                    }
+                }
+                return;
             }
             if name_str == "tensor" {
                 // Resolve type params before the incomplete/missing-figura
@@ -1355,6 +1379,42 @@ fn validate_instans_precision_param(interner: &Interner, param: &TypeExpr, error
     let marker = interner.resolve(ident.name);
     if let Err(err) = crate::semantic::InstansPrecision::from_marker(marker) {
         errors.push(instans_precision_marker_error(err, ident.span));
+    }
+}
+
+fn validate_capacity_index_param(
+    resolver: &Resolver,
+    interner: &Interner,
+    param: &TypeExpr,
+    errors: &mut Vec<SemanticError>,
+) {
+    match capacity_index_issue(param, resolver, interner) {
+        None => {}
+        Some(issue) => errors.push(undefined_type_error(issue, param.span)),
+    }
+}
+
+fn capacity_index_issue(param: &TypeExpr, resolver: &Resolver, interner: &Interner) -> Option<&'static str> {
+    let TypeExprKind::Named(ident, nested) = &param.kind else {
+        return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
+    };
+    if !nested.is_empty() {
+        return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
+    }
+    let name = interner.resolve(ident.name);
+    if radix_types::parse_natural_capacity(name).is_some() {
+        return None;
+    }
+    let Some(def_id) = resolver.lookup(ident.name) else {
+        return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
+    };
+    let Some(symbol) = resolver.get_symbol(def_id) else {
+        return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
+    };
+    match symbol.kind {
+        crate::semantic::SymbolKind::IndexParam => None,
+        crate::semantic::SymbolKind::TypeParam => Some(ISSUE_FIGURA_TYPE_PARAM_IN_INDEX),
+        _ => Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL),
     }
 }
 
@@ -2420,6 +2480,67 @@ fn lower_atomic_type_expr(
     Ok(types.atomic(elem_ty))
 }
 
+fn lower_bounded_primitive(
+    prim: Primitive,
+    params: &[TypeExpr],
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<TypeId, TypeLowerError> {
+    match params {
+        [] => Ok(types.primitive(prim)),
+        [capacity] => {
+            let capacity = lower_capacity_index(capacity, resolver, interner, types)?;
+            Ok(match prim {
+                Primitive::Ascii => types.bounded_ascii(capacity),
+                Primitive::Textus => types.bounded_textus(capacity),
+                Primitive::Octeti => types.bounded_octeti(capacity),
+                _ => unreachable!("lower_bounded_primitive only handles ascii/textus/octeti"),
+            })
+        }
+        _ => Err(TypeLowerError::Issue(ISSUE_PRIMITIVE_PARAMS)),
+    }
+}
+
+fn lower_lista_type(
+    params: &[TypeExpr],
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<TypeId, TypeLowerError> {
+    match params {
+        [elem] => {
+            let elem = lower_type_expr(elem, resolver, interner, types)?;
+            Ok(types.array(elem))
+        }
+        [elem, capacity] => {
+            let elem = lower_type_expr(elem, resolver, interner, types)?;
+            let capacity = lower_capacity_index(capacity, resolver, interner, types)?;
+            Ok(types.bounded_array(elem, capacity))
+        }
+        _ => Err(TypeLowerError::CollectionArity(CollectionKind::Lista)),
+    }
+}
+
+fn lower_capacity_index(
+    param: &TypeExpr,
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<crate::semantic::IndexId, TypeLowerError> {
+    if let Some(issue) = capacity_index_issue(param, resolver, interner) {
+        return Err(TypeLowerError::Issue(issue));
+    }
+    let TypeExprKind::Named(ident, _) = &param.kind else {
+        return Err(TypeLowerError::Issue(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL));
+    };
+    let name = interner.resolve(ident.name);
+    if let Some(value) = radix_types::parse_natural_capacity(name) {
+        return Ok(types.intern_index(crate::semantic::IndexExpr::Literal(value)));
+    }
+    Ok(types.intern_index(crate::semantic::IndexExpr::Param(ident.name)))
+}
+
 fn lower_named_type(
     name: &crate::syntax::Ident,
     params: &[TypeExpr],
@@ -2461,6 +2582,9 @@ fn lower_named_type(
                 return Err(type_lower_error_from_message(&message));
             }
             return Ok(ty);
+        }
+        if matches!(prim, Primitive::Ascii | Primitive::Textus | Primitive::Octeti) {
+            return lower_bounded_primitive(prim, params, resolver, interner, types);
         }
         if !params.is_empty() {
             return Err(TypeLowerError::Issue(ISSUE_PRIMITIVE_PARAMS));
@@ -2556,7 +2680,10 @@ fn lower_named_type(
     }
 
     if let Some(collection) = CollectionKind::from_name(name_str) {
-        if params.len() != collection.arity() {
+        if collection == CollectionKind::Lista {
+            return lower_lista_type(params, resolver, interner, types);
+        }
+        if !collection.accepts_arity(params.len()) {
             return Err(TypeLowerError::CollectionArity(collection));
         }
         let lowered = params

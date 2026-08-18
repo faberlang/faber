@@ -97,6 +97,10 @@ mod tensor_index;
 mod tensor_type_directed;
 
 #[cfg(test)]
+#[path = "bounded_identity_test.rs"]
+mod bounded_identity_test;
+
+#[cfg(test)]
 #[path = "generic_params_test.rs"]
 mod generic_params_test;
 

@@ -1441,7 +1441,10 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
             Some("array destructuring should be expanded before statement lowering".to_owned())
         }
         "atomic_compiler_owned_syntax" => Some("atomic requires compiler-owned syntax; use atomic<T>".to_owned()),
-        "lista_arity" => Some("lista requires one type parameter".to_owned()),
+        "lista_arity" => Some("lista requires one or two type parameters".to_owned()),
+        "bounded_capacity_not_natural" => {
+            Some("bounded capacity N must be a NATURAL literal or a bound magnitudo parameter".to_owned())
+        }
         "tabula_arity" => Some("tabula requires two type parameters".to_owned()),
         "copia_arity" => Some("copia requires one type parameter".to_owned()),
         "promissum_arity" => Some("promissum requires one type parameter".to_owned()),

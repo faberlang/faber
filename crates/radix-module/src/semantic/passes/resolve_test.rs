@@ -385,15 +385,28 @@ fn resolve_test_reports_tabula_arity() {
     compile_and_expect("typus Bad = tabula", "SEM008", "tabula_arity");
 }
 
-#[test]
-fn resolve_test_proposed_bounded_lista_still_reports_lista_arity() {
-    compile_and_expect("typus X = lista<numerus, 8>", "SEM008", "lista_arity");
+fn resolve_bounded_source(source: &str) -> (TypeTable, Result<(), Vec<crate::semantic::SemanticError>>) {
+    let parsed = parse(lex(source));
+    assert!(parsed.errors.is_empty(), "parse errors: {:?}", parsed.errors);
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let program = parsed.program.as_ref().expect("program");
+    collect::collect(program, &mut resolver, &mut types).expect("collect");
+    let resolved = resolve(program, &mut resolver, &parsed.interner, &mut types);
+    (types, resolved.map(|_| ()))
 }
 
 #[test]
-fn resolve_test_proposed_bounded_cords_still_report_primitive_params() {
+fn resolve_test_proposed_bounded_lista_typechecks() {
+    let (_types, resolved) = resolve_bounded_source("typus X = lista<numerus, 8>");
+    resolved.unwrap_or_else(|errors| panic!("lista<numerus, 8> must resolve, got {errors:?}"));
+}
+
+#[test]
+fn resolve_test_proposed_bounded_cords_typecheck() {
     for source in ["typus X = textus<8>", "typus X = ascii<8>", "typus X = octeti<8>"] {
-        compile_and_expect(source, "SEM008", "primitive_params");
+        let (_types, resolved) = resolve_bounded_source(source);
+        resolved.unwrap_or_else(|errors| panic!("{source} must resolve, got {errors:?}"));
     }
 }
 

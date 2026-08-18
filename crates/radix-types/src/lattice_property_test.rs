@@ -501,6 +501,10 @@ impl TypeName for Type {
             }
             Type::SizedInstans(p) => Box::leak(format!("instans<{p:?}>").into_boxed_str()),
             Type::Array(_) => "lista",
+            Type::BoundedArray { .. } => "lista_n",
+            Type::BoundedTextus { .. } => "textus_n",
+            Type::BoundedAscii { .. } => "ascii_n",
+            Type::BoundedOcteti { .. } => "octeti_n",
             Type::Map(_, _) => "tabula",
             Type::Option(_) => "option",
             Type::Set(_) => "copia",

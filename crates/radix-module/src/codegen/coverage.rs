@@ -387,6 +387,8 @@ fn type_children(ty: &Type) -> Vec<TypeId> {
         }
         Type::Union(members) => members.clone(),
         Type::Tuple(elements) => elements.clone(),
+        Type::BoundedArray { element, .. } => vec![*element],
+        Type::BoundedTextus { .. } | Type::BoundedAscii { .. } | Type::BoundedOcteti { .. } => Vec::new(),
     }
 }
 

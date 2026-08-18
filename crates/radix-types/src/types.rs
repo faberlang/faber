@@ -513,6 +513,26 @@ impl TypeTable {
         self.intern(Type::Array(element))
     }
 
+    /// Allocate a `lista<T, N>` bounded array. Distinct from unbounded [`Type::Array`].
+    pub fn bounded_array(&mut self, element: TypeId, capacity: IndexId) -> TypeId {
+        self.intern(Type::BoundedArray { element, capacity })
+    }
+
+    /// Allocate a `textus<N>` bounded Unicode buffer.
+    pub fn bounded_textus(&mut self, capacity: IndexId) -> TypeId {
+        self.intern(Type::BoundedTextus { capacity })
+    }
+
+    /// Allocate an `ascii<N>` bounded ASCII buffer.
+    pub fn bounded_ascii(&mut self, capacity: IndexId) -> TypeId {
+        self.intern(Type::BoundedAscii { capacity })
+    }
+
+    /// Allocate an `octeti<N>` bounded byte buffer.
+    pub fn bounded_octeti(&mut self, capacity: IndexId) -> TypeId {
+        self.intern(Type::BoundedOcteti { capacity })
+    }
+
     /// Allocate a `tabula<K, V>` semantic collection.
     pub fn map(&mut self, key: TypeId, value: TypeId) -> TypeId {
         self.intern(Type::Map(key, value))
@@ -759,6 +779,21 @@ impl TypeTable {
             | (Type::Set(ae), Type::Set(be))
             | (Type::Promissum(ae), Type::Promissum(be))
             | (Type::Cursor(ae), Type::Cursor(be)) => self.equals(*ae, *be),
+            (
+                Type::BoundedArray {
+                    element: ae,
+                    capacity: ac,
+                },
+                Type::BoundedArray {
+                    element: be,
+                    capacity: bc,
+                },
+            ) => self.equals(*ae, *be) && self.index_equals(*ac, *bc),
+            (Type::BoundedTextus { capacity: ac }, Type::BoundedTextus { capacity: bc })
+            | (Type::BoundedAscii { capacity: ac }, Type::BoundedAscii { capacity: bc })
+            | (Type::BoundedOcteti { capacity: ac }, Type::BoundedOcteti { capacity: bc }) => {
+                self.index_equals(*ac, *bc)
+            }
             (Type::PromissumFailable(at, ae), Type::PromissumFailable(bt, be)) => {
                 self.equals(*at, *bt) && self.equals(*ae, *be)
             }
@@ -1061,6 +1096,24 @@ impl TypeTable {
                 self.assignable(*from_elem, *to_elem) && self.index_equals(*from_shape, *to_shape)
             }
 
+            // Bounded buffers: element-covariant, capacity invariant. Bare
+            // primitives are not assignable to or from any bounded form (D4/D5).
+            (
+                Type::BoundedArray {
+                    element: from_elem,
+                    capacity: from_cap,
+                },
+                Type::BoundedArray {
+                    element: to_elem,
+                    capacity: to_cap,
+                },
+            ) => self.assignable(*from_elem, *to_elem) && self.index_equals(*from_cap, *to_cap),
+            (Type::BoundedTextus { capacity: from_cap }, Type::BoundedTextus { capacity: to_cap })
+            | (Type::BoundedAscii { capacity: from_cap }, Type::BoundedAscii { capacity: to_cap })
+            | (Type::BoundedOcteti { capacity: from_cap }, Type::BoundedOcteti { capacity: to_cap }) => {
+                self.index_equals(*from_cap, *to_cap)
+            }
+
             _ => false,
         }
     }
@@ -1084,6 +1137,18 @@ pub enum Type {
 
     /// `lista<T>` collection.
     Array(TypeId),
+
+    /// `lista<T, N>` bounded array. Distinct from unbounded [`Type::Array`].
+    BoundedArray { element: TypeId, capacity: IndexId },
+
+    /// `textus<N>` bounded Unicode buffer. Distinct from [`Primitive::Textus`].
+    BoundedTextus { capacity: IndexId },
+
+    /// `ascii<N>` bounded ASCII buffer. Distinct from [`Primitive::Ascii`].
+    BoundedAscii { capacity: IndexId },
+
+    /// `octeti<N>` bounded byte buffer. Distinct from [`Primitive::Octeti`].
+    BoundedOcteti { capacity: IndexId },
 
     /// `tabula<K, V>` collection.
     Map(TypeId, TypeId),
@@ -1206,6 +1271,13 @@ impl Hash for Type {
                 e.hash(state);
                 s.hash(state);
             }
+            Self::BoundedArray { element, capacity } => {
+                element.hash(state);
+                capacity.hash(state);
+            }
+            Self::BoundedTextus { capacity }
+            | Self::BoundedAscii { capacity }
+            | Self::BoundedOcteti { capacity } => capacity.hash(state),
             Self::SizedNumeric(p, w) => {
                 p.hash(state);
                 w.hash(state);
@@ -1418,11 +1490,23 @@ impl CollectionKind {
         }
     }
 
+    /// Whether `n` is a legal applied-argument count for this family.
+    ///
+    /// `lista` accepts one type argument (`lista<T>`) or a type plus a
+    /// magnitudo capacity (`lista<T, N>`). Other families stay exact.
+    #[must_use]
+    pub fn accepts_arity(self, n: usize) -> bool {
+        match self {
+            Self::Lista => n == 1 || n == 2,
+            other => n == other.arity(),
+        }
+    }
+
     /// Diagnostic text for incorrect generic arity.
     #[must_use]
     pub fn arity_error(self) -> &'static str {
         match self {
-            Self::Lista => "lista requires one type parameter",
+            Self::Lista => "lista requires one or two type parameters",
             Self::Tabula => "tabula requires two type parameters",
             Self::Copia => "copia requires one type parameter",
             Self::Promissum => "promissum requires one type parameter",
@@ -1670,6 +1754,12 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         Type::Tensor(e, s) | Type::Vector(e, s) | Type::Matrix(e, s) | Type::Sparsa(e, s) => {
             type_in_bounds(e) && index_in_bounds(s)
         }
+        Type::BoundedArray { element, capacity } => {
+            type_in_bounds(element) && index_in_bounds(capacity)
+        }
+        Type::BoundedTextus { capacity }
+        | Type::BoundedAscii { capacity }
+        | Type::BoundedOcteti { capacity } => index_in_bounds(capacity),
         Type::Primitive(_)
         | Type::SizedNumeric(_, _)
         | Type::ModularWord(_)
@@ -1734,4 +1824,4 @@ pub struct InferVar(pub u32);
 
 #[cfg(test)]
 #[path = "types_test.rs"]
-mod tests;
+mod types_test;

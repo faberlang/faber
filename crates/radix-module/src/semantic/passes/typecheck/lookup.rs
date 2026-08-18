@@ -485,6 +485,10 @@ impl TypeChecker<'_> {
                     self.invalid_operand_types(ISSUE_ASCII_LITERAL_TOO_LONG, span);
                     return self.error_type;
                 }
+                if decoded.len() == 1 {
+                    let capacity = self.types.intern_index(IndexExpr::Literal(1));
+                    return self.types.bounded_ascii(capacity);
+                }
                 self.ascii_type()
             }
             Err(crate::ascii_literal::AsciiLiteralError::NonAsciiScalar(ch)) => {
