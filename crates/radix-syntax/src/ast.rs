@@ -921,7 +921,10 @@ pub enum ExprKind {
     Ident(Ident),
     Literal(Literal),
     /// Contextual empty value: `vacua`.
-    Vacua(Span),
+    ///
+    /// Carries the surface spelling so resolution can prefer a user binding
+    /// of the same name (binding-wins).
+    Vacua(Ident),
     Binary(BinaryExpr),
     Unary(UnaryExpr),
     Ternary(TernaryExpr),
@@ -1308,12 +1311,16 @@ pub enum ConversioTarget {
 
 #[derive(Debug)]
 pub struct ScriptumExpr {
+    /// Surface spelling that claimed the builtin (`scriptum` or a pack alias).
+    pub symbol: Symbol,
     pub template: Symbol,
     pub args: Vec<Expr>,
 }
 
 #[derive(Debug)]
 pub struct LegeExpr {
+    /// Surface spelling that claimed the builtin (`lege`/`lineam` or a pack alias).
+    pub symbol: Symbol,
     /// `lineam` marker for line-oriented input.
     pub line: bool,
 

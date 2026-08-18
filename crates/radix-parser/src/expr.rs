@@ -1308,7 +1308,7 @@ impl Parser {
                 // row) claims — an undeclared Latin `vacua` stays an ordinary
                 // identifier.
                 if self.keyword_claim_key(ident.name) == Some("vacua") {
-                    ExprKind::Vacua(ident.span)
+                    ExprKind::Vacua(ident)
                 } else if let Some(constructor) =
                     self.try_parse_qualified_typed_constructor(&ident)?
                 {
@@ -2096,6 +2096,9 @@ impl Parser {
     /// Parse the `scriptum("template", args...)` formatting builtin.
     fn parse_scriptum_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
+        let TokenKind::Ident(symbol) = self.peek().kind else {
+            return Err(self.expected_expression_error("scriptum"));
+        };
         self.expect_keyword_ident(TokenKind::Scriptum, "expected 'scriptum'")?;
         self.expect(&TokenKind::LParen, "expected '(' after 'scriptum'")?;
 
@@ -2112,7 +2115,11 @@ impl Parser {
         let id = self.next_id();
         Ok(Expr {
             id,
-            kind: ExprKind::Scriptum(ScriptumExpr { template, args }),
+            kind: ExprKind::Scriptum(ScriptumExpr {
+                symbol,
+                template,
+                args,
+            }),
             span,
         })
     }
@@ -2120,6 +2127,9 @@ impl Parser {
     /// Parse `lege` and `lineam` input builtins.
     fn parse_lege_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
+        let TokenKind::Ident(symbol) = self.peek().kind else {
+            return Err(self.expected_expression_error("lege"));
+        };
         let line = if self.eat_keyword_ident(TokenKind::Lineam) {
             true
         } else {
@@ -2131,7 +2141,7 @@ impl Parser {
         let id = self.next_id();
         Ok(Expr {
             id,
-            kind: ExprKind::Lege(LegeExpr { line, span }),
+            kind: ExprKind::Lege(LegeExpr { symbol, line, span }),
             span,
         })
     }

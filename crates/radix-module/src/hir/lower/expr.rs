@@ -49,7 +49,9 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
 
     let kind = match &expr.kind {
         ExprKind::Literal(lit) => lower_literal(lowerer, lit),
-        ExprKind::Vacua(_) => HirExpressionKind::Vacua,
+        ExprKind::Vacua(ident) => lowerer
+            .lower_shadowed_builtin(expr.id, ident.name)
+            .unwrap_or(HirExpressionKind::Vacua),
         ExprKind::Ident(ident) => lowerer.lower_nomen(ident),
         ExprKind::Binary(bin) => lowerer.lower_binarius(bin),
         ExprKind::Unary(unary) => lowerer.lower_unarius(unary),
@@ -77,8 +79,10 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Intervallum(range) => lowerer.lower_intervallum(range),
         ExprKind::Conversio(conversio) => lowerer.lower_conversio(conversio),
         ExprKind::Ad(ad_expr) => lowerer.lower_ad_expr(ad_expr),
-        ExprKind::Scriptum(scriptum) => lowerer.lower_scriptum(scriptum),
-        ExprKind::Lege(lege) => HirExpressionKind::ReadLine(lege.line),
+        ExprKind::Scriptum(scriptum) => lowerer.lower_scriptum_or_binding(expr.id, scriptum),
+        ExprKind::Lege(lege) => lowerer
+            .lower_shadowed_builtin(expr.id, lege.symbol)
+            .unwrap_or(HirExpressionKind::ReadLine(lege.line)),
 
         ExprKind::Praefixum(praefixum) => lowerer.lower_praefixum(praefixum),
         ExprKind::Ego(span) => lowerer.lower_ego(*span),
@@ -870,6 +874,54 @@ impl Lowerer<'_> {
             .map(|arg| lower_expr(self, arg))
             .collect();
         HirExpressionKind::Scriptum(scriptum.template, args)
+    }
+
+    /// When resolve recorded a user binding for a builtin-claimed word, emit
+    /// a name load through the lowerer's own scope table. Resolver DefIds for
+    /// locals are not the HIR identities later passes walk.
+    fn lower_shadowed_builtin(
+        &mut self,
+        node: crate::syntax::NodeId,
+        name: crate::lexer::Symbol,
+    ) -> Option<HirExpressionKind> {
+        if self.resolver.shadowed_builtin(node).is_none() {
+            return None;
+        }
+        Some(if let Some(def_id) = self.lookup_name(name) {
+            HirExpressionKind::Path(def_id)
+        } else {
+            self.error("undefined_name");
+            HirExpressionKind::Error
+        })
+    }
+
+    fn lower_scriptum_or_binding(
+        &mut self,
+        node: crate::syntax::NodeId,
+        scriptum: &crate::syntax::ScriptumExpr,
+    ) -> HirExpressionKind {
+        let Some(kind) = self.lower_shadowed_builtin(node, scriptum.symbol) else {
+            return self.lower_scriptum(scriptum);
+        };
+        let span = self.current_span;
+        let callee = HirExpression { id: self.next_hir_id(), kind, ty: None, span };
+        let mut args = Vec::with_capacity(scriptum.args.len() + 1);
+        args.push(HirCallArg {
+            name: None,
+            spread: false,
+            expr: HirExpression {
+                id: self.next_hir_id(),
+                kind: HirExpressionKind::Literal(HirLiteral::String(scriptum.template)),
+                ty: None,
+                span,
+            },
+            span,
+        });
+        for arg in &scriptum.args {
+            let expr = lower_expr(self, arg);
+            args.push(HirCallArg { name: None, spread: false, expr, span: arg.span });
+        }
+        HirExpressionKind::Call(Box::new(callee), Vec::new(), args)
     }
 
     fn lower_praefixum(&mut self, praefixum: &crate::syntax::PraefixumExpr) -> HirExpressionKind {

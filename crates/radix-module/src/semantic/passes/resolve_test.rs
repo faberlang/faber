@@ -14,7 +14,9 @@ use crate::lexer::{Interner, Span};
 use crate::parser::parse;
 use crate::semantic::passes::collect;
 use crate::semantic::{Primitive, Type};
-use crate::syntax::{BlockStmt, FuncDecl, Param, Program, Stmt, StmtKind, TypeExpr, TypeExprKind};
+use crate::syntax::{
+    BlockStmt, Expr, ExprKind, FuncDecl, IfBody, Param, Program, Stmt, StmtKind, TypeExpr, TypeExprKind,
+};
 use crate::test_support::args_have_no_legacy_message;
 use crate::{CompileResult, Compiler, Config};
 
@@ -1692,5 +1694,340 @@ fn rivus_pilot_bare_colliding_name_reports_variant_ambiguous() {
          incipit { fixum _ l ← Lex }",
         "SEM001",
         "variant_ambiguous",
+    );
+}
+
+// ── KW-U2: binding-wins for builtin-claimed words ──
+
+fn has_issue(result: &CompileResult, code: &str, issue: &str) -> bool {
+    result
+        .diagnostics
+        .iter()
+        .any(|d| d.code == Some(code) && d.issue() == Some(issue))
+}
+
+#[test]
+fn shadowed_lege_binding_is_the_value_not_the_builtin() {
+    let result = compile_ok(
+        r#"
+incipit {
+  fixum textus lege ← "data"
+  nota lege
+}
+"#,
+    );
+    assert!(result.success(), "binding-named lege must compile: {:?}", result.diagnostics);
+    assert!(
+        !has_issue(&result, "WARN001", "unused_variable"),
+        "lege binding must be used, not treated as the builtin: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn shadowed_lege_fn_is_callable() {
+    let result = compile_ok(
+        r#"
+functio lege(textus path) → textus {
+  redde path
+}
+incipit {
+  fixum textus x ← lege("cfg")
+  nota x
+}
+"#,
+    );
+    assert!(
+        result.success(),
+        "user fn named lege must be callable: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        !has_issue(&result, "SEM012", "callee_not_callable"),
+        "lege(\"cfg\") must call the user fn, not the builtin: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn shadowed_vacua_binding_is_the_value_not_the_builtin() {
+    let result = compile_ok(
+        r#"
+incipit {
+  fixum textus vacua ← "empty"
+  nota vacua
+}
+"#,
+    );
+    assert!(result.success(), "binding-named vacua must compile: {:?}", result.diagnostics);
+    assert!(
+        !has_issue(&result, "SEM014", "vacua_requires_declared_type"),
+        "vacua binding must win over the empty-collection marker: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn unshadowed_lege_stays_the_builtin() {
+    let result = compile_ok(
+        r#"
+incipit {
+  fixum _ input ← lege
+}
+"#,
+    );
+    assert!(
+        result.success(),
+        "bare unshadowed lege must remain the builtin: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn shadowed_scriptum_fn_is_callable() {
+    let result = compile_ok(
+        r#"
+functio scriptum(textus t) → textus {
+  redde t
+}
+incipit {
+  fixum textus x ← scriptum("hello")
+  nota x
+}
+"#,
+    );
+    assert!(
+        result.success(),
+        "user fn named scriptum must be callable: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn unshadowed_scriptum_stays_the_builtin() {
+    let result = compile_ok(
+        r#"
+incipit {
+  fixum textus x ← scriptum("hello")
+  nota x
+}
+"#,
+    );
+    assert!(
+        result.success(),
+        "unshadowed scriptum must remain the builtin: {:?}",
+        result.diagnostics
+    );
+}
+
+fn resolve_ok(source: &str) -> (Program, Resolver, Interner) {
+    let parsed = parse(lex(source));
+    assert!(parsed.errors.is_empty(), "parse errors: {:?}", parsed.errors);
+    let program = parsed.program.expect("program");
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    collect::collect(&program, &mut resolver, &mut types).expect("collect");
+    resolve(&program, &mut resolver, &parsed.interner, &mut types).expect("resolve");
+    (program, resolver, parsed.interner)
+}
+
+fn walk_exprs<'a>(program: &'a Program, visit: &mut impl FnMut(&'a Expr)) {
+    fn walk_stmt<'a>(stmt: &'a Stmt, visit: &mut impl FnMut(&'a Expr)) {
+        match &stmt.kind {
+            StmtKind::Var(decl) => {
+                if let Some(init) = &decl.init {
+                    walk_expr(init, visit);
+                }
+            }
+            StmtKind::Scribe(scribe) => {
+                for arg in &scribe.args {
+                    walk_expr(arg, visit);
+                }
+            }
+            StmtKind::Incipit(incipit) => match &incipit.body {
+                IfBody::Block(block) => {
+                    for inner in &block.statements {
+                        walk_stmt(inner, visit);
+                    }
+                }
+                IfBody::Ergo(inner) => walk_stmt(inner, visit),
+            },
+            StmtKind::Func(func) => {
+                if let Some(body) = &func.body {
+                    for inner in &body.statements {
+                        walk_stmt(inner, visit);
+                    }
+                }
+            }
+            StmtKind::Expr(stmt) => walk_expr(&stmt.expr, visit),
+            _ => {}
+        }
+    }
+    fn walk_expr<'a>(expr: &'a Expr, visit: &mut impl FnMut(&'a Expr)) {
+        visit(expr);
+        match &expr.kind {
+            ExprKind::Call(call) => {
+                walk_expr(&call.callee, visit);
+                for arg in &call.args {
+                    walk_expr(&arg.value, visit);
+                }
+            }
+            ExprKind::Scriptum(scriptum) => {
+                for arg in &scriptum.args {
+                    walk_expr(arg, visit);
+                }
+            }
+            _ => {}
+        }
+    }
+    for stmt in &program.statements {
+        walk_stmt(stmt, visit);
+    }
+}
+
+#[test]
+fn resolve_records_shadowing_for_bound_lege() {
+    let (program, resolver, _) = resolve_ok(
+        r#"
+incipit {
+  fixum textus lege ← "data"
+  nota lege
+}
+"#,
+    );
+    let mut lege_nodes = Vec::new();
+    walk_exprs(&program, &mut |expr| {
+        if matches!(expr.kind, ExprKind::Lege(_)) {
+            lege_nodes.push(expr.id);
+        }
+    });
+    assert_eq!(lege_nodes.len(), 1, "expected one claimed lege node");
+    assert!(
+        resolver.shadowed_builtin(lege_nodes[0]).is_some(),
+        "bound lege must record shadowing"
+    );
+}
+
+#[test]
+fn resolve_does_not_record_shadowing_for_unbound_lege() {
+    let (program, resolver, _) = resolve_ok(
+        r#"
+incipit {
+  fixum _ input ← lege
+}
+"#,
+    );
+    let mut lege_nodes = Vec::new();
+    walk_exprs(&program, &mut |expr| {
+        if matches!(expr.kind, ExprKind::Lege(_)) {
+            lege_nodes.push(expr.id);
+        }
+    });
+    assert_eq!(lege_nodes.len(), 1, "expected one claimed lege node");
+    assert!(
+        resolver.shadowed_builtin(lege_nodes[0]).is_none(),
+        "unbound lege must stay the builtin"
+    );
+}
+
+#[test]
+fn resolve_records_shadowing_for_bound_vacua() {
+    let (program, resolver, _) = resolve_ok(
+        r#"
+incipit {
+  fixum textus vacua ← "empty"
+  nota vacua
+}
+"#,
+    );
+    let mut vacua_nodes = Vec::new();
+    walk_exprs(&program, &mut |expr| {
+        if matches!(expr.kind, ExprKind::Vacua(_)) {
+            vacua_nodes.push(expr.id);
+        }
+    });
+    assert_eq!(vacua_nodes.len(), 1, "expected one claimed vacua node");
+    assert!(
+        resolver.shadowed_builtin(vacua_nodes[0]).is_some(),
+        "bound vacua must record shadowing"
+    );
+}
+
+#[test]
+fn en_read_binding_wins_over_lege_builtin() {
+    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
+    let compiler = Compiler::new(Config::default().with_locale_pack(pack));
+    let result = compiler.compile_str(
+        "test.fab",
+        r#"
+main {
+  const string read ← "data"
+  print read
+}
+"#,
+    );
+    assert!(result.success(), "en read binding must compile: {:?}", result.diagnostics);
+    assert!(
+        !has_issue(&result, "WARN001", "unused_variable"),
+        "en read binding must be used: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn en_read_fn_is_callable() {
+    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
+    let compiler = Compiler::new(Config::default().with_locale_pack(pack));
+    let result = compiler.compile_str(
+        "test.fab",
+        r#"
+fn read(string file) → string {
+  return file
+}
+main {
+  const string x ← read("cfg")
+  print x
+}
+"#,
+    );
+    assert!(result.success(), "en read fn must be callable: {:?}", result.diagnostics);
+    assert!(
+        !has_issue(&result, "SEM012", "callee_not_callable"),
+        "read(\"cfg\") must call the user fn: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn lege_corpus_still_checks() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/lege/lege.fab");
+    let source = std::fs::read_to_string(&path).expect("lege corpus fixture");
+    let config =
+        Config::default().with_stdlib(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib"));
+    let result = Compiler::new(config).compile_str("lege.fab", &source);
+    assert!(result.success(), "lege.fab must still compile: {:?}", result.diagnostics);
+}
+
+#[test]
+fn th_th_example_still_checks_with_locale002_advisories() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../../../examples/reader-locale/th-TH/src/main.fab");
+    let source = std::fs::read_to_string(&path).expect("th-TH example");
+    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/th-TH/pack.toml");
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed th-TH pack should load");
+    let result =
+        crate::tool::check_diagnostics_for_source_with_locale_pack("main.fab", &source, false, Some(&pack), None);
+    assert!(result.success, "th-TH example must still check: {:?}", result.diagnostics);
+    let locale002 = result
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == Some("LOCALE002"))
+        .count();
+    assert_eq!(
+        locale002, 2,
+        "th-TH example must keep exactly two LOCALE002 advisories: {:?}",
+        result.diagnostics
     );
 }

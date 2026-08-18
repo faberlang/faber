@@ -1676,3 +1676,179 @@ fn localized_tensor_vacua_surface_lowers_to_latin_identity() {
         "localized th-TH surface must canonicalize to the same tensor type as Latin"
     );
 }
+
+// ── KW-U2: binding-wins lowering ──
+
+fn entry_statements(lowered: &crate::hir::LoweredProgram) -> &[crate::hir::HirStatement] {
+    let entry = lowered.hir.entry.as_ref().expect("expected entry block");
+    &entry.statements
+}
+
+#[test]
+fn unshadowed_lege_lowers_to_readline() {
+    let (lowered, _, _) = lower_source(
+        r#"
+incipit {
+  fixum _ input ← lege
+}
+"#,
+    );
+    let HirStatementKind::Local(local) = &entry_statements(&lowered)[0].kind else {
+        panic!("expected local");
+    };
+    let init = local.init.as_ref().expect("initializer");
+    assert!(
+        matches!(init.kind, HirExpressionKind::ReadLine(false)),
+        "unshadowed lege must stay ReadLine, got {:?}",
+        init.kind
+    );
+}
+
+#[test]
+fn shadowed_lege_lowers_to_name_load() {
+    let (lowered, _, _) = lower_source(
+        r#"
+incipit {
+  fixum textus lege ← "data"
+  nota lege
+}
+"#,
+    );
+    let stmts = entry_statements(&lowered);
+    let HirStatementKind::Local(local) = &stmts[0].kind else {
+        panic!("expected local");
+    };
+    let HirStatementKind::Expr(scribe) = &stmts[1].kind else {
+        panic!("expected scribe expr, got {:?}", stmts[1].kind);
+    };
+    let HirExpressionKind::Scribe(_, args) = &scribe.kind else {
+        panic!("expected scribe, got {:?}", scribe.kind);
+    };
+    assert!(
+        matches!(args[0].kind, HirExpressionKind::Path(def_id) if def_id == local.def_id),
+        "shadowed lege must lower to a name load of the binding, got {:?}",
+        args[0].kind
+    );
+}
+
+#[test]
+fn shadowed_lege_fn_call_lowers_to_call_on_path() {
+    let (lowered, _, _) = lower_source(
+        r#"
+functio lege(textus path) → textus {
+  redde path
+}
+incipit {
+  fixum textus x ← lege("cfg")
+}
+"#,
+    );
+    let function_def = lowered.hir.items[0].def_id;
+    let stmts = entry_statements(&lowered);
+    let HirStatementKind::Local(local) = &stmts[0].kind else {
+        panic!("expected local");
+    };
+    let init = local.init.as_ref().expect("initializer");
+    let HirExpressionKind::Call(callee, _, _) = &init.kind else {
+        panic!("expected call, got {:?}", init.kind);
+    };
+    assert!(
+        matches!(callee.kind, HirExpressionKind::Path(def_id) if def_id == function_def),
+        "shadowed lege call must load the user fn, got {:?}",
+        callee.kind
+    );
+}
+
+#[test]
+fn unshadowed_vacua_lowers_to_vacua() {
+    let (lowered, _, _) = lower_source(
+        r#"
+incipit {
+  fixum lista<numerus> values ← vacua
+}
+"#,
+    );
+    let HirStatementKind::Local(local) = &entry_statements(&lowered)[0].kind else {
+        panic!("expected local");
+    };
+    let init = local.init.as_ref().expect("initializer");
+    assert!(
+        matches!(init.kind, HirExpressionKind::Vacua),
+        "unshadowed vacua must stay Vacua, got {:?}",
+        init.kind
+    );
+}
+
+#[test]
+fn shadowed_vacua_lowers_to_name_load() {
+    let (lowered, _, _) = lower_source(
+        r#"
+incipit {
+  fixum textus vacua ← "empty"
+  nota vacua
+}
+"#,
+    );
+    let stmts = entry_statements(&lowered);
+    let HirStatementKind::Local(local) = &stmts[0].kind else {
+        panic!("expected local");
+    };
+    let HirStatementKind::Expr(scribe) = &stmts[1].kind else {
+        panic!("expected scribe expr, got {:?}", stmts[1].kind);
+    };
+    let HirExpressionKind::Scribe(_, args) = &scribe.kind else {
+        panic!("expected scribe, got {:?}", scribe.kind);
+    };
+    assert!(
+        matches!(args[0].kind, HirExpressionKind::Path(def_id) if def_id == local.def_id),
+        "shadowed vacua must lower to a name load of the binding, got {:?}",
+        args[0].kind
+    );
+}
+
+#[test]
+fn shadowed_scriptum_fn_call_lowers_to_call_on_path() {
+    let (lowered, _, _) = lower_source(
+        r#"
+functio scriptum(textus t) → textus {
+  redde t
+}
+incipit {
+  fixum textus x ← scriptum("hello")
+}
+"#,
+    );
+    let function_def = lowered.hir.items[0].def_id;
+    let HirStatementKind::Local(local) = &entry_statements(&lowered)[0].kind else {
+        panic!("expected local");
+    };
+    let init = local.init.as_ref().expect("initializer");
+    let HirExpressionKind::Call(callee, _, _) = &init.kind else {
+        panic!("expected call, got {:?}", init.kind);
+    };
+    assert!(
+        matches!(callee.kind, HirExpressionKind::Path(def_id) if def_id == function_def),
+        "shadowed scriptum must lower to a call on the user fn, got {:?}",
+        callee.kind
+    );
+}
+
+#[test]
+fn unshadowed_scriptum_lowers_to_scriptum() {
+    let (lowered, _, _) = lower_source(
+        r#"
+incipit {
+  fixum textus x ← scriptum("hello")
+}
+"#,
+    );
+    let HirStatementKind::Local(local) = &entry_statements(&lowered)[0].kind else {
+        panic!("expected local");
+    };
+    let init = local.init.as_ref().expect("initializer");
+    assert!(
+        matches!(init.kind, HirExpressionKind::Scriptum(_, _)),
+        "unshadowed scriptum must stay Scriptum, got {:?}",
+        init.kind
+    );
+}

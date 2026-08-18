@@ -1136,19 +1136,24 @@ fn resolve_expr(resolver: &mut Resolver, interner: &Interner, expr: &Expr, error
                 resolve_expr(resolver, interner, recovery, errors);
             }
         }
-        ExprKind::Scriptum(expr) => {
-            for arg in &expr.args {
+        ExprKind::Scriptum(scriptum) => {
+            record_shadowed_builtin(resolver, expr.id, scriptum.symbol);
+            for arg in &scriptum.args {
                 resolve_expr(resolver, interner, arg, errors);
             }
         }
-        ExprKind::Lege(_) => {}
+        ExprKind::Lege(lege) => {
+            record_shadowed_builtin(resolver, expr.id, lege.symbol);
+        }
         ExprKind::Ad(ad_expr) => {
             if let Some(opener) = &ad_expr.opener {
                 resolve_expr(resolver, interner, opener, errors);
             }
         }
 
-        ExprKind::Vacua(_) => {}
+        ExprKind::Vacua(ident) => {
+            record_shadowed_builtin(resolver, expr.id, ident.name);
+        }
         ExprKind::Praefixum(expr) => match &expr.body {
             crate::syntax::PraefixumBody::Block(block) => resolve_block(resolver, interner, block, errors),
             crate::syntax::PraefixumBody::Expr(expr) => resolve_expr(resolver, interner, expr, errors),
@@ -1168,6 +1173,21 @@ fn resolve_expr(resolver: &mut Resolver, interner: &Interner, expr: &Expr, error
             }
         }
     }
+}
+
+/// If a builtin-claimed spelling is a visible value binding, record that the
+/// expression is shadowed so lowering emits a name load instead of the builtin.
+fn record_shadowed_builtin(resolver: &mut Resolver, node: crate::syntax::NodeId, name: crate::lexer::Symbol) {
+    let Some(def_id) = resolver.lookup(name) else {
+        return;
+    };
+    if resolver
+        .get_symbol(def_id)
+        .is_some_and(|symbol| !symbol.kind.is_value_name())
+    {
+        return;
+    }
+    resolver.record_shadowed_builtin(node, def_id);
 }
 
 fn resolve_type_expr(resolver: &mut Resolver, interner: &Interner, ty: &TypeExpr, errors: &mut Vec<SemanticError>) {
