@@ -116,9 +116,9 @@ pub use kernel_decomposition::{decompose_kernel_function, KernelDecomposition, K
 pub use kernel_plan::{
     admit_quantized_gather, admit_quantized_matmul, BarrierPhase, BarrierPoint,
     CollectionKernelPlan, GroupedMatMulPlan, MatMulPlan, OobPaddingPolicy, PackedAdmissionError,
-    PackedDequantClass, PackedDequantResolution, PlanValidationError, QuantizedGatherPlan,
-    QuantizedMatMulPlan, ReduceOp, ReductionPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan,
-    TransposePlan, TRANSPOSE_WORKGROUP_X,
+    PackedDequantClass, PackedDequantError, PackedDequantResolution, PlanValidationError,
+    QuantizedGatherPlan, QuantizedMatMulPlan, ReduceOp, ReductionPlan, SharedMemoryLayout,
+    SsmConv1dPlan, SsmScanPlan, TransposePlan, TRANSPOSE_WORKGROUP_X,
 };
 pub use layout::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout,

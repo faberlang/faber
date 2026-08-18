@@ -28,11 +28,13 @@
 
 mod build;
 mod packed;
+mod packed_dequant;
 mod plan;
 mod validate;
 
 pub use build::*;
 pub use packed::*;
+pub use packed_dequant::*;
 pub use plan::*;
 pub use validate::*;
 
