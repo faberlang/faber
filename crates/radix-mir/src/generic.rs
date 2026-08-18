@@ -768,7 +768,7 @@ fn instantiate_existing_type_id(
         }
         Type::BoundedOcteti { capacity } => {
             find_existing_type(types, &Type::BoundedOcteti { capacity }, span, index)
-        },
+        }
         Type::Atomic(inner) => instantiate_existing_unary_type(
             types,
             inner,
@@ -1159,16 +1159,28 @@ fn instantiate_mutable_type_id(
         ),
         Type::BoundedTextus { capacity } => {
             let capacity = substitute_index_params(types, capacity, shape_bindings);
-            Ok(intern_or_find(types, &Type::BoundedTextus { capacity }, index))
+            Ok(intern_or_find(
+                types,
+                &Type::BoundedTextus { capacity },
+                index,
+            ))
         }
         Type::BoundedAscii { capacity } => {
             let capacity = substitute_index_params(types, capacity, shape_bindings);
-            Ok(intern_or_find(types, &Type::BoundedAscii { capacity }, index))
+            Ok(intern_or_find(
+                types,
+                &Type::BoundedAscii { capacity },
+                index,
+            ))
         }
         Type::BoundedOcteti { capacity } => {
             let capacity = substitute_index_params(types, capacity, shape_bindings);
-            Ok(intern_or_find(types, &Type::BoundedOcteti { capacity }, index))
-        },
+            Ok(intern_or_find(
+                types,
+                &Type::BoundedOcteti { capacity },
+                index,
+            ))
+        }
         Type::Atomic(inner) => instantiate_mutable_unary_type(
             types,
             inner,

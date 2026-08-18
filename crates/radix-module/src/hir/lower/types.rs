@@ -436,7 +436,10 @@ impl Lowerer<'_> {
         }
         let name = self.interner.resolve(ident.name);
         if let Some(value) = radix_types::parse_natural_capacity(name) {
-            return Some(self.types.intern_index(crate::semantic::IndexExpr::Literal(value)));
+            return Some(
+                self.types
+                    .intern_index(crate::semantic::IndexExpr::Literal(value)),
+            );
         }
         let Some(def_id) = self.resolver.lookup(ident.name) else {
             self.error("bounded_capacity_not_natural");
@@ -447,9 +450,10 @@ impl Lowerer<'_> {
             return None;
         };
         match symbol.kind {
-            crate::semantic::SymbolKind::IndexParam => {
-                Some(self.types.intern_index(crate::semantic::IndexExpr::Param(ident.name)))
-            }
+            crate::semantic::SymbolKind::IndexParam => Some(
+                self.types
+                    .intern_index(crate::semantic::IndexExpr::Param(ident.name)),
+            ),
             crate::semantic::SymbolKind::TypeParam => {
                 self.error("figura_type_param_in_index");
                 None

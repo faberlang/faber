@@ -1092,6 +1092,24 @@ pub(super) fn import_semantic_type_with_nominal(
                 .find_array(inner)
                 .unwrap_or_else(|| target.array(inner))
         }
+        Type::BoundedArray { element, capacity } => {
+            let element =
+                import_semantic_type_with_nominal(source, target, element, imported, nominal);
+            let capacity = import_index_expr(source, target, capacity);
+            target.bounded_array(element, capacity)
+        }
+        Type::BoundedTextus { capacity } => {
+            let capacity = import_index_expr(source, target, capacity);
+            target.bounded_textus(capacity)
+        }
+        Type::BoundedAscii { capacity } => {
+            let capacity = import_index_expr(source, target, capacity);
+            target.bounded_ascii(capacity)
+        }
+        Type::BoundedOcteti { capacity } => {
+            let capacity = import_index_expr(source, target, capacity);
+            target.bounded_octeti(capacity)
+        }
         Type::Map(key, value) => {
             let key = import_semantic_type_with_nominal(source, target, key, imported, nominal);
             let value = import_semantic_type_with_nominal(source, target, value, imported, nominal);

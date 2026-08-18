@@ -565,9 +565,10 @@ fn snapshot_interface_type_inner(
             .collect::<FileInterfaceResult<Vec<_>>>()
             .map(InterfaceTypeSnapshot::Tuple),
         Type::Error => Err(FileInterfaceError::ErrorTypeUnsupported),
-        Type::BoundedArray { .. } | Type::BoundedTextus { .. } | Type::BoundedAscii { .. } | Type::BoundedOcteti { .. } => {
-            Err(FileInterfaceError::InferenceTypeUnsupported)
-        }
+        Type::BoundedArray { .. }
+        | Type::BoundedTextus { .. }
+        | Type::BoundedAscii { .. }
+        | Type::BoundedOcteti { .. } => Err(FileInterfaceError::InferenceTypeUnsupported),
     }
 }
 

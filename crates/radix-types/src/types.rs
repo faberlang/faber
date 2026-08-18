@@ -1108,11 +1108,18 @@ impl TypeTable {
                     capacity: to_cap,
                 },
             ) => self.assignable(*from_elem, *to_elem) && self.index_equals(*from_cap, *to_cap),
-            (Type::BoundedTextus { capacity: from_cap }, Type::BoundedTextus { capacity: to_cap })
-            | (Type::BoundedAscii { capacity: from_cap }, Type::BoundedAscii { capacity: to_cap })
-            | (Type::BoundedOcteti { capacity: from_cap }, Type::BoundedOcteti { capacity: to_cap }) => {
-                self.index_equals(*from_cap, *to_cap)
-            }
+            (
+                Type::BoundedTextus { capacity: from_cap },
+                Type::BoundedTextus { capacity: to_cap },
+            )
+            | (
+                Type::BoundedAscii { capacity: from_cap },
+                Type::BoundedAscii { capacity: to_cap },
+            )
+            | (
+                Type::BoundedOcteti { capacity: from_cap },
+                Type::BoundedOcteti { capacity: to_cap },
+            ) => self.index_equals(*from_cap, *to_cap),
 
             _ => false,
         }
@@ -1139,16 +1146,25 @@ pub enum Type {
     Array(TypeId),
 
     /// `lista<T, N>` bounded array. Distinct from unbounded [`Type::Array`].
-    BoundedArray { element: TypeId, capacity: IndexId },
+    BoundedArray {
+        element: TypeId,
+        capacity: IndexId,
+    },
 
     /// `textus<N>` bounded Unicode buffer. Distinct from [`Primitive::Textus`].
-    BoundedTextus { capacity: IndexId },
+    BoundedTextus {
+        capacity: IndexId,
+    },
 
     /// `ascii<N>` bounded ASCII buffer. Distinct from [`Primitive::Ascii`].
-    BoundedAscii { capacity: IndexId },
+    BoundedAscii {
+        capacity: IndexId,
+    },
 
     /// `octeti<N>` bounded byte buffer. Distinct from [`Primitive::Octeti`].
-    BoundedOcteti { capacity: IndexId },
+    BoundedOcteti {
+        capacity: IndexId,
+    },
 
     /// `tabula<K, V>` collection.
     Map(TypeId, TypeId),

@@ -1526,7 +1526,10 @@ fn bounded_forms_are_distinct_from_bare_primitives_and_each_other() {
     assert!(!types.equals(ascii8, ascii9), "ascii<8> ≠ ascii<9>");
     assert!(!types.equals(ascii, ascii64), "ascii ≠ ascii<64>");
     assert!(!types.equals(textus4, textus), "textus<4> ≠ textus");
-    assert!(!types.equals(lista8, lista), "lista<numerus, 8> ≠ lista<numerus>");
+    assert!(
+        !types.equals(lista8, lista),
+        "lista<numerus, 8> ≠ lista<numerus>"
+    );
     assert!(!types.equals(octeti8, octeti), "octeti<8> ≠ octeti");
 
     assert!(!types.assignable(ascii8, ascii));
