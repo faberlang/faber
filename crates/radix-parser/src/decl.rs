@@ -1608,6 +1608,7 @@ impl Parser {
             annotations.push(Annotation { kind, span });
         }
 
+        self.check_nucleum_annotation_conflicts(&annotations)?;
         Ok(annotations)
     }
 
@@ -1624,10 +1625,6 @@ impl Parser {
         };
         let name = self.parse_annotation_name()?;
 
-        if self.check(&TokenKind::LBrace) {
-            return self.parse_braced_annotation(name);
-        }
-
         // Dispatch on the consumed annotation name's keyword identity (any
         // reader locale), not the current token (which is already past it).
         // The claim routes through the pack-authoritative surface gate: a
@@ -1640,6 +1637,17 @@ impl Parser {
             None => Some(self.interner.resolve(name.name)),
         }
         .and_then(|latin| lookup_keyword_spec(latin).and_then(|spec| spec.token_kind.clone()));
+
+        // Nucleum is structured in both sugar and braced forms so the fragment
+        // modifier is typed data, not an untyped argument or a raw braced field.
+        if matches!(annotation_identity, Some(TokenKind::Nucleum)) {
+            return self.parse_nucleum_annotation();
+        }
+
+        if self.check(&TokenKind::LBrace) {
+            return self.parse_braced_annotation(name);
+        }
+
         match annotation_identity {
             Some(TokenKind::Cli) => return self.parse_cli_annotation(),
             Some(TokenKind::Imperium) => return self.parse_imperium_annotation(),
@@ -1875,6 +1883,102 @@ impl Parser {
         Ok(AnnotationKind::RadixLane(RadixLaneAnnotation { lane }))
     }
 
+    fn parse_nucleum_annotation(&mut self) -> Result<AnnotationKind, ParseError> {
+        if self.check(&TokenKind::LBrace) {
+            return self.parse_braced_nucleum_annotation();
+        }
+
+        let fragment = self.eat_annotation_ident(TokenKind::Fragment);
+        self.expect_annotation_end("unexpected token after @ nucleum")?;
+        Ok(AnnotationKind::Nucleum(NucleumAnnotation { fragment }))
+    }
+
+    fn parse_braced_nucleum_annotation(&mut self) -> Result<AnnotationKind, ParseError> {
+        self.expect(&TokenKind::LBrace, "expected '{' after annotation name")?;
+
+        let mut fragment = false;
+        let mut saw_fragment_field = false;
+        while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
+            let field_name = self.parse_annotation_field_name()?;
+            let field_name_str = self.interner.resolve(field_name.name).to_owned();
+            self.expect(&TokenKind::Eq, "expected '=' in annotation field")?;
+
+            if field_name_str != "fragment" {
+                return Err(self
+                    .invalid_annotation_error("invalid_nucleum_field")
+                    .with_arg("field", field_name_str));
+            }
+            if saw_fragment_field {
+                return Err(self.invalid_annotation_error("duplicate_nucleum_field"));
+            }
+            saw_fragment_field = true;
+            fragment = self.parse_nucleum_fragment_flag()?;
+
+            if !self.eat(&TokenKind::Comma) {
+                break;
+            }
+        }
+
+        self.expect(&TokenKind::RBrace, "expected '}' after annotation fields")?;
+        Ok(AnnotationKind::Nucleum(NucleumAnnotation { fragment }))
+    }
+
+    fn parse_nucleum_fragment_flag(&mut self) -> Result<bool, ParseError> {
+        if self.check_keyword_ident(TokenKind::Verum) || self.check(&TokenKind::Verum) {
+            self.advance();
+            return Ok(true);
+        }
+        if self.check_keyword_ident(TokenKind::Falsum) || self.check(&TokenKind::Falsum) {
+            self.advance();
+            return Ok(false);
+        }
+        Err(self.invalid_annotation_error("invalid_nucleum_fragment_value"))
+    }
+
+    fn check_nucleum_annotation_conflicts(
+        &self,
+        annotations: &[Annotation],
+    ) -> Result<(), ParseError> {
+        let mut nucleum_span = None;
+        let mut nucleum_fragment = false;
+        for annotation in annotations {
+            if let AnnotationKind::Nucleum(nucleum) = &annotation.kind {
+                if nucleum_span.is_some() {
+                    return Err(ParseError::structured(
+                        ParseErrorKind::InvalidAnnotation,
+                        annotation.span,
+                    )
+                    .with_arg("issue", "duplicate_nucleum"));
+                }
+                nucleum_span = Some(annotation.span);
+                nucleum_fragment = nucleum.fragment;
+            }
+        }
+
+        if nucleum_fragment {
+            for annotation in annotations {
+                if self.is_graphics_fragment_annotation(&annotation.kind) {
+                    return Err(ParseError::structured(
+                        ParseErrorKind::InvalidAnnotation,
+                        annotation.span,
+                    )
+                    .with_arg("issue", "nucleum_fragment_conflicts_with_fragment"));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn is_graphics_fragment_annotation(&self, kind: &AnnotationKind) -> bool {
+        let name = match kind {
+            AnnotationKind::Statement(stmt) => stmt.name.name,
+            AnnotationKind::Braced(braced) => braced.name.name,
+            _ => return false,
+        };
+        self.interner.resolve(name) == "fragment"
+    }
+
     /// Accept a string literal or a bare identifier as the lane value.
     /// Identifiers are resolved through the interner so that known lane
     /// names (`air`, `mir`, `hir-direct`) work unquoted in statement
@@ -1932,6 +2036,8 @@ impl Parser {
             TokenKind::Solum => Ok(self.keyword_ident("solum", span)),
             TokenKind::Omitte => Ok(self.keyword_ident("omitte", span)),
             TokenKind::Metior => Ok(self.keyword_ident("metior", span)),
+            TokenKind::Nucleum => Ok(self.keyword_ident("nucleum", span)),
+            TokenKind::Fragment => Ok(self.keyword_ident("fragment", span)),
             _ => Err(ParseError::structured(ParseErrorKind::Expected, span)
                 .with_arg("issue", "annotation_name")),
         }
