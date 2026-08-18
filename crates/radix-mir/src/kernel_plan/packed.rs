@@ -28,6 +28,8 @@ use std::fmt;
 pub enum PackedDequantClass {
     /// Plain f32 passthrough — existing `TiledMatMul` / `Gather`.
     PassthroughF32,
+    /// Native 2-byte IEEE-754 binary16; in-kernel f32 convert.
+    NativeF16Convert,
     /// Native 2-byte bfloat16; in-kernel f32 convert.
     NativeBf16Convert,
     /// Block dequant (`Q8_0`, `Q5_0`): f16 scale + packed ints, 32 elements.
@@ -92,6 +94,7 @@ impl PackedDequantResolution {
     pub fn for_layout(layout: PackedStorageLayout) -> Self {
         let class = match layout {
             PackedStorageLayout::F32 => PackedDequantClass::PassthroughF32,
+            PackedStorageLayout::F16 => PackedDequantClass::NativeF16Convert,
             PackedStorageLayout::Bf16 => PackedDequantClass::NativeBf16Convert,
             PackedStorageLayout::Q8_0 | PackedStorageLayout::Q5_0 => PackedDequantClass::Block,
             PackedStorageLayout::Q4_K | PackedStorageLayout::Q5_K | PackedStorageLayout::Q6_K => {
@@ -121,7 +124,7 @@ impl PackedDequantResolution {
 ///
 /// # Errors
 /// [`PackedAdmissionError::UnrepresentableLayout`] when `id` is outside
-/// {F32, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0}.
+/// {F32, F16, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0}.
 pub fn packed_layout_from_ggml_type_id(
     id: u32,
 ) -> Result<PackedStorageLayout, PackedAdmissionError> {
@@ -330,12 +333,12 @@ impl fmt::Display for PackedAdmissionError {
             Self::UnrepresentableLayout { ggml_type_id } => write!(
                 f,
                 "packed kernel layout GGML type id {ggml_type_id} is unrepresentable \
-                 (admitted: F32, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0)"
+                 (admitted: F32, F16, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0)"
             ),
             Self::NonConstLayout => write!(
                 f,
                 "packed kernel layout must be a const GGML type id \
-                 (F32, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0)"
+                 (F32, F16, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0)"
             ),
         }
     }
