@@ -291,6 +291,7 @@ pub fn analyze_with_cli(
     if let Some(pack) = config.locale_pack.as_ref() {
         register_locale_pack_type_spellings(pack, &mut resolver, &mut types, interner);
     }
+    resolver.load_scribe_family_surfaces(config.locale_pack.as_ref());
     resolver.set_namespace_exports_from_strings(&config.namespace_exports, interner);
     resolver.set_namespace_seams_from_strings(&config.namespace_seams, interner);
     resolver.set_namespace_declarations_from_strings(&config.namespace_declarations, interner);

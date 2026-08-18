@@ -56,7 +56,7 @@ pub fn locale_suggestion_spec() -> DiagnosticSpec {
     DiagnosticSpec {
         code: "LOCALE002",
         help: Some(
-            "use the suggested pack spelling or add the spelling as an explicit alias if it is intentional",
+            "use the suggested pack spelling if you meant the keyword; the written spelling is a valid name",
         ),
     }
 }
