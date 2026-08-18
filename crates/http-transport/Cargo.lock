@@ -28,7 +28,7 @@ name = "faber-http-transport"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "faber-runtime",
+ "faber",
  "http",
  "http-body-util",
  "hyper",
@@ -37,7 +37,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "faber-runtime"
+name = "faber"
 version = "0.1.0"
 dependencies = [
  "regex",

@@ -48,7 +48,7 @@ image — it is not a text-emit product surface.
 flowchart TB
     subgraph faberrepo["faber — public repo"]
         Home["home: grammar, matrices, docs"]
-        Runtime["runtime/\ngenerated-code carriers (faber-runtime package)"]
+        Runtime["runtime/\ngenerated-code carriers (faber package)"]
     end
     Radix["radix\nprivate compiler + faber CLI"]
     Hosts["hosts\nABI consumers and platform/browser hosts"]

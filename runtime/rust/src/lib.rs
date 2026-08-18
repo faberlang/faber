@@ -1,7 +1,7 @@
 //! Faber language runtime types for generated Rust code.
 //!
-//! Standalone public package (faber/runtime/rust) — no private Radix/Hosts/
-//! faber-runtime dependency. Contract material Radix owns is committed in
+//! Standalone public package (faber/runtime/rust) — no private Radix/Hosts
+//! dependency. Contract material Radix owns is committed in
 //! [`contract`]; concrete built-in effects split to Hosts in S1-U3.
 
 pub mod arena;

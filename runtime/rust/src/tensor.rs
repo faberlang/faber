@@ -33,7 +33,7 @@ pub use crate::contract::tensor::{
 };
 
 // Local domain messages, grouped by op so each kernel's error surface is
-// visible at a glance. `pub(crate)` = internal to faber-runtime; the `pub`
+// visible at a glance. `pub(crate)` = internal to this crate; the `pub`
 // layernorm messages are part of the generated-code error surface.
 // ── relu / sqrt / gelu ──
 pub(crate) const ERR_RELU_NON_FINITE_INPUT: &str =
