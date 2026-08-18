@@ -864,9 +864,10 @@ fn start_host_dispatch(
     override_dispatch: Option<Arc<dyn HostDispatch>>,
 ) -> Result<(), DispatchError> {
     // S1-U3 split, stabilized: the faber runtime package owns the
-    // HostDispatch contract plus the one builtin route (`runtime:echo`) whose
-    // provider split never shipped. An installed host is consulted first; when
-    // it rejects a builtin-classified route, the builtin fallback covers it.
+    // HostDispatch contract plus builtin routes (`runtime:echo`,
+    // `processus:exi`) that stay in-process. An installed host is consulted
+    // first; when it rejects a builtin-classified route, the builtin fallback
+    // covers it.
     // Unrelated routes stay fail-closed against the host error (no host is
     // installed → `host_dispatch_unavailable`).
     if let Some(dispatch) = &override_dispatch {
@@ -904,9 +905,11 @@ fn dispatch_or_builtin_fallback(
     Ok(())
 }
 
-/// Minimal S1-U3-stabilized builtin dispatch. Only `runtime:echo` is restored
-/// in-process (the provider split never shipped an echo provider); the full
-/// pre-split builtin table is intentionally not resurrected.
+/// Minimal S1-U3-stabilized builtin dispatch. `runtime:echo` is restored
+/// in-process (the provider split never shipped an echo provider). The
+/// terminal builtin `processus:exi` is also in-process (`process::exit`)
+/// because the host processus provider must keep that route unmanifested.
+/// The full pre-split builtin table is intentionally not resurrected.
 #[derive(Clone, Copy, Debug)]
 struct BuiltinRuntimeDispatch;
 
@@ -917,6 +920,15 @@ impl HostDispatch for BuiltinRuntimeDispatch {
         responses: ResponseSender,
         _cancellation: Cancellation,
     ) -> Result<(), DispatchError> {
+        if request.route == "processus:exi" {
+            let Some(code) = processus_exi_code(&request.opener) else {
+                thread::spawn(move || {
+                    let _ = responses.error("processus:exi opener must be numerus");
+                });
+                return Ok(());
+            };
+            std::process::exit(code);
+        }
         // Echo one `Item` frame containing the opener, then `Done` (matches
         // the MIR stepper / Go / TS inline echo contract).
         thread::spawn(move || {
@@ -932,8 +944,17 @@ impl HostDispatch for BuiltinRuntimeDispatch {
 /// dispatch gate and the native-host fallback probe route through it, so the
 /// coverage cannot drift. Must stay aligned with the radix-owned plan fact
 /// `is_builtin_ad_route`.
-fn is_builtin_route(route: &str) -> bool {
-    matches!(route, "runtime:echo")
+pub(crate) fn is_builtin_route(route: &str) -> bool {
+    matches!(route, "runtime:echo" | "processus:exi")
+}
+
+fn processus_exi_code(opener: &Valor) -> Option<i32> {
+    let Valor::Numerus(code) = opener else {
+        return None;
+    };
+    // SAFETY: clamped to 0..=255, safe for i32.
+    #[allow(clippy::cast_possible_truncation)]
+    Some((*code).clamp(0, i64::from(u8::MAX)) as i32)
 }
 
 fn sermo_request(inner: &SermoInner, target: Option<&'static str>) -> SermoRequest {
@@ -944,7 +965,6 @@ fn sermo_request(inner: &SermoInner, target: Option<&'static str>) -> SermoReque
         target,
     }
 }
-
 
 fn push_runtime_frame(inner: &mut SermoInner, status: FrameStatus, data: Valor) {
     inner.incoming.push_back(Scrinium {
@@ -966,7 +986,6 @@ fn request_data(inner: &SermoInner) -> Valor {
         .first()
         .map_or(Valor::Nihil, |request| request.data.clone())
 }
-
 
 fn ensure_scalar_runtime_response<T>(sermo: &mut Sermo)
 where
@@ -1772,4 +1791,3 @@ async fn drain_remaining_then_err_async<T>(
     }
     Err(error)
 }
-
