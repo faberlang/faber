@@ -342,3 +342,156 @@ impl fmt::Display for PackedAdmissionError {
 }
 
 impl std::error::Error for PackedAdmissionError {}
+
+/// Why a packed block dequant / probe GEMM refused its input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackedDequantError {
+    /// Packed block length is not the layout's `block_bytes`.
+    BlockBytesMismatch { expected: u32, actual: usize },
+    /// This unit has no in-kernel dequant formula for `layout`.
+    UnsupportedLayout { layout: PackedStorageLayout },
+}
+
+impl fmt::Display for PackedDequantError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BlockBytesMismatch { expected, actual } => write!(
+                f,
+                "packed dequant block is {actual} bytes; expected {expected}"
+            ),
+            Self::UnsupportedLayout { layout } => write!(
+                f,
+                "packed dequant has no body for {layout:?} (admitted layouts land per R-PACK-02 unit)"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for PackedDequantError {}
+
+/// IEEE-754 binary16 → binary32 (`ggml_compute_fp16_to_fp32`). Every
+/// finite half is exact in f32; the mapping is a pure bit expansion.
+#[must_use]
+pub fn ggml_half_to_f32(bits: u16) -> f32 {
+    let sign = u32::from(bits >> 15) & 0x1;
+    let exp = u32::from(bits >> 10) & 0x1f;
+    let frac = u32::from(bits & 0x3ff);
+    let bits32 = if exp == 0 {
+        if frac == 0 {
+            sign << 31
+        } else {
+            let p = 32 - frac.leading_zeros();
+            (sign << 31) | ((p + 102) << 23) | ((frac << (24 - p)) - (1 << 23))
+        }
+    } else if exp == 0x1f {
+        (sign << 31) | (0xff << 23) | (frac << 13)
+    } else {
+        (sign << 31) | ((exp + 112) << 23) | (frac << 13)
+    };
+    f32::from_bits(bits32)
+}
+
+/// In-kernel Q8_0 block dequant (R-PACK-02B): `y[j] = i8(qs[j]) * f16(d)`.
+///
+/// # Errors
+/// [`PackedDequantError::BlockBytesMismatch`] when `block` is not 34 bytes.
+pub fn dequant_q8_0_block(block: &[u8]) -> Result<[f32; 32], PackedDequantError> {
+    if block.len() != PackedStorageLayout::Q8_0.block_bytes() as usize {
+        return Err(PackedDequantError::BlockBytesMismatch {
+            expected: PackedStorageLayout::Q8_0.block_bytes(),
+            actual: block.len(),
+        });
+    }
+    let d = ggml_half_to_f32(u16::from_le_bytes([block[0], block[1]]));
+    let mut y = [0.0f32; 32];
+    for (j, slot) in y.iter_mut().enumerate() {
+        *slot = f32::from(block[2 + j] as i8) * d;
+    }
+    Ok(y)
+}
+
+/// `get_scale_min_k4` (llama.cpp `ggml-quants.c`): 6-bit scale + 6-bit min
+/// from `scales[12]`.
+fn get_scale_min_k4(index: usize, scales: &[u8]) -> (u8, u8) {
+    if index < 4 {
+        (scales[index] & 63, scales[index + 4] & 63)
+    } else {
+        (
+            (scales[index + 4] & 0x0f) | ((scales[index - 4] >> 6) << 4),
+            (scales[index + 4] >> 4) | ((scales[index] >> 6) << 4),
+        )
+    }
+}
+
+/// In-kernel Q4_K superblock dequant (R-PACK-02D): `d`/`dmin` halves +
+/// `scales[12]` + `qs[128]` → 256 f32 elements.
+///
+/// # Errors
+/// [`PackedDequantError::BlockBytesMismatch`] when `block` is not 144 bytes.
+pub fn dequant_q4_k_block(block: &[u8]) -> Result<[f32; 256], PackedDequantError> {
+    if block.len() != PackedStorageLayout::Q4_K.block_bytes() as usize {
+        return Err(PackedDequantError::BlockBytesMismatch {
+            expected: PackedStorageLayout::Q4_K.block_bytes(),
+            actual: block.len(),
+        });
+    }
+    let d = ggml_half_to_f32(u16::from_le_bytes([block[0], block[1]]));
+    let min = ggml_half_to_f32(u16::from_le_bytes([block[2], block[3]]));
+    let scales = &block[4..16];
+    let qs = &block[16..144];
+    let mut y = [0.0f32; 256];
+    let mut is = 0usize;
+    let mut qoff = 0usize;
+    for chunk in [0usize, 64, 128, 192] {
+        let (sc, m) = get_scale_min_k4(is, scales);
+        let d1 = d * f32::from(sc);
+        let m1 = min * f32::from(m);
+        let (sc, m) = get_scale_min_k4(is + 1, scales);
+        let d2 = d * f32::from(sc);
+        let m2 = min * f32::from(m);
+        for l in 0..32usize {
+            y[chunk + l] = d1 * f32::from(qs[qoff + l] & 0x0f) - m1;
+            y[chunk + 32 + l] = d2 * f32::from(qs[qoff + l] >> 4) - m2;
+        }
+        qoff += 32;
+        is += 2;
+    }
+    Ok(y)
+}
+
+/// Dequant one packed block for an admitted layout. R-PACK-02B implements
+/// Q8_0; R-PACK-02D implements Q4_K. Unsupported layouts fail closed.
+///
+/// # Errors
+/// [`PackedDequantError`] when the block length is wrong or the layout
+/// has no body yet.
+pub fn dequant_packed_block(
+    layout: PackedStorageLayout,
+    block: &[u8],
+) -> Result<Vec<f32>, PackedDequantError> {
+    match layout {
+        PackedStorageLayout::Q8_0 => Ok(dequant_q8_0_block(block)?.to_vec()),
+        PackedStorageLayout::Q4_K => Ok(dequant_q4_k_block(block)?.to_vec()),
+        other => Err(PackedDequantError::UnsupportedLayout { layout: other }),
+    }
+}
+
+/// Dense f32 GEMM `C[M,N] = A[M,K] · B[K,N]` used by the packed-kernel
+/// probes. The right operand is already dequanted **per block** — this is
+/// not a whole-model F32 materialization.
+#[must_use]
+pub fn gemm_f32(left: &[f32], m: usize, k: usize, right: &[f32], n: usize) -> Vec<f32> {
+    debug_assert_eq!(left.len(), m * k);
+    debug_assert_eq!(right.len(), k * n);
+    let mut out = vec![0.0f32; m * n];
+    for row in 0..m {
+        for col in 0..n {
+            let mut acc = 0.0f32;
+            for inner in 0..k {
+                acc += left[row * k + inner] * right[inner * n + col];
+            }
+            out[row * n + col] = acc;
+        }
+    }
+    out
+}
