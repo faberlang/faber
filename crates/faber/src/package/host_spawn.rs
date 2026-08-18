@@ -3,6 +3,12 @@
 //! No hosts Cargo, git, or registry dependency. The client writes the CLI
 //! file surface (`--descriptor` JSON, `--module` raw bytes, `--inputs` JSON)
 //! and parses the receipt / HostError JSON the CLI prints.
+//!
+//! Error taxonomy (CLI owns the codes):
+//! - exit 0 — receipt JSON
+//! - exit 2 — HostError JSON on stdout; this client surfaces `code` /
+//!   `message` verbatim (`E_INVALID_ARGS` vs `E_DEVICE_DESCRIPTOR` stay distinct)
+//! - exit 64 / spawn failure / unreadable child output — `E_HOST_SPAWN`
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -111,11 +117,20 @@ pub fn request_from_section(
 }
 
 /// Invoke `faber-host-macos-arm64 device-execute` as a child process.
+#[allow(dead_code)] // live entry for device-runtime; lib tests use `execute_device_at`
 pub fn execute_device(
     request: &DeviceExecuteRequest,
     build_if_missing: bool,
 ) -> Result<DeviceExecuteReceipt, HostSpawnError> {
-    let host = resolve_host_cli(build_if_missing)?;
+    execute_device_at(&resolve_host_cli(build_if_missing)?, request)
+}
+
+/// Invoke a resolved host binary. Tests pass a stub CLI here so the decode
+/// contract does not depend on a prebuilt sibling hosts artifact.
+fn execute_device_at(
+    host: &Path,
+    request: &DeviceExecuteRequest,
+) -> Result<DeviceExecuteReceipt, HostSpawnError> {
     let work = WorkDir::create()?;
     let descriptor_path = work.path.join("descriptor.json");
     let module_path = work.path.join("module.bin");
@@ -124,7 +139,7 @@ pub fn execute_device(
     write_file(&module_path, &request.module_image)?;
     write_file(&inputs_path, &request.inputs_json)?;
 
-    let output = Command::new(&host)
+    let output = Command::new(host)
         .args([
             "device-execute",
             "--backend",
@@ -142,34 +157,44 @@ pub fn execute_device(
             message: format!("failed to spawn {}: {error}", host.display()),
         })?;
 
-    match output.status.code() {
-        Some(0) => serde_json::from_slice(&output.stdout).map_err(|error| HostSpawnError {
+    decode_device_execute_output(output.status.code(), &output.stdout, &output.stderr)
+}
+
+/// Decode one `device-execute` child response.
+///
+/// A parseable HostError JSON on stdout is returned as-is. The client does
+/// not rewrite CLI codes into `E_HOST_SPAWN`.
+fn decode_device_execute_output(
+    status: Option<i32>,
+    stdout: &[u8],
+    stderr: &[u8],
+) -> Result<DeviceExecuteReceipt, HostSpawnError> {
+    if status == Some(0) {
+        return serde_json::from_slice(stdout).map_err(|error| HostSpawnError {
             code: "E_HOST_SPAWN".to_owned(),
             message: format!("device-execute receipt JSON is invalid: {error}"),
-        }),
-        Some(2) => {
-            let parsed: WireHostError =
-                serde_json::from_slice(&output.stdout).unwrap_or(WireHostError {
-                    code: "E_HOST_SPAWN".to_owned(),
-                    message: String::from_utf8_lossy(&output.stderr).into_owned(),
-                });
-            Err(HostSpawnError {
+        });
+    }
+    if let Ok(parsed) = serde_json::from_slice::<WireHostError>(stdout) {
+        if !parsed.code.is_empty() {
+            return Err(HostSpawnError {
                 code: parsed.code,
                 message: parsed.message,
-            })
+            });
         }
-        other => Err(HostSpawnError {
-            code: "E_HOST_SPAWN".to_owned(),
-            message: format!(
-                "device-execute exited {:?}: {}",
-                other,
-                String::from_utf8_lossy(&output.stderr)
-            ),
-        }),
     }
+    Err(HostSpawnError {
+        code: "E_HOST_SPAWN".to_owned(),
+        message: format!(
+            "device-execute exited {:?}: {}",
+            status,
+            String::from_utf8_lossy(stderr)
+        ),
+    })
 }
 
 /// Locate the hosts CLI. Never a Cargo dependency — the binary is a child.
+#[allow(dead_code)] // called by `execute_device`
 pub fn resolve_host_cli(build_if_missing: bool) -> Result<PathBuf, HostSpawnError> {
     resolve_host_cli_at(
         std::env::var_os("FABER_HOST_MACOS_ARM64").map(PathBuf::from),
