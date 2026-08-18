@@ -630,6 +630,11 @@ pub struct Resolver {
     /// defs. These identities are not HIR items, so NameCatalog and imported
     /// type-paths miss them unless emit admits this map.
     locale_pack_type_aliases: FxHashMap<DefId, LexSymbol>,
+    /// Builtin-claimed expression nodes (`lege`/`lineam`/`vacua`/`scriptum`)
+    /// whose surface spelling is bound to a value in the live lexical scope.
+    /// Lowering consults this table and emits a name load instead of the builtin.
+    /// Runtime-only walk state; excluded from FHIR snapshots.
+    shadowed_builtins: FxHashMap<crate::syntax::NodeId, DefId>,
 }
 
 impl Resolver {
@@ -670,6 +675,7 @@ impl Resolver {
             used_namespaces: FxHashSet::default(),
             schemas: FxHashMap::default(),
             locale_pack_type_aliases: FxHashMap::default(),
+            shadowed_builtins: FxHashMap::default(),
         }
     }
 
@@ -2458,6 +2464,17 @@ impl Resolver {
         self.lookup_shadow.get(&name).copied()
     }
 
+    /// Record that a builtin-claimed expression is shadowed by a value binding.
+    pub fn record_shadowed_builtin(&mut self, node: crate::syntax::NodeId, def_id: DefId) {
+        self.shadowed_builtins.insert(node, def_id);
+    }
+
+    /// Return the value binding that shadows a builtin-claimed expression, if any.
+    #[must_use]
+    pub fn shadowed_builtin(&self, node: crate::syntax::NodeId) -> Option<DefId> {
+        self.shadowed_builtins.get(&node).copied()
+    }
+
     /// Return visible value-namespace names from the current lexical scope.
     ///
     /// Served from the nearest-name shadow: one entry per visible spelling,
@@ -2742,6 +2759,7 @@ impl Resolver {
             used_namespaces,
             schemas: FxHashMap::default(),
             locale_pack_type_aliases: FxHashMap::default(),
+            shadowed_builtins: FxHashMap::default(),
         }
     }
 
