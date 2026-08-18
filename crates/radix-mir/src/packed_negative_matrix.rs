@@ -125,8 +125,8 @@ fn wrong_layout_on_packed_block_fails_closed() {
             actual: 34
         }
     );
-    let error = dequant_packed_block(PackedStorageLayout::F16, &q8)
-        .expect_err("no silent F16 reinterpret");
+    let error =
+        dequant_packed_block(PackedStorageLayout::F16, &q8).expect_err("no silent F16 reinterpret");
     assert_eq!(
         error,
         PackedDequantError::UnsupportedLayout {
