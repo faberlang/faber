@@ -2331,6 +2331,52 @@ fn parses_scribe_diagnostic() {
     }
 }
 
+/// KW-U1: bare `nota 5` stays the output statement (next token is not `(`).
+#[test]
+fn statement_initial_bare_nota_stays_scribe() {
+    let result = parse_ok("nota 5");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    match &program.statements[0].kind {
+        StmtKind::Scribe(stmt) => assert!(matches!(stmt.kind, ScribeKind::Nota)),
+        other => panic!("expected scribe statement, got {other:?}"),
+    }
+}
+
+/// KW-U1: `nota (5)` at statement start is a user call, not the output statement.
+#[test]
+fn statement_initial_nota_paren_form_is_a_call() {
+    let result = parse_ok("nota (5)");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    let StmtKind::Expr(expr_stmt) = &program.statements[0].kind else {
+        panic!(
+            "expected expression statement, got {:?}",
+            program.statements[0].kind
+        );
+    };
+    let ExprKind::Call(call) = &expr_stmt.expr.kind else {
+        panic!("expected call, got {:?}", expr_stmt.expr.kind);
+    };
+    let ExprKind::Ident(ident) = &call.callee.kind else {
+        panic!("expected ident callee, got {:?}", call.callee.kind);
+    };
+    assert_eq!(symbol_name(&result, ident.name), "nota");
+}
+
+/// KW-U1: the paren lookahead applies only to the scribe family.
+#[test]
+fn statement_initial_si_with_paren_condition_stays_if() {
+    let result = parse_ok("si (x) { }");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    assert!(
+        matches!(program.statements[0].kind, StmtKind::Si(_)),
+        "structural `si (x) {{ }}` must stay an if-statement, got {:?}",
+        program.statements[0].kind
+    );
+}
+
 #[test]
 fn parses_redde_return() {
     let result = parse_ok("redde 1");

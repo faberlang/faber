@@ -72,7 +72,12 @@ impl Parser {
                 Some(TokenKind::Cede) => self.parse_cede_stmt()?,
                 Some(TokenKind::Adfirma) => self.parse_adfirma_stmt()?,
                 Some(TokenKind::Requirit) => self.parse_require_stmt()?,
-                Some(TokenKind::Scribe) => self.parse_scribe_stmt()?,
+                // Scribe-family keywords claim statement-initial position only
+                // when not immediately followed by `(`. `nota 5` is the output
+                // statement; `nota (5)` falls through as a user call.
+                Some(TokenKind::Scribe) if self.peek_at(1).kind != TokenKind::LParen => {
+                    self.parse_scribe_stmt()?
+                }
                 Some(TokenKind::Incipit | TokenKind::Incipiet) => self.parse_incipit_stmt()?,
                 Some(TokenKind::Ex) => self.parse_extract_stmt()?,
                 Some(TokenKind::Discerne) => self.parse_discerne_stmt()?,
@@ -96,7 +101,9 @@ impl Parser {
                 }
                 Some(TokenKind::Reddet) => self.parse_reddet_stmt(start)?,
                 Some(TokenKind::Tacebit) => self.parse_tacebit_stmt(start)?,
-                Some(TokenKind::Nota | TokenKind::Mone | TokenKind::Vide) => {
+                Some(TokenKind::Nota | TokenKind::Mone | TokenKind::Vide)
+                    if self.peek_at(1).kind != TokenKind::LParen =>
+                {
                     self.parse_scribe_stmt()?
                 }
                 _ => self.parse_expr_stmt()?,
