@@ -776,7 +776,11 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             MirStatementKind::RuntimeCall {
                 call:
                     MirRuntimeCall {
-                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMatMul),
+                        intrinsic:
+                            MirIntrinsic::Collection(
+                                MirCollectionOp::TensorMatMul
+                                | MirCollectionOp::TensorQuantizedMatMul,
+                            ),
                         ..
                     },
                 ..

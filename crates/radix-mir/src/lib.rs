@@ -44,6 +44,8 @@ pub mod validate;
 pub mod visit;
 
 mod figura;
+#[cfg(test)]
+mod packed_kernel_probe;
 /// Shared statement/value read analysis for device-program lowering.
 mod read_analysis;
 #[allow(dead_code)]
