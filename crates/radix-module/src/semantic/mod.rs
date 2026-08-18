@@ -32,6 +32,7 @@
 mod analyzed_application;
 mod annotation_contract;
 mod broadcast_reduction;
+mod def_id_closure;
 mod error;
 mod figura;
 mod format_type;
@@ -78,6 +79,10 @@ pub use annotation_contract::{
     ContractPayloadValue, ResolvedContractApplication, ResolvedContractField,
 };
 pub use broadcast_reduction::compute_cotangent_reduction_axes;
+pub use def_id_closure::{
+    check_def_id_closure, def_id_closure_gaps, missing_emit_def_diagnostic, resolved_reference_defs,
+    DEF_ID_CLOSURE_CODE, DEF_ID_CLOSURE_ISSUE,
+};
 pub use error::{SemanticError, SemanticErrorKind, WarningKind};
 pub use figura::{
     format_figura, literal_index_i64s, lower_figura_expr, FIGURA_NOT_INDEX_PARAM_MSG, FIGURA_TYPE_PARAM_IN_INDEX_MSG,

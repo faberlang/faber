@@ -91,6 +91,11 @@ impl<'a> NameCatalog<'a> {
         self.names.contains_key(&def_id)
     }
 
+    /// Definition identities present in the catalog (the local emit def table).
+    pub fn registered_defs(&self) -> impl Iterator<Item = DefId> + '_ {
+        self.names.keys().copied()
+    }
+
     /// Register a DefId-to-name mapping not present in the local HIR.
     ///
     /// Used to resolve cross-file `DefIds` (types/functions imported from sibling

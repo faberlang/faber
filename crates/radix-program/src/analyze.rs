@@ -552,7 +552,7 @@ pub fn analyze_package_spec(
         .map(|file| ModuleId::for_spec(&spec, file.module_segments.clone()))
         .filter(|id| nodes.get(id).is_some_and(|node| node.is_entry));
     let roots = program_roots(&spec, &nodes, include_proba);
-    Ok(AnalyzedProgram {
+    let mut program = AnalyzedProgram {
         spec,
         entry,
         roots,
@@ -561,7 +561,23 @@ pub fn analyze_package_spec(
         entry_frontmatter,
         diagnostics,
         library_resolver: library_resolver.clone(),
-    })
+    };
+
+    #[cfg(feature = "hir-rust")]
+    {
+        let closure_diags = crate::rust_target::check_program_def_id_closure(
+            &mut program,
+            library_resolver,
+            seams.locale_loader,
+            true,
+        );
+        program.diagnostics.extend(closure_diags);
+        if program.diagnostics.iter().any(Diagnostic::is_error) {
+            return Err(std::mem::take(&mut program.diagnostics));
+        }
+    }
+
+    Ok(program)
 }
 
 fn program_roots(

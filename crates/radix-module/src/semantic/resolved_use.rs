@@ -3,8 +3,10 @@
 //! These facts feed package graphs and target emission needs so backends do not
 //! rediscover uses by scanning HIR or rendered text independently.
 
-use crate::hir::visit::{walk_expr, walk_local, walk_stmt, HirVisitor};
-use crate::hir::{DefId, HirExpression, HirExpressionKind, HirItemKind, HirLocal, HirModule, HirParam, HirStatement};
+use crate::hir::visit::{walk_expr, walk_local, walk_pattern, walk_stmt, HirVisitor};
+use crate::hir::{
+    DefId, HirExpression, HirExpressionKind, HirItemKind, HirLocal, HirModule, HirParam, HirPattern, HirStatement,
+};
 use crate::semantic::qualified_identity::QualifiedIdentityTable;
 use crate::semantic::{Type, TypeId, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -410,5 +412,15 @@ impl HirVisitor for UseVisitor<'_> {
 
     fn visit_stmt(&mut self, stmt: &HirStatement) {
         walk_stmt(self, stmt);
+    }
+
+    fn visit_pattern(&mut self, pattern: &HirPattern) {
+        if let HirPattern::Variant(def_id, _) = pattern {
+            // Importer-local union/enum variant paths are resolved references.
+            // NameCatalog does not visit them; emit must register them or
+            // resolve_def reports CODEGEN001.
+            self.record_local(*def_id, ResolvedUseKind::Path);
+        }
+        walk_pattern(self, pattern);
     }
 }
