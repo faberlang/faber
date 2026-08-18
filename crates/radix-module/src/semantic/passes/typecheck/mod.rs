@@ -626,5 +626,9 @@ mod literal_inference_test;
 mod glyph_binary_test;
 
 #[cfg(test)]
+#[path = "tensor_plus_test.rs"]
+mod tensor_plus_test;
+
+#[cfg(test)]
 #[path = "gradient_test.rs"]
 mod gradient_test;
