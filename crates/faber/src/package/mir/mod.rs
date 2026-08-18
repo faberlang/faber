@@ -220,22 +220,16 @@ fn host_route(
     // device-bearing image fails closed (never silently runs CPU).
     #[cfg(feature = "device-runtime")]
     {
-        match super::host_factory::resolve_backend_selection(
-            selection,
-            requires_device,
-            &super::host_factory::admitted_backends(),
-        ) {
-            Err(diagnostic) => Err(vec![diagnostic]),
-            Ok(None) => Ok(None),
-            Ok(Some(backend)) => {
-                let device = image
-                    .device
-                    .as_ref()
-                    .ok_or_else(|| vec![super::host_factory::missing_device_descriptor(backend)])?;
-                super::device::execute_device_route(device, backend, &image.source_hashes)?;
-                Ok(Some(()))
-            }
+        // In-process `host_factory` is parked (no hosts crate). Packed Metal
+        // closeout uses `host_spawn`. An explicit backend or a device-bearing
+        // image still fails closed — never a silent CPU fallback.
+        if selection != DeviceSelection::Auto || requires_device {
+            return Err(vec![mir_diag(
+                &image.diagnostic_path,
+                "device section or explicit backend selection present, but this faber build parks the in-process host; packed closeout uses the spawn client",
+            )]);
         }
+        Ok(None)
     }
     #[cfg(not(feature = "device-runtime"))]
     {

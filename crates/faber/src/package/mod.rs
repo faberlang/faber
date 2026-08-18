@@ -43,7 +43,7 @@ mod dispatch;
 mod fhir;
 #[cfg(feature = "hir-go")]
 mod go_build;
-#[cfg(feature = "device-runtime")]
+#[cfg(all(feature = "device-runtime", feature = "host-macos-arm64"))]
 mod host_factory;
 pub(crate) mod host_spawn;
 #[cfg_attr(not(feature = "hir-rust"), path = "library_link_unavailable.rs")]
@@ -79,6 +79,9 @@ pub use cmd::{
     cmd_build, cmd_check_package, cmd_emit_package, should_treat_as_package_from_args,
     use_package_compiler_from_args,
 };
+#[cfg(all(feature = "device-runtime", feature = "host-macos-arm64"))]
+#[allow(unused_imports)]
+pub(crate) use device::execute_device_route;
 #[cfg(feature = "device-runtime")]
 #[allow(unused_imports)]
 pub(crate) use device::host_partition_for_lowered;
@@ -86,7 +89,7 @@ pub(crate) use device::host_partition_for_lowered;
 #[allow(unused_imports)]
 pub(crate) use device::{
     admit_device_program_section, device_program_for_lowered, device_section_for_program,
-    execute_device_route, run_dense_full_model_metal_closeout,
+    run_dense_full_model_metal_closeout,
 };
 pub(crate) use dispatch::{
     load_provider_manifests, selected_providers_for_routes, ProviderManifest,
@@ -94,7 +97,7 @@ pub(crate) use dispatch::{
 #[cfg(feature = "hir-go")]
 #[allow(unused_imports)]
 pub(crate) use go_build::{emit_go_module, invoke_go_build, GoBuildLayout};
-#[cfg(feature = "device-runtime")]
+#[cfg(all(feature = "device-runtime", feature = "host-macos-arm64"))]
 #[allow(unused_imports)]
 pub(crate) use host_factory::{
     admitted_backends, construct_composite_host, create_program_session, discovery_receipt,
