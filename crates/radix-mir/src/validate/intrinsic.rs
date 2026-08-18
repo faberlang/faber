@@ -507,7 +507,6 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorMul
             | MirCollectionOp::TensorMatMul
             | MirCollectionOp::TensorCruxEntropia
-            | MirCollectionOp::TensorGather
             | MirCollectionOp::TensorSsmScan
             | MirCollectionOp::TensorDiv
             | MirCollectionOp::RegexMatches
@@ -531,10 +530,17 @@ impl Validator<'_, '_> {
             | MirCollectionOp::SparseSet => 3,
             MirCollectionOp::TensorRmsNorm => 4,
             MirCollectionOp::TensorLayerNorm => 0,
+            MirCollectionOp::TensorGather => 0,
         };
         if matches!(op, MirCollectionOp::TensorLayerNorm) {
             if !(3..=5).contains(&call.args.len()) {
                 self.error(span, "collection TensorLayerNorm expects 3-5 MIR arguments");
+            }
+        } else if matches!(op, MirCollectionOp::TensorGather) {
+            // Dense gather is [table, ids]. Packed gather (R-PACK-02N) adds
+            // an optional trailing GGML type-id const.
+            if !(2..=3).contains(&call.args.len()) {
+                self.error(span, "collection TensorGather expects 2 or 3 MIR arguments");
             }
         } else if call.args.len() != expected_args {
             self.error(
