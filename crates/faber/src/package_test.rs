@@ -8429,7 +8429,7 @@ entry = "main.fab"
     assert!(cargo_toml.contains("edition = \"2021\""));
     assert!(cargo_toml.contains("0.3.0"));
     assert!(cargo_toml.contains("[dependencies]"));
-    assert!(cargo_toml.contains("package = \"faber-runtime\"") && cargo_toml.contains("git = "));
+    assert!(cargo_toml.contains("package = \"faber\"") && cargo_toml.contains("git = "));
     assert!(!cargo_toml.contains("norma = { path = "));
     assert!(!cargo_toml.contains("tokio = { version = "));
 
@@ -8776,7 +8776,7 @@ entry = "main.fab"
     )
     .expect("emit");
     let cargo_toml = fs::read_to_string(&layout.generated_cargo_manifest).expect("read cargo");
-    assert!(cargo_toml.contains("faber = { package = \"faber-runtime\""));
+    assert!(cargo_toml.contains("faber = { package = \"faber\""));
     assert!(cargo_toml.contains("tokio = { version = "));
 }
 
@@ -9738,7 +9738,7 @@ main {
     // onto the root module tree (`crate::child::label()`), so a cargo build of
     // the emitted crate proves there is no dangling `crate::parent::child`
     // path left in the codegen.
-    // D1 offline seam: the generated crate resolves faber-runtime from the
+    // D1 offline seam: the generated crate resolves the faber runtime from the
     // container-local checkout (the released `v<faber version>` git tag does
     // not exist until the next release), so the cargo build stays offline.
     let container_root = radix_module::paths::faberlang_home().expect("faberlang container root");
@@ -10505,7 +10505,7 @@ main {
     // Call while CWD is not the app root — relative lock paths must still resolve.
     let old = std::env::current_dir().expect("cwd");
     std::env::set_current_dir(&root).expect("chdir root");
-    // D1 offline seam: the linked library's faber-runtime row falls back to
+    // D1 offline seam: the linked library's faber runtime row falls back to
     // the container-local checkout behind the path override.
     let override_root = root.join("container");
     fs::create_dir_all(override_root.join("faber/runtime/rust")).expect("override runtime");

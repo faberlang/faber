@@ -295,7 +295,7 @@ fn f16_round_f64(v: f64) -> f64 {
     f64::from(f16_round_f32(v as f32))
 }
 
-/// f32 -> f16 round-to-nearest-even (the faber-runtime `f32_to_f16_rn`
+/// f32 -> f16 round-to-nearest-even (the public faber `f32_to_f16_rn`
 /// algorithm; the IEEE bit-layout shifts/truncations are intentional).
 #[allow(
     clippy::cast_possible_wrap,

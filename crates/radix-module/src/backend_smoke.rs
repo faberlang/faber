@@ -126,7 +126,7 @@ fn generated_rust_needs_tokio(code: &str) -> bool {
 }
 
 fn render_smoke_cargo_dependencies(code: &str, runtime: &Path) -> String {
-    let mut deps = format!("faber = {{ package = \"faber-runtime\", path = \"{}\" }}\n", runtime.display());
+    let mut deps = format!("faber = {{ path = \"{}\" }}\n", runtime.display());
     if generated_rust_needs_tokio(code) {
         deps.push_str("tokio = { version = \"1\", features = [\"rt\", \"net\", \"time\"] }\n");
     }

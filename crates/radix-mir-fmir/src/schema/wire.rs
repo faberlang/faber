@@ -863,7 +863,7 @@ pub enum WireReduceOp {
 // sibling-field precedent. `WIRE_DEVICE_PROGRAM_VERSION` and the outer
 // `PACKAGE_MIR_ARTIFACT_VERSION = 6` stay untouched; the MD2 `distributed`
 // section files are never co-edited. The wire types here mirror the GI4-1
-// frozen faber-runtime facts field-for-field (the `session.rs` / `kv_cache.rs`
+// frozen public faber crate facts field-for-field (the `session.rs` / `kv_cache.rs`
 // types): the per-invocation input cadence, the workload modes, the session
 // observation cadence, and the typed `KvCacheLayout` carriage.
 

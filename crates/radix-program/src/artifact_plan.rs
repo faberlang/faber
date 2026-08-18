@@ -572,7 +572,7 @@ fn plan_rust_artifacts(
             id: "rust:runtime:faber".to_owned(),
             kind: ArtifactKind::RuntimeDependency,
             target: Some("rust"),
-            path: PathBuf::from("faber-runtime"),
+            path: PathBuf::from("faber"),
             depends_on: Vec::new(),
         },
     );

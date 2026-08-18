@@ -1,7 +1,7 @@
 //! Radix-owned tensor operation contract: shared error-message constants and
 //! shape arithmetic.
 //!
-//! Mirrors `faber-runtime::tensor`. Radix is the authority for this contract;
+//! Mirrors `faber::tensor`. Radix is the authority for this contract;
 //! the runtime copy is expected to become a generated/committed artifact in a
 //! later phase. Copied faithfully so compile-time (runner) and runtime emit
 //! byte-identical error text and agree on shape math.

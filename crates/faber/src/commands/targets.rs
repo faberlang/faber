@@ -95,7 +95,7 @@ const FABER_CAPABILITY_ROWS: &[(&str, &str, &str)] = &[
     (
         "device-runtime",
         "device-runtime",
-        "device runtime support surface (faber-runtime + package/device modules); compiled only under the device-runtime feature",
+        "device runtime support surface (faber runtime + package/device modules); compiled only under the device-runtime feature",
     ),
     (
         "host-macos-arm64",

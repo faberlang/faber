@@ -401,7 +401,7 @@ fn a10_device_identity_hash_is_unchanged_by_a_logical_plan() {
 
 #[test]
 fn bound_distributed_plan_hash_spelling_contract_is_frozen() {
-    // MD2-B1 computes `bound_distributed_plan_hash` in faber-runtime over
+    // MD2-B1 computes `bound_distributed_plan_hash` in the public faber crate over
     // the `BoundDistributedPlan` canonical bytes (the logical hash + binding
     // facts). H1 freezes the spelling: the same `sha256:<64-hex>` format as
     // A10 and the logical hash. Physical ids enter THIS bound-plan domain —
