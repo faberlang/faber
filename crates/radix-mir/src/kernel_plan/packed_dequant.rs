@@ -118,7 +118,7 @@ pub fn dequant_q6_k(block: &[u8]) -> Result<[f32; 256], PackedDequantError> {
         let qh_off = n / 4;
         for l in 0..32usize {
             let is = l / 16;
-            let q1 = i32::from((ql[ql_off + l] & 0x0f) | (((qh[qh_off + l] >> 0) & 3) << 4)) - 32;
+            let q1 = i32::from((ql[ql_off + l] & 0x0f) | ((qh[qh_off + l] & 3) << 4)) - 32;
             let q2 =
                 i32::from((ql[ql_off + l + 32] & 0x0f) | (((qh[qh_off + l] >> 2) & 3) << 4)) - 32;
             let q3 = i32::from((ql[ql_off + l] >> 4) | (((qh[qh_off + l] >> 4) & 3) << 4)) - 32;
