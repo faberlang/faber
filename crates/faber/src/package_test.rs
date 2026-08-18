@@ -5921,7 +5921,7 @@ async_main {
     assert_eq!(item.exported_name, "Response");
     assert_eq!(item.kind, LibraryItemKind::Interface);
     assert_eq!(item.rust_runtime_type.as_deref(), None);
-    assert!(item.elide_rust_decl);
+    assert!(!item.elide_rust_decl);
 }
 
 #[test]
@@ -5961,7 +5961,11 @@ async_main {
         .code
         .contains("let responsum: Box<dyn crate::http::Response> ="));
     assert!(!output.code.contains("rete.get"));
-    assert!(!output.code.contains("pub trait Response"));
+    assert!(
+        output.code.contains("pub trait Response"),
+        "norma:http rides the ordinary generated-library path; Response is not a faber::http runtime carrier:\n{}",
+        output.code
+    );
 }
 
 #[test]
