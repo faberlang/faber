@@ -122,7 +122,9 @@ impl TypeChecker<'_> {
             if self.is_range_index(idx_ty) {
                 return self.types.primitive(Primitive::Octeti);
             }
-            return self.types.sized_numeric(Primitive::Numerus, NumericWidth::U8);
+            return self
+                .types
+                .sized_numeric(Primitive::Numerus, NumericWidth::U8);
         }
         if let Type::Tensor(elem, shape) = resolved_kind {
             return self.check_tensor_bracket_index(elem, shape, idx_ty, object_span, index_span);
@@ -468,11 +470,7 @@ impl TypeChecker<'_> {
         let len = bytes.len();
         if let Some((start, end)) = static_octeti_index_window(index) {
             if start > end || end > len {
-                self.error_issue(
-                    SemanticErrorKind::TypeMismatch,
-                    ISSUE_OCTETI_INDEX_OUT_OF_BOUNDS,
-                    index.span,
-                );
+                self.error_issue(SemanticErrorKind::TypeMismatch, ISSUE_OCTETI_INDEX_OUT_OF_BOUNDS, index.span);
             }
         }
     }
