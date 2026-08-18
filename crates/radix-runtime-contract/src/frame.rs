@@ -1,7 +1,7 @@
 //! Radix-owned frame status contract: the lifecycle states of a `sermo`
 //! (conversation) frame in the `ad` bridge/gateway architecture.
 //!
-//! Mirrors `faber-runtime::frame::FrameStatus`. Radix is the authority for this
+//! Mirrors `faber::frame::FrameStatus`. Radix is the authority for this
 //! contract; the runtime copy is expected to become a generated/committed
 //! artifact in a later phase (same direction as `crate::abi::host_abi`). The
 //! seven variants and their terminal/content classification are also encoded in

@@ -1,7 +1,7 @@
 //! Radix-owned sparsa (sparse tensor) operation contract: shared error-message
 //! constants.
 //!
-//! Mirrors `faber-runtime::sparsa`. Radix is the authority; the runtime copy is
+//! Mirrors `faber::sparsa`. Radix is the authority; the runtime copy is
 //! expected to become a generated/committed artifact in a later phase. Copied
 //! faithfully so compile-time and runtime emit byte-identical error text.
 //!

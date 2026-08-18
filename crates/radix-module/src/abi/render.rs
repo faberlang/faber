@@ -33,7 +33,7 @@ pub fn render_json(payload: &AbiPayload) -> Result<String, serde_json::Error> {
 /// Render the payload as a runtime-facing Rust constants artifact.
 ///
 /// The artifact is a constants view of the Radix-owned contract. The runtime
-/// (`faber-runtime`) keeps its own C struct implementations; only symbol names,
+/// (public `faber` crate) keeps its own C struct implementations; only symbol names,
 /// enum codes, LLVM layout spellings, status codes, and diagnostic rows are
 /// emitted here.
 ///
@@ -54,7 +54,7 @@ pub fn render_rust(payload: &AbiPayload) -> Result<String, serde_json::Error> {
     let _ = writeln!(out, "//! Fingerprint: {fingerprint}.");
     out.push_str("//!\n");
     out.push_str("//! This artifact is a constants view of the Radix-owned contract. The runtime\n");
-    out.push_str("//! (`faber-runtime`) keeps its own C struct implementations (FaberRtSliceV1,\n");
+    out.push_str("//! (public `faber` crate) keeps its own C struct implementations (FaberRtSliceV1,\n");
     out.push_str("//! FaberRtStatusV1, ...); only the symbol names, enum codes, layout spellings,\n");
     out.push_str("//! status codes, and diagnostic rows are generated here.\n\n");
 

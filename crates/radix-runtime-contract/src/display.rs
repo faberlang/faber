@@ -1,7 +1,7 @@
 //! Radix-owned scalar display helpers shared by the interpreter (and, as text,
 //! by generated Rust).
 //!
-//! Mirrors the subset of `faber-runtime::display` used at Radix build time.
+//! Mirrors the subset of `faber::display` used at Radix build time.
 //! Radix is the authority; the runtime copy is expected to become a
 //! generated/committed artifact in a later phase.
 

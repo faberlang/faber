@@ -1,6 +1,6 @@
 //! Runtime contract equivalence checks.
 //!
-//! These pin the Radix-owned copies against known `faber-runtime` values and
+//! These pin the Radix-owned copies against known public `faber` crate values and
 //! datetime round-trips, so a transcription error in the copied contract is
 //! caught here rather than as silent emit or behavior drift.
 
@@ -14,7 +14,7 @@ use crate::runtime_contract::{
 #[test]
 fn tensor_error_constants_match_runtime_text() {
     // Spot-check the constants actually consumed by codegen/runner; these must
-    // be byte-identical to faber-runtime so compile-time and runtime agree.
+    // be byte-identical to the public faber crate so compile-time and runtime agree.
     assert_eq!(tensor::ERR_CREA_INVALID_SHAPE, "tensor crea invalid shape");
     assert_eq!(tensor::ERR_FORMA_RESHAPE_COUNT, "tensor forma (reshape) element count mismatch");
     assert_eq!(tensor::ERR_FORMA_ELEMENT_COUNT, "tensor forma element count mismatch");

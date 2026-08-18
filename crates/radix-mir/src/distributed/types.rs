@@ -15,7 +15,7 @@
 //! md2-delivery.md §MD2-D1):
 //!
 //! - The plan is **portable and target-neutral** — it never references a
-//!   `PhysicalDeviceId` (radix-mir does not depend on faber-runtime, FC18).
+//!   `PhysicalDeviceId` (radix-mir does not depend on the public faber crate, FC18).
 //! - [`DeviceProgramPartition`] references the semantic program by **stable
 //!   id** — launch/buffer ids, the program's own kernel index space, and
 //!   `(buffer, version, producing launch)` result triples — never by name,

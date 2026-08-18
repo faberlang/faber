@@ -38,7 +38,7 @@ fn smoke_hir_rust_mangled_real_emit_fails_when_rustc_present() {
     }
     if !cargo_available() || crate::test_support::faber_runtime_crate_path().is_none() {
         eprintln!(
-            "cargo or faber-runtime not available; skipping rust mangled-emit self-test \
+            "cargo or faber runtime crate not available; skipping rust mangled-emit self-test \
              (assert_emitted_rust_typechecks would skip the typecheck and pass vacuously)"
         );
         return;

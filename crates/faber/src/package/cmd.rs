@@ -422,7 +422,7 @@ pub fn cmd_build(command: radix_module::tool::BuildCommand, format: bool, linter
 
     let code = output_code(output);
 
-    // Single-file Rust builds that need faber-runtime / tokio (from HIR facts,
+    // Single-file Rust builds that need the `faber` runtime / tokio (from HIR facts,
     // not emitted-text sniffing) emit a generated Cargo crate under
     // `target/faber/`. Programs without those deps keep the bare `.rs` path.
     if target == radix_module::codegen::Target::HirRust {

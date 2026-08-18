@@ -1,7 +1,7 @@
 //! Radix-owned `instans` runtime — absolute point-in-time with precision
 //! contract.
 //!
-//! Mirrors `faber-runtime::instans`. Radix is the authority; the runtime copy
+//! Mirrors `faber::instans`. Radix is the authority; the runtime copy
 //! is expected to become a generated/committed artifact in a later phase. All
 //! precision variants store i64 nanoseconds since Unix epoch; the precision
 //! parameter declares how many trailing digits are meaningful

@@ -16,7 +16,7 @@
 //! # Contract anchors
 //!
 //! - **Portable and target-neutral**: the plan never references a
-//!   `PhysicalDeviceId` (radix-mir does not depend on faber-runtime, FC18).
+//!   `PhysicalDeviceId` (radix-mir does not depend on the public faber crate, FC18).
 //! - **Stable ids only**: partitions reference the semantic program by
 //!   launch/buffer ids, the program's own kernel index space, and
 //!   `(buffer, version, producing launch)` result triples — never by name,
