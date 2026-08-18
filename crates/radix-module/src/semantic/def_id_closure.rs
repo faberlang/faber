@@ -11,7 +11,7 @@
 use crate::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase};
 use crate::hir::DefId;
 use crate::semantic::resolved_use::ResolvedUseIndex;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Stable diagnostic code for an emit-table miss.
 pub const DEF_ID_CLOSURE_CODE: &str = "DEFID001";
@@ -59,6 +59,28 @@ pub fn missing_emit_def_diagnostic(def_id: DefId, name: Option<&str>, file: &str
         .with_code(DEF_ID_CLOSURE_CODE)
         .with_args(args)
         .with_file(file.to_owned())
+}
+
+/// Display name for a def on the DEFID001 surface.
+///
+/// Locale-pack TypeAlias surfaces are not imported type-paths. `name_of` used
+/// to look only at path tails, so a missing pack alias reported `def_id=35`
+/// with no `def_name`. Pack spellings win; imported path tails remain the
+/// fallback for genuine import defs.
+#[must_use]
+pub fn emit_def_table_name<'a>(
+    def_id: DefId,
+    locale_pack_type_aliases: &'a FxHashMap<DefId, String>,
+    imported_type_paths: &'a FxHashMap<DefId, String>,
+) -> Option<&'a str> {
+    locale_pack_type_aliases
+        .get(&def_id)
+        .map(String::as_str)
+        .or_else(|| {
+            imported_type_paths
+                .get(&def_id)
+                .and_then(|path| path.rsplit("::").next())
+        })
 }
 
 /// Compare referenced defs against the emit table and emit one diagnostic per miss.
@@ -128,5 +150,79 @@ mod tests {
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, Some(DEF_ID_CLOSURE_CODE));
         assert!(diags[0].message.contains("Known"));
+    }
+
+    #[cfg(feature = "hir-rust")]
+    #[test]
+    fn rust_locale_pack_type_alias_def_reaches_emit_table() {
+        use crate::codegen::rust::emit_def_table;
+        use crate::codegen::Target;
+        use crate::semantic::{analyze, analyze_resolved_uses, PassConfig};
+        use rustc_hash::FxHashMap;
+
+        let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/th-TH/pack.toml");
+        let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed th-TH pack should load");
+        let source = "ฟังก์ชัน ก(จำนวน n) → จำนวน {\n  คืน n\n}\n";
+        let lex = crate::lexer::lex_with_locale_pack(source, &pack);
+        let mut parsed = crate::parser::parse(lex);
+        assert!(parsed.errors.is_empty(), "parse errors: {:?}", parsed.errors);
+        let program = parsed.program.expect("program");
+        let mut config = PassConfig::for_target(Target::HirRust);
+        config.locale_pack = Some(pack);
+        let result = analyze(&program, &config, &mut parsed.interner);
+        assert!(
+            result.diagnostics.iter().all(|diag| !diag.is_error()),
+            "analysis errors: {:?}",
+            result.diagnostics
+        );
+        let hir = result.hir.expect("hir");
+        let soan = parsed.interner.intern("จำนวน");
+        let def_id = result
+            .resolver
+            .lookup_type(soan)
+            .expect("th-TH numerus surface จำนวน must register a TypeAlias DefId");
+        let surface = parsed.interner.resolve(soan).to_owned();
+        let aliases = result
+            .resolver
+            .locale_pack_type_alias_names(&parsed.interner);
+        assert_eq!(aliases.get(&def_id), Some(&surface));
+
+        let imported = FxHashMap::default();
+        let emit = emit_def_table(&hir, &parsed.interner, std::iter::empty(), &imported, aliases.keys().copied());
+        assert!(
+            emit.contains(&def_id),
+            "locale-pack TypeAlias DefId {def_id:?} must reach emit_def_table"
+        );
+
+        let referenced = [def_id].into_iter().collect();
+        let missing = check_def_id_closure(
+            &referenced,
+            &FxHashSet::default(),
+            |id| emit_def_table_name(id, &aliases, &imported).map(str::to_owned),
+            "main.fab",
+        );
+        assert_eq!(missing.len(), 1);
+        assert_eq!(missing[0].code, Some(DEF_ID_CLOSURE_CODE));
+        assert!(
+            missing[0]
+                .args
+                .iter()
+                .any(|arg| arg.name == "def_name" && arg.value == surface),
+            "DEFID001 must name the pack alias, got {:?}",
+            missing[0].args
+        );
+
+        let uses = analyze_resolved_uses(&hir, &result.types, &crate::semantic::QualifiedIdentityTable::new());
+        let live = resolved_reference_defs(&uses);
+        let admitted = check_def_id_closure(
+            &live,
+            &emit,
+            |id| emit_def_table_name(id, &aliases, &imported).map(str::to_owned),
+            "main.fab",
+        );
+        assert!(
+            admitted.is_empty(),
+            "admitted pack aliases must not trip DEFID001: {admitted:?}"
+        );
     }
 }

@@ -80,8 +80,8 @@ pub use annotation_contract::{
 };
 pub use broadcast_reduction::compute_cotangent_reduction_axes;
 pub use def_id_closure::{
-    check_def_id_closure, def_id_closure_gaps, missing_emit_def_diagnostic, resolved_reference_defs,
-    DEF_ID_CLOSURE_CODE, DEF_ID_CLOSURE_ISSUE,
+    check_def_id_closure, def_id_closure_gaps, emit_def_table_name, missing_emit_def_diagnostic,
+    resolved_reference_defs, DEF_ID_CLOSURE_CODE, DEF_ID_CLOSURE_ISSUE,
 };
 pub use error::{SemanticError, SemanticErrorKind, WarningKind};
 pub use figura::{
@@ -671,7 +671,8 @@ fn register_locale_pack_type_spellings(
                 span: crate::lexer::Span::default(),
             };
             match resolver.define(symbol) {
-                Ok(_) | Err(_) => {}
+                Ok(def_id) => resolver.record_locale_pack_type_alias(def_id, name),
+                Err(_) => {}
             }
         }
     }
