@@ -253,10 +253,18 @@ variantFields := (typeAnnotation IDENTIFIER (',' typeAnnotation IDENTIFIER)*)?
 
 ### Identifier Naming
 
-Faber keyword ownership is contextual per spelling. Outside a spelling's owning
-contexts, that spelling may be an `IDENTIFIER`. An owning context may itself be
-effectively global when its production applies everywhere a statement or
-expression may begin.
+Faber has no globally reserved words. Keyword ownership is contextual per
+spelling: a keyword claims only its owning grammar slot. Every user-chosen
+name slot accepts every keyword spelling — declaration names, parameters,
+members, binding targets (`fixum`/`varia`/`sit` patterns and captures),
+import aliases, and loop/iteration bindings. Type-name slots stay out.
+
+Outside a spelling's owning contexts, that spelling may be an `IDENTIFIER`.
+An owning context may itself be effectively global when its production
+applies everywhere a statement or expression may begin. Builtin claims
+(`lege`/`lineam`/`scriptum`/`vacua`, and the scribe family in
+statement-initial position) are defaults, not reservations: a user binding
+of the same surface spelling wins.
 
 Radix still emits globally reserved tokens for some spellings and selectively
 reinterprets them as identifiers. That is transitional implementation behavior;
@@ -884,6 +892,12 @@ scriptumExpr  := 'scriptum' '(' STRING (',' expression)* ')'
 legeExpr      := 'lege' 'lineam'?
 ```
 
+`scriptum` and `lege`/`lineam` are builtin claims that resolve to a user binding
+when the surface spelling is bound in scope (parameter, local, function, or any
+in-scope definition); otherwise they are the builtin. The same binding-wins rule
+applies to `scriptum`'s paren-claimed form and to the `vacua` empty-collection
+marker: builtin claims are defaults, not reservations.
+
 `finge` variant construction accepts a qualified variant path
 (`finge pkg.Bonum { … }`), so an imported union's variants construct through
 the import alias, and the `∷` cast is a full type annotation
@@ -917,6 +931,12 @@ arrayPatternElement := '_' | 'ceteri'? IDENTIFIER
 ```ebnf
 outputStmt := ('nota' | 'vide' | 'mone' | 'scribe') expression (',' expression)*
 ```
+
+The scribe family (`nota`/`vide`/`mone`/`scribe` — en `print`/`debug`/`warn`/`write`)
+claims the statement-initial position only when **not** immediately followed by
+`(`. `nota expr` is the output statement; a statement-initial `nota(...)` is an
+expression statement whose callee is the identifier `nota` — a user function
+call, never the intrinsic.
 
 - `nota` = neutral diagnostic note, `vide` = debug/inspect, `mone` = warn
 - `scribe` is a diagnostic channel spelling; use current stdlib methods for real output
@@ -1139,4 +1159,4 @@ policy around it, see:
 2. **Type-first declarations**: `fixum textus name` NOT `fixum name: textus`
 3. **Iteration loops**: `itera ex/de collection fixum/varia item { }` or `itera ab range fixum/varia item { }` (verb-first, source, then binding)
 4. **Parentheses around conditions are valid but not idiomatic**: prefer `si x > 0 { }` or `si flag est verum { }` over `si (x > 0) { }`
-5. **Diagnostic keywords are statements**, not functions — `nota x` works, `nota(x)` also works (parentheses group the expression), but `nota` is not a callable value
+5. **Scribe-family keywords claim statement-initial position only when not followed by `(`** — `nota x` is the output statement; a statement-initial `nota(x)` is a call to the identifier `nota`
