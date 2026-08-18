@@ -1577,6 +1577,32 @@ fn bounded_ascii_one_is_not_bare_ascii() {
 }
 
 #[test]
+fn bounded_ascii_one_assigns_to_textus_like_bare_ascii() {
+    let mut types = TypeTable::new();
+    let ascii = types.primitive(Primitive::Ascii);
+    let textus = types.primitive(Primitive::Textus);
+    let n1 = types.intern_index(IndexExpr::Literal(1));
+    let n8 = types.intern_index(IndexExpr::Literal(8));
+    let ascii1 = types.bounded_ascii(n1);
+    let ascii8 = types.bounded_ascii(n8);
+
+    assert!(types.assignable(ascii, textus), "bare ascii → textus");
+    assert!(
+        types.assignable(ascii1, textus),
+        "ascii<1> → textus (D17 payload widening)"
+    );
+    assert!(
+        !types.assignable(ascii8, textus),
+        "ascii<8> ↛ textus until BB-4"
+    );
+    assert!(!types.assignable(textus, ascii1), "textus ↛ ascii<1>");
+    assert!(
+        !types.assignable(ascii1, ascii),
+        "ascii<1> ↛ ascii until BB-4"
+    );
+}
+
+#[test]
 fn parse_natural_capacity_accepts_decimal_digits_only() {
     assert_eq!(crate::parse_natural_capacity("8"), Some(8));
     assert_eq!(crate::parse_natural_capacity("0"), Some(0));
