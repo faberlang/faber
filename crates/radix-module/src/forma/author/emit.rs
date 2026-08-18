@@ -1153,6 +1153,13 @@ impl AuthorEmitter {
                 w.write(" ");
                 Self::write_quoted_symbol(lane.lane, surface, interner, w);
             }
+            AnnotationKind::Nucleum(nucleum) => {
+                w.write(surface.contextual_keyword("nucleum"));
+                if nucleum.fragment {
+                    w.write(" ");
+                    w.write(surface.contextual_keyword("fragment"));
+                }
+            }
             AnnotationKind::Braced(braced) => {
                 Self::write_ident(&braced.name, surface, interner, w);
                 w.write(" {");

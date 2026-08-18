@@ -1026,6 +1026,7 @@ fn inferred_callee_nested_argument_emits_one_argument_mismatch_diagnostic() {
                 is_async: false,
                 is_generator: false,
                 is_kernel: false,
+                nucleum_fragment: false,
                 is_device: false,
                 is_vertex: false,
                 is_fragment: false,

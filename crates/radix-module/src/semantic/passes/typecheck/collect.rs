@@ -107,6 +107,11 @@ impl TypeChecker<'_> {
         for method in &struct_item.methods {
             let sig = self.function_signature(&method.func);
             methods.insert(method.func.name, sig);
+            if let Some(role) = method.func.nucleum_role() {
+                self.nucleum_roles.insert(method.def_id, role);
+                self.method_nucleum_roles
+                    .insert((def_id, method.func.name), role);
+            }
         }
 
         self.type_params_by_def.insert(
@@ -298,6 +303,9 @@ impl TypeChecker<'_> {
                 HirItemKind::Function(func) => {
                     let sig = self.function_signature(func);
                     self.functions.insert(item.def_id, sig);
+                    if let Some(role) = func.nucleum_role() {
+                        self.nucleum_roles.insert(item.def_id, role);
+                    }
                 }
                 HirItemKind::Import(import) => {
                     for import_item in &import.items {

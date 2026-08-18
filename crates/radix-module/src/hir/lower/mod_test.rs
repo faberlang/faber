@@ -1097,6 +1097,7 @@ functio plane_vertex() → vacuum { redde }
         panic!("expected function item");
     };
     assert!(!func.is_kernel);
+    assert!(!func.nucleum_fragment);
     assert!(!func.is_device);
     assert!(func.is_vertex, "is_vertex should be true after @vertex annotation wiring");
     assert!(!func.is_fragment);
@@ -1116,9 +1117,46 @@ functio plane_fragment() → vacuum { redde }
         panic!("expected function item");
     };
     assert!(!func.is_kernel);
+    assert!(!func.nucleum_fragment);
     assert!(!func.is_device);
     assert!(func.is_fragment, "is_fragment should be true after @fragment annotation wiring");
     assert!(!func.is_vertex);
+}
+
+#[test]
+fn lowers_nucleum_into_entry_role() {
+    let source = r"
+@ nucleum
+functio k() → vacuum { redde }
+";
+    let (lowered, interner, _) = lower_source(source);
+    let HirItemKind::Function(func) = &lowered.hir.items[0].kind else {
+        panic!("expected function item");
+    };
+    assert_eq!(func.nucleum_role(), Some(crate::hir::NucleumRole::Entry));
+    assert!(func.is_kernel);
+    assert!(!func.nucleum_fragment);
+    assert_eq!(interner.resolve(func.annotations[0].family), "nucleum");
+    assert!(func.annotations[0].fields.is_empty());
+}
+
+#[test]
+fn lowers_nucleum_fragment_into_fragment_role() {
+    let source = r"
+@ nucleum fragment
+functio helper() → vacuum { redde }
+";
+    let (lowered, interner, _) = lower_source(source);
+    let HirItemKind::Function(func) = &lowered.hir.items[0].kind else {
+        panic!("expected function item");
+    };
+    assert_eq!(func.nucleum_role(), Some(crate::hir::NucleumRole::Fragment));
+    assert!(!func.is_kernel);
+    assert!(func.nucleum_fragment);
+    assert_eq!(interner.resolve(func.annotations[0].family), "nucleum");
+    assert_eq!(func.annotations[0].fields.len(), 1);
+    assert_eq!(interner.resolve(func.annotations[0].fields[0].name), "fragment");
+    assert!(matches!(func.annotations[0].fields[0].value, HirAnnotationValue::Bool(true)));
 }
 
 #[test]

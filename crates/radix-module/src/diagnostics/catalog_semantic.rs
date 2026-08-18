@@ -813,6 +813,9 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
         "gpu_builtin_device_function_required" => {
             Some("GPU builtin call is only valid inside device functions".to_owned())
         }
+        "NUCLEUM_FRAGMENT_CONTEXT" => Some(
+            "calls to @ nucleum fragment definitions are rejected until composition lands".to_owned(),
+        ),
         "gpu_builtin_type_args" => Some("GPU builtin call does not accept type arguments".to_owned()),
         "inferred_callee_type_args" => Some("inferred callee does not accept type arguments".to_owned()),
         "intrinsic_method_type_args" => Some("intrinsic method does not accept type arguments".to_owned()),
@@ -987,6 +990,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             Some("choose one of the allowed type arguments for this generic parameter".to_owned())
         }
         "gpu_builtin_device_function_required" => Some("call GPU builtins only inside @ machina functions".to_owned()),
+        "NUCLEUM_FRAGMENT_CONTEXT" => {
+            Some("wait for nucleum fragment composition, or call an @ nucleum entry instead".to_owned())
+        }
         "integer_operands_required" => Some("use integer operands for this operator".to_owned()),
         "instans_ordering_operands_required" => Some("compare instans values with instans values".to_owned()),
         "json_duplicate_key" => Some("remove or rename the duplicate JSON object key".to_owned()),

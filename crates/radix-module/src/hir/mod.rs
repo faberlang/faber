@@ -53,7 +53,7 @@ pub use nodes::{
     HirRefKind, HirSchema, HirSchemaColumn, HirScribeKind, HirSourceAnchorId, HirStatement, HirStatementKind,
     HirStruct, HirTestMetadata, HirTestModifier, HirTrivia, HirTriviaAttachment, HirTriviaOwner, HirTriviaOwnerKind,
     HirTypeAlias, HirTypeParam, HirTypeParamConstraint, HirUnOp, HirVariant, HirVariantField, LibraryBinding,
-    LibraryIdentity, LibraryItem, LibraryItemKind, LibraryProvider, LibraryRegistry,
+    LibraryIdentity, LibraryItem, LibraryItemKind, LibraryProvider, LibraryRegistry, NucleumRole,
 };
 
 /// Lowered HIR for one source unit.

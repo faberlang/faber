@@ -1141,6 +1141,12 @@ impl PrettyEmitter<'_> {
                 self.w.write("radix lane ");
                 self.write_quoted_symbol(lane.lane);
             }
+            AnnotationKind::Nucleum(nucleum) => {
+                self.w.write("nucleum");
+                if nucleum.fragment {
+                    self.w.write(" fragment");
+                }
+            }
             AnnotationKind::Braced(braced) => {
                 self.write_ident(&braced.name);
                 self.w.write(" {");

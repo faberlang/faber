@@ -2091,7 +2091,13 @@ fn device_safe_reports_rank2_tensor_device_view_layout_gap() {
         .any(|gap| gap.slug() == "missing-layout-fact" && gap.shape() == "kernel device view rank 2"));
 }
 
-fn role_func(is_kernel: bool, is_device: bool, is_vertex: bool, is_fragment: bool) -> HirFunction {
+fn role_func(
+    is_kernel: bool,
+    nucleum_fragment: bool,
+    is_device: bool,
+    is_vertex: bool,
+    is_fragment: bool,
+) -> HirFunction {
     use crate::lexer::Symbol;
     HirFunction {
         name: Symbol(0),
@@ -2105,6 +2111,7 @@ fn role_func(is_kernel: bool, is_device: bool, is_vertex: bool, is_fragment: boo
         is_async: false,
         is_generator: false,
         is_kernel,
+        nucleum_fragment,
         is_device,
         is_vertex,
         is_fragment,
@@ -2117,7 +2124,7 @@ fn role_func(is_kernel: bool, is_device: bool, is_vertex: bool, is_fragment: boo
 fn device_role_accepts_kernel_only() {
     // CTO a7c616ed: kernel-only annotation yields MirDeviceRole::Kernel.
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(true, false, false, false)),
+        crate::mir::device::device_role_for_hir_function(&role_func(true, false, false, false, false)),
         Some(MirDeviceRole::Kernel)
     );
 }
@@ -2125,7 +2132,7 @@ fn device_role_accepts_kernel_only() {
 #[test]
 fn device_role_accepts_device_only() {
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(false, true, false, false)),
+        crate::mir::device::device_role_for_hir_function(&role_func(false, false, true, false, false)),
         Some(MirDeviceRole::Device)
     );
 }
@@ -2135,7 +2142,7 @@ fn device_role_rejects_vertex_only() {
     // Vertex-only is a graphics stage (MirKernelShaderStage), not a
     // MirDeviceRole — returns None.
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(false, false, true, false)),
+        crate::mir::device::device_role_for_hir_function(&role_func(false, false, false, true, false)),
         None
     );
 }
@@ -2144,7 +2151,7 @@ fn device_role_rejects_vertex_only() {
 fn device_role_rejects_fragment_only() {
     // Fragment-only is a graphics stage, not a MirDeviceRole.
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(false, false, false, true)),
+        crate::mir::device::device_role_for_hir_function(&role_func(false, false, false, false, true)),
         None
     );
 }
@@ -2153,7 +2160,7 @@ fn device_role_rejects_fragment_only() {
 fn device_role_rejects_conflicting_kernel_vertex() {
     // Conflicting compute + graphics: fail-closed, no device role.
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(true, false, true, false)),
+        crate::mir::device::device_role_for_hir_function(&role_func(true, false, false, true, false)),
         None
     );
 }
@@ -2161,7 +2168,7 @@ fn device_role_rejects_conflicting_kernel_vertex() {
 #[test]
 fn device_role_rejects_conflicting_kernel_fragment() {
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(true, false, false, true)),
+        crate::mir::device::device_role_for_hir_function(&role_func(true, false, false, false, true)),
         None
     );
 }
@@ -2169,7 +2176,7 @@ fn device_role_rejects_conflicting_kernel_fragment() {
 #[test]
 fn device_role_rejects_conflicting_kernel_device() {
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(true, true, false, false)),
+        crate::mir::device::device_role_for_hir_function(&role_func(true, false, true, false, false)),
         None
     );
 }
@@ -2177,7 +2184,7 @@ fn device_role_rejects_conflicting_kernel_device() {
 #[test]
 fn device_role_rejects_conflicting_device_vertex() {
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(false, true, true, false)),
+        crate::mir::device::device_role_for_hir_function(&role_func(false, false, true, true, false)),
         None
     );
 }
@@ -2185,7 +2192,7 @@ fn device_role_rejects_conflicting_device_vertex() {
 #[test]
 fn device_role_rejects_conflicting_device_fragment() {
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(false, true, false, true)),
+        crate::mir::device::device_role_for_hir_function(&role_func(false, false, true, false, true)),
         None
     );
 }
@@ -2193,7 +2200,162 @@ fn device_role_rejects_conflicting_device_fragment() {
 #[test]
 fn device_role_rejects_conflicting_vertex_fragment() {
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(false, false, true, true)),
+        crate::mir::device::device_role_for_hir_function(&role_func(false, false, false, true, true)),
         None
+    );
+}
+
+#[test]
+fn device_role_accepts_nucleum_fragment_only() {
+    assert_eq!(
+        crate::mir::device::device_role_for_hir_function(&role_func(false, true, false, false, false)),
+        Some(MirDeviceRole::Fragment)
+    );
+    assert_eq!(
+        role_func(false, true, false, false, false).nucleum_role(),
+        Some(crate::hir::NucleumRole::Fragment)
+    );
+}
+
+#[test]
+fn device_role_rejects_conflicting_entry_and_fragment() {
+    assert_eq!(
+        crate::mir::device::device_role_for_hir_function(&role_func(true, true, false, false, false)),
+        None
+    );
+    assert_eq!(role_func(true, true, false, false, false).nucleum_role(), None);
+}
+
+#[test]
+fn device_role_rejects_nucleum_fragment_plus_vertex() {
+    assert_eq!(
+        crate::mir::device::device_role_for_hir_function(&role_func(false, true, false, true, false)),
+        None
+    );
+}
+
+#[test]
+fn device_role_rejects_nucleum_fragment_plus_graphics_fragment() {
+    assert_eq!(
+        crate::mir::device::device_role_for_hir_function(&role_func(false, true, false, false, true)),
+        None
+    );
+}
+
+#[test]
+fn device_role_rejects_nucleum_entry_plus_graphics_fragment() {
+    assert_eq!(
+        crate::mir::device::device_role_for_hir_function(&role_func(true, false, false, false, true)),
+        None
+    );
+}
+
+fn first_function_item(analysis: &crate::driver::AnalyzedModule) -> (&crate::hir::DefId, &HirFunction) {
+    analysis
+        .hir
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            crate::hir::HirItemKind::Function(func) => Some((&item.def_id, func.as_ref())),
+            _ => None,
+        })
+        .expect("expected a function item")
+}
+
+#[test]
+fn nucleum_annotation_lowers_to_entry_role() {
+    let source = r"
+@ nucleum
+functio k(fractus<f32> x) → fractus<f32> {
+    redde x
+}
+";
+    let session = Session::new(Config::default());
+    let analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
+    let (def_id, func) = first_function_item(&analysis);
+    assert_eq!(func.nucleum_role(), Some(crate::hir::NucleumRole::Entry));
+    assert!(func.is_kernel);
+    assert!(!func.nucleum_fragment);
+    let roles = device_roles_from_hir(&analysis.hir);
+    assert_eq!(roles.get(def_id), Some(&MirDeviceRole::Kernel));
+}
+
+#[test]
+fn nucleum_fragment_annotation_lowers_to_fragment_role() {
+    let source = r"
+@ nucleum fragment
+functio helper(fractus<f32> x) → fractus<f32> {
+    redde x
+}
+";
+    let session = Session::new(Config::default());
+    let analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
+    let (def_id, func) = first_function_item(&analysis);
+    assert_eq!(func.nucleum_role(), Some(crate::hir::NucleumRole::Fragment));
+    assert!(!func.is_kernel);
+    assert!(func.nucleum_fragment);
+    let roles = device_roles_from_hir(&analysis.hir);
+    assert_eq!(
+        roles.get(def_id),
+        Some(&MirDeviceRole::Fragment),
+        "fragment is a composition role, not Kernel"
+    );
+}
+
+#[test]
+fn nucleum_fragment_is_not_a_dispatch_or_reflection_entry() {
+    let source = r"
+@ nucleum fragment
+functio helper(fractus<f32> x) → fractus<f32> {
+    redde x
+}
+
+@ nucleum
+functio k(fractus<f32> x) → fractus<f32> {
+    redde x
+}
+";
+    let session = Session::new(Config::default());
+    let analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
+    let roles = device_roles_from_hir(&analysis.hir);
+    let mut kernel_entries = 0;
+    let mut fragment_entries = 0;
+    for item in &analysis.hir.items {
+        let crate::hir::HirItemKind::Function(_) = &item.kind else {
+            continue;
+        };
+        match roles.get(&item.def_id) {
+            Some(MirDeviceRole::Kernel) => kernel_entries += 1,
+            Some(MirDeviceRole::Fragment) => fragment_entries += 1,
+            other => panic!("unexpected role for {}: {other:?}", item.def_id.0),
+        }
+    }
+    assert_eq!(kernel_entries, 1, "only @ nucleum Entry receives Kernel/dispatch identity");
+    assert_eq!(fragment_entries, 1);
+}
+
+#[test]
+fn nucleum_fragment_call_is_rejected_by_staging_gate() {
+    let source = r"
+@ nucleum fragment
+functio helper(fractus<f32> x) → fractus<f32> {
+    redde x
+}
+
+@ nucleum
+functio k(fractus<f32> x) → fractus<f32> {
+    redde helper(x)
+}
+";
+    let session = Session::new(Config::default());
+    let Err(errors) = driver::analyze_source(&session, "device.fab", source) else {
+        panic!("calls to Fragment definitions must be rejected until NF-6");
+    };
+    assert!(
+        errors.iter().any(|err| err
+            .args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "NUCLEUM_FRAGMENT_CONTEXT")),
+        "expected NUCLEUM_FRAGMENT_CONTEXT, got {errors:?}"
     );
 }

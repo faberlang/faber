@@ -7,6 +7,8 @@ use rustc_hash::FxHashMap;
 pub enum MirDeviceRole {
     Kernel,
     Device,
+    /// `@ nucleum fragment` — composition role, not a dispatch stage.
+    Fragment,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -74,10 +76,11 @@ pub fn device_roles_from_hir(hir: &HirModule) -> FxHashMap<DefId, MirDeviceRole>
 
 #[must_use]
 pub fn device_role_for_hir_function(func: &HirFunction) -> Option<MirDeviceRole> {
-    // Fail-closed annotation exclusivity (CTO a7c616ed): one function must
-    // not simultaneously carry compute and graphics annotations.
+    // Fail-closed annotation exclusivity (CTO a7c616ed, extended NF-2):
+    // Entry, Fragment, machina, and graphics stages are mutually exclusive.
     let conflicting = [
         func.is_kernel,
+        func.nucleum_fragment,
         func.is_device,
         func.is_vertex,
         func.is_fragment,
@@ -90,6 +93,8 @@ pub fn device_role_for_hir_function(func: &HirFunction) -> Option<MirDeviceRole>
     }
     if func.is_kernel {
         Some(MirDeviceRole::Kernel)
+    } else if func.nucleum_fragment {
+        Some(MirDeviceRole::Fragment)
     } else if func.is_device {
         Some(MirDeviceRole::Device)
     } else {

@@ -68,7 +68,9 @@ impl AirPurityChecker<'_> {
         // purity gate still rejects plain kernels/device functions without a
         // backward annotation, and never admits placement/lifecycle into
         // generated AIR (the purity ledger is untouched).
-        if (function.is_kernel || function.is_device) && self.lanes.backward_for(def_id).is_none() {
+        if (function.is_kernel || function.nucleum_fragment || function.is_device)
+            && self.lanes.backward_for(def_id).is_none()
+        {
             self.reject(span, "kernel_device_function");
         }
         if function.cli_args.is_some() {
