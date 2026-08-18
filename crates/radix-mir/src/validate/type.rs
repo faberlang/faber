@@ -482,7 +482,9 @@ impl Validator<'_, '_> {
             | Type::Atomic(inner)
             | Type::Option(inner)
             | Type::Ref(_, inner)
-            | Type::Alias(_, inner) => self.validate_type_id(inner, span, seen),
+            | Type::Alias(_, inner)
+            | Type::BoundedArray { element: inner, .. } => self.validate_type_id(inner, span, seen),
+            Type::BoundedTextus { .. } | Type::BoundedAscii { .. } | Type::BoundedOcteti { .. } => {}
             Type::PromissumFailable(success, alternate) | Type::AsyncCursor(success, alternate) => {
                 self.validate_type_id(success, span, seen);
                 self.validate_type_id(alternate, span, seen);

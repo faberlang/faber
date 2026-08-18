@@ -881,7 +881,7 @@ pub fn lower_with_cli_locale_pack_and_contracts(
 
 fn lowering_issue_args_from_message(message: &str) -> Vec<DiagnosticArg> {
     match message {
-        "lista requires one type parameter" => issue_args("lista_arity"),
+        "lista requires one or two type parameters" => issue_args("lista_arity"),
         "tabula requires two type parameters" => issue_args("tabula_arity"),
         "copia requires one type parameter" => issue_args("copia_arity"),
         "promissum requires one type parameter" => issue_args("promissum_arity"),

@@ -308,6 +308,8 @@ impl UseVisitor<'_> {
             | Type::Intervallum(inner)
             | Type::Option(inner)
             | Type::Ref(_, inner) => vec![inner],
+            Type::BoundedArray { element, .. } => vec![element],
+            Type::BoundedTextus { .. } | Type::BoundedAscii { .. } | Type::BoundedOcteti { .. } => Vec::new(),
             Type::PromissumFailable(success, alternate) | Type::AsyncCursor(success, alternate) => {
                 vec![success, alternate]
             }

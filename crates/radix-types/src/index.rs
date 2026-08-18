@@ -135,3 +135,16 @@ fn resolve_shape_to_dims(shape_id: IndexId, types: &crate::TypeTable) -> Vec<Ind
 fn is_literal_one(id: IndexId, types: &crate::TypeTable) -> bool {
     matches!(types.get_index(id), IndexExpr::Literal(1))
 }
+
+/// Parse a NATURAL capacity spelling interned as a named type-argument ident.
+///
+/// BB-1R interns `8` in `ascii<8>` as the decimal ident `"8"`. Only a pure
+/// ASCII-digit spelling is a capacity literal; other names are magnitudo
+/// params or non-natural rejects at the resolve site.
+#[must_use]
+pub fn parse_natural_capacity(name: &str) -> Option<u64> {
+    if name.is_empty() || !name.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    name.parse().ok()
+}

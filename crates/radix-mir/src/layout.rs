@@ -540,7 +540,11 @@ fn layout_kind_for_type(
         | Type::Ref(_, _)
         | Type::Interface(_)
         | Type::Func(_)
-        | Type::Applied(_, _) => Some(MirLayoutKind::OpaqueHandle),
+        | Type::Applied(_, _)
+        | Type::BoundedArray { .. }
+        | Type::BoundedTextus { .. }
+        | Type::BoundedAscii { .. }
+        | Type::BoundedOcteti { .. } => Some(MirLayoutKind::OpaqueHandle),
     };
     visiting.remove(&ty);
     memo.insert(ty, kind);

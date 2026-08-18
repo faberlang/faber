@@ -1787,9 +1787,18 @@ pub(crate) fn validate_referential_integrity(
             radix_types::Type::Tensor(t, i)
             | radix_types::Type::Vector(t, i)
             | radix_types::Type::Matrix(t, i)
-            | radix_types::Type::Sparsa(t, i) => {
+            | radix_types::Type::Sparsa(t, i)
+            | radix_types::Type::BoundedArray {
+                element: t,
+                capacity: i,
+            } => {
                 check_type(*t)?;
                 check_index(*i)?;
+            }
+            radix_types::Type::BoundedTextus { capacity }
+            | radix_types::Type::BoundedAscii { capacity }
+            | radix_types::Type::BoundedOcteti { capacity } => {
+                check_index(*capacity)?;
             }
             radix_types::Type::Ref(_, t) => {
                 check_type(*t)?;

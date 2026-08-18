@@ -1499,3 +1499,86 @@ fn failable_promissum_assignable_checks_both_channels() {
     // Same channels: assignable.
     assert!(types.assignable(a, a));
 }
+
+// --- BB-2: bounded buffer type identity ---
+
+#[test]
+fn bounded_forms_are_distinct_from_bare_primitives_and_each_other() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let ascii = types.primitive(Primitive::Ascii);
+    let textus = types.primitive(Primitive::Textus);
+    let octeti = types.primitive(Primitive::Octeti);
+    let n8 = types.intern_index(IndexExpr::Literal(8));
+    let n9 = types.intern_index(IndexExpr::Literal(9));
+    let n64 = types.intern_index(IndexExpr::Literal(64));
+    let n4 = types.intern_index(IndexExpr::Literal(4));
+
+    let ascii8 = types.bounded_ascii(n8);
+    let ascii9 = types.bounded_ascii(n9);
+    let ascii64 = types.bounded_ascii(n64);
+    let textus4 = types.bounded_textus(n4);
+    let lista8 = types.bounded_array(numerus, n8);
+    let lista = types.array(numerus);
+    let octeti8 = types.bounded_octeti(n8);
+
+    assert!(!types.equals(ascii8, ascii), "ascii<8> ≠ ascii");
+    assert!(!types.equals(ascii8, ascii9), "ascii<8> ≠ ascii<9>");
+    assert!(!types.equals(ascii, ascii64), "ascii ≠ ascii<64>");
+    assert!(!types.equals(textus4, textus), "textus<4> ≠ textus");
+    assert!(!types.equals(lista8, lista), "lista<numerus, 8> ≠ lista<numerus>");
+    assert!(!types.equals(octeti8, octeti), "octeti<8> ≠ octeti");
+
+    assert!(!types.assignable(ascii8, ascii));
+    assert!(!types.assignable(ascii, ascii8));
+    assert!(!types.assignable(ascii8, ascii9));
+    assert!(!types.assignable(ascii9, ascii8));
+    assert!(!types.assignable(lista8, lista));
+    assert!(!types.assignable(lista, lista8));
+    assert!(types.assignable(ascii8, ascii8));
+    assert!(types.assignable(lista8, lista8));
+
+    assert!(matches!(types.get(lista), Type::Array(_)));
+    assert!(matches!(
+        types.get(lista8),
+        Type::BoundedArray { element, capacity }
+            if *element == numerus && types.index_equals(*capacity, n8)
+    ));
+}
+
+#[test]
+fn lista_accepts_one_or_two_applied_arguments() {
+    assert_eq!(CollectionKind::Lista.arity(), 1);
+    assert!(CollectionKind::Lista.accepts_arity(1));
+    assert!(CollectionKind::Lista.accepts_arity(2));
+    assert!(!CollectionKind::Lista.accepts_arity(0));
+    assert!(!CollectionKind::Lista.accepts_arity(3));
+    assert_eq!(
+        CollectionKind::Lista.arity_error(),
+        "lista requires one or two type parameters"
+    );
+    assert!(!CollectionKind::Tabula.accepts_arity(1));
+}
+
+#[test]
+fn bounded_ascii_one_is_not_bare_ascii() {
+    let mut types = TypeTable::new();
+    let ascii = types.primitive(Primitive::Ascii);
+    let n1 = types.intern_index(IndexExpr::Literal(1));
+    let ascii1 = types.bounded_ascii(n1);
+    assert!(matches!(
+        types.get(ascii1),
+        Type::BoundedAscii { capacity } if types.index_equals(*capacity, n1)
+    ));
+    assert!(!types.equals(ascii1, ascii));
+}
+
+#[test]
+fn parse_natural_capacity_accepts_decimal_digits_only() {
+    assert_eq!(crate::parse_natural_capacity("8"), Some(8));
+    assert_eq!(crate::parse_natural_capacity("0"), Some(0));
+    assert_eq!(crate::parse_natural_capacity(""), None);
+    assert_eq!(crate::parse_natural_capacity("N"), None);
+    assert_eq!(crate::parse_natural_capacity("N+1"), None);
+    assert_eq!(crate::parse_natural_capacity("8u"), None);
+}

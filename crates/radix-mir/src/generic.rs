@@ -751,6 +751,24 @@ fn instantiate_existing_type_id(
             index,
             Type::Sparsa,
         ),
+        Type::BoundedArray { element, capacity } => instantiate_existing_indexed_type(
+            types,
+            element,
+            capacity,
+            generic_bindings,
+            span,
+            index,
+            |element, capacity| Type::BoundedArray { element, capacity },
+        ),
+        Type::BoundedTextus { capacity } => {
+            find_existing_type(types, &Type::BoundedTextus { capacity }, span, index)
+        }
+        Type::BoundedAscii { capacity } => {
+            find_existing_type(types, &Type::BoundedAscii { capacity }, span, index)
+        }
+        Type::BoundedOcteti { capacity } => {
+            find_existing_type(types, &Type::BoundedOcteti { capacity }, span, index)
+        },
         Type::Atomic(inner) => instantiate_existing_unary_type(
             types,
             inner,
@@ -1129,6 +1147,28 @@ fn instantiate_mutable_type_id(
             index,
             Type::Sparsa,
         ),
+        Type::BoundedArray { element, capacity } => instantiate_mutable_indexed_type(
+            types,
+            element,
+            capacity,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            |element, capacity| Type::BoundedArray { element, capacity },
+        ),
+        Type::BoundedTextus { capacity } => {
+            let capacity = substitute_index_params(types, capacity, shape_bindings);
+            Ok(intern_or_find(types, &Type::BoundedTextus { capacity }, index))
+        }
+        Type::BoundedAscii { capacity } => {
+            let capacity = substitute_index_params(types, capacity, shape_bindings);
+            Ok(intern_or_find(types, &Type::BoundedAscii { capacity }, index))
+        }
+        Type::BoundedOcteti { capacity } => {
+            let capacity = substitute_index_params(types, capacity, shape_bindings);
+            Ok(intern_or_find(types, &Type::BoundedOcteti { capacity }, index))
+        },
         Type::Atomic(inner) => instantiate_mutable_unary_type(
             types,
             inner,
@@ -1430,6 +1470,13 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
         | Type::Option(inner)
         | Type::Ref(_, inner)
         | Type::Alias(_, inner) => type_contains_param_inner(types, *inner, seen),
+        Type::BoundedArray { element, capacity } => {
+            index_contains_param(types, *capacity)
+                || type_contains_param_inner(types, *element, seen)
+        }
+        Type::BoundedTextus { capacity }
+        | Type::BoundedAscii { capacity }
+        | Type::BoundedOcteti { capacity } => index_contains_param(types, *capacity),
         Type::Map(key, value)
         | Type::PromissumFailable(key, value)
         | Type::AsyncCursor(key, value) => {

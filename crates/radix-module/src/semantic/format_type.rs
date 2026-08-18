@@ -23,6 +23,15 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
 
         Type::Array(elem) => format!("lista<{}>", format_faber_type(*elem, types, interner, resolve_def)),
 
+        Type::BoundedArray { element, capacity } => format!(
+            "lista<{}, {}>",
+            format_faber_type(*element, types, interner, resolve_def),
+            format_figura(*capacity, types, interner)
+        ),
+        Type::BoundedTextus { capacity } => format!("textus<{}>", format_figura(*capacity, types, interner)),
+        Type::BoundedAscii { capacity } => format!("ascii<{}>", format_figura(*capacity, types, interner)),
+        Type::BoundedOcteti { capacity } => format!("octeti<{}>", format_figura(*capacity, types, interner)),
+
         Type::Map(key, value) => format!(
             "tabula<{}, {}>",
             format_faber_type(*key, types, interner, resolve_def),

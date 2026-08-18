@@ -394,11 +394,71 @@ impl Lowerer<'_> {
             }
             return ty;
         }
+        if matches!(prim, Primitive::Ascii | Primitive::Textus | Primitive::Octeti) {
+            return self.lower_bounded_primitive(prim, params);
+        }
         if !params.is_empty() {
             self.error("primitive_params");
             return self.types.intern(Type::Error);
         }
         self.types.primitive(prim)
+    }
+
+    fn lower_bounded_primitive(&mut self, prim: Primitive, params: &[TypeExpr]) -> TypeId {
+        match params {
+            [] => self.types.primitive(prim),
+            [capacity] => {
+                let Some(capacity) = self.lower_capacity_index(capacity) else {
+                    return self.types.intern(Type::Error);
+                };
+                match prim {
+                    Primitive::Ascii => self.types.bounded_ascii(capacity),
+                    Primitive::Textus => self.types.bounded_textus(capacity),
+                    Primitive::Octeti => self.types.bounded_octeti(capacity),
+                    _ => unreachable!("lower_bounded_primitive only handles ascii/textus/octeti"),
+                }
+            }
+            _ => {
+                self.error("primitive_params");
+                self.types.intern(Type::Error)
+            }
+        }
+    }
+
+    fn lower_capacity_index(&mut self, param: &TypeExpr) -> Option<crate::semantic::IndexId> {
+        let TypeExprKind::Named(ident, nested) = &param.kind else {
+            self.error("bounded_capacity_not_natural");
+            return None;
+        };
+        if !nested.is_empty() {
+            self.error("bounded_capacity_not_natural");
+            return None;
+        }
+        let name = self.interner.resolve(ident.name);
+        if let Some(value) = radix_types::parse_natural_capacity(name) {
+            return Some(self.types.intern_index(crate::semantic::IndexExpr::Literal(value)));
+        }
+        let Some(def_id) = self.resolver.lookup(ident.name) else {
+            self.error("bounded_capacity_not_natural");
+            return None;
+        };
+        let Some(symbol) = self.resolver.get_symbol(def_id) else {
+            self.error("bounded_capacity_not_natural");
+            return None;
+        };
+        match symbol.kind {
+            crate::semantic::SymbolKind::IndexParam => {
+                Some(self.types.intern_index(crate::semantic::IndexExpr::Param(ident.name)))
+            }
+            crate::semantic::SymbolKind::TypeParam => {
+                self.error("figura_type_param_in_index");
+                None
+            }
+            _ => {
+                self.error("bounded_capacity_not_natural");
+                None
+            }
+        }
     }
 
     fn lower_modular_word_type(&mut self, params: &[TypeExpr]) -> TypeId {
@@ -414,7 +474,10 @@ impl Lowerer<'_> {
     }
 
     fn lower_collection_type(&mut self, collection: CollectionKind, params: &[TypeExpr]) -> TypeId {
-        if params.len() != collection.arity() {
+        if collection == CollectionKind::Lista {
+            return self.lower_lista_type(params);
+        }
+        if !collection.accepts_arity(params.len()) {
             self.error_from_message(collection.arity_error());
             return self.types.intern(Type::Error);
         }
@@ -423,6 +486,26 @@ impl Lowerer<'_> {
             .map(|param| self.lower_type(param))
             .collect::<Vec<_>>();
         collection.lower(self.types, &lowered)
+    }
+
+    fn lower_lista_type(&mut self, params: &[TypeExpr]) -> TypeId {
+        match params {
+            [elem] => {
+                let elem = self.lower_type(elem);
+                self.types.array(elem)
+            }
+            [elem, capacity] => {
+                let elem = self.lower_type(elem);
+                let Some(capacity) = self.lower_capacity_index(capacity) else {
+                    return self.types.intern(Type::Error);
+                };
+                self.types.bounded_array(elem, capacity)
+            }
+            _ => {
+                self.error_from_message(CollectionKind::Lista.arity_error());
+                self.types.intern(Type::Error)
+            }
+        }
     }
 
     fn lower_qualified_type(&mut self, path: &[Ident], params: &[TypeExpr]) -> TypeId {

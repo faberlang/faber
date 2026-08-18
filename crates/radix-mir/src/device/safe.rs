@@ -265,7 +265,11 @@ impl<'a> DeviceSafeClassifier<'a> {
             | Type::Interface(_)
             | Type::Func(_)
             | Type::Applied(_, _)
-            | Type::Union(_) => {
+            | Type::Union(_)
+            | Type::BoundedArray { .. }
+            | Type::BoundedTextus { .. }
+            | Type::BoundedAscii { .. }
+            | Type::BoundedOcteti { .. } => {
                 self.record_policy(format!("device aggregate value type {semantic:?}"));
             }
             Type::Atomic(_) => self.check_device_layout(ty),
