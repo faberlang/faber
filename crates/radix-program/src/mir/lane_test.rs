@@ -305,8 +305,8 @@ import from "geomlib:data" data
 fn prove_linked_bodies() {
     const data.Mesh ready ← data.mesh(2)
     const data.Mesh empty ← data.mesh(0 - 1)
-    print (ready.layout_count() coalesce 0)
-    print (empty.layout_count() coalesce 0)
+    print ready.layout_count() coalesce 0
+    print empty.layout_count() coalesce 0
 }
 "#,
     )
