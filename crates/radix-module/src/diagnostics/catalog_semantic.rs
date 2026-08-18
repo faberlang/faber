@@ -989,7 +989,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "generic_type_arg_domain" => {
             Some("choose one of the allowed type arguments for this generic parameter".to_owned())
         }
-        "gpu_builtin_device_function_required" => Some("call GPU builtins only inside @ machina functions".to_owned()),
+        "gpu_builtin_device_function_required" => {
+            Some("call GPU builtins only inside @ nucleum or @ nucleum fragment functions".to_owned())
+        }
         "NUCLEUM_FRAGMENT_CONTEXT" => {
             Some("wait for nucleum fragment composition, or call an @ nucleum entry instead".to_owned())
         }

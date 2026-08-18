@@ -738,7 +738,6 @@ impl<'a> Lowerer<'a> {
                 is_generator: false,
                 is_kernel: false,
                 nucleum_fragment: false,
-                is_device: false,
                 is_vertex: false,
                 is_fragment: false,
                 annotations: Vec::new(),

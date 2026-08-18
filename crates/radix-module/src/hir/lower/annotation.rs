@@ -349,7 +349,7 @@ impl Lowerer<'_> {
 
         if matches!(
             family_name,
-            "futura" | "cursor" | "nucleum" | "machina" | "vertex" | "fragment" | "solum" | "omitte" | "metior"
+            "futura" | "cursor" | "nucleum" | "vertex" | "fragment" | "solum" | "omitte" | "metior"
         ) && stmt.args.is_empty()
         {
             return HirAnnotation::with_fields(family, Vec::new(), span);

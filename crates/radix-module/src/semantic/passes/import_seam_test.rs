@@ -66,7 +66,7 @@ functio aperta() → vacuum {
 }
 
 @ interna
-functio machina() → vacuum {
+functio clausa() → vacuum {
 }
 
 @ privata
@@ -325,7 +325,7 @@ fn same_package_publica_resolves() {
 
 #[test]
 fn same_package_interna_resolves() {
-    let result = check_same_package("machina");
+    let result = check_same_package("clausa");
     assert!(result.success, "same-package @ interna must resolve: {:?}", result.diagnostics);
 }
 
@@ -357,10 +357,10 @@ fn cross_package_publica_resolves() {
 
 #[test]
 fn cross_package_interna_errors() {
-    let result = check_cross_package("machina");
+    let result = check_cross_package("clausa");
     assert!(!result.success, "cross-package @ interna must error: {:?}", result.diagnostics);
     let diag = find_issue(&result.diagnostics, ISSUE_IMPORT_INTERNA_CROSS_PACKAGE);
-    expect_structured(diag, "SEM006", ISSUE_IMPORT_INTERNA_CROSS_PACKAGE, "machina");
+    expect_structured(diag, "SEM006", ISSUE_IMPORT_INTERNA_CROSS_PACKAGE, "clausa");
 }
 
 #[test]

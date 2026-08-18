@@ -783,7 +783,6 @@ fn is_compiler_owned_family(name: &str) -> bool {
             | "nondum"
             | "verte"
             | "nucleum"
-            | "machina"
             // CLI/JSON metadata families consumed by lowering (corpus + exempla).
             | "alias"
             | "descriptio"

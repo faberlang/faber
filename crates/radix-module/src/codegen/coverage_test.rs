@@ -200,7 +200,6 @@ fn go_rejects_ad_with_stable_slug() {
                 is_generator: false,
                 is_kernel: false,
                 nucleum_fragment: false,
-                is_device: false,
                 is_vertex: false,
                 is_fragment: false,
                 test: None,

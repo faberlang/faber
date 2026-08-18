@@ -62,15 +62,13 @@ impl AirPurityChecker<'_> {
             self.reject(span, "generator_function");
         }
         // S3-A2 (council B3; goal.md "explicit device intent, e.g. @ nucleum"):
-        // a DIFFERENTIABLE device function (`@ nucleum`/`@ machina` + `@ radix
-        // backward`) is admitted to the AIR lane — its AIR form generates the
-        // backward companion while its kernel form is the device forward. The
-        // purity gate still rejects plain kernels/device functions without a
-        // backward annotation, and never admits placement/lifecycle into
-        // generated AIR (the purity ledger is untouched).
-        if (function.is_kernel || function.nucleum_fragment || function.is_device)
-            && self.lanes.backward_for(def_id).is_none()
-        {
+        // a DIFFERENTIABLE device function (`@ nucleum`/`@ nucleum fragment` +
+        // `@ radix backward`) is admitted to the AIR lane — its AIR form
+        // generates the backward companion while its kernel form is the device
+        // forward. The purity gate still rejects plain kernels/fragments
+        // without a backward annotation, and never admits placement/lifecycle
+        // into generated AIR (the purity ledger is untouched).
+        if (function.is_kernel || function.nucleum_fragment) && self.lanes.backward_for(def_id).is_none() {
             self.reject(span, "kernel_device_function");
         }
         if function.cli_args.is_some() {

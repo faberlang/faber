@@ -2091,13 +2091,7 @@ fn device_safe_reports_rank2_tensor_device_view_layout_gap() {
         .any(|gap| gap.slug() == "missing-layout-fact" && gap.shape() == "kernel device view rank 2"));
 }
 
-fn role_func(
-    is_kernel: bool,
-    nucleum_fragment: bool,
-    is_device: bool,
-    is_vertex: bool,
-    is_fragment: bool,
-) -> HirFunction {
+fn role_func(is_kernel: bool, nucleum_fragment: bool, is_vertex: bool, is_fragment: bool) -> HirFunction {
     use crate::lexer::Symbol;
     HirFunction {
         name: Symbol(0),
@@ -2112,7 +2106,6 @@ fn role_func(
         is_generator: false,
         is_kernel,
         nucleum_fragment,
-        is_device,
         is_vertex,
         is_fragment,
         annotations: Vec::new(),
@@ -2124,16 +2117,8 @@ fn role_func(
 fn device_role_accepts_kernel_only() {
     // CTO a7c616ed: kernel-only annotation yields MirDeviceRole::Kernel.
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(true, false, false, false, false)),
+        crate::mir::device::device_role_for_hir_function(&role_func(true, false, false, false)),
         Some(MirDeviceRole::Kernel)
-    );
-}
-
-#[test]
-fn device_role_accepts_device_only() {
-    assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(false, false, true, false, false)),
-        Some(MirDeviceRole::Device)
     );
 }
 
@@ -2142,7 +2127,7 @@ fn device_role_rejects_vertex_only() {
     // Vertex-only is a graphics stage (MirKernelShaderStage), not a
     // MirDeviceRole — returns None.
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(false, false, false, true, false)),
+        crate::mir::device::device_role_for_hir_function(&role_func(false, false, true, false)),
         None
     );
 }
@@ -2151,7 +2136,7 @@ fn device_role_rejects_vertex_only() {
 fn device_role_rejects_fragment_only() {
     // Fragment-only is a graphics stage, not a MirDeviceRole.
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(false, false, false, false, true)),
+        crate::mir::device::device_role_for_hir_function(&role_func(false, false, false, true)),
         None
     );
 }
@@ -2160,7 +2145,7 @@ fn device_role_rejects_fragment_only() {
 fn device_role_rejects_conflicting_kernel_vertex() {
     // Conflicting compute + graphics: fail-closed, no device role.
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(true, false, false, true, false)),
+        crate::mir::device::device_role_for_hir_function(&role_func(true, false, true, false)),
         None
     );
 }
@@ -2168,31 +2153,7 @@ fn device_role_rejects_conflicting_kernel_vertex() {
 #[test]
 fn device_role_rejects_conflicting_kernel_fragment() {
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(true, false, false, false, true)),
-        None
-    );
-}
-
-#[test]
-fn device_role_rejects_conflicting_kernel_device() {
-    assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(true, false, true, false, false)),
-        None
-    );
-}
-
-#[test]
-fn device_role_rejects_conflicting_device_vertex() {
-    assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(false, false, true, true, false)),
-        None
-    );
-}
-
-#[test]
-fn device_role_rejects_conflicting_device_fragment() {
-    assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(false, false, true, false, true)),
+        crate::mir::device::device_role_for_hir_function(&role_func(true, false, false, true)),
         None
     );
 }
@@ -2200,7 +2161,7 @@ fn device_role_rejects_conflicting_device_fragment() {
 #[test]
 fn device_role_rejects_conflicting_vertex_fragment() {
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(false, false, false, true, true)),
+        crate::mir::device::device_role_for_hir_function(&role_func(false, false, true, true)),
         None
     );
 }
@@ -2208,11 +2169,11 @@ fn device_role_rejects_conflicting_vertex_fragment() {
 #[test]
 fn device_role_accepts_nucleum_fragment_only() {
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(false, true, false, false, false)),
+        crate::mir::device::device_role_for_hir_function(&role_func(false, true, false, false)),
         Some(MirDeviceRole::Fragment)
     );
     assert_eq!(
-        role_func(false, true, false, false, false).nucleum_role(),
+        role_func(false, true, false, false).nucleum_role(),
         Some(crate::hir::NucleumRole::Fragment)
     );
 }
@@ -2220,16 +2181,16 @@ fn device_role_accepts_nucleum_fragment_only() {
 #[test]
 fn device_role_rejects_conflicting_entry_and_fragment() {
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(true, true, false, false, false)),
+        crate::mir::device::device_role_for_hir_function(&role_func(true, true, false, false)),
         None
     );
-    assert_eq!(role_func(true, true, false, false, false).nucleum_role(), None);
+    assert_eq!(role_func(true, true, false, false).nucleum_role(), None);
 }
 
 #[test]
 fn device_role_rejects_nucleum_fragment_plus_vertex() {
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(false, true, false, true, false)),
+        crate::mir::device::device_role_for_hir_function(&role_func(false, true, true, false)),
         None
     );
 }
@@ -2237,7 +2198,7 @@ fn device_role_rejects_nucleum_fragment_plus_vertex() {
 #[test]
 fn device_role_rejects_nucleum_fragment_plus_graphics_fragment() {
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(false, true, false, false, true)),
+        crate::mir::device::device_role_for_hir_function(&role_func(false, true, false, true)),
         None
     );
 }
@@ -2245,7 +2206,7 @@ fn device_role_rejects_nucleum_fragment_plus_graphics_fragment() {
 #[test]
 fn device_role_rejects_nucleum_entry_plus_graphics_fragment() {
     assert_eq!(
-        crate::mir::device::device_role_for_hir_function(&role_func(true, false, false, false, true)),
+        crate::mir::device::device_role_for_hir_function(&role_func(true, false, false, true)),
         None
     );
 }

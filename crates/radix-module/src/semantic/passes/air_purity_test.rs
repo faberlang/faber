@@ -322,11 +322,11 @@ functio loss(numerus x) → numerus {
 }
 
 // ---------------------------------------------------------------------------
-// S3-A2 (council B3): a DIFFERENTIABLE device function (`@ nucleum`/`@ machina`
-// + `@ radix backward`) is admitted to the AIR lane — its AIR form generates
-// the backward companion while its kernel form is the device forward. The
-// purity gate still rejects plain kernels/device functions without a backward
-// annotation (no over-relaxation).
+// S3-A2 (council B3): a DIFFERENTIABLE device function (`@ nucleum`/`@ nucleum
+// fragment` + `@ radix backward`) is admitted to the AIR lane — its AIR form
+// generates the backward companion while its kernel form is the device
+// forward. The purity gate still rejects plain kernels/fragments without a
+// backward annotation (no over-relaxation).
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -378,12 +378,13 @@ functio forward(tf32[2, 2] x) → tf32[2, 2] {
 }
 
 #[test]
-fn rejects_plain_device_function_in_air_lane() {
-    // `@ machina` marks a device function; without a backward annotation it is
-    // outside the v1 AIR subset (the device branch of the same rejection).
+fn rejects_plain_nucleum_fragment_in_air_lane() {
+    // `@ nucleum fragment` is a device helper; without a backward annotation
+    // it is outside the v1 AIR subset (the fragment branch of the same
+    // rejection).
     let errors = air_errors(
         r#"
-@ machina
+@ nucleum fragment
 @ radix lane "air"
 functio forward(tf32[2, 2] x) → tf32[2, 2] {
     redde x.multiplica(x)

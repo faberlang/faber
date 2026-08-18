@@ -337,9 +337,6 @@ pub struct HirFunction {
     /// [`Self::is_kernel`] and with graphics stage flags.
     pub nucleum_fragment: bool,
 
-    /// CUDA device helper (`machina`).
-    pub is_device: bool,
-
     /// Graphics vertex shader entry (`@ vertex`).
     pub is_vertex: bool,
 

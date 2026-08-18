@@ -245,7 +245,7 @@ fn ngab1_host_partition_executes_boundary_call_via_llvm_host() {
     // No physical device kernel body rides the CPU module: the kernel symbol
     // is never defined and no device-entry annotations appear.
     assert!(
-        !module_text.contains("@nucleum") && !module_text.contains("@machina"),
+        !module_text.contains("@nucleum"),
         "the CPU module carries no device-entry annotations; got:\n{module_text}"
     );
     let kernel_symbol =

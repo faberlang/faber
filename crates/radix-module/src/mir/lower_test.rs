@@ -3940,7 +3940,6 @@ fn shader_stage_rejects_conflicting_annotations() {
             is_generator: false,
             is_kernel,
             nucleum_fragment: false,
-            is_device: false,
             is_vertex,
             is_fragment,
             annotations: Vec::new(),

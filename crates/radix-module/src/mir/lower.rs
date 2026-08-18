@@ -741,7 +741,7 @@ impl<'a> MirLowerer<'a> {
         if stage.is_none() && !annotations_exclusive(function) {
             self.errors.push(MirError::validation(
                 span,
-                "conflicting shader-stage annotations: at most one of @nucleum, @nucleum fragment, @machina, @vertex, or @fragment is allowed",
+                "conflicting shader-stage annotations: at most one of @nucleum, @nucleum fragment, @vertex, or @fragment is allowed",
             ));
         }
         stage
@@ -1011,12 +1011,11 @@ impl<'a> MirLowerer<'a> {
 
 /// Annotation exclusivity check shared by device-role and shader-stage
 /// assignment (CTO a7c616ed, extended NF-2: at most one of Entry/Fragment/
-/// `is_device`/`is_vertex`/`is_fragment` may be set).
+/// `is_vertex`/`is_fragment` may be set).
 fn annotations_exclusive(function: &HirFunction) -> bool {
     [
         function.is_kernel,
         function.nucleum_fragment,
-        function.is_device,
         function.is_vertex,
         function.is_fragment,
     ]
@@ -1028,10 +1027,10 @@ fn annotations_exclusive(function: &HirFunction) -> bool {
 
 /// Map HIR function flags to MIR device roles.
 ///
-/// `MirDeviceRole` classifies compute entry/helper roles (Kernel/Device) and
-/// the nucleum composition role (`Fragment`). Graphics shader stages
-/// (`@ vertex`/`@ fragment`) set `is_vertex`/`is_fragment` on `HirFunction`,
-/// but the shader-stage identity seam is `MirKernelShaderStage`, not
+/// `MirDeviceRole` classifies compute entry (`Kernel`) and the nucleum
+/// composition role (`Fragment`). Graphics shader stages (`@ vertex`/
+/// `@ fragment`) set `is_vertex`/`is_fragment` on `HirFunction`, but the
+/// shader-stage identity seam is `MirKernelShaderStage`, not
 /// `MirDeviceRole` (CTO a7c616ed: do not conflate execution stage with
 /// compute helper role).
 fn device_role_for_function(function: &HirFunction) -> Option<MirDeviceRole> {
@@ -1042,8 +1041,6 @@ fn device_role_for_function(function: &HirFunction) -> Option<MirDeviceRole> {
         Some(MirDeviceRole::Kernel)
     } else if function.nucleum_fragment {
         Some(MirDeviceRole::Fragment)
-    } else if function.is_device {
-        Some(MirDeviceRole::Device)
     } else {
         None
     }

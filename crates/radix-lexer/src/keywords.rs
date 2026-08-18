@@ -1197,16 +1197,10 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     },
     // Compiler-owned annotation families that previously lived only as bare
     // identifiers after `@`. Registered so packs can re-spell them (en: kernel,
-    // device, …) while HIR keeps Latin family ids.
+    // …) while HIR keeps Latin family ids.
     KeywordSpec {
         text: "nucleum",
         token_kind: Some(TokenKind::Nucleum),
-        scope: KeywordScope::Annotation,
-        category: KeywordCategory::Annotation,
-    },
-    KeywordSpec {
-        text: "machina",
-        token_kind: Some(TokenKind::Machina),
         scope: KeywordScope::Annotation,
         category: KeywordCategory::Annotation,
     },
