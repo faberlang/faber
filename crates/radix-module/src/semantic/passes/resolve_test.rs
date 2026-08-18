@@ -2024,8 +2024,8 @@ fn lege_corpus_still_checks() {
 fn th_th_example_still_checks_with_locale002_advisories() {
     // Container layout: radix/crates/radix-module -> three ups to the
     // container root where the examples sibling lives.
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../examples/reader-locale/th-TH/src/main.fab");
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/reader-locale/th-TH/src/main.fab");
     let source = std::fs::read_to_string(&path).expect("th-TH example");
     let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/th-TH/pack.toml");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed th-TH pack should load");

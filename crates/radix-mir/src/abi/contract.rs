@@ -5,10 +5,10 @@ use crate::{
 use radix_lexer::Interner;
 
 use super::{
-    ERR_KERNEL_BUILTIN_DUPLICATE_NAME, ERR_KERNEL_BUILTIN_UNKNOWN_NAME, MirAbiError,
-    MirKernelBufferBindingType, MirKernelBuiltin, MirKernelBuiltinInput, MirKernelDispatchSize,
-    MirKernelResourceAccess, MirKernelShaderAccess, MirKernelSignature, MirWorkgroupSize,
-    device_view_element_count, require_u32_index,
+    device_view_element_count, require_u32_index, MirAbiError, MirKernelBufferBindingType,
+    MirKernelBuiltin, MirKernelBuiltinInput, MirKernelDispatchSize, MirKernelResourceAccess,
+    MirKernelShaderAccess, MirKernelSignature, MirWorkgroupSize, ERR_KERNEL_BUILTIN_DUPLICATE_NAME,
+    ERR_KERNEL_BUILTIN_UNKNOWN_NAME,
 };
 
 pub(crate) fn combined_builtin_dependencies(

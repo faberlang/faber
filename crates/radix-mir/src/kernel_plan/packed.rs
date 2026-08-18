@@ -12,9 +12,9 @@
 
 use super::build::matmul_barrier_schedule;
 use super::plan::{
-    CollectionKernelPlan, F32_ELEMENT_BYTE_WIDTH, GatherPlan, MATMUL_SHARED_A_BUFFER_NAME,
-    MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE, MatMulPlan, MatMulShapes, MatMulSharedMemory,
-    OobPaddingPolicy, QuantizedMatMulPlan, SharedMemoryLayout,
+    CollectionKernelPlan, GatherPlan, MatMulPlan, MatMulShapes, MatMulSharedMemory,
+    OobPaddingPolicy, QuantizedMatMulPlan, SharedMemoryLayout, F32_ELEMENT_BYTE_WIDTH,
+    MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE,
 };
 use crate::abi::PackedStorageLayout;
 use crate::{

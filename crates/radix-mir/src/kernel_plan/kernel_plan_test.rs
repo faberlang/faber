@@ -302,11 +302,9 @@ fn sum_reduction_plan_is_fully_populated() {
             after: BarrierPhase::SharedMemoryLoad
         })
     );
-    assert!(
-        reduction.barriers[1..]
-            .iter()
-            .all(|point| point.after == BarrierPhase::ReductionStep)
-    );
+    assert!(reduction.barriers[1..]
+        .iter()
+        .all(|point| point.after == BarrierPhase::ReductionStep));
     plan.validate().expect("built plan validates");
 }
 

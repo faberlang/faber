@@ -7,10 +7,10 @@
 
 use crate::abi::PackedStorageLayout;
 use crate::kernel_plan::{
-    CollectionKernelPlan, MATMUL_TILE, MatMulShapes, PackedAdmissionError, PackedDequantError,
-    QuantizedMatMulPlan, admit_quantized_gather_from_ggml_type_id, admit_quantized_matmul,
+    admit_quantized_gather_from_ggml_type_id, admit_quantized_matmul,
     admit_quantized_matmul_from_ggml_type_id, dequant_packed_block, dequant_q4_k_block,
-    dequant_q8_0_block,
+    dequant_q8_0_block, CollectionKernelPlan, MatMulShapes, PackedAdmissionError,
+    PackedDequantError, QuantizedMatMulPlan, MATMUL_TILE,
 };
 
 fn shapes(m: u64, k: u64, n: u64) -> MatMulShapes {
