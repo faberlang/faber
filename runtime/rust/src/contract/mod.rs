@@ -9,7 +9,7 @@
 //! for the values; the compiler-side copies in `radix-runtime-contract` /
 //! `radix-host-abi` stay the sync source.
 
-pub mod tensor;
-pub mod sparsa;
-pub mod frame;
 pub mod abi;
+pub mod frame;
+pub mod sparsa;
+pub mod tensor;

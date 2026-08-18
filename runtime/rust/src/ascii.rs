@@ -210,10 +210,7 @@ mod tests {
     fn try_from_textus_and_bytes() {
         assert_eq!(Ascii::try_from_textus("ok"), Some(Ascii::new("ok")));
         assert_eq!(Ascii::try_from_textus("π"), None);
-        assert_eq!(
-            Ascii::try_from_bytes(&[0x68, 0x69]),
-            Some(Ascii::new("hi"))
-        );
+        assert_eq!(Ascii::try_from_bytes(&[0x68, 0x69]), Some(Ascii::new("hi")));
         assert_eq!(Ascii::try_from_bytes(&[0xff]), None);
     }
 
