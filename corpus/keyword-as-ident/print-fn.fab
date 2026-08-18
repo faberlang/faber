@@ -1,0 +1,46 @@
++++
+term = "keyword-as-ident"
+kind = "concept"
+category = "identifier"
+canonical = true
+summary = "A user function named print, with a print parameter, whose body uses the output intrinsic."
+syntax = "fn print(string print) { print print }"
+related = ["nota", "functio"]
+locale = "en"
++++
+
+# =============================================================================
+# keyword-as-ident — user function named `print`
+# =============================================================================
+#
+# What this teaches:
+#   • Name slots accept keyword spellings — `fn print` and parameter `print`
+#     are ordinary identifiers.
+#   • Bare `print print` inside the body stays the output intrinsic (scribe
+#     family, not a recursive call).
+#   • Statement-initial `print(...)` is a user call to that function.
+#
+# Common mistakes:
+#   • Writing `print(x)` when the output statement is wanted — use the bare
+#     form `print x`.
+#   • Pairing `fn print` with a local `const string print` in the same scope —
+#     the binding shadows the function, so `print(...)` is no longer callable.
+#
+# See also: nota, functio, print-binding.fab, print-call.fab
+# =============================================================================
+#
+# Operator example:
+#   fn print(string print) { print print }
+#
+# GRAMMAR:
+#   outputStmt :← 'print' expr            -- bare: intrinsic
+#   exprStmt   :← 'print' '(' args ')'    -- paren: user call
+#
+# EXPECTED OUTPUT:
+#   print-fn.expected — hello
+
+fn print(string print) { print print }
+
+main {
+    print("hello")
+}

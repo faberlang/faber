@@ -1,0 +1,46 @@
++++
+term = "keyword-as-ident"
+kind = "concept"
+category = "identifier"
+canonical = true
+summary = "Statement-initial print(...) is a user function call, not the output intrinsic."
+syntax = "fn print(string print) { print print }; print(\"print\")"
+related = ["nota", "functio"]
+locale = "en"
++++
+
+# =============================================================================
+# keyword-as-ident — user call `print(...)`
+# =============================================================================
+#
+# What this teaches:
+#   • `print(...)` at statement start is an expression statement whose callee
+#     is the identifier `print` — here the user function.
+#   • The exact token sequence `print(print)` is the same call form. It only
+#     type-checks when the argument `print` is a string. A local binding
+#     named `print` shadows the function (SEM012); passing the function
+#     itself is SEM010. The runnable form below keeps the paren call and
+#     supplies a string (`"print"`).
+#
+# Common mistakes:
+#   • Expecting `print(x)` to be the output statement — that is the bare
+#     form `print x`.
+#
+# See also: nota, functio, print-fn.fab, print-binding.fab
+# =============================================================================
+#
+# Operator example:
+#   fn print(string print) { print print }
+#   print(print)            -- user call; argument must be a string
+#
+# GRAMMAR:
+#   exprStmt :← 'print' '(' args ')'
+#
+# EXPECTED OUTPUT:
+#   print-call.expected — print
+
+fn print(string print) { print print }
+
+main {
+    print("print")
+}

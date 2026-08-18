@@ -1,0 +1,42 @@
++++
+term = "keyword-as-ident"
+kind = "concept"
+category = "identifier"
+canonical = true
+summary = "A binding named read wins over the lege builtin."
+syntax = "const string read ← \"data\"; print read"
+related = ["lege", "nota"]
+locale = "en"
++++
+
+# =============================================================================
+# keyword-as-ident — shadowed `read` binding
+# =============================================================================
+#
+# What this teaches:
+#   • Binding wins — a user binding named `read` is the value of bare `read`
+#     in expression position. The lege builtin is not reserved.
+#   • The binding is used (no WARN001). The program prints the string, not
+#     a stdin line.
+#
+# Common mistakes:
+#   • Assuming `read` is always the builtin once the spelling is in the
+#     pack — builtin claims are defaults, not reservations.
+#
+# See also: lege, nota, read-unshadowed.fab
+# =============================================================================
+#
+# Operator example:
+#   const string read ← "data"
+#   print read
+#
+# GRAMMAR:
+#   readExpr :← 'read'     -- builtin only when the spelling is not bound
+#
+# EXPECTED OUTPUT:
+#   read-shadowed.expected — data
+
+main {
+    const string read ← "data"
+    print read
+}
