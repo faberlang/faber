@@ -173,7 +173,9 @@ use radix_module::codegen::Target;
 use radix_module::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase};
 use radix_module::driver::Config;
 use radix_module::file_interface::FileExportKind;
-use radix_module::hir::{HirItemKind, LibraryBinding, LibraryItem, LibraryItemKind, LibraryProvider};
+use radix_module::hir::{
+    HirItemKind, LibraryBinding, LibraryItem, LibraryItemKind, LibraryProvider,
+};
 use radix_module::mir::{BufferHost, Host, MirDiagnosticKind, MirProvider, RunnerError, Value};
 use radix_module::Output;
 use std::fs;
@@ -1140,7 +1142,8 @@ entry = "main.fab"
 "#,
         )
         .expect("write manifest");
-        let workspace_root = radix_module::paths::faberlang_home().expect("faberlang container root");
+        let workspace_root =
+            radix_module::paths::faberlang_home().expect("faberlang container root");
         let touch_source = workspace_root.join("examples/coreutils/packages/touch/src/main.fab");
         let touch_source_text = fs::read_to_string(&touch_source).expect("read coreutils touch");
         fs::write(
@@ -8604,6 +8607,71 @@ main {
 }
 
 #[test]
+fn package_runtime_plan_argv_only_processus_import_stays_green_with_native_host() {
+    // Norma `processus` walks every library `ad`, including uncalled
+    // `exit_process` → `processus:exi`. That route is a terminal builtin,
+    // not a host export. An argv-only consumer with host=native must not
+    // fail closed as `host_provider_selection_invalid`.
+    let container_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    super::runtime_sources::set_path_override_for_test(Some(container_root));
+    let pkg = test_temp_dir("runtime-plan-argv-only-processus");
+    fs::create_dir_all(pkg.join("src")).expect("src");
+    fs::write(
+        pkg.join("faber.toml"),
+        r#"
+[package]
+name = "runtime-plan-argv-only-processus"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[target.rust]
+host = "native"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        pkg.join("src/main.fab"),
+        r#"
+import from "norma:processus" processus
+
+main {
+  const list<string> args ← processus.argv() ↦ list<string>
+}
+"#,
+    )
+    .expect("entry");
+
+    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
+
+    assert_eq!(plan.host, Some(ManifestRustHost::Native));
+    assert!(
+        plan.non_runtime_routes.contains("processus:argumenta"),
+        "argv must collect processus:argumenta (got {:?})",
+        plan.non_runtime_routes
+    );
+    assert!(
+        plan.non_runtime_routes.contains("processus:exi"),
+        "library walk still collects uncalled processus:exi (got {:?})",
+        plan.non_runtime_routes
+    );
+    assert!(
+        super::dispatch::is_builtin_ad_route("processus:exi"),
+        "processus:exi must be classified terminal-builtin"
+    );
+    assert!(
+        plan.provider_error.is_none(),
+        "argv-only native host must not demand a processus:exi export: {:?}",
+        plan.provider_error
+    );
+    assert!(
+        package_host_selection_diagnostic(&plan, &pkg.join("faber.toml")).is_none(),
+        "argv-only native host plan must stay green"
+    );
+}
+
+#[test]
 fn package_runtime_plan_rejects_unknown_native_provider() {
     let pkg = test_temp_dir("runtime-plan-unknown-provider");
     fs::create_dir_all(pkg.join("src")).expect("src");
@@ -13433,7 +13501,10 @@ fn simple_loss(
     };
     let package = analyze_with_faber_seams(&config, &dir).expect("analyze library package");
     assert!(
-        !package.diagnostics.iter().any(radix_module::Diagnostic::is_error),
+        !package
+            .diagnostics
+            .iter()
+            .any(radix_module::Diagnostic::is_error),
         "expected no analysis errors, got {:?}",
         package
             .diagnostics
