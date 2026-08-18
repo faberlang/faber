@@ -527,6 +527,25 @@ fn test_launch_plan_from_signature_matmul() {
 }
 
 #[test]
+fn test_launch_plan_from_signature_quantized_matmul_is_verbatim_tile_grid() {
+    // Packed QMM uses the same tile-grid dispatch as TensorMatMul. The
+    // generic ceil(dispatch/workgroup) path under-launches (1×1 instead
+    // of 2×2 here) and leaves the last output row zero.
+    let signature = matmul_signature(16, 16, 16);
+    let function = body_function(MirCollectionOp::TensorQuantizedMatMul);
+    let plan = KernelLaunchPlan::from_signature_and_function(&signature, &function);
+    assert_eq!(plan.workgroup, MirWorkgroupSize { x: 8, y: 8, z: 1 });
+    assert_eq!(
+        plan.dispatch_size,
+        MirKernelDispatchSize { x: 2, y: 2, z: 1 }
+    );
+    assert_eq!(
+        plan.workgroup_count,
+        MirKernelWorkgroupCount { x: 2, y: 2, z: 1 }
+    );
+}
+
+#[test]
 fn test_launch_plan_from_signature_reduction() {
     // Everything else: ceil(dispatch / workgroup) per axis.
     let signature = reduction_signature(16, 8, 2);

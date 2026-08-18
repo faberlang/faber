@@ -208,9 +208,12 @@ pub struct MirKernelWorkgroupCount {
 /// The single shared semantics every reflection consumer applies after
 /// [`MirKernelReflection::from_signature`] via
 /// [`MirKernelReflection::apply_effective_workgroup`]:
-/// - **matmul**: `dispatch_size` is the tile grid (one workgroup per output
-///   tile) — the count is `dispatch_size` verbatim; dividing by the tile
-///   under-launches (PRP-004).
+/// - **matmul** (`TensorMatMul`, `TensorQuantizedMatMul`,
+///   `TensorGroupedMatMul`): `dispatch_size` is the tile grid (one
+///   workgroup per output tile) — the count is `dispatch_size` verbatim;
+///   dividing by the tile under-launches (PRP-004). A packed QMM that
+///   took the generic ceil path wrote only the first `tile` rows / a
+///   `1/tile` strip of columns (vocab-1 all-zero last-row logits).
 /// - **everything else** (reduction, elementwise, non-collection):
 ///   `ceil(dispatch_size / effective)` per dimension.
 ///
@@ -222,7 +225,14 @@ pub fn collection_op_workgroup_count(
     dispatch_size: MirKernelDispatchSize,
     effective: MirWorkgroupSize,
 ) -> MirKernelWorkgroupCount {
-    if kernel_has_collection_op(function, |op| matches!(op, MirCollectionOp::TensorMatMul)) {
+    if kernel_has_collection_op(function, |op| {
+        matches!(
+            op,
+            MirCollectionOp::TensorMatMul
+                | MirCollectionOp::TensorQuantizedMatMul
+                | MirCollectionOp::TensorGroupedMatMul
+        )
+    }) {
         return MirKernelWorkgroupCount {
             x: dispatch_size.x,
             y: dispatch_size.y,
