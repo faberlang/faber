@@ -398,6 +398,36 @@ Artifact build, load, install, cache, hash, and execution routes MUST use strict
 decoding. A permissive normalizer, if one exists, is an explicit developer tool
 and never an implicit fallback.
 
+### 5.1 Decoder error classes
+
+Structured decoder errors MUST carry `class` as one of these lowercase ASCII
+identifiers. Rust and TypeScript share the identifiers. Each row names a
+protocol MUST-reject already written in §1–§7 / §10. Implementations MUST NOT
+add classes. If a reject has no row, stop and route a protocol amend.
+
+| `class` | Meaning (already required) |
+| --- | --- |
+| `truncated` | payload shorter than declared length, or unexpected end (§1.4) |
+| `trailing_bytes` | bytes after the declared payload (§1.4) |
+| `bad_magic` | preamble is not `FABERMP\0` (§1.8) |
+| `profile_unsupported` | profile major/minor the decoder does not accept (§7.1) |
+| `payload_limit` | declared length above the enabled-kind / empty-set cap (§1.5–6, §6) |
+| `kind_string_limit` | `kind` string header longer than 64 bytes (§6) |
+| `root_map` | root map count ≠ 3, or keys not `kind` then `schema` then `value` (§2, §6) |
+| `schema_array` | `schema` array length ≠ 2, or elements not unsigned 16-bit (§2, §6) |
+| `kind_unregistered` | unknown kind, or reserved-but-unregistered kind admitted (§2.5, §10) |
+| `schema_unsupported` | document schema major/minor the decoder does not accept (§7.2) |
+| `noncanonical` | any alternate encoding of a legal schema value, including present-at-default OPTIONAL, overlong primitives, float32, unsorted keys (§3, §5.10) |
+| `duplicate_key` | duplicate map key (§3.7) |
+| `unknown_field` | field not in the admitted schema (§4.1) |
+| `missing_field` | REQUIRED field absent (§4.1) |
+| `type` | wrong primitive, or `nil` where null is not legal (§3.1, §5.8) |
+| `utf8` | string payload is not valid UTF-8 (§3.4) |
+| `extension` | MessagePack extension / timestamp (§3.8) |
+| `limit` | a kind-specific resource limit; payload names the violated limit (§6) |
+| `overflow` | length/budget arithmetic overflow (§6) |
+| `legacy` | known non-FCMP product bytes (postcard FHIR) named for a diagnostic (§1.8, §13) |
+
 ## 6. Resource limits
 
 These profile-level envelope-prefix limits apply to every decoder before
@@ -578,10 +608,12 @@ registered entry MUST record:
 - reference implementation and independent conformance implementation; and
 - fixture-manifest path.
 
-Kind strings are never reused. A retired kind remains reserved. A reservation
+Kind strings MUST NOT be reused. A retired kind remains reserved. A reservation
 is a namespace claim, not a registration: `fhir.unit` and `fhir.package` remain
 reserved names until their owning FHIR schemas publish concrete finite limits
-and the other registry fields. Registration without concrete limits MUST fail,
+and the other registry fields. `fcmp.test` is reserved as a generic-vector
+fixture kind and is not registered. Product decoders MUST NOT admit `fcmp.test`
+while it is reserved. Registration without concrete limits MUST fail,
 and an implementation MUST NOT admit a reserved-but-unregistered kind.
 
 Initial reservations:
@@ -590,12 +622,15 @@ Initial reservations:
 | --- | --- | --- |
 | `fhir.unit` | Post-RTR2 FHIR module contract: a stable module ID/record with schema-defined contents and import edges | reserved; schema and limits not published |
 | `fhir.package` | Post-RTR2/RTR3b FHIR analyzed-program graph with explicit roots, optional entry, stable module records, import edges, library identities, and graph-specific limits | reserved; schema and limits not published |
+| `fcmp.test` | Generic-vector fixture kind for profile conformance | reserved; not registered |
 
 This document reserves the names but does not register or freeze the FHIR
 schemas. The `fhir.unit` schema MUST be defined against the post-RTR2 module
 contract. The `fhir.package` schema MUST be defined against the post-RTR2/RTR3b
 `AnalyzedProgram` graph contract; each schema MUST NOT use a legacy vector-era
-envelope as its authoritative semantic shape.
+envelope as its authoritative semantic shape. `fcmp.test` remains reserved
+for generic profile vectors; reservation does not register it or admit it
+to product decoders.
 
 ## 11. Conformance
 
@@ -646,7 +681,7 @@ A document family is not stable until:
    fixture byte-identically;
 2. one independent non-Rust implementation does the same;
 3. each implementation rejects every shared negative fixture with the expected
-   error class; and
+   error `class` from §5.1; and
 4. repeated generation in fresh processes produces identical bytes and hashes.
 
 FHIR's first independent implementation is expected to be TypeScript. That
