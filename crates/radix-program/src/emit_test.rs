@@ -208,7 +208,7 @@ main {
         result
             .diagnostics
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue()))
             .collect::<Vec<_>>()
     );
     let Some(Output::Rust(output)) = result.output else {
