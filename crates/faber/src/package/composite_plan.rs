@@ -1272,6 +1272,10 @@ fn plan_spelling(plan: &CollectionKernelPlan) -> &'static str {
         CollectionKernelPlan::RmsNormalization(_) => "rms-normalization",
         CollectionKernelPlan::Rope(_) => "rope",
         CollectionKernelPlan::CausalMaskedSoftmax(_) => "causal-masked-softmax",
+        CollectionKernelPlan::QuantizedMatMul(_) => "quantized-matmul",
+        CollectionKernelPlan::GroupedMatMul(_) => "grouped-matmul",
+        CollectionKernelPlan::SsmConv1d(_) => "ssm-conv1d",
+        CollectionKernelPlan::SsmScan(_) => "ssm-scan",
     }
 }
 
