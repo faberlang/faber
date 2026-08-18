@@ -65,21 +65,17 @@ fn dynamic_path_params_keep_literal_plus() {
 #[test]
 fn static_path_encoded_request_matches_encoded_route() {
     let table = add_get(route_table(), "/hello%20world".into(), "hello".into()).expect("route");
-    assert!(
-        match_route(table, "GET".into(), "/hello%20world".into())
-            .expect("encoded match")
-            .is_some()
-    );
+    assert!(match_route(table, "GET".into(), "/hello%20world".into())
+        .expect("encoded match")
+        .is_some());
 }
 
 #[test]
 fn static_path_decoded_request_matches_encoded_route() {
     let table = add_get(route_table(), "/hello%20world".into(), "hello".into()).expect("route");
-    assert!(
-        match_route(table, "GET".into(), "/hello world".into())
-            .expect("decoded match")
-            .is_some()
-    );
+    assert!(match_route(table, "GET".into(), "/hello world".into())
+        .expect("decoded match")
+        .is_some());
 }
 
 #[test]
@@ -269,9 +265,10 @@ fn query_param_missing_key_returns_none() {
 
 #[test]
 fn header_value_missing_key_returns_none() {
-    let headers = Valor::Tabula(BTreeMap::from([
-        ("Content-Type".to_owned(), text("application/json")),
-    ]));
+    let headers = Valor::Tabula(BTreeMap::from([(
+        "Content-Type".to_owned(),
+        text("application/json"),
+    )]));
     assert_eq!(header_value(headers, "x-missing".into()), None);
 }
 
