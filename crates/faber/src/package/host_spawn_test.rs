@@ -1,7 +1,9 @@
 use super::{
-    execute_device, resolve_host_cli_at, DeviceExecuteReceipt, DeviceExecuteRequest, HostSpawnError,
+    decode_device_inputs, encode_device_inputs, execute_device, resolve_host_cli_at,
+    DeviceExecuteReceipt, DeviceExecuteRequest, HostSpawnError,
 };
 use serde_json::Value;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 fn add_descriptor_json() -> Vec<u8> {
@@ -96,4 +98,92 @@ fn host_spawn_error_displays_code_and_message() {
         message: "missing binary".to_owned(),
     };
     assert_eq!(err.to_string(), "E_HOST_SPAWN: missing binary");
+}
+
+fn assert_bit_exact(inputs: &BTreeMap<u32, Vec<f32>>) {
+    let json = encode_device_inputs(inputs).expect("encode");
+    let decoded = decode_device_inputs(&json).expect("decode");
+    assert_eq!(decoded.len(), inputs.len());
+    for (id, expected) in inputs {
+        let got = decoded.get(id).unwrap_or_else(|| panic!("missing {id}"));
+        assert_eq!(got.len(), expected.len(), "buffer {id} length");
+        for (index, (observed, want)) in got.iter().zip(expected).enumerate() {
+            assert_eq!(
+                observed.to_bits(),
+                want.to_bits(),
+                "inputs[{id}][{index}] bits diverged"
+            );
+        }
+    }
+}
+
+/// First spawn-wire divergence: packed GGUF word `0xff810000` (SmolLM2
+/// file offset 1_774_948) encoded as `"NaN"` and decoded as `0x7fc00000`.
+#[test]
+fn spawn_inputs_preserve_smollm2_first_nan_payload() {
+    const FIRST: u32 = 0xff81_0000;
+    let inputs = BTreeMap::from([(1, vec![f32::from_bits(FIRST)])]);
+    let json = encode_device_inputs(&inputs).expect("encode");
+    let text = String::from_utf8(json.clone()).expect("utf8");
+    assert!(text.contains("\"0xff810000\""), "{text}");
+    assert!(!text.contains("\"NaN\""), "{text}");
+    assert_bit_exact(&inputs);
+}
+
+#[test]
+fn spawn_inputs_round_trip_smollm2_prefill_tokens_and_payloads() {
+    let tokens: Vec<f32> = [504u32, 2365, 6354, 16438, 27003, 690, 260, 23790, 2767]
+        .into_iter()
+        .map(f32::from_bits)
+        .collect();
+    let payloads = vec![
+        f32::from_bits(0xff81_0000),
+        f32::from_bits(0x7fc0_0001),
+        f32::from_bits(0x7f80_0001),
+        f32::NAN,
+        f32::INFINITY,
+        f32::NEG_INFINITY,
+        -0.0,
+        1.0e-5,
+        1.5,
+    ];
+    let inputs = BTreeMap::from([(1, tokens), (2, payloads)]);
+    assert_bit_exact(&inputs);
+}
+
+#[test]
+fn spawn_inputs_accept_legacy_nan_string() {
+    let decoded = decode_device_inputs(br#"{"1":["NaN"]}"#).expect("decode");
+    assert!(decoded[&1][0].is_nan());
+}
+
+/// Round-trip a real SmolLM2 packed prefix when the pinned GGUF is present.
+#[test]
+fn spawn_inputs_round_trip_smollm2_packed_prefix() {
+    const PATH: &str = "~/ai/models/SmolLM2-360M-Instruct-Q4_K_M.gguf";
+    const FIRST_NAN_OFFSET: usize = 1_774_948;
+    let Ok(bytes) = std::fs::read(PATH) else {
+        return;
+    };
+    assert!(
+        bytes.len() > FIRST_NAN_OFFSET + 4,
+        "pinned SmolLM2 GGUF is shorter than the named NaN offset"
+    );
+    let word = u32::from_le_bytes(
+        bytes[FIRST_NAN_OFFSET..FIRST_NAN_OFFSET + 4]
+            .try_into()
+            .expect("4 bytes"),
+    );
+    assert_eq!(word, 0xff81_0000, "first packed NaN word moved");
+    let start = FIRST_NAN_OFFSET.saturating_sub(64);
+    let end = (FIRST_NAN_OFFSET + 256).min(bytes.len());
+    let mut padded = bytes[start..end].to_vec();
+    while padded.len() % 4 != 0 {
+        padded.push(0);
+    }
+    let values: Vec<f32> = padded
+        .chunks_exact(4)
+        .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+        .collect();
+    assert_bit_exact(&BTreeMap::from([(7, values)]));
 }
