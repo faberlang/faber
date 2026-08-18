@@ -269,3 +269,37 @@ fn is_valid_provider_segment_accepts_alphanumeric_underscore_hyphen() {
     assert!(!is_valid_provider_segment("bad provider"));
     assert!(!is_valid_provider_segment("bad.provider"));
 }
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn norma_http_generates_ordinary_rust_module() {
+    // The drifted `is_builtin_norma_http` special-case mapped Latin verbs to
+    // `faber::http::*` (which does not exist) and skipped rust-module emit.
+    // norma:http now rides the ordinary generated-library path.
+    let root = temp_root("norma-http-ordinary");
+    fs::create_dir_all(root.join("norma/src")).expect("mkdir norma");
+    fs::write(
+        root.join("norma/src/http.fab"),
+        "functio get(textus url) → numerus { redde 0 }\n",
+    )
+    .expect("write http.fab");
+
+    let resolver = LibraryResolver::new(&root);
+    let module = resolver
+        .resolve("norma:http")
+        .expect("resolve")
+        .expect("norma:http must resolve");
+    let import = crate::LibraryImportBinding {
+        binding: "http".to_owned(),
+        visibility: radix_module::syntax::Visibility::Publica,
+        import_span: radix_module::lexer::Span::new(0, 0),
+        module,
+    };
+    let mut cache =
+        LibraryInterfaceCache::default().with_locale_loader(crate::test_support::test_locale_pack);
+    assert!(
+        library_generates_rust_module(&import, &mut cache).expect("generate decision"),
+        "norma:http must generate a rust module after the special-case deletion"
+    );
+    let _ = fs::remove_dir_all(&root);
+}
