@@ -4446,14 +4446,6 @@
     {
       "src": "valor",
       "tgt": "octeti",
-      "target": "ts",
-      "predicted": "fallback",
-      "measured": "dedicated",
-      "detail": "arm:dedicated"
-    },
-    {
-      "src": "valor",
-      "tgt": "octeti",
       "target": "wasm-text",
       "predicted": "not-emitted",
       "measured": "dedicated",
