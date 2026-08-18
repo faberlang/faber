@@ -83,7 +83,10 @@ fn resolve_alias(source: &str) -> (TypeTable, crate::semantic::TypeId) {
     resolve(program, &mut resolver, &parsed.interner, &mut types).expect("resolve");
     let alias = parsed.interner.intern("X");
     let def_id = resolver.lookup(alias).expect("alias def");
-    let ty = resolver.get_symbol(def_id).and_then(|s| s.ty).expect("alias type");
+    let ty = resolver
+        .get_symbol(def_id)
+        .and_then(|s| s.ty)
+        .expect("alias type");
     (types, ty)
 }
 
@@ -131,7 +134,10 @@ fn magnitudo_n_specializes_bounded_ascii() {
     resolve(program, &mut resolver, &parsed.interner, &mut types).expect("resolve");
     let alias = parsed.interner.intern("X");
     let def_id = resolver.lookup(alias).expect("alias def");
-    let ty = resolver.get_symbol(def_id).and_then(|s| s.ty).expect("alias type");
+    let ty = resolver
+        .get_symbol(def_id)
+        .and_then(|s| s.ty)
+        .expect("alias type");
     assert!(
         matches!(
             types.get(ty),
