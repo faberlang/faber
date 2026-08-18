@@ -425,8 +425,8 @@ noopStmt     := 'صمت'
 ```ebnf
 throwStmt   := ('ارم' | 'انهر') expression ['إذا' expression]
 catchClause := 'التقط' IDENTIFIER blockStmt
-assertStmt  := 'أكد' expression ('secus' expression)?
-requiritStmt := 'يتطلب' expression 'secus' expression
+assertStmt  := 'أكد' expression ('انهر' expression)?
+requiritStmt := 'يتطلب' expression 'ارم' expression
 ```
 
 - `التقط` يرتبط بالعبارات المهيكلة وأذرع الشروط. لا يرتبط بالكتل المجردة الاعتباطية.

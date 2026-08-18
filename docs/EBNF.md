@@ -589,16 +589,16 @@ throwStmt         := bareThrow | guardedThrowSugar
 bareThrow         := ('iace' | 'mori') expression
 guardedThrowSugar := ('iace' | 'mori') expression NO_NEWLINE 'si' expression
 catchClause       := 'cape' IDENTIFIER blockStmt
-assertStmt        := 'adfirma' expression ('secus' expression)?
-requiritStmt      := 'requirit' expression 'secus' expression
+assertStmt        := 'adfirma' expression ('mori' expression)?
+requiritStmt      := 'requirit' expression 'iace' expression
 ```
 
 - `cape` attaches to the structured forms whose productions name `catchClause`: conditional arms, `dum`, `itera`, `elige`, `cura`, and `fac`. It does not attach to arbitrary bare blocks.
 - Use the explicit do block when a standalone block needs a handler: `fac { ... } cape err { ... }`.
 - `iace` = throw (recoverable), `mori` = panic (fatal).
 - A same-line `si <expr>` guard on `iace` and `mori` is line-sensitive parser sugar: `iace val si cond` desugars to `si cond { iace val }` at parse time. Its canonical, compression-safe spelling is the expanded `si` block. A source compressor must expand this sugar before removing line breaks; the guarded shorthand remains under language review.
-- `adfirma` is a runtime invariant check. It desugars conceptually to `mori "msg" si !cond`, with the positive condition kept in source form and the inversion applied during lowering. `secus` introduces the false-path message, mirroring its role in `si/secus` and the `sic/secus` ternary; this keeps the throw-family vocabulary (`mori msg si cond`, `iace msg si cond`) consistent and avoids the heterogeneous comma, which the grammar reserves for homogeneous list separators. An `adfirma` failure is fatal and uncatchable by `cape` (it lowers to a panic, not a `Result`-channel error); in test context the harness isolates each `proba` so a failed assertion ends that test without ending the suite.
-- `requirit` is the recoverable require statement (en surface `require … else …`), the typed-error-channel twin of `adfirma`. `requirit cond secus err` desugars to `si non (cond) { iace err }` at lowering; the thrown value enters the function's `⇥ E` channel and is catchable by `cape`/`fac`, unlike `adfirma` (fatal). A `requirit` statement in a `⇥`-less function is a compile error, same as `iace`. `secus`/`else` introduces the false-path error expression; the en surface maps to the same identity.
+- `adfirma` is a runtime invariant check. It desugars conceptually to `mori "msg" si !cond`, with the positive condition kept in source form and the inversion applied during lowering. The optional particle is `mori` (en `panic`): `adfirma cond mori msg` / `assert cond panic msg`. This particle is proposed (not shipped). Bare `adfirma cond` stays legal. An `adfirma` failure is fatal and uncatchable by `cape` (it lowers to a panic, not a `Result`-channel error); in test context the harness isolates each `proba` so a failed assertion ends that test without ending the suite.
+- `requirit` is the recoverable require statement (en surface `require … throw …`), the typed-error-channel twin of `adfirma`. `requirit cond iace err` desugars to `si non (cond) { iace err }` at lowering; the thrown value enters the function's `⇥ E` channel and is catchable by `cape`/`fac`, unlike `adfirma` (fatal). A `requirit` statement in a `⇥`-less function is a compile error, same as `iace`. The particle is `iace` (en `throw`); this particle is proposed (not shipped).
 
 ---
 
