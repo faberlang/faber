@@ -24,7 +24,9 @@
 //! 7. [`exhaustive`] reports pattern coverage issues.
 //! 8. [`return_path`] rejects value-returning functions whose bodies can fall
 //!    through without returning.
-//! 9. [`lint`] reports quality diagnostics that may be warnings rather than
+//! 9. [`fragment_definition`] checks `@ nucleum fragment` bodies against the
+//!    device-safe effect subset and records a per-definition effect summary.
+//! 10. [`lint`] reports quality diagnostics that may be warnings rather than
 //!    hard semantic errors.
 //!
 //! ERROR POLICY
@@ -42,6 +44,7 @@ pub mod companion_predeclare;
 pub mod companion_signature;
 pub mod definite_assignment;
 pub mod exhaustive;
+pub mod fragment_definition;
 pub mod import_path;
 pub mod import_seam;
 pub mod kernel_namespace;

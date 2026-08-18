@@ -813,9 +813,8 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
         "gpu_builtin_device_function_required" => {
             Some("GPU builtin call is only valid inside device functions".to_owned())
         }
-        "NUCLEUM_FRAGMENT_CONTEXT" => Some(
-            "calls to @ nucleum fragment definitions are rejected until composition lands".to_owned(),
-        ),
+        "NUCLEUM_FRAGMENT_CONTEXT" => nucleum_fragment_context_message(args),
+        "NUCLEUM_FRAGMENT_EFFECT" => nucleum_fragment_effect_message(args),
         "gpu_builtin_type_args" => Some("GPU builtin call does not accept type arguments".to_owned()),
         "inferred_callee_type_args" => Some("inferred callee does not accept type arguments".to_owned()),
         "intrinsic_method_type_args" => Some("intrinsic method does not accept type arguments".to_owned()),
@@ -992,9 +991,8 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "gpu_builtin_device_function_required" => {
             Some("call GPU builtins only inside @ nucleum or @ nucleum fragment functions".to_owned())
         }
-        "NUCLEUM_FRAGMENT_CONTEXT" => {
-            Some("wait for nucleum fragment composition, or call an @ nucleum entry instead".to_owned())
-        }
+        "NUCLEUM_FRAGMENT_CONTEXT" => nucleum_fragment_context_help(args),
+        "NUCLEUM_FRAGMENT_EFFECT" => nucleum_fragment_effect_help(args),
         "integer_operands_required" => Some("use integer operands for this operator".to_owned()),
         "instans_ordering_operands_required" => Some("compare instans values with instans values".to_owned()),
         "json_duplicate_key" => Some("remove or rename the duplicate JSON object key".to_owned()),
@@ -1080,6 +1078,76 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         }
         _ => None,
     }
+}
+
+fn nucleum_fragment_context_message(args: &[DiagnosticArg]) -> Option<String> {
+    Some(
+        match arg_value(args, "reason") {
+            Some("entry_callee") => "@ nucleum fragment cannot call an @ nucleum entry",
+            Some("graphics_stage") => "@ nucleum fragment cannot call a graphics @ fragment or @ vertex",
+            Some("host_callable") => "@ nucleum fragment cannot call a host function or other non-device-safe callable",
+            _ => "calls to @ nucleum fragment definitions are rejected until composition lands",
+        }
+        .to_owned(),
+    )
+}
+
+fn nucleum_fragment_context_help(args: &[DiagnosticArg]) -> Option<String> {
+    Some(
+        match arg_value(args, "reason") {
+            Some("entry_callee") => {
+                "compose another @ nucleum fragment, or keep the dispatch on the calling @ nucleum entry"
+            }
+            Some("graphics_stage") => "keep graphics @ fragment / @ vertex stages out of nucleus fragment bodies",
+            Some("host_callable") => "call another @ nucleum fragment or an approved device intrinsic from this body",
+            _ => "wait for nucleum fragment composition, or call an @ nucleum entry instead",
+        }
+        .to_owned(),
+    )
+}
+
+fn nucleum_fragment_effect_message(args: &[DiagnosticArg]) -> Option<String> {
+    Some(
+        match arg_value(args, "reason")? {
+            "alternate_exit" => "@ nucleum fragment must be infallible; alternate-exit (⇥) is not allowed",
+            "async_posture" => "@ nucleum fragment cannot use an async (fiet) posture",
+            "generator_posture" => "@ nucleum fragment cannot use a generator (fiunt/fient) posture",
+            "host_io" => "@ nucleum fragment cannot perform host I/O",
+            "host_allocation" => "@ nucleum fragment cannot perform host allocation",
+            "host_runtime" => "@ nucleum fragment cannot invoke a host runtime helper",
+            "captured_mut_host" => "@ nucleum fragment cannot capture mutable host state",
+            "dynamic_function" => "@ nucleum fragment cannot use a dynamic function value",
+            "address_taking" => "@ nucleum fragment cannot take or dereference an address",
+            "hidden_storage" => "@ nucleum fragment cannot use hidden persistent storage",
+            "missing_body" => "@ nucleum fragment requires a body",
+            "unapproved_effect" => "@ nucleum fragment body is outside the device-safe effect subset",
+            _ => return None,
+        }
+        .to_owned(),
+    )
+}
+
+fn nucleum_fragment_effect_help(args: &[DiagnosticArg]) -> Option<String> {
+    Some(
+        match arg_value(args, "reason")? {
+            "alternate_exit" => "remove the ⇥ channel, iace, and fac/cape recovery from the fragment",
+            "async_posture" => "write the fragment as a synchronous finite function",
+            "generator_posture" => "write the fragment as a synchronous finite function",
+            "host_io" => "keep scribe, lege, and other host I/O out of the fragment body",
+            "host_allocation" => "use only local scalars, tensors, and caller-provided device storage",
+            "host_runtime" => "replace the host helper with a fragment or an approved device intrinsic",
+            "captured_mut_host" => "pass device state as an explicit argument instead of capturing it",
+            "dynamic_function" => "call a named fragment or approved device intrinsic directly",
+            "address_taking" => "read and write device values directly; do not form addresses",
+            "hidden_storage" => "make every persistent write an explicit argument write",
+            "missing_body" => "give the fragment a device-safe body",
+            "unapproved_effect" => {
+                "keep the body to scalar/tensor ops, structured control flow, locals, and device-safe argument I/O"
+            }
+            _ => return None,
+        }
+        .to_owned(),
+    )
 }
 
 // NAME RESOLUTION
