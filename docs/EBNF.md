@@ -158,13 +158,23 @@ methodDecl   := 'functio' IDENTIFIER genericParams? '(' paramList ')' funcModifi
 ### Annotations
 
 ```ebnf
-annotation            := bracedAnnotation | annotationSugar
+annotation            := nucleumAnnotation | bracedAnnotation | annotationSugar
 annotationName        := ANNOTATION_NAME
 bracedAnnotation      := '@' annotationName '{' annotationFieldList? '}'
 annotationFieldList   := annotationField (',' annotationField)* ','?
 annotationField       := ANNOTATION_FIELD_NAME '=' (expression | typeAnnotation)
 annotationSugar       := '@' annotationName NON_NEWLINE_TOKEN* NEWLINE
+nucleumAnnotation     := nucleumSugar | nucleumBraced
+nucleumSugar          := '@' 'nucleum' nucleumModifier? NEWLINE
+nucleumBraced         := '@' 'nucleum' '{' nucleumFieldList? '}'
+nucleumModifier       := 'fragment'
+nucleumFieldList      := nucleumField (',' nucleumField)* ','?
+nucleumField          := 'fragment' '=' ('verum' | 'falsum')
 ```
+
+`@ nucleum fragment` is a modifier on the `nucleum` annotation (sugar or
+braced `fragment = verum` / `falsum`), not a fused annotation name and not the
+graphics `@ fragment` stage. Standalone `@ fragment` is unchanged.
 
 Braced annotation records (`@ futura { }`, `@ optio { binding = verbose, ... }`)
 are canonical and compression-safe. Unbraced annotations are line-sensitive,
