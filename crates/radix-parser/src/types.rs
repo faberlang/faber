@@ -52,7 +52,8 @@ impl Parser {
     /// GRAMMAR:
     ///   type := [de|in] (func-type | named-type | union-type)
     ///   func-type := ( type-list ) arrow type
-    ///   named-type := ident [type-list]
+    ///   named-type := ident ['<' type-argument (',' type-argument)* '>']
+    ///   type-argument := type | NATURAL
     ///   union-type := type cup type (cup type)*
     ///
     /// Nullable value types are represented in pure type syntax as `T ∪ nihil`.
@@ -223,7 +224,7 @@ impl Parser {
                 } else {
                     let mut params = Vec::new();
                     loop {
-                        params.push(self.parse_type()?);
+                        params.push(self.parse_type_argument()?);
                         if !self.eat(&TokenKind::Comma) {
                             break;
                         }
@@ -440,6 +441,24 @@ impl Parser {
             kind: TypeExprKind::Named(self.keyword_ident(width, span), Vec::new()),
             span,
         }
+    }
+
+    /// Parse one applied type argument: a type, or a NATURAL capacity.
+    ///
+    /// NATURAL is interned as a named ident so later phases can read the
+    /// decimal spelling. Arity and primitive-params stay resolve errors.
+    fn parse_type_argument(&mut self) -> Result<TypeExpr, ParseError> {
+        if let TokenKind::Integer(value) = self.peek().kind {
+            let span = self.current_span();
+            self.advance();
+            return Ok(TypeExpr {
+                nullable: false,
+                mode: None,
+                kind: TypeExprKind::Named(self.keyword_ident(&value.to_string(), span), Vec::new()),
+                span,
+            });
+        }
+        self.parse_type()
     }
 
     /// Parse a tensor `Figura` in type position.

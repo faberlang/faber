@@ -204,6 +204,35 @@ fn parses_lista_infer_element_hole() {
 }
 
 #[test]
+fn types_test_parses_proposed_bounded_type_forms() {
+    let cases: &[(&str, &str, &[&str])] = &[
+        ("typus X = lista<numerus, 8>", "lista", &["numerus", "8"]),
+        ("typus X = textus<8>", "textus", &["8"]),
+        ("typus X = ascii<8>", "ascii", &["8"]),
+        ("typus X = octeti<8>", "octeti", &["8"]),
+    ];
+    for (source, type_name, expected_params) in cases {
+        let result = parse_ok(source);
+        let program = result.program.as_ref().expect("program");
+        let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
+            panic!("expected type alias in {source}");
+        };
+        let TypeExprKind::Named(name, params) = &alias.ty.kind else {
+            panic!("expected named type in {source}");
+        };
+        assert_eq!(result.interner.resolve(name.name), *type_name);
+        assert_eq!(params.len(), expected_params.len(), "{source}");
+        for (param, expected) in params.iter().zip(expected_params.iter()) {
+            let TypeExprKind::Named(param_name, nested) = &param.kind else {
+                panic!("expected named type argument in {source}");
+            };
+            assert!(nested.is_empty(), "{source}");
+            assert_eq!(result.interner.resolve(param_name.name), *expected);
+        }
+    }
+}
+
+#[test]
 fn parses_qualified_type_path() {
     let result = parse_ok("functio f(terminus.Terminus value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
