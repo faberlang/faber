@@ -1599,7 +1599,10 @@ impl AuthorEmitter {
                 Self::write_ident(&member.member, surface, interner, w);
             }
             ExprKind::Index(index) => {
-                Self::write_expr_prec(&index.object, 13, surface, interner, w);
+                // WHY: object prec 12 keeps `a[i][j]` / `a.b[i]` flat; 13 would
+                // emit `(a[i])[j]`. After `scribe`/`print` that form re-parses
+                // as a parenthesized call (`(print(a[i]))[j]`).
+                Self::write_expr_prec(&index.object, 12, surface, interner, w);
                 w.write("[");
                 Self::write_expr(&index.index, surface, interner, w);
                 w.write("]");
@@ -1621,7 +1624,9 @@ impl AuthorEmitter {
                 }
             }
             ExprKind::OptionalChain(chain) => {
-                Self::write_expr_prec(&chain.object, 13, surface, interner, w);
+                // WHY: object prec 12 keeps `a?.b?.c` flat; 13 would emit
+                // `(a?.b)?.c`, which after `scribe`/`print` re-parses as a call.
+                Self::write_expr_prec(&chain.object, 12, surface, interner, w);
                 match &chain.chain {
                     OptionalChainKind::Member(member) => {
                         w.write("?.");
@@ -1645,7 +1650,8 @@ impl AuthorEmitter {
                 }
             }
             ExprKind::NonNull(nonnull) => {
-                Self::write_expr_prec(&nonnull.object, 13, surface, interner, w);
+                // WHY: same postfix-chain rule as Index / OptionalChain.
+                Self::write_expr_prec(&nonnull.object, 12, surface, interner, w);
                 match &nonnull.chain {
                     NonNullKind::Member(member) => {
                         w.write("!.");
@@ -2454,5 +2460,38 @@ mod tests {
             !output.contains(" ∪ nihil"),
             "must not emit null marker for non-nullable type, got: {output}"
         );
+    }
+
+    #[test]
+    fn scribe_postfix_chains_stay_flat_and_idempotent() {
+        // Index / member / optional-chain objects used parent_prec 13, which
+        // wrapped same-precedence postfix as `(a[i])[j]`. After `scribe` that
+        // form re-parses as a call: `(scribe(a[i]))[j]`.
+        let source = "\
+incipit {
+    scribe matrix[1][0]
+    scribe obj.field[0]
+    scribe obj?.field?.inner
+}
+";
+        let first = crate::forma::compile_author_str("scribe-postfix.fab", source);
+        assert!(first.success(), "author emit failed: {:?}", first.diagnostics);
+        let first_code = first.output.map(|output| output.code).unwrap_or_default();
+        assert!(
+            !first_code.contains("(matrix[1])")
+                && !first_code.contains("(obj.field)")
+                && !first_code.contains("(obj?.field)"),
+            "postfix chains must stay flat so scribe does not re-parse as a call:\n{first_code}"
+        );
+        assert!(
+            first_code.contains("scribe matrix[1][0]")
+                && first_code.contains("scribe obj.field[0]")
+                && first_code.contains("scribe obj?.field?.inner"),
+            "expected flat scribe postfix chains:\n{first_code}"
+        );
+        let second = crate::forma::compile_author_str("scribe-postfix.fab", &first_code);
+        assert!(second.success(), "second author emit failed: {:?}", second.diagnostics);
+        let second_code = second.output.map(|output| output.code).unwrap_or_default();
+        assert_eq!(first_code, second_code, "scribe postfix chains must be author-idempotent");
     }
 }
