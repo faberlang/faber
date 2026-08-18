@@ -410,8 +410,57 @@ pub fn dequant_q8_0_block(block: &[u8]) -> Result<[f32; 32], PackedDequantError>
     Ok(y)
 }
 
+/// `get_scale_min_k4` (llama.cpp `ggml-quants.c`): 6-bit scale + 6-bit min
+/// from `scales[12]`.
+fn get_scale_min_k4(index: usize, scales: &[u8]) -> (u8, u8) {
+    if index < 4 {
+        (scales[index] & 63, scales[index + 4] & 63)
+    } else {
+        (
+            (scales[index + 4] & 0x0f) | ((scales[index - 4] >> 6) << 4),
+            (scales[index + 4] >> 4) | ((scales[index] >> 6) << 4),
+        )
+    }
+}
+
+/// In-kernel Q4_K superblock dequant (R-PACK-02D): `d`/`dmin` halves +
+/// `scales[12]` + `qs[128]` → 256 f32 elements.
+///
+/// # Errors
+/// [`PackedDequantError::BlockBytesMismatch`] when `block` is not 144 bytes.
+pub fn dequant_q4_k_block(block: &[u8]) -> Result<[f32; 256], PackedDequantError> {
+    if block.len() != PackedStorageLayout::Q4_K.block_bytes() as usize {
+        return Err(PackedDequantError::BlockBytesMismatch {
+            expected: PackedStorageLayout::Q4_K.block_bytes(),
+            actual: block.len(),
+        });
+    }
+    let d = ggml_half_to_f32(u16::from_le_bytes([block[0], block[1]]));
+    let min = ggml_half_to_f32(u16::from_le_bytes([block[2], block[3]]));
+    let scales = &block[4..16];
+    let qs = &block[16..144];
+    let mut y = [0.0f32; 256];
+    let mut is = 0usize;
+    let mut qoff = 0usize;
+    for chunk in [0usize, 64, 128, 192] {
+        let (sc, m) = get_scale_min_k4(is, scales);
+        let d1 = d * f32::from(sc);
+        let m1 = min * f32::from(m);
+        let (sc, m) = get_scale_min_k4(is + 1, scales);
+        let d2 = d * f32::from(sc);
+        let m2 = min * f32::from(m);
+        for l in 0..32usize {
+            y[chunk + l] = d1 * f32::from(qs[qoff + l] & 0x0f) - m1;
+            y[chunk + 32 + l] = d2 * f32::from(qs[qoff + l] >> 4) - m2;
+        }
+        qoff += 32;
+        is += 2;
+    }
+    Ok(y)
+}
+
 /// Dequant one packed block for an admitted layout. R-PACK-02B implements
-/// Q8_0; later layout units add arms. Unsupported layouts fail closed.
+/// Q8_0; R-PACK-02D implements Q4_K. Unsupported layouts fail closed.
 ///
 /// # Errors
 /// [`PackedDequantError`] when the block length is wrong or the layout
@@ -422,6 +471,7 @@ pub fn dequant_packed_block(
 ) -> Result<Vec<f32>, PackedDequantError> {
     match layout {
         PackedStorageLayout::Q8_0 => Ok(dequant_q8_0_block(block)?.to_vec()),
+        PackedStorageLayout::Q4_K => Ok(dequant_q4_k_block(block)?.to_vec()),
         other => Err(PackedDequantError::UnsupportedLayout { layout: other }),
     }
 }

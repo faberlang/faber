@@ -1863,14 +1863,77 @@ fn q8_0_dequant_rejects_truncated_block() {
     );
 }
 
+fn gi2_first_block_fixture(layout: &str) -> (Vec<u8>, Vec<f32>) {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../docs/factory/gpu-inference-gguf/evidence/gi2-dequant-goldens.json"
+    );
+    let json: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("GI2-1 goldens")).expect("json");
+    let fixture = json["block_fixtures"]
+        .as_array()
+        .expect("block_fixtures")
+        .iter()
+        .find(|block| block["type"] == layout)
+        .unwrap_or_else(|| panic!("GI2-1 goldens must include a {layout} block"));
+    let packed = parse_hex_bytes(fixture["bytes_hex"].as_str().expect("bytes_hex"));
+    let expected = fixture["output_hex"]
+        .as_array()
+        .expect("output_hex")
+        .iter()
+        .map(|word| {
+            f32::from_bits(u32::from_str_radix(word.as_str().expect("hex word"), 16).expect("hex"))
+        })
+        .collect();
+    (packed, expected)
+}
+
 #[test]
-fn packed_dequant_q4k_fails_closed_until_r_pack_02d() {
-    let error = dequant_packed_block(crate::abi::PackedStorageLayout::Q4_K, &[0u8; 144])
-        .expect_err("Q4_K body is R-PACK-02D");
+fn q4_k_block_dequant_matches_gi2_1_golden() {
+    let (packed, expected) = gi2_first_block_fixture("Q4_K");
+    assert_eq!(packed.len(), 144);
+    assert_eq!(expected.len(), 256);
+    let got = dequant_q4_k_block(&packed).expect("Q4_K block is 144 bytes");
+    assert_eq!(got.as_slice(), expected.as_slice());
+    assert_eq!(
+        dequant_packed_block(crate::abi::PackedStorageLayout::Q4_K, &packed).expect("Q4_K arm"),
+        expected
+    );
+}
+
+#[test]
+fn q4_k_packed_gemm_matches_cpu_reference_without_whole_model_f32() {
+    // One Q4_K superblock as B[K=256, N=1]; A is a single row of ones.
+    let (packed, _) = gi2_first_block_fixture("Q4_K");
+    let right = dequant_q4_k_block(&packed).expect("Q4_K block");
+    let left = [1.0f32; 256];
+    let out = gemm_f32(&left, 1, 256, &right, 1);
+    let expected: f32 = right.iter().sum();
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].to_bits(), expected.to_bits());
+    assert!(out[0].is_finite());
+}
+
+#[test]
+fn q4_k_dequant_rejects_truncated_block() {
+    let error = dequant_q4_k_block(&[0u8; 8]).expect_err("truncated Q4_K must fail closed");
+    assert_eq!(
+        error,
+        PackedDequantError::BlockBytesMismatch {
+            expected: 144,
+            actual: 8
+        }
+    );
+}
+
+#[test]
+fn packed_dequant_q5k_fails_closed_until_later_unit() {
+    let error = dequant_packed_block(crate::abi::PackedStorageLayout::Q5_K, &[0u8; 176])
+        .expect_err("Q5_K body is R-PACK-02F");
     assert_eq!(
         error,
         PackedDequantError::UnsupportedLayout {
-            layout: crate::abi::PackedStorageLayout::Q4_K
+            layout: crate::abi::PackedStorageLayout::Q5_K
         }
     );
 }
