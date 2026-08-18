@@ -3799,3 +3799,184 @@ fn matrix_display_rows_split_on_column_count() {
         .expect("matrix display must succeed");
     assert_eq!(text, "[[1, 2, 3], [4, 5, 6]]");
 }
+
+// ---------------------------------------------------------------------------
+// tensor_matmul correctness + measurement (perf-A F1)
+// ---------------------------------------------------------------------------
+
+fn eval_tensor_matmul(left: Value, right: Value) -> Result<Value, RunnerError> {
+    evaluate_collection_call(
+        &MirRuntimeCall {
+            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMatMul),
+            args: vec![
+                MirOperand::Value(MirValueId(0)),
+                MirOperand::Value(MirValueId(1)),
+            ],
+            return_ty: MirType::semantic(TypeId(0)),
+        },
+        vec![(MirValueId(0), left), (MirValueId(1), right)],
+    )
+}
+
+fn dense_float_tensor(rows: i64, cols: i64, fill: impl Fn(i64, i64) -> f64) -> Value {
+    let mut data = Vec::with_capacity((rows * cols) as usize);
+    for i in 0..rows {
+        for j in 0..cols {
+            data.push(Value::Float(fill(i, j)));
+        }
+    }
+    tensor_value(data, vec![rows, cols])
+}
+
+#[test]
+fn test_tensor_matmul_float_2x3_by_3x4() {
+    // Same contraction as product-corpus/tensor-package/fmir-matmul.
+    let left = dense_float_tensor(2, 3, |i, j| (i * 3 + j + 1) as f64);
+    let right = dense_float_tensor(3, 4, |i, j| (i * 4 + j + 1) as f64);
+    let result = eval_tensor_matmul(left, right).expect("float matmul");
+    let Value::Tensor(cell) = result else {
+        panic!("expected tensor");
+    };
+    let out = cell.borrow();
+    assert_eq!(out.shape, vec![2, 4]);
+    assert_numeric_close(
+        &out.data,
+        &[38.0, 44.0, 50.0, 56.0, 83.0, 98.0, 113.0, 128.0],
+        1e-9,
+    );
+}
+
+#[test]
+fn test_tensor_matmul_int_2x2() {
+    let left = tensor_value(
+        vec![Value::Int(1), Value::Int(2), Value::Int(3), Value::Int(4)],
+        vec![2, 2],
+    );
+    let right = tensor_value(
+        vec![Value::Int(5), Value::Int(6), Value::Int(7), Value::Int(8)],
+        vec![2, 2],
+    );
+    let result = eval_tensor_matmul(left, right).expect("int matmul");
+    let Value::Tensor(cell) = result else {
+        panic!("expected tensor");
+    };
+    let out = cell.borrow();
+    assert_eq!(out.shape, vec![2, 2]);
+    assert_eq!(
+        out.data,
+        vec![
+            Value::Int(19),
+            Value::Int(22),
+            Value::Int(43),
+            Value::Int(50)
+        ]
+    );
+}
+
+#[test]
+fn test_tensor_matmul_mixed_promotes_to_float() {
+    let left = tensor_value(vec![Value::Int(2), Value::Int(4)], vec![1, 2]);
+    let right = tensor_value(vec![Value::Float(0.5), Value::Float(1.5)], vec![2, 1]);
+    let result = eval_tensor_matmul(left, right).expect("mixed matmul");
+    let Value::Tensor(cell) = result else {
+        panic!("expected tensor");
+    };
+    let out = cell.borrow();
+    assert_eq!(out.shape, vec![1, 1]);
+    assert_numeric_close(&out.data, &[7.0], 1e-9);
+}
+
+#[test]
+#[ignore = "manual before/after bench; run with --ignored"]
+fn measure_tensor_matmul_128() {
+    use std::time::Instant;
+
+    let dim = 128_i64;
+    let left = dense_float_tensor(dim, dim, |i, j| ((i * 17 + j) % 13) as f64);
+    let right = dense_float_tensor(dim, dim, |i, j| ((i * 13 + j) % 11) as f64 * 0.5);
+    // Warmup
+    let _ = eval_tensor_matmul(left.clone(), right.clone()).expect("warmup");
+    let mut samples = Vec::new();
+    for _ in 0..5 {
+        let start = Instant::now();
+        let result = eval_tensor_matmul(left.clone(), right.clone()).expect("timed matmul");
+        samples.push(start.elapsed());
+        let Value::Tensor(cell) = result else {
+            panic!("expected tensor");
+        };
+        assert_eq!(cell.borrow().shape, vec![dim, dim]);
+        assert_eq!(cell.borrow().data.len(), (dim * dim) as usize);
+    }
+    samples.sort();
+    let median = samples[samples.len() / 2];
+    eprintln!(
+        "MEASURE tensor_matmul {dim}x{dim}x{dim} n={} samples={:?} median={median:?}",
+        samples.len(),
+        samples
+    );
+}
+
+#[test]
+fn recovery_calls_index_only_orphan_temp_destinations() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirBlock, MirCallee, MirPlace, MirStatement, MirStatementKind, MirTempId, MirTerminator,
+        MirTerminatorKind, MirValidationContext,
+    };
+    use radix_types::TypeTable;
+
+    let mut function = test_function();
+    function.blocks.push(MirBlock {
+        id: MirBlockId(0),
+        statements: vec![MirStatement {
+            kind: MirStatementKind::Call {
+                destination: Some(MirPlace::temp(MirTempId(1))),
+                callee: MirCallee::Function(MirFunctionId(0)),
+                args: vec![],
+            },
+            span: Span::default(),
+        }],
+        terminator: MirTerminator {
+            kind: MirTerminatorKind::Return(None),
+            span: Span::default(),
+        },
+        span: Span::default(),
+    });
+    function.blocks.push(MirBlock {
+        id: MirBlockId(1),
+        statements: vec![MirStatement {
+            kind: MirStatementKind::Call {
+                destination: Some(MirPlace::temp(MirTempId(3))),
+                callee: MirCallee::Function(MirFunctionId(0)),
+                args: vec![MirOperand::Constant(MirConstant::Int(7))],
+            },
+            span: Span::default(),
+        }],
+        terminator: MirTerminator {
+            kind: MirTerminatorKind::Unreachable,
+            span: Span::default(),
+        },
+        span: Span::default(),
+    });
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(function);
+    let runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    assert!(
+        !runner
+            .recovery_calls
+            .contains_key(&(MirFunctionId(0), MirTempId(1))),
+        "reachable-block calls must stay out of the recovery index"
+    );
+    let orphan = runner
+        .recovery_calls
+        .get(&(MirFunctionId(0), MirTempId(3)))
+        .expect("orphan recovery call must be indexed");
+    assert_eq!(orphan.1, vec![MirOperand::Constant(MirConstant::Int(7))]);
+}

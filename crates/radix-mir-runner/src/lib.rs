@@ -20,14 +20,14 @@ pub use host::{BufferHost, Host, StdioHost};
 pub use value::{MapKey, Value};
 
 use radix_hir::DefId;
-use radix_lexer::{Interner, Span};
+use radix_lexer::{Interner, Span, Symbol};
 use radix_mir::{
     MirBinOp, MirBlock, MirBlockId, MirCallee, MirConstant, MirFunction, MirFunctionId, MirLocalId,
     MirOperand, MirPlace, MirPlaceBase, MirProgram, MirStatementKind, MirTempId, MirTerminatorKind,
     MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
 };
 use radix_types::{effective_width, NumericWidth, Primitive, Type, TypeTable};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
 use value::{
@@ -158,6 +158,13 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     gradient_handles: FxHashMap<u64, GradientStorage>,
     /// Next gradient handle id (monotonic, never reused).
     next_gradient_handle: u64,
+    /// Decoded `textus` literals, keyed by interned source symbol.
+    textus_literals: RefCell<FxHashMap<Symbol, String>>,
+    /// Owned ASCII literals, keyed by interned source symbol.
+    ascii_literals: RefCell<FxHashMap<Symbol, String>>,
+    /// Side-effecting `⇥` recovery calls parked in unreachable orphan blocks.
+    /// Looked up by `(function, dest temp)` so conversion failure is O(1).
+    recovery_calls: FxHashMap<(MirFunctionId, MirTempId), (MirCallee, Vec<MirOperand>)>,
 }
 
 impl<'a, H: Host + ?Sized> Runner<'a, H> {
@@ -194,6 +201,9 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             block_cache,
             gradient_handles: FxHashMap::default(),
             next_gradient_handle: 0,
+            textus_literals: RefCell::new(FxHashMap::default()),
+            ascii_literals: RefCell::new(FxHashMap::default()),
+            recovery_calls: index_orphan_recovery_calls(program),
         }
     }
 }
@@ -830,23 +840,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             .last()
             .map(|frame| frame.function)
             .ok_or_else(|| RunnerError::internal(span, "recovery evaluation outside a frame"))?;
-        let deferred = {
-            let function = self.function_by_id(function_id, span)?;
-            function.blocks.iter().find_map(|block| {
-                block.statements.iter().find_map(|statement| {
-                    let MirStatementKind::Call {
-                        destination: Some(place),
-                        callee,
-                        args,
-                    } = &statement.kind
-                    else {
-                        return None;
-                    };
-                    matches!(place.base, MirPlaceBase::Temp(id) if id == *temp_id)
-                        .then(|| (callee.clone(), args.clone()))
-                })
-            })
-        };
+        let deferred = self.recovery_calls.get(&(function_id, *temp_id)).cloned();
         if let Some((callee, args)) = deferred {
             return match self.invoke_call(&callee, &args, span)? {
                 CallOutcome::Ok(value) => Ok(value),
@@ -860,16 +854,14 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     #[allow(clippy::unnecessary_wraps)]
-    fn eval_constant(&self, constant: &MirConstant, _span: Span) -> Result<Value, RunnerError> {
+    fn eval_constant(&self, constant: &MirConstant, span: Span) -> Result<Value, RunnerError> {
         Ok(match constant {
             MirConstant::Int(value) => Value::Int(*value),
             MirConstant::UInt(value) => Value::UInt(*value),
             MirConstant::Float(value) => Value::Float(*value),
             MirConstant::Bool(value) => Value::Bool(*value),
-            MirConstant::String(symbol) => Value::Str(
-                crate::textus_literal::decode_textus_literal(self.interner.resolve(*symbol)),
-            ),
-            MirConstant::Ascii(symbol) => Value::Str(self.interner.resolve(*symbol).to_owned()),
+            MirConstant::String(symbol) => Value::Str(self.interned_textus(*symbol)),
+            MirConstant::Ascii(symbol) => Value::Str(self.interned_ascii(*symbol)),
             MirConstant::Nil => Value::Nil,
             MirConstant::Unit => Value::Unit,
             MirConstant::Octeti(bytes) => Value::Octeti(bytes.clone()),
@@ -878,7 +870,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             // Phase-4 substitution; evaluating it would be a silent guess.
             MirConstant::ShapeSize { .. } => {
                 return Err(RunnerError::internal(
-                    _span,
+                    span,
                     "symbolic shape-size constant is not concretely evaluable (Phase-4 substitution)",
                 ));
             }
@@ -893,6 +885,26 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 Value::Regex(runtime_regex_pattern(&pattern))
             }
         })
+    }
+
+    fn interned_textus(&self, symbol: Symbol) -> String {
+        let mut cache = self.textus_literals.borrow_mut();
+        if let Some(cached) = cache.get(&symbol) {
+            return cached.clone();
+        }
+        let decoded = crate::textus_literal::decode_textus_literal(self.interner.resolve(symbol));
+        cache.insert(symbol, decoded.clone());
+        decoded
+    }
+
+    fn interned_ascii(&self, symbol: Symbol) -> String {
+        let mut cache = self.ascii_literals.borrow_mut();
+        if let Some(cached) = cache.get(&symbol) {
+            return cached.clone();
+        }
+        let owned = self.interner.resolve(symbol).to_owned();
+        cache.insert(symbol, owned.clone());
+        owned
     }
 
     fn read_place(&mut self, place: &MirPlace, span: Span) -> Result<Value, RunnerError> {
@@ -1416,6 +1428,78 @@ fn constant_equals_value(constant: &MirConstant, value: &Value, interner: &Inter
         (MirConstant::Nil, Value::Nil) => true,
         (MirConstant::Unit, Value::Unit) => true,
         _ => false,
+    }
+}
+
+fn index_orphan_recovery_calls(
+    program: &MirProgram,
+) -> FxHashMap<(MirFunctionId, MirTempId), (MirCallee, Vec<MirOperand>)> {
+    let mut map = FxHashMap::default();
+    for function in &program.functions {
+        let reachable = reachable_block_ids(function);
+        for block in &function.blocks {
+            if reachable.contains(&block.id) {
+                continue;
+            }
+            for statement in &block.statements {
+                let MirStatementKind::Call {
+                    destination: Some(place),
+                    callee,
+                    args,
+                } = &statement.kind
+                else {
+                    continue;
+                };
+                let MirPlaceBase::Temp(temp_id) = place.base else {
+                    continue;
+                };
+                map.entry((function.id, temp_id))
+                    .or_insert_with(|| (callee.clone(), args.clone()));
+            }
+        }
+    }
+    map
+}
+
+fn reachable_block_ids(function: &MirFunction) -> FxHashSet<MirBlockId> {
+    let mut reachable = FxHashSet::default();
+    let mut stack = vec![MirBlockId(0)];
+    reachable.insert(MirBlockId(0));
+    while let Some(id) = stack.pop() {
+        let Some(block) = function.block_by_id(id) else {
+            continue;
+        };
+        for succ in terminator_successors(&block.terminator.kind) {
+            if reachable.insert(succ) {
+                stack.push(succ);
+            }
+        }
+    }
+    reachable
+}
+
+fn terminator_successors(kind: &MirTerminatorKind) -> Vec<MirBlockId> {
+    match kind {
+        MirTerminatorKind::Return(_)
+        | MirTerminatorKind::ReturnError(_)
+        | MirTerminatorKind::Unreachable => Vec::new(),
+        MirTerminatorKind::Goto(target) => vec![*target],
+        MirTerminatorKind::Branch {
+            then_block,
+            else_block,
+            ..
+        } => vec![*then_block, *else_block],
+        MirTerminatorKind::Switch { cases, default, .. } => {
+            let mut targets = Vec::with_capacity(cases.len() + 1);
+            targets.push(*default);
+            targets.extend(cases.iter().map(|case| case.target));
+            targets
+        }
+        MirTerminatorKind::TryCall {
+            ok_block,
+            error_block,
+            ..
+        } => vec![*ok_block, *error_block],
     }
 }
 

@@ -31,8 +31,8 @@
 
 use super::value::{
     format_template, modular_operand, modular_word_mask, modular_word_result,
-    uint_width_checked_add, values_equal, width_checked_add, GradientStorage, MapKey, SermoValue,
-    TensorValue, Value,
+    uint_width_checked_add, uint_width_checked_mul, values_equal, width_checked_add,
+    width_checked_mul, GradientStorage, MapKey, SermoValue, TensorValue, Value,
 };
 use super::{gelu_f64, host::provider_identity, Runner, RunnerError};
 use radix_hir::DefId;
@@ -386,16 +386,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let shape_value = self.eval_operand(shape_arg, span)?;
         let rank = self.eval_operand(rank_arg, span)?.as_index(span)?;
         let incoming_shape = gradient_shape_dims(&shape_value, rank, span)?;
-        let incoming = match self.eval_operand(data_arg, span)? {
-            Value::Tensor(tensor) => tensor.borrow().data.clone(),
-            Value::Array(items) => items.borrow().clone(),
-            _ => {
-                return Err(RunnerError::internal(
-                    span,
-                    "gradient accumulate data is not tensor storage",
-                ))
-            }
-        };
+        let incoming = self.eval_operand(data_arg, span)?;
         let storage = self.gradient_handles.get_mut(&handle).ok_or_else(|| {
             RunnerError::internal(span, format!("gradient accumulate unknown handle {handle}"))
         })?;
@@ -408,14 +399,19 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 ),
             ));
         }
-        if incoming.len() != storage.data.len() {
-            return Err(RunnerError::internal(
-                span,
-                "gradient accumulate backing-length mismatch",
-            ));
-        }
-        for (stored, incoming_value) in storage.data.iter_mut().zip(incoming.iter()) {
-            *stored = numeric_add(stored, incoming_value, NumericWidth::F64, span)?;
+        match &incoming {
+            Value::Tensor(tensor) => {
+                accumulate_gradient_data(&mut storage.data, &tensor.borrow().data, span)?;
+            }
+            Value::Array(items) => {
+                accumulate_gradient_data(&mut storage.data, &items.borrow(), span)?;
+            }
+            _ => {
+                return Err(RunnerError::internal(
+                    span,
+                    "gradient accumulate data is not tensor storage",
+                ));
+            }
         }
         Ok(Value::Unit)
     }
@@ -1845,12 +1841,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     // other differing pair fails closed with a typed
                     // diagnostic — the broadcast fact must be recorded, never
                     // guessed (A3).
-                    let (higher_shape, lower_shape, lower_data) = if l.shape.len() >= r.shape.len()
-                    {
-                        (&l.shape, &r.shape, &r.data)
-                    } else {
-                        (&r.shape, &l.shape, &l.data)
-                    };
+                    let (higher_is_left, higher_shape, lower_shape, higher_data, lower_data) =
+                        if l.shape.len() >= r.shape.len() {
+                            (true, &l.shape, &r.shape, &l.data, &r.data)
+                        } else {
+                            (false, &r.shape, &l.shape, &r.data, &l.data)
+                        };
                     if higher_shape.len() != lower_shape.len() + 1
                         || lower_shape != &higher_shape[1..]
                     {
@@ -1866,31 +1862,34 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     let rows: usize = usize::try_from(higher_shape[0].max(0)).map_err(|_| {
                         RunnerError::internal(span, format!("{label} broadcast row overflow"))
                     })?;
-                    let mut lower_broadcast =
-                        Vec::with_capacity(lower_data.len().saturating_mul(rows.max(1)));
-                    for _ in 0..rows {
-                        lower_broadcast.extend(lower_data.iter().cloned());
+                    // Stride over the lower-rank operand instead of cloning it
+                    // `rows` times (perf-A F1). Operand order is preserved
+                    // because Sub is not commutative.
+                    if lower_data.is_empty() {
+                        if !higher_data.is_empty() {
+                            return Err(RunnerError::internal(
+                                span,
+                                format!("{label} backing-length mismatch"),
+                            ));
+                        }
+                        return Ok(tensor_value(Vec::new(), higher_shape.clone()));
                     }
-                    // Operand order is preserved (Sub is not commutative); the
-                    // lower-rank operand is the one expanded into the higher
-                    // rank's leading-axis frame.
-                    let (l_data, r_data) = if l.shape.len() >= r.shape.len() {
-                        (&l.data, &lower_broadcast)
-                    } else {
-                        (&lower_broadcast, &r.data)
-                    };
-                    // Backing-length mismatch would silently truncate via zip
-                    // (PRP-077) — reject explicitly.
-                    if l_data.len() != r_data.len() {
+                    let expected = rows.saturating_mul(lower_data.len());
+                    if higher_data.len() != expected {
                         return Err(RunnerError::internal(
                             span,
                             format!("{label} backing-length mismatch"),
                         ));
                     }
-                    let data = l_data
-                        .iter()
-                        .zip(r_data.iter())
-                        .map(|(a, b)| op(a, b, width, span))
+                    let data = (0..higher_data.len())
+                        .map(|index| {
+                            let lower = &lower_data[index % lower_data.len()];
+                            if higher_is_left {
+                                op(&higher_data[index], lower, width, span)
+                            } else {
+                                op(lower, &higher_data[index], width, span)
+                            }
+                        })
                         .collect::<Result<Vec<_>, _>>()?;
                     return Ok(tensor_value(data, higher_shape.clone()));
                 }
@@ -2199,26 +2198,42 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
         let m = l_shape[0];
         let n = r_shape[1];
-        let mut result_data = Vec::with_capacity((m * n) as usize);
-        for i in 0..m {
-            for j in 0..n {
-                let mut acc = Value::Int(0);
-                let mut first = true;
-                for k in 0..k_left {
-                    let a = borrow.data[(i * k_left + k) as usize].clone();
-                    let b = borrow_r.data[(k * n + j) as usize].clone();
-                    if first {
-                        acc = numeric_mul(&a, &b, width, span)?;
-                        first = false;
-                    } else {
-                        let prod = numeric_mul(&a, &b, width, span)?;
-                        acc = numeric_add(&acc, &prod, width, span)?;
-                    }
-                }
-                result_data.push(acc);
+        // Homogeneous numerus tensors take a typed ikj kernel: one classify
+        // walk, then a tight numeric loop with row-major right-hand access.
+        // Mixed / non-numeric tensors keep the borrowed Value fallback.
+        if !borrow.data.is_empty() && !borrow_r.data.is_empty() {
+            if let (Some(left_f), Some(right_f)) =
+                (extract_f64s(&borrow.data), extract_f64s(&borrow_r.data))
+            {
+                let cells = matmul_f64(&left_f, &right_f, m, k_left, n);
+                return Ok(tensor_value(
+                    cells.into_iter().map(Value::Float).collect(),
+                    vec![m, n],
+                ));
+            }
+            if let (Some(left_i), Some(right_i)) =
+                (extract_i64s(&borrow.data), extract_i64s(&borrow_r.data))
+            {
+                let cells = matmul_i64(&left_i, &right_i, m, k_left, n, width, span)?;
+                return Ok(tensor_value(
+                    cells.into_iter().map(Value::Int).collect(),
+                    vec![m, n],
+                ));
+            }
+            if let (Some(left_u), Some(right_u)) =
+                (extract_u64s(&borrow.data), extract_u64s(&borrow_r.data))
+            {
+                let cells = matmul_u64(&left_u, &right_u, m, k_left, n, width, span)?;
+                return Ok(tensor_value(
+                    cells.into_iter().map(Value::UInt).collect(),
+                    vec![m, n],
+                ));
             }
         }
-        Ok(tensor_value(result_data, vec![m, n]))
+        Ok(tensor_value(
+            matmul_values(&borrow.data, &borrow_r.data, m, k_left, n, width, span)?,
+            vec![m, n],
+        ))
     }
 
     /// Sum across a specified axis: `sum(x, axis)`.
@@ -3677,6 +3692,150 @@ fn gradient_shape_dims(
         ));
     }
     Ok(dims)
+}
+
+fn accumulate_gradient_data(
+    stored: &mut [Value],
+    incoming: &[Value],
+    span: Span,
+) -> Result<(), RunnerError> {
+    if incoming.len() != stored.len() {
+        return Err(RunnerError::internal(
+            span,
+            "gradient accumulate backing-length mismatch",
+        ));
+    }
+    for (slot, value) in stored.iter_mut().zip(incoming) {
+        *slot = numeric_add(slot, value, NumericWidth::F64, span)?;
+    }
+    Ok(())
+}
+
+fn extract_f64s(data: &[Value]) -> Option<Vec<f64>> {
+    let mut out = Vec::with_capacity(data.len());
+    for value in data {
+        match value {
+            Value::Float(v) => out.push(*v),
+            _ => return None,
+        }
+    }
+    Some(out)
+}
+
+fn extract_i64s(data: &[Value]) -> Option<Vec<i64>> {
+    let mut out = Vec::with_capacity(data.len());
+    for value in data {
+        match value {
+            Value::Int(v) => out.push(*v),
+            _ => return None,
+        }
+    }
+    Some(out)
+}
+
+fn extract_u64s(data: &[Value]) -> Option<Vec<u64>> {
+    let mut out = Vec::with_capacity(data.len());
+    for value in data {
+        match value {
+            Value::UInt(v) => out.push(*v),
+            _ => return None,
+        }
+    }
+    Some(out)
+}
+
+fn matmul_dims(m: i64, k: i64, n: i64) -> (usize, usize, usize) {
+    (m.max(0) as usize, k.max(0) as usize, n.max(0) as usize)
+}
+
+fn matmul_f64(left: &[f64], right: &[f64], m: i64, k: i64, n: i64) -> Vec<f64> {
+    let (m, k, n) = matmul_dims(m, k, n);
+    let mut out = vec![0.0; m.saturating_mul(n)];
+    for i in 0..m {
+        for kk in 0..k {
+            let a = left[i * k + kk];
+            let right_row = &right[kk * n..(kk + 1) * n];
+            let out_row = &mut out[i * n..(i + 1) * n];
+            for j in 0..n {
+                out_row[j] += a * right_row[j];
+            }
+        }
+    }
+    out
+}
+
+fn matmul_i64(
+    left: &[i64],
+    right: &[i64],
+    m: i64,
+    k: i64,
+    n: i64,
+    width: NumericWidth,
+    span: Span,
+) -> Result<Vec<i64>, RunnerError> {
+    let (m, k, n) = matmul_dims(m, k, n);
+    let mut out = vec![0_i64; m.saturating_mul(n)];
+    for i in 0..m {
+        for kk in 0..k {
+            let a = left[i * k + kk];
+            let right_row = &right[kk * n..(kk + 1) * n];
+            let out_row = &mut out[i * n..(i + 1) * n];
+            for j in 0..n {
+                let prod = width_checked_mul(a, right_row[j], width, span)?;
+                out_row[j] = width_checked_add(out_row[j], prod, width, span)?;
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn matmul_u64(
+    left: &[u64],
+    right: &[u64],
+    m: i64,
+    k: i64,
+    n: i64,
+    width: NumericWidth,
+    span: Span,
+) -> Result<Vec<u64>, RunnerError> {
+    let (m, k, n) = matmul_dims(m, k, n);
+    let mut out = vec![0_u64; m.saturating_mul(n)];
+    for i in 0..m {
+        for kk in 0..k {
+            let a = left[i * k + kk];
+            let right_row = &right[kk * n..(kk + 1) * n];
+            let out_row = &mut out[i * n..(i + 1) * n];
+            for j in 0..n {
+                let prod = uint_width_checked_mul(a, right_row[j], width, span)?;
+                out_row[j] = uint_width_checked_add(out_row[j], prod, width, span)?;
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn matmul_values(
+    left: &[Value],
+    right: &[Value],
+    m: i64,
+    k: i64,
+    n: i64,
+    width: NumericWidth,
+    span: Span,
+) -> Result<Vec<Value>, RunnerError> {
+    let (m, k, n) = matmul_dims(m, k, n);
+    let mut out = vec![Value::Int(0); m.saturating_mul(n)];
+    for i in 0..m {
+        for kk in 0..k {
+            let a = &left[i * k + kk];
+            for j in 0..n {
+                let prod = numeric_mul(a, &right[kk * n + j], width, span)?;
+                let slot = &mut out[i * n + j];
+                *slot = numeric_add(slot, &prod, width, span)?;
+            }
+        }
+    }
+    Ok(out)
 }
 
 fn numeric_as_f64(value: &Value, span: Span) -> Result<f64, RunnerError> {
