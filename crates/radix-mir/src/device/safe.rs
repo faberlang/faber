@@ -783,6 +783,21 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             } => {
                 crate::visit::walk_stmt(self, stmt);
             }
+            // R-PACK-02B: packed QuantizedMatMul is a recipe op — the plan
+            // pass admits it (`CollectionKernelPlan::QuantizedMatMul`) and
+            // the Metal emitter lowers the Q8_0 in-kernel dequant body.
+            // Other packed layouts fail closed in the emitter until their
+            // unit. Operand layouts are still walked and checked.
+            MirStatementKind::RuntimeCall {
+                call:
+                    MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorQuantizedMatMul),
+                        ..
+                    },
+                ..
+            } => {
+                crate::visit::walk_stmt(self, stmt);
+            }
             // S5-U2: rank-2 `TensorTranspose` is a recipe op — the plan pass
             // admits it (`CollectionKernelPlan::Transpose`, kernel_plan.rs),
             // the ABI resolves its dispatch contract (workgroup 64, dispatch

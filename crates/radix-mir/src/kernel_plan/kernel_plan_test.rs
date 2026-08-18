@@ -1797,3 +1797,80 @@ fn quantized_matmul_plan_validate_rejects_f32_layout() {
         PlanValidationError::QuantizedMatMulF32Fallback
     );
 }
+
+// ── R-PACK-02B Q8_0 dequant + GEMM probe (GI2-1 goldens) ──────────────────
+
+fn parse_hex_bytes(hex: &str) -> Vec<u8> {
+    assert_eq!(hex.len() % 2, 0, "hex byte string must be even");
+    (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).expect("hex byte"))
+        .collect()
+}
+
+fn parse_hex_f32s(words: &[&str]) -> Vec<f32> {
+    words
+        .iter()
+        .map(|word| f32::from_bits(u32::from_str_radix(word, 16).expect("hex f32")))
+        .collect()
+}
+
+#[test]
+fn q8_0_block_dequant_matches_gi2_1_golden() {
+    // GI2-1 `gi2-dequant-goldens.json`: real blk.0.attn_v.weight block 0.
+    let packed =
+        parse_hex_bytes("7f13b2ef0081cff90a0316cfc70aea841ae908f1330d18e1cdce2309ffed0f33eba8");
+    let expected = parse_hex_f32s(&[
+        "bd922c80", "bc7ede00", "00000000", "bdee0040", "bd37a780", "bbd1e400", "3c15ec00",
+        "3b33e800", "3ca4ea00", "bd37a780", "bd55a380", "3c15ec00", "bca4ea00", "bde86100",
+        "3cc2e600", "bcac6900", "3befe000", "bc60e200", "3d3f2680", "3c42e600", "3cb3e800",
+        "bce86100", "bd3f2680", "bd3b6700", "3d032e80", "3c06ee00", "ba6fe000", "bc8e6d00",
+        "3c60e200", "3d3f2680", "bc9d6b00", "bda4ea00",
+    ]);
+    let got = dequant_q8_0_block(&packed).expect("Q8_0 block is 34 bytes");
+    assert_eq!(got.as_slice(), expected.as_slice());
+    assert_eq!(
+        dequant_packed_block(crate::abi::PackedStorageLayout::Q8_0, &packed).expect("Q8_0 arm"),
+        expected
+    );
+}
+
+#[test]
+fn q8_0_packed_gemm_matches_cpu_reference_without_whole_model_f32() {
+    // One Q8_0 block as B[K=32, N=1]; A is a single row of ones.
+    // Dequant is block-wise — the fixture is 34 packed bytes, never a
+    // whole-model F32 expansion.
+    let packed =
+        parse_hex_bytes("7f13b2ef0081cff90a0316cfc70aea841ae908f1330d18e1cdce2309ffed0f33eba8");
+    let right = dequant_q8_0_block(&packed).expect("Q8_0 block");
+    let left = [1.0f32; 32];
+    let out = gemm_f32(&left, 1, 32, &right, 1);
+    let expected: f32 = right.iter().sum();
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].to_bits(), expected.to_bits());
+    assert!(out[0].is_finite());
+}
+
+#[test]
+fn q8_0_dequant_rejects_truncated_block() {
+    let error = dequant_q8_0_block(&[0u8; 8]).expect_err("truncated Q8_0 must fail closed");
+    assert_eq!(
+        error,
+        PackedDequantError::BlockBytesMismatch {
+            expected: 34,
+            actual: 8
+        }
+    );
+}
+
+#[test]
+fn packed_dequant_q4k_fails_closed_until_r_pack_02d() {
+    let error = dequant_packed_block(crate::abi::PackedStorageLayout::Q4_K, &[0u8; 144])
+        .expect_err("Q4_K body is R-PACK-02D");
+    assert_eq!(
+        error,
+        PackedDequantError::UnsupportedLayout {
+            layout: crate::abi::PackedStorageLayout::Q4_K
+        }
+    );
+}
