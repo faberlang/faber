@@ -11,7 +11,7 @@
 use crate::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase};
 use crate::hir::DefId;
 use crate::semantic::resolved_use::ResolvedUseIndex;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Stable diagnostic code for an emit-table miss.
 pub const DEF_ID_CLOSURE_CODE: &str = "DEFID001";
@@ -59,6 +59,28 @@ pub fn missing_emit_def_diagnostic(def_id: DefId, name: Option<&str>, file: &str
         .with_code(DEF_ID_CLOSURE_CODE)
         .with_args(args)
         .with_file(file.to_owned())
+}
+
+/// Display name for a def on the DEFID001 surface.
+///
+/// Locale-pack TypeAlias surfaces are not imported type-paths. `name_of` used
+/// to look only at path tails, so a missing pack alias reported `def_id=35`
+/// with no `def_name`. Pack spellings win; imported path tails remain the
+/// fallback for genuine import defs.
+#[must_use]
+pub fn emit_def_table_name<'a>(
+    def_id: DefId,
+    locale_pack_type_aliases: &'a FxHashMap<DefId, String>,
+    imported_type_paths: &'a FxHashMap<DefId, String>,
+) -> Option<&'a str> {
+    locale_pack_type_aliases
+        .get(&def_id)
+        .map(String::as_str)
+        .or_else(|| {
+            imported_type_paths
+                .get(&def_id)
+                .and_then(|path| path.rsplit("::").next())
+        })
 }
 
 /// Compare referenced defs against the emit table and emit one diagnostic per miss.
