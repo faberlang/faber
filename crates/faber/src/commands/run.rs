@@ -262,18 +262,9 @@ fn resolve_route_selection(
         manifest.device.backend.as_deref(),
         &layout.manifest_path,
     )?;
-    // DDPP1-U2 (C2 feature isolation): with `device-runtime` the portable
-    // default is applied by the host factory; without it the same semantics
-    // (`cli override > manifest backend > auto`) resolve locally — a small
-    // build can never reach a device route.
-    #[cfg(feature = "device-runtime")]
-    {
-        return Ok(package::effective_backend_selection(None, manifest_backend));
-    }
-    #[cfg(not(feature = "device-runtime"))]
-    {
-        return Ok(manifest_backend.unwrap_or(DeviceSelection::Auto));
-    }
+    // CLI already returned above. Manifest backend or portable `auto`.
+    // In-process host_factory is parked; this fold does not need it.
+    Ok(manifest_backend.unwrap_or(DeviceSelection::Auto))
 }
 
 /// Render route diagnostics with their stable host codes (N1.4). The
