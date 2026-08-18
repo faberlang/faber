@@ -1,10 +1,10 @@
 use super::plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, CollectionKernelPlan,
     GatherPlan, GroupedMatMulPlan, LayerNormalizationPlan, MatMulPlan, MatMulShapes,
-    MatMulSharedMemory, OobPaddingPolicy, QuantizedMatMulPlan, ReduceOp, ReductionPlan,
-    RmsNormalizationPlan, RopePlan, RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan,
-    TransposePlan, F32_ELEMENT_BYTE_WIDTH, MATMUL_SHARED_A_BUFFER_NAME,
-    MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE, REDUCTION_SHARED_BUFFER_NAME, TRANSPOSE_WORKGROUP_X,
+    MatMulSharedMemory, OobPaddingPolicy, ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan,
+    RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
+    F32_ELEMENT_BYTE_WIDTH, MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE,
+    REDUCTION_SHARED_BUFFER_NAME, TRANSPOSE_WORKGROUP_X,
 };
 use super::validate::{
     validate_axis_reduction_plan, validate_causal_masked_softmax_plan, validate_gather_plan,
@@ -202,15 +202,10 @@ impl CollectionKernelPlan {
                 if !signature_matches_matmul(signature, dispatch_x, dispatch_y, shapes) {
                     return None;
                 }
-                Some(CollectionKernelPlan::QuantizedMatMul(QuantizedMatMulPlan {
-                    m,
-                    k,
-                    n,
-                    layout,
-                    tile: MATMUL_TILE,
-                    workgroup_x: signature.workgroup.x,
-                    workgroup_y: signature.workgroup.y,
-                }))
+                // R-PACK-02A: F32 falls back to TiledMatMul; packed layouts
+                // keep QuantizedMatMul. The signature already matches the
+                // shared tile grid.
+                Some(super::admit_quantized_matmul(layout, shapes))
             }
             CollectionOpContract::GroupedMatMul {
                 dispatch_x,
@@ -394,6 +389,14 @@ impl CollectionKernelPlan {
                 // row count) and cross-checks the signature's input/output
                 // element counts plus the ids extra-input count.
                 let (table_rows, table_cols, id_count) = gather_recipe_facts(function, validation)?;
+                // R-PACK-02A: optional trailing GGML type-id const. Packed
+                // tables admit QuantizedGather; unrepresentable ids fail
+                // closed. The carried plan stays Gather (no wire change).
+                if let Some(operand) =
+                    super::trailing_layout_operand(function, MirCollectionOp::TensorGather)
+                {
+                    super::packed_layout_from_operand(operand).ok()?;
+                }
                 let input_count = table_rows.saturating_mul(table_cols);
                 let output_count = id_count.saturating_mul(table_cols);
                 if !signature_matches_transformer_counts(signature, input_count, output_count) {
@@ -510,7 +513,7 @@ pub(super) fn reduction_barrier_schedule(workgroup_x: u32) -> Vec<BarrierPoint> 
 /// inner product), then the post-inner-product-step barrier (publishes the
 /// read completion before the next K tile's cooperative load overwrites the
 /// buffers). The K-tile loop repeats this pair `ceil(k / tile)` times.
-pub(super) fn matmul_barrier_schedule() -> Vec<BarrierPoint> {
+pub(crate) fn matmul_barrier_schedule() -> Vec<BarrierPoint> {
     vec![
         BarrierPoint {
             after: BarrierPhase::SharedMemoryLoad,

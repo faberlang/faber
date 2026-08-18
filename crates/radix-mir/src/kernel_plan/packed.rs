@@ -1,0 +1,344 @@
+//! Packed-layout admission and per-layout dequant resolution (R-PACK-02A).
+//!
+//! `QuantizedMatMul` / `QuantizedGather` names were frozen by R-PACK-01A.
+//! This module is the fail-closed policy that maps a GGML type id onto a
+//! typed plan: F32 falls back to the existing dense recipes; the packed
+//! §5 layouts resolve a [`PackedDequantResolution`]; anything else is
+//! unrepresentable.
+//!
+//! `QuantizedGatherPlan` is an admission record, not a
+//! [`super::CollectionKernelPlan`] variant — adding a variant would force
+//! a wire change (unit stop condition).
+
+use super::build::matmul_barrier_schedule;
+use super::plan::{
+    CollectionKernelPlan, GatherPlan, MatMulPlan, MatMulShapes, MatMulSharedMemory,
+    OobPaddingPolicy, QuantizedMatMulPlan, SharedMemoryLayout, F32_ELEMENT_BYTE_WIDTH,
+    MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE,
+};
+use crate::abi::PackedStorageLayout;
+use crate::{
+    MirCollectionOp, MirConstant, MirFunction, MirOperand, MirRuntimeCall, MirStatementKind,
+};
+use std::fmt;
+
+/// In-kernel dequant class pinned to the §5 layout table (block vs
+/// superblock vs native convert). Never inferred from a filename.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackedDequantClass {
+    /// Plain f32 passthrough — existing `TiledMatMul` / `Gather`.
+    PassthroughF32,
+    /// Native 2-byte bfloat16; in-kernel f32 convert.
+    NativeBf16Convert,
+    /// Block dequant (`Q8_0`, `Q5_0`): f16 scale + packed ints, 32 elements.
+    Block,
+    /// Superblock dequant (`Q4_K`, `Q5_K`, `Q6_K`): 256 elements.
+    Superblock,
+}
+
+/// Typed dequant facts resolved from an admitted [`PackedStorageLayout`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PackedDequantResolution {
+    /// Closed layout this resolution was derived from.
+    pub layout: PackedStorageLayout,
+    /// Block/superblock/convert class from the §5 table.
+    pub class: PackedDequantClass,
+    /// Logical elements per stored block.
+    pub block_elements: u32,
+    /// Packed bytes per stored block.
+    pub block_bytes: u32,
+}
+
+/// Why packed admission refused a layout or operand.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackedAdmissionError {
+    /// GGML type id is outside the closed §5 set.
+    UnrepresentableLayout { ggml_type_id: u32 },
+    /// Layout operand is not a const GGML type id.
+    NonConstLayout,
+}
+
+/// Packed embedding-table gather admission (R-PACK-02A).
+///
+/// Not a [`CollectionKernelPlan`] variant — the carried plan stays
+/// [`CollectionKernelPlan::Gather`] so the accepted wire is unchanged.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuantizedGatherPlan {
+    /// Table rows `V`.
+    pub table_rows: u64,
+    /// Table columns `D`.
+    pub table_cols: u64,
+    /// Id-vector length `T`.
+    pub id_count: u64,
+    /// Stored table layout (never `F32` — that stays [`GatherPlan`]).
+    pub layout: PackedStorageLayout,
+    /// In-kernel dequant facts for `layout`.
+    pub dequant: PackedDequantResolution,
+}
+
+/// Gather admission result: F32 stays the existing recipe; packed tables
+/// resolve [`QuantizedGatherPlan`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AdmittedGather {
+    /// Dense f32 table — existing [`GatherPlan`].
+    Dense(GatherPlan),
+    /// Packed table — row gather + in-kernel dequant.
+    Quantized(QuantizedGatherPlan),
+}
+
+impl PackedDequantResolution {
+    /// Resolve the pinned dequant facts for an admitted layout.
+    #[must_use]
+    pub fn for_layout(layout: PackedStorageLayout) -> Self {
+        let class = match layout {
+            PackedStorageLayout::F32 => PackedDequantClass::PassthroughF32,
+            PackedStorageLayout::Bf16 => PackedDequantClass::NativeBf16Convert,
+            PackedStorageLayout::Q8_0 | PackedStorageLayout::Q5_0 => PackedDequantClass::Block,
+            PackedStorageLayout::Q4_K | PackedStorageLayout::Q5_K | PackedStorageLayout::Q6_K => {
+                PackedDequantClass::Superblock
+            }
+        };
+        Self {
+            layout,
+            class,
+            block_elements: layout.block_elements(),
+            block_bytes: layout.block_bytes(),
+        }
+    }
+
+    /// Resolve from a GGML type id. Unknown ids fail closed.
+    ///
+    /// # Errors
+    /// [`PackedAdmissionError::UnrepresentableLayout`] when `id` is not in
+    /// the closed §5 set.
+    pub fn from_ggml_type_id(id: u32) -> Result<Self, PackedAdmissionError> {
+        let layout = packed_layout_from_ggml_type_id(id)?;
+        Ok(Self::for_layout(layout))
+    }
+}
+
+/// Closed-set GGML type id → layout. Unknown ids fail closed.
+///
+/// # Errors
+/// [`PackedAdmissionError::UnrepresentableLayout`] when `id` is outside
+/// {F32, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0}.
+pub fn packed_layout_from_ggml_type_id(
+    id: u32,
+) -> Result<PackedStorageLayout, PackedAdmissionError> {
+    PackedStorageLayout::from_ggml_type_id(id)
+        .ok_or(PackedAdmissionError::UnrepresentableLayout { ggml_type_id: id })
+}
+
+/// Layout from a trailing const operand (GGML type id). Non-const and
+/// unknown ids fail closed.
+///
+/// # Errors
+/// [`PackedAdmissionError::NonConstLayout`] or
+/// [`PackedAdmissionError::UnrepresentableLayout`].
+pub fn packed_layout_from_operand(
+    operand: &MirOperand,
+) -> Result<PackedStorageLayout, PackedAdmissionError> {
+    let id = match operand {
+        MirOperand::Constant(MirConstant::Int(value)) => u32::try_from(*value).ok(),
+        MirOperand::Constant(MirConstant::UInt(value)) => u32::try_from(*value).ok(),
+        _ => None,
+    };
+    let Some(id) = id else {
+        return Err(PackedAdmissionError::NonConstLayout);
+    };
+    packed_layout_from_ggml_type_id(id)
+}
+
+/// Admit a matmul over `layout`: F32 → [`CollectionKernelPlan::TiledMatMul`];
+/// packed §5 layouts → [`CollectionKernelPlan::QuantizedMatMul`] with typed
+/// dequant. The layout is already a closed enum — unrepresentable ids are
+/// rejected by [`packed_layout_from_ggml_type_id`] first.
+#[must_use]
+pub fn admit_quantized_matmul(
+    layout: PackedStorageLayout,
+    shapes: MatMulShapes,
+) -> CollectionKernelPlan {
+    match layout {
+        PackedStorageLayout::F32 => tiled_matmul_from_shapes(shapes),
+        packed => CollectionKernelPlan::QuantizedMatMul(QuantizedMatMulPlan {
+            m: shapes.m,
+            k: shapes.k,
+            n: shapes.n,
+            layout: packed,
+            tile: MATMUL_TILE,
+            workgroup_x: MATMUL_TILE,
+            workgroup_y: MATMUL_TILE,
+        }),
+    }
+}
+
+/// Admit a matmul from a GGML type id (the first-failing-oracle surface).
+///
+/// # Errors
+/// [`PackedAdmissionError::UnrepresentableLayout`] when `id` is not admitted.
+pub fn admit_quantized_matmul_from_ggml_type_id(
+    id: u32,
+    shapes: MatMulShapes,
+) -> Result<CollectionKernelPlan, PackedAdmissionError> {
+    let layout = packed_layout_from_ggml_type_id(id)?;
+    Ok(admit_quantized_matmul(layout, shapes))
+}
+
+/// Admit a row-gather over `layout`: F32 → existing [`GatherPlan`]; packed
+/// §5 layouts → [`QuantizedGatherPlan`].
+#[must_use]
+pub fn admit_quantized_gather(
+    layout: PackedStorageLayout,
+    table_rows: u64,
+    table_cols: u64,
+    id_count: u64,
+) -> AdmittedGather {
+    match layout {
+        PackedStorageLayout::F32 => AdmittedGather::Dense(GatherPlan {
+            table_rows,
+            table_cols,
+            id_count,
+        }),
+        packed => AdmittedGather::Quantized(QuantizedGatherPlan {
+            table_rows,
+            table_cols,
+            id_count,
+            layout: packed,
+            dequant: PackedDequantResolution::for_layout(packed),
+        }),
+    }
+}
+
+/// Admit a gather from a GGML type id.
+///
+/// # Errors
+/// [`PackedAdmissionError::UnrepresentableLayout`] when `id` is not admitted.
+pub fn admit_quantized_gather_from_ggml_type_id(
+    id: u32,
+    table_rows: u64,
+    table_cols: u64,
+    id_count: u64,
+) -> Result<AdmittedGather, PackedAdmissionError> {
+    let layout = packed_layout_from_ggml_type_id(id)?;
+    Ok(admit_quantized_gather(
+        layout, table_rows, table_cols, id_count,
+    ))
+}
+
+/// Confirm a resolved subchain plan matches packed admission (R-PACK-02A
+/// decomposition gate). Fail-closed on an unrepresentable gather/matmul
+/// layout const; F32 quantized-matmul must already have fallen back to
+/// [`CollectionKernelPlan::TiledMatMul`].
+///
+/// # Errors
+/// [`PackedAdmissionError`] when a layout const is unrepresentable or a
+/// `QuantizedMatMul` plan still carries F32.
+pub fn confirm_packed_admission(
+    function: &MirFunction,
+    plan: &CollectionKernelPlan,
+) -> Result<(), PackedAdmissionError> {
+    if let Some(operand) = trailing_layout_operand(function, MirCollectionOp::TensorQuantizedMatMul)
+    {
+        let layout = packed_layout_from_operand(operand)?;
+        match (layout, plan) {
+            (PackedStorageLayout::F32, CollectionKernelPlan::TiledMatMul(_)) => {}
+            (packed, CollectionKernelPlan::QuantizedMatMul(quantized))
+                if packed != PackedStorageLayout::F32 && quantized.layout == packed => {}
+            _ => {
+                return Err(PackedAdmissionError::UnrepresentableLayout {
+                    ggml_type_id: layout.ggml_type_id(),
+                });
+            }
+        }
+    }
+    if let Some(operand) = trailing_layout_operand(function, MirCollectionOp::TensorGather) {
+        let layout = packed_layout_from_operand(operand)?;
+        let CollectionKernelPlan::Gather(gather) = plan else {
+            return Err(PackedAdmissionError::UnrepresentableLayout {
+                ggml_type_id: layout.ggml_type_id(),
+            });
+        };
+        let _ = admit_quantized_gather(
+            layout,
+            gather.table_rows,
+            gather.table_cols,
+            gather.id_count,
+        );
+    }
+    Ok(())
+}
+
+/// Optional trailing GGML type-id const on `op` (the packed-layout fact).
+pub(crate) fn trailing_layout_operand(
+    function: &MirFunction,
+    op: MirCollectionOp,
+) -> Option<&MirOperand> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            if crate::collection_ops::statement_collection_op(statement) != Some(op) {
+                continue;
+            }
+            let MirStatementKind::RuntimeCall {
+                call: MirRuntimeCall { args, .. },
+                ..
+            } = &statement.kind
+            else {
+                continue;
+            };
+            // Quantized matmul: [left, right, layout]. Gather: [table, ids, layout?].
+            let index = match op {
+                MirCollectionOp::TensorQuantizedMatMul => 2,
+                MirCollectionOp::TensorGather => 2,
+                _ => return None,
+            };
+            return args.get(index);
+        }
+    }
+    None
+}
+
+pub(super) fn tiled_matmul_from_shapes(shapes: MatMulShapes) -> CollectionKernelPlan {
+    let tile = MATMUL_TILE;
+    let tile_slots = tile * tile;
+    CollectionKernelPlan::TiledMatMul(MatMulPlan {
+        m: shapes.m,
+        k: shapes.k,
+        n: shapes.n,
+        tile,
+        workgroup_x: tile,
+        workgroup_y: tile,
+        shared_memory: MatMulSharedMemory {
+            shared_a: SharedMemoryLayout {
+                element_byte_width: F32_ELEMENT_BYTE_WIDTH,
+                slot_count: tile_slots,
+                buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
+            },
+            shared_b: SharedMemoryLayout {
+                element_byte_width: F32_ELEMENT_BYTE_WIDTH,
+                slot_count: tile_slots,
+                buffer_name: MATMUL_SHARED_B_BUFFER_NAME.to_owned(),
+            },
+        },
+        barriers: matmul_barrier_schedule(),
+        oob_padding: OobPaddingPolicy::ZeroFill,
+    })
+}
+
+impl fmt::Display for PackedAdmissionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnrepresentableLayout { ggml_type_id } => write!(
+                f,
+                "packed kernel layout GGML type id {ggml_type_id} is unrepresentable \
+                 (admitted: F32, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0)"
+            ),
+            Self::NonConstLayout => write!(
+                f,
+                "packed kernel layout must be a const GGML type id \
+                 (F32, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0)"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for PackedAdmissionError {}

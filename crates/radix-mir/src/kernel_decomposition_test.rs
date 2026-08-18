@@ -1951,3 +1951,163 @@ fn rms_norm_then_matmul_decomposes_into_two_subchains() {
             .expect("every carried subchain plan validates");
     }
 }
+
+// ── R-PACK-02A packed admission through decomposition ─────────────────────
+
+fn quantized_matmul_decomposition_function(
+    types: &mut TypeTable,
+    ggml_type_id: i64,
+) -> MirFunction {
+    let left = rank2_tensor_ty(types, [8, 16]);
+    let right = rank2_tensor_ty(types, [16, 16]);
+    let out = rank2_tensor_ty(types, [8, 16]);
+    device_function(
+        &[(0, left), (1, right)],
+        vec![collection_statement_operands(
+            MirCollectionOp::TensorQuantizedMatMul,
+            vec![
+                MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                MirOperand::Constant(MirConstant::Int(ggml_type_id)),
+            ],
+            2,
+            out,
+        )],
+        Some(2),
+        out,
+    )
+}
+
+fn packed_gather_decomposition_function(types: &mut TypeTable, ggml_type_id: i64) -> MirFunction {
+    let table = rank2_tensor_ty(types, [960, 64]);
+    let output = rank2_tensor_ty(types, [9, 64]);
+    let ids_element = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let ids = MirType::semantic(types.array(ids_element));
+    device_function(
+        &[(0, table), (1, ids)],
+        vec![collection_statement_operands(
+            MirCollectionOp::TensorGather,
+            vec![
+                MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                MirOperand::Constant(MirConstant::Int(ggml_type_id)),
+            ],
+            2,
+            output,
+        )],
+        Some(2),
+        output,
+    )
+}
+
+#[test]
+fn q4k_quantized_matmul_decomposes_to_packed_plan() {
+    let mut types = TypeTable::new();
+    let function = quantized_matmul_decomposition_function(&mut types, 12);
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("Q4_K quantized-matmul body decomposes");
+    assert_eq!(decomposition.subchains.len(), 1);
+    let CollectionKernelPlan::QuantizedMatMul(plan) = &decomposition.subchains[0].plan else {
+        panic!(
+            "Q4_K fixture must decompose to QuantizedMatMul, got {:?}",
+            decomposition.subchains[0].plan
+        );
+    };
+    assert_eq!(plan.layout, crate::abi::PackedStorageLayout::Q4_K);
+    assert_eq!(
+        plan.dequant_resolution().class,
+        crate::kernel_plan::PackedDequantClass::Superblock
+    );
+}
+
+#[test]
+fn f32_quantized_matmul_decomposes_to_tiled_matmul() {
+    let mut types = TypeTable::new();
+    let function = quantized_matmul_decomposition_function(&mut types, 0);
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("F32 quantized-matmul body decomposes via TiledMatMul fallback");
+    assert!(
+        matches!(
+            decomposition.subchains[0].plan,
+            CollectionKernelPlan::TiledMatMul(_)
+        ),
+        "F32 must fall back to TiledMatMul, got {:?}",
+        decomposition.subchains[0].plan
+    );
+}
+
+#[test]
+fn packed_section5_layouts_decompose_to_quantized_matmul() {
+    use crate::abi::PackedStorageLayout;
+    let rows = [
+        (PackedStorageLayout::Bf16, 30),
+        (PackedStorageLayout::Q8_0, 8),
+        (PackedStorageLayout::Q4_K, 12),
+        (PackedStorageLayout::Q5_K, 13),
+        (PackedStorageLayout::Q6_K, 14),
+        (PackedStorageLayout::Q5_0, 6),
+    ];
+    for (layout, id) in rows {
+        let mut types = TypeTable::new();
+        let function = quantized_matmul_decomposition_function(&mut types, i64::from(id));
+        let validation = MirValidationContext::new(&types);
+        let decomposition = decompose_kernel_function(&function, &validation)
+            .unwrap_or_else(|error| panic!("{layout:?} must decompose, got {error}"));
+        let CollectionKernelPlan::QuantizedMatMul(plan) = &decomposition.subchains[0].plan else {
+            panic!("{layout:?} must admit QuantizedMatMul");
+        };
+        assert_eq!(plan.layout, layout);
+    }
+}
+
+#[test]
+fn unrepresentable_quantized_matmul_layout_fails_closed() {
+    let mut types = TypeTable::new();
+    let function = quantized_matmul_decomposition_function(&mut types, 99);
+    let validation = MirValidationContext::new(&types);
+    let error = decompose_kernel_function(&function, &validation)
+        .expect_err("GGML type id 99 must fail closed");
+    let message = error.to_string();
+    assert!(
+        message.contains("admitted GGML type id") || message.contains("unrepresentable"),
+        "typed fail-closed diagnostic, got: {message}"
+    );
+}
+
+#[test]
+fn packed_gather_layout_admits_through_decomposition() {
+    let mut types = TypeTable::new();
+    let function = packed_gather_decomposition_function(&mut types, 12);
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("Q4_K gather admits (carried plan stays Gather)");
+    assert!(
+        matches!(
+            decomposition.subchains[0].plan,
+            CollectionKernelPlan::Gather(_)
+        ),
+        "packed gather stays Gather on the wire-stable plan, got {:?}",
+        decomposition.subchains[0].plan
+    );
+    let admitted = crate::kernel_plan::admit_quantized_gather(
+        crate::abi::PackedStorageLayout::Q4_K,
+        960,
+        64,
+        9,
+    );
+    assert!(
+        matches!(admitted, crate::kernel_plan::AdmittedGather::Quantized(_)),
+        "Q4_K embedding table admits QuantizedGather"
+    );
+}
+
+#[test]
+fn unrepresentable_gather_layout_fails_closed() {
+    let mut types = TypeTable::new();
+    let function = packed_gather_decomposition_function(&mut types, 99);
+    let validation = MirValidationContext::new(&types);
+    decompose_kernel_function(&function, &validation)
+        .expect_err("unrepresentable gather layout must fail closed");
+}

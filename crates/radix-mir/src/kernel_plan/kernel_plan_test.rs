@@ -1618,3 +1618,182 @@ fn grouped_and_ssm_plans_resolve_typed_variants() {
     assert!(matches!(scan, CollectionKernelPlan::SsmScan(_)));
     scan.validate().expect("ssm scan validates");
 }
+
+// ── R-PACK-02A packed admission / dequant resolution ──────────────────────
+
+fn section5_packed_layouts() -> [(
+    crate::abi::PackedStorageLayout,
+    PackedDequantClass,
+    u32,
+    u32,
+); 6] {
+    use crate::abi::PackedStorageLayout;
+    [
+        (
+            PackedStorageLayout::Bf16,
+            PackedDequantClass::NativeBf16Convert,
+            1,
+            2,
+        ),
+        (PackedStorageLayout::Q8_0, PackedDequantClass::Block, 32, 34),
+        (
+            PackedStorageLayout::Q4_K,
+            PackedDequantClass::Superblock,
+            256,
+            144,
+        ),
+        (
+            PackedStorageLayout::Q5_K,
+            PackedDequantClass::Superblock,
+            256,
+            176,
+        ),
+        (
+            PackedStorageLayout::Q6_K,
+            PackedDequantClass::Superblock,
+            256,
+            210,
+        ),
+        (PackedStorageLayout::Q5_0, PackedDequantClass::Block, 32, 22),
+    ]
+}
+
+#[test]
+fn packed_dequant_resolution_binds_section5_layout_table() {
+    use crate::abi::PackedStorageLayout;
+    let f32 = PackedDequantResolution::for_layout(PackedStorageLayout::F32);
+    assert_eq!(f32.class, PackedDequantClass::PassthroughF32);
+    assert_eq!((f32.block_elements, f32.block_bytes), (1, 4));
+    for (layout, class, elements, bytes) in section5_packed_layouts() {
+        let resolved = PackedDequantResolution::for_layout(layout);
+        assert_eq!(resolved.class, class, "{layout:?}");
+        assert_eq!(resolved.block_elements, elements, "{layout:?}");
+        assert_eq!(resolved.block_bytes, bytes, "{layout:?}");
+        assert_eq!(
+            PackedDequantResolution::from_ggml_type_id(layout.ggml_type_id()).expect("admitted"),
+            resolved
+        );
+    }
+}
+
+#[test]
+fn admit_quantized_matmul_falls_back_f32_to_tiled_matmul() {
+    use crate::abi::PackedStorageLayout;
+    let shapes = MatMulShapes { m: 8, k: 16, n: 16 };
+    let plan = admit_quantized_matmul(PackedStorageLayout::F32, shapes);
+    assert!(
+        matches!(plan, CollectionKernelPlan::TiledMatMul(_)),
+        "F32 must fall back to TiledMatMul, got {plan:?}"
+    );
+    plan.validate().expect("F32 fallback TiledMatMul validates");
+}
+
+#[test]
+fn admit_quantized_matmul_resolves_every_packed_section5_layout() {
+    let shapes = MatMulShapes { m: 8, k: 16, n: 16 };
+    for (layout, class, elements, bytes) in section5_packed_layouts() {
+        let plan = admit_quantized_matmul(layout, shapes);
+        let CollectionKernelPlan::QuantizedMatMul(quantized) = &plan else {
+            panic!("{layout:?} must admit QuantizedMatMul, got {plan:?}");
+        };
+        assert_eq!(quantized.layout, layout);
+        let dequant = quantized.dequant_resolution();
+        assert_eq!(dequant.class, class);
+        assert_eq!(
+            (dequant.block_elements, dequant.block_bytes),
+            (elements, bytes)
+        );
+        plan.validate().expect("packed QuantizedMatMul validates");
+    }
+}
+
+#[test]
+fn q4k_ggml_id_admits_quantized_matmul_with_superblock_dequant() {
+    // First-failing-oracle surface: a Q4_K GGML id (12) on the pre-02A
+    // f32-only substrate had no admission helper and no dequant
+    // resolution — `admit_quantized_matmul_from_ggml_type_id` did not exist.
+    let shapes = MatMulShapes { m: 8, k: 16, n: 16 };
+    let plan = admit_quantized_matmul_from_ggml_type_id(12, shapes)
+        .expect("Q4_K type id 12 is an admitted packed layout");
+    let CollectionKernelPlan::QuantizedMatMul(quantized) = &plan else {
+        panic!("Q4_K must admit QuantizedMatMul, got {plan:?}");
+    };
+    assert_eq!(quantized.layout, crate::abi::PackedStorageLayout::Q4_K);
+    assert_eq!(
+        quantized.dequant_resolution().class,
+        PackedDequantClass::Superblock
+    );
+}
+
+#[test]
+fn unrepresentable_ggml_type_id_fails_closed() {
+    let shapes = MatMulShapes { m: 8, k: 16, n: 16 };
+    let error = admit_quantized_matmul_from_ggml_type_id(99, shapes)
+        .expect_err("GGML type id 99 is unrepresentable");
+    assert_eq!(
+        error,
+        PackedAdmissionError::UnrepresentableLayout { ggml_type_id: 99 }
+    );
+    let gather_error = admit_quantized_gather_from_ggml_type_id(99, 960, 64, 9)
+        .expect_err("GGML type id 99 is unrepresentable for gather");
+    assert_eq!(
+        gather_error,
+        PackedAdmissionError::UnrepresentableLayout { ggml_type_id: 99 }
+    );
+}
+
+#[test]
+fn admit_quantized_gather_resolves_packed_embedding_tables() {
+    for (layout, class, ..) in section5_packed_layouts() {
+        let admitted = admit_quantized_gather(layout, 960, 64, 9);
+        let AdmittedGather::Quantized(gather) = admitted else {
+            panic!("{layout:?} embedding table must admit QuantizedGather");
+        };
+        assert_eq!(gather.layout, layout);
+        assert_eq!(gather.dequant.class, class);
+        assert_eq!(
+            (gather.table_rows, gather.table_cols, gather.id_count),
+            (960, 64, 9)
+        );
+    }
+    let dense = admit_quantized_gather(crate::abi::PackedStorageLayout::F32, 960, 64, 9);
+    assert!(
+        matches!(dense, AdmittedGather::Dense(_)),
+        "F32 embedding table stays Gather, got {dense:?}"
+    );
+}
+
+#[test]
+fn from_contract_f32_quantized_matmul_falls_back_to_tiled() {
+    use crate::abi::PackedStorageLayout;
+    let signature = quantized_matmul_signature(8, 16, 16);
+    let plan = CollectionKernelPlan::from_contract(
+        &signature,
+        &packed_layout_fixture(PackedStorageLayout::F32),
+        MirCollectionOp::TensorQuantizedMatMul,
+        None,
+    )
+    .expect("F32 quantized-matmul contract admits");
+    assert!(
+        matches!(plan, CollectionKernelPlan::TiledMatMul(_)),
+        "from_contract must fall back F32 QuantizedMatMul to TiledMatMul, got {plan:?}"
+    );
+}
+
+#[test]
+fn quantized_matmul_plan_validate_rejects_f32_layout() {
+    let plan = CollectionKernelPlan::QuantizedMatMul(QuantizedMatMulPlan {
+        m: 8,
+        k: 16,
+        n: 16,
+        layout: crate::abi::PackedStorageLayout::F32,
+        tile: MATMUL_TILE,
+        workgroup_x: MATMUL_TILE,
+        workgroup_y: MATMUL_TILE,
+    });
+    assert_eq!(
+        plan.validate()
+            .expect_err("F32 QuantizedMatMulPlan must fail"),
+        PlanValidationError::QuantizedMatMulF32Fallback
+    );
+}

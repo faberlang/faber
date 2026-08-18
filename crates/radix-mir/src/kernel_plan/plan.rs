@@ -94,9 +94,10 @@ pub enum CollectionKernelPlan {
     /// scores, zero probability above the diagonal. See
     /// [`CausalMaskedSoftmaxPlan`].
     CausalMaskedSoftmax(CausalMaskedSoftmaxPlan),
-    /// Packed quantized GEMM recipe (R-PACK-01A: name frozen; admission of
-    /// per-layout dequant resolution is R-PACK-02A). In-kernel block/superblock
+    /// Packed quantized GEMM recipe (R-PACK-01A: name frozen; R-PACK-02A
+    /// admits per-layout dequant resolution). In-kernel block/superblock
     /// dequant, f32 accumulate — never a whole-model F32 materialization.
+    /// F32 falls back to [`CollectionKernelPlan::TiledMatMul`].
     /// See [`QuantizedMatMulPlan`].
     QuantizedMatMul(QuantizedMatMulPlan),
     /// Grouped/segmented packed GEMM over rank-3 expert slices (R-PACK-01A:
@@ -241,6 +242,15 @@ pub struct QuantizedMatMulPlan {
     pub workgroup_x: u32,
     /// Workgroup lane count on `y`; must equal `tile`.
     pub workgroup_y: u32,
+}
+
+impl QuantizedMatMulPlan {
+    /// Typed per-layout dequant facts (R-PACK-02A). Derived from
+    /// [`Self::layout`] — not a stored field (wire-stable).
+    #[must_use]
+    pub fn dequant_resolution(&self) -> crate::kernel_plan::PackedDequantResolution {
+        crate::kernel_plan::PackedDequantResolution::for_layout(self.layout)
+    }
 }
 
 /// Grouped packed GEMM over rank-3 expert slices (R-PACK-01A: name frozen).
