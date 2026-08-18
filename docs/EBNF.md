@@ -358,9 +358,10 @@ functionType   := '(' typeList? ')' '→' typeAnnotation alternateExitClause?
 typeList       := typeAnnotation (',' typeAnnotation)*
 ```
 
-- Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values.
+- Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
+- Applied `NATURAL` arguments are `magnitudo` capacity facts, not width markers. Proposed (not shipped) bounded forms use that slot: `lista<T, N>`, `textus<N>`, `ascii<N>`, `octeti<N>`. Width-marker families such as `numerus<i32>` stay the separate `widthTypeSugar` production below.
 - Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
-- Arrays are written `lista<T>`. Postfix `T[]` is not accepted.
+- Arrays are written `lista<T>` (unbounded, shipped). Postfix `T[]` is not accepted. `lista<T, N>` is a proposed (not shipped) bounded form; see Generic Collections.
 - `de`/`in` mark ownership (borrow/mut-borrow) on the immediately following union member. Parenthesize when grouping must be explicit.
 - Two hole kinds share the `holeType` production. `_` is the monomorphic hole ("infer exactly one inhabitant type"); the standalone `∪` is the union hole ("infer a finite multi-member union"). Both are legal wherever a base type is: bindings, returns, params, fields, and type arguments (`lista<∪>`, `tabula<K, ∪>`, `→ ∪`).
 - **Lone-`∪` rule:** a `∪` hole consumes the whole type expression — any following `∪` is a parse error (`A ∪ ∪`, `∪ B` rejected, issue `unexpected_cup_after_union_hole`). `_` keeps today's behavior and may still appear as a binary-cup member (`_ ∪ B`).
@@ -385,7 +386,9 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | Faber      | Meaning |
 | ---------- | ------- |
 | `textus`   | Unicode string |
+| `textus<N>` | proposed — not shipped; bounded Unicode string; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker |
 | `ascii`    | ASCII-only string |
+| `ascii<N>` | proposed — not shipped; bounded ASCII string; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker |
 | `forma`    | captured template + params |
 | `numerus`  | integer (default `i64`) |
 | `modulus<W>` | unsigned modular word; arithmetic wraps modulo 2^W |
@@ -396,6 +399,12 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `numquam`  | never |
 | `ignotum`  | unknown |
 | `octeti`   | bytes |
+| `octeti<N>` | proposed — not shipped; bounded byte buffer; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker |
+
+Bare `textus` / `ascii` / `octeti` remain the unbounded productions. The
+proposed (not shipped) forms `textus<N>`, `ascii<N>`, and `octeti<N>` take
+one `magnitudo` / `NATURAL` applied argument. That `N` is capacity, not a
+width marker and not a language-wide default.
 
 Sized primitives accept one optional **width marker** (not a user type parameter):
 
@@ -418,6 +427,7 @@ full wrap. Cross-width modular arithmetic is rejected.
 | Faber          | Meaning  |
 | -------------- | -------- |
 | `lista<T>`     | array    |
+| `lista<T, N>`  | proposed — not shipped; bounded array; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker |
 | `tabula<K,V>`  | map      |
 | `copia<T>`     | set      |
 | `promissum<T>` | promise  |
