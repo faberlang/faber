@@ -450,6 +450,8 @@ pub fn analyze_with_cli(
         diagnostics.extend(e);
     }
 
+    diagnostics.extend(passes::fragment_definition::check(&hir, &resolver, &types, interner).errors);
+
     // G2: target-neutral de/in/ex mode analysis always runs on base analysis.
     // When borrow_analysis is already on (legacy for_target(Rust)), full
     // `borrow::analyze` covers modes + Rust lifetime — skip the dual pass.
