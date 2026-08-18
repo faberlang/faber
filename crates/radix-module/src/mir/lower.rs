@@ -2528,3 +2528,7 @@ mod tests;
 #[cfg(test)]
 #[path = "lower_glyph_test.rs"]
 mod glyph_tests;
+
+#[cfg(test)]
+#[path = "optional_field_unwrap_test.rs"]
+mod optional_field_unwrap_tests;

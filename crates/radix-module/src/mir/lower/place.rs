@@ -276,6 +276,15 @@ impl FunctionBuilder<'_> {
     fn lower_non_null_base(&mut self, object: &HirExpression) -> Option<MirPlace> {
         let place = self.lower_projectable_place(object)?;
         if let Some(inner_ty) = self.nullable_inner_ty(object) {
+            // Typecheck wraps `sponte` field loads as `T ∪ nihil`, but MIR
+            // stores those fields as `T` (omitted construction is `nihil` in
+            // the raw slot). Unwrap only when the place is actually an option.
+            if self
+                .place_ty(&place)
+                .is_some_and(|ty| self.types.nullable_inner(ty.semantic_id()).is_none())
+            {
+                return Some(place);
+            }
             return Some(self.assign_temp_place(
                 MirValueKind::Option(MirOptionOp::Unwrap {
                     value: MirOperand::Place(place),
@@ -286,6 +295,45 @@ impl FunctionBuilder<'_> {
             ));
         }
         Some(place)
+    }
+
+    fn place_ty(&self, place: &MirPlace) -> Option<MirType> {
+        let mut ty = match place.base {
+            MirPlaceBase::Local(id) => self
+                .locals
+                .iter()
+                .find(|local| local.id == id)
+                .map(|local| local.ty)?,
+            MirPlaceBase::Temp(id) => self
+                .temps
+                .iter()
+                .find(|temp| temp.id == id)
+                .map(|temp| temp.ty)?,
+        };
+        for projection in &place.projections {
+            ty = match projection {
+                MirProjection::Field(name) => self.struct_field_storage_ty(ty, *name)?,
+                _ => return None,
+            };
+        }
+        Some(ty)
+    }
+
+    fn struct_field_storage_ty(&self, base: MirType, name: crate::lexer::Symbol) -> Option<MirType> {
+        let def_id = match self.normalized_type(base.semantic_id()) {
+            Type::Struct(def_id) => *def_id,
+            Type::Applied(applied, _) => match self.normalized_type(*applied) {
+                Type::Struct(def_id) => *def_id,
+                _ => return None,
+            },
+            Type::Ref(_, inner) => return self.struct_field_storage_ty(MirType::semantic(*inner), name),
+            _ => return None,
+        };
+        self.context
+            .struct_field_types
+            .get(&def_id)
+            .and_then(|fields| fields.get(&name))
+            .copied()
     }
 
     /// Adapt a storage place to a narrowed HIR use-site type.
