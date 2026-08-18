@@ -1,0 +1,51 @@
++++
+term = "tensor-shape-generic"
+kind = "concept"
+category = "type"
+canonical = false
+summary = "Shape-changing generic tensor function: scaled_dot_product over magnitudo B, D."
+syntax = "functio name<magnitudo B, magnitudo D>(tensor<f32, [B, D]> …) → tensor<f32, [B, D]>"
+related = ["tensor", "magnitudo", "functio", "matmul"]
+locale = "la"
++++
+# =============================================================================
+# tensor-shape-generic — generic scaled_dot_product (shape-changing contracts)
+# =============================================================================
+#
+# What this teaches:
+#   • Two `magnitudo` params (`B`, `D`) stand for rank-2 dims; the typechecker
+#     computes symbolic result shapes through transpose, matmul, elementwise,
+#     and softmax (`[B,D] → [D,B] → [B,B] → [B,D]`).
+#   • The body is method-spelled (`transpone` / `matmul` / `multiplica` /
+#     `activatio_softmax`). Glyph `·`/`⊙` arms are unit-2B and are not
+#     required for this proof.
+#   • One generic function replaces the concrete `scaled_dot_product_2x8`
+#     overload pattern. Call-site implicit binding is Phase-1 machinery;
+#     this exemplum proves the declaration (via `nota`), matching
+#     `generic-shape.fab`.
+#
+# Common mistakes:
+#   • Spelling a concrete `_2x8` overload instead of `magnitudo` params.
+#   • Expecting explicit shape args at the call site (`sdpa<f32, 2, 8>(…)`)
+#     — that syntax is not available (PARSE030).
+#
+# See also: tensor, magnitudo, functio, matmul
+# =============================================================================
+
+# Phase-2 payoff: one generic scaled_dot_product, method-spelled, Depth-2
+# static body. Same shape as the unit-2A pin
+# `generic_scaled_dot_product_method_body_typechecks`.
+
+functio scaled_dot_product<magnitudo B, magnitudo D>(
+    tensor<f32, [B, D]> qb, tensor<f32, [B, D]> kb, tensor<f32, [B, D]> vb,
+    tensor<f32, [B, B]> scale
+) → tensor<f32, [B, D]> {
+    fixum tensor<f32, [D, B]> kt ← kb.transpone()
+    fixum tensor<f32, [B, B]> scores ← qb.matmul(kt)
+    fixum tensor<f32, [B, B]> scaled ← scores.multiplica(scale)
+    fixum tensor<f32, [B, B]> attn ← scaled.activatio_softmax()
+    fixum tensor<f32, [B, D]> context ← attn.matmul(vb)
+    redde context
+}
+
+nota "shape-generic scaled_dot_product parata"
