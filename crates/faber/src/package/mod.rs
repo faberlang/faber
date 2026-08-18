@@ -35,6 +35,7 @@ mod binding_probe;
 mod cargo;
 mod cmd;
 pub(crate) mod composite_plan;
+mod dense_full_model_device;
 #[cfg(feature = "device-runtime")]
 mod device;
 mod dispatch;
@@ -84,7 +85,7 @@ pub(crate) use device::host_partition_for_lowered;
 #[allow(unused_imports)]
 pub(crate) use device::{
     admit_device_program_section, device_program_for_lowered, device_section_for_program,
-    execute_device_route,
+    execute_device_route, run_dense_full_model_metal_closeout,
 };
 pub(crate) use dispatch::{
     load_provider_manifests, selected_providers_for_routes, ProviderManifest,
