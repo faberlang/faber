@@ -1128,7 +1128,7 @@ fn semantic_duplicate_definition_help(args: &[DiagnosticArg]) -> Option<String> 
 fn semantic_undefined_variable_message(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
         "name_not_variant" => Some("name does not refer to a variant".to_owned()),
-        "unknown_identifier" => Some("unknown identifier".to_owned()),
+        "scribe_callee" | "unknown_identifier" => Some("unknown identifier".to_owned()),
         "unknown_record_field" => Some("unknown record field".to_owned()),
         "unknown_variant" => Some("unknown variant".to_owned()),
         "unknown_variant_fields" => Some("unknown variant fields".to_owned()),
@@ -1139,6 +1139,12 @@ fn semantic_undefined_variable_message(args: &[DiagnosticArg]) -> Option<String>
 
 fn semantic_undefined_variable_help(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
+        "scribe_callee" => {
+            let spelling = arg_value(args, "spelling")?;
+            Some(format!(
+                "write `{spelling} <expr>` without parentheses for the output statement"
+            ))
+        }
         "unknown_identifier" => {
             let suggestion = arg_value(args, "suggestion")?;
             Some(format!("declare the variable before use; did you mean {suggestion}?"))

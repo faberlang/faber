@@ -120,6 +120,16 @@ fn reports_undefined_variable_in_expression() {
 }
 
 #[test]
+fn scribe_family_callee_hints_bare_output_form() {
+    compile_and_expect("incipit { sit x ← nota(1) }", "SEM001", "scribe_callee");
+}
+
+#[test]
+fn unknown_non_scribe_callee_stays_unknown_identifier() {
+    compile_and_expect("incipit { sit x ← missing(1) }", "SEM001", "unknown_identifier");
+}
+
+#[test]
 fn semantic_undefined_variable_suggests_visible_name() {
     let parsed = parse(lex(r#"
 incipit {

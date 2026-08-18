@@ -630,6 +630,10 @@ pub struct Resolver {
     /// defs. These identities are not HIR items, so NameCatalog and imported
     /// type-paths miss them unless emit admits this map.
     locale_pack_type_aliases: FxHashMap<DefId, LexSymbol>,
+    /// Surface spellings of the scribe family (`nota`/`vide`/`mone`/`scribe`
+    /// and the active pack's aliases). Empty means registry-direct Latin.
+    /// Runtime-only hint state for SEM001.scribe_callee; excluded from snapshots.
+    scribe_family_surfaces: FxHashSet<String>,
 }
 
 impl Resolver {
@@ -670,7 +674,43 @@ impl Resolver {
             used_namespaces: FxHashSet::default(),
             schemas: FxHashMap::default(),
             locale_pack_type_aliases: FxHashMap::default(),
+            scribe_family_surfaces: FxHashSet::default(),
         }
+    }
+
+    /// Record scribe-family surfaces from the active reader pack.
+    ///
+    /// An empty set (no pack) keeps registry-direct Latin detection.
+    pub fn load_scribe_family_surfaces(&mut self, pack: Option<&LocalePack>) {
+        self.scribe_family_surfaces.clear();
+        let Some(pack) = pack else {
+            return;
+        };
+        for key in ["nota", "vide", "mone", "scribe"] {
+            if let Some(binding) = pack.keywords.get(key) {
+                self.scribe_family_surfaces
+                    .insert(binding.canonical.clone());
+                self.scribe_family_surfaces
+                    .extend(binding.aliases.iter().cloned());
+            }
+        }
+    }
+
+    /// Return whether `spelling` is a scribe-family surface in the active pack.
+    #[must_use]
+    pub(crate) fn is_scribe_family_surface(&self, spelling: &str) -> bool {
+        if !self.scribe_family_surfaces.is_empty() {
+            return self.scribe_family_surfaces.contains(spelling);
+        }
+        matches!(
+            crate::lexer::lookup_keyword_spec(spelling).and_then(|spec| spec.token_kind.clone()),
+            Some(
+                crate::lexer::TokenKind::Nota
+                    | crate::lexer::TokenKind::Vide
+                    | crate::lexer::TokenKind::Mone
+                    | crate::lexer::TokenKind::Scribe
+            )
+        )
     }
 
     /// Install package-supplied file-namespace exports (name → tier) using this
@@ -2742,6 +2782,7 @@ impl Resolver {
             used_namespaces,
             schemas: FxHashMap::default(),
             locale_pack_type_aliases: FxHashMap::default(),
+            scribe_family_surfaces: FxHashSet::default(),
         }
     }
 

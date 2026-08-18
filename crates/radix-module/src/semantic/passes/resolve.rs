@@ -109,6 +109,7 @@ const ISSUE_UNKNOWN_TYPE_LOWERING: &str = "unknown_type_lowering_error";
 const ISSUE_UNRECOGNIZED_CURATA_ALLOCATOR: &str = "unrecognized_curata_allocator";
 const ISSUE_NAME_NOT_VALUE: &str = "name_not_value";
 const ISSUE_NAMESPACE_MISSING_EXPORT: &str = "namespace_missing_export";
+const ISSUE_SCRIBE_CALLEE: &str = "scribe_callee";
 const ISSUE_UNKNOWN_IDENTIFIER: &str = "unknown_identifier";
 const ISSUE_UNKNOWN_NAMESPACE: &str = "unknown_namespace";
 const ISSUE_UNKNOWN_QUALIFIED_TYPE: &str = "unknown_qualified_type";
@@ -1722,6 +1723,12 @@ fn resolve_variant_ident(resolver: &mut Resolver, ident: &crate::syntax::Ident, 
 
 fn undefined_identifier_error(resolver: &Resolver, interner: &Interner, ident: &crate::syntax::Ident) -> SemanticError {
     let spelling = interner.resolve(ident.name);
+    if resolver.is_scribe_family_surface(spelling) {
+        return SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+            .with_arg("issue", ISSUE_SCRIBE_CALLEE)
+            .with_arg("spelling", spelling.to_owned());
+    }
+
     let mut error = SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
         .with_arg("issue", ISSUE_UNKNOWN_IDENTIFIER);
 
