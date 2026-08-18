@@ -1,8 +1,7 @@
 //! Coverage for nucleum-fragment MIR composition.
 
 use super::{
-    compose, reject_surviving_fragment_calls, surviving_fragment_calls, with_budget_override, ExpansionBudget,
-    ISSUE_CYCLE, ISSUE_EXPANSION,
+    compose, reject_surviving_fragment_calls, surviving_fragment_calls, ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION,
 };
 use crate::diagnostics::{semantic_message, DiagnosticArg};
 use crate::driver::{self, Config, Session};
@@ -21,6 +20,18 @@ const ENTRY: DefId = DefId(1);
 const FRAGMENT: DefId = DefId(2);
 const FRAGMENT_INNER: DefId = DefId(6);
 const FRAGMENT_B: DefId = DefId(7);
+
+fn with_budget_override<R>(budget: ExpansionBudget, f: impl FnOnce() -> R) -> R {
+    struct Reset(Option<ExpansionBudget>);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            super::BUDGET_OVERRIDE.with(|slot| slot.set(self.0));
+        }
+    }
+    let prev = super::BUDGET_OVERRIDE.with(|slot| slot.replace(Some(budget)));
+    let _reset = Reset(prev);
+    f()
+}
 
 const CALL_SPAN: fn() -> Span = || test_span_between(40, 52);
 const DEF_SPAN: fn() -> Span = || test_span_between(8, 20);

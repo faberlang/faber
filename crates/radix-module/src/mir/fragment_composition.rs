@@ -50,19 +50,6 @@ thread_local! {
     static BUDGET_OVERRIDE: Cell<Option<ExpansionBudget>> = const { Cell::new(None) };
 }
 
-/// Run `f` with an internal test budget. No CLI surface.
-pub fn with_budget_override<R>(budget: ExpansionBudget, f: impl FnOnce() -> R) -> R {
-    struct Reset(Option<ExpansionBudget>);
-    impl Drop for Reset {
-        fn drop(&mut self) {
-            BUDGET_OVERRIDE.with(|slot| slot.set(self.0));
-        }
-    }
-    let prev = BUDGET_OVERRIDE.with(|slot| slot.replace(Some(budget)));
-    let _reset = Reset(prev);
-    f()
-}
-
 /// Active budget: test override or the documented defaults.
 #[must_use]
 pub fn active_budget() -> ExpansionBudget {
@@ -403,9 +390,7 @@ impl CompositionPass<'_> {
         if site.block_index >= caller.blocks.len() {
             return None;
         }
-        let Some(stmt_index) = site.stmt_index else {
-            return None;
-        };
+        let stmt_index = site.stmt_index?;
         if stmt_index >= caller.blocks[site.block_index].statements.len() {
             return None;
         }
@@ -504,8 +489,8 @@ impl CompositionPass<'_> {
             span,
             vec![
                 DiagnosticArg::new("kind", reason),
-                DiagnosticArg::new("observed", &observed.to_string()),
-                DiagnosticArg::new("limit", &limit.to_string()),
+                DiagnosticArg::new("observed", observed.to_string()),
+                DiagnosticArg::new("limit", limit.to_string()),
                 DiagnosticArg::new("chain", &chain),
             ],
         ));
