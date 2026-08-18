@@ -57,6 +57,7 @@ hir-faber = ["radix-module/hir-faber"]
 hir-fhir = ["radix-module/hir-fhir", "radix-program/hir-fhir"]
 mir-fmir = ["radix-module/mir-fmir", "radix-program/mir-fmir"]
 runner = ["radix-module/runner", "dep:radix-mir-runner", "dep:proba", "proba/runner"]
+host-macos-arm64 = []
 
 [lints]
 workspace = true
