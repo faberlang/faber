@@ -6,9 +6,9 @@
 //! created dist assets. This test exercises the actual binary to prove the
 //! product-build path is reached.
 //!
-//! The faber-web content root resolves via `FABER_WEB_HOME` (env override),
+//! The tela content root resolves via `FABER_TELA_HOME` (env override),
 //! then the faberlang container root discovered by
-//! `radix_module::paths::faberlang_home()` (`faber-web` under it). When the content
+//! `radix_module::paths::faberlang_home()` (`tela` under it). When the content
 //! root is absent the test skips with a recorded message, exactly as it
 //! already does when `tsc` is missing from PATH (both preconditions recorded,
 //! never claimed as coverage).
@@ -21,15 +21,15 @@ use std::process::{Command, Stdio};
 mod temp;
 use temp::TempDir;
 
-/// faber-web content root: `FABER_WEB_HOME` override, then the faberlang
+/// tela content root: `FABER_TELA_HOME` override, then the faberlang
 /// container root via `radix_module::paths::faberlang_home()`.
-fn faber_web_root() -> PathBuf {
-    if let Ok(home) = std::env::var("FABER_WEB_HOME") {
+fn tela_root() -> PathBuf {
+    if let Ok(home) = std::env::var("FABER_TELA_HOME") {
         return PathBuf::from(home);
     }
     radix_module::paths::faberlang_home()
         .expect("faberlang container root")
-        .join("faber-web")
+        .join("tela")
 }
 
 fn temp_dir(label: &str) -> TempDir {
@@ -39,8 +39,8 @@ fn temp_dir(label: &str) -> TempDir {
 /// Set up a browser-app product package identical in shape to the WEB3 unit
 /// fixture, then run `faber build` as a subprocess.
 fn write_browser_app(app: &Path) {
-    let lib = faber_web_root();
-    assert!(lib.is_dir(), "faber-web missing at {}", lib.display());
+    let lib = tela_root();
+    assert!(lib.is_dir(), "tela missing at {}", lib.display());
 
     fs::create_dir_all(app.join("src")).expect("app src");
     fs::create_dir_all(app.join("pages")).expect("pages");
@@ -57,7 +57,7 @@ version = "0.1.0"
 entry = "main.fab"
 
 [reader]
-locale = "la"
+locale = "en"
 
 [build]
 target = "ts"
@@ -68,7 +68,7 @@ kind = "browser-app"
 emit = "typescript"
 
 [dependencies]
-web = "0.1.0"
+tela = "0.0.0"
 "#,
     )
     .expect("manifest");
@@ -79,8 +79,8 @@ web = "0.1.0"
         format!(
             r#"
 [[package]]
-name = "web"
-version = "0.1.0"
+name = "tela"
+version = "0.0.0"
 source = "path"
 package_root = "{package_root}"
 kind = "lib"
@@ -89,7 +89,7 @@ target_triple = "browser"
 target_manifest = ""
 interface_root = "{interface_root}"
 artifact = ""
-crate = "web"
+crate = "tela"
 rustc = ""
 "#,
             package_root = lib.display(),
@@ -98,16 +98,17 @@ rustc = ""
     )
     .expect("lock");
 
+    // Real tela today (pre-U1) marks only Scope + WebController @ public.
+    // The fixture uses only that surface so the CLI regression is not blocked
+    // on the in-flight export-port unit.
     fs::write(
         app.join("src/main.fab"),
         r#"
-importa ex "web:web" web
-importa ex "web:dom" dom
+import from "tela:web" web
+import from "tela:dom" d
 
 @ WebController { selector = "[data-faber=shell]" }
-functio shell(dom.Scope scope) → vacuum {
-  nota dom.require(scope, "button")
-}
+fn shell(d.Scope scope) → void {}
 "#,
     )
     .expect("entry");
@@ -127,10 +128,10 @@ fn faber_build_writes_static_assets_and_manifest_for_browser_product() {
         eprintln!("tsc not found on PATH; skipping WEB2 CLI regression");
         return;
     }
-    let lib = faber_web_root();
+    let lib = tela_root();
     if !lib.is_dir() {
         eprintln!(
-            "faber-web content root absent at {}; set FABER_WEB_HOME; skipping WEB2 CLI regression",
+            "tela content root absent at {}; set FABER_TELA_HOME; skipping WEB2 CLI regression",
             lib.display()
         );
         return;
