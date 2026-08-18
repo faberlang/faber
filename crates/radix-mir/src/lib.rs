@@ -17,6 +17,7 @@ pub mod device_program_plans;
 pub mod device_semantics;
 pub mod distributed;
 pub mod dump;
+pub mod elementwise_plan;
 pub mod generic;
 pub mod gradient;
 pub mod host_partition;
@@ -110,6 +111,11 @@ pub use device_program_plans::{
     RecipeKind,
 };
 pub use dump::dump_program;
+pub use elementwise_plan::{
+    plan_elementwise, ConcreteTensorShape, ElementwiseBarrier, ElementwiseExpr, ElementwiseInput,
+    ElementwiseOp, ElementwiseOutput, ElementwisePlan, IndexMapping, NumericalPolicy,
+    ReassociationPolicy, SourceSpanFact,
+};
 pub use generic::{
     bind_generic_type_witness, fold_shape_size_constant, function_contains_shape_size,
     instantiate_existing_generic_type, rewrite_function_constants, substitute_shape_size_constants,
