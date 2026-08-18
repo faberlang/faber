@@ -38,6 +38,7 @@ impl KeywordPack for SlotTestPack {
             "return" => Some("redde"),
             "true" => Some("verum"),
             "false" => Some("falsum"),
+            "print" => Some("nota"),
             _ => None,
         }
     }
@@ -233,4 +234,46 @@ fn vacua_claim_is_surface_gated() {
         matches!(init.kind, ExprKind::Ident(_)),
         "undeclared Latin `vacua` must not claim the marker under a non-la pack"
     );
+}
+
+/// KW-U1: en `print(print)` is a user call; bare `print print` stays the output statement.
+#[test]
+fn en_print_paren_form_is_user_call_not_scribe() {
+    let mut parser =
+        parser_over_with_pack("fn print(string print) { print print }\nprint(print)\n");
+    let result = parser.parse_program();
+    assert!(
+        result.errors.is_empty(),
+        "en print fixture must parse: {:?}",
+        result.errors
+    );
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 2);
+
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!(
+            "expected function declaration, got {:?}",
+            program.statements[0].kind
+        );
+    };
+    let body = func.body.as_ref().expect("function body");
+    assert!(
+        matches!(body.statements[0].kind, StmtKind::Scribe(_)),
+        "bare `print print` stays the output statement, got {:?}",
+        body.statements[0].kind
+    );
+
+    let StmtKind::Expr(expr_stmt) = &program.statements[1].kind else {
+        panic!(
+            "expected expression statement, got {:?}",
+            program.statements[1].kind
+        );
+    };
+    let ExprKind::Call(call) = &expr_stmt.expr.kind else {
+        panic!("expected call, got {:?}", expr_stmt.expr.kind);
+    };
+    let ExprKind::Ident(ident) = &call.callee.kind else {
+        panic!("expected ident callee, got {:?}", call.callee.kind);
+    };
+    assert_eq!(result.interner.resolve(ident.name), "print");
 }
