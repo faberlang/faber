@@ -459,8 +459,8 @@ pub fn dequant_q4_k_block(block: &[u8]) -> Result<[f32; 256], PackedDequantError
     Ok(y)
 }
 
-/// Dequant one packed block for an admitted layout. R-PACK-02B implements
-/// Q8_0; R-PACK-02D implements Q4_K. Unsupported layouts fail closed.
+/// Dequant one packed block for an admitted layout. Unsupported layouts
+/// fail closed.
 ///
 /// # Errors
 /// [`PackedDequantError`] when the block length is wrong or the layout
@@ -472,6 +472,8 @@ pub fn dequant_packed_block(
     match layout {
         PackedStorageLayout::Q8_0 => Ok(dequant_q8_0_block(block)?.to_vec()),
         PackedStorageLayout::Q4_K => Ok(dequant_q4_k_block(block)?.to_vec()),
+        PackedStorageLayout::Q5_K => Ok(super::packed_dequant::dequant_q5_k(block)?.to_vec()),
+        PackedStorageLayout::Q6_K => Ok(super::packed_dequant::dequant_q6_k(block)?.to_vec()),
         other => Err(PackedDequantError::UnsupportedLayout { layout: other }),
     }
 }

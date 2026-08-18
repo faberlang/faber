@@ -1927,13 +1927,8 @@ fn q4_k_dequant_rejects_truncated_block() {
 }
 
 #[test]
-fn packed_dequant_q5k_fails_closed_until_later_unit() {
-    let error = dequant_packed_block(crate::abi::PackedStorageLayout::Q5_K, &[0u8; 176])
-        .expect_err("Q5_K body is R-PACK-02F");
-    assert_eq!(
-        error,
-        PackedDequantError::UnsupportedLayout {
-            layout: crate::abi::PackedStorageLayout::Q5_K
-        }
-    );
+fn packed_dequant_q5k_accepts_full_superblock() {
+    let values = dequant_packed_block(crate::abi::PackedStorageLayout::Q5_K, &[0u8; 176])
+        .expect("Q5_K body landed in R-PACK-02F");
+    assert_eq!(values.len(), 256);
 }
