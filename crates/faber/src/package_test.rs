@@ -5454,12 +5454,10 @@ import from "norma:http" http
 
 async_main {
     await_const _ responsum ← http.get("http://127.0.0.1:9/test")
-    print responsum.status()
+    print responsum.status
     const _ caput ← responsum.header("x-faber-test")
     if caput is null { print "header:missing" } else { print "header:present" }
-    print responsum.body()
-    const _ data ← responsum.body_json()
-    if data.is_nihil() { print "json:missing" } else { print "json:present" }
+    print responsum.body
 }
 "#,
     )
@@ -5481,23 +5479,31 @@ async_main {
     };
     assert!(output.code.contains("crate::http::get"));
     assert!(output.code.contains("fn __faber_block_on"));
-    assert!(output.code.contains(".body_json()"));
     assert!(
-        output.code.contains(".body_json()")
-            && (output.code.contains("faber::Valor")
-                || output.code.contains("use faber::Valor as valor;")
-                || output.code.contains(": valor")),
-        "expected body_json valor binding via faber::Valor, got:\n{}",
+        output.code.contains("crate::http::response::Response"),
+        "expected leaf Response path crate::http::response::Response, got:\n{}",
+        output.code
+    );
+    assert!(
+        output.code.contains(".status") && output.code.contains(".body"),
+        "expected field reads of status/body on the Response carrier, got:\n{}",
+        output.code
+    );
+    assert!(
+        output.code.contains(".header("),
+        "expected header() method read on the Response carrier, got:\n{}",
+        output.code
+    );
+    assert!(
+        !output.code.contains("body_json")
+            && !output.code.contains(".status()")
+            && !output.code.contains(".body()"),
+        "H1 Response has fields status/body and header(); no body_json/status()/body():\n{}",
         output.code
     );
     assert!(
         !output.code.contains(&["Faber", "Value"].concat()),
         "generated code must not reference legacy valor type:\n{}",
-        output.code
-    );
-    assert!(
-        output.code.contains("crate::http::Response"),
-        "expected runtime HTTP response carrier, got:\n{}",
         output.code
     );
 
@@ -5884,6 +5890,7 @@ fn aliased_norma_import_preserves_provider_identity_in_analysis() {
         &entry,
         r#"
 import from "norma:http" http as rete
+import from "norma:http/response" response
 
 async_main {
   await_const _ responsum ← rete.get("http://127.0.0.1:9")
@@ -5905,21 +5912,46 @@ async_main {
 
     assert!(
         analysis.hir.items.iter().all(|item| {
-            let HirItemKind::Interface(interface) = &item.kind else {
-                return true;
+            let name = match &item.kind {
+                HirItemKind::Interface(interface) => analysis.interner.resolve(interface.name),
+                HirItemKind::Struct(strukt) => analysis.interner.resolve(strukt.name),
+                HirItemKind::TypeAlias(alias) => analysis.interner.resolve(alias.name),
+                _ => return true,
             };
-            analysis.interner.resolve(interface.name) != "Response"
+            name != "Response"
         }),
-        "library interfaces should not be source-spliced into importer HIR"
+        "library types should not be source-spliced into importer HIR"
     );
-    let item = library_item_by_export(analysis, &["http"], "Response", LibraryItemKind::Interface);
+    assert!(
+        analysis.libraries.items.values().all(|item| {
+            !(library_path_eq(&item.identity.module_path, &["http"])
+                && item.exported_name == "Response")
+        }),
+        "Response must not be exported at [http] (no facade interface or type-alias)"
+    );
+    assert!(
+        package
+            .entry_node()
+            .expect("entry unit")
+            .expanded_library_imports
+            .iter()
+            .any(|import| library_path_eq(&import.module.module_path, &["http", "response"])
+                && import.module.package == "norma"),
+        "rete import closure must include the Response leaf at [http, response]"
+    );
+    let item = library_item_by_export(
+        analysis,
+        &["http", "response"],
+        "Response",
+        LibraryItemKind::Struct,
+    );
     assert_eq!(
         item.identity.provider,
         LibraryProvider::Builtin("norma".to_owned())
     );
-    assert_eq!(item.identity.module_path, vec!["http"]);
+    assert_eq!(item.identity.module_path, vec!["http", "response"]);
     assert_eq!(item.exported_name, "Response");
-    assert_eq!(item.kind, LibraryItemKind::Interface);
+    assert_eq!(item.kind, LibraryItemKind::Struct);
     assert_eq!(item.rust_runtime_type.as_deref(), None);
     assert!(!item.elide_rust_decl);
 }
@@ -5957,13 +5989,23 @@ async_main {
     assert!(output
         .code
         .contains("crate::http::get(\"http://127.0.0.1:9\".to_string()).await"));
-    assert!(output
-        .code
-        .contains("let responsum: Box<dyn crate::http::Response> ="));
+    assert!(
+        output
+            .code
+            .contains("let responsum: crate::http::response::Response ="),
+        "expected struct crate::http::response::Response (cf. crate::caelum::terminus::Endpoint), got:\n{}",
+        output.code
+    );
+    assert!(
+        output.code.contains("pub struct Response"),
+        "Response must lower as a leaf struct, got:\n{}",
+        output.code
+    );
     assert!(!output.code.contains("rete.get"));
     assert!(
-        output.code.contains("pub trait Response"),
-        "norma:http rides the ordinary generated-library path; Response is not a faber::http runtime carrier:\n{}",
+        !output.code.contains("Box<dyn crate::http::Response>")
+            && !output.code.contains("pub trait Response"),
+        "H1 forbids Box<dyn crate::http::Response> and pub trait Response:\n{}",
         output.code
     );
 }
