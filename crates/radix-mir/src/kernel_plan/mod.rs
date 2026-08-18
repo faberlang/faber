@@ -27,10 +27,12 @@
 //! plan.
 
 mod build;
+mod packed;
 mod plan;
 mod validate;
 
 pub use build::*;
+pub use packed::*;
 pub use plan::*;
 pub use validate::*;
 

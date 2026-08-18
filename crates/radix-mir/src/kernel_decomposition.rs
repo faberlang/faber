@@ -204,6 +204,8 @@ pub fn decompose_kernel_function(
         // (the subchain's produced local is consumed by a later subchain,
         // invisible inside the slice itself).
         let plan = resolve_subchain_plan(&synthetic, function, validation)?;
+        crate::kernel_plan::confirm_packed_admission(&synthetic, &plan)
+            .map_err(|error| PlanMappingError::mapping(error.to_string()))?;
         let produced = indices.iter().rev().find_map(|&index| {
             crate::read_analysis::statement_destination(&block.statements[index])
         });

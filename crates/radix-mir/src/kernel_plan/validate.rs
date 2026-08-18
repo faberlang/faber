@@ -287,6 +287,9 @@ pub(super) fn validate_quantized_matmul_plan(
             tile: plan.tile,
         });
     }
+    if plan.layout == crate::abi::PackedStorageLayout::F32 {
+        return Err(PlanValidationError::QuantizedMatMulF32Fallback);
+    }
     Ok(())
 }
 
@@ -583,6 +586,9 @@ pub enum PlanValidationError {
     CausalMaskedSoftmaxZeroDimension { rows: u64, cols: u64 },
     /// Packed quantized GEMM requires positive M/K/N and a non-zero tile.
     QuantizedMatMulZeroDimension { m: u64, k: u64, n: u64, tile: u32 },
+    /// F32 must fall back to `TiledMatMul` (R-PACK-02A); it is not a
+    /// `QuantizedMatMul` layout.
+    QuantizedMatMulF32Fallback,
     /// Grouped packed GEMM requires positive M/K/N/groups and a non-zero tile.
     GroupedMatMulZeroDimension {
         m: u64,
@@ -723,6 +729,10 @@ impl fmt::Display for PlanValidationError {
             Self::QuantizedMatMulZeroDimension { m, k, n, tile } => write!(
                 f,
                 "quantized matmul requires positive M/K/N and a non-zero tile, got M={m}, K={k}, N={n}, tile={tile}"
+            ),
+            Self::QuantizedMatMulF32Fallback => write!(
+                f,
+                "quantized matmul F32 layout must fall back to TiledMatMul"
             ),
             Self::GroupedMatMulZeroDimension {
                 m,
