@@ -116,6 +116,50 @@ pub fn dequant_q5_k(block: &[u8]) -> Result<[f32; 256], PackedDequantError> {
     Ok(y)
 }
 
+/// `block_q6_K` (`ql[128]`, `qh[64]`, `scales[16]`, `d`) → 256 f32.
+///
+/// Mirrors `dequantize_row_q6_K` at the GI2-1 ggml pin (`a957b7747`).
+///
+/// # Errors
+/// [`PackedDequantError::BlockBytesMismatch`] when `block` is not 210 bytes.
+pub fn dequant_q6_k(block: &[u8]) -> Result<[f32; 256], PackedDequantError> {
+    let want = PackedStorageLayout::Q6_K.block_bytes() as usize;
+    if block.len() != want {
+        return Err(PackedDequantError::BlockBytesMismatch {
+            layout: PackedStorageLayout::Q6_K,
+            actual: block.len(),
+        });
+    }
+    let d = half_to_f32(u16::from_le_bytes([block[208], block[209]]));
+    let ql = &block[0..128];
+    let qh = &block[128..192];
+    let sc = &block[192..208];
+    let mut y = [0.0f32; 256];
+    for n in [0usize, 128] {
+        let sc_base = n / 16;
+        let ql_off = n / 2;
+        let qh_off = n / 4;
+        for l in 0..32usize {
+            let is = l / 16;
+            let q1 = i32::from((ql[ql_off + l] & 0x0f) | (((qh[qh_off + l] >> 0) & 3) << 4)) - 32;
+            let q2 =
+                i32::from((ql[ql_off + l + 32] & 0x0f) | (((qh[qh_off + l] >> 2) & 3) << 4)) - 32;
+            let q3 = i32::from((ql[ql_off + l] >> 4) | (((qh[qh_off + l] >> 4) & 3) << 4)) - 32;
+            let q4 =
+                i32::from((ql[ql_off + l + 32] >> 4) | (((qh[qh_off + l] >> 6) & 3) << 4)) - 32;
+            let sc0 = f32::from(sc[sc_base + is] as i8);
+            let sc2 = f32::from(sc[sc_base + is + 2] as i8);
+            let sc4 = f32::from(sc[sc_base + is + 4] as i8);
+            let sc6 = f32::from(sc[sc_base + is + 6] as i8);
+            y[n + l] = d * sc0 * f32::from(q1 as i8);
+            y[n + l + 32] = d * sc2 * f32::from(q2 as i8);
+            y[n + l + 64] = d * sc4 * f32::from(q3 as i8);
+            y[n + l + 96] = d * sc6 * f32::from(q4 as i8);
+        }
+    }
+    Ok(y)
+}
+
 /// Packed GEMM over already-dequantized right columns: `C[m,n] = A[m,k] · W[k,n]`.
 ///
 /// The weight operand is the dequantized superblock (never a whole-model
@@ -192,5 +236,83 @@ mod tests {
         let out = packed_gemm_f32(&left, &weights, 1, k, 1);
         assert_eq!(out.len(), 1);
         assert_eq!(out[0], 256.0);
+    }
+
+    fn parse_hex_bytes(hex: &str) -> Vec<u8> {
+        assert_eq!(hex.len() % 2, 0, "odd hex length");
+        (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).expect("hex byte"))
+            .collect()
+    }
+
+    fn parse_hex_f32(hex: &str) -> f32 {
+        let bits = u32::from_str_radix(hex, 16).expect("hex f32 bits");
+        f32::from_bits(bits)
+    }
+
+    #[test]
+    fn q6_k_gi2_goldens_match_cpu_reference() {
+        let raw = include_str!(
+            "../../../../docs/factory/gpu-inference-gguf/evidence/gi2-dequant-goldens.json"
+        );
+        let json: serde_json::Value = serde_json::from_str(raw).expect("gi2 goldens json");
+        let fixtures = json["block_fixtures"]
+            .as_array()
+            .expect("block_fixtures array");
+        let mut seen = 0usize;
+        for fixture in fixtures {
+            if fixture["type"].as_str() != Some("Q6_K") {
+                continue;
+            }
+            seen += 1;
+            let bytes = parse_hex_bytes(fixture["bytes_hex"].as_str().expect("bytes_hex"));
+            let got = dequant_q6_k(&bytes).expect("Q6_K width");
+            let want = fixture["output_hex"].as_array().expect("output_hex");
+            assert_eq!(want.len(), 256, "{}", fixture["name"]);
+            for (i, hex) in want.iter().enumerate() {
+                let expected = parse_hex_f32(hex.as_str().expect("output hex"));
+                assert_eq!(
+                    got[i].to_bits(),
+                    expected.to_bits(),
+                    "{}[{i}]",
+                    fixture["name"]
+                );
+            }
+        }
+        assert!(seen >= 3, "expected GI2-1 Q6_K block fixtures, got {seen}");
+    }
+
+    #[test]
+    fn q6_k_refuses_wrong_block_width() {
+        let err = dequant_q6_k(&[0u8; 16]).expect_err("width must fail closed");
+        assert!(matches!(
+            err,
+            PackedDequantError::BlockBytesMismatch {
+                layout: PackedStorageLayout::Q6_K,
+                actual: 16
+            }
+        ));
+    }
+
+    #[test]
+    fn q6_k_packed_gemm_probe_matches_cpu_reference() {
+        let raw = include_str!(
+            "../../../../docs/factory/gpu-inference-gguf/evidence/gi2-dequant-goldens.json"
+        );
+        let json: serde_json::Value = serde_json::from_str(raw).expect("gi2 goldens json");
+        let fixture = json["block_fixtures"]
+            .as_array()
+            .expect("block_fixtures")
+            .iter()
+            .find(|row| row["type"].as_str() == Some("Q6_K"))
+            .expect("at least one Q6_K fixture");
+        let bytes = parse_hex_bytes(fixture["bytes_hex"].as_str().expect("bytes_hex"));
+        let weights = dequant_q6_k(&bytes).expect("Q6_K block");
+        let k = 256usize;
+        let left = vec![1.0f32; k];
+        let out = packed_gemm_f32(&left, &weights, 1, k, 1);
+        let expected: f32 = weights.iter().copied().sum();
+        assert_eq!(out[0].to_bits(), expected.to_bits());
     }
 }
