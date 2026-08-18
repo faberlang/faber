@@ -415,13 +415,13 @@ add classes. If a reject has no row, stop and route a protocol amend.
 | `kind_string_limit` | `kind` string header longer than 64 bytes (§6) |
 | `root_map` | root map count ≠ 3, or keys not `kind` then `schema` then `value` (§2, §6) |
 | `schema_array` | `schema` array length ≠ 2, or elements not unsigned 16-bit (§2, §6) |
-| `kind_unregistered` | unknown kind, or reserved-but-unregistered kind admitted (§2.5, §10) |
+| `kind_unregistered` | unknown kind, or reserved-but-unregistered kind admitted (§2, §10) |
 | `schema_unsupported` | document schema major/minor the decoder does not accept (§7.2) |
 | `noncanonical` | any alternate encoding of a legal schema value, including present-at-default OPTIONAL, overlong primitives, float32, unsorted keys (§3, §5.10) |
-| `duplicate_key` | duplicate map key (§3.7) |
-| `unknown_field` | field not in the admitted schema (§4.1) |
-| `missing_field` | REQUIRED field absent (§4.1) |
-| `type` | wrong primitive, or `nil` where null is not legal (§3.1, §5.8) |
+| `duplicate_key` | duplicate map key, duplicate canonical set element, or duplicate canonical logical-map key (§3.7, §4.4, §4.5) |
+| `unknown_field` | field not in the admitted schema, including present `value` on a unit variant (§4.1, §4.2) |
+| `missing_field` | REQUIRED field absent, including absent `value` on a payload variant (§4.1, §4.2) |
+| `type` | wrong primitive, `nil` where null is not legal, integer out of declared range, non-string MessagePack map key, or unknown closed-union tag (§3.1, §3.2, §3.7, §4.2, §5.8) |
 | `utf8` | string payload is not valid UTF-8 (§3.4) |
 | `extension` | MessagePack extension / timestamp (§3.8) |
 | `limit` | a kind-specific resource limit; payload names the violated limit (§6) |
