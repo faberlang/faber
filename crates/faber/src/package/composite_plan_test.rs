@@ -8,8 +8,6 @@
 
 use super::*;
 use crate::package::PackageSpec;
-use radix_module::codegen::Target;
-use radix_module::diagnostics::{Diagnostic, DiagnosticArg};
 use radix_mir::abi::{
     MirKernelDispatchSize, MirKernelResourceAccess, MirKernelWorkgroupCount, MirWorkgroupSize,
 };
@@ -26,6 +24,8 @@ use radix_mir_fmir::{
     DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId, FmirDeviceArtifact,
     FmirDeviceBackend, MaterializationStage,
 };
+use radix_module::codegen::Target;
+use radix_module::diagnostics::{Diagnostic, DiagnosticArg};
 use radix_types::TypeId;
 use std::collections::BTreeMap;
 use std::path::PathBuf;

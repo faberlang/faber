@@ -30,7 +30,9 @@ use crate::cli::Command;
 use crate::input_shape::{locale_without_package_error, verify_input_is_package_shaped};
 use crate::package;
 use clap::Parser;
-use radix_module::tool::{self, BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
+use radix_module::tool::{
+    self, BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand,
+};
 
 use convert::cmd_convert;
 use explain::cmd_explain;

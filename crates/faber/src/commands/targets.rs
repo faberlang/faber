@@ -9,7 +9,9 @@
 //! per-row availability; device/host-leaf/device-runtime capability rows are
 //! **compiled-only** — a build without the feature reports no row for it.
 
-use radix_module::tool::{target_capabilities_for_surface, TargetCapabilities, TargetCommandSurface};
+use radix_module::tool::{
+    target_capabilities_for_surface, TargetCapabilities, TargetCommandSurface,
+};
 use std::collections::BTreeSet;
 
 /// Emit-target rows keyed to the faber feature that must be compiled for the
@@ -23,23 +25,63 @@ use std::collections::BTreeSet;
 const FABER_TARGET_ROWS: &[(radix_module::codegen::Target, &str, &str)] = &[
     (radix_module::codegen::Target::HirRust, "rust", "hir-rust"),
     (radix_module::codegen::Target::HirFhir, "fhir", "hir-fhir"),
-    (radix_module::codegen::Target::MirFmir, "fmir-text", "mir-fmir"),
-    (radix_module::codegen::Target::MirFmirBinary, "fmir", "mir-fmir"),
+    (
+        radix_module::codegen::Target::MirFmir,
+        "fmir-text",
+        "mir-fmir",
+    ),
+    (
+        radix_module::codegen::Target::MirFmirBinary,
+        "fmir",
+        "mir-fmir",
+    ),
     (
         radix_module::codegen::Target::MirFmirBundle,
         "fmir-bin",
         "mir-fmir",
     ),
-    (radix_module::codegen::Target::HirFaber, "faber", "hir-faber"),
+    (
+        radix_module::codegen::Target::HirFaber,
+        "faber",
+        "hir-faber",
+    ),
     (radix_module::codegen::Target::HirGo, "go", "hir-go"),
-    (radix_module::codegen::Target::HirPython, "python", "hir-python"),
-    (radix_module::codegen::Target::HirHaskell, "haskell", "hir-haskell"),
+    (
+        radix_module::codegen::Target::HirPython,
+        "python",
+        "hir-python",
+    ),
+    (
+        radix_module::codegen::Target::HirHaskell,
+        "haskell",
+        "hir-haskell",
+    ),
     (radix_module::codegen::Target::MirWasm, "wasm", "mir-wasm"),
-    (radix_module::codegen::Target::MirWasm, "wasm-text", "mir-wasm"),
-    (radix_module::codegen::Target::MirLlvm, "llvm-text", "mir-llvm"),
-    (radix_module::codegen::Target::MirLlvmHost, "llvm-host", "mir-llvm"),
-    (radix_module::codegen::Target::MirMetal, "metal-text", "mir-metal"),
-    (radix_module::codegen::Target::MirWgsl, "wgsl-text", "mir-wgsl"),
+    (
+        radix_module::codegen::Target::MirWasm,
+        "wasm-text",
+        "mir-wasm",
+    ),
+    (
+        radix_module::codegen::Target::MirLlvm,
+        "llvm-text",
+        "mir-llvm",
+    ),
+    (
+        radix_module::codegen::Target::MirLlvmHost,
+        "llvm-host",
+        "mir-llvm",
+    ),
+    (
+        radix_module::codegen::Target::MirMetal,
+        "metal-text",
+        "mir-metal",
+    ),
+    (
+        radix_module::codegen::Target::MirWgsl,
+        "wgsl-text",
+        "mir-wgsl",
+    ),
     (radix_module::codegen::Target::MirSexp, "sexp", "mir-sexp"),
     (radix_module::codegen::Target::HirTypeScript, "ts", "hir-ts"),
 ];

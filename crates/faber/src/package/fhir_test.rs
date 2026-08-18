@@ -577,7 +577,9 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
         .values()
         .collect::<Vec<_>>();
     assert!(
-        library_items.iter().all(|item| item.exported_name != "Vec3"),
+        library_items
+            .iter()
+            .all(|item| item.exported_name != "Vec3"),
         "retired en-pack Vec3 must not be projected: {library_items:?}"
     );
     assert!(

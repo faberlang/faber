@@ -33,13 +33,13 @@
 use super::*;
 use crate::package::device::DEVICE_RUN_PLAN_VERSION;
 use crate::package::test_support::{test_temp_dir, TestDir};
-use radix_module::codegen::Target;
 use radix_mir::boundary_abi::HOST_CALL_ABI_VERSION;
 use radix_mir::device_program::{
     BufferLifetime, BufferRole, DeviceProgramLifetime, ObservationCadence,
 };
 use radix_mir::kernel_plan::CollectionKernelPlan;
 use radix_mir::layout::MirTensorStorageLayout;
+use radix_module::codegen::Target;
 use std::fs;
 use std::path::PathBuf;
 

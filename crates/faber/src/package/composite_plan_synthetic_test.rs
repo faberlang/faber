@@ -20,9 +20,6 @@ use super::composite_plan::{
     SubmissionRegionFact,
 };
 use super::test_support::{test_temp_dir, TestDir};
-use radix_module::codegen::Target;
-use radix_module::diagnostics::{Diagnostic, DiagnosticArg};
-use radix_module::driver::Config;
 use radix_mir::abi::{
     MirKernelDispatchSize, MirKernelResourceAccess, MirKernelWorkgroupCount, MirWorkgroupSize,
 };
@@ -39,6 +36,9 @@ use radix_mir_fmir::{
     DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId, FmirDeviceArtifact,
     FmirDeviceBackend, MaterializationStage,
 };
+use radix_module::codegen::Target;
+use radix_module::diagnostics::{Diagnostic, DiagnosticArg};
+use radix_module::driver::Config;
 use radix_program::analyze::AnalyzedProgram;
 use radix_types::TypeId;
 use std::collections::BTreeMap;

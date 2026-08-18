@@ -42,7 +42,9 @@ fn compile_with_test_options(
     )
 }
 
-fn discover_package(input: &Path) -> Result<PackageSpec, Box<radix_module::diagnostics::Diagnostic>> {
+fn discover_package(
+    input: &Path,
+) -> Result<PackageSpec, Box<radix_module::diagnostics::Diagnostic>> {
     crate::package::discover_package(input)
 }
 

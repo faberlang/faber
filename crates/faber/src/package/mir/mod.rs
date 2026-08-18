@@ -276,7 +276,10 @@ pub(crate) fn with_linked_test_package_mir<R>(
     package: radix_program::analyze::AnalyzedProgram,
     scope: &radix_program::mir::TestPackageScope,
     config: &Config,
-    run: impl for<'a> FnOnce(&radix_module::mir::ValidatedMir<'a>, &radix_program::mir::TestFunctionIds) -> R,
+    run: impl for<'a> FnOnce(
+        &radix_module::mir::ValidatedMir<'a>,
+        &radix_program::mir::TestFunctionIds,
+    ) -> R,
 ) -> Result<R, Vec<Diagnostic>> {
     radix_program::mir::with_linked_test_package_mir(
         package,
