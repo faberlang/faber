@@ -1,0 +1,64 @@
++++
+term = "functio"
+kind = "keyword"
+category = "function"
+canonical = false
+summary = "Failable function-value callback: (string, int) → Tensor ⇥ LookupError throws through the call site."
+syntax = "functio <name>((string, int) → tensor<f32, [1]> ⇥ LookupError, string, int) → tensor<f32, [1]> ⇥ LookupError"
+related = ["functio", "⇥", "iace", "redde"]
+locale = "en"
++++
+# =============================================================================
+# functio — Failable function-value callback: (string, int) → Tensor ⇥ LookupError
+# =============================================================================
+#
+# What this teaches:
+#   • A named (string, int) → tensor<f32, [1]> ⇥ LookupError callback keeps E
+#     as a function value. Call-through from a ⇥ LookupError apply site
+#     propagates the throw (Rust Result + ?).
+#   • Related keywords: functio, ⇥, iace, redde
+#
+# Common mistakes:
+#   • Passing a failable closure instead of a named ⇥ function — rust emit
+#     rejects failable closures (`rust_failable_closure_unsupported`).
+#
+# See also: functio, ⇥, iace, redde
+# =============================================================================
+
+# functio failable-fn-value — named callback throw through a function-typed parameter
+#
+# (string, int) → tensor<f32, [1]> ⇥ LookupError
+# apply(lookup, name, layer) re-throws lookup's ⇥ without fac/cape.
+#
+# GRAMMAR:
+#   funcType :← '(' typeList ')' '→' type '⇥' type
+#
+# EXPECTED OUTPUT:
+#   compile-only probe — rust emit keeps Result + ? on the callback call.
+#
+# BACKEND:
+#   Rust application lane emits `&impl Fn(String, i64) -> Result<…, LookupError>`
+#   and `?` at the apply call site (FF-1 / D10).
+
+union LookupError {
+    Missing { string key, int layer }
+}
+
+# Named thrower — live throw, not a bool-struct. Passed as the callback value.
+fn lookup_throw(string name, int layer) → tensor<f32, [1]> ⇥ LookupError {
+    throw variant Missing { key = name, layer = layer }
+}
+
+# ⇥ caller invokes the function-typed parameter. The throw propagates.
+fn apply((string, int) → tensor<f32, [1]> ⇥ LookupError lookup, string name, int layer) → tensor<f32, [1]> ⇥ LookupError {
+    return lookup(name, layer)
+}
+
+main {
+    do {
+        const _ t ← apply(lookup_throw, "missing", 0)
+    }
+    catch err {
+        warn "threw"
+    }
+}
