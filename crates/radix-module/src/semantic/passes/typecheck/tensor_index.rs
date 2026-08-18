@@ -233,7 +233,9 @@ fn constrain_transpose_result_shape(
 ///
 /// Reuses the broadcast constraint solver; element strict-equality is already
 /// enforced by the `TensorPeer` parameter resolution against the argument.
-fn constrain_elementwise_result_shape(
+/// Shared by the `addita` method and numeric tensor `+` so both surfaces
+/// publish the same `Figura'` and cannot diverge.
+pub(super) fn constrain_elementwise_result_shape(
     checker: &mut TypeChecker<'_>,
     receiver_ty: TypeId,
     arg_ty: TypeId,

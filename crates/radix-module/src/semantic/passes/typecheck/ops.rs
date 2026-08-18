@@ -647,6 +647,9 @@ impl TypeChecker<'_> {
                         return self.error_type;
                     }
                     self.textus_type()
+                } else if let Some(result) = self.check_addita_plus(lhs_ty, rhs_ty, lhs.span) {
+                    // Numeric tensor/vector/matrix `+` is the live `addita` / `.added()` op.
+                    result
                 } else {
                     self.numeric_arithmetic_bin(lhs_ty, rhs_ty, lhs.span)
                 }
@@ -891,6 +894,88 @@ impl TypeChecker<'_> {
                 self.error_type
             }
         }
+    }
+
+    /// Numeric `+` on tensor / vector / matrix: the live `addita` / `.added()` op.
+    ///
+    /// One Add arm covers the three families. Tensor broadcast is `addita`'s
+    /// `Figura'` (`constrain_elementwise_result_shape`). Vector/matrix follow
+    /// their live `addita` same-shape contracts. `None` means this is not an
+    /// addita-family pair — scalar arithmetic continues.
+    fn check_addita_plus(&mut self, lhs: TypeId, rhs: TypeId, span: crate::lexer::Span) -> Option<TypeId> {
+        let lhs_resolved = self.resolve_inferred_type(lhs);
+        let rhs_resolved = self.resolve_inferred_type(rhs);
+        match (self.types.get(lhs_resolved).clone(), self.types.get(rhs_resolved).clone()) {
+            (Type::Tensor(lhs_elem, _), Type::Tensor(rhs_elem, _)) => {
+                Some(self.check_tensor_addita_plus(lhs_resolved, rhs_resolved, lhs_elem, rhs_elem, span))
+            }
+            (Type::Vector(lhs_elem, _), Type::Vector(rhs_elem, _)) => Some(self.check_same_shape_addita_plus(
+                lhs_resolved,
+                rhs_resolved,
+                lhs_elem,
+                rhs_elem,
+                TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED,
+                span,
+            )),
+            (Type::Matrix(lhs_elem, _), Type::Matrix(rhs_elem, _)) => Some(self.check_same_shape_addita_plus(
+                lhs_resolved,
+                rhs_resolved,
+                lhs_elem,
+                rhs_elem,
+                MATRIX_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED,
+                span,
+            )),
+            _ => None,
+        }
+    }
+
+    fn check_tensor_addita_plus(
+        &mut self,
+        lhs_ty: TypeId,
+        rhs_ty: TypeId,
+        lhs_elem: TypeId,
+        rhs_elem: TypeId,
+        span: crate::lexer::Span,
+    ) -> TypeId {
+        if !crate::semantic::numeric_width::is_tensor_numeric_element(self.types, lhs_elem)
+            || !crate::semantic::numeric_width::is_tensor_numeric_element(self.types, rhs_elem)
+        {
+            self.invalid_operand_types(TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED, span);
+            return self.error_type;
+        }
+        if !self.types.equals(lhs_elem, rhs_elem) {
+            self.invalid_operand_types(ARGUMENT_TYPE_MISMATCH, span);
+            return self.error_type;
+        }
+        let result = super::tensor_index::tensor_with_fresh_shape(self, lhs_elem);
+        let result_shape = match self.types.get(result) {
+            Type::Tensor(_, shape) => *shape,
+            _ => unreachable!("fresh tensor result carries a shape"),
+        };
+        super::tensor_index::constrain_elementwise_result_shape(self, lhs_ty, rhs_ty, result_shape, span);
+        result
+    }
+
+    fn check_same_shape_addita_plus(
+        &mut self,
+        lhs_ty: TypeId,
+        rhs_ty: TypeId,
+        lhs_elem: TypeId,
+        rhs_elem: TypeId,
+        non_numeric_issue: &'static str,
+        span: crate::lexer::Span,
+    ) -> TypeId {
+        if !crate::semantic::numeric_width::is_tensor_numeric_element(self.types, lhs_elem)
+            || !crate::semantic::numeric_width::is_tensor_numeric_element(self.types, rhs_elem)
+        {
+            self.invalid_operand_types(non_numeric_issue, span);
+            return self.error_type;
+        }
+        if !self.types.equals(lhs_ty, rhs_ty) {
+            self.invalid_operand_types(ARGUMENT_TYPE_MISMATCH, span);
+            return self.error_type;
+        }
+        lhs_ty
     }
 
     /// `⊙` Hadamard: identical built-in shapes produce the identical shape.
@@ -1149,6 +1234,9 @@ const NUMERIC_OPERAND_REQUIRED: &str = "numeric_operand_required";
 const BOOLEAN_OPERAND_REQUIRED: &str = "boolean_operand_required";
 const INTEGER_OPERAND_REQUIRED: &str = "integer_operand_required";
 const STRING_OPERANDS_REQUIRED: &str = "string_operands_required";
+const TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED: &str = "tensor_arithmetic_numeric_element_required";
+const MATRIX_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED: &str = "matrix_arithmetic_numeric_element_required";
+const ARGUMENT_TYPE_MISMATCH: &str = "argument_type_mismatch";
 
 #[derive(Clone, Copy)]
 struct NumericShape {

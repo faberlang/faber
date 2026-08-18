@@ -1960,6 +1960,11 @@ impl<'a> FunctionBuilder<'a> {
         if op.is_glyph_product() {
             return self.lower_glyph_product(op, lhs, rhs, expr);
         }
+        // Numeric tensor/vector/matrix `+` takes the live `addita` method path
+        // (`TensorAdd` / elementwise `MirBinOp::Add`), never primitive scalar Add.
+        if op == HirBinOp::Add && self.is_addita_plus_operands(lhs, rhs) {
+            return self.lower_glyph_product(op, lhs, rhs, expr);
+        }
         let Some(op) = mir_bin_op(op) else {
             self.errors
                 .push(MirError::unsupported(expr.span, "binary operator without a MIR primitive"));
@@ -2440,6 +2445,18 @@ impl<'a> FunctionBuilder<'a> {
 
     fn is_vacuum(&self, ty: MirType) -> bool {
         ty.semantic_id() == self.types.primitive(Primitive::Vacuum)
+    }
+
+    fn is_addita_plus_operands(&self, lhs: &HirExpression, rhs: &HirExpression) -> bool {
+        let (Some(lhs_ty), Some(rhs_ty)) = (lhs.ty, rhs.ty) else {
+            return false;
+        };
+        matches!(
+            (self.normalized_type(lhs_ty), self.normalized_type(rhs_ty)),
+            (Type::Tensor(_, _), Type::Tensor(_, _))
+                | (Type::Vector(_, _), Type::Vector(_, _))
+                | (Type::Matrix(_, _), Type::Matrix(_, _))
+        )
     }
 
     fn normalized_type(&self, mut ty: TypeId) -> &Type {

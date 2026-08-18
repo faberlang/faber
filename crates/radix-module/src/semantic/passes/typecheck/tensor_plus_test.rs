@@ -1,0 +1,117 @@
+//! Numeric tensor / vector / matrix `+` is the live `addita` / `.added()` op.
+//!
+//! Glyph/method identity: same-shape and tensor-broadcast `+` typecheck as
+//! `addita`; mixed `tensor + textus` stays `string_operands_required`.
+
+use crate::diagnostics::DiagnosticArg;
+use crate::driver::{analyze_source, Config, Session};
+
+fn accepts(source: &str) {
+    let session = Session::new(Config::default());
+    let result = analyze_source(&session, "tensor_plus.fab", source);
+    assert!(result.is_ok(), "expected typecheck ok: {:?}", result.err());
+}
+
+fn rejects_with_issue(source: &str, issue: &str) {
+    let session = Session::new(Config::default());
+    let result = analyze_source(&session, "tensor_plus.fab", source);
+    let Err(diagnostics) = result else {
+        panic!("expected typecheck failure, but source was accepted");
+    };
+    let issue_arg = DiagnosticArg::new("issue", issue);
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.args.contains(&issue_arg)),
+        "expected a diagnostic with issue `{issue}`, got: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn tensor_plus_same_shape_typechecks() {
+    accepts(
+        r"functio sum(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> {
+    redde a + b
+}",
+    );
+}
+
+#[test]
+fn vector_plus_same_shape_typechecks() {
+    accepts(
+        r"functio sum(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
+    redde a + b
+}",
+    );
+}
+
+#[test]
+fn matrix_plus_same_shape_typechecks() {
+    accepts(
+        r"functio sum(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<f32, [2, 2]> {
+    redde a + b
+}",
+    );
+}
+
+#[test]
+fn tensor_plus_broadcast_unifies_result_shape() {
+    // Same case as `tensor_arithmetic_broadcast_unifies_result_shape`.
+    accepts(
+        r"incipit {
+  fixum tf32[2] a ← vacua
+  fixum tf32[2, 1] b ← vacua
+  fixum tf32[2, 2] c ← a + b
+  nota c.longitudo()
+}",
+    );
+}
+
+#[test]
+fn tensor_plus_incompatible_shapes_reject() {
+    rejects_with_issue(
+        r"incipit {
+  fixum tf32[3] a ← vacua
+  fixum tf32[2] b ← vacua
+  fixum tf32[3] c ← a + b
+  nota c.longitudo()
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn tensor_plus_non_numeric_element_rejects() {
+    rejects_with_issue(
+        r"incipit {
+  fixum tensor<textus, [2]> a ← vacua
+  fixum tensor<textus, [2]> b ← vacua
+  fixum tensor<textus, [2]> c ← a + b
+  nota c.longitudo()
+}",
+        "tensor_arithmetic_numeric_element_required",
+    );
+}
+
+#[test]
+fn tensor_plus_textus_rejects() {
+    rejects_with_issue(
+        r"functio sum(tensor<f32, [2]> a, textus s) → textus {
+    redde a + s
+}",
+        "string_operands_required",
+    );
+}
+
+#[test]
+fn tensor_plus_linear_matmul_bias_typechecks() {
+    accepts(
+        r"functio linear<magnitudo M, magnitudo K, magnitudo N>(
+    tensor<f32, [M, K]> x,
+    tensor<f32, [K, N]> w,
+    tensor<f32, [M, N]> b
+) → tensor<f32, [M, N]> {
+    redde (x · w) + b
+}",
+    );
+}
