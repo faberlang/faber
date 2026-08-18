@@ -1096,12 +1096,12 @@ fn wrong_call_arity_uses_structured_issue_arg() {
 
 #[test]
 fn non_callable_callee_uses_structured_issue_arg() {
-    test_support::assert_rejects_with_issue("incipit { nota (1)() }", "callee_not_callable");
+    test_support::assert_rejects_with_issue("incipit { nota 1() }", "callee_not_callable");
 }
 
 #[test]
 fn invalid_conversion_uses_structured_issue_arg() {
-    test_support::assert_rejects_with_issue("incipit { nota (1 ↦ octeti) }", "numeric_to_octeti_unspecified");
+    test_support::assert_rejects_with_issue("incipit { nota 1 ↦ octeti }", "numeric_to_octeti_unspecified");
 }
 
 #[test]
@@ -1138,7 +1138,7 @@ fn json_value_type_mismatch_uses_structured_issue_arg() {
 #[test]
 fn dynamic_collection_invalid_conversion_uses_structured_context_args() {
     test_support::assert_rejects_with_issue(
-        "incipit { nota ([1] ↦ tabula<textus, numerus>) }",
+        "incipit { nota [1] ↦ tabula<textus, numerus> }",
         "lista_to_tabula_unsupported",
     );
 }
@@ -1146,12 +1146,12 @@ fn dynamic_collection_invalid_conversion_uses_structured_context_args() {
 #[test]
 fn intervallum_invalid_operand_uses_structured_issue_arg() {
     // The Faber range membership operator is `intra`, and the range operator is `‥`
-    test_support::assert_rejects_with_issue("incipit { nota (\"text\" intra 0‥3) }", "range_operand_must_be_numeric");
+    test_support::assert_rejects_with_issue("incipit { nota \"text\" intra 0‥3 }", "range_operand_must_be_numeric");
 }
 
 #[test]
 fn string_add_invalid_operand_uses_structured_issue_arg() {
-    test_support::assert_rejects_with_issue("incipit { nota (\"text\" + 1) }", "string_operands_required");
+    test_support::assert_rejects_with_issue("incipit { nota \"text\" + 1 }", "string_operands_required");
 }
 
 #[test]
