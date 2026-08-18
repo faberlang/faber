@@ -26,11 +26,11 @@
 //!    bindings with conservative branch precision.
 //! 9. [`exhaustive`] reports pattern coverage issues.
 //! 10. [`return_path`] rejects value-returning functions whose bodies can fall
-//!    through without returning.
+//!     through without returning.
 //! 11. [`fragment_definition`] checks `@ nucleum fragment` bodies against the
-//!    device-safe effect subset and records a per-definition effect summary.
+//!     device-safe effect subset and records a per-definition effect summary.
 //! 12. [`lint`] reports quality diagnostics that may be warnings rather than
-//!    hard semantic errors.
+//!     hard semantic errors.
 //!
 //! ERROR POLICY
 //! ============
