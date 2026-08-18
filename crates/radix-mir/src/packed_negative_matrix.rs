@@ -19,7 +19,7 @@ fn shapes(m: u64, k: u64, n: u64) -> MatMulShapes {
 
 #[test]
 fn wrong_layout_ggml_id_fails_closed() {
-    for id in [1u32, 2, 3, 7, 9, 15, 16, 99] {
+    for id in [2u32, 3, 7, 9, 15, 16, 99] {
         let error = admit_quantized_matmul_from_ggml_type_id(id, shapes(8, 32, 32))
             .expect_err("unrepresentable layout must fail closed");
         assert_eq!(
@@ -123,6 +123,14 @@ fn wrong_layout_on_packed_block_fails_closed() {
         PackedDequantError::BlockBytesMismatch {
             expected: 144,
             actual: 34
+        }
+    );
+    let error = dequant_packed_block(PackedStorageLayout::F16, &q8)
+        .expect_err("no silent F16 reinterpret");
+    assert_eq!(
+        error,
+        PackedDequantError::UnsupportedLayout {
+            layout: PackedStorageLayout::F16
         }
     );
     let error = dequant_packed_block(PackedStorageLayout::Bf16, &q8)

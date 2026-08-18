@@ -2186,6 +2186,7 @@ fn f32_quantized_matmul_decomposes_to_tiled_matmul() {
 fn packed_section5_layouts_decompose_to_quantized_matmul() {
     use crate::abi::PackedStorageLayout;
     let rows = [
+        (PackedStorageLayout::F16, 1),
         (PackedStorageLayout::Bf16, 30),
         (PackedStorageLayout::Q8_0, 8),
         (PackedStorageLayout::Q4_K, 12),

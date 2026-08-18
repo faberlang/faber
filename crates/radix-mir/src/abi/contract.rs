@@ -162,6 +162,8 @@ pub enum CollectionOpContract {
 pub enum PackedStorageLayout {
     /// Plain f32 passthrough (existing `TiledMatMul` / gather surface).
     F32,
+    /// Native 2-byte IEEE-754 binary16; in-kernel f32 convert.
+    F16,
     /// Native 2-byte bfloat16; in-kernel f32 convert.
     Bf16,
     /// f16 scale + int8, 32 elements / 34 bytes.
@@ -182,6 +184,7 @@ impl PackedStorageLayout {
     pub const fn ggml_type_id(self) -> u32 {
         match self {
             Self::F32 => 0,
+            Self::F16 => 1,
             Self::Q5_0 => 6,
             Self::Q8_0 => 8,
             Self::Q4_K => 12,
@@ -197,6 +200,7 @@ impl PackedStorageLayout {
     pub const fn from_ggml_type_id(id: u32) -> Option<Self> {
         match id {
             0 => Some(Self::F32),
+            1 => Some(Self::F16),
             6 => Some(Self::Q5_0),
             8 => Some(Self::Q8_0),
             12 => Some(Self::Q4_K),
@@ -211,7 +215,7 @@ impl PackedStorageLayout {
     #[must_use]
     pub const fn block_elements(self) -> u32 {
         match self {
-            Self::F32 | Self::Bf16 => 1,
+            Self::F32 | Self::F16 | Self::Bf16 => 1,
             Self::Q8_0 | Self::Q5_0 => 32,
             Self::Q4_K | Self::Q5_K | Self::Q6_K => 256,
         }
@@ -222,7 +226,7 @@ impl PackedStorageLayout {
     pub const fn block_bytes(self) -> u32 {
         match self {
             Self::F32 => 4,
-            Self::Bf16 => 2,
+            Self::F16 | Self::Bf16 => 2,
             Self::Q8_0 => 34,
             Self::Q4_K => 144,
             Self::Q5_K => 176,
@@ -479,7 +483,7 @@ fn packed_layout_from_operand(operand: &MirOperand) -> Result<PackedStorageLayou
         .ok_or_else(|| {
             MirAbiError::new(
                 "packed kernel layout must be an admitted GGML type id \
-                 (F32, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0)",
+                 (F32, F16, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0)",
             )
         })
 }
