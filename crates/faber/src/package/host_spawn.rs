@@ -483,14 +483,34 @@ fn add_buffer_version(
 
 #[cfg(feature = "device-runtime")]
 fn inputs_to_json(inputs: &BTreeMap<u32, Vec<f32>>) -> Result<Vec<u8>, HostSpawnError> {
-    let wire: BTreeMap<String, Vec<f32>> = inputs
+    let wire: BTreeMap<String, Vec<serde_json::Value>> = inputs
         .iter()
-        .map(|(id, values)| (id.to_string(), values.clone()))
+        .map(|(id, values)| {
+            (
+                id.to_string(),
+                values.iter().copied().map(f32_to_json).collect(),
+            )
+        })
         .collect();
     serde_json::to_vec_pretty(&wire).map_err(|error| HostSpawnError {
         code: "E_DEVICE_DESCRIPTOR".to_owned(),
         message: format!("failed to encode device-execute inputs: {error}"),
     })
+}
+
+#[cfg(feature = "device-runtime")]
+fn f32_to_json(value: f32) -> serde_json::Value {
+    if value.is_nan() {
+        serde_json::Value::String("NaN".to_owned())
+    } else if value == f32::INFINITY {
+        serde_json::Value::String("Infinity".to_owned())
+    } else if value == f32::NEG_INFINITY {
+        serde_json::Value::String("-Infinity".to_owned())
+    } else {
+        serde_json::Number::from_f64(f64::from(value))
+            .map(serde_json::Value::Number)
+            .unwrap_or_else(|| serde_json::Value::String("NaN".to_owned()))
+    }
 }
 
 fn sibling_hosts_dir() -> Result<PathBuf, HostSpawnError> {
