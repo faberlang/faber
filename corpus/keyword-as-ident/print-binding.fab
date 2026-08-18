@@ -1,0 +1,41 @@
++++
+term = "keyword-as-ident"
+kind = "concept"
+category = "identifier"
+canonical = true
+summary = "A binding named print used as the argument of the bare output intrinsic."
+syntax = "const string print ← \"print\"; print print"
+related = ["nota", "fixum"]
+locale = "en"
++++
+
+# =============================================================================
+# keyword-as-ident — binding named `print`
+# =============================================================================
+#
+# What this teaches:
+#   • Binding targets accept keyword spellings — `const string print` is a
+#     user name, not a reserved word.
+#   • Bare `print print` is the output intrinsic of that binding.
+#
+# Common mistakes:
+#   • Using `print(print)` here — that is a call to the identifier `print`,
+#     which in this file is a string, not a function (SEM012).
+#
+# See also: nota, fixum, print-fn.fab, print-call.fab
+# =============================================================================
+#
+# Operator example:
+#   const string print ← "print"
+#   print print
+#
+# GRAMMAR:
+#   outputStmt :← 'print' expr
+#
+# EXPECTED OUTPUT:
+#   print-binding.expected — print
+
+main {
+    const string print ← "print"
+    print print
+}

@@ -1,0 +1,19 @@
+# KW-U4 regression guard — Thai near-collision stays advisory.
+#
+# source  = examples/reader-locale/th-TH/src/main.fab
+# command = faber check --locale th-TH
+# status  = ok
+# advisory_code  = LOCALE002
+# advisory_count = 2
+#
+# Ruling 4: no locale-specific carve-out. ผ่าน-style names remain valid
+# identifiers. LOCALE002 is a non-blocking spelling advisory.
+#
+# warning 1 (function declaration):
+#   ฟังก์ชัน ผ่าน(จำนวน score) → ตรรกะ {
+#
+# warning 2 (call site):
+#   บันทึก ผ่าน(score)
+#
+# Proven on proof-merge 065d1edb1 (U1+U2+U3) and on the pre-wave
+# installed faber 1.7.0: same two advisories, same ok status.
