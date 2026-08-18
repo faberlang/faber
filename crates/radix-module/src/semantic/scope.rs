@@ -2090,6 +2090,20 @@ impl Resolver {
             .collect()
     }
 
+    /// Interned binding for an installed file interface, looked up by name
+    /// without requiring a mutable interner.
+    ///
+    /// Transitive library leaves are installed on the consumer during
+    /// `set_file_interfaces_from_snapshots` (so signatures can name them) but
+    /// have no HIR import binding. Emit walks this to register those DefIds.
+    #[must_use]
+    pub fn file_interface_namespace(&self, name: &str, interner: &crate::lexer::Interner) -> Option<LexSymbol> {
+        self.file_interfaces
+            .keys()
+            .copied()
+            .find(|sym| interner.resolve(*sym) == name)
+    }
+
     /// Canonical FileInterface export name for a consumer-locale surface.
     ///
     /// Target backends write this name. The library module is emitted from
