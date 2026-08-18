@@ -377,6 +377,25 @@ fn lower_analyzed_unit_with_options(
         if !finalize_errors.is_empty() {
             return Err(finalize_errors);
         }
+        let roles = crate::mir::device_roles_from_hir(&unit.hir);
+        let layouts = MirLayoutTable::from_types(&unit.types);
+        let summaries =
+            crate::semantic::passes::fragment_definition::check(&unit.hir, &unit.resolver, &unit.types, &unit.interner)
+                .summaries;
+        let instantiation_errors = super::fragment_instantiation::check(
+            &program.functions,
+            &monomorphizations,
+            &layouts,
+            &unit.types,
+            &roles,
+            Some(&summaries),
+        );
+        if !instantiation_errors.is_empty() {
+            return Err(instantiation_errors
+                .into_iter()
+                .map(|error| MirError { message: error.message(), issue: error.issue.to_owned(), span: error.span })
+                .collect());
+        }
         let mut validation = LoweringContextMaps::collect(unit).validation;
         validation.layouts = MirLayoutTable::from_types(&unit.types);
         validation.closure_environments = closure_environments

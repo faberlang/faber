@@ -815,6 +815,7 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
         }
         "NUCLEUM_FRAGMENT_CONTEXT" => nucleum_fragment_context_message(args),
         "NUCLEUM_FRAGMENT_EFFECT" => nucleum_fragment_effect_message(args),
+        "NUCLEUM_FRAGMENT_TYPE" => nucleum_fragment_type_message(args),
         "gpu_builtin_type_args" => Some("GPU builtin call does not accept type arguments".to_owned()),
         "inferred_callee_type_args" => Some("inferred callee does not accept type arguments".to_owned()),
         "intrinsic_method_type_args" => Some("intrinsic method does not accept type arguments".to_owned()),
@@ -993,6 +994,7 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         }
         "NUCLEUM_FRAGMENT_CONTEXT" => nucleum_fragment_context_help(args),
         "NUCLEUM_FRAGMENT_EFFECT" => nucleum_fragment_effect_help(args),
+        "NUCLEUM_FRAGMENT_TYPE" => nucleum_fragment_type_help(args),
         "integer_operands_required" => Some("use integer operands for this operator".to_owned()),
         "instans_ordering_operands_required" => Some("compare instans values with instans values".to_owned()),
         "json_duplicate_key" => Some("remove or rename the duplicate JSON object key".to_owned()),
@@ -1081,11 +1083,20 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
 }
 
 fn nucleum_fragment_context_message(args: &[DiagnosticArg]) -> Option<String> {
+    let caller = arg_value(args, "caller");
     Some(
-        match arg_value(args, "reason") {
-            Some("entry_callee") => "@ nucleum fragment cannot call an @ nucleum entry",
-            Some("graphics_stage") => "@ nucleum fragment cannot call a graphics @ fragment or @ vertex",
-            Some("host_callable") => "@ nucleum fragment cannot call a host function or other non-device-safe callable",
+        match (caller, arg_value(args, "reason")) {
+            (_, Some("entry_callee")) => "@ nucleum fragment cannot call an @ nucleum entry",
+            (_, Some("nested_dispatch")) => "@ nucleum cannot call another @ nucleum entry",
+            (Some("entry"), Some("graphics_stage")) => "@ nucleum cannot call a graphics @ fragment or @ vertex",
+            (_, Some("graphics_stage")) => "@ nucleum fragment cannot call a graphics @ fragment or @ vertex",
+            (Some("host"), Some("host_callable")) => "host code cannot call an @ nucleum fragment",
+            (Some("entry"), Some("host_callable")) => {
+                "@ nucleum cannot call a host function or other non-device-safe callable"
+            }
+            (_, Some("host_callable")) => {
+                "@ nucleum fragment cannot call a host function or other non-device-safe callable"
+            }
             _ => "calls to @ nucleum fragment definitions are rejected until composition lands",
         }
         .to_owned(),
@@ -1093,14 +1104,79 @@ fn nucleum_fragment_context_message(args: &[DiagnosticArg]) -> Option<String> {
 }
 
 fn nucleum_fragment_context_help(args: &[DiagnosticArg]) -> Option<String> {
+    let caller = arg_value(args, "caller");
     Some(
-        match arg_value(args, "reason") {
-            Some("entry_callee") => {
+        match (caller, arg_value(args, "reason")) {
+            (_, Some("entry_callee")) => {
                 "compose another @ nucleum fragment, or keep the dispatch on the calling @ nucleum entry"
             }
-            Some("graphics_stage") => "keep graphics @ fragment / @ vertex stages out of nucleus fragment bodies",
-            Some("host_callable") => "call another @ nucleum fragment or an approved device intrinsic from this body",
+            (_, Some("nested_dispatch")) => {
+                "compose an @ nucleum fragment into the entry instead of dispatching another entry"
+            }
+            (Some("entry"), Some("graphics_stage")) => {
+                "keep graphics @ fragment / @ vertex stages out of nucleus entries"
+            }
+            (_, Some("graphics_stage")) => "keep graphics @ fragment / @ vertex stages out of nucleus fragment bodies",
+            (Some("host"), Some("host_callable")) => {
+                "call an @ nucleum fragment only from an @ nucleum entry or another fragment"
+            }
+            (Some("entry"), Some("host_callable")) => {
+                "call an @ nucleum fragment or an approved device intrinsic from this entry"
+            }
+            (_, Some("host_callable")) => {
+                "call another @ nucleum fragment or an approved device intrinsic from this body"
+            }
             _ => "wait for nucleum fragment composition, or call an @ nucleum entry instead",
+        }
+        .to_owned(),
+    )
+}
+
+fn nucleum_fragment_type_message(args: &[DiagnosticArg]) -> Option<String> {
+    let expected = arg_value(args, "expected");
+    let actual = arg_value(args, "actual");
+    Some(match (arg_value(args, "reason")?, expected, actual) {
+        ("bindings", _, _) => "@ nucleum fragment call has unsolved generic or magnitudo bindings".to_owned(),
+        ("shape", Some(expected), Some(actual)) => {
+            format!("@ nucleum fragment call shape {actual} does not match specialized shape {expected}")
+        }
+        ("shape", _, _) => "@ nucleum fragment call does not satisfy the specialized shape constraints".to_owned(),
+        ("layout", Some(expected), Some(actual)) => {
+            format!("@ nucleum fragment call layout {actual} does not match specialized layout {expected}")
+        }
+        ("layout", _, _) => "@ nucleum fragment call does not satisfy the specialized layout constraints".to_owned(),
+        ("argument", Some(expected), Some(actual)) => {
+            format!("@ nucleum fragment argument has type {actual}, expected {expected}")
+        }
+        ("argument", _, _) => "@ nucleum fragment argument does not match the specialized signature".to_owned(),
+        ("mode", Some(expected), Some(actual)) => {
+            format!("@ nucleum fragment argument mode {actual} is not valid for {expected}")
+        }
+        ("mode", _, _) => "@ nucleum fragment argument mode does not match the specialized signature".to_owned(),
+        ("target", _, _) => {
+            "@ nucleum fragment specialized types are not legal for the current device target".to_owned()
+        }
+        ("return", Some(expected), Some(actual)) => {
+            format!("@ nucleum fragment returns {actual}, which does not fit caller type {expected}")
+        }
+        ("return", _, _) => "@ nucleum fragment return does not fit the caller".to_owned(),
+        ("effect", _, _) => "@ nucleum fragment specialized effect summary does not fit the caller".to_owned(),
+        _ => return None,
+    })
+}
+
+fn nucleum_fragment_type_help(args: &[DiagnosticArg]) -> Option<String> {
+    Some(
+        match arg_value(args, "reason")? {
+            "bindings" => "supply concrete type and magnitudo arguments so the fragment can be specialized",
+            "shape" => "pass a value whose concrete shape matches the specialized fragment parameter",
+            "layout" => "pass a value whose concrete layout matches the specialized fragment parameter",
+            "argument" => "pass an argument whose specialized type matches the fragment parameter",
+            "mode" => "pass the argument with the parameter's de/in/ex/owned mode",
+            "target" => "restrict the specialized types to the device-safe target subset",
+            "return" => "assign the fragment result to a destination that matches the specialized return",
+            "effect" => "keep the specialized fragment infallible and inside the device-safe effect subset",
+            _ => return None,
         }
         .to_owned(),
     )
