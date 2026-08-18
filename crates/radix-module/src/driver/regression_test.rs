@@ -175,7 +175,7 @@ fn statement_level_ad_does_not_roundtrip_through_faber_codegen() {
 fn rejects_old_verte_aliases_as_postfix_operators() {
     let session = test_session(Target::HirRust);
     for alias in &["qua", "innatum", "novum"] {
-        let source = format!("incipit {{ nota (42 {alias} textus) }}");
+        let source = format!("incipit {{ nota 42 {alias} textus }}");
         let result = compile(&session, "test.fab", &source);
 
         assert!(!result.success(), "source using old postfix alias '{alias}' must fail");

@@ -358,8 +358,9 @@ fn unsigned_integer_runner_upper_half_sha512_k_and_shift_pattern() {
 incipit {
     fixum numerus<u64> k ← 15165310421466868936
     fixum numerus<u64> w ← 7017280452245743616
-    nota (k ∧ 255) + (w ∧ 255)
-    nota (k ⇐ 1) ∨ (k ⇒ 63)
+    fixum numerus<u64> masked ← (k ∧ 255) + (w ∧ 255)
+    nota masked
+    nota k ⇐ 1 ∨ k ⇒ 63
 }
 ",
         &mut host,
