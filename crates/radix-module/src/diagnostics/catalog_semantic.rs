@@ -1671,7 +1671,10 @@ fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
         "iace" => "`iace` is outside the v1 AIR subset".to_owned(),
         "inc_dec_mutation" => "increment/decrement mutation is outside the v1 AIR subset".to_owned(),
         "input_read" => "input reads are host effects outside the v1 AIR subset".to_owned(),
-        "itera_loop" => "`itera` loops are outside the v1 AIR subset".to_owned(),
+        "itera_loop" => match arg_value(args, "causa") {
+            Some(causa) => format!("`itera` loops are outside the v1 AIR subset ({causa})"),
+            None => "`itera` loops are outside the v1 AIR subset".to_owned(),
+        },
         "kernel_device_function" => "kernel/device functions are outside the v1 AIR subset".to_owned(),
         "loop" => "loops are outside the v1 AIR subset".to_owned(),
         "loop_control" => "loop control is outside the v1 AIR subset".to_owned(),
