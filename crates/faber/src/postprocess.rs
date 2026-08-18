@@ -44,7 +44,12 @@ pub fn write_output_artifact(
 ) {
     ensure_artifact_parent(path);
 
-    let code = postprocess_code(radix_module::tool::output_code(output), target, format, linter);
+    let code = postprocess_code(
+        radix_module::tool::output_code(output),
+        target,
+        format,
+        linter,
+    );
     write_artifact_contents(path, code);
 }
 

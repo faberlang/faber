@@ -49,8 +49,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use radix_module::codegen::Target;
-use radix_module::diagnostics::Diagnostic;
 use radix_mir::abi::{
     MirKernelDispatchSize, MirKernelResourceAccess, MirKernelWorkgroupCount, MirWorkgroupSize,
     ReducedProjection,
@@ -65,6 +63,8 @@ use radix_mir::kernel_plan::CollectionKernelPlan;
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::MirType;
 use radix_mir_fmir::{DeviceTargetId, FmirDeviceArtifact, FmirDeviceBackend};
+use radix_module::codegen::Target;
+use radix_module::diagnostics::Diagnostic;
 use serde::Serialize;
 
 use radix_program::analyze::AnalyzedProgram;
