@@ -670,9 +670,8 @@ fn register_locale_pack_type_spellings(
                 mutable: false,
                 span: crate::lexer::Span::default(),
             };
-            match resolver.define(symbol) {
-                Ok(def_id) => resolver.record_locale_pack_type_alias(def_id, name),
-                Err(_) => {}
+            if let Ok(def_id) = resolver.define(symbol) {
+                resolver.record_locale_pack_type_alias(def_id, name)
             }
         }
     }
