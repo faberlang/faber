@@ -44,10 +44,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use radix_mir::abi::ReducedProjection;
 use radix_mir::abi::{
     MirKernelDispatchSize, MirKernelResourceAccess, MirKernelWorkgroupCount, MirWorkgroupSize,
 };
+use radix_mir::abi::{PackedStorageLayout, ReducedProjection};
 use radix_mir::device_program::{
     Binding, BufferId, BufferIdentity, BufferLifetime, BufferRole, BufferVersion, DeviceProgram,
     DeviceProgramLifetime, DeviceResource, KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit,
@@ -63,9 +63,9 @@ use radix_mir::distributed::{
 };
 use radix_mir::kernel_plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, CollectionKernelPlan,
-    GatherPlan, LayerNormalizationPlan, MatMulPlan, MatMulSharedMemory, OobPaddingPolicy, ReduceOp,
-    ReductionPlan, RmsNormalizationPlan, RopePlan, RowSoftmaxPlan, SharedMemoryLayout,
-    TransposePlan,
+    GatherPlan, GroupedMatMulPlan, LayerNormalizationPlan, MatMulPlan, MatMulSharedMemory,
+    OobPaddingPolicy, QuantizedMatMulPlan, ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan,
+    RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
 };
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::{MirFunctionId, MirType};
@@ -74,8 +74,8 @@ use radix_types::TypeId;
 use super::wire::{
     WireBarrierPhase, WireBarrierPoint, WireBufferIdentity, WireBufferLifetime, WireBufferRole,
     WireBufferVersion, WireCollectionKernelPlan, WireDeviceProgram, WireKernelUnit,
-    WireOobPaddingPolicy, WireProgramLifetime, WireReduceOp, WireResourceAccess, WireResultBuffer,
-    WireSharedMemoryLayout, WireStorageLayout,
+    WireOobPaddingPolicy, WirePackedStorageLayout, WireProgramLifetime, WireReduceOp,
+    WireResourceAccess, WireResultBuffer, WireSharedMemoryLayout, WireStorageLayout,
 };
 use crate::error::FmirImageError;
 
@@ -612,6 +612,56 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
                 cols: plan.cols,
             })
         }
+        // R-PACK-01C: packed-kernel wire mirrors reconstruct field-for-field
+        // (GI3-1 F1 mechanical-mirror discipline; no extra semantic facts).
+        WireCollectionKernelPlan::QuantizedMatMul(plan) => {
+            CollectionKernelPlan::QuantizedMatMul(QuantizedMatMulPlan {
+                m: plan.m,
+                k: plan.k,
+                n: plan.n,
+                layout: wire_packed_layout(plan.layout),
+                tile: plan.tile,
+                workgroup_x: plan.workgroup_x,
+                workgroup_y: plan.workgroup_y,
+            })
+        }
+        WireCollectionKernelPlan::GroupedMatMul(plan) => {
+            CollectionKernelPlan::GroupedMatMul(GroupedMatMulPlan {
+                m: plan.m,
+                k: plan.k,
+                n: plan.n,
+                groups: plan.groups,
+                layout: wire_packed_layout(plan.layout),
+                tile: plan.tile,
+                workgroup_x: plan.workgroup_x,
+                workgroup_y: plan.workgroup_y,
+            })
+        }
+        WireCollectionKernelPlan::SsmConv1d(plan) => {
+            CollectionKernelPlan::SsmConv1d(SsmConv1dPlan {
+                length: plan.length,
+                channels: plan.channels,
+                kernel_width: plan.kernel_width,
+                layout: wire_packed_layout(plan.layout),
+            })
+        }
+        WireCollectionKernelPlan::SsmScan(plan) => CollectionKernelPlan::SsmScan(SsmScanPlan {
+            length: plan.length,
+            state_dim: plan.state_dim,
+            layout: wire_packed_layout(plan.layout),
+        }),
+    }
+}
+
+fn wire_packed_layout(layout: WirePackedStorageLayout) -> PackedStorageLayout {
+    match layout {
+        WirePackedStorageLayout::F32 => PackedStorageLayout::F32,
+        WirePackedStorageLayout::Bf16 => PackedStorageLayout::Bf16,
+        WirePackedStorageLayout::Q8_0 => PackedStorageLayout::Q8_0,
+        WirePackedStorageLayout::Q4_K => PackedStorageLayout::Q4_K,
+        WirePackedStorageLayout::Q5_K => PackedStorageLayout::Q5_K,
+        WirePackedStorageLayout::Q6_K => PackedStorageLayout::Q6_K,
+        WirePackedStorageLayout::Q5_0 => PackedStorageLayout::Q5_0,
     }
 }
 
