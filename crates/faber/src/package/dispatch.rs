@@ -43,16 +43,18 @@ pub(crate) fn selected_providers_for_routes(
 /// Plan-time route classification for the builtin runtime dispatch
 /// (dual-backend contract).
 ///
-/// This route does **not** require `[target.rust] host = "native"`: the
-/// builtin runtime covers it, so a native host stays optional. The S1-U3
+/// These routes do **not** require `[target.rust] host = "native"`: the
+/// builtin runtime covers them, so a native host stays optional. The S1-U3
 /// provider split removed the pre-split builtin table from
-/// `faber/runtime/rust/src/frame.rs`; only `runtime:echo` is restored
-/// in-process (the echo provider split never shipped). Every other route is a
+/// `faber/runtime/rust/src/frame.rs`; only `runtime:echo` and the terminal
+/// builtin `processus:exi` are restored in-process. `processus:exi` stays
+/// unmanifested on the host (no protocol-visible terminal response yet) and
+/// must not be demanded as a provider export. Every other route is a
 /// host-required provider route and must be backed by a selected host provider
 /// under `[target.rust] host`. This mirror is a radix-owned plan fact and must
 /// stay aligned with the runtime-side `is_builtin_route` coverage.
 pub(crate) fn is_builtin_ad_route(route: &str) -> bool {
-    matches!(route, "runtime:echo")
+    matches!(route, "runtime:echo" | "processus:exi")
 }
 
 /// Non-`runtime:` routes that are **not** covered by builtin dispatch and therefore
@@ -139,4 +141,26 @@ pub(crate) fn load_provider_manifests(
         .with_arg("route", route.clone()));
     }
     Ok(manifests)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{host_required_routes, is_builtin_ad_route};
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn builtin_matcher_covers_echo_and_terminal_exi() {
+        assert!(is_builtin_ad_route("runtime:echo"));
+        assert!(is_builtin_ad_route("processus:exi"));
+        assert!(!is_builtin_ad_route("processus:argumenta"));
+        assert!(!is_builtin_ad_route("solum:lege"));
+    }
+
+    #[test]
+    fn host_required_routes_drop_terminal_exi() {
+        let routes = BTreeSet::from(["processus:argumenta".to_owned(), "processus:exi".to_owned()]);
+        let required = host_required_routes(&routes);
+        assert!(required.contains("processus:argumenta"));
+        assert!(!required.contains("processus:exi"));
+    }
 }
