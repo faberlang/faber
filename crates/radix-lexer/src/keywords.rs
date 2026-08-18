@@ -100,6 +100,9 @@ pub enum KeywordOwner {
     /// Parameter or field name after the type expression.
     ParameterName,
 
+    /// Binding target in `fixum`/`varia`/`sit` patterns and captures.
+    BindingTarget,
+
     /// Import visibility surface.
     ImportVisibility,
 
@@ -1337,9 +1340,6 @@ pub fn validate_keyword_groups() -> Vec<KeywordGroupValidationError> {
     errors
 }
 
-/// Globally reserved spellings that may still name parameters or members.
-const GLOBAL_PARAMETER_OR_MEMBER: &[&str] = &["cape", "inter", "scribe", "incipiet", "ex", "ad"];
-
 /// Return whether `owner` may reinterpret a keyword token as an identifier.
 #[must_use]
 pub fn keyword_allowed_as_ident(owner: KeywordOwner, kind: &TokenKind) -> Option<&'static str> {
@@ -1355,7 +1355,8 @@ fn keyword_owner_is_identifier_like(owner: KeywordOwner) -> bool {
     match owner {
         KeywordOwner::DeclarationName
         | KeywordOwner::ParameterName
-        | KeywordOwner::MemberIdentifier => true,
+        | KeywordOwner::MemberIdentifier
+        | KeywordOwner::BindingTarget => true,
         KeywordOwner::EntryModifier
         | KeywordOwner::FunctionModifier
         | KeywordOwner::GenusHeader
@@ -1389,15 +1390,13 @@ fn keyword_owner_is_identifier_like(owner: KeywordOwner) -> bool {
 }
 
 fn keyword_owner_allows_spec(owner: KeywordOwner, spec: &KeywordSpec) -> bool {
+    // Name slots accept every keyword spelling. TypeName stays out.
+    if keyword_owner_is_identifier_like(owner) {
+        return true;
+    }
     match spec.scope {
         KeywordScope::Contextual(owners) => owners.contains(&owner),
-        KeywordScope::TestOwned | KeywordScope::Alias { .. } => {
-            keyword_owner_is_identifier_like(owner)
-        }
-        KeywordScope::Global => {
-            keyword_owner_is_identifier_like(owner)
-                && GLOBAL_PARAMETER_OR_MEMBER.contains(&spec.text)
-        }
+        KeywordScope::TestOwned | KeywordScope::Alias { .. } | KeywordScope::Global => false,
         KeywordScope::Annotation => owner == KeywordOwner::AnnotationName,
     }
 }

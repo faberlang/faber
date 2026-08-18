@@ -6,9 +6,19 @@
 //! pin both modes directly on the helpers, independent of any dispatch site,
 //! so the token→spelling migration cannot silently break slot recognition.
 
-use super::{ParseOptions, Parser};
+use super::{parse, ParseOptions, Parser};
 use radix_lexer::{lex, lex_with_locale_pack, KeywordPack, LexResult, TokenKind};
-use radix_syntax::{ExprKind, StmtKind};
+use radix_syntax::{BindingPattern, ExprKind, StmtKind};
+
+fn parse_ok_with_slot_pack(source: &str) -> super::ParseResult {
+    let result = parse(lex_with_locale_pack(source, &SlotTestPack));
+    assert!(
+        result.success(),
+        "expected parse success under slot-test pack, got errors: {:?}",
+        result.errors
+    );
+    result
+}
 
 /// Minimal reader pack: localizes `iuncta` to `本地` and `tacebit` to `await`
 /// as tokenless keywords (no token emission), with no Latin fallback declared.
@@ -38,6 +48,8 @@ impl KeywordPack for SlotTestPack {
             "return" => Some("redde"),
             "true" => Some("verum"),
             "false" => Some("falsum"),
+            "print" => Some("nota"),
+            "read" => Some("lege"),
             _ => None,
         }
     }
@@ -140,6 +152,47 @@ fn slot_helper_expect_errors_when_absent() {
         result.is_err(),
         "missing slot keyword must produce an error"
     );
+}
+
+#[test]
+fn name_slots_accept_keyword_spellings_on_en_pack_surface() {
+    // Green guards: declaration and parameter slots keep surface spellings
+    // (`print`/`read`/`nota`) under a pack that maps print→nota, read→lege.
+    for source in [
+        "fn read(string read) → vacuum {}\n",
+        "fn print(string print) → vacuum {}\n",
+        "fn nota(string nota) → vacuum {}\n",
+    ] {
+        let result = parse_ok_with_slot_pack(source);
+        let program = result.program.as_ref().expect("program");
+        let StmtKind::Func(decl) = &program.statements[0].kind else {
+            panic!("expected function declaration for {source}");
+        };
+        let expected = if source.contains("read") {
+            "read"
+        } else if source.contains("print") {
+            "print"
+        } else {
+            "nota"
+        };
+        let name = result.interner.resolve(decl.name.name);
+        let param = result.interner.resolve(decl.params[0].name.name);
+        assert_eq!(
+            name, expected,
+            "function name surface spelling for {source}"
+        );
+        assert_eq!(param, expected, "parameter surface spelling for {source}");
+    }
+
+    let bind = parse_ok_with_slot_pack("var string read ← \"data\"\n");
+    let program = bind.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let BindingPattern::Ident(name) = &var.binding else {
+        panic!("expected identifier binding");
+    };
+    assert_eq!(bind.interner.resolve(name.name), "read");
 }
 
 #[test]

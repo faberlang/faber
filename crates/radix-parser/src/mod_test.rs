@@ -3289,6 +3289,45 @@ fn varia_binds_tokenless_keyword_as_identifier() {
 }
 
 #[test]
+fn name_slots_accept_keyword_spellings_on_latin_surface() {
+    // Formalized name-slot policy (KW-U3): declaration, parameter, and
+    // binding-target slots accept every keyword spelling.
+    for source in [
+        "functio lege(textus lege) → vacuum {}\n",
+        "functio nota(textus nota) → vacuum {}\n",
+        "functio print(textus print) → vacuum {}\n",
+        "fixum textus lege ← \"data\"\n",
+        "fixum textus nota ← \"print\"\n",
+        "fixum textus print ← \"print\"\n",
+    ] {
+        let result = parse_program(source);
+        assert!(
+            result.success(),
+            "name slot must accept keyword spelling:\n{source}\nerrors: {:?}",
+            result.errors
+        );
+    }
+
+    let func = parse_ok("functio lege(textus lege) → vacuum {}\n");
+    let program = func.program.as_ref().expect("program");
+    let StmtKind::Func(decl) = &program.statements[0].kind else {
+        panic!("expected function declaration");
+    };
+    assert_eq!(symbol_name(&func, decl.name.name), "lege");
+    assert_eq!(symbol_name(&func, decl.params[0].name.name), "lege");
+
+    let bind = parse_ok("fixum textus lege ← \"data\"\n");
+    let program = bind.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let BindingPattern::Ident(name) = &var.binding else {
+        panic!("expected identifier binding");
+    };
+    assert_eq!(symbol_name(&bind, name.name), "lege");
+}
+
+#[test]
 fn legacy_question_mark_in_fixum_rejected() {
     assert_parse_error_matches(
         r"fixum textus? maybe ← nihil",
