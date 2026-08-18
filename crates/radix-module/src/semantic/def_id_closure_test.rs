@@ -80,17 +80,13 @@ fn rust_locale_pack_type_alias_def_reaches_emit_table() {
         .lookup_type(soan)
         .expect("th-TH numerus surface จำนวน must register a TypeAlias DefId");
     let surface = parsed.interner.resolve(soan).to_owned();
-    let aliases = result.resolver.locale_pack_type_alias_names(&parsed.interner);
+    let aliases = result
+        .resolver
+        .locale_pack_type_alias_names(&parsed.interner);
     assert_eq!(aliases.get(&def_id), Some(&surface));
 
     let imported = FxHashMap::default();
-    let emit = emit_def_table(
-        &hir,
-        &parsed.interner,
-        std::iter::empty(),
-        &imported,
-        aliases.keys().copied(),
-    );
+    let emit = emit_def_table(&hir, &parsed.interner, std::iter::empty(), &imported, aliases.keys().copied());
     assert!(
         emit.contains(&def_id),
         "locale-pack TypeAlias DefId {def_id:?} must reach emit_def_table"
