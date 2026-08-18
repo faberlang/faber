@@ -8,7 +8,7 @@ use crate::{
     MirBlock, MirBlockId, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirIntrinsic,
     MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirPlaceBase,
     MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator,
-    MirTerminatorKind, MirType, MirValidationContext,
+    MirTerminatorKind, MirType, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind,
 };
 use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
@@ -51,6 +51,29 @@ fn collection_statement(
         ty,
         test_span(),
     )
+}
+
+fn unary_assign_statement(
+    op: MirUnOp,
+    operand: u32,
+    destination: u32,
+    ty: MirType,
+) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace::local(MirLocalId(destination)),
+            value: MirValue {
+                id: MirValueId(0),
+                kind: MirValueKind::Unary {
+                    op,
+                    operand: MirOperand::Place(MirPlace::local(MirLocalId(operand))),
+                },
+                ty,
+                span: test_span(),
+            },
+        },
+        span: test_span(),
+    }
 }
 
 fn collection_statement_place(
@@ -481,5 +504,41 @@ fn unsupported_collection_op_is_barrier() {
             assert_eq!(op, MirCollectionOp::TensorCruxEntropia);
         }
         other => panic!("expected UnsupportedOp barrier, got {other:?}"),
+    }
+}
+
+/// Unary Relu/Gelu assign (`MirValueKind::Unary`) — the collection-op / unary
+/// duality at `device_program_plans.rs` (`is_elementwise_collection_op` vs
+/// `is_admitted_tensor_unary`).
+///
+/// `plan_elementwise` classifies only collection runtime calls. A live tensor
+/// unary assign is therefore an [`ElementwiseBarrier::Effect`], even though
+/// Relu/Gelu are admitted as both a collection op and a tensor unary.
+#[test]
+fn unary_relu_gelu_assign_is_effect_barrier() {
+    for (unop, collection) in [
+        (MirUnOp::Relu, MirCollectionOp::TensorRelu),
+        (MirUnOp::Gelu, MirCollectionOp::TensorGelu),
+    ] {
+        assert!(
+            crate::device_program_plans::is_admitted_tensor_unary(unop),
+            "{unop:?} is an admitted tensor unary"
+        );
+        assert!(
+            crate::device_program_plans::is_elementwise_collection_op(collection),
+            "{collection:?} is an elementwise collection op — the other side of the duality"
+        );
+        let mut types = TypeTable::new();
+        let r1 = rank1_tensor_ty(&mut types, 4);
+        let function = device_function(
+            &[(0, r1)],
+            vec![unary_assign_statement(unop, 0, 1, r1)],
+            Some(1),
+            r1,
+        );
+        match barrier_of(&function, &types) {
+            ElementwiseBarrier::Effect { .. } => {}
+            other => panic!("expected Effect barrier for unary {unop:?}, got {other:?}"),
+        }
     }
 }
