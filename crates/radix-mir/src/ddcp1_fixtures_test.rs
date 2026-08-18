@@ -1335,6 +1335,7 @@ fn whole_recipe_rope_position_head() {
             width: HEAD_DIM,
             per_row: true,
             rows: T,
+            rotate_half: false,
         });
         plan.validate()
             .expect("the Rope whole-recipe plan validates");

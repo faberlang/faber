@@ -360,27 +360,30 @@ impl CollectionKernelPlan {
                     },
                 ))
             }
-            MirCollectionOp::TensorRope => {
+            MirCollectionOp::TensorRope | MirCollectionOp::TensorRopeHalf => {
                 // GI3-1: the RoPE recipe resolves pos/dim from the trailing
                 // const operands and the row width from the operand dims
                 // (the last-axis extent; elements beyond `dim` are
                 // preserved unrotated). Per-position mode (the GI3-1
                 // contract amendment) is carried by the cos/sin table
                 // operand shapes — rank-2 `[rows, dim/2]` tables rotate
-                // every row at its own position.
+                // every row at its own position. `TensorRopeHalf` selects
+                // Qwen/NeoX rotate_half pairing; `TensorRope` stays llama
+                // consecutive-pair.
                 let (dims, axis) = transformer_recipe_shape(function, validation, op)?;
                 let count = dims_product(&dims)?;
                 if !signature_matches_transformer_counts(signature, count, count) {
                     return None;
                 }
                 let (pos, dim, width, per_row, rows) =
-                    rope_plan_facts(function, validation, &dims, axis)?;
+                    rope_plan_facts(function, validation, op, &dims, axis)?;
                 Some(CollectionKernelPlan::Rope(RopePlan {
                     pos,
                     dim,
                     width,
                     per_row,
                     rows,
+                    rotate_half: matches!(op, MirCollectionOp::TensorRopeHalf),
                 }))
             }
             MirCollectionOp::TensorGather => {
@@ -717,9 +720,10 @@ pub(crate) fn transformer_recipe_shape(
             }
             Some((dims, axis))
         }
-        MirCollectionOp::TensorRope => {
-            // GI3-1: RoPE rotates consecutive pairs on the last axis.
-            let args = transformer_statement_args(function, MirCollectionOp::TensorRope)?;
+        MirCollectionOp::TensorRope | MirCollectionOp::TensorRopeHalf => {
+            // GI3-1: RoPE rotates on the last axis. Pairing is a plan fact
+            // (`rotate_half`); the shape contract is shared.
+            let args = transformer_statement_args(function, op)?;
             let dims = transformer_operand_dims(function, &args[0], validation)?;
             let rank = dims.len();
             if rank == 0 || rank > 2 {
@@ -841,18 +845,22 @@ fn rms_norm_const_facts(
     Some((epsilon.to_bits(), norm_dim))
 }
 
-/// The `TensorRope` const-operand facts (GI3-1): `pos` must be a
-/// non-negative `MirConstant::Int`/`UInt` and `dim` a positive, even
-/// `MirConstant::Int`/`UInt` not exceeding the last-axis extent (the CCI-1
-/// source contract; the MIR validator re-checks). Returns
+/// The `TensorRope` / `TensorRopeHalf` const-operand facts (GI3-1): `pos`
+/// must be a non-negative `MirConstant::Int`/`UInt` and `dim` a positive,
+/// even `MirConstant::Int`/`UInt` not exceeding the last-axis extent (the
+/// CCI-1 source contract; the MIR validator re-checks). Returns
 /// `(pos, dim, width)`; `None` when a const constraint fails.
 fn rope_plan_facts(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
+    op: MirCollectionOp,
     dims: &[u64],
     axis: u64,
 ) -> Option<(u64, u64, u64, bool, u64)> {
-    let args = transformer_statement_args(function, MirCollectionOp::TensorRope)?;
+    if !op.is_rope() {
+        return None;
+    }
+    let args = transformer_statement_args(function, op)?;
     if args.len() != 3 {
         return None;
     }
@@ -873,7 +881,7 @@ fn rope_plan_facts(
     // statement destination. Rank-2 `[rows, dim/2]` tables select per-row
     // rotation; rank-1 `[dim/2]` tables are the single-position mode.
     let x_local = crate::read_analysis::operand_local(args.first()?)?;
-    let destination = rope_destination_local(function)?;
+    let destination = rope_destination_local(function, op)?;
     let tables: Vec<&MirParam> = function
         .params
         .iter()
@@ -902,13 +910,12 @@ fn rope_plan_facts(
     Some((pos, dim, width, per_row, rows))
 }
 
-/// The `TensorRope` statement's destination local (the rotated output).
-fn rope_destination_local(function: &MirFunction) -> Option<MirLocalId> {
+/// The `TensorRope` / `TensorRopeHalf` statement's destination local (the
+/// rotated output).
+fn rope_destination_local(function: &MirFunction, op: MirCollectionOp) -> Option<MirLocalId> {
     for block in &function.blocks {
         for statement in &block.statements {
-            if crate::collection_ops::statement_collection_op(statement)
-                != Some(MirCollectionOp::TensorRope)
-            {
+            if crate::collection_ops::statement_collection_op(statement) != Some(op) {
                 continue;
             }
             let MirStatementKind::RuntimeCall { destination, .. } = &statement.kind else {

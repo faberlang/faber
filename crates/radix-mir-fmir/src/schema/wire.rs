@@ -630,6 +630,10 @@ pub struct WireRopePlan {
     pub per_row: bool,
     /// The row count (per-row mode; the table row stride).
     pub rows: u64,
+    /// Qwen2 / GPT-NeoX `rotate_half` pairing. Default false keeps llama
+    /// pair-rotate wire payloads unchanged.
+    #[serde(default)]
+    pub rotate_half: bool,
 }
 
 /// Causal masked-row softmax recipe plan (wire mirror of

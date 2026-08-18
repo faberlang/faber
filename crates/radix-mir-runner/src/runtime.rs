@@ -1296,7 +1296,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorMean => self.tensor_mean(args, span),
             MirCollectionOp::TensorLayerNorm => self.tensor_layernorm(args, span, return_ty),
             MirCollectionOp::TensorRmsNorm => self.tensor_rms_norm(args, span),
-            MirCollectionOp::TensorRope => self.tensor_rope(args, span),
+            MirCollectionOp::TensorRope => self.tensor_rope(args, span, false),
+            MirCollectionOp::TensorRopeHalf => self.tensor_rope(args, span, true),
             MirCollectionOp::TensorGather => self.tensor_gather(args, span),
             // GI3-1: the causal masked-row softmax op is admitted on the
             // plan surface with NO runner body — the CPU-oracle semantics
@@ -2633,10 +2634,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         Ok(tensor_value(output, shape.clone()))
     }
 
-    fn tensor_rope(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+    fn tensor_rope(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        rotate_half: bool,
+    ) -> Result<Value, RunnerError> {
         const FREQ_BASE: f64 = 100_000.0;
 
-        // MIR layout: [x, pos, dim].
+        // MIR layout: [x, pos, dim]. Shared by TensorRope and TensorRopeHalf.
         let [input, pos_arg, dim_arg] = args else {
             return Err(RunnerError::internal(span, "tensor rope arity"));
         };
@@ -2683,23 +2689,29 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             ));
         }
 
-        // llama-arch NORM consecutive-pair rotation; freq_base frozen at
-        // 100000 (the CCI-1 v1 source constant).
+        // llama-arch NORM consecutive-pair, or Qwen/NeoX rotate_half.
+        // freq_base frozen at 100000 (the CCI-1 v1 source constant).
         let pos_f = pos as f64;
         let dim_f = dim as f64;
+        let half = (dim / 2) as usize;
         let mut output = Vec::with_capacity(borrow.data.len());
         for row in 0..batch {
             let base = row * last_extent;
             let mut row_data: Vec<Value> = borrow.data[base..base + last_extent].to_vec();
-            for k in 0..dim / 2 {
+            for k in 0..half {
                 let kf = k as f64;
                 let theta = pos_f * FREQ_BASE.powf(-(2.0 * kf) / dim_f);
                 let cos = theta.cos();
                 let sin = theta.sin();
-                let x0 = numeric_as_f64(&row_data[2 * k as usize], span)?;
-                let x1 = numeric_as_f64(&row_data[2 * k as usize + 1], span)?;
-                row_data[2 * k as usize] = Value::Float(x0 * cos - x1 * sin);
-                row_data[2 * k as usize + 1] = Value::Float(x0 * sin + x1 * cos);
+                let (i0, i1) = if rotate_half {
+                    (k, k + half)
+                } else {
+                    (2 * k, 2 * k + 1)
+                };
+                let x0 = numeric_as_f64(&row_data[i0], span)?;
+                let x1 = numeric_as_f64(&row_data[i1], span)?;
+                row_data[i0] = Value::Float(x0 * cos - x1 * sin);
+                row_data[i1] = Value::Float(x0 * sin + x1 * cos);
             }
             output.extend(row_data);
         }

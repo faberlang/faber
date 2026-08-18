@@ -617,6 +617,7 @@ fn collection_op(op: MirCollectionOp) -> &'static str {
         MirCollectionOp::TensorLayerNorm => "tensor-layernorm",
         MirCollectionOp::TensorRmsNorm => "tensor-rms-norm",
         MirCollectionOp::TensorRope => "tensor-rope",
+        MirCollectionOp::TensorRopeHalf => "tensor-rope-half",
         MirCollectionOp::TensorGather => "tensor-gather",
         MirCollectionOp::TensorCausalMaskedSoftmax => "tensor-causal-masked-softmax",
         MirCollectionOp::TensorQuantizedMatMul => "tensor-quantized-matmul",

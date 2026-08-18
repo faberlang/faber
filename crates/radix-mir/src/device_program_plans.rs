@@ -642,6 +642,7 @@ pub fn is_recipe_op(op: MirCollectionOp) -> bool {
             // like the transformer ops (admission/resolution is GI3-1).
             | MirCollectionOp::TensorRmsNorm
             | MirCollectionOp::TensorRope
+            | MirCollectionOp::TensorRopeHalf
             | MirCollectionOp::TensorGather
             | MirCollectionOp::TensorCausalMaskedSoftmax
             | MirCollectionOp::TensorQuantizedMatMul
@@ -668,6 +669,7 @@ pub fn is_transformer_recipe_op(op: MirCollectionOp) -> bool {
             // `CollectionOpContract` variant exists for them either).
             | MirCollectionOp::TensorRmsNorm
             | MirCollectionOp::TensorRope
+            | MirCollectionOp::TensorRopeHalf
             | MirCollectionOp::TensorGather
             | MirCollectionOp::TensorCausalMaskedSoftmax
     )

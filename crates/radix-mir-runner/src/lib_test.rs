@@ -3378,6 +3378,51 @@ fn test_tensor_rope_preserves_remainder_beyond_dim() {
     assert_numeric_close(&out.data, &expected, 1e-4);
 }
 
+/// Qwen/NeoX `rotate_half`: pairs `(x[k], x[k+dim/2])` with the same
+/// `theta[k]` as llama pair-rotate. A unit vector at x[0] lands in x[2]
+/// for dim=4 (not x[1]).
+#[test]
+fn test_tensor_rope_half_rank1_rotate_half_pairs() {
+    let input = tensor_value(
+        vec![
+            Value::Float(1.0),
+            Value::Float(0.0),
+            Value::Float(0.0),
+            Value::Float(0.0),
+        ],
+        vec![4],
+    );
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorRopeHalf),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Int(4)),
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let result = evaluate_collection_call(&call, vec![(MirValueId(0), input)])
+        .expect("rope_half dispatch should succeed");
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![4]);
+    let c0 = 1.0_f64.cos();
+    let s0 = 1.0_f64.sin();
+    let theta1 = 1.0_f64 * 100_000.0_f64.powf(-(2.0 * 1.0) / 4.0);
+    let c1 = theta1.cos();
+    let s1 = theta1.sin();
+    let expected = [
+        1.0 * c0 - 0.0 * s0,
+        0.0 * c1 - 0.0 * s1,
+        1.0 * s0 + 0.0 * c0,
+        0.0 * s1 + 0.0 * c1,
+    ];
+    assert_numeric_close(&out.data, &expected, 1e-4);
+}
+
 /// CCI-1: gather selects table rows by id, preserving repeated/out-of-order
 /// ids, and fails closed on an out-of-range id.
 #[test]
