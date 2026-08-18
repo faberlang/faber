@@ -490,9 +490,11 @@ fn library_home() -> Option<PathBuf> {
             // Walk out of both normal checkouts and packet worktrees. A packet's
             // compile-time manifest lives below `faberlang/worktrees/<packet>/radix`,
             // so the old two-level probe stopped before the sibling `norma` checkout.
+            // Stop only on `norma/`. A nearer `triga/` (packet member or leftover
+            // sibling checkout) is not a library home unless Norma is there too.
             let mut candidate = Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf();
             loop {
-                if candidate.join("norma").is_dir() || candidate.join("triga").is_dir() {
+                if candidate.join("norma").is_dir() {
                     return Some(candidate);
                 }
                 if !candidate.pop() {
