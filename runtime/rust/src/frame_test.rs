@@ -63,6 +63,16 @@ fn runtime_echo_returns_opener_then_done() {
 }
 
 #[test]
+fn builtin_matcher_covers_echo_and_terminal_exi() {
+    // Classification only — do not dispatch `processus:exi` here; the builtin
+    // arm calls `process::exit` and would terminate the test process.
+    assert!(frame::is_builtin_route("runtime:echo"));
+    assert!(frame::is_builtin_route("processus:exi"));
+    assert!(!frame::is_builtin_route("processus:argumenta"));
+    assert!(!frame::is_builtin_route("solum:lege"));
+}
+
+#[test]
 fn runtime_echo_builtin_covers_hostless_dispatch() {
     // S1-U3 stabilization: the builtin `runtime:echo` route works with no host
     // dispatch installed (the bare-binary e2e product path without host=native).
