@@ -386,7 +386,7 @@ A strict decoder MUST validate all of the following:
 6. REQUIRED, OPTIONAL, and unknown fields;
 7. enum tags and payload shape;
 8. integer ranges and document field types;
-9. document structural and referential invariants; and
+9. document structural and referential invariants (class `invariant`); and
 10. byte canonicality.
 
 A decoder MAY prove byte canonicality while parsing. An initial implementation
@@ -425,6 +425,7 @@ add classes. If a reject has no row, stop and route a protocol amend.
 | `utf8` | string payload is not valid UTF-8 (§3.4) |
 | `extension` | MessagePack extension / timestamp (§3.8) |
 | `limit` | a kind-specific resource limit; payload names the violated limit (§6) |
+| `invariant` | a document-schema structural or referential invariant; payload names the violated invariant (§5.9) |
 | `overflow` | length/budget arithmetic overflow (§6) |
 | `legacy` | known non-FCMP product bytes (postcard FHIR) named for a diagnostic (§1.8, §13) |
 
