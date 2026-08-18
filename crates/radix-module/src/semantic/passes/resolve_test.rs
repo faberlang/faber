@@ -381,6 +381,23 @@ fn reports_alias_lowering_error_with_structured_event() {
 }
 
 #[test]
+fn resolve_test_reports_tabula_arity() {
+    compile_and_expect("typus Bad = tabula", "SEM008", "tabula_arity");
+}
+
+#[test]
+fn resolve_test_proposed_bounded_lista_still_reports_lista_arity() {
+    compile_and_expect("typus X = lista<numerus, 8>", "SEM008", "lista_arity");
+}
+
+#[test]
+fn resolve_test_proposed_bounded_cords_still_report_primitive_params() {
+    for source in ["typus X = textus<8>", "typus X = ascii<8>", "typus X = octeti<8>"] {
+        compile_and_expect(source, "SEM008", "primitive_params");
+    }
+}
+
+#[test]
 fn reports_unknown_type_with_structured_event() {
     let parsed = parse(lex("functio f(Missing value) → vacuum {}"));
     assert!(parsed.errors.is_empty(), "parse errors: {:?}", parsed.errors);
