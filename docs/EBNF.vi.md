@@ -371,8 +371,8 @@ noopStmt := 'im_lặng'
 ```ebnf
 throwStmt := ('ném' | 'chết') expression ['nếu' expression]
 catchClause := 'bắt' IDENTIFIER blockStmt
-assertStmt := 'khẳng_định' expression ('secus' expression)?
-requiritStmt := 'yêu_cầu' expression 'secus' expression
+assertStmt := 'khẳng_định' expression ('chết' expression)?
+requiritStmt := 'yêu_cầu' expression 'ném' expression
 ```
 
 `bắt` gắn vào câu lệnh có cấu trúc và nhánh điều kiện. `làm { ... } bắt lỗi { ... }` là biên phục hồi lỗi cục bộ chuẩn. `thử` và `cuối` là bề mặt cũ, bị từ chối với chẩn đoán di trú. `ném` là lỗi có thể phục hồi; `chết` là panic nghiêm trọng. Dấu `nếu <biểu_thức>` sau `ném` hoặc `chết` là đường tắt cú pháp.

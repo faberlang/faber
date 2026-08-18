@@ -432,8 +432,8 @@ noopStmt     := '静默'
 ```ebnf
 throwStmt   := ('抛错' | '崩溃') expression ['如果' expression]
 catchClause := '捕获' IDENTIFIER blockStmt
-assertStmt  := '断言' expression ('secus' expression)?
-requiritStmt := '需求' expression 'secus' expression
+assertStmt  := '断言' expression ('崩溃' expression)?
+requiritStmt := '需求' expression '抛错' expression
 ```
 
 - `捕获` 附着于结构化语句与条件分支。它不附着于任意的裸块。

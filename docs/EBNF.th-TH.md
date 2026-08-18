@@ -347,8 +347,8 @@ noopStmt     := 'เงียบ'
 ```ebnf
 throwStmt   := ('โยน' | 'ตาย') expression ['ถ้า' expression]
 catchClause := 'จับ' IDENTIFIER blockStmt
-assertStmt  := 'ยืนยัน' expression ('secus' expression)?
-requiritStmt := 'ต้องการ' expression 'secus' expression
+assertStmt  := 'ยืนยัน' expression ('ตาย' expression)?
+requiritStmt := 'ต้องการ' expression 'โยน' expression
 ```
 
 `จับ` ต่อกับคำสั่งแบบมีโครงสร้างและแขนของเงื่อนไข ไม่ต่อกับบล็อกเปล่าโดยตรง `ทำ { ... } จับ err { ... }` เป็นขอบเขต recoverable แบบครั้งเดียว `ลอง` และ `ท้าย` เป็นพื้นผิวเก่าที่ถูกปฏิเสธ `โยน` คือข้อผิดพลาดที่กู้คืนได้ และ `ตาย` คือ panic ร้ายแรง guard `ถ้า <expr>` เป็นน้ำตาลของ parser

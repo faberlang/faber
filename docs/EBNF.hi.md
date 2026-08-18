@@ -391,8 +391,8 @@ noopStmt     := 'मौन'
 ```ebnf
 throwStmt   := ('इधरफेंको' | 'मरोजाओ') expression ['यदि' expression]
 catchClause := 'पकड़ो' IDENTIFIER blockStmt
-assertStmt  := 'पुष्टि' expression ('secus' expression)?
-requiritStmt := 'आवश्यक' expression 'secus' expression
+assertStmt  := 'पुष्टि' expression ('मरोजाओ' expression)?
+requiritStmt := 'आवश्यक' expression 'इधरफेंको' expression
 ```
 
 `पकड़ो` structured statements और conditional arms से जुड़ता है। यह मनमाने bare block से नहीं जुड़ता। `करो { ... } पकड़ो त्रुटि { ... }` canonical one-shot local recoverable-error boundary है। `प्रयास` legacy try/catch surface है और `अंततः` legacy finally surface; दोनों migration diagnostic के साथ अस्वीकार हैं। `इधरफेंको` recoverable throw है और `मरोजाओ` fatal panic। Optional `यदि <expr>` guard parser sugar है: `इधरफेंको मान यदि शर्त` parse समय पर `यदि शर्त { इधरफेंको मान }` बनता है। `पुष्टि` रनटाइम इनवेरिएंट चेक है; यह संकल्पात्मक रूप से `मरोजाओ "msg" यदि !cond` में अवमूदन होता है, स्रोत में सकारात्मक स्थिति रखते हुए। `secus` गलत-पथ संदेश पेश करता है।

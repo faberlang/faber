@@ -345,8 +345,8 @@ noopStmt     := '靜默'
 ```ebnf
 throwStmt   := ('拋出' | '崩潰') expression ['若' expression]
 catchClause := '捕捉' IDENTIFIER blockStmt
-assertStmt  := '斷言' expression ('secus' expression)?
-requiritStmt := '需要' expression 'secus' expression
+assertStmt  := '斷言' expression ('崩潰' expression)?
+requiritStmt := '需要' expression '拋出' expression
 ```
 
 `捕捉` 可附加於結構化語句與條件分支，不可附加於任意裸區塊。`執行 { ... } 捕捉 err { ... }` 是標準的區域復原錯誤邊界。`嘗試` 與 `最後` 是舊語法並會被遷移診斷拒絕。`拋出` 可復原；`崩潰` 是致命錯誤。`拋出 value 若 condition` 會在解析時展開為條件式。
