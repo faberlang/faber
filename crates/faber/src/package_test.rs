@@ -8616,7 +8616,7 @@ fn package_runtime_plan_argv_only_processus_import_stays_green_with_native_host(
     // `exit_process` → `processus:exi`. That route is a terminal builtin,
     // not a host export. An argv-only consumer with host=native must not
     // fail closed as `host_provider_selection_invalid`.
-    let container_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let container_root = radix_module::paths::faberlang_home().expect("faberlang container root");
     super::runtime_sources::set_path_override_for_test(Some(container_root));
     let pkg = test_temp_dir("runtime-plan-argv-only-processus");
     fs::create_dir_all(pkg.join("src")).expect("src");
@@ -9741,7 +9741,7 @@ main {
     // D1 offline seam: the generated crate resolves faber-runtime from the
     // container-local checkout (the released `v<faber version>` git tag does
     // not exist until the next release), so the cargo build stays offline.
-    let container_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let container_root = radix_module::paths::faberlang_home().expect("faberlang container root");
     super::runtime_sources::set_path_override_for_test(Some(container_root));
     let layout = discover_build_layout(&entry).expect("layout");
     emit_generated_crate(&layout, &output.code, None).expect("emit generated crate");
