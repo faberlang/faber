@@ -1310,6 +1310,19 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorCausalMaskedSoftmax => {
                 Err(RunnerError::unsupported(span, "causal masked softmax"))
             }
+            // R-PACK-01 packed kernels have no CPU-runner body. The
+            // interpreter fails closed with a named diagnostic — never a
+            // silent skip or invented F32 expansion.
+            MirCollectionOp::TensorQuantizedMatMul => {
+                Err(RunnerError::unsupported(span, "quantized matmul"))
+            }
+            MirCollectionOp::TensorGroupedMatMul => {
+                Err(RunnerError::unsupported(span, "grouped matmul"))
+            }
+            MirCollectionOp::TensorSsmConv1d => {
+                Err(RunnerError::unsupported(span, "ssm conv1d"))
+            }
+            MirCollectionOp::TensorSsmScan => Err(RunnerError::unsupported(span, "ssm scan")),
             MirCollectionOp::TensorDiv => {
                 self.tensor_elementwise_or_scalar(args, span, "tensor div", numeric_div, return_ty)
             }
