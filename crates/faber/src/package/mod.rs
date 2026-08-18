@@ -357,7 +357,7 @@ pub(crate) fn library_resolver_for_package(
 // loading, strict product-view manifest validation (FBR-P1-001), and
 // `FABER_LIBRARY_HOME` / workspace probing — while keeping the faber-internal
 // entry signatures.
-pub(crate) fn faber_analysis_seams() -> radix_program::analyze::AnalysisSeams {
+pub fn faber_analysis_seams() -> radix_program::analyze::AnalysisSeams {
     radix_program::analyze::AnalysisSeams {
         locale_loader: load_locale_pack_for_input,
         manifest_validator: validate_product_manifest_for_spec,
