@@ -1,12 +1,13 @@
 # GOAL: FCMP profile 1 — amend the draft before a separate freeze decision
 
-**Status**: planned — draft; U-2a landed `02327f9`; not frozen; §14 re-check `0dc52153` record_risk is still not a freeze
+**Status**: planned — draft; U-2a landed `02327f9`; not frozen; operator addendum 2026-08-18 requires sequencing restructure (HIR/package schema first; envelope freeze is not the next action)
 **Created**: 2026-08-17
 **Campaign:** `—` (standalone)
 **Source:** operator intake: `faber/docs/faber-messagepack-profile-v1.md` (amended from commit `4878b6f`; review memo `604d6a30`; CTO `5a4e974a`)
 **Repos:** `faber` (spec + registry); `radix` (reference implementation — deferred, see Sequencing)
-**Related:** `radix/docs/factory/radix-top-level-recomposition/goal.md` (hard sequencing dependency — operator flagged 2026-08-17); FHIR artifact format goal (unwritten, follows the freeze)
+**Related:** `radix/docs/factory/radix-top-level-recomposition/goal.md` (hard sequencing dependency — operator flagged 2026-08-17); FHIR artifact format goal (unwritten; addendum says write it now or fold HIR schema into this goal)
 **Amendment spec:** `docs/factory/fcmp-profile-1/amendment.md`
+**Operator addendum:** `docs/factory/fcmp-profile-1/addendum.md` (2026-08-18) — product is HIR package serialization; envelope-first freeze is the disconnect to restructure
 
 ---
 
@@ -154,3 +155,13 @@ CTO `5a4e974a` (`correct_before_next_phase`): optional/default identity and
 envelope-prefix limits were unset. They are folded as (a) omit-defaults and
 the 64 / 3 / 2 / 256 prefix table in the protocol file (`02327f9`). Do not
 freeze here. Do not reopen unit 2. Do not dispatch unit 3.
+
+## Operator addendum (2026-08-18)
+
+Operator ruling in [`addendum.md`](addendum.md). Product is save/load of
+analyzed HIR as a distributable library package (Norma, Gradus); MessagePack
+replaces postcard. The envelope profile is not the thing to freeze or
+implement first. Managing session must re-lower so the HIR/package field spec
+(live `HirArtifact` / `FhirPackage`) is the critical path. Do not dispatch
+unit 3 as a generic codec. Do not ask for a FCMP 1.0 freeze while `value` is
+undefined.
