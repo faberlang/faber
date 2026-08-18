@@ -62,6 +62,7 @@ use crate::hir::{
     DefId, HirArrayElement, HirAvailability, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConversioTarget,
     HirExpression, HirExpressionKind, HirFunction, HirId, HirItem, HirItemKind, HirLiteral, HirLocal, HirModule,
     HirObjectField, HirObjectKey, HirParam, HirParamMode, HirPattern, HirStatement, HirStatementKind, HirStruct,
+    NucleumRole,
 };
 use crate::lexer::{Interner, Symbol};
 use crate::locale::LocalePack;
@@ -216,6 +217,12 @@ struct TypeChecker<'a> {
     /// Function signatures collected before body checking so calls can be
     /// checked regardless of declaration order.
     functions: FxHashMap<DefId, FuncSig>,
+
+    /// Nucleus roles keyed by function/method `DefId` for the NF-2 staging gate.
+    nucleum_roles: FxHashMap<DefId, NucleumRole>,
+
+    /// Method nucleum roles keyed by (struct-or-interface def, method name).
+    method_nucleum_roles: FxHashMap<(DefId, Symbol), NucleumRole>,
 
     /// Constant declaration types available to path lookup.
     consts: FxHashMap<DefId, TypeId>,
@@ -408,6 +415,8 @@ impl<'a> TypeChecker<'a> {
             binding_shadow: FxHashMap::default(),
             binding_names: FxHashMap::default(),
             functions: FxHashMap::default(),
+            nucleum_roles: FxHashMap::default(),
+            method_nucleum_roles: FxHashMap::default(),
             consts: FxHashMap::default(),
             structs: FxHashMap::default(),
             json_structs: FxHashSet::default(),

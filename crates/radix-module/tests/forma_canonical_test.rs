@@ -85,7 +85,7 @@ fn emits_basic_function_and_entry() {
         is_async: false,
         is_generator: false,
         is_kernel: false,
-        is_device: false,
+        nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
 
@@ -137,7 +137,7 @@ fn emits_alternate_exit_signature() {
                 is_async: false,
                 is_generator: false,
                 is_kernel: false,
-                is_device: false,
+                nucleum_fragment: false,
                 is_vertex: false,
                 is_fragment: false,
 
@@ -200,7 +200,7 @@ fn emits_post_name_declaration_markers_for_params_and_fields() {
                     is_async: false,
                     is_generator: false,
                     is_kernel: false,
-                    is_device: false,
+                    nucleum_fragment: false,
                     is_vertex: false,
                     is_fragment: false,
 
@@ -408,7 +408,7 @@ fn emits_parameter_references_with_original_names() {
         is_async: false,
         is_generator: false,
         is_kernel: false,
-        is_device: false,
+        nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
 
@@ -546,7 +546,7 @@ fn emits_si_sin_secus_chain_with_ergo_redde() {
         is_async: false,
         is_generator: false,
         is_kernel: false,
-        is_device: false,
+        nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
 
@@ -653,7 +653,7 @@ fn canonical_si_continuations_start_on_new_lines() {
         is_async: false,
         is_generator: false,
         is_kernel: false,
-        is_device: false,
+        nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
 
@@ -990,7 +990,7 @@ fn emits_synthetic_proba_functions_as_proba_cases() {
         is_async: false,
         is_generator: false,
         is_kernel: false,
-        is_device: false,
+        nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
 
@@ -1407,7 +1407,7 @@ fn emits_braced_unit_marker_from_hir_annotation() {
         is_async: false,
         is_generator: false,
         is_kernel: false,
-        is_device: false,
+        nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
         annotations: vec![HirAnnotation {
@@ -1698,7 +1698,7 @@ fn re_emits_ego_as_self_keyword_not_type_name() {
             is_async: false,
             is_generator: false,
             is_kernel: false,
-            is_device: false,
+            nucleum_fragment: false,
             is_vertex: false,
             is_fragment: false,
             annotations: Vec::new(),

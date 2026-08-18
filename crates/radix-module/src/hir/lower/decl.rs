@@ -370,6 +370,7 @@ impl Lowerer<'_> {
         }
 
         let posture = self.resolve_callable_posture(decl.posture, &annotations, stmt.span);
+        let (nucleum_entry, nucleum_fragment) = Self::nucleum_role_bits(&annotations, self.interner);
 
         let func = HirFunction {
             name: decl.name.name,
@@ -382,8 +383,8 @@ impl Lowerer<'_> {
             posture,
             is_async: posture.is_async(),
             is_generator: posture.is_stream(),
-            is_kernel: Self::annotation_family_is(&annotations, self.interner, "nucleum"),
-            is_device: Self::annotation_family_is(&annotations, self.interner, "machina"),
+            is_kernel: nucleum_entry,
+            nucleum_fragment,
             is_vertex,
             is_fragment,
             test: None,
@@ -468,6 +469,7 @@ impl Lowerer<'_> {
                     self.pop_type_params();
 
                     let posture = self.resolve_callable_posture(method.posture, &annotations, member.span);
+                    let (nucleum_entry, nucleum_fragment) = Self::nucleum_role_bits(&annotations, self.interner);
 
                     let func = HirFunction {
                         name: method.name.name,
@@ -480,8 +482,8 @@ impl Lowerer<'_> {
                         posture,
                         is_async: posture.is_async(),
                         is_generator: posture.is_stream(),
-                        is_kernel: Self::annotation_family_is(&annotations, self.interner, "nucleum"),
-                        is_device: Self::annotation_family_is(&annotations, self.interner, "machina"),
+                        is_kernel: nucleum_entry,
+                        nucleum_fragment,
                         is_vertex: Self::annotation_family_is(&annotations, self.interner, "vertex"),
                         is_fragment: Self::annotation_family_is(&annotations, self.interner, "fragment"),
                         test: None,
@@ -780,6 +782,7 @@ impl Lowerer<'_> {
         match &annotation.kind {
             crate::syntax::AnnotationKind::Statement(stmt) => self.interner.resolve(stmt.name.name) == family,
             crate::syntax::AnnotationKind::Braced(braced) => self.interner.resolve(braced.name.name) == family,
+            crate::syntax::AnnotationKind::Nucleum(_) => family == "nucleum",
             _ => false,
         }
     }

@@ -208,7 +208,7 @@ impl TypeChecker<'_> {
     }
 
     fn systems_device_tensor_bracket_reads_element(&self) -> bool {
-        // WHY: only systems targets consume `@ nucleum` / `@ machina` device
+        // WHY: only systems targets consume `@ nucleum` / `@ nucleum fragment`
         // roles as storage-buffer projections. Rust/application targets keep
         // tensor bracket reads nullable via the host `accipe` contract.
         self.current_device_function

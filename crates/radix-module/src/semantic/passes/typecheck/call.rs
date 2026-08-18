@@ -37,6 +37,7 @@ const ISSUE_FAILABLE_CALL_ENCLOSING_ERROR_TYPE_MISMATCH: &str = "failable_call_e
 const ISSUE_FAILABLE_CALL_HANDLER_ERROR_TYPE_MISMATCH: &str = "failable_call_handler_error_type_mismatch";
 const ISSUE_FAILABLE_CALL_REQUIRES_HANDLER: &str = "failable_call_requires_handler";
 const ISSUE_GPU_BUILTIN_DEVICE_FUNCTION_REQUIRED: &str = "gpu_builtin_device_function_required";
+const ISSUE_NUCLEUM_FRAGMENT_CONTEXT: &str = "NUCLEUM_FRAGMENT_CONTEXT";
 const ISSUE_GPU_BUILTIN_TYPE_ARGS: &str = "gpu_builtin_type_args";
 const ISSUE_INFERRED_CALLEE_TYPE_ARGS: &str = "inferred_callee_type_args";
 const ISSUE_INTRINSIC_METHOD_TYPE_ARGS: &str = "intrinsic_method_type_args";
@@ -357,6 +358,16 @@ impl TypeChecker<'_> {
             return self.error_type;
         }
         if let Some(sig) = self.lookup_method_signature(receiver_ty, *name) {
+            if let Some(owner) = self
+                .struct_def_from_type(receiver_ty)
+                .or_else(|| self.interface_def_from_type(receiver_ty))
+            {
+                if self.method_nucleum_roles.get(&(owner, *name)) == Some(&crate::hir::NucleumRole::Fragment) {
+                    self.invalid_operand_types(ISSUE_NUCLEUM_FRAGMENT_CONTEXT, receiver.span);
+                    self.typecheck_call_arg_exprs(args);
+                    return self.error_type;
+                }
+            }
             if let Some(method) = self.lookup_interface_method_info(receiver_ty, *name) {
                 let availability = method.availability.clone();
                 let span = method.span;
@@ -739,6 +750,11 @@ impl TypeChecker<'_> {
             }
 
             if let Some(sig) = self.functions.get(def_id).cloned() {
+                if self.nucleum_roles.get(def_id) == Some(&crate::hir::NucleumRole::Fragment) {
+                    self.invalid_operand_types(ISSUE_NUCLEUM_FRAGMENT_CONTEXT, callee.span);
+                    self.typecheck_call_arg_exprs(args);
+                    return self.error_type;
+                }
                 if let Some(name) = self.resolver.get_symbol(*def_id).map(|symbol| symbol.name) {
                     self.set_chorda_scalar_closure_context(name);
                     let ret = self.check_instantiated_call(&sig, explicit_type_args, args, callee.span, expected);

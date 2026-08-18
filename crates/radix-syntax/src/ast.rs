@@ -1471,6 +1471,8 @@ pub enum AnnotationKind {
     RadixTypusDomain(RadixTypusDomainAnnotation),
     /// `@ radix lane "air" / "mir" / "hir-direct"`
     RadixLane(RadixLaneAnnotation),
+    /// `@ nucleum` / `@ nucleum fragment` — typed modifier data, not an untyped argument.
+    Nucleum(NucleumAnnotation),
     Cli(CliAnnotation),
     Imperium(ImperiumAnnotation),
     Optio(OptioAnnotation),
@@ -1508,6 +1510,17 @@ pub struct RadixTypusDomainAnnotation {
 #[derive(Debug)]
 pub struct RadixLaneAnnotation {
     pub lane: Symbol,
+}
+
+/// Structured `@ nucleum` annotation, with an optional `fragment` modifier.
+///
+/// The modifier is typed data on this family. It is not an untyped annotation
+/// argument and is distinct from the graphics `@ fragment` annotation.
+#[derive(Debug)]
+pub struct NucleumAnnotation {
+    /// True when the `fragment` modifier is present (`@ nucleum fragment` or
+    /// `@ nucleum { fragment = verum }`).
+    pub fragment: bool,
 }
 
 #[derive(Debug)]

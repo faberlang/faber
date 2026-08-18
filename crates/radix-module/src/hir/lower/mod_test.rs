@@ -1097,7 +1097,7 @@ functio plane_vertex() → vacuum { redde }
         panic!("expected function item");
     };
     assert!(!func.is_kernel);
-    assert!(!func.is_device);
+    assert!(!func.nucleum_fragment);
     assert!(func.is_vertex, "is_vertex should be true after @vertex annotation wiring");
     assert!(!func.is_fragment);
     assert_eq!(func.annotations.len(), 1);
@@ -1116,9 +1116,45 @@ functio plane_fragment() → vacuum { redde }
         panic!("expected function item");
     };
     assert!(!func.is_kernel);
-    assert!(!func.is_device);
+    assert!(!func.nucleum_fragment);
     assert!(func.is_fragment, "is_fragment should be true after @fragment annotation wiring");
     assert!(!func.is_vertex);
+}
+
+#[test]
+fn lowers_nucleum_into_entry_role() {
+    let source = r"
+@ nucleum
+functio k() → vacuum { redde }
+";
+    let (lowered, interner, _) = lower_source(source);
+    let HirItemKind::Function(func) = &lowered.hir.items[0].kind else {
+        panic!("expected function item");
+    };
+    assert_eq!(func.nucleum_role(), Some(crate::hir::NucleumRole::Entry));
+    assert!(func.is_kernel);
+    assert!(!func.nucleum_fragment);
+    assert_eq!(interner.resolve(func.annotations[0].family), "nucleum");
+    assert!(func.annotations[0].fields.is_empty());
+}
+
+#[test]
+fn lowers_nucleum_fragment_into_fragment_role() {
+    let source = r"
+@ nucleum fragment
+functio helper() → vacuum { redde }
+";
+    let (lowered, interner, _) = lower_source(source);
+    let HirItemKind::Function(func) = &lowered.hir.items[0].kind else {
+        panic!("expected function item");
+    };
+    assert_eq!(func.nucleum_role(), Some(crate::hir::NucleumRole::Fragment));
+    assert!(!func.is_kernel);
+    assert!(func.nucleum_fragment);
+    assert_eq!(interner.resolve(func.annotations[0].family), "nucleum");
+    assert_eq!(func.annotations[0].fields.len(), 1);
+    assert_eq!(interner.resolve(func.annotations[0].fields[0].name), "fragment");
+    assert!(matches!(func.annotations[0].fields[0].value, HirAnnotationValue::Bool(true)));
 }
 
 #[test]
@@ -1581,32 +1617,22 @@ fn add_one(float x) → float {
         panic!("expected function item");
     };
     assert!(func.is_kernel, "expected is_kernel from @ kernel → nucleum");
-    assert!(!func.is_device);
     assert_eq!(interner.resolve(func.annotations[0].family), "nucleum");
 }
 
 #[test]
-fn llm_pack_device_and_future_annotations_lower_to_latin_families() {
+fn llm_pack_future_annotation_lowers_to_latin_family() {
     let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
 
     let source = r"
-@ device
-fn helper(float x) → float { return x }
-
 @ future
 fn fetch() → int { return 1 }
 ";
     let (lowered, interner, _) = lower_source_with_locale_pack(source, &pack);
-    assert_eq!(lowered.hir.items.len(), 2);
+    assert_eq!(lowered.hir.items.len(), 1);
 
-    let HirItemKind::Function(device_fn) = &lowered.hir.items[0].kind else {
-        panic!("expected device function");
-    };
-    assert!(device_fn.is_device);
-    assert_eq!(interner.resolve(device_fn.annotations[0].family), "machina");
-
-    let HirItemKind::Function(future_fn) = &lowered.hir.items[1].kind else {
+    let HirItemKind::Function(future_fn) = &lowered.hir.items[0].kind else {
         panic!("expected future function");
     };
     assert!(future_fn.is_async, "expected is_async from @ future → futura");
@@ -1620,11 +1646,9 @@ fn llm_pack_annotation_family_surfaces_project_latin_to_english() {
 
     assert!(validate_locale_pack_ok(&pack));
     assert_eq!(pack.contextual_keyword_surface("nucleum"), "kernel");
-    assert_eq!(pack.contextual_keyword_surface("machina"), "device");
     assert_eq!(pack.contextual_keyword_surface("futura"), "future");
     assert_eq!(pack.contextual_keyword_surface("optio"), "option");
     assert_eq!(pack.keyword_latin_key("kernel"), Some("nucleum"));
-    assert_eq!(pack.keyword_latin_key("device"), Some("machina"));
     assert_eq!(pack.keyword_latin_key("future"), Some("futura"));
     assert_eq!(pack.keyword_latin_key("option"), Some("optio"));
 }

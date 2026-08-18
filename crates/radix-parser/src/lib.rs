@@ -911,6 +911,10 @@ mod tests;
 mod schema_test;
 
 #[cfg(test)]
+#[path = "nucleum_annotation_test.rs"]
+mod nucleum_annotation_test;
+
+#[cfg(test)]
 mod non_trivia_index_tests {
     use super::*;
     use radix_lexer::lex;

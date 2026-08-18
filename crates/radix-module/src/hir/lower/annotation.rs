@@ -15,7 +15,7 @@ use crate::syntax::{
     braced_cli_nomen, braced_imperium_nomen, braced_nondum_view, braced_operandus_view, braced_optio_view,
     braced_radix_lane_view, braced_radix_typus_view, braced_verte_view, nondum_from_stmt, radix_lane_from_stmt,
     verte_from_stmt, Annotation, AnnotationField, AnnotationFieldValue, AnnotationKind, AnnotationStmt,
-    BracedAnnotation, CliAnnotation, ImperiumAnnotation, OperandusAnnotation, OptioAnnotation,
+    BracedAnnotation, CliAnnotation, ImperiumAnnotation, NucleumAnnotation, OperandusAnnotation, OptioAnnotation,
     RadixTypusDomainAnnotation,
 };
 
@@ -81,6 +81,7 @@ impl Lowerer<'_> {
                 let radix_sym = self.interner.intern("radix");
                 self.lower_radix_lane_fields(radix_sym, lane.lane, annotation.span)
             }
+            AnnotationKind::Nucleum(nucleum) => self.lower_nucleum_annotation(nucleum, annotation.span),
             AnnotationKind::Cli(cli) => self.lower_cli_annotation(cli, annotation.span),
             AnnotationKind::Imperium(imperium) => self.lower_imperium_annotation(imperium, annotation.span),
             AnnotationKind::Optio(optio) => self.lower_optio_annotation(optio, annotation.span),
@@ -348,7 +349,7 @@ impl Lowerer<'_> {
 
         if matches!(
             family_name,
-            "futura" | "cursor" | "nucleum" | "machina" | "vertex" | "fragment" | "solum" | "omitte" | "metior"
+            "futura" | "cursor" | "nucleum" | "vertex" | "fragment" | "solum" | "omitte" | "metior"
         ) && stmt.args.is_empty()
         {
             return HirAnnotation::with_fields(family, Vec::new(), span);
@@ -444,6 +445,22 @@ impl Lowerer<'_> {
             });
         }
         HirAnnotation::with_fields(family, fields, span)
+    }
+
+    fn lower_nucleum_annotation(&mut self, nucleum: &NucleumAnnotation, span: Span) -> HirAnnotation {
+        let family = self.intern_field_name("nucleum");
+        if nucleum.fragment {
+            return HirAnnotation::with_fields(
+                family,
+                vec![HirAnnotationField {
+                    name: self.intern_field_name("fragment"),
+                    value: HirAnnotationValue::Bool(true),
+                    span,
+                }],
+                span,
+            );
+        }
+        HirAnnotation::with_fields(family, Vec::new(), span)
     }
 
     fn lower_cli_annotation(&mut self, cli: &CliAnnotation, span: Span) -> HirAnnotation {
@@ -672,6 +689,27 @@ impl Lowerer<'_> {
         annotations
             .iter()
             .any(|annotation| interner.resolve(annotation.family) == family)
+    }
+
+    /// Entry vs fragment bits for the nucleus surface. Both true is a conflict
+    /// left visible so `device_role_for_hir_function` can fail closed.
+    pub(super) fn nucleum_role_bits(annotations: &[HirAnnotation], interner: &crate::lexer::Interner) -> (bool, bool) {
+        let mut entry = false;
+        let mut fragment = false;
+        for annotation in annotations {
+            if interner.resolve(annotation.family) != "nucleum" {
+                continue;
+            }
+            let is_fragment = annotation.fields.iter().any(|field| {
+                interner.resolve(field.name) == "fragment" && matches!(field.value, HirAnnotationValue::Bool(true))
+            });
+            if is_fragment {
+                fragment = true;
+            } else {
+                entry = true;
+            }
+        }
+        (entry, fragment)
     }
 
     fn intern_field_name(&mut self, name: &str) -> Symbol {

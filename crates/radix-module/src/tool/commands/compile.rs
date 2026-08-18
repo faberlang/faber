@@ -1562,6 +1562,7 @@ fn annotations_include_callable_family(
     annotations.iter().any(|annotation| match &annotation.kind {
         AnnotationKind::Futura => family == "futura",
         AnnotationKind::Cursor => family == "cursor",
+        AnnotationKind::Nucleum(_) => family == "nucleum",
         AnnotationKind::Statement(stmt) => interner.resolve(stmt.name.name) == family,
         AnnotationKind::Braced(braced) => interner.resolve(braced.name.name) == family,
         _ => false,

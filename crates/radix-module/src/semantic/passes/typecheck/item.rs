@@ -67,7 +67,7 @@ impl TypeChecker<'_> {
         let prev_allow_inferred = self.allow_inferred_return;
         self.current_return = func.ret_ty;
         self.current_error = func.err_ty.map(ErrorSink::Function);
-        self.current_device_function = func.is_kernel || func.is_device;
+        self.current_device_function = func.is_kernel || func.nucleum_fragment;
         self.current_shader_function = func.is_vertex || func.is_fragment;
         self.current_generator_function = func.is_generator;
         self.current_await_context = func.is_async;

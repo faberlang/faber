@@ -167,7 +167,7 @@ targets = ["rust"]
 functio aperta() → vacuum {
 }
 @ interna
-functio machina() → vacuum {
+functio clausa() → vacuum {
 }
 "#,
     )
@@ -185,7 +185,7 @@ functio machina() → vacuum {
         .expect("probe export surface");
     use crate::semantic::passes::visibility_annotation::VisibilityTier;
     assert_eq!(surface.get("aperta"), Some(&VisibilityTier::Publica));
-    assert_eq!(surface.get("machina"), Some(&VisibilityTier::Interna));
+    assert_eq!(surface.get("clausa"), Some(&VisibilityTier::Interna));
     assert_eq!(surface.len(), 2, "untyped name set would flatten interna away");
 }
 
@@ -215,7 +215,7 @@ targets = ["rust"]
         provider.join("src/probe.fab"),
         r#"
 @ interna
-functio machina() → vacuum {
+functio clausa() → vacuum {
 }
 "#,
     )
@@ -227,7 +227,7 @@ functio machina() → vacuum {
         r#"
 importa ex "probe:probe" probe
 incipit {
-  probe.machina()
+  probe.clausa()
 }
 "#,
     )
@@ -333,7 +333,7 @@ targets = ["rust"]
         provider.join("src/probe.fab"),
         r#"
 @ interna
-genus Machina {
+genus Instrumentum {
     textus nomen = ""
 }
 "#,
@@ -346,7 +346,7 @@ genus Machina {
         r#"
 importa ex "probe:probe" probe
 incipit {
-  fixum probe.Machina m ← probe.Machina { nomen = "x" }
+  fixum probe.Instrumentum m ← probe.Instrumentum { nomen = "x" }
   nota m.nomen
 }
 "#,
@@ -1631,11 +1631,9 @@ incipit {
     )
     .expect("app");
     let source = fs::read_to_string(&app).expect("read app");
-    // crates/radix → radix repo → faberlang container (norma/ sibling of radix/).
-    let home = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../..")
-        .canonicalize()
-        .expect("faberlang root");
+    // Packet worktrees sit below faberlang/worktrees/<lane>/; a fixed
+    // crates/radix-module/../../.. walk stops at the packet (no norma/).
+    let home = crate::paths::faberlang_home().expect("faberlang container root");
     assert!(
         home.join("norma/src/json.fab").is_file(),
         "expected norma json under {}",

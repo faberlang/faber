@@ -1026,7 +1026,7 @@ fn inferred_callee_nested_argument_emits_one_argument_mismatch_diagnostic() {
                 is_async: false,
                 is_generator: false,
                 is_kernel: false,
-                is_device: false,
+                nucleum_fragment: false,
                 is_vertex: false,
                 is_fragment: false,
                 annotations: Vec::new(),
@@ -1312,7 +1312,7 @@ fn gpu_builtin_call_typechecks_inside_device_function() {
         &session,
         "<test>",
         r"
-@ machina
+@ nucleum fragment
 functio helper() → u32 {
     redde workgroup_size_y()
 }

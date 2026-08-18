@@ -283,6 +283,19 @@ pub enum HirAnnotationValue {
     Nihil,
 }
 
+/// Nucleus surface role. Replaces the former `is_kernel` boolean for `@ nucleum`.
+///
+/// `Entry` is the only dispatch/reflection/`DeviceProgram` role. `Fragment` is
+/// device code composed into an entry — never a standalone dispatch stage.
+/// Graphics `@ fragment` remains [`HirFunction::is_fragment`] and is not this type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum NucleumRole {
+    /// `@ nucleum` — device-entry ABI, dispatch metadata, reflection identity.
+    Entry,
+    /// `@ nucleum fragment` — composition helper, never a dispatch entry.
+    Fragment,
+}
+
 /// Function signature and optional lowered body.
 ///
 /// Function HIR is shared by top-level functions and methods. A missing body
@@ -317,11 +330,12 @@ pub struct HirFunction {
     /// Generator callable (`fiunt`/`fient` / `cursor`).
     pub is_generator: bool,
 
-    /// CUDA kernel entry (`nucleum`).
+    /// CUDA kernel entry (`@ nucleum`). The Entry half of [`NucleumRole`].
     pub is_kernel: bool,
 
-    /// CUDA device helper (`machina`).
-    pub is_device: bool,
+    /// `@ nucleum fragment` composition helper. Mutually exclusive with
+    /// [`Self::is_kernel`] and with graphics stage flags.
+    pub nucleum_fragment: bool,
 
     /// Graphics vertex shader entry (`@ vertex`).
     pub is_vertex: bool,
@@ -332,6 +346,18 @@ pub struct HirFunction {
     /// Structured metadata for lowered Faber test cases.
     pub test: Option<HirTestMetadata>,
     pub annotations: Vec<HirAnnotation>,
+}
+
+impl HirFunction {
+    /// Exclusive nucleus role, or `None` when unset or when both bits are set.
+    #[must_use]
+    pub fn nucleum_role(&self) -> Option<NucleumRole> {
+        match (self.is_kernel, self.nucleum_fragment) {
+            (true, false) => Some(NucleumRole::Entry),
+            (false, true) => Some(NucleumRole::Fragment),
+            _ => None,
+        }
+    }
 }
 
 /// Lowered test metadata attached to the generated test function item.
