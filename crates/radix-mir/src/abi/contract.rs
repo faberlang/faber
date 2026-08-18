@@ -510,10 +510,10 @@ fn packed_rank2_matmul_operands(
             "quantized matmul requires a trailing GGML type-id const",
         ));
     };
-    let left_dims = crate::tensor_type::tensor_literal_dims(left_ty, validation)
-        .map_err(MirAbiError::new)?;
-    let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)
-        .map_err(MirAbiError::new)?;
+    let left_dims =
+        crate::tensor_type::tensor_literal_dims(left_ty, validation).map_err(MirAbiError::new)?;
+    let right_dims =
+        crate::tensor_type::tensor_literal_dims(right_ty, validation).map_err(MirAbiError::new)?;
     if left_dims.len() != 2 || right_dims.len() != 2 {
         return Err(MirAbiError::new(
             "quantized matmul dispatch contract requires rank-2 tensor operands",
@@ -530,7 +530,11 @@ fn packed_rank2_matmul_operands(
         ));
     }
     let layout = packed_layout_from_operand(layout_operand)?;
-    Ok(([left_dims[0], left_dims[1]], [right_dims[0], right_dims[1]], layout))
+    Ok((
+        [left_dims[0], left_dims[1]],
+        [right_dims[0], right_dims[1]],
+        layout,
+    ))
 }
 
 fn grouped_matmul_contract(
@@ -559,10 +563,10 @@ fn grouped_matmul_contract(
             "grouped matmul requires a trailing GGML type-id const",
         ));
     };
-    let left_dims = crate::tensor_type::tensor_literal_dims(left_ty, validation)
-        .map_err(MirAbiError::new)?;
-    let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)
-        .map_err(MirAbiError::new)?;
+    let left_dims =
+        crate::tensor_type::tensor_literal_dims(left_ty, validation).map_err(MirAbiError::new)?;
+    let right_dims =
+        crate::tensor_type::tensor_literal_dims(right_ty, validation).map_err(MirAbiError::new)?;
     if right_dims.len() != 3 {
         return Err(MirAbiError::new(
             "grouped matmul dispatch contract requires a rank-3 right operand",
@@ -620,10 +624,10 @@ fn ssm_conv1d_contract(
             "ssm conv1d requires a trailing GGML type-id const",
         ));
     };
-    let input_dims = crate::tensor_type::tensor_literal_dims(input_ty, validation)
-        .map_err(MirAbiError::new)?;
-    let kernel_dims = crate::tensor_type::tensor_literal_dims(kernel_ty, validation)
-        .map_err(MirAbiError::new)?;
+    let input_dims =
+        crate::tensor_type::tensor_literal_dims(input_ty, validation).map_err(MirAbiError::new)?;
+    let kernel_dims =
+        crate::tensor_type::tensor_literal_dims(kernel_ty, validation).map_err(MirAbiError::new)?;
     if input_dims.len() != 2 {
         return Err(MirAbiError::new(
             "ssm conv1d dispatch contract requires a rank-2 input",
@@ -663,8 +667,8 @@ fn ssm_scan_contract(
             "ssm scan requires a trailing GGML type-id const",
         ));
     };
-    let input_dims = crate::tensor_type::tensor_literal_dims(input_ty, validation)
-        .map_err(MirAbiError::new)?;
+    let input_dims =
+        crate::tensor_type::tensor_literal_dims(input_ty, validation).map_err(MirAbiError::new)?;
     if input_dims.len() != 2 {
         return Err(MirAbiError::new(
             "ssm scan dispatch contract requires a rank-2 input",

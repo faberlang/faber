@@ -973,11 +973,9 @@ pub fn contract_shape_signature(
             let left_ty = recipe_operand_ty(function, MirCollectionOp::TensorQuantizedMatMul)?;
             let element_ty = tensor_element_ty(left_ty, validation)?;
             signature.input = storage_input(0, element_ty, m.saturating_mul(k));
-            signature.extra_inputs.push(storage_input(
-                1,
-                element_ty,
-                k.saturating_mul(n),
-            ));
+            signature
+                .extra_inputs
+                .push(storage_input(1, element_ty, k.saturating_mul(n)));
             signature.output = storage_output(2, element_ty, m.saturating_mul(n));
             signature.output.source_local =
                 recipe_destination_local_for(function, MirCollectionOp::TensorQuantizedMatMul);

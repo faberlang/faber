@@ -1588,11 +1588,7 @@ fn grouped_and_ssm_plans_resolve_typed_variants() {
         y: 1,
         z: 1,
     };
-    ssm_signature.dispatch_size = MirKernelDispatchSize {
-        x: 32,
-        y: 1,
-        z: 1,
-    };
+    ssm_signature.dispatch_size = MirKernelDispatchSize { x: 32, y: 1, z: 1 };
     let conv = CollectionKernelPlan::from_contract(
         &ssm_signature,
         &CollectionOpContract::SsmConv1d {
