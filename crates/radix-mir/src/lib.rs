@@ -45,6 +45,8 @@ pub mod visit;
 
 mod figura;
 #[cfg(test)]
+mod packed_dense_projection_probe;
+#[cfg(test)]
 mod packed_gather_probe;
 #[cfg(test)]
 mod packed_kernel_probe;

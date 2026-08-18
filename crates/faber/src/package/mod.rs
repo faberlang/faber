@@ -51,6 +51,7 @@ mod llvm_host;
 mod locale;
 mod manifest;
 pub(crate) mod mir;
+mod packed_projection;
 mod product;
 mod runtime_dependency;
 mod runtime_sources;
@@ -266,7 +267,9 @@ pub(crate) fn library_cache_default() -> LibraryInterfaceCache {
     LibraryInterfaceCache::default().with_locale_loader(load_locale_pack_for_input)
 }
 
-pub(crate) fn library_resolver_from_config(config: &radix_module::driver::Config) -> LibraryResolver {
+pub(crate) fn library_resolver_from_config(
+    config: &radix_module::driver::Config,
+) -> LibraryResolver {
     // The library home (provider repos such as `norma/` and `triga/`) is
     // independent of the reader-pack stdlib path (`stdlib/locale/<id>/pack.toml`).
     // Precedence: an explicit custom stdlib roots the library home; otherwise
