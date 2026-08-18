@@ -1193,7 +1193,7 @@ fn runner_rejects_singular_matrix_inverse() {
         r#"
 incipit {
     fixum matrix<f32, [2, 2]> singular ← [[1.0, 2.0], [2.0, 4.0]] ↦ matrix<f32, [2, 2]>
-    adfirma singular.inversa() est nihil secus "singular inverse rejects"
+    adfirma singular.inversa() est nihil mori "singular inverse rejects"
 }
 "#,
         &mut host,
@@ -2130,7 +2130,7 @@ fn runner_adfirma_uses_custom_message() {
         run_fixture_source(
             r#"
 incipit {
-    adfirma falsum secus "custom failure"
+    adfirma falsum mori "custom failure"
 }
 "#,
             &mut host,

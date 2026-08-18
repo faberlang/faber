@@ -1946,7 +1946,7 @@ functio lonely_vertex() → vacuum {
 #[test]
 fn wgsl_text_source_vertex_entry_rejects_layout_without_position() {
     let source = include_str!("fixtures/shader-contract-source-facts.fab").replace(
-        r#"    adfirma vertex_layout_matches(0, 0, "position", 0, 3, 0, 12, 1, 1) secus "position layout fixes location 0, Float32x3, zero offset, 12-byte stride, and vertex step mode"
+        r#"    adfirma vertex_layout_matches(0, 0, "position", 0, 3, 0, 12, 1, 1) mori "position layout fixes location 0, Float32x3, zero offset, 12-byte stride, and vertex step mode"
 "#,
         "",
     );

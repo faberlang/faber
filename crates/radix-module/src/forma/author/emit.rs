@@ -128,7 +128,7 @@ impl AuthorEmitter {
                 Self::write_expr(&adfirma.cond, surface, interner, w);
                 if let Some(message) = &adfirma.message {
                     w.write(" ");
-                    w.write(surface.contextual_keyword("secus"));
+                    w.write(surface.contextual_keyword("mori"));
                     w.write(" ");
                     Self::write_expr(message, surface, interner, w);
                 }
@@ -139,7 +139,7 @@ impl AuthorEmitter {
                 w.write(" ");
                 Self::write_expr(&require.cond, surface, interner, w);
                 w.write(" ");
-                w.write(surface.contextual_keyword("secus"));
+                w.write(surface.contextual_keyword("iace"));
                 w.write(" ");
                 Self::write_expr(&require.error, surface, interner, w);
                 w.newline();

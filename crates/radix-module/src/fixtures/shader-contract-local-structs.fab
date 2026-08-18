@@ -55,13 +55,13 @@ genus FragmentOutput {
 
 # Contract-role function body (annotation added by U2's recognition).
 functio declare_vertex_layout(BufferLayout layout) → bivalens {
-    adfirma layout.name ≡ "position" secus "vertex layout fixes the position attribute"
+    adfirma layout.name ≡ "position" mori "vertex layout fixes the position attribute"
     redde verum
 }
 
 # Contract-role function body (annotation added by U2's recognition).
 functio declare_fragment_output(FragmentOutput output) → bivalens {
-    adfirma output.location ≡ 0 secus "fragment output fixes location 0"
+    adfirma output.location ≡ 0 mori "fragment output fixes location 0"
     redde verum
 }
 
@@ -77,6 +77,6 @@ incipit {
     fixum _ position ← BufferAttribute { semantic = "position", location = 0, format = 3, offset_bytes = 0, stride_bytes = 12, step_mode = 1 }
     fixum _ layout ← BufferLayout { name = "position", array_stride = 12, attributes = [position] }
     fixum _ color_output ← FragmentOutput { semantic = "color", location = 0, format = 4 }
-    adfirma declare_vertex_layout(layout) secus "vertex layout contract declares position facts"
-    adfirma declare_fragment_output(color_output) secus "fragment output contract declares location-0 facts"
+    adfirma declare_vertex_layout(layout) mori "vertex layout contract declares position facts"
+    adfirma declare_fragment_output(color_output) mori "fragment output contract declares location-0 facts"
 }

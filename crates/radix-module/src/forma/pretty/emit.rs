@@ -217,7 +217,7 @@ impl PrettyEmitter<'_> {
                 self.w.write("adfirma ");
                 self.write_expr(&adfirma.cond);
                 if let Some(message) = &adfirma.message {
-                    self.w.write(" secus ");
+                    self.w.write(" mori ");
                     self.write_expr(message);
                 }
                 self.w.newline();
@@ -225,7 +225,7 @@ impl PrettyEmitter<'_> {
             StmtKind::Require(require) => {
                 self.w.write("requirit ");
                 self.write_expr(&require.cond);
-                self.w.write(" secus ");
+                self.w.write(" iace ");
                 self.write_expr(&require.error);
                 self.w.newline();
             }

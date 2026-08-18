@@ -111,10 +111,10 @@ fn test_metadata(item: &crate::hir::HirItem) -> &HirTestMetadata {
 
 #[test]
 fn lowers_requirit_to_guarded_throw() {
-    // `requirit cond secus err` desugars to `si non (cond) { iace err }`:
+    // `requirit cond iace err` desugars to `si non (cond) { iace err }`:
     // a Si expression whose condition is the negated condition and whose
     // then-block throws the error payload.
-    let source = "functio f() → numerus ⇥ textus {\n  requirit verum secus \"bad\"\n  redde 1\n}";
+    let source = "functio f() → numerus ⇥ textus {\n  requirit verum iace \"bad\"\n  redde 1\n}";
     let (lowered, _, _) = lower_source(source);
     let HirItemKind::Function(func) = &lowered.hir.items[0].kind else {
         panic!("expected function item");
@@ -144,11 +144,11 @@ fn lowers_requirit_to_guarded_throw() {
 
 #[test]
 fn lowers_en_require_surface_to_guarded_throw() {
-    // The en surface `require cond else err` resolves to the same requirit
+    // The en surface `require cond throw err` resolves to the same requirit
     // identity and desugars identically.
     let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
-    let source = "fn f() → int ⇥ string {\n  require true else \"bad\"\n  return 1\n}";
+    let source = "fn f() → int ⇥ string {\n  require true throw \"bad\"\n  return 1\n}";
     let (lowered, _, _) = lower_source_with_locale_pack(source, &pack);
     let HirItemKind::Function(func) = &lowered.hir.items[0].kind else {
         panic!("expected function item");

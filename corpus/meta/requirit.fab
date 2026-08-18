@@ -4,7 +4,7 @@ kind = "keyword"
 category = "errors"
 canonical = true
 summary = "Require a condition or throw a recoverable error."
-syntax = "requirit <expression> secus <expression>"
+syntax = "requirit <expression> iace <expression>"
 aliases = ["require"]
 related = ["adfirma", "iace", "cape", "⇥"]
 locale = "en"
@@ -16,7 +16,7 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Recoverable guard — `require <condition> else <error>` throws into the
+#   • Recoverable guard — `require <condition> throw <error>` throws into the
 #     function's ⇥ channel when the condition is false (en surface of `requirit`)
 #   • Twin of `adfirma` — `assert` is fatal; `require` is catchable by `catch`
 #   • Typed payload — the false-path expression is a `variant` with `causa`,
@@ -31,10 +31,10 @@ locale = "en"
 
 # requirit — recoverable require statement
 #
-# require <condition> else <error>
+# require <condition> throw <error>
 #
 # GRAMMAR:
-#   requiritStmt :← 'requirit' expr 'secus' expr
+#   requiritStmt :← 'requirit' expr 'iace' expr
 #
 # EXPECTED OUTPUT:
 #   empty — success-path main only (requirit.expected)
@@ -44,7 +44,7 @@ union GuardError {
 }
 
 fn guarded(int value) → int ⇥ GuardError {
-    require value > 0 else variant Invalid { causa = "value must be positive" }
+    require value > 0 throw variant Invalid { causa = "value must be positive" }
     return value
 }
 
@@ -54,14 +54,14 @@ main {
         assert ok ≡ 1
     }
     catch err {
-        assert false else "success path must not throw"
+        assert false panic "success path must not throw"
     }
 }
 
 test "false path is recoverable" {
     do {
         const int dropped ← guarded(0)
-        assert false else "false path must throw"
+        assert false panic "false path must throw"
     }
     catch err {
         # recovered — require entered ⇥ and catch intercepted it

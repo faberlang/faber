@@ -53,40 +53,40 @@ main {
     const instant parsed ← utc ↦ instant
     const instant normalized ← offset ↦ instant
 
-    assert parsed ≡ normalized else "offset ingest normalizes to UTC instant"
+    assert parsed ≡ normalized panic "offset ingest normalizes to UTC instant"
 
     # --- TOML datetime provenance (Valor::Instans carrier, not textus) ---
     const valor doc ← toml.parse("creatus = 1979-05-27T07:32:00.123456Z")
     const valor carrier ← valor.get(doc, "creatus")
     const instant<us> fromToml ← carrier ↦ instant<us>
-    assert fromToml ↦ string ≡ "1979-05-27T07:32:00.123456Z" else "emit honors micros contract"
+    assert fromToml ↦ string ≡ "1979-05-27T07:32:00.123456Z" panic "emit honors micros contract"
 
     # --- precision-tagged equality: distinct at ns, equal at ms ---
     const valor leftWire ← "1979-05-27T07:32:00.123456Z"
     const valor rightWire ← "1979-05-27T07:32:00.123999Z"
     const instant<ns> left ← leftWire ↦ instant<ns>
     const instant<ns> right ← rightWire ↦ instant<ns>
-    assert left ≠ right else "sub-millisecond bits differ at nanosecond precision"
+    assert left ≠ right panic "sub-millisecond bits differ at nanosecond precision"
     const instant<ms> leftMs ← left ↦ instant<ms>
     const instant<ms> rightMs ← right ↦ instant<ms>
-    assert leftMs ≡ rightMs else "same millisecond at declared ms precision"
+    assert leftMs ≡ rightMs panic "same millisecond at declared ms precision"
 
     # --- cross-precision conversio: widen and narrow with observable truncation ---
     const instant<ns> fine ← parsed ↦ instant<ns>
     const instant<ms> coarse ← fine ↦ instant<ms>
     const instant seconds ← fine ↦ instant
-    assert seconds ↦ string ≡ "1979-05-27T07:32:00Z" else "narrow to seconds strips sub-second wire"
+    assert seconds ↦ string ≡ "1979-05-27T07:32:00Z" panic "narrow to seconds strips sub-second wire"
 
     const instant<ms> wider ← secunda ↦ instant<ms>
-    assert wider ≤ millis else "cross-precision comparison at coarser operand"
+    assert wider ≤ millis panic "cross-precision comparison at coarser operand"
 
     # --- wire emit and parse-back via TOML (same instant) ---
     const string wire ← epoch_wire(parsed)
     const valor replayDoc ← toml.parse("creatus = 1979-05-27T07:32:00Z")
     const valor replayCarrier ← valor.get(replayDoc, "creatus")
     const instant roundtrip ← replayCarrier ↦ instant
-    assert roundtrip ≡ parsed else "TOML ingest roundtrip matches UTC valor extract"
-    assert wire ≡ "1979-05-27T07:32:00Z" else "seconds-precision wire emit"
+    assert roundtrip ≡ parsed panic "TOML ingest roundtrip matches UTC valor extract"
+    assert wire ≡ "1979-05-27T07:32:00Z" panic "seconds-precision wire emit"
 
     print wire, secunda, millis, micros, nanos, fromToml, coarse
 }

@@ -4,7 +4,7 @@ kind = "keyword"
 category = "testing"
 canonical = false
 summary = "Asserts conditions inside function bodies."
-syntax = "adfirma <expression> [, <message>]"
+syntax = "adfirma <expression> [mori <expression>]"
 related = ["adfirma", "functio"]
 locale = "en"
 +++
@@ -32,24 +32,24 @@ locale = "en"
 # adfirma — assertions in functions
 #
 # adfirma <condition>
-# adfirma <condition>, "nuntius"
+# adfirma <condition> mori "nuntius"
 #
 # GRAMMAR:
-#   adfirmaStmt :← 'adfirma' expr (',' stringLit)?
+#   adfirmaStmt :← 'adfirma' expr ('mori' expr)?
 #
 # EXPECTED OUTPUT:
 #   none — preconditions and postconditions only; no nota output
 
 # Validate input at function start
 fn divide(int a, int b) → int {
-    assert b ≠ 0 else "divisor non sit nihil"
+    assert b ≠ 0 panic "divisor non sit nihil"
     return a / b
 }
 
 # Multiple assertions
 fn aetas(int natus, int nunc) → int {
-    assert natus > 0 else "annus natus positivus sit"
-    assert nunc ≥ natus else "annus nunc post natum sit"
+    assert natus > 0 panic "annus natus positivus sit"
+    assert nunc ≥ natus panic "annus nunc post natum sit"
     return nunc - natus
 }
 
@@ -59,7 +59,7 @@ fn absolutum(int n) → int {
     if n < 0 {
         value ← -n
     }
-    assert value ≥ 0 else "valor non negativus sit"
+    assert value ≥ 0 panic "valor non negativus sit"
     return value
 }
 

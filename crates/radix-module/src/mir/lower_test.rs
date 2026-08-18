@@ -2155,7 +2155,7 @@ fn lowers_adfirma_to_assert_runtime_intrinsics() {
         r#"
 functio check(textus name, numerus count) → vacuum {
     adfirma count > 0
-    adfirma name ≠ "" secus "name must not be empty"
+    adfirma name ≠ "" mori "name must not be empty"
 }
 "#,
     );

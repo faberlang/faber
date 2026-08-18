@@ -48,7 +48,7 @@ main {
 
     assert millis ↦ string ≡ "1979-05-27T07:32:00.000Z"
     assert micros ↦ string ≡ "1979-05-27T07:32:00.123456Z"
-    assert normalized ≡ seconds else "offset ingest lands on same UTC instant"
+    assert normalized ≡ seconds panic "offset ingest lands on same UTC instant"
 
     const instant<ns> fine ← nanos
     const instant narrowed ← fine ↦ instant
