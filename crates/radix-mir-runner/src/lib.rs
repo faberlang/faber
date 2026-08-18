@@ -1528,3 +1528,7 @@ pub(crate) fn runtime_regex_pattern(pattern: &str) -> String {
 #[cfg(test)]
 #[path = "lib_test.rs"]
 mod lib_test;
+
+#[cfg(test)]
+#[path = "octeti_index_test.rs"]
+mod octeti_index_test;

@@ -2857,6 +2857,21 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 Ok(Value::Str(ch.to_string()))
             }
             Value::Octeti(bytes) => {
+                if let Ok((start, end, inclusive)) = interval_parts(&index, span) {
+                    let start = start.as_index(span)?;
+                    let end = end.as_index(span)?;
+                    let end = if inclusive {
+                        end.checked_add(1).ok_or_else(|| {
+                            RunnerError::internal(span, "octeti index out of bounds")
+                        })?
+                    } else {
+                        end
+                    };
+                    if start > end || end > bytes.len() {
+                        return Err(RunnerError::internal(span, "octeti index out of bounds"));
+                    }
+                    return Ok(Value::Octeti(bytes[start..end].to_vec()));
+                }
                 let idx = index.as_index(span)?;
                 bytes
                     .get(idx)
