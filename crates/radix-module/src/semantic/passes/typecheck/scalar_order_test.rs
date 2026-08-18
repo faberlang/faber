@@ -182,6 +182,30 @@ incipit {
     );
 }
 
+#[test]
+fn interval_helper_rejects_multi_char_bounded_ascii_bound() {
+    rejects_with_issue(
+        &compile(
+            r#"
+functio retenta(textus s, textus infimum sponte, textus supremum sponte) → textus {
+    redde s
+}
+
+functio go(ascii<8> bound) {
+    nota retenta("hello", bound, 'z')
+}
+"#,
+        ),
+        "argument_type_mismatch",
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn char_literal_assigns_to_textus_slot() {
+    accepts(&compile("incipit { fixum textus t ← 'a' }"));
+}
+
 #[cfg(feature = "hir-rust")]
 #[test]
 fn en_predicate_helper_closure_scalar_order_typechecks() {

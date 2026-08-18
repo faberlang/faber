@@ -1010,8 +1010,14 @@ impl TypeTable {
                 instans_assignable(self, from, to)
             }
 
-            // ASCII machine text widens to Unicode `textus`.
-            (Type::Primitive(Primitive::Ascii), Type::Primitive(Primitive::Textus)) => true,
+            // ASCII machine text widens to Unicode `textus`. After D17, `'x'`
+            // is `ascii<1>` (`BoundedAscii { 1 }`) and uses the same payload
+            // widening. Multi-char `ascii<N>` stays out until BB-4.
+            (from_ty, Type::Primitive(Primitive::Textus))
+                if self.ascii_payload_widens_to_textus_ty(from_ty) =>
+            {
+                true
+            }
 
             // WHY: `octeti` is semantic sugar for `lista<numerus<u8>>`. The two
             // are representation-identical (`Vec<u8>` in Rust) once sized numerics
@@ -1121,6 +1127,25 @@ impl TypeTable {
                 Type::BoundedOcteti { capacity: to_cap },
             ) => self.index_equals(*from_cap, *to_cap),
 
+            _ => false,
+        }
+    }
+
+    /// Bare `ascii` and D17 `'x'` (`ascii<1>`) widen to `textus`.
+    ///
+    /// Multi-char `ascii<N>` does not; BB-4 names bounded→unbounded conversion.
+    #[must_use]
+    pub fn ascii_payload_widens_to_textus(&self, from: TypeId) -> bool {
+        self.ascii_payload_widens_to_textus_ty(self.get(from))
+    }
+
+    fn ascii_payload_widens_to_textus_ty(&self, from_ty: &Type) -> bool {
+        match from_ty {
+            Type::Alias(_, inner) => self.ascii_payload_widens_to_textus(*inner),
+            Type::Primitive(Primitive::Ascii) => true,
+            Type::BoundedAscii { capacity } => {
+                matches!(self.get_index(*capacity), IndexExpr::Literal(1))
+            }
             _ => false,
         }
     }
