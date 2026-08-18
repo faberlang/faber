@@ -8,8 +8,9 @@
 //! PASS ORDER
 //! ==========
 //! The canonical pass registry and execution order live in [`passes`]. In
-//! outline: collect → resolve → HIR lowering → typecheck → borrow →
-//! definite-assignment → exhaustiveness → return-path → lint.
+//! outline: collect → resolve → HIR lowering → typecheck → air-unroll →
+//! air-purity → borrow → definite-assignment → exhaustiveness → return-path →
+//! lint.
 //!
 //! ERROR HANDLING
 //! ==============
@@ -445,6 +446,15 @@ pub fn analyze_with_cli(
         Some(&companion_signatures),
     ) {
         diagnostics.extend(e);
+    }
+
+    // Named unroll: concrete-N `itera ab` → straight line, before air_purity.
+    // Skip when typecheck already failed — types on the rewritten nodes would
+    // be unreliable.
+    if !diagnostics.iter().any(SemanticError::is_error) {
+        if let Err(e) = passes::air_unroll::unroll(&mut hir, &radix_lanes, interner, &types) {
+            diagnostics.extend(e);
+        }
     }
 
     if let Err(e) = passes::air_purity::check(&hir, &radix_lanes, interner, &types) {

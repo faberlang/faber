@@ -17,16 +17,19 @@
 //! 3. HIR lowering happens outside this module, after collect/resolve errors
 //!    have been reported.
 //! 4. [`typecheck`] assigns and verifies expression/statement types on HIR.
-//! 5. [`borrow`] runs target-gated ownership checks where required, currently
+//! 5. [`air_unroll`] rewrites eligible AIR-lane concrete-`N` `itera ab` range
+//!    loops into straight-line bindings before purity admission.
+//! 6. [`air_purity`] is the fail-closed AIR-lane subset gate.
+//! 7. [`borrow`] runs target-gated ownership checks where required, currently
 //!    for Rust output.
-//! 6. [`definite_assignment`] rejects reads of uninitialized non-`sponte`
+//! 8. [`definite_assignment`] rejects reads of uninitialized non-`sponte`
 //!    bindings with conservative branch precision.
-//! 7. [`exhaustive`] reports pattern coverage issues.
-//! 8. [`return_path`] rejects value-returning functions whose bodies can fall
+//! 9. [`exhaustive`] reports pattern coverage issues.
+//! 10. [`return_path`] rejects value-returning functions whose bodies can fall
 //!    through without returning.
-//! 9. [`fragment_definition`] checks `@ nucleum fragment` bodies against the
+//! 11. [`fragment_definition`] checks `@ nucleum fragment` bodies against the
 //!    device-safe effect subset and records a per-definition effect summary.
-//! 10. [`lint`] reports quality diagnostics that may be warnings rather than
+//! 12. [`lint`] reports quality diagnostics that may be warnings rather than
 //!    hard semantic errors.
 //!
 //! ERROR POLICY
@@ -38,6 +41,7 @@
 //! severities rather than from pass execution alone.
 
 pub mod air_purity;
+pub mod air_unroll;
 pub mod borrow;
 pub mod collect;
 pub mod companion_predeclare;
