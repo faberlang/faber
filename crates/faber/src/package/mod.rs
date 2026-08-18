@@ -45,6 +45,7 @@ mod fhir;
 mod go_build;
 #[cfg(feature = "device-runtime")]
 mod host_factory;
+pub(crate) mod host_spawn;
 #[cfg_attr(not(feature = "hir-rust"), path = "library_link_unavailable.rs")]
 mod library_link;
 #[cfg(feature = "mir-llvm")]
