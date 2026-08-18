@@ -7,10 +7,10 @@
 
 use crate::abi::PackedStorageLayout;
 use crate::kernel_plan::{
-    admit_quantized_gather_from_ggml_type_id, admit_quantized_matmul,
+    CollectionKernelPlan, MATMUL_TILE, MatMulShapes, PackedAdmissionError, PackedDequantError,
+    QuantizedMatMulPlan, admit_quantized_gather_from_ggml_type_id, admit_quantized_matmul,
     admit_quantized_matmul_from_ggml_type_id, dequant_packed_block, dequant_q4_k_block,
-    dequant_q8_0_block, CollectionKernelPlan, MatMulShapes, PackedAdmissionError,
-    PackedDequantError, QuantizedMatMulPlan, MATMUL_TILE,
+    dequant_q8_0_block,
 };
 
 fn shapes(m: u64, k: u64, n: u64) -> MatMulShapes {
@@ -19,7 +19,7 @@ fn shapes(m: u64, k: u64, n: u64) -> MatMulShapes {
 
 #[test]
 fn wrong_layout_ggml_id_fails_closed() {
-    for id in [2u32, 3, 7, 9, 15, 16, 99] {
+    for id in [2u32, 3, 7, 9, 15, 16, 40, 99] {
         let error = admit_quantized_matmul_from_ggml_type_id(id, shapes(8, 32, 32))
             .expect_err("unrepresentable layout must fail closed");
         assert_eq!(
@@ -147,6 +147,14 @@ fn wrong_layout_on_packed_block_fails_closed() {
         error,
         PackedDequantError::UnsupportedLayout {
             layout: PackedStorageLayout::F32
+        }
+    );
+    let error = dequant_packed_block(PackedStorageLayout::MXFP4, &q8)
+        .expect_err("no silent MXFP4 reinterpret");
+    assert_eq!(
+        error,
+        PackedDequantError::UnsupportedLayout {
+            layout: PackedStorageLayout::MXFP4
         }
     );
 }

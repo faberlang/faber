@@ -12,9 +12,9 @@
 
 use super::build::matmul_barrier_schedule;
 use super::plan::{
-    CollectionKernelPlan, GatherPlan, MatMulPlan, MatMulShapes, MatMulSharedMemory,
-    OobPaddingPolicy, QuantizedMatMulPlan, SharedMemoryLayout, F32_ELEMENT_BYTE_WIDTH,
-    MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE,
+    CollectionKernelPlan, F32_ELEMENT_BYTE_WIDTH, GatherPlan, MATMUL_SHARED_A_BUFFER_NAME,
+    MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE, MatMulPlan, MatMulShapes, MatMulSharedMemory,
+    OobPaddingPolicy, QuantizedMatMulPlan, SharedMemoryLayout,
 };
 use crate::abi::PackedStorageLayout;
 use crate::{
@@ -23,7 +23,8 @@ use crate::{
 use std::fmt;
 
 /// In-kernel dequant class pinned to the §5 layout table (block vs
-/// superblock vs native convert). Never inferred from a filename.
+/// superblock vs native convert vs E8M0 scaled group). Never inferred
+/// from a filename.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PackedDequantClass {
     /// Plain f32 passthrough — existing `TiledMatMul` / `Gather`.
@@ -36,6 +37,13 @@ pub enum PackedDequantClass {
     Block,
     /// Superblock dequant (`Q4_K`, `Q5_K`, `Q6_K`): 256 elements.
     Superblock,
+    /// MXFP4 scaled group: one E8M0 scale over 32 packed 4-bit values.
+    ///
+    /// Not a native per-element convert and not `Block` (that class is
+    /// f16 scale + packed ints). llama.cpp `dequantize_row_mxfp4`
+    /// (`ggml-quants.c:569-587`) multiplies `kvalues_mxfp4[nibble]` by
+    /// `GGML_E8M0_TO_FP32_HALF(e)`.
+    ScaledE8M0Group,
 }
 
 /// Typed dequant facts resolved from an admitted [`PackedStorageLayout`].
@@ -100,6 +108,7 @@ impl PackedDequantResolution {
             PackedStorageLayout::Q4_K | PackedStorageLayout::Q5_K | PackedStorageLayout::Q6_K => {
                 PackedDequantClass::Superblock
             }
+            PackedStorageLayout::MXFP4 => PackedDequantClass::ScaledE8M0Group,
         };
         Self {
             layout,
@@ -124,7 +133,7 @@ impl PackedDequantResolution {
 ///
 /// # Errors
 /// [`PackedAdmissionError::UnrepresentableLayout`] when `id` is outside
-/// {F32, F16, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0}.
+/// {F32, F16, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0, MXFP4}.
 pub fn packed_layout_from_ggml_type_id(
     id: u32,
 ) -> Result<PackedStorageLayout, PackedAdmissionError> {
@@ -333,12 +342,12 @@ impl fmt::Display for PackedAdmissionError {
             Self::UnrepresentableLayout { ggml_type_id } => write!(
                 f,
                 "packed kernel layout GGML type id {ggml_type_id} is unrepresentable \
-                 (admitted: F32, F16, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0)"
+                 (admitted: F32, F16, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0, MXFP4)"
             ),
             Self::NonConstLayout => write!(
                 f,
                 "packed kernel layout must be a const GGML type id \
-                 (F32, F16, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0)"
+                 (F32, F16, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0, MXFP4)"
             ),
         }
     }
