@@ -597,9 +597,7 @@ fn signature_matches_grouped_matmul(
         && signature.output.element_count == shapes.m.saturating_mul(shapes.n)
         && signature.extra_inputs.len() == 1
         && signature.extra_inputs[0].element_count
-            == groups
-                .saturating_mul(shapes.k)
-                .saturating_mul(shapes.n)
+            == groups.saturating_mul(shapes.k).saturating_mul(shapes.n)
 }
 
 fn signature_matches_ssm_extent(signature: &MirKernelSignature, extent: u64) -> bool {

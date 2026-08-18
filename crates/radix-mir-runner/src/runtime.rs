@@ -1319,9 +1319,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorGroupedMatMul => {
                 Err(RunnerError::unsupported(span, "grouped matmul"))
             }
-            MirCollectionOp::TensorSsmConv1d => {
-                Err(RunnerError::unsupported(span, "ssm conv1d"))
-            }
+            MirCollectionOp::TensorSsmConv1d => Err(RunnerError::unsupported(span, "ssm conv1d")),
             MirCollectionOp::TensorSsmScan => Err(RunnerError::unsupported(span, "ssm scan")),
             MirCollectionOp::TensorDiv => {
                 self.tensor_elementwise_or_scalar(args, span, "tensor div", numeric_div, return_ty)
