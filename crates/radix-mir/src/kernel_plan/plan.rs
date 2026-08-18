@@ -207,6 +207,11 @@ pub struct RopePlan {
     /// The row count (per-row mode; the table row stride — each row's
     /// `dim/2`-entry angle segment). Zero in single-position mode.
     pub rows: u64,
+    /// Qwen2 / GPT-NeoX `rotate_half` pairing (`TensorRopeHalf`). False is
+    /// the llama consecutive-pair default (`TensorRope`); the field is a
+    /// typed fact of which MIR op resolved the plan, never inferred from
+    /// text (A3).
+    pub rotate_half: bool,
 }
 
 /// Causal masked-row softmax recipe plan (GI3-1: name frozen in this unit,

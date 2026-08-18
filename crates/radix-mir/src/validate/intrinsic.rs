@@ -524,6 +524,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorFromFlat
             | MirCollectionOp::TensorSlice
             | MirCollectionOp::TensorRope
+            | MirCollectionOp::TensorRopeHalf
             | MirCollectionOp::TensorQuantizedMatMul
             | MirCollectionOp::TensorGroupedMatMul
             | MirCollectionOp::TensorSsmConv1d
@@ -1225,7 +1226,7 @@ impl Validator<'_, '_> {
             MirCollectionOp::TensorRmsNorm => {
                 self.validate_tensor_rms_norm(scope, first_arg_ty, call, span);
             }
-            MirCollectionOp::TensorRope => {
+            MirCollectionOp::TensorRope | MirCollectionOp::TensorRopeHalf => {
                 self.validate_tensor_rope(scope, first_arg_ty, call, span);
             }
             MirCollectionOp::TensorGather => {

@@ -245,6 +245,11 @@ pub enum MirCollectionOp {
     /// (`[x, pos, dim]`); elements beyond `dim` on the last axis are
     /// preserved. Odd/overlarge `dim` fail closed at the source surface.
     TensorRope,
+    /// Qwen2 / GPT-NeoX `rotate_half` rotary embedding: pairs
+    /// `(x[k], x[k + dim/2])` with the same `theta[k]` tables as
+    /// [`Self::TensorRope`]. Same `[x, pos, dim]` const layout; llama
+    /// pair-rotate callers stay on [`Self::TensorRope`].
+    TensorRopeHalf,
     /// Row gather over the first axis (the CCI-1 `gather` source contract):
     /// `table[V,D]` + `ids[T]` → `[T,D]` with `out[t] = table[ids[t]]`,
     /// repeated/out-of-order ids preserved. The ids vector is a plain
@@ -313,6 +318,16 @@ pub enum MirCollectionOp {
     /// Regex `consentit`: whether the `regex` receiver's pattern matches a
     /// `textus` argument (the Rust `regex` crate `is_match` semantics).
     RegexMatches,
+}
+
+impl MirCollectionOp {
+    /// llama pair-rotate (`TensorRope`) or Qwen/NeoX `rotate_half`
+    /// (`TensorRopeHalf`). Same `[x, pos, dim]` const layout; the variant
+    /// selects the pairing.
+    #[must_use]
+    pub const fn is_rope(self) -> bool {
+        matches!(self, Self::TensorRope | Self::TensorRopeHalf)
+    }
 }
 
 /// A classified reason a MIR-backed target cannot lower a shape.

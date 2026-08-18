@@ -2828,6 +2828,7 @@ fn rope_function_resolves_rope_plan() {
     );
     assert_eq!(plan.dim, 64, "rotated width comes from the const operand");
     assert_eq!(plan.width, 64, "row width is the last-axis extent");
+    assert!(!plan.rotate_half, "TensorRope stays llama consecutive-pair");
     derived.validate().expect("the derived plan validates");
     let carried = CollectionKernelPlan::Rope(crate::kernel_plan::RopePlan {
         pos: 0,
@@ -2835,8 +2836,35 @@ fn rope_function_resolves_rope_plan() {
         width: 64,
         per_row: false,
         rows: 0,
+        rotate_half: false,
     });
     assert!(carried_plan_agrees(&carried, Some(&derived)));
+}
+
+#[test]
+fn rope_half_function_resolves_rotate_half_plan() {
+    let mut types = TypeTable::new();
+    let function = rank2_const_op_function(
+        &mut types,
+        [2, 64],
+        MirCollectionOp::TensorRopeHalf,
+        vec![MirConstant::Int(0), MirConstant::Int(64)],
+    );
+    let signature = transformer_signature(2 * 64, 2 * 64);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("rope_half function facts resolve")
+        .expect("rope_half function carries a recipe plan");
+    let CollectionKernelPlan::Rope(plan) = &derived else {
+        panic!("rope_half body must derive a rope plan, got {derived:?}");
+    };
+    assert!(
+        plan.rotate_half,
+        "TensorRopeHalf must select rotate_half pairing"
+    );
+    assert_eq!(plan.dim, 64);
+    assert_eq!(plan.width, 64);
+    derived.validate().expect("the derived plan validates");
 }
 
 #[test]
@@ -2966,6 +2994,7 @@ fn inference_recipe_kinds_are_typed() {
             width: 64,
             per_row: false,
             rows: 0,
+            rotate_half: false,
         })),
         RecipeKind::Rope
     );

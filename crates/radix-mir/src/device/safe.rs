@@ -831,6 +831,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                                 | MirCollectionOp::TensorLayerNorm
                                 | MirCollectionOp::TensorRmsNorm
                                 | MirCollectionOp::TensorRope
+                                | MirCollectionOp::TensorRopeHalf
                                 | MirCollectionOp::TensorGather
                                 | MirCollectionOp::TensorCausalMaskedSoftmax,
                             ),
