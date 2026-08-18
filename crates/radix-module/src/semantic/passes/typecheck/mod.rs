@@ -218,10 +218,14 @@ struct TypeChecker<'a> {
     /// checked regardless of declaration order.
     functions: FxHashMap<DefId, FuncSig>,
 
-    /// Nucleus roles keyed by function/method `DefId` for the NF-2 staging gate.
+    /// Nucleus roles keyed by function/method `DefId`. Call legality now lives
+    /// on the MIR instantiation/composition seam; typecheck no longer rejects
+    /// fragment calls.
+    #[allow(dead_code)]
     nucleum_roles: FxHashMap<DefId, NucleumRole>,
 
     /// Method nucleum roles keyed by (struct-or-interface def, method name).
+    #[allow(dead_code)]
     method_nucleum_roles: FxHashMap<(DefId, Symbol), NucleumRole>,
 
     /// Constant declaration types available to path lookup.

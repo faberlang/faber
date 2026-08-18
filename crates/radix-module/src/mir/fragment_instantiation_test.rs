@@ -604,7 +604,7 @@ functio outer(fractus<f32> x) → fractus<f32> {
 }
 
 #[test]
-fn staging_gate_still_rejects_fragment_calls_at_analyze() {
+fn legal_entry_to_fragment_reaches_composition() {
     let source = r"
 @ nucleum fragment
 functio helper(fractus<f32> x) → fractus<f32> {
@@ -617,14 +617,11 @@ functio k(fractus<f32> x) → fractus<f32> {
 }
 ";
     let session = Session::new(Config::default());
-    let Err(errors) = driver::analyze_source(&session, "device.fab", source) else {
-        panic!("calls to Fragment definitions must be rejected until NF-6");
-    };
+    let mut analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis).expect("legal Entry→Fragment must compose");
+    let roles = crate::mir::device_roles_from_hir(&analysis.hir);
     assert!(
-        errors.iter().any(|err| err
-            .args
-            .iter()
-            .any(|arg| arg.name == "issue" && arg.value == ISSUE_CONTEXT)),
-        "expected NUCLEUM_FRAGMENT_CONTEXT, got {errors:?}"
+        crate::mir::fragment_composition::surviving_fragment_calls(&lowered.functions, &[], &roles).is_empty(),
+        "staging-gate rejection narrowed to composition success"
     );
 }

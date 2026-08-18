@@ -396,6 +396,19 @@ fn lower_analyzed_unit_with_options(
                 .map(|error| MirError { message: error.message(), issue: error.issue.to_owned(), span: error.span })
                 .collect());
         }
+        let composition_errors = super::fragment_composition::compose(
+            &mut program.functions,
+            &monomorphizations,
+            &roles,
+            super::fragment_composition::active_budget(),
+            Some(&unit.interner),
+        );
+        if !composition_errors.is_empty() {
+            return Err(composition_errors
+                .into_iter()
+                .map(|error| MirError { message: error.message(), issue: error.issue.to_owned(), span: error.span })
+                .collect());
+        }
         let mut validation = LoweringContextMaps::collect(unit).validation;
         validation.layouts = MirLayoutTable::from_types(&unit.types);
         validation.closure_environments = closure_environments

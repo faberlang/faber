@@ -816,6 +816,8 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
         "NUCLEUM_FRAGMENT_CONTEXT" => nucleum_fragment_context_message(args),
         "NUCLEUM_FRAGMENT_EFFECT" => nucleum_fragment_effect_message(args),
         "NUCLEUM_FRAGMENT_TYPE" => nucleum_fragment_type_message(args),
+        "NUCLEUM_FRAGMENT_CYCLE" => nucleum_fragment_cycle_message(args),
+        "NUCLEUM_FRAGMENT_EXPANSION" => nucleum_fragment_expansion_message(args),
         "gpu_builtin_type_args" => Some("GPU builtin call does not accept type arguments".to_owned()),
         "inferred_callee_type_args" => Some("inferred callee does not accept type arguments".to_owned()),
         "intrinsic_method_type_args" => Some("intrinsic method does not accept type arguments".to_owned()),
@@ -995,6 +997,8 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "NUCLEUM_FRAGMENT_CONTEXT" => nucleum_fragment_context_help(args),
         "NUCLEUM_FRAGMENT_EFFECT" => nucleum_fragment_effect_help(args),
         "NUCLEUM_FRAGMENT_TYPE" => nucleum_fragment_type_help(args),
+        "NUCLEUM_FRAGMENT_CYCLE" => nucleum_fragment_cycle_help(args),
+        "NUCLEUM_FRAGMENT_EXPANSION" => nucleum_fragment_expansion_help(args),
         "integer_operands_required" => Some("use integer operands for this operator".to_owned()),
         "instans_ordering_operands_required" => Some("compare instans values with instans values".to_owned()),
         "json_duplicate_key" => Some("remove or rename the duplicate JSON object key".to_owned()),
@@ -1097,7 +1101,7 @@ fn nucleum_fragment_context_message(args: &[DiagnosticArg]) -> Option<String> {
             (_, Some("host_callable")) => {
                 "@ nucleum fragment cannot call a host function or other non-device-safe callable"
             }
-            _ => "calls to @ nucleum fragment definitions are rejected until composition lands",
+            _ => "@ nucleum fragment call is not legal in this context",
         }
         .to_owned(),
     )
@@ -1126,7 +1130,7 @@ fn nucleum_fragment_context_help(args: &[DiagnosticArg]) -> Option<String> {
             (_, Some("host_callable")) => {
                 "call another @ nucleum fragment or an approved device intrinsic from this body"
             }
-            _ => "wait for nucleum fragment composition, or call an @ nucleum entry instead",
+            _ => "call an @ nucleum fragment only from an @ nucleum entry or another fragment",
         }
         .to_owned(),
     )
@@ -1177,6 +1181,57 @@ fn nucleum_fragment_type_help(args: &[DiagnosticArg]) -> Option<String> {
             "return" => "assign the fragment result to a destination that matches the specialized return",
             "effect" => "keep the specialized fragment infallible and inside the device-safe effect subset",
             _ => return None,
+        }
+        .to_owned(),
+    )
+}
+
+fn nucleum_fragment_cycle_message(args: &[DiagnosticArg]) -> Option<String> {
+    let cycle = arg_value(args, "cycle").or_else(|| arg_value(args, "chain"))?;
+    Some(format!("nucleum fragment call cycle: {cycle}"))
+}
+
+fn nucleum_fragment_cycle_help(args: &[DiagnosticArg]) -> Option<String> {
+    let cycle = arg_value(args, "cycle")
+        .or_else(|| arg_value(args, "chain"))
+        .unwrap_or("");
+    Some(if cycle.is_empty() {
+        "remove the recursive fragment call; fragment composition requires an acyclic call graph".to_owned()
+    } else {
+        format!("break the cycle {cycle}; fragment composition requires an acyclic call graph")
+    })
+}
+
+fn nucleum_fragment_expansion_message(args: &[DiagnosticArg]) -> Option<String> {
+    let kind = arg_value(args, "kind").or_else(|| arg_value(args, "reason"));
+    let observed = arg_value(args, "observed");
+    let limit = arg_value(args, "limit");
+    let chain = arg_value(args, "chain");
+    Some(match (kind, observed, limit, chain) {
+        (Some("survived"), _, _, _) => "nucleum fragment call survived composition".to_owned(),
+        (Some("unresolved"), _, _, _) => "nucleum fragment call could not be resolved for composition".to_owned(),
+        (Some("failable"), _, _, _) => "nucleum fragment call cannot use a failable terminator".to_owned(),
+        (Some(kind), Some(observed), Some(limit), Some(chain)) => {
+            format!("nucleum fragment expansion exceeds {kind} limit {limit} (observed {observed}) along {chain}")
+        }
+        (Some(kind), Some(observed), Some(limit), _) => {
+            format!("nucleum fragment expansion exceeds {kind} limit {limit} (observed {observed})")
+        }
+        _ => "nucleum fragment expansion exceeds the documented budget".to_owned(),
+    })
+}
+
+fn nucleum_fragment_expansion_help(args: &[DiagnosticArg]) -> Option<String> {
+    Some(
+        match arg_value(args, "kind").or_else(|| arg_value(args, "reason"))? {
+            "depth" => "shorten the fragment call chain or split the entry",
+            "nodes" => "reduce the composed body size under this @ nucleum entry",
+            "instances" => "reduce the number of concrete fragment instances composed into this entry",
+            "callsite" => "a fragment call site can be composed only once",
+            "survived" => "composition must clone the fragment body; a surviving call is a compiler defect",
+            "unresolved" => "the fragment body must be present in the current MIR program",
+            "failable" => "fragments are infallible; do not compose a TryCall",
+            _ => "keep the composed fragment expansion inside the documented budget",
         }
         .to_owned(),
     )
