@@ -260,18 +260,12 @@ fn char_to_single_char_string_follows_scalar_convention() {
 
 #[test]
 fn numerus_to_char_relational_rejects() {
-    rejects_with_issue(
-        &compile("incipit { si 1 ≥ 'a' { nota \"bad\" } }"),
-        "numeric_operands_required",
-    );
+    rejects_with_issue(&compile("incipit { si 1 ≥ 'a' { nota \"bad\" } }"), "numeric_operands_required");
 }
 
 #[test]
 fn char_to_numerus_relational_rejects() {
-    rejects_with_issue(
-        &compile("incipit { si 'a' ≥ 1 { nota \"bad\" } }"),
-        "numeric_operands_required",
-    );
+    rejects_with_issue(&compile("incipit { si 'a' ≥ 1 { nota \"bad\" } }"), "numeric_operands_required");
 }
 
 #[test]
