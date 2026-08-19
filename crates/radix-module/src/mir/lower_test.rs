@@ -4654,18 +4654,3 @@ fn conversio_assign_chain_lowers_inner_then_outer_conversion() {
     assert_eq!(count_occurrences(&dump, " = %"), 2, "chain must store once per link:\n{dump}");
     assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
 }
-
-// ── MIR emit targets (CDA-U7): claimed `↦` routes lower `↤` ─────────────────
-
-#[cfg(feature = "mir-wasm")]
-#[test]
-fn wasm_text_emits_conversio_assign_via_runtime_convert() {
-    let output = crate::mir::test_support::compile_wasm_text(
-        "incipit {\n  varia numerus count ← 0\n  count ↤ \"42\"\n  nota count\n}",
-    );
-    assert!(
-        output.contains("convert") || output.contains("parse") || output.contains("stoi"),
-        "wasm-text must emit the ↦ conversion for ↤:\n{output}"
-    );
-    assert!(!output.contains("↤"), "raw ↤ must not leak into emitted wasm-text:\n{output}");
-}

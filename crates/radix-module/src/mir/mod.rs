@@ -28,10 +28,6 @@ mod wgsl_text;
 #[path = "test_support.rs"]
 pub mod test_support;
 
-#[cfg(test)]
-#[path = "text_test_helpers.rs"]
-pub mod text_test_helpers;
-
 // --- Core from radix-mir (module paths for residual code) ---
 pub use radix_mir::{
     abi, ai_workbench_stage5, artifact_completeness, boundary_abi, capability, control, device, device_semantics, dump,
