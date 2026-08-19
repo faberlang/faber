@@ -861,9 +861,7 @@ impl AuthorEmitter {
                         w.write(" ");
                         Self::write_ident(&field.name, surface, interner, w);
                     }
-                    if !variant.fields.is_empty() {
-                        w.write(" ");
-                    }
+                    w.write(" ");
                     w.write("}");
                 }
                 if index + 1 < union.variants.len() {
