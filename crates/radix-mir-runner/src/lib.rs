@@ -1553,3 +1553,15 @@ mod ascii1_index_test;
 #[cfg(test)]
 #[path = "ascii_cursor_test.rs"]
 mod ascii_cursor_test;
+
+#[cfg(test)]
+#[path = "capability_test.rs"]
+mod capability_test;
+
+#[cfg(test)]
+#[path = "kernel_test.rs"]
+mod kernel_test;
+
+#[cfg(test)]
+#[path = "value_test.rs"]
+mod value_test;

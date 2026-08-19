@@ -55,7 +55,7 @@ pub use llvm_text::{
     emit_llvm_text_probe_with_device_roles, emit_llvm_text_probe_with_device_roles_and_exit,
     fmir_artifact_packet_facts, CliAdapterField, CliAdapterPlan, CliRecordFunction, MirLlvmTextProbeError,
 };
-pub(crate) use lower::prepare_mir_lowering_interner;
+pub use lower::prepare_mir_lowering_interner;
 pub use lower::{
     dump_analyzed_unit, lower_analyzed_unit, lower_analyzed_unit_allowing_cli_entry_record_with_context,
     lower_analyzed_unit_allowing_cli_entry_with_context, lower_analyzed_unit_allowing_cli_records_with_context,
@@ -207,13 +207,6 @@ mod nodes_tests;
 #[cfg(test)]
 #[path = "rank2_reduction_readiness_test.rs"]
 mod rank2_reduction_readiness_tests;
-#[cfg(test)]
-#[cfg(all(test, feature = "runner"))]
-#[path = "runner_test.rs"]
-mod runner_integration_tests;
-#[cfg(test)]
-#[path = "sexp_text_test.rs"]
-mod sexp_text_integration_tests;
 #[cfg(test)]
 #[path = "tensor_operation_floor_test.rs"]
 mod tensor_operation_floor_tests;

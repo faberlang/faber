@@ -56,37 +56,3 @@ pub fn run_analyzed<H: Host + ?Sized>(unit: &mut AnalyzedModule, host: &mut H) -
     })?;
     run_entry(&lowered.validated, host)
 }
-
-#[cfg(test)]
-#[path = "capability_test.rs"]
-mod capability_tests;
-
-#[cfg(test)]
-mod value {
-    pub use radix_lexer::Span;
-    pub use radix_mir::MirBinOp;
-    pub use radix_mir_runner::value::*;
-}
-
-#[cfg(test)]
-#[path = "value_test.rs"]
-mod value_tests;
-
-#[cfg(test)]
-mod kernel {
-    pub use radix_mir_runner::kernel::*;
-    pub use radix_mir_runner::value::MapKey;
-    pub use radix_mir_runner::{BufferHost, Value};
-}
-
-#[cfg(test)]
-#[path = "kernel_test.rs"]
-mod kernel_tests;
-
-#[cfg(test)]
-#[path = "conversio_test.rs"]
-mod conversio_tests;
-
-#[cfg(test)]
-#[path = "cede_cursor_test.rs"]
-mod cede_cursor_tests;

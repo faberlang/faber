@@ -1,6 +1,8 @@
 //! Unit tests for runner value helpers (companion to `value.rs`).
 
 use super::value::*;
+use radix_lexer::Span;
+use radix_mir::MirBinOp;
 
 #[test]
 fn bitwise_rejects_negative_signed_in_unsigned_context() {

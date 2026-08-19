@@ -435,7 +435,7 @@ fn lower_analyzed_unit_with_options(
 
 /// Pre-intern symbols synthesized by MIR lowering before a target clones the
 /// analyzed-unit interner for emission.
-pub(crate) fn prepare_mir_lowering_interner(interner: &mut Interner) {
+pub fn prepare_mir_lowering_interner(interner: &mut Interner) {
     for template in ["", "§", "§ §", "§ § §", " ", "nihil"] {
         interner.intern(template);
     }

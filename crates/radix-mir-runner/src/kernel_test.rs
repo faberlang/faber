@@ -7,9 +7,9 @@
 //! console output.
 
 use super::kernel::dispatch_kernel;
-use super::kernel::{BufferHost, MapKey, Value};
-use crate::kernel::KernelModule;
-use crate::lexer::Span;
+use super::{BufferHost, MapKey, Value};
+use radix_lexer::Span;
+use radix_mir::KernelModule;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -17,7 +17,14 @@ use std::rc::Rc;
 #[test]
 fn kernel_processus_argv_returns_host_args() {
     let mut host = BufferHost::with_argumenta(vec!["alpha".to_owned(), "beta".to_owned()]);
-    let value = dispatch_kernel(&mut host, KernelModule::Processus, "argv", &[], Span::default()).expect("argv");
+    let value = dispatch_kernel(
+        &mut host,
+        KernelModule::Processus,
+        "argv",
+        &[],
+        Span::default(),
+    )
+    .expect("argv");
     let Value::Array(items) = value else {
         panic!("expected array");
     };
@@ -30,7 +37,14 @@ fn kernel_processus_argv_returns_host_args() {
 fn kernel_json_parse_parses_object() {
     let mut host = BufferHost::default();
     let raw = Value::Str("{\"ok\": true}".to_owned());
-    let value = dispatch_kernel(&mut host, KernelModule::Json, "parse", &[raw], Span::default()).expect("json parse");
+    let value = dispatch_kernel(
+        &mut host,
+        KernelModule::Json,
+        "parse",
+        &[raw],
+        Span::default(),
+    )
+    .expect("json parse");
     assert!(matches!(value, Value::Map(_)));
 }
 
@@ -38,14 +52,33 @@ fn kernel_json_parse_parses_object() {
 fn kernel_json_round_trips_and_try_parse_rejects_invalid_input() {
     let mut host = BufferHost::default();
     let raw = Value::Str("{\"items\":[1,true]}".to_owned());
-    let parsed = dispatch_kernel(&mut host, KernelModule::Json, "parse", &[raw], Span::default()).expect("json parse");
-    let rendered = dispatch_kernel(&mut host, KernelModule::Json, "stringify", &[parsed], Span::default())
-        .expect("json stringify");
+    let parsed = dispatch_kernel(
+        &mut host,
+        KernelModule::Json,
+        "parse",
+        &[raw],
+        Span::default(),
+    )
+    .expect("json parse");
+    let rendered = dispatch_kernel(
+        &mut host,
+        KernelModule::Json,
+        "stringify",
+        &[parsed],
+        Span::default(),
+    )
+    .expect("json stringify");
     assert_eq!(rendered, Value::Str("{\"items\":[1,true]}".to_owned()));
 
     let invalid = Value::Str("{".to_owned());
-    let value = dispatch_kernel(&mut host, KernelModule::Json, "try_parse", &[invalid], Span::default())
-        .expect("json try_parse");
+    let value = dispatch_kernel(
+        &mut host,
+        KernelModule::Json,
+        "try_parse",
+        &[invalid],
+        Span::default(),
+    )
+    .expect("json try_parse");
     assert_eq!(value, Value::Nil);
 }
 
@@ -57,8 +90,14 @@ fn kernel_json_stringify_sorts_map_keys_deterministically() {
     fields.insert(MapKey::Str("a".to_owned()), Value::Int(2));
     let value = Value::Map(Rc::new(RefCell::new(fields)));
 
-    let rendered =
-        dispatch_kernel(&mut host, KernelModule::Json, "stringify", &[value], Span::default()).expect("json stringify");
+    let rendered = dispatch_kernel(
+        &mut host,
+        KernelModule::Json,
+        "stringify",
+        &[value],
+        Span::default(),
+    )
+    .expect("json stringify");
 
     assert_eq!(rendered, Value::Str(r#"{"a":2,"z":1}"#.to_owned()));
 }
@@ -70,7 +109,14 @@ fn kernel_toml_parse_parses_nested_table_and_array_of_tables() {
         "[package]\nname = \"radix\"\n\n[package.metadata]\nfeatured = true\n\n[[bin]]\nname = \"radix\"\n\n[[bin]]\nname = \"faber\"\n"
             .to_owned(),
     );
-    let parsed = dispatch_kernel(&mut host, KernelModule::Toml, "parse", &[raw], Span::default()).expect("toml parse");
+    let parsed = dispatch_kernel(
+        &mut host,
+        KernelModule::Toml,
+        "parse",
+        &[raw],
+        Span::default(),
+    )
+    .expect("toml parse");
     let Value::Map(root) = &parsed else {
         panic!("expected root map");
     };
@@ -93,7 +139,10 @@ fn kernel_toml_parse_parses_nested_table_and_array_of_tables() {
         panic!("expected metadata map");
     };
     let metadata = metadata.borrow();
-    assert_eq!(metadata.get(&MapKey::Str("featured".to_owned())), Some(&Value::Bool(true)));
+    assert_eq!(
+        metadata.get(&MapKey::Str("featured".to_owned())),
+        Some(&Value::Bool(true))
+    );
     let Value::Array(bins) = root.get(&MapKey::Str("bin".to_owned())).expect("bin array") else {
         panic!("expected bin array");
     };
@@ -104,8 +153,17 @@ fn kernel_toml_parse_parses_nested_table_and_array_of_tables() {
 #[test]
 fn kernel_toml_datetime_lowers_to_instans_and_round_trips() {
     let mut host = BufferHost::default();
-    let raw = Value::Str("[pkg]\nreleased = 1979-05-27T07:32:00Z\nlocal = 1979-05-27T07:32:00\n".to_owned());
-    let parsed = dispatch_kernel(&mut host, KernelModule::Toml, "parse", &[raw], Span::default()).expect("toml parse");
+    let raw = Value::Str(
+        "[pkg]\nreleased = 1979-05-27T07:32:00Z\nlocal = 1979-05-27T07:32:00\n".to_owned(),
+    );
+    let parsed = dispatch_kernel(
+        &mut host,
+        KernelModule::Toml,
+        "parse",
+        &[raw],
+        Span::default(),
+    )
+    .expect("toml parse");
     let Value::Map(root) = &parsed else {
         panic!("expected root map");
     };
@@ -115,18 +173,30 @@ fn kernel_toml_datetime_lowers_to_instans_and_round_trips() {
     };
     let pkg = pkg.borrow();
     assert!(
-        matches!(pkg.get(&MapKey::Str("released".to_owned())), Some(Value::Instans(_))),
+        matches!(
+            pkg.get(&MapKey::Str("released".to_owned())),
+            Some(Value::Instans(_))
+        ),
         "offset TOML datetime must lower to Instans"
     );
     assert!(
-        matches!(pkg.get(&MapKey::Str("local".to_owned())), Some(Value::Instans(_))),
+        matches!(
+            pkg.get(&MapKey::Str("local".to_owned())),
+            Some(Value::Instans(_))
+        ),
         "local TOML datetime must lower to Instans (read as UTC)"
     );
     drop(pkg);
     drop(root);
 
-    let rendered = dispatch_kernel(&mut host, KernelModule::Toml, "stringify", &[parsed], Span::default())
-        .expect("toml stringify");
+    let rendered = dispatch_kernel(
+        &mut host,
+        KernelModule::Toml,
+        "stringify",
+        &[parsed],
+        Span::default(),
+    )
+    .expect("toml stringify");
     let Value::Str(rendered) = rendered else {
         panic!("expected string");
     };
@@ -157,17 +227,32 @@ fn kernel_toml_round_trips_nested_document() {
     let Value::Str(rendered) = rendered else {
         panic!("expected string");
     };
-    let reparsed = dispatch_kernel(&mut host, KernelModule::Toml, "parse", &[Value::Str(rendered)], Span::default())
-        .expect("toml re-parse");
-    assert_eq!(reparsed, parsed, "toml parse/stringify round-trip must preserve the valor tree");
+    let reparsed = dispatch_kernel(
+        &mut host,
+        KernelModule::Toml,
+        "parse",
+        &[Value::Str(rendered)],
+        Span::default(),
+    )
+    .expect("toml re-parse");
+    assert_eq!(
+        reparsed, parsed,
+        "toml parse/stringify round-trip must preserve the valor tree"
+    );
 }
 
 #[test]
 fn kernel_toml_try_parse_rejects_invalid_input_and_parse_errors() {
     let mut host = BufferHost::default();
     let invalid = Value::Str("broken = [".to_owned());
-    let value = dispatch_kernel(&mut host, KernelModule::Toml, "try_parse", &[invalid], Span::default())
-        .expect("toml try_parse");
+    let value = dispatch_kernel(
+        &mut host,
+        KernelModule::Toml,
+        "try_parse",
+        &[invalid],
+        Span::default(),
+    )
+    .expect("toml try_parse");
     assert_eq!(value, Value::Nil);
 
     let err = dispatch_kernel(
@@ -215,8 +300,13 @@ fn kernel_processus_spawn_waits_and_returns_status() {
         panic!("expected subprocess status map");
     };
     let fields = fields.borrow();
-    assert!(matches!(fields.get(&MapKey::Str("pid".to_owned())), Some(Value::Int(pid)) if *pid > 0));
-    assert_eq!(fields.get(&MapKey::Str("status".to_owned())), Some(&Value::Int(3)));
+    assert!(
+        matches!(fields.get(&MapKey::Str("pid".to_owned())), Some(Value::Int(pid)) if *pid > 0)
+    );
+    assert_eq!(
+        fields.get(&MapKey::Str("status".to_owned())),
+        Some(&Value::Int(3))
+    );
 }
 
 #[test]
@@ -227,13 +317,22 @@ fn kernel_processus_captura_returns_status_stdout_and_stderr() {
         Value::Str("-c".to_owned()),
         Value::Str("printf out; printf err >&2; exit 7".to_owned()),
     ])));
-    let value = dispatch_kernel(&mut host, KernelModule::Processus, "captura", &[argv], Span::default())
-        .expect("processus captura");
+    let value = dispatch_kernel(
+        &mut host,
+        KernelModule::Processus,
+        "captura",
+        &[argv],
+        Span::default(),
+    )
+    .expect("processus captura");
     let Value::Map(fields) = value else {
         panic!("expected captured process map");
     };
     let fields = fields.borrow();
-    assert_eq!(fields.get(&MapKey::Str("status".to_owned())), Some(&Value::Int(7)));
+    assert_eq!(
+        fields.get(&MapKey::Str("status".to_owned())),
+        Some(&Value::Int(7))
+    );
     assert_eq!(
         fields.get(&MapKey::Str("stdout".to_owned())),
         Some(&Value::Str("out".to_owned()))
@@ -245,7 +344,10 @@ fn kernel_processus_captura_returns_status_stdout_and_stderr() {
 }
 
 fn solum_fixture(label: &str) -> (tempfile::TempDir, PathBuf) {
-    let root = crate::test_support::test_temp_dir(&format!("kernel-{label}"));
+    let root = tempfile::Builder::new()
+        .prefix(&format!("kernel-{label}-"))
+        .tempdir()
+        .expect("create solum fixture dir");
     let nested = root.path().join("nested");
     std::fs::create_dir_all(&nested).expect("create solum fixture dir");
     (root, nested)
@@ -264,7 +366,10 @@ fn kernel_solum_write_file_read_file_round_trips_text() {
     solum_dispatch(
         &mut BufferHost::default(),
         "write_file",
-        &[Value::Str(text.clone()), Value::Str("alpha\nbeta".to_owned())],
+        &[
+            Value::Str(text.clone()),
+            Value::Str("alpha\nbeta".to_owned()),
+        ],
     );
 
     assert_eq!(
@@ -281,11 +386,18 @@ fn kernel_solum_read_bytes_reads_file_as_octeti() {
     solum_dispatch(
         &mut BufferHost::default(),
         "write_file",
-        &[Value::Str(text.clone()), Value::Str("alpha\nbeta".to_owned())],
+        &[
+            Value::Str(text.clone()),
+            Value::Str("alpha\nbeta".to_owned()),
+        ],
     );
 
     assert_eq!(
-        solum_dispatch(&mut BufferHost::default(), "read_bytes", &[Value::Str(text)]),
+        solum_dispatch(
+            &mut BufferHost::default(),
+            "read_bytes",
+            &[Value::Str(text)]
+        ),
         Value::Octeti(b"alpha\nbeta".to_vec())
     );
 }
@@ -301,7 +413,10 @@ fn kernel_solum_write_bytes_writes_bytes() {
         &[Value::Str(text.clone()), Value::Octeti(vec![0, 1, 2, 255])],
     );
 
-    assert_eq!(std::fs::read(&path).expect("read bytes file"), vec![0, 1, 2, 255]);
+    assert_eq!(
+        std::fs::read(&path).expect("read bytes file"),
+        vec![0, 1, 2, 255]
+    );
 }
 
 #[test]
@@ -333,7 +448,11 @@ fn kernel_solum_is_regular_returns_true_for_file() {
     );
 
     assert_eq!(
-        solum_dispatch(&mut BufferHost::default(), "is_regular", &[Value::Str(text)]),
+        solum_dispatch(
+            &mut BufferHost::default(),
+            "is_regular",
+            &[Value::Str(text)]
+        ),
         Value::Bool(true)
     );
 }
@@ -344,7 +463,11 @@ fn kernel_solum_is_directory_returns_true_for_dir() {
     let dir_text = nested.to_string_lossy().into_owned();
 
     assert_eq!(
-        solum_dispatch(&mut BufferHost::default(), "is_directory", &[Value::Str(dir_text)]),
+        solum_dispatch(
+            &mut BufferHost::default(),
+            "is_directory",
+            &[Value::Str(dir_text)]
+        ),
         Value::Bool(true)
     );
 }
@@ -357,11 +480,18 @@ fn kernel_solum_byte_length_returns_byte_count() {
     solum_dispatch(
         &mut BufferHost::default(),
         "write_file",
-        &[Value::Str(text.clone()), Value::Str("alpha\nbeta".to_owned())],
+        &[
+            Value::Str(text.clone()),
+            Value::Str("alpha\nbeta".to_owned()),
+        ],
     );
 
     assert_eq!(
-        solum_dispatch(&mut BufferHost::default(), "byte_length", &[Value::Str(text)]),
+        solum_dispatch(
+            &mut BufferHost::default(),
+            "byte_length",
+            &[Value::Str(text)]
+        ),
         Value::Int(10)
     );
 }
@@ -405,7 +535,10 @@ fn kernel_solum_copy_copies_file() {
         ],
     );
 
-    assert_eq!(std::fs::read_to_string(&dst).expect("read copied file"), "content");
+    assert_eq!(
+        std::fs::read_to_string(&dst).expect("read copied file"),
+        "content"
+    );
 }
 
 #[test]
@@ -424,10 +557,16 @@ fn kernel_solum_rename_moves_file() {
     solum_dispatch(
         &mut BufferHost::default(),
         "rename",
-        &[Value::Str(src.to_string_lossy().into_owned()), Value::Str(dst_text)],
+        &[
+            Value::Str(src.to_string_lossy().into_owned()),
+            Value::Str(dst_text),
+        ],
     );
 
-    assert_eq!(std::fs::read_to_string(&dst).expect("read moved file"), "movable");
+    assert_eq!(
+        std::fs::read_to_string(&dst).expect("read moved file"),
+        "movable"
+    );
 }
 
 #[test]
@@ -451,7 +590,11 @@ fn kernel_solum_touch_creates_file() {
     let path = nested.join("touched.txt");
     let text = path.to_string_lossy().into_owned();
 
-    solum_dispatch(&mut BufferHost::default(), "touch", &[Value::Str(text.clone())]);
+    solum_dispatch(
+        &mut BufferHost::default(),
+        "touch",
+        &[Value::Str(text.clone())],
+    );
     assert!(path.exists());
 }
 
@@ -487,12 +630,19 @@ fn kernel_solum_read_link_reads_symlink_target() {
     solum_dispatch(
         &mut BufferHost::default(),
         "write_file",
-        &[Value::Str(target_text.clone()), Value::Str("data".to_owned())],
+        &[
+            Value::Str(target_text.clone()),
+            Value::Str("data".to_owned()),
+        ],
     );
     std::os::unix::fs::symlink(&target, &link).expect("create symlink");
 
     assert_eq!(
-        solum_dispatch(&mut BufferHost::default(), "read_link", &[Value::Str(link_text)]),
+        solum_dispatch(
+            &mut BufferHost::default(),
+            "read_link",
+            &[Value::Str(link_text)]
+        ),
         Value::Str(target_text)
     );
 }
@@ -507,7 +657,10 @@ fn kernel_solum_create_link_is_symlink_creates_and_checks_hardlink() {
     solum_dispatch(
         &mut BufferHost::default(),
         "write_file",
-        &[Value::Str(src_text.clone()), Value::Str("linked".to_owned())],
+        &[
+            Value::Str(src_text.clone()),
+            Value::Str("linked".to_owned()),
+        ],
     );
 
     solum_dispatch(
@@ -517,7 +670,11 @@ fn kernel_solum_create_link_is_symlink_creates_and_checks_hardlink() {
     );
 
     assert_eq!(
-        solum_dispatch(&mut BufferHost::default(), "is_symlink", &[Value::Str(link_text)]),
+        solum_dispatch(
+            &mut BufferHost::default(),
+            "is_symlink",
+            &[Value::Str(link_text)]
+        ),
         Value::Bool(true)
     );
 }
@@ -557,14 +714,25 @@ fn kernel_solum_remove_tree_removes_directory_tree() {
     let (root, _nested) = solum_fixture("remove_tree");
     let root_text = root.path().to_string_lossy().into_owned();
 
-    solum_dispatch(&mut BufferHost::default(), "remove_tree", &[Value::Str(root_text)]);
+    solum_dispatch(
+        &mut BufferHost::default(),
+        "remove_tree",
+        &[Value::Str(root_text)],
+    );
     assert!(!root.path().exists());
 }
 
 #[test]
 fn kernel_aleator_seed_is_deterministic_and_uuid_is_v4_shape() {
     let mut host = BufferHost::default();
-    dispatch_kernel(&mut host, KernelModule::Aleator, "seed", &[Value::Int(42)], Span::default()).expect("seed");
+    dispatch_kernel(
+        &mut host,
+        KernelModule::Aleator,
+        "seed",
+        &[Value::Int(42)],
+        Span::default(),
+    )
+    .expect("seed");
     let first = dispatch_kernel(
         &mut host,
         KernelModule::Aleator,
@@ -573,7 +741,14 @@ fn kernel_aleator_seed_is_deterministic_and_uuid_is_v4_shape() {
         Span::default(),
     )
     .expect("random_int first");
-    dispatch_kernel(&mut host, KernelModule::Aleator, "seed", &[Value::Int(42)], Span::default()).expect("seed");
+    dispatch_kernel(
+        &mut host,
+        KernelModule::Aleator,
+        "seed",
+        &[Value::Int(42)],
+        Span::default(),
+    )
+    .expect("seed");
     let second = dispatch_kernel(
         &mut host,
         KernelModule::Aleator,
@@ -595,7 +770,14 @@ fn kernel_aleator_seed_is_deterministic_and_uuid_is_v4_shape() {
         panic!("expected octeti");
     };
     assert_eq!(bytes.len(), 4);
-    let uuid = dispatch_kernel(&mut host, KernelModule::Aleator, "uuid", &[], Span::default()).expect("uuid");
+    let uuid = dispatch_kernel(
+        &mut host,
+        KernelModule::Aleator,
+        "uuid",
+        &[],
+        Span::default(),
+    )
+    .expect("uuid");
     let Value::Str(uuid) = uuid else {
         panic!("expected uuid string");
     };
