@@ -555,6 +555,7 @@ fn snapshot_interface_type_inner(
         )),
         Type::Infer(_) => Err(FileInterfaceError::InferenceTypeUnsupported),
         Type::InferUnion(_) => Err(FileInterfaceError::InferenceTypeUnsupported),
+        Type::MarkerHole { .. } => Err(FileInterfaceError::InferenceTypeUnsupported),
         Type::Union(members) => members
             .iter()
             .map(|member| {

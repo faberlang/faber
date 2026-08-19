@@ -73,7 +73,7 @@ impl TypeChecker<'_> {
             let mut shape_vars = self.shape_vars_for(sig, &shape_symbols);
             (
                 self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars)),
-                None,
+                Some(param_vars),
                 shape_vars,
             )
         };
@@ -128,13 +128,15 @@ impl TypeChecker<'_> {
             self.typecheck_call_arg_exprs(args);
             return Some(self.error_type);
         }
-        if explicit_type_args.iter().any(|ty| {
-            matches!(
-                self.types.get(self.resolve_inferred_type(*ty)),
-                Type::Infer(_)
-            )
-        }) {
-            self.missing_type_annotation("explicit_type_arg_inference_unsupported", span);
+        if explicit_type_args
+            .iter()
+            .any(|ty| self.infer_union_var_of(*ty).is_some())
+        {
+            // PH-1: `∪` already lowers, but an explicit type-arg slot is a
+            // monomorphic param witness. Accumulation does not solve the
+            // callee param, so reject with a named issue rather than leaking
+            // an unsolved InferUnion as cannot_infer_variable_type.
+            self.invalid_operand_types("explicit_union_type_arg_unsupported", span);
             self.typecheck_call_arg_exprs(args);
             return Some(self.error_type);
         }
@@ -197,6 +199,9 @@ impl TypeChecker<'_> {
             return false;
         };
         let witness = self.resolve_inferred_type(witness);
+        if self.is_infer(witness) || self.infer_union_var_of(witness).is_some() {
+            return false;
+        }
         if allowed
             .iter()
             .any(|allowed_ty| self.types.equals(*allowed_ty, witness))

@@ -1241,9 +1241,11 @@ pub(super) fn import_semantic_type_with_nominal(
         other @ (Type::Struct(_) | Type::Enum(_) | Type::Interface(_)) => {
             import_nominal_by_canonical_key(&other, nominal).unwrap_or_else(|| target.intern(other))
         }
-        other @ (Type::Param(_) | Type::Infer(_) | Type::InferUnion(_) | Type::Error) => {
-            target.intern(other)
-        }
+        other @ (Type::Param(_)
+        | Type::Infer(_)
+        | Type::InferUnion(_)
+        | Type::MarkerHole { .. }
+        | Type::Error) => target.intern(other),
     };
     imported.insert(ty, imported_ty);
     imported_ty

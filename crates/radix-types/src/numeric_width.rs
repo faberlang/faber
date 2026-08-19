@@ -293,6 +293,20 @@ pub fn lower_sized_primitive(
     match params.len() {
         0 => types.primitive(prim),
         1 => {
+            if matches!(params[0].kind, radix_syntax::TypeExprKind::Infer) {
+                let family = match prim {
+                    Primitive::Numerus => crate::MarkerFamily::Numerus,
+                    Primitive::Fractus => crate::MarkerFamily::Fractus,
+                    _ => {
+                        report("width marker must be a bare spelling such as i32 or u8");
+                        return types.intern(Type::Error);
+                    }
+                };
+                return types.intern(Type::MarkerHole {
+                    family,
+                    var: crate::InferVar(params[0].span.start),
+                });
+            }
             if let Some(marker) = type_expr_width_marker(&params[0], interner) {
                 match NumericWidth::from_marker(marker, prim) {
                     Ok(width) => types.sized_numeric(prim, width),
@@ -327,6 +341,12 @@ pub fn lower_modular_word(
     if params.len() != 1 {
         report("modulus requires exactly one unsigned width marker; use modulus<u8>, modulus<u16>, modulus<u32>, or modulus<u64>");
         return types.intern(Type::Error);
+    }
+    if matches!(params[0].kind, radix_syntax::TypeExprKind::Infer) {
+        return types.intern(Type::MarkerHole {
+            family: crate::MarkerFamily::Modulus,
+            var: crate::InferVar(params[0].span.start),
+        });
     }
     let Some(marker) = type_expr_width_marker(&params[0], interner) else {
         report("modulus width marker must be a bare unsigned spelling such as u32");

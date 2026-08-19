@@ -9,8 +9,8 @@ pub use radix_types::{
     collection_type_specs, is_atomic_element_type, is_intervallum_bound_type,
     lookup_collection_type_spec, lookup_primitive_type_spec, lookup_tensor_family_type_spec,
     primitive_type_specs, tensor_family_type_specs, CollectionKind, CollectionTypeSpec, FuncSig,
-    InferVar, ParamType, Primitive, PrimitiveTypeSpec, SemanticMutability, SemanticParamMode,
-    TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId, TypeParamConstraint, TypeTable,
-    TypeTableSnapshot, ATOMIC_ELEMENT_MSG, INTERVALLUM_BOUND_MSG,
+    InferVar, MarkerFamily, ParamType, Primitive, PrimitiveTypeSpec, SemanticMutability,
+    SemanticParamMode, TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId, TypeParamConstraint,
+    TypeTable, TypeTableSnapshot, ATOMIC_ELEMENT_MSG, INTERVALLUM_BOUND_MSG,
 };
 pub use radix_types::{SchemaColumnDef, SchemaDef};

@@ -865,6 +865,16 @@ impl TypeTable {
             }
             (Type::Infer(a_var), Type::Infer(b_var)) => a_var == b_var,
             (Type::InferUnion(a_var), Type::InferUnion(b_var)) => a_var == b_var,
+            (
+                Type::MarkerHole {
+                    family: af,
+                    var: av,
+                },
+                Type::MarkerHole {
+                    family: bf,
+                    var: bv,
+                },
+            ) => af == bf && av == bv,
             (Type::Union(a_types), Type::Union(b_types)) => {
                 self.union_members_equal(a_types, b_types)
             }
@@ -1268,6 +1278,15 @@ pub enum Type {
     /// variable instead of binding one inhabitant.
     InferUnion(InferVar),
 
+    /// Family-preserving marker hole: `numerus<_>`, `fractus<_>`, `modulus<_>`,
+    /// `instans<_>`. The family is identity; only the marker is inferred.
+    /// Distinct from [`Type::Infer`] so an unsolved hole cannot reach a
+    /// width-position match.
+    MarkerHole {
+        family: MarkerFamily,
+        var: InferVar,
+    },
+
     Union(Vec<TypeId>),
 
     /// Ordered positional aggregate.
@@ -1341,6 +1360,10 @@ impl Hash for Type {
                 args.hash(state);
             }
             Self::Infer(v) | Self::InferUnion(v) => v.hash(state),
+            Self::MarkerHole { family, var } => {
+                family.hash(state);
+                var.hash(state);
+            }
             Self::Union(members) | Self::Tuple(members) => members.hash(state),
             Self::Error => {}
         }
@@ -1811,6 +1834,7 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         | Type::Param(_)
         | Type::Infer(_)
         | Type::InferUnion(_)
+        | Type::MarkerHole { .. }
         | Type::Error => true,
     }
 }
@@ -1862,6 +1886,18 @@ pub enum SemanticParamMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct InferVar(pub u32);
+
+/// Closed-marker family for [`Type::MarkerHole`].
+///
+/// Width and precision enums stay closed; this names which family the hole
+/// belongs to so `numerus<_>` cannot become `fractus<f32>`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MarkerFamily {
+    Numerus,
+    Fractus,
+    Modulus,
+    Instans,
+}
 
 #[cfg(test)]
 #[path = "types_test.rs"]

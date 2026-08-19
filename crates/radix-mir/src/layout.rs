@@ -504,7 +504,11 @@ fn layout_kind_for_type(
         Type::Primitive(Primitive::Vacuum) => Some(MirLayoutKind::Void),
         Type::Primitive(Primitive::Numquam) => Some(MirLayoutKind::Never),
         Type::Alias(_, target) => layout_kind_for_type(types, *target, memo, visiting),
-        Type::Param(_) | Type::Infer(_) | Type::InferUnion(_) | Type::Error => None,
+        Type::Param(_)
+        | Type::Infer(_)
+        | Type::InferUnion(_)
+        | Type::MarkerHole { .. }
+        | Type::Error => None,
         Type::SizedNumeric(_, _) => Some(MirLayoutKind::OpaqueHandle),
         Type::Array(_) => Some(opaque_aggregate(MirAggregateFamily::Array)),
         Type::Map(_, _) => Some(opaque_aggregate(MirAggregateFamily::Map)),

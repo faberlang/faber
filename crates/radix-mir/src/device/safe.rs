@@ -220,7 +220,11 @@ impl<'a> DeviceSafeClassifier<'a> {
             Type::Primitive(Primitive::Bivalens | Primitive::Vacuum | Primitive::Numquam)
             | Type::SizedNumeric(Primitive::Fractus, _) => self.check_device_layout(ty),
             Type::Alias(_, _) => self.check_device_layout(ty),
-            Type::Param(_) | Type::Infer(_) | Type::InferUnion(_) | Type::Error => {
+            Type::Param(_)
+            | Type::Infer(_)
+            | Type::InferUnion(_)
+            | Type::MarkerHole { .. }
+            | Type::Error => {
                 self.record_layout(SHAPE_UNRESOLVED_TYPE);
             }
             Type::Primitive(

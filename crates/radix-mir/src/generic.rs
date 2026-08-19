@@ -835,6 +835,7 @@ fn instantiate_existing_type_id(
         | Type::Interface(_)
         | Type::Infer(_)
         | Type::InferUnion(_)
+        | Type::MarkerHole { .. }
         | Type::Error => Ok(ty),
     }
 }
@@ -1299,6 +1300,7 @@ fn instantiate_mutable_type_id(
         | Type::Interface(_)
         | Type::Infer(_)
         | Type::InferUnion(_)
+        | Type::MarkerHole { .. }
         | Type::Error => Ok(ty),
     }
 }
@@ -1528,6 +1530,7 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
         | Type::Interface(_)
         | Type::Infer(_)
         | Type::InferUnion(_)
+        | Type::MarkerHole { .. }
         | Type::Error => false,
     }
 }

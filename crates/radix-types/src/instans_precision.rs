@@ -103,6 +103,12 @@ pub fn lower_sized_instans(
     match params.len() {
         0 => types.primitive(Primitive::Instans),
         1 => {
+            if matches!(params[0].kind, radix_syntax::TypeExprKind::Infer) {
+                return types.intern(Type::MarkerHole {
+                    family: crate::MarkerFamily::Instans,
+                    var: crate::InferVar(params[0].span.start),
+                });
+            }
             if let Some(marker) = type_expr_precision_marker(&params[0], interner) {
                 match InstansPrecision::from_marker(marker) {
                     Ok(precision) => types.sized_instans(precision),

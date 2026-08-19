@@ -369,6 +369,7 @@ impl UseVisitor<'_> {
             | Type::Param(_)
             | Type::Infer(_)
             | Type::InferUnion(_)
+            | Type::MarkerHole { .. }
             | Type::Error => Vec::new(),
         };
 

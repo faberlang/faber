@@ -262,6 +262,13 @@ impl TypeChecker<'_> {
             self.missing_type_annotation(issue, span);
             return true;
         }
+        if matches!(
+            self.types.get(self.resolve_inferred_type(ty)),
+            Type::MarkerHole { .. }
+        ) {
+            self.missing_type_annotation("marker_width_unsolved", span);
+            return true;
+        }
         // THU-U-05: an unsolved `∪` hole is a missing-annotation *error*, never
         // a warning. The check walks compound shapes so a nested hole (e.g.
         // `lista<∪>` with no element flows) cannot survive past finalize.

@@ -351,6 +351,7 @@ fn type_children(ty: &Type) -> Vec<TypeId> {
         | Type::Param(_)
         | Type::Infer(_)
         | Type::InferUnion(_)
+        | Type::MarkerHole { .. }
         | Type::Error
         | Type::Struct(_)
         | Type::Enum(_)

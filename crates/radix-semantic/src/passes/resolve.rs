@@ -1527,6 +1527,9 @@ fn validate_instans_precision_param(
     param: &TypeExpr,
     errors: &mut Vec<SemanticError>,
 ) {
+    if matches!(param.kind, TypeExprKind::Infer) {
+        return;
+    }
     let TypeExprKind::Named(ident, nested) = &param.kind else {
         errors.push(undefined_type_error(
             ISSUE_PRECISION_MARKER_SHAPE,
@@ -1596,6 +1599,9 @@ fn validate_width_marker_param(
     prim: Primitive,
     errors: &mut Vec<SemanticError>,
 ) {
+    if matches!(param.kind, TypeExprKind::Infer) {
+        return;
+    }
     let TypeExprKind::Named(ident, nested) = &param.kind else {
         errors.push(undefined_type_error(ISSUE_WIDTH_MARKER_SHAPE, param.span));
         return;

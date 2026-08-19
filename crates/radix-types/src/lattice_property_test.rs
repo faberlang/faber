@@ -530,6 +530,7 @@ impl TypeName for Type {
             Type::Applied(_, _) => "applied",
             Type::Infer(_) => "infer",
             Type::InferUnion(_) => "infer_union",
+            Type::MarkerHole { .. } => "marker_hole",
             Type::Tuple(_) => "tuple",
             Type::Error => "error",
         }

@@ -520,6 +520,7 @@ fn semantic_missing_type_annotation_message(args: &[DiagnosticArg]) -> Option<St
         "cannot_infer_tensor_shape" => Some("cannot infer tensor shape".to_owned()),
         "bounded_capacity_unsolved" => Some("cannot infer bounded-buffer capacity".to_owned()),
         "cannot_infer_variable_type" => Some("cannot infer variable type".to_owned()),
+        "marker_width_unsolved" => Some("cannot infer width or precision marker".to_owned()),
         "directional_view_type_not_registered" => {
             Some("directional view type not registered".to_owned())
         }
@@ -541,6 +542,10 @@ fn semantic_missing_type_annotation_help(args: &[DiagnosticArg]) -> Option<Strin
         "bounded_capacity_unsolved" => {
             Some("write a concrete N (ascii<8>) or give the hole a bounded witness".to_owned())
         }
+        "marker_width_unsolved" => Some(
+            "write a concrete marker (numerus<i32>) or give the hole a same-family witness"
+                .to_owned(),
+        ),
         "cannot_infer_alternate_exit_type"
         | "cannot_infer_constant_type"
         | "cannot_infer_expression_type"
@@ -827,6 +832,9 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
 
 fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
+        "explicit_union_type_arg_unsupported" => {
+            Some("union hole ∪ is not a legal explicit type argument".to_owned())
+        }
         "range_step_must_be_numeric" => Some("range step must be numeric".to_owned()),
         "intervallum_bound_required" => Some(crate::INTERVALLUM_BOUND_MSG.to_owned()),
         "intervallum_longitudo_bound" => {
@@ -1015,6 +1023,9 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
 
 fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
+        "explicit_union_type_arg_unsupported" => {
+            Some("write _ for a monomorphic hole, or a concrete type".to_owned())
+        }
         "range_step_must_be_numeric" => Some("use a numeric range step".to_owned()),
         "intervallum_bound_required" => Some("use numerus, fractus, instans, or sized scalar bounds".to_owned()),
         "intervallum_longitudo_bound" => Some("use numerus intervallum bounds for longitudo today".to_owned()),

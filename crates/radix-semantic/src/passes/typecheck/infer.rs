@@ -60,6 +60,9 @@ impl TypeChecker<'_> {
         if let Some(found) = self.infer_union_var_of(resolved) {
             return found == var;
         }
+        if let Type::MarkerHole { var: found, .. } = self.types.get(resolved) {
+            return *found == var;
+        }
         // Clone children out of the table first — recursive occurs needs `&mut self`.
         let children: Vec<TypeId> = match self.types.get(resolved) {
             Type::Array(inner)
@@ -136,6 +139,68 @@ impl TypeChecker<'_> {
         self.occurs_cache.clear();
         self.substitutions.borrow_mut().insert(var, resolved);
         resolved
+    }
+
+    /// Bind `numerus<_>` / twins to a same-family witness (exact marker, P6).
+    fn bind_marker_hole(
+        &mut self,
+        var: InferVar,
+        family: MarkerFamily,
+        witness: TypeId,
+        span: radix_lexer::Span,
+        issue: &'static str,
+    ) -> TypeId {
+        let Some(witness) = self.materialize_marker_witness(family, witness) else {
+            self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+            return self.error_type;
+        };
+        let before = self.errors.len();
+        self.bind_infer_exact_issue(var, witness, span, issue);
+        if self.errors.len() > before {
+            return self.error_type;
+        }
+        self.substitutions
+            .borrow()
+            .get(&var)
+            .copied()
+            .unwrap_or(witness)
+    }
+
+    fn materialize_marker_witness(
+        &mut self,
+        family: MarkerFamily,
+        witness: TypeId,
+    ) -> Option<TypeId> {
+        let witness = self.resolve_inferred_type(witness);
+        match (family, self.types.get(witness).clone()) {
+            (MarkerFamily::Numerus, Type::SizedNumeric(Primitive::Numerus, width)) => {
+                Some(self.types.sized_numeric(Primitive::Numerus, width))
+            }
+            (MarkerFamily::Numerus, Type::Primitive(Primitive::Numerus)) => Some(
+                self.types
+                    .sized_numeric(Primitive::Numerus, NumericWidth::I64),
+            ),
+            (MarkerFamily::Fractus, Type::SizedNumeric(Primitive::Fractus, width)) => {
+                Some(self.types.sized_numeric(Primitive::Fractus, width))
+            }
+            (MarkerFamily::Fractus, Type::Primitive(Primitive::Fractus)) => Some(
+                self.types
+                    .sized_numeric(Primitive::Fractus, NumericWidth::F64),
+            ),
+            (MarkerFamily::Modulus, Type::ModularWord(width)) => {
+                Some(self.types.intern(Type::ModularWord(width)))
+            }
+            (MarkerFamily::Instans, Type::SizedInstans(precision)) => {
+                Some(self.types.sized_instans(precision))
+            }
+            (MarkerFamily::Instans, Type::Primitive(Primitive::Instans)) => {
+                Some(self.types.primitive(Primitive::Instans))
+            }
+            (expected, Type::MarkerHole { family: other, .. }) if expected == other => {
+                Some(witness)
+            }
+            _ => None,
+        }
     }
 
     /// Bind an inference variable for equality without assignability widening.
@@ -236,6 +301,13 @@ impl TypeChecker<'_> {
 
         let left_ty = self.types.get(left).clone();
         let right_ty = self.types.get(right).clone();
+
+        if let Type::MarkerHole { family, var } = &left_ty {
+            return self.bind_marker_hole(*var, *family, right, span, issue);
+        }
+        if let Type::MarkerHole { family, var } = &right_ty {
+            return self.bind_marker_hole(*var, *family, left, span, issue);
+        }
 
         match (left_ty, right_ty) {
             (Type::Primitive(Primitive::Numerus), Type::Primitive(Primitive::Fractus))
@@ -522,6 +594,14 @@ impl TypeChecker<'_> {
             }
             match self.types.get(current) {
                 Type::Alias(_, resolved) => current = *resolved,
+                Type::MarkerHole { var, .. } => {
+                    if let Some(subst) = self.substitutions.borrow().get(var).copied() {
+                        path.push(*var);
+                        current = subst;
+                        continue;
+                    }
+                    break;
+                }
                 _ => break,
             }
         }

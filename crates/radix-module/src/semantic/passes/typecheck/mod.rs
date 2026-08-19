@@ -48,6 +48,10 @@ mod generic_params_test;
 mod generic_call_test;
 
 #[cfg(test)]
+#[path = "marker_hole_test.rs"]
+mod marker_hole_test;
+
+#[cfg(test)]
 #[path = "generic_construction_test.rs"]
 mod generic_construction_test;
 

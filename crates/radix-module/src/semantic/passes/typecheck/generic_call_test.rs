@@ -93,17 +93,117 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
-fn explicit_generic_call_rejects_infer_hole() {
-    rejects_with_issue(
+fn explicit_generic_call_accepts_infer_hole() {
+    accepts(
         r"functio id<T>(T x) → T {
     redde x
 }
 
 incipit {
     fixum _ x ← id<_>(42)
+    nota x
 }",
-        "explicit_type_arg_inference_unsupported",
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn explicit_generic_call_accepts_mixed_hole_and_concrete() {
+    accepts(
+        r#"functio both<A, B>(A a, B b) → A {
+    redde a
+}
+
+incipit {
+    fixum _ x ← both<_, textus>(1, "k")
+    nota x
+}"#,
+    );
+}
+
+#[test]
+fn explicit_generic_call_hole_still_requires_exact_arity() {
+    rejects_with_issue(
+        r#"functio both<A, B>(A a, B b) → A {
+    redde a
+}
+
+incipit {
+    fixum _ x ← both<_>(1, "k")
+}"#,
+        "wrong_number_of_type_arguments",
+    );
+}
+
+#[test]
+fn explicit_generic_call_unsolved_hole_still_errors() {
+    rejects_with_issue(
+        r"functio empty<T>() → T {
+    tacet
+}
+
+incipit {
+    fixum _ x ← empty<_>()
+}",
+        "cannot_infer_expression_type",
+    );
+}
+
+#[test]
+fn explicit_generic_call_rejects_union_hole() {
+    rejects_with_issue(
+        r#"functio both<A, B>(A a, B b) → A {
+    redde a
+}
+
+incipit {
+    fixum _ x ← both<∪, textus>(1, "k")
+}"#,
+        "explicit_union_type_arg_unsupported",
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn explicit_hole_and_omitted_list_share_return_type_id() {
+    let source = r"functio id<T>(T x) → T {
+    redde x
+}
+
+incipit {
+    fixum _ a ← id<_>(42)
+    fixum _ b ← id(42)
+    nota a
+    nota b
+}";
+    let session = crate::driver::Session::new(Config::default().with_target(Target::HirRust));
+    let unit = crate::driver::analyze_source(&session, "generic_call.fab", source).expect("analyze");
+    assert!(
+        !unit
+            .diagnostics
+            .iter()
+            .any(crate::diagnostics::Diagnostic::is_error),
+        "diagnostics: {:?}",
+        unit.diagnostics
+    );
+    let entry = unit.hir.entry.as_ref().expect("incipit");
+    let tys: Vec<_> = entry
+        .statements
+        .iter()
+        .filter_map(|stmt| match &stmt.kind {
+            crate::hir::HirStatementKind::Local(local) => local.ty,
+            _ => None,
+        })
+        .collect();
+    assert_eq!(tys.len(), 2, "expected two locals");
+    assert_eq!(
+        tys[0],
+        tys[1],
+        "id<_>(42) and id(42) must share a TypeId, got {:?} vs {:?}",
+        unit.types.get(tys[0]),
+        unit.types.get(tys[1])
     );
 }
 

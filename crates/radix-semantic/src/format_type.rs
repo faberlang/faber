@@ -3,7 +3,7 @@
 //! Shared by the Faber pretty-printer and target backends that attach Faber
 //! type annotations (Rust tensor comments in Stage 7).
 
-use super::{format_figura, Primitive, SemanticMutability, Type, TypeId, TypeTable};
+use super::{format_figura, MarkerFamily, Primitive, SemanticMutability, Type, TypeId, TypeTable};
 use radix_hir::DefId;
 use radix_lexer::Interner;
 
@@ -170,6 +170,13 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
 
         Type::Infer(_) => "_".to_owned(),
         Type::InferUnion(_) => "∪".to_owned(),
+        Type::MarkerHole { family, .. } => match family {
+            MarkerFamily::Numerus => "numerus<_>",
+            MarkerFamily::Fractus => "fractus<_>",
+            MarkerFamily::Modulus => "modulus<_>",
+            MarkerFamily::Instans => "instans<_>",
+        }
+        .to_owned(),
         Type::Tuple(elements) => {
             let args: Vec<String> = elements
                 .iter()

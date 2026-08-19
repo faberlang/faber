@@ -1756,6 +1756,7 @@ pub(crate) fn validate_referential_integrity(
             | radix_types::Type::SizedInstans(_)
             | radix_types::Type::Infer(_)
             | radix_types::Type::InferUnion(_)
+            | radix_types::Type::MarkerHole { .. }
             | radix_types::Type::Error => {}
             radix_types::Type::Array(t)
             | radix_types::Type::Set(t)
