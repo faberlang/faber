@@ -6,7 +6,7 @@
 //! artifact in a later phase (same direction as `crate::abi::host_abi`). The
 //! seven variants and their terminal/content classification are also encoded in
 //! `crate::builtins::frame_types::STATUS_VARIANTS` and emitted by
-//! `crate::codegen::frame_shim` for every target backend.
+//! `radix_hir_rust::frame_shim` and `radix_hir_go::frame_shim` for every target backend.
 //!
 //! KEEP IN SYNC: `radix::builtins::frame_types::STATUS_VARIANTS` and the text emissions in
 //! `radix_hir_rust::frame_shim` (verified by `#[cfg(test)] mod tests` in this file).
