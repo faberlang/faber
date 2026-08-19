@@ -447,7 +447,8 @@ impl Parser {
     ///
     /// NATURAL is interned as a named ident so later phases can read the
     /// decimal spelling. Arity and primitive-params stay resolve errors.
-    fn parse_type_argument(&mut self) -> Result<TypeExpr, ParseError> {
+    /// Call-site `typeArguments` share this production with named types.
+    pub(super) fn parse_type_argument(&mut self) -> Result<TypeExpr, ParseError> {
         if let TokenKind::Integer(value) = self.peek().kind {
             let span = self.current_span();
             self.advance();

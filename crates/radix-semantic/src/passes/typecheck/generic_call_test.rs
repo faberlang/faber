@@ -114,6 +114,23 @@ incipit {
 }
 
 #[test]
+fn explicit_magnitudo_natural_args_bind_at_call_site() {
+    // gradus nn.fab: `linear_from_raw<2, 2, 2>(...)` — NATURAL typeArguments
+    // on magnitudo params.
+    accepts(
+        r"functio take<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    redde x
+}
+
+incipit {
+    fixum tensor<f32, [2, 2]> a ← vacua
+    fixum tensor<f32, [2, 2]> b ← take<2, 2>(a)
+    nota b.longitudo()
+}",
+    );
+}
+
+#[test]
 fn explicit_generic_call_accepts_mixed_hole_and_concrete() {
     accepts(
         r#"functio both<A, B>(A a, B b) → A {

@@ -71,6 +71,7 @@ impl TypeChecker<'_> {
                 param_vars.insert(*sym, *ty);
             }
             let mut shape_vars = self.shape_vars_for(sig, &shape_symbols);
+            self.bind_explicit_magnitudo_args(sig, explicit_type_args, &mut shape_vars);
             (
                 self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars)),
                 Some(param_vars),
@@ -112,6 +113,12 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
         debug_assert!(!explicit_type_args.is_empty());
+
+        if self.explicit_args_are_magnitudo_list(explicit_type_args)
+            && explicit_type_args.len() == sig.type_params.len()
+        {
+            return None;
+        }
 
         let type_param_count = sig
             .type_params
@@ -445,6 +452,35 @@ impl TypeChecker<'_> {
             self.collect_shape_params_in_type(err, &mut symbols);
         }
         symbols
+    }
+
+    fn magnitudo_literal_of(&self, ty: TypeId) -> Option<u64> {
+        let Type::Param(sym) = self.types.get(ty) else {
+            return None;
+        };
+        let name = self.interner?.resolve(*sym);
+        radix_types::parse_natural_capacity(name)
+    }
+
+    fn explicit_args_are_magnitudo_list(&self, explicit_type_args: &[TypeId]) -> bool {
+        !explicit_type_args.is_empty()
+            && explicit_type_args
+                .iter()
+                .all(|ty| self.magnitudo_literal_of(*ty).is_some())
+    }
+
+    fn bind_explicit_magnitudo_args(
+        &mut self,
+        sig: &FuncSig,
+        explicit_type_args: &[TypeId],
+        shape_vars: &mut FxHashMap<Symbol, crate::IndexId>,
+    ) {
+        for (sym, ty) in sig.type_params.iter().zip(explicit_type_args.iter()) {
+            if let Some(value) = self.magnitudo_literal_of(*ty) {
+                let id = self.types.intern_index(IndexExpr::Literal(value));
+                shape_vars.insert(*sym, id);
+            }
+        }
     }
 
     fn collect_shape_params_in_type(&self, ty: TypeId, out: &mut FxHashSet<Symbol>) {

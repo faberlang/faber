@@ -307,6 +307,13 @@ impl Lowerer<'_> {
             return self.types.intern(Type::Param(name.name));
         }
 
+        // Applied NATURAL (`linear_from_raw<2, 2, 2>`) is interned as Param so
+        // call-site typecheck can bind magnitudo slots. Digit spellings are not
+        // type names.
+        if params.is_empty() && radix_types::parse_natural_capacity(name_str).is_some() {
+            return self.types.intern(Type::Param(name.name));
+        }
+
         let Some(def_id) = self.resolver.lookup_type(name.name) else {
             self.error("unknown_type_name");
             return self.types.intern(Type::Error);
