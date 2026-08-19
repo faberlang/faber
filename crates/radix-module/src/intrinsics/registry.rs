@@ -252,6 +252,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // textus
     intrinsic!(Textus, "accipe", 1, &[IntrinsicParamKind::NumerusIndex], Textus, collection Index),
     intrinsic!(Textus, "continet", 1, &[IntrinsicParamKind::Textus], Bool, collection Contains),
+    intrinsic!(Textus, "cursor", 0, &[], CursorAsciiOne, collection CordCursor),
     intrinsic!(Textus, "divide", 1, &[IntrinsicParamKind::Textus], TextusArray, collection Split),
     intrinsic!(Textus, "finis", 1, &[IntrinsicParamKind::Textus], Bool, collection EndsWith),
     intrinsic!(Textus, "initium", 1, &[IntrinsicParamKind::Textus], Bool, collection StartsWith),

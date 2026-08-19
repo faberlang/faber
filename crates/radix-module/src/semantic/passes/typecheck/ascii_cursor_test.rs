@@ -42,14 +42,6 @@ fn ascii_cursor_type_is_cursor_of_bounded_ascii_one() {
     );
 }
 
-#[test]
-fn textus_cursor_is_still_a_catalog_miss() {
-    let types = TypeTable::new();
-    let textus = types.get(types.primitive(Primitive::Textus));
-    assert_ne!(receivers_for_type(textus), &[IntrinsicReceiver::Ascii]);
-    assert!(lookup_method_for_type(textus, "cursor", 0).is_none());
-}
-
 #[cfg(feature = "hir-rust")]
 #[test]
 fn ascii_cursor_accepts_as_cursor_ascii_one() {

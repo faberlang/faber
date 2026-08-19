@@ -30,7 +30,7 @@
 )]
 
 use super::value::{
-    format_template, modular_operand, modular_word_mask, modular_word_result,
+    ascii1_from_scalar, format_template, modular_operand, modular_word_mask, modular_word_result,
     uint_width_checked_add, uint_width_checked_mul, values_equal, width_checked_add,
     width_checked_mul, GradientStorage, MapKey, SermoValue, TensorValue, Value,
 };
@@ -3015,9 +3015,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "cord cursor arity"));
         };
         let value = self.eval_operand(receiver, span)?;
-        let bytes = match value {
-            Value::Str(text) => text.into_bytes(),
-            Value::Ascii(byte) => vec![byte],
+        let elems = match value {
+            Value::Str(text) => {
+                let mut elems = Vec::with_capacity(text.len());
+                for ch in text.chars() {
+                    elems.push(ascii1_from_scalar(ch, span)?);
+                }
+                elems
+            }
+            Value::Ascii(byte) => vec![Value::Ascii(byte)],
             _ => {
                 return Err(RunnerError::internal(
                     span,
@@ -3025,7 +3031,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 ))
             }
         };
-        let elems = bytes.into_iter().map(Value::Ascii).collect();
         Ok(Value::Array(Rc::new(RefCell::new(elems))))
     }
 

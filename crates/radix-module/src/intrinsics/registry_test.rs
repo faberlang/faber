@@ -211,8 +211,18 @@ fn ascii_cursor_is_registered_as_cord_cursor() {
     assert_eq!(cursor.receiver, IntrinsicReceiver::Ascii);
     assert_eq!(cursor.return_kind, super::IntrinsicReturnKind::CursorAsciiOne);
     assert_eq!(mir_collection_op(cursor), Some(MirCollectionOp::CordCursor));
+}
+
+#[test]
+fn textus_cursor_is_registered_as_cord_cursor() {
+    let types = TypeTable::new();
     let textus = types.get(types.primitive(Primitive::Textus));
-    assert!(lookup_method_for_type(textus, "cursor", 0).is_none());
+
+    assert_eq!(receivers_for_type(textus), &[IntrinsicReceiver::Textus]);
+    let cursor = lookup_method_for_type(textus, "cursor", 0).expect("textus cursor");
+    assert_eq!(cursor.receiver, IntrinsicReceiver::Textus);
+    assert_eq!(cursor.return_kind, super::IntrinsicReturnKind::CursorAsciiOne);
+    assert_eq!(mir_collection_op(cursor), Some(MirCollectionOp::CordCursor));
 }
 
 #[test]

@@ -68,3 +68,31 @@ fn ascii_cursor_one_byte_ascii_value_is_singleton() {
     };
     assert_eq!(cell.borrow().as_slice(), &[Value::Ascii(b'x')]);
 }
+
+#[test]
+fn textus_cursor_two_scalars_are_ascii1_not_heap_strings() {
+    let value = eval_cord_cursor(Value::Str("ab".to_owned())).expect("textus cursor");
+    let Value::Array(cell) = value else {
+        panic!("cursor must materialize as an array, got {value:?}");
+    };
+    let elems = cell.borrow().clone();
+    assert_eq!(elems, vec![Value::Ascii(b'a'), Value::Ascii(b'b')]);
+    assert!(
+        elems.iter().all(|elem| !matches!(elem, Value::Str(_))),
+        "cord cursor must not allocate a heap String per step, got {elems:?}"
+    );
+}
+
+#[test]
+fn textus_cursor_non_ascii_scalar_traps() {
+    let err = eval_cord_cursor(Value::Str("é".to_owned())).expect_err("non-ASCII");
+    assert!(
+        err.message.contains("textus index trap"),
+        "non-ASCII cursor must use the live [i] trap, got {err:?}"
+    );
+    let err = eval_cord_cursor(Value::Str("ξ".to_owned())).expect_err("non-ASCII greek");
+    assert!(
+        err.message.contains("textus index trap"),
+        "non-ASCII cursor must use the live [i] trap, got {err:?}"
+    );
+}
