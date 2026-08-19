@@ -845,9 +845,7 @@ impl PrettyEmitter<'_> {
                         s.w.write(" ");
                         s.write_ident(&field.name);
                     }
-                    if !variant.fields.is_empty() {
-                        s.w.write(" ");
-                    }
+                    s.w.write(" ");
                     s.w.write("}");
                 }
                 if index + 1 < union.variants.len() {
