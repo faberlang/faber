@@ -88,13 +88,18 @@ impl TypeChecker<'_> {
 
     pub fn tensor_shape_has_unresolved_hole(&mut self, ty: TypeId) -> bool {
         let resolved = self.resolve_inferred_type(ty);
-        let Type::Tensor(_, shape) = self.types.get(resolved) else {
-            return false;
+        let capacity = match self.types.get(resolved) {
+            Type::Tensor(_, shape) => *shape,
+            Type::BoundedAscii { capacity }
+            | Type::BoundedTextus { capacity }
+            | Type::BoundedOcteti { capacity } => *capacity,
+            Type::BoundedArray { capacity, .. } => *capacity,
+            _ => return false,
         };
-        let shape = self.resolve_index(*shape);
-        if matches!(self.types.get_index(shape), IndexExpr::Unspecified) {
+        let capacity = self.resolve_index(capacity);
+        if matches!(self.types.get_index(capacity), IndexExpr::Unspecified) {
             return true;
         }
-        self.index_contains_unresolved_hole(shape)
+        self.index_contains_unresolved_hole(capacity)
     }
 }

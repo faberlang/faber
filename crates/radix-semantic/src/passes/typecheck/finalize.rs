@@ -150,6 +150,23 @@ impl TypeChecker<'_> {
                 let shape = self.canonicalize_index(shape);
                 self.types.tensor_with_shape(elem, shape)
             }
+            Type::BoundedAscii { capacity } => {
+                let capacity = self.canonicalize_index(capacity);
+                self.types.bounded_ascii(capacity)
+            }
+            Type::BoundedTextus { capacity } => {
+                let capacity = self.canonicalize_index(capacity);
+                self.types.bounded_textus(capacity)
+            }
+            Type::BoundedOcteti { capacity } => {
+                let capacity = self.canonicalize_index(capacity);
+                self.types.bounded_octeti(capacity)
+            }
+            Type::BoundedArray { element, capacity } => {
+                let element = self.canonicalize_type(element);
+                let capacity = self.canonicalize_index(capacity);
+                self.types.bounded_array(element, capacity)
+            }
             Type::InferUnion(var) => {
                 // THU-U-05 solve: the accumulated member set is the answer.
                 // `union_members` is frozen once checking converges; finalize
@@ -253,7 +270,15 @@ impl TypeChecker<'_> {
             return true;
         }
         if self.tensor_shape_has_unresolved_hole(ty) {
-            self.missing_type_annotation("cannot_infer_tensor_shape", span);
+            let peeled = self.resolve_inferred_type(ty);
+            let issue = match self.types.get(peeled) {
+                Type::BoundedAscii { .. }
+                | Type::BoundedTextus { .. }
+                | Type::BoundedOcteti { .. }
+                | Type::BoundedArray { .. } => "bounded_capacity_unsolved",
+                _ => "cannot_infer_tensor_shape",
+            };
+            self.missing_type_annotation(issue, span);
             return true;
         }
         false

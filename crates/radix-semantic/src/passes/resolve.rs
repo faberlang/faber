@@ -1564,6 +1564,9 @@ fn capacity_index_issue(
     resolver: &Resolver,
     interner: &Interner,
 ) -> Option<&'static str> {
+    if matches!(param.kind, TypeExprKind::Infer) {
+        return None;
+    }
     let TypeExprKind::Named(ident, nested) = &param.kind else {
         return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
     };
@@ -2820,6 +2823,10 @@ fn lower_capacity_index(
     interner: &Interner,
     types: &mut TypeTable,
 ) -> Result<crate::IndexId, TypeLowerError> {
+    if matches!(param.kind, TypeExprKind::Infer) {
+        let var = types.fresh_index_infer_var();
+        return Ok(types.intern_index(IndexExpr::Infer(var)));
+    }
     if let Some(issue) = capacity_index_issue(param, resolver, interner) {
         return Err(TypeLowerError::Issue(issue));
     }
@@ -3012,7 +3019,10 @@ fn lower_named_type(
         SymbolKind::Enum => types.intern(Type::Enum(def_id)),
         SymbolKind::Interface => types.intern(Type::Interface(def_id)),
         SymbolKind::TypeAlias => match symbol.ty {
-            Some(resolved) => types.intern(Type::Alias(def_id, resolved)),
+            Some(resolved) => {
+                let body = crate::index::freshen_bounded_capacity_holes(types, resolved);
+                types.intern(Type::Alias(def_id, body))
+            }
             None => return Err(TypeLowerError::UnresolvedAlias),
         },
         SymbolKind::TypeParam => types.intern(Type::Param(symbol.name)),

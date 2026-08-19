@@ -323,7 +323,8 @@ impl Lowerer<'_> {
             crate::SymbolKind::Interface => self.types.intern(Type::Interface(def_id)),
             crate::SymbolKind::TypeAlias => {
                 if let Some(resolved) = symbol.ty {
-                    self.types.intern(Type::Alias(def_id, resolved))
+                    let body = crate::index::freshen_bounded_capacity_holes(self.types, resolved);
+                    self.types.intern(Type::Alias(def_id, body))
                 } else {
                     self.error("missing_resolved_type_alias");
                     self.types.intern(Type::Error)
@@ -435,6 +436,10 @@ impl Lowerer<'_> {
     }
 
     fn lower_capacity_index(&mut self, param: &TypeExpr) -> Option<crate::IndexId> {
+        if matches!(param.kind, TypeExprKind::Infer) {
+            let var = self.types.fresh_index_infer_var();
+            return Some(self.types.intern_index(crate::IndexExpr::Infer(var)));
+        }
         let TypeExprKind::Named(ident, nested) = &param.kind else {
             self.error("bounded_capacity_not_natural");
             return None;

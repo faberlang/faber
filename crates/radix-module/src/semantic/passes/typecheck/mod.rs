@@ -36,6 +36,10 @@ mod tensor_type_directed_host_tests;
 mod bounded_identity_test;
 
 #[cfg(test)]
+#[path = "bounded_capacity_slot_test.rs"]
+mod bounded_capacity_slot_test;
+
+#[cfg(test)]
 #[path = "generic_params_test.rs"]
 mod generic_params_test;
 

@@ -518,6 +518,7 @@ fn semantic_missing_type_annotation_message(args: &[DiagnosticArg]) -> Option<St
         "cannot_infer_field_type" => Some("cannot infer field type".to_owned()),
         "cannot_infer_return_type" => Some("cannot infer return type".to_owned()),
         "cannot_infer_tensor_shape" => Some("cannot infer tensor shape".to_owned()),
+        "bounded_capacity_unsolved" => Some("cannot infer bounded-buffer capacity".to_owned()),
         "cannot_infer_variable_type" => Some("cannot infer variable type".to_owned()),
         "directional_view_type_not_registered" => {
             Some("directional view type not registered".to_owned())
@@ -537,6 +538,9 @@ fn semantic_missing_type_annotation_message(args: &[DiagnosticArg]) -> Option<St
 fn semantic_missing_type_annotation_help(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
         "cannot_infer_tensor_shape" => Some("provide a concrete tensor or sparsa shape".to_owned()),
+        "bounded_capacity_unsolved" => {
+            Some("write a concrete N (ascii<8>) or give the hole a bounded witness".to_owned())
+        }
         "cannot_infer_alternate_exit_type"
         | "cannot_infer_constant_type"
         | "cannot_infer_expression_type"

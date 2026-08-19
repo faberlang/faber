@@ -342,6 +342,23 @@ impl TypeChecker<'_> {
                 let shape = self.substitute_index_params(shape, shape_vars.as_deref_mut());
                 self.types.sparsa_with_shape(element, shape)
             }
+            Type::BoundedAscii { capacity } => {
+                let capacity = self.substitute_index_params(capacity, shape_vars.as_deref_mut());
+                self.types.bounded_ascii(capacity)
+            }
+            Type::BoundedTextus { capacity } => {
+                let capacity = self.substitute_index_params(capacity, shape_vars.as_deref_mut());
+                self.types.bounded_textus(capacity)
+            }
+            Type::BoundedOcteti { capacity } => {
+                let capacity = self.substitute_index_params(capacity, shape_vars.as_deref_mut());
+                self.types.bounded_octeti(capacity)
+            }
+            Type::BoundedArray { element, capacity } => {
+                let element = self.substitute_type_params(element, vars, shape_vars.as_deref_mut());
+                let capacity = self.substitute_index_params(capacity, shape_vars.as_deref_mut());
+                self.types.bounded_array(element, capacity)
+            }
             Type::Func(sig) => {
                 let substituted = self.substitute_func_sig(&sig, vars, shape_vars.as_deref_mut());
                 self.types.function(substituted)
@@ -430,8 +447,15 @@ impl TypeChecker<'_> {
             Type::Tensor(_, shape)
             | Type::Vector(_, shape)
             | Type::Matrix(_, shape)
-            | Type::Sparsa(_, shape) => {
+            | Type::Sparsa(_, shape)
+            | Type::BoundedAscii { capacity: shape }
+            | Type::BoundedTextus { capacity: shape }
+            | Type::BoundedOcteti { capacity: shape } => {
                 self.collect_shape_params_in_index(shape, out);
+            }
+            Type::BoundedArray { element, capacity } => {
+                self.collect_shape_params_in_type(element, out);
+                self.collect_shape_params_in_index(capacity, out);
             }
             Type::Array(inner)
             | Type::Set(inner)

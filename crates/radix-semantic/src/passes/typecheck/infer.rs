@@ -317,6 +317,48 @@ impl TypeChecker<'_> {
                 };
                 return self.types.sparsa_with_shape(elem, shape);
             }
+            (Type::BoundedAscii { capacity: ca }, Type::BoundedAscii { capacity: cb }) => {
+                let Ok(capacity) =
+                    super::tensor_index::unify_tensor_shape_indices(self, ca, cb, span)
+                else {
+                    return self.error_type;
+                };
+                return self.types.bounded_ascii(capacity);
+            }
+            (Type::BoundedTextus { capacity: ca }, Type::BoundedTextus { capacity: cb }) => {
+                let Ok(capacity) =
+                    super::tensor_index::unify_tensor_shape_indices(self, ca, cb, span)
+                else {
+                    return self.error_type;
+                };
+                return self.types.bounded_textus(capacity);
+            }
+            (Type::BoundedOcteti { capacity: ca }, Type::BoundedOcteti { capacity: cb }) => {
+                let Ok(capacity) =
+                    super::tensor_index::unify_tensor_shape_indices(self, ca, cb, span)
+                else {
+                    return self.error_type;
+                };
+                return self.types.bounded_octeti(capacity);
+            }
+            (
+                Type::BoundedArray {
+                    element: ea,
+                    capacity: ca,
+                },
+                Type::BoundedArray {
+                    element: eb,
+                    capacity: cb,
+                },
+            ) => {
+                let element = self.unify_with_policy(ea, eb, span, issue, policy);
+                let Ok(capacity) =
+                    super::tensor_index::unify_tensor_shape_indices(self, ca, cb, span)
+                else {
+                    return self.error_type;
+                };
+                return self.types.bounded_array(element, capacity);
+            }
             (Type::Atomic(inner_a), Type::Atomic(inner_b)) => {
                 let inner = self.unify_with_policy(inner_a, inner_b, span, issue, policy);
                 return self.types.atomic(inner);
