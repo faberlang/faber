@@ -102,7 +102,7 @@ pub mod tensor_type_directed;
 
 /// Type information for a value currently visible in lexical scope.
 #[derive(Clone, Copy)]
-pub struct BindingInfo {
+pub(crate) struct BindingInfo {
     /// Table-local type of the binding after declaration or pattern checking.
     ty: TypeId,
     /// Proven single-scalar `textus`/`ascii` (literal, unit `sectio`, predicate param, or interval bound param).
@@ -112,7 +112,7 @@ pub struct BindingInfo {
 }
 
 /// Struct member information collected before expression checking begins.
-pub struct StructInfo {
+pub(crate) struct StructInfo {
     /// Field contracts keyed by lowered field symbol.
     fields: FxHashMap<Symbol, StructFieldInfo>,
 
@@ -123,7 +123,7 @@ pub struct StructInfo {
 
 /// Interface method contract plus availability metadata.
 #[derive(Clone)]
-pub struct InterfaceMethodInfo {
+pub(crate) struct InterfaceMethodInfo {
     sig: FuncSig,
     availability: Vec<HirAvailability>,
     span: radix_lexer::Span,
@@ -147,7 +147,7 @@ struct StructFieldInfo {
 
 /// Current alternate-exit context for `iace` and handled failable calls.
 #[derive(Clone, Copy)]
-pub enum ErrorSink {
+pub(crate) enum ErrorSink {
     /// Function-level alternate-exit type declared on the current function.
     Function(TypeId),
 
@@ -163,7 +163,7 @@ pub enum ErrorSink {
 /// deliberately separate from the shared type table: `Type::Infer` values are
 /// stored in the table, but their substitutions are only meaningful through this
 /// checker instance.
-pub struct TypeChecker<'a> {
+pub(crate) struct TypeChecker<'a> {
     /// Resolver snapshot from previous semantic passes. Kept with the checker so
     /// future lookup logic can consult resolved symbols without widening method
     /// signatures.
@@ -323,17 +323,15 @@ pub struct TypeChecker<'a> {
 
 /// Typecheck resolved HIR and attach table-local types to declarations and expressions.
 ///
-/// This entrypoint owns the full typecheck lifecycle: collect declaration
-/// contracts, check item/entry bodies, then finalize HIR annotations by resolving
-/// aliases and inference substitutions. It returns all hard diagnostics together
-/// so callers can present a useful batch instead of stopping at the first
-/// mismatch.
+/// Test helper around [`typecheck_with_interner`]. Production analysis uses
+/// [`typecheck_with_config`].
 ///
 /// # Errors
 ///
 /// Returns type mismatch, arity, and other typecheck diagnostics as a list of
 /// [`SemanticError`]s.
-pub fn typecheck(
+#[cfg(test)]
+pub(crate) fn typecheck(
     hir: &mut HirModule,
     resolver: &Resolver,
     types: &mut TypeTable,
@@ -346,7 +344,8 @@ pub fn typecheck(
 /// # Errors
 ///
 /// Returns type mismatch and related diagnostics as a list of [`SemanticError`]s.
-pub fn typecheck_with_interner(
+#[cfg(test)]
+pub(crate) fn typecheck_with_interner(
     hir: &mut HirModule,
     resolver: &Resolver,
     types: &mut TypeTable,
@@ -361,7 +360,7 @@ pub fn typecheck_with_interner(
 /// # Errors
 ///
 /// Returns type mismatch and related diagnostics as a list of [`SemanticError`]s.
-pub fn typecheck_with_config(
+pub(crate) fn typecheck_with_config(
     hir: &mut HirModule,
     resolver: &Resolver,
     types: &mut TypeTable,

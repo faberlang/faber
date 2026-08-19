@@ -1,6 +1,5 @@
 //! Typecheck pipeline tests — driver/codegen proofs that cannot live in the leaf.
 
-pub use radix_semantic::passes::typecheck::*;
 pub use radix_semantic::*;
 
 #[cfg(test)]

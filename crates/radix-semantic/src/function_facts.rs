@@ -233,7 +233,7 @@ pub fn analyze_function_facts(hir: &HirModule, types: &TypeTable) -> FunctionFac
 }
 
 #[derive(Default)]
-pub struct RawFnDeps {
+pub(crate) struct RawFnDeps {
     pub direct_throw: bool,
     /// Direct `ad` in body — codegen-failable only; does not propagate via calls.
     pub direct_ad: bool,
@@ -242,7 +242,7 @@ pub struct RawFnDeps {
 }
 
 #[must_use]
-pub fn propagate_failable(
+pub(crate) fn propagate_failable(
     raw: &FxHashMap<DefId, RawFnDeps>,
     declared_err: &FxHashMap<DefId, TypeId>,
 ) -> FxHashSet<DefId> {

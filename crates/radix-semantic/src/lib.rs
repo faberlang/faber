@@ -73,7 +73,6 @@ pub mod lower;
 #[cfg(test)]
 #[path = "test_support.rs"]
 pub mod test_support;
-pub use function_facts::{propagate_failable, RawFnDeps};
 pub use lower::annotation::try_parse_nondum_annotation;
 pub use lower::LoweredProgram;
 pub use numeric_width::is_tensor_element_type;
@@ -229,16 +228,11 @@ impl SemanticResult {
         self.hir.is_some() && !self.diagnostics.iter().any(SemanticError::is_error)
     }
 
-    /// Result-shaped alias of [`Self::success`] for tests ported from driver `Result`.
+    /// Result-shaped alias of [`Self::success`] for in-crate tests.
+    #[cfg(test)]
     #[must_use]
-    pub fn is_ok(&self) -> bool {
+    pub(crate) fn is_ok(&self) -> bool {
         self.success()
-    }
-
-    /// Result-shaped alias of a failed [`Self::success`] check.
-    #[must_use]
-    pub fn is_err(&self) -> bool {
-        !self.success()
     }
 }
 

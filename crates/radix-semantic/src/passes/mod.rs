@@ -56,7 +56,7 @@ pub mod lint;
 pub mod live_tuus_cursor_escape;
 pub mod resolve;
 pub mod return_path;
-pub mod typecheck;
+pub(crate) mod typecheck;
 pub mod visibility_annotation;
 
 #[cfg(test)]
