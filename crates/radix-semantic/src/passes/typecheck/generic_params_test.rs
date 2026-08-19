@@ -1,0 +1,370 @@
+//! DEFER-059 ratchet: generic params stay rigid in bodies; call sites instantiate.
+
+use crate::test_support;
+
+fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
+    crate::test_support::analyze_source(source)
+}
+
+fn accepts(source: &str) {
+    let result = compile(source);
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+}
+
+fn rejects_with_issue(source: &str, issue: &str) {
+    let result = compile(source);
+    assert!(
+        !result.is_ok(),
+        "expected failure, got: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result.diagnostics.iter().any(|diag| diag
+            .args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == issue)),
+        "expected diagnostic issue {issue:?}, got: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn generic_return_widening_rejects_unsound_conversio() {
+    rejects_with_issue(
+        r"functio bad<T>(T x) → T {
+    redde x ↦ textus
+}",
+        "return_type_mismatch",
+    );
+}
+
+#[test]
+fn generic_union_construction_substitutes_expected_witness() {
+    // U-D1: a generic union's variant payload is checked against the union's
+    // type param substituted by the enclosing expected type.
+    accepts(
+        r"discretio Cista<T> {
+    Plena { T res }
+}
+
+functio facere() → Cista<numerus> {
+    redde finge Plena { res = 1 }
+}",
+    );
+}
+
+#[test]
+fn generic_class_construction_substitutes_expected_witness() {
+    // U-D1: generic genus construction substitutes the expected witness into
+    // the field type before the initializer is checked.
+    accepts(
+        r"genus C<T> {
+    T value
+}
+
+functio facere() → C<numerus> {
+    redde C { value = 1 }
+}",
+    );
+}
+
+#[test]
+fn generic_class_construction_rejects_uninstantiated_field() {
+    // Without an applied context the raw `T` field is still not satisfiable by
+    // a concrete initializer: the substitution must come from the construction
+    // site, never silently from the field.
+    rejects_with_issue(
+        r#"genus C<T> {
+    T value
+}
+
+functio facere() → C<numerus> {
+    redde C { value = "x" }
+}"#,
+        "field_initializer_type_mismatch",
+    );
+}
+
+#[test]
+fn generic_call_instantiates_type_params_at_call_site() {
+    accepts(
+        r"functio id<T>(T x) → T {
+    redde x
+}
+
+incipit {
+    fixum numerus n ← id(42)
+    nota n
+}",
+    );
+}
+
+#[test]
+fn generic_call_shares_one_witness_for_repeated_param_symbol() {
+    accepts(
+        r"functio pair<T>(T a, T b) → T {
+    redde a
+}
+
+incipit {
+    fixum numerus n ← pair(1, 2)
+    nota n
+}",
+    );
+}
+
+#[test]
+fn generic_call_rejects_mismatched_witnesses_for_shared_param_symbol() {
+    rejects_with_issue(
+        r#"functio pair<T>(T a, T b) → T {
+    redde a
+}
+
+incipit {
+    fixum _ n ← pair(1, "two")
+}"#,
+        "argument_type_mismatch",
+    );
+}
+
+#[test]
+fn magnitudo_param_lowers_in_vector_signature() {
+    accepts(
+        r"functio same_width<elem, magnitudo N>(vector<elem, N> v) → vector<elem, N> {
+    redde v
+}",
+    );
+}
+
+#[test]
+fn vector_dot_returns_element_type() {
+    accepts(
+        r"incipit {
+    fixum vf32[4] a ← [1.0, 2.0, 3.0, 4.0] ↦ vf32[4]
+    fixum vf32[4] b ← [4.0, 3.0, 2.0, 1.0] ↦ vf32[4]
+    fixum f32 d ← a.dot(b)
+    nota d
+}",
+    );
+}
+
+// ── shape generics (Phase 1A): implicit magnitudo binding ─────────────────
+
+#[test]
+fn shape_param_binds_from_argument_shape_at_call_site() {
+    // D1: a magnitudo shape param lowercases to a fresh index hole and binds
+    // from the argument tensor shapes; the call-site result shape is the
+    // concrete witness.
+    accepts(
+        r"functio sgd_step<magnitudo Figura>(tensor<f32, Figura> param, tensor<f32, Figura> grad, f32 lr) → tensor<f32, Figura> {
+    fixum tensor<f32, Figura> lr_fill ← param.reple(lr)
+    fixum tensor<f32, Figura> scaled ← grad.multiplica(lr_fill)
+    redde param.subtrahe(scaled)
+}
+
+incipit {
+    fixum tensor<f32, [2, 2]> p ← vacua
+    fixum tensor<f32, [2, 2]> g ← vacua
+    fixum tensor<f32, [2, 2]> r ← sgd_step(p, g, 0.1)
+    nota r.longitudo()
+}",
+    );
+}
+
+#[test]
+fn tuple_shape_params_bind_from_argument_shape() {
+    // D1 on the GOAL-CHECK blocker pattern: `tensor<f32, [B, D]>` with two
+    // magnitudo params binds both dims from a `[2, 2]` argument.
+    accepts(
+        r"functio sgd_generic<T, magnitudo B, magnitudo D>(tensor<T, [B, D]> param, tensor<T, [B, D]> grad, T lr) → tensor<T, [B, D]> {
+    redde param
+}
+
+incipit {
+    fixum tensor<f32, [2, 2]> p ← vacua
+    fixum tensor<f32, [2, 2]> g ← vacua
+    fixum tensor<f32, [2, 2]> r ← sgd_generic(p, g, 0.1)
+    nota r.longitudo()
+}",
+    );
+}
+
+#[test]
+fn shape_param_binds_rank_agnostic_across_concrete_ranks() {
+    // D1: the bare `Figura` shape param is rank-agnostic — one generic
+    // signature covers `[2, 2]`, `[4]`, and `[]` witnesses.
+    accepts(
+        r"functio sgd_step<magnitudo Figura>(tensor<f32, Figura> param, tensor<f32, Figura> grad, f32 lr) → tensor<f32, Figura> {
+    fixum tensor<f32, Figura> lr_fill ← param.reple(lr)
+    fixum tensor<f32, Figura> scaled ← grad.multiplica(lr_fill)
+    redde param.subtrahe(scaled)
+}
+
+incipit {
+    fixum tensor<f32, [2, 2]> p2 ← vacua
+    fixum tensor<f32, [2, 2]> g2 ← vacua
+    fixum tensor<f32, [2, 2]> r2 ← sgd_step(p2, g2, 0.1)
+    fixum tensor<f32, [4]> p1 ← vacua
+    fixum tensor<f32, [4]> g1 ← vacua
+    fixum tensor<f32, [4]> r1 ← sgd_step(p1, g1, 0.1)
+    fixum tensor<f32, []> p0 ← vacua
+    fixum tensor<f32, []> g0 ← vacua
+    fixum tensor<f32, []> r0 ← sgd_step(p0, g0, 0.1)
+    nota r0.longitudo()
+}",
+    );
+}
+
+#[test]
+fn shape_param_binds_from_expected_type() {
+    // D1: a shape param present only in the return type binds from the
+    // enclosing expected type (no shape-bearing arguments).
+    accepts(
+        r"functio make<T, magnitudo Figura>(T x) → tensor<T, Figura> {
+    redde vacua
+}
+
+incipit {
+    fixum tensor<numerus, [2, 2]> u ← make(5)
+    nota u.longitudo()
+}",
+    );
+}
+
+#[test]
+fn shape_param_binds_with_explicit_type_args() {
+    // Explicit type args cover type params only; shape params stay implicit
+    // (D1), so `sgd_generic<f32>` needs no figura witness.
+    accepts(
+        r"functio sgd_generic<T, magnitudo Figura>(tensor<T, Figura> param, T lr) → tensor<T, Figura> {
+    redde param
+}
+
+incipit {
+    fixum tensor<f32, [2, 2]> p ← vacua
+    fixum tensor<f32, [2, 2]> r ← sgd_generic<f32>(p, 0.1)
+    nota r.longitudo()
+}",
+    );
+}
+
+#[test]
+fn shared_shape_param_binds_once_across_repeated_positions() {
+    // One hole per distinct shape-param symbol: param and grad share `Figura`,
+    // so a `[2, 2]` grad must match a `[2, 2]` param — a rank-2 grad against
+    // a rank-1 param rejects instead of binding two independent shapes.
+    rejects_with_issue(
+        r"functio pair_shaped<T, magnitudo Figura>(tensor<T, Figura> a, tensor<T, Figura> b) → tensor<T, Figura> {
+    redde a
+}
+
+incipit {
+    fixum tensor<f32, [2, 2]> x ← vacua
+    fixum tensor<f32, [2]> y ← vacua
+    fixum _ r ← pair_shaped(x, y)
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn unbound_shape_param_rejects_with_sem014() {
+    // D6: a shape param bound by neither arguments nor the expected type is
+    // an explicit SEM014.cannot_infer_tensor_shape — never a silent guess.
+    rejects_with_issue(
+        r"functio make<T, magnitudo Figura>(T x) → tensor<T, Figura> {
+    redde vacua
+}
+
+incipit {
+    make(5)
+}",
+        "cannot_infer_tensor_shape",
+    );
+}
+
+#[test]
+fn param_bound_shape_does_not_fire_sem014_in_library_context() {
+    // The goal's SEM014 relaxation: a shape held rigid by a magnitudo param is
+    // not an open metavariable, so a library-context declaration finalizes
+    // without `cannot_infer_tensor_shape`.
+    accepts(
+        r"functio sgd_step<T, magnitudo Figura>(tensor<T, Figura> param, tensor<T, Figura> grad, T lr) → tensor<T, Figura> {
+    redde param
+}",
+    );
+}
+
+#[test]
+fn open_shape_hole_in_library_context_still_fires_sem014() {
+    // The pinned remaining SEM014 trigger: a literal `_` hole in a tensor shape
+    // that no witness resolves is still a missing annotation.
+    rejects_with_issue(
+        r"functio k() → vacuum {
+    fixum tensor<f32, [_, 3]> x ← vacua
+}",
+        "cannot_infer_tensor_shape",
+    );
+}
+
+// ── shape-changing contracts (Phase 2A): symbolic methods in generic bodies ─
+
+#[test]
+fn generic_scaled_dot_product_method_body_typechecks() {
+    // The Phase-2 payoff shape: method-spelled scaled_dot_product with
+    // symbolic transpose, matmul, elementwise, and softmax steps.
+    accepts(
+        r"functio sdpa_full<magnitudo B, magnitudo D>(
+    tensor<f32, [B, D]> qb, tensor<f32, [B, D]> kb, tensor<f32, [B, D]> vb,
+    tensor<f32, [B, B]> scale
+) → tensor<f32, [B, D]> {
+    fixum tensor<f32, [D, B]> kt ← kb.transpone()
+    fixum tensor<f32, [B, B]> scores ← qb.matmul(kt)
+    fixum tensor<f32, [B, B]> scaled ← scores.multiplica(scale)
+    fixum tensor<f32, [B, B]> attn ← scaled.activatio_softmax()
+    fixum tensor<f32, [B, D]> context ← attn.matmul(vb)
+    redde context
+}",
+    );
+}
+
+#[test]
+fn shape_changing_call_site_binds_witnesses() {
+    // Concrete [2, 8] arguments bind B and D through a shape-changing body.
+    accepts(
+        r#"functio sdpa<magnitudo B, magnitudo D>(tensor<f32, [B, D]> qb, tensor<f32, [B, D]> kb, tensor<f32, [B, D]> vb) → tensor<f32, [B, D]> {
+    fixum tensor<f32, [D, B]> kt ← kb.transpone()
+    fixum tensor<f32, [B, B]> scores ← qb.matmul(kt)
+    fixum tensor<f32, [B, D]> context ← scores.matmul(vb)
+    redde context
+}
+
+incipit {
+    fixum tensor<f32, [2, 8]> qb ← vacua
+    fixum tensor<f32, [2, 8]> kb ← vacua
+    fixum tensor<f32, [2, 8]> vb ← vacua
+    fixum tensor<f32, [2, 8]> ctx ← sdpa(qb, kb, vb)
+    nota "call ok"
+}"#,
+    );
+}
+
+#[test]
+fn shape_changing_call_site_shape_mismatch_rejects() {
+    // A [3, 4] argument cannot witness [B, D] after B=2/D=8 bound from the
+    // first argument; the inner matmul dims also mismatch. Reject, never guess.
+    rejects_with_issue(
+        r#"functio sdpa_bad<magnitudo B, magnitudo D>(tensor<f32, [B, D]> qb, tensor<f32, [B, D]> kb, tensor<f32, [B, D]> vb) → tensor<f32, [B, D]> {
+    redde qb.matmul(kb)
+}
+
+incipit {
+    fixum tensor<f32, [2, 8]> qb ← vacua
+    fixum tensor<f32, [3, 4]> kb ← vacua
+    fixum tensor<f32, [2, 8]> vb ← vacua
+    fixum tensor<f32, [2, 8]> ctx ← sdpa_bad(qb, kb, vb)
+    nota "bad call ok"
+}"#,
+        "incompatible_tensor_index",
+    );
+}

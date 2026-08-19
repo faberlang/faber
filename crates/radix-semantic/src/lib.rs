@@ -70,6 +70,9 @@ pub mod kernel;
 pub mod live_tuus_cursor;
 pub mod locale;
 pub mod lower;
+#[cfg(test)]
+#[path = "test_support.rs"]
+pub mod test_support;
 pub use function_facts::{propagate_failable, RawFnDeps};
 pub use lower::annotation::try_parse_nondum_annotation;
 pub use lower::LoweredProgram;
@@ -224,6 +227,18 @@ impl SemanticResult {
     /// policy must inspect `diagnostics` themselves.
     pub fn success(&self) -> bool {
         self.hir.is_some() && !self.diagnostics.iter().any(SemanticError::is_error)
+    }
+
+    /// Result-shaped alias of [`Self::success`] for tests ported from driver `Result`.
+    #[must_use]
+    pub fn is_ok(&self) -> bool {
+        self.success()
+    }
+
+    /// Result-shaped alias of a failed [`Self::success`] check.
+    #[must_use]
+    pub fn is_err(&self) -> bool {
+        !self.success()
     }
 }
 
@@ -622,7 +637,7 @@ pub fn analyze_with_cli(
 }
 
 // constructor: moves all parameters into result
-fn early_semantic_result(
+pub(crate) fn early_semantic_result(
     types: TypeTable,
     resolver: Resolver,
     radix_lanes: RadixLaneMetadata,
@@ -645,7 +660,7 @@ fn early_semantic_result(
 ///
 /// No HIR exists here, so there is no real program-end boundary; the sidecar
 /// is deliberately empty.
-fn empty_presentation() -> HirPresentation {
+pub(crate) fn empty_presentation() -> HirPresentation {
     HirPresentation {
         owners: Vec::new(),
         attachments: Vec::new(),
@@ -804,3 +819,99 @@ fn register_locale_pack_type_spellings(
         }
     }
 }
+
+#[cfg(test)]
+#[path = "analyzed_application_test.rs"]
+mod analyzed_application_test;
+
+#[cfg(test)]
+#[path = "annotation_contract_test.rs"]
+mod annotation_contract_test;
+
+#[cfg(test)]
+#[path = "broadcast_reduction_test.rs"]
+mod broadcast_reduction_test;
+
+#[cfg(test)]
+#[path = "def_id_closure_test.rs"]
+mod def_id_closure_test;
+
+#[cfg(test)]
+#[path = "error_test.rs"]
+mod error_test;
+
+#[cfg(test)]
+#[path = "figura_literal_test.rs"]
+mod figura_literal_test;
+
+#[cfg(test)]
+#[path = "figura_test.rs"]
+mod figura_test;
+
+#[cfg(test)]
+#[path = "format_type_test.rs"]
+mod format_type_test;
+
+#[cfg(test)]
+#[path = "function_facts_propagate_worklist_test.rs"]
+mod function_facts_propagate_worklist_test;
+
+#[cfg(test)]
+#[path = "function_facts_test.rs"]
+mod function_facts_test;
+
+#[cfg(test)]
+#[path = "index_infer_test.rs"]
+mod index_infer_test;
+
+#[cfg(test)]
+#[path = "index_test.rs"]
+mod index_test;
+
+#[cfg(test)]
+#[path = "index_unify_test.rs"]
+mod index_unify_test;
+
+#[cfg(test)]
+#[path = "init_state_test.rs"]
+mod init_state_test;
+
+#[cfg(test)]
+#[path = "instans_precision_test.rs"]
+mod instans_precision_test;
+
+#[cfg(test)]
+#[path = "lista_tensor_conversio_test.rs"]
+mod lista_tensor_conversio_test;
+
+#[cfg(test)]
+#[path = "mod_test.rs"]
+mod mod_test;
+
+#[cfg(test)]
+#[path = "numeric_width_test.rs"]
+mod numeric_width_test;
+
+#[cfg(test)]
+#[path = "radix_lane_test.rs"]
+mod radix_lane_test;
+
+#[cfg(test)]
+#[path = "scope_test.rs"]
+mod scope_test;
+
+#[cfg(test)]
+#[path = "tensor_bracket_test.rs"]
+mod tensor_bracket_test;
+
+#[cfg(test)]
+#[path = "tensor_element_lattice_test.rs"]
+mod tensor_element_lattice_test;
+
+#[cfg(test)]
+#[path = "types_test.rs"]
+mod types_test;
+
+#[cfg(test)]
+#[path = "vector_width_test.rs"]
+mod vector_width_test;

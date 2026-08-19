@@ -58,6 +58,15 @@ impl SemanticError {
     pub fn is_error(&self) -> bool {
         !matches!(self.kind, SemanticErrorKind::Warning(_))
     }
+
+    /// Named `issue` argument, if the diagnostic carries one.
+    #[must_use]
+    pub fn issue(&self) -> Option<&str> {
+        self.args
+            .iter()
+            .find(|arg| arg.name == "issue")
+            .map(|arg| arg.value.as_str())
+    }
 }
 
 /// Semantic diagnostic categories used by passes and command policy — owned

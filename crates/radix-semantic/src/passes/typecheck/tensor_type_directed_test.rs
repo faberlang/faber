@@ -1,0 +1,230 @@
+//! Regression coverage for the tensor type-directed construction and reshape clean break.
+//!
+//! These tests lock the typecheck behaviour for `tensor.creata()`, `tensor.structa()`,
+//! `tensor.formata()`, and receiver-based alternatives (`crea`, `forma`, `formata`).
+//! They also verify that removed/stale API shapes produce structured diagnostics.
+
+use radix_diagnostics::DiagnosticArg;
+use radix_target::Target;
+
+fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
+    crate::test_support::analyze_source(source)
+}
+
+fn accepts(source: &str) {
+    let result = compile(source);
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+}
+
+fn rejects_with_issue(source: &str, issue: &str) {
+    let result = compile(source);
+    assert!(
+        !result.is_ok(),
+        "expected failure, got: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.args == vec![DiagnosticArg::new("issue", issue)]),
+        "expected diagnostic issue {issue:?}, got: {:?}",
+        result.diagnostics
+    );
+}
+
+const IMPORT: &str = r#"importa ex "norma:tensor" tensor
+"#;
+
+#[test]
+fn static_tensor_creata_and_structa_accept_complete_type_args() {
+    accepts(
+        &(IMPORT.to_owned()
+            + r"incipit {
+  fixum tf32[2, 2] grid ← tensor.creata<tf32[2, 2]>(0.0)
+  fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+  fixum tf32[2, 3] data ← tensor.structa<tf32[2, 3]>(flat)
+  nota grid.longitudo()
+  nota data.longitudo()
+}"),
+    );
+}
+
+#[test]
+fn static_tensor_formata_accepts_complete_type_arg() {
+    accepts(
+        r"incipit {
+  fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+  fixum tf32[] seed ← vacua
+  fixum tf32[2, 3] data ← seed.strue(flat, [2, 3])
+  fixum tf32[3, 2] view ← data.formata<tf32[3, 2]>()
+  nota view.longitudo()
+}",
+    );
+}
+
+#[test]
+fn dynamic_tensor_receiver_methods_accept_payload_first() {
+    accepts(
+        r"incipit {
+  fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+  fixum lista<numerus> shape ← [2, 2]
+  fixum tf32[] seed ← vacua
+  fixum tf32[2, 2] grid ← seed.crea(0.0, shape)
+  fixum tf32[2, 2] data ← seed.strue(flat, shape)
+  fixum tf32[4] view ← data.forma([4])
+  nota view.longitudo()
+}",
+    );
+}
+
+#[test]
+fn rejects_old_crea_argument_order() {
+    rejects_with_issue(
+        r"incipit {
+  fixum tf32[] seed ← vacua
+  fixum _ grid ← seed.crea([2, 2], 0.0)
+}",
+        "tensor_crea_argument_order",
+    );
+}
+
+#[test]
+fn rejects_old_structa_receiver_name() {
+    rejects_with_issue(
+        r"incipit {
+  fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+  fixum tf32[] seed ← vacua
+  fixum _ grid ← seed.structa(flat, [2, 2])
+}",
+        "tensor_receiver_structa_renamed",
+    );
+}
+
+#[test]
+fn rejects_old_tensor_creata_with_runtime_shape() {
+    rejects_with_issue(
+        &(IMPORT.to_owned()
+            + r"incipit {
+  fixum _ grid ← tensor.creata(0.0, [2, 2])
+}"),
+        "tensor_creata_runtime_shape_removed",
+    );
+}
+
+#[test]
+fn rejects_old_tensor_creata_element_type_arg_with_runtime_shape() {
+    rejects_with_issue(
+        &(IMPORT.to_owned()
+            + r"incipit {
+  fixum _ grid ← tensor.creata<numerus>(0, [2, 2])
+}"),
+        "tensor_type_arg_incomplete",
+    );
+}
+
+#[test]
+fn rejects_element_only_tensor_creata_type_arg() {
+    rejects_with_issue(
+        &(IMPORT.to_owned()
+            + r"incipit {
+  fixum _ grid ← tensor.creata<f32>(0.0)
+}"),
+        "tensor_type_arg_incomplete",
+    );
+}
+
+#[test]
+fn rejects_tensor_structa_forma() {
+    rejects_with_issue(
+        &(IMPORT.to_owned()
+            + r"incipit {
+  fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+  fixum _ grid ← tensor.structa_forma(flat, [2, 3])
+}"),
+        "tensor_structa_forma_removed",
+    );
+}
+
+#[test]
+fn rejects_receiver_creata_with_type_args() {
+    rejects_with_issue(
+        r"incipit {
+  fixum tf32[] seed ← vacua
+  fixum _ grid ← seed.creata<tf32[2, 2]>(0.0)
+}",
+        "tensor_receiver_creata_type_args",
+    );
+}
+
+#[test]
+fn rejects_tensor_creata_without_complete_type_arg() {
+    rejects_with_issue(
+        &(IMPORT.to_owned()
+            + r"incipit {
+  fixum _ grid ← tensor.creata(0.0)
+}"),
+        "tensor_creata_complete_type_arg_required",
+    );
+}
+
+#[test]
+fn rejects_formata_without_complete_type_arg() {
+    rejects_with_issue(
+        r"incipit {
+  fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+  fixum tf32[] seed ← vacua
+  fixum tf32[2, 2] data ← seed.strue(flat, [2, 2])
+  fixum _ view ← data.formata()
+}",
+        "tensor_formata_complete_type_arg_required",
+    );
+}
+
+#[test]
+fn rejects_formata_value_args() {
+    rejects_with_issue(
+        r"incipit {
+  fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+  fixum tf32[] seed ← vacua
+  fixum tf32[2, 2] data ← seed.strue(flat, [2, 2])
+  fixum _ view ← data.formata<tf32[4]>([4])
+}",
+        "tensor_formata_forbids_value_args",
+    );
+}
+
+#[test]
+fn rejects_tensor_creata_element_type_mismatch_at_assignment() {
+    rejects_with_issue(
+        &(IMPORT.to_owned()
+            + r#"incipit {
+  fixum _ grid ← tensor.creata<tf32[2, 2]>("bad")
+}"#),
+        "argument_type_mismatch",
+    );
+}
+
+#[test]
+fn rejects_formata_element_type_mismatch_with_structured_issue_arg() {
+    rejects_with_issue(
+        r"incipit {
+  fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+  fixum tf32[] seed ← vacua
+  fixum tf32[2, 2] data ← seed.strue(flat, [2, 2])
+  fixum _ view ← data.formata<tensor<numerus, [4]>>()
+}",
+        "tensor_formata_element_type_mismatch",
+    );
+}
+
+#[test]
+fn preserves_lista_to_tensor_conversion() {
+    accepts(
+        r"incipit {
+  fixum lista<numerus> xs ← [1, 2, 3, 4]
+  fixum tensor<numerus, [4]> grid ← xs ↦ tensor<numerus, [4]>
+  nota grid.longitudo()
+}",
+    );
+}

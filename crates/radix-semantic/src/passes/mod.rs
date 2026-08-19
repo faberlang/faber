@@ -58,3 +58,77 @@ pub mod resolve;
 pub mod return_path;
 pub mod typecheck;
 pub mod visibility_annotation;
+
+#[cfg(test)]
+pub use crate::{
+    DefId, Primitive, Resolver, SemanticError, SemanticErrorKind, SymbolKind, Type, TypeId,
+    TypeTable, WarningKind,
+};
+
+#[cfg(test)]
+#[path = "air_purity_test.rs"]
+mod air_purity_test;
+
+#[cfg(test)]
+#[path = "air_unroll_test.rs"]
+mod air_unroll_test;
+
+#[cfg(test)]
+#[path = "borrow_test.rs"]
+mod borrow_test;
+
+#[cfg(test)]
+#[path = "collect_test.rs"]
+mod collect_test;
+
+#[cfg(test)]
+#[path = "companion_predeclare_test.rs"]
+mod companion_predeclare_test;
+
+#[cfg(test)]
+#[path = "companion_signature_test.rs"]
+mod companion_signature_test;
+
+#[cfg(test)]
+#[path = "definite_assignment_test.rs"]
+mod definite_assignment_test;
+
+#[cfg(test)]
+#[path = "exhaustive_test.rs"]
+mod exhaustive_test;
+
+#[cfg(test)]
+#[path = "fragment_definition_test.rs"]
+mod fragment_definition_test;
+
+#[cfg(test)]
+#[path = "import_path_test.rs"]
+mod import_path_test;
+
+#[cfg(test)]
+#[path = "kernel_namespace_test.rs"]
+mod kernel_namespace_test;
+
+#[cfg(test)]
+#[path = "lint_test.rs"]
+mod lint_test;
+
+#[cfg(test)]
+#[path = "resolve_test.rs"]
+mod resolve_test;
+
+#[cfg(test)]
+#[path = "return_path_test.rs"]
+mod return_path_test;
+
+#[cfg(test)]
+#[path = "schema_resolve_test.rs"]
+mod schema_resolve_test;
+
+#[cfg(test)]
+#[path = "typecheck_test.rs"]
+mod typecheck_test;
+
+#[cfg(test)]
+#[path = "visibility_annotation_test.rs"]
+mod visibility_annotation_test;

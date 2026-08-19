@@ -1,0 +1,188 @@
+//! Tests for rectangular lista-to-tensor shape resolution.
+//!
+//! These tests prove that rectangular list literals resolve to tensor shapes
+//! and that irregular or type-mismatched lists produce the expected
+//! ListaToTensorError diagnostics.
+
+use super::lista_tensor_conversio::{
+    analyze_rectangular_lista_literal, ensure_lista_numerus_type, resolve_lista_to_tensor_shape,
+    validate_lista_to_tensor_source, ListaToTensorError, ListaToTensorShape,
+    RectangularListaLiteralError,
+};
+use crate::{IndexExpr, Primitive, Type, TypeTable};
+use radix_hir::{HirArrayElement, HirExpression, HirExpressionKind, HirId, HirLiteral};
+use radix_lexer::Span;
+
+#[test]
+fn lista_tensor_conversio_resolves_literal_rank_one_shape() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let shape = types.intern_index(IndexExpr::Literal(3));
+    let target = types.intern(Type::Tensor(numerus, shape));
+
+    assert_eq!(
+        resolve_lista_to_tensor_shape(target, &types),
+        Some(ListaToTensorShape::Literal(vec![3]))
+    );
+}
+
+#[test]
+fn lista_tensor_conversio_resolves_literal_rank_two_shape() {
+    let mut types = TypeTable::new();
+    let f32 = types.sized_numeric(Primitive::Fractus, crate::NumericWidth::F32);
+    let two = types.intern_index(IndexExpr::Literal(2));
+    let three = types.intern_index(IndexExpr::Literal(3));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![two, three]));
+    let target = types.intern(Type::Tensor(f32, shape));
+
+    assert_eq!(
+        resolve_lista_to_tensor_shape(target, &types),
+        Some(ListaToTensorShape::Literal(vec![2, 3]))
+    );
+}
+
+#[test]
+fn lista_tensor_conversio_uses_infer_one_d_for_non_literal_shape() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let shape = types.fresh_index_infer_var();
+    let shape = types.intern_index(IndexExpr::Infer(shape));
+    let target = types.intern(Type::Tensor(numerus, shape));
+
+    assert_eq!(
+        resolve_lista_to_tensor_shape(target, &types),
+        Some(ListaToTensorShape::InferOneD)
+    );
+}
+
+#[test]
+fn lista_tensor_conversio_validates_flat_source() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let lista = types.array(numerus);
+    let shape = types.intern_index(IndexExpr::Literal(3));
+    let tensor = types.intern(Type::Tensor(numerus, shape));
+
+    assert_eq!(
+        validate_lista_to_tensor_source(lista, tensor, &types),
+        Ok(())
+    );
+}
+
+#[test]
+fn lista_tensor_conversio_rejects_nested_source() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let inner = types.array(numerus);
+    let nested = types.array(inner);
+    let shape = types.intern_index(IndexExpr::Literal(3));
+    let tensor = types.intern(Type::Tensor(numerus, shape));
+
+    assert_eq!(
+        validate_lista_to_tensor_source(nested, tensor, &types),
+        Err(ListaToTensorError::NestedLista)
+    );
+}
+
+#[test]
+fn lista_tensor_conversio_ensures_shape_list_type() {
+    let mut types = TypeTable::new();
+    let shape_ty = ensure_lista_numerus_type(&mut types);
+
+    assert!(matches!(
+        types.get(shape_ty),
+        Type::Array(elem) if types.equals(*elem, types.primitive(Primitive::Numerus))
+    ));
+}
+
+#[test]
+fn rectangular_lista_literal_analyzer_flattens_rank_two_literal() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let target = tensor_type(&mut types, numerus, &[2, 2]);
+    let expr = nested_int_literal(&mut types, numerus, &[&[1, 2], &[3, 4]]);
+
+    let analyzed =
+        analyze_rectangular_lista_literal(&expr, target, &types).expect("rectangular literal");
+
+    assert_eq!(analyzed.leaf_elem, numerus);
+    assert_eq!(analyzed.dims, vec![2, 2]);
+    assert_eq!(analyzed.flat_leaves.len(), 4);
+}
+
+#[test]
+fn rectangular_lista_literal_analyzer_rejects_ragged_rows() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let target = tensor_type(&mut types, numerus, &[2, 2]);
+    let expr = nested_int_literal(&mut types, numerus, &[&[1, 2], &[3]]);
+
+    assert!(matches!(
+        analyze_rectangular_lista_literal(&expr, target, &types),
+        Err(RectangularListaLiteralError::RowLengthMismatch)
+    ));
+}
+
+#[test]
+fn rectangular_lista_literal_analyzer_rejects_shape_mismatch() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let target = tensor_type(&mut types, numerus, &[3, 3]);
+    let expr = nested_int_literal(&mut types, numerus, &[&[1, 2], &[3, 4]]);
+
+    assert!(matches!(
+        analyze_rectangular_lista_literal(&expr, target, &types),
+        Err(RectangularListaLiteralError::ShapeMismatch)
+    ));
+}
+
+fn tensor_type(types: &mut TypeTable, elem: crate::TypeId, dims: &[u64]) -> crate::TypeId {
+    let mut dim_ids = Vec::with_capacity(dims.len());
+    for dim in dims {
+        dim_ids.push(types.intern_index(IndexExpr::Literal(*dim)));
+    }
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    types.intern(Type::Tensor(elem, shape))
+}
+
+fn nested_int_literal(
+    types: &mut TypeTable,
+    elem: crate::TypeId,
+    rows: &[&[u64]],
+) -> HirExpression {
+    let row_ty = types.array(elem);
+    let outer_ty = types.array(row_ty);
+    HirExpression {
+        id: HirId(0),
+        kind: HirExpressionKind::Array(
+            rows.iter()
+                .enumerate()
+                .map(|(row_index, row)| {
+                    HirArrayElement::Expr(HirExpression {
+                        id: HirId(u32::try_from(row_index + 1).expect("fixture index fits u32")),
+                        kind: HirExpressionKind::Array(
+                            row.iter()
+                                .enumerate()
+                                .map(|(col_index, value)| {
+                                    HirArrayElement::Expr(HirExpression {
+                                        id: HirId(
+                                            u32::try_from(10 + row_index * 10 + col_index)
+                                                .expect("fixture index fits u32"),
+                                        ),
+                                        kind: HirExpressionKind::Literal(HirLiteral::Int(*value)),
+                                        ty: Some(elem),
+                                        span: Span::default(),
+                                    })
+                                })
+                                .collect(),
+                        ),
+                        ty: Some(row_ty),
+                        span: Span::default(),
+                    })
+                })
+                .collect(),
+        ),
+        ty: Some(outer_ty),
+        span: Span::default(),
+    }
+}
