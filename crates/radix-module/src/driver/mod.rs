@@ -369,7 +369,6 @@ fn codegen_diagnostic(name: &str, code: &'static str, message: impl Into<String>
         .with_file(name.to_owned())
 }
 
-// consumes both values into CompileResult
 fn compile_error(mut analysis: AnalyzedModule, diagnostic: Diagnostic) -> CompileResult {
     analysis.diagnostics.push(diagnostic);
     CompileResult { output: None, diagnostics: analysis.diagnostics }
@@ -487,7 +486,6 @@ fn mir_validation_errors_to_spanned(errors: Vec<crate::mir::MirValidationError>)
     SpannedCodegenError { message, args, span }
 }
 
-// consumes both values into error path
 fn compile_codegen_error(analysis: AnalyzedModule, name: &str, err: SpannedCodegenError) -> CompileResult {
     let mut diagnostic = Diagnostic::codegen_error(&err.message)
         .with_args(err.args)
@@ -963,7 +961,6 @@ fn generate_wgsl_text_output(
 }
 
 #[cfg(feature = "mir-wgsl")]
-#[cfg(feature = "mir-wgsl")]
 fn emit_wgsl_vertex_source_output(
     graphics_source: &GraphicsSourceFacts,
     vertex_mir: Option<&crate::mir::MirFunction>,
@@ -1012,7 +1009,6 @@ fn emit_wgsl_vertex_source_output(
 }
 
 #[cfg(feature = "mir-wgsl")]
-#[cfg(feature = "mir-wgsl")]
 fn emit_wgsl_fragment_source_output(
     graphics_source: &GraphicsSourceFacts,
     fragment_mir: Option<&crate::mir::MirFunction>,
@@ -1060,7 +1056,6 @@ fn emit_wgsl_fragment_source_output(
 }
 
 #[cfg(feature = "mir-wgsl")]
-#[cfg(feature = "mir-wgsl")]
 fn emit_wgsl_graphics_pipeline_output(
     graphics_source: &GraphicsSourceFacts,
     vertex_mir: Option<&crate::mir::MirFunction>,
@@ -1095,7 +1090,6 @@ fn emit_wgsl_graphics_pipeline_output(
 }
 
 #[cfg(feature = "mir-wgsl")]
-#[cfg(feature = "mir-wgsl")]
 fn validate_wgsl_vertex_source_entry(entry: &GraphicsVertexEntry) -> Result<(), crate::mir::MirWgslTextProbeError> {
     if entry.annotation_payload_count != 0 {
         return Err(wgsl_vertex_source_error(
@@ -1126,7 +1120,6 @@ fn validate_wgsl_vertex_source_entry(entry: &GraphicsVertexEntry) -> Result<(), 
 }
 
 #[cfg(feature = "mir-wgsl")]
-#[cfg(feature = "mir-wgsl")]
 fn wgsl_vertex_source_error(shape: &'static str, issue: &'static str) -> crate::mir::MirWgslTextProbeError {
     crate::mir::MirWgslTextProbeError {
         message: format!("MIR-to-WGSL unsupported: {shape}"),
@@ -1136,7 +1129,6 @@ fn wgsl_vertex_source_error(shape: &'static str, issue: &'static str) -> crate::
 }
 
 #[cfg(feature = "mir-wgsl")]
-#[cfg(feature = "mir-wgsl")]
 fn wgsl_vertex_abi_error(error: crate::mir::MirAbiError) -> crate::mir::MirWgslTextProbeError {
     crate::mir::MirWgslTextProbeError {
         message: format!("MIR-to-WGSL unsupported: {}", error.message),
@@ -1145,7 +1137,6 @@ fn wgsl_vertex_abi_error(error: crate::mir::MirAbiError) -> crate::mir::MirWgslT
     }
 }
 
-#[cfg(feature = "mir-wgsl")]
 #[cfg(feature = "mir-wgsl")]
 fn wgsl_text_codegen_error(error: crate::mir::MirWgslTextProbeError) -> codegen::CodegenError {
     codegen::CodegenError {
@@ -1157,8 +1148,6 @@ fn wgsl_text_codegen_error(error: crate::mir::MirWgslTextProbeError) -> codegen:
     }
 }
 
-#[cfg(feature = "mir-wgsl")]
-#[cfg(feature = "mir-wgsl")]
 #[cfg(feature = "mir-wgsl")]
 fn wgsl_vertex_source_error_with_detail(
     shape: &'static str,
@@ -1172,7 +1161,6 @@ fn wgsl_vertex_source_error_with_detail(
     }
 }
 
-#[cfg(feature = "mir-wgsl")]
 #[cfg(feature = "mir-wgsl")]
 fn validate_wgsl_fragment_source_entry(entry: &GraphicsFragmentEntry) -> Result<(), crate::mir::MirWgslTextProbeError> {
     if entry.annotation_payload_count != 0 {
