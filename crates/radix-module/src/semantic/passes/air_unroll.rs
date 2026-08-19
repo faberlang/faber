@@ -86,15 +86,10 @@ fn unroll_function(
     ids: &mut IdGen,
     errors: &mut Vec<SemanticError>,
 ) {
-    let mask = {
-        let Some(body) = &function.body else {
-            return;
-        };
-        MaskAnalysis::analyze(&function.params, body, types, interner)
-    };
     let Some(body) = &mut function.body else {
         return;
     };
+    let mask = MaskAnalysis::analyze(&function.params, body, types, interner);
     rewrite_block(body, lanes, interner, ids, errors, &mask);
 }
 
@@ -110,10 +105,11 @@ fn rewrite_block(
     while index < block.statements.len() {
         // Classify `itera` before walking into it so a nested range loop is
         // still visible to the outer decline check.
-        if classify_itera_stmt(&block.statements[index], block, lanes, interner, mask).is_none() {
+        let plan = classify_itera_stmt(&block.statements[index], block, lanes, interner, mask);
+        if plan.is_none() {
             rewrite_nested_stmt(&mut block.statements[index], lanes, interner, ids, errors, mask);
         }
-        let Some(plan) = classify_itera_stmt(&block.statements[index], block, lanes, interner, mask) else {
+        let Some(plan) = plan else {
             index += 1;
             continue;
         };
