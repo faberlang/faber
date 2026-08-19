@@ -192,7 +192,14 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Lista, "inversa", 0, &[], ArrayInner, collection Reverse),
     intrinsic!(Lista, "inverte", 0, &[], Vacuum, collection ReverseInPlace),
     intrinsic!(Lista, "longitudo", 0, &[], Numerus, collection Length),
-    intrinsic!(Lista, "mappata", 1, &[IntrinsicParamKind::Mapper], MapperArray, HigherOrderMap),
+    intrinsic!(
+        Lista,
+        "mappata",
+        1,
+        &[IntrinsicParamKind::Mapper],
+        MapperArray,
+        HigherOrderMap
+    ),
     intrinsic!(Lista, "omissa", 1, &[IntrinsicParamKind::NumerusIndex], ArrayInner, collection DropFirst),
     intrinsic!(Lista, "ordina", 0, &[], Vacuum, CodegenOnly),
     intrinsic!(Lista, "ordinata", 0, &[], ArrayInner, collection Sort),
@@ -265,9 +272,30 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Textus, "vacua", 0, &[], Bool, collection IsEmpty),
     // numeric (numerus + fractus)
     intrinsic!(Numeric, "absolutum", 0, &[], SameAsReceiver, collection Absolute),
-    intrinsic!(Numeric, "addita", 1, &[IntrinsicParamKind::Inner], SameAsReceiver, CodegenOnly),
-    intrinsic!(Numeric, "adde", 1, &[IntrinsicParamKind::Inner], Vacuum, CodegenOnly),
-    intrinsic!(Numeric, "alterna", 1, &[IntrinsicParamKind::Inner], Vacuum, CodegenOnly),
+    intrinsic!(
+        Numeric,
+        "addita",
+        1,
+        &[IntrinsicParamKind::Inner],
+        SameAsReceiver,
+        CodegenOnly
+    ),
+    intrinsic!(
+        Numeric,
+        "adde",
+        1,
+        &[IntrinsicParamKind::Inner],
+        Vacuum,
+        CodegenOnly
+    ),
+    intrinsic!(
+        Numeric,
+        "alterna",
+        1,
+        &[IntrinsicParamKind::Inner],
+        Vacuum,
+        CodegenOnly
+    ),
     intrinsic!(
         Numeric,
         "alternata",
@@ -277,7 +305,14 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         CodegenOnly
     ),
     intrinsic!(Numeric, "complementa", 0, &[], Vacuum, CodegenOnly),
-    intrinsic!(Numeric, "complementata", 0, &[], SameAsReceiver, CodegenOnly),
+    intrinsic!(
+        Numeric,
+        "complementata",
+        0,
+        &[],
+        SameAsReceiver,
+        CodegenOnly
+    ),
     intrinsic!(
         Numeric,
         "coniuncta",
@@ -286,7 +321,14 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         CodegenOnly
     ),
-    intrinsic!(Numeric, "coniunge", 1, &[IntrinsicParamKind::Inner], Vacuum, CodegenOnly),
+    intrinsic!(
+        Numeric,
+        "coniunge",
+        1,
+        &[IntrinsicParamKind::Inner],
+        Vacuum,
+        CodegenOnly
+    ),
     intrinsic!(
         Numeric,
         "disiuncta",
@@ -295,8 +337,22 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         CodegenOnly
     ),
-    intrinsic!(Numeric, "disiunge", 1, &[IntrinsicParamKind::Inner], Vacuum, CodegenOnly),
-    intrinsic!(Numeric, "dextra", 1, &[IntrinsicParamKind::Inner], Vacuum, CodegenOnly),
+    intrinsic!(
+        Numeric,
+        "disiunge",
+        1,
+        &[IntrinsicParamKind::Inner],
+        Vacuum,
+        CodegenOnly
+    ),
+    intrinsic!(
+        Numeric,
+        "dextra",
+        1,
+        &[IntrinsicParamKind::Inner],
+        Vacuum,
+        CodegenOnly
+    ),
     intrinsic!(
         Numeric,
         "dextrata",
@@ -305,15 +361,64 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         CodegenOnly
     ),
-    intrinsic!(Numeric, "divida", 1, &[IntrinsicParamKind::Inner], Vacuum, CodegenOnly),
-    intrinsic!(Numeric, "divisa", 1, &[IntrinsicParamKind::Inner], SameAsReceiver, CodegenOnly),
-    intrinsic!(Numeric, "maior", 1, &[IntrinsicParamKind::Inner], Bool, CodegenOnly),
-    intrinsic!(Numeric, "maxime", 1, &[IntrinsicParamKind::Inner], Bool, CodegenOnly),
+    intrinsic!(
+        Numeric,
+        "divida",
+        1,
+        &[IntrinsicParamKind::Inner],
+        Vacuum,
+        CodegenOnly
+    ),
+    intrinsic!(
+        Numeric,
+        "divisa",
+        1,
+        &[IntrinsicParamKind::Inner],
+        SameAsReceiver,
+        CodegenOnly
+    ),
+    intrinsic!(
+        Numeric,
+        "maior",
+        1,
+        &[IntrinsicParamKind::Inner],
+        Bool,
+        CodegenOnly
+    ),
+    intrinsic!(
+        Numeric,
+        "maxime",
+        1,
+        &[IntrinsicParamKind::Inner],
+        Bool,
+        CodegenOnly
+    ),
     intrinsic!(Numeric, "maximus", 1, &[IntrinsicParamKind::Inner], SameAsReceiver, collection Maximum),
-    intrinsic!(Numeric, "minime", 1, &[IntrinsicParamKind::Inner], Bool, CodegenOnly),
+    intrinsic!(
+        Numeric,
+        "minime",
+        1,
+        &[IntrinsicParamKind::Inner],
+        Bool,
+        CodegenOnly
+    ),
     intrinsic!(Numeric, "minimus", 1, &[IntrinsicParamKind::Inner], SameAsReceiver, collection Minimum),
-    intrinsic!(Numeric, "minor", 1, &[IntrinsicParamKind::Inner], Bool, CodegenOnly),
-    intrinsic!(Numeric, "modula", 1, &[IntrinsicParamKind::Inner], Vacuum, CodegenOnly),
+    intrinsic!(
+        Numeric,
+        "minor",
+        1,
+        &[IntrinsicParamKind::Inner],
+        Bool,
+        CodegenOnly
+    ),
+    intrinsic!(
+        Numeric,
+        "modula",
+        1,
+        &[IntrinsicParamKind::Inner],
+        Vacuum,
+        CodegenOnly
+    ),
     intrinsic!(
         Numeric,
         "modulata",
@@ -322,7 +427,14 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         CodegenOnly
     ),
-    intrinsic!(Numeric, "multiplica", 1, &[IntrinsicParamKind::Inner], Vacuum, CodegenOnly),
+    intrinsic!(
+        Numeric,
+        "multiplica",
+        1,
+        &[IntrinsicParamKind::Inner],
+        Vacuum,
+        CodegenOnly
+    ),
     intrinsic!(
         Numeric,
         "multiplicata",
@@ -342,7 +454,14 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         CodegenOnly
     ),
     intrinsic!(Numeric, "signum", 0, &[], SameAsReceiver, collection Signum),
-    intrinsic!(Numeric, "sinistra", 1, &[IntrinsicParamKind::Inner], Vacuum, CodegenOnly),
+    intrinsic!(
+        Numeric,
+        "sinistra",
+        1,
+        &[IntrinsicParamKind::Inner],
+        Vacuum,
+        CodegenOnly
+    ),
     intrinsic!(
         Numeric,
         "sinistrata",
@@ -351,7 +470,14 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         CodegenOnly
     ),
-    intrinsic!(Numeric, "subtrahe", 1, &[IntrinsicParamKind::Inner], Vacuum, CodegenOnly),
+    intrinsic!(
+        Numeric,
+        "subtrahe",
+        1,
+        &[IntrinsicParamKind::Inner],
+        Vacuum,
+        CodegenOnly
+    ),
     intrinsic!(
         Numeric,
         "subtracta",
@@ -699,7 +825,14 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         CodegenOnly
     ),
-    intrinsic!(Vector, "productum", 1, &[IntrinsicParamKind::ReceiverSelf], Inner, CodegenOnly),
+    intrinsic!(
+        Vector,
+        "productum",
+        1,
+        &[IntrinsicParamKind::ReceiverSelf],
+        Inner,
+        CodegenOnly
+    ),
     intrinsic!(
         Vector,
         "transversum",
@@ -710,7 +843,14 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     ),
     intrinsic!(Vector, "longitudo", 0, &[], Inner, CodegenOnly),
     intrinsic!(Vector, "normalizata", 0, &[], SameAsReceiver, CodegenOnly),
-    intrinsic!(Vector, "swizzle", 1, &[IntrinsicParamKind::Textus], SameAsReceiver, CodegenOnly),
+    intrinsic!(
+        Vector,
+        "swizzle",
+        1,
+        &[IntrinsicParamKind::Textus],
+        SameAsReceiver,
+        CodegenOnly
+    ),
     intrinsic!(Vector, "crea", 0, &[], SameAsReceiver, CodegenOnly),
     // intervallum
     intrinsic!(Intervallum, "coercere", 1, &[IntrinsicParamKind::ReceiverSelf], SameAsReceiver, collection IntervalClamp),
@@ -739,7 +879,3 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // report (Open Q #3 default).
     intrinsic!(Regex, "consentit", 1, &[IntrinsicParamKind::Textus], Bool, collection RegexMatches),
 ];
-
-#[cfg(test)]
-#[path = "registry_test.rs"]
-mod tests;

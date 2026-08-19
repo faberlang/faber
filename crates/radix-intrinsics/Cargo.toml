@@ -1,0 +1,17 @@
+[package]
+name = "radix-intrinsics"
+version = "0.83.0"
+edition = "2021"
+description = "Neutral compiler-owned receiver intrinsic catalog"
+license = "MIT"
+
+[lints.clippy]
+# Group first at lower priority so per-lint allows below win package-wide
+# (leaf pattern; workspace lints are not inherited).
+pedantic = { level = "deny", priority = -1 }
+# Structural (mirrors radix-module): grouped match arms name shared
+# MIR-classification invariants.
+match_same_arms = "allow"
+
+[dependencies]
+radix-types = { path = "../radix-types" }

@@ -32,6 +32,7 @@ missing_panics_doc = "allow"
 [dependencies]
 radix-codegen-shared = { path = "../radix-codegen-shared" }
 radix-target = { path = "../radix-target" }
+radix-intrinsics = { path = "../radix-intrinsics" }
 # Consumerless leaves, gated out of default builds (U7, removal-delivery-spec).
 radix-hir-faber = { path = "../radix-hir-faber", optional = true }
 radix-mir = { path = "../radix-mir", optional = true }

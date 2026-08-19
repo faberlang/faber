@@ -655,6 +655,13 @@ name = "radix-host-abi"
 version = "0.83.0"
 
 [[package]]
+name = "radix-intrinsics"
+version = "0.83.0"
+dependencies = [
+ "radix-types",
+]
+
+[[package]]
 name = "radix-lexer"
 version = "0.83.0"
 dependencies = [
@@ -729,6 +736,7 @@ dependencies = [
  "radix-hir-faber",
  "radix-hir-fhir",
  "radix-host-abi",
+ "radix-intrinsics",
  "radix-lexer",
  "radix-mir",
  "radix-mir-runner",
