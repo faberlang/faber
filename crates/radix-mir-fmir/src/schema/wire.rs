@@ -324,9 +324,10 @@ pub struct WireResultBuffer {
 /// The explicit observation fact of a result row (F5/F6): the value is read
 /// back at a declared completion boundary, decoupled from role and lifetime.
 /// The fact also carries the **observation cadence** (S5A-U1): whether the
-/// declared observation is read back every step ([`PerStep`](WireObservationCadence::`PerStep`)
-/// — e.g. the loss) or once after the step loop
-/// ([`EndOfRun`](WireObservationCadence::`EndOfRun`) — e.g. the final forward,
+/// declared observation is read back every step
+/// ([`PerStep`](WireObservationCadence::PerStep) — e.g. the loss) or once after
+/// the step loop ([`EndOfRun`](WireObservationCadence::EndOfRun) — e.g. the
+/// final forward,
 /// gradients, params).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
