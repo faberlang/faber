@@ -198,29 +198,20 @@ pub struct ManifestDispatch {
     pub providers: Vec<String>,
 }
 
-fn default_product_out() -> String {
-    "dist".to_owned()
+macro_rules! product_path_default {
+    ($name:ident, $value:literal) => {
+        fn $name() -> String {
+            $value.to_owned()
+        }
+    };
 }
 
-fn default_product_templates() -> String {
-    "pages".to_owned()
-}
-
-fn default_product_styles() -> String {
-    "styles".to_owned()
-}
-
-fn default_product_public() -> String {
-    "public".to_owned()
-}
-
-fn default_product_assets_manifest() -> String {
-    "assets.json".to_owned()
-}
-
-fn default_product_controllers_json() -> String {
-    "controllers.json".to_owned()
-}
+product_path_default!(default_product_out, "dist");
+product_path_default!(default_product_templates, "pages");
+product_path_default!(default_product_styles, "styles");
+product_path_default!(default_product_public, "public");
+product_path_default!(default_product_assets_manifest, "assets.json");
+product_path_default!(default_product_controllers_json, "controllers.json");
 
 /// Resolve the manifest `[build] target` for an input path, returning `None`
 /// when no package layout is discoverable and when the manifest names no
