@@ -528,7 +528,7 @@ fn model_divergence_detail(found: &ModelIdentity, expected: &ModelIdentity) -> S
             found.tensor_count, expected.tensor_count
         );
     }
-    "model identity differs from its typed source".to_owned()
+    unreachable!("ModelIdentity inequality must diverge on a checked field")
 }
 
 /// Backend domain: selection agreement, per-artifact digest re-verification
@@ -654,7 +654,7 @@ fn verify_region_partition(plan: &CompositePlan) -> Result<(), CompositePlanErro
         .iter()
         .map(|launch| launch.id)
         .collect();
-    let mut covered: Vec<LaunchId> = Vec::new();
+    let mut covered: BTreeSet<LaunchId> = BTreeSet::new();
     for region in &plan.prepared_regions {
         for launch in &region.launches {
             if !declared.contains(launch) {
@@ -666,7 +666,7 @@ fn verify_region_partition(plan: &CompositePlan) -> Result<(), CompositePlanErro
                     ),
                 });
             }
-            if covered.contains(launch) {
+            if !covered.insert(*launch) {
                 return Err(CompositePlanError::DomainMismatch {
                     domain: IdentityDomain::Kernel,
                     detail: format!(
@@ -675,7 +675,6 @@ fn verify_region_partition(plan: &CompositePlan) -> Result<(), CompositePlanErro
                     ),
                 });
             }
-            covered.push(*launch);
         }
     }
     if covered.len() != declared.len() {
