@@ -2106,7 +2106,6 @@ impl Resolver {
 
     /// Every installed file-interface namespace, including transitive library
     /// leaves that have no consumer HIR import binding.
-    #[must_use]
     pub fn file_interface_namespaces(&self) -> impl Iterator<Item = LexSymbol> + '_ {
         self.file_interfaces.keys().copied()
     }
