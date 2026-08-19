@@ -233,6 +233,15 @@ pub fn plan_package(package: &AnalyzedProgram, target: Target) -> ArtifactPlan {
     }
 }
 
+/// Export names that remain in target symbol tables after composition.
+///
+/// Nucleum fragment bodies are omitted; `Entry` kernels and ordinary exports stay.
+#[cfg(feature = "hir-fhir")]
+#[must_use]
+pub fn target_symbol_exports(package: &AnalyzedProgram) -> Vec<String> {
+    crate::nucleum::target_symbol_exports(package)
+}
+
 /// Fail closed when the plan is unsupported for the selected target.
 pub(crate) fn plan_or_reject(
     package: &AnalyzedProgram,

@@ -22,8 +22,8 @@ use crate::import_graph::{resolve_import, ImportResolution};
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::Config;
 use radix_module::hir::package::{
-    build_package, encode_package, LibraryImportWire, LocalLinkWire, PackageDependencyWire,
-    PackageIdentityWire, PackageUnitInput,
+    build_package_with_nucleum, encode_package, LibraryImportWire, LocalLinkWire,
+    PackageDependencyWire, PackageIdentityWire, PackageUnitInput,
 };
 use radix_module::hir::HirItemKind;
 use std::collections::{BTreeMap, BTreeSet};
@@ -39,6 +39,8 @@ const FHIR_PACKAGE_UNLOCKED_LOCK_IDENTITY: &str = "unlocked";
 pub struct PackageFhir {
     pub root: PathBuf,
     pub package_path: PathBuf,
+    /// Canonical MIR sidecar for importable nucleum fragments (goal OQ2).
+    pub nucleum_path: Option<PathBuf>,
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +65,7 @@ pub fn build_package_fhir(
     input: &Path,
     seams: &AnalysisSeams,
 ) -> Result<PackageFhir, Vec<Diagnostic>> {
-    let package = crate::analyze::analyze_package(config, input, seams)?;
+    let mut package = crate::analyze::analyze_package(config, input, seams)?;
     if package
         .diagnostics
         .iter()
@@ -105,7 +107,7 @@ pub fn build_package_fhir(
         });
     }
 
-    let fhir_package = build_package(
+    let (fhir_package, mut nucleum) = build_package_with_nucleum(
         identity,
         &entry_path,
         entry_frontmatter,
@@ -131,9 +133,12 @@ pub fn build_package_fhir(
         .map_err(|error| vec![fhir_diag(input, error.to_string())])?;
     let package_path = artifact_root.join(FHIR_PACKAGE_FILE);
     fs::write(&package_path, &bytes).map_err(|error| vec![fhir_diag(input, error.to_string())])?;
+    crate::nucleum::attach_canonical_mir(&mut nucleum, &mut package.nodes)?;
+    let nucleum_path = crate::nucleum::write_nucleum_sidecar(&artifact_root, &nucleum)?;
     Ok(PackageFhir {
         root: artifact_root,
         package_path,
+        nucleum_path: Some(nucleum_path),
     })
 }
 

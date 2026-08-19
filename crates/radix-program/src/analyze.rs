@@ -600,6 +600,17 @@ pub fn analyze_package_spec(
         }
     }
 
+    #[cfg(feature = "hir-fhir")]
+    {
+        match crate::nucleum::metadata_for_program(&program) {
+            Ok(_) => {}
+            Err(diagnostic) => {
+                program.diagnostics.push(diagnostic);
+                return Err(std::mem::take(&mut program.diagnostics));
+            }
+        }
+    }
+
     Ok(program)
 }
 

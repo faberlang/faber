@@ -27,6 +27,8 @@ pub mod manifest;
 pub mod member_path;
 pub mod mir;
 pub mod modules;
+#[cfg(feature = "hir-fhir")]
+pub mod nucleum;
 pub mod paths;
 #[cfg(feature = "hir-rust")]
 pub mod rust_target;
