@@ -318,6 +318,9 @@ pub enum MirCollectionOp {
     /// Regex `consentit`: whether the `regex` receiver's pattern matches a
     /// `textus` argument (the Rust `regex` crate `is_match` semantics).
     RegexMatches,
+    /// Cord walk: `ascii.cursor()` / later `textus.cursor()` → `cursor<ascii<1>>`.
+    /// One buffer of one-byte ascii values; not a per-step heap slice.
+    CordCursor,
 }
 
 impl MirCollectionOp {

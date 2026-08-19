@@ -14,6 +14,8 @@ pub enum IntrinsicReceiver {
     Tabula,
     Copia,
     Textus,
+    /// Bare `ascii` cord. Owns `cursor` only — do not route through Textus.
+    Ascii,
     /// Shared `numerus` and `fractus` surface (`absolutum`, `signum`, ...).
     Numeric,
     /// `fractus`-only rounding helpers.
@@ -99,6 +101,8 @@ pub enum IntrinsicReturnKind {
     MapperArray,
     ReducerInfer,
     TextusArray,
+    /// `cursor<ascii<1>>` — the `ascii.cursor()` / later `textus.cursor()` walk.
+    CursorAsciiOne,
 }
 
 /// How MIR should treat a promoted intrinsic, when applicable.
@@ -243,9 +247,12 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Copia, "symmetrica", 1, &[IntrinsicParamKind::SetInner], SetInner, collection SymmetricDifference),
     intrinsic!(Copia, "unio", 1, &[IntrinsicParamKind::SetInner], SetInner, collection Union),
     intrinsic!(Copia, "vacua", 0, &[], Bool, collection IsEmpty),
+    // ascii
+    intrinsic!(Ascii, "cursor", 0, &[], CursorAsciiOne, collection CordCursor),
     // textus
     intrinsic!(Textus, "accipe", 1, &[IntrinsicParamKind::NumerusIndex], Textus, collection Index),
     intrinsic!(Textus, "continet", 1, &[IntrinsicParamKind::Textus], Bool, collection Contains),
+    intrinsic!(Textus, "cursor", 0, &[], CursorAsciiOne, collection CordCursor),
     intrinsic!(Textus, "divide", 1, &[IntrinsicParamKind::Textus], TextusArray, collection Split),
     intrinsic!(Textus, "finis", 1, &[IntrinsicParamKind::Textus], Bool, collection EndsWith),
     intrinsic!(Textus, "initium", 1, &[IntrinsicParamKind::Textus], Bool, collection StartsWith),

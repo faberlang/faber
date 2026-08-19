@@ -202,6 +202,30 @@ fn sparse_representation_densata_is_promoted_to_distinct_mir_operation() {
 }
 
 #[test]
+fn ascii_cursor_is_registered_as_cord_cursor() {
+    let types = TypeTable::new();
+    let ascii = types.get(types.primitive(Primitive::Ascii));
+
+    assert_eq!(receivers_for_type(ascii), &[IntrinsicReceiver::Ascii]);
+    let cursor = lookup_method_for_type(ascii, "cursor", 0).expect("ascii cursor");
+    assert_eq!(cursor.receiver, IntrinsicReceiver::Ascii);
+    assert_eq!(cursor.return_kind, super::IntrinsicReturnKind::CursorAsciiOne);
+    assert_eq!(mir_collection_op(cursor), Some(MirCollectionOp::CordCursor));
+}
+
+#[test]
+fn textus_cursor_is_registered_as_cord_cursor() {
+    let types = TypeTable::new();
+    let textus = types.get(types.primitive(Primitive::Textus));
+
+    assert_eq!(receivers_for_type(textus), &[IntrinsicReceiver::Textus]);
+    let cursor = lookup_method_for_type(textus, "cursor", 0).expect("textus cursor");
+    assert_eq!(cursor.receiver, IntrinsicReceiver::Textus);
+    assert_eq!(cursor.return_kind, super::IntrinsicReturnKind::CursorAsciiOne);
+    assert_eq!(mir_collection_op(cursor), Some(MirCollectionOp::CordCursor));
+}
+
+#[test]
 fn textus_vacua_is_registered_as_is_empty() {
     let types = TypeTable::new();
     let textus = types.get(types.primitive(Primitive::Textus));

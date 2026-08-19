@@ -1,8 +1,8 @@
 //! Compiler-owned receiver intrinsic registry.
 //!
 //! Radix promotes a fixed catalog of `lista`, `tabula`, `copia`, `textus`,
-//! `numerus`, `fractus`, `tensor`, `matrix`, `vector`, `intervallum`, and
-//! `atomic`
+//! `ascii`, `numerus`, `fractus`, `tensor`, `matrix`, `vector`, `intervallum`,
+//! and `atomic`
 //! methods. Semantic analysis, MIR lowering, and target backends consult this
 //! module instead of maintaining parallel string tables.
 
@@ -48,6 +48,7 @@ pub fn receivers_for_type(ty: &Type) -> &'static [IntrinsicReceiver] {
         Type::Map(_, _) => &[IntrinsicReceiver::Tabula],
         Type::Set(_) => &[IntrinsicReceiver::Copia],
         Type::Primitive(Primitive::Textus) => &[IntrinsicReceiver::Textus],
+        Type::Primitive(Primitive::Ascii) => &[IntrinsicReceiver::Ascii],
         Type::Primitive(Primitive::Regex) => &[IntrinsicReceiver::Regex],
         Type::Primitive(Primitive::Numerus) => &[IntrinsicReceiver::Numeric],
         Type::Primitive(Primitive::Fractus) => &[IntrinsicReceiver::Fractus, IntrinsicReceiver::Numeric],

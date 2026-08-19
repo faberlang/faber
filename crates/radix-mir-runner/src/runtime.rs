@@ -30,7 +30,7 @@
 )]
 
 use super::value::{
-    format_template, modular_operand, modular_word_mask, modular_word_result,
+    ascii1_from_scalar, format_template, modular_operand, modular_word_mask, modular_word_result,
     uint_width_checked_add, uint_width_checked_mul, values_equal, width_checked_add,
     width_checked_mul, GradientStorage, MapKey, SermoValue, TensorValue, Value,
 };
@@ -1211,6 +1211,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::EndsWith => {
                 self.str_pair_bool(args, span, |left, right| left.ends_with(&right))
             }
+            MirCollectionOp::CordCursor => self.eval_cord_cursor(args, span),
             MirCollectionOp::RegexMatches => {
                 let [receiver, text] = args else {
                     return Err(RunnerError::internal(span, "regex consentit arity"));
@@ -3007,6 +3008,30 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 "contains receiver type mismatch",
             )),
         }
+    }
+
+    fn eval_cord_cursor(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "cord cursor arity"));
+        };
+        let value = self.eval_operand(receiver, span)?;
+        let elems = match value {
+            Value::Str(text) => {
+                let mut elems = Vec::with_capacity(text.len());
+                for ch in text.chars() {
+                    elems.push(ascii1_from_scalar(ch, span)?);
+                }
+                elems
+            }
+            Value::Ascii(byte) => vec![Value::Ascii(byte)],
+            _ => {
+                return Err(RunnerError::internal(
+                    span,
+                    "cord cursor receiver type mismatch",
+                ))
+            }
+        };
+        Ok(Value::Array(Rc::new(RefCell::new(elems))))
     }
 
     fn map_str_arg(

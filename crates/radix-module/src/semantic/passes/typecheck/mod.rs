@@ -591,6 +591,14 @@ mod equality_exact_types_test;
 #[path = "ascii_index_test.rs"]
 mod ascii_index_test;
 
+#[cfg(test)]
+#[path = "ascii_cursor_test.rs"]
+mod ascii_cursor_test;
+
+#[cfg(test)]
+#[path = "textus_cursor_test.rs"]
+mod textus_cursor_test;
+
 // Lane-gated: compiles through the full driver to the Rust target; a
 // core-only build excludes the module.
 #[cfg(all(test, feature = "hir-rust"))]
