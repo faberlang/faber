@@ -644,6 +644,7 @@ fn collection_op(op: MirCollectionOp) -> &'static str {
         MirCollectionOp::Keys => "keys",
         MirCollectionOp::Values => "values",
         MirCollectionOp::RegexMatches => "regex_matches",
+        MirCollectionOp::CordCursor => "cord_cursor",
     }
 }
 

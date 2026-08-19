@@ -1545,3 +1545,7 @@ mod octeti_index_test;
 #[cfg(test)]
 #[path = "ascii1_index_test.rs"]
 mod ascii1_index_test;
+
+#[cfg(test)]
+#[path = "ascii_cursor_test.rs"]
+mod ascii_cursor_test;

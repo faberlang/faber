@@ -1211,6 +1211,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::EndsWith => {
                 self.str_pair_bool(args, span, |left, right| left.ends_with(&right))
             }
+            MirCollectionOp::CordCursor => self.eval_cord_cursor(args, span),
             MirCollectionOp::RegexMatches => {
                 let [receiver, text] = args else {
                     return Err(RunnerError::internal(span, "regex consentit arity"));
@@ -3007,6 +3008,25 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 "contains receiver type mismatch",
             )),
         }
+    }
+
+    fn eval_cord_cursor(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "cord cursor arity"));
+        };
+        let value = self.eval_operand(receiver, span)?;
+        let bytes = match value {
+            Value::Str(text) => text.into_bytes(),
+            Value::Ascii(byte) => vec![byte],
+            _ => {
+                return Err(RunnerError::internal(
+                    span,
+                    "cord cursor receiver type mismatch",
+                ))
+            }
+        };
+        let elems = bytes.into_iter().map(Value::Ascii).collect();
+        Ok(Value::Array(Rc::new(RefCell::new(elems))))
     }
 
     fn map_str_arg(
