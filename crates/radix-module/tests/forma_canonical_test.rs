@@ -7,6 +7,7 @@
 //! contract: every construct that the compiler can lower to HIR must re-emit
 //! to source that the parser would accept.
 
+use radix_module::codegen::faber::LocaleKeywordBridge;
 use radix_module::forma::canonical::FaberCodegen;
 use radix_module::hir::DefId;
 use radix_module::hir::{
@@ -27,7 +28,7 @@ fn span() -> Span {
 
 fn generate_faber(program: &HirModule, types: &TypeTable, interner: &Interner) -> String {
     let latin = radix_module::locale::latin_locale_pack();
-    let surface = radix_module::locale::KeywordSurface::new(&latin);
+    let surface = LocaleKeywordBridge(radix_module::locale::KeywordSurface::new(&latin));
     FaberCodegen::default()
         .generate(
             program,
@@ -348,7 +349,7 @@ fn rejects_hir_error_nodes_in_direct_faber_codegen() {
 
     let mut gen = FaberCodegen::default();
     let latin = radix_module::locale::latin_locale_pack();
-    let surface = radix_module::locale::KeywordSurface::new(&latin);
+    let surface = LocaleKeywordBridge(radix_module::locale::KeywordSurface::new(&latin));
     let Err(error) = gen.generate(
         &program,
         &radix_module::forma::canonical::empty_presentation(),
