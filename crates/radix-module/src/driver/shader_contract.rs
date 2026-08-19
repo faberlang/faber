@@ -157,10 +157,8 @@ pub(crate) fn collect_shader_contract_facts(
         file,
         keys: FactKeys::default(),
     };
-    {
-        let mut visitor = AdfirmaVisitor { collector: &mut collector };
-        visitor.visit_program(hir);
-    }
+    let mut visitor = AdfirmaVisitor { collector: &mut collector };
+    visitor.visit_program(hir);
     collector.facts
 }
 
