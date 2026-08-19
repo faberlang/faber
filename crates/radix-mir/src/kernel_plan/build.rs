@@ -499,15 +499,12 @@ impl CollectionKernelPlan {
 /// after every tree halving step (`log2(workgroup_x)` steps for the
 /// power-of-two workgroup).
 pub(super) fn reduction_barrier_schedule(workgroup_x: u32) -> Vec<BarrierPoint> {
-    let mut barriers = Vec::new();
-    barriers.push(BarrierPoint {
+    let mut barriers = vec![BarrierPoint {
         after: BarrierPhase::SharedMemoryLoad,
-    });
-    for _ in 0..workgroup_x.trailing_zeros() {
-        barriers.push(BarrierPoint {
-            after: BarrierPhase::ReductionStep,
-        });
-    }
+    }];
+    barriers.extend((0..workgroup_x.trailing_zeros()).map(|_| BarrierPoint {
+        after: BarrierPhase::ReductionStep,
+    }));
     barriers
 }
 
@@ -581,11 +578,10 @@ fn signature_matches_matmul(
         && signature.extra_inputs[0].element_count == shapes.k.saturating_mul(shapes.n)
 }
 
-/// The transpose signature must already carry the contract it was built
-/// from: `apply_collection_op_contract` sets workgroup
-/// `(TRANSPOSE_WORKGROUP_X, 1, 1)`, dispatch `(M·N, 1, 1)`, and the input and
-/// output buffers each hold the flat `M·N` element count (the transposed
-/// `[N,M]` tensor has the same element count as the `[M,N]` source).
+/// The grouped-matmul signature must already carry the contract it was built
+/// from: workgroup `(MATMUL_TILE, MATMUL_TILE, 1)`, the tile-grid dispatch,
+/// left operand `M·K`, output `M·N`, and the grouped right operand
+/// `groups·K·N`.
 fn signature_matches_grouped_matmul(
     signature: &MirKernelSignature,
     dispatch_x: u64,
@@ -617,6 +613,11 @@ fn signature_matches_ssm_extent(signature: &MirKernelSignature, extent: u64) -> 
         && signature.output.element_count == extent
 }
 
+/// The transpose signature must already carry the contract it was built
+/// from: `apply_collection_op_contract` sets workgroup
+/// `(TRANSPOSE_WORKGROUP_X, 1, 1)`, dispatch `(M·N, 1, 1)`, and the input and
+/// output buffers each hold the flat `M·N` element count (the transposed
+/// `[N,M]` tensor has the same element count as the `[M,N]` source).
 fn signature_matches_transpose(signature: &MirKernelSignature, m: u64, n: u64) -> bool {
     let count = m.saturating_mul(n);
     signature.workgroup.x == TRANSPOSE_WORKGROUP_X
@@ -1037,11 +1038,7 @@ fn transformer_operand_dims(
 /// `MirConstant::UInt` (the trailing const operands of the transformer
 /// lowerings).
 fn const_axis(operand: &MirOperand) -> Option<u64> {
-    match operand {
-        MirOperand::Constant(MirConstant::Int(axis)) => u64::try_from(*axis).ok(),
-        MirOperand::Constant(MirConstant::UInt(axis)) => Some(*axis),
-        _ => None,
-    }
+    const_non_negative(operand)
 }
 
 /// The flattened element count of the literal dims.
