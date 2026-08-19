@@ -478,6 +478,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::IntervalMaterialize
             | MirCollectionOp::Keys
             | MirCollectionOp::Values
+            | MirCollectionOp::CordCursor
             | MirCollectionOp::TensorCausalMaskedSoftmax => 1,
             MirCollectionOp::Append
             | MirCollectionOp::AppendImmutable
@@ -1425,6 +1426,20 @@ impl Validator<'_, '_> {
                     Type::Array(_) | Type::Tensor(_, _)
                 ) {
                     self.error(span, "interval materialize result is not lista or tensor");
+                }
+            }
+            MirCollectionOp::CordCursor => {
+                if let Some(receiver_ty) = first_arg_ty {
+                    if !matches!(
+                        self.type_kind(receiver_ty),
+                        Type::Primitive(Primitive::Ascii | Primitive::Textus)
+                            | Type::BoundedAscii { .. }
+                    ) {
+                        self.error(span, "cord cursor receiver is not ascii or textus");
+                    }
+                }
+                if !matches!(self.type_kind(call.return_ty), Type::Cursor(_)) {
+                    self.error(span, "cord cursor result is not a cursor");
                 }
             }
         }
