@@ -195,7 +195,6 @@ pub fn lower_analyzed_unit_allowing_cli_entry_with_context(
 /// # Errors
 /// Returns `MirError` values for unsupported CLI program surfaces, missing
 /// semantic types, sealed-block misuse, and post-lowering validation failures.
-// public API: consumed into iterator immediately
 pub fn lower_analyzed_unit_allowing_cli_entry_record_with_context(
     unit: &mut AnalyzedModule,
     cli_entry_record_fields: Vec<MirNamedOperand>,
@@ -1421,7 +1420,7 @@ impl<'a> FunctionBuilder<'a> {
             let Some(konst) = self.context.top_level_consts.get(&def_id).copied() else {
                 continue;
             };
-            let _ = self.lower_top_level_const_binding(def_id, konst, body.span);
+            self.lower_top_level_const_binding(def_id, konst, body.span);
         }
     }
 
