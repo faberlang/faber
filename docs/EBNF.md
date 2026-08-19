@@ -387,9 +387,9 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | Faber      | Meaning |
 | ---------- | ------- |
 | `textus`   | Unicode string |
-| `textus<N>` | proposed — not shipped; bounded Unicode string; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker |
+| `textus<N>` | proposed — not shipped; bounded Unicode string; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker. `textus<_>` is the capacity hole (infer `N`). |
 | `ascii`    | ASCII-only string |
-| `ascii<N>` | proposed — not shipped; bounded ASCII string; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker |
+| `ascii<N>` | proposed — not shipped; bounded ASCII string; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker. `ascii<_>` is the capacity hole (infer `N`). |
 | `forma`    | captured template + params |
 | `numerus`  | integer (default `i64`) |
 | `modulus<W>` | unsigned modular word; arithmetic wraps modulo 2^W |
@@ -400,12 +400,15 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `numquam`  | never |
 | `ignotum`  | unknown |
 | `octeti`   | bytes |
-| `octeti<N>` | proposed — not shipped; bounded byte buffer; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker |
+| `octeti<N>` | proposed — not shipped; bounded byte buffer; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker. `octeti<_>` is the capacity hole (infer `N`). |
 
 Bare `textus` / `ascii` / `octeti` remain the unbounded productions. The
 proposed (not shipped) forms `textus<N>`, `ascii<N>`, and `octeti<N>` take
 one `magnitudo` / `NATURAL` applied argument. That `N` is capacity, not a
-width marker and not a language-wide default.
+width marker and not a language-wide default. `_` in that slot (`ascii<_>`,
+`textus<_>`, `octeti<_>`, `lista<T, _>`) is a capacity hole: the form stays
+bounded, and `N` is inferred from a same-family bounded witness. Bare
+`ascii` is not a hole.
 
 Sized primitives accept one optional **width marker** (not a user type parameter):
 
@@ -428,7 +431,7 @@ full wrap. Cross-width modular arithmetic is rejected.
 | Faber          | Meaning  |
 | -------------- | -------- |
 | `lista<T>`     | array    |
-| `lista<T, N>`  | proposed — not shipped; bounded array; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker |
+| `lista<T, N>`  | proposed — not shipped; bounded array; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker. `lista<T, _>` is the capacity hole (infer `N`). |
 | `tabula<K,V>`  | map      |
 | `copia<T>`     | set      |
 | `promissum<T>` | promise  |
