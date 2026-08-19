@@ -692,13 +692,11 @@ impl TypeChecker<'_> {
         span: crate::lexer::Span,
     ) -> Option<TypeId> {
         let source_resolved = self.resolve_inferred_type(source_ty);
-        let source = self.types.get(source_resolved).clone();
-        let target = self.types.get(target_resolved).clone();
+        let source = self.types.get(source_resolved);
+        let target = self.types.get(target_resolved);
 
         let Some((from_elem, from_shape, to_elem, to_shape)) = sparse_tensor_pair(source, target) else {
-            if matches!(self.types.get(source_resolved), Type::Sparsa(_, _))
-                || matches!(self.types.get(target_resolved), Type::Sparsa(_, _))
-            {
+            if matches!(source, Type::Sparsa(_, _)) || matches!(target, Type::Sparsa(_, _)) {
                 self.invalid_conversion(ISSUE_SPARSA_COLLECTION_UNSUPPORTED, span);
                 return Some(self.error_type);
             }
@@ -1608,13 +1606,13 @@ impl TypeChecker<'_> {
 }
 
 fn sparse_tensor_pair(
-    source: Type,
-    target: Type,
+    source: &Type,
+    target: &Type,
 ) -> Option<(TypeId, crate::semantic::IndexId, TypeId, crate::semantic::IndexId)> {
     match (source, target) {
         (Type::Tensor(from_elem, from_shape), Type::Sparsa(to_elem, to_shape))
         | (Type::Sparsa(from_elem, from_shape), Type::Tensor(to_elem, to_shape)) => {
-            Some((from_elem, from_shape, to_elem, to_shape))
+            Some((*from_elem, *from_shape, *to_elem, *to_shape))
         }
         _ => None,
     }
