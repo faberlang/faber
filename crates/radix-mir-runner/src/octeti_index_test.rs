@@ -76,10 +76,10 @@ fn octeti_index_range_out_of_bounds_fails() {
         exclusive_range(0, 5),
     )
     .expect_err("out-of-range octeti window must fail");
-    assert!(
-        err.message.contains("octeti index out of bounds"),
-        "expected live octeti OOB fail, got: {}",
-        err.message
+    assert_eq!(
+        err.issue,
+        "runner_octeti_index_out_of_bounds",
+        "expected live octeti OOB fail, got: {err:?}"
     );
 }
 

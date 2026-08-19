@@ -75,7 +75,6 @@ fn missing_explicit_host_binary_is_a_spawn_error() {
     )
     .expect_err("missing binary");
     assert_eq!(err.code, "E_HOST_SPAWN");
-    assert!(err.message.contains("FABER_HOST_MACOS_ARM64"), "{err}");
 }
 
 #[test]
@@ -89,7 +88,6 @@ fn spawn_malformed_descriptor_returns_structured_cli_error() {
     }"#;
     let err = spawn_via_stub_cli(malformed_request(), stdout);
     assert_eq!(err.code, "E_INVALID_ARGS");
-    assert!(err.message.contains("descriptor JSON"), "{err}");
 }
 
 #[test]

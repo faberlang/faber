@@ -235,12 +235,18 @@ fn standalone_fragment_symbol_is_rejected() {
     let mut types = TypeTable::new();
     let ty = f32_ty(&mut types);
     let program = leftover_symbol(ty);
-    let errors = reject_nucleum_fragment_survivors(&program, &device_from(&program, &roles()));
+    let device = device_from(&program, &roles());
+    assert!(
+        surviving_nucleum_fragments(&program, &device)
+            .iter()
+            .any(|survivor| survivor.kind == FragmentSurvivorKind::Symbol),
+        "standalone leftover must be a symbol survivor"
+    );
+    let errors = reject_nucleum_fragment_survivors(&program, &device);
     assert!(
         errors
             .iter()
-            .any(|error| error.issue == NUCLEUM_FRAGMENT_SURVIVED
-                && error.message.contains("symbol")),
+            .any(|error| error.issue == NUCLEUM_FRAGMENT_SURVIVED),
         "standalone fragment symbol must be rejected, got {errors:?}"
     );
     let context = MirValidationContext::new(&types);
