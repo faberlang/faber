@@ -230,7 +230,7 @@ impl CompositionPass<'_> {
         stack: &mut Vec<MirFunctionId>,
         seen: &mut FxHashSet<Vec<MirFunctionId>>,
     ) {
-        if visited.contains(&node) || !self.errors.is_empty() && visiting.is_empty() {
+        if visited.contains(&node) || (!self.errors.is_empty() && visiting.is_empty()) {
             return;
         }
         if !visiting.insert(node) {
@@ -266,7 +266,7 @@ impl CompositionPass<'_> {
     }
 
     fn expand_function(&mut self, caller_id: MirFunctionId) {
-        let mut account = Account::new(self.budget);
+        let mut account = Account::new();
         let mut block_depth = FxHashMap::default();
         let mut block_chain = FxHashMap::default();
         if let Some(function) = self.function(caller_id) {
@@ -623,7 +623,7 @@ struct Account {
 }
 
 impl Account {
-    fn new(_budget: ExpansionBudget) -> Self {
+    fn new() -> Self {
         Self { nodes: 0, instances: 0, sites: FxHashMap::default() }
     }
 }
