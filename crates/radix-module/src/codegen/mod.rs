@@ -23,8 +23,8 @@
 //!   public [`crate::Output`] variant.
 
 pub mod breakable;
+pub use radix_semantic::coverage;
 pub mod conversio_coverage;
-pub mod coverage;
 #[cfg(feature = "hir-faber")]
 pub mod faber;
 pub mod frame_shim;
@@ -258,7 +258,7 @@ pub fn generate_from_analyzed_with_options(
                 &analysis.presentation,
                 &analysis.types,
                 &analysis.interner,
-                surface,
+                &faber::LocaleKeywordBridge(surface.clone()),
                 &imported_spellings.by_type,
                 &by_def,
             )?;
@@ -446,7 +446,11 @@ pub fn generate_rust_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> 
     radix_codegen_shared::reject_hir_errors(&analysis.hir)?;
     reject_rust_unsupported_types(&analysis.types)?;
 
-    let namespace_info = rust::build_file_import_namespaces(&analysis.hir, &analysis.interner, &analysis.resolver);
+    let namespace_info = rust::build_file_import_namespaces(
+        &analysis.hir,
+        &analysis.interner,
+        &rust::ResolverImportsBridge(&analysis.resolver),
+    );
     let provider_modules = emit_provider_modules(analysis)?;
     let gpu_builtins = rust::rust_gpu_builtins(&analysis.gpu_builtins);
     let function_facts = rust::rust_function_facts(&analysis.function_facts);
@@ -640,7 +644,7 @@ pub fn generate_with_options(
                 &faber::empty_presentation(),
                 types,
                 interner,
-                &surface,
+                &faber::LocaleKeywordBridge(surface),
                 &rustc_hash::FxHashMap::default(),
                 &rustc_hash::FxHashMap::default(),
             )?;

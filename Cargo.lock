@@ -742,6 +742,7 @@ dependencies = [
  "radix-mir-runner",
  "radix-parser",
  "radix-runtime-contract",
+ "radix-semantic",
  "radix-syntax",
  "radix-target",
  "radix-types",
@@ -783,6 +784,26 @@ dependencies = [
 [[package]]
 name = "radix-runtime-contract"
 version = "0.83.0"
+
+[[package]]
+name = "radix-semantic"
+version = "0.83.0"
+dependencies = [
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-hir-fhir",
+ "radix-intrinsics",
+ "radix-lexer",
+ "radix-parser",
+ "radix-syntax",
+ "radix-target",
+ "radix-types",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "toml",
+ "unicode-normalization",
+]
 
 [[package]]
 name = "radix-syntax"

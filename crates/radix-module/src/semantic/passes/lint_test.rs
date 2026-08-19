@@ -4,7 +4,8 @@
 //! `varia` declarations, shadowed names, unreachable code, unnecessary casts,
 //! unused imports, and explicit `ignotum` annotations.
 
-use super::{lint, Resolver, SemanticErrorKind, TypeTable, WarningKind};
+use super::lint::lint;
+use super::{Resolver, SemanticErrorKind, TypeTable, WarningKind};
 use crate::hir::{
     HirBinOp, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirImport, HirImportItem, HirItem, HirItemKind,
     HirLiteral, HirLocal, HirModule, HirObjectField, HirObjectKey, HirStatement, HirStatementKind,

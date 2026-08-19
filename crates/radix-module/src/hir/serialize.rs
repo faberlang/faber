@@ -30,7 +30,7 @@ pub fn from_analyzed(unit: &AnalyzedModule, content_hash: &str, relative_path: &
         },
         hir: unit.hir.clone(),
         presentation: unit.presentation.clone(),
-        cli_program: unit.cli_program.as_ref().map(CliProgramWire::from),
+        cli_program: unit.cli_program.as_ref().map(cli_program_wire),
         types: unit.types.snapshot(),
         interner: unit.interner.to_string_table(),
         resolver: unit.resolver.to_snapshot(),
@@ -127,115 +127,99 @@ fn gpu_builtin_to_wire(b: radix_types::MirKernelBuiltin) -> GpuBuiltinWire {
 
 // ── CLI wire conversions (F18 Shape B — forward mapping) ─────────────────
 
-impl From<&crate::cli::CliType> for CliTypeWire {
-    fn from(ty: &crate::cli::CliType) -> Self {
-        match ty {
-            crate::cli::CliType::Textus => CliTypeWire::Textus,
-            crate::cli::CliType::Numerus => CliTypeWire::Numerus,
-            crate::cli::CliType::Fractus => CliTypeWire::Fractus,
-            crate::cli::CliType::Bivalens => CliTypeWire::Bivalens,
-            crate::cli::CliType::Octeti => CliTypeWire::Octeti,
-            crate::cli::CliType::Ignotum => CliTypeWire::Ignotum,
-            crate::cli::CliType::ListaTextus => CliTypeWire::ListaTextus,
-            crate::cli::CliType::ListaNumerus => CliTypeWire::ListaNumerus,
-        }
+fn cli_type_wire(ty: &crate::cli::CliType) -> CliTypeWire {
+    match ty {
+        crate::cli::CliType::Textus => CliTypeWire::Textus,
+        crate::cli::CliType::Numerus => CliTypeWire::Numerus,
+        crate::cli::CliType::Fractus => CliTypeWire::Fractus,
+        crate::cli::CliType::Bivalens => CliTypeWire::Bivalens,
+        crate::cli::CliType::Octeti => CliTypeWire::Octeti,
+        crate::cli::CliType::Ignotum => CliTypeWire::Ignotum,
+        crate::cli::CliType::ListaTextus => CliTypeWire::ListaTextus,
+        crate::cli::CliType::ListaNumerus => CliTypeWire::ListaNumerus,
     }
 }
 
-impl From<&crate::cli::CliDefault> for CliDefaultWire {
-    fn from(d: &crate::cli::CliDefault) -> Self {
-        match d {
-            crate::cli::CliDefault::Text(s) => CliDefaultWire::Text(s.clone()),
-            crate::cli::CliDefault::Integer(i) => CliDefaultWire::Integer(*i),
-            crate::cli::CliDefault::Float(f) => CliDefaultWire::Float(*f),
-            crate::cli::CliDefault::Bool(b) => CliDefaultWire::Bool(*b),
-            crate::cli::CliDefault::Nil => CliDefaultWire::Nil,
-            crate::cli::CliDefault::Expr(s) => CliDefaultWire::Expr(s.clone()),
-        }
+fn cli_default_wire(d: &crate::cli::CliDefault) -> CliDefaultWire {
+    match d {
+        crate::cli::CliDefault::Text(s) => CliDefaultWire::Text(s.clone()),
+        crate::cli::CliDefault::Integer(i) => CliDefaultWire::Integer(*i),
+        crate::cli::CliDefault::Float(f) => CliDefaultWire::Float(*f),
+        crate::cli::CliDefault::Bool(b) => CliDefaultWire::Bool(*b),
+        crate::cli::CliDefault::Nil => CliDefaultWire::Nil,
+        crate::cli::CliDefault::Expr(s) => CliDefaultWire::Expr(s.clone()),
     }
 }
 
-impl From<&crate::cli::CliExit> for CliExitWire {
-    fn from(e: &crate::cli::CliExit) -> Self {
-        match e {
-            crate::cli::CliExit::Fixed(v) => CliExitWire::Fixed(*v),
-            crate::cli::CliExit::Binding(s) => CliExitWire::Binding(s.clone()),
-            crate::cli::CliExit::Field { object, field } => {
-                CliExitWire::Field { object: object.clone(), field: field.clone() }
-            }
-            crate::cli::CliExit::Unsupported => CliExitWire::Unsupported,
+fn cli_exit_wire(e: &crate::cli::CliExit) -> CliExitWire {
+    match e {
+        crate::cli::CliExit::Fixed(v) => CliExitWire::Fixed(*v),
+        crate::cli::CliExit::Binding(s) => CliExitWire::Binding(s.clone()),
+        crate::cli::CliExit::Field { object, field } => {
+            CliExitWire::Field { object: object.clone(), field: field.clone() }
         }
+        crate::cli::CliExit::Unsupported => CliExitWire::Unsupported,
     }
 }
 
-impl From<&crate::cli::CliOption> for CliOptionWire {
-    fn from(o: &crate::cli::CliOption) -> Self {
-        CliOptionWire {
-            binding: o.binding.clone(),
-            ty: CliTypeWire::from(&o.ty),
-            short: o.short.clone(),
-            long: o.long.clone(),
-            description: o.description.clone(),
-            global: o.global,
-            default: o.default.as_ref().map(CliDefaultWire::from),
-            flag: o.flag,
-        }
+fn cli_option_wire(o: &crate::cli::CliOption) -> CliOptionWire {
+    CliOptionWire {
+        binding: o.binding.clone(),
+        ty: cli_type_wire(&o.ty),
+        short: o.short.clone(),
+        long: o.long.clone(),
+        description: o.description.clone(),
+        global: o.global,
+        default: o.default.as_ref().map(cli_default_wire),
+        flag: o.flag,
     }
 }
 
-impl From<&crate::cli::CliOperand> for CliOperandWire {
-    fn from(o: &crate::cli::CliOperand) -> Self {
-        CliOperandWire {
-            binding: o.binding.clone(),
-            ty: CliTypeWire::from(&o.ty),
-            rest: o.rest,
-            description: o.description.clone(),
-            global: o.global,
-            default: o.default.as_ref().map(CliDefaultWire::from),
-        }
+fn cli_operand_wire(o: &crate::cli::CliOperand) -> CliOperandWire {
+    CliOperandWire {
+        binding: o.binding.clone(),
+        ty: cli_type_wire(&o.ty),
+        rest: o.rest,
+        description: o.description.clone(),
+        global: o.global,
+        default: o.default.as_ref().map(cli_default_wire),
     }
 }
 
-impl From<&crate::cli::CliCommand> for CliCommandWire {
-    fn from(c: &crate::cli::CliCommand) -> Self {
-        CliCommandWire {
-            path: c.path.clone(),
-            module_path: c.module_path.clone(),
-            function: c.function.clone(),
-            function_symbol: c.function_symbol,
-            args_binding: c.args_binding.clone(),
-            aliases: c.aliases.clone(),
-            description: c.description.clone(),
-            options: c.options.iter().map(CliOptionWire::from).collect(),
-            operands: c.operands.iter().map(CliOperandWire::from).collect(),
-        }
+fn cli_command_wire(c: &crate::cli::CliCommand) -> CliCommandWire {
+    CliCommandWire {
+        path: c.path.clone(),
+        module_path: c.module_path.clone(),
+        function: c.function.clone(),
+        function_symbol: c.function_symbol,
+        args_binding: c.args_binding.clone(),
+        aliases: c.aliases.clone(),
+        description: c.description.clone(),
+        options: c.options.iter().map(cli_option_wire).collect(),
+        operands: c.operands.iter().map(cli_operand_wire).collect(),
     }
 }
 
-impl From<&crate::cli::CliMode> for CliModeWire {
-    fn from(m: &crate::cli::CliMode) -> Self {
-        match m {
-            crate::cli::CliMode::NotCli => CliModeWire::NotCli,
-            crate::cli::CliMode::SingleCommand => CliModeWire::SingleCommand,
-            crate::cli::CliMode::Subcommand => CliModeWire::Subcommand,
-        }
+fn cli_mode_wire(m: &crate::cli::CliMode) -> CliModeWire {
+    match m {
+        crate::cli::CliMode::NotCli => CliModeWire::NotCli,
+        crate::cli::CliMode::SingleCommand => CliModeWire::SingleCommand,
+        crate::cli::CliMode::Subcommand => CliModeWire::Subcommand,
     }
 }
 
-impl From<&crate::cli::CliProgram> for CliProgramWire {
-    fn from(p: &crate::cli::CliProgram) -> Self {
-        CliProgramWire {
-            name: p.name.clone(),
-            entry_args: p.entry_args.clone(),
-            mode: CliModeWire::from(&p.mode),
-            version: p.version.clone(),
-            description: p.description.clone(),
-            global_options: p.global_options.iter().map(CliOptionWire::from).collect(),
-            global_operands: p.global_operands.iter().map(CliOperandWire::from).collect(),
-            options: p.options.iter().map(CliOptionWire::from).collect(),
-            operands: p.operands.iter().map(CliOperandWire::from).collect(),
-            commands: p.commands.iter().map(CliCommandWire::from).collect(),
-            exit: p.exit.as_ref().map(CliExitWire::from),
-        }
+fn cli_program_wire(p: &crate::cli::CliProgram) -> CliProgramWire {
+    CliProgramWire {
+        name: p.name.clone(),
+        entry_args: p.entry_args.clone(),
+        mode: cli_mode_wire(&p.mode),
+        version: p.version.clone(),
+        description: p.description.clone(),
+        global_options: p.global_options.iter().map(cli_option_wire).collect(),
+        global_operands: p.global_operands.iter().map(cli_operand_wire).collect(),
+        options: p.options.iter().map(cli_option_wire).collect(),
+        operands: p.operands.iter().map(cli_operand_wire).collect(),
+        commands: p.commands.iter().map(cli_command_wire).collect(),
+        exit: p.exit.as_ref().map(cli_exit_wire),
     }
 }

@@ -4,11 +4,13 @@
 //! moved-by-default parameters and call arguments (Rust-output ownership
 //! semantics).
 
-use super::{analyze, DefId, Resolver, SemanticErrorKind, SemanticParamMode, TypeTable, WarningKind};
+use super::borrow::analyze;
+use super::{DefId, Resolver, SemanticErrorKind, TypeTable, WarningKind};
 use crate::hir::{
     HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirItem, HirItemKind, HirLiteral, HirModule,
     HirParam, HirParamMode, HirStatement, HirStatementKind,
 };
+use crate::semantic::SemanticParamMode;
 use crate::semantic::{FuncSig, ParamType, Primitive, SemanticError};
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::test_span;
@@ -693,7 +695,7 @@ fn warns_when_ex_parameter_is_never_consumed() {
 
 #[test]
 fn analyze_modes_rejects_use_after_move_without_rust_lifetime() {
-    use super::analyze_modes;
+    use super::borrow::analyze_modes;
     let mut types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
     let func_ty = types.function(FuncSig {

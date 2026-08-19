@@ -4,7 +4,7 @@
 //! Integration cells compile a real importer against a real target and assert
 //! `code` / `issue()` / args on every diagnostic.
 
-use super::{
+use super::import_seam::{
     importability, seam_from_flag, violation_issue, ImportSeam, Importability, ISSUE_IMPORT_INTERNA_CROSS_PACKAGE,
     ISSUE_IMPORT_MODULE_PRIVATE,
 };

@@ -5,7 +5,7 @@
 //! conflicting visibility tiers on one declaration, and no longer warns on
 //! member visibility annotations (WARN012 retired for the enforced kinds).
 
-use super::check;
+use super::visibility_annotation::check;
 use crate::diagnostics::DiagnosticArg;
 use crate::diagnostics::Severity;
 use crate::driver::{compile, Config, Session};

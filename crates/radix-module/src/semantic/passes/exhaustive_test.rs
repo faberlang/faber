@@ -8,12 +8,13 @@
 //! `omnia` alignment through the enum-shaped HIR they lower to — see the probe
 //! note in the union section below.
 
-use super::{check, discerne_definitely_covered, DefId, SemanticErrorKind, Type, TypeId, TypeTable, WarningKind};
+use super::exhaustive::{check, discerne_definitely_covered};
 use crate::hir::{
     HirBlock, HirCasuArm, HirExpression, HirExpressionKind, HirItem, HirItemKind, HirLiteral, HirModule, HirPattern,
     HirStatement, HirStatementKind, HirVariant, HirVariantField,
 };
 use crate::semantic::SemanticError;
+use crate::semantic::{DefId, SemanticErrorKind, Type, TypeId, TypeTable, WarningKind};
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::test_span;
 use rustc_hash::FxHashMap;

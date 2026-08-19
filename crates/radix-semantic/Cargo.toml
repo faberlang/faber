@@ -1,0 +1,51 @@
+[package]
+name = "radix-semantic"
+version = "0.83.0"
+edition = "2021"
+description = "Semantic analysis for Faber: collection, resolution, HIR lowering, typecheck, post-typecheck analyses, and coupled source contracts"
+license = "MIT"
+
+[lints.clippy]
+# Carried from radix-module (whose semantic code was written under this
+# exact posture); per-lint fixes land incrementally.
+pedantic = { level = "deny", priority = -1 }
+too_many_lines = "allow"
+match_same_arms = "allow"
+struct_excessive_bools = "allow"
+fn_params_excessive_bools = "allow"
+struct_field_names = "allow"
+needless_pass_by_value = "allow"
+similar_names = "allow"
+unnecessary_wraps = "allow"
+unused_self = "allow"
+items_after_statements = "allow"
+used_underscore_items = "allow"
+implicit_hasher = "allow"
+too_many_arguments = "allow"
+doc_markdown = "allow"
+missing_panics_doc = "allow"
+result_large_err = "allow"
+semicolon_if_nothing_returned = "allow"
+needless_return = "allow"
+single_match_else = "allow"
+
+
+[dependencies]
+radix-diagnostics = { path = "../radix-diagnostics" }
+radix-hir = { path = "../radix-hir" }
+radix-hir-fhir = { path = "../radix-hir-fhir", optional = true }
+radix-intrinsics = { path = "../radix-intrinsics" }
+radix-lexer = { path = "../radix-lexer" }
+radix-parser = { path = "../radix-parser" }
+radix-syntax = { path = "../radix-syntax" }
+radix-target = { path = "../radix-target" }
+radix-types = { path = "../radix-types" }
+rustc-hash = "2"
+serde_json = "1"
+toml = "1.1.2"
+unicode-normalization = "0.1"
+serde = { version = "1.0.228", features = ["derive"] }
+
+[features]
+hir-fhir = ["dep:radix-hir-fhir"]
+

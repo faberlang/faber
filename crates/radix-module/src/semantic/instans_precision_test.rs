@@ -4,7 +4,7 @@
 //! correct InstansPrecision variant and that precision assignability rules
 //! between ranks behave as expected.
 
-use super::{instans_assignable, InstansPrecision, InstansPrecisionError, InstansPrecisionRank};
+use super::instans_precision::{instans_assignable, InstansPrecision, InstansPrecisionError, InstansPrecisionRank};
 use crate::semantic::{Primitive, TypeTable};
 
 #[test]

@@ -75,7 +75,7 @@ fn reports_duplicate_definitions() {
 
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
-    let result = collect(&program, &mut resolver, &mut types);
+    let result = collect::collect(&program, &mut resolver, &mut types);
     assert!(result.is_err());
     let errors = result.unwrap_err();
     expect_structured_error(
@@ -106,7 +106,7 @@ fn inferred_import_name_collision_requests_explicit_alias() {
 
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
-    let result = collect(&program, &mut resolver, &mut types);
+    let result = collect::collect(&program, &mut resolver, &mut types);
     assert!(result.is_err());
     let errors = result.unwrap_err();
     expect_structured_error(
@@ -128,7 +128,7 @@ fn top_level_var_requires_identifier_binding() {
 
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
-    let result = collect(&program, &mut resolver, &mut types);
+    let result = collect::collect(&program, &mut resolver, &mut types);
     assert!(result.is_err());
     let errors = result.unwrap_err();
     expect_structured_error(
@@ -161,7 +161,7 @@ fn collects_enum_variants() {
 
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
-    let result = collect(&program, &mut resolver, &mut types);
+    let result = collect::collect(&program, &mut resolver, &mut types);
     assert!(result.is_ok());
 
     // Variants register under the parent-qualified namespace, not the bare
@@ -203,7 +203,7 @@ fn collects_union_variants() {
 
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
-    let result = collect(&program, &mut resolver, &mut types);
+    let result = collect::collect(&program, &mut resolver, &mut types);
     assert!(result.is_ok());
 
     // Variants register under the parent-qualified namespace, not the bare
@@ -252,7 +252,7 @@ fn cross_union_variant_names_do_not_collide() {
 
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
-    let result = collect(&program, &mut resolver, &mut types);
+    let result = collect::collect(&program, &mut resolver, &mut types);
     assert!(result.is_ok(), "cross-union same-name variants must declare cleanly");
 
     let a_def = resolver.lookup(interner.intern("A")).expect("union A def");
@@ -300,7 +300,7 @@ fn same_union_duplicate_variant_still_fails() {
 
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
-    let result = collect(&program, &mut resolver, &mut types);
+    let result = collect::collect(&program, &mut resolver, &mut types);
     assert!(result.is_err());
     expect_structured_error(
         &result.unwrap_err(),
@@ -334,7 +334,7 @@ fn collects_function_definitions() {
 
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
-    let result = collect(&program, &mut resolver, &mut types);
+    let result = collect::collect(&program, &mut resolver, &mut types);
     assert!(result.is_ok());
 
     let def_id = resolver
@@ -364,7 +364,7 @@ fn allows_duplicate_import_module_bindings() {
 
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
-    let result = collect(&program, &mut resolver, &mut types);
+    let result = collect::collect(&program, &mut resolver, &mut types);
     assert!(result.is_ok());
 }
 
@@ -384,7 +384,7 @@ fn import_alias_binds_visible_name() {
 
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
-    let result = collect(&program, &mut resolver, &mut types);
+    let result = collect::collect(&program, &mut resolver, &mut types);
     assert!(result.is_ok());
 
     assert!(resolver.lookup(interner.intern("originale")).is_none());
@@ -401,7 +401,7 @@ fn empty_program_collects_without_errors() {
 
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
-    let result = collect(&program, &mut resolver, &mut types);
+    let result = collect::collect(&program, &mut resolver, &mut types);
 
     assert!(result.is_ok(), "empty program should collect without errors");
 }
@@ -459,7 +459,7 @@ discretio PhaseErrorKind {
 
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
-    collect(program, &mut resolver, &mut types)
+    collect::collect(program, &mut resolver, &mut types)
         .expect("the five pilot names must declare cleanly across distinct unions");
 
     // Each colliding name is registered under BOTH defining unions with a

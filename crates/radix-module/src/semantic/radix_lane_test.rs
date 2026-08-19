@@ -53,9 +53,7 @@ functio loss() → numerus {
     );
 
     assert!(
-        !errors
-            .iter()
-            .any(super::super::error::SemanticError::is_error),
+        !errors.iter().any(super::error::SemanticError::is_error),
         "unexpected hard errors: {errors:?}"
     );
     let collected = lanes.iter().map(|(_, lane)| lane).collect::<Vec<_>>();
@@ -74,9 +72,7 @@ functio loss() → numerus {
     );
 
     assert!(
-        !errors
-            .iter()
-            .any(super::super::error::SemanticError::is_error),
+        !errors.iter().any(super::error::SemanticError::is_error),
         "unexpected hard errors: {errors:?}"
     );
     let collected = lanes.iter().map(|(_, lane)| lane).collect::<Vec<_>>();
@@ -100,9 +96,7 @@ functio direct() → numerus {
     );
 
     assert!(
-        !errors
-            .iter()
-            .any(super::super::error::SemanticError::is_error),
+        !errors.iter().any(super::error::SemanticError::is_error),
         "unexpected hard errors: {errors:?}"
     );
     let mut collected = lanes
@@ -250,9 +244,7 @@ functio loss(tf32[2] a, tf32[2] b) → tf32[2] {
     );
 
     assert!(
-        !errors
-            .iter()
-            .any(super::super::error::SemanticError::is_error),
+        !errors.iter().any(super::error::SemanticError::is_error),
         "unexpected hard errors: {errors:?}",
     );
     let collected = lanes.iter().map(|(_, lane)| lane).collect::<Vec<_>>();
@@ -398,9 +390,7 @@ functio loss(tf32[2] a, tf32[2] b) → tf32[2] {
     );
 
     assert!(
-        !errors
-            .iter()
-            .any(super::super::error::SemanticError::is_error),
+        !errors.iter().any(super::error::SemanticError::is_error),
         "unexpected hard errors: {errors:?}"
     );
     let backward_defs: Vec<_> = lanes.iter_backward().collect();
@@ -425,9 +415,7 @@ functio no_backward(numerus x) → numerus {
     );
 
     assert!(
-        !errors
-            .iter()
-            .any(super::super::error::SemanticError::is_error),
+        !errors.iter().any(super::error::SemanticError::is_error),
         "unexpected hard errors: {errors:?}"
     );
 

@@ -4,7 +4,7 @@
 //! while unknown modules, invalid paths, glob re-exports, and legacy
 //! `norma:json` in script mode are rejected.
 
-use super::{validate_kernel_imports, validate_script_kernel_library_imports};
+use super::kernel_namespace::{validate_kernel_imports, validate_script_kernel_library_imports};
 use crate::parser;
 use crate::semantic::{SemanticError, SemanticErrorKind};
 use crate::test_support::args_have_no_legacy_message;

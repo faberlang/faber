@@ -4,7 +4,7 @@
 //! and that irregular or type-mismatched lists produce the expected
 //! ListaToTensorError diagnostics.
 
-use super::{
+use super::lista_tensor_conversio::{
     analyze_rectangular_lista_literal, ensure_lista_numerus_type, resolve_lista_to_tensor_shape,
     validate_lista_to_tensor_source, ListaToTensorError, ListaToTensorShape, RectangularListaLiteralError,
 };

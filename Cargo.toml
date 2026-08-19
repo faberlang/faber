@@ -22,6 +22,7 @@ members = [
     "crates/radix-types",
     "crates/radix-target",
     "crates/radix-intrinsics",
+    "crates/radix-semantic",
     "crates/faber",
 ]
 resolver = "2"

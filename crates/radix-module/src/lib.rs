@@ -63,7 +63,7 @@ pub use radix_lexer::ascii_literal;
 pub mod aspect;
 #[cfg(test)]
 pub mod backend_smoke;
-pub mod builtins;
+pub use radix_semantic::builtins;
 pub mod cli;
 pub mod cli_descriptor;
 pub mod codegen;
@@ -83,6 +83,7 @@ pub mod llvm_host;
 pub mod locale;
 #[cfg(feature = "mir-core")]
 pub mod mir;
+pub mod tensor_goal_gate;
 pub use radix_lexer::octeti_literal;
 pub mod parser;
 pub mod paths;

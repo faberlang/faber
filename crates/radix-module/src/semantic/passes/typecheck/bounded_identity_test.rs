@@ -1,6 +1,8 @@
 //! BB-2 pins: bounded type identity, assignability, char-literal typing, rejects.
 
 use super::*;
+use crate::codegen::Target;
+use crate::hir::HirLiteral;
 use crate::lexer::{lex, Interner, Span};
 use crate::parser::parse;
 use crate::semantic::passes::collect;

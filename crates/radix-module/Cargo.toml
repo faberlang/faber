@@ -33,6 +33,7 @@ missing_panics_doc = "allow"
 radix-codegen-shared = { path = "../radix-codegen-shared" }
 radix-target = { path = "../radix-target" }
 radix-intrinsics = { path = "../radix-intrinsics" }
+radix-semantic = { path = "../radix-semantic" }
 # Consumerless leaves, gated out of default builds (U7, removal-delivery-spec).
 radix-hir-faber = { path = "../radix-hir-faber", optional = true }
 radix-mir = { path = "../radix-mir", optional = true }
@@ -66,7 +67,7 @@ tempfile = "3"
 default = ["full-targets"]
 full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "runner"]
 hir-faber = ["dep:radix-hir-faber", "radix-target/hir-faber"]
-hir-fhir = ["dep:radix-hir-fhir", "radix-target/hir-fhir"]
+hir-fhir = ["dep:radix-hir-fhir", "radix-target/hir-fhir", "radix-semantic/hir-fhir"]
 mir-fmir = ["mir-core"]
 mir-core = ["dep:radix-mir"]
 runner = ["mir-core", "dep:radix-mir-runner"]

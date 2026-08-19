@@ -1,0 +1,3169 @@
+//! AST name resolution and type-alias lowering for the semantic front end.
+//!
+//! `resolve` is the second AST-phase semantic pass. It runs after
+//! [collect](super::collect) has populated the resolver with top-level
+//! declaration identities and before HIR lowering tries to encode semantic
+//! identities into lowered nodes. This pass validates lexical availability of
+//! names and types, creates nested scopes for local bindings, checks
+//! return/loop-control placement, and resolves type aliases into the shared
+//! [`TypeTable`].
+//!
+//! BOUNDARY
+//! ========
+//! The pass is deliberately pre-HIR and non-inferential. It can prove that a
+//! name exists and that a type name refers to a type-like symbol, but it does
+//! not assign expression types, validate assignability, run borrow checks, or
+//! decide target-specific warning policy. Those responsibilities belong to HIR
+//! lowering, typecheck, and later analysis passes.
+//!
+//! INVARIANTS
+//! ==========
+//! - Global declarations already exist in the resolver when this pass starts.
+//! - Scopes are entered around functions, blocks, loops, matches, and module-ish
+//!   declaration bodies so lookup follows lexical containment.
+//! - Variable declarations resolve their annotation and initializer before the
+//!   declared binding enters the current scope; parameter and pattern bindings
+//!   enter the scope that owns the body they make available.
+//! - `redde`, `rumpe`, and `perge` placement is checked from the scope stack.
+//! - Type aliases are the only AST type expressions lowered here; their
+//!   resulting `TypeId`s are stored on resolver symbols for later HIR/typecheck
+//!   use.
+//!
+//! TYPE-ALIAS FIXPOINT
+//! ===================
+//! Aliases can reference earlier or later aliases, so this file lowers them
+//! with a small fixed-point loop. An alias whose dependency is not yet typed is
+//! deferred; an iteration with no progress reports the remaining aliases as a
+//! circular dependency. This keeps cycle handling local to the one pre-HIR type
+//! lowering responsibility resolve owns.
+//!
+//! ERROR STRATEGY
+//! ==============
+//! Resolution accumulates hard semantic errors and lets the driver stop before
+//! HIR lowering. The only warning produced here is the `curata` allocator-name
+//! lint (`WARN015`); broader warning/error policy for target-sensitive analysis
+//! is handled by the later HIR passes and driver.
+
+use crate::error::WarningKind;
+use crate::instans_precision::InstansPrecisionError;
+use crate::numeric_width::WidthError;
+use crate::{
+    BareVariantLookup, CollectionKind, FuncSig, IndexExpr, ParamType, Primitive,
+    QualifiedVariantPathLookup, Resolver, SchemaColumnDef, SchemaDef, ScopeKind, SemanticError,
+    SemanticErrorKind, SemanticMutability, SemanticParamMode, Symbol, SymbolKind, Type, TypeId,
+    TypeTable,
+};
+use radix_hir::DefId;
+use radix_lexer::Interner;
+use radix_syntax::{
+    AssignOp, BindingPattern, BlockStmt, ClausuraBody, ConversioTarget, DiscerneStmt, Expr,
+    ExprKind, FiguraExpr, IfBody, Pattern, PatternBind, ProbandumDecl, Program, SiStmt, Stmt,
+    StmtKind, TypeExpr, TypeExprKind, TypeParam,
+};
+use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
+
+const ISSUE_DUPLICATE_DEFINITION: &str = "duplicate_definition";
+const ISSUE_EMPTY_QUALIFIED_TYPE_PATH: &str = "empty_qualified_type_path";
+const ISSUE_EMPTY_UNION_TYPE: &str = "empty_union_type";
+const ISSUE_ATOMIC_ARITY: &str = "atomic_arity";
+const ISSUE_ATOMIC_ELEMENT: &str = "atomic_element";
+const ISSUE_ATOMIC_INCOMPLETE: &str = "atomic_incomplete";
+const ISSUE_FIGURA_UNKNOWN_INDEX: &str = "figura_unknown_index";
+const ISSUE_FIGURA_TYPE_PARAM_IN_INDEX: &str = "figura_type_param_in_index";
+const ISSUE_INVALID_FRACTUS_WIDTH_MARKER: &str = "invalid_fractus_width_marker";
+const ISSUE_INVALID_NUMERUS_WIDTH_MARKER: &str = "invalid_numerus_width_marker";
+const ISSUE_INVALID_PRECISION_MARKER: &str = "invalid_precision_marker";
+const ISSUE_INVALID_WIDTH_MARKER: &str = "invalid_width_marker";
+const ISSUE_INTERVALLUM_ARITY: &str = "intervallum_arity";
+const ISSUE_INTERVALLUM_BOUND: &str = "intervallum_bound";
+const ISSUE_MATRIX_INCOMPLETE: &str = "matrix_incomplete";
+const ISSUE_MATRIX_MISSING_FIGURA: &str = "matrix_missing_figura";
+const ISSUE_MATRIX_SHAPE_TWO_DIM: &str = "matrix_shape_two_dim";
+const ISSUE_MISSING_TYPE_ALIAS_SYMBOL: &str = "missing_type_alias_symbol";
+const ISSUE_MISSING_TYPE_SYMBOL_INFO: &str = "missing_type_symbol_info";
+const ISSUE_NAME_NOT_VARIANT: &str = "name_not_variant";
+const ISSUE_NAME_NOT_TYPE: &str = "name_not_type";
+const ISSUE_OCTET_PARAMS: &str = "octet_params";
+const ISSUE_PRECISION_MARKER_PARAMS: &str = "precision_marker_params";
+const ISSUE_PRECISION_MARKER_SHAPE: &str = "precision_marker_shape";
+const ISSUE_PRIMITIVE_PARAMS: &str = "primitive_params";
+const ISSUE_BOUNDED_CAPACITY_NOT_NATURAL: &str = "bounded_capacity_not_natural";
+const ISSUE_QUALIFIED_TYPE_NOT_EXPORTED: &str = "qualified_type_not_exported";
+const ISSUE_QUALIFIED_TYPE_MIDDLE_NOT_NAMESPACE: &str = "qualified_type_middle_not_namespace";
+const ISSUE_QUALIFIED_TYPE_PREFIX_NOT_NAMESPACE: &str = "qualified_type_prefix_not_namespace";
+const ISSUE_FIGURA_NOT_INDEX_PARAM: &str = "figura_not_index_param";
+const ISSUE_SCRINIUM_ARITY: &str = "scrinium_arity";
+const ISSUE_SCRINIUM_MISSING_BUILTIN: &str = "scrinium_missing_builtin";
+const ISSUE_SERIES_PARAMS: &str = "series_params";
+const ISSUE_SCHEMA_DUPLICATE_VISIBLE: &str = "schema_duplicate_visible";
+const ISSUE_SCHEMA_DUPLICATE_SOURCE: &str = "schema_duplicate_source";
+const ISSUE_SCHEMA_UNKNOWN_TYPE: &str = "schema_unknown_type";
+const ISSUE_SCHEMA_NESTED_COLUMN: &str = "schema_nested_column";
+const ISSUE_SPARSA_ELEMENT_NON_NUMERIC: &str = "sparsa_element_non_numeric";
+const ISSUE_SPARSA_INCOMPLETE: &str = "sparsa_incomplete";
+const ISSUE_SPARSA_MISSING_FIGURA: &str = "sparsa_missing_figura";
+const ISSUE_TENSOR_INCOMPLETE: &str = "tensor_incomplete";
+const ISSUE_TENSOR_MISSING_FIGURA: &str = "tensor_missing_figura";
+const ISSUE_TYPE_ALIAS_CYCLE: &str = "type_alias_cycle";
+const ISSUE_TYPE_NAME_NOT_TYPE: &str = "type_name_not_type";
+const ISSUE_VARIANT_AMBIGUOUS: &str = "variant_ambiguous";
+const ISSUE_UNION_ONLY_NIHIL: &str = "union_only_nihil";
+const ISSUE_UNKNOWN_TYPE_LOWERING: &str = "unknown_type_lowering_error";
+const ISSUE_UNRECOGNIZED_CURATA_ALLOCATOR: &str = "unrecognized_curata_allocator";
+const ISSUE_NAME_NOT_VALUE: &str = "name_not_value";
+const ISSUE_NAMESPACE_MISSING_EXPORT: &str = "namespace_missing_export";
+const ISSUE_SCRIBE_CALLEE: &str = "scribe_callee";
+const ISSUE_UNKNOWN_IDENTIFIER: &str = "unknown_identifier";
+const ISSUE_UNKNOWN_NAMESPACE: &str = "unknown_namespace";
+const ISSUE_UNKNOWN_QUALIFIED_TYPE: &str = "unknown_qualified_type";
+const ISSUE_UNKNOWN_TYPE_NAME: &str = "unknown_type_name";
+const ISSUE_UNKNOWN_TYPE: &str = "unknown_type";
+const ISSUE_UNKNOWN_VARIANT: &str = "unknown_variant";
+const ISSUE_VECTOR_INCOMPLETE: &str = "vector_incomplete";
+const ISSUE_VECTOR_MISSING_WIDTH: &str = "vector_missing_width";
+const ISSUE_VECTOR_WIDTH_SINGLE_DIM: &str = "vector_width_single_dim";
+const ISSUE_WIDTH_MARKER_PARAMS: &str = "width_marker_params";
+const ISSUE_WIDTH_MARKER_SHAPE: &str = "width_marker_shape";
+
+/// Resolve AST-level names and type aliases after declaration collection.
+///
+/// The resulting resolver contains the lexical scope tree and any type-alias
+/// `TypeId`s needed by lowering/typecheck. Errors are accumulated so a single
+/// source file can report several undefined names, invalid control-flow forms,
+/// or alias cycles in one compiler run.
+///
+/// # Errors
+///
+/// Returns undefined-name, duplicate-binding, and alias-cycle errors as a list
+/// of [`SemanticError`]s.
+pub fn resolve(
+    program: &Program,
+    resolver: &mut Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<(), Vec<SemanticError>> {
+    let mut errors = Vec::new();
+    let mut aliases = Vec::new();
+
+    // Gather alias declarations before resolving bodies so later alias lowering
+    // can run against the full set of collected symbols.
+    for stmt in &program.statements {
+        if let StmtKind::TypeAlias(decl) = &stmt.kind {
+            let Some(def_id) = resolver.lookup(decl.name.name) else {
+                errors.push(lowering_error(ISSUE_MISSING_TYPE_ALIAS_SYMBOL, stmt.span));
+                continue;
+            };
+            aliases.push(AliasEntry {
+                def_id,
+                type_params: &decl.type_params,
+                ty: &decl.ty,
+                span: stmt.span,
+            });
+        }
+    }
+
+    for stmt in &program.statements {
+        resolve_stmt(resolver, interner, stmt, &mut errors);
+    }
+
+    resolve_alias_types(&aliases, resolver, interner, types, &mut errors);
+    resolve_schema_decls(program, resolver, interner, types, &mut errors);
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
+fn resolve_stmt(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    stmt: &Stmt,
+    errors: &mut Vec<SemanticError>,
+) {
+    let stmt_span = stmt.span;
+    match &stmt.kind {
+        StmtKind::Var(decl) => {
+            if let Some(ty) = &decl.ty {
+                resolve_type_expr(resolver, interner, ty, errors);
+            }
+            let local_scope = !matches!(resolver.current().kind, ScopeKind::Global);
+            // A typed `↤` initializer has the binding being declared as its own
+            // assignment target (the parser synthesized it), so the binding
+            // must be in scope while the initializer resolves. Define it up
+            // front and skip the post-init definition so one def_id serves
+            // both the target and the declaration.
+            let conversio_assign_init = decl.init.as_ref().is_some_and(|init| {
+                matches!(
+                    &init.kind,
+                    ExprKind::Assign(assign) if matches!(assign.op, AssignOp::ConversioAssign)
+                )
+            });
+            if conversio_assign_init && local_scope {
+                define_binding_pattern(
+                    resolver,
+                    &decl.binding,
+                    decl.mutability == radix_syntax::AstMutability::Mutable,
+                    errors,
+                );
+            }
+            if let Some(init) = &decl.init {
+                resolve_expr(resolver, interner, init, errors);
+            }
+            if local_scope && !conversio_assign_init {
+                define_binding_pattern(
+                    resolver,
+                    &decl.binding,
+                    decl.mutability == radix_syntax::AstMutability::Mutable,
+                    errors,
+                );
+            }
+        }
+        StmtKind::Func(decl) => {
+            resolver.enter_scope(ScopeKind::Function);
+            for param in &decl.type_params {
+                define_generic_param(resolver, param, errors);
+            }
+            for param in &decl.params {
+                resolve_type_expr(resolver, interner, &param.ty, errors);
+                let binding_name = param.alias.as_ref().unwrap_or(&param.name);
+                define_symbol(
+                    resolver,
+                    binding_name.name,
+                    binding_name.span,
+                    SymbolKind::Param,
+                    param.mode == radix_syntax::AstParamMode::In,
+                    errors,
+                );
+                if let Some(default) = &param.default {
+                    resolve_expr(resolver, interner, default, errors);
+                }
+            }
+            for ident in modifier_bindings(&decl.modifiers) {
+                define_symbol(
+                    resolver,
+                    ident.name,
+                    ident.span,
+                    SymbolKind::Local,
+                    true,
+                    errors,
+                );
+            }
+            define_shader_stage_locals_for_resolution(
+                resolver,
+                interner,
+                &stmt.annotations,
+                stmt_span,
+                errors,
+            );
+            check_curata_allocator_names(&decl.modifiers, interner, errors);
+            if let Some(ret) = &decl.ret {
+                resolve_type_expr(resolver, interner, ret, errors);
+            }
+            if let Some(body) = &decl.body {
+                resolve_block(resolver, interner, body, errors);
+            }
+            resolver.exit_scope();
+        }
+        StmtKind::Class(decl) => {
+            resolver.enter_scope(ScopeKind::Module);
+            for param in &decl.type_params {
+                define_generic_param(resolver, param, errors);
+            }
+            if let Some(base) = &decl.extends {
+                resolve_type_ident(resolver, interner, base, errors);
+            }
+            for iface in &decl.implements {
+                resolve_type_ident(resolver, interner, iface, errors);
+            }
+            for member in &decl.members {
+                match &member.kind {
+                    radix_syntax::ClassMemberKind::Field(field) => {
+                        resolve_type_expr(resolver, interner, &field.ty, errors);
+                        if let Some(init) = &field.init {
+                            resolve_expr(resolver, interner, init, errors);
+                        }
+                    }
+                    radix_syntax::ClassMemberKind::Method(method) => {
+                        resolver.enter_scope(ScopeKind::Function);
+                        for param in &method.type_params {
+                            define_generic_param(resolver, param, errors);
+                        }
+                        for param in &method.params {
+                            resolve_type_expr(resolver, interner, &param.ty, errors);
+                            let binding_name = param.alias.as_ref().unwrap_or(&param.name);
+                            define_symbol(
+                                resolver,
+                                binding_name.name,
+                                binding_name.span,
+                                SymbolKind::Param,
+                                param.mode == radix_syntax::AstParamMode::In,
+                                errors,
+                            );
+                            if let Some(default) = &param.default {
+                                resolve_expr(resolver, interner, default, errors);
+                            }
+                        }
+                        for ident in modifier_bindings(&method.modifiers) {
+                            define_symbol(
+                                resolver,
+                                ident.name,
+                                ident.span,
+                                SymbolKind::Local,
+                                true,
+                                errors,
+                            );
+                        }
+                        check_curata_allocator_names(&method.modifiers, interner, errors);
+                        if let Some(ret) = &method.ret {
+                            resolve_type_expr(resolver, interner, ret, errors);
+                        }
+                        if let Some(body) = &method.body {
+                            resolve_block(resolver, interner, body, errors);
+                        }
+                        resolver.exit_scope();
+                    }
+                }
+            }
+            resolver.exit_scope();
+        }
+        StmtKind::Interface(decl) => {
+            resolver.enter_scope(ScopeKind::Module);
+            for param in &decl.type_params {
+                define_generic_param(resolver, param, errors);
+            }
+            for method in &decl.methods {
+                resolver.enter_scope(ScopeKind::Function);
+                for param in &method.params {
+                    resolve_type_expr(resolver, interner, &param.ty, errors);
+                    define_symbol(
+                        resolver,
+                        param.name.name,
+                        param.name.span,
+                        SymbolKind::Param,
+                        param.mode == radix_syntax::AstParamMode::In,
+                        errors,
+                    );
+                }
+                if let Some(ret) = &method.ret {
+                    resolve_type_expr(resolver, interner, ret, errors);
+                }
+                resolver.exit_scope();
+            }
+            resolver.exit_scope();
+        }
+        StmtKind::TypeAlias(decl) => {
+            resolver.enter_scope(ScopeKind::Module);
+            for param in &decl.type_params {
+                define_generic_param(resolver, param, errors);
+            }
+            resolve_type_expr(resolver, interner, &decl.ty, errors);
+            resolver.exit_scope();
+        }
+        // Relational schema declarations are resolved by `resolve_schema_decls`
+        // (after alias lowering so column types may reference aliases): a
+        // schema introduces no value bindings or local scopes for this pass,
+        // and its ordered column metadata is type-level only.
+        StmtKind::Schema(_decl) => {}
+        StmtKind::Enum(_) => {}
+        StmtKind::Union(decl) => {
+            resolver.enter_scope(ScopeKind::Module);
+            for param in &decl.type_params {
+                define_generic_param(resolver, param, errors);
+            }
+            for variant in &decl.variants {
+                for field in &variant.fields {
+                    resolve_type_expr(resolver, interner, &field.ty, errors);
+                }
+            }
+            resolver.exit_scope();
+        }
+        StmtKind::Import(_decl) => {}
+        StmtKind::Block(block) => resolve_block(resolver, interner, block, errors),
+        StmtKind::Expr(expr) => resolve_expr(resolver, interner, &expr.expr, errors),
+        StmtKind::IncDec(stmt) => resolve_expr(resolver, interner, &stmt.target, errors),
+        StmtKind::Si(stmt) => resolve_si_stmt(resolver, interner, stmt, errors),
+        StmtKind::Dum(stmt) => {
+            resolve_expr(resolver, interner, &stmt.cond, errors);
+            resolver.enter_scope(ScopeKind::Loop);
+            resolve_if_body(resolver, interner, &stmt.body, errors);
+            resolver.exit_scope();
+            if let Some(catch) = &stmt.catch {
+                resolver.enter_scope(ScopeKind::Block);
+                define_symbol(
+                    resolver,
+                    catch.binding.name,
+                    catch.binding.span,
+                    SymbolKind::Local,
+                    false,
+                    errors,
+                );
+                resolve_block(resolver, interner, &catch.body, errors);
+                resolver.exit_scope();
+            }
+        }
+        StmtKind::Itera(stmt) => {
+            resolve_expr(resolver, interner, &stmt.iterable, errors);
+            resolver.enter_scope(ScopeKind::Loop);
+            define_symbol(
+                resolver,
+                stmt.binding.name,
+                stmt.binding.span,
+                SymbolKind::Local,
+                stmt.mutability == radix_syntax::AstMutability::Mutable,
+                errors,
+            );
+            resolve_if_body(resolver, interner, &stmt.body, errors);
+            resolver.exit_scope();
+            if let Some(catch) = &stmt.catch {
+                resolver.enter_scope(ScopeKind::Block);
+                define_symbol(
+                    resolver,
+                    catch.binding.name,
+                    catch.binding.span,
+                    SymbolKind::Local,
+                    false,
+                    errors,
+                );
+                resolve_block(resolver, interner, &catch.body, errors);
+                resolver.exit_scope();
+            }
+        }
+        StmtKind::Elige(stmt) => {
+            resolve_expr(resolver, interner, &stmt.expr, errors);
+            for case in &stmt.cases {
+                resolve_elige_case_value(resolver, interner, &case.value, errors);
+                resolve_if_body(resolver, interner, &case.body, errors);
+            }
+            if let Some(default) = &stmt.default {
+                resolve_if_body(resolver, interner, &default.body, errors);
+            }
+            if let Some(catch) = &stmt.catch {
+                resolver.enter_scope(ScopeKind::Block);
+                define_symbol(
+                    resolver,
+                    catch.binding.name,
+                    catch.binding.span,
+                    SymbolKind::Local,
+                    false,
+                    errors,
+                );
+                resolve_block(resolver, interner, &catch.body, errors);
+                resolver.exit_scope();
+            }
+        }
+        StmtKind::Discerne(stmt) => resolve_discerne(resolver, interner, stmt, errors),
+        StmtKind::Custodi(stmt) => {
+            for clause in &stmt.clauses {
+                resolve_expr(resolver, interner, &clause.cond, errors);
+                resolve_if_body(resolver, interner, &clause.body, errors);
+            }
+        }
+        StmtKind::Fac(stmt) => {
+            resolver.enter_scope(ScopeKind::Loop);
+            resolve_block(resolver, interner, &stmt.body, errors);
+            resolver.exit_scope();
+            if let Some(catch) = &stmt.catch {
+                resolver.enter_scope(ScopeKind::Block);
+                define_symbol(
+                    resolver,
+                    catch.binding.name,
+                    catch.binding.span,
+                    SymbolKind::Local,
+                    false,
+                    errors,
+                );
+                resolve_block(resolver, interner, &catch.body, errors);
+                resolver.exit_scope();
+            }
+            if let Some(cond) = &stmt.while_ {
+                resolve_expr(resolver, interner, cond, errors);
+            }
+        }
+        StmtKind::Redde(stmt) => {
+            if !resolver.in_function() {
+                errors.push(
+                    SemanticError::structured(
+                        SemanticErrorKind::ReturnOutsideFunction,
+                        stmt.value.as_ref().map_or(stmt_span, |value| value.span),
+                    )
+                    .with_arg("issue", "return_outside_function")
+                    .with_arg("keyword", "redde")
+                    .with_arg("context", "function"),
+                );
+            }
+            if let Some(value) = &stmt.value {
+                resolve_expr(resolver, interner, value, errors);
+            }
+        }
+        StmtKind::Rumpe(stmt) => {
+            if !resolver.in_breakable() {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::BreakOutsideBreakable, stmt.span)
+                        .with_arg("issue", "break_outside_breakable")
+                        .with_arg("keyword", "rumpe")
+                        .with_arg("context", "breakable block"),
+                );
+            }
+        }
+        StmtKind::Perge(stmt) => {
+            if !resolver.in_loop() {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::ContinueOutsideLoop, stmt.span)
+                        .with_arg("issue", "continue_outside_loop")
+                        .with_arg("keyword", "perge")
+                        .with_arg("context", "loop"),
+                );
+            }
+        }
+        StmtKind::Iace(stmt) => resolve_expr(resolver, interner, &stmt.value, errors),
+        StmtKind::Mori(stmt) => resolve_expr(resolver, interner, &stmt.value, errors),
+        StmtKind::Tacet(_) => {}
+        StmtKind::Reddet(stmt) => resolve_expr(resolver, interner, &stmt.future, errors),
+        StmtKind::Tacebit(stmt) => resolve_expr(resolver, interner, &stmt.future, errors),
+        StmtKind::Adfirma(stmt) => {
+            resolve_expr(resolver, interner, &stmt.cond, errors);
+            if let Some(message) = &stmt.message {
+                resolve_expr(resolver, interner, message, errors);
+            }
+        }
+        StmtKind::Require(stmt) => {
+            resolve_expr(resolver, interner, &stmt.cond, errors);
+            resolve_expr(resolver, interner, &stmt.error, errors);
+        }
+        StmtKind::Scribe(stmt) => {
+            for arg in &stmt.args {
+                resolve_expr(resolver, interner, arg, errors);
+            }
+        }
+        StmtKind::Incipit(stmt) => {
+            resolver.enter_scope(ScopeKind::Function);
+            if let Some(args) = &stmt.args {
+                define_symbol(
+                    resolver,
+                    args.name,
+                    args.span,
+                    SymbolKind::Param,
+                    false,
+                    errors,
+                );
+            }
+            if let Some(exitus) = &stmt.exitus {
+                resolve_expr(resolver, interner, exitus, errors);
+            }
+            resolve_if_body(resolver, interner, &stmt.body, errors);
+            resolver.exit_scope();
+        }
+        StmtKind::Cura(stmt) => {
+            resolve_type_expr(resolver, interner, &stmt.ty, errors);
+            resolver.enter_scope(ScopeKind::Block);
+            define_symbol(
+                resolver,
+                stmt.binding.name,
+                stmt.binding.span,
+                SymbolKind::Local,
+                stmt.mutability == radix_syntax::AstMutability::Mutable,
+                errors,
+            );
+            resolve_block(resolver, interner, &stmt.body, errors);
+            resolver.exit_scope();
+            if let Some(catch) = &stmt.catch {
+                resolver.enter_scope(ScopeKind::Block);
+                define_symbol(
+                    resolver,
+                    catch.binding.name,
+                    catch.binding.span,
+                    SymbolKind::Local,
+                    false,
+                    errors,
+                );
+                resolve_block(resolver, interner, &catch.body, errors);
+                resolver.exit_scope();
+            }
+        }
+        StmtKind::Probandum(test) => resolve_probandum(resolver, interner, test, errors),
+        StmtKind::Proba(case) => {
+            resolve_block(resolver, interner, &case.body, errors);
+        }
+        StmtKind::Ex(stmt) => {
+            resolve_expr(resolver, interner, &stmt.source, errors);
+            for field in &stmt.fields {
+                if let Some(alias) = &field.alias {
+                    define_symbol(
+                        resolver,
+                        alias.name,
+                        alias.span,
+                        SymbolKind::Local,
+                        stmt.mutability == radix_syntax::AstMutability::Mutable,
+                        errors,
+                    );
+                } else {
+                    define_symbol(
+                        resolver,
+                        field.name.name,
+                        field.name.span,
+                        SymbolKind::Local,
+                        stmt.mutability == radix_syntax::AstMutability::Mutable,
+                        errors,
+                    );
+                }
+            }
+            if let Some(rest) = &stmt.rest {
+                define_symbol(
+                    resolver,
+                    rest.name,
+                    rest.span,
+                    SymbolKind::Local,
+                    stmt.mutability == radix_syntax::AstMutability::Mutable,
+                    errors,
+                );
+            }
+        }
+    }
+}
+
+fn resolve_block(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    block: &BlockStmt,
+    errors: &mut Vec<SemanticError>,
+) {
+    resolver.enter_scope(ScopeKind::Block);
+    for stmt in &block.statements {
+        resolve_stmt(resolver, interner, stmt, errors);
+    }
+    resolver.exit_scope();
+}
+
+fn resolve_if_body(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    body: &IfBody,
+    errors: &mut Vec<SemanticError>,
+) {
+    match body {
+        IfBody::Block(block) => resolve_block(resolver, interner, block, errors),
+        // `ergo` bodies lower to a one-arm block (`lower_ergo_body`), so resolve
+        // them in a nested block scope too: bindings must not leak into the
+        // enclosing scope and local shadowing must match lowering.
+        IfBody::Ergo(stmt) => {
+            resolver.enter_scope(ScopeKind::Block);
+            resolve_stmt(resolver, interner, stmt, errors);
+            resolver.exit_scope();
+        }
+    }
+}
+
+fn resolve_si_stmt(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    stmt: &SiStmt,
+    errors: &mut Vec<SemanticError>,
+) {
+    resolve_expr(resolver, interner, &stmt.cond, errors);
+    resolve_if_body(resolver, interner, &stmt.then, errors);
+    if let Some(catch) = &stmt.catch {
+        resolver.enter_scope(ScopeKind::Block);
+        define_symbol(
+            resolver,
+            catch.binding.name,
+            catch.binding.span,
+            SymbolKind::Local,
+            false,
+            errors,
+        );
+        resolve_block(resolver, interner, &catch.body, errors);
+        resolver.exit_scope();
+    }
+    if let Some(else_) = &stmt.else_ {
+        resolve_secus_clause(resolver, interner, else_, errors);
+    }
+}
+
+fn resolve_probandum(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    test: &ProbandumDecl,
+    errors: &mut Vec<SemanticError>,
+) {
+    resolver.enter_scope(ScopeKind::Module);
+    for setup in &test.body.setup {
+        resolve_block(resolver, interner, &setup.body, errors);
+    }
+    for case in &test.body.tests {
+        resolve_block(resolver, interner, &case.body, errors);
+    }
+    for nested in &test.body.nested {
+        resolve_probandum(resolver, interner, nested, errors);
+    }
+    resolver.exit_scope();
+}
+
+fn resolve_secus_clause(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    clause: &radix_syntax::SecusClause,
+    errors: &mut Vec<SemanticError>,
+) {
+    match clause {
+        radix_syntax::SecusClause::Sin { stmt, .. } => {
+            resolve_si_stmt(resolver, interner, stmt, errors)
+        }
+        radix_syntax::SecusClause::Block { body, catch, .. } => {
+            resolve_block(resolver, interner, body, errors);
+            if let Some(catch) = catch {
+                resolver.enter_scope(ScopeKind::Block);
+                define_symbol(
+                    resolver,
+                    catch.binding.name,
+                    catch.binding.span,
+                    SymbolKind::Local,
+                    false,
+                    errors,
+                );
+                resolve_block(resolver, interner, &catch.body, errors);
+                resolver.exit_scope();
+            }
+        }
+        radix_syntax::SecusClause::Stmt { stmt, catch, .. } => {
+            resolve_stmt(resolver, interner, stmt, errors);
+            if let Some(catch) = catch {
+                resolver.enter_scope(ScopeKind::Block);
+                define_symbol(
+                    resolver,
+                    catch.binding.name,
+                    catch.binding.span,
+                    SymbolKind::Local,
+                    false,
+                    errors,
+                );
+                resolve_block(resolver, interner, &catch.body, errors);
+                resolver.exit_scope();
+            }
+        }
+    }
+}
+
+/// Resolve one `elige` `casu` value expression.
+///
+/// The casu value is an expression position, but HIR lowering treats it as a
+/// variant pattern. A member chain with leading path segments must therefore
+/// resolve the leading path as a real qualifier before the penultimate
+/// segment can name a local enum/union — `casu missing.A.X { }` must never
+/// silently bind the local `A.X` through the bare-name fallback. A prefix
+/// that is not a real qualifier fails closed as an unknown variant;
+/// two-segment paths (`casu A.X { }`) keep the existing member-resolution
+/// behavior, and every other value resolves as an ordinary expression.
+fn resolve_elige_case_value(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    value: &Expr,
+    errors: &mut Vec<SemanticError>,
+) {
+    if let ExprKind::Member(member) = &value.kind {
+        let last_span = member.member.span;
+        if let Some(segments) = member_segments(member) {
+            if segments.len() >= 3 {
+                match resolver.qualified_variant_path(&segments) {
+                    QualifiedVariantPathLookup::Variant(_) => return,
+                    QualifiedVariantPathLookup::UnknownVariant
+                    | QualifiedVariantPathLookup::NotQualified => {
+                        errors.push(
+                            SemanticError::structured(
+                                SemanticErrorKind::UndefinedVariable,
+                                last_span,
+                            )
+                            .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
+                        );
+                        return;
+                    }
+                }
+            }
+        }
+    }
+    resolve_expr(resolver, interner, value, errors);
+}
+
+/// Collect the identifier segments of a right-leaning member chain
+/// (`a.b.c` → `[a, b, c]`). Returns `None` when any step is not a plain
+/// identifier (index, call, and optional-chain steps are not variant paths).
+fn member_segments(member: &radix_syntax::MemberExpr) -> Option<Vec<radix_lexer::Symbol>> {
+    let mut segments = Vec::new();
+    segments.push(member.member.name);
+    let mut object = member.object.as_ref();
+    loop {
+        match &object.kind {
+            ExprKind::Ident(ident) => {
+                segments.push(ident.name);
+                break;
+            }
+            ExprKind::Member(inner) => {
+                segments.push(inner.member.name);
+                object = inner.object.as_ref();
+            }
+            _ => return None,
+        }
+    }
+    segments.reverse();
+    Some(segments)
+}
+
+fn resolve_discerne(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    stmt: &DiscerneStmt,
+    errors: &mut Vec<SemanticError>,
+) {
+    for subject in &stmt.subjects {
+        resolve_expr(resolver, interner, subject, errors);
+    }
+
+    resolver.enter_scope(ScopeKind::Match);
+    for arm in &stmt.arms {
+        resolver.enter_scope(ScopeKind::Block);
+        for pattern in &arm.patterns {
+            resolve_pattern(resolver, interner, pattern, errors);
+        }
+        resolve_if_body(resolver, interner, &arm.body, errors);
+        resolver.exit_scope();
+    }
+    if let Some(default) = &stmt.default {
+        resolve_if_body(resolver, interner, &default.body, errors);
+    }
+    resolver.exit_scope();
+}
+
+fn resolve_pattern(
+    resolver: &mut Resolver,
+    _interner: &Interner,
+    pattern: &Pattern,
+    errors: &mut Vec<SemanticError>,
+) {
+    match pattern {
+        Pattern::Wildcard(_) => {}
+        Pattern::Literal(_, _) => {}
+        Pattern::Ident(ident, bind) => {
+            // A bare name that two or more unions define is an ambiguous
+            // variant pattern; report it and never bind it silently. The
+            // single-union case keeps today's behavior exactly (a Local is
+            // still defined for the arm body; lowering owns the variant shape).
+            if matches!(
+                resolver.lookup_variant_bare(ident.name),
+                BareVariantLookup::Ambiguous { .. }
+            ) {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+                        .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
+                );
+            }
+            define_symbol(
+                resolver,
+                ident.name,
+                ident.span,
+                SymbolKind::Local,
+                false,
+                errors,
+            );
+            resolve_pattern_bind(resolver, bind.as_ref(), errors);
+        }
+        Pattern::Path(path) => {
+            let segments = path.segments.as_slice();
+            match segments {
+                [.., parent, last] => {
+                    if segments.len() >= 3 {
+                        // A path with leading path segments must resolve the
+                        // leading path as a real qualifier before the
+                        // penultimate segment can name the parent enum/union —
+                        // a pattern like `casu missing.A.X { }` must never
+                        // silently bind the local `A.X`.
+                        let symbols: Vec<radix_lexer::Symbol> =
+                            segments.iter().map(|ident| ident.name).collect();
+                        match resolver.qualified_variant_path(&symbols) {
+                            QualifiedVariantPathLookup::Variant(_) => {}
+                            QualifiedVariantPathLookup::UnknownVariant
+                            | QualifiedVariantPathLookup::NotQualified => {
+                                errors.push(
+                                    SemanticError::structured(
+                                        SemanticErrorKind::UndefinedVariable,
+                                        last.span,
+                                    )
+                                    .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
+                                );
+                            }
+                        }
+                    } else {
+                        // Qualified path pattern `A.X`: resolve the terminal
+                        // segment against the penultimate segment's union when it
+                        // names one; a bare last-segment fallback preserves the
+                        // legacy module-path behavior.
+                        let parent_enum = resolver.lookup(parent.name).and_then(|parent_def| {
+                            resolver
+                                .get_symbol(parent_def)
+                                .filter(|symbol| symbol.kind == SymbolKind::Enum)
+                                .map(|_| parent_def)
+                        });
+                        if let Some(parent_enum) = parent_enum {
+                            if resolver.variant_child(parent_enum, last.name).is_none() {
+                                // The suffix is not one of this union's variants.
+                                // Preserve the legacy behavior: a known non-variant
+                                // name is `name_not_variant`; a multi-union bare
+                                // name is an explicit ambiguity; anything else is
+                                // an unknown variant.
+                                match resolver.lookup(last.name) {
+                                    Some(_) => {
+                                        errors.push(
+                                            SemanticError::structured(
+                                                SemanticErrorKind::UndefinedVariable,
+                                                last.span,
+                                            )
+                                            .with_arg("issue", ISSUE_NAME_NOT_VARIANT),
+                                        );
+                                    }
+                                    None => match resolver.lookup_variant_bare(last.name) {
+                                        BareVariantLookup::Ambiguous { .. } => {
+                                            errors.push(
+                                                SemanticError::structured(
+                                                    SemanticErrorKind::UndefinedVariable,
+                                                    last.span,
+                                                )
+                                                .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
+                                            );
+                                        }
+                                        BareVariantLookup::Single(_) | BareVariantLookup::None => {
+                                            errors.push(
+                                                SemanticError::structured(
+                                                    SemanticErrorKind::UndefinedVariable,
+                                                    last.span,
+                                                )
+                                                .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
+                                            );
+                                        }
+                                    },
+                                }
+                            }
+                        } else {
+                            resolve_variant_path_without_enum_parent(
+                                resolver, segments, last, errors,
+                            );
+                        }
+                    }
+                }
+                [last] => resolve_variant_ident(resolver, last, errors),
+                [] => {}
+            }
+            resolve_pattern_bind(resolver, path.bind.as_ref(), errors);
+        }
+    }
+}
+
+/// Resolve a qualified variant path whose penultimate segment is not an
+/// ordinary Enum binding.
+///
+/// A qualified imported parent (`a.A.X`) resolves BEFORE any bare-variant
+/// fallback: two imported unions may share the terminal variant
+/// name without collapsing into a false ambiguity, and a miss against an
+/// identified variant-bearing parent fails closed as an unknown variant
+/// instead of binding through another union. Paths that are not qualified
+/// imported variant paths at all keep the legacy bare-table / per-union
+/// policy.
+fn resolve_variant_path_without_enum_parent(
+    resolver: &mut Resolver,
+    segments: &[radix_syntax::Ident],
+    last: &radix_syntax::Ident,
+    errors: &mut Vec<SemanticError>,
+) {
+    let symbols: Vec<radix_lexer::Symbol> = segments.iter().map(|ident| ident.name).collect();
+    match resolver.qualified_variant_path(&symbols) {
+        QualifiedVariantPathLookup::Variant(_) => {}
+        QualifiedVariantPathLookup::UnknownVariant => {
+            errors.push(
+                SemanticError::structured(SemanticErrorKind::UndefinedVariable, last.span)
+                    .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
+            );
+        }
+        QualifiedVariantPathLookup::NotQualified => resolve_variant_ident(resolver, last, errors),
+    }
+}
+
+fn resolve_pattern_bind(
+    resolver: &mut Resolver,
+    bind: Option<&PatternBind>,
+    errors: &mut Vec<SemanticError>,
+) {
+    if let Some(bind) = bind {
+        match bind {
+            PatternBind::Alias(alias) => {
+                define_symbol(
+                    resolver,
+                    alias.name,
+                    alias.span,
+                    SymbolKind::Local,
+                    false,
+                    errors,
+                );
+            }
+            PatternBind::Bindings {
+                mutability,
+                bindings,
+            } => {
+                for binding in bindings {
+                    let name = binding.alias.as_ref().unwrap_or(&binding.name);
+                    define_symbol(
+                        resolver,
+                        name.name,
+                        name.span,
+                        SymbolKind::Local,
+                        *mutability == radix_syntax::AstMutability::Mutable,
+                        errors,
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn resolve_expr(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    expr: &Expr,
+    errors: &mut Vec<SemanticError>,
+) {
+    match &expr.kind {
+        ExprKind::Ident(ident) => {
+            let Some(def_id) = resolver.lookup(ident.name) else {
+                // Bare names may still name a union variant. When exactly one
+                // union defines the name the reference is valid; two or more is
+                // an explicit ambiguity, never a silent pick.
+                match resolver.lookup_variant_bare(ident.name) {
+                    BareVariantLookup::Single(_) => {}
+                    BareVariantLookup::Ambiguous { .. } => {
+                        errors.push(
+                            SemanticError::structured(
+                                SemanticErrorKind::UndefinedVariable,
+                                ident.span,
+                            )
+                            .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
+                        );
+                    }
+                    BareVariantLookup::None => {
+                        errors.push(undefined_identifier_error(resolver, interner, ident));
+                    }
+                }
+                return;
+            };
+            // Type-kind names (structs, enums, interfaces, type aliases, type
+            // params, index params) must not be accepted in expression position.
+            if let Some(symbol) = resolver.get_symbol(def_id) {
+                if !symbol.kind.is_value_name() {
+                    errors.push(
+                        SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+                            .with_arg("issue", ISSUE_NAME_NOT_VALUE),
+                    );
+                }
+            }
+        }
+        ExprKind::Literal(_) => {}
+        ExprKind::Binary(expr) => {
+            resolve_expr(resolver, interner, &expr.lhs, errors);
+            resolve_expr(resolver, interner, &expr.rhs, errors);
+        }
+        ExprKind::Unary(expr) => resolve_expr(resolver, interner, &expr.operand, errors),
+        ExprKind::Ternary(expr) => {
+            resolve_expr(resolver, interner, &expr.cond, errors);
+            resolve_expr(resolver, interner, &expr.then, errors);
+            resolve_expr(resolver, interner, &expr.else_, errors);
+        }
+        ExprKind::Call(expr) => {
+            resolve_expr(resolver, interner, &expr.callee, errors);
+            for arg in &expr.args {
+                resolve_expr(resolver, interner, &arg.value, errors);
+            }
+        }
+        ExprKind::Member(expr) => {
+            // Enum-variant paths (e.g. `Color.rubrum`) must be accepted in
+            // expression position even though the bare enum name is not a
+            // value. Mirror the HIR `lower_membrum` logic.
+            if let ExprKind::Ident(base) = &expr.object.kind {
+                if resolve_enum_variant_member(resolver, base, &expr.member, errors) {
+                    return;
+                }
+            }
+            resolve_expr(resolver, interner, &expr.object, errors);
+            // Strict library-pack surfaces are total for the library they
+            // define: only the listed surface spellings resolve at the source
+            // boundary. Post-HIR canonical lookups could resolve the installed
+            // member, so reject the non-listed spelling here (SEM010).
+            if let ExprKind::Ident(base) = &expr.object.kind {
+                if let Some(def_id) = resolver.lookup(base.name) {
+                    if let Some(symbol) = resolver.get_symbol(def_id) {
+                        if symbol.kind == SymbolKind::Module
+                            && !resolver
+                                .namespace_member_surface_valid(symbol.name, expr.member.name)
+                        {
+                            errors.push(
+                                SemanticError::structured(
+                                    SemanticErrorKind::UndefinedMember,
+                                    expr.member.span,
+                                )
+                                .with_arg("issue", ISSUE_NAMESPACE_MISSING_EXPORT)
+                                .with_arg("member", interner.resolve(expr.member.name).to_owned()),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        ExprKind::Index(expr) => {
+            resolve_expr(resolver, interner, &expr.object, errors);
+            resolve_expr(resolver, interner, &expr.index, errors);
+        }
+        ExprKind::Gradient(expr) => {
+            resolve_expr(resolver, interner, &expr.call, errors);
+            for selector in &expr.selectors {
+                resolve_expr(resolver, interner, selector, errors);
+            }
+        }
+        ExprKind::OptionalChain(expr) => {
+            resolve_expr(resolver, interner, &expr.object, errors);
+            match &expr.chain {
+                radix_syntax::OptionalChainKind::Member(_) => {}
+                radix_syntax::OptionalChainKind::Index(expr) => {
+                    resolve_expr(resolver, interner, expr, errors)
+                }
+                radix_syntax::OptionalChainKind::Call(args) => {
+                    for arg in args {
+                        resolve_expr(resolver, interner, &arg.value, errors);
+                    }
+                }
+            }
+        }
+        ExprKind::NonNull(expr) => {
+            resolve_expr(resolver, interner, &expr.object, errors);
+            match &expr.chain {
+                radix_syntax::NonNullKind::Member(_) => {}
+                radix_syntax::NonNullKind::Index(expr) => {
+                    resolve_expr(resolver, interner, expr, errors)
+                }
+                radix_syntax::NonNullKind::Call(args) => {
+                    for arg in args {
+                        resolve_expr(resolver, interner, &arg.value, errors);
+                    }
+                }
+            }
+        }
+        ExprKind::Assign(expr) => {
+            resolve_expr(resolver, interner, &expr.target, errors);
+            resolve_expr(resolver, interner, &expr.value, errors);
+        }
+        ExprKind::Verte(expr) => {
+            resolve_expr(resolver, interner, &expr.expr, errors);
+            resolve_type_expr(resolver, interner, &expr.ty, errors);
+        }
+        ExprKind::Finge(expr) => {
+            resolve_variant_path(resolver, &expr.variant, errors);
+            for field in &expr.fields {
+                resolve_expr(resolver, interner, &field.value, errors);
+            }
+            if let Some(cast) = &expr.cast {
+                resolve_type_expr(resolver, interner, cast, errors);
+            }
+        }
+        ExprKind::Clausura(expr) => {
+            resolver.enter_scope(ScopeKind::Function);
+            for param in &expr.params {
+                resolve_type_expr(resolver, interner, &param.ty, errors);
+                define_symbol(
+                    resolver,
+                    param.name.name,
+                    param.name.span,
+                    SymbolKind::Param,
+                    false,
+                    errors,
+                );
+            }
+            if let Some(ret) = &expr.ret {
+                resolve_type_expr(resolver, interner, ret, errors);
+            }
+            if let Some(err) = &expr.err {
+                resolve_type_expr(resolver, interner, err, errors);
+            }
+            match &expr.body {
+                ClausuraBody::Expr(expr) => resolve_expr(resolver, interner, expr, errors),
+                ClausuraBody::Block(block) => resolve_block(resolver, interner, block, errors),
+                ClausuraBody::Fac(stmt) => {
+                    resolver.enter_scope(ScopeKind::Loop);
+                    resolve_block(resolver, interner, &stmt.body, errors);
+                    resolver.exit_scope();
+                    if let Some(catch) = &stmt.catch {
+                        resolver.enter_scope(ScopeKind::Block);
+                        define_symbol(
+                            resolver,
+                            catch.binding.name,
+                            catch.binding.span,
+                            SymbolKind::Local,
+                            false,
+                            errors,
+                        );
+                        resolve_block(resolver, interner, &catch.body, errors);
+                        resolver.exit_scope();
+                    }
+                    if let Some(cond) = &stmt.while_ {
+                        resolve_expr(resolver, interner, cond, errors);
+                    }
+                }
+            }
+            resolver.exit_scope();
+        }
+        ExprKind::Cede(expr) => resolve_expr(resolver, interner, &expr.expr, errors),
+        ExprKind::Array(expr) => {
+            for element in &expr.elements {
+                match element {
+                    radix_syntax::ArrayElement::Expr(expr) => {
+                        resolve_expr(resolver, interner, expr, errors)
+                    }
+                    radix_syntax::ArrayElement::Spread(expr) => {
+                        resolve_expr(resolver, interner, expr, errors)
+                    }
+                }
+            }
+        }
+        ExprKind::Object(expr) => {
+            for field in &expr.fields {
+                match &field.key {
+                    radix_syntax::ObjectKey::Computed(expr) => {
+                        resolve_expr(resolver, interner, expr, errors)
+                    }
+                    radix_syntax::ObjectKey::Spread(expr) => {
+                        resolve_expr(resolver, interner, expr, errors)
+                    }
+                    _ => {}
+                }
+                if let Some(value) = &field.value {
+                    resolve_expr(resolver, interner, value, errors);
+                }
+            }
+        }
+        ExprKind::Intervallum(expr) => {
+            resolve_expr(resolver, interner, &expr.start, errors);
+            resolve_expr(resolver, interner, &expr.end, errors);
+            if let Some(step) = &expr.step {
+                resolve_expr(resolver, interner, step, errors);
+            }
+        }
+        ExprKind::Conversio(expr) => {
+            resolve_expr(resolver, interner, &expr.expr, errors);
+            // WHY: The runtime conversion target is a real type expression.
+            // Conversio parameters such as `Hex` in `↦ numerus<i32, Hex>` are
+            // codegen hints, not normal type annotations that must resolve in scope.
+            match &expr.target {
+                ConversioTarget::Explicit(ty) => {
+                    resolve_conversio_target_type(resolver, interner, ty, errors);
+                }
+                ConversioTarget::Intervallum(operand) => {
+                    resolve_expr(resolver, interner, operand, errors);
+                }
+            }
+            if let Some(recovery) = &expr.recovery {
+                resolve_expr(resolver, interner, recovery, errors);
+            }
+        }
+        ExprKind::Scriptum(scriptum) => {
+            record_shadowed_builtin(resolver, expr.id, scriptum.symbol);
+            for arg in &scriptum.args {
+                resolve_expr(resolver, interner, arg, errors);
+            }
+        }
+        ExprKind::Lege(lege) => {
+            record_shadowed_builtin(resolver, expr.id, lege.symbol);
+        }
+        ExprKind::Ad(ad_expr) => {
+            if let Some(opener) = &ad_expr.opener {
+                resolve_expr(resolver, interner, opener, errors);
+            }
+        }
+
+        ExprKind::Vacua(ident) => {
+            record_shadowed_builtin(resolver, expr.id, ident.name);
+        }
+        ExprKind::Praefixum(expr) => match &expr.body {
+            radix_syntax::PraefixumBody::Block(block) => {
+                resolve_block(resolver, interner, block, errors)
+            }
+            radix_syntax::PraefixumBody::Expr(expr) => {
+                resolve_expr(resolver, interner, expr, errors)
+            }
+        },
+        ExprKind::Ego(_) => {}
+        ExprKind::Paren(expr) => resolve_expr(resolver, interner, expr, errors),
+        ExprKind::TypeCheck(expr) => {
+            resolve_expr(resolver, interner, &expr.expr, errors);
+            resolve_type_expr(resolver, interner, &expr.ty, errors);
+        }
+        ExprKind::Iuncta(expr) => {
+            for ty in &expr.type_args {
+                resolve_type_expr(resolver, interner, ty, errors);
+            }
+            for element in &expr.elements {
+                resolve_expr(resolver, interner, element, errors);
+            }
+        }
+    }
+}
+
+/// If a builtin-claimed spelling is a visible value binding, record that the
+/// expression is shadowed so lowering emits a name load instead of the builtin.
+fn record_shadowed_builtin(
+    resolver: &mut Resolver,
+    node: radix_syntax::NodeId,
+    name: radix_lexer::Symbol,
+) {
+    let Some(def_id) = resolver.lookup(name) else {
+        return;
+    };
+    if resolver
+        .get_symbol(def_id)
+        .is_some_and(|symbol| !symbol.kind.is_value_name())
+    {
+        return;
+    }
+    resolver.record_shadowed_builtin(node, def_id);
+}
+
+fn resolve_type_expr(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    ty: &TypeExpr,
+    errors: &mut Vec<SemanticError>,
+) {
+    match &ty.kind {
+        TypeExprKind::Infer => {}
+        TypeExprKind::UnionHole => {}
+        TypeExprKind::Tensor(elem, figura) => {
+            resolve_type_expr(resolver, interner, elem, errors);
+            resolve_figura_expr(resolver, figura, errors);
+        }
+        TypeExprKind::Vector(elem, figura) => {
+            resolve_type_expr(resolver, interner, elem, errors);
+            resolve_figura_expr(resolver, figura, errors);
+        }
+        TypeExprKind::Matrix(elem, figura) => {
+            resolve_type_expr(resolver, interner, elem, errors);
+            resolve_figura_expr(resolver, figura, errors);
+        }
+        TypeExprKind::Sparsa(elem, figura) => {
+            resolve_type_expr(resolver, interner, elem, errors);
+            resolve_figura_expr(resolver, figura, errors);
+        }
+        TypeExprKind::Atomic(elem) => resolve_type_expr(resolver, interner, elem, errors),
+        TypeExprKind::PromissumFailable(success, alternate) => {
+            resolve_type_expr(resolver, interner, success, errors);
+            resolve_type_expr(resolver, interner, alternate, errors);
+        }
+        TypeExprKind::Named(name, params) => {
+            resolve_type_ident(resolver, interner, name, errors);
+            let name_str = interner.resolve(name.name);
+            if let Some(prim) = Primitive::from_name(name_str) {
+                if matches!(prim, Primitive::Numerus | Primitive::Fractus) {
+                    for param in params {
+                        validate_width_marker_param(interner, param, prim, errors);
+                    }
+                    return;
+                }
+                if matches!(prim, Primitive::Instans) {
+                    for param in params {
+                        validate_instans_precision_param(interner, param, errors);
+                    }
+                    return;
+                }
+                if matches!(
+                    prim,
+                    Primitive::Ascii | Primitive::Textus | Primitive::Octeti
+                ) {
+                    match params.as_slice() {
+                        [] => {}
+                        [capacity] => {
+                            validate_capacity_index_param(resolver, interner, capacity, errors)
+                        }
+                        _ => errors.push(lowering_error(ISSUE_PRIMITIVE_PARAMS, name.span)),
+                    }
+                    return;
+                }
+            }
+            if CollectionKind::from_name(name_str) == Some(CollectionKind::Lista) {
+                match params.as_slice() {
+                    [elem] => resolve_type_expr(resolver, interner, elem, errors),
+                    [elem, capacity] => {
+                        resolve_type_expr(resolver, interner, elem, errors);
+                        validate_capacity_index_param(resolver, interner, capacity, errors);
+                    }
+                    _ => {
+                        for param in params {
+                            resolve_type_expr(resolver, interner, param, errors);
+                        }
+                    }
+                }
+                return;
+            }
+            if name_str == "tensor" {
+                // Resolve type params before the incomplete/missing-figura
+                // error so unknown element types are reported too.
+                for param in params {
+                    resolve_type_expr(resolver, interner, param, errors);
+                }
+                if params.is_empty() {
+                    errors.push(type_mismatch_error(ISSUE_TENSOR_INCOMPLETE, name.span));
+                } else {
+                    errors.push(type_mismatch_error(ISSUE_TENSOR_MISSING_FIGURA, name.span));
+                }
+                return;
+            }
+            if name_str == "sparsa" {
+                for param in params {
+                    resolve_type_expr(resolver, interner, param, errors);
+                }
+                if params.is_empty() {
+                    errors.push(type_mismatch_error(ISSUE_SPARSA_INCOMPLETE, name.span));
+                } else {
+                    errors.push(type_mismatch_error(ISSUE_SPARSA_MISSING_FIGURA, name.span));
+                }
+                return;
+            }
+            if name_str == "atomic" {
+                for param in params {
+                    resolve_type_expr(resolver, interner, param, errors);
+                }
+                if params.is_empty() {
+                    errors.push(type_mismatch_error(ISSUE_ATOMIC_INCOMPLETE, name.span));
+                } else {
+                    errors.push(type_mismatch_error(ISSUE_ATOMIC_ARITY, name.span));
+                }
+                return;
+            }
+            if name_str == "vector" {
+                for param in params {
+                    resolve_type_expr(resolver, interner, param, errors);
+                }
+                if params.is_empty() {
+                    errors.push(type_mismatch_error(ISSUE_VECTOR_INCOMPLETE, name.span));
+                } else {
+                    errors.push(type_mismatch_error(ISSUE_VECTOR_MISSING_WIDTH, name.span));
+                }
+                return;
+            }
+            if name_str == "matrix" {
+                for param in params {
+                    resolve_type_expr(resolver, interner, param, errors);
+                }
+                if params.is_empty() {
+                    errors.push(type_mismatch_error(ISSUE_MATRIX_INCOMPLETE, name.span));
+                } else {
+                    errors.push(type_mismatch_error(ISSUE_MATRIX_MISSING_FIGURA, name.span));
+                }
+                return;
+            }
+            for param in params {
+                resolve_type_expr(resolver, interner, param, errors);
+            }
+        }
+        TypeExprKind::Qualified(path, params) => {
+            resolve_qualified_type_path(resolver, interner, path, errors);
+            for param in params {
+                resolve_type_expr(resolver, interner, param, errors);
+            }
+        }
+        TypeExprKind::Func(func) => {
+            for param in &func.params {
+                resolve_type_expr(resolver, interner, param, errors);
+            }
+            resolve_type_expr(resolver, interner, &func.ret, errors);
+            // The error type in a Func type expression must be name-resolved
+            // too; otherwise an unknown type name in the error position is
+            // silently accepted.
+            if let Some(err_ty) = &func.err {
+                resolve_type_expr(resolver, interner, err_ty, errors);
+            }
+        }
+        TypeExprKind::Union(members) => {
+            for m in members {
+                resolve_type_expr(resolver, interner, m, errors);
+            }
+        }
+    }
+}
+
+fn resolve_figura_expr(
+    resolver: &Resolver,
+    figura: &radix_syntax::FiguraExpr,
+    errors: &mut Vec<SemanticError>,
+) {
+    match figura {
+        radix_syntax::FiguraExpr::Infer | radix_syntax::FiguraExpr::Literal(_) => {}
+        radix_syntax::FiguraExpr::Tuple(dims) => {
+            for dim in dims {
+                resolve_figura_expr(resolver, dim, errors);
+            }
+        }
+        radix_syntax::FiguraExpr::Var(ident) => {
+            let Some(def_id) = resolver.lookup(ident.name) else {
+                errors.push(undefined_type_error(ISSUE_FIGURA_UNKNOWN_INDEX, ident.span));
+                return;
+            };
+            let Some(symbol) = resolver.get_symbol(def_id) else {
+                return;
+            };
+            if !matches!(symbol.kind, SymbolKind::IndexParam) {
+                errors.push(type_mismatch_error(
+                    ISSUE_FIGURA_NOT_INDEX_PARAM,
+                    ident.span,
+                ));
+            }
+        }
+    }
+}
+
+fn validate_instans_precision_param(
+    interner: &Interner,
+    param: &TypeExpr,
+    errors: &mut Vec<SemanticError>,
+) {
+    let TypeExprKind::Named(ident, nested) = &param.kind else {
+        errors.push(undefined_type_error(
+            ISSUE_PRECISION_MARKER_SHAPE,
+            param.span,
+        ));
+        return;
+    };
+    if !nested.is_empty() {
+        errors.push(undefined_type_error(
+            ISSUE_PRECISION_MARKER_PARAMS,
+            param.span,
+        ));
+        return;
+    }
+    let marker = interner.resolve(ident.name);
+    if let Err(err) = crate::InstansPrecision::from_marker(marker) {
+        errors.push(instans_precision_marker_error(err, ident.span));
+    }
+}
+
+fn validate_capacity_index_param(
+    resolver: &Resolver,
+    interner: &Interner,
+    param: &TypeExpr,
+    errors: &mut Vec<SemanticError>,
+) {
+    match capacity_index_issue(param, resolver, interner) {
+        None => {}
+        Some(issue) => errors.push(undefined_type_error(issue, param.span)),
+    }
+}
+
+fn capacity_index_issue(
+    param: &TypeExpr,
+    resolver: &Resolver,
+    interner: &Interner,
+) -> Option<&'static str> {
+    let TypeExprKind::Named(ident, nested) = &param.kind else {
+        return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
+    };
+    if !nested.is_empty() {
+        return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
+    }
+    let name = interner.resolve(ident.name);
+    if radix_types::parse_natural_capacity(name).is_some() {
+        return None;
+    }
+    let Some(def_id) = resolver.lookup(ident.name) else {
+        return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
+    };
+    let Some(symbol) = resolver.get_symbol(def_id) else {
+        return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
+    };
+    match symbol.kind {
+        SymbolKind::IndexParam => None,
+        SymbolKind::TypeParam => Some(ISSUE_FIGURA_TYPE_PARAM_IN_INDEX),
+        _ => Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL),
+    }
+}
+
+fn validate_width_marker_param(
+    interner: &Interner,
+    param: &TypeExpr,
+    prim: Primitive,
+    errors: &mut Vec<SemanticError>,
+) {
+    let TypeExprKind::Named(ident, nested) = &param.kind else {
+        errors.push(undefined_type_error(ISSUE_WIDTH_MARKER_SHAPE, param.span));
+        return;
+    };
+    if !nested.is_empty() {
+        errors.push(undefined_type_error(ISSUE_WIDTH_MARKER_PARAMS, param.span));
+        return;
+    }
+    let marker = interner.resolve(ident.name);
+    if crate::numeric_width::is_conversio_radix_hint(marker) {
+        return;
+    }
+    if let Err(err) = crate::NumericWidth::from_marker(marker, prim) {
+        errors.push(width_marker_error(err, prim, param.span));
+    }
+}
+
+fn undefined_type_error(issue: &'static str, span: radix_lexer::Span) -> SemanticError {
+    SemanticError::structured(SemanticErrorKind::UndefinedType, span).with_arg("issue", issue)
+}
+
+fn instans_precision_marker_error(
+    err: InstansPrecisionError,
+    span: radix_lexer::Span,
+) -> SemanticError {
+    let issue = match err {
+        InstansPrecisionError::UnknownMarker => ISSUE_INVALID_PRECISION_MARKER,
+        InstansPrecisionError::TooManyParams => ISSUE_PRECISION_MARKER_PARAMS,
+    };
+    undefined_type_error(issue, span)
+}
+
+fn width_marker_error(err: WidthError, prim: Primitive, span: radix_lexer::Span) -> SemanticError {
+    let issue = match err {
+        WidthError::UnknownMarker => match prim {
+            Primitive::Numerus => ISSUE_INVALID_NUMERUS_WIDTH_MARKER,
+            Primitive::Fractus => ISSUE_INVALID_FRACTUS_WIDTH_MARKER,
+            _ => ISSUE_INVALID_WIDTH_MARKER,
+        },
+        WidthError::FloatOnNumerus => "float_width_on_numerus",
+        WidthError::IntOnFractus => "integer_width_on_fractus",
+        WidthError::TooManyParams => ISSUE_WIDTH_MARKER_PARAMS,
+    };
+    undefined_type_error(issue, span).with_arg("primitive", primitive_name(prim))
+}
+
+fn type_mismatch_error(issue: &'static str, span: radix_lexer::Span) -> SemanticError {
+    SemanticError::structured(SemanticErrorKind::TypeMismatch, span).with_arg("issue", issue)
+}
+
+fn lowering_error(issue: &'static str, span: radix_lexer::Span) -> SemanticError {
+    SemanticError::structured(SemanticErrorKind::LoweringError, span).with_arg("issue", issue)
+}
+
+fn lowering_collection_arity_error(
+    collection: CollectionKind,
+    span: radix_lexer::Span,
+) -> SemanticError {
+    lowering_error(collection_arity_issue(collection), span)
+}
+
+fn collection_arity_issue(collection: CollectionKind) -> &'static str {
+    match collection {
+        CollectionKind::Lista => "lista_arity",
+        CollectionKind::Tabula => "tabula_arity",
+        CollectionKind::Copia => "copia_arity",
+        CollectionKind::Promissum => "promissum_arity",
+        CollectionKind::Cursor => "cursor_arity",
+    }
+}
+
+fn primitive_name(prim: Primitive) -> &'static str {
+    match prim {
+        Primitive::Numerus => "numerus",
+        Primitive::Fractus => "fractus",
+        Primitive::Instans => "instans",
+        Primitive::Ascii => "ascii",
+        Primitive::Textus => "textus",
+        Primitive::Bivalens => "bivalens",
+        Primitive::Nihil => "nihil",
+        Primitive::Vacuum => "vacuum",
+        Primitive::Numquam => "numquam",
+        Primitive::Ignotum => "ignotum",
+        Primitive::Octeti => "octeti",
+        Primitive::Regex => "regex",
+        Primitive::Json => "json",
+        Primitive::Valor => "valor",
+    }
+}
+
+fn resolve_conversio_target_type(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    ty: &TypeExpr,
+    errors: &mut Vec<SemanticError>,
+) {
+    match &ty.kind {
+        TypeExprKind::Named(name, params)
+            if Primitive::from_name(interner.resolve(name.name)).is_some() =>
+        {
+            resolve_type_ident(resolver, interner, name, errors);
+            if !params.is_empty() {
+                return;
+            }
+        }
+        _ => {}
+    }
+
+    resolve_type_expr(resolver, interner, ty, errors);
+}
+
+fn resolve_type_ident(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    ident: &radix_syntax::Ident,
+    errors: &mut Vec<SemanticError>,
+) {
+    let name = interner.resolve(ident.name);
+
+    if is_builtin_type(name) {
+        return;
+    }
+
+    let Some(def_id) = resolver.lookup_type(ident.name) else {
+        errors.push(undefined_type_error(ISSUE_UNKNOWN_TYPE, ident.span));
+        return;
+    };
+
+    let Some(symbol) = resolver.get_symbol(def_id) else {
+        errors.push(undefined_type_error(ISSUE_UNKNOWN_TYPE, ident.span));
+        return;
+    };
+
+    match symbol.kind {
+        SymbolKind::Struct
+        | SymbolKind::Enum
+        | SymbolKind::Interface
+        | SymbolKind::TypeAlias
+        | SymbolKind::TypeParam
+        | SymbolKind::Schema => {}
+        _ => errors.push(undefined_type_error(ISSUE_NAME_NOT_TYPE, ident.span)),
+    }
+}
+
+fn resolve_qualified_type_path(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    path: &[radix_syntax::Ident],
+    errors: &mut Vec<SemanticError>,
+) {
+    let Some((namespace, type_name)) = path.first().zip(path.last()) else {
+        return;
+    };
+    // Middle segments (indices 1..len-1) must be Module-kind bindings, not
+    // just successful lookups.
+    for segment in &path[1..path.len().saturating_sub(1)] {
+        let Some(def_id) = resolver.lookup(segment.name) else {
+            errors.push(undefined_type_error(ISSUE_UNKNOWN_NAMESPACE, segment.span));
+            return;
+        };
+        if !matches!(
+            resolver.get_symbol(def_id).map(|symbol| symbol.kind),
+            Some(SymbolKind::Module)
+        ) {
+            errors.push(undefined_type_error(
+                ISSUE_QUALIFIED_TYPE_MIDDLE_NOT_NAMESPACE,
+                segment.span,
+            ));
+            return;
+        }
+    }
+    let Some(namespace_def_id) = resolver.lookup(namespace.name) else {
+        errors.push(undefined_type_error(
+            ISSUE_UNKNOWN_NAMESPACE,
+            namespace.span,
+        ));
+        return;
+    };
+    if !matches!(
+        resolver
+            .get_symbol(namespace_def_id)
+            .map(|symbol| symbol.kind),
+        Some(SymbolKind::Module)
+    ) {
+        errors.push(undefined_type_error(
+            ISSUE_QUALIFIED_TYPE_PREFIX_NOT_NAMESPACE,
+            namespace.span,
+        ));
+        return;
+    }
+    resolver.mark_namespace_used(namespace.name);
+    if !resolver.namespace_exports_member(namespace.name, type_name.name) {
+        if let Some(issue) =
+            resolver.namespace_member_rejection_issue(namespace.name, type_name.name)
+        {
+            errors.push(crate::passes::import_seam::diagnostic(
+                type_name.span,
+                issue,
+                interner.resolve(type_name.name),
+            ));
+        } else {
+            errors.push(undefined_type_error(
+                ISSUE_QUALIFIED_TYPE_NOT_EXPORTED,
+                type_name.span,
+            ));
+        }
+        return;
+    }
+    if resolver
+        .namespace_file_type(namespace.name, type_name.name)
+        .is_some()
+    {
+        return;
+    }
+    errors.push(undefined_type_error(
+        ISSUE_UNKNOWN_QUALIFIED_TYPE,
+        type_name.span,
+    ));
+}
+
+fn resolve_enum_variant_member(
+    resolver: &mut Resolver,
+    enum_ident: &radix_syntax::Ident,
+    variant_ident: &radix_syntax::Ident,
+    errors: &mut Vec<SemanticError>,
+) -> bool {
+    let Some(enum_def) = resolver.lookup(enum_ident.name) else {
+        return false;
+    };
+    let Some(enum_symbol) = resolver.get_symbol(enum_def) else {
+        return false;
+    };
+    if enum_symbol.kind != SymbolKind::Enum {
+        return false;
+    }
+
+    if resolver
+        .variant_child(enum_def, variant_ident.name)
+        .is_some()
+    {
+        return true;
+    }
+
+    // `A.X` where the suffix is not one of A's variants: if the bare name is
+    // a variant of several unions, the ambiguity is the honest diagnostic;
+    // otherwise fall back to the existing bare-table + unknown-variant path.
+    if matches!(
+        resolver.lookup_variant_bare(variant_ident.name),
+        BareVariantLookup::Ambiguous { .. }
+    ) {
+        errors.push(
+            SemanticError::structured(SemanticErrorKind::UndefinedVariable, variant_ident.span)
+                .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
+        );
+        return true;
+    }
+
+    let Some(variant_def) = resolver.lookup(variant_ident.name) else {
+        errors.push(
+            SemanticError::structured(SemanticErrorKind::UndefinedVariable, variant_ident.span)
+                .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
+        );
+        return true;
+    };
+    let Some(variant_symbol) = resolver.get_symbol(variant_def) else {
+        errors.push(
+            SemanticError::structured(SemanticErrorKind::UndefinedVariable, variant_ident.span)
+                .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
+        );
+        return true;
+    };
+    if variant_symbol.kind != SymbolKind::Variant {
+        errors.push(
+            SemanticError::structured(SemanticErrorKind::UndefinedVariable, variant_ident.span)
+                .with_arg("issue", ISSUE_NAME_NOT_VARIANT),
+        );
+        return true;
+    }
+    errors.push(
+        SemanticError::structured(SemanticErrorKind::UndefinedVariable, variant_ident.span)
+            .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
+    );
+    true
+}
+
+/// Resolve the variant path of a `finge` construction.
+///
+/// A single-segment path (`finge Bonum { … }`) resolves exactly as before.
+/// A two-segment path (`finge pkg.Bonum { … }` or `finge Exitus.Bonum { … }`)
+/// resolves the terminal segment against the penultimate segment's union when
+/// it names one. A path with leading path segments (`finge a.A.X { … }`)
+/// resolves the leading path as a real qualifier before anything else: a
+/// qualified imported parent resolves through the imported union's parent
+/// link, and a prefix that is not a real qualifier fails closed —
+/// `missing.A.X` must never silently resolve as the local `A.X`.
+fn resolve_variant_path(
+    resolver: &mut Resolver,
+    path: &[radix_syntax::Ident],
+    errors: &mut Vec<SemanticError>,
+) {
+    let Some((last, init)) = path.split_last() else {
+        return;
+    };
+    if path.len() == 1 {
+        return resolve_variant_ident(resolver, last, errors);
+    }
+    if path.len() >= 3 {
+        // The leading path must resolve as a real qualifier before the
+        // penultimate segment can name the parent enum/union — a
+        // construction like `finge missing.A.X { … }` must never silently
+        // resolve as the local `A.X`.
+        let symbols: Vec<radix_lexer::Symbol> = path.iter().map(|ident| ident.name).collect();
+        match resolver.qualified_variant_path(&symbols) {
+            QualifiedVariantPathLookup::Variant(_) => return,
+            QualifiedVariantPathLookup::UnknownVariant
+            | QualifiedVariantPathLookup::NotQualified => {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::UndefinedVariable, last.span)
+                        .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
+                );
+                return;
+            }
+        }
+    }
+    let Some(parent) = init.last() else {
+        return;
+    };
+    let parent_enum = resolver.lookup(parent.name).and_then(|parent_def| {
+        resolver
+            .get_symbol(parent_def)
+            .filter(|symbol| symbol.kind == SymbolKind::Enum)
+            .map(|_| parent_def)
+    });
+    if let Some(parent_enum) = parent_enum {
+        if resolver.variant_child(parent_enum, last.name).is_none() {
+            // The suffix is not one of this union's variants. Preserve the
+            // pattern-path behavior: a known non-variant name is
+            // `name_not_variant`; a multi-union bare name is an explicit
+            // ambiguity; anything else is an unknown variant.
+            match resolver.lookup(last.name) {
+                Some(_) => {
+                    errors.push(
+                        SemanticError::structured(SemanticErrorKind::UndefinedVariable, last.span)
+                            .with_arg("issue", ISSUE_NAME_NOT_VARIANT),
+                    );
+                }
+                None => match resolver.lookup_variant_bare(last.name) {
+                    BareVariantLookup::Ambiguous { .. } => {
+                        errors.push(
+                            SemanticError::structured(
+                                SemanticErrorKind::UndefinedVariable,
+                                last.span,
+                            )
+                            .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
+                        );
+                    }
+                    BareVariantLookup::Single(_) | BareVariantLookup::None => {
+                        errors.push(
+                            SemanticError::structured(
+                                SemanticErrorKind::UndefinedVariable,
+                                last.span,
+                            )
+                            .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
+                        );
+                    }
+                },
+            }
+        }
+    } else {
+        // The penultimate segment names no ordinary Enum binding. A qualified
+        // imported parent (`a.A.X`) resolves BEFORE any bare-variant fallback;
+        // paths that are not qualified imported variant paths keep the
+        // legacy bare-table / per-union policy.
+        resolve_variant_path_without_enum_parent(resolver, path, last, errors);
+    }
+}
+
+fn resolve_variant_ident(
+    resolver: &mut Resolver,
+    ident: &radix_syntax::Ident,
+    errors: &mut Vec<SemanticError>,
+) {
+    let Some(def_id) = resolver.lookup(ident.name) else {
+        // Variants no longer occupy the bare scope table: consult the
+        // per-union namespace. Exactly one defining union resolves; two or
+        // more is an explicit ambiguity, never a silent pick.
+        match resolver.lookup_variant_bare(ident.name) {
+            BareVariantLookup::Single(_) => return,
+            BareVariantLookup::Ambiguous { .. } => {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+                        .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
+                );
+                return;
+            }
+            BareVariantLookup::None => {}
+        }
+        errors.push(
+            SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+                .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
+        );
+        return;
+    };
+
+    let Some(symbol) = resolver.get_symbol(def_id) else {
+        errors.push(
+            SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+                .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
+        );
+        return;
+    };
+
+    if symbol.kind != SymbolKind::Variant {
+        errors.push(
+            SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+                .with_arg("issue", ISSUE_NAME_NOT_VARIANT),
+        );
+    }
+}
+
+fn undefined_identifier_error(
+    resolver: &Resolver,
+    interner: &Interner,
+    ident: &radix_syntax::Ident,
+) -> SemanticError {
+    let spelling = interner.resolve(ident.name);
+    if resolver.is_scribe_family_surface(spelling) {
+        return SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+            .with_arg("issue", ISSUE_SCRIBE_CALLEE)
+            .with_arg("spelling", spelling.to_owned());
+    }
+
+    let mut error = SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+        .with_arg("issue", ISSUE_UNKNOWN_IDENTIFIER);
+
+    if let Some(suggestion) = semantic_name_suggestion(resolver, interner, spelling) {
+        error = error
+            .with_arg("spelling", spelling.to_owned())
+            .with_arg("suggestion", suggestion);
+    }
+
+    error
+}
+
+struct NameSuggestionCandidate<'a> {
+    spelling: &'a str,
+    distance: usize,
+}
+
+/// Fold an interned symbol's spelling for the per-Symbol suggestion cache.
+///
+/// Runs only on a cache miss, i.e. at most once per distinct symbol per
+/// resolver lifetime, because the caller serves folds from
+/// `Resolver::name_suggestion_folds` (the fold is a pure function of the
+/// interned string, so the cache never goes stale across scope changes).
+fn fold_interned_symbol(interner: &Interner, name: radix_lexer::Symbol) -> String {
+    name_suggestion_key(interner.resolve(name))
+}
+
+fn semantic_name_suggestion(
+    resolver: &Resolver,
+    interner: &Interner,
+    spelling: &str,
+) -> Option<String> {
+    let folded = name_suggestion_key(spelling);
+
+    // Candidate folds are served from the per-Symbol cache (a pure function of
+    // the interned string, so the cache never goes stale across scope changes)
+    // and candidate spellings are borrowed from the interner, so the candidate
+    // loop allocates no owned Strings. Exact fold match is O(1) via the map;
+    // edit-distance near-miss still scans the pre-folded candidate list.
+    //
+    // Populate the cache in a first pass (mutation only, no held borrows);
+    // the second pass reads the folds back as `&str` so each distinct symbol
+    // normalizes at most once per resolver lifetime.
+    let visible = resolver.visible_value_names();
+    let mut folds = resolver.name_suggestion_folds.borrow_mut();
+    for &name in &visible {
+        let candidate: &str = interner.resolve(name);
+        if candidate == spelling {
+            continue;
+        }
+        folds
+            .entry(name)
+            .or_insert_with(|| fold_interned_symbol(interner, name));
+    }
+
+    let mut exact_by_fold: rustc_hash::FxHashMap<&str, &str> = rustc_hash::FxHashMap::default();
+    let mut folded_candidates: Vec<(&str, &str)> = Vec::new();
+    for &name in &visible {
+        let candidate: &str = interner.resolve(name);
+        if candidate == spelling {
+            continue;
+        }
+        let candidate_fold: &str = folds
+            .get(&name)
+            .expect("visible-name fold cached in the first pass");
+        exact_by_fold
+            .entry(candidate_fold)
+            .and_modify(|best| {
+                if candidate < *best {
+                    *best = candidate;
+                }
+            })
+            .or_insert(candidate);
+        folded_candidates.push((candidate_fold, candidate));
+    }
+
+    if let Some(&exact) = exact_by_fold.get(folded.as_str()) {
+        return Some(exact.to_owned());
+    }
+
+    folded_candidates
+        .into_iter()
+        .filter_map(|(candidate_fold, candidate)| {
+            let distance = edit_distance(&folded, candidate_fold);
+            (distance <= name_suggestion_distance_threshold(candidate_fold)).then_some(
+                NameSuggestionCandidate {
+                    spelling: candidate,
+                    distance,
+                },
+            )
+        })
+        .min_by(|left, right| {
+            left.distance
+                .cmp(&right.distance)
+                .then_with(|| left.spelling.cmp(right.spelling))
+        })
+        .map(|candidate| candidate.spelling.to_owned())
+}
+
+fn name_suggestion_key(text: &str) -> String {
+    text.nfkc()
+        .flat_map(|ch| ch.to_string().nfd().collect::<Vec<_>>())
+        .filter(|ch| !is_combining_mark(*ch))
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+fn name_suggestion_distance_threshold(folded_spelling: &str) -> usize {
+    if folded_spelling.chars().count() <= 4 {
+        1
+    } else {
+        2
+    }
+}
+
+fn edit_distance(left: &str, right: &str) -> usize {
+    let left: Vec<char> = left.chars().collect();
+    let right: Vec<char> = right.chars().collect();
+    let mut previous: Vec<usize> = (0..=right.len()).collect();
+    let mut current = vec![0; right.len() + 1];
+
+    for (left_index, left_ch) in left.iter().enumerate() {
+        current[0] = left_index + 1;
+        for (right_index, right_ch) in right.iter().enumerate() {
+            let substitution = previous[right_index] + usize::from(left_ch != right_ch);
+            let insertion = current[right_index] + 1;
+            let deletion = previous[right_index + 1] + 1;
+            current[right_index + 1] = substitution.min(insertion).min(deletion);
+        }
+        std::mem::swap(&mut previous, &mut current);
+    }
+
+    previous[right.len()]
+}
+
+fn is_builtin_type(name: &str) -> bool {
+    matches!(
+        name,
+        "ascii"
+            | "forma"
+            | "scrinium"
+            | "status"
+            | "sermo"
+            | "textus"
+            | "numerus"
+            | "modulus"
+            | "fractus"
+            | "bivalens"
+            | "nihil"
+            | "vacuum"
+            | "numquam"
+            | "ignotum"
+            | "octeti"
+            | "octet"
+            | "regex"
+            | "objectum"
+            | "quidlibet"
+            | "lista"
+            | "tabula"
+            | "copia"
+            | "promissum"
+            | "cursor"
+            | "tensor"
+            | "matrix"
+            | "intervallum"
+            | "iuncta"
+            | "sparsa"
+            | "series"
+            | "json"
+            | "valor"
+            | "instans"
+    ) || crate::numeric_width::is_numeric_width_type_sugar(name)
+}
+
+fn define_binding_pattern(
+    resolver: &mut Resolver,
+    pattern: &BindingPattern,
+    mutable: bool,
+    errors: &mut Vec<SemanticError>,
+) {
+    match pattern {
+        BindingPattern::Ident(ident) => {
+            define_symbol(
+                resolver,
+                ident.name,
+                ident.span,
+                SymbolKind::Local,
+                mutable,
+                errors,
+            );
+        }
+        BindingPattern::Wildcard(_) => {}
+        BindingPattern::Array { elements, rest, .. } => {
+            for element in elements {
+                define_binding_pattern(resolver, element, mutable, errors);
+            }
+            if let Some(rest) = rest {
+                define_symbol(
+                    resolver,
+                    rest.name,
+                    rest.span,
+                    SymbolKind::Local,
+                    mutable,
+                    errors,
+                );
+            }
+        }
+        BindingPattern::Object { fields, rest, .. } => {
+            for field in fields {
+                let binding = field.alias.as_ref().unwrap_or(&field.name);
+                define_symbol(
+                    resolver,
+                    binding.name,
+                    binding.span,
+                    SymbolKind::Local,
+                    mutable,
+                    errors,
+                );
+            }
+            if let Some(rest) = rest {
+                define_symbol(
+                    resolver,
+                    rest.name,
+                    rest.span,
+                    SymbolKind::Local,
+                    mutable,
+                    errors,
+                );
+            }
+        }
+    }
+}
+
+fn symbol_by_text(interner: &Interner, text: &str) -> Option<radix_lexer::Symbol> {
+    interner
+        .strings()
+        .iter()
+        .position(|interned| interned == text)
+        .map(|index| {
+            radix_lexer::Symbol(u32::try_from(index).expect("interned symbol count fits u32"))
+        })
+}
+
+fn define_shader_stage_locals_for_resolution(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    annotations: &[radix_syntax::Annotation],
+    span: radix_lexer::Span,
+    errors: &mut Vec<SemanticError>,
+) {
+    let has_annotation = |family: &str| {
+        annotations.iter().any(|annotation| match &annotation.kind {
+            radix_syntax::AnnotationKind::Statement(stmt) => {
+                interner.resolve(stmt.name.name) == family
+            }
+            radix_syntax::AnnotationKind::Braced(braced) => {
+                interner.resolve(braced.name.name) == family
+            }
+            _ => false,
+        })
+    };
+
+    if has_annotation("vertex") {
+        for (name, mutable) in [("position", false), ("out_position", true)] {
+            if let Some(symbol) = symbol_by_text(interner, name) {
+                define_symbol(resolver, symbol, span, SymbolKind::Local, mutable, errors);
+            }
+        }
+    }
+    if has_annotation("fragment") {
+        for (name, mutable) in [("normal", false), ("color", false), ("out_color", true)] {
+            if let Some(symbol) = symbol_by_text(interner, name) {
+                define_symbol(resolver, symbol, span, SymbolKind::Local, mutable, errors);
+            }
+        }
+    }
+}
+
+fn define_symbol(
+    resolver: &mut Resolver,
+    name: radix_lexer::Symbol,
+    span: radix_lexer::Span,
+    kind: SymbolKind,
+    mutable: bool,
+    errors: &mut Vec<SemanticError>,
+) {
+    let def_id = resolver.fresh_def_id();
+    let symbol = Symbol {
+        def_id,
+        name,
+        kind,
+        ty: None,
+        mutable,
+        span,
+    };
+
+    if resolver.define(symbol).is_err() {
+        errors.push(
+            SemanticError::structured(SemanticErrorKind::DuplicateDefinition, span)
+                .with_arg("issue", ISSUE_DUPLICATE_DEFINITION),
+        );
+    }
+}
+
+struct AliasEntry<'a> {
+    def_id: DefId,
+    type_params: &'a [TypeParam],
+    ty: &'a TypeExpr,
+    span: radix_lexer::Span,
+}
+
+enum TypeLowerError {
+    UnresolvedAlias,
+    Issue(&'static str),
+    CollectionArity(CollectionKind),
+}
+
+fn resolve_alias_types(
+    aliases: &[AliasEntry<'_>],
+    resolver: &mut Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+    errors: &mut Vec<SemanticError>,
+) {
+    let mut pending: Vec<&AliasEntry<'_>> = aliases.iter().collect();
+
+    // Alias symbols must carry concrete TypeIds before HIR/typecheck consume
+    // them. A simple fixed point is enough because unresolved aliases are the
+    // only recoverable dependency failure from `lower_type_expr`.
+    while !pending.is_empty() {
+        let mut next_pending = Vec::new();
+        let mut progress = false;
+
+        for alias in pending {
+            // The alias's own type parameters are scoped during body lowering,
+            // mirroring hir/lower/decl.rs::lower_typus (which push_type_params).
+            // `resolve_stmt` entered and exited a module scope around the alias
+            // earlier, so the params must be re-defined in a fresh module scope
+            // here or `lower_type_expr` resolves the body's `Type::Param`
+            // references against an out-of-scope symbol (SEM008).
+            resolver.enter_scope(ScopeKind::Module);
+            for param in alias.type_params {
+                define_generic_param(resolver, param, errors);
+            }
+            let lowered = lower_type_expr(alias.ty, resolver, interner, types);
+            resolver.exit_scope();
+
+            match lowered {
+                Ok(type_id) => {
+                    if let Some(symbol) = resolver.get_symbol_mut(alias.def_id) {
+                        symbol.ty = Some(type_id);
+                    } else {
+                        errors.push(lowering_error(ISSUE_MISSING_TYPE_ALIAS_SYMBOL, alias.span));
+                    }
+                    progress = true;
+                }
+                Err(TypeLowerError::UnresolvedAlias) => {
+                    next_pending.push(alias);
+                }
+                Err(TypeLowerError::Issue(issue)) => {
+                    errors.push(lowering_error(issue, alias.ty.span));
+                    // Mark this alias as consumed (placeholder type) so
+                    // dependent aliases do not keep deferring and produce a
+                    // false CircularDependency error in a later iteration.
+                    if let Some(symbol) = resolver.get_symbol_mut(alias.def_id) {
+                        symbol.ty = Some(types.primitive(Primitive::Vacuum));
+                    }
+                    progress = true;
+                }
+                Err(TypeLowerError::CollectionArity(collection)) => {
+                    errors.push(lowering_collection_arity_error(collection, alias.ty.span));
+                    if let Some(symbol) = resolver.get_symbol_mut(alias.def_id) {
+                        symbol.ty = Some(types.primitive(Primitive::Vacuum));
+                    }
+                    progress = true;
+                }
+            }
+        }
+
+        if !progress {
+            for alias in next_pending {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::CircularDependency, alias.ty.span)
+                        .with_arg("issue", ISSUE_TYPE_ALIAS_CYCLE),
+                );
+            }
+            break;
+        }
+
+        pending = next_pending;
+    }
+}
+
+/// Resolve relational schema declarations and build their ordered metadata.
+///
+/// Runs after [`resolve_alias_types`] so a column type may reference a `typus`
+/// alias (the fixpoint has interned every resolvable alias by then). The
+/// schema name was registered by `collect` as a type-namespace symbol; this
+/// pass raises the semantic rejections, lowers every column type into the
+/// shared [`TypeTable`], and stores the ordered five-field column metadata on
+/// the resolver. The path is purely source-level: no database, no catalog, no
+/// driver dependency anywhere (a partial schema resolves without a DB
+/// connection).
+///
+/// Rejections:
+/// - `schema_duplicate_visible`: two columns with the same public name.
+/// - `schema_duplicate_source`: two visible names resolving to one source
+///   name after alias resolution.
+/// - `schema_unknown_type`: a column type that cannot be established in the
+///   type namespace.
+/// - `schema_nested_column`: a column whose type is itself a schema.
+/// - `schema_method` / `schema_inheritance` are grammar-level: the parser
+///   rejects method-like members and `sub`/`implet` inheritance before the
+///   AST exists.
+fn resolve_schema_decls(
+    program: &Program,
+    resolver: &mut Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+    errors: &mut Vec<SemanticError>,
+) {
+    for stmt in &program.statements {
+        let StmtKind::Schema(decl) = &stmt.kind else {
+            continue;
+        };
+        let Some(def_id) = resolver.lookup(decl.name.name) else {
+            // `collect` should have registered the schema symbol; a miss means
+            // collection already reported the failure.
+            continue;
+        };
+
+        let name = decl.name.name;
+        let mut seen_visible: rustc_hash::FxHashSet<radix_lexer::Symbol> =
+            rustc_hash::FxHashSet::default();
+        let mut seen_source: rustc_hash::FxHashSet<radix_lexer::Symbol> =
+            rustc_hash::FxHashSet::default();
+        let mut columns = Vec::with_capacity(decl.columns.len());
+
+        for (order, column) in decl.columns.iter().enumerate() {
+            if !seen_visible.insert(column.name.name) {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::DuplicateDefinition, column.span)
+                        .with_arg("issue", ISSUE_SCHEMA_DUPLICATE_VISIBLE)
+                        .with_arg("column", interner.resolve(column.name.name)),
+                );
+            }
+
+            // Identity mapping when no alias row: two visible names must not
+            // collapse to one source name.
+            let source = column
+                .source_alias
+                .as_ref()
+                .map_or(column.name.name, |alias| alias.name);
+            if !seen_source.insert(source) {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::DuplicateDefinition, column.span)
+                        .with_arg("issue", ISSUE_SCHEMA_DUPLICATE_SOURCE)
+                        .with_arg("column", interner.resolve(column.name.name))
+                        .with_arg("source", interner.resolve(source)),
+                );
+            }
+
+            // Faber type contract: lower through the existing type resolver so
+            // `T ∪ nihil` spells nullability. Every failure to establish the
+            // column type in the type namespace raises the pinned
+            // `schema_unknown_type` issue and interns the recovery sentinel so
+            // the ordered metadata stays complete.
+            let ty = match lower_type_expr(&column.ty, resolver, interner, types) {
+                Ok(ty) => ty,
+                Err(
+                    TypeLowerError::UnresolvedAlias
+                    | TypeLowerError::Issue(_)
+                    | TypeLowerError::CollectionArity(_),
+                ) => {
+                    errors.push(
+                        SemanticError::structured(SemanticErrorKind::UndefinedType, column.ty.span)
+                            .with_arg("issue", ISSUE_SCHEMA_UNKNOWN_TYPE)
+                            .with_arg("column", interner.resolve(column.name.name)),
+                    );
+                    types.intern(Type::Error)
+                }
+            };
+
+            if is_schema_type(types, ty, resolver) {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::LoweringError, column.span)
+                        .with_arg("issue", ISSUE_SCHEMA_NESTED_COLUMN)
+                        .with_arg("column", interner.resolve(column.name.name)),
+                );
+            }
+
+            // Required/nullability derived from `T ∪ nihil` in the type
+            // position: nullable columns lower to `Type::Option(_)`.
+            let required = !matches!(types.get(ty), Type::Option(_));
+            columns.push(SchemaColumnDef {
+                name: column.name.name,
+                source,
+                ty,
+                required,
+                order,
+            });
+        }
+
+        resolver.register_schema(def_id, SchemaDef { name, columns });
+    }
+}
+
+/// Return whether `ty` names a relational schema (as opposed to a genus) in
+/// the type arena: the schema carrier is the declared-type intern slot, and
+/// the resolver symbol kind is the disambiguator.
+fn is_schema_type(types: &TypeTable, ty: TypeId, resolver: &Resolver) -> bool {
+    if let Type::Struct(def_id) = types.get(ty) {
+        return matches!(
+            resolver.get_symbol(*def_id).map(|symbol| symbol.kind),
+            Some(SymbolKind::Schema)
+        );
+    }
+    false
+}
+
+fn lower_type_expr(
+    ty: &TypeExpr,
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<TypeId, TypeLowerError> {
+    // This is intentionally narrower than full typechecking: it interns the
+    // declared shape of a type expression so aliases have stable TypeIds, but
+    // assignability and expression typing remain HIR-phase responsibilities.
+    let mut ty_id = match &ty.kind {
+        TypeExprKind::Infer => types.intern(Type::Infer(crate::InferVar(ty.span.start))),
+        TypeExprKind::UnionHole => types.intern(Type::InferUnion(crate::InferVar(ty.span.start))),
+        TypeExprKind::Tensor(elem, figura) => {
+            lower_tensor_type_expr(elem, figura, resolver, interner, types)?
+        }
+        TypeExprKind::Vector(elem, figura) => {
+            lower_vector_type_expr(elem, figura, resolver, interner, types)?
+        }
+        TypeExprKind::Matrix(elem, figura) => {
+            lower_matrix_type_expr(elem, figura, resolver, interner, types)?
+        }
+        TypeExprKind::Sparsa(elem, figura) => {
+            lower_sparsa_type_expr(elem, figura, resolver, interner, types)?
+        }
+        TypeExprKind::Atomic(elem) => lower_atomic_type_expr(elem, resolver, interner, types)?,
+        TypeExprKind::PromissumFailable(success, alternate) => {
+            let success = lower_type_expr(success, resolver, interner, types)?;
+            let alternate = lower_type_expr(alternate, resolver, interner, types)?;
+            types.promissum_failable(success, alternate)
+        }
+        TypeExprKind::Named(name, params) => {
+            lower_named_type(name, params, resolver, interner, types)?
+        }
+        TypeExprKind::Qualified(path, params) => {
+            lower_qualified_type(path, params, resolver, interner, types)?
+        }
+        TypeExprKind::Func(func) => {
+            let params = func
+                .params
+                .iter()
+                .map(|param| {
+                    lower_type_expr(param, resolver, interner, types).map(|ty| ParamType {
+                        ty,
+                        mode: SemanticParamMode::Owned,
+                        optional: false,
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let ret = lower_type_expr(&func.ret, resolver, interner, types)?;
+            let err = func
+                .err
+                .as_ref()
+                .map(|err| lower_type_expr(err, resolver, interner, types))
+                .transpose()?;
+            types.function(FuncSig {
+                type_params: Vec::new(),
+                type_param_constraints: Vec::new(),
+                params,
+                ret,
+                err,
+                is_async: false,
+                is_generator: false,
+            })
+        }
+        TypeExprKind::Union(members) => {
+            if members.is_empty() {
+                return Err(TypeLowerError::Issue(ISSUE_EMPTY_UNION_TYPE));
+            }
+
+            // Collect → sort → adjacent dedup (O(n log n + n·equals)) instead
+            // of O(n²) pairwise is_distinct_union_member scans.
+            //
+            // The sort key must cluster `equals`-true members
+            // (union_member_sort_key): a `typus` alias and the type it resolves
+            // to are distinct arena entries whose raw TypeId ordinals need not
+            // be adjacent — an unrelated member listed between them survives
+            // dedup_by(equals), so the union carries a redundant member and two
+            // spellings of the same union no longer resolve to equal types.
+            let mut cleaned: Vec<TypeId> = Vec::with_capacity(members.len());
+            let mut had_nihil = false;
+
+            for m in members {
+                let lowered = lower_type_expr(m, resolver, interner, types)?;
+                if let Type::Primitive(Primitive::Nihil) = types.get(lowered) {
+                    had_nihil = true;
+                    continue;
+                }
+                cleaned.push(lowered);
+            }
+
+            cleaned.sort_by_key(|id| (types.union_member_sort_key(*id).0, id.0));
+            cleaned.dedup_by(|a, b| types.equals(*a, *b));
+
+            if cleaned.is_empty() {
+                return Err(TypeLowerError::Issue(ISSUE_UNION_ONLY_NIHIL));
+            }
+
+            let base = if cleaned.len() == 1 {
+                cleaned[0]
+            } else {
+                types.intern(Type::Union(cleaned))
+            };
+            if had_nihil {
+                types.option(base)
+            } else {
+                base
+            }
+        }
+    };
+
+    if let Some(mode) = ty.mode {
+        let mutability = match mode {
+            radix_syntax::TypeMode::De => SemanticMutability::Immutable,
+            radix_syntax::TypeMode::In => SemanticMutability::Mutable,
+        };
+        ty_id = types.reference(mutability, ty_id);
+    }
+
+    if ty.nullable {
+        ty_id = types.option(ty_id);
+    }
+
+    Ok(ty_id)
+}
+
+fn type_lower_error_from_message(message: &str) -> TypeLowerError {
+    let issue = match message {
+        crate::FIGURA_NOT_INDEX_PARAM_MSG => ISSUE_FIGURA_NOT_INDEX_PARAM,
+        crate::FIGURA_TYPE_PARAM_IN_INDEX_MSG => ISSUE_FIGURA_TYPE_PARAM_IN_INDEX,
+        crate::FIGURA_UNKNOWN_INDEX_MSG => ISSUE_FIGURA_UNKNOWN_INDEX,
+        crate::MATRIX_SHAPE_TWO_DIM_MSG => ISSUE_MATRIX_SHAPE_TWO_DIM,
+        crate::ATOMIC_ELEMENT_MSG => ISSUE_ATOMIC_ELEMENT,
+        crate::VECTOR_WIDTH_SINGLE_DIM_MSG => ISSUE_VECTOR_WIDTH_SINGLE_DIM,
+        "f16, f32, and f64 are fractus widths; use fractus<f16>, fractus<f32>, or fractus<f64>" => {
+            "float_width_on_numerus"
+        }
+        "fractus accepts at most one width marker" => "fractus_width_params",
+        "fractus accepts only f16, f32, or f64" => "invalid_fractus_width_marker",
+        "integer width markers are numerus widths; use numerus<…>" => "integer_width_on_fractus",
+        "instans accepts at most one precision marker" => "instans_precision_params",
+        "instans accepts only ms, us, or ns as a precision marker" => ISSUE_INVALID_PRECISION_MARKER,
+        "numerus accepts at most one width marker" => "numerus_width_params",
+        "precision marker must be a bare spelling such as ms or us" => ISSUE_PRECISION_MARKER_SHAPE,
+        "primitive accepts at most one width marker" => "primitive_width_params",
+        "unknown width marker for numerus" => "invalid_numerus_width_marker",
+        "unknown width marker for this family" => ISSUE_INVALID_WIDTH_MARKER,
+        "width marker cannot accept parameters" => ISSUE_WIDTH_MARKER_PARAMS,
+        "width marker must be a bare spelling such as i32 or u8" => ISSUE_WIDTH_MARKER_SHAPE,
+        "modulus requires exactly one unsigned width marker; use modulus<u8>, modulus<u16>, modulus<u32>, or modulus<u64>" => {
+            "modular_word_width_required"
+        }
+        "modulus width marker must be a bare unsigned spelling such as u32" => "modular_word_width_shape",
+        "modulus accepts only unsigned width markers u8, u16, u32, or u64" => "unsupported_modular_word_width",
+        "modulus requires an unsigned integer width marker" => "modular_word_unsigned_width_required",
+        _ => ISSUE_UNKNOWN_TYPE_LOWERING,
+    };
+    TypeLowerError::Issue(issue)
+}
+
+fn lower_tensor_type_expr(
+    elem: &TypeExpr,
+    figura: &radix_syntax::FiguraExpr,
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<TypeId, TypeLowerError> {
+    let elem_ty = lower_type_expr(elem, resolver, interner, types)?;
+    let shape =
+        crate::lower_figura_expr(figura, resolver, types).map_err(type_lower_error_from_message)?;
+    Ok(types.tensor_with_shape(elem_ty, shape))
+}
+
+fn lower_vector_type_expr(
+    elem: &TypeExpr,
+    width: &FiguraExpr,
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<TypeId, TypeLowerError> {
+    let elem_ty = lower_type_expr(elem, resolver, interner, types)?;
+    let width_id = crate::lower_vector_width_expr(width, resolver, types)
+        .map_err(|error| TypeLowerError::Issue(error.issue))?;
+    Ok(types.vector_with_width(elem_ty, width_id))
+}
+
+fn lower_matrix_type_expr(
+    elem: &TypeExpr,
+    shape: &FiguraExpr,
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<TypeId, TypeLowerError> {
+    let elem_ty = lower_type_expr(elem, resolver, interner, types)?;
+    let shape_id = crate::lower_matrix_shape_expr(shape, resolver, types)
+        .map_err(type_lower_error_from_message)?;
+    Ok(types.matrix_with_shape(elem_ty, shape_id))
+}
+
+fn lower_sparsa_type_expr(
+    elem: &TypeExpr,
+    figura: &radix_syntax::FiguraExpr,
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<TypeId, TypeLowerError> {
+    let elem_ty = lower_type_expr(elem, resolver, interner, types)?;
+    if !crate::numeric_width::is_tensor_numeric_element(types, elem_ty) {
+        return Err(TypeLowerError::Issue(ISSUE_SPARSA_ELEMENT_NON_NUMERIC));
+    }
+    let shape =
+        crate::lower_figura_expr(figura, resolver, types).map_err(type_lower_error_from_message)?;
+    Ok(types.sparsa_with_shape(elem_ty, shape))
+}
+
+fn lower_atomic_type_expr(
+    elem: &TypeExpr,
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<TypeId, TypeLowerError> {
+    let elem_ty = lower_type_expr(elem, resolver, interner, types)?;
+    if !crate::is_atomic_element_type(types, elem_ty) {
+        return Err(TypeLowerError::Issue(ISSUE_ATOMIC_ELEMENT));
+    }
+    Ok(types.atomic(elem_ty))
+}
+
+fn lower_bounded_primitive(
+    prim: Primitive,
+    params: &[TypeExpr],
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<TypeId, TypeLowerError> {
+    match params {
+        [] => Ok(types.primitive(prim)),
+        [capacity] => {
+            let capacity = lower_capacity_index(capacity, resolver, interner, types)?;
+            Ok(match prim {
+                Primitive::Ascii => types.bounded_ascii(capacity),
+                Primitive::Textus => types.bounded_textus(capacity),
+                Primitive::Octeti => types.bounded_octeti(capacity),
+                _ => unreachable!("lower_bounded_primitive only handles ascii/textus/octeti"),
+            })
+        }
+        _ => Err(TypeLowerError::Issue(ISSUE_PRIMITIVE_PARAMS)),
+    }
+}
+
+fn lower_lista_type(
+    params: &[TypeExpr],
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<TypeId, TypeLowerError> {
+    match params {
+        [elem] => {
+            let elem = lower_type_expr(elem, resolver, interner, types)?;
+            Ok(types.array(elem))
+        }
+        [elem, capacity] => {
+            let elem = lower_type_expr(elem, resolver, interner, types)?;
+            let capacity = lower_capacity_index(capacity, resolver, interner, types)?;
+            Ok(types.bounded_array(elem, capacity))
+        }
+        _ => Err(TypeLowerError::CollectionArity(CollectionKind::Lista)),
+    }
+}
+
+fn lower_capacity_index(
+    param: &TypeExpr,
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<crate::IndexId, TypeLowerError> {
+    if let Some(issue) = capacity_index_issue(param, resolver, interner) {
+        return Err(TypeLowerError::Issue(issue));
+    }
+    let TypeExprKind::Named(ident, _) = &param.kind else {
+        return Err(TypeLowerError::Issue(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL));
+    };
+    let name = interner.resolve(ident.name);
+    if let Some(value) = radix_types::parse_natural_capacity(name) {
+        return Ok(types.intern_index(IndexExpr::Literal(value)));
+    }
+    Ok(types.intern_index(IndexExpr::Param(ident.name)))
+}
+
+fn lower_named_type(
+    name: &radix_syntax::Ident,
+    params: &[TypeExpr],
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<TypeId, TypeLowerError> {
+    let name_str = interner.resolve(name.name);
+
+    if name_str == "modulus" {
+        let mut error = None;
+        let ty =
+            crate::numeric_width::lower_modular_word(params, interner, types, &mut |message| {
+                error = Some(message.to_owned());
+            });
+        if let Some(message) = error {
+            return Err(type_lower_error_from_message(&message));
+        }
+        return Ok(ty);
+    }
+
+    if let Some(prim) = Primitive::from_name(name_str) {
+        if matches!(prim, Primitive::Numerus | Primitive::Fractus) {
+            let mut error = None;
+            let ty = crate::numeric_width::lower_sized_primitive(
+                prim,
+                params,
+                interner,
+                types,
+                &mut |message| {
+                    error = Some(message.to_owned());
+                },
+            );
+            if let Some(message) = error {
+                return Err(type_lower_error_from_message(&message));
+            }
+            return Ok(ty);
+        }
+        if matches!(prim, Primitive::Instans) {
+            let mut error = None;
+            let ty = crate::instans_precision::lower_sized_instans(
+                params,
+                interner,
+                types,
+                &mut |message| {
+                    error = Some(message.to_owned());
+                },
+            );
+            if let Some(message) = error {
+                return Err(type_lower_error_from_message(&message));
+            }
+            return Ok(ty);
+        }
+        if matches!(
+            prim,
+            Primitive::Ascii | Primitive::Textus | Primitive::Octeti
+        ) {
+            return lower_bounded_primitive(prim, params, resolver, interner, types);
+        }
+        if !params.is_empty() {
+            return Err(TypeLowerError::Issue(ISSUE_PRIMITIVE_PARAMS));
+        }
+        return Ok(types.primitive(prim));
+    }
+
+    // WHY: `octet` is the canonical byte scalar spelling — an alternative
+    // name for `numerus<u8>`, symmetric with `octeti` (the byte buffer, which
+    // unifies with `lista<numerus<u8>>`). Fixed-width; rejects parameters.
+    if name_str == "octet" {
+        if !params.is_empty() {
+            return Err(TypeLowerError::Issue(ISSUE_OCTET_PARAMS));
+        }
+        return Ok(types.sized_numeric(Primitive::Numerus, crate::NumericWidth::U8));
+    }
+
+    let mut width_error = None;
+    if let Some(ty) =
+        crate::numeric_width::lower_standalone_width_type(name_str, params, types, &mut |message| {
+            width_error = Some(message.to_owned());
+        })
+    {
+        if let Some(message) = width_error {
+            return Err(type_lower_error_from_message(&message));
+        }
+        return Ok(ty);
+    }
+
+    // SQL row: dynamic column map (faber::Valor per column).
+    if name_str == "series" {
+        if !params.is_empty() {
+            return Err(TypeLowerError::Issue(ISSUE_SERIES_PARAMS));
+        }
+        let textus = types.primitive(Primitive::Textus);
+        let valor = types.primitive(Primitive::Valor);
+        return Ok(types.map(textus, valor));
+    }
+
+    if name_str == "intervallum" {
+        if params.len() != 1 {
+            return Err(TypeLowerError::Issue(ISSUE_INTERVALLUM_ARITY));
+        }
+        let bound = lower_type_expr(&params[0], resolver, interner, types)?;
+        if !crate::is_intervallum_bound_type(types, bound) {
+            return Err(TypeLowerError::Issue(ISSUE_INTERVALLUM_BOUND));
+        }
+        return Ok(types.intervallum(bound));
+    }
+
+    if name_str == "scrinium" {
+        let Some(def_id) = crate::builtins::frame_types::scrinium_def_id(resolver) else {
+            return Err(TypeLowerError::Issue(ISSUE_SCRINIUM_MISSING_BUILTIN));
+        };
+        let payload_ty = match params {
+            [] => types.primitive(Primitive::Valor),
+            [payload] => lower_type_expr(payload, resolver, interner, types)?,
+            _ => {
+                return Err(TypeLowerError::Issue(ISSUE_SCRINIUM_ARITY));
+            }
+        };
+        return Ok(crate::builtins::frame_types::scrinium_payload_type_id(
+            types, def_id, payload_ty,
+        ));
+    }
+
+    if name_str == "atomic" {
+        if params.is_empty() {
+            return Err(TypeLowerError::Issue(ISSUE_ATOMIC_INCOMPLETE));
+        }
+        return Err(TypeLowerError::Issue(ISSUE_ATOMIC_ARITY));
+    }
+
+    if name_str == "tensor" {
+        if params.is_empty() {
+            return Err(TypeLowerError::Issue(ISSUE_TENSOR_INCOMPLETE));
+        }
+        return Err(TypeLowerError::Issue(ISSUE_TENSOR_MISSING_FIGURA));
+    }
+
+    if name_str == "sparsa" {
+        if params.is_empty() {
+            return Err(TypeLowerError::Issue(ISSUE_SPARSA_INCOMPLETE));
+        }
+        return Err(TypeLowerError::Issue(ISSUE_SPARSA_MISSING_FIGURA));
+    }
+
+    if name_str == "matrix" {
+        if params.is_empty() {
+            return Err(TypeLowerError::Issue(ISSUE_MATRIX_INCOMPLETE));
+        }
+        return Err(TypeLowerError::Issue(ISSUE_MATRIX_MISSING_FIGURA));
+    }
+
+    if let Some(collection) = CollectionKind::from_name(name_str) {
+        if collection == CollectionKind::Lista {
+            return lower_lista_type(params, resolver, interner, types);
+        }
+        if !collection.accepts_arity(params.len()) {
+            return Err(TypeLowerError::CollectionArity(collection));
+        }
+        let lowered = params
+            .iter()
+            .map(|param| lower_type_expr(param, resolver, interner, types))
+            .collect::<Result<Vec<_>, _>>()?;
+        return Ok(collection.lower(types, &lowered));
+    }
+
+    let Some(def_id) = resolver.lookup_type(name.name) else {
+        return Err(TypeLowerError::Issue(ISSUE_UNKNOWN_TYPE_NAME));
+    };
+
+    let Some(symbol) = resolver.get_symbol(def_id) else {
+        return Err(TypeLowerError::Issue(ISSUE_MISSING_TYPE_SYMBOL_INFO));
+    };
+
+    let base = match symbol.kind {
+        SymbolKind::Struct => types.intern(Type::Struct(def_id)),
+        SymbolKind::Enum => types.intern(Type::Enum(def_id)),
+        SymbolKind::Interface => types.intern(Type::Interface(def_id)),
+        SymbolKind::TypeAlias => match symbol.ty {
+            Some(resolved) => types.intern(Type::Alias(def_id, resolved)),
+            None => return Err(TypeLowerError::UnresolvedAlias),
+        },
+        SymbolKind::TypeParam => types.intern(Type::Param(symbol.name)),
+        SymbolKind::Schema => {
+            // A schema name is a type-namespace identity per the
+            // typus/genus declared-type precedent — usable as a type argument —
+            // with no runtime semantics (zero MIR/backend lowering). The
+            // declared-type intern slot is the carrier; schema vs genus is
+            // disambiguated by the symbol kind, so the schema's ordered
+            // relational metadata never becomes a genus field list.
+            types.intern(Type::Struct(def_id))
+        }
+        _ => return Err(TypeLowerError::Issue(ISSUE_TYPE_NAME_NOT_TYPE)),
+    };
+
+    if params.is_empty() {
+        return Ok(base);
+    }
+
+    let args = params
+        .iter()
+        .map(|param| lower_type_expr(param, resolver, interner, types))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(types.intern(Type::Applied(base, args)))
+}
+
+fn lower_qualified_type(
+    path: &[radix_syntax::Ident],
+    params: &[TypeExpr],
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<TypeId, TypeLowerError> {
+    let Some((namespace, type_name)) = path.first().zip(path.last()) else {
+        return Err(TypeLowerError::Issue(ISSUE_EMPTY_QUALIFIED_TYPE_PATH));
+    };
+    // Middle segments (indices 1..len-1) must be Module-kind bindings, not
+    // just successful lookups.
+    for segment in &path[1..path.len().saturating_sub(1)] {
+        let Some(def_id) = resolver.lookup(segment.name) else {
+            return Err(TypeLowerError::Issue(ISSUE_UNKNOWN_NAMESPACE));
+        };
+        if !matches!(
+            resolver.get_symbol(def_id).map(|symbol| symbol.kind),
+            Some(SymbolKind::Module)
+        ) {
+            return Err(TypeLowerError::Issue(
+                ISSUE_QUALIFIED_TYPE_MIDDLE_NOT_NAMESPACE,
+            ));
+        }
+    }
+    let Some(namespace_def_id) = resolver.lookup(namespace.name) else {
+        return Err(TypeLowerError::Issue(ISSUE_UNKNOWN_NAMESPACE));
+    };
+    if !matches!(
+        resolver
+            .get_symbol(namespace_def_id)
+            .map(|symbol| symbol.kind),
+        Some(SymbolKind::Module)
+    ) {
+        return Err(TypeLowerError::Issue(
+            ISSUE_QUALIFIED_TYPE_PREFIX_NOT_NAMESPACE,
+        ));
+    }
+    if !resolver.namespace_exports_member(namespace.name, type_name.name) {
+        if let Some(issue) =
+            resolver.namespace_member_rejection_issue(namespace.name, type_name.name)
+        {
+            return Err(TypeLowerError::Issue(issue));
+        }
+        return Err(TypeLowerError::Issue(ISSUE_QUALIFIED_TYPE_NOT_EXPORTED));
+    }
+    if let Some(type_id) = resolver.namespace_file_type(namespace.name, type_name.name) {
+        if params.is_empty() {
+            return Ok(type_id);
+        }
+        let args = params
+            .iter()
+            .map(|param| lower_type_expr(param, resolver, interner, types))
+            .collect::<Result<Vec<_>, _>>()?;
+        return Ok(types.intern(Type::Applied(type_id, args)));
+    }
+    Err(TypeLowerError::Issue(ISSUE_UNKNOWN_QUALIFIED_TYPE))
+}
+
+fn define_generic_param(
+    resolver: &mut Resolver,
+    param: &radix_syntax::TypeParam,
+    errors: &mut Vec<SemanticError>,
+) {
+    let kind = match param.kind {
+        radix_syntax::GenericParamKind::Typus => SymbolKind::TypeParam,
+        radix_syntax::GenericParamKind::Magnitudo => SymbolKind::IndexParam,
+    };
+    define_symbol(
+        resolver,
+        param.name.name,
+        param.name.span,
+        kind,
+        false,
+        errors,
+    );
+}
+
+/// Recognized `curata` allocator contract names.
+///
+/// `"arena"`/`"page"` match the statement-form `cura` kinds validated in the
+/// parser; `"alloc"`/`"allocator"` cover existing corpus and test usage
+/// (corpus/curata/curata.fab, parser/driver tests). Anything else
+/// earns a warning until allocator threading ships and this becomes a hard
+/// contract (docs/factory/deferred/defer-017.md).
+const CURATA_KNOWN_ALLOCATORS: &[&str] = &["alloc", "allocator", "arena", "page"];
+
+/// Warn when a postfix `curata <ident>` names an unknown allocator contract.
+fn check_curata_allocator_names(
+    modifiers: &[radix_syntax::FuncModifier],
+    interner: &Interner,
+    errors: &mut Vec<SemanticError>,
+) {
+    for modifier in modifiers {
+        if let radix_syntax::FuncModifier::Curata { required, .. } = modifier {
+            let name = interner.resolve(required.name);
+            if !CURATA_KNOWN_ALLOCATORS.contains(&name) {
+                errors.push(
+                    SemanticError::structured(
+                        SemanticErrorKind::Warning(WarningKind::UnrecognizedCurataAllocator),
+                        required.span,
+                    )
+                    .with_arg("issue", ISSUE_UNRECOGNIZED_CURATA_ALLOCATOR)
+                    .with_arg("name", name),
+                );
+            }
+        }
+    }
+}
+
+fn modifier_bindings(modifiers: &[radix_syntax::FuncModifier]) -> Vec<&radix_syntax::Ident> {
+    let mut out = Vec::new();
+    for modifier in modifiers {
+        match modifier {
+            radix_syntax::FuncModifier::Argumenta(ident)
+            | radix_syntax::FuncModifier::Errata(ident)
+            | radix_syntax::FuncModifier::Optiones(ident) => out.push(ident),
+            radix_syntax::FuncModifier::Curata { required, alias } => {
+                out.push(alias.as_ref().unwrap_or(required))
+            }
+            radix_syntax::FuncModifier::Exitus(radix_syntax::ExitusValue::Name(ident)) => {
+                out.push(ident)
+            }
+            _ => {}
+        }
+    }
+    out
+}

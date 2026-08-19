@@ -1,0 +1,277 @@
+//! Statement and block typing for local control surfaces inside HIR bodies.
+//!
+//! This module owns the places where typechecking mutates lexical binding
+//! state: local declarations, block scopes, and `redde` statements. Expression
+//! checking handles most value forms, but statements decide when a synthesized
+//! value is intentionally ignored, when a local declaration needs a fresh
+//! inference variable, and how return statements contribute to the enclosing
+//! function's normal result type.
+//!
+//! INVARIANTS
+//! ==========
+//! - A local binding is inserted only after its declared or inferred type has
+//!   been established.
+//! - `redde` contributes only to an explicitly declared normal return channel.
+//!   Expression-bodied closures can infer a result from their expression without
+//!   using `redde`. Alternate exits are checked through `current_error` in
+//!   expression/control-flow code.
+//! - Blocks always introduce a lexical scope and type to their trailing
+//!   expression when present, otherwise to `vacuum`.
+//! - Ignored expression statements must not leave unresolved inference variables
+//!   dangling; finalization should only see genuinely unresolved declarations or
+//!   expressions.
+
+#[allow(clippy::wildcard_imports)]
+// parent module provides shared imports for typechecking
+use super::*;
+
+const ISSUE_IGNORED_EXPR_RESULT_INFER: &str = "ignored_expression_result_must_resolve";
+const ISSUE_INITIALIZER_ANNOTATION_MISMATCH: &str = "initializer_annotation_mismatch";
+const ISSUE_AWAIT_BIND_REQUIRES_ASYNC_CONTEXT: &str = "await_bind_requires_async_context";
+const ISSUE_AWAIT_BIND_REQUIRES_PROMISSUM: &str = "await_bind_requires_promissum";
+const ISSUE_AWAIT_FAILABLE_REQUIRES_ALTERNATE_EXIT: &str = "await_failable_requires_alternate_exit";
+const ISSUE_AWAIT_FAILABLE_ALTERNATE_TYPE_MISMATCH: &str = "await_failable_alternate_type_mismatch";
+const ISSUE_INCOMPATIBLE_RETURN_TYPES: &str = "incompatible_return_types";
+const ISSUE_RETURN_TYPE_MISMATCH: &str = "return_type_mismatch";
+
+impl TypeChecker<'_> {
+    /// Validate a `redde` statement against the current normal return contract.
+    ///
+    /// Annotated functions use their declared return type as an expected type so
+    /// nested expressions can benefit from top-down information. Bodyful named
+    /// functions and statement-bodied closures without `→` are effect-only and
+    /// reject `redde`; expression surfaces that opt into inferred returns still
+    /// collect the first observed return type and unify later returns against it.
+    pub fn check_return(&mut self, value: Option<&mut HirExpression>, span: radix_lexer::Span) {
+        if self.current_return.is_none() && !self.allow_inferred_return {
+            if let Some(expr) = value {
+                self.check_expr(expr);
+            }
+            self.errors.push(
+                SemanticError::structured(SemanticErrorKind::MissingReturn, span)
+                    .with_arg("issue", "redde_requires_return_type")
+                    .with_arg("keyword", "redde"),
+            );
+            return;
+        }
+
+        let value_ty = match value {
+            Some(expr) => {
+                if let Some(expected) = self.current_return {
+                    self.check_expr_with_expected(expr, Some(expected))
+                } else {
+                    self.check_expr(expr)
+                }
+            }
+            None => self.vacuum_type(),
+        };
+
+        if let Some(expected) = self.current_return {
+            self.unify_assign_issue(value_ty, expected, span, ISSUE_RETURN_TYPE_MISMATCH);
+            return;
+        }
+
+        match self.inferred_return {
+            None => self.inferred_return = Some(value_ty),
+            Some(existing) => {
+                // WHY: inferred returns join peer branches symmetrically, not assignment.
+                self.unify_join(value_ty, existing, span, ISSUE_INCOMPATIBLE_RETURN_TYPES);
+            }
+        }
+    }
+
+    /// Establish a local declaration's type and install its binding.
+    ///
+    /// The four local shapes deliberately map to different inference policies:
+    /// annotated initializers are checked bidirectionally, bare annotations are
+    /// accepted as-is, initializer-only locals synthesize from the expression,
+    /// and declarations without either side receive a fresh inference variable
+    /// that must be resolved before finalization.
+    pub fn check_local(&mut self, local: &mut HirLocal) {
+        if local.is_await {
+            self.check_await_local(local);
+            return;
+        }
+
+        let inferred = match (&local.ty, &mut local.init) {
+            (Some(ty), Some(init)) => {
+                // A conversion-directed initializer (`fixum T x ↤ value`) has
+                // the binding itself as its assignment target; the written type
+                // is the conversion destination. Make the binding visible to
+                // lvalue resolution while the initializer is checked.
+                if matches!(init.kind, HirExpressionKind::ConversioAssign { .. }) {
+                    self.insert_binding_with_scalar(local.def_id, *ty, false, local.mutable);
+                }
+                let init_ty = self.check_expr_with_expected(init, Some(*ty));
+                self.unify_assign_issue(
+                    init_ty,
+                    *ty,
+                    init.span,
+                    ISSUE_INITIALIZER_ANNOTATION_MISMATCH,
+                );
+                super::tensor_index::record_shape_witness_from_init(self, local.def_id, init);
+                *ty
+            }
+            (Some(ty), None) => *ty,
+            (None, Some(init)) => {
+                let inferred = self.check_expr(init);
+                super::tensor_index::record_shape_witness_from_init(self, local.def_id, init);
+                inferred
+            }
+            (None, None) => self.fresh_infer(),
+        };
+
+        if local.ty.is_none() {
+            local.ty = Some(inferred);
+        }
+
+        let scalar_text = local
+            .init
+            .as_ref()
+            .is_some_and(|init| self.is_provably_single_scalar_text(init));
+        self.record_binding_name(local.def_id, local.name);
+        self.insert_binding_with_scalar(local.def_id, inferred, scalar_text, local.mutable);
+    }
+
+    fn check_await_local(&mut self, local: &mut HirLocal) {
+        if !self.current_await_context {
+            let span = local
+                .init
+                .as_ref()
+                .map_or(radix_lexer::Span::default(), |init| init.span);
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_AWAIT_BIND_REQUIRES_ASYNC_CONTEXT,
+                span,
+            );
+        }
+
+        let awaited = if let Some(init) = &mut local.init {
+            let future_ty = self.check_expr(init);
+            let awaited =
+                self.await_success_type(future_ty, init.span, ISSUE_AWAIT_BIND_REQUIRES_PROMISSUM);
+            super::tensor_index::record_shape_witness_from_init(self, local.def_id, init);
+            awaited
+        } else {
+            self.error_type
+        };
+
+        let local_ty = if let Some(ty) = local.ty {
+            self.unify_assign_issue(
+                awaited,
+                ty,
+                local
+                    .init
+                    .as_ref()
+                    .map_or(radix_lexer::Span::default(), |init| init.span),
+                ISSUE_INITIALIZER_ANNOTATION_MISMATCH,
+            );
+            ty
+        } else {
+            local.ty = Some(awaited);
+            awaited
+        };
+
+        let scalar_text = local
+            .init
+            .as_ref()
+            .is_some_and(|init| self.is_provably_single_scalar_text(init));
+        self.record_binding_name(local.def_id, local.name);
+        self.insert_binding_with_scalar(local.def_id, local_ty, scalar_text, local.mutable);
+    }
+
+    pub fn await_success_type(
+        &mut self,
+        future_ty: TypeId,
+        span: radix_lexer::Span,
+        issue: &'static str,
+    ) -> TypeId {
+        match self.types.get(self.resolve_inferred_type(future_ty)) {
+            Type::Promissum(inner) => *inner,
+            Type::PromissumFailable(success, alternate) => {
+                let success = *success;
+                let alternate = *alternate;
+                self.check_await_alternate_channel(alternate, span);
+                success
+            }
+            _ => {
+                self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+                self.error_type
+            }
+        }
+    }
+
+    fn check_await_alternate_channel(&mut self, alternate: TypeId, span: radix_lexer::Span) {
+        let Some(error_ty) = self.current_error.map(|sink| match sink {
+            ErrorSink::Function(ty) | ErrorSink::Local(ty) => ty,
+        }) else {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_AWAIT_FAILABLE_REQUIRES_ALTERNATE_EXIT,
+                span,
+            );
+            return;
+        };
+        self.unify_assign_issue(
+            alternate,
+            error_ty,
+            span,
+            ISSUE_AWAIT_FAILABLE_ALTERNATE_TYPE_MISMATCH,
+        );
+    }
+
+    /// Check one statement for side effects on type state and lexical scope.
+    ///
+    /// Most expression-like constructs delegate to expression checking. The
+    /// statement layer mainly enforces that discarded values are resolved and
+    /// that `redde` is routed through the function-return accumulator instead of
+    /// being treated as an ordinary expression result.
+    pub fn check_stmt(&mut self, stmt: &mut HirStatement) {
+        match &mut stmt.kind {
+            HirStatementKind::Local(local) => self.check_local(local),
+            HirStatementKind::Expr(expr) => {
+                let expr_ty = self.check_expr(expr);
+                if self.is_infer(self.resolve_inferred_type(expr_ty)) {
+                    let vacuum = self.vacuum_type();
+                    self.unify_assign_issue(
+                        expr_ty,
+                        vacuum,
+                        expr.span,
+                        ISSUE_IGNORED_EXPR_RESULT_INFER,
+                    );
+                }
+            }
+            HirStatementKind::Redde(value) => self.check_return(value.as_mut(), stmt.span),
+            HirStatementKind::Rumpe | HirStatementKind::Perge | HirStatementKind::Tacet => {}
+            HirStatementKind::IncDec(inc_dec) => {
+                self.check_inc_dec(inc_dec.op, &mut inc_dec.target, stmt.span)
+            }
+            HirStatementKind::Custodi(custodi) => {
+                for clause in &mut custodi.clauses {
+                    self.check_condition(&mut clause.cond);
+                    self.check_block(&mut clause.body, None);
+                }
+            }
+        }
+    }
+
+    /// Check a lexical block and return its value type.
+    ///
+    /// Blocks are expression-compatible in Faber, so callers can pass an
+    /// expected type that guides the trailing expression. Non-expression blocks
+    /// produce `vacuum`; this keeps statement-only bodies explicit without
+    /// inventing a bottom type for control-flow statements.
+    pub fn check_block(&mut self, block: &mut HirBlock, expected: Option<TypeId>) -> TypeId {
+        self.push_scope();
+        for stmt in &mut block.statements {
+            self.check_stmt(stmt);
+        }
+        let ty = if let Some(expr) = &mut block.expr {
+            self.check_expr_with_expected(expr, expected)
+        } else {
+            self.vacuum_type()
+        };
+        self.pop_scope();
+        ty
+    }
+}

@@ -145,7 +145,8 @@ incipit {
     let mut types = TypeTable::new();
     collect::collect(program, &mut resolver, &mut types).expect("collect");
 
-    let errors = resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
+    let errors =
+        resolve::resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
     let err = expect_structured_error(&errors, SemanticErrorKind::UndefinedVariable, "unknown_identifier");
 
     assert!(err
@@ -172,7 +173,8 @@ incipit {
     let mut types = TypeTable::new();
     collect::collect(program, &mut resolver, &mut types).expect("collect");
 
-    let errors = resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
+    let errors =
+        resolve::resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
     let err = expect_structured_error(&errors, SemanticErrorKind::UndefinedVariable, "unknown_identifier");
 
     assert!(
@@ -197,7 +199,8 @@ incipit {
     let mut types = TypeTable::new();
     collect::collect(program, &mut resolver, &mut types).expect("collect");
 
-    let errors = resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
+    let errors =
+        resolve::resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
     let mut suggestions: Vec<(String, String)> = errors
         .iter()
         .filter(|err| err.kind == SemanticErrorKind::UndefinedVariable)
@@ -243,7 +246,8 @@ incipit {
     let mut types = TypeTable::new();
     collect::collect(program, &mut resolver, &mut types).expect("collect");
 
-    let errors = resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
+    let errors =
+        resolve::resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
     let err = expect_structured_error(&errors, SemanticErrorKind::UndefinedVariable, "unknown_identifier");
 
     assert!(err
@@ -270,7 +274,8 @@ incipit {
     let mut types = TypeTable::new();
     collect::collect(program, &mut resolver, &mut types).expect("collect");
 
-    let errors = resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
+    let errors =
+        resolve::resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
 
     expect_structured_error(&errors, SemanticErrorKind::DuplicateDefinition, "duplicate_definition");
 }
@@ -298,7 +303,7 @@ fn resolves_type_alias_to_builtin() {
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
     let _ = collect::collect(program, &mut resolver, &mut types);
-    let result = resolve(program, &mut resolver, &parsed.interner, &mut types);
+    let result = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types);
     assert!(result.is_ok());
 
     let alias_sym = parsed.interner.intern("Numeri");
@@ -319,7 +324,7 @@ fn resolves_generic_type_alias_own_type_params() {
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
     let _ = collect::collect(program, &mut resolver, &mut types);
-    let result = resolve(program, &mut resolver, &parsed.interner, &mut types);
+    let result = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types);
     assert!(result.is_ok(), "generic alias must resolve: {result:?}");
 
     let alias_sym = parsed.interner.intern("X");
@@ -392,7 +397,7 @@ fn resolve_bounded_source(source: &str) -> (TypeTable, Result<(), Vec<crate::sem
     let mut types = TypeTable::new();
     let program = parsed.program.as_ref().expect("program");
     collect::collect(program, &mut resolver, &mut types).expect("collect");
-    let resolved = resolve(program, &mut resolver, &parsed.interner, &mut types);
+    let resolved = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types);
     (types, resolved.map(|_| ()))
 }
 
@@ -419,7 +424,8 @@ fn reports_unknown_type_with_structured_event() {
     let program = parsed.program.as_ref().expect("program");
     collect::collect(program, &mut resolver, &mut types).expect("collect");
 
-    let errors = resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
+    let errors =
+        resolve::resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
 
     expect_structured_error(&errors, SemanticErrorKind::UndefinedType, "unknown_type");
 }
@@ -447,7 +453,8 @@ fn reports_invalid_width_marker_with_structured_event() {
         let program = parsed.program.as_ref().expect("program");
         collect::collect(program, &mut resolver, &mut types).expect("collect");
 
-        let errors = resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
+        let errors =
+            resolve::resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
         let err = expect_structured_error(&errors, SemanticErrorKind::UndefinedType, issue);
 
         assert!(err
@@ -472,7 +479,7 @@ fn reports_incomplete_tensor_type_with_structured_event() {
     let mut types = TypeTable::new();
     collect::collect(&program, &mut resolver, &mut types).expect("collect");
 
-    let errors = resolve(&program, &mut resolver, &interner, &mut types).expect_err("resolve should fail");
+    let errors = resolve::resolve(&program, &mut resolver, &interner, &mut types).expect_err("resolve should fail");
 
     expect_structured_error(&errors, SemanticErrorKind::TypeMismatch, "tensor_missing_figura");
 }
@@ -1105,7 +1112,7 @@ functio f(terminus.Terminus value) → vacuum {}
         )
         .expect("install file interface");
 
-    let result = resolve(program, &mut resolver, &parsed.interner, &mut types);
+    let result = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types);
 
     assert!(result.is_ok(), "resolve errors: {:?}", result.err());
 }
@@ -1123,7 +1130,8 @@ functio f(terminus.Terminus value) → vacuum {}
     let program = parsed.program.as_ref().expect("program");
     collect::collect(program, &mut resolver, &mut types).expect("collect");
 
-    let errors = resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
+    let errors =
+        resolve::resolve(program, &mut resolver, &parsed.interner, &mut types).expect_err("resolve should fail");
 
     expect_structured_error(&errors, SemanticErrorKind::UndefinedType, "qualified_type_prefix_not_namespace");
 }
@@ -1137,7 +1145,7 @@ fn type_alias_union_deduplicates_structurally_equal_compound_members() {
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
     let _ = collect::collect(program, &mut resolver, &mut types);
-    let result = resolve(program, &mut resolver, &parsed.interner, &mut types);
+    let result = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types);
     assert!(result.is_ok());
 
     let alias_sym = parsed.interner.intern("Numerorum");
@@ -1159,7 +1167,7 @@ fn type_alias_union_dedups_alias_with_peeled_target_member() {
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
     let _ = collect::collect(program, &mut resolver, &mut types);
-    let result = resolve(program, &mut resolver, &parsed.interner, &mut types);
+    let result = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types);
     assert!(result.is_ok());
 
     let alias_sym = parsed.interner.intern("Numerorum");
@@ -1188,7 +1196,7 @@ fn type_alias_union_dedups_alias_even_when_not_typeid_adjacent() {
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
     let _ = collect::collect(program, &mut resolver, &mut types);
-    let result = resolve(program, &mut resolver, &parsed.interner, &mut types);
+    let result = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types);
     assert!(result.is_ok());
 
     let alias_sym = parsed.interner.intern("Numerorum");
@@ -1222,7 +1230,7 @@ fn type_alias_union_spellings_with_and_without_alias_member_are_equal() {
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
     let _ = collect::collect(program, &mut resolver, &mut types);
-    let result = resolve(program, &mut resolver, &parsed.interner, &mut types);
+    let result = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types);
     assert!(result.is_ok());
 
     let with_alias_sym = parsed.interner.intern("Numerorum");
@@ -1476,7 +1484,7 @@ functio exemplo() → numerus {
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
     let _ = collect::collect(&program, &mut resolver, &mut types);
-    let result = resolve(&program, &mut resolver, &interner, &mut types);
+    let result = resolve::resolve(&program, &mut resolver, &interner, &mut types);
     assert!(result.is_ok(), "rumpe inside fac should resolve: {:?}", result.err());
 }
 
@@ -1508,7 +1516,7 @@ functio exemplo(bivalens condicio) → numerus {
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
     let _ = collect::collect(&program, &mut resolver, &mut types);
-    let result = resolve(&program, &mut resolver, &interner, &mut types);
+    let result = resolve::resolve(&program, &mut resolver, &interner, &mut types);
     assert!(result.is_ok(), "perge inside fac…dum should resolve: {:?}", result.err());
 }
 
@@ -1539,7 +1547,7 @@ functio exemplo() → numerus {
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
     let _ = collect::collect(&program, &mut resolver, &mut types);
-    let result = resolve(&program, &mut resolver, &interner, &mut types);
+    let result = resolve::resolve(&program, &mut resolver, &interner, &mut types);
     assert!(result.is_ok(), "perge inside fac should resolve: {:?}", result.err());
 }
 
@@ -1550,7 +1558,7 @@ fn resolve_source(source: &str) -> Vec<crate::semantic::SemanticError> {
     let mut types = TypeTable::new();
     let program = parsed.program.as_ref().expect("program");
     collect::collect(program, &mut resolver, &mut types).expect("collect");
-    resolve(program, &mut resolver, &parsed.interner, &mut types)
+    resolve::resolve(program, &mut resolver, &parsed.interner, &mut types)
         .err()
         .unwrap_or_default()
 }
@@ -1867,7 +1875,7 @@ fn resolve_ok(source: &str) -> (Program, Resolver, Interner) {
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
     collect::collect(&program, &mut resolver, &mut types).expect("collect");
-    resolve(&program, &mut resolver, &parsed.interner, &mut types).expect("resolve");
+    resolve::resolve(&program, &mut resolver, &parsed.interner, &mut types).expect("resolve");
     (program, resolver, parsed.interner)
 }
 

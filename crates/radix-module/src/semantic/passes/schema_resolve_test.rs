@@ -83,7 +83,7 @@ fn resolve_program(source: &str) -> (crate::parser::ParseResult, Resolver, TypeT
     {
         let program = parsed.program.as_ref().expect("program");
         let _ = collect::collect(program, &mut resolver, &mut types);
-        let result = resolve(program, &mut resolver, &parsed.interner, &mut types);
+        let result = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types);
         assert!(result.is_ok(), "resolve failed: {result:?}");
     }
     (parsed, resolver, types)
@@ -98,7 +98,7 @@ fn resolve_errors(source: &str) -> Vec<crate::semantic::SemanticError> {
     let mut types = TypeTable::new();
     let program = parsed.program.as_ref().expect("program");
     let _ = collect::collect(program, &mut resolver, &mut types);
-    match resolve(program, &mut resolver, &parsed.interner, &mut types) {
+    match resolve::resolve(program, &mut resolver, &parsed.interner, &mut types) {
         Ok(()) => Vec::new(),
         Err(errors) => errors,
     }
@@ -410,7 +410,7 @@ fn schema_kind_is_never_a_value_name() {
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
     let _ = collect::collect(program, &mut resolver, &mut types);
-    let result = resolve(program, &mut resolver, &parsed.interner, &mut types);
+    let result = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types);
     assert!(result.is_ok(), "schema must resolve: {result:?}");
 
     let schema_sym = parsed.interner.intern("PersonaQuaerenda");

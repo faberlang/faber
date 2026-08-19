@@ -121,7 +121,7 @@ pub fn compile_canonical(session: &Session, name: &str, source: &str) -> FormatC
         &analysis.presentation,
         &analysis.types,
         &analysis.interner,
-        &surface,
+        &crate::codegen::faber::LocaleKeywordBridge(surface),
         &imported_spellings.by_type,
         &by_def,
     ) {
@@ -387,7 +387,7 @@ pub fn emit_from_analyzed(
         &canonical::empty_presentation(),
         types,
         interner,
-        &surface,
+        &crate::codegen::faber::LocaleKeywordBridge(surface),
         &rustc_hash::FxHashMap::default(),
         &rustc_hash::FxHashMap::default(),
     )?;

@@ -4,7 +4,7 @@
 //! template-based import paths, and rejects parent-traversal (`..`) and
 //! absolute paths.
 
-use super::validate_import_paths;
+use super::import_path::validate_import_paths;
 use crate::parser;
 use crate::parser::ParseErrorKind;
 use crate::semantic::{SemanticError, SemanticErrorKind};

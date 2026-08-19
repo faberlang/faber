@@ -4,7 +4,7 @@
 //! list types, and tensor types are correctly identified by the surface-type
 //! recognition helpers.
 
-use super::{is_bracket_index_list_expr, is_bracket_index_list_type, is_tensor_type};
+use super::tensor_bracket::{is_bracket_index_list_expr, is_bracket_index_list_type, is_tensor_type};
 use crate::hir::{HirExpression, HirExpressionKind, HirId, HirLiteral};
 use crate::lexer::Span;
 use crate::semantic::{Primitive, TypeTable};

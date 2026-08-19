@@ -37,7 +37,8 @@ functio mul_pair(numerus a, numerus b) → numerus {
     crate::semantic::passes::collect::collect(&program, &mut resolver, &mut types).expect("collect");
 
     // Stage 2: predeclare should register the companion name.
-    let predecls = super::predeclare(&program, &mut resolver, &parse.interner).expect("predeclare");
+    let predecls =
+        super::companion_predeclare::predeclare(&program, &mut resolver, &parse.interner).expect("predeclare");
 
     // The companion name should be in the resolver.
     let companion_sym = parse.interner.intern("mul_backward");
@@ -133,7 +134,8 @@ functio f(numerus a) → numerus {
     let mut resolver = crate::semantic::Resolver::new();
 
     crate::semantic::passes::collect::collect(&program, &mut resolver, &mut types).expect("collect");
-    let predecls = super::predeclare(&program, &mut resolver, &parse.interner).expect("predeclare");
+    let predecls =
+        super::companion_predeclare::predeclare(&program, &mut resolver, &parse.interner).expect("predeclare");
 
     // The companion should NOT be in resolver or predeclarations map.
     let companion_sym = parse.interner.intern("wrong_backward");

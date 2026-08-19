@@ -1,0 +1,667 @@
+//! Inference-variable unification and substitution resolution.
+//!
+//! This file is the checker-local inference engine. `Type::Infer` nodes live in
+//! the shared [`TypeTable`], but their meaning is completed by the
+//! `TypeChecker` substitution map here. Any code that needs the current meaning
+//! of a type must resolve through `TypeChecker::resolve_inferred_type`, not by inspecting
+//! the table entry alone.
+//!
+//! ERROR RECOVERY
+//! ==============
+//! Unification reports hard type errors and returns the table-local error type
+//! when compatibility fails. The checker then keeps walking the HIR so one bad
+//! expression does not hide unrelated diagnostics. Unresolved inference
+//! variables are diagnosed later by finalization as missing annotations.
+//!
+//! INVARIANTS
+//! ==========
+//! - `InferVar` IDs are scoped to one `TypeChecker` run.
+//! - Substitutions may point at aliases or other inferred types; resolving must
+//!   chase both substitution and alias chains.
+//! - The occurs check prevents recursive inference substitutions from creating
+//!   an infinite semantic type.
+
+#[allow(clippy::wildcard_imports)]
+// parent module provides shared imports for typechecking
+use super::*;
+
+/// Whether unification is a symmetric inference join or a directional assignment.
+#[derive(Copy, Clone)]
+enum UnifyPolicy {
+    /// Accept widening in either direction (`assignable(a, b) || assignable(b, a)`).
+    Join,
+    /// Enforce source-to-destination flow (`assignable(left, right)` only).
+    Assign,
+}
+
+impl TypeChecker<'_> {
+    /// Return whether `var` occurs inside `ty` after current substitutions.
+    ///
+    /// This is the guard that keeps `T = lista<T>`-style inference cycles out of
+    /// the type table. It walks structural type shapes because compound entries
+    /// are allocated in the shared arena rather than expanded inline.
+    ///
+    /// BO-S-6: memoize by `(var, resolved TypeId)`. Cache is cleared on each
+    /// successful bind so substitution growth cannot stale a negative result.
+    pub fn occurs_in(&mut self, var: InferVar, ty: TypeId) -> bool {
+        let resolved = self.resolve_inferred_type(ty);
+        if let Some(&cached) = self.occurs_cache.get(&(var, resolved)) {
+            return cached;
+        }
+        let result = self.occurs_in_uncached(var, resolved);
+        self.occurs_cache.insert((var, resolved), result);
+        result
+    }
+
+    fn occurs_in_uncached(&mut self, var: InferVar, resolved: TypeId) -> bool {
+        if let Some(found) = self.infer_var_of(resolved) {
+            return found == var;
+        }
+        if let Some(found) = self.infer_union_var_of(resolved) {
+            return found == var;
+        }
+        // Clone children out of the table first — recursive occurs needs `&mut self`.
+        let children: Vec<TypeId> = match self.types.get(resolved) {
+            Type::Array(inner)
+            | Type::Option(inner)
+            | Type::Ref(_, inner)
+            | Type::Promissum(inner)
+            | Type::Cursor(inner)
+            | Type::Atomic(inner)
+            | Type::Intervallum(inner)
+            | Type::Set(inner)
+            | Type::Alias(_, inner)
+            | Type::Tensor(inner, _)
+            | Type::Vector(inner, _)
+            | Type::Matrix(inner, _)
+            | Type::Sparsa(inner, _) => vec![*inner],
+            Type::Map(key, value)
+            | Type::PromissumFailable(key, value)
+            | Type::AsyncCursor(key, value) => {
+                vec![*key, *value]
+            }
+            Type::Func(sig) => {
+                let mut kids: Vec<TypeId> = sig.params.iter().map(|p| p.ty).collect();
+                kids.push(sig.ret);
+                if let Some(err) = sig.err {
+                    kids.push(err);
+                }
+                for c in &sig.type_param_constraints {
+                    if let TypeParamConstraint::OneOf(types) = c {
+                        kids.extend(types.iter().copied());
+                    }
+                }
+                kids
+            }
+            Type::Applied(base, args) => {
+                let mut kids = vec![*base];
+                kids.extend(args.iter().copied());
+                kids
+            }
+            Type::Union(types) => types.clone(),
+            Type::Tuple(elems) => elems.clone(),
+            Type::Record(fields) => fields.values().copied().collect(),
+            _ => return false,
+        };
+        children.into_iter().any(|child| self.occurs_in(var, child))
+    }
+
+    /// Bind an inference variable to a resolved type or merge with its old binding.
+    ///
+    /// Existing substitutions are joined rather than overwritten so multiple
+    /// constraints on the same inferred type converge through the normal
+    /// compatibility rules.
+    ///
+    /// U-02: union-hole variables never reach this path. `unify_with_policy`
+    /// routes `Type::InferUnion` through the accumulation arms before the
+    /// monomorphic bind path, so `var` here is always a monomorphic `Type::Infer`.
+    fn bind_infer_with_diagnostic(
+        &mut self,
+        var: InferVar,
+        ty: TypeId,
+        span: radix_lexer::Span,
+        issue: &'static str,
+    ) -> TypeId {
+        let resolved = self.resolve_inferred_type(ty);
+        let existing = self.substitutions.borrow().get(&var).copied();
+        if let Some(existing) = existing {
+            return self.unify_with_policy(existing, resolved, span, issue, UnifyPolicy::Join);
+        }
+
+        if self.occurs_in(var, resolved) {
+            self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+            return self.error_type;
+        }
+
+        self.occurs_cache.clear();
+        self.substitutions.borrow_mut().insert(var, resolved);
+        resolved
+    }
+
+    /// Bind an inference variable for equality without assignability widening.
+    ///
+    /// WHY: [`Self::bind_infer`] merges via [`Self::unify_join`], which accepts
+    /// assignable-but-distinct pairs (`ascii`/`textus`, `numerus`/`fractus`, …).
+    /// Equality must keep deliberate type annotations intact.
+    pub fn bind_infer_exact_issue(
+        &mut self,
+        var: InferVar,
+        ty: TypeId,
+        span: radix_lexer::Span,
+        issue: &'static str,
+    ) {
+        let resolved = self.resolve_inferred_type(ty);
+        let existing = self.substitutions.borrow().get(&var).copied();
+        if let Some(existing) = existing {
+            let existing_resolved = self.resolve_inferred_type(existing);
+            if !self.types.equals(existing_resolved, resolved) {
+                self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+            }
+            return;
+        }
+
+        if self.occurs_in(var, resolved) {
+            self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+            return;
+        }
+
+        self.occurs_cache.clear();
+        self.substitutions.borrow_mut().insert(var, resolved);
+    }
+
+    /// Merge two table-local types symmetrically (inference join).
+    ///
+    /// This is the **symmetric** variant used when joining two partial types
+    /// during inference (collection element types, map key/value types,
+    /// closure parameter types, function return types, etc.). It accepts
+    /// both directions of the widening rules so that inference succeeds
+    /// regardless of argument order.
+    ///
+    /// For **directional assignment** (source must be assignable to
+    /// destination), use [`Self::unify_assign_issue`] instead.
+    pub fn unify_join(
+        &mut self,
+        a: TypeId,
+        b: TypeId,
+        span: radix_lexer::Span,
+        issue: &'static str,
+    ) -> TypeId {
+        self.unify_with_policy(a, b, span, issue, UnifyPolicy::Join)
+    }
+
+    pub fn unify_assign_issue(
+        &mut self,
+        a: TypeId,
+        b: TypeId,
+        span: radix_lexer::Span,
+        issue: &'static str,
+    ) -> TypeId {
+        self.unify_with_policy(a, b, span, issue, UnifyPolicy::Assign)
+    }
+
+    fn unify_with_policy(
+        &mut self,
+        a: TypeId,
+        b: TypeId,
+        span: radix_lexer::Span,
+        issue: &'static str,
+        policy: UnifyPolicy,
+    ) -> TypeId {
+        let left = self.normalize_applied_alias(self.resolve_inferred_type(a));
+        let right = self.normalize_applied_alias(self.resolve_inferred_type(b));
+        if left == right {
+            return left;
+        }
+
+        // U-02: union-hole accumulation arms run before the monomorphic bind
+        // path. A `∪` hole (`Type::InferUnion`) never binds through
+        // `substitutions`; direct flows into the slot accumulate members and
+        // the hole itself is returned so later flows keep accumulating.
+        if let Some(var) = self.infer_union_var_of(left) {
+            return self.accumulate_into_union_hole(var, right, span, issue);
+        }
+        if let Some(var) = self.infer_union_var_of(right) {
+            return self.accumulate_into_union_hole(var, left, span, issue);
+        }
+
+        if let Some(var) = self.infer_var_of(left) {
+            return self.bind_infer_with_diagnostic(var, right, span, issue);
+        }
+        if let Some(var) = self.infer_var_of(right) {
+            return self.bind_infer_with_diagnostic(var, left, span, issue);
+        }
+
+        // WHY: `Type::Param` is not special-cased here. Call sites rewrite params
+        // to fresh infers in `generic.rs` before assignment-shaped checks run.
+
+        let left_ty = self.types.get(left).clone();
+        let right_ty = self.types.get(right).clone();
+
+        match (left_ty, right_ty) {
+            (Type::Primitive(Primitive::Numerus), Type::Primitive(Primitive::Fractus))
+            | (Type::Primitive(Primitive::Fractus), Type::Primitive(Primitive::Numerus))
+                if matches!(policy, UnifyPolicy::Join) =>
+            {
+                return self.fractus_type();
+            }
+            (Type::Primitive(a), Type::Primitive(b)) if a == b => return left,
+            (Type::Array(a), Type::Array(b)) => {
+                let inner = self.unify_with_policy(a, b, span, issue, policy);
+                return self.types.array(inner);
+            }
+            (Type::Map(ka, va), Type::Map(kb, vb)) => {
+                let key = self.unify_with_policy(ka, kb, span, issue, policy);
+                let value = self.unify_with_policy(va, vb, span, issue, policy);
+                return self.types.map(key, value);
+            }
+            (Type::Set(a), Type::Set(b)) => {
+                let inner = self.unify_with_policy(a, b, span, issue, policy);
+                return self.types.set(inner);
+            }
+            (Type::Promissum(a), Type::Promissum(b)) => {
+                let inner = self.unify_with_policy(a, b, span, issue, policy);
+                return self.types.promissum(inner);
+            }
+            (Type::PromissumFailable(asuccess, aerr), Type::PromissumFailable(bsuccess, berr)) => {
+                let success = self.unify_with_policy(asuccess, bsuccess, span, issue, policy);
+                let alternate = self.unify_with_policy(aerr, berr, span, issue, policy);
+                return self.types.promissum_failable(success, alternate);
+            }
+            (Type::Cursor(a), Type::Cursor(b)) => {
+                let inner = self.unify_with_policy(a, b, span, issue, policy);
+                return self.types.cursor(inner);
+            }
+            (Type::AsyncCursor(aitem, aerr), Type::AsyncCursor(bitem, berr)) => {
+                let item = self.unify_with_policy(aitem, bitem, span, issue, policy);
+                let alternate = self.unify_with_policy(aerr, berr, span, issue, policy);
+                return self.types.async_cursor(item, alternate);
+            }
+            (Type::Option(a), Type::Option(b)) => {
+                let inner = self.unify_with_policy(a, b, span, issue, policy);
+                return self.types.option(inner);
+            }
+            (Type::Ref(ma, a), Type::Ref(mb, b)) if ma == mb => {
+                let inner = self.unify_with_policy(a, b, span, issue, policy);
+                return self.types.reference(ma, inner);
+            }
+            (Type::Tensor(ea, sa), Type::Tensor(eb, sb)) => {
+                let elem = self.unify_with_policy(ea, eb, span, issue, policy);
+                let Ok(shape) = super::tensor_index::unify_tensor_shape_indices(self, sa, sb, span)
+                else {
+                    return self.error_type;
+                };
+                return self.types.tensor_with_shape(elem, shape);
+            }
+            // F-010: structural unify for Vector, Matrix, Sparsa, Atomic, Intervallum.
+            (Type::Vector(ea, wa), Type::Vector(eb, wb)) => {
+                let elem = self.unify_with_policy(ea, eb, span, issue, policy);
+                let Ok(width) = super::tensor_index::unify_tensor_shape_indices(self, wa, wb, span)
+                else {
+                    return self.error_type;
+                };
+                return self.types.vector_with_width(elem, width);
+            }
+            (Type::Matrix(ea, sa), Type::Matrix(eb, sb)) => {
+                let elem = self.unify_with_policy(ea, eb, span, issue, policy);
+                let Ok(shape) = super::tensor_index::unify_tensor_shape_indices(self, sa, sb, span)
+                else {
+                    return self.error_type;
+                };
+                return self.types.matrix_with_shape(elem, shape);
+            }
+            (Type::Sparsa(ea, sa), Type::Sparsa(eb, sb)) => {
+                let elem = self.unify_with_policy(ea, eb, span, issue, policy);
+                let Ok(shape) = super::tensor_index::unify_tensor_shape_indices(self, sa, sb, span)
+                else {
+                    return self.error_type;
+                };
+                return self.types.sparsa_with_shape(elem, shape);
+            }
+            (Type::Atomic(inner_a), Type::Atomic(inner_b)) => {
+                let inner = self.unify_with_policy(inner_a, inner_b, span, issue, policy);
+                return self.types.atomic(inner);
+            }
+            (Type::Intervallum(inner_a), Type::Intervallum(inner_b)) => {
+                let inner = self.unify_with_policy(inner_a, inner_b, span, issue, policy);
+                return self.types.intervallum(inner);
+            }
+            (Type::Func(sig_a), Type::Func(sig_b)) => {
+                return self.unify_function_signatures(sig_a, sig_b, span, issue, policy);
+            }
+            _ => match policy {
+                UnifyPolicy::Join => {
+                    if self.types.assignable(left, right) {
+                        return right;
+                    }
+                    if self.types.assignable(right, left) {
+                        return left;
+                    }
+                }
+                UnifyPolicy::Assign => {
+                    if self.types.assignable(left, right) {
+                        return right;
+                    }
+                }
+            },
+        }
+
+        self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+        self.error_type
+    }
+
+    fn unify_function_signatures(
+        &mut self,
+        sig_a: FuncSig,
+        sig_b: FuncSig,
+        span: radix_lexer::Span,
+        issue: &'static str,
+        policy: UnifyPolicy,
+    ) -> TypeId {
+        if sig_a.params.len() != sig_b.params.len() {
+            self.error_issue(SemanticErrorKind::WrongArity, issue, span);
+            return self.error_type;
+        }
+        if sig_a.is_async != sig_b.is_async || sig_a.is_generator != sig_b.is_generator {
+            self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+            return self.error_type;
+        }
+        let mut params = Vec::with_capacity(sig_a.params.len());
+        for (param_a, param_b) in sig_a.params.iter().zip(sig_b.params.iter()) {
+            if param_a.mode != param_b.mode || param_a.optional != param_b.optional {
+                self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+                return self.error_type;
+            }
+            let param_ty = match policy {
+                // WHY: function parameters are contravariant under assignment.
+                UnifyPolicy::Assign => {
+                    self.unify_with_policy(param_b.ty, param_a.ty, span, issue, policy)
+                }
+                // F-012: under Join, parameters are also contravariant (GLB,
+                // not LUB). Use Assign to enforce contravariance instead of
+                // the covariant Join which unsoundly picks the wider param type.
+                UnifyPolicy::Join => {
+                    let ty = self.unify_with_policy(
+                        param_b.ty,
+                        param_a.ty,
+                        span,
+                        issue,
+                        UnifyPolicy::Assign,
+                    );
+                    if self.resolve_inferred_type(ty) == self.error_type {
+                        return self.error_type;
+                    }
+                    ty
+                }
+            };
+            params.push(ParamType {
+                ty: param_ty,
+                mode: param_a.mode,
+                optional: param_a.optional,
+            });
+        }
+        let ret = self.unify_with_policy(sig_a.ret, sig_b.ret, span, issue, policy);
+        let err = match (sig_a.err, sig_b.err) {
+            (Some(a_err), Some(b_err)) => {
+                Some(self.unify_with_policy(a_err, b_err, span, issue, policy))
+            }
+            (None, None) => None,
+            _ => {
+                self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+                return self.error_type;
+            }
+        };
+        self.types.function(FuncSig {
+            type_params: sig_a.type_params.clone(),
+            type_param_constraints: sig_a.type_param_constraints.clone(),
+            params,
+            ret,
+            err,
+            is_async: sig_a.is_async,
+            is_generator: sig_a.is_generator,
+        })
+    }
+
+    /// Return whether a type still names an inference variable after resolution.
+    ///
+    /// Deliberately monomorphic-only: `∪` holes ([`Type::InferUnion`]) are
+    /// inference variables too, but call sites that use `is_infer` to route
+    /// an unresolved slot into the monomorphic bind/join path must not see
+    /// them (U-02 accumulation arms in `unify_with_policy` handle those).
+    pub fn is_infer(&self, ty: TypeId) -> bool {
+        self.infer_var_of(ty).is_some()
+    }
+
+    /// Extract the inference variable token from a table entry if present.
+    pub fn infer_var_of(&self, ty: TypeId) -> Option<InferVar> {
+        match self.types.get(ty) {
+            Type::Infer(var) => Some(*var),
+            _ => None,
+        }
+    }
+
+    /// Extract the union-hole variable token if the table entry is a `∪` hole.
+    ///
+    /// Distinct from [`Self::infer_var_of`]: union holes accumulate member
+    /// types and are never bound through `substitutions`, so they must not
+    /// take the monomorphic bind path in `unify_with_policy` or the equality
+    /// checks.
+    pub fn infer_union_var_of(&self, ty: TypeId) -> Option<InferVar> {
+        match self.types.get(ty) {
+            Type::InferUnion(var) => Some(*var),
+            _ => None,
+        }
+    }
+
+    /// Resolve checker-local substitutions and semantic aliases to a usable type.
+    ///
+    /// `TypeId` itself is only an arena index. For inferred or aliased types, the
+    /// current semantic meaning is the fixed point reached by following the
+    /// checker substitution map and `Type::Alias` entries.
+    ///
+    /// Union holes ([`Type::InferUnion`]) are **not** collapsed here: they are
+    /// never present in `substitutions` (U-02 accumulates members instead of
+    /// binding), and resolving them to their current member set would hide the
+    /// open hole from later `unify_with_policy` accumulation arms. Finalization
+    /// owns the solve.
+    ///
+    /// BO-S-2: path-compress intermediate `InferVar` substitutions so repeated
+    /// reads are amortized O(α(n)). Alias chains live in the shared table and
+    /// are followed but not rewritten.
+    pub fn resolve_inferred_type(&self, ty: TypeId) -> TypeId {
+        let mut current = ty;
+        let mut path: Vec<InferVar> = Vec::new();
+        loop {
+            if let Some(infer) = self.infer_var_of(current) {
+                if let Some(subst) = self.substitutions.borrow().get(&infer).copied() {
+                    path.push(infer);
+                    current = subst;
+                    continue;
+                }
+            }
+            match self.types.get(current) {
+                Type::Alias(_, resolved) => current = *resolved,
+                _ => break,
+            }
+        }
+        let representative = current;
+        if !path.is_empty() {
+            let mut subs = self.substitutions.borrow_mut();
+            for var in path {
+                if subs.get(&var).copied() != Some(representative) {
+                    subs.insert(var, representative);
+                }
+            }
+        }
+        representative
+    }
+
+    /// Expand an applied generic type alias (`X<int>`) into its substituted
+    /// body so unification sees the resolved shape.
+    ///
+    /// The resolve pass lowers `type X<T> = T` into `Type::Alias(def, body)`;
+    /// a use `X<int>` becomes `Type::Applied(Type::Alias(def, body), [int])`.
+    /// The alias's own type params are recorded in `alias_type_params` during
+    /// item collection; here the args are substituted for the param names in
+    /// the body (mirroring generic call-site substitution). Non-alias applied
+    /// types (structs, enums, builtins) are returned unchanged — generic
+    /// nominal application is invariant and must not be peeled here.
+    fn normalize_applied_alias(&mut self, ty: TypeId) -> TypeId {
+        let Type::Applied(base, args) = self.types.get(ty).clone() else {
+            return ty;
+        };
+        let Type::Alias(def, body) = self.types.get(base).clone() else {
+            return ty;
+        };
+        let Some(param_names) = self.alias_type_params.get(&def).cloned() else {
+            return ty;
+        };
+        if param_names.len() != args.len() {
+            return ty;
+        }
+        let mut vars = FxHashMap::default();
+        for (param, arg) in param_names.iter().zip(args.iter()) {
+            vars.insert(*param, *arg);
+        }
+        let substituted = self.substitute_type_params(body, &mut vars, None);
+        let substituted = self.resolve_inferred_type(substituted);
+        // Peel chained alias applications (`type Y<T> = X<T>`).
+        match self.types.get(substituted).clone() {
+            Type::Applied(base, _) => {
+                match self.types.get(self.resolve_inferred_type(base)).clone() {
+                    Type::Alias(_, _) => self.normalize_applied_alias(substituted),
+                    _ => substituted,
+                }
+            }
+            _ => substituted,
+        }
+    }
+
+    /// Allocate a fresh inference variable in the shared type table.
+    ///
+    /// The returned `TypeId` can be stored on HIR nodes immediately, but it is
+    /// only final when `substitutions` later resolves its `InferVar`.
+    pub fn fresh_infer(&mut self) -> TypeId {
+        let var = InferVar(self.next_infer);
+        self.next_infer += 1;
+        let id = self.types.intern(Type::Infer(var));
+        self.infer_ids.insert(var, id);
+        id
+    }
+
+    /// Canonical `TypeId` of the `Type::InferUnion(var)` hole.
+    ///
+    /// Interning is value-based, so this is the same table entry HIR lowering
+    /// produced for the source `∪` annotation.
+    fn union_hole_type_id(&mut self, var: InferVar) -> TypeId {
+        self.types.intern(Type::InferUnion(var))
+    }
+
+    /// Accumulate one member type into a union hole, deduplicated via
+    /// structural `TypeTable::equals` so repeated flows do not inflate the set.
+    fn accumulate_union_member(&mut self, var: InferVar, ty: TypeId) {
+        let mut members = self.union_members.borrow_mut();
+        let entry = members.entry(var).or_default();
+        if !entry
+            .iter()
+            .any(|existing| self.types.equals(*existing, ty))
+        {
+            entry.push(ty);
+        }
+    }
+
+    /// Occurs-guarded member push: accumulating a type that contains the hole
+    /// itself would form a recursive semantic type when finalize builds the
+    /// `Union`, so the flow is rejected with a type mismatch instead.
+    ///
+    /// Returns `true` when the member was stored.
+    fn push_union_member_guarded(
+        &mut self,
+        var: InferVar,
+        member: TypeId,
+        span: radix_lexer::Span,
+        issue: &'static str,
+    ) -> bool {
+        if member == self.error_type {
+            return false;
+        }
+        if self.occurs_in(var, member) {
+            self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+            return false;
+        }
+        self.accumulate_union_member(var, member);
+        true
+    }
+
+    /// Merge a resolved incoming type into a `∪` hole and return the hole.
+    ///
+    /// U-02 accumulation semantics (per binding / per type node):
+    /// - a concrete type flowing into the slot contributes one member;
+    /// - an explicit `Union` contributes each of its members (flatten);
+    /// - another `∪` hole contributes its accumulated member set (copy);
+    /// - a monomorphic `_` hole contributes its current resolution when bound,
+    ///   or is kept as a pending member so finalize resolves it later;
+    /// - the occurs check rejects recursive members.
+    ///
+    /// The hole itself stays open (never bound through `substitutions`), so
+    /// later direct flows keep accumulating into the same slot.
+    fn accumulate_into_union_hole(
+        &mut self,
+        var: InferVar,
+        incoming: TypeId,
+        span: radix_lexer::Span,
+        issue: &'static str,
+    ) -> TypeId {
+        let incoming = self.resolve_inferred_type(incoming);
+        if incoming == self.error_type {
+            return self.error_type;
+        }
+        if let Some(other_var) = self.infer_union_var_of(incoming) {
+            if other_var == var {
+                // Same hole — `unify_with_policy` already short-circuits `left == right`.
+                return self.union_hole_type_id(var);
+            }
+            // Union-with-union: copy the other hole's accumulated members in.
+            let borrowed = self.union_members.borrow();
+            let other_members: Vec<TypeId> = borrowed.get(&other_var).cloned().unwrap_or_default();
+            drop(borrowed);
+            for member in other_members {
+                if !self.push_union_member_guarded(var, member, span, issue) {
+                    return self.error_type;
+                }
+            }
+            return self.union_hole_type_id(var);
+        }
+        match self.types.get(incoming).clone() {
+            Type::Union(members) => {
+                for member in members {
+                    if !self.push_union_member_guarded(var, member, span, issue) {
+                        return self.error_type;
+                    }
+                }
+            }
+            Type::Infer(mono_var) => {
+                // Cross-shape `_` → `∪`: contribute the monomorphic resolution
+                // when known; otherwise keep the pending hole as a member.
+                let subst = self.substitutions.borrow().get(&mono_var).copied();
+                match subst {
+                    Some(ty) => {
+                        if !self.push_union_member_guarded(var, ty, span, issue) {
+                            return self.error_type;
+                        }
+                    }
+                    None => {
+                        if !self.push_union_member_guarded(var, incoming, span, issue) {
+                            return self.error_type;
+                        }
+                    }
+                }
+            }
+            _ => {
+                if !self.push_union_member_guarded(var, incoming, span, issue) {
+                    return self.error_type;
+                }
+            }
+        }
+        self.union_hole_type_id(var)
+    }
+}

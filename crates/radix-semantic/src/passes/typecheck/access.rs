@@ -1,0 +1,664 @@
+//! Path, assignment target, member, index, and nullability access typing.
+//!
+//! Access forms sit on the boundary between resolved symbols and expression
+//! shape. Name resolution has already chosen `DefId`s; this file decides
+//! whether those definitions are usable as values, whether an access is a valid
+//! lvalue, and which type is produced by fields, indexes, optional chains, and
+//! non-null chains.
+//!
+//! NULLABILITY AND UNKNOWN POLICY
+//! ==============================
+//! Optional chaining strips one `optio` layer for the member/index/call check
+//! and then wraps the result back in `optio`. Non-null chaining strips one
+//! `optio` layer without producing an optional result. `ignotum` and unions are
+//! treated as permissive access shapes only where the code explicitly says so;
+//! they are recovery/escape behavior, not target-specific codegen policy.
+
+#[allow(clippy::wildcard_imports)]
+// parent module provides shared imports for typechecking
+use super::*;
+
+const ISSUE_TEXTUS_INDEX_MUST_BE_NUMERUS_OR_RANGE: &str = "textus_index_must_be_numerus_or_range";
+const ISSUE_OCTETI_INDEX_MUST_BE_NUMERUS_OR_RANGE: &str = "octeti_index_must_be_numerus_or_range";
+const ISSUE_OCTETI_INDEX_OUT_OF_BOUNDS: &str = "octeti_index_out_of_bounds";
+const ISSUE_ARRAY_INDEX_MUST_BE_NUMERUS: &str = "array_index_must_be_numerus";
+const ISSUE_INDEXING_REQUIRES_ARRAY_OR_MAP: &str = "indexing_requires_array_or_map";
+const ISSUE_MAP_INDEX_TYPE_MISMATCH: &str = "map_index_type_mismatch";
+const ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS: &str = "tensor_index_vector_integer_elements";
+const ISSUE_TENSOR_SCALAR_INDEX_RANK: &str = "tensor_scalar_index_rank";
+const ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA: &str = "tensor_bracket_index_integer_or_lista";
+const ISSUE_INVALID_ASSIGNMENT_TARGET: &str = "invalid_assignment_target";
+
+impl TypeChecker<'_> {
+    /// Checks that an expression can appear on the left side of assignment and
+    /// returns the type the assigned value must match.
+    ///
+    /// Paths must resolve to mutable local bindings; constants report
+    /// immutability but still return their declared type so the right-hand side
+    /// can be checked. Field and index lvalues reuse the normal access rules.
+    pub fn check_lvalue(&mut self, target: &mut HirExpression) -> TypeId {
+        let ty = match &mut target.kind {
+            HirExpressionKind::Path(def_id) => {
+                // WHY: write-once enforcement for `fixum` locals lives in the
+                // definite-assignment pass, which sees init state. Typecheck only
+                // rejects targets that are never assignable (constants); a
+                // `fixum` local may receive its single initializer here.
+                if let Some(binding) = self.lookup_binding(*def_id) {
+                    binding.ty
+                } else if let Some(ty) = self.consts.get(def_id).copied() {
+                    self.immutable_assignment("assignment_to_constant", target.span);
+                    ty
+                } else if let Some(symbol) = self.resolver.get_symbol(*def_id) {
+                    // Resolver-registered builtins (e.g. @vertex out_position).
+                    if let Some(ty) = symbol.ty {
+                        self.insert_binding(*def_id, ty);
+                        ty
+                    } else {
+                        self.error_issue(
+                            SemanticErrorKind::InvalidAssignmentTarget,
+                            ISSUE_INVALID_ASSIGNMENT_TARGET,
+                            target.span,
+                        );
+                        self.error_type
+                    }
+                } else {
+                    self.error_issue(
+                        SemanticErrorKind::InvalidAssignmentTarget,
+                        ISSUE_INVALID_ASSIGNMENT_TARGET,
+                        target.span,
+                    );
+                    self.error_type
+                }
+            }
+            HirExpressionKind::Field(object, name) => self.check_field(object, *name),
+            HirExpressionKind::Index(object, index) => self.check_index_lvalue(object, index),
+            _ => {
+                self.error_issue(
+                    SemanticErrorKind::InvalidAssignmentTarget,
+                    ISSUE_INVALID_ASSIGNMENT_TARGET,
+                    target.span,
+                );
+                self.error_type
+            }
+        };
+        target.ty = Some(self.resolve_inferred_type(ty));
+        ty
+    }
+    /// Computes the result of indexing an already-typed object with an
+    /// already-typed index expression.
+    ///
+    /// Arrays require numeric indexes, maps unify the index with the map key,
+    /// and `textus` accepts numerus/range-like numeric unions while returning
+    /// `textus`. Unions and `ignotum` preserve forward progress by producing an
+    /// unknown element shape rather than guessing a concrete target layout.
+    pub fn check_index_from_type(
+        &mut self,
+        object_ty: TypeId,
+        idx_ty: TypeId,
+        object_span: radix_lexer::Span,
+        index_span: radix_lexer::Span,
+    ) -> TypeId {
+        let resolved = self.resolve_inferred_type(object_ty);
+        let resolved_kind = self.types.get(resolved).clone();
+        // WHY: textus and ascii scalar index returns `ascii<1>` (D14 / D17),
+        // the type of `'x'`. Emit stays `Ascii::from_byte` (zero-alloc).
+        // Range indices (e.g. textus[0‥5]) still return a textus substring.
+        if matches!(
+            resolved_kind,
+            Type::Primitive(Primitive::Textus | Primitive::Ascii)
+        ) {
+            if !self.is_textus_index_type(idx_ty) {
+                self.invalid_operand_types(ISSUE_TEXTUS_INDEX_MUST_BE_NUMERUS_OR_RANGE, index_span);
+            }
+            if self.is_range_index(idx_ty) {
+                return self.types.primitive(Primitive::Textus);
+            }
+            return self.ascii_one_type();
+        }
+        // WHY: octeti[i] is one byte (`numerus<u8>`), O(1). octeti[lo‥hi] is a
+        // half-open window that stays `octeti`. Do not reuse the textus return
+        // (`ascii` / substring). BoundedOcteti index is a later unit.
+        if matches!(resolved_kind, Type::Primitive(Primitive::Octeti)) {
+            if !self.is_textus_index_type(idx_ty) {
+                self.invalid_operand_types(ISSUE_OCTETI_INDEX_MUST_BE_NUMERUS_OR_RANGE, index_span);
+            }
+            if self.is_range_index(idx_ty) {
+                return self.types.primitive(Primitive::Octeti);
+            }
+            return self
+                .types
+                .sized_numeric(Primitive::Numerus, NumericWidth::U8);
+        }
+        if let Type::Tensor(elem, shape) = resolved_kind {
+            return self.check_tensor_bracket_index(elem, shape, idx_ty, object_span, index_span);
+        }
+        let kind = match resolved_kind {
+            Type::Array(elem) => Some((Some(elem), None, None)),
+            Type::Map(key, value) => Some((None, Some(key), Some(value))),
+            Type::Tuple(_elements) => {
+                // Without the index expression we cannot validate a constant
+                // value or determine which element is accessed. Return error
+                // type so the caller sees a diagnostic rather than guessing.
+                if !self.is_integer(idx_ty) {
+                    self.invalid_operand_types(ISSUE_ARRAY_INDEX_MUST_BE_NUMERUS, index_span);
+                }
+                return self.error_type;
+            }
+            Type::Union(_) => Some((Some(self.types.primitive(Primitive::Ignotum)), None, None)),
+            Type::Primitive(Primitive::Ignotum) => {
+                Some((Some(self.types.primitive(Primitive::Ignotum)), None, None))
+            }
+            Type::Infer(_) => Some((Some(self.fresh_infer()), None, None)),
+            _ => None,
+        };
+
+        match kind {
+            Some((Some(elem), None, None)) => {
+                if !self.is_integer(idx_ty) {
+                    self.invalid_operand_types(ISSUE_ARRAY_INDEX_MUST_BE_NUMERUS, index_span);
+                }
+                elem
+            }
+            Some((None, Some(key), Some(value))) => {
+                self.unify_assign_issue(idx_ty, key, index_span, ISSUE_MAP_INDEX_TYPE_MISMATCH);
+                value
+            }
+            _ => {
+                self.invalid_operand_types(ISSUE_INDEXING_REQUIRES_ARRAY_OR_MAP, object_span);
+                self.error_type
+            }
+        }
+    }
+    fn is_textus_index_type(&mut self, idx_ty: TypeId) -> bool {
+        if self.is_integer(idx_ty) {
+            return true;
+        }
+
+        match self.types.get(self.resolve_inferred_type(idx_ty)).clone() {
+            Type::Intervallum(bound) => self.is_integer(bound),
+            Type::Union(types) => types.into_iter().all(|ty| self.is_integer(ty)),
+            _ => false,
+        }
+    }
+
+    /// Whether the index type is a range (Intervallum), meaning the bracket
+    /// access returns a substring rather than a scalar value.
+    fn is_range_index(&mut self, idx_ty: TypeId) -> bool {
+        matches!(
+            self.types.get(self.resolve_inferred_type(idx_ty)),
+            Type::Intervallum(_)
+        )
+    }
+    /// DEFER-063: validate a tensor bracket index and return `T ∪ nihil`.
+    ///
+    /// Bracket access is sugar for `accipe` / `ponde`. The index may be a
+    /// scalar integer (rank-1 only) or an integer list (`lista<integer>`).
+    /// Scalar index on a statically-known rank != 1 is rejected; non-integer
+    /// indices reject with a deliberate diagnostic. Statically provable OOB is
+    /// inherited from `accipe` policy (runtime OOB is `nihil` for `accipe`).
+    fn check_tensor_bracket_index(
+        &mut self,
+        elem: TypeId,
+        shape: crate::index::IndexId,
+        idx_ty: TypeId,
+        _object_span: radix_lexer::Span,
+        index_span: radix_lexer::Span,
+    ) -> TypeId {
+        let resolved_idx = self.resolve_inferred_type(idx_ty);
+        if crate::tensor_bracket::is_bracket_index_list_type(self.types, resolved_idx) {
+            if !crate::numeric_width::is_integer_index_vector(self.types, resolved_idx) {
+                self.invalid_operand_types(ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS, index_span);
+            }
+        } else if crate::numeric_width::is_integer_index_scalar(self.types, resolved_idx) {
+            // WHY: a scalar bracket index addresses a single axis, so it is only
+            // well-formed on a rank-1 tensor. Rank-N tensors require `[[r, c, …]]`
+            // or a `lista<integer>` value. When the shape is an inference hole we
+            // defer the rank check to runtime/later inference rather than guess.
+            if let Some(rank) = self.static_tensor_rank(shape) {
+                if rank != 1 {
+                    self.invalid_operand_types(ISSUE_TENSOR_SCALAR_INDEX_RANK, index_span);
+                }
+            }
+        } else {
+            self.invalid_operand_types(ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA, index_span);
+        }
+        if self.systems_device_tensor_bracket_reads_element() {
+            return elem;
+        }
+        self.types.option(elem)
+    }
+
+    fn systems_device_tensor_bracket_reads_element(&self) -> bool {
+        // WHY: only systems targets consume `@ nucleum` / `@ nucleum fragment`
+        // roles as storage-buffer projections. Rust/application targets keep
+        // tensor bracket reads nullable via the host `accipe` contract.
+        self.current_device_function
+            && matches!(
+                self.target,
+                Target::MirLlvm | Target::MirLlvmHost | Target::MirMetal | Target::MirWgsl
+            )
+    }
+
+    /// Statically known tensor rank from a shape index, when fully resolved.
+    fn static_tensor_rank(&mut self, shape: crate::index::IndexId) -> Option<usize> {
+        let resolved = self.resolve_index(shape);
+        match self.types.get_index(resolved) {
+            crate::index::IndexExpr::Tuple(dims) => Some(dims.len()),
+            _ => None,
+        }
+    }
+    /// Resolves field access from a precomputed object type.
+    ///
+    /// Struct fields come from the collected struct table, maps expose their
+    /// value type for property-style access, and records must contain the named
+    /// field. Missing record fields are diagnosed here; other unsupported
+    /// object shapes return the shared error type so the caller decides whether
+    /// a higher-level access form should emit a user-facing diagnostic.
+    pub fn check_field_from_type(
+        &mut self,
+        object_ty: TypeId,
+        name: Symbol,
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        if matches!(
+            self.types.get(self.resolve_inferred_type(object_ty)),
+            Type::Option(_)
+        ) {
+            self.undefined_member("optional_receiver_requires_chain", span);
+            return self.error_type;
+        }
+        if let Some(struct_def) = self.struct_def_from_type(object_ty) {
+            if let Some(info) = self.structs.get(&struct_def) {
+                if let Some(field) = info.fields.get(&name).copied() {
+                    if let Some(payload_ty) =
+                        self.scrinium_payload_field_type(object_ty, struct_def, name)
+                    {
+                        return payload_ty;
+                    }
+                    if field.optional {
+                        return self.types.option(field.ty);
+                    }
+                    return field.ty;
+                }
+            }
+            self.undefined_member("unknown_struct_field", span);
+            return self.error_type;
+        }
+        if matches!(
+            self.types.get(self.resolve_inferred_type(object_ty)),
+            Type::Primitive(Primitive::Textus | Primitive::Ignotum)
+        ) && self
+            .interner
+            .is_some_and(|interner| interner.resolve(name) == "nuntius")
+        {
+            return self.types.primitive(Primitive::Textus);
+        }
+        if let Type::Map(_, value_ty) = self.types.get(self.resolve_inferred_type(object_ty)) {
+            return *value_ty;
+        }
+        if let Type::Record(fields) = self.types.get(self.resolve_inferred_type(object_ty)) {
+            if let Some(field_ty) = fields.get(&name).copied() {
+                return field_ty;
+            }
+            self.error_issue(
+                SemanticErrorKind::UndefinedVariable,
+                "unknown_record_field",
+                span,
+            );
+            return self.error_type;
+        }
+        self.error_type
+    }
+    /// Checks a non-null chain segment after removing one optional layer from
+    /// the receiver when present.
+    ///
+    /// This is a type-level assertion for subsequent access only. It does not
+    /// insert runtime checks or decide how a backend should represent failed
+    /// non-null assertions.
+    pub fn check_non_null(
+        &mut self,
+        object: &mut HirExpression,
+        chain: &mut radix_hir::HirNonNullKind,
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        let object_ty = self.check_expr(object);
+        let inner_ty = match self.types.get(self.resolve_inferred_type(object_ty)) {
+            Type::Option(inner) => *inner,
+            _ => object_ty,
+        };
+
+        match chain {
+            radix_hir::HirNonNullKind::Member(name) => {
+                self.check_field_from_type(inner_ty, *name, object.span)
+            }
+            radix_hir::HirNonNullKind::Index(index) => {
+                let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
+                self.check_index_from_type(inner_ty, idx_ty, object.span, index.span)
+            }
+            radix_hir::HirNonNullKind::Call(args) => {
+                self.check_call_from_type(inner_ty, &[], args, span)
+            }
+        }
+    }
+
+    /// Typechecks the receiver in `value!.method()` as a method receiver.
+    ///
+    /// The parser lowers the non-null member boundary into the callee/receiver
+    /// of the surrounding call. It must not be resolved as a field first,
+    /// because imported and declared methods are looked up by the ordinary
+    /// method-call path. The receiver's resulting type is the asserted payload
+    /// type so MIR lowering can preserve the existing non-null assertion.
+    pub fn check_non_null_method_receiver(
+        &mut self,
+        receiver: &mut HirExpression,
+        method: Symbol,
+    ) -> Option<TypeId> {
+        let object = match &mut receiver.kind {
+            HirExpressionKind::NonNull(object, radix_hir::HirNonNullKind::Member(name))
+                if *name == method =>
+            {
+                object.as_mut()
+            }
+            _ => return None,
+        };
+        let object_ty = self.check_expr(object);
+        let inner_ty = match self.types.get(self.resolve_inferred_type(object_ty)) {
+            Type::Option(inner) => *inner,
+            _ => object_ty,
+        };
+        receiver.ty = Some(inner_ty);
+        Some(inner_ty)
+    }
+    /// Checks an optional chain segment and wraps the access result in `optio`.
+    ///
+    /// The receiver is checked once, then an existing option is unwrapped for
+    /// the member/index/call rule. A non-optional receiver still produces an
+    /// optional result because the syntax's observable contract is nullable
+    /// access, not a proof that the receiver was nullable before this point.
+    pub fn check_optional_chain(
+        &mut self,
+        object: &mut HirExpression,
+        chain: &mut radix_hir::HirOptionalChainKind,
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        let object_ty = self.check_expr(object);
+        let object_resolved = self.resolve_inferred_type(object_ty);
+
+        let inner_ty = match self.types.get(object_resolved) {
+            Type::Option(inner) => *inner,
+            _ => object_ty,
+        };
+
+        let result = match chain {
+            radix_hir::HirOptionalChainKind::Member(name) => {
+                if matches!(
+                    self.types.get(self.resolve_inferred_type(inner_ty)),
+                    Type::Primitive(Primitive::Nihil)
+                ) {
+                    self.types.primitive(Primitive::Ignotum)
+                } else {
+                    self.check_field_from_type(inner_ty, *name, object.span)
+                }
+            }
+            radix_hir::HirOptionalChainKind::Index(index) => {
+                let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
+                self.check_index_from_type(inner_ty, idx_ty, object.span, index.span)
+            }
+            radix_hir::HirOptionalChainKind::Call(args) => {
+                self.check_call_from_type(inner_ty, &[], args, span)
+            }
+        };
+
+        if matches!(
+            self.types.get(self.resolve_inferred_type(result)),
+            Type::Option(_)
+        ) {
+            result
+        } else {
+            self.types.option(result)
+        }
+    }
+    /// Checks ordinary index syntax by synthesizing both operands first.
+    pub fn check_index(&mut self, object: &mut HirExpression, index: &mut HirExpression) -> TypeId {
+        let obj_ty = self.check_expr(object);
+        let resolved = self.resolve_inferred_type(obj_ty);
+        if let Type::Tuple(elements) = self.types.get(resolved).clone() {
+            let idx_ty = self.check_expr(index);
+            return self.check_tuple_index(&elements, index, object.span, index.span, idx_ty);
+        }
+        let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
+        let result = self.check_index_from_type(obj_ty, idx_ty, object.span, index.span);
+        self.reject_static_octeti_index_oob(object, index);
+        result
+    }
+
+    /// Resolve a `Type::Tuple` index access to the element at the given position.
+    ///
+    /// The index expression must be a compile-time constant integer. Out-of-bounds
+    /// and non-constant indices produce diagnostics.
+    fn check_tuple_index(
+        &mut self,
+        elements: &[TypeId],
+        index: &HirExpression,
+        _object_span: radix_lexer::Span,
+        index_span: radix_lexer::Span,
+        _idx_ty: TypeId,
+    ) -> TypeId {
+        let const_idx = if let HirExpressionKind::Literal(HirLiteral::Int(n)) = &index.kind {
+            // A literal too large to fit `usize` cannot index any real tuple,
+            // so it saturates to `usize::MAX` and falls out of bounds below.
+            usize::try_from(*n).unwrap_or(usize::MAX)
+        } else {
+            self.invalid_operand_types("tuple_index_must_be_constant", index_span);
+            return self.error_type;
+        };
+
+        if const_idx >= elements.len() {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                "tuple_index_out_of_bounds",
+                index_span,
+            );
+            return self.error_type;
+        }
+
+        elements[const_idx]
+    }
+    /// Check bracket access in assignment position.
+    ///
+    /// Tensor bracket writes are `ponde` sugar: reads return `T ∪ nihil`, but
+    /// writes accept a plain element `T`.
+    fn check_index_lvalue(
+        &mut self,
+        object: &mut HirExpression,
+        index: &mut HirExpression,
+    ) -> TypeId {
+        let obj_ty = self.check_expr(object);
+        let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
+        let resolved = self.resolve_inferred_type(obj_ty);
+        if let Type::Tensor(elem, shape) = self.types.get(resolved).clone() {
+            self.check_tensor_bracket_index(elem, shape, idx_ty, object.span, index.span);
+            return elem;
+        }
+        if let Type::Tuple(elements) = self.types.get(resolved).clone() {
+            return self.check_tuple_index(&elements, index, object.span, index.span, idx_ty);
+        }
+        let result = self.check_index_from_type(obj_ty, idx_ty, object.span, index.span);
+        self.reject_static_octeti_index_oob(object, index);
+        result
+    }
+
+    /// Reject a compile-time-provable out-of-range index on an octeti literal.
+    ///
+    /// Runtime OOB still traps. This only fires when both the payload length
+    /// and the index (scalar or `lo‥hi`) are constants. A range must lie fully
+    /// inside the payload — no short slice, no pad.
+    fn reject_static_octeti_index_oob(&mut self, object: &HirExpression, index: &HirExpression) {
+        let HirExpressionKind::Literal(HirLiteral::Octeti(sym)) = object.kind else {
+            return;
+        };
+        let Some(raw) = self.interned_literal_payload(sym) else {
+            return;
+        };
+        let Ok(bytes) = radix_lexer::octeti_literal::decode_octeti_hex(raw) else {
+            return;
+        };
+        let len = bytes.len();
+        if let Some((start, end)) = static_octeti_index_window(index) {
+            if start > end || end > len {
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_OCTETI_INDEX_OUT_OF_BOUNDS,
+                    index.span,
+                );
+            }
+        }
+    }
+    /// Checks ordinary field syntax by synthesizing the receiver first.
+    pub fn check_field(&mut self, object: &mut HirExpression, name: Symbol) -> TypeId {
+        // Namespace const data members (`module.CONST`) are first-class value
+        // references: resolve the const's remapped type from the installed
+        // file interface, mirroring how the call path resolves namespace
+        // functions. Type exports stay type-position-only; structs/enums/
+        // aliases referenced as values keep their existing error path.
+        if let HirExpressionKind::Path(module_def_id) = &object.kind {
+            if let Some(namespace) = self
+                .resolver
+                .get_symbol(*module_def_id)
+                .map(|symbol| symbol.name)
+            {
+                if let Some(ty) = self
+                    .resolver
+                    .namespace_file_const_canonical(namespace, name)
+                {
+                    return ty;
+                }
+                // Namespace enum-variant value references (`module.VARIANT`)
+                // resolve through the imported enum's variant table; the
+                // variant's value type is `Type::Enum(consumer enum def)`
+                // (codex-gap S1 U2 VALUE members).
+                if let Some((_, ty)) = self.resolver.namespace_file_variant(namespace, name) {
+                    return ty;
+                }
+            }
+        }
+        let obj_ty = self.check_expr(object);
+        self.check_field_from_type(obj_ty, name, object.span)
+    }
+
+    fn scrinium_payload_field_type(
+        &self,
+        object_ty: TypeId,
+        struct_def: DefId,
+        name: Symbol,
+    ) -> Option<TypeId> {
+        if Some(struct_def) != self.resolver.builtin_scrinium_def_id() {
+            return None;
+        }
+        if self
+            .interner
+            .is_none_or(|interner| interner.resolve(name) != "data")
+        {
+            return None;
+        }
+        match self.types.get(self.resolve_inferred_type(object_ty)) {
+            Type::Applied(_, args) => args.first().copied(),
+            Type::Struct(_) => Some(self.types.primitive(Primitive::Valor)),
+            _ => None,
+        }
+    }
+
+    /// Converts a resolved definition path into the value type visible at an
+    /// expression site.
+    ///
+    /// Local bindings, constants, functions, enum variants, structs, interfaces,
+    /// and modules have different expression roles. Modules deliberately produce
+    /// `ignotum` so qualified lookup can keep progressing without pretending the
+    /// module itself is a first-class runtime value.
+    pub fn check_path(&mut self, def_id: DefId, span: radix_lexer::Span) -> TypeId {
+        if let Some(binding) = self.lookup_binding(def_id) {
+            return binding.ty;
+        }
+
+        if let Some(ty) = self.consts.get(&def_id) {
+            return *ty;
+        }
+
+        if let Some(sig) = self.functions.get(&def_id) {
+            return self.types.function(sig.clone());
+        }
+
+        if let Some(parent) = self.variant_parent.get(&def_id).copied() {
+            return self.types.intern(Type::Enum(parent));
+        }
+
+        // One get_symbol probe; branch on kind / ty without re-hashing DefId.
+        if let Some(symbol) = self.resolver.get_symbol(def_id) {
+            match symbol.kind {
+                crate::SymbolKind::Struct => {
+                    return self.types.intern(Type::Struct(def_id));
+                }
+                crate::SymbolKind::Interface => {
+                    return self.types.intern(Type::Interface(def_id));
+                }
+                crate::SymbolKind::Module => {
+                    return self.types.primitive(Primitive::Ignotum);
+                }
+                _ => {}
+            }
+
+            if self.import_receivers.contains(&def_id) {
+                return self.types.primitive(Primitive::Ignotum);
+            }
+
+            // Resolver-stored types (e.g. @vertex shader position/out_position).
+            if let Some(ty) = symbol.ty {
+                self.insert_binding(def_id, ty);
+                return ty;
+            }
+        } else if self.import_receivers.contains(&def_id) {
+            return self.types.primitive(Primitive::Ignotum);
+        }
+
+        self.error_issue(
+            SemanticErrorKind::UndefinedVariable,
+            "unknown_identifier",
+            span,
+        );
+        self.error_type
+    }
+}
+
+/// Exclusive `[start, end)` window for a constant octeti index, when both
+/// endpoints (or the scalar index) are integer literals.
+///
+/// A scalar `i` is the window `[i, i+1)`. Exclusive `lo‥hi` is `[lo, hi)`.
+/// Inclusive `lo…hi` is `[lo, hi+1)`. `None` means the index is not a
+/// compile-time integer window.
+fn static_octeti_index_window(index: &HirExpression) -> Option<(usize, usize)> {
+    match &index.kind {
+        HirExpressionKind::Literal(HirLiteral::Int(n)) => {
+            let start = usize::try_from(*n).ok()?;
+            let end = start.checked_add(1)?;
+            Some((start, end))
+        }
+        HirExpressionKind::Intervallum {
+            start, end, kind, ..
+        } => {
+            let HirExpressionKind::Literal(HirLiteral::Int(start)) = start.kind else {
+                return None;
+            };
+            let HirExpressionKind::Literal(HirLiteral::Int(end)) = end.kind else {
+                return None;
+            };
+            let start = usize::try_from(start).ok()?;
+            let end = usize::try_from(end).ok()?;
+            let end = match kind {
+                radix_hir::HirRangeKind::Exclusive => end,
+                radix_hir::HirRangeKind::Inclusive => end.checked_add(1)?,
+            };
+            Some((start, end))
+        }
+        _ => None,
+    }
+}

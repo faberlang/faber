@@ -56,14 +56,4 @@ pub use nodes::{
     LibraryIdentity, LibraryItem, LibraryItemKind, LibraryProvider, LibraryRegistry, NucleumRole,
 };
 
-/// Lowered HIR for one source unit.
-#[derive(Debug)]
-pub struct LoweredProgram {
-    pub hir: HirModule,
-
-    /// Presentation sidecar produced by the same lowering pass: source
-    /// anchors, typed trivia owners, attachments, structural block ends, the
-    /// program end, and the explicit entry-start anchor. Always travels with
-    /// `hir`; semantic consumers stay trivia-blind by construction.
-    pub presentation: HirPresentation,
-}
+pub use radix_semantic::LoweredProgram;

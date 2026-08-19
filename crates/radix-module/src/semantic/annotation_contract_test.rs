@@ -4,7 +4,6 @@
 //! parsed, registered, applied, and that violations produce expected
 //! diagnostics.
 
-use super::{analyze, AnnotationAttachmentTarget, ContractFieldType, ContractPayloadValue};
 use crate::codegen::Target;
 use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceAnnotationContract, InterfaceAnnotationContractField,
@@ -13,6 +12,9 @@ use crate::file_interface::{
 use crate::hir::{HirAnnotationValue, HirItemKind};
 use crate::lexer::lex;
 use crate::parser::parse;
+use crate::semantic::annotation_contract::{
+    analyze, AnnotationAttachmentTarget, ContractFieldType, ContractPayloadValue,
+};
 use crate::semantic::{analyze as semantic_analyze, PassConfig, Primitive, SemanticErrorKind};
 use crate::test_support::args_have_no_legacy_message;
 use std::collections::BTreeMap;

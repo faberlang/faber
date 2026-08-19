@@ -1,0 +1,169 @@
+//! Item-level typechecking for declarations that establish function bodies and
+//! global values.
+//!
+//! This file is the point where HIR items become checked bodies rather than
+//! collected signatures. Earlier typecheck setup has already registered
+//! callable, constant, struct, interface, and enum metadata; the routines here
+//! use those tables to validate the bodies and to write inferred declaration
+//! types back into both the HIR and the checker-side signature maps.
+//!
+//! INVARIANTS
+//! ==========
+//! - Function parameters and CLI argument bindings are scoped only to the
+//!   function body.
+//! - `current_return` tracks the normal return channel, while `current_error`
+//!   tracks the alternate-exit channel used by `iace`/catchable control flow.
+//! - Async-consuming forms are scoped to async functions/entries; closures do
+//!   not implicitly inherit await permission.
+//! - Bodyful named functions without `→` are effect-only. They finalize to
+//!   `vacuum` and reject `redde` instead of inferring a value return.
+//! - Struct field defaults are checked against their declared field types; they
+//!   do not create fresh field types.
+
+#[allow(clippy::wildcard_imports)]
+// parent module provides shared imports for typechecking
+use super::*;
+
+const ISSUE_PARAMETER_DEFAULT_TYPE_MISMATCH: &str = "parameter_default_type_mismatch";
+const ISSUE_CONSTANT_ANNOTATION_MISMATCH: &str = "constant_annotation_mismatch";
+const ISSUE_FIELD_DEFAULT_TYPE_MISMATCH: &str = "field_default_type_mismatch";
+
+impl TypeChecker<'_> {
+    /// Check a function body under its declared signature context.
+    ///
+    /// This temporarily installs the function's normal and alternate-exit
+    /// result types so nested `redde` and `iace` expressions validate against
+    /// the signature rather than against an enclosing body. When the normal
+    /// return type is omitted, the function is effect-only: it accepts
+    /// statement-only bodies, rejects `redde`, and finalizes the normal return
+    /// channel to `vacuum`.
+    pub fn check_function(&mut self, def_id: DefId, func: &mut HirFunction) {
+        self.reject_json_annotations_on_site(&func.annotations, "functio");
+        let func_name = self.function_display_name(def_id).unwrap_or_default();
+        self.push_scope();
+        for (idx, param) in func.params.iter_mut().enumerate() {
+            if let Some(default) = &mut param.default {
+                let default_ty = self.check_expr_with_expected(default, Some(param.ty));
+                self.unify_assign_issue(
+                    default_ty,
+                    param.ty,
+                    default.span,
+                    ISSUE_PARAMETER_DEFAULT_TYPE_MISMATCH,
+                );
+            }
+            let scalar_text = self.interval_bound_param_is_scalar_text(&func_name, idx, param.ty);
+            let mutable = matches!(param.mode, HirParamMode::In);
+            self.record_binding_name(param.def_id, param.name);
+            self.insert_binding_with_scalar(param.def_id, param.ty, scalar_text, mutable);
+        }
+        if let Some(param) = &func.cli_args {
+            self.record_binding_name(param.def_id, param.name);
+            self.insert_binding(param.def_id, param.ty);
+        }
+
+        let prev_return = self.current_return;
+        let prev_error = self.current_error;
+        let prev_device_function = self.current_device_function;
+        let prev_shader_function = self.current_shader_function;
+        let prev_generator_function = self.current_generator_function;
+        let prev_await_context = self.current_await_context;
+        let prev_await_return_context = self.current_await_return_context;
+        let prev_inferred = self.inferred_return;
+        let prev_allow_inferred = self.allow_inferred_return;
+        self.current_return = func.ret_ty;
+        self.current_error = func.err_ty.map(ErrorSink::Function);
+        self.current_device_function = func.is_kernel || func.nucleum_fragment;
+        self.current_shader_function = func.is_vertex || func.is_fragment;
+        self.current_generator_function = func.is_generator;
+        self.current_await_context = func.is_async;
+        self.current_await_return_context = func.is_async && !func.is_generator;
+        self.inferred_return = None;
+        self.allow_inferred_return = false;
+
+        if let Some(body) = &mut func.body {
+            self.check_block(body, None);
+        }
+
+        let inferred = self.inferred_return.take();
+        if func.ret_ty.is_none() {
+            let ret_ty = inferred.unwrap_or(self.vacuum_type());
+            func.ret_ty = Some(ret_ty);
+            let (ret, err) = self.callable_boundary_return(
+                ret_ty,
+                func.err_ty,
+                func.is_async,
+                func.is_generator,
+            );
+            if let Some(sig) = self.functions.get_mut(&def_id) {
+                sig.ret = ret;
+                sig.err = err;
+            }
+        }
+
+        self.current_return = prev_return;
+        self.current_error = prev_error;
+        self.current_device_function = prev_device_function;
+        self.current_shader_function = prev_shader_function;
+        self.current_generator_function = prev_generator_function;
+        self.current_await_context = prev_await_context;
+        self.current_await_return_context = prev_await_return_context;
+        self.inferred_return = prev_inferred;
+        self.allow_inferred_return = prev_allow_inferred;
+        self.pop_scope();
+    }
+
+    /// Check a constant initializer and record the resulting global type.
+    ///
+    /// Constants may either state their type or synthesize it from the
+    /// initializer. The HIR and `consts` table are kept in lockstep because path
+    /// lookup during the rest of typechecking reads from the table, while later
+    /// phases read the annotated HIR.
+    pub fn check_const(&mut self, def_id: DefId, const_item: &mut radix_hir::HirConst) {
+        let ty = if let Some(annotated) = const_item.ty {
+            let value_ty = self.check_expr_with_expected(&mut const_item.value, Some(annotated));
+            self.unify_assign_issue(
+                value_ty,
+                annotated,
+                const_item.value.span,
+                ISSUE_CONSTANT_ANNOTATION_MISMATCH,
+            );
+            annotated
+        } else {
+            self.check_expr(&mut const_item.value)
+        };
+
+        const_item.ty = Some(ty);
+        self.consts.insert(def_id, ty);
+    }
+
+    /// Dispatch item checking after the type metadata collection pass.
+    ///
+    /// Only items with executable or value-bearing bodies need work here.
+    /// Metadata-only declarations were already harvested into lookup tables, and
+    /// their structural contracts are enforced where expressions or patterns use
+    /// them.
+    pub fn check_item(&mut self, item: &mut HirItem) {
+        match &mut item.kind {
+            HirItemKind::Function(func) => self.check_function(item.def_id, func),
+            HirItemKind::Constant(const_item) => self.check_const(item.def_id, const_item),
+            HirItemKind::Struct(struct_item) => {
+                self.check_json_struct_contract(item.def_id, struct_item);
+                for field in &mut struct_item.fields {
+                    if let Some(init) = &mut field.init {
+                        let init_ty = self.check_expr_with_expected(init, Some(field.ty));
+                        self.unify_assign_issue(
+                            init_ty,
+                            field.ty,
+                            init.span,
+                            ISSUE_FIELD_DEFAULT_TYPE_MISMATCH,
+                        );
+                    }
+                }
+                for method in &mut struct_item.methods {
+                    self.check_function(method.def_id, &mut method.func);
+                }
+            }
+            _ => {}
+        }
+    }
+}

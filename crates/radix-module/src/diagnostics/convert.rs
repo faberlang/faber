@@ -6,13 +6,13 @@
 //! once those types are co-located; until then free functions are used through
 //! the façade re-exports.
 
-use super::catalog;
-use super::catalog_semantic;
-use super::catalog_syntax;
 use crate::lexer::{LexError, LocaleSuggestion};
 use crate::parser::ParseError;
 use crate::semantic::SemanticError;
 use radix_diagnostics::{diagnostic_identity, Diagnostic, DiagnosticArg, DiagnosticPhase, PhaseErrorKind, Severity};
+use radix_semantic::catalog;
+use radix_semantic::catalog_semantic;
+use radix_semantic::catalog_syntax;
 
 /// Normalize a lexer error using the diagnostic code catalog.
 ///
