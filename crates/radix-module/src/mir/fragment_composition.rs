@@ -1080,3 +1080,7 @@ fn remap_and_connect(
 #[cfg(test)]
 #[path = "fragment_composition_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "fragment_corpus_test.rs"]
+mod corpus;
