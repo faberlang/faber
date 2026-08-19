@@ -441,6 +441,10 @@ pub fn generate_from_analyzed_with_options(
 /// so those cross-file DefIds would be unresolvable during code generation.
 /// This mirrors the Rust backend's `build_file_import_namespaces` by reading
 /// the resolver's file interface exports and registering them as external defs.
+///
+/// Transitive library leaves (no consumer HIR binding) are the rust DEFID001
+/// class: facade signatures name those types, so they must land in the emit
+/// table even when the consumer never wrote `import from "leaf"`.
 #[cfg(feature = "hir-ts")]
 fn register_cross_file_defids(gen: &mut ts::TsCodegen<'_>, hir: &HirModule, resolver: &crate::semantic::Resolver) {
     for item in &hir.items {
@@ -455,6 +459,11 @@ fn register_cross_file_defids(gen: &mut ts::TsCodegen<'_>, hir: &HirModule, reso
             for export in resolver.imported_file_type_exports(binding) {
                 gen.register_external_def(export.def_id, export.member, binding);
             }
+        }
+    }
+    for namespace in resolver.file_interface_namespaces() {
+        for export in resolver.imported_file_type_exports(namespace) {
+            gen.register_named_def(export.def_id, export.member);
         }
     }
 }
