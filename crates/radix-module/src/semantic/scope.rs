@@ -131,6 +131,24 @@ fn interface_member_kind_name(kind: InterfaceMemberKind) -> &'static str {
     }
 }
 
+#[cfg(feature = "hir-fhir")]
+fn interface_nominal_kind_from_wire(kind: radix_hir_fhir::NominalKind) -> InterfaceNominalKind {
+    match kind {
+        radix_hir_fhir::NominalKind::Struct => InterfaceNominalKind::Struct,
+        radix_hir_fhir::NominalKind::Enum => InterfaceNominalKind::Enum,
+        radix_hir_fhir::NominalKind::Interface => InterfaceNominalKind::Interface,
+    }
+}
+
+#[cfg(feature = "hir-fhir")]
+fn interface_nominal_kind_to_wire(kind: InterfaceNominalKind) -> radix_hir_fhir::NominalKind {
+    match kind {
+        InterfaceNominalKind::Struct => radix_hir_fhir::NominalKind::Struct,
+        InterfaceNominalKind::Enum => radix_hir_fhir::NominalKind::Enum,
+        InterfaceNominalKind::Interface => radix_hir_fhir::NominalKind::Interface,
+    }
+}
+
 /// Stable index into the resolver's scope arena.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ScopeId(pub u32);
@@ -2689,7 +2707,7 @@ impl Resolver {
     #[cfg(feature = "hir-fhir")]
     #[must_use]
     pub fn from_snapshot(snapshot: radix_hir_fhir::ResolverSnapshot) -> Self {
-        use radix_hir_fhir::{FileExportSnapshot, NominalKind};
+        use radix_hir_fhir::FileExportSnapshot;
 
         // The FHIR snapshot is the codegen-facing surface and carries export
         // names without tiers; reconstruction marks every name `@ publica`.
@@ -2762,27 +2780,13 @@ impl Resolver {
         let imported_nominal_types: FxHashMap<(InterfaceNominalKind, LexSymbol), TypeId> = snapshot
             .imported_nominal_types
             .into_iter()
-            .map(|((kind, name), ty)| {
-                let nominal_kind = match kind {
-                    NominalKind::Struct => InterfaceNominalKind::Struct,
-                    NominalKind::Enum => InterfaceNominalKind::Enum,
-                    NominalKind::Interface => InterfaceNominalKind::Interface,
-                };
-                ((nominal_kind, name), ty)
-            })
+            .map(|((kind, name), ty)| ((interface_nominal_kind_from_wire(kind), name), ty))
             .collect();
 
         let ambiguous_imported_nominal_types: FxHashSet<(InterfaceNominalKind, LexSymbol)> = snapshot
             .ambiguous_imported_nominal_types
             .into_iter()
-            .map(|(kind, name)| {
-                let nominal_kind = match kind {
-                    NominalKind::Struct => InterfaceNominalKind::Struct,
-                    NominalKind::Enum => InterfaceNominalKind::Enum,
-                    NominalKind::Interface => InterfaceNominalKind::Interface,
-                };
-                (nominal_kind, name)
-            })
+            .map(|(kind, name)| (interface_nominal_kind_from_wire(kind), name))
             .collect();
 
         let global = Scope::new(ScopeId(0), None, ScopeKind::Global);
@@ -2835,9 +2839,7 @@ impl Resolver {
     #[cfg(feature = "hir-fhir")]
     #[must_use]
     pub fn to_snapshot(&self) -> radix_hir_fhir::ResolverSnapshot {
-        use radix_hir_fhir::{
-            FileExportSnapshot, FileInterfaceSnapshot, NominalKind, ResolverSnapshot, StructFieldSnapshot,
-        };
+        use radix_hir_fhir::{FileExportSnapshot, FileInterfaceSnapshot, ResolverSnapshot, StructFieldSnapshot};
 
         let namespace_exports = self
             .namespace_exports
@@ -2883,27 +2885,13 @@ impl Resolver {
         let imported_nominal_types = self
             .imported_nominal_types
             .iter()
-            .map(|(&(kind, name), &ty)| {
-                let nominal_kind = match kind {
-                    InterfaceNominalKind::Struct => NominalKind::Struct,
-                    InterfaceNominalKind::Enum => NominalKind::Enum,
-                    InterfaceNominalKind::Interface => NominalKind::Interface,
-                };
-                ((nominal_kind, name), ty)
-            })
+            .map(|(&(kind, name), &ty)| ((interface_nominal_kind_to_wire(kind), name), ty))
             .collect();
 
-        let ambiguous_imported_nominal_types: Vec<(NominalKind, LexSymbol)> = self
+        let ambiguous_imported_nominal_types: Vec<(radix_hir_fhir::NominalKind, LexSymbol)> = self
             .ambiguous_imported_nominal_types
             .iter()
-            .map(|&(kind, name)| {
-                let nominal_kind = match kind {
-                    InterfaceNominalKind::Struct => NominalKind::Struct,
-                    InterfaceNominalKind::Enum => NominalKind::Enum,
-                    InterfaceNominalKind::Interface => NominalKind::Interface,
-                };
-                (nominal_kind, name)
-            })
+            .map(|&(kind, name)| (interface_nominal_kind_to_wire(kind), name))
             .collect();
 
         ResolverSnapshot {
