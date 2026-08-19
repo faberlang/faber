@@ -25,6 +25,10 @@ pub use diagnostics_locale_pack::*;
 pub use emit::*;
 pub use inspect::*;
 pub use json::escape_json;
+#[cfg(feature = "hir-fhir")]
+pub use package::{
+    nucleum_dispatch_reflection_names, nucleum_omitted_target_symbols, signature_only_fragment_import_diagnostic,
+};
 #[cfg(feature = "mir-core")]
 pub use reflection::*;
 pub use source::*;

@@ -16,7 +16,7 @@ use radix_module::file_interface::{
 };
 use radix_module::hir::{
     DefId, HirConst, HirEnum, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind,
-    HirParamMode, HirStruct, HirTypeParamConstraint,
+    HirParamMode, HirStruct, HirTypeParamConstraint, NucleumRole,
 };
 use radix_module::semantic::{FuncSig, ParamType, SemanticParamMode, Type, TypeParamConstraint};
 use std::collections::BTreeSet;
@@ -39,6 +39,7 @@ pub struct AnalyzedCallableContract {
     pub name: String,
     pub callable: radix_module::file_interface::InterfaceCallable,
     pub has_body: bool,
+    pub nucleum_role: Option<NucleumRole>,
 }
 
 pub fn extract_callable_contracts(
@@ -60,14 +61,17 @@ pub fn extract_callable_contracts(
                 return None;
             }
             Some(
-                snapshot_function(function, analysis, file_label, None).map(|callable| {
-                    AnalyzedCallableContract {
-                        def_id: item.def_id,
-                        span: item.span,
-                        name,
-                        callable,
-                        has_body: function.body.is_some(),
-                    }
+                reject_signature_only_fragment(function, &name, file_label).and_then(|()| {
+                    snapshot_function(function, analysis, file_label, None).map(|callable| {
+                        AnalyzedCallableContract {
+                            def_id: item.def_id,
+                            span: item.span,
+                            name,
+                            callable,
+                            has_body: function.body.is_some(),
+                            nucleum_role: function.nucleum_role(),
+                        }
+                    })
                 }),
             )
         })
@@ -99,12 +103,15 @@ pub fn extract_file_interface_with_identity(
         }
 
         let kind = match &item.kind {
-            HirItemKind::Function(func) => FileExportKind::Function(snapshot_function(
-                func,
-                analysis,
-                file_label,
-                export_identity,
-            )?),
+            HirItemKind::Function(func) => {
+                reject_signature_only_fragment(func, &name, file_label)?;
+                FileExportKind::Function(snapshot_function(
+                    func,
+                    analysis,
+                    file_label,
+                    export_identity,
+                )?)
+            }
             HirItemKind::TypeAlias(alias) => FileExportKind::TypeAlias(
                 snapshot_interface_type_with_identity(
                     alias.ty,
@@ -281,9 +288,11 @@ fn snapshot_interface_method(
     interface_name: &str,
     export_identity: Option<&ExportIdentityContext>,
 ) -> Result<radix_module::file_interface::InterfaceCallable, Diagnostic> {
-    let ret = method
-        .ret_ty
-        .unwrap_or_else(|| analysis.types.primitive(radix_module::semantic::Primitive::Vacuum));
+    let ret = method.ret_ty.unwrap_or_else(|| {
+        analysis
+            .types
+            .primitive(radix_module::semantic::Primitive::Vacuum)
+    });
     let sig = FuncSig {
         type_params: Vec::new(),
         type_param_constraints: Vec::new(),
@@ -373,10 +382,11 @@ fn snapshot_struct_method(
     struct_name: &str,
     export_identity: Option<&ExportIdentityContext>,
 ) -> Result<radix_module::file_interface::InterfaceCallable, Diagnostic> {
-    let ret = method
-        .func
-        .ret_ty
-        .unwrap_or_else(|| analysis.types.primitive(radix_module::semantic::Primitive::Vacuum));
+    let ret = method.func.ret_ty.unwrap_or_else(|| {
+        analysis
+            .types
+            .primitive(radix_module::semantic::Primitive::Vacuum)
+    });
     let sig = FuncSig {
         type_params: method
             .func
@@ -554,6 +564,24 @@ fn hir_item_name(item: &HirItemKind, analysis: &AnalyzedModule) -> Option<String
         HirItemKind::Import(_) => return None,
     };
     Some(name.to_owned())
+}
+
+fn reject_signature_only_fragment(
+    function: &HirFunction,
+    name: &str,
+    file_label: &str,
+) -> Result<(), Diagnostic> {
+    if function.nucleum_role() == Some(NucleumRole::Fragment) && function.body.is_none() {
+        return Err(crate::package_diagnostic_error(format!(
+            "signature-only nucleum fragment `{name}` cannot be imported"
+        ))
+        .with_phase(DiagnosticPhase::Analysis)
+        .with_file(file_label.to_owned())
+        .with_arg("issue", "NUCLEUM_FRAGMENT_EFFECT")
+        .with_arg("reason", "missing_body")
+        .with_arg("site", "import"));
+    }
+    Ok(())
 }
 
 fn interface_error(file_label: &str, export_name: &str, err: FileInterfaceError) -> Diagnostic {
