@@ -9,7 +9,7 @@ pub use radix_semantic::lower::annotation::*;
 
 #[cfg(test)]
 #[path = "annotation_test.rs"]
-mod tests;
+mod annotation_test;
 
 #[cfg(test)]
 #[path = "generic_call_test.rs"]
@@ -21,7 +21,7 @@ mod schema_test;
 
 #[cfg(test)]
 #[path = "mod_test.rs"]
-mod mod_host_tests;
+mod tests;
 
 #[cfg(test)]
 #[path = "instans_type_test.rs"]
