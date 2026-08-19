@@ -311,7 +311,7 @@ pub(crate) fn library_resolver_for_package(
         Ok(lock) => lock,
         Err(diag) => return Err(vec![*diag]),
     };
-    let mut lock_diags = radix_program::lockfile::validate_dependencies_against_lock(
+    let lock_diags = radix_program::lockfile::validate_dependencies_against_lock(
         package_root,
         &manifest.dependencies,
         lock.as_ref(),
@@ -319,8 +319,6 @@ pub(crate) fn library_resolver_for_package(
     if lock_diags.iter().any(Diagnostic::is_error) {
         return Err(lock_diags);
     }
-    // Non-error path notes are unused for now; keep only errors.
-    lock_diags.clear();
 
     let mut locked = std::collections::BTreeMap::new();
     if let Some(lock) = lock.as_ref() {
