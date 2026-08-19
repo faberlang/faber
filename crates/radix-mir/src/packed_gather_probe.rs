@@ -1,4 +1,4 @@
-//! Packed QuantizedGather identity probe (R-PACK-02N).
+//! Packed `QuantizedGather` identity probe (R-PACK-02N).
 //!
 //! CPU-side proof that row gather + in-kernel dequant matches the GI2-1
 //! goldens without a whole-table F32 materialization.

@@ -99,6 +99,7 @@ pub fn dequant_q5_k(block: &[u8]) -> Result<[f32; 256], PackedDequantError> {
 ///
 /// # Errors
 /// [`PackedDequantError::BlockBytesMismatch`] when `block` is not 210 bytes.
+#[allow(clippy::cast_possible_truncation)]
 pub fn dequant_q6_k(block: &[u8]) -> Result<[f32; 256], PackedDequantError> {
     let want = PackedStorageLayout::Q6_K.block_bytes() as usize;
     if block.len() != want {
@@ -115,19 +116,22 @@ pub fn dequant_q6_k(block: &[u8]) -> Result<[f32; 256], PackedDequantError> {
     for n in [0usize, 128] {
         let sc_base = n / 16;
         let ql_off = n / 2;
-        let qh_off = n / 4;
+        let qh_byte_off = n / 4;
         for l in 0..32usize {
             let is = l / 16;
-            let q1 = i32::from((ql[ql_off + l] & 0x0f) | ((qh[qh_off + l] & 3) << 4)) - 32;
+            let q1 = i32::from((ql[ql_off + l] & 0x0f) | ((qh[qh_byte_off + l] & 3) << 4)) - 32;
             let q2 =
-                i32::from((ql[ql_off + l + 32] & 0x0f) | (((qh[qh_off + l] >> 2) & 3) << 4)) - 32;
-            let q3 = i32::from((ql[ql_off + l] >> 4) | (((qh[qh_off + l] >> 4) & 3) << 4)) - 32;
+                i32::from((ql[ql_off + l + 32] & 0x0f) | (((qh[qh_byte_off + l] >> 2) & 3) << 4))
+                    - 32;
+            let q3 =
+                i32::from((ql[ql_off + l] >> 4) | (((qh[qh_byte_off + l] >> 4) & 3) << 4)) - 32;
             let q4 =
-                i32::from((ql[ql_off + l + 32] >> 4) | (((qh[qh_off + l] >> 6) & 3) << 4)) - 32;
-            let sc0 = f32::from(sc[sc_base + is] as i8);
-            let sc2 = f32::from(sc[sc_base + is + 2] as i8);
-            let sc4 = f32::from(sc[sc_base + is + 4] as i8);
-            let sc6 = f32::from(sc[sc_base + is + 6] as i8);
+                i32::from((ql[ql_off + l + 32] >> 4) | (((qh[qh_byte_off + l] >> 6) & 3) << 4))
+                    - 32;
+            let sc0 = f32::from(sc[sc_base + is].cast_signed());
+            let sc2 = f32::from(sc[sc_base + is + 2].cast_signed());
+            let sc4 = f32::from(sc[sc_base + is + 4].cast_signed());
+            let sc6 = f32::from(sc[sc_base + is + 6].cast_signed());
             y[n + l] = d * sc0 * f32::from(q1 as i8);
             y[n + l + 32] = d * sc2 * f32::from(q2 as i8);
             y[n + l + 64] = d * sc4 * f32::from(q3 as i8);
@@ -180,6 +184,11 @@ pub fn synthetic_q5_k_ones_block() -> [u8; 176] {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::float_cmp,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss
+)]
 mod tests {
     use super::PackedDequantError;
     use super::*;

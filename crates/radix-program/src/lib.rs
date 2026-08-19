@@ -41,9 +41,9 @@ pub mod wasm;
 pub(crate) mod test_support;
 
 pub use radix_module::program::{
-    analyze_prepared_program_name, analyze_prepared_program_path, compile_prepared_program_path, find_package_root,
-    library_home, package_identity_facts_for_path, prepare_program_module, prepare_program_module_for_name,
-    PreparedProgramModule, FABER_LIBRARY_HOME_ENV,
+    analyze_prepared_program_name, analyze_prepared_program_path, compile_prepared_program_path,
+    find_package_root, library_home, package_identity_facts_for_path, prepare_program_module,
+    prepare_program_module_for_name, PreparedProgramModule, FABER_LIBRARY_HOME_ENV,
 };
 
 pub(crate) const MANIFEST_FILE: &str = "faber.toml";

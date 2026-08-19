@@ -394,11 +394,11 @@ impl CapabilityGap {
     #[must_use]
     pub fn slug(&self) -> &'static str {
         match self {
-            Self::UnsupportedMirShape { slug, .. } => slug,
-            Self::MissingLayoutFact { slug, .. } => slug,
-            Self::MissingAbiFact { slug, .. } => slug,
-            Self::MissingRuntimeBoundary { slug, .. } => slug,
-            Self::TargetPolicyRejection { slug, .. } => slug,
+            Self::UnsupportedMirShape { slug, .. }
+            | Self::MissingLayoutFact { slug, .. }
+            | Self::MissingAbiFact { slug, .. }
+            | Self::MissingRuntimeBoundary { slug, .. }
+            | Self::TargetPolicyRejection { slug, .. } => slug,
         }
     }
 

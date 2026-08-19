@@ -1340,8 +1340,8 @@ pub(super) fn rebuild_merged_validated(
             .closure_environments
             .insert(environment.id, environment.clone());
     }
-    merged.validated =
-        radix_module::mir::ValidatedMir::new(merged.program.clone(), context).map_err(|errors| {
+    merged.validated = radix_module::mir::ValidatedMir::new(merged.program.clone(), context)
+        .map_err(|errors| {
             errors
                 .into_iter()
                 .map(|error| mir_lowering_diag(diagnostic_path, error.message))

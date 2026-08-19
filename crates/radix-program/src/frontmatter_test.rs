@@ -22,7 +22,10 @@ entry = "main.fab"
     toml::from_str(toml_str).expect("valid test manifest")
 }
 
-fn diagnostic_arg<'a>(diag: &'a radix_module::diagnostics::Diagnostic, name: &str) -> Option<&'a str> {
+fn diagnostic_arg<'a>(
+    diag: &'a radix_module::diagnostics::Diagnostic,
+    name: &str,
+) -> Option<&'a str> {
     diag.args
         .iter()
         .find(|arg| arg.name == name)

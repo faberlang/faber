@@ -254,7 +254,7 @@ impl FunctionBuilder<'_> {
                 let arg = HirCallArg { name: None, spread: false, expr: rhs.clone(), span: rhs.span };
                 self.lower_vector_method(lhs, method_name, std::slice::from_ref(&arg), expr)
             }
-            (Type::Matrix(..), Type::Matrix(..)) | (Type::Matrix(..), Type::Vector(..)) => {
+            (Type::Matrix(..), Type::Matrix(..) | Type::Vector(..)) => {
                 let arg = HirCallArg { name: None, spread: false, expr: rhs.clone(), span: rhs.span };
                 self.lower_matrix_method(lhs, method_name, std::slice::from_ref(&arg), expr)
             }
@@ -472,13 +472,10 @@ impl FunctionBuilder<'_> {
             if !args.is_empty() {
                 return None;
             }
-            return match method {
-                VectorMethodKind::Longitudo => Some(self.lower_vector_longitudo(lhs, width, elem_ty, expr)),
-                VectorMethodKind::Normalizata => {
-                    Some(self.lower_vector_normalizata(lhs, width, elem_ty, vector_ty, expr))
-                }
-                _ => unreachable!(),
-            };
+            if matches!(method, VectorMethodKind::Longitudo) {
+                return Some(self.lower_vector_longitudo(lhs, width, elem_ty, expr));
+            }
+            return Some(self.lower_vector_normalizata(lhs, width, elem_ty, vector_ty, expr));
         }
 
         let [arg] = args else {
@@ -504,9 +501,8 @@ impl FunctionBuilder<'_> {
                 Some(self.lower_vector_cross(lhs, rhs, elem_ty, vector_ty, expr))
             }
             VectorMethodKind::Dot => Some(self.lower_vector_dot(lhs, rhs, width, elem_ty, expr)),
-            VectorMethodKind::Swizzle => unreachable!("swizzle branch returns before vector peer lowering"),
-            VectorMethodKind::Longitudo | VectorMethodKind::Normalizata => {
-                unreachable!("zero-arg vector methods handled above")
+            VectorMethodKind::Swizzle | VectorMethodKind::Longitudo | VectorMethodKind::Normalizata => {
+                None
             }
         }
     }

@@ -311,22 +311,28 @@ fn read_source(args: &[String]) -> (String, String) {
 
 fn cmd_inspect_lex(input: &[String]) {
     let (name, source) = read_source(input);
-    print_inspection(radix_module::services::lex_inspection_for_source(&name, &source));
+    print_inspection(radix_module::services::lex_inspection_for_source(
+        &name, &source,
+    ));
 }
 
 fn cmd_inspect_parse(input: &[String]) {
     let (name, source) = read_source(input);
-    print_inspection(radix_module::services::parse_inspection_for_source(&name, &source));
+    print_inspection(radix_module::services::parse_inspection_for_source(
+        &name, &source,
+    ));
 }
 
 fn cmd_inspect_hir(input: &[String], load: Option<std::path::PathBuf>) {
     if let Some(path) = load {
         eprintln!("error: `faber hir --load` is not supported; use `radix hir --load`");
-        let _ = path;
+        drop(path);
         std::process::exit(1);
     }
     let (name, source) = read_source(input);
-    print_inspection(radix_module::services::hir_inspection_for_source(&name, &source));
+    print_inspection(radix_module::services::hir_inspection_for_source(
+        &name, &source,
+    ));
 }
 
 fn cmd_inspect_mir(input: &[String]) {
@@ -344,7 +350,9 @@ fn cmd_inspect_mir(input: &[String]) {
 
 fn cmd_inspect_cli_ir(input: &[String]) {
     let (name, source) = read_source(input);
-    print_inspection(radix_module::services::cli_ir_inspection_for_source(&name, &source));
+    print_inspection(radix_module::services::cli_ir_inspection_for_source(
+        &name, &source,
+    ));
 }
 
 fn cmd_check_file(command: CheckCommand) {
@@ -353,7 +361,8 @@ fn cmd_check_file(command: CheckCommand) {
         std::process::exit(1);
     }
     let (name, source) = read_source(&command.input);
-    let mut result = radix_module::services::check_diagnostics_for_source(&name, &source, command.permissive);
+    let mut result =
+        radix_module::services::check_diagnostics_for_source(&name, &source, command.permissive);
     let warn_policy = radix_module::driver::WarnPolicy {
         deny_all_warnings: command.deny_warnings,
         deny_codes: command.deny_codes.clone(),
@@ -382,7 +391,10 @@ fn cmd_verify_file(command: VerifyCommand) {
         );
     }
     if let Some(coverage) = &result.coverage {
-        print!("{}", radix_module::aspect::render_hir_aspect_coverage(coverage));
+        print!(
+            "{}",
+            radix_module::aspect::render_hir_aspect_coverage(coverage)
+        );
     }
     if !result.success {
         std::process::exit(1);

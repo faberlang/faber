@@ -174,7 +174,7 @@ pub enum PackedStorageLayout {
     Q5_K,
     /// 6-bit superblock, 256 elements / 210 bytes.
     Q6_K,
-    /// f16 scale + 5-bit, 32 elements / 22 bytes (dense-rung SmolLM2).
+    /// f16 scale + 5-bit, 32 elements / 22 bytes (dense-rung `SmolLM2`).
     Q5_0,
     /// MXFP4: E8M0 group scale + packed 4-bit values, 32 elements / 17 bytes.
     ///

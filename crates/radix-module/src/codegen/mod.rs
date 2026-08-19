@@ -685,10 +685,12 @@ fn emit_provider_modules(analysis: &crate::driver::AnalyzedModule) -> Result<Vec
             }
             let session = crate::driver::Session::new(config);
             let name = provider_path.display().to_string();
-            let prepared = crate::program::compile::prepare_program_module(&provider_path, &source, &session)
-                .map_err(|diag| CodegenError {
-                    message: format!("cannot prepare provider module `{module_name}`: {}", diag.message),
-                    args: Vec::new(),
+            let prepared =
+                crate::program::compile::prepare_program_module(&provider_path, &source, &session).map_err(|diag| {
+                    CodegenError {
+                        message: format!("cannot prepare provider module `{module_name}`: {}", diag.message),
+                        args: Vec::new(),
+                    }
                 })?;
             let unit = crate::driver::analyze_source_with_module_import_contract(
                 &prepared.session,

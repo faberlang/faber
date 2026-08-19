@@ -125,6 +125,14 @@ pub struct MirSeams {
     /// version after the move (RP5 byte-parity).
     pub toolchain_version: &'static str,
 }
+use radix_mir_fmir::{
+    decode_binary_image, decode_text_image, encode_binary_image, encode_text_image,
+    is_known_host_requirement, FmirBinaryImageFile, FmirDeviceSection, FmirDeviceSelection,
+    FmirImageError, FmirTextCliOperand, FmirTextCliRootSection, FmirTextCliSection,
+    FmirTextCliValueType, FmirTextImageFile, FmirTextProgramSection, FmirTextRuntimeSection,
+    FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection,
+    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
+};
 use radix_module::cli::{
     CliCommand, CliDefault, CliExit, CliMode, CliOperand, CliOption, CliProgram, CliType,
 };
@@ -148,14 +156,8 @@ use radix_module::mir::{
     MirStatementKind, MirSwitchCase, MirTerminator, MirTerminatorKind, MirType, MirValue,
     MirValueKind, RunnerError,
 };
-use radix_module::semantic::{IndexExpr, Primitive, Resolver, Type, TypeId, TypeTable, TypeTableSnapshot};
-use radix_mir_fmir::{
-    decode_binary_image, decode_text_image, encode_binary_image, encode_text_image,
-    is_known_host_requirement, FmirBinaryImageFile, FmirDeviceSection, FmirDeviceSelection,
-    FmirImageError, FmirTextCliOperand, FmirTextCliRootSection, FmirTextCliSection,
-    FmirTextCliValueType, FmirTextImageFile, FmirTextProgramSection, FmirTextRuntimeSection,
-    FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection,
-    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
+use radix_module::semantic::{
+    IndexExpr, Primitive, Resolver, Type, TypeId, TypeTable, TypeTableSnapshot,
 };
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
@@ -349,7 +351,8 @@ impl TestPackageScope {
 }
 
 /// Caller-visible identity map for functions in a linked package test MIR.
-pub type TestFunctionIds = HashMap<(PathBuf, radix_module::hir::DefId), radix_module::mir::MirFunctionId>;
+pub type TestFunctionIds =
+    HashMap<(PathBuf, radix_module::hir::DefId), radix_module::mir::MirFunctionId>;
 
 #[derive(Default)]
 struct CliPackagePlan {

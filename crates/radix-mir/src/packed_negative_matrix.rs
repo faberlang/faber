@@ -164,7 +164,7 @@ fn misaligned_range_last_block_truncated_fails_closed() {
     // Claim 33 Q8_0 elements (not a 32-element multiple). One full block
     // (34 B) is present; the extra element needs a second block that is
     // missing / truncated.
-    let packed = vec![0u8; 34];
+    let packed = [0u8; 34];
     let logical = 33usize;
     let block_elems = PackedStorageLayout::Q8_0.block_elements() as usize;
     let block_bytes = PackedStorageLayout::Q8_0.block_bytes() as usize;
@@ -194,7 +194,7 @@ fn misaligned_range_last_block_truncated_fails_closed() {
 fn misaligned_q4_k_range_fails_closed() {
     // 257 logical elements need a second 144-byte superblock; only one
     // superblock is stored.
-    let packed = vec![0u8; 144];
+    let packed = [0u8; 144];
     let last = 256usize;
     let start = (last / 256) * 144;
     let error = dequant_q4_k_block(packed.get(start..).unwrap_or(&[]))

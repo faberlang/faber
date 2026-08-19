@@ -155,7 +155,7 @@ pub fn at_file_start(trivia: &[HirTrivia]) -> &[HirTrivia] {
     for item in trivia {
         match item {
             HirTrivia::Newline { .. } => count += 1,
-            _ => break,
+            HirTrivia::CommentLine { .. } => break,
         }
     }
     &trivia[count..]

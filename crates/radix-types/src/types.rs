@@ -959,7 +959,7 @@ impl TypeTable {
     /// [`Self::assignable`], so every subquery is cached too. Split out so the
     /// memo plumbing does not count toward the pedantic `too_many_lines` gate
     /// on the public entry point.
-    #[allow(clippy::match_same_arms)]
+    #[allow(clippy::match_same_arms, clippy::too_many_lines)]
     fn assignable_inner(&self, from: TypeId, to: TypeId) -> bool {
         let from_ty = self.get(from);
         let to_ty = self.get(to);

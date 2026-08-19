@@ -2803,8 +2803,8 @@ fn gi3_inference_recipe_plans_round_trip_on_the_wire() {
     }
 }
 
-/// R-PACK-01C: packed-kernel wire mirrors (QuantizedMatMul / GroupedMatMul /
-/// SsmConv1d / SsmScan) serialize and round-trip through the text codec on
+/// R-PACK-01C: packed-kernel wire mirrors (`QuantizedMatMul` / `GroupedMatMul` /
+/// `SsmConv1d` / `SsmScan`) serialize and round-trip through the text codec on
 /// the accepted wire version — mechanical field-for-field arms, no extra
 /// semantic facts, no version bump.
 #[test]

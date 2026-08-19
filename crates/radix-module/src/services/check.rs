@@ -95,7 +95,8 @@ pub fn check_diagnostics_for_source_with_locale_pack(
     // miss path (SEM014.cannot_infer_expression_type on non-literal args).
     pass_config.import_path_templates = templates.cloned();
     if let Some(path) = source_path_for_import_contract(name) {
-        let contract = crate::program::compile::import_contract_for_file(&path, source, resolved_pack.as_ref(), templates);
+        let contract =
+            crate::program::compile::import_contract_for_file(&path, source, resolved_pack.as_ref(), templates);
         if let Some(pack) = resolved_pack.as_mut() {
             if let Err(err) = crate::locale::merge_library_locale_packs(pack, &contract.library_package_roots) {
                 diagnostics.push(

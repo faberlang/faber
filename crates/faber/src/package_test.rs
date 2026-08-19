@@ -5935,8 +5935,10 @@ async_main {
             .expect("entry unit")
             .expanded_library_imports
             .iter()
-            .any(|import| library_path_eq(&import.module.module_path, &["http", "response"])
-                && import.module.package == "norma"),
+            .any(
+                |import| library_path_eq(&import.module.module_path, &["http", "response"])
+                    && import.module.package == "norma"
+            ),
         "rete import closure must include the Response leaf at [http, response]"
     );
     let item = library_item_by_export(

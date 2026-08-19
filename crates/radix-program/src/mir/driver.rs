@@ -533,7 +533,8 @@ pub(super) fn bridge_norma_providers_to_kernel(
                 else {
                     continue;
                 };
-                let Some(module) = radix_module::kernel::resolve_kernel_module_name(norma_module) else {
+                let Some(module) = radix_module::kernel::resolve_kernel_module_name(norma_module)
+                else {
                     // Non-manifest `norma:*` stays as Package; the runner's
                     // `host.provider()` reports it unsupported.
                     continue;

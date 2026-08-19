@@ -7,8 +7,7 @@
 
 use super::{Interner, INLINE_COMMENT_ISSUE};
 use crate::{
-    keyword_specs, lex, lookup_keyword_spec, KeywordCategory, KeywordScope, LexErrorKind,
-    LexResult, TokenKind,
+    keyword_specs, lex, lookup_keyword_spec, KeywordScope, LexErrorKind, LexResult, TokenKind,
 };
 
 fn has_arg(err: &crate::LexError, name: &str, value: &str) -> bool {

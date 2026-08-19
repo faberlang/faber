@@ -1,6 +1,6 @@
 //! Per-layout packed GEMM identity probes (R-PACK-02J..M).
 //!
-//! CPU-side proof that BF16 / Q5_0 dequant + GEMM matches the pinned
+//! CPU-side proof that BF16 / `Q5_0` dequant + GEMM matches the pinned
 //! convert / GI2-1 goldens without a whole-model F32 materialization.
 
 #![cfg(test)]
@@ -17,6 +17,7 @@ fn bf16_bits_to_f32(bits: u16) -> f32 {
 /// In-kernel-style BF16 GEMM: convert each packed right-hand element at
 /// the load that needs it. Never allocates an f32 weight tensor of the
 /// whole right operand first.
+#[allow(clippy::many_single_char_names)]
 fn bf16_quantized_matmul(
     left: &[f32],
     packed_right: &[u16],
@@ -99,6 +100,7 @@ fn half_to_f32(bits: u16) -> f32 {
 }
 
 /// `dequantize_row_q5_0` — 32 elements / 22 bytes.
+#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
 fn dequant_q5_0_block(block: &[u8]) -> [f32; 32] {
     assert_eq!(block.len(), 22);
     let d = half_to_f32(u16::from_le_bytes([block[0], block[1]]));

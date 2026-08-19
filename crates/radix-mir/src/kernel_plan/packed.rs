@@ -133,7 +133,7 @@ impl PackedDequantResolution {
 ///
 /// # Errors
 /// [`PackedAdmissionError::UnrepresentableLayout`] when `id` is outside
-/// {F32, F16, BF16, Q8_0, Q4_K, Q5_K, Q6_K, Q5_0, MXFP4}.
+/// {F32, F16, BF16, `Q8_0`, `Q4_K`, `Q5_K`, `Q6_K`, `Q5_0`, MXFP4}.
 pub fn packed_layout_from_ggml_type_id(
     id: u32,
 ) -> Result<PackedStorageLayout, PackedAdmissionError> {
@@ -403,7 +403,7 @@ pub fn ggml_half_to_f32(bits: u16) -> f32 {
     f32::from_bits(bits32)
 }
 
-/// In-kernel Q8_0 block dequant (R-PACK-02B): `y[j] = i8(qs[j]) * f16(d)`.
+/// In-kernel `Q8_0` block dequant (R-PACK-02B): `y[j] = i8(qs[j]) * f16(d)`.
 ///
 /// # Errors
 /// [`PackedDequantError::BlockBytesMismatch`] when `block` is not 34 bytes.
@@ -417,7 +417,7 @@ pub fn dequant_q8_0_block(block: &[u8]) -> Result<[f32; 32], PackedDequantError>
     let d = ggml_half_to_f32(u16::from_le_bytes([block[0], block[1]]));
     let mut y = [0.0f32; 32];
     for (j, slot) in y.iter_mut().enumerate() {
-        *slot = f32::from(block[2 + j] as i8) * d;
+        *slot = f32::from(block[2 + j].cast_signed()) * d;
     }
     Ok(y)
 }
@@ -435,7 +435,7 @@ fn get_scale_min_k4(index: usize, scales: &[u8]) -> (u8, u8) {
     }
 }
 
-/// In-kernel Q4_K superblock dequant (R-PACK-02D): `d`/`dmin` halves +
+/// In-kernel `Q4_K` superblock dequant (R-PACK-02D): `d`/`dmin` halves +
 /// `scales[12]` + `qs[128]` → 256 f32 elements.
 ///
 /// # Errors

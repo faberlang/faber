@@ -75,8 +75,6 @@ pub mod forma;
 pub mod forma_render;
 pub mod hir;
 pub(crate) mod import_resolve;
-pub mod program;
-pub mod services;
 pub mod intrinsics;
 pub mod kernel;
 pub mod lexer;
@@ -88,13 +86,14 @@ pub mod mir;
 pub mod octeti_literal;
 pub mod parser;
 pub mod paths;
+pub mod program;
 pub mod runtime_contract;
 pub mod semantic;
+pub mod services;
 pub mod syntax;
 #[cfg(test)]
 pub mod test_support;
 pub mod textus_literal;
-
 
 use std::path::Path;
 

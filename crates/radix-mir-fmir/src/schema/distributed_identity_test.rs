@@ -351,7 +351,7 @@ fn logical_distributed_plan_hash_covers_the_logical_plan_canonical_bytes_only() 
     let plan = sample_logical_plan();
     let reference = format!(
         "{SHA256_IDENTITY_PREFIX}{}",
-        handroll::sha256_hex(&encode_logical_plan(&plan))
+        handroll::sha256_hex(encode_logical_plan(&plan))
     );
     assert_eq!(logical_distributed_plan_hash(&plan), reference);
 }

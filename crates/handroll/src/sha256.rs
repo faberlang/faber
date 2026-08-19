@@ -213,6 +213,7 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 /// One FIPS 180-4 compression round over a single 64-byte block.
+#[allow(clippy::many_single_char_names)] // FIPS 180-4 working-variable names (a–h)
 fn compress(state: &mut [u32; 8], block: &[u8]) {
     debug_assert_eq!(block.len(), 64);
     // Message schedule W[0..64] (§6.2.2 step 1).
@@ -320,7 +321,7 @@ mod tests {
         let mut hasher = Sha256::new();
         let chunk = [b'a'; 4096];
         for _ in 0..(1_000_000 / 4096) {
-            hasher.update(&chunk);
+            hasher.update(chunk);
         }
         hasher.update(&[b'a'; 4096][..1_000_000 % 4096]);
         assert_eq!(
@@ -340,7 +341,7 @@ mod tests {
         );
         let mut bytewise = Sha256::new();
         for &byte in data {
-            bytewise.update(&[byte]);
+            bytewise.update([byte]);
         }
         let mut odd = Sha256::new();
         for chunk in data.chunks(7) {

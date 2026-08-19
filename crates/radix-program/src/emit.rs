@@ -279,9 +279,9 @@ fn compile_package_internal(
                 .unwrap_or_default();
             return PackageCompileResult {
                 compile_result: CompileResult {
-                    output: Some(radix_module::Output::WasmText(radix_module::WasmTextOutput {
-                        code: entry_wat,
-                    })),
+                    output: Some(radix_module::Output::WasmText(
+                        radix_module::WasmTextOutput { code: entry_wat },
+                    )),
                     diagnostics: package.diagnostics.clone(),
                 },
                 #[cfg(feature = "hir-go")]

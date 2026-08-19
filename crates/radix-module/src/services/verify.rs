@@ -1,9 +1,8 @@
 //! Typed verify service. Printing and process exit live in `radix-cli`.
 
 use crate::aspect::{
-    emit_tla_modules, report_hir_aspects, summarize_hir_aspect_coverage,
-    HirAspectBackendKind, HirAspectCoverageReport, HirAspectCoverageStatus, HirAspectTlaModule, HirAspectVerifier,
-    TlaAspectCheckerConfig, TlaAspectVerifier,
+    emit_tla_modules, report_hir_aspects, summarize_hir_aspect_coverage, HirAspectBackendKind, HirAspectCoverageReport,
+    HirAspectCoverageStatus, HirAspectTlaModule, HirAspectVerifier, TlaAspectCheckerConfig, TlaAspectVerifier,
 };
 use crate::diagnostics::Diagnostic;
 use crate::driver::{AnalyzedModule, Config, Session};

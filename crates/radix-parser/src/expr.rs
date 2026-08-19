@@ -730,7 +730,7 @@ impl Parser {
     ///   call := `(` args `)`
     ///   member := `.` ident
     ///   index := `[` expr `]`
-    ///   gradient := '∇' ['[' place (',' place)* ']']
+    ///   gradient := ∇ [ [ place (, place)* ] ]
     ///   cast := `∷` type
     ///   optional-chain := '?.' ident | '?[' expr `]` | '?(' args `)`
     ///   conversion := '↦' type [type-params] ['⇥' recovery]

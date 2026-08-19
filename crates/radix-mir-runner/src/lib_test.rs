@@ -4,6 +4,7 @@
 //! defaults, runner issue encoding, regex patterns, constant/value
 //! equality, and the F-0xx regression behaviors.
 
+#![allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 #![expect(
     clippy::cast_precision_loss,
     reason = "test helpers promote Int elements to f64 for float comparison"

@@ -65,7 +65,11 @@ fn lex_json(source_file: &crate::driver::SourceFile, result: &crate::lexer::LexR
     let mut out = String::new();
     let _ = writeln!(out, "{{");
     let _ = writeln!(out, "  \"file\": \"{}\",", escape_json(&source_file.name));
-    let _ = writeln!(out, "  \"frontmatter\": {},", frontmatter_json(source_file.frontmatter.as_ref()));
+    let _ = writeln!(
+        out,
+        "  \"frontmatter\": {},",
+        frontmatter_json(source_file.frontmatter.as_ref())
+    );
     let _ = writeln!(out, "  \"success\": {},", result.success());
     let _ = writeln!(out, "  \"tokens\": [");
     for (i, token) in result.tokens.iter().enumerate() {
@@ -133,7 +137,11 @@ fn parse_json(source_file: &crate::driver::SourceFile, parse_result: &crate::par
     let mut out = String::new();
     let _ = writeln!(out, "{{");
     let _ = writeln!(out, "  \"file\": \"{}\",", escape_json(&source_file.name));
-    let _ = writeln!(out, "  \"frontmatter\": {},", frontmatter_json(source_file.frontmatter.as_ref()));
+    let _ = writeln!(
+        out,
+        "  \"frontmatter\": {},",
+        frontmatter_json(source_file.frontmatter.as_ref())
+    );
     let _ = writeln!(out, "  \"body_byte_offset\": {},", source_file.body_byte_offset);
     let _ = writeln!(out, "  \"success\": {},", parse_result.success());
     if let Some(program) = &parse_result.program {
@@ -196,13 +204,7 @@ pub fn hir_inspection_for_source(name: &str, source: &str) -> SourceInspection {
     };
     let (lowered, errors) = crate::hir::lower(&program, &mut resolver, &mut types, &mut interner);
     SourceInspection {
-        text: hir_inspection_json(
-            &source_file,
-            &lowered.hir,
-            Some(&lowered.presentation),
-            &interner,
-            &errors,
-        ),
+        text: hir_inspection_json(&source_file, &lowered.hir, Some(&lowered.presentation), &interner, &errors),
         success: errors.is_empty(),
         errors: Vec::new(),
     }
@@ -220,7 +222,11 @@ pub fn hir_inspection_json(
     let mut out = String::new();
     let _ = writeln!(out, "{{");
     let _ = writeln!(out, "  \"file\": \"{}\",", escape_json(&source_file.name));
-    let _ = writeln!(out, "  \"frontmatter\": {},", frontmatter_json(source_file.frontmatter.as_ref()));
+    let _ = writeln!(
+        out,
+        "  \"frontmatter\": {},",
+        frontmatter_json(source_file.frontmatter.as_ref())
+    );
     let _ = writeln!(out, "  \"success\": {},", errors.is_empty());
     let _ = writeln!(out, "  \"items\": {},", hir.items.len());
     match presentation {

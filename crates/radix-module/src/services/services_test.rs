@@ -67,12 +67,6 @@ fn wgsl_output_reflection(result: crate::CompileResult) -> (String, crate::mir::
     (wgsl_output.code.clone(), reflection)
 }
 
-
-
-
-
-
-
 const OMNIA_EXEMPLUM: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/omnia/omnia.fab"));
 
 fn assert_json_object_keys(value: &serde_json::Value, expected: &[&str]) {
@@ -83,23 +77,6 @@ fn assert_json_object_keys(value: &serde_json::Value, expected: &[&str]) {
     expected.sort_unstable();
     assert_eq!(actual, expected, "json object keys");
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[test]
 fn cmd_targets_rust_scena_typescript_capabilities() {
@@ -281,7 +258,6 @@ fn faber_surface_fhir_row_is_package_and_run_capable() {
     );
 }
 
-
 #[test]
 fn cmd_targets_llvm_host_and_llvm_text_keep_separate_rows() {
     // The emit-only llvm-text row keeps run/package off the radix surface;
@@ -321,7 +297,6 @@ fn cmd_targets_discovery_includes_llvm_host() {
         "llvm-host must appear exactly once (no alias spelling): {names:?}"
     );
 }
-
 
 #[test]
 fn cmd_targets_keeps_faber_package_capabilities_off_radix_surface() {
@@ -447,12 +422,6 @@ fn cmd_targets_reports_fhir() {
     );
 }
 
-
-
-
-
-
-
 #[test]
 fn hir_aspect_verify_reports_checker_unavailable_without_success() {
     let result = verify_source("omnia.fab", OMNIA_EXEMPLUM, None);
@@ -576,12 +545,6 @@ fn diagnostics_check_rejects_undeclared_latin_keyword_in_grammar_position() {
         .code
         .is_some_and(|code| code.starts_with("LOCALE"))));
 }
-
-
-
-
-
-
 
 /// Shared fixture: compiles the `add_one` nucleum and returns parsed reflection JSON.
 fn gpu_reflection_fixture() -> (String, serde_json::Value) {
@@ -1429,8 +1392,8 @@ fn assert_shader_contract_vertex_source_variant_rejects(source: &str, issue: &st
 
 #[test]
 fn wgsl_text_source_vertex_entry_rejects_annotation_payload() {
-    let source =
-        include_str!("../fixtures/shader-contract-source-facts.fab").replace("@ vertex", "@ vertex { mode = \"main\" }");
+    let source = include_str!("../fixtures/shader-contract-source-facts.fab")
+        .replace("@ vertex", "@ vertex { mode = \"main\" }");
 
     assert_shader_contract_vertex_source_variant_rejects(&source, "mir_wgsl_vertex_source_annotation_payload");
 }
@@ -1903,9 +1866,6 @@ fn emit_faber_file_preserves_namespace_qualified_type_references() {
     assert!(!output.code.contains("genus Box"));
 }
 
-
-
-
 #[test]
 fn emit_fmir_target_rejection_preserves_delegation_message() {
     let result = compile_cli_source("main.fab", "functio salve() {}", crate::codegen::Target::MirFmir);
@@ -1926,7 +1886,6 @@ fn emit_fmir_target_rejection_preserves_delegation_message() {
     );
     assert!(rendered.contains("faber build --target fmir-text"), "{rendered}");
 }
-
 
 #[test]
 fn mir_output_for_source_returns_deterministic_text() {
@@ -1982,9 +1941,6 @@ function f0 -> ty#1 {
 "
     );
 }
-
-
-
 
 #[test]
 fn wgsl_text_source_fragment_entry_rejects_annotation_payload() {

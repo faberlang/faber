@@ -70,8 +70,10 @@ pub fn print_diagnostics(
         return;
     }
     match diagnostics_locale_pack {
-        Some(pack) => match radix_module::diagnostics::render_expanded_diagnostics_with_pack(diagnostics, pack)
-        {
+        Some(pack) => match radix_module::diagnostics::render_expanded_diagnostics_with_pack(
+            diagnostics,
+            pack,
+        ) {
             Ok(rendered) => eprintln!("{rendered}"),
             Err(err) => {
                 eprintln!("error: failed to render reader-pack diagnostics: {err}");

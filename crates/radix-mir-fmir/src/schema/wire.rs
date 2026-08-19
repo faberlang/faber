@@ -661,11 +661,11 @@ pub enum WirePackedStorageLayout {
     Bf16,
     /// f16 scale + int8.
     Q8_0,
-    /// 6-bit superblock Q4_K.
+    /// 6-bit superblock `Q4_K`.
     Q4_K,
-    /// 6-bit superblock Q5_K.
+    /// 6-bit superblock `Q5_K`.
     Q5_K,
-    /// 6-bit superblock Q6_K.
+    /// 6-bit superblock `Q6_K`.
     Q6_K,
     /// f16 scale + 5-bit (dense-rung).
     Q5_0,

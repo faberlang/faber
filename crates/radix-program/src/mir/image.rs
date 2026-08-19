@@ -251,8 +251,8 @@ pub(super) fn run_fmir_package_image<H: Host + ?Sized>(
     let mut validation = radix_module::mir::MirValidationContext::new(&types);
     validation.interner = Some(&interner);
     apply_validation_metadata(&mut validation, &image.validation);
-    let validated =
-        radix_module::mir::ValidatedMir::new(image.program.clone(), validation).map_err(|errors| {
+    let validated = radix_module::mir::ValidatedMir::new(image.program.clone(), validation)
+        .map_err(|errors| {
             errors
                 .into_iter()
                 .map(|error| mir_diag(&image.diagnostic_path, error.message))

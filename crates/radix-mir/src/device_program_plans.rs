@@ -1631,7 +1631,7 @@ fn recipe_destination_local_for(function: &MirFunction, op: MirCollectionOp) -> 
     let (_, destination) = first_collection_call(function, |found| found == op)?;
     match destination?.base {
         MirPlaceBase::Local(local) => Some(local),
-        _ => None,
+        MirPlaceBase::Temp(_) => None,
     }
 }
 

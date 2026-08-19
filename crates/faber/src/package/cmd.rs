@@ -458,8 +458,12 @@ pub fn cmd_build(command: radix_module::services::BuildCommand, format: bool, li
     }
 
     // Legacy single-file path (direct .fab files, other targets, or --out-dir override cases)
-    let output_path =
-        radix_module::services::build_output_path(&command.out_dir, &input_path, target, is_package);
+    let output_path = radix_module::services::build_output_path(
+        &command.out_dir,
+        &input_path,
+        target,
+        is_package,
+    );
 
     let code = crate::postprocess::postprocess_code(code, target, format, linter);
     write_output_file(&output_path, code.as_bytes());
@@ -560,7 +564,10 @@ fn single_file_rust_runtime_plan(
 /// Resolve the build target: an explicit CLI target wins, otherwise the
 /// package manifest's `build.target`. Unlike [`resolve_check_target`], a
 /// manifest read failure is fatal here rather than silently falling back.
-fn resolve_build_target(command: &radix_module::services::BuildCommand, input_path: &Path) -> Target {
+fn resolve_build_target(
+    command: &radix_module::services::BuildCommand,
+    input_path: &Path,
+) -> Target {
     if command.target_explicit {
         return command.target;
     }

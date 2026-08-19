@@ -1151,10 +1151,7 @@ fn same_module_finge_construction_unchanged() {
 // Postfix gradient selection (`call(...) ∇` / `call(...) ∇ [places]`)
 // ---------------------------------------------------------------------------
 
-fn gradient_expr<'a>(
-    result: &'a ParseResult,
-    statement_index: usize,
-) -> &'a radix_syntax::GradientExpr {
+fn gradient_expr(result: &ParseResult, statement_index: usize) -> &radix_syntax::GradientExpr {
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[statement_index].kind else {
         panic!("expected variable declaration");

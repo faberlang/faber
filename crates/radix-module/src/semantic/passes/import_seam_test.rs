@@ -12,8 +12,8 @@ use crate::diagnostics::Diagnostic;
 use crate::import_resolve::library_home_test_support;
 use crate::semantic::passes::visibility_annotation::VisibilityTier;
 use crate::semantic::SemanticErrorKind;
-use crate::test_support::args_have_no_legacy_message;
 use crate::services::check_diagnostics_for_source;
+use crate::test_support::args_have_no_legacy_message;
 use std::fs;
 use std::path::{Path, PathBuf};
 

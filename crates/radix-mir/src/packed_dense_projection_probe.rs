@@ -11,7 +11,7 @@ use crate::kernel_plan::{
     admit_quantized_matmul, dequant_q8_0_block, gemm_f32, CollectionKernelPlan, MatMulShapes,
 };
 
-/// Named dense-rung projections (SmolLM2 aspect, block-aligned probe dims).
+/// Named dense-rung projections (`SmolLM2` aspect, block-aligned probe dims).
 struct DenseProjection {
     name: &'static str,
     m: u64,
@@ -90,7 +90,7 @@ struct Gi2Block {
     output_hex: Vec<String>,
 }
 
-/// Packed right operand GEMM: dequant one Q8_0 block at the load that needs
+/// Packed right operand GEMM: dequant one `Q8_0` block at the load that needs
 /// it. Never allocates an f32 tensor of the whole right operand.
 fn q8_0_projection_gemm(left: &[f32], packed: &[u8], m: usize, k: usize, n: usize) -> Vec<f32> {
     let mut out = vec![0.0f32; m * n];
@@ -157,6 +157,7 @@ fn dense_projections_admit_quantized_matmul_not_f32_tiled() {
 }
 
 #[test]
+#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
 fn dense_projections_match_cpu_reference_without_weight_expansion() {
     let (block, values) = q8_0_golden_block();
     for projection in DENSE_PROJECTIONS {

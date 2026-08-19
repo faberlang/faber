@@ -37,7 +37,7 @@ fn scalar_index_out_of_bounds_fails_closed() {
 fn non_ascii_scalar_index_fails_closed() {
     let err = ascii1_from_scalar('é', span()).expect_err("non-ASCII");
     assert!(err.message.contains("textus index trap"), "got {err:?}");
-    let _ty: RunnerError = err;
+    let _: RunnerError = err;
 }
 
 #[test]

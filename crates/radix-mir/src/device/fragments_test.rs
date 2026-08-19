@@ -1,4 +1,4 @@
-//! Survivor-invariant proofs at the ValidatedMir / validate_program seam.
+//! Survivor-invariant proofs at the `ValidatedMir` / `validate_program` seam.
 
 use super::{
     first_surviving_fragment_call, reject_nucleum_fragment_survivors, surviving_nucleum_fragments,

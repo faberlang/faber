@@ -1,7 +1,9 @@
 //! Package-local namespace-call linking and rewrite passes.
 
 use super::*;
-use radix_module::hir::visit::{walk_expr, walk_expr_mut, walk_program_mut, HirVisitor, HirVisitorMut};
+use radix_module::hir::visit::{
+    walk_expr, walk_expr_mut, walk_program_mut, HirVisitor, HirVisitorMut,
+};
 
 /// Post-rewrite pass: recover the function type for synthetic-path call
 /// callees (pkg001-mir-fix).
@@ -106,7 +108,10 @@ impl HirVisitor for CapeFailableCollector<'_> {
 
 impl CapeFailableCollector<'_> {
     /// The error type carried by a synthetic namespace callee, when failable.
-    fn synthetic_callee_error_ty(&self, callee: &radix_module::hir::HirExpression) -> Option<TypeId> {
+    fn synthetic_callee_error_ty(
+        &self,
+        callee: &radix_module::hir::HirExpression,
+    ) -> Option<TypeId> {
         let HirExpressionKind::Path(def_id) = callee.kind else {
             return None;
         };
@@ -675,10 +680,9 @@ fn companion_resolves(
     if function.ret_ty.is_none() {
         return false;
     }
-    function
-        .params
-        .iter()
-        .any(|param| radix_module::semantic::tensor_type_directed::is_tensor_type(param.ty, &analysis.types))
+    function.params.iter().any(|param| {
+        radix_module::semantic::tensor_type_directed::is_tensor_type(param.ty, &analysis.types)
+    })
 }
 
 fn link_nested_library_imports(
@@ -786,35 +790,38 @@ fn link_library_method_targets(
         /// (struct export name, method name, method def id)
         methods: Vec<(String, String, DefId)>,
     }
-    let collect_methods = |interface: &radix_module::file_interface::FileInterface,
-                           analysis: &radix_module::driver::AnalyzedModule| {
-        let mut methods = Vec::new();
-        for export in interface.exports.values() {
-            let radix_module::file_interface::FileExportKind::Struct(struct_export) = &export.kind else {
-                continue;
-            };
-            // Find the source struct item (methods carry the def ids).
-            let Some(struct_item) = analysis.hir.items.iter().find(|item| {
-                let HirItemKind::Struct(strukt) = &item.kind else {
-                    return false;
+    let collect_methods =
+        |interface: &radix_module::file_interface::FileInterface,
+         analysis: &radix_module::driver::AnalyzedModule| {
+            let mut methods = Vec::new();
+            for export in interface.exports.values() {
+                let radix_module::file_interface::FileExportKind::Struct(struct_export) =
+                    &export.kind
+                else {
+                    continue;
                 };
-                analysis.interner.resolve(strukt.name) == struct_export.name
-            }) else {
-                continue;
-            };
-            let HirItemKind::Struct(strukt) = &struct_item.kind else {
-                continue;
-            };
-            for method in &strukt.methods {
-                methods.push((
-                    struct_export.name.clone(),
-                    analysis.interner.resolve(method.func.name).to_owned(),
-                    method.def_id,
-                ));
+                // Find the source struct item (methods carry the def ids).
+                let Some(struct_item) = analysis.hir.items.iter().find(|item| {
+                    let HirItemKind::Struct(strukt) = &item.kind else {
+                        return false;
+                    };
+                    analysis.interner.resolve(strukt.name) == struct_export.name
+                }) else {
+                    continue;
+                };
+                let HirItemKind::Struct(strukt) = &struct_item.kind else {
+                    continue;
+                };
+                for method in &strukt.methods {
+                    methods.push((
+                        struct_export.name.clone(),
+                        analysis.interner.resolve(method.func.name).to_owned(),
+                        method.def_id,
+                    ));
+                }
             }
-        }
-        methods
-    };
+            methods
+        };
     let mut sources: Vec<SourceStruct> = Vec::new();
     for unit in package.nodes.values() {
         sources.push(SourceStruct {
@@ -2252,7 +2259,8 @@ impl ShadowedAliasRewriter<'_> {
             Type::Alias(_, inner) => self.types.get(*inner),
             other => other,
         };
-        if radix_module::intrinsics::lookup_method_for_type(normalized, &method_name, arg_count).is_some()
+        if radix_module::intrinsics::lookup_method_for_type(normalized, &method_name, arg_count)
+            .is_some()
         {
             return true;
         }
@@ -2611,7 +2619,8 @@ pub(super) fn rewrite_object_field(
     diagnostics: &mut Vec<String>,
 ) {
     match &mut field.key {
-        radix_module::hir::HirObjectKey::Computed(key) | radix_module::hir::HirObjectKey::Spread(key) => {
+        radix_module::hir::HirObjectKey::Computed(key)
+        | radix_module::hir::HirObjectKey::Spread(key) => {
             rewrite_expr(
                 unit_path,
                 key,

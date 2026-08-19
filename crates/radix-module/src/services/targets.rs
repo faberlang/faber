@@ -365,5 +365,3 @@ fn faber_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
         },
     }
 }
-
-
