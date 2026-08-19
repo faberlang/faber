@@ -1,3 +1,9 @@
+//! Package-mode CLI commands: `build`, `check`, and `emit`.
+//!
+//! Routes package-shaped inputs to target-specific builders (Rust/Cargo,
+//! MIR images, Go, Wasm, …) while single-file and stdin paths keep legacy
+//! emit behaviour. Target availability follows compile-time feature gates.
+
 use radix_module::codegen::Target;
 use radix_module::services::DiagnosticMode;
 use radix_module::{CompileResult, Output};
@@ -24,6 +30,20 @@ use radix_program::manifest::manifest_build_target;
 /// Print `message` and terminate.
 fn fail(message: &str) -> ! {
     eprintln!("{message}");
+    std::process::exit(1);
+}
+
+/// Exit when a build target was requested but this `faber` binary lacks its feature.
+#[cfg(any(
+    not(feature = "hir-fhir"),
+    not(feature = "mir-llvm"),
+    not(feature = "mir-wasm"),
+    not(feature = "hir-go"),
+))]
+fn exit_target_feature_unavailable(target_name: &str, feature: &str) -> ! {
+    eprintln!(
+        "error: target `{target_name}` is not available in this faber build; rebuild with feature `{feature}`"
+    );
     std::process::exit(1);
 }
 
@@ -161,12 +181,7 @@ pub fn cmd_build(command: radix_module::services::BuildCommand, format: bool, li
 
     if is_package && target == Target::HirFhir {
         #[cfg(not(feature = "hir-fhir"))]
-        {
-            eprintln!(
-                "error: target `fhir` is not available in this faber build; rebuild with feature `hir-fhir`"
-            );
-            std::process::exit(1);
-        }
+        exit_target_feature_unavailable("fhir", "hir-fhir");
         #[cfg(feature = "hir-fhir")]
         let artifact = match radix_program::fhir::build_package_fhir(
             &config,
@@ -193,12 +208,7 @@ pub fn cmd_build(command: radix_module::services::BuildCommand, format: bool, li
     // runtime archive is unavailable or the host triple is unsupported.
     if is_package && target == Target::MirLlvmHost {
         #[cfg(not(feature = "mir-llvm"))]
-        {
-            eprintln!(
-                "error: target `llvm-host` is not available in this faber build; rebuild with feature `mir-llvm`"
-            );
-            std::process::exit(1);
-        }
+        exit_target_feature_unavailable("llvm-host", "mir-llvm");
         #[cfg(feature = "mir-llvm")]
         {
             let profile = if command.release {
@@ -226,12 +236,7 @@ pub fn cmd_build(command: radix_module::services::BuildCommand, format: bool, li
     // an external-tool step (`wat2wasm` / `wasm-tools parse`).
     if is_package && target == Target::MirWasm {
         #[cfg(not(feature = "mir-wasm"))]
-        {
-            eprintln!(
-                "error: target `wasm` is not available in this faber build; rebuild with feature `mir-wasm`"
-            );
-            std::process::exit(1);
-        }
+        exit_target_feature_unavailable("wasm", "mir-wasm");
         #[cfg(feature = "mir-wasm")]
         {
             let output_dir = match discover_build_layout(&input_path) {
@@ -290,14 +295,9 @@ pub fn cmd_build(command: radix_module::services::BuildCommand, format: bool, li
     // G6 GO3/GO4: package Go builds write target/faber/go and invoke `go build`.
     // The multi-module file collection travels inside the compile result
     // itself (FBR-P2-003) — no hidden thread-local state.
-    if is_package && target == radix_module::codegen::Target::HirGo {
+    if is_package && target == Target::HirGo {
         #[cfg(not(feature = "hir-go"))]
-        {
-            eprintln!(
-                "error: target `go` is not available in this faber build; rebuild with feature `hir-go`"
-            );
-            std::process::exit(1);
-        }
+        exit_target_feature_unavailable("go", "hir-go");
         #[cfg(feature = "hir-go")]
         {
             let go_result = radix_program::emit::compile_package_result(
@@ -357,7 +357,7 @@ pub fn cmd_build(command: radix_module::services::BuildCommand, format: bool, li
 
     // Package Rust builds own a generated crate under target/faber/ and let
     // Cargo place artifacts in sibling debug/release directories.
-    if is_package && target == radix_module::codegen::Target::HirRust {
+    if is_package && target == Target::HirRust {
         let layout = match discover_build_layout(&input_path) {
             Ok(l) => l,
             Err(d) => fail_with_diagnostic(&d),
@@ -425,7 +425,7 @@ pub fn cmd_build(command: radix_module::services::BuildCommand, format: bool, li
     // Single-file Rust builds that need the `faber` runtime / tokio (from HIR facts,
     // not emitted-text sniffing) emit a generated Cargo crate under
     // `target/faber/`. Programs without those deps keep the bare `.rs` path.
-    if target == radix_module::codegen::Target::HirRust {
+    if target == Target::HirRust {
         match single_file_rust_runtime_plan(&config, &input_path) {
             Ok(plan) if plan.requires_generated_crate() => {
                 let package_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -644,11 +644,10 @@ pub fn use_package_compiler(target: Target, path: &std::path::Path, force_packag
     false
 }
 
-/// CLI-argument variant of target-aware package routing.
+/// CLI-argument variant of [`use_package_compiler`].
 ///
-/// Standard-input builds (`-`) cannot be package builds because package
-/// discovery needs filesystem paths for imports, manifests, and generated
-/// layouts.
+/// See [`should_treat_as_package_from_args`] for the stdin guard shared with
+/// check-only routing.
 pub fn use_package_compiler_from_args(
     target: Target,
     input: &[String],
