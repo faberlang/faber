@@ -83,6 +83,45 @@ pub struct DeviceExecuteReceipt {
     /// Program-graph SHA-256 receipt.
     #[serde(default)]
     pub program_graph_hash: String,
+    /// Child file-read wall (descriptor + module + inputs).
+    #[serde(default)]
+    pub file_read_us: u64,
+    /// Descriptor JSON decode wall.
+    #[serde(default)]
+    pub descriptor_decode_us: u64,
+    /// Inputs JSON decode wall (packed weights ride this file).
+    #[serde(default)]
+    pub json_decode_us: u64,
+    /// Composite-host construction wall (Metal device admit).
+    #[serde(default)]
+    pub host_construct_us: u64,
+    /// Session create wall (module compile + PerProgram alloc).
+    #[serde(default)]
+    pub session_create_us: u64,
+    /// Module compile + pipeline-create wall inside session create.
+    #[serde(default)]
+    pub load_module_us: u64,
+    /// PerProgram allocation wall inside session create.
+    #[serde(default)]
+    pub per_program_alloc_us: u64,
+    /// Host→device copy-in wall (packed-weight upload on SingleRun).
+    #[serde(default)]
+    pub copy_in_us: u64,
+    /// Kernel encode + submit + blocking wait (true GPU step time).
+    #[serde(default)]
+    pub gpu_encode_submit_wait_us: u64,
+    /// Observation readback wall.
+    #[serde(default)]
+    pub readback_us: u64,
+    /// Child wall from first file read through teardown (excludes dyld).
+    #[serde(default)]
+    pub cli_internal_us: u64,
+    /// Parent temp-file write wall (descriptor + module + inputs JSON).
+    #[serde(default)]
+    pub parent_write_files_us: u64,
+    /// Parent `Command::output` wall (process start through child exit).
+    #[serde(default)]
+    pub parent_child_wait_us: u64,
 }
 
 impl DeviceExecuteReceipt {
@@ -131,14 +170,19 @@ fn execute_device_at(
     host: &Path,
     request: &DeviceExecuteRequest,
 ) -> Result<DeviceExecuteReceipt, HostSpawnError> {
+    use std::time::Instant;
+
     let work = WorkDir::create()?;
     let descriptor_path = work.path.join("descriptor.json");
     let module_path = work.path.join("module.bin");
     let inputs_path = work.path.join("inputs.json");
+    let write_started = Instant::now();
     write_file(&descriptor_path, &request.descriptor_json)?;
     write_file(&module_path, &request.module_image)?;
     write_file(&inputs_path, &request.inputs_json)?;
+    let parent_write_files_us = elapsed_us(write_started);
 
+    let child_started = Instant::now();
     let output = Command::new(host)
         .args([
             "device-execute",
@@ -156,8 +200,17 @@ fn execute_device_at(
             code: "E_HOST_SPAWN".to_owned(),
             message: format!("failed to spawn {}: {error}", host.display()),
         })?;
+    let parent_child_wait_us = elapsed_us(child_started);
 
-    decode_device_execute_output(output.status.code(), &output.stdout, &output.stderr)
+    let mut receipt =
+        decode_device_execute_output(output.status.code(), &output.stdout, &output.stderr)?;
+    receipt.parent_write_files_us = parent_write_files_us;
+    receipt.parent_child_wait_us = parent_child_wait_us;
+    Ok(receipt)
+}
+
+fn elapsed_us(start: std::time::Instant) -> u64 {
+    u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX)
 }
 
 /// Decode one `device-execute` child response.
