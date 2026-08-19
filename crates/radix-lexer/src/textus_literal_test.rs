@@ -2,7 +2,7 @@
 //! Proves: basic escapes, unknown escape passthrough, boundary cases
 //! (trailing backslash, empty string).
 
-use super::decode_textus_literal;
+use crate::textus_literal::decode_textus_literal;
 
 #[test]
 fn decode_plain_text_passthrough() {

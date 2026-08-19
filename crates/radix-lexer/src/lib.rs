@@ -39,6 +39,26 @@ mod keywords;
 mod scan;
 mod token;
 
+/// Literal payload contracts: the lexer reports raw `Ascii`/`Octeti`/`Textus`
+/// tokens with shallow delimiter matching; these modules own the source-level
+/// decode/escape/validation contracts shared by semantic analysis, forma, and
+/// MIR lowering.
+pub mod ascii_literal;
+pub mod octeti_literal;
+pub mod textus_literal;
+
+#[cfg(test)]
+#[path = "ascii_literal_test.rs"]
+mod ascii_literal_tests;
+
+#[cfg(test)]
+#[path = "octeti_literal_test.rs"]
+mod octeti_literal_tests;
+
+#[cfg(test)]
+#[path = "textus_literal_test.rs"]
+mod textus_literal_tests;
+
 use std::collections::HashMap;
 
 pub use cursor::Cursor;

@@ -59,7 +59,7 @@
 pub mod abi;
 #[cfg(feature = "device")]
 pub mod air;
-pub mod ascii_literal;
+pub use radix_lexer::ascii_literal;
 pub mod aspect;
 #[cfg(test)]
 pub mod backend_smoke;
@@ -83,7 +83,7 @@ pub mod llvm_host;
 pub mod locale;
 #[cfg(feature = "mir-core")]
 pub mod mir;
-pub mod octeti_literal;
+pub use radix_lexer::octeti_literal;
 pub mod parser;
 pub mod paths;
 pub mod program;
@@ -93,7 +93,7 @@ pub mod services;
 pub mod syntax;
 #[cfg(test)]
 pub mod test_support;
-pub mod textus_literal;
+pub use radix_lexer::textus_literal;
 
 use std::path::Path;
 

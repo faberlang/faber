@@ -57,7 +57,3 @@ fn hex_pair_byte(hi: char, lo: char) -> Result<u8, OctetiLiteralError> {
     )]
     Ok(((hi << 4) | lo) as u8)
 }
-
-#[cfg(test)]
-#[path = "octeti_literal_test.rs"]
-mod tests;

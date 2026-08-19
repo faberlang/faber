@@ -53,7 +53,3 @@ pub fn decode_ascii_literal(raw: &str) -> Result<String, AsciiLiteralError> {
 
     Ok(decoded)
 }
-
-#[cfg(test)]
-#[path = "ascii_literal_test.rs"]
-mod tests;
