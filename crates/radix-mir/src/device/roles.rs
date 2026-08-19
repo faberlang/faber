@@ -37,11 +37,15 @@ impl MirDeviceContext {
 
     #[must_use]
     pub fn role_for_function(&self, function: &MirFunction) -> Option<MirDeviceRole> {
-        self.by_function_id.get(&function.id).copied().or_else(|| {
-            function
-                .source
-                .and_then(|def_id| self.by_def_id.get(&def_id).copied())
-        })
+        self.by_function_id
+            .get(&function.id)
+            .copied()
+            .or_else(|| function.source.and_then(|def_id| self.role_for_def(def_id)))
+    }
+
+    #[must_use]
+    pub fn role_for_def(&self, def_id: DefId) -> Option<MirDeviceRole> {
+        self.by_def_id.get(&def_id).copied()
     }
 
     #[must_use]
