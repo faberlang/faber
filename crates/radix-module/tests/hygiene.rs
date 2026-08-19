@@ -70,14 +70,11 @@ const BUDGETS: Budgets = Budgets {
     // `let _ =` discards; remaining sites are deliberate side-effect binds
     // in lowering/resolver paths.
     let_underscore: 6,
-    // WHY: remaining inline bodies: annotation.rs, forma/author/emit.rs,
-    // and (Wave 1) driver/shader_contract.rs (identity-resolved shader-contract
-    // ingestion tests). broadcast_reduction extracted 2026-08-19.
-    inline_test_modules: 3,
-    // WHY: files that still embed #[test] in production sources (annotation,
-    // forma emit, function_facts) + the Wave-1 driver/shader_contract.rs inline
-    // test module. Ceiling only.
-    test_attr_in_production: 4,
+    // All inline `mod tests { … }` bodies extracted to *_test.rs companions
+    // (2026-08-19: annotation, emit, shader_contract, broadcast_reduction).
+    inline_test_modules: 0,
+    // All #[test] attrs moved out of production sources into companions.
+    test_attr_in_production: 0,
 };
 
 #[test]
