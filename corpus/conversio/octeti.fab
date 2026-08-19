@@ -64,7 +64,9 @@ main {
     print adec
 
     # octeti → ascii with recovery (non-ASCII byte → recovery value)
+    # A one-scalar ascii literal is ascii<1>, which does not assign to bare
+    # ascii. Recovery for ↦ ascii must be bare ascii (a multi-char literal).
     const bytes nonAscii ← |ff|
-    const ascii arecovery ← nonAscii ↦ ascii ⇥ 'x'
+    const ascii arecovery ← nonAscii ↦ ascii ⇥ 'n/a'
     print arecovery
 }
