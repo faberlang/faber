@@ -6,18 +6,13 @@
 //! gathered before emission, not substrings recovered from generated code.
 
 #[cfg(feature = "hir-rust")]
-mod rust;
-#[cfg(feature = "hir-ts")]
-mod ts;
-
-#[cfg(feature = "hir-rust")]
 pub use crate::codegen::rust::used_import_defs;
 #[cfg(feature = "hir-go")]
 pub use radix_hir_go::{collect_go_needs, GoNeeds};
 #[cfg(feature = "hir-rust")]
-pub use rust::{collect_rust_needs, RustNeeds};
+pub use radix_hir_rust::needs::{collect_rust_needs, RustNeeds};
 #[cfg(feature = "hir-ts")]
-pub use ts::{collect_ts_needs, TsNeeds, TsNeedsKind};
+pub use radix_hir_ts::needs::{collect_ts_needs, TsNeeds, TsNeedsKind};
 
 /// Guard helper: production policy must not use body-text `code.contains` for import decisions.
 #[cfg(test)]

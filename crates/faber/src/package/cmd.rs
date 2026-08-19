@@ -526,7 +526,7 @@ fn single_file_rust_runtime_plan(
     })?;
     let session = Session::new(config.clone());
     let analysis = analyze_prepared_program_path(&session, input_path, &source)?;
-    let needs = radix_module::codegen::collect_rust_needs(
+    let needs = radix_hir_rust::needs::collect_rust_needs(
         &analysis.hir,
         &analysis.types,
         std::collections::BTreeSet::new(),
