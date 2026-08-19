@@ -22,7 +22,6 @@
 //! - Target dispatch is explicit so adding a backend must also choose its
 //!   public [`crate::Output`] variant.
 
-pub mod breakable;
 pub use radix_semantic::coverage;
 pub mod conversio_coverage;
 #[cfg(feature = "hir-faber")]
