@@ -3,11 +3,12 @@
 use super::test_support;
 use super::*;
 use crate::codegen::Target;
+use crate::hir::{HirItemKind, HirStatementKind};
 use crate::lexer::{lex, Interner};
 use crate::parser::parse;
 use crate::semantic::passes::collect;
 use crate::semantic::passes::resolve::resolve;
-use crate::semantic::{MarkerFamily, NumericWidth, Resolver, TypeTable};
+use crate::semantic::{InstansPrecision, MarkerFamily, NumericWidth, Resolver, TypeTable};
 
 fn resolve_alias(source: &str) -> (TypeTable, crate::semantic::TypeId) {
     let mut parsed = parse(lex(source));
@@ -156,6 +157,279 @@ fn unsolved_numerus_hole_errors() {
 }",
         "marker_width_unsolved",
     );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn numerus_hole_interns_sized_i32_not_i64() {
+    let unit = test_support::analyze_ok(
+        r"incipit {
+    fixum numerus<_> n ← 1 ∷ numerus<i32>
+    nota n
+}",
+    );
+    let tys = test_support::entry_local_tys(&unit);
+    assert_eq!(tys.len(), 1);
+    assert!(
+        matches!(
+            unit.types.get(tys[0]),
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::I32)
+        ),
+        "numerus<_> ← i32 must intern sized i32, got {:?}",
+        unit.types.get(tys[0])
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn numerus_hole_and_bare_are_two_interned_types() {
+    let unit = test_support::analyze_ok(
+        r"incipit {
+    fixum numerus a ← 42
+    fixum numerus<_> b ← 42
+    nota a
+    nota b
+}",
+    );
+    let tys = test_support::entry_local_tys(&unit);
+    assert_eq!(tys.len(), 2);
+    assert!(
+        matches!(unit.types.get(tys[0]), Type::Primitive(Primitive::Numerus)),
+        "bare numerus stays Primitive, got {:?}",
+        unit.types.get(tys[0])
+    );
+    assert!(
+        matches!(
+            unit.types.get(tys[1]),
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::I64)
+        ),
+        "numerus<_> from 42 materializes sized i64, got {:?}",
+        unit.types.get(tys[1])
+    );
+    assert_ne!(tys[0], tys[1], "same width, two interned types");
+    assert!(unit.types.equals(tys[0], tys[1]), "bare numerus still equals sized i64");
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn fractus_hole_interns_sized_f32() {
+    let unit = test_support::analyze_ok(
+        r"incipit {
+    fixum fractus<_> x ← 1.0 ∷ fractus<f32>
+    nota x
+}",
+    );
+    let tys = test_support::entry_local_tys(&unit);
+    assert_eq!(tys.len(), 1);
+    assert!(
+        matches!(
+            unit.types.get(tys[0]),
+            Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32)
+        ),
+        "got {:?}",
+        unit.types.get(tys[0])
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn fractus_hole_materializes_bare_witness_to_f64() {
+    let unit = test_support::analyze_ok(
+        r"incipit {
+    fixum fractus<_> x ← 1.0
+    nota x
+}",
+    );
+    let tys = test_support::entry_local_tys(&unit);
+    assert_eq!(tys.len(), 1);
+    assert!(
+        matches!(
+            unit.types.get(tys[0]),
+            Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64)
+        ),
+        "fractus<_> from 1.0 must materialize sized f64, got {:?}",
+        unit.types.get(tys[0])
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn fractus_hole_rejects_numerus_witness() {
+    test_support::assert_rejects_with_issue(
+        r"incipit {
+    fixum fractus<_> x ← 1 ∷ numerus<i32>
+    nota x
+}",
+        "expression_type_mismatch",
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn modulus_hole_interns_u32() {
+    let unit = test_support::analyze_ok(
+        r"incipit {
+    fixum modulus<_> m ← 1 ∷ modulus<u32>
+    nota m
+}",
+    );
+    let tys = test_support::entry_local_tys(&unit);
+    assert_eq!(tys.len(), 1);
+    assert!(
+        matches!(unit.types.get(tys[0]), Type::ModularWord(NumericWidth::U32)),
+        "got {:?}",
+        unit.types.get(tys[0])
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn modulus_hole_rejects_signed_numerus() {
+    test_support::assert_analysis_rejects_with_issue(
+        r"incipit {
+    fixum modulus<_> m ← 1 ∷ numerus<i32>
+    nota m
+}",
+        "expression_type_mismatch",
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn instans_hole_interns_millis() {
+    let unit = test_support::analyze_ok(
+        r"functio pin(instans<ms> t) → vacuum {
+    fixum instans<_> hole ← t
+    nota hole
+}",
+    );
+    let HirItemKind::Function(function) = &unit.hir.items[0].kind else {
+        panic!("expected function");
+    };
+    let body = function.body.as_ref().expect("body");
+    let HirStatementKind::Local(local) = &body.statements[0].kind else {
+        panic!("expected local");
+    };
+    let ty = local.ty.expect("hole type");
+    assert!(
+        matches!(unit.types.get(ty), Type::SizedInstans(InstansPrecision::Millis)),
+        "got {:?}",
+        unit.types.get(ty)
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn instans_hole_rejects_numerus_witness() {
+    test_support::assert_rejects_with_issue(
+        r"incipit {
+    fixum instans<_> t ← 1
+    nota t
+}",
+        "expression_type_mismatch",
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn instans_hole_from_bare_stays_seconds() {
+    let unit = test_support::analyze_ok(
+        r"functio pin(instans t) → vacuum {
+    fixum instans<_> hole ← t
+    nota hole
+}",
+    );
+    let HirItemKind::Function(function) = &unit.hir.items[0].kind else {
+        panic!("expected function");
+    };
+    let body = function.body.as_ref().expect("body");
+    let HirStatementKind::Local(local) = &body.statements[0].kind else {
+        panic!("expected local");
+    };
+    let ty = local.ty.expect("hole type");
+    assert!(
+        matches!(unit.types.get(ty), Type::Primitive(Primitive::Instans)),
+        "bare instans witness keeps seconds, got {:?}",
+        unit.types.get(ty)
+    );
+}
+
+#[test]
+fn unsolved_numerus_binding_errors() {
+    test_support::assert_analysis_rejects_with_issue(
+        r"functio k() → vacuum {
+    fixum numerus<_> n
+    tacet
+}",
+        "marker_width_unsolved",
+    );
+}
+
+#[test]
+fn unsolved_fractus_and_modulus_holes_error() {
+    test_support::assert_analysis_rejects_with_issue(
+        r"functio k() → fractus<_> {
+    tacet
+}",
+        "marker_width_unsolved",
+    );
+    test_support::assert_analysis_rejects_with_issue(
+        r"functio k() → modulus<_> {
+    tacet
+}",
+        "marker_width_unsolved",
+    );
+}
+
+#[test]
+fn convert_hint_hole_rejected_as_binding() {
+    test_support::assert_analysis_rejects_with_issue(
+        r"incipit {
+    fixum numerus<u32, _> n ← 1
+    nota n
+}",
+        "numerus_width_params",
+    );
+}
+
+#[test]
+fn harness_exact_i32_does_not_join_i64() {
+    let mut types = TypeTable::new();
+    let resolver = Resolver::new();
+    let interner = Interner::new();
+    let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+    let hole = checker
+        .types
+        .intern(Type::MarkerHole { family: MarkerFamily::Numerus, var: InferVar(1) });
+    let i32_ty = checker
+        .types
+        .sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    let i64_ty = checker
+        .types
+        .sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let span = crate::lexer::Span::default();
+    checker.unify_assign_issue(i32_ty, hole, span, "expression_type_mismatch");
+    assert!(checker.errors.is_empty(), "{:?}", checker.errors);
+    checker.unify_assign_issue(i64_ty, hole, span, "expression_type_mismatch");
+    assert!(!checker.errors.is_empty(), "numerus<_> solved to i32 must not then accept i64");
+}
+
+#[test]
+fn harness_family_mismatch_does_not_bind() {
+    let mut types = TypeTable::new();
+    let resolver = Resolver::new();
+    let interner = Interner::new();
+    let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+    let hole = checker
+        .types
+        .intern(Type::MarkerHole { family: MarkerFamily::Numerus, var: InferVar(2) });
+    let f32_ty = checker
+        .types
+        .sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let span = crate::lexer::Span::default();
+    let unified = checker.unify_assign_issue(f32_ty, hole, span, "expression_type_mismatch");
+    assert!(!checker.errors.is_empty());
+    assert_eq!(unified, checker.error_type);
 }
 
 #[test]

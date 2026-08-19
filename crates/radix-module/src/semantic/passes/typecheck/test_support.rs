@@ -20,8 +20,9 @@
 
 use crate::codegen::Target;
 use crate::diagnostics::Diagnostic;
-use crate::driver;
-use crate::semantic::SemanticError;
+use crate::driver::{self, AnalyzedModule};
+use crate::hir::HirStatementKind;
+use crate::semantic::{SemanticError, TypeId};
 use crate::{CompileResult, Compiler, Config};
 
 /// File name used for diagnostic identity in compile/analyse calls.
@@ -60,6 +61,31 @@ pub fn analyze_and_get_diagnostics(source: &str) -> Vec<Diagnostic> {
         Ok(unit) => unit.diagnostics,
         Err(diagnostics) => diagnostics,
     }
+}
+
+/// Analyze and return the unit when typecheck produced no errors.
+pub fn analyze_ok(source: &str) -> AnalyzedModule {
+    let session = driver::Session::new(Config::default().with_target(Target::HirRust));
+    let unit = driver::analyze_source(&session, TEST_NAME, source).expect("analyze");
+    assert!(
+        !unit.diagnostics.iter().any(Diagnostic::is_error),
+        "diagnostics: {:?}",
+        unit.diagnostics
+    );
+    unit
+}
+
+/// TypeIds of `incipit` locals, in source order.
+pub fn entry_local_tys(unit: &AnalyzedModule) -> Vec<TypeId> {
+    let entry = unit.hir.entry.as_ref().expect("incipit");
+    entry
+        .statements
+        .iter()
+        .filter_map(|stmt| match &stmt.kind {
+            HirStatementKind::Local(local) => local.ty,
+            _ => None,
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------

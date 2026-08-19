@@ -123,6 +123,122 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
+#[test]
+fn mixed_hole_first_param_is_bare_numerus() {
+    let unit = super::test_support::analyze_ok(
+        r#"functio both<A, B>(A a, B b) → A {
+    redde a
+}
+
+incipit {
+    fixum _ x ← both<_, textus>(1, "k")
+    nota x
+}"#,
+    );
+    let tys = super::test_support::entry_local_tys(&unit);
+    assert_eq!(tys.len(), 1);
+    assert!(
+        matches!(
+            unit.types.get(tys[0]),
+            crate::semantic::Type::Primitive(crate::semantic::Primitive::Numerus)
+        ),
+        "both<_, textus>(1, \"k\") must solve A to bare numerus, got {:?}",
+        unit.types.get(tys[0])
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn mixed_hole_second_param_solves_from_argument() {
+    let unit = super::test_support::analyze_ok(
+        r#"functio both<A, B>(A a, B b) → B {
+    redde b
+}
+
+incipit {
+    fixum _ x ← both<numerus, _>(1, "k")
+    nota x
+}"#,
+    );
+    let tys = super::test_support::entry_local_tys(&unit);
+    assert_eq!(tys.len(), 1);
+    assert!(
+        matches!(
+            unit.types.get(tys[0]),
+            crate::semantic::Type::Primitive(crate::semantic::Primitive::Textus)
+        ),
+        "both<numerus, _>(1, \"k\") must solve B to textus, got {:?}",
+        unit.types.get(tys[0])
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn constrained_generic_call_hole_solves_then_checks_domain() {
+    accepts(
+        r#"@ radix typus T in textus lista<textus> octeti
+functio load<T>(T value) → T {
+    redde value
+}
+
+incipit {
+    fixum textus body ← load<_>("body")
+    nota body
+}"#,
+    );
+}
+
+#[test]
+fn constrained_generic_call_hole_rejects_after_solve() {
+    rejects_with_args(
+        r#"@ radix typus T in textus lista<textus> octeti
+functio load<T>(T value) → T {
+    redde value
+}
+
+incipit {
+    fixum numerus n ← load<_>(1)
+    nota n
+}"#,
+        &[
+            DiagnosticArg::new("issue", "generic_type_arg_domain"),
+            DiagnosticArg::new("rejected", "numerus"),
+            DiagnosticArg::new("param", "T"),
+            DiagnosticArg::new("accepted", "textus, octeti, lista<textus>"),
+        ],
+    );
+}
+
+#[test]
+fn explicit_generic_call_rejects_union_hole_in_second_slot() {
+    rejects_with_issue(
+        r#"functio both<A, B>(A a, B b) → A {
+    redde a
+}
+
+incipit {
+    fixum _ x ← both<textus, ∪>("k", 1)
+}"#,
+        "explicit_union_type_arg_unsupported",
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn genus_applied_hole_solves_from_field() {
+    accepts(
+        r"genus C<T> {
+    T value
+}
+
+incipit {
+    fixum C<_> x ← C { value = 1 }
+    nota x
+}",
+    );
+}
+
 #[test]
 fn explicit_generic_call_hole_still_requires_exact_arity() {
     rejects_with_issue(
