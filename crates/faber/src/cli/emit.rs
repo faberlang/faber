@@ -97,6 +97,34 @@ pub enum FaberCliTarget {
     /// Experimental MIR-backed Racket s-expression probe.
     #[value(name = "sexp", alias = "racket", alias = "lisp")]
     MirSexp,
+
+    /// Swift backend.
+    #[value(name = "swift")]
+    HirSwift,
+
+    /// HIR artifact serialization target.
+    #[value(name = "fhir")]
+    HirFhir,
+
+    /// Native host executable product target.
+    #[value(name = "llvm-host")]
+    MirLlvmHost,
+
+    /// Legacy source-backed MIR package artifact runtime.
+    #[value(name = "scena", hide = true)]
+    MirScena,
+
+    /// Source-independent package MIR text image.
+    #[value(name = "fmir-text")]
+    MirFmir,
+
+    /// Source-independent package MIR binary image.
+    #[value(name = "fmir")]
+    MirFmirBinary,
+
+    /// Direct runnable binary wrapper with embedded package MIR image bytes.
+    #[value(name = "fmir-bin")]
+    MirFmirBundle,
 }
 
 impl FaberCliTarget {
@@ -119,6 +147,13 @@ impl FaberCliTarget {
             FaberCliTarget::MirMetal => radix_module::codegen::Target::MirMetal,
             FaberCliTarget::MirWgsl => radix_module::codegen::Target::MirWgsl,
             FaberCliTarget::MirSexp => radix_module::codegen::Target::MirSexp,
+            FaberCliTarget::HirSwift => radix_module::codegen::Target::HirSwift,
+            FaberCliTarget::HirFhir => radix_module::codegen::Target::HirFhir,
+            FaberCliTarget::MirLlvmHost => radix_module::codegen::Target::MirLlvmHost,
+            FaberCliTarget::MirScena => radix_module::codegen::Target::MirScena,
+            FaberCliTarget::MirFmir => radix_module::codegen::Target::MirFmir,
+            FaberCliTarget::MirFmirBinary => radix_module::codegen::Target::MirFmirBinary,
+            FaberCliTarget::MirFmirBundle => radix_module::codegen::Target::MirFmirBundle,
         }
     }
 }

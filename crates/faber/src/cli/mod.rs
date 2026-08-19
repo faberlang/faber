@@ -46,7 +46,7 @@ pub enum Command {
     Check(CheckArgs),
 
     /// Run aspect verification on a single file
-    Verify(radix_module::tool::VerifyArgs),
+    Verify(VerifyArgs),
 
     /// Verify a library package's target binding manifest
     VerifyLibrary(VerifyLibraryArgs),
@@ -71,19 +71,19 @@ pub enum Command {
     FmirRun(FmirRunArgs),
 
     /// Tokenize source and output JSON (compatibility alias for `radix lex`)
-    Lex(radix_module::tool::InputArgs),
+    Lex(InputArgs),
 
     /// Parse source and output AST as JSON (compatibility alias for `radix parse`)
-    Parse(radix_module::tool::InputArgs),
+    Parse(InputArgs),
 
     /// Lower AST to HIR and output as JSON (compatibility alias for `radix hir`)
-    Hir(radix_module::tool::InputArgs),
+    Hir(InputArgs),
 
     /// Lower checked HIR to MIR and output a deterministic text dump (compatibility alias for `radix mir`)
-    Mir(radix_module::tool::InputArgs),
+    Mir(InputArgs),
 
     /// Validate and output normalized CLI IR as JSON (compatibility alias for `radix cli-ir`)
-    CliIr(radix_module::tool::InputArgs),
+    CliIr(InputArgs),
 
     /// Compile to target for stdout (compatibility alias for `radix emit`)
     Emit(EmitArgs),
@@ -188,7 +188,7 @@ pub struct ConvertArgs {
 pub struct BuildArgs {
     /// Output target language
     #[arg(short = 't', long = "target", value_enum)]
-    pub target: Option<radix_module::tool::CliTarget>,
+    pub target: Option<FaberCliTarget>,
 
     /// Output directory for generated files
     #[arg(short = 'o', long = "out-dir", default_value = ".")]
@@ -230,6 +230,28 @@ pub struct BuildArgs {
     /// Input file or package path
     #[arg(value_name = "INPUT")]
     pub input: String,
+}
+
+/// Shared source-input grammar for phase inspection commands.
+#[derive(clap::Args, Debug)]
+pub struct InputArgs {
+    /// Load a pre-analyzed HIR artifact from a .fhir file
+    #[arg(long, value_name = "FILE")]
+    pub load: Option<PathBuf>,
+
+    /// Input file path, or '-' / omitted for stdin
+    pub input: Vec<String>,
+}
+
+/// Parsed `verify` command payload after clap normalization.
+#[derive(clap::Args, Debug)]
+pub struct VerifyArgs {
+    /// Force package verification mode
+    #[arg(long)]
+    pub package: bool,
+
+    /// Input file, or '-' / omitted for stdin
+    pub input: Vec<String>,
 }
 
 /// Arguments for `faber check`.

@@ -13,7 +13,7 @@ use crate::import_resolve::library_home_test_support;
 use crate::semantic::passes::visibility_annotation::VisibilityTier;
 use crate::semantic::SemanticErrorKind;
 use crate::test_support::args_have_no_legacy_message;
-use crate::tool::check_diagnostics_for_source;
+use crate::services::check_diagnostics_for_source;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -207,7 +207,7 @@ fn module_analysis_does_not_derive_contracts_from_path_name() {
     fs::write(&consumer, consumer_source("./probe", "probe", "aperta")).expect("consumer");
     let source = fs::read_to_string(&consumer).expect("read");
     let session = crate::driver::Session::new(crate::driver::Config::default());
-    let prepared = crate::tool::commands::compile::prepare_program_module(&consumer, &source, &session)
+    let prepared = crate::program::compile::prepare_program_module(&consumer, &source, &session)
         .expect("program helper builds contracts from the path");
     assert!(
         prepared.contract.file_interfaces.contains_key("probe"),
@@ -295,7 +295,7 @@ incipit {
 
 // ──── Integration matrix ────
 
-fn check_same_package(member: &str) -> crate::tool::CheckDiagnosticsResult {
+fn check_same_package(member: &str) -> crate::services::CheckDiagnosticsResult {
     let (_td, root) = temp_dir(&format!("same-{member}"));
     write_lib_manifest(&root, "probe");
     write_target_lib(&root, "probe");
@@ -305,7 +305,7 @@ fn check_same_package(member: &str) -> crate::tool::CheckDiagnosticsResult {
     check_diagnostics_for_source(&consumer.display().to_string(), &source, false)
 }
 
-fn check_cross_package(member: &str) -> crate::tool::CheckDiagnosticsResult {
+fn check_cross_package(member: &str) -> crate::services::CheckDiagnosticsResult {
     let (_td, home) = temp_dir(&format!("cross-{member}"));
     let probe = home.join("probe");
     write_lib_manifest(&probe, "probe");

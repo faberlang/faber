@@ -86,7 +86,8 @@ impl ModuleGraph {
     }
 
     /// Library import bindings from `from`, in recorded order.
-    pub fn library_edges(&self, from: &ModuleId) -> &[LibraryImportBinding] {
+    #[allow(dead_code)]
+    pub(crate) fn library_edges(&self, from: &ModuleId) -> &[LibraryImportBinding] {
         self.library.get(from).map(Vec::as_slice).unwrap_or(&[])
     }
 
@@ -167,7 +168,8 @@ impl AnalyzedProgram {
         self.nodes.iter().find(|(_, node)| node.path == path)
     }
 
-    pub fn node_by_path_mut(
+    #[allow(dead_code)]
+    pub(crate) fn node_by_path_mut(
         &mut self,
         path: &Path,
     ) -> Option<(&ModuleId, &mut AnalyzedProgramNode)> {

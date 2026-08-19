@@ -376,7 +376,7 @@ fn json_string_array_items(values: &[String]) -> String {
 /// public serialization contract. This helper keeps those surfaces valid for
 /// strings that come from source text or diagnostics.
 #[must_use]
-pub fn escape_json(s: &str) -> String {
+pub(crate) fn escape_json(s: &str) -> String {
     let mut escaped = String::with_capacity(s.len());
     for ch in s.chars() {
         match ch {

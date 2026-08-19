@@ -12,7 +12,7 @@ use crate::mir::{
     InferenceBlockerCategory, InferenceBlockerStatus, TensorOperationFloorStatus, TensorOperationFloorTarget,
     TensorPlacementFacet, TensorPlacementStatus, TensorSystemsTarget, TensorSystemsTargetStatus,
 };
-use crate::tool::{target_capabilities_for_surface, TargetCommandSurface};
+use crate::services::{target_capabilities_for_surface, TargetCommandSurface};
 
 #[test]
 fn readiness_matrix_covers_rank2_and_reductions_across_requested_paths() {

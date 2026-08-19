@@ -24,7 +24,7 @@ use crate::lexer;
 use crate::locale::{latin_locale_pack, KeywordSurface};
 use crate::parser;
 #[cfg(feature = "hir-faber")]
-use crate::tool::commands::compile::prepare_program_module_for_name;
+use crate::program::compile::prepare_program_module_for_name;
 use crate::{Diagnostic, FaberOutput};
 
 use super::author;

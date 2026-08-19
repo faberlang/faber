@@ -9,8 +9,8 @@
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::forma::compile_canonical;
-use crate::tool::check_diagnostics_for_source_with_locale_pack;
-use crate::tool::commands::compile::clear_import_target_cache;
+use crate::services::check_diagnostics_for_source_with_locale_pack;
+use crate::program::compile::clear_import_target_cache;
 use std::env;
 use std::fs;
 use std::path::PathBuf;

@@ -340,7 +340,7 @@ fn absolute_path(path: &Path) -> PathBuf {
     }
 }
 
-pub(crate) fn find_package_root(from_file: &Path) -> Option<PathBuf> {
+pub fn find_package_root(from_file: &Path) -> Option<PathBuf> {
     let start = from_file.parent()?.to_path_buf();
     PACKAGE_ROOT_CACHE.with(|cache| {
         let mut cache = cache.borrow_mut();
@@ -466,7 +466,7 @@ fn parse_manifest_provider_name(toml_source: &str) -> Option<String> {
     None
 }
 
-fn library_home() -> Option<PathBuf> {
+pub fn library_home() -> Option<PathBuf> {
     // Thread-local override (test-only): isolate compile_test env-var mutations
     // so parallel vertex-source tests don't pick up a transient temp path.
     #[cfg(test)]

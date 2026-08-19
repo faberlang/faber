@@ -235,7 +235,7 @@ incipit {
     let source = fs::read_to_string(&app).expect("read app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         !result.success,
         "interna import must fail closed to a cross-package consumer: {:?}",
@@ -296,7 +296,7 @@ incipit {
     let source = fs::read_to_string(&app).expect("read app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         result.success,
         "publica import must stay importable: {:?}",
@@ -355,7 +355,7 @@ incipit {
     let source = fs::read_to_string(&app).expect("read app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         !result.success,
         "interna type import must fail closed cross-package: {:?}",
@@ -411,7 +411,7 @@ incipit {
     let source = fs::read_to_string(&app).expect("read app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         result.success,
         "publica type alias must stay importable: {:?}",
@@ -477,7 +477,7 @@ incipit {
     let source = fs::read_to_string(&app).expect("read app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         !result.success,
         "interna type alias must fail closed to a cross-package consumer: {:?}",
@@ -540,7 +540,7 @@ incipit {
     let source = fs::read_to_string(&app).expect("read app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         !result.success,
         "unmarked type alias must be module-private: {:?}",
@@ -583,7 +583,7 @@ main {
     // Same seam as `radix check`: the en reader pack drives lexing of both the
     // consumer and its relative import target.
     let en_pack = en_locale_pack();
-    let result = crate::tool::check_diagnostics_for_source_with_locale_pack(
+    let result = crate::services::check_diagnostics_for_source_with_locale_pack(
         &app.display().to_string(),
         &source,
         false,
@@ -754,7 +754,7 @@ incipiet {
     let source = fs::read_to_string(&app).expect("read app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         result.success,
         "legacy @ futura import must typecheck as promissum for tacebit: {:?}",
@@ -811,7 +811,7 @@ functio caller() fiet → vacuum ⇥ textus {
     let source = fs::read_to_string(&app).expect("read app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         result.success,
         "imported failable @ futura function must expose promissum<T ⇥ E> for tacebit: {:?}",
@@ -879,7 +879,7 @@ incipit {
     let source = fs::read_to_string(&app).expect("read");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
 
     assert!(
         result.success,
@@ -955,7 +955,7 @@ incipit {
     .expect("app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::compile_cli_path(&app, false, crate::codegen::Target::HirRust);
+    let result = crate::services::compile_cli_path(&app, false, crate::codegen::Target::HirRust);
 
     assert!(
         result.success(),
@@ -1069,7 +1069,7 @@ incipit {
         interface.exports.keys().collect::<Vec<_>>()
     );
 
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         result.success,
         "check must succeed without SEM002.file_interface_import_failed: {:?}",
@@ -1146,7 +1146,7 @@ incipit {
     // pange may still be present in the snapshot; install must skip it and keep salve.
     assert!(interface.exports.contains_key("salve"));
 
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         result.success,
         "salve must remain usable when pange is poison: {:?}",
@@ -1255,7 +1255,7 @@ incipit {
         interface.exports.keys().collect::<Vec<_>>()
     );
 
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         !result
             .diagnostics
@@ -1348,7 +1348,7 @@ incipit {
     let source = fs::read_to_string(&app).expect("read app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         result.success,
         "provider scene interface should install enum params and qualified fields: {:?}",
@@ -1485,7 +1485,7 @@ incipit {
         "mount ret must snapshot Mounted with a module identity, got {ret:?}"
     );
 
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         result.success,
         "browser seam shape must typecheck: {:?}",
@@ -1586,7 +1586,7 @@ incipit {
     let source = fs::read_to_string(&app).expect("read app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         result.success,
         "same-named local classes must typecheck: {:?}",
@@ -1652,7 +1652,7 @@ incipit {
             interface.exports.keys().collect::<Vec<_>>()
         );
     }
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         result.success,
         "norma:json facade must typecheck on tool path: {:?}",
@@ -1828,7 +1828,7 @@ incipit {
         );
     }
 
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         result.success,
         "imported instans-typed exports must typecheck, diagnostics={:?}",
@@ -1998,7 +1998,7 @@ fn probe(string selector) → string {
     let en_pack = en_locale_pack();
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source_with_locale_pack(
+    let result = crate::services::check_diagnostics_for_source_with_locale_pack(
         &app.display().to_string(),
         &source,
         false,
@@ -2136,7 +2136,7 @@ incipit {
     .expect("app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::compile_cli_path(&app, false, crate::codegen::Target::HirRust);
+    let result = crate::services::compile_cli_path(&app, false, crate::codegen::Target::HirRust);
 
     assert!(
         result.success(),
@@ -2240,7 +2240,7 @@ incipit {
     .expect("app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::compile_cli_path(&app, false, crate::codegen::Target::HirRust);
+    let result = crate::services::compile_cli_path(&app, false, crate::codegen::Target::HirRust);
 
     assert!(
         result.success(),
@@ -2306,7 +2306,7 @@ main {
     )
     .expect("write entry");
 
-    let identities = crate::tool::package_identity_facts_for_path(&entry)
+    let identities = crate::services::package_identity_facts_for_path(&entry)
         .expect("en-surface local imports must register identity facts");
     assert_eq!(identities.product, "geminus", "product derives from the package root");
     assert_eq!(
@@ -2360,7 +2360,7 @@ incipit {
     )
     .expect("write entry");
 
-    let identities = crate::tool::package_identity_facts_for_path(&entry)
+    let identities = crate::services::package_identity_facts_for_path(&entry)
         .expect("Latin local imports must register identity facts under the la pack");
     assert_eq!(identities.product, "adiutorium", "product derives from the package root");
     assert_eq!(
@@ -2389,7 +2389,7 @@ fn valid_tag_name(string name) → bool {
 }
 "#;
     let en_pack = en_locale_pack();
-    let result = crate::tool::check_diagnostics_for_source_with_locale_pack(
+    let result = crate::services::check_diagnostics_for_source_with_locale_pack(
         "en_contains_infer.fab",
         source,
         false,
@@ -2554,7 +2554,7 @@ incipit {
     let source = fs::read_to_string(&app).expect("read app");
     let la_pack = la_locale_pack();
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source_with_locale_pack(
+    let result = crate::services::check_diagnostics_for_source_with_locale_pack(
         &app.display().to_string(),
         &source,
         false,
@@ -2591,7 +2591,7 @@ incipit {
     let source = fs::read_to_string(&app).expect("read app");
     let la_pack = la_locale_pack();
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source_with_locale_pack(
+    let result = crate::services::check_diagnostics_for_source_with_locale_pack(
         &app.display().to_string(),
         &source,
         false,
@@ -2628,7 +2628,7 @@ incipit {
     let source = fs::read_to_string(&app).expect("read app");
     let la_pack = la_locale_pack();
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source_with_locale_pack(
+    let result = crate::services::check_diagnostics_for_source_with_locale_pack(
         &app.display().to_string(),
         &source,
         false,
@@ -2832,7 +2832,7 @@ incipit {
     let source = fs::read_to_string(&app).expect("read app");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::tool::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
     assert!(
         result.success,
         "imported union consumer must check green through the convert snapshot: {:?}",

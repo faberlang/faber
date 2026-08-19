@@ -199,7 +199,7 @@ fn count_diagnostics_with_issue(diagnostics: &[Diagnostic], code: &str, issue: &
 /// written into a fresh temp dir: `lib.fab` (contents `lib`) and a consumer
 /// file `consumer.fab` (contents `consumer`). Returns the normalized
 /// diagnostics for the consumer.
-fn check_two_file_package(lib: &str, consumer: &str, consumer_path: &Path) -> crate::tool::CheckDiagnosticsResult {
+fn check_two_file_package(lib: &str, consumer: &str, consumer_path: &Path) -> crate::services::CheckDiagnosticsResult {
     std::fs::create_dir_all(consumer_path.parent().expect("consumer in a dir")).expect("create temp package");
     std::fs::write(
         consumer_path
@@ -210,7 +210,7 @@ fn check_two_file_package(lib: &str, consumer: &str, consumer_path: &Path) -> cr
     )
     .expect("write lib.fab");
     std::fs::write(consumer_path, consumer).expect("write consumer");
-    crate::tool::check_diagnostics_for_source_with_locale_pack(
+    crate::services::check_diagnostics_for_source_with_locale_pack(
         &consumer_path.display().to_string(),
         consumer,
         false,

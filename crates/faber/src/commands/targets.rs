@@ -9,7 +9,7 @@
 //! per-row availability; device/host-leaf/device-runtime capability rows are
 //! **compiled-only** — a build without the feature reports no row for it.
 
-use radix_module::tool::{
+use radix_module::services::{
     target_capabilities_for_surface, TargetCapabilities, TargetCommandSurface,
 };
 use std::collections::BTreeSet;

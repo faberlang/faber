@@ -4451,7 +4451,7 @@ fn analyze_exemplum_for_mir_async(rel: &str) -> AnalyzedModule {
             .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     );
-    crate::tool::analyze_prepared_program_path(&session, &path, &source).unwrap_or_else(|diagnostics| {
+    crate::services::analyze_prepared_program_path(&session, &path, &source).unwrap_or_else(|diagnostics| {
         let facts: Vec<String> = diagnostics
             .iter()
             .map(|d| format!("{:?} {:?} {:?}", d.code, d.issue(), d.args))

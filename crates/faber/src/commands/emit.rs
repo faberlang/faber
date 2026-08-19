@@ -1,7 +1,7 @@
 //! `faber emit -t faber` policy wrapper.
 
 use crate::cli::FaberCliTarget;
-use radix_module::tool::EmitCommand;
+use radix_module::services::EmitCommand;
 
 pub fn cmd_emit_faber(command: EmitCommand, format: bool, linter: bool) {
     if command.package {
@@ -54,7 +54,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
         None => code_pack.clone(),
     };
 
-    let result = radix_module::tool::compile_cli_input_with_locale_pack(
+    let result = radix_module::services::compile_cli_input_with_locale_pack(
         &command.input,
         command.package,
         command.target,
@@ -63,7 +63,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
         command.module_name.as_deref(),
     );
 
-    radix_module::tool::print_diagnostics(
+    crate::postprocess::print_diagnostics(
         &result.diagnostics,
         command.diagnostic_mode,
         diagnostic_pack.as_ref(),
@@ -75,7 +75,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
     };
 
     if command.reflection {
-        let reflection_json = match radix_module::tool::output_reflection_json(&output) {
+        let reflection_json = match radix_module::services::output_reflection_json(&output) {
             Ok(Some(json)) => json,
             Ok(None) => {
                 eprintln!("error: target does not expose GPU reflection metadata");
@@ -87,7 +87,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
             }
         };
         if let Some(path) = command.output {
-            radix_module::tool::write_text_artifact(&path, &reflection_json);
+            crate::postprocess::write_text_artifact(&path, &reflection_json);
         } else {
             println!("{reflection_json}");
         }
@@ -100,7 +100,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
     }
 
     let code = crate::postprocess::postprocess_code(
-        radix_module::tool::output_code(output),
+        radix_module::services::output_code(output),
         command.target,
         format,
         linter,
