@@ -102,7 +102,7 @@ pub mod tensor_type_directed;
 
 /// Type information for a value currently visible in lexical scope.
 #[derive(Clone, Copy)]
-struct BindingInfo {
+pub struct BindingInfo {
     /// Table-local type of the binding after declaration or pattern checking.
     ty: TypeId,
     /// Proven single-scalar `textus`/`ascii` (literal, unit `sectio`, predicate param, or interval bound param).
@@ -112,7 +112,7 @@ struct BindingInfo {
 }
 
 /// Struct member information collected before expression checking begins.
-struct StructInfo {
+pub struct StructInfo {
     /// Field contracts keyed by lowered field symbol.
     fields: FxHashMap<Symbol, StructFieldInfo>,
 
@@ -123,7 +123,7 @@ struct StructInfo {
 
 /// Interface method contract plus availability metadata.
 #[derive(Clone)]
-struct InterfaceMethodInfo {
+pub struct InterfaceMethodInfo {
     sig: FuncSig,
     availability: Vec<HirAvailability>,
     span: radix_lexer::Span,
@@ -147,7 +147,7 @@ struct StructFieldInfo {
 
 /// Current alternate-exit context for `iace` and handled failable calls.
 #[derive(Clone, Copy)]
-enum ErrorSink {
+pub enum ErrorSink {
     /// Function-level alternate-exit type declared on the current function.
     Function(TypeId),
 

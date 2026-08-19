@@ -47,7 +47,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 ///
 /// Returns non-exhaustive match and unreachable pattern errors as a list of
 /// [`SemanticError`]s.
-#[must_use]
 pub fn check(hir: &HirModule, types: &TypeTable) -> Result<(), Vec<SemanticError>> {
     let enum_variants = collect_enum_variants(hir);
     let mut checker = ExhaustiveChecker {

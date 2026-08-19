@@ -144,6 +144,9 @@ impl Target {
 
     /// Whether this target is available in the current Radix build.
     #[must_use]
+    // WHY: each arm computes a distinct feature gate; `matches!` would compare
+    // patterns and change semantics.
+    #[allow(clippy::match_like_matches_macro)]
     pub fn is_available(self) -> bool {
         match self {
             Target::HirRust => cfg!(feature = "hir-rust"),

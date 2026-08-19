@@ -4,10 +4,10 @@
 //! `radix-semantic` owns the boundary between parsed syntax and the typed HIR
 //! consumed by backend-independent analysis and code generation, plus its
 //! coupled satellites: the `@ cli` source model, reader-locale packs,
-//! portable file interfaces, builtins/kernel registries, and the literal-
-//! independent HIR lowering entry. It owns the semantic pass
-//! order, the shared resolver and type table, and the policy that decides when a
-//! partially analyzed program is too compromised to lower further.
+//! portable file interfaces, builtins/kernel registries, and the HIR
+//! lowering entry. It runs the semantic pass order, owns the shared resolver
+//! and type table, and decides when a partially analyzed program is too
+//! compromised to lower further.
 //!
 //! PASS ORDER
 //! ==========

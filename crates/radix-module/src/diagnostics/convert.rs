@@ -1,4 +1,4 @@
-//! Phase-error → [`Diagnostic`] conversion (stays in package `radix`).
+//! Phase-error → [`Diagnostic`] conversion (monolith-owned; catalog specs come from `radix-semantic`).
 //!
 //! These converters depend on lexer/parser/semantic error enums and therefore
 //! cannot live in `radix-diagnostics` without creating a Cargo cycle. Call sites

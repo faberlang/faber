@@ -1,12 +1,16 @@
 //! Core compiler library for Faber.
 //!
-//! `radix` owns the language implementation: lexing, parsing, semantic
-//! analysis, lowering, target code generation, diagnostics, and the
-//! developer-facing inspection surfaces that expose those phases. The
-//! user-facing `faber` crate builds package and project workflows on top of
-//! this library; the developer `radix` binary lives in `radix-cli`. Package
-//! policy, manifest loading, and generated Cargo layouts deliberately live
-//! there instead of here.
+//! `radix-module` owns the module-compiler pipeline: the driver (phase
+//! ordering and target dispatch), MIR lowering, HIR-direct codegen dispatch,
+//! services, and the façade modules that re-export the extracted leaves.
+//! Semantic analysis (collection, resolution, HIR lowering, typecheck,
+//! post-typecheck passes) lives in the `radix-semantic` leaf; the lexer,
+//! parser, syntax, types, HIR, diagnostics, intrinsics, target-identity, and
+//! backend emitters live in their own leaves, re-exported here for the
+//! historical `crate::*` paths. The user-facing `faber` crate builds package
+//! and project workflows on top of this library; the developer `radix` binary
+//! lives in `radix-cli`. Package policy, manifest loading, and generated
+//! Cargo layouts deliberately live there instead of here.
 //!
 //! The public API keeps the embedding contract small. Callers choose a
 //! [`Config`], instantiate a [`Compiler`], and receive a [`CompileResult`] that

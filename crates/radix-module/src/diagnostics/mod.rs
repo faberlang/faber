@@ -1,9 +1,10 @@
 //! Cross-phase diagnostic contract for the compiler.
 //!
-//! Core transport types live in foundation crate `radix-diagnostics`. This
-//! module re-exports them for the historical `radix_module::diagnostics::*` path and
-//! keeps phase catalogs, conversion, and ariadne rendering in package `radix`
-//! until parser/semantic enums are extracted.
+//! Core transport types live in foundation crate `radix-diagnostics`; the
+//! phase catalogs and code lookup live in `radix-semantic` (they key on the
+//! semantic error taxonomy). This module re-exports both for the historical
+//! `radix_module::diagnostics::*` path and owns the remaining conversions and
+//! ariadne rendering.
 
 mod convert;
 mod render;
