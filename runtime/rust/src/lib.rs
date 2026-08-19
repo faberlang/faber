@@ -6,6 +6,7 @@
 
 pub mod arena;
 pub mod ascii;
+pub mod ascii_bounded;
 pub mod contract;
 pub mod cursor_stream;
 pub mod display;
@@ -23,6 +24,7 @@ pub mod valor;
 
 pub use arena::{Arena, ArenaHandle};
 pub use ascii::Ascii;
+pub use ascii_bounded::{AsciiN, AsciiNOverflow};
 pub use cursor_stream::{materialize_cursor_stream, CursorStreamSink};
 pub use display::{
     display_bivalens, display_fractus, display_option, display_option_bivalens,
