@@ -97,7 +97,9 @@ pub use boundary_abi::{
 // Vocabulary moved down to radix-types (feature-granularity §2); re-exported
 pub use device::{
     classify_device_safe, classify_device_safe_for_target_entry, device_roles_from_hir,
-    MirDeviceContext, MirDeviceRole,
+    first_surviving_fragment_call, reject_nucleum_fragment_survivors, surviving_nucleum_fragments,
+    FragmentSurvivor, FragmentSurvivorKind, MirDeviceContext, MirDeviceRole,
+    NUCLEUM_FRAGMENT_SURVIVED,
 };
 pub use device_program::{
     Binding, BufferId, BufferIdentity, BufferLifetime, BufferRegistry, BufferRole, BufferVersion,
@@ -199,9 +201,10 @@ pub use ty::{
     place_base_ty, MirTypeError, MirTypeLookup,
 };
 pub use validate::{
-    validate_program, MirEnumRepresentation, MirFunctionSignature, MirParamSignature,
-    MirScalarValueDomain, MirValidationContext, MirValidationError, ValidatedMir,
-    INTEGER_PAYLOAD_I64_SENTINEL, INTEGER_PAYLOAD_U64_SENTINEL, INTEGER_PAYLOAD_U8_SENTINEL,
+    validate_program, validate_program_with_device_roles, MirEnumRepresentation,
+    MirFunctionSignature, MirParamSignature, MirScalarValueDomain, MirValidationContext,
+    MirValidationError, ValidatedMir, INTEGER_PAYLOAD_I64_SENTINEL, INTEGER_PAYLOAD_U64_SENTINEL,
+    INTEGER_PAYLOAD_U8_SENTINEL,
 };
 pub use visit::{
     terminator_successors, walk_operand, walk_place, walk_stmt, walk_terminator, walk_value,

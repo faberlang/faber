@@ -5,11 +5,13 @@
 
 use super::context::MirValidationContext;
 use super::error::{MirFunctionSignature, MirParamSignature, MirValidationError};
+use crate::device::{reject_nucleum_fragment_survivors, MirDeviceContext, MirDeviceRole};
 use crate::visit::MirVisitor;
 use crate::{
     MirBlock, MirBlockId, MirFunction, MirFunctionId, MirGenericBindings, MirLocal, MirLocalId,
     MirParam, MirProgram, MirTemp, MirTempId, MirType, MirValueId,
 };
+use radix_hir::DefId;
 use radix_lexer::Span;
 use radix_types::FuncSig;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -71,6 +73,29 @@ impl<'a> ValidatedMir<'a> {
         })
     }
 
+    /// Build a validated-MIR token and enforce the nucleum-fragment survivor
+    /// invariant against `roles`.
+    ///
+    /// Ordinary `new` stays role-blind so fragment-free kernels do not
+    /// false-positive. Tests and mutation proofs call this seam directly
+    /// (no public skip-composition flag).
+    ///
+    /// # Errors
+    /// Returns structural validation errors plus [`crate::NUCLEUM_FRAGMENT_SURVIVED`]
+    /// when a fragment call or standalone fragment symbol remains.
+    pub fn with_device_roles(
+        program: MirProgram,
+        mut context: MirValidationContext<'a>,
+        roles: &FxHashMap<DefId, MirDeviceRole>,
+    ) -> Result<Self, Vec<MirValidationError>> {
+        context.rebuild_variant_positions();
+        validate_program_with_device_roles(&program, &context, roles)?;
+        Ok(Self {
+            program,
+            validation: context,
+        })
+    }
+
     /// The validated inner program.
     #[must_use]
     pub fn program(&self) -> &MirProgram {
@@ -105,6 +130,33 @@ pub fn validate_program(
         Ok(())
     } else {
         Err(validator.errors)
+    }
+}
+
+/// Validate structural MIR and reject leftover nucleum-fragment calls/symbols.
+///
+/// # Errors
+/// Returns combined structural and [`crate::NUCLEUM_FRAGMENT_SURVIVED`] errors.
+#[expect(
+    clippy::implicit_hasher,
+    reason = "FxHashMap is the crate-wide map type for device roles"
+)]
+pub fn validate_program_with_device_roles(
+    program: &MirProgram,
+    context: &MirValidationContext<'_>,
+    roles: &FxHashMap<DefId, MirDeviceRole>,
+) -> Result<(), Vec<MirValidationError>> {
+    let mut errors = match validate_program(program, context) {
+        Ok(()) => Vec::new(),
+        Err(errors) => errors,
+    };
+    let mut device = MirDeviceContext::from_hir_roles(roles.clone());
+    device.attach_program(program);
+    errors.extend(reject_nucleum_fragment_survivors(program, &device));
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
     }
 }
 

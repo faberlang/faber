@@ -24,6 +24,18 @@ impl MirValidationError {
             span,
         }
     }
+
+    pub(crate) fn with_issue(
+        span: Span,
+        issue: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            message: message.into(),
+            issue: issue.into(),
+            span,
+        }
+    }
 }
 
 fn validation_issue(message: &str) -> String {
