@@ -1538,7 +1538,7 @@ fn localized_keyword_tokens(pack: &LocalePack, issues: &mut Vec<LocalePackIssue>
 }
 
 fn validate_keyword_binding(binding: &KeywordBinding, issues: &mut Vec<LocalePackIssue>) -> Option<String> {
-    let Some(spec) = keyword_specs().iter().find(|spec| spec.text == binding.key) else {
+    let Some(spec) = lookup_keyword_spec(&binding.key) else {
         issues.push(LocalePackIssue::UnknownKeyword { key: binding.key.clone() });
         return None;
     };
