@@ -1,8 +1,11 @@
 //! AST→HIR lowering — re-exported from `radix-semantic::lower` (test host).
 
-pub use crate::hir::{HirAnnotation, HirAnnotationField, HirAnnotationValue, HirAvailability};
-pub use radix_semantic::lower::annotation::*;
 pub use radix_semantic::lower::*;
+
+#[cfg(test)]
+pub use crate::hir::{HirAnnotation, HirAnnotationField, HirAnnotationValue, HirAvailability};
+#[cfg(test)]
+pub use radix_semantic::lower::annotation::*;
 
 #[cfg(test)]
 #[path = "annotation_test.rs"]

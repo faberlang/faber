@@ -258,7 +258,7 @@ pub fn generate_from_analyzed_with_options(
                 &analysis.presentation,
                 &analysis.types,
                 &analysis.interner,
-                &faber::LocaleKeywordBridge(surface.clone()),
+                &faber::LocaleKeywordBridge(*surface),
                 &imported_spellings.by_type,
                 &by_def,
             )?;
