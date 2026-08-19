@@ -1080,6 +1080,12 @@ impl TypeChecker<'_> {
             Type::Primitive(Primitive::Bivalens) => PrimitiveConversioFamily::Bivalens,
             Type::Primitive(Primitive::Textus) => PrimitiveConversioFamily::Textus,
             Type::Primitive(Primitive::Ascii) => PrimitiveConversioFamily::Ascii,
+            // D17 / BB-2: `'x'` is `ascii<1>`. Same conversio family as bare
+            // ascii so `'a' ↦ textus` / `s[i] ↦ numerus` stay explicit widens.
+            // Multi-char `ascii<N>` stays out until BB-4.
+            Type::BoundedAscii { capacity } if matches!(self.types.get_index(*capacity), IndexExpr::Literal(1)) => {
+                PrimitiveConversioFamily::Ascii
+            }
             Type::Primitive(Primitive::Octeti) => PrimitiveConversioFamily::Octeti,
             Type::Primitive(Primitive::Regex) => PrimitiveConversioFamily::Regex,
             _ => PrimitiveConversioFamily::Other,

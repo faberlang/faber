@@ -785,7 +785,7 @@ fn runner_runs_octeti_conversio_fixture() {
             "?".to_owned(),
             "2".to_owned(),
             "hi".to_owned(),
-            "x".to_owned()
+            "n/a".to_owned()
         ]
     );
     assert!(host.stderr_lines.is_empty());
