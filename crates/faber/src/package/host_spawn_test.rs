@@ -1,6 +1,7 @@
 use super::{
-    decode_device_inputs, encode_device_inputs, execute_device_at, resolve_host_cli_at,
-    DeviceExecuteReceipt, DeviceExecuteRequest, HostSpawnError,
+    decode_device_inputs, encode_device_inputs, encode_weight_map, execute_device_at,
+    resolve_host_cli_at, DeviceExecuteReceipt, DeviceExecuteRequest, HostSpawnError,
+    WeightFileRange,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -29,6 +30,8 @@ fn malformed_request() -> DeviceExecuteRequest {
         descriptor_json: b"{not-json".to_vec(),
         module_image: b"// fake".to_vec(),
         inputs_json: b"{}".to_vec(),
+        weights_path: None,
+        weight_map_json: None,
     }
 }
 
@@ -49,6 +52,8 @@ fn empty_kernels_request() -> DeviceExecuteRequest {
         .to_vec(),
         module_image: b"// fake".to_vec(),
         inputs_json: br#"{"1":[1.0,2.0],"2":[3.0,4.0]}"#.to_vec(),
+        weights_path: None,
+        weight_map_json: None,
     }
 }
 
@@ -168,6 +173,23 @@ fn spawn_inputs_round_trip_smollm2_prefill_tokens_and_payloads() {
 fn spawn_inputs_accept_legacy_nan_string() {
     let decoded = decode_device_inputs(br#"{"1":["NaN"]}"#).expect("decode");
     assert!(decoded[&1][0].is_nan());
+}
+
+#[test]
+fn weight_map_json_names_byte_ranges_not_payloads() {
+    let map = BTreeMap::from([(
+        7,
+        WeightFileRange {
+            offset: 1_774_948,
+            len: 12,
+            elems: 4,
+        },
+    )]);
+    let json = encode_weight_map(&map).expect("encode");
+    let text = String::from_utf8(json).expect("utf8");
+    assert!(text.contains("\"7\""), "{text}");
+    assert!(text.contains("1774948"), "{text}");
+    assert!(!text.contains("0xff810000"), "{text}");
 }
 
 /// Round-trip a real SmolLM2 packed prefix when the pinned GGUF is present.

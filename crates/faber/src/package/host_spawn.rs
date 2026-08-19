@@ -1,7 +1,8 @@
 //! Spawn/connect client for the hosts `device-execute` CLI.
 //!
 //! No hosts Cargo, git, or registry dependency. The client writes the CLI
-//! file surface (`--descriptor` JSON, `--module` raw bytes, `--inputs` JSON)
+//! file surface (`--descriptor` JSON, `--module` raw bytes, `--inputs` JSON
+//! for tiny per-step values, optional `--weights` GGUF + `--weight-map`)
 //! and parses the receipt / HostError JSON the CLI prints.
 //!
 //! Error taxonomy (CLI owns the codes):
@@ -46,8 +47,23 @@ pub struct DeviceExecuteRequest {
     pub descriptor_json: Vec<u8>,
     /// Raw module image (MSL or PTX).
     pub module_image: Vec<u8>,
-    /// Inputs JSON (`{ "<buffer-id>": [f32, ...] }`).
+    /// Inputs JSON (`{ "<buffer-id>": [f32, ...] }`) — tiny per-step values.
     pub inputs_json: Vec<u8>,
+    /// GGUF file the child maps; not copied into the work dir.
+    pub weights_path: Option<PathBuf>,
+    /// `{ "<buffer-id>": { offset, len, elems } }` into `--weights`.
+    pub weight_map_json: Option<Vec<u8>>,
+}
+
+/// One GGUF byte range the child copies into a host f32 buffer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WeightFileRange {
+    /// Byte offset into the GGUF file.
+    pub offset: u64,
+    /// Packed-byte length to copy.
+    pub len: u64,
+    /// Logical f32 element count of the host buffer.
+    pub elems: u64,
 }
 
 /// Receipt the hosts CLI prints on exit 0.
@@ -89,7 +105,7 @@ pub struct DeviceExecuteReceipt {
     /// Descriptor JSON decode wall.
     #[serde(default)]
     pub descriptor_decode_us: u64,
-    /// Inputs JSON decode wall (packed weights ride this file).
+    /// Inputs JSON decode wall (tiny per-step values only).
     #[serde(default)]
     pub json_decode_us: u64,
     /// Composite-host construction wall (Metal device admit).
@@ -144,14 +160,32 @@ pub fn request_from_section(
     backend: &str,
     module_image: &[u8],
     inputs: &BTreeMap<u32, Vec<f32>>,
+    weights_path: Option<&Path>,
+    weight_map: Option<&BTreeMap<u32, WeightFileRange>>,
 ) -> Result<DeviceExecuteRequest, HostSpawnError> {
     let descriptor_json = descriptor_json_from_section(section, backend)?;
     let inputs_json = encode_device_inputs(inputs)?;
+    let weight_map_json = match weight_map {
+        Some(map) if !map.is_empty() => Some(encode_weight_map(map)?),
+        _ => None,
+    };
+    let weights_path = match (weights_path, &weight_map_json) {
+        (Some(path), Some(_)) => Some(path.to_path_buf()),
+        (None, None) | (Some(_), None) => None,
+        (None, Some(_)) => {
+            return Err(HostSpawnError {
+                code: "E_HOST_SPAWN".to_owned(),
+                message: "weight-map present without a GGUF path".to_owned(),
+            });
+        }
+    };
     Ok(DeviceExecuteRequest {
         backend: backend.to_owned(),
         descriptor_json,
         module_image: module_image.to_vec(),
         inputs_json,
+        weights_path,
+        weight_map_json,
     })
 }
 
@@ -176,30 +210,41 @@ fn execute_device_at(
     let descriptor_path = work.path.join("descriptor.json");
     let module_path = work.path.join("module.bin");
     let inputs_path = work.path.join("inputs.json");
+    let weight_map_path = work.path.join("weight-map.json");
     let write_started = Instant::now();
     write_file(&descriptor_path, &request.descriptor_json)?;
     write_file(&module_path, &request.module_image)?;
     write_file(&inputs_path, &request.inputs_json)?;
+    if let Some(map) = &request.weight_map_json {
+        write_file(&weight_map_path, map)?;
+    }
     let parent_write_files_us = elapsed_us(write_started);
 
     let child_started = Instant::now();
-    let output = Command::new(host)
-        .args([
-            "device-execute",
-            "--backend",
-            &request.backend,
-            "--descriptor",
-            &path_text(&descriptor_path)?,
-            "--module",
-            &path_text(&module_path)?,
-            "--inputs",
-            &path_text(&inputs_path)?,
-        ])
-        .output()
-        .map_err(|error| HostSpawnError {
-            code: "E_HOST_SPAWN".to_owned(),
-            message: format!("failed to spawn {}: {error}", host.display()),
-        })?;
+    let mut command = Command::new(host);
+    command.args([
+        "device-execute",
+        "--backend",
+        &request.backend,
+        "--descriptor",
+        &path_text(&descriptor_path)?,
+        "--module",
+        &path_text(&module_path)?,
+        "--inputs",
+        &path_text(&inputs_path)?,
+    ]);
+    if let (Some(weights), Some(_)) = (&request.weights_path, &request.weight_map_json) {
+        command.args([
+            "--weights",
+            &path_text(weights)?,
+            "--weight-map",
+            &path_text(&weight_map_path)?,
+        ]);
+    }
+    let output = command.output().map_err(|error| HostSpawnError {
+        code: "E_HOST_SPAWN".to_owned(),
+        message: format!("failed to spawn {}: {error}", host.display()),
+    })?;
     let parent_child_wait_us = elapsed_us(child_started);
 
     let mut receipt =
@@ -577,6 +622,19 @@ pub fn encode_device_inputs(inputs: &BTreeMap<u32, Vec<f32>>) -> Result<Vec<u8>,
     serde_json::to_vec_pretty(&wire).map_err(|error| HostSpawnError {
         code: "E_DEVICE_DESCRIPTOR".to_owned(),
         message: format!("failed to encode device-execute inputs: {error}"),
+    })
+}
+
+pub(crate) fn encode_weight_map(
+    map: &BTreeMap<u32, WeightFileRange>,
+) -> Result<Vec<u8>, HostSpawnError> {
+    let wire: BTreeMap<String, WeightFileRange> = map
+        .iter()
+        .map(|(id, range)| (id.to_string(), *range))
+        .collect();
+    serde_json::to_vec(&wire).map_err(|error| HostSpawnError {
+        code: "E_DEVICE_DESCRIPTOR".to_owned(),
+        message: format!("failed to encode device-execute weight-map: {error}"),
     })
 }
 
