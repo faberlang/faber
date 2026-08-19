@@ -115,6 +115,26 @@ fn parses_multiple_type_args_on_direct_call() {
 }
 
 #[test]
+fn parses_natural_type_args_on_direct_call() {
+    // gradus nn.fab: `return linear_from_raw<2, 2, 2>(raw_x, raw_w, raw_b)`
+    // PARSE030.expected_expression when call-site typeArguments rejected NATURAL.
+    let result = parse_ok(
+        r"incipit {
+    fixum _ x ← linear_from_raw<2, 2, 2>(a, b, c)
+}",
+    );
+    let call = first_call_expr(&result);
+    assert_eq!(call.type_args.len(), 3);
+    for arg in &call.type_args {
+        let TypeExprKind::Named(name, params) = &arg.kind else {
+            panic!("expected NATURAL type argument, got {:?}", arg.kind);
+        };
+        assert!(params.is_empty());
+        assert_eq!(result.interner.resolve(name.name), "2");
+    }
+}
+
+#[test]
 fn parsers_call_without_type_args_has_empty_type_args() {
     let result = parse_ok(
         r#"incipit {

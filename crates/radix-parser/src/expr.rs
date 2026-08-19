@@ -2063,11 +2063,14 @@ impl Parser {
         self.finish_type_args_list()
     }
 
-    /// Parse `< type (, type)* >` after the opening `<` has been consumed.
+    /// Parse `< typeArgument (, typeArgument)* >` after the opening `<` has been consumed.
+    ///
+    /// Call-site lists use the same `typeArguments` production as named types,
+    /// including NATURAL (`linear_from_raw<2, 2, 2>(…)`).
     fn finish_type_args_list(&mut self) -> Result<Vec<TypeExpr>, ParseError> {
         let mut args = Vec::new();
         loop {
-            args.push(self.parse_type()?);
+            args.push(self.parse_type_argument()?);
             if !self.eat(&TokenKind::Comma) {
                 break;
             }
