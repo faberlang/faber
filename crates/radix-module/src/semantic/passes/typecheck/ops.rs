@@ -207,11 +207,6 @@ impl TypeChecker<'_> {
         rhs_resolved
     }
 
-    /// Enforce exact-type match for `≡`, `≠`, `est`, and `non est`.
-    ///
-    /// WHY: assignability may widen across representations; equality must not
-    /// erase deliberate annotations (`ascii`, sized numerics, precision-tagged
-    /// `instans`, …). Authors widen explicitly with `↦` before comparing.
     /// Enforce numeric promotion join for `≈` and `≉`.
     ///
     /// WHY: exact `≡` rejects cross-width numeric pairs; `≈` reuses the same
@@ -234,6 +229,11 @@ impl TypeChecker<'_> {
         self.numeric_bin(lhs, rhs, span);
     }
 
+    /// Enforce exact-type match for `≡`, `≠`, `est`, and `non est`.
+    ///
+    /// WHY: assignability may widen across representations; equality must not
+    /// erase deliberate annotations (`ascii`, sized numerics, precision-tagged
+    /// `instans`, …). Authors widen explicitly with `↦` before comparing.
     pub(super) fn exact_equality_types(&mut self, lhs: TypeId, rhs: TypeId, span: crate::lexer::Span) {
         let lhs_resolved = self.resolve_inferred_type(lhs);
         let rhs_resolved = self.resolve_inferred_type(rhs);
