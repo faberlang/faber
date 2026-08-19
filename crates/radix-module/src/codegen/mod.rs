@@ -27,7 +27,6 @@ pub use radix_semantic::coverage;
 pub mod conversio_coverage;
 #[cfg(feature = "hir-faber")]
 pub mod faber;
-pub mod frame_shim;
 #[cfg(feature = "hir-go")]
 pub mod go;
 #[cfg(feature = "hir-haskell")]
