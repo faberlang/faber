@@ -245,34 +245,22 @@ impl FunctionBuilder<'_> {
             ty,
             fields: MirAggregateFields::Ordered(vec![
                 // Scalar-per-lane: four scalar elements, not mixed [vec3, scalar].
-                MirAggregateItem::Operand(MirOperand::Place(MirPlace {
-                    base: src_place.base.clone(),
-                    projections: {
-                        let mut p = src_place.projections.clone();
-                        p.push(MirProjection::VectorLane(0));
-                        p
-                    },
-                })),
-                MirAggregateItem::Operand(MirOperand::Place(MirPlace {
-                    base: src_place.base.clone(),
-                    projections: {
-                        let mut p = src_place.projections.clone();
-                        p.push(MirProjection::VectorLane(1));
-                        p
-                    },
-                })),
-                MirAggregateItem::Operand(MirOperand::Place(MirPlace {
-                    base: src_place.base.clone(),
-                    projections: {
-                        let mut p = src_place.projections.clone();
-                        p.push(MirProjection::VectorLane(2));
-                        p
-                    },
-                })),
+                Self::vec3_lane_operand(&src_place, 0),
+                Self::vec3_lane_operand(&src_place, 1),
+                Self::vec3_lane_operand(&src_place, 2),
                 MirAggregateItem::Operand(one),
             ]),
         };
         self.append_stmt(MirStatement { kind: MirStatementKind::Construct { destination, aggregate }, span });
+    }
+
+    fn vec3_lane_operand(src: &MirPlace, lane: u8) -> MirAggregateItem {
+        let mut projections = src.projections.clone();
+        projections.push(MirProjection::VectorLane(lane));
+        MirAggregateItem::Operand(MirOperand::Place(MirPlace {
+            base: src.base.clone(),
+            projections,
+        }))
     }
 
     /// Lower a HIR block used as an expression.
@@ -1320,7 +1308,9 @@ impl FunctionBuilder<'_> {
             CollectionIteraKind::Cursor(value) | CollectionIteraKind::AsyncCursor(value) => {
                 (collection, MirType::semantic(value), false)
             }
-            CollectionIteraKind::Unsupported => return None,
+            CollectionIteraKind::Unsupported => {
+                unreachable!("unsupported collection itera kinds fail closed above")
+            }
         };
 
         let index = self.next_local_id();
