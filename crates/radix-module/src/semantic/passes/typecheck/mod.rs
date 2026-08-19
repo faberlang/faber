@@ -130,6 +130,10 @@ mod null_narrowing_tests;
 #[path = "octeti_index_test.rs"]
 mod octeti_index_test;
 
+#[cfg(test)]
+#[path = "octeti_endian_conversio_test.rs"]
+mod octeti_endian_conversio_test;
+
 /// Type information for a value currently visible in lexical scope.
 #[derive(Clone, Copy)]
 struct BindingInfo {

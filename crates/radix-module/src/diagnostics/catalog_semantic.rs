@@ -604,6 +604,9 @@ fn semantic_invalid_conversion_message(args: &[DiagnosticArg]) -> Option<String>
         "octeti_to_numerus_unspecified" => Some(
             "conversion from octeti to numerus is unspecified (byte width and endianness); use `chorda` or explicit byte verbs instead".to_owned(),
         ),
+        "octeti_endian_width_mismatch" => Some(
+            "octeti endian conversion requires a window whose length matches the target width (2, 4, or 8 bytes)".to_owned(),
+        ),
         "octeti_to_fractus_unspecified" => Some(
             "conversion from octeti to fractus is unspecified (IEEE width and endianness); use `chorda` or explicit byte verbs instead".to_owned(),
         ),
@@ -710,6 +713,9 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         | "octeti_to_numerus_unspecified"
         | "octeti_to_fractus_unspecified"
         | "octeti_to_bivalens_unsupported" => Some("use chorda or explicit byte conversion helpers".to_owned()),
+        "octeti_endian_width_mismatch" => {
+            Some("use a window of 2, 4, or 8 bytes matching i16/u16, i32/u32, or i64/u64".to_owned())
+        }
         "sparsa_collection_unsupported" => Some("densify or use an explicit sparse helper".to_owned()),
         "sparsa_tensor_element_mismatch" | "tensor_element_mismatch" => {
             Some("convert element widths explicitly before changing representation".to_owned())

@@ -280,7 +280,7 @@ phase = 4
 action = "review"
 rule = "operator-group"
 primary = "conversio/conversio.fab"
-paths = ["conversio/bivalens.fab", "conversio/collectiones.fab", "conversio/conversio.fab", "conversio/lista-tensor-shaped.fab", "conversio/numeric-bool.fab", "conversio/octeti.fab", "conversio/radix.fab", "conversio/rectangular-lista-literal-tensor.fab", "conversio/tensor-data-edge.fab", "conversio/tensor.fab"]
+paths = ["conversio/bivalens.fab", "conversio/collectiones.fab", "conversio/conversio.fab", "conversio/lista-tensor-shaped.fab", "conversio/numeric-bool.fab", "conversio/octeti-endian.fab", "conversio/octeti.fab", "conversio/radix.fab", "conversio/rectangular-lista-literal-tensor.fab", "conversio/tensor-data-edge.fab", "conversio/tensor.fab"]
 
 [[terms]]
 term = "copia"
@@ -1770,6 +1770,12 @@ category = "conversion"
 
 [[files]]
 path = "conversio/numeric-bool.fab"
+term = "↦"
+kind = "operator-group"
+category = "conversion"
+
+[[files]]
+path = "conversio/octeti-endian.fab"
 term = "↦"
 kind = "operator-group"
 category = "conversion"

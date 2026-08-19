@@ -50,6 +50,7 @@ const ISSUE_PROMISSUM_TO_VALOR_BOUNDARY: &str = "promissum_to_valor_boundary";
 const ISSUE_CURSOR_TO_VALOR_BOUNDARY: &str = "cursor_to_valor_boundary";
 const ISSUE_NUMERIC_TO_OCTETI_UNSPECIFIED: &str = "numeric_to_octeti_unspecified";
 const ISSUE_OCTETI_TO_NUMERUS_UNSPECIFIED: &str = "octeti_to_numerus_unspecified";
+const ISSUE_OCTETI_ENDIAN_WIDTH_MISMATCH: &str = "octeti_endian_width_mismatch";
 const ISSUE_OCTETI_TO_FRACTUS_UNSPECIFIED: &str = "octeti_to_fractus_unspecified";
 const ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED: &str = "octeti_to_bivalens_unsupported";
 const ISSUE_PROMISSUM_TARGET_BOUNDARY: &str = "promissum_target_boundary";
@@ -153,6 +154,34 @@ fn lista_to_tensor_issue(error: ListaToTensorError) -> Option<&'static str> {
     }
 }
 
+fn endian_read_width_bytes(ty: &Type) -> Option<usize> {
+    match ty {
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::I16 | NumericWidth::U16) => Some(2),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::I32 | NumericWidth::U32) => Some(4),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::I64 | NumericWidth::U64) => Some(8),
+        _ => None,
+    }
+}
+
+fn static_exclusive_range_len(index: &HirExpression) -> Option<usize> {
+    let HirExpressionKind::Intervallum { start, end, kind, .. } = &index.kind else {
+        return None;
+    };
+    let HirExpressionKind::Literal(HirLiteral::Int(start)) = start.kind else {
+        return None;
+    };
+    let HirExpressionKind::Literal(HirLiteral::Int(end)) = end.kind else {
+        return None;
+    };
+    let start = usize::try_from(start).ok()?;
+    let end = usize::try_from(end).ok()?;
+    let end = match kind {
+        crate::hir::HirRangeKind::Exclusive => end,
+        crate::hir::HirRangeKind::Inclusive => end.checked_add(1)?,
+    };
+    end.checked_sub(start)
+}
+
 fn rectangular_lista_literal_issue(error: RectangularListaLiteralError) -> &'static str {
     match error {
         RectangularListaLiteralError::NotNestedLiteral => ISSUE_LISTA_TO_TENSOR_NESTED,
@@ -189,6 +218,7 @@ impl TypeChecker<'_> {
         &mut self,
         source: &mut HirExpression,
         target: &mut HirConversioTarget,
+        params: &[Symbol],
         recovery: Option<&mut HirExpression>,
         span: crate::lexer::Span,
     ) -> TypeId {
@@ -238,7 +268,9 @@ impl TypeChecker<'_> {
             }
         }
 
-        if let Some(error_ty) = self.check_rejected_primitive_conversio(source_ty, target_resolved, span) {
+        if let Some(error_ty) =
+            self.check_rejected_primitive_conversio(source, source_ty, target_resolved, params, span)
+        {
             return error_ty;
         }
 
@@ -548,8 +580,10 @@ impl TypeChecker<'_> {
     /// Reject primitive `↦` pairs with no single obvious meaning (byte reinterpretation, etc.).
     fn check_rejected_primitive_conversio(
         &mut self,
+        source: &HirExpression,
         source_ty: TypeId,
         target_resolved: TypeId,
+        params: &[Symbol],
         span: crate::lexer::Span,
     ) -> Option<TypeId> {
         let issue = match (
@@ -563,7 +597,7 @@ impl TypeChecker<'_> {
                 PrimitiveConversioFamily::Octeti,
             ) => Some(ISSUE_NUMERIC_TO_OCTETI_UNSPECIFIED),
             (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Numerus) => {
-                Some(ISSUE_OCTETI_TO_NUMERUS_UNSPECIFIED)
+                self.octeti_to_numerus_issue(source, target_resolved, params)
             }
             (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Fractus) => {
                 Some(ISSUE_OCTETI_TO_FRACTUS_UNSPECIFIED)
@@ -579,6 +613,51 @@ impl TypeChecker<'_> {
             return Some(self.error_type);
         }
         None
+    }
+
+    /// `octeti ↦ numerus<W, Be|Le>` is allowed when width is 2/4/8 and a
+    /// static window matches. Without Be/Le, or on i8/u8/unsized numerus,
+    /// the family reject stays.
+    fn octeti_to_numerus_issue(
+        &self,
+        source: &HirExpression,
+        target_resolved: TypeId,
+        params: &[Symbol],
+    ) -> Option<&'static str> {
+        if !self.conversio_has_endian_hint(params) {
+            return Some(ISSUE_OCTETI_TO_NUMERUS_UNSPECIFIED);
+        }
+        let Some(need) = endian_read_width_bytes(self.types.get(target_resolved)) else {
+            return Some(ISSUE_OCTETI_TO_NUMERUS_UNSPECIFIED);
+        };
+        match self.static_octeti_window_len(source) {
+            Some(got) if got != need => Some(ISSUE_OCTETI_ENDIAN_WIDTH_MISMATCH),
+            _ => None,
+        }
+    }
+
+    fn conversio_has_endian_hint(&self, params: &[Symbol]) -> bool {
+        let Some(interner) = self.interner else {
+            return false;
+        };
+        params
+            .iter()
+            .any(|param| matches!(interner.resolve(*param), "Be" | "Le"))
+    }
+
+    /// Compile-time window length: a whole octeti literal, or a constant
+    /// `lo‥hi` / `lo…hi` index. Unknown length is a runtime check.
+    fn static_octeti_window_len(&self, source: &HirExpression) -> Option<usize> {
+        match &source.kind {
+            HirExpressionKind::Literal(HirLiteral::Octeti(sym)) => {
+                let raw = self.interned_literal_payload(*sym)?;
+                crate::octeti_literal::decode_octeti_hex(raw)
+                    .ok()
+                    .map(|bytes| bytes.len())
+            }
+            HirExpressionKind::Index(_, index) => static_exclusive_range_len(index),
+            _ => None,
+        }
     }
 
     /// Reject async/sync `promissum` boundaries unless both sides are `promissum`.

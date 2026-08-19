@@ -22,6 +22,18 @@
 
 use super::*;
 
+#[derive(Copy, Clone)]
+enum EndianHint {
+    Be,
+    Le,
+}
+
+fn octeti_array<const N: usize>(bytes: &[u8]) -> [u8; N] {
+    let mut arr = [0_u8; N];
+    arr.copy_from_slice(bytes);
+    arr
+}
+
 impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     pub(crate) fn convert_to_textus(
         &mut self,
@@ -153,11 +165,90 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 }
                 Err(error) => Err(error),
             },
+            Value::Octeti(bytes) => {
+                self.convert_octeti_endian_numerus(bytes, params, width, recovery, span)
+            }
             other => Err(RunnerError::internal(
                 span,
                 format!("unsupported conversio to numerus from {other:?}"),
             )),
         }
+    }
+
+    fn convert_octeti_endian_numerus(
+        &mut self,
+        bytes: Vec<u8>,
+        params: &[Symbol],
+        width: NumericWidth,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let Some(endian) = self.endian_hint(params) else {
+            return Err(RunnerError::internal(
+                span,
+                "unsupported conversio to numerus from Octeti",
+            ));
+        };
+        let need = match width {
+            NumericWidth::I16 | NumericWidth::U16 => 2,
+            NumericWidth::I32 | NumericWidth::U32 => 4,
+            NumericWidth::I64 | NumericWidth::U64 => 8,
+            _ => {
+                return self.recover_or_fail(recovery, span, "octeti endian width unsupported");
+            }
+        };
+        if bytes.len() != need {
+            return self.recover_or_fail(recovery, span, "octeti endian width mismatch");
+        }
+        match (width, endian) {
+            (NumericWidth::I16, EndianHint::Be) => Ok(Value::Int(i64::from(i16::from_be_bytes(
+                octeti_array(&bytes),
+            )))),
+            (NumericWidth::I16, EndianHint::Le) => Ok(Value::Int(i64::from(i16::from_le_bytes(
+                octeti_array(&bytes),
+            )))),
+            (NumericWidth::I32, EndianHint::Be) => Ok(Value::Int(i64::from(i32::from_be_bytes(
+                octeti_array(&bytes),
+            )))),
+            (NumericWidth::I32, EndianHint::Le) => Ok(Value::Int(i64::from(i32::from_le_bytes(
+                octeti_array(&bytes),
+            )))),
+            (NumericWidth::I64, EndianHint::Be) => {
+                Ok(Value::Int(i64::from_be_bytes(octeti_array(&bytes))))
+            }
+            (NumericWidth::I64, EndianHint::Le) => {
+                Ok(Value::Int(i64::from_le_bytes(octeti_array(&bytes))))
+            }
+            (NumericWidth::U16, EndianHint::Be) => Ok(Value::UInt(u64::from(u16::from_be_bytes(
+                octeti_array(&bytes),
+            )))),
+            (NumericWidth::U16, EndianHint::Le) => Ok(Value::UInt(u64::from(u16::from_le_bytes(
+                octeti_array(&bytes),
+            )))),
+            (NumericWidth::U32, EndianHint::Be) => Ok(Value::UInt(u64::from(u32::from_be_bytes(
+                octeti_array(&bytes),
+            )))),
+            (NumericWidth::U32, EndianHint::Le) => Ok(Value::UInt(u64::from(u32::from_le_bytes(
+                octeti_array(&bytes),
+            )))),
+            (NumericWidth::U64, EndianHint::Be) => {
+                Ok(Value::UInt(u64::from_be_bytes(octeti_array(&bytes))))
+            }
+            (NumericWidth::U64, EndianHint::Le) => {
+                Ok(Value::UInt(u64::from_le_bytes(octeti_array(&bytes))))
+            }
+            _ => self.recover_or_fail(recovery, span, "octeti endian width unsupported"),
+        }
+    }
+
+    fn endian_hint(&self, params: &[Symbol]) -> Option<EndianHint> {
+        params
+            .iter()
+            .find_map(|param| match self.interner.resolve(*param) {
+                "Be" => Some(EndianHint::Be),
+                "Le" => Some(EndianHint::Le),
+                _ => None,
+            })
     }
 
     pub(crate) fn convert_to_modular_word(
