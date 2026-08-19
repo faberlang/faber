@@ -2749,10 +2749,7 @@ fn lower_qualified_type(
         let Some(def_id) = resolver.lookup(segment.name) else {
             return Err(TypeLowerError::Issue(ISSUE_UNKNOWN_NAMESPACE));
         };
-        if !matches!(
-            resolver.get_symbol(def_id).map(|symbol| symbol.kind),
-            Some(SymbolKind::Module)
-        ) {
+        if !matches!(resolver.get_symbol(def_id).map(|symbol| symbol.kind), Some(SymbolKind::Module)) {
             return Err(TypeLowerError::Issue(ISSUE_QUALIFIED_TYPE_MIDDLE_NOT_NAMESPACE));
         }
     }
@@ -2786,11 +2783,7 @@ fn lower_qualified_type(
     Err(TypeLowerError::Issue(ISSUE_UNKNOWN_QUALIFIED_TYPE))
 }
 
-fn define_generic_param(
-    resolver: &mut Resolver,
-    param: &crate::syntax::TypeParam,
-    errors: &mut Vec<SemanticError>,
-) {
+fn define_generic_param(resolver: &mut Resolver, param: &crate::syntax::TypeParam, errors: &mut Vec<SemanticError>) {
     let kind = match param.kind {
         crate::syntax::GenericParamKind::Typus => SymbolKind::TypeParam,
         crate::syntax::GenericParamKind::Magnitudo => SymbolKind::IndexParam,

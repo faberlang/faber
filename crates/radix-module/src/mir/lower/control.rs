@@ -257,10 +257,7 @@ impl FunctionBuilder<'_> {
     fn vec3_lane_operand(src: &MirPlace, lane: u8) -> MirAggregateItem {
         let mut projections = src.projections.clone();
         projections.push(MirProjection::VectorLane(lane));
-        MirAggregateItem::Operand(MirOperand::Place(MirPlace {
-            base: src.base.clone(),
-            projections,
-        }))
+        MirAggregateItem::Operand(MirOperand::Place(MirPlace { base: src.base.clone(), projections }))
     }
 
     /// Lower a HIR block used as an expression.
