@@ -2104,6 +2104,13 @@ impl Resolver {
             .find(|sym| interner.resolve(*sym) == name)
     }
 
+    /// Every installed file-interface namespace, including transitive library
+    /// leaves that have no consumer HIR import binding.
+    #[must_use]
+    pub fn file_interface_namespaces(&self) -> impl Iterator<Item = LexSymbol> + '_ {
+        self.file_interfaces.keys().copied()
+    }
+
     /// Canonical FileInterface export name for a consumer-locale surface.
     ///
     /// Target backends write this name. The library module is emitted from
