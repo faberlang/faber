@@ -58,6 +58,7 @@ pub(crate) fn clear_import_target_cache() {
 
 type ReaderPackRef<'a> = Option<&'a crate::locale::LocalePack>;
 
+#[allow(clippy::result_large_err)]
 fn read_input_source(input: &[String]) -> Result<(String, String), crate::Diagnostic> {
     if input.is_empty() || input[0] == "-" {
         let mut source = String::new();
@@ -601,6 +602,7 @@ pub(crate) fn frontmatter_locale_pack_from_frontmatter(
 /// Mirrors the frontmatter-locale resolver, but an explicit CLI locale that
 /// cannot be resolved exits with the resolver's diagnostic instead of falling
 /// back silently. Returns `None` when no locale was given.
+#[allow(clippy::result_large_err)]
 pub fn explicit_locale_pack(locale: Option<&str>) -> Result<Option<crate::locale::LocalePack>, crate::Diagnostic> {
     let Some(locale) = locale.map(str::trim).filter(|s| !s.is_empty()) else {
         return Ok(None);
