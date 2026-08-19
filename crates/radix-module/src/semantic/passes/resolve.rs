@@ -50,7 +50,7 @@ use crate::semantic::error::WarningKind;
 use crate::semantic::instans_precision::InstansPrecisionError;
 use crate::semantic::numeric_width::WidthError;
 use crate::semantic::{
-    BareVariantLookup, CollectionKind, FuncSig, ParamType, Primitive, QualifiedVariantPathLookup, Resolver,
+    BareVariantLookup, CollectionKind, FuncSig, IndexExpr, ParamType, Primitive, QualifiedVariantPathLookup, Resolver,
     SchemaColumnDef, SchemaDef, ScopeKind, SemanticError, SemanticErrorKind, SemanticMutability, SemanticParamMode,
     Symbol, SymbolKind, Type, TypeId, TypeTable,
 };
@@ -1360,7 +1360,7 @@ fn resolve_figura_expr(resolver: &Resolver, figura: &crate::syntax::FiguraExpr, 
             let Some(symbol) = resolver.get_symbol(def_id) else {
                 return;
             };
-            if !matches!(symbol.kind, crate::semantic::SymbolKind::IndexParam) {
+            if !matches!(symbol.kind, SymbolKind::IndexParam) {
                 errors.push(type_mismatch_error(ISSUE_FIGURA_NOT_INDEX_PARAM, ident.span));
             }
         }
@@ -1412,8 +1412,8 @@ fn capacity_index_issue(param: &TypeExpr, resolver: &Resolver, interner: &Intern
         return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
     };
     match symbol.kind {
-        crate::semantic::SymbolKind::IndexParam => None,
-        crate::semantic::SymbolKind::TypeParam => Some(ISSUE_FIGURA_TYPE_PARAM_IN_INDEX),
+        SymbolKind::IndexParam => None,
+        SymbolKind::TypeParam => Some(ISSUE_FIGURA_TYPE_PARAM_IN_INDEX),
         _ => Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL),
     }
 }
@@ -2536,9 +2536,9 @@ fn lower_capacity_index(
     };
     let name = interner.resolve(ident.name);
     if let Some(value) = radix_types::parse_natural_capacity(name) {
-        return Ok(types.intern_index(crate::semantic::IndexExpr::Literal(value)));
+        return Ok(types.intern_index(IndexExpr::Literal(value)));
     }
-    Ok(types.intern_index(crate::semantic::IndexExpr::Param(ident.name)))
+    Ok(types.intern_index(IndexExpr::Param(ident.name)))
 }
 
 fn lower_named_type(
@@ -2702,22 +2702,22 @@ fn lower_named_type(
     };
 
     let base = match symbol.kind {
-        crate::semantic::SymbolKind::Struct => types.intern(crate::semantic::Type::Struct(def_id)),
-        crate::semantic::SymbolKind::Enum => types.intern(crate::semantic::Type::Enum(def_id)),
-        crate::semantic::SymbolKind::Interface => types.intern(crate::semantic::Type::Interface(def_id)),
-        crate::semantic::SymbolKind::TypeAlias => match symbol.ty {
-            Some(resolved) => types.intern(crate::semantic::Type::Alias(def_id, resolved)),
+        SymbolKind::Struct => types.intern(Type::Struct(def_id)),
+        SymbolKind::Enum => types.intern(Type::Enum(def_id)),
+        SymbolKind::Interface => types.intern(Type::Interface(def_id)),
+        SymbolKind::TypeAlias => match symbol.ty {
+            Some(resolved) => types.intern(Type::Alias(def_id, resolved)),
             None => return Err(TypeLowerError::UnresolvedAlias),
         },
-        crate::semantic::SymbolKind::TypeParam => types.intern(crate::semantic::Type::Param(symbol.name)),
-        crate::semantic::SymbolKind::Schema => {
+        SymbolKind::TypeParam => types.intern(Type::Param(symbol.name)),
+        SymbolKind::Schema => {
             // A schema name is a type-namespace identity per the
             // typus/genus declared-type precedent — usable as a type argument —
             // with no runtime semantics (zero MIR/backend lowering). The
             // declared-type intern slot is the carrier; schema vs genus is
             // disambiguated by the symbol kind, so the schema's ordered
             // relational metadata never becomes a genus field list.
-            types.intern(crate::semantic::Type::Struct(def_id))
+            types.intern(Type::Struct(def_id))
         }
         _ => return Err(TypeLowerError::Issue(ISSUE_TYPE_NAME_NOT_TYPE)),
     };
@@ -2730,7 +2730,7 @@ fn lower_named_type(
         .iter()
         .map(|param| lower_type_expr(param, resolver, interner, types))
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(types.intern(crate::semantic::Type::Applied(base, args)))
+    Ok(types.intern(Type::Applied(base, args)))
 }
 
 fn lower_qualified_type(
@@ -2751,7 +2751,7 @@ fn lower_qualified_type(
         };
         if !matches!(
             resolver.get_symbol(def_id).map(|symbol| symbol.kind),
-            Some(crate::semantic::SymbolKind::Module)
+            Some(SymbolKind::Module)
         ) {
             return Err(TypeLowerError::Issue(ISSUE_QUALIFIED_TYPE_MIDDLE_NOT_NAMESPACE));
         }
@@ -2763,7 +2763,7 @@ fn lower_qualified_type(
         resolver
             .get_symbol(namespace_def_id)
             .map(|symbol| symbol.kind),
-        Some(crate::semantic::SymbolKind::Module)
+        Some(SymbolKind::Module)
     ) {
         return Err(TypeLowerError::Issue(ISSUE_QUALIFIED_TYPE_PREFIX_NOT_NAMESPACE));
     }
@@ -2781,15 +2781,15 @@ fn lower_qualified_type(
             .iter()
             .map(|param| lower_type_expr(param, resolver, interner, types))
             .collect::<Result<Vec<_>, _>>()?;
-        return Ok(types.intern(crate::semantic::Type::Applied(type_id, args)));
+        return Ok(types.intern(Type::Applied(type_id, args)));
     }
     Err(TypeLowerError::Issue(ISSUE_UNKNOWN_QUALIFIED_TYPE))
 }
 
 fn define_generic_param(
-    resolver: &mut crate::semantic::Resolver,
+    resolver: &mut Resolver,
     param: &crate::syntax::TypeParam,
-    errors: &mut Vec<crate::semantic::SemanticError>,
+    errors: &mut Vec<SemanticError>,
 ) {
     let kind = match param.kind {
         crate::syntax::GenericParamKind::Typus => SymbolKind::TypeParam,
