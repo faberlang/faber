@@ -28,7 +28,7 @@ fn compile_accepts_en_require_surface_with_alternate_exit() {
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
-    let source = "fn f() → int ⇥ string {\n  require true else \"bad\"\n  return 1\n}";
+    let source = "fn f() → int ⇥ string {\n  require true throw \"bad\"\n  return 1\n}";
     let result = compile(&session, "test.fab", source);
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -42,7 +42,7 @@ fn compile_rejects_en_require_in_arrowless_function() {
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
-    let source = "fn f() → int {\n  require true else \"bad\"\n  return 1\n}";
+    let source = "fn f() → int {\n  require true throw \"bad\"\n  return 1\n}";
     let result = compile(&session, "test.fab", source);
 
     assert!(
