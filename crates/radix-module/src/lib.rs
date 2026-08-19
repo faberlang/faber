@@ -4,8 +4,9 @@
 //! analysis, lowering, target code generation, diagnostics, and the
 //! developer-facing inspection surfaces that expose those phases. The
 //! user-facing `faber` crate builds package and project workflows on top of
-//! this library; package policy, manifest loading, and generated Cargo layouts
-//! deliberately live there instead of here.
+//! this library; the developer `radix` binary lives in `radix-cli`. Package
+//! policy, manifest loading, and generated Cargo layouts deliberately live
+//! there instead of here.
 //!
 //! The public API keeps the embedding contract small. Callers choose a
 //! [`Config`], instantiate a [`Compiler`], and receive a [`CompileResult`] that
@@ -74,6 +75,8 @@ pub mod forma;
 pub mod forma_render;
 pub mod hir;
 pub(crate) mod import_resolve;
+pub mod program;
+pub mod services;
 pub mod intrinsics;
 pub mod kernel;
 pub mod lexer;
@@ -91,7 +94,7 @@ pub mod syntax;
 #[cfg(test)]
 pub mod test_support;
 pub mod textus_literal;
-pub mod tool;
+
 
 use std::path::Path;
 
@@ -287,7 +290,7 @@ impl Compiler {
                 return CompileResult { output: None, diagnostics: vec![Diagnostic::io_error(path, &e)] };
             }
         };
-        crate::tool::commands::compile::compile_prepared_program_path(&self.session, path, &source)
+        crate::program::compile_prepared_program_path(&self.session, path, &source)
     }
 
     /// Compile source code from a string.

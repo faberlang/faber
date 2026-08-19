@@ -12,7 +12,7 @@ pub use radix_mir_runner::{
 use crate::diagnostics::Diagnostic;
 use crate::driver::{AnalyzedModule, Session};
 use crate::mir::lower_analyzed_unit_with_context;
-use crate::tool::analyze_prepared_program_name;
+use crate::program::analyze_prepared_program_name;
 
 /// Failure modes for the analyzed-source run routes.
 ///

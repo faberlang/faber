@@ -680,12 +680,12 @@ fn emit_provider_modules(analysis: &crate::driver::AnalyzedModule) -> Result<Vec
             let mut config = crate::driver::Config::default()
                 .with_bodyless_functions()
                 .with_dev_stdlib();
-            if let Some(pack) = crate::tool::commands::compile::package_reader_locale_pack(&provider_path) {
+            if let Some(pack) = crate::program::compile::package_reader_locale_pack(&provider_path) {
                 config = config.with_locale_pack(pack);
             }
             let session = crate::driver::Session::new(config);
             let name = provider_path.display().to_string();
-            let prepared = crate::tool::commands::compile::prepare_program_module(&provider_path, &source, &session)
+            let prepared = crate::program::compile::prepare_program_module(&provider_path, &source, &session)
                 .map_err(|diag| CodegenError {
                     message: format!("cannot prepare provider module `{module_name}`: {}", diag.message),
                     args: Vec::new(),

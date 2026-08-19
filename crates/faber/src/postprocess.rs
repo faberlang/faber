@@ -5,6 +5,7 @@
 //! developer tools as part of user-facing build/emit workflows.
 
 use radix_module::codegen::Target;
+use radix_module::services::DiagnosticMode;
 use radix_module::Output;
 use std::path::Path;
 use std::{fs, io};
@@ -45,12 +46,56 @@ pub fn write_output_artifact(
     ensure_artifact_parent(path);
 
     let code = postprocess_code(
-        radix_module::tool::output_code(output),
+        radix_module::services::output_code(output),
         target,
         format,
         linter,
     );
     write_artifact_contents(path, code);
+}
+
+/// Print diagnostics using Faber-owned presentation.
+pub fn print_diagnostics(
+    diagnostics: &[radix_module::diagnostics::Diagnostic],
+    mode: DiagnosticMode,
+    diagnostics_locale_pack: Option<&radix_module::locale::LocalePack>,
+) {
+    if mode != DiagnosticMode::Diagnostics {
+        for diag in diagnostics {
+            eprintln!("{}", radix_module::diagnostics::render_plain(diag));
+        }
+        return;
+    }
+    if diagnostics.is_empty() {
+        return;
+    }
+    match diagnostics_locale_pack {
+        Some(pack) => match radix_module::diagnostics::render_expanded_diagnostics_with_pack(diagnostics, pack)
+        {
+            Ok(rendered) => eprintln!("{rendered}"),
+            Err(err) => {
+                eprintln!("error: failed to render reader-pack diagnostics: {err}");
+                std::process::exit(1);
+            }
+        },
+        None => eprintln!(
+            "{}",
+            radix_module::diagnostics::render_expanded_diagnostics(diagnostics)
+        ),
+    }
+}
+
+/// Write a text artifact, creating parent directories as needed.
+pub fn write_text_artifact(path: &Path, text: &str) {
+    ensure_artifact_parent(path);
+    match fs::write(path, text) {
+        Ok(()) => {}
+        Err(err) if err.kind() == io::ErrorKind::BrokenPipe => {}
+        Err(err) => {
+            eprintln!("error: failed to write '{}': {}", path.display(), err);
+            std::process::exit(1);
+        }
+    }
 }
 
 fn ensure_artifact_parent(path: &Path) {

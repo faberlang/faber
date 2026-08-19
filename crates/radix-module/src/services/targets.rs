@@ -46,30 +46,13 @@ pub enum TargetCommandSurface {
     Faber,
 }
 
-/// Print backend capability rows for terminal discovery.
-pub fn cmd_targets() {
-    for &target in discoverable_targets() {
-        let capabilities = target_capabilities_for_surface(TargetCommandSurface::Radix, target);
-        println!(
-            "{} available={} check={} build={} run={} package={} note={}",
-            target_name(target),
-            yes_no(target.is_available()),
-            yes_no(capabilities.check),
-            yes_no(capabilities.build),
-            yes_no(capabilities.run),
-            yes_no(capabilities.package),
-            capabilities.note
-        );
-    }
-}
-
 #[must_use]
-pub(crate) fn discoverable_targets() -> &'static [crate::codegen::Target] {
+pub fn discoverable_targets() -> &'static [crate::codegen::Target] {
     &DISCOVERABLE_TARGET_ROWS
 }
 
 #[must_use]
-pub(crate) fn target_extension(target: crate::codegen::Target) -> &'static str {
+pub fn target_extension(target: crate::codegen::Target) -> &'static str {
     match target {
         crate::codegen::Target::MirStepper => "stepper",
         crate::codegen::Target::HirRust => "rs",
@@ -95,7 +78,7 @@ pub(crate) fn target_extension(target: crate::codegen::Target) -> &'static str {
 }
 
 #[must_use]
-pub(crate) fn target_name(target: crate::codegen::Target) -> &'static str {
+pub fn target_name(target: crate::codegen::Target) -> &'static str {
     match target {
         crate::codegen::Target::MirStepper => "stepper",
         crate::codegen::Target::HirRust => "rust",
@@ -383,10 +366,4 @@ fn faber_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
     }
 }
 
-fn yes_no(value: bool) -> &'static str {
-    if value {
-        "yes"
-    } else {
-        "no"
-    }
-}
+

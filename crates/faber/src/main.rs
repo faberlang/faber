@@ -2,7 +2,7 @@
 //!
 //! Clap shapes live in [`cli`]; handlers live in [`commands`]. Package-aware
 //! compilation routes through [`package`]; single-file compiler inspection
-//! delegates to `radix_module::tool`.
+//! delegates to typed `radix_module::services`.
 
 mod cli;
 mod commands;

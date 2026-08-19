@@ -2060,7 +2060,7 @@ fn th_th_example_still_checks_with_locale002_advisories() {
     let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/th-TH/pack.toml");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed th-TH pack should load");
     let result =
-        crate::tool::check_diagnostics_for_source_with_locale_pack("main.fab", &source, false, Some(&pack), None);
+        crate::services::check_diagnostics_for_source_with_locale_pack("main.fab", &source, false, Some(&pack), None);
     assert!(result.success, "th-TH example must still check: {:?}", result.diagnostics);
     let locale002 = result
         .diagnostics

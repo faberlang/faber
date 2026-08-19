@@ -1,0 +1,415 @@
+//! Clap-free phase-inspection services. Printing and process exit live in `radix-cli`.
+
+use super::json::{
+    annotation_json, cli_analysis_json, escape_json, frontmatter_json, leading_trivia_json, presentation_json,
+};
+use crate::diagnostics::DiagnosticConvert;
+use std::fmt::Write;
+
+/// Inspection payload plus success. Callers print `text` and exit on `!success`.
+#[derive(Debug)]
+pub struct SourceInspection {
+    pub text: String,
+    pub success: bool,
+    pub errors: Vec<String>,
+}
+
+fn source_file(name: impl Into<String>, source: String) -> Result<crate::driver::SourceFile, String> {
+    crate::driver::SourceFile::inline(name, source).map_err(|error| error.to_string())
+}
+
+fn format_location(source_file: &crate::driver::SourceFile, offset: u32) -> String {
+    let (line, column) = source_file.offset_to_line_col(offset);
+    format!("{}:{}:{}", source_file.name.as_str(), line, column)
+}
+
+fn format_optional_location(source_file: &crate::driver::SourceFile, span: Option<crate::lexer::Span>) -> String {
+    match span {
+        Some(span) => format_location(source_file, span.start),
+        None => source_file.name.clone(),
+    }
+}
+
+fn lex_error_message(source_file: &crate::driver::SourceFile, err: &crate::lexer::LexError) -> String {
+    crate::diagnostics::Diagnostic::from_lex_error(&source_file.name, &source_file.content, err).message
+}
+
+fn parse_error_message(source_file: &crate::driver::SourceFile, err: &crate::parser::ParseError) -> String {
+    crate::diagnostics::Diagnostic::from_parse_error(&source_file.name, &source_file.content, err).message
+}
+
+fn lower_error_message(source_file: &crate::driver::SourceFile, err: &crate::hir::LowerError) -> String {
+    let mut semantic_error =
+        crate::semantic::SemanticError::structured(crate::semantic::SemanticErrorKind::LoweringError, err.span);
+    semantic_error.args.extend(err.args.clone());
+    crate::diagnostics::Diagnostic::from_semantic_error(&source_file.name, &source_file.content, &semantic_error)
+        .message
+}
+
+fn semantic_error_message(source_file: &crate::driver::SourceFile, err: &crate::semantic::SemanticError) -> String {
+    crate::diagnostics::Diagnostic::from_semantic_error(&source_file.name, &source_file.content, err).message
+}
+
+/// Tokenize source and return the lex inspection JSON payload.
+#[must_use]
+pub fn lex_inspection_for_source(name: &str, source: &str) -> SourceInspection {
+    let source_file = match source_file(name.to_owned(), source.to_owned()) {
+        Ok(file) => file,
+        Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
+    };
+    let result = crate::lexer::lex(source_file.content.as_str());
+    SourceInspection { text: lex_json(&source_file, &result), success: result.success(), errors: Vec::new() }
+}
+
+fn lex_json(source_file: &crate::driver::SourceFile, result: &crate::lexer::LexResult) -> String {
+    let mut out = String::new();
+    let _ = writeln!(out, "{{");
+    let _ = writeln!(out, "  \"file\": \"{}\",", escape_json(&source_file.name));
+    let _ = writeln!(out, "  \"frontmatter\": {},", frontmatter_json(source_file.frontmatter.as_ref()));
+    let _ = writeln!(out, "  \"success\": {},", result.success());
+    let _ = writeln!(out, "  \"tokens\": [");
+    for (i, token) in result.tokens.iter().enumerate() {
+        let comma = if i + 1 < result.tokens.len() { "," } else { "" };
+        let _ = writeln!(
+            out,
+            "    {{ \"kind\": \"{}\", \"span\": [{}, {}] }}{}",
+            escape_json(&token_kind_display(&token.kind)),
+            token.span.start,
+            token.span.end,
+            comma
+        );
+    }
+    let _ = writeln!(out, "  ],");
+    let _ = writeln!(out, "  \"errors\": [");
+    for (i, err) in result.errors.iter().enumerate() {
+        let comma = if i + 1 < result.errors.len() { "," } else { "" };
+        let _ = writeln!(
+            out,
+            "    {{ \"message\": \"{}\", \"span\": [{}, {}] }}{}",
+            escape_json(&lex_error_message(source_file, err)),
+            err.span.start,
+            err.span.end,
+            comma
+        );
+    }
+    let _ = writeln!(out, "  ]");
+    let _ = writeln!(out, "}}");
+    out
+}
+
+fn token_kind_display(kind: &crate::lexer::TokenKind) -> String {
+    let kind = format!("{kind:?}");
+    if kind.len() > 60 {
+        format!("{}...", &kind[..57])
+    } else {
+        kind
+    }
+}
+
+/// Parse source and return the AST inspection JSON payload.
+#[must_use]
+pub fn parse_inspection_for_source(name: &str, source: &str) -> SourceInspection {
+    let source_file = match source_file(name.to_owned(), source.to_owned()) {
+        Ok(file) => file,
+        Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
+    };
+    let lex_result = crate::lexer::lex(source_file.content.as_str());
+    if !lex_result.success() {
+        return SourceInspection {
+            text: String::new(),
+            success: false,
+            errors: lexer_error_lines(&source_file, &lex_result.errors),
+        };
+    }
+    let parse_result = crate::parser::parse(lex_result);
+    SourceInspection {
+        text: parse_json(&source_file, &parse_result),
+        success: parse_result.success(),
+        errors: Vec::new(),
+    }
+}
+
+fn parse_json(source_file: &crate::driver::SourceFile, parse_result: &crate::parser::ParseResult) -> String {
+    let mut out = String::new();
+    let _ = writeln!(out, "{{");
+    let _ = writeln!(out, "  \"file\": \"{}\",", escape_json(&source_file.name));
+    let _ = writeln!(out, "  \"frontmatter\": {},", frontmatter_json(source_file.frontmatter.as_ref()));
+    let _ = writeln!(out, "  \"body_byte_offset\": {},", source_file.body_byte_offset);
+    let _ = writeln!(out, "  \"success\": {},", parse_result.success());
+    if let Some(program) = &parse_result.program {
+        write_parse_ast_json(&mut out, program, &parse_result.interner);
+    } else {
+        let _ = writeln!(out, "  \"ast\": null,");
+    }
+    let _ = writeln!(out, "  \"errors\": [");
+    for (i, err) in parse_result.errors.iter().enumerate() {
+        let comma = if i + 1 < parse_result.errors.len() { "," } else { "" };
+        let _ = writeln!(
+            out,
+            "    {{ \"message\": \"{}\", \"span\": [{}, {}] }}{}",
+            escape_json(&parse_error_message(source_file, err)),
+            err.span.start,
+            err.span.end,
+            comma
+        );
+    }
+    let _ = writeln!(out, "  ]");
+    let _ = writeln!(out, "}}");
+    out
+}
+
+fn write_parse_ast_json(out: &mut String, program: &crate::syntax::Program, interner: &crate::lexer::Interner) {
+    let _ = writeln!(out, "  \"statements\": {},", program.statements.len());
+    let _ = writeln!(out, "  \"ast\": [");
+    for (i, stmt) in program.statements.iter().enumerate() {
+        let comma = if i + 1 < program.statements.len() { "," } else { "" };
+        let kind = format!("{:?}", stmt.kind);
+        let _ = writeln!(
+            out,
+            "    {{ \"id\": {}, \"kind\": \"{}\", \"span\": [{}, {}], \"leading_trivia\": [{}], \"annotations\": [{}] }}{}",
+            stmt.id,
+            debug_variant_name(&kind),
+            stmt.span.start,
+            stmt.span.end,
+            leading_trivia_json(&stmt.leading_trivia, interner),
+            annotation_json(&stmt.annotations),
+            comma
+        );
+    }
+    let _ = writeln!(out, "  ],");
+}
+
+/// Lower parsed source to HIR and return the inspection JSON payload.
+#[must_use]
+pub fn hir_inspection_for_source(name: &str, source: &str) -> SourceInspection {
+    let source_file = match source_file(name.to_owned(), source.to_owned()) {
+        Ok(file) => file,
+        Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
+    };
+    let (program, mut interner) = match parse_inspect_program(&source_file) {
+        Ok(parsed) => parsed,
+        Err(errors) => return SourceInspection { text: String::new(), success: false, errors },
+    };
+    let (mut resolver, mut types) = match prepare_hir_prerequisites(&source_file, &program, &mut interner) {
+        Ok(ready) => ready,
+        Err(errors) => return SourceInspection { text: String::new(), success: false, errors },
+    };
+    let (lowered, errors) = crate::hir::lower(&program, &mut resolver, &mut types, &mut interner);
+    SourceInspection {
+        text: hir_inspection_json(
+            &source_file,
+            &lowered.hir,
+            Some(&lowered.presentation),
+            &interner,
+            &errors,
+        ),
+        success: errors.is_empty(),
+        errors: Vec::new(),
+    }
+}
+
+/// Format an already-loaded HIR module as the inspect JSON payload.
+#[must_use]
+pub fn hir_inspection_json(
+    source_file: &crate::driver::SourceFile,
+    hir: &crate::hir::HirModule,
+    presentation: Option<&radix_hir::HirPresentation>,
+    interner: &crate::lexer::Interner,
+    errors: &[crate::hir::LowerError],
+) -> String {
+    let mut out = String::new();
+    let _ = writeln!(out, "{{");
+    let _ = writeln!(out, "  \"file\": \"{}\",", escape_json(&source_file.name));
+    let _ = writeln!(out, "  \"frontmatter\": {},", frontmatter_json(source_file.frontmatter.as_ref()));
+    let _ = writeln!(out, "  \"success\": {},", errors.is_empty());
+    let _ = writeln!(out, "  \"items\": {},", hir.items.len());
+    match presentation {
+        Some(presentation) => {
+            let _ = writeln!(out, "  \"presentation\": {},", presentation_json(presentation, interner));
+        }
+        None => {
+            let _ = writeln!(out, "  \"presentation\": null,");
+        }
+    }
+    let _ = writeln!(out, "  \"hir\": [");
+    for (i, item) in hir.items.iter().enumerate() {
+        let comma = if i + 1 < hir.items.len() { "," } else { "" };
+        let kind = format!("{:?}", item.kind);
+        let _ = writeln!(
+            out,
+            "    {{ \"id\": {:?}, \"def_id\": {:?}, \"kind\": \"{}\", \"span\": [{}, {}] }}{}",
+            item.id.0,
+            item.def_id.0,
+            debug_variant_name(&kind),
+            item.span.start,
+            item.span.end,
+            comma
+        );
+    }
+    let _ = writeln!(out, "  ],");
+    let _ = writeln!(out, "  \"errors\": [");
+    for (i, err) in errors.iter().enumerate() {
+        let comma = if i + 1 < errors.len() { "," } else { "" };
+        let _ = writeln!(
+            out,
+            "    {{ \"message\": \"{}\", \"span\": [{}, {}] }}{}",
+            escape_json(&lower_error_message(source_file, err)),
+            err.span.start,
+            err.span.end,
+            comma
+        );
+    }
+    let _ = writeln!(out, "  ]");
+    let _ = writeln!(out, "}}");
+    out
+}
+
+/// Produce MIR inspection text without exiting the process.
+#[cfg(feature = "mir-core")]
+pub fn mir_output_for_source(name: &str, raw_source: &str) -> Result<String, Vec<String>> {
+    let source_file = source_file(name.to_owned(), raw_source.to_owned()).map_err(|error| vec![error])?;
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_dev_stdlib());
+    let prepared = match crate::program::prepare_program_module_for_name(&source_file.name, raw_source, &session) {
+        Ok(prepared) => prepared,
+        Err(diagnostic) => return Err(format_mir_frontend_diagnostics(&source_file, vec![*diagnostic])),
+    };
+
+    let mut analysis = match crate::driver::analyze_source_with_module_import_contract(
+        &prepared.session,
+        &source_file.name,
+        raw_source,
+        None,
+        prepared.contract,
+    ) {
+        Ok(analysis) => analysis,
+        Err(diagnostics) => return Err(format_mir_frontend_diagnostics(&source_file, diagnostics)),
+    };
+
+    match crate::mir::dump_analyzed_unit(&mut analysis) {
+        Ok(output) => Ok(output),
+        Err(errors) => Err(format_mir_errors(&source_file, errors)),
+    }
+}
+
+#[cfg(feature = "mir-core")]
+fn format_mir_frontend_diagnostics(
+    source_file: &crate::driver::SourceFile,
+    diagnostics: Vec<crate::diagnostics::Diagnostic>,
+) -> Vec<String> {
+    diagnostics
+        .into_iter()
+        .map(|diagnostic| {
+            let prefix = if diagnostic.is_error() { "error" } else { "warning" };
+            format!(
+                "{}: {}: {}",
+                prefix,
+                format_optional_location(source_file, diagnostic.span),
+                diagnostic.message
+            )
+        })
+        .collect()
+}
+
+#[cfg(feature = "mir-core")]
+fn format_mir_errors(source_file: &crate::driver::SourceFile, errors: Vec<crate::mir::MirError>) -> Vec<String> {
+    errors
+        .into_iter()
+        .map(|err| format!("error: {}: {}", format_location(source_file, err.span.start), err.message))
+        .collect()
+}
+
+/// Analyze CLI annotations and return the normalized CLI IR JSON payload.
+#[must_use]
+pub fn cli_ir_inspection_for_source(name: &str, source: &str) -> SourceInspection {
+    let source_file = match source_file(name.to_owned(), source.to_owned()) {
+        Ok(file) => file,
+        Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
+    };
+    let (program, interner) = match parse_inspect_program(&source_file) {
+        Ok(parsed) => parsed,
+        Err(errors) => return SourceInspection { text: String::new(), success: false, errors },
+    };
+    let cli_analysis = crate::cli::analyze(&program, &interner);
+    SourceInspection {
+        text: format!("{}\n", cli_analysis_json(&cli_analysis)),
+        success: cli_analysis.errors.is_empty(),
+        errors: Vec::new(),
+    }
+}
+
+fn parse_inspect_program(
+    source_file: &crate::driver::SourceFile,
+) -> Result<(crate::syntax::Program, crate::lexer::Interner), Vec<String>> {
+    let lex_result = crate::lexer::lex(source_file.content.as_str());
+    if !lex_result.success() {
+        return Err(lexer_error_lines(source_file, &lex_result.errors));
+    }
+    let parse_result = crate::parser::parse(lex_result);
+    if !parse_result.success() {
+        return Err(parser_error_lines(source_file, &parse_result.errors));
+    }
+    let crate::parser::ParseResult { program, interner, .. } = parse_result;
+    let Some(program) = program else {
+        return Err(vec!["internal error: successful parse result missing program".to_owned()]);
+    };
+    Ok((program, interner))
+}
+
+fn debug_variant_name(debug: &str) -> &str {
+    if let Some((variant, _)) = debug.split_once('(') {
+        variant
+    } else {
+        debug
+    }
+}
+
+fn lexer_error_lines(source_file: &crate::driver::SourceFile, errors: &[crate::lexer::LexError]) -> Vec<String> {
+    let mut lines = vec!["lexer errors:".to_owned()];
+    for err in errors {
+        lines.push(format!(
+            "  {}: {}",
+            format_location(source_file, err.span.start),
+            lex_error_message(source_file, err)
+        ));
+    }
+    lines
+}
+
+fn parser_error_lines(source_file: &crate::driver::SourceFile, errors: &[crate::parser::ParseError]) -> Vec<String> {
+    let mut lines = vec!["parser errors:".to_owned()];
+    for err in errors {
+        lines.push(format!(
+            "  {}: {}",
+            format_location(source_file, err.span.start),
+            parse_error_message(source_file, err)
+        ));
+    }
+    lines
+}
+
+fn prepare_hir_prerequisites(
+    source_file: &crate::driver::SourceFile,
+    program: &crate::syntax::Program,
+    interner: &mut crate::lexer::Interner,
+) -> Result<(crate::semantic::Resolver, crate::semantic::TypeTable), Vec<String>> {
+    let mut resolver = crate::semantic::Resolver::new();
+    let mut types = crate::semantic::TypeTable::new();
+    crate::builtins::register(&mut resolver, &mut types, interner);
+    crate::builtins::register_frame_types_if_needed(program, &mut resolver, &mut types, interner);
+
+    if let Err(errors) = crate::semantic::passes::collect::collect(program, &mut resolver, &mut types) {
+        let mut lines = vec!["collection errors:".to_owned()];
+        for err in errors {
+            lines.push(format!("  {:?}: {}", err.kind, semantic_error_message(source_file, &err)));
+        }
+        return Err(lines);
+    }
+    if let Err(errors) = crate::semantic::passes::resolve::resolve(program, &mut resolver, interner, &mut types) {
+        let mut lines = vec!["resolution errors:".to_owned()];
+        for err in errors {
+            lines.push(format!("  {:?}: {}", err.kind, semantic_error_message(source_file, &err)));
+        }
+        return Err(lines);
+    }
+    Ok((resolver, types))
+}

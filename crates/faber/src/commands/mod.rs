@@ -30,8 +30,8 @@ use crate::cli::Command;
 use crate::input_shape::{locale_without_package_error, verify_input_is_package_shaped};
 use crate::package;
 use clap::Parser;
-use radix_module::tool::{
-    self, BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand,
+use radix_module::services::{
+    BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand,
 };
 
 use convert::cmd_convert;
@@ -108,8 +108,8 @@ fn dispatch(command: Command) {
                     release: args.release,
                     target: args
                         .target
-                        .unwrap_or(radix_module::tool::CliTarget::HirRust)
-                        .into(),
+                        .unwrap_or(crate::cli::FaberCliTarget::HirRust)
+                        .to_radix(),
                     target_explicit,
                     deny_warnings: args.deny_warnings,
                     deny_codes: args.deny,
@@ -137,7 +137,7 @@ fn dispatch(command: Command) {
                     diagnostics_locale: args.diagnostics_locale,
                 });
             } else {
-                tool::cmd_check(CheckCommand {
+                cmd_check_file(CheckCommand {
                     input: args.input,
                     package: args.package,
                     permissive: args.permissive,
@@ -157,7 +157,7 @@ fn dispatch(command: Command) {
                 );
                 std::process::exit(1);
             }
-            tool::cmd_verify(VerifyCommand {
+            cmd_verify_file(VerifyCommand {
                 input: args.input,
                 package: args.package,
             });
@@ -175,11 +175,11 @@ fn dispatch(command: Command) {
             eprintln!("error: test requires the runner feature");
             std::process::exit(1);
         }
-        Command::Lex(args) => tool::cmd_lex(&args.input),
-        Command::Parse(args) => tool::cmd_parse(&args.input),
-        Command::Hir(args) => tool::cmd_hir(&args.input, None),
-        Command::Mir(args) => tool::cmd_mir(&args.input),
-        Command::CliIr(args) => tool::cmd_cli_ir(&args.input),
+        Command::Lex(args) => cmd_inspect_lex(&args.input),
+        Command::Parse(args) => cmd_inspect_parse(&args.input),
+        Command::Hir(args) => cmd_inspect_hir(&args.input, args.load),
+        Command::Mir(args) => cmd_inspect_mir(&args.input),
+        Command::CliIr(args) => cmd_inspect_cli_ir(&args.input),
         Command::Emit(args) => {
             let emit_command = EmitCommand {
                 input: args.input,
@@ -275,6 +275,116 @@ fn reject_reader_locale_without_package(
 ) {
     if let Some(message) = locale_without_package_error(locale, input, force_package) {
         eprintln!("error: {message}");
+        std::process::exit(1);
+    }
+}
+
+fn print_inspection(result: radix_module::services::SourceInspection) {
+    if !result.text.is_empty() {
+        print!("{}", result.text);
+    }
+    for error in &result.errors {
+        eprintln!("{error}");
+    }
+    if !result.success {
+        std::process::exit(1);
+    }
+}
+
+fn read_source(args: &[String]) -> (String, String) {
+    if args.is_empty() || args[0] == "-" {
+        let mut source = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut source).unwrap_or_else(|err| {
+            eprintln!("error: failed to read stdin: {err}");
+            std::process::exit(1);
+        });
+        ("<stdin>".to_owned(), source)
+    } else {
+        let path = std::path::PathBuf::from(&args[0]);
+        let source = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            eprintln!("error: cannot read '{}': {}", path.display(), e);
+            std::process::exit(1);
+        });
+        (args[0].clone(), source)
+    }
+}
+
+fn cmd_inspect_lex(input: &[String]) {
+    let (name, source) = read_source(input);
+    print_inspection(radix_module::services::lex_inspection_for_source(&name, &source));
+}
+
+fn cmd_inspect_parse(input: &[String]) {
+    let (name, source) = read_source(input);
+    print_inspection(radix_module::services::parse_inspection_for_source(&name, &source));
+}
+
+fn cmd_inspect_hir(input: &[String], load: Option<std::path::PathBuf>) {
+    if let Some(path) = load {
+        eprintln!("error: `faber hir --load` is not supported; use `radix hir --load`");
+        let _ = path;
+        std::process::exit(1);
+    }
+    let (name, source) = read_source(input);
+    print_inspection(radix_module::services::hir_inspection_for_source(&name, &source));
+}
+
+fn cmd_inspect_mir(input: &[String]) {
+    let (name, source) = read_source(input);
+    match radix_module::services::mir_output_for_source(&name, &source) {
+        Ok(output) => print!("{output}"),
+        Err(messages) => {
+            for message in messages {
+                eprintln!("{message}");
+            }
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_inspect_cli_ir(input: &[String]) {
+    let (name, source) = read_source(input);
+    print_inspection(radix_module::services::cli_ir_inspection_for_source(&name, &source));
+}
+
+fn cmd_check_file(command: CheckCommand) {
+    if command.package {
+        eprintln!("error: package checking is owned by the `faber` tool; rerun with `faber check --package`");
+        std::process::exit(1);
+    }
+    let (name, source) = read_source(&command.input);
+    let mut result = radix_module::services::check_diagnostics_for_source(&name, &source, command.permissive);
+    let warn_policy = radix_module::driver::WarnPolicy {
+        deny_all_warnings: command.deny_warnings,
+        deny_codes: command.deny_codes.clone(),
+    };
+    radix_module::driver::apply_warn_policy(&mut result.diagnostics, &warn_policy);
+    crate::postprocess::print_diagnostics(&result.diagnostics, command.diagnostic_mode, None);
+    let success = result.success
+        && !result
+            .diagnostics
+            .iter()
+            .any(radix_module::diagnostics::Diagnostic::is_error);
+    if success {
+        eprintln!("ok: {name}");
+    } else {
+        std::process::exit(1);
+    }
+}
+
+fn cmd_verify_file(command: VerifyCommand) {
+    let (name, source) = read_source(&command.input);
+    let result = radix_module::services::verify_source(&name, &source, None);
+    if !result.diagnostics.is_empty() {
+        eprint!(
+            "{}",
+            radix_module::diagnostics::render_expanded_diagnostics(&result.diagnostics)
+        );
+    }
+    if let Some(coverage) = &result.coverage {
+        print!("{}", radix_module::aspect::render_hir_aspect_coverage(coverage));
+    }
+    if !result.success {
         std::process::exit(1);
     }
 }

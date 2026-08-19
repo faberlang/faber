@@ -718,7 +718,6 @@ name = "radix-module"
 version = "0.83.0"
 dependencies = [
  "ariadne",
- "clap",
  "handroll",
  "hygiene-ratchet",
  "insta",

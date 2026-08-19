@@ -1,149 +1,13 @@
-//! Semantic `check` command handler and normalized diagnostic collection.
-//!
-//! Single-file check for the radix CLI: lex, parse, and analyze one source
-//! input, then print diagnostics or return a normalized collection. Package
-//! inputs are rejected with a message pointing at the `faber` CLI. Fatal
-//! errors that permissive mode does not downgrade exit with code 1.
+//! Typed check service: normalized diagnostics, no print/exit.
 
-use super::super::cli::{CheckCommand, DiagnosticMode};
-use super::diagnostics_locale_pack::load_diagnostics_locale_pack_or_exit;
-use super::emit::print_diagnostics;
-use super::package::should_treat_as_package_from_input;
-use super::source::{
-    format_location, lex_error_message, parse_error_message, read_source, semantic_error_message,
-    source_file_from_input,
-};
-use crate::diagnostics::{DiagnosticConvert, Severity};
-use crate::driver::WarnPolicy;
+use crate::diagnostics::DiagnosticConvert;
 
 const MISSING_PARSE_PROGRAM_MESSAGE: &str = "successful parse result missing program";
 const PERMISSIVE_DOWNGRADE_MESSAGE: &str = "permissive mode downgraded unresolved/import-driven semantic errors";
 
-pub fn cmd_check(command: CheckCommand) {
-    if command.package || should_treat_as_package_from_input(&command.input) {
-        eprintln!("error: package checking is owned by the `faber` tool; rerun with `faber check --package`");
-        std::process::exit(1);
-    }
-
-    let warn_policy = WarnPolicy { deny_all_warnings: command.deny_warnings, deny_codes: command.deny_codes.clone() };
-
-    let (name, source) = read_source(&command.input);
-    let source_file = source_file_from_input(name, source);
-
-    // Code pack: an explicit `--locale` wins; otherwise honor the source's
-    // `+++ locale = "…" +++` frontmatter (en-surface corpus) exactly like the
-    // analysis driver and the diagnostic-check path. The `SourceFile` content
-    // is already frontmatter-stripped, so frontmatter resolution goes through
-    // the peeled metadata.
-    let mut code_pack = super::compile::explicit_locale_pack(command.locale.as_deref())
-        .or_else(|| super::compile::frontmatter_locale_pack_from_frontmatter(source_file.frontmatter.as_ref()));
-    let diagnostics_locale_pack = load_diagnostics_locale_pack_or_exit(command.diagnostics_locale_pack.as_ref());
-
-    if command.diagnostic_mode == DiagnosticMode::Diagnostics || command.diagnostics_locale_pack.is_some() {
-        run_diagnostic_check(
-            &command,
-            &source_file,
-            &warn_policy,
-            code_pack.as_ref(),
-            diagnostics_locale_pack.as_ref(),
-        );
-        return;
-    }
-
-    let (program, mut interner) = parse_check_program(&source_file, code_pack.as_ref());
-    let cli_analysis = crate::cli::analyze(&program, &interner);
-    if print_cli_errors(&source_file, &cli_analysis.errors) > 0 {
-        std::process::exit(1);
-    }
-
-    let mut pass_config = crate::semantic::PassConfig::for_target(crate::codegen::Target::HirRust);
-    // WHY: the code/reader pack must reach the semantic passes (intrinsic
-    // surface→canonical resolution, type spellings), not just lexing and
-    // import contracts. Without it the CLI check treats every localized
-    // intrinsic surface (en `contains` → `continet`) as an unknown method
-    // miss and leaves a fresh inference hole that surfaces as
-    // SEM014.cannot_infer_expression_type for non-literal args — while the
-    // driver path (`faber`/`emit`) rewrites the same call and checks green.
-    // The driver wires the pack at the same seam (`driver::mod.rs`).
-    if let Some(path) = source_path_for_import_contract(&source_file.name) {
-        let contract = super::compile::import_contract_for_file(&path, &source_file.content, code_pack.as_ref(), None);
-        if let Some(pack) = code_pack.as_mut() {
-            if let Err(err) = crate::locale::merge_library_locale_packs(pack, &contract.library_package_roots) {
-                eprintln!(
-                    "error: failed to load library locale pack: {}",
-                    crate::locale::format_locale_pack_load_error(&err)
-                );
-                std::process::exit(1);
-            }
-        }
-        pass_config.namespace_exports = contract.namespace_exports;
-        pass_config.namespace_seams = contract.namespace_seams;
-        pass_config.namespace_declarations = contract.namespace_declarations;
-        pass_config.file_interfaces = contract.file_interfaces;
-    }
-    pass_config.locale_pack.clone_from(&code_pack);
-    let semantic_result =
-        crate::semantic::analyze_with_cli(&program, &pass_config, &mut interner, cli_analysis.program.as_ref());
-
-    let report =
-        print_semantic_diagnostics(&source_file, &semantic_result.diagnostics, command.permissive, &warn_policy);
-    if command.permissive && report.downgraded > 0 {
-        eprintln!(
-            "warning:{}: downgraded {} unresolved/import-driven semantic error(s) in permissive mode",
-            source_file.name.as_str(),
-            report.downgraded
-        );
-    }
-
-    if report.denied_warnings > 0 {
-        eprintln!(
-            "error:{}: {} warning(s) promoted to error(s) by --deny policy",
-            source_file.name.as_str(),
-            report.denied_warnings
-        );
-    }
-
-    let ok =
-        (semantic_result.success() || (command.permissive && report.fatal_errors == 0)) && report.denied_warnings == 0;
-    if ok {
-        eprintln!("ok: {}", source_file.name.as_str());
-    } else {
-        std::process::exit(1);
-    }
-}
-
-fn run_diagnostic_check(
-    command: &CheckCommand,
-    source_file: &crate::driver::SourceFile,
-    warn_policy: &WarnPolicy,
-    code_pack: Option<&crate::locale::LocalePack>,
-    diagnostics_locale_pack: Option<&crate::locale::LocalePack>,
-) {
-    // `code_pack` (explicit `--locale` or source frontmatter) drives lexing;
-    // `diagnostics_locale_pack` (from `--diagnostics-locale`) drives message
-    // rendering only. When no diagnostics pack is given, the catalog English
-    // rendering applies.
-    let mut result = check_diagnostics_for_source_with_locale_pack(
-        &source_file.name,
-        &source_file.content,
-        command.permissive,
-        code_pack,
-        None,
-    );
-    crate::driver::apply_warn_policy(&mut result.diagnostics, warn_policy);
-    let success = result.success
-        && !result
-            .diagnostics
-            .iter()
-            .any(radix_diagnostics::Diagnostic::is_error);
-    if !result.diagnostics.is_empty() {
-        print_diagnostics(&result.diagnostics, command.diagnostic_mode, diagnostics_locale_pack);
-    }
-    if success {
-        eprintln!("ok: {}", source_file.name.as_str());
-    } else {
-        std::process::exit(1);
-    }
+struct CheckErrorTally {
+    fatal_errors: usize,
+    downgraded: usize,
 }
 
 /// Use a filesystem path when available so provider imports can be resolved.
@@ -155,103 +19,6 @@ fn source_path_for_import_contract(name: &str) -> Option<std::path::PathBuf> {
         None
     }
 }
-
-fn parse_check_program(
-    source_file: &crate::driver::SourceFile,
-    code_pack: Option<&crate::locale::LocalePack>,
-) -> (crate::syntax::Program, crate::lexer::Interner) {
-    let lex_result = match code_pack {
-        Some(pack) => crate::lexer::lex_with_locale_pack(source_file.content.as_str(), pack),
-        None => crate::lexer::lex(source_file.content.as_str()),
-    };
-    if !lex_result.success() {
-        for err in &lex_result.errors {
-            eprintln!(
-                "{}: {}",
-                format_location(source_file, err.span.start),
-                lex_error_message(source_file, err)
-            );
-        }
-        std::process::exit(1);
-    }
-
-    let parse_result = crate::parser::parse(lex_result);
-    if !parse_result.success() {
-        for err in &parse_result.errors {
-            eprintln!(
-                "{}: {}",
-                format_location(source_file, err.span.start),
-                parse_error_message(source_file, err)
-            );
-        }
-        std::process::exit(1);
-    }
-
-    let crate::parser::ParseResult { program, interner, .. } = parse_result;
-    let Some(program) = program else {
-        eprintln!("internal error: successful parse result missing program");
-        std::process::exit(1);
-    };
-
-    (program, interner)
-}
-
-fn print_cli_errors(source_file: &crate::driver::SourceFile, errors: &[crate::semantic::SemanticError]) -> usize {
-    for err in errors {
-        eprintln!(
-            "error: {}: {}",
-            format_location(source_file, err.span.start),
-            semantic_error_message(source_file, err)
-        );
-    }
-    errors.len()
-}
-
-struct CheckErrorTally {
-    fatal_errors: usize,
-    downgraded: usize,
-    denied_warnings: usize,
-}
-
-fn print_semantic_diagnostics(
-    source_file: &crate::driver::SourceFile,
-    diagnostics: &[crate::semantic::SemanticError],
-    permissive: bool,
-    warn_policy: &WarnPolicy,
-) -> CheckErrorTally {
-    let mut fatal_errors = 0usize;
-    let mut downgraded = 0usize;
-    let mut denied_warnings = 0usize;
-    for err in diagnostics {
-        let downgraded_error = permissive && err.kind.is_permissive_check_downgrade();
-        let code = crate::diagnostics::semantic_spec(err.kind).code;
-        let denied_warning =
-            (!err.is_error() || downgraded_error) && warn_policy.promotes(Severity::Warning, Some(code));
-        let prefix = if (err.is_error() && !downgraded_error) || denied_warning {
-            "error"
-        } else {
-            "warning"
-        };
-        eprintln!(
-            "{}: {}: {}",
-            prefix,
-            format_location(source_file, err.span.start),
-            semantic_error_message(source_file, err)
-        );
-        if err.is_error() {
-            if downgraded_error {
-                downgraded += 1;
-            } else {
-                fatal_errors += 1;
-            }
-        }
-        if denied_warning {
-            denied_warnings += 1;
-        }
-    }
-    CheckErrorTally { fatal_errors, downgraded, denied_warnings }
-}
-
 /// Result of running check through normalized diagnostics.
 #[derive(Debug)]
 pub struct CheckDiagnosticsResult {
@@ -285,7 +52,7 @@ pub fn check_diagnostics_for_source_with_locale_pack(
     // parse with no diagnostics of substance.
     let mut resolved_pack = code_pack
         .map(ToOwned::to_owned)
-        .or_else(|| super::compile::frontmatter_locale_pack_from_source(name, source));
+        .or_else(|| crate::program::compile::frontmatter_locale_pack_from_source(name, source));
 
     let lex_result = lex_check_source(source, resolved_pack.as_ref());
     collect_locale_diagnostics(&mut diagnostics, name, source, &lex_result);
@@ -328,7 +95,7 @@ pub fn check_diagnostics_for_source_with_locale_pack(
     // miss path (SEM014.cannot_infer_expression_type on non-literal args).
     pass_config.import_path_templates = templates.cloned();
     if let Some(path) = source_path_for_import_contract(name) {
-        let contract = super::compile::import_contract_for_file(&path, source, resolved_pack.as_ref(), templates);
+        let contract = crate::program::compile::import_contract_for_file(&path, source, resolved_pack.as_ref(), templates);
         if let Some(pack) = resolved_pack.as_mut() {
             if let Err(err) = crate::locale::merge_library_locale_packs(pack, &contract.library_package_roots) {
                 diagnostics.push(
@@ -469,7 +236,7 @@ fn collect_semantic_check_diagnostics(
         diagnostics.push(diagnostic);
     }
 
-    CheckErrorTally { fatal_errors, downgraded, denied_warnings: 0 }
+    CheckErrorTally { fatal_errors, downgraded }
 }
 
 fn push_permissive_downgrade_diagnostic(

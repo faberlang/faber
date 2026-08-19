@@ -55,14 +55,14 @@ impl ModuleId {
 
 /// Export within a module (function, type, etc.).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
-pub struct ExportId {
+pub(crate) struct ExportId {
     pub module: ModuleId,
     pub name: String,
 }
 
 /// Binding identity for a native-target declaration.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
-pub struct BindingId {
+pub(crate) struct BindingId {
     pub package: PackageId,
     pub key: String,
 }

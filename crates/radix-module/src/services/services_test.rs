@@ -4,17 +4,11 @@
 //! reader-pack integration; target discovery and capability reporting.
 
 use super::*;
-use crate::test_support::args_have_no_legacy_message;
-#[cfg(feature = "hir-faber")]
-use crate::tool::compile_cli_source_with_locale_pack;
-use crate::tool::{
+use crate::services::{
     check_diagnostics_for_source, check_diagnostics_for_source_with_locale_pack, compile_cli_path, compile_cli_source,
-    discoverable_targets, target_capabilities, target_capabilities_for_surface, target_extension, target_name,
-    verify_source, AbiArgs, AbiFormat, BuildCommand, CheckArgs, CheckCommand, CliTarget, DiagnosticMode, EmitArgs,
-    EmitCommand, InputArgs, RadixCli, RadixCommand, TargetCommandSurface, VerifyArgs,
+    compile_cli_source_with_locale_pack, discoverable_targets, target_capabilities, target_capabilities_for_surface,
+    target_extension, target_name, verify_source, TargetCommandSurface,
 };
-use clap::error::ErrorKind;
-use clap::{CommandFactory, Parser};
 use std::path::PathBuf;
 
 fn temp_fab(label: &str, content: &str) -> (tempfile::TempDir, String) {
@@ -73,44 +67,11 @@ fn wgsl_output_reflection(result: crate::CompileResult) -> (String, crate::mir::
     (wgsl_output.code.clone(), reflection)
 }
 
-fn parse_radix<const N: usize>(args: [&str; N]) -> RadixCli {
-    RadixCli::try_parse_from(args).expect("cli parse")
-}
 
-fn expect_check(cli: RadixCli) -> CheckArgs {
-    match cli.command {
-        RadixCommand::Check(args) => args,
-        other => panic!("expected check, got {other:?}"),
-    }
-}
 
-fn expect_emit(cli: RadixCli) -> EmitArgs {
-    match cli.command {
-        RadixCommand::Emit(args) => args,
-        other => panic!("expected emit, got {other:?}"),
-    }
-}
 
-fn expect_verify(cli: RadixCli) -> VerifyArgs {
-    match cli.command {
-        RadixCommand::Verify(args) => args,
-        other => panic!("expected verify, got {other:?}"),
-    }
-}
 
-fn expect_mir(cli: RadixCli) -> InputArgs {
-    match cli.command {
-        RadixCommand::Mir(args) => args,
-        other => panic!("expected mir, got {other:?}"),
-    }
-}
 
-fn expect_abi(cli: RadixCli) -> AbiArgs {
-    match cli.command {
-        RadixCommand::Abi(args) => args,
-        other => panic!("expected abi, got {other:?}"),
-    }
-}
 
 const OMNIA_EXEMPLUM: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/omnia/omnia.fab"));
 
@@ -123,210 +84,22 @@ fn assert_json_object_keys(value: &serde_json::Value, expected: &[&str]) {
     assert_eq!(actual, expected, "json object keys");
 }
 
-#[test]
-fn escape_json_escapes_special_chars() {
-    let escaped = escape_json("a\\b\"c\nd\re\tf\u{001f}g");
-    assert_eq!(escaped, "a\\\\b\\\"c\\nd\\re\\tf\\u001fg");
-}
 
-#[test]
-fn escape_json_handles_empty_string() {
-    assert_eq!(escape_json(""), "");
-}
 
-#[test]
-fn escape_json_passes_through_plain_text() {
-    assert_eq!(escape_json("hello world"), "hello world");
-    assert_eq!(escape_json("abc123!@#$%^&*()"), "abc123!@#$%^&*()");
-}
 
-#[test]
-fn read_source_reads_file_argument() {
-    let (_td, file) = temp_fab("read", "incipit {}");
-    let args = vec![file.clone()];
 
-    let (name, source) = read_source(&args);
-    assert_eq!(name, file);
-    assert_eq!(source, "incipit {}");
-}
 
-#[test]
-fn format_location_uses_line_and_column() {
-    let source_file =
-        crate::driver::SourceFile::inline("demo.fab", "alfa\nbeta\ngamma".to_owned()).expect("source file");
 
-    assert_eq!(format_location(&source_file, 0), "demo.fab:1:1");
-    assert_eq!(format_location(&source_file, 5), "demo.fab:2:1");
-    assert_eq!(format_location(&source_file, 8), "demo.fab:2:4");
-}
 
-#[test]
-fn format_location_handles_start_of_file() {
-    let source_file = crate::driver::SourceFile::inline("start.fab", "x".to_owned()).expect("source file");
 
-    assert_eq!(format_location(&source_file, 0), "start.fab:1:1");
-    assert_eq!(format_location(&source_file, 1), "start.fab:1:2");
-}
 
-#[test]
-fn parse_error_message_renders_parse_code() {
-    let parse_source = "@ cli\n";
-    let parse_result = crate::parser::parse(crate::lexer::lex(parse_source));
-    let parse_err = parse_result.errors.first().expect("parse error");
-    assert!(args_have_no_legacy_message(&parse_err.args), "expected structured parse error");
-    let parse_file = crate::driver::SourceFile::inline("parse.fab", parse_source.to_owned()).expect("source file");
 
-    assert_eq!(super::source::parse_error_message(&parse_file, parse_err), "PARSE001");
-}
 
-#[test]
-fn semantic_error_message_renders_sem_code() {
-    let semantic_source = "nota missing\n";
-    let semantic_file =
-        crate::driver::SourceFile::inline("semantic.fab", semantic_source.to_owned()).expect("source file");
-    let semantic_err = crate::semantic::SemanticError::structured(
-        crate::semantic::SemanticErrorKind::UndefinedVariable,
-        crate::lexer::Span { start: 5, end: 12 },
-    )
-    .with_arg("issue", "unknown_identifier");
-    assert!(
-        args_have_no_legacy_message(&semantic_err.args),
-        "expected structured semantic error"
-    );
 
-    assert_eq!(
-        super::source::semantic_error_message(&semantic_file, &semantic_err),
-        "SEM001.unknown_identifier"
-    );
-}
 
-#[test]
-fn cli_analysis_json_renders_structured_validation_messages() {
-    let source = r#"
-@ cli "tool"
-incipit {}
-"#;
-    let parsed = crate::parser::parse(crate::lexer::lex(source));
-    assert!(parsed.errors.is_empty(), "parse errors: {:?}", parsed.errors);
-    let program = parsed.program.as_ref().expect("program");
-    let analysis = crate::cli::analyze(program, &parsed.interner);
-    assert!(!analysis.errors.is_empty());
-    assert!(
-        analysis
-            .errors
-            .iter()
-            .all(|err| args_have_no_legacy_message(&err.args)),
-        "expected structured CLI diagnostics"
-    );
 
-    let json = super::json::cli_analysis_json(&analysis);
 
-    // ALLOW_DIAGNOSTIC_RENDER_TEXT: CLI JSON rendered diagnostic contract.
-    assert!(json.contains("SEM009.missing_entry_argument"));
-    assert!(!json.contains("\"message\": \"\""));
-}
 
-#[test]
-fn cmd_lex_succeeds_on_valid_file() {
-    let (_td, file) = temp_fab("pipeline-lex", "incipit {}");
-    cmd_lex(&[file]);
-}
-
-#[test]
-fn cmd_parse_succeeds_on_valid_file() {
-    let (_td, file) = temp_fab("pipeline-parse", "incipit {}");
-    cmd_parse(&[file]);
-}
-
-#[test]
-fn cmd_hir_succeeds_on_valid_file() {
-    let (_td, file) = temp_fab("pipeline-hir", "incipit {}");
-    cmd_hir(&[file], None);
-}
-
-#[test]
-fn cmd_mir_succeeds_on_valid_file() {
-    let (_td, file) = temp_fab("pipeline-mir", "incipit {}");
-    cmd_mir(&[file]);
-}
-
-#[test]
-fn cmd_check_succeeds_on_valid_file() {
-    let (_td, file) = temp_fab("pipeline-check", "incipit {}");
-    cmd_check(CheckCommand {
-        input: vec![file],
-        package: false,
-        permissive: false,
-        deny_warnings: false,
-        deny_codes: vec![],
-        diagnostic_mode: DiagnosticMode::Normal,
-        diagnostics_locale_pack: None,
-        locale: None,
-        diagnostics_locale: None,
-    });
-}
-
-#[test]
-fn cmd_emit_succeeds_on_valid_file() {
-    let (_td, file) = temp_fab("pipeline-emit", "incipit {}");
-    cmd_emit(EmitCommand {
-        input: vec![file],
-        package: false,
-        target: crate::codegen::Target::HirRust,
-        reflection: false,
-        #[cfg(feature = "mir-llvm")]
-        cuda_descriptor: None,
-        output: None,
-        diagnostic_mode: DiagnosticMode::Normal,
-        diagnostics_locale_pack: None,
-        locale: None,
-        diagnostics_locale: None,
-        output_mode: crate::codegen::OutputMode::Application,
-        module_name: None,
-    });
-}
-
-#[test]
-fn cmd_cli_ir_succeeds_on_valid_cli_file() {
-    let (_td, file) = temp_fab(
-        "cli-ir",
-        r#"
-@ cli "tool"
-@ optio verbose brevis "v" longum "verbose" typus bivalens
-incipit argumenta args {}
-"#,
-    );
-
-    cmd_cli_ir(&[file]);
-}
-
-#[test]
-fn cmd_build_writes_file_output_to_disk() {
-    let (_td, file) = temp_fab("build", "incipit {}");
-    let out_dir_td = temp_dir("build-out");
-    let out_dir = out_dir_td.path().to_path_buf();
-    let expected_name = PathBuf::from(&file)
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .expect("temp file stem")
-        .to_owned();
-
-    cmd_build(BuildCommand {
-        input: file,
-        out_dir: out_dir.clone(),
-        package: false,
-        release: false,
-        target: crate::codegen::Target::HirRust,
-        target_explicit: true,
-        deny_warnings: false,
-        deny_codes: vec![],
-        locale: None,
-        diagnostics_locale: None,
-    });
-
-    let output = out_dir.join(expected_name).with_extension("rs");
-    assert!(output.exists(), "expected output at {}", output.display());
-}
 
 #[test]
 fn cmd_targets_rust_scena_typescript_capabilities() {
@@ -508,39 +281,6 @@ fn faber_surface_fhir_row_is_package_and_run_capable() {
     );
 }
 
-#[test]
-fn cmd_targets_llvm_host_is_a_distinct_product_target() {
-    // Stage 9 S9.1: llvm-host is a distinct target name with NO alias
-    // spelling. The radix surface keeps it delegated (emit rejects it);
-    // the Faber product surface is check/build/run/package true because the
-    // Stage 8 package graph is green through the shared builder.
-    let radix_row = target_capabilities_for_surface(TargetCommandSurface::Radix, crate::codegen::Target::MirLlvmHost);
-    assert!(radix_row.check);
-    assert!(!radix_row.build);
-    assert!(!radix_row.run);
-    assert!(!radix_row.package);
-    assert!(
-        radix_row
-            .note
-            .contains("faber build/run --target llvm-host"),
-        "unexpected Radix llvm-host note: {}",
-        radix_row.note
-    );
-
-    let faber_row = target_capabilities_for_surface(TargetCommandSurface::Faber, crate::codegen::Target::MirLlvmHost);
-    assert!(faber_row.check);
-    assert!(faber_row.build);
-    assert!(faber_row.run);
-    assert!(faber_row.package);
-    assert!(
-        faber_row.note.contains("--target llvm-host"),
-        "unexpected Faber llvm-host note: {}",
-        faber_row.note
-    );
-
-    assert_eq!(target_name(crate::codegen::Target::MirLlvmHost), "llvm-host");
-    assert_eq!(target_extension(crate::codegen::Target::MirLlvmHost), "run");
-}
 
 #[test]
 fn cmd_targets_llvm_host_and_llvm_text_keep_separate_rows() {
@@ -582,27 +322,6 @@ fn cmd_targets_discovery_includes_llvm_host() {
     );
 }
 
-#[test]
-fn cli_target_llvm_host_parses_without_alias() {
-    // Stage 9 S9.1: `-t llvm-host` parses to CliTarget::MirLlvmHost; the
-    // distinct spelling has no compatibility alias, so other spellings are
-    // rejected by clap.
-    assert_eq!(
-        expect_emit(parse_radix(["radix", "emit", "-t", "llvm-host", "main.fab"])).target,
-        CliTarget::MirLlvmHost
-    );
-    assert_eq!(
-        crate::codegen::Target::from(CliTarget::MirLlvmHost),
-        crate::codegen::Target::MirLlvmHost
-    );
-    for rejected in ["llvm-native", "native-llvm", "llvmhost"] {
-        let err = RadixCli::try_parse_from(["radix", "emit", "-t", rejected, "main.fab"]);
-        assert!(
-            matches!(err, Err(ref e) if e.kind() == ErrorKind::InvalidValue),
-            "spelling `{rejected}` must be rejected as an invalid target value"
-        );
-    }
-}
 
 #[test]
 fn cmd_targets_keeps_faber_package_capabilities_off_radix_surface() {
@@ -715,10 +434,6 @@ fn amd_target_has_no_discoverable_row_and_gates_workflows() {
 
 #[test]
 fn cmd_targets_reports_fhir() {
-    // U3.3: -t fhir is a valid CLI target that maps to Target::HirFhir.
-    let args = expect_emit(parse_radix(["radix", "emit", "-t", "fhir", "main.fab"]));
-    assert_eq!(args.target, CliTarget::HirFhir);
-
     // Target::HirFhir capability row is visible in the targets registry.
     let caps = target_capabilities(crate::codegen::Target::HirFhir);
     assert!(!caps.package);
@@ -732,75 +447,11 @@ fn cmd_targets_reports_fhir() {
     );
 }
 
-#[test]
-fn targets_fhir_capability_row() {
-    // U5.1 done_when §7: specific fhir row assertions pinning F8 values.
-    let caps = target_capabilities(crate::codegen::Target::HirFhir);
-    assert!(caps.check, "fhir check must be true");
-    assert!(caps.build, "fhir build must be true");
-    assert!(!caps.run, "fhir run must be false");
-    assert!(!caps.package, "fhir package must be false");
-    assert!(
-        caps.note.contains("portable analyzed HIR artifact"),
-        "unexpected fhir note: {}",
-        caps.note
-    );
-    assert!(
-        caps.note.contains("execution surface"),
-        "fhir note must mention 'execution surface': {}",
-        caps.note
-    );
-}
 
-#[test]
-fn cli_parses_check_permissive_flag() {
-    let args = expect_check(parse_radix(["radix", "check", "--permissive", "main.fab"]));
 
-    assert!(args.permissive);
-    assert!(!args.diagnostics);
-    assert!(!args.package);
-    assert_eq!(args.input, vec!["main.fab"]);
-}
 
-#[test]
-fn cli_parses_check_diagnostics_flag() {
-    let args = expect_check(parse_radix(["radix", "check", "--diagnostics", "main.fab"]));
 
-    assert!(args.diagnostics);
-    assert!(!args.permissive);
-    assert!(!args.package);
-    assert_eq!(args.input, vec!["main.fab"]);
-}
 
-#[test]
-fn cli_parses_check_diagnostics_locale_flag() {
-    let args = expect_check(parse_radix([
-        "radix",
-        "check",
-        "--diagnostics-locale",
-        "reader/th-TH.toml",
-        "main.fab",
-    ]));
-
-    assert_eq!(args.diagnostics_locale_pack, Some(PathBuf::from("reader/th-TH.toml")));
-    assert_eq!(args.input, vec!["main.fab"]);
-}
-
-#[test]
-fn cli_parses_check_locale_flag() {
-    let args = expect_check(parse_radix(["radix", "check", "--locale", "zh-Hans", "main.fab"]));
-
-    assert_eq!(args.locale.as_deref(), Some("zh-Hans"));
-    assert_eq!(args.input, vec!["main.fab"]);
-}
-
-#[test]
-fn cli_parses_verify_command() {
-    let args = expect_verify(parse_radix(["radix", "verify", "omnia.fab"]));
-
-    assert!(!args.package);
-    assert_eq!(args.input, vec!["omnia.fab"]);
-}
 
 #[test]
 fn hir_aspect_verify_reports_checker_unavailable_without_success() {
@@ -926,90 +577,11 @@ fn diagnostics_check_rejects_undeclared_latin_keyword_in_grammar_position() {
         .is_some_and(|code| code.starts_with("LOCALE"))));
 }
 
-#[test]
-fn cli_parses_check_package_flag() {
-    let args = expect_check(parse_radix(["radix", "check", "--package", "pkg/main.fab"]));
 
-    assert!(args.package);
-    assert_eq!(args.input, vec!["pkg/main.fab"]);
-}
 
-#[test]
-fn cli_accepts_target_aliases() {
-    assert_eq!(
-        expect_emit(parse_radix(["radix", "emit", "-t", "faber", "main.fab"])).target,
-        CliTarget::HirFaber
-    );
-    assert_eq!(
-        expect_emit(parse_radix(["radix", "emit", "-t", "fab", "main.fab"])).target,
-        CliTarget::HirFaber
-    );
-    assert_eq!(
-        expect_emit(parse_radix(["radix", "emit", "-t", "llvm", "main.fab"])).target,
-        CliTarget::MirLlvm
-    );
-    assert_eq!(
-        expect_emit(parse_radix(["radix", "emit", "-t", "llvm-ir", "main.fab"])).target,
-        CliTarget::MirLlvm
-    );
-    assert_eq!(
-        expect_emit(parse_radix(["radix", "emit", "-t", "wat", "main.fab"])).target,
-        CliTarget::MirWasm
-    );
-    assert_eq!(
-        expect_emit(parse_radix(["radix", "emit", "-t", "wasm", "main.fab"])).target,
-        CliTarget::MirWasm
-    );
-    assert_eq!(
-        expect_emit(parse_radix(["radix", "emit", "-t", "wasm-text", "main.fab"])).target,
-        CliTarget::MirWasm
-    );
-    assert_eq!(
-        expect_emit(parse_radix(["radix", "emit", "-t", "fhir", "main.fab"])).target,
-        CliTarget::HirFhir
-    );
-}
 
-#[test]
-fn cli_parses_emit_diagnostics_flag() {
-    let args = expect_emit(parse_radix(["radix", "emit", "--diagnostics", "main.fab"]));
 
-    assert!(args.diagnostics);
-    assert_eq!(args.target, CliTarget::HirRust);
-    assert!(!args.package);
-    assert_eq!(args.input, vec!["main.fab"]);
-}
 
-#[test]
-fn cli_parses_emit_diagnostics_locale_flag() {
-    let args = expect_emit(parse_radix([
-        "radix",
-        "emit",
-        "--diagnostics-locale",
-        "reader/th-TH.toml",
-        "main.fab",
-    ]));
-
-    assert_eq!(args.diagnostics_locale_pack, Some(PathBuf::from("reader/th-TH.toml")));
-    assert_eq!(args.input, vec!["main.fab"]);
-}
-
-#[test]
-fn cli_parses_emit_locale_flag() {
-    let args = expect_emit(parse_radix(["radix", "emit", "--locale", "zh-Hans", "main.fab"]));
-
-    assert_eq!(args.locale.as_deref(), Some("zh-Hans"));
-    assert_eq!(args.input, vec!["main.fab"]);
-}
-
-#[test]
-fn cli_parses_emit_reflection_flag() {
-    let args = expect_emit(parse_radix(["radix", "emit", "--reflection", "-t", "wgsl-text", "main.fab"]));
-
-    assert!(args.reflection);
-    assert_eq!(args.target, CliTarget::MirWgsl);
-    assert_eq!(args.input, vec!["main.fab"]);
-}
 
 /// Shared fixture: compiles the `add_one` nucleum and returns parsed reflection JSON.
 fn gpu_reflection_fixture() -> (String, serde_json::Value) {
@@ -1801,7 +1373,7 @@ fn shader_contract_source_vertex_entry_emits_validated_wgsl_through_cli_path() {
 
 #[test]
 fn wgsl_text_source_vertex_names_ignore_assertion_message_text() {
-    let source = include_str!("fixtures/shader-contract-source-facts.fab")
+    let source = include_str!("../fixtures/shader-contract-source-facts.fab")
         .replace(
             "position layout fixes location 0, Float32x3, zero offset, 12-byte stride, and vertex step mode",
             "normal prose must not drive vertex ABI identity",
@@ -1858,14 +1430,14 @@ fn assert_shader_contract_vertex_source_variant_rejects(source: &str, issue: &st
 #[test]
 fn wgsl_text_source_vertex_entry_rejects_annotation_payload() {
     let source =
-        include_str!("fixtures/shader-contract-source-facts.fab").replace("@ vertex", "@ vertex { mode = \"main\" }");
+        include_str!("../fixtures/shader-contract-source-facts.fab").replace("@ vertex", "@ vertex { mode = \"main\" }");
 
     assert_shader_contract_vertex_source_variant_rejects(&source, "mir_wgsl_vertex_source_annotation_payload");
 }
 
 #[test]
 fn wgsl_text_source_vertex_entry_rejects_parameters() {
-    let source = include_str!("fixtures/shader-contract-source-facts.fab").replace(
+    let source = include_str!("../fixtures/shader-contract-source-facts.fab").replace(
         "functio shader_plane_vertex() → vacuum",
         "functio shader_plane_vertex(numerus x) → vacuum",
     );
@@ -1877,7 +1449,7 @@ fn wgsl_text_source_vertex_entry_rejects_parameters() {
 fn wgsl_text_source_vertex_entry_rejects_non_vacuum_return() {
     // The source body now lowers far enough for WGSL entry validation to report
     // the non-vacuum return directly.
-    let source = include_str!("fixtures/shader-contract-source-facts.fab").replace(
+    let source = include_str!("../fixtures/shader-contract-source-facts.fab").replace(
         "functio shader_plane_vertex() → vacuum {\n}",
         "functio shader_plane_vertex() → numerus {\n    redde 1\n}",
     );
@@ -1887,7 +1459,7 @@ fn wgsl_text_source_vertex_entry_rejects_non_vacuum_return() {
 
 #[test]
 fn wgsl_text_source_vertex_entry_rejects_error_type() {
-    let source = include_str!("fixtures/shader-contract-source-facts.fab").replace(
+    let source = include_str!("../fixtures/shader-contract-source-facts.fab").replace(
         "functio shader_plane_vertex() → vacuum",
         "functio shader_plane_vertex() → vacuum ⇥ textus",
     );
@@ -1901,7 +1473,7 @@ fn wgsl_text_source_vertex_entry_accepts_non_empty_body() {
     // The body uses `tacet` (a no-op statement that passes semantic analysis)
     // to prove the rejection gate is gone. Full MIR-body splice is covered
     // by the shader-contract integration tests when implicit locals are available.
-    let source = include_str!("fixtures/shader-contract-source-facts.fab").replace(
+    let source = include_str!("../fixtures/shader-contract-source-facts.fab").replace(
         "functio shader_plane_vertex() → vacuum {\n}",
         "functio shader_plane_vertex() → vacuum {\n    tacet\n}",
     );
@@ -1945,7 +1517,7 @@ functio lonely_vertex() → vacuum {
 
 #[test]
 fn wgsl_text_source_vertex_entry_rejects_layout_without_position() {
-    let source = include_str!("fixtures/shader-contract-source-facts.fab").replace(
+    let source = include_str!("../fixtures/shader-contract-source-facts.fab").replace(
         r#"    adfirma vertex_layout_matches(0, 0, "position", 0, 3, 0, 12, 1, 1) mori "position layout fixes location 0, Float32x3, zero offset, 12-byte stride, and vertex step mode"
 "#,
         "",
@@ -1975,7 +1547,7 @@ fn wgsl_text_source_vertex_entry_rejects_layout_without_position() {
 fn wgsl_text_source_vertex_entry_rejects_duplicate_layout_location() {
     // U2's identity-resolved ingestion rejects a duplicate vertex-input
     // location at contract-collection time (fail-closed, never merged).
-    let source = include_str!("fixtures/shader-contract-source-facts.fab").replace(
+    let source = include_str!("../fixtures/shader-contract-source-facts.fab").replace(
         "vertex_layout_matches(0, 1, \"normal\", 1, 3, 0, 12, 1, 4)",
         "vertex_layout_matches(0, 1, \"normal\", 0, 3, 0, 12, 1, 4)",
     );
@@ -2331,30 +1903,8 @@ fn emit_faber_file_preserves_namespace_qualified_type_references() {
     assert!(!output.code.contains("genus Box"));
 }
 
-#[test]
-fn cli_parses_emit_package_flag() {
-    let args = expect_emit(parse_radix(["radix", "emit", "--package", "pkg/main.fab"]));
 
-    assert!(args.package);
-    assert_eq!(args.input, vec!["pkg/main.fab"]);
-}
 
-#[test]
-fn cli_allows_omitted_input_for_stdin() {
-    // CheckArgs documents omitted input as stdin (`-` / empty vec).
-    let cli = RadixCli::try_parse_from(["radix", "check"]).expect("omitted input is stdin");
-    let crate::tool::cli::RadixCommand::Check(args) = cli.command else {
-        panic!("expected check command");
-    };
-    assert!(args.input.is_empty(), "omitted path leaves input empty for stdin");
-}
-
-#[test]
-fn cli_rejects_unknown_target_alias() {
-    let err = RadixCli::try_parse_from(["radix", "emit", "-t", "nonexistent", "main.fab"])
-        .expect_err("unknown target alias should fail");
-    assert_eq!(err.kind(), ErrorKind::InvalidValue);
-}
 
 #[test]
 fn emit_fmir_target_rejection_preserves_delegation_message() {
@@ -2377,12 +1927,6 @@ fn emit_fmir_target_rejection_preserves_delegation_message() {
     assert!(rendered.contains("faber build --target fmir-text"), "{rendered}");
 }
 
-#[test]
-fn cli_parses_mir_command() {
-    let args = expect_mir(parse_radix(["radix", "mir", "main.fab"]));
-
-    assert_eq!(args.input, vec!["main.fab"]);
-}
 
 #[test]
 fn mir_output_for_source_returns_deterministic_text() {
@@ -2439,63 +1983,8 @@ function f0 -> ty#1 {
     );
 }
 
-#[test]
-fn cli_help_surface_lists_current_commands_and_hides_legacy_alias() {
-    let help = RadixCli::command().render_help().to_string();
 
-    assert!(help.contains("Usage: radix <COMMAND>"));
-    assert!(!help.contains("build"));
-    assert!(help.contains("targets"));
-    assert!(help.contains("abi"));
-    assert!(help.contains("check"));
-    assert!(help.contains("emit"));
-    assert!(help.contains("mir"));
-    assert!(!help.contains("emit-package"));
-}
 
-#[test]
-fn cli_long_help_includes_llm_guidance_and_output_contract() {
-    let help = RadixCli::command().render_long_help().to_string();
-
-    assert!(help.contains("LLM Guidance"));
-    assert!(help.contains("Output contract"));
-    assert!(help.contains("radix check"));
-    // Package / multi-file work is Faber's surface; single-file is radix.
-    assert!(help.contains("faber.toml") || help.contains("Package tests"));
-    assert!(help.contains("faber test") || help.contains("faber build"));
-}
-
-#[test]
-fn cli_rejects_removed_emit_package_alias() {
-    let err =
-        RadixCli::try_parse_from(["radix", "emit-package", "-t", "faber", "pkg/main.fab"]).expect_err("removed alias");
-
-    assert_eq!(err.kind(), ErrorKind::InvalidSubcommand);
-}
-
-#[test]
-fn cmd_abi_defaults_to_json_format_with_no_output() {
-    let cli = parse_radix(["radix", "abi"]);
-    let args = expect_abi(cli);
-    assert_eq!(args.format, AbiFormat::Json);
-    assert!(args.output.is_none());
-}
-
-#[test]
-fn cmd_abi_parses_rust_format_and_output_path() {
-    let cli = parse_radix(["radix", "abi", "--format", "rust", "--output", "/tmp/radix-abi.rs"]);
-    let args = expect_abi(cli);
-    assert_eq!(args.format, AbiFormat::Rust);
-    assert_eq!(args.output.as_deref(), Some(std::path::Path::new("/tmp/radix-abi.rs")));
-}
-
-#[test]
-fn cmd_abi_accepts_short_format_and_output_flags() {
-    let cli = parse_radix(["radix", "abi", "-f", "json", "-o", "/tmp/radix-abi.json"]);
-    let args = expect_abi(cli);
-    assert_eq!(args.format, AbiFormat::Json);
-    assert_eq!(args.output.as_deref(), Some(std::path::Path::new("/tmp/radix-abi.json")));
-}
 
 #[test]
 fn wgsl_text_source_fragment_entry_rejects_annotation_payload() {
@@ -2659,7 +2148,7 @@ fn emit_fhir_serializes_valid_faber_to_fhir_bytes() {
 #[cfg(feature = "hir-fhir")]
 fn emit_fhir_round_trip_hello_world() {
     // End-to-end FHIR round-trip: analyze → serialize → deserialize → verify.
-    let source = include_str!("../tests/fixtures/hir_artifact/hello-world.fab");
+    let source = include_str!("../../tests/fixtures/hir_artifact/hello-world.fab");
     // Peel frontmatter: leading `//!` / `#` comment lines at the top of the fixture.
     let peeled = crate::driver::peel_raw_source("hello-world.fab", source).expect("fixture frontmatter should peel");
 

@@ -5,7 +5,6 @@
 //! [`crate::Compiler`] / [`crate::driver::Session`]. Package inputs are rejected
 //! with a message pointing at the `faber` CLI.
 
-use super::source::read_source;
 use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceAnnotationContract, InterfaceAnnotationContractField,
     InterfaceCallable, InterfaceEnumVariant, InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport,
@@ -59,7 +58,21 @@ pub(crate) fn clear_import_target_cache() {
 
 type ReaderPackRef<'a> = Option<&'a crate::locale::LocalePack>;
 
-pub use crate::import_resolve::FABER_LIBRARY_HOME_ENV;
+fn read_input_source(input: &[String]) -> Result<(String, String), crate::Diagnostic> {
+    if input.is_empty() || input[0] == "-" {
+        let mut source = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut source)
+            .map_err(|err| crate::Diagnostic::error(format!("failed to read stdin: {err}")))?;
+        return Ok(("<stdin>".to_owned(), source));
+    }
+    let path = PathBuf::from(&input[0]);
+    let source = std::fs::read_to_string(&path).map_err(|err| crate::Diagnostic::io_error(&path, &err))?;
+    Ok((input[0].clone(), source))
+}
+
+fn package_reject(message: &str) -> crate::CompileResult {
+    crate::CompileResult { output: None, diagnostics: vec![crate::Diagnostic::error(message.to_owned())] }
+}
 
 /// Return whether an input path syntactically names package mode.
 #[must_use]
@@ -117,11 +130,13 @@ fn compile_cli_input_with_locale_pack_inner(
 ) -> crate::CompileResult {
     if input.is_empty() || input[0] == "-" {
         if package {
-            eprintln!("error: package compilation requires a path input");
-            std::process::exit(1);
+            return package_reject("package compilation requires a path input");
         }
 
-        let (name, source) = read_source(input);
+        let (name, source) = match read_input_source(input) {
+            Ok(read) => read,
+            Err(diagnostic) => return crate::CompileResult { output: None, diagnostics: vec![diagnostic] },
+        };
         return compile_cli_source_with_locale_pack_inner(
             &name,
             &source,
@@ -174,8 +189,9 @@ fn compile_cli_path_with_locale_pack_inner(
     explicit: bool,
 ) -> crate::CompileResult {
     if package || should_treat_as_package(path) {
-        eprintln!("error: package compilation is owned by the `faber` tool; rerun with `faber build` or `faber emit`");
-        std::process::exit(1);
+        return package_reject(
+            "package compilation is owned by the `faber` tool; rerun with `faber build` or `faber emit`",
+        );
     }
 
     let source = match std::fs::read_to_string(path) {
@@ -292,7 +308,7 @@ impl ImportContract {
 
 /// Program-layer compile of one on-disk source: discover contracts, then
 /// fail-closed module analysis.
-pub(crate) fn compile_prepared_program_path(
+pub fn compile_prepared_program_path(
     session: &crate::driver::Session,
     path: &Path,
     source: &str,
@@ -585,15 +601,14 @@ pub(crate) fn frontmatter_locale_pack_from_frontmatter(
 /// Mirrors the frontmatter-locale resolver, but an explicit CLI locale that
 /// cannot be resolved exits with the resolver's diagnostic instead of falling
 /// back silently. Returns `None` when no locale was given.
-pub(crate) fn explicit_locale_pack(locale: Option<&str>) -> Option<crate::locale::LocalePack> {
-    let locale = locale.map(str::trim).filter(|s| !s.is_empty())?;
+pub fn explicit_locale_pack(locale: Option<&str>) -> Result<Option<crate::locale::LocalePack>, crate::Diagnostic> {
+    let Some(locale) = locale.map(str::trim).filter(|s| !s.is_empty()) else {
+        return Ok(None);
+    };
     let config = crate::driver::Config::default();
     match crate::driver::resolve_frontmatter_locale_pack(&config, locale) {
-        Ok(pack) => Some(pack),
-        Err(diag) => {
-            eprintln!("error: {} (from --locale '{locale}')", diag.message);
-            std::process::exit(1);
-        }
+        Ok(pack) => Ok(Some(pack)),
+        Err(diag) => Err(*diag),
     }
 }
 
@@ -657,20 +672,6 @@ fn parse_reader_locale_from_toml(toml_source: &str) -> Option<String> {
         }
     }
     None
-}
-
-/// Package-local import identity facts for a source file path.
-///
-/// Computes the canonical package identity (`product` + this file's module
-/// segments) and the resolved local sibling import targets (`binding → target
-/// file's canonical module segments`) for the file, mirroring the package
-/// machinery (`module_segments_for_file` / `package_identity` /
-/// `resolve_import`). Returns `None` when the file has no local sibling
-/// imports, so plain single-file compiles keep the legacy provider routing.
-#[must_use]
-pub fn package_import_identities_for_path(path: &Path) -> Option<crate::driver::PackageImportIdentities> {
-    let facts = package_identity_facts_for_path(path)?;
-    (!facts.imports.is_empty()).then_some(facts)
 }
 
 /// Package identity facts for a source file path, regardless of local imports.
