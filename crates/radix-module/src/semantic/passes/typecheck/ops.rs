@@ -419,7 +419,7 @@ impl TypeChecker<'_> {
             return self.error_type;
         }
         let mut conversion_target = HirConversioTarget::Type(target_ty);
-        self.check_conversio(source, &mut conversion_target, recovery, span);
+        self.check_conversio(source, &mut conversion_target, &[], recovery, span);
         target_ty
     }
 

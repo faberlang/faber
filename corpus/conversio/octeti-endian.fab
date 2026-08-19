@@ -1,0 +1,47 @@
++++
+term = "↦"
+kind = "operator-group"
+category = "conversion"
+canonical = false
+summary = "Endian integer unpack from an octeti window."
+syntax = "<octeti>[lo‥hi] ↦ int<W, Be|Le>"
+related = ["↦", "octeti", "int"]
+locale = "en"
++++
+
+# =============================================================================
+# ↦ — Endian integer unpack from an octeti window.
+# =============================================================================
+#
+# What this teaches:
+#   • Locked read form — `corpus[0‥4] ↦ int<u32, Be>` and `… ↦ int<u32, Le>`.
+#   • Hex-slot hints — `Be` / `Le` sit in the same second-argument slot as `Hex` / `Bin` / `Oct`.
+#   • Exact width — the window length must match the integer width (2 / 4 / 8).
+#
+# Common mistakes:
+#   • Omitting Be/Le — `bytes ↦ int<u32>` stays rejected (endian unspecified).
+#   • Using a short window — a 3-byte source does not pad.
+#
+# See also: ↦, octeti, int
+# =============================================================================
+
+
+# conversio — octeti window ↦ int<W, Be|Le>
+#
+# GRAMMAR:
+#   convertExpr :← expr '↦' type '<' width ',' endian '>'
+#
+# EXPECTED OUTPUT:
+#   3735928559
+#   4022250974
+#
+# BACKEND:
+#   HIR-direct Rust emits from_be_bytes / from_le_bytes. MIR-stepper agrees.
+
+main {
+    const _ be ← |de ad be ef|[0‥4] ↦ int<u32, Be>
+    const _ le ← |de ad be ef|[0‥4] ↦ int<u32, Le>
+
+    print be
+    print le
+}

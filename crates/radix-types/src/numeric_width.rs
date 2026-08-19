@@ -198,10 +198,13 @@ impl WidthError {
     }
 }
 
-/// Radix conversio parse hints that follow an optional width marker.
+/// Conversio slot-2 hints that follow an optional width marker.
+///
+/// `Hex` / `Bin` / `Oct` are text-parse radices. `Be` / `Le` are endian
+/// unpack rules for `octeti` windows — same slot, not bases.
 #[must_use]
 pub fn is_conversio_radix_hint(marker: &str) -> bool {
-    matches!(marker, "Hex" | "Bin" | "Oct")
+    matches!(marker, "Hex" | "Bin" | "Oct" | "Be" | "Le")
 }
 
 /// Standalone width-marker type sugar (`f32` → `fractus<f32>`, `i64` → `numerus<i64>`).
