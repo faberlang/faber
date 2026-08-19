@@ -1,0 +1,20 @@
+[package]
+name = "radix-target"
+version = "0.83.0"
+edition = "2021"
+description = "Neutral compilation-target identity: enum, spelling, feature gating"
+license = "MIT"
+
+[lints]
+workspace = true
+
+[dependencies]
+# Intentionally empty: target identity is a std-only contract. Consumers
+# forward their own hir-*/mir-* features here so `is_available` reflects
+# their build.
+
+[features]
+hir-faber = []
+hir-fhir = []
+mir-fmir = []
+

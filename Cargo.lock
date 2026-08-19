@@ -735,6 +735,7 @@ dependencies = [
  "radix-parser",
  "radix-runtime-contract",
  "radix-syntax",
+ "radix-target",
  "radix-types",
  "rustc-hash",
  "serde",
@@ -782,6 +783,10 @@ dependencies = [
  "radix-lexer",
  "serde",
 ]
+
+[[package]]
+name = "radix-target"
+version = "0.83.0"
 
 [[package]]
 name = "radix-types"

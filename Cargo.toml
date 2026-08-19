@@ -20,6 +20,7 @@ members = [
     "crates/radix-lexer",
     "crates/radix-syntax",
     "crates/radix-types",
+    "crates/radix-target",
     "crates/faber",
 ]
 resolver = "2"
