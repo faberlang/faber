@@ -2877,16 +2877,18 @@ fn vector_swizzle_lane(ch: char) -> Option<u8> {
     }
 }
 
-fn vector_lane_operand(place: &MirPlace, lane: u8) -> MirOperand {
+fn projected_operand(place: &MirPlace, projection: MirProjection) -> MirOperand {
     let mut projections = place.projections.clone();
-    projections.push(MirProjection::VectorLane(lane));
+    projections.push(projection);
     MirOperand::Place(MirPlace { base: place.base.clone(), projections })
 }
 
+fn vector_lane_operand(place: &MirPlace, lane: u8) -> MirOperand {
+    projected_operand(place, MirProjection::VectorLane(lane))
+}
+
 fn matrix_cell_operand(place: &MirPlace, row: u8, column: u8) -> MirOperand {
-    let mut projections = place.projections.clone();
-    projections.push(MirProjection::MatrixCell { row, column });
-    MirOperand::Place(MirPlace { base: place.base.clone(), projections })
+    projected_operand(place, MirProjection::MatrixCell { row, column })
 }
 
 fn numeric_imperativus_binop(method_name: &str) -> Option<MirBinOp> {
