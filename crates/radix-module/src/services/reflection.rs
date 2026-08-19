@@ -19,7 +19,7 @@ const GPU_REFLECTION_SCHEMA_VERSION: u32 = 1;
 pub fn output_reflection_json(output: &crate::Output) -> Result<Option<String>, serde_json::Error> {
     #[cfg(not(any(feature = "mir-metal", feature = "mir-wgsl")))]
     {
-        let _ = output;
+        drop(output);
         Ok(None)
     }
     #[cfg(any(feature = "mir-metal", feature = "mir-wgsl"))]

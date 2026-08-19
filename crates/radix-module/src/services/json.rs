@@ -57,14 +57,15 @@ pub(crate) fn presentation_json(
             Some(radix_hir::HirOwnerRef::Def(def)) => format!("{{ \"def\": {} }}", def.0),
             None => "null".to_owned(),
         };
-        let _ = writeln!(
+        writeln!(
             out,
             "    {{ \"anchor\": {}, \"kind\": \"{}\", \"semantic\": {} }}{}",
             owner.id.0,
             hir_owner_kind_name(&owner.kind),
             semantic,
             comma
-        );
+        )
+        .ok();
     }
     out.push_str("  ],\n");
 
@@ -75,13 +76,14 @@ pub(crate) fn presentation_json(
         } else {
             ""
         };
-        let _ = writeln!(
+        writeln!(
             out,
             "    {{ \"anchor\": {}, \"leading\": [{}] }}{}",
             attachment.anchor.0,
             hir_trivia_json(&attachment.leading, interner),
             comma
-        );
+        )
+        .ok();
     }
     out.push_str("  ],\n");
 
@@ -98,25 +100,26 @@ pub(crate) fn presentation_json(
         })
         .collect::<Vec<_>>()
         .join(", ");
-    let _ = writeln!(out, "  \"block_ends\": [{block_ends}],");
+    writeln!(out, "  \"block_ends\": [{block_ends}],").ok();
 
     let program_end = &presentation.program_end;
-    let _ = writeln!(
+    writeln!(
         out,
         "  \"program_end\": {{ \"anchor\": {}, \"span\": [{}, {}] }},",
         program_end.id.0, program_end.span.start, program_end.span.end
-    );
+    )
+    .ok();
 
     match &presentation.entry_start_anchor {
         Some(anchor) => {
-            let _ = writeln!(out, "  \"entry_start_anchor\": {}", anchor.0);
+            writeln!(out, "  \"entry_start_anchor\": {}", anchor.0).ok();
         }
         None => {
-            let _ = writeln!(out, "  \"entry_start_anchor\": null");
+            writeln!(out, "  \"entry_start_anchor\": null").ok();
         }
     }
 
-    let _ = write!(out, "}}");
+    write!(out, "}}").ok();
     out
 }
 
@@ -188,8 +191,8 @@ pub(crate) fn annotation_json(annotations: &[crate::syntax::Annotation]) -> Stri
 pub(crate) fn cli_analysis_json(analysis: &crate::cli::CliAnalysis) -> String {
     let mut out = String::new();
     out.push_str("{\n");
-    let _ = writeln!(out, "  \"mode\": \"{}\",", cli_mode_name(&analysis.mode));
-    let _ = writeln!(out, "  \"success\": {},", analysis.errors.is_empty());
+    writeln!(out, "  \"mode\": \"{}\",", cli_mode_name(&analysis.mode)).ok();
+    writeln!(out, "  \"success\": {},", analysis.errors.is_empty()).ok();
     if let Some(program) = &analysis.program {
         out.push_str("  \"program\": ");
         out.push_str(&cli_program_json(program, 2));
@@ -197,7 +200,7 @@ pub(crate) fn cli_analysis_json(analysis: &crate::cli::CliAnalysis) -> String {
     } else {
         out.push_str("  \"program\": null,\n");
     }
-    let _ = write!(out, "  \"errors\": {}\n}}", cli_analysis_errors_json(&analysis.errors));
+    write!(out, "  \"errors\": {}\n}}", cli_analysis_errors_json(&analysis.errors)).ok();
     out
 }
 
@@ -227,25 +230,27 @@ fn cli_program_json(program: &crate::cli::CliProgram, indent: usize) -> String {
     let inner = " ".repeat(indent + 2);
     let mut out = String::new();
     out.push_str("{\n");
-    let _ = writeln!(out, "{inner}\"name\": \"{}\",", escape_json(&program.name));
-    let _ = writeln!(out, "{inner}\"entry_args\": \"{}\",", escape_json(&program.entry_args));
-    let _ = writeln!(out, "{inner}\"mode\": \"{}\",", cli_mode_name(&program.mode));
-    let _ = writeln!(out, "{inner}\"version\": {},", json_string_opt(program.version.as_deref()));
-    let _ = writeln!(
+    writeln!(out, "{inner}\"name\": \"{}\",", escape_json(&program.name)).ok();
+    writeln!(out, "{inner}\"entry_args\": \"{}\",", escape_json(&program.entry_args)).ok();
+    writeln!(out, "{inner}\"mode\": \"{}\",", cli_mode_name(&program.mode)).ok();
+    writeln!(out, "{inner}\"version\": {},", json_string_opt(program.version.as_deref())).ok();
+    writeln!(
         out,
         "{inner}\"description\": {},",
         json_string_opt(program.description.as_deref())
-    );
-    let _ = writeln!(out, "{inner}\"global_options\": {},", cli_options_json(&program.global_options));
-    let _ = writeln!(
+    )
+    .ok();
+    writeln!(out, "{inner}\"global_options\": {},", cli_options_json(&program.global_options)).ok();
+    writeln!(
         out,
         "{inner}\"global_operands\": {},",
         cli_operands_json(&program.global_operands)
-    );
-    let _ = writeln!(out, "{inner}\"options\": {},", cli_options_json(&program.options));
-    let _ = writeln!(out, "{inner}\"operands\": {},", cli_operands_json(&program.operands));
-    let _ = writeln!(out, "{inner}\"commands\": {}", cli_commands_json(&program.commands));
-    let _ = write!(out, "{pad}}}");
+    )
+    .ok();
+    writeln!(out, "{inner}\"options\": {},", cli_options_json(&program.options)).ok();
+    writeln!(out, "{inner}\"operands\": {},", cli_operands_json(&program.operands)).ok();
+    writeln!(out, "{inner}\"commands\": {}", cli_commands_json(&program.commands)).ok();
+    write!(out, "{pad}}}").ok();
     out
 }
 
@@ -386,7 +391,7 @@ pub(crate) fn escape_json(s: &str) -> String {
             '\r' => escaped.push_str("\\r"),
             '\t' => escaped.push_str("\\t"),
             ch if ch.is_control() => {
-                let _ = write!(escaped, "\\u{:04x}", ch as u32);
+                write!(escaped, "\\u{:04x}", ch as u32).ok();
             }
             ch => escaped.push(ch),
         }

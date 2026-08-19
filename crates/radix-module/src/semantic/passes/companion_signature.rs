@@ -60,7 +60,7 @@ pub fn attach_signatures(
     radix_lanes: &RadixLaneMetadata,
     resolver: &mut Resolver,
     types: &mut TypeTable,
-    interner: &mut Interner,
+    _interner: &mut Interner,
 ) -> CompanionSignatures {
     let mut companions = CompanionSignatures::default();
 
@@ -123,8 +123,6 @@ pub fn attach_signatures(
         if let Some(symbol) = resolver.get_symbol_mut(companion_def_id) {
             symbol.ty = Some(func_type_id);
         }
-
-        let _ = interner; // kept for API compat; synthetic names unused
 
         companions.functions.insert(companion_def_id, sig);
     }

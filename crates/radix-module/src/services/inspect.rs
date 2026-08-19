@@ -63,41 +63,44 @@ pub fn lex_inspection_for_source(name: &str, source: &str) -> SourceInspection {
 
 fn lex_json(source_file: &crate::driver::SourceFile, result: &crate::lexer::LexResult) -> String {
     let mut out = String::new();
-    let _ = writeln!(out, "{{");
-    let _ = writeln!(out, "  \"file\": \"{}\",", escape_json(&source_file.name));
-    let _ = writeln!(
+    writeln!(out, "{{").ok();
+    writeln!(out, "  \"file\": \"{}\",", escape_json(&source_file.name)).ok();
+    writeln!(
         out,
         "  \"frontmatter\": {},",
         frontmatter_json(source_file.frontmatter.as_ref())
-    );
-    let _ = writeln!(out, "  \"success\": {},", result.success());
-    let _ = writeln!(out, "  \"tokens\": [");
+    )
+    .ok();
+    writeln!(out, "  \"success\": {},", result.success()).ok();
+    writeln!(out, "  \"tokens\": [").ok();
     for (i, token) in result.tokens.iter().enumerate() {
         let comma = if i + 1 < result.tokens.len() { "," } else { "" };
-        let _ = writeln!(
+        writeln!(
             out,
             "    {{ \"kind\": \"{}\", \"span\": [{}, {}] }}{}",
             escape_json(&token_kind_display(&token.kind)),
             token.span.start,
             token.span.end,
             comma
-        );
+        )
+        .ok();
     }
-    let _ = writeln!(out, "  ],");
-    let _ = writeln!(out, "  \"errors\": [");
+    writeln!(out, "  ],").ok();
+    writeln!(out, "  \"errors\": [").ok();
     for (i, err) in result.errors.iter().enumerate() {
         let comma = if i + 1 < result.errors.len() { "," } else { "" };
-        let _ = writeln!(
+        writeln!(
             out,
             "    {{ \"message\": \"{}\", \"span\": [{}, {}] }}{}",
             escape_json(&lex_error_message(source_file, err)),
             err.span.start,
             err.span.end,
             comma
-        );
+        )
+        .ok();
     }
-    let _ = writeln!(out, "  ]");
-    let _ = writeln!(out, "}}");
+    writeln!(out, "  ]").ok();
+    writeln!(out, "}}").ok();
     out
 }
 
@@ -135,44 +138,46 @@ pub fn parse_inspection_for_source(name: &str, source: &str) -> SourceInspection
 
 fn parse_json(source_file: &crate::driver::SourceFile, parse_result: &crate::parser::ParseResult) -> String {
     let mut out = String::new();
-    let _ = writeln!(out, "{{");
-    let _ = writeln!(out, "  \"file\": \"{}\",", escape_json(&source_file.name));
-    let _ = writeln!(
+    writeln!(out, "{{").ok();
+    writeln!(out, "  \"file\": \"{}\",", escape_json(&source_file.name)).ok();
+    writeln!(
         out,
         "  \"frontmatter\": {},",
         frontmatter_json(source_file.frontmatter.as_ref())
-    );
-    let _ = writeln!(out, "  \"body_byte_offset\": {},", source_file.body_byte_offset);
-    let _ = writeln!(out, "  \"success\": {},", parse_result.success());
+    )
+    .ok();
+    writeln!(out, "  \"body_byte_offset\": {},", source_file.body_byte_offset).ok();
+    writeln!(out, "  \"success\": {},", parse_result.success()).ok();
     if let Some(program) = &parse_result.program {
         write_parse_ast_json(&mut out, program, &parse_result.interner);
     } else {
-        let _ = writeln!(out, "  \"ast\": null,");
+        writeln!(out, "  \"ast\": null,").ok();
     }
-    let _ = writeln!(out, "  \"errors\": [");
+    writeln!(out, "  \"errors\": [").ok();
     for (i, err) in parse_result.errors.iter().enumerate() {
         let comma = if i + 1 < parse_result.errors.len() { "," } else { "" };
-        let _ = writeln!(
+        writeln!(
             out,
             "    {{ \"message\": \"{}\", \"span\": [{}, {}] }}{}",
             escape_json(&parse_error_message(source_file, err)),
             err.span.start,
             err.span.end,
             comma
-        );
+        )
+        .ok();
     }
-    let _ = writeln!(out, "  ]");
-    let _ = writeln!(out, "}}");
+    writeln!(out, "  ]").ok();
+    writeln!(out, "}}").ok();
     out
 }
 
 fn write_parse_ast_json(out: &mut String, program: &crate::syntax::Program, interner: &crate::lexer::Interner) {
-    let _ = writeln!(out, "  \"statements\": {},", program.statements.len());
-    let _ = writeln!(out, "  \"ast\": [");
+    writeln!(out, "  \"statements\": {},", program.statements.len()).ok();
+    writeln!(out, "  \"ast\": [").ok();
     for (i, stmt) in program.statements.iter().enumerate() {
         let comma = if i + 1 < program.statements.len() { "," } else { "" };
         let kind = format!("{:?}", stmt.kind);
-        let _ = writeln!(
+        writeln!(
             out,
             "    {{ \"id\": {}, \"kind\": \"{}\", \"span\": [{}, {}], \"leading_trivia\": [{}], \"annotations\": [{}] }}{}",
             stmt.id,
@@ -182,9 +187,9 @@ fn write_parse_ast_json(out: &mut String, program: &crate::syntax::Program, inte
             leading_trivia_json(&stmt.leading_trivia, interner),
             annotation_json(&stmt.annotations),
             comma
-        );
+        ).ok();
     }
-    let _ = writeln!(out, "  ],");
+    writeln!(out, "  ],").ok();
 }
 
 /// Lower parsed source to HIR and return the inspection JSON payload.
@@ -220,28 +225,29 @@ pub fn hir_inspection_json(
     errors: &[crate::hir::LowerError],
 ) -> String {
     let mut out = String::new();
-    let _ = writeln!(out, "{{");
-    let _ = writeln!(out, "  \"file\": \"{}\",", escape_json(&source_file.name));
-    let _ = writeln!(
+    writeln!(out, "{{").ok();
+    writeln!(out, "  \"file\": \"{}\",", escape_json(&source_file.name)).ok();
+    writeln!(
         out,
         "  \"frontmatter\": {},",
         frontmatter_json(source_file.frontmatter.as_ref())
-    );
-    let _ = writeln!(out, "  \"success\": {},", errors.is_empty());
-    let _ = writeln!(out, "  \"items\": {},", hir.items.len());
+    )
+    .ok();
+    writeln!(out, "  \"success\": {},", errors.is_empty()).ok();
+    writeln!(out, "  \"items\": {},", hir.items.len()).ok();
     match presentation {
         Some(presentation) => {
-            let _ = writeln!(out, "  \"presentation\": {},", presentation_json(presentation, interner));
+            writeln!(out, "  \"presentation\": {},", presentation_json(presentation, interner)).ok();
         }
         None => {
-            let _ = writeln!(out, "  \"presentation\": null,");
+            writeln!(out, "  \"presentation\": null,").ok();
         }
     }
-    let _ = writeln!(out, "  \"hir\": [");
+    writeln!(out, "  \"hir\": [").ok();
     for (i, item) in hir.items.iter().enumerate() {
         let comma = if i + 1 < hir.items.len() { "," } else { "" };
         let kind = format!("{:?}", item.kind);
-        let _ = writeln!(
+        writeln!(
             out,
             "    {{ \"id\": {:?}, \"def_id\": {:?}, \"kind\": \"{}\", \"span\": [{}, {}] }}{}",
             item.id.0,
@@ -250,23 +256,25 @@ pub fn hir_inspection_json(
             item.span.start,
             item.span.end,
             comma
-        );
+        )
+        .ok();
     }
-    let _ = writeln!(out, "  ],");
-    let _ = writeln!(out, "  \"errors\": [");
+    writeln!(out, "  ],").ok();
+    writeln!(out, "  \"errors\": [").ok();
     for (i, err) in errors.iter().enumerate() {
         let comma = if i + 1 < errors.len() { "," } else { "" };
-        let _ = writeln!(
+        writeln!(
             out,
             "    {{ \"message\": \"{}\", \"span\": [{}, {}] }}{}",
             escape_json(&lower_error_message(source_file, err)),
             err.span.start,
             err.span.end,
             comma
-        );
+        )
+        .ok();
     }
-    let _ = writeln!(out, "  ]");
-    let _ = writeln!(out, "}}");
+    writeln!(out, "  ]").ok();
+    writeln!(out, "}}").ok();
     out
 }
 

@@ -215,7 +215,7 @@ impl LeanAspectChecker {
 
         let mut wrapper = format!("import «{module_name}»\n\n");
         for decl in &decls {
-            let _ = writeln!(wrapper, "#print axioms {decl}");
+            writeln!(wrapper, "#print axioms {decl}").ok();
         }
 
         let parent = module_path.parent().unwrap_or(Path::new("."));
@@ -410,7 +410,7 @@ fn generate_lean_source(records: &[&HirAspectRecord]) -> String {
 
     for (i, record) in records.iter().enumerate() {
         let label = theorem_label(record, i);
-        let _ = write!(out, "theorem {label} : True := trivial\n\n");
+        write!(out, "theorem {label} : True := trivial\n\n").ok();
     }
 
     out

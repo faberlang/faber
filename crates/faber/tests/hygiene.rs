@@ -28,8 +28,8 @@ const BUDGETS: Budgets = Budgets {
     unimplemented: 0,
     // WHY: deliberate discards in library resolution and diagnostic paths
     // (io_buf, prefill_run) — pre-existing drift documented by the prior
-    // ratchet (expect 1→2, let_ 3→8).
-    let_underscore: 10,
+    // ratchet (expect 1→2, let_ 3→8→4 after 2026-08-19 burndown).
+    let_underscore: 4,
     inline_test_modules: 0,
     test_attr_in_production: 0,
 };

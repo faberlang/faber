@@ -65,20 +65,19 @@ const BUDGETS: Budgets = Budgets {
     // (llvm_host.rs) — all are write-to-output/side-effect operations where
     // errors are surfaced through the caller's error path or are intentionally
     // best-effort. Lean checker best-effort cleanup uses `ignore_result`.
-    // Re-baselined 41→48: presentation_json (U-6, a7487ea0c) adds 7 more
-    // `let _ = writeln!` output discards to the hand-written JSON inspection
-    // surface (radix hir inspect presentation sidecar); same pattern and
-    // rationale as the existing json.rs discards.
-    let_underscore: 48,
+    // Re-baselined 41→48→6 (2026-08-19 hygiene burndown): inspection JSON
+    // emitters now use `writeln!(…).ok()` / `write!(…).ok()` instead of
+    // `let _ =` discards; remaining sites are deliberate side-effect binds
+    // in lowering/resolver paths.
+    let_underscore: 6,
     // WHY: remaining inline bodies: annotation.rs, forma/author/emit.rs,
-    // semantic/broadcast_reduction.rs, and (Wave 1) driver/shader_contract.rs
-    // (identity-resolved shader-contract ingestion tests). Extract further in
-    // a dedicated burn-down.
-    inline_test_modules: 4,
+    // and (Wave 1) driver/shader_contract.rs (identity-resolved shader-contract
+    // ingestion tests). broadcast_reduction extracted 2026-08-19.
+    inline_test_modules: 3,
     // WHY: files that still embed #[test] in production sources (annotation,
-    // forma emit, broadcast_reduction, function_facts) + the Wave-1
-    // driver/shader_contract.rs inline test module. Ceiling only.
-    test_attr_in_production: 5,
+    // forma emit, function_facts) + the Wave-1 driver/shader_contract.rs inline
+    // test module. Ceiling only.
+    test_attr_in_production: 4,
 };
 
 #[test]

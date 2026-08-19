@@ -33,7 +33,7 @@ const POP_DIRECTIONAL_ISOLATE: char = '\u{2069}';
 /// render as span-less context rather than failing the reporting path.
 pub fn render_diagnostics(diagnostics: &[Diagnostic], sources: &[(String, String)]) {
     for diag in diagnostics {
-        let _ = render_one(diag, sources, None);
+        render_one(diag, sources, None).ok();
     }
 }
 
@@ -93,7 +93,10 @@ fn render_one(
         builder = builder.with_help(help);
     }
 
-    let _ = builder.finish().eprint((&diag.file, Source::from(source)));
+    builder
+        .finish()
+        .eprint((&diag.file, Source::from(source)))
+        .ok();
     Ok(())
 }
 
@@ -134,11 +137,11 @@ fn render_plain_text(diag: &Diagnostic, pack: Option<&LocalePack>) -> Result<Str
     let mut output = plain_header(severity, label.as_deref(), &location, safe_text.message());
 
     if let Some(line) = &diag.source_line {
-        let _ = write!(output, "\n  | {}", bidi_isolate_code(line));
+        write!(output, "\n  | {}", bidi_isolate_code(line)).ok();
     }
 
     if let Some(help) = safe_text.help() {
-        let _ = write!(output, "\n  = help: {help}");
+        write!(output, "\n  = help: {help}").ok();
     }
 
     Ok(output)
@@ -187,11 +190,11 @@ fn render_expanded_text(diag: &Diagnostic, pack: Option<&LocalePack>) -> Result<
     let mut output = expanded_header(severity, &label, diag.phase, file, &span, safe_text.message());
 
     if let Some(line) = &diag.source_line {
-        let _ = write!(output, "\nsource: {}", bidi_isolate_code(line));
+        write!(output, "\nsource: {}", bidi_isolate_code(line)).ok();
     }
 
     if let Some(help) = safe_text.help() {
-        let _ = write!(output, "\nhelp: {help}");
+        write!(output, "\nhelp: {help}").ok();
     }
 
     Ok(output)
@@ -346,7 +349,7 @@ fn sanitize_diagnostic_text(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for ch in text.chars() {
         if is_bidi_control(ch) {
-            let _ = write!(out, "U+{:04X}", ch as u32);
+            write!(out, "U+{:04X}", ch as u32).ok();
         } else {
             out.push(ch);
         }

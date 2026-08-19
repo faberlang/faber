@@ -501,7 +501,10 @@ impl FunctionBuilder<'_> {
                 Some(self.lower_vector_cross(lhs, rhs, elem_ty, vector_ty, expr))
             }
             VectorMethodKind::Dot => Some(self.lower_vector_dot(lhs, rhs, width, elem_ty, expr)),
-            VectorMethodKind::Swizzle | VectorMethodKind::Longitudo | VectorMethodKind::Normalizata => None,
+            VectorMethodKind::Swizzle => unreachable!("swizzle branch returns before vector peer lowering"),
+            VectorMethodKind::Longitudo | VectorMethodKind::Normalizata => {
+                unreachable!("zero-arg vector methods handled above")
+            }
         }
     }
 

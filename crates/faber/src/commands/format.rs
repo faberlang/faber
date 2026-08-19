@@ -68,7 +68,7 @@ pub fn cmd_format(command: &FormatCommand) {
     // --write is the explicit spelling of the in-place default; the default
     // branch below already writes in place (the `--write`/`--stdout` conflict
     // is enforced at the CLI parse boundary).
-    let _ = command.write;
+    drop(command.write);
 
     let files = match resolve_format_paths(&command.paths) {
         Ok(files) => files,

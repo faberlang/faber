@@ -46,51 +46,52 @@ pub fn render_rust(payload: &AbiPayload) -> Result<String, serde_json::Error> {
     out.push_str("//! Generated host ABI constants — emitted by `radix abi --format rust`.\n");
     out.push_str("//!\n");
     out.push_str("//! Authority: the Radix compiler binary (`radix abi`). Do not edit by hand.\n");
-    let _ = writeln!(
+    writeln!(
         out,
         "//! Compiler: {} {}; ABI version: {}; surface: {}.",
         payload.compiler.name, payload.compiler.version, payload.abi_version, payload.surface,
-    );
-    let _ = writeln!(out, "//! Fingerprint: {fingerprint}.");
+    )
+    .ok();
+    writeln!(out, "//! Fingerprint: {fingerprint}.").ok();
     out.push_str("//!\n");
     out.push_str("//! This artifact is a constants view of the Radix-owned contract. The runtime\n");
     out.push_str("//! (public `faber` crate) keeps its own C struct implementations (FaberRtSliceV1,\n");
     out.push_str("//! FaberRtStatusV1, ...); only the symbol names, enum codes, layout spellings,\n");
     out.push_str("//! status codes, and diagnostic rows are generated here.\n\n");
 
-    let _ = write!(out, "pub const ABI_VERSION: u32 = {};\n\n", payload.abi_version);
+    write!(out, "pub const ABI_VERSION: u32 = {};\n\n", payload.abi_version).ok();
 
     out.push_str("// --- Host ABI symbols ---\n");
     for row in &payload.symbols {
-        let _ = writeln!(out, "pub const {}: &str = \"{}\";", row.name, row.value);
+        writeln!(out, "pub const {}: &str = \"{}\";", row.name, row.value).ok();
     }
     out.push('\n');
 
     for family in &payload.enums {
-        let _ = writeln!(out, "// --- {} ---", family.family);
-        let _ = writeln!(out, "pub type {} = {};", family.type_alias, family.repr);
+        writeln!(out, "// --- {} ---", family.family).ok();
+        writeln!(out, "pub type {} = {};", family.type_alias, family.repr).ok();
         for row in &family.rows {
-            let _ = writeln!(out, "pub const {}: {} = {};", row.name, family.type_alias, row.value);
+            writeln!(out, "pub const {}: {} = {};", row.name, family.type_alias, row.value).ok();
         }
         out.push('\n');
     }
 
     out.push_str("// --- LLVM layout spellings ---\n");
     for row in &payload.llvm_types {
-        let _ = writeln!(out, "pub const {}: &str = \"{}\";", row.name, row.value);
+        writeln!(out, "pub const {}: &str = \"{}\";", row.name, row.value).ok();
     }
     out.push('\n');
 
     out.push_str("// --- Status codes (runtime wraps these in FaberRtStatusV1) ---\n");
     for row in &payload.statuses {
-        let _ = writeln!(out, "pub const {}: i32 = {};", row.name, row.value);
+        writeln!(out, "pub const {}: i32 = {};", row.name, row.value).ok();
     }
     out.push('\n');
 
     out.push_str("// --- Diagnostic symbols ---\n");
     out.push_str("pub const DIAGNOSTIC_SYMBOLS_V1: &[(&str, &str, &str)] = &[\n");
     for row in &payload.diagnostics {
-        let _ = writeln!(out, "    (\"{}\", \"{}\", \"{}\"),", row.kind, row.carrier, row.symbol);
+        writeln!(out, "    (\"{}\", \"{}\", \"{}\"),", row.kind, row.carrier, row.symbol).ok();
     }
     out.push_str("];\n\n");
     out.push_str("pub fn diagnostic_symbol_v1(kind: &str, carrier: &str) -> Option<&'static str> {\n");

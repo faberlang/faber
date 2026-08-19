@@ -28,6 +28,11 @@ const INSTANS_ORDERING_OPERANDS_REQUIRED: &str = "instans_ordering_operands_requ
 const NUMERIC_VALUE_EQUALITY_OPERANDS_REQUIRED: &str = "numeric_value_equality_operands_required";
 const ISSUE_CONVERSIO_ASSIGN_INFERENCE_HOLE_DESTINATION: &str = "conversio_assign_inference_hole_destination";
 
+#[cold]
+fn fresh_tensor_result_missing_shape() -> ! {
+    unreachable!("fresh tensor result carries a shape");
+}
+
 impl TypeChecker<'_> {
     fn is_error(&self, ty: TypeId) -> bool {
         self.resolve_inferred_type(ty) == self.error_type
@@ -772,7 +777,7 @@ impl TypeChecker<'_> {
                 let result = super::tensor_index::tensor_with_fresh_shape(self, elem);
                 let result_shape = match self.types.get(result) {
                     Type::Tensor(_, shape) => *shape,
-                    _ => unreachable!("fresh tensor result carries a shape"),
+                    _ => fresh_tensor_result_missing_shape(),
                 };
                 super::tensor_index::constrain_matmul_result_shape(
                     self,
@@ -950,7 +955,7 @@ impl TypeChecker<'_> {
         let result = super::tensor_index::tensor_with_fresh_shape(self, lhs_elem);
         let result_shape = match self.types.get(result) {
             Type::Tensor(_, shape) => *shape,
-            _ => unreachable!("fresh tensor result carries a shape"),
+            _ => fresh_tensor_result_missing_shape(),
         };
         super::tensor_index::constrain_elementwise_result_shape(self, lhs_ty, rhs_ty, result_shape, span);
         result
@@ -1019,7 +1024,7 @@ impl TypeChecker<'_> {
                 let result = super::tensor_index::tensor_with_fresh_shape(self, lhs_elem);
                 let result_shape = match self.types.get(result) {
                     Type::Tensor(_, shape) => *shape,
-                    _ => unreachable!("fresh tensor result carries a shape"),
+                    _ => fresh_tensor_result_missing_shape(),
                 };
                 let lhs_shape = self.resolve_index(lhs_shape);
                 let rhs_shape = self.resolve_index(rhs_shape);
