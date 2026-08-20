@@ -130,16 +130,29 @@ pub fn cmd_format(command: &FormatCommand) {
 /// `format --locale` mode (canonical HIR surface).
 /// `Err(())` means a diagnostic was already printed.
 #[cfg(feature = "hir-faber")]
-pub(super) fn convert_single_doc(path: &Path, to: &str, source: &str) -> Result<String, ()> {
+pub(super) fn convert_single_doc(
+    path: &Path,
+    to: &str,
+    from: Option<&str>,
+    source: &str,
+) -> Result<String, ()> {
     let name = path.display().to_string();
-    let session = match format_session(path, Some(to), source) {
+    let source_for_compile = match source_with_locale_override(source, from) {
+        Ok(source) => source,
+        Err(message) => {
+            eprintln!("error: {message}");
+            return Err(());
+        }
+    };
+    let session = match format_session(path, Some(to), &source_for_compile) {
         Ok(session) => session,
         Err(message) => {
             eprintln!("error: {message}");
             return Err(());
         }
     };
-    let result = radix_module::codegen::faber::compile_canonical(&session, &name, source);
+    let result =
+        radix_module::codegen::faber::compile_canonical(&session, &name, &source_for_compile);
     let mut had_error = false;
     for diag in &result.diagnostics {
         if diag.is_error() {
@@ -155,7 +168,7 @@ pub(super) fn convert_single_doc(path: &Path, to: &str, source: &str) -> Result<
         }
         return Err(());
     };
-    match formatted_source_for_write(path, source, &output.code) {
+    match converted_source_for_write(path, source, &output.code, to) {
         Ok(converted) => Ok(converted),
         Err(message) => {
             eprintln!("error: {message}");
@@ -171,6 +184,17 @@ pub(super) fn convert_single_doc(path: &Path, to: &str, source: &str) -> Result<
 #[cfg(not(feature = "hir-faber"))]
 fn format_single_doc(_path: &Path, _source: &str) -> Result<String, ()> {
     eprintln!("error: formatting requires a faber build with feature `hir-faber`");
+    Err(())
+}
+
+#[cfg(not(feature = "hir-faber"))]
+pub(super) fn convert_single_doc(
+    _path: &Path,
+    _to: &str,
+    _from: Option<&str>,
+    _source: &str,
+) -> Result<String, ()> {
+    eprintln!("error: reader-locale conversion requires a faber build with feature `hir-faber`");
     Err(())
 }
 
@@ -238,13 +262,18 @@ pub(super) fn format_session(
     let selected_locale = locale.or(frontmatter_locale.as_deref());
 
     // The package locale probe requires a real file path. A virtual source
-    // (e.g. `--stdin`, source name `<stdin>`) has no file to probe; use the
-    // dev-stdlib session directly (the author pipeline's default config for a
-    // plain manifestless file).
+    // (e.g. `--stdin`, source name `<stdin>`) has no package context, so load
+    // the selected installed pack directly. The source locale still wins for
+    // parsing through frontmatter; this pack is also the target emit surface.
     if !path.is_file() {
+        let virtual_locale = selected_locale.unwrap_or("en");
+        let pack = crate::package::locale_pack_for_emit_with_diagnostic(&[], Some(virtual_locale))
+            .map_err(|diagnostic| diagnostic.message.clone())?
+            .ok_or_else(|| format!("reader locale '{virtual_locale}' did not resolve to a pack"))?;
         return Ok(Session::new(
             Config::default()
                 .with_target(Target::HirFaber)
+                .with_locale_pack(pack)
                 .with_dev_stdlib(),
         ));
     }
@@ -272,6 +301,98 @@ pub(super) fn formatted_source_for_write(
 
     let body_start = split.body_byte_offset as usize;
     Ok(format!("{}{}", &raw[..body_start], body))
+}
+
+/// Write converted output with a frontmatter locale that matches its target
+/// body surface. Ordinary `format` deliberately preserves the source prefix;
+/// conversion is the one path that changes the code locale.
+pub(super) fn converted_source_for_write(
+    path: &Path,
+    raw: &str,
+    formatted_body: &str,
+    target_locale: &str,
+) -> Result<String, String> {
+    let formatted = formatted_source_for_write(path, raw, formatted_body)?;
+    rewrite_frontmatter_locale(&formatted, target_locale, false)
+}
+
+/// Replace or insert the locale key in a source frontmatter block. The
+/// `insert_if_missing` mode is used only for the temporary source passed to
+/// canonical compilation when `--from` overrides a missing or stale key.
+fn rewrite_frontmatter_locale(
+    source: &str,
+    locale: &str,
+    insert_if_missing: bool,
+) -> Result<String, String> {
+    let split = split_frontmatter(source).map_err(|error| error.to_string())?;
+    let Some(frontmatter) = split.frontmatter_text else {
+        if insert_if_missing {
+            return Ok(format!("+++\nlocale = \"{locale}\"\n+++\n{source}"));
+        }
+        return Ok(source.to_owned());
+    };
+
+    let mut updated = String::with_capacity(frontmatter.len());
+    let mut found = false;
+    for line in frontmatter.split_inclusive('\n') {
+        let line_without_newline = line.strip_suffix('\n').unwrap_or(line);
+        let content = line_without_newline
+            .strip_suffix('\r')
+            .unwrap_or(line_without_newline);
+        let trimmed = content.trim_start();
+        let is_locale_key = trimmed
+            .strip_prefix("locale")
+            .is_some_and(|rest| rest.trim_start().starts_with('='));
+        if is_locale_key {
+            let indent_len = content.len() - trimmed.len();
+            updated.push_str(&content[..indent_len]);
+            updated.push_str("locale = \"");
+            updated.push_str(locale);
+            updated.push_str("\"");
+            if line_without_newline.ends_with('\r') {
+                updated.push('\r');
+            }
+            if line.ends_with('\n') {
+                updated.push('\n');
+            }
+            found = true;
+        } else {
+            updated.push_str(line);
+        }
+    }
+
+    if !found && insert_if_missing {
+        if !updated.ends_with('\n') {
+            updated.push('\n');
+        }
+        updated.push_str("locale = \"");
+        updated.push_str(locale);
+        updated.push_str("\"\n");
+    }
+    if !found && !insert_if_missing {
+        return Ok(source.to_owned());
+    }
+
+    let frontmatter_start = source
+        .find('\n')
+        .map(|index| index + 1)
+        .ok_or_else(|| "frontmatter opening delimiter is unterminated".to_owned())?;
+    let frontmatter_end = frontmatter_start + frontmatter.len();
+    let body_start = split.body_byte_offset as usize;
+    Ok(format!(
+        "{}{}{}{}",
+        &source[..frontmatter_start],
+        updated,
+        &source[frontmatter_end..body_start],
+        &source[body_start..]
+    ))
+}
+
+fn source_with_locale_override(source: &str, from: Option<&str>) -> Result<String, String> {
+    let Some(from) = from else {
+        return Ok(source.to_owned());
+    };
+    rewrite_frontmatter_locale(source, from, true)
 }
 
 pub(super) fn source_for_compare(_path: &Path, raw: &str) -> String {

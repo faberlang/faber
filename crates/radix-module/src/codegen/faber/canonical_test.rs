@@ -1453,6 +1453,32 @@ fn emits_entry_annotations_before_incipit() {
 }
 
 #[test]
+fn localized_adfirma_message_uses_each_locale_surface() {
+    let cases = [
+        ("en", "fn check(int n) { assert n ≻ 0 panic \"bad\" }\n", "assert n ≻ 0 panic"),
+        (
+            "la",
+            "functio check(numerus n) { adfirma n ≻ 0 mori \"bad\" }\n",
+            "adfirma n ≻ 0 mori",
+        ),
+    ];
+
+    for (locale, source, expected) in cases {
+        let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        pack_path.push(format!("../../stdlib/locale/{locale}/pack.toml"));
+        let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed locale pack should load");
+        let session = crate::driver::Session::new(crate::driver::Config::default().with_locale_pack(pack));
+        let result = super::compile::compile_canonical(&session, &format!("mori-{locale}.fab"), source);
+        assert!(result.success(), "{locale} canonical emit failed: {:?}", result.diagnostics);
+        let output = result.output.expect("canonical output").code;
+        assert!(
+            output.contains(expected),
+            "adfirma message must use the {locale} Mori surface, got:\n{output}"
+        );
+    }
+}
+
+#[test]
 fn localized_emit_consults_locale_pack_surface() {
     // Phase 1 threading: the canonical emitter consults the reader pack surface,
     // so localized source re-emits in the localized surface (round-trip preserves

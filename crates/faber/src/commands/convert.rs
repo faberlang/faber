@@ -141,12 +141,12 @@ fn validate_target_locale(locale: &str) {
 fn convert_single_doc(
     path: &Path,
     to: &str,
-    _from: Option<&str>,
+    from: Option<&str>,
     source: &str,
 ) -> Result<String, ()> {
     #[cfg(not(feature = "hir-faber"))]
     {
-        drop((path, to, _from, source));
+        drop((path, to, from, source));
         eprintln!(
             "error: reader-locale conversion requires a faber build with feature `hir-faber`"
         );
@@ -154,7 +154,7 @@ fn convert_single_doc(
     }
     #[cfg(feature = "hir-faber")]
     {
-        super::format::convert_single_doc(path, to, source)
+        super::format::convert_single_doc(path, to, from, source)
     }
 }
 

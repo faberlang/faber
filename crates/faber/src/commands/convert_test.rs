@@ -7,7 +7,7 @@ use super::super::format_test::{
     run_faber_format_stdout_with_args as run_faber_convert_stdout_with_args,
 };
 use std::fs;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 
 #[test]
@@ -127,6 +127,105 @@ fn convert_la_emits_latin_surface() {
 
     assert!(locale_output.contains("incipit {"));
     assert!(locale_output.contains("nota \"Salve, Munde!\""));
+}
+
+/// `convert --stdin` must install the requested target pack. The old virtual
+/// source branch silently fell back to Latin, making `--to en` a no-op.
+#[test]
+fn convert_stdin_to_english_localizes_latin_source() {
+    let source = super::super::format_test::VALID_BLOCK_SOURCE;
+    let (stdout, stderr, success) = run_faber_convert_stdin("en", source);
+    assert!(success, "faber convert --stdin must succeed: {stderr}");
+    assert!(
+        stdout.contains("fn gradus(int x)"),
+        "convert --stdin --to en must emit the English surface:\n{stdout}"
+    );
+    assert!(
+        !code_only(&stdout).contains("functio"),
+        "convert --stdin --to en must not silently preserve Latin:\n{stdout}"
+    );
+}
+
+/// Conversion rewrites the frontmatter locale with the emitted body so the
+/// result can be formatted again under its own declared surface.
+#[test]
+fn convert_rewrites_frontmatter_to_target_locale() {
+    let fixture = std::env::temp_dir().join("faber-convert-frontmatter-locale.fab");
+    let source = super::super::format_test::VALID_BLOCK_SOURCE;
+    fs::write(&fixture, source).expect("write Latin fixture");
+    let output = run_faber_convert_stdout_with_args(&[
+        "convert",
+        "--to",
+        "en",
+        "--stdout",
+        fixture.to_str().expect("utf8 path"),
+    ]);
+    let _ = fs::remove_file(&fixture);
+
+    assert!(
+        output.contains("locale = \"en\""),
+        "converted frontmatter must declare the target locale:\n{output}"
+    );
+    assert!(
+        output.contains("fn gradus(int x)"),
+        "converted body must use the target locale:\n{output}"
+    );
+}
+
+/// `--from` selects the source reader pack when frontmatter is stale.
+#[test]
+fn convert_from_override_reads_mislabeled_english_source() {
+    let fixture = std::env::temp_dir().join("faber-convert-from-override.fab");
+    let source =
+        super::super::format_test::EN_TYPES_SOURCE.replace("locale = \"en\"", "locale = \"la\"");
+    fs::write(&fixture, source).expect("write mislabeled fixture");
+    let output = Command::new(faber_binary())
+        .args(["convert", "--from", "en", "--to", "la", "--stdout"])
+        .arg(&fixture)
+        .output()
+        .expect("run faber convert --from en --to la");
+    let _ = fs::remove_file(&fixture);
+
+    assert!(
+        output.status.success(),
+        "--from must override stale frontmatter: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).expect("utf8 converted source");
+    assert!(stdout.contains("locale = \"la\""));
+    assert!(
+        stdout.contains("functio pack(numerus n"),
+        "--from en must parse English and emit Latin:\n{stdout}"
+    );
+}
+
+fn run_faber_convert_stdin(to: &str, source: &str) -> (String, String, bool) {
+    let mut child = Command::new(faber_binary())
+        .args(["convert", "--to", to, "--stdin"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn faber convert --stdin");
+    child
+        .stdin
+        .take()
+        .expect("stdin")
+        .write_all(source.as_bytes())
+        .expect("write stdin source");
+    let mut stdout = String::new();
+    child
+        .stdout
+        .take()
+        .expect("stdout")
+        .read_to_string(&mut stdout)
+        .expect("read stdout");
+    let mut stderr = String::new();
+    if let Some(mut err) = child.stderr.take() {
+        let _ = err.read_to_string(&mut stderr);
+    }
+    let success = child.wait().expect("wait").success();
+    (stdout, stderr, success)
 }
 
 #[test]

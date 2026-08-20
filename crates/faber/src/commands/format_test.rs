@@ -258,7 +258,7 @@ pub(crate) fn run_faber_format_stdout_with_args(args: &[&str]) -> String {
 /// product-default en pack is pack-authoritative).
 pub(crate) const VALID_BLOCK_SOURCE: &str = "+++\nlocale = \"la\"\n+++\nfunctio gradus(numerus x) → numerus {\n    si x ≻ 0 {\n        redde x\n    } sin x ≡ 0 {\n        redde 0\n    } secus {\n        redde 0 - x\n    }\n}\n";
 
-const EN_TYPES_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nfn pack(int n, float x, string name, bytes buf) → string {\n    const int count ← n\n    const float scale ← x\n    const string label ← name\n    const bytes payload ← buf\n    print count\n    print scale\n    print label\n    print payload.length()\n    return label\n}\n";
+pub(crate) const EN_TYPES_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nfn pack(int n, float x, string name, bytes buf) → string {\n    const int count ← n\n    const float scale ← x\n    const string label ← name\n    const bytes payload ← buf\n    print count\n    print scale\n    print label\n    print payload.length()\n    return label\n}\n";
 
 /// Need: `faber format --stdout` on an en-frontmatter source must
 /// keep English type spellings (the author engine relatinized them).
@@ -376,6 +376,30 @@ fn format_stdin_roundtrip_matches_canonical_pipeline() {
         stdout.contains("incipit {"),
         "--stdin output must be the formatted source:\n{stdout}"
     );
+}
+
+/// The stdin path must honor an English frontmatter locale just like the file
+/// path; otherwise the canonical emitter falls back to Latin and cannot parse
+/// the English source at all.
+#[test]
+fn format_stdin_en_source_keeps_english_surface() {
+    let (stdout, stderr, success) = run_faber_format_stdin(EN_TYPES_SOURCE);
+    assert!(
+        success,
+        "faber format --stdin must accept en source: {stderr}"
+    );
+    let body = radix_module::driver::split_frontmatter(&stdout)
+        .expect("split")
+        .body;
+    assert!(
+        body.contains("fn pack(int n, float x, string name, bytes buf)"),
+        "en stdin format must keep the English surface:\n{stdout}"
+    );
+    assert!(
+        !body.contains("functio pack(numerus n"),
+        "en stdin format must not relatinize the source:\n{stdout}"
+    );
+    assert_canonical_reparses_with(body, "en types stdin", Some(&english_pack())).expect("reparse");
 }
 
 fn run_faber_format_stdin(source: &str) -> (String, String, bool) {
