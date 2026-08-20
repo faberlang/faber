@@ -3,7 +3,7 @@
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_locale_pack_type_alias_def_reaches_emit_table() {
-    use crate::codegen::rust::emit_def_table;
+    use crate::codegen::rust::generate_def_table;
     use crate::codegen::Target;
     use crate::semantic::{
         analyze, analyze_resolved_uses, check_def_id_closure, emit_def_table_name, resolved_reference_defs, PassConfig,
@@ -39,10 +39,10 @@ fn rust_locale_pack_type_alias_def_reaches_emit_table() {
     assert_eq!(aliases.get(&def_id), Some(&surface));
 
     let imported = FxHashMap::default();
-    let emit = emit_def_table(&hir, &parsed.interner, std::iter::empty(), &imported, aliases.keys().copied());
+    let emit = generate_def_table(&hir, &parsed.interner, std::iter::empty(), &imported, aliases.keys().copied());
     assert!(
         emit.contains(&def_id),
-        "locale-pack TypeAlias DefId {def_id:?} must reach emit_def_table"
+        "locale-pack TypeAlias DefId {def_id:?} must reach generate_def_table"
     );
 
     let referenced = [def_id].into_iter().collect();
