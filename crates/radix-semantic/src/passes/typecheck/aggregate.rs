@@ -87,7 +87,7 @@ impl TypeChecker<'_> {
                         continue;
                     };
                     let value_ty = self.check_expr_with_expected(value, Some(field_info.ty));
-                    self.unify_assign_issue(
+                    self.unify_carrier_assign(
                         value_ty,
                         field_info.ty,
                         value.span,

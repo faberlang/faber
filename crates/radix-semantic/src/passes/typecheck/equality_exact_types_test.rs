@@ -1,8 +1,8 @@
 //! Typecheck probes for exact-type equality (`≡`, `≠`, `est`, `non est`).
 
+use crate::SemanticErrorKind;
 use crate::semantic_message;
 use crate::test_support;
-use crate::SemanticErrorKind;
 
 const EXACT_EQ_ISSUE: &str = "equality_exact_types_required";
 
@@ -165,9 +165,74 @@ fn equality_exact_types_matrix() {
     }
 }
 
-/// The §3b diagnostic pointer: `ascii ≡ numerus` (e.g. `s[i] ≡ 97`) stays a
-/// strict SEM010 exact-types error whose message names the existing `↦ numerus`
-/// conversio instead of suggesting an implicit comparison rule.
+#[test]
+fn ref_view_field_read_exact_equality_uses_carrier_type() {
+    let result = compile(
+        r#"
+genus Euler {
+    textus order
+}
+
+functio same(de Euler value) → bivalens {
+    redde value.order ≠ "XYZ"
+}
+"#,
+    );
+    assert!(
+        result.is_ok(),
+        "ref field read equality should compare its carrier: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn non_view_field_read_keeps_exact_equality_rejection() {
+    let result = compile(
+        r#"
+genus Euler {
+    textus order
+}
+
+functio same(Euler value) → bivalens {
+    redde value.order ≠ 'X'
+}
+"#,
+    );
+    assert!(
+        result.diagnostics.iter().any(|diag| {
+            diag.kind == SemanticErrorKind::TypeMismatch
+                && diag
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == EXACT_EQ_ISSUE)
+        }),
+        "non-view field equality should retain exact-type rejection: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn direct_ref_value_exact_equality_keeps_view_contract() {
+    let result = compile(
+        r#"
+functio same(de textus value) → bivalens {
+    redde value ≠ "XYZ"
+}
+"#,
+    );
+    assert!(
+        result.diagnostics.iter().any(|diag| {
+            diag.kind == SemanticErrorKind::TypeMismatch
+                && diag
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == EXACT_EQ_ISSUE)
+        }),
+        "direct ref equality should retain the view: {:?}",
+        result.diagnostics
+    );
+}
+
 #[test]
 fn ascii_numerus_equality_message_names_numerus_conversio() {
     let result = compile(

@@ -132,7 +132,15 @@ impl TypeChecker<'_> {
                         self.numerus_type()
                     }
                 } else {
-                    match self.types.get(self.resolve_inferred_type(iter_ty)) {
+                    // A collection field read through an immutable `ref` root
+                    // is a read-only view of the carrier collection. Use that
+                    // carrier for iterable-shape dispatch; field projections
+                    // retain their `Ref` type for access and borrow checks.
+                    let iter_ty = self
+                        .types
+                        .peel_access_marker(self.resolve_inferred_type(iter_ty))
+                        .1;
+                    match self.types.get(iter_ty) {
                         Type::Array(inner) => match mode {
                             radix_hir::HirIteraMode::De => self.numerus_type(),
                             radix_hir::HirIteraMode::Ex => *inner,
