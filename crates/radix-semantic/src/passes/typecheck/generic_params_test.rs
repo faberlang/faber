@@ -368,3 +368,118 @@ incipit {
         "incompatible_tensor_index",
     );
 }
+
+// ── method-level type params on generic classes ───────────
+
+#[test]
+fn generic_method_type_params_mix_with_class_params_accepts() {
+    // Class param A is visible in the method signature and body; method param
+    // C is visible in the method signature and body.
+    accepts(
+        r"genus Something<A> {
+    functio run<C>(A b, C c) → A {
+        fixum C local ← c
+        fixum A a2 ← b
+        redde a2
+    }
+}",
+    );
+}
+
+#[test]
+fn generic_method_type_param_shadows_class_param_name() {
+    // Method param A reuses the class param name and wins in the method
+    // signature. Box<numerus> would reject "x" for the class witness, so
+    // set<textus>("x") accepting proves the method's A bound the call.
+    accepts(
+        r#"genus Box<A> {
+    A hidden
+    functio set<A>(A x) → A { redde x }
+}
+
+functio make() → Box<numerus> {
+    redde Box { hidden = 1 }
+}
+
+incipit {
+    fixum Box<numerus> s ← make()
+    fixum textus t ← s.set<textus>("x")
+    fixum numerus n ← s.set<numerus>(5)
+    nota t
+    nota n
+}"#,
+    );
+}
+
+#[test]
+fn generic_sibling_method_cannot_see_method_type_param() {
+    // Method type params are method-local: a sibling cannot name another's C.
+    rejects_with_issue(
+        r"genus Something<A> {
+    A field
+    functio run<C>(A b, C c) → A {
+        redde b
+    }
+    functio sibling(C x) → C {
+        redde x
+    }
+}",
+        "unknown_type",
+    );
+}
+
+#[test]
+fn generic_class_type_param_in_field_type_accepts() {
+    accepts(
+        r"genus Something<A> {
+    A field
+}",
+    );
+}
+
+#[test]
+fn generic_method_on_generic_class_dual_witness_call_accepts() {
+    // Class witness A=numerus and method witness C=textus at the same call.
+    accepts(
+        r#"genus Something<A> {
+    functio run<C>(A b, C c) → A {
+        fixum C local ← c
+        fixum A a2 ← b
+        redde a2
+    }
+}
+
+functio make() → Something<numerus> {
+    redde Something { }
+}
+
+incipit {
+    fixum Something<numerus> s ← make()
+    fixum numerus result ← s.run<textus>(1, "x")
+    nota result
+}"#,
+    );
+}
+
+#[test]
+fn generic_method_on_generic_class_swapped_args_rejects() {
+    rejects_with_issue(
+        r#"genus Something<A> {
+    functio run<C>(A b, C c) → A {
+        fixum C local ← c
+        fixum A a2 ← b
+        redde a2
+    }
+}
+
+functio make() → Something<numerus> {
+    redde Something { }
+}
+
+incipit {
+    fixum Something<numerus> s ← make()
+    fixum _ result ← s.run<textus>("x", 1)
+}"#,
+        "argument_type_mismatch",
+    );
+}
