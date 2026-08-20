@@ -2605,7 +2605,15 @@ fn lower_type_expr(
                 .map(|param| {
                     lower_type_expr(param, resolver, interner, types).map(|ty| ParamType {
                         ty,
-                        mode: SemanticParamMode::Owned,
+                        mode: param
+                            .mode
+                            .map_or(SemanticParamMode::Owned, |mode| match mode {
+                                radix_syntax::TypeMode::De => SemanticParamMode::Ref,
+                                radix_syntax::TypeMode::In => SemanticParamMode::MutRef,
+                                radix_syntax::TypeMode::Own | radix_syntax::TypeMode::Copy => {
+                                    SemanticParamMode::Owned
+                                }
+                            }),
                         optional: false,
                     })
                 })

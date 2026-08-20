@@ -109,9 +109,9 @@ fn serialize_artifact(artifact: &radix_hir_fhir::HirArtifact) -> Vec<u8> {
 /// the inner `postcard::Error`.
 #[test]
 fn hir_artifact_adversarial_malformed() {
-    // sequence: 0x03 = schema_version=3 (valid varint), then unending 0xFF
-    // varint that causes DeserializeBadVarint → Malformed.
-    let mut bytes = vec![0x03u8];
+    // sequence: the current schema version (valid varint), then unending
+    // 0xFF varint that causes DeserializeBadVarint → Malformed.
+    let mut bytes = vec![SCHEMA_VERSION as u8];
     bytes.extend(std::iter::repeat_n(0xFFu8, 256));
     let result = load_fhir(&bytes);
     match result {
@@ -136,7 +136,7 @@ fn hir_artifact_adversarial_schema_v1_rejected() {
     match result {
         Err(HirArtifactError::UnsupportedSchemaVersion { found, expected }) => {
             assert_eq!(found, 1);
-            assert_eq!(expected, 3);
+            assert_eq!(expected, SCHEMA_VERSION);
         }
         Err(other) => panic!("expected UnsupportedSchemaVersion(found=1), got {other:?}"),
         Ok(_) => panic!("expected UnsupportedSchemaVersion(found=1), got Ok"),
@@ -204,7 +204,7 @@ fn hir_artifact_adversarial_version_mismatch_zero() {
     match result {
         Err(HirArtifactError::UnsupportedSchemaVersion { found, expected }) => {
             assert_eq!(found, 0);
-            assert_eq!(expected, 3);
+            assert_eq!(expected, SCHEMA_VERSION);
         }
         Err(other) => panic!("expected UnsupportedSchemaVersion(found=0), got {other:?}"),
         Ok(_) => panic!("expected UnsupportedSchemaVersion(found=0), got Ok"),
@@ -225,7 +225,7 @@ fn hir_artifact_adversarial_version_mismatch_one() {
     match result {
         Err(HirArtifactError::UnsupportedSchemaVersion { found, expected }) => {
             assert_eq!(found, 1);
-            assert_eq!(expected, 3);
+            assert_eq!(expected, SCHEMA_VERSION);
         }
         Err(other) => panic!("expected UnsupportedSchemaVersion(found=1), got {other:?}"),
         Ok(_) => panic!("expected UnsupportedSchemaVersion(found=1), got Ok"),

@@ -229,6 +229,10 @@ pub enum WarningKind {
     /// A local binding declared `mut`. Grammar allows it (borrowed-into-local);
     /// the lint discourages the form in favor of a `mut` parameter (OQ-3).
     DiscouragedMutLocal,
+    /// A parameter used the legacy `de`/`in`/`ex` prefix slot before the type.
+    /// Still legal (corpus-compatible) but deprecated in favor of the
+    /// type-position access marker (MU-5a); the prefix never errors.
+    DeprecatedParamPrefix,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.

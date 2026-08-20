@@ -142,11 +142,16 @@ impl Lowerer<'_> {
         } else {
             &param.name
         };
+        let ty = self.lower_type(&param.ty);
+        let mode = match param.ty.mode {
+            Some(type_mode) => super::type_mode_hir_param_mode(type_mode),
+            None => lower_param_mode(param.mode),
+        };
         HirParam {
             def_id,
             name: binding_name.name,
-            ty: self.lower_type(&param.ty),
-            mode: lower_param_mode(param.mode),
+            ty,
+            mode,
             optional: param.sponte || param.default.is_some(),
             sponte: param.sponte,
 

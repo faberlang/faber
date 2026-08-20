@@ -362,8 +362,19 @@ pub enum GpuBuiltinWire {
 /// adds the [`HirPresentation`](radix_hir::HirPresentation) sidecar to
 /// [`HirArtifact`]; schema-v1 artifacts are rejected by the loader (no
 /// compatibility decoder). Version 3 removes the retired `Requirit` test
-/// modifier (serde variant removal changes the wire format).
-pub const SCHEMA_VERSION: u32 = 3;
+/// modifier (serde variant removal changes the wire format). Version 4
+/// represents parameter modes as the unified mode unification fact: a
+/// parameter's `HirParamMode` (and the semantic `param_modes` entries) now
+/// derive from the type-position access marker when present, with the legacy
+/// parameter-prefix slot as a deprecated fallback (MU-5a). Type-position
+/// markers model the mode on the marked `Type::Ref(...)` and fn-type/closure
+/// parameter slots now carry their own modes.
+///
+/// Old artifacts fail closed by design: `decode.rs` has no compatibility
+/// decoder, so any schema mismatch (v1, v2, or v3) is rejected as
+/// [`HirArtifactError::UnsupportedSchemaVersion`] before the payload is
+/// interpreted — never a confusing field-layout error.
+pub const SCHEMA_VERSION: u32 = 4;
 
 /// Serializable snapshot of one analyzed compilation unit (F1, F2, F4).
 ///
@@ -444,7 +455,7 @@ mod tests {
         let bytes = postcard::to_allocvec(&original).expect("serialize HirArtifact");
         let deserialized: HirArtifact =
             postcard::from_bytes(&bytes).expect("deserialize HirArtifact");
-        assert_eq!(original.schema_version, 3);
+        assert_eq!(original.schema_version, SCHEMA_VERSION);
         assert_eq!(original, deserialized);
     }
 }

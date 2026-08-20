@@ -6,7 +6,7 @@ use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::parse_ok;
 use crate::{parse, ParseErrorKind};
 use radix_lexer::lex;
-use radix_syntax::{ClassMemberKind, FiguraExpr, StmtKind, TypeExprKind};
+use radix_syntax::{ClassMemberKind, ExprKind, FiguraExpr, StmtKind, TypeExprKind};
 
 fn parse_errors_include_issue(source: &str, kind: ParseErrorKind, issue: &str) {
     let result = parse(lex(source));
@@ -165,6 +165,56 @@ fn parses_own_copy_markers_on_function_params() {
 #[test]
 fn own_and_copy_remain_binding_names() {
     let _ = parse_ok("incipit { fixum numerus own ← 1\n fixum numerus copy ← 2 }");
+}
+
+#[test]
+fn parses_type_position_markers_on_fn_type_params() {
+    let result = parse_ok(
+        "typus Handler = (de textus, in numerus, own lista<numerus>, copy textus) → vacuum",
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
+        panic!("expected type alias");
+    };
+    let TypeExprKind::Func(func) = &alias.ty.kind else {
+        panic!("expected fn type");
+    };
+    assert!(matches!(
+        func.params[0].mode,
+        Some(radix_syntax::TypeMode::De)
+    ));
+    assert!(matches!(
+        func.params[1].mode,
+        Some(radix_syntax::TypeMode::In)
+    ));
+    assert!(matches!(
+        func.params[2].mode,
+        Some(radix_syntax::TypeMode::Own)
+    ));
+    assert!(matches!(
+        func.params[3].mode,
+        Some(radix_syntax::TypeMode::Copy)
+    ));
+}
+
+#[test]
+fn parses_type_position_markers_on_closure_params() {
+    let result = parse_ok("fixum _ f ← (de textus x, own lista<numerus> xs) ∴ xs");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(binding) = &program.statements[0].kind else {
+        panic!("expected fixum");
+    };
+    let ExprKind::Clausura(clausura) = &binding.init.as_ref().expect("init").kind else {
+        panic!("expected clausura");
+    };
+    assert!(matches!(
+        clausura.params[0].ty.mode,
+        Some(radix_syntax::TypeMode::De)
+    ));
+    assert!(matches!(
+        clausura.params[1].ty.mode,
+        Some(radix_syntax::TypeMode::Own)
+    ));
 }
 
 #[test]

@@ -134,6 +134,10 @@ mod mutability_own_test;
 mod mutability_mut_test;
 
 #[cfg(test)]
+#[path = "param_mode_test.rs"]
+mod param_mode_test;
+
+#[cfg(test)]
 #[path = "resolve_test.rs"]
 mod resolve_test;
 

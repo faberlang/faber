@@ -545,7 +545,7 @@ mod tests {
             Err(FhirPackageError::UnsupportedUnitSchemaVersion {
                 module,
                 found: 99,
-                expected: 3,
+                expected: SCHEMA_VERSION,
             }) => assert_eq!(module, "src/main.fab"),
             other => panic!("expected UnsupportedUnitSchemaVersion(99), got {other:?}"),
         }
