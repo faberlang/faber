@@ -434,7 +434,14 @@ impl<'a> BorrowChecker<'a> {
         // legal. Own-param transfers still run below.
         let rust_sim = callee.ty.is_some();
         let language_call_borrows = self.language_conflicts && !(rust_sim && self.rust_lifetime);
-        if language_call_borrows {
+        // Named function Paths leave `callee.ty` unset. Their mut/ref dest-call
+        // borrows are call-scoped in every pass: real Rust releases an
+        // argument's `&mut`/`&` reborrow when the call ends, so sequential use
+        // after a single `mut` param call stays legal (D-1). Push a call scope
+        // so even the rust-lifetime pass releases these at call end instead of
+        // holding the borrow to end-of-block.
+        let call_scoped = !rust_sim;
+        if language_call_borrows || call_scoped {
             self.push_scope();
         }
 
@@ -530,7 +537,7 @@ impl<'a> BorrowChecker<'a> {
                 SemanticParamMode::Owned => self.check_expr(&arg.expr),
             }
         }
-        if language_call_borrows {
+        if language_call_borrows || call_scoped {
             self.pop_scope();
         }
     }

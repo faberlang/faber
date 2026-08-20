@@ -4,7 +4,7 @@
 //! moved-by-default parameters and call arguments (Rust-output ownership
 //! semantics).
 
-use super::borrow::{analyze, analyze_modes};
+use super::borrow::{analyze, analyze_modes, analyze_rust_lifetime};
 use super::{DefId, Resolver, SemanticErrorKind, TypeTable, WarningKind};
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::test_span;
@@ -1615,5 +1615,131 @@ fn analyze_modes_rejects_mut_root_explicit_ref_conflict() {
         &result.unwrap_err(),
         SemanticErrorKind::MutableBorrowConflict,
         "mutable_borrow_conflict",
+    );
+}
+
+/// MU-1-baseline shape (D-1): a `const`/unmarked source passed into a single
+/// `mut` param, then used sequentially after the call. The call-scoped borrow
+/// must release at call end, so rust-lifetime qualification accepts the
+/// program.
+fn const_into_mut_sequential_use_program(types: &mut TypeTable) -> HirModule {
+    let numerus = types.primitive(Primitive::Numerus);
+    // `poke(a)` with a named `poke` Path (callee.ty unset).
+    let poke_call = HirExpression {
+        id: radix_hir::HirId(4),
+        kind: HirExpressionKind::Call(
+            Box::new(HirExpression {
+                id: radix_hir::HirId(3),
+                kind: HirExpressionKind::Path(DefId(0)),
+                ty: None,
+                span: test_span(),
+            }),
+            Vec::new(),
+            vec![HirCallArg {
+                name: None,
+                spread: false,
+                expr: HirExpression {
+                    id: radix_hir::HirId(5),
+                    kind: HirExpressionKind::Path(DefId(2)),
+                    ty: None,
+                    span: test_span(),
+                },
+                span: test_span(),
+            }],
+        ),
+        ty: None,
+        span: test_span(),
+    };
+    HirModule {
+        items: vec![HirItem {
+            id: radix_hir::HirId(0),
+            def_id: DefId(0),
+            kind: HirItemKind::Function(Box::new(HirFunction {
+                cli_args: None,
+                name: radix_lexer::Symbol(1),
+                type_params: Vec::new(),
+                params: vec![HirParam {
+                    def_id: DefId(1),
+                    name: radix_lexer::Symbol(2),
+                    ty: numerus,
+                    mode: HirParamMode::In,
+                    optional: false,
+                    sponte: false,
+                    default: None,
+                    span: test_span(),
+                }],
+                ret_ty: None,
+                err_ty: None,
+                body: None,
+                posture: radix_syntax::CallablePosture::SyncFinite,
+                is_async: false,
+                is_generator: false,
+                is_kernel: false,
+                nucleum_fragment: false,
+                is_vertex: false,
+                is_fragment: false,
+                annotations: Vec::new(),
+                test: None,
+            })),
+            span: test_span(),
+        }],
+        entry: Some(HirBlock {
+            statements: vec![
+                HirStatement {
+                    id: radix_hir::HirId(1),
+                    kind: HirStatementKind::Local(radix_hir::HirLocal {
+                        def_id: DefId(2),
+                        name: radix_lexer::Symbol(3),
+                        ty: Some(numerus),
+                        init: Some(HirExpression {
+                            id: radix_hir::HirId(2),
+                            kind: HirExpressionKind::Literal(HirLiteral::Int(3)),
+                            ty: Some(numerus),
+                            span: test_span(),
+                        }),
+                        mutable: false,
+                        is_await: false,
+                        runtime_provided: false,
+                    }),
+                    span: test_span(),
+                },
+                HirStatement {
+                    id: radix_hir::HirId(6),
+                    kind: HirStatementKind::Expr(poke_call),
+                    span: test_span(),
+                },
+                HirStatement {
+                    id: radix_hir::HirId(7),
+                    kind: HirStatementKind::Expr(HirExpression {
+                        id: radix_hir::HirId(8),
+                        kind: HirExpressionKind::Path(DefId(2)),
+                        ty: None,
+                        span: test_span(),
+                    }),
+                    span: test_span(),
+                },
+            ],
+            expr: None,
+            span: test_span(),
+            ..Default::default()
+        }),
+        entry_annotations: Vec::new(),
+        entry_args_name: None,
+        entry_is_async: false,
+    }
+}
+
+#[test]
+fn rust_lifetime_releases_mut_param_call_borrow_after_call() {
+    let mut types = TypeTable::new();
+    let result = analyze_rust_lifetime(
+        &const_into_mut_sequential_use_program(&mut types),
+        &Resolver::new(),
+        &types,
+    );
+    assert!(
+        result.is_ok(),
+        "mut-param call borrow must release at call end (D-1 unmarked const source), got: {:?}",
+        result.err()
     );
 }
