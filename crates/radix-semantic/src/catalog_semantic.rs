@@ -363,9 +363,9 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
         SemanticErrorKind::Warning(WarningKind::UnionHoleSolvedMonomorphically) => {
             semantic_union_hole_solved_monomorphically_help(args)
         }
-        SemanticErrorKind::Warning(WarningKind::EmptyMarkerShadowing) => {
-            Some("choose a different binding name when the empty-collection marker is needed".to_owned())
-        }
+        SemanticErrorKind::Warning(WarningKind::EmptyMarkerShadowing) => Some(
+            "choose a different binding name when the empty-collection marker is needed".to_owned(),
+        ),
         _ => None,
     }
 }
@@ -1875,8 +1875,12 @@ fn semantic_borrow_message(args: &[DiagnosticArg]) -> Option<String> {
             Some("mutable borrow conflicts with existing borrow".to_owned())
         }
         "shared_borrow_conflict" => Some("shared borrow conflicts with mutable borrow".to_owned()),
-        "unused_ex_parameter" => Some("`ex` parameter is never consumed; consider `de`".to_owned()),
-        "unused_in_parameter" => Some("`in` parameter is never mutated; consider `de`".to_owned()),
+        "unused_own_parameter" => {
+            Some("`own` parameter is never consumed; consider `ref`".to_owned())
+        }
+        "unused_mut_parameter" => {
+            Some("`mut` parameter is never mutated; consider `ref`".to_owned())
+        }
         "use_after_move" => Some("use after move".to_owned()),
         "use_while_mutably_borrowed" => Some("use while mutably borrowed".to_owned()),
         "write_while_borrowed" => Some("write while borrowed".to_owned()),
@@ -2495,10 +2499,10 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
             DiagnosticSpec { code: "WARN007", help: Some("remove the construct or gate it by target") }
         }
         WarningKind::UnusedMutRefParam => {
-            DiagnosticSpec { code: "WARN008", help: Some("change 'in' to 'de' if mutation is unnecessary") }
+            DiagnosticSpec { code: "WARN008", help: Some("change `mut` to `ref` if mutation is unnecessary") }
         }
         WarningKind::UnusedMoveParam => {
-            DiagnosticSpec { code: "WARN009", help: Some("change 'ex' to 'de' if ownership transfer is unnecessary") }
+            DiagnosticSpec { code: "WARN009", help: Some("change `own` to `ref` if ownership transfer is unnecessary") }
         }
         WarningKind::ExplicitIgnotumAnnotation => DiagnosticSpec {
             code: "WARN010",

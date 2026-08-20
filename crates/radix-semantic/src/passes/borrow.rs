@@ -2,15 +2,15 @@
 //!
 //! Two entry points implement the HIR v1 G2 split:
 //!
-//! - [`analyze_modes`] — **target-neutral** Faber `de`/`in`/`ex` policy:
-//!   use-after-consume, illegal mutation through `de`, and incompatible mode
-//!   passing. Runs for every application-lane target.
-//! - [`analyze`] — **Rust qualification**: the mode rules plus shared/mutable
-//!   borrow conflict approximation used by Rust emit.
+//! - [`analyze_modes`] — **target-neutral** access-fact policy: use-after-
+//!   consume, illegal mutation through `ref`, and incompatible access passing.
+//!   Runs for every application-lane target.
+//! - [`analyze`] — Rust uses the same declared-fact rules; it does not add a
+//!   simulated lifetime policy.
 //!
-//! Precise lifetime reasoning remains Rust's job. Language mode validity is
+//! Precise lifetime reasoning remains Rust's job. Declared access validity is
 //! decided before target selection so TS/Go cannot silently accept programs
-//! that violate Faber ownership modes.
+//! that violate Faber ownership facts.
 //!
 //! ERROR STRATEGY
 //! ==============
@@ -47,9 +47,10 @@
 //!   diagnostic consumer treats warning-kind diagnostics as errors.
 
 use crate::{
-    FuncSig, ParamType, Primitive, Resolver, SemanticError, SemanticErrorKind, SemanticParamMode,
-    Type, TypeId, TypeTable, WarningKind, ISSUE_ASSIGN_THROUGH_REF, ISSUE_MUT_INTO_OWN,
-    ISSUE_MUT_LOCAL, ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_UNMARKED_INTO_OWN, SUGGESTION_COPY,
+    AccessMarker, FuncSig, ParamType, Primitive, Resolver, SemanticError, SemanticErrorKind,
+    SemanticParamMode, Type, TypeId, TypeTable, WarningKind, ISSUE_ASSIGN_THROUGH_REF,
+    ISSUE_MUT_INTO_OWN, ISSUE_MUT_LOCAL, ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_UNMARKED_INTO_OWN,
+    SUGGESTION_COPY,
 };
 use radix_hir::visit::{walk_expr, HirVisitor};
 use radix_hir::{
@@ -64,21 +65,21 @@ const ISSUE_CANNOT_MOVE_WHILE_BORROWED: &str = "cannot_move_while_borrowed";
 const ISSUE_DE_TO_IN_OR_EX_POSITION: &str = "de_to_in_or_ex_position";
 const ISSUE_MUTABLE_BORROW_CONFLICT: &str = "mutable_borrow_conflict";
 const ISSUE_SHARED_BORROW_CONFLICT: &str = "shared_borrow_conflict";
-const ISSUE_UNUSED_EX_PARAMETER: &str = "unused_ex_parameter";
-const ISSUE_UNUSED_IN_PARAMETER: &str = "unused_in_parameter";
+const ISSUE_UNUSED_OWN_PARAMETER: &str = "unused_own_parameter";
+const ISSUE_UNUSED_MUT_PARAMETER: &str = "unused_mut_parameter";
 const ISSUE_USE_AFTER_MOVE: &str = "use_after_move";
 const ISSUE_USE_WHILE_MUTABLY_BORROWED: &str = "use_while_mutably_borrowed";
 const ISSUE_WRITE_WHILE_BORROWED: &str = "write_while_borrowed";
 
-/// Target-neutral Faber parameter-mode analysis (`de`/`in`/`ex`).
+/// Target-neutral Faber access-fact analysis.
 ///
-/// Language `ref`/`mut`/`own` facts run here. Rust lifetime/borrow conflict
-/// approximation for unmarked values does not. Use this during base analysis
-/// so all HIR targets share mode validity.
+/// Language `ref`/`mut`/`own`/`copy` facts run here. Rust lifetime/borrow
+/// conflict approximation for unmarked values does not. Use this during base
+/// analysis so all HIR targets share access validity.
 ///
 /// # Errors
 ///
-/// Returns mode violations as a list of [`SemanticError`]s.
+/// Returns access violations as a list of [`SemanticError`]s.
 pub fn analyze_modes(
     hir: &HirModule,
     _resolver: &Resolver,
@@ -87,56 +88,38 @@ pub fn analyze_modes(
     run(hir, types, false, true)
 }
 
-/// Full Rust check: mode rules plus borrow/lifetime conflict approximation.
-///
-/// Used by legacy `PassConfig::for_target(Rust)` single-shot analysis.
+/// Rust-target analysis uses the same type-fact-driven language rules as the
+/// other HIR targets. Rust's compiler remains the authority for precise
+/// lifetime checking; this pass must not reject legal mutation of unmarked
+/// values or treat an unmarked parameter as an implicit reference.
 ///
 /// # Errors
 ///
-/// Returns borrow/lifetime conflicts as a list of [`SemanticError`]s.
+/// Returns declared access-mode violations as a list of [`SemanticError`]s.
 pub fn analyze(
     hir: &HirModule,
     _resolver: &Resolver,
     types: &TypeTable,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, true, true)
+    run(hir, types, false, true)
 }
 
-/// Rust-only lifetime/borrow conflicts after modes already ran.
+/// Retired Rust lifetime simulation hook.
 ///
-/// Filters diagnostics to issues that are not pure language-mode policy so
-/// driver base + qualification does not double-report use-after-`ex` / `de`.
+/// The driver still calls this target-qualification seam, but semantic
+/// lifetime simulation is no longer policy. Generated Rust and its compiler
+/// own precise borrow checking; declared `ref`/`mut`/`own`/`copy` facts are
+/// enforced by [`analyze_modes`] instead.
 ///
 /// # Errors
 ///
-/// Returns Rust-specific borrow/lifetime conflicts as a list of
-/// [`SemanticError`]s.
+/// Always returns `Ok(())`; the result type remains for the qualification API.
 pub fn analyze_rust_lifetime(
-    hir: &HirModule,
+    _hir: &HirModule,
     _resolver: &Resolver,
-    types: &TypeTable,
+    _types: &TypeTable,
 ) -> Result<(), Vec<SemanticError>> {
-    let mut checker = BorrowChecker::new(types, true, false);
-    checker.check_program(hir);
-    checker.errors.retain(|err| {
-        err.args.iter().any(|arg| {
-            arg.name == "issue"
-                && matches!(
-                    arg.value.as_str(),
-                    ISSUE_BORROW_OF_MOVED
-                        | ISSUE_CANNOT_MOVE_WHILE_BORROWED
-                        | ISSUE_MUTABLE_BORROW_CONFLICT
-                        | ISSUE_SHARED_BORROW_CONFLICT
-                        | ISSUE_USE_WHILE_MUTABLY_BORROWED
-                        | ISSUE_WRITE_WHILE_BORROWED
-                )
-        })
-    });
-    if checker.errors.is_empty() {
-        Ok(())
-    } else {
-        Err(checker.errors)
-    }
+    Ok(())
 }
 
 fn run(
@@ -181,8 +164,8 @@ struct BorrowChecker<'a> {
     /// Semantic type table produced before analysis; call signatures determine
     /// whether each argument is read, borrowed, or moved.
     types: &'a TypeTable,
-    /// When true, emit Rust shared/mutable borrow conflict diagnostics
-    /// for unmarked values (legacy lifetime simulation).
+    /// Retained only for the retired qualification implementation path;
+    /// normal analysis never enables simulated Rust lifetime diagnostics.
     rust_lifetime: bool,
     /// When true, emit the mutable-borrow-conflict family as language rules
     /// (mut-local binds, `mut`/`ref` dests, explicit refs of `mut` roots).
@@ -209,10 +192,11 @@ struct BorrowChecker<'a> {
 /// Usage summary for one function parameter after traversing its body.
 ///
 /// This is policy state rather than ownership state: it decides whether the
-/// declared Faber mode is stronger than the function actually needs.
+/// declared access fact is stronger than the function actually needs.
 #[derive(Clone, Copy)]
 struct ParamUsage {
     mode: HirParamMode,
+    marker: Option<AccessMarker>,
     span: radix_lexer::Span,
     mutated: bool,
     passed_in_or_ex: bool,
@@ -312,6 +296,7 @@ impl<'a> BorrowChecker<'a> {
                 param.def_id,
                 ParamUsage {
                     mode: param.mode,
+                    marker: self.types.peel_access_marker(param.ty).0,
                     span: param.span,
                     mutated: false,
                     passed_in_or_ex: false,
@@ -435,8 +420,8 @@ impl<'a> BorrowChecker<'a> {
             return;
         };
         let params = params.to_vec();
-        // Named function Paths leave `callee.ty` unset. Applying Ref/MutRef
-        // rust-lifetime simulation to those calls would reject D-1 unmarked
+        // Named function Paths leave `callee.ty` unset. Applying the retired
+        // lifetime simulation to those calls would reject D-1 unmarked
         // `const` → `mut` param use. Language `mut` dest borrows are
         // call-scoped so sequential use after a single `mut` param call stays
         // legal. Own-param transfers still run below.
@@ -961,30 +946,30 @@ impl<'a> BorrowChecker<'a> {
     fn emit_mode_lints(&mut self) {
         let mut warnings = Vec::new();
         for usage in self.param_usage.values() {
-            match usage.mode {
-                HirParamMode::In => {
+            match usage.marker {
+                Some(AccessMarker::Mut) => {
                     if !usage.mutated && !usage.passed_in_or_ex {
                         warnings.push(
                             SemanticError::structured(
                                 SemanticErrorKind::Warning(WarningKind::UnusedMutRefParam),
                                 usage.span,
                             )
-                            .with_arg("issue", ISSUE_UNUSED_IN_PARAMETER),
+                            .with_arg("issue", ISSUE_UNUSED_MUT_PARAMETER),
                         );
                     }
                 }
-                HirParamMode::Ex => {
+                Some(AccessMarker::Own) => {
                     if !usage.passed_ex && !usage.returned && !usage.moved {
                         warnings.push(
                             SemanticError::structured(
                                 SemanticErrorKind::Warning(WarningKind::UnusedMoveParam),
                                 usage.span,
                             )
-                            .with_arg("issue", ISSUE_UNUSED_EX_PARAMETER),
+                            .with_arg("issue", ISSUE_UNUSED_OWN_PARAMETER),
                         );
                     }
                 }
-                HirParamMode::Owned | HirParamMode::De => {}
+                Some(AccessMarker::Ref | AccessMarker::Copy) | None => {}
             }
         }
         self.errors.extend(warnings);
@@ -1042,9 +1027,9 @@ impl HirVisitor for BorrowChecker<'_> {
                     self.visit_expr(value);
                 }
             }
-            // `↤` writes the target place (ownership mode / borrow rules for
-            // `de`/`in` params apply) before visiting the conversion source
-            // and its `⇥` recovery — no ordinary-assignment bypass.
+            // `↤` writes the target place (declared ownership/access rules
+            // apply) before visiting the conversion source and its `⇥`
+            // recovery — no ordinary-assignment bypass.
             HirExpressionKind::ConversioAssign {
                 target,
                 source,
