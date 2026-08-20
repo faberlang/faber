@@ -8,8 +8,10 @@ use super::{
     validate_locale_pack, DiagnosticTemplateRenderError, LocalePack, LocalePackIssue, TemplateField,
     LOCALE_PACK_SCHEMA_VERSION,
 };
+use crate::codegen::Target;
 use crate::diagnostics::DiagnosticConvert;
 use crate::diagnostics::{Diagnostic, DiagnosticArg};
+use crate::driver::{compile, Config, Session};
 use crate::file_interface::{InterfaceLibraryIdentity, InterfaceMemberKind};
 use crate::lexer::{lex_with_locale_pack, LexError, LexErrorKind, LocaleSuggestion, Span, TokenKind};
 use crate::locale::TypeBindingKind;
@@ -1336,6 +1338,24 @@ fn en_empty_named_binding_rhs_claims_as_marker() {
         matches!(init.kind, ExprKind::Vacua(_)),
         "RHS `empty` must claim as the marker, got {:?}",
         init.kind
+    );
+
+    let reference = compile(
+        &Session::new(
+            Config::default()
+                .with_target(Target::HirRust)
+                .with_locale_pack(pack)
+                .with_locale_pack_explicit(),
+        ),
+        "en-empty-reference.fab",
+        "main { print empty }",
+    );
+    assert!(
+        reference.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == Some("SEM014") && diagnostic.issue() == Some("vacua_requires_declared_type")
+        }),
+        "bare en `empty` reference must require a declared collection type: {:?}",
+        reference.diagnostics
     );
 }
 
