@@ -37,6 +37,151 @@ fn test_function() -> MirFunction {
 }
 
 #[test]
+fn scalar_mut_param_propagates_through_runner_frames() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirLocal, MirParam, MirParamMode, MirStatement, MirStatementKind, MirTerminator,
+        MirTerminatorKind, MirValue, MirValueKind,
+    };
+    use radix_types::{Primitive, TypeTable};
+
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let vacuum = types.primitive(Primitive::Vacuum);
+    let scalar = MirType::semantic(numerus);
+    let span = Span::default();
+    let mut interner = Interner::new();
+    let mut program = MirProgram::new();
+    let mutabile = interner.intern("mutabile");
+    let salve = interner.intern("salve");
+    program.functions.push(MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![],
+        locals: vec![MirLocal {
+            id: MirLocalId(0),
+            name: None,
+            ty: scalar,
+            mutable: true,
+            span,
+        }],
+        temps: vec![],
+        blocks: vec![],
+        return_ty: MirType::semantic(vacuum),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    });
+    program.functions.push(MirFunction {
+        id: MirFunctionId(1),
+        source: None,
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(1),
+            name: None,
+            ty: scalar,
+            mode: MirParamMode::In,
+            span,
+        }],
+        locals: vec![MirLocal {
+            id: MirLocalId(1),
+            name: None,
+            ty: scalar,
+            mutable: true,
+            span,
+        }],
+        temps: vec![],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::Assign {
+                    place: MirPlace::local(MirLocalId(1)),
+                    value: MirValue {
+                        id: MirValueId(0),
+                        kind: MirValueKind::Binary {
+                            op: MirBinOp::Mul,
+                            lhs: MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                            rhs: MirOperand::Constant(MirConstant::Int(2)),
+                        },
+                        ty: scalar,
+                        span,
+                    },
+                },
+                span,
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span,
+            },
+            span,
+        }],
+        return_ty: MirType::semantic(vacuum),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    });
+
+    let context = MirValidationContext::new(&types);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .expect("caller frame")
+        .locals
+        .insert(MirLocalId(0), Value::Int(3));
+
+    runner
+        .invoke_call(
+            &MirCallee::Function(MirFunctionId(1)),
+            &[MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+            span,
+        )
+        .expect("mut call should execute");
+    assert_eq!(
+        runner
+            .read_local(MirLocalId(0), span)
+            .expect("caller value"),
+        Value::Int(6)
+    );
+    let error = match runner.invoke_call(
+        &MirCallee::Function(MirFunctionId(1)),
+        &[MirOperand::Constant(MirConstant::Int(3))],
+        span,
+    ) {
+        Err(error) => error,
+        Ok(_) => panic!("in parameter must reject a non-place argument"),
+    };
+    assert_eq!(error.message, "mutable parameter requires a place argument");
+
+    for operand in [
+        MirOperand::Constant(MirConstant::String(mutabile)),
+        MirOperand::Place(MirPlace::local(MirLocalId(0))),
+        MirOperand::Constant(MirConstant::String(salve)),
+    ] {
+        runner
+            .eval_runtime_call(
+                &MirRuntimeCall {
+                    intrinsic: MirIntrinsic::Diagnostic(MirDiagnosticKind::Nota),
+                    args: vec![operand],
+                    return_ty: MirType::semantic(vacuum),
+                },
+                span,
+            )
+            .expect("nota should execute");
+    }
+    drop(runner);
+    assert_eq!(host.stdout_lines, ["mutabile", "6", "salve"]);
+}
+
+#[test]
 fn converts_numeric_array_to_octeti_in_one_step() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;

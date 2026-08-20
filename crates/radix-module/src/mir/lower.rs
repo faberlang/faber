@@ -409,6 +409,7 @@ fn lower_analyzed_unit_with_options(
                 .collect());
         }
         let mut validation = LoweringContextMaps::collect(unit).validation;
+        align_function_signatures_with_mir_params(&mut validation, &program.functions);
         validation.layouts = MirLayoutTable::from_types(&unit.types);
         validation.closure_environments = closure_environments
             .iter()
@@ -430,6 +431,24 @@ fn lower_analyzed_unit_with_options(
         })
     } else {
         Err(lowering_errors)
+    }
+}
+
+/// Replace HIR reference wrappers in local callable signatures with the MIR
+/// storage types. `MirParamMode` carries the borrow ABI separately, while call
+/// argument validation must compare the caller's value place with the callee's
+/// referent slot type.
+fn align_function_signatures_with_mir_params(validation: &mut MirValidationContext<'_>, functions: &[MirFunction]) {
+    for function in functions {
+        let Some(source) = function.source else {
+            continue;
+        };
+        let Some(signature) = validation.functions.get_mut(&source) else {
+            continue;
+        };
+        for (expected, param) in signature.params.iter_mut().zip(&function.params) {
+            expected.ty = param.ty;
+        }
     }
 }
 
@@ -1357,14 +1376,27 @@ impl<'a> FunctionBuilder<'a> {
 
     fn add_param(&mut self, def_id: DefId, name: crate::lexer::Symbol, ty: TypeId, mode: HirParamMode, span: Span) {
         let local = self.next_local_id();
-        let mir_ty = MirType::semantic(ty);
-        let mir_mode = match mode {
-            HirParamMode::Owned => MirParamMode::Owned,
-            HirParamMode::De => MirParamMode::De,
-            HirParamMode::In => MirParamMode::In,
-            HirParamMode::Ex => MirParamMode::Ex,
+        // MIR carries borrow intent in `MirParamMode`; the local slot carries
+        // the referent value type so MIR arithmetic and places stay scalar.
+        // HIR's `in T` / `de T` type is a `Ref` wrapper for source checking.
+        let storage_ty = if matches!(mode, HirParamMode::De | HirParamMode::In) {
+            match self.normalized_type(ty) {
+                Type::Ref(_, inner) => *inner,
+                _ => ty,
+            }
+        } else {
+            ty
         };
-        let mutable = matches!(mode, HirParamMode::In);
+        let mir_ty = MirType::semantic(storage_ty);
+        // Keep the MIR ABI mode and local mutability paired. In particular,
+        // `in` must remain `MirParamMode::In` so call frames can preserve a
+        // scalar mutable borrow instead of treating it as an owned value.
+        let (mir_mode, mutable) = match mode {
+            HirParamMode::Owned => (MirParamMode::Owned, false),
+            HirParamMode::De => (MirParamMode::De, false),
+            HirParamMode::In => (MirParamMode::In, true),
+            HirParamMode::Ex => (MirParamMode::Ex, false),
+        };
         self.params
             .push(MirParam { local, name: Some(name), ty: mir_ty, mode: mir_mode, span });
         self.locals

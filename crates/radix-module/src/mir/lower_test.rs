@@ -194,6 +194,45 @@ fn lowers_function_params_as_mir_locals() {
     assert!(!function.locals[1].mutable);
 }
 
+#[test]
+fn scalar_mut_param_preserves_in_mode_through_mir_lowering() {
+    let source = r#"
+functio duplica(in numerus value) → vacuum {
+    value ← value * 2
+}
+
+incipit {
+    nota "mutabile"
+    varia numerus value ← 3
+    duplica(value)
+    nota value
+    nota "salve"
+}
+"#;
+    let mut unit = analyze(source);
+    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let function = &program.functions[0];
+
+    assert_eq!(function.params[0].mode, MirParamMode::In);
+    assert!(function.locals[0].mutable, "in parameter must be writable in MIR");
+    assert!(function.blocks[0].statements.iter().any(|statement| {
+        matches!(
+            &statement.kind,
+            MirStatementKind::Assign { place, .. } if *place == MirPlace::local(function.params[0].local)
+        )
+    }));
+
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "scalar-mut-param.fab",
+        source,
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("MIR runner proof should execute: {error:?}"));
+    assert_eq!(host.stdout_lines, ["mutabile", "6", "salve"]);
+}
+
 // ===========================================================================
 // Section C: Matrix / vector / tensor operations
 // ===========================================================================
