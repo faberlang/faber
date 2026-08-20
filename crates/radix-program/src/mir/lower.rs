@@ -1368,13 +1368,15 @@ pub(super) fn ensure_unique_definition_sources(
         let identity = (function.name, function.span);
         if let Some(existing) = seen.insert(source, identity) {
             if existing != identity {
-                return Err(vec![mir_diag(
+                return Err(vec![mir_issue_diag(
                     path,
+                    "package_mir_duplicate_function_source",
                     format!(
                         "package MIR link found duplicate function source def#{}",
                         source.0
                     ),
-                )]);
+                )
+                .with_arg("def_id", source.0.to_string())]);
             }
         }
     }
