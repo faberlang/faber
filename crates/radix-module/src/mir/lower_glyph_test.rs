@@ -310,6 +310,40 @@ functio elementwise(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32
 }
 
 // ===========================================================================
+// `+` / `-` addita / subtrahe family
+// ===========================================================================
+
+#[test]
+fn lowers_tensor_infix_plus_to_tensor_add_collection_op() {
+    let dump = dump_source(
+        r"
+functio combine(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> {
+    redde a + b
+}
+",
+    );
+
+    assert!(dump.contains("runtime collection tensor_add"), "{dump}");
+    assert!(!dump.contains("glyph product binary operator"), "{dump}");
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"), "{dump}");
+}
+
+#[test]
+fn lowers_tensor_infix_minus_to_tensor_sub_collection_op() {
+    let dump = dump_source(
+        r"
+functio combine(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> {
+    redde a - b
+}
+",
+    );
+
+    assert!(dump.contains("runtime collection tensor_sub"), "{dump}");
+    assert!(!dump.contains("glyph product binary operator"), "{dump}");
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"), "{dump}");
+}
+
+// ===========================================================================
 // Fail-closed combinations that still typecheck
 // ===========================================================================
 

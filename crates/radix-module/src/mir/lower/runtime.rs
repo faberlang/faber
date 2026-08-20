@@ -2863,6 +2863,9 @@ fn glyph_method_name(op: HirBinOp, lhs_ty: &Type, rhs_ty: &Type) -> Option<&'sta
         (HirBinOp::Add, Type::Vector(..), Type::Vector(..)) => Some("addita"),
         (HirBinOp::Add, Type::Matrix(..), Type::Matrix(..)) => Some("addita"),
         (HirBinOp::Add, Type::Tensor(..), Type::Tensor(..)) => Some("addita"),
+        (HirBinOp::Sub, Type::Vector(..), Type::Vector(..)) => Some("subtrahe"),
+        (HirBinOp::Sub, Type::Matrix(..), Type::Matrix(..)) => Some("subtrahe"),
+        (HirBinOp::Sub, Type::Tensor(..), Type::Tensor(..)) => Some("subtrahe"),
         _ => None,
     }
 }
