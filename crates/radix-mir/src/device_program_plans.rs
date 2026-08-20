@@ -613,7 +613,7 @@ pub fn executor_plan_extension(program: &DeviceProgram) -> ExecutorPlanExtension
 fn bind_dimensions(plan: &CollectionKernelPlan, output_extent: u64) -> (Vec<u64>, BindLayout) {
     match plan {
         CollectionKernelPlan::RmsNormalization(plan) => {
-            if plan.width > 0 && output_extent % plan.width == 0 {
+            if plan.width > 0 && output_extent.is_multiple_of(plan.width) {
                 (
                     vec![output_extent / plan.width, plan.width],
                     BindLayout::RowMajor,
@@ -632,7 +632,7 @@ fn bind_dimensions(plan: &CollectionKernelPlan, output_extent: u64) -> (Vec<u64>
                     rotated_width: plan.dim,
                 }
             };
-            let rows = if plan.width > 0 && output_extent % plan.width == 0 {
+            let rows = if plan.width > 0 && output_extent.is_multiple_of(plan.width) {
                 output_extent / plan.width
             } else {
                 plan.rows.max(1)
