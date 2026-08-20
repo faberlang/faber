@@ -2614,10 +2614,82 @@
     {
       "src": "octeti",
       "tgt": "lista",
+      "target": "rust",
+      "predicted": "fallback",
+      "measured": "rejected",
+      "detail": "frontend:unsupported_conversio"
+    },
+    {
+      "src": "octeti",
+      "tgt": "lista",
       "target": "ts",
       "predicted": "fallback",
-      "measured": "dedicated",
-      "detail": "arm:dedicated"
+      "measured": "rejected",
+      "detail": "frontend:unsupported_conversio"
+    },
+    {
+      "src": "octeti",
+      "tgt": "lista",
+      "target": "go",
+      "predicted": "fallback",
+      "measured": "rejected",
+      "detail": "frontend:unsupported_conversio"
+    },
+    {
+      "src": "octeti",
+      "tgt": "lista",
+      "target": "faber",
+      "predicted": "dedicated",
+      "measured": "rejected",
+      "detail": "frontend:unsupported_conversio"
+    },
+    {
+      "src": "octeti",
+      "tgt": "lista",
+      "target": "llvm-text",
+      "predicted": "dedicated",
+      "measured": "rejected",
+      "detail": "frontend:unsupported_conversio"
+    },
+    {
+      "src": "octeti",
+      "tgt": "lista",
+      "target": "wasm-text",
+      "predicted": "not-emitted",
+      "measured": "rejected",
+      "detail": "frontend:unsupported_conversio"
+    },
+    {
+      "src": "octeti",
+      "tgt": "lista",
+      "target": "wasm",
+      "predicted": "not-emitted",
+      "measured": "rejected",
+      "detail": "frontend:unsupported_conversio"
+    },
+    {
+      "src": "octeti",
+      "tgt": "lista",
+      "target": "wgsl-text",
+      "predicted": "not-emitted",
+      "measured": "rejected",
+      "detail": "frontend:unsupported_conversio"
+    },
+    {
+      "src": "octeti",
+      "tgt": "lista",
+      "target": "sexp-struct",
+      "predicted": "not-emitted",
+      "measured": "rejected",
+      "detail": "frontend:unsupported_conversio"
+    },
+    {
+      "src": "octeti",
+      "tgt": "lista",
+      "target": "sexp",
+      "predicted": "not-emitted",
+      "measured": "rejected",
+      "detail": "frontend:unsupported_conversio"
     },
     {
       "src": "octeti",

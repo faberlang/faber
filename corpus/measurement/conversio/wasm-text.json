@@ -7,8 +7,8 @@
   "summary": {
     "dedicated": 64,
     "fallback": 0,
-    "rejected": 190,
-    "not-emitted": 187
+    "rejected": 191,
+    "not-emitted": 186
   },
   "cells": [
     {
@@ -710,7 +710,7 @@
     {
       "src": "octeti",
       "tgt": "lista",
-      "tier": "not-emitted",
+      "tier": "rejected",
       "measured": true
     },
     {
