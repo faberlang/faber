@@ -423,7 +423,7 @@ impl super::FaberCodegen {
                 writer.write("]");
             }
             HirExpressionKind::Vacua => {
-                writer.write(surface.contextual_keyword("vacua"));
+                writer.write(self.uncaptured_contextual_keyword("vacua", names, interner, surface));
             }
             HirExpressionKind::Struct(def_id, fields) => {
                 let name = self

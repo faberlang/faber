@@ -620,6 +620,13 @@ mod tests {
             }
         }
 
+        fn contextual_keyword_alias(&self, latin_key: &'static str, index: usize) -> Option<&str> {
+            match (latin_key, index) {
+                ("vacua", 0) => Some("VACUA_ALIAS"),
+                _ => None,
+            }
+        }
+
         fn type_surface(&self, kind: TypeBindingKind) -> &str {
             match kind {
                 TypeBindingKind::TensorFamily(TensorFamilyKind::Tensor) => "TENSOR_MARKER",
@@ -752,6 +759,63 @@ mod tests {
         assert!(
             !out.code.contains("vacua"),
             "Vacua emit must not print the literal Latin spelling, got:\n{}",
+            out.code
+        );
+    }
+
+    #[test]
+    fn vacua_emit_uses_alias_when_surface_spelling_is_bound() {
+        // A collected binding that shares the marker surface must not capture
+        // the re-emitted marker: emit the pack alias instead.
+        let mut interner = Interner::new();
+        let bound = interner.intern("VACUA_MARKER");
+        let hir = HirModule {
+            items: Vec::new(),
+            entry: Some(HirBlock::simple(
+                vec![HirStatement {
+                    id: HirId(1),
+                    kind: HirStatementKind::Local(HirLocal {
+                        def_id: DefId(1),
+                        name: bound,
+                        ty: None,
+                        init: Some(HirExpression {
+                            id: HirId(2),
+                            kind: HirExpressionKind::Vacua,
+                            ty: None,
+                            span: span(),
+                        }),
+                        mutable: false,
+                        is_await: false,
+                        runtime_provided: false,
+                    }),
+                    span: span(),
+                }],
+                None,
+                span(),
+            )),
+            entry_annotations: Vec::new(),
+            entry_args_name: None,
+            entry_is_async: false,
+        };
+        let types = TypeTable::new();
+        let out = crate::emit(
+            &hir,
+            &empty_presentation(),
+            &types,
+            &interner,
+            &ProbeSurface,
+            &FxHashMap::default(),
+            &FxHashMap::default(),
+        )
+        .expect("shadowed vacua program must emit");
+        assert!(
+            out.code.contains("VACUA_ALIAS"),
+            "Vacua emit must use the uncaptured alias when the surface is bound, got:\n{}",
+            out.code
+        );
+        assert!(
+            !out.code.contains("← VACUA_MARKER"),
+            "Vacua emit must not print the captured surface as the initializer, got:\n{}",
             out.code
         );
     }
