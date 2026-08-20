@@ -20,8 +20,11 @@ use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::test_span;
 use crate::SemanticErrorKind;
 use crate::{Primitive, Resolver, Type, TypeTable};
+use crate::file_interface::{FileExport, FileExportKind, FileInterface, InterfaceStructExport};
+use crate::passes::visibility_annotation::VisibilityTier;
 use radix_hir::{HirCallArg, HirExpression, HirExpressionKind, HirLiteral, HirPattern};
 use radix_lexer::Span;
+use std::collections::BTreeMap;
 
 // ---------------------------------------------------------------------------
 // Helper: compile source and get diagnostics (fallback for non-harness assertions)
@@ -1261,6 +1264,56 @@ fn rejects_unknown_method_on_concrete_receiver() {
         "genus Seed {\n  functio status() → numerus { redde 1 }\n}\
          functio probe() → numerus { fixum Seed s ← Seed {} redde s.from_flat(3) }",
         "unknown_method",
+    );
+}
+
+#[test]
+fn rejects_unknown_method_on_imported_struct_receiver() {
+    // DX receipt a35e77d5: the tensor receiver was accidentally replaced by
+    // `train.Seed` in four `from_flat` calls. Keep the imported nominal shape
+    // here so typecheck cannot recover through an inferred method result.
+    let mut interface = FileInterface::new();
+    interface.insert(FileExport {
+        name: "Seed".to_owned(),
+        kind: FileExportKind::Struct(InterfaceStructExport {
+            name: "Seed".to_owned(),
+            fields: Vec::new(),
+            methods: Vec::new(),
+            annotation_contract: None,
+        }),
+    });
+    let result = test_support::analyze_source_with_import_contract(
+        r#"importa ex "./train" train
+
+functio probe(train.Seed seed) → tensor<f32, [2]> {
+    redde seed.from_flat([1.0, 2.0], [2])
+}
+"#,
+        BTreeMap::from([(
+            "train".to_owned(),
+            BTreeMap::from([("Seed".to_owned(), VisibilityTier::Publica)]),
+        )]),
+        BTreeMap::from([("train".to_owned(), interface)]),
+    );
+    let diagnostic = result
+        .diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.kind == SemanticErrorKind::UndefinedMember
+                && diagnostic
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "unknown_method")
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "expected unknown_method for imported Seed receiver, got {:?}",
+                result.diagnostics
+            )
+        });
+    assert!(
+        args_have_no_legacy_message(&diagnostic.args),
+        "unknown_method must remain a structured diagnostic: {diagnostic:?}"
     );
 }
 

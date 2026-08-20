@@ -343,9 +343,9 @@ impl TypeChecker<'_> {
     ///
     /// Declared/interface methods are preferred. The array branch preserves a
     /// small built-in collection-method surface until stdlib-backed method
-    /// metadata covers all call shapes. Unknown interface members are hard
-    /// diagnostics; unknown concrete members recover with a fresh inference type
-    /// to avoid cascading failures from incomplete receiver information.
+    /// metadata covers all call shapes. Unknown interface and concrete nominal
+    /// members are hard diagnostics; only the explicit `ignotum` escape keeps
+    /// unknown receiver methods permissive.
     pub fn check_method_call(
         &mut self,
         receiver: &mut HirExpression,
