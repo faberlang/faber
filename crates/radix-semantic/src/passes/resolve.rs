@@ -232,7 +232,8 @@ fn resolve_stmt(
                     binding_name.name,
                     binding_name.span,
                     SymbolKind::Param,
-                    param.mode == radix_syntax::AstParamMode::In,
+                    param.mode == radix_syntax::AstParamMode::In
+                        || param.ty.mode == Some(radix_syntax::TypeMode::In),
                     errors,
                 );
                 if let Some(default) = &param.default {
@@ -297,7 +298,8 @@ fn resolve_stmt(
                                 binding_name.name,
                                 binding_name.span,
                                 SymbolKind::Param,
-                                param.mode == radix_syntax::AstParamMode::In,
+                                param.mode == radix_syntax::AstParamMode::In
+                                    || param.ty.mode == Some(radix_syntax::TypeMode::In),
                                 errors,
                             );
                             if let Some(default) = &param.default {
@@ -341,7 +343,8 @@ fn resolve_stmt(
                         param.name.name,
                         param.name.span,
                         SymbolKind::Param,
-                        param.mode == radix_syntax::AstParamMode::In,
+                        param.mode == radix_syntax::AstParamMode::In
+                            || param.ty.mode == Some(radix_syntax::TypeMode::In),
                         errors,
                     );
                 }
@@ -2565,6 +2568,25 @@ fn lower_type_expr(
     interner: &Interner,
     types: &mut TypeTable,
 ) -> Result<TypeId, TypeLowerError> {
+    lower_type_expr_with_context(ty, resolver, interner, types, false)
+}
+
+fn lower_parameter_type_expr(
+    ty: &TypeExpr,
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<TypeId, TypeLowerError> {
+    lower_type_expr_with_context(ty, resolver, interner, types, true)
+}
+
+fn lower_type_expr_with_context(
+    ty: &TypeExpr,
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+    allow_scalar_ref_mut: bool,
+) -> Result<TypeId, TypeLowerError> {
     // This is intentionally narrower than full typechecking: it interns the
     // declared shape of a type expression so aliases have stable TypeIds, but
     // assignability and expression typing remain HIR-phase responsibilities.
@@ -2600,18 +2622,20 @@ fn lower_type_expr(
                 .params
                 .iter()
                 .map(|param| {
-                    lower_type_expr(param, resolver, interner, types).map(|ty| ParamType {
-                        ty,
-                        mode: param
-                            .mode
-                            .map_or(SemanticParamMode::Owned, |mode| match mode {
-                                radix_syntax::TypeMode::De => SemanticParamMode::Ref,
-                                radix_syntax::TypeMode::In => SemanticParamMode::MutRef,
-                                radix_syntax::TypeMode::Own | radix_syntax::TypeMode::Copy => {
-                                    SemanticParamMode::Owned
-                                }
-                            }),
-                        optional: false,
+                    lower_parameter_type_expr(param, resolver, interner, types).map(|ty| {
+                        ParamType {
+                            ty,
+                            mode: param
+                                .mode
+                                .map_or(SemanticParamMode::Owned, |mode| match mode {
+                                    radix_syntax::TypeMode::De => SemanticParamMode::Ref,
+                                    radix_syntax::TypeMode::In => SemanticParamMode::MutRef,
+                                    radix_syntax::TypeMode::Own | radix_syntax::TypeMode::Copy => {
+                                        SemanticParamMode::Owned
+                                    }
+                                }),
+                            optional: false,
+                        }
                     })
                 })
                 .collect::<Result<Vec<_>, _>>()?;
@@ -2679,7 +2703,13 @@ fn lower_type_expr(
 
     if let Some(mode) = ty.mode {
         let marker = crate::access_marker_from_type_mode(mode);
-        if types.is_scalar_for_access_marker(ty_id) {
+        if types.is_scalar_for_access_marker(ty_id)
+            && !(allow_scalar_ref_mut
+                && matches!(
+                    mode,
+                    radix_syntax::TypeMode::De | radix_syntax::TypeMode::In
+                ))
+        {
             return Err(TypeLowerError::Issue(crate::ISSUE_SCALAR_ACCESS_MARKER));
         }
         ty_id = types.access_marker(marker, ty_id);

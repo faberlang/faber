@@ -146,6 +146,7 @@ impl TypeChecker<'_> {
     }
 
     fn numeric_shape(&self, ty: TypeId) -> Option<NumericShape> {
+        let (_, ty) = self.types.peel_access_marker(ty);
         match self.types.get(ty) {
             Type::Primitive(Primitive::Numerus) => Some(NumericShape {
                 prim: Primitive::Numerus,

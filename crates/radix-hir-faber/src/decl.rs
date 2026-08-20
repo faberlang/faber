@@ -493,27 +493,21 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        // A type-position mode marker already rides the param type (`de T`),
-        // and `type_to_faber` prints it. Only emit the legacy prefix mode here
-        // when the type does not already encode the access marker — that keeps
-        // the corpus's prefix spellings byte-identical while avoiding
-        // double-emission for the new type-position spellings.
+        // A type-position mode marker already rides the param type, and
+        // `type_to_faber` prints it. Imported/synthetic signatures can still
+        // carry a separate HIR mode, so re-home that fact on the type instead
+        // of emitting the retired parameter-prefix slot.
         let type_carries_mode = matches!(types.get(param.ty), radix_types::Type::Ref(..));
         if !type_carries_mode {
-            match param.mode {
-                radix_hir::HirParamMode::De => {
-                    writer.write(surface.keyword(TokenKind::De));
-                    writer.write(" ");
-                }
-                radix_hir::HirParamMode::In => {
-                    writer.write(surface.keyword(TokenKind::In));
-                    writer.write(" ");
-                }
-                radix_hir::HirParamMode::Ex => {
-                    writer.write(surface.keyword(TokenKind::Ex));
-                    writer.write(" ");
-                }
-                radix_hir::HirParamMode::Owned => {}
+            let marker = match param.mode {
+                radix_hir::HirParamMode::De => Some(TokenKind::De),
+                radix_hir::HirParamMode::In => Some(TokenKind::In),
+                radix_hir::HirParamMode::Ex => Some(TokenKind::Own),
+                radix_hir::HirParamMode::Owned => None,
+            };
+            if let Some(marker) = marker {
+                writer.write(surface.keyword(marker));
+                writer.write(" ");
             }
         }
         writer.write(&self.type_to_faber(param.ty, types, names, interner, surface));

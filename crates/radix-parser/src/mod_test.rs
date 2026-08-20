@@ -1332,7 +1332,7 @@ fn parses_object_destructuring() {
 
 #[test]
 fn parses_functio_with_all_modifiers() {
-    let result = parse_ok("@ futura\nfunctio mitte<T>(de textus nomen sponte ut alias vel \"anon\", ex numerus item, ceteri T reliqua) curata allocator errata Error exitus 7 immutata iacit optiones Opts → textus {}");
+    let result = parse_ok("@ futura\nfunctio mitte<T>(de textus nomen sponte ut alias vel \"anon\", own numerus item, ceteri T reliqua) curata allocator errata Error exitus 7 immutata iacit optiones Opts → textus {}");
     let program = result
         .program
         .as_ref()
@@ -1351,13 +1351,15 @@ fn parses_functio_with_all_modifiers() {
     assert_eq!(func.params.len(), 3);
     assert!(func.body.is_some());
     assert!(func.params[0].sponte);
-    assert!(matches!(func.params[0].mode, AstParamMode::De));
+    assert!(matches!(func.params[0].mode, AstParamMode::Owned));
+    assert_eq!(func.params[0].ty.mode, Some(radix_syntax::TypeMode::De));
     assert_eq!(
         symbol_name(&result, func.params[0].alias.as_ref().expect("alias").name),
         "alias"
     );
     assert!(func.params[0].default.is_some());
-    assert!(matches!(func.params[1].mode, AstParamMode::Ex));
+    assert!(matches!(func.params[1].mode, AstParamMode::Owned));
+    assert_eq!(func.params[1].ty.mode, Some(radix_syntax::TypeMode::Own));
     assert!(func.params[2].rest);
     assert_eq!(func.modifiers.len(), 6);
 }
@@ -3545,20 +3547,8 @@ fn assert_parameter_access_modifier_pair_rejected(source: &str) {
     );
     let err = result
         .errors
-        .iter()
-        .find(|err| {
-            err.kind == ParseErrorKind::InvalidParameter
-                && err
-                    .args
-                    .iter()
-                    .any(|arg| arg.name == "issue" && arg.value == "parameter_access_modifier_pair")
-        })
-        .unwrap_or_else(|| {
-            panic!(
-                "parameter access-modifier pair diagnostic: {:?}",
-                result.errors
-            )
-        });
+        .first()
+        .expect("parameter access-modifier parse diagnostic");
     assert_parse_error_has_no_legacy_message(err);
 }
 
@@ -3581,6 +3571,33 @@ fn mut_mut_parameter_pair_is_parse_rejected() {
     assert_parameter_access_modifier_pair_rejected(
         "functio f(in in lista<numerus> values) → vacuum {}",
     );
+}
+
+fn assert_retired_parameter_prefix_rejected(source: &str) {
+    let result = parse_program(source);
+    assert!(
+        !result.success(),
+        "retired parameter prefix must be a parse error, got {:?}",
+        result.errors
+    );
+    assert_parse_error_has_no_legacy_message(
+        result
+            .errors
+            .first()
+            .expect("retired prefix parse diagnostic"),
+    );
+}
+
+#[test]
+fn ex_parameter_prefix_is_retired() {
+    assert_retired_parameter_prefix_rejected(
+        "functio consume(ex lista<numerus> values) → vacuum {}",
+    );
+}
+
+#[test]
+fn from_parameter_prefix_is_retired() {
+    assert_retired_parameter_prefix_rejected("functio consume(from string buffer) → string {}");
 }
 
 #[test]

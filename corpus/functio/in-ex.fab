@@ -23,22 +23,24 @@ locale = "en"
 # See also: →, ⇥, redde, sponte, ceteri, prae, curata, futura, cursor
 # =============================================================================
 
-# Parameter borrow markers: de (shared), in (mutable), ex (consume)
+# Parameter access markers live in the type position:
 #
-# de <type> <nomen>  -- shared borrow (read-only from caller's view)
-# in <type> <nomen>  -- mutable borrow (callee may modify the binding)
-# ex <type> <nomen>  -- consume/move ownership into callee
+# ref <type> <nomen>  -- shared read-only view
+# mut <type> <nomen>  -- mutable borrow; writes reach the caller
+# own <type> <nomen>  -- consume ownership into the callee
+# copy <type> <nomen>  -- duplicate at acquisition, then own the copy
 #
-# GRAMMAR:
-#   parameter :← ('de' | 'in' | 'ex')? type ident ...
+# The old parameter-prefix slot is retired. The `from`/`ex` token identity
+# remains available for imports, iteration, and field extraction.
 #
 # EXPECTED OUTPUT:
 #   mutabile
 #   6
 #   salve
 #
-# BACKEND: Rust lowering treats `in` as immutable args (borrow lowering gap;
-# whitelist: functio/in-ex.fab). Go target is runnable.
+# BACKEND: Rust emission propagates the scalar mutable borrow as `&mut i64`.
+# The MIR runner still drops that scalar borrow during execution; the gap is
+# recorded in the mutability-engine ledger and is a non-blocking residual.
 
 # --- Shared borrow: read label without taking ownership ---
 
@@ -55,7 +57,7 @@ fn duplica(mut int value) → void {
 
 # --- Consume: take ownership of textus and return it ---
 
-fn consume(from string buffer) → string {
+fn consume(own string buffer) → string {
     return buffer
 }
 
@@ -63,9 +65,9 @@ main {
     imprime("mutabile")
 
     var int value ← 3
-    # in borrows valor mutably inside duplica
+    # mut borrows the caller's scalar inside duplica
     duplica(value)
 
-    # ex moves the literal into consume
+    # own consumes the literal into consume
     print consume("salve")
 }
