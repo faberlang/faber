@@ -1804,7 +1804,7 @@ incipit {
 }
 
 #[test]
-fn shadowed_vacua_lowers_to_name_load() {
+fn bound_vacua_still_lowers_to_vacua() {
     let (lowered, _, _) = lower_source(
         r#"
 incipit {
@@ -1814,9 +1814,6 @@ incipit {
 "#,
     );
     let stmts = entry_statements(&lowered);
-    let HirStatementKind::Local(local) = &stmts[0].kind else {
-        panic!("expected local");
-    };
     let HirStatementKind::Expr(scribe) = &stmts[1].kind else {
         panic!("expected scribe expr, got {:?}", stmts[1].kind);
     };
@@ -1824,9 +1821,34 @@ incipit {
         panic!("expected scribe, got {:?}", scribe.kind);
     };
     assert!(
-        matches!(args[0].kind, HirExpressionKind::Path(def_id) if def_id == local.def_id),
-        "shadowed vacua must lower to a name load of the binding, got {:?}",
+        matches!(args[0].kind, HirExpressionKind::Vacua),
+        "bare vacua must stay Vacua beside a same-named binding, got {:?}",
         args[0].kind
+    );
+}
+
+#[test]
+fn vacua_call_lowers_to_call_on_path() {
+    let (lowered, _, _) = lower_source(
+        r#"
+functio vacua() → numerus { redde 1 }
+incipit {
+  fixum _ x ← vacua()
+}
+"#,
+    );
+    let function_def = lowered.hir.items[0].def_id;
+    let HirStatementKind::Local(local) = &entry_statements(&lowered)[0].kind else {
+        panic!("expected local");
+    };
+    let init = local.init.as_ref().expect("initializer");
+    let HirExpressionKind::Call(callee, _, _) = &init.kind else {
+        panic!("expected call, got {:?}", init.kind);
+    };
+    assert!(
+        matches!(callee.kind, HirExpressionKind::Path(def_id) if def_id == function_def),
+        "vacua() must load the user fn, got {:?}",
+        callee.kind
     );
 }
 
