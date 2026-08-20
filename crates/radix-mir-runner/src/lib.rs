@@ -23,8 +23,9 @@ use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol};
 use radix_mir::{
     MirBinOp, MirBlock, MirBlockId, MirCallee, MirConstant, MirFunction, MirFunctionId, MirLocalId,
-    MirOperand, MirPlace, MirPlaceBase, MirProgram, MirStatementKind, MirTempId, MirTerminatorKind,
-    MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
+    MirOperand, MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirStatementKind, MirTempId,
+    MirTerminatorKind, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind,
+    ValidatedMir,
 };
 use radix_types::{effective_width, NumericWidth, Primitive, Type, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -113,9 +114,20 @@ fn runner_issue(message: &str) -> String {
     issue.trim_end_matches('_').to_string()
 }
 
+#[derive(Debug, Clone)]
+struct PlaceAlias {
+    /// Frame containing the caller place. The caller remains on the stack for
+    /// the lifetime of the callee frame, so this is a stable in-runner cell.
+    frame: usize,
+    place: MirPlace,
+}
+
 struct Frame {
     function: MirFunctionId,
     locals: FxHashMap<MirLocalId, Value>,
+    /// `in` parameter locals that borrow a caller place instead of owning a
+    /// cloned scalar value.
+    aliases: FxHashMap<MirLocalId, PlaceAlias>,
     temps: FxHashMap<MirTempId, Value>,
     values: FxHashMap<MirValueId, Value>,
     block: MirBlockId,
@@ -391,6 +403,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         self.frames.push(Frame {
             function: function_id,
             locals,
+            aliases: FxHashMap::default(),
             temps: FxHashMap::default(),
             values: FxHashMap::default(),
             block: entry_block,
@@ -726,18 +739,26 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             _ => (self.resolve_callee(callee, span)?, None),
         };
         // BO-M-3/052: avoid cloning the entire MirFunction; collect param locals only.
-        let param_locals = self
+        let param_modes = self
             .function_by_id(func_id, span)?
             .params
             .iter()
-            .map(|param| param.local)
+            .map(|param| (param.local, param.mode))
             .collect::<Vec<_>>();
         let arg_values = args
             .iter()
             .map(|arg| self.eval_operand(arg, span))
             .collect::<Result<Vec<_>, _>>()?;
-        if param_locals.len() != arg_values.len() {
+        if param_modes.len() != arg_values.len() {
             return Err(RunnerError::internal(span, "call argument count mismatch"));
+        }
+        for ((_, mode), operand) in param_modes.iter().zip(args) {
+            if *mode == MirParamMode::In && !matches!(operand, MirOperand::Place(_)) {
+                return Err(RunnerError::internal(
+                    span,
+                    "mutable parameter requires a place argument",
+                ));
+            }
         }
 
         let depth = self.frames.len();
@@ -748,8 +769,30 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             if let Some((local, value)) = closure_environment {
                 frame.locals.insert(local, value);
             }
-            for (local, arg) in param_locals.into_iter().zip(arg_values) {
-                frame.locals.insert(local, arg);
+            for ((local, mode), (arg, operand)) in param_modes
+                .into_iter()
+                .zip(arg_values.into_iter().zip(args))
+            {
+                // `in` is a borrow contract, not a scalar copy. Keep a
+                // direct place alias while the caller frame is live; all
+                // other modes retain the existing value transfer behavior.
+                if mode == MirParamMode::In
+                    && depth > 0
+                    && matches!(operand, MirOperand::Place(place) if place.projections.is_empty())
+                {
+                    let MirOperand::Place(place) = operand else {
+                        unreachable!("place checked above");
+                    };
+                    frame.aliases.insert(
+                        local,
+                        PlaceAlias {
+                            frame: depth - 1,
+                            place: place.clone(),
+                        },
+                    );
+                } else {
+                    frame.locals.insert(local, arg);
+                }
             }
         }
         self.run_until_depth(depth);
@@ -933,17 +976,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         if place.projections.is_empty() {
             let frame = self
                 .frames
-                .last_mut()
+                .len()
+                .checked_sub(1)
                 .ok_or_else(|| RunnerError::internal(span, "no active frame"))?;
-            match place.base {
-                MirPlaceBase::Local(id) => {
-                    frame.locals.insert(id, value);
-                }
-                MirPlaceBase::Temp(id) => {
-                    frame.temps.insert(id, value);
-                }
-            }
-            return Ok(());
+            return self.write_base_place(frame, &place.base, value, span);
         }
 
         let parent = MirPlace {
@@ -956,6 +992,38 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         let mut current = self.read_place(&parent, span)?;
         current = self.project_write(current, last, value, span)?;
         self.write_place(&parent, current, span)
+    }
+
+    fn write_base_place(
+        &mut self,
+        frame_index: usize,
+        base: &MirPlaceBase,
+        value: Value,
+        span: Span,
+    ) -> Result<(), RunnerError> {
+        if let MirPlaceBase::Local(id) = base {
+            let alias = self
+                .frames
+                .get(frame_index)
+                .and_then(|frame| frame.aliases.get(id))
+                .cloned();
+            if let Some(alias) = alias {
+                return self.write_base_place(alias.frame, &alias.place.base, value, span);
+            }
+        }
+        let frame = self
+            .frames
+            .get_mut(frame_index)
+            .ok_or_else(|| RunnerError::internal(span, "no active frame"))?;
+        match base {
+            MirPlaceBase::Local(id) => {
+                frame.locals.insert(*id, value);
+            }
+            MirPlaceBase::Temp(id) => {
+                frame.temps.insert(*id, value);
+            }
+        }
+        Ok(())
     }
 
     fn project_write(
@@ -1052,11 +1120,52 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     fn read_local(&self, id: MirLocalId, span: Span) -> Result<Value, RunnerError> {
+        let frame = self
+            .frames
+            .len()
+            .checked_sub(1)
+            .ok_or_else(|| RunnerError::internal(span, "no active frame"))?;
+        self.read_local_at(frame, id, span)
+    }
+
+    fn read_local_at(
+        &self,
+        frame_index: usize,
+        id: MirLocalId,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let alias = self
+            .frames
+            .get(frame_index)
+            .and_then(|frame| frame.aliases.get(&id))
+            .cloned();
+        if let Some(alias) = alias {
+            return self.read_base_place(alias.frame, &alias.place.base, span);
+        }
         self.frames
-            .last()
+            .get(frame_index)
             .and_then(|frame| frame.locals.get(&id))
             .cloned()
             .ok_or_else(|| RunnerError::internal(span, format!("uninitialized local l{}", id.0)))
+    }
+
+    fn read_base_place(
+        &self,
+        frame_index: usize,
+        base: &MirPlaceBase,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        match base {
+            MirPlaceBase::Local(id) => self.read_local_at(frame_index, *id, span),
+            MirPlaceBase::Temp(id) => self
+                .frames
+                .get(frame_index)
+                .and_then(|frame| frame.temps.get(id))
+                .cloned()
+                .ok_or_else(|| {
+                    RunnerError::internal(span, format!("uninitialized temp t{}", id.0))
+                }),
+        }
     }
 
     fn read_temp(&self, id: MirTempId, span: Span) -> Result<Value, RunnerError> {
