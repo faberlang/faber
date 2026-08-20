@@ -122,6 +122,10 @@ mod mutability_baseline_test;
 mod mutability_markers_test;
 
 #[cfg(test)]
+#[path = "mutability_ref_test.rs"]
+mod mutability_ref_test;
+
+#[cfg(test)]
 #[path = "resolve_test.rs"]
 mod resolve_test;
 

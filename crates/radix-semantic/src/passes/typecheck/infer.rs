@@ -264,6 +264,28 @@ impl TypeChecker<'_> {
         self.unify_with_policy(a, b, span, issue, UnifyPolicy::Assign)
     }
 
+    /// Unify assignment on carrier payloads, ignoring access-marker wrappers.
+    ///
+    /// `ref`/`mut`/`own` are type facts, not a different payload shape. Mode
+    /// legality is enforced by the borrow pass.
+    pub fn unify_carrier_assign(
+        &mut self,
+        a: TypeId,
+        b: TypeId,
+        span: radix_lexer::Span,
+        issue: &'static str,
+    ) -> TypeId {
+        let a = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(a))
+            .1;
+        let b = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(b))
+            .1;
+        self.unify_assign_issue(a, b, span, issue)
+    }
+
     fn unify_with_policy(
         &mut self,
         a: TypeId,

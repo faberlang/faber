@@ -282,7 +282,19 @@ impl TypeChecker<'_> {
 
         for (arg, param) in args.iter_mut().zip(sig.params.iter()) {
             let arg_ty = self.check_expr_with_expected(&mut arg.expr, Some(param.ty));
-            self.unify_assign_issue(arg_ty, param.ty, arg.span, ISSUE_ARGUMENT_TYPE_MISMATCH);
+            if self.types.is_ref_view(arg_ty)
+                && (matches!(
+                    param.mode,
+                    SemanticParamMode::MutRef | SemanticParamMode::Move
+                ) || self.types.is_mut_or_own_view(param.ty))
+            {
+                self.error_issue(
+                    SemanticErrorKind::ModeMismatch,
+                    crate::ISSUE_REF_TO_MUT_OR_OWN_POSITION,
+                    arg.span,
+                );
+            }
+            self.unify_carrier_assign(arg_ty, param.ty, arg.span, ISSUE_ARGUMENT_TYPE_MISMATCH);
         }
     }
     /// Typecheck a Path receiver as an imported namespace function, if it is one.
@@ -421,7 +433,8 @@ impl TypeChecker<'_> {
         }
 
         let resolved_receiver_ty = self.resolve_inferred_type(receiver_ty);
-        let resolved_receiver = self.types.get(resolved_receiver_ty);
+        let (_, intrinsic_ty) = self.types.peel_access_marker(resolved_receiver_ty);
+        let resolved_receiver = self.types.get(intrinsic_ty);
         let receiver_is_atomic = matches!(resolved_receiver, Type::Atomic(_));
         if super::intrinsics::receiver_supports_intrinsics(resolved_receiver) {
             if self.reject_explicit_type_args_on_dynamic_callee(

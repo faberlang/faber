@@ -158,6 +158,26 @@ pub fn mir_is_higher_order_lista(entry: &MethodIntrinsic) -> bool {
     )
 }
 
+/// Catalog fact: this intrinsic mutates its receiver in place.
+///
+/// Authority is the registry row (`return_kind` and in-place MIR ops), never a
+/// post-typecheck void-return heuristic on a call expression. `Lista "appende"`
+/// is the named example: `IntrinsicReturnKind::Vacuum`.
+#[must_use]
+pub fn is_mutating_receiver(entry: &MethodIntrinsic) -> bool {
+    match entry.return_kind {
+        IntrinsicReturnKind::Vacuum => true,
+        _ => matches!(
+            entry.mir_kind,
+            IntrinsicMirKind::Collection(
+                MirCollectionOp::Delete
+                    | MirCollectionOp::RemoveFirst
+                    | MirCollectionOp::RemoveLast
+            ) | IntrinsicMirKind::Atomic(MirAtomicOp::Exchange | MirAtomicOp::CompareExchange)
+        ),
+    }
+}
+
 /// Imperativus numeric operator methods that mutate a `varia` receiver in place.
 #[must_use]
 pub fn is_numeric_imperativus_operator(method: &str) -> bool {

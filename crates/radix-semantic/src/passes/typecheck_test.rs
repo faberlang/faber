@@ -267,9 +267,7 @@ fn known_method_on_concrete_receiver_still_resolves() {
 #[test]
 fn ignotum_receiver_method_call_still_infers() {
     // Dynamic/Ignotum receivers keep inferring unknown methods.
-    test_support::assert_accepts(
-        "functio probe(ignotum s) → ignotum { redde s.from_flat(3) }",
-    );
+    test_support::assert_accepts("functio probe(ignotum s) → ignotum { redde s.from_flat(3) }");
 }
 
 #[test]

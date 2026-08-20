@@ -103,7 +103,7 @@ impl TypeChecker<'_> {
                     self.insert_binding_with_scalar(local.def_id, *ty, false, local.mutable);
                 }
                 let init_ty = self.check_expr_with_expected(init, Some(*ty));
-                self.unify_assign_issue(
+                self.unify_carrier_assign(
                     init_ty,
                     *ty,
                     init.span,

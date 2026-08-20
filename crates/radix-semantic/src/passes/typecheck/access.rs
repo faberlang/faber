@@ -17,6 +17,7 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
+use crate::AccessMarker;
 
 const ISSUE_TEXTUS_INDEX_MUST_BE_NUMERUS_OR_RANGE: &str = "textus_index_must_be_numerus_or_range";
 const ISSUE_OCTETI_INDEX_MUST_BE_NUMERUS_OR_RANGE: &str = "octeti_index_must_be_numerus_or_range";
@@ -98,6 +99,10 @@ impl TypeChecker<'_> {
         object_span: radix_lexer::Span,
         index_span: radix_lexer::Span,
     ) -> TypeId {
+        let object_ty = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(object_ty))
+            .1;
         let resolved = self.resolve_inferred_type(object_ty);
         let resolved_kind = self.types.get(resolved).clone();
         // WHY: textus and ascii scalar index returns `ascii<1>` (D14 / D17),
@@ -276,9 +281,10 @@ impl TypeChecker<'_> {
                         return payload_ty;
                     }
                     if field.optional {
-                        return self.types.option(field.ty);
+                        let optional_ty = self.types.option(field.ty);
+                        return self.project_ref_view(object_ty, optional_ty);
                     }
-                    return field.ty;
+                    return self.project_ref_view(object_ty, field.ty);
                 }
             }
             self.undefined_member("unknown_struct_field", span);
@@ -309,6 +315,36 @@ impl TypeChecker<'_> {
         }
         self.error_type
     }
+
+    /// Field projections of a `ref` genus are `ref` views of referential fields.
+    fn project_ref_view(&mut self, object_ty: TypeId, field_ty: TypeId) -> TypeId {
+        if !self.types.is_ref_view(object_ty) {
+            return field_ty;
+        }
+        if self.types.is_scalar_for_access_marker(field_ty) || self.types.is_ref_view(field_ty) {
+            return field_ty;
+        }
+        self.types.access_marker(AccessMarker::Ref, field_ty)
+    }
+
+    /// Whether `expr` is a declared `ref` root or a projection of one.
+    pub(super) fn expr_is_ref_view(&self, expr: &HirExpression) -> bool {
+        if let Some(ty) = expr.ty {
+            if self.types.is_ref_view(self.resolve_inferred_type(ty)) {
+                return true;
+            }
+        }
+        match &expr.kind {
+            HirExpressionKind::Field(object, _)
+            | HirExpressionKind::Index(object, _)
+            | HirExpressionKind::Deref(object) => self.expr_is_ref_view(object),
+            HirExpressionKind::Path(def_id) => self
+                .lookup_binding(*def_id)
+                .is_some_and(|binding| self.types.is_ref_view(binding.ty)),
+            _ => false,
+        }
+    }
+
     /// Checks a non-null chain segment after removing one optional layer from
     /// the receiver when present.
     ///

@@ -1,0 +1,22 @@
++++
+term = "mutabilitas"
+kind = "reject"
+category = "type"
+summary = "MU-2 red: passing a ref value into an own position is rejected."
+syntax = "fn take(own list<int> xs); take(ref_value)"
+related = ["ref", "own"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — ref into own (MU-2)
+# =============================================================================
+# This exemplum intentionally fails to compile.
+
+fn take(own list<int> xs) → void {
+    print xs.length()
+}
+
+main {
+    const ref list<int> a ← [1, 2, 3]
+    take(a)
+}

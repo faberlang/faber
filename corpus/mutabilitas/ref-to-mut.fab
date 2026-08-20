@@ -1,0 +1,22 @@
++++
+term = "mutabilitas"
+kind = "reject"
+category = "type"
+summary = "MU-2 red: passing a ref value into a mut position is rejected."
+syntax = "fn poke(mut list<int> xs); poke(ref_value)"
+related = ["ref", "mut"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — ref into mut (MU-2)
+# =============================================================================
+# This exemplum intentionally fails to compile.
+
+fn poke(mut list<int> xs) → void {
+    xs.append(4)
+}
+
+main {
+    const ref list<int> a ← [1, 2, 3]
+    poke(a)
+}

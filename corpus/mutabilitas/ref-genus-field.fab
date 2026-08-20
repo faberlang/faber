@@ -1,0 +1,22 @@
++++
+term = "mutabilitas"
+kind = "reject"
+category = "type"
+summary = "MU-2 red: mutating a referential field of a ref genus is rejected."
+syntax = "const ref Person p; p.friends.append(3)"
+related = ["ref", "genus"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — ref genus field transitivity (MU-2)
+# =============================================================================
+# This exemplum intentionally fails to compile.
+
+class Person {
+    list<int> friends
+}
+
+main {
+    const ref Person p ← Person { friends = [1, 2] }
+    p.friends.append(3)
+}
