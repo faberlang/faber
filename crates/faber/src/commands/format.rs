@@ -168,48 +168,46 @@ pub(super) fn convert_single_doc(path: &Path, to: &str, source: &str) -> Result<
 /// locale, printing diagnostics and returning the formatted output ready for
 /// write/stdout (frontmatter preserved). `Err(())` means a diagnostic was
 /// already printed.
+#[cfg(not(feature = "hir-faber"))]
+fn format_single_doc(_path: &Path, _source: &str) -> Result<String, ()> {
+    eprintln!("error: formatting requires a faber build with feature `hir-faber`");
+    Err(())
+}
+
+#[cfg(feature = "hir-faber")]
 fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
-    #[cfg(not(feature = "hir-faber"))]
-    {
-        let _ = (path, source);
-        eprintln!("error: formatting requires a faber build with feature `hir-faber`");
-        return Err(());
-    }
-    #[cfg(feature = "hir-faber")]
-    {
-        let name = path.display().to_string();
-        let session = match format_session(path, None, source) {
-            Ok(session) => session,
-            Err(message) => {
-                eprintln!("error: {message}");
-                return Err(());
-            }
-        };
-        let result = radix_module::codegen::faber::compile_canonical(&session, &name, source);
-
-        let mut had_error = false;
-        for diag in &result.diagnostics {
-            if diag.is_error() {
-                eprintln!("error: {}: {}", path.display(), diag.message);
-                had_error = true;
-            } else {
-                eprintln!("warning: {}: {}", path.display(), diag.message);
-            }
-        }
-
-        let Some(output) = result.output else {
-            if !had_error {
-                eprintln!("error: {}: format failed", path.display());
-            }
+    let name = path.display().to_string();
+    let session = match format_session(path, None, source) {
+        Ok(session) => session,
+        Err(message) => {
+            eprintln!("error: {message}");
             return Err(());
-        };
+        }
+    };
+    let result = radix_module::codegen::faber::compile_canonical(&session, &name, source);
 
-        match formatted_source_for_write(path, source, &output.code) {
-            Ok(formatted) => Ok(formatted),
-            Err(message) => {
-                eprintln!("error: {message}");
-                Err(())
-            }
+    let mut had_error = false;
+    for diag in &result.diagnostics {
+        if diag.is_error() {
+            eprintln!("error: {}: {}", path.display(), diag.message);
+            had_error = true;
+        } else {
+            eprintln!("warning: {}: {}", path.display(), diag.message);
+        }
+    }
+
+    let Some(output) = result.output else {
+        if !had_error {
+            eprintln!("error: {}: format failed", path.display());
+        }
+        return Err(());
+    };
+
+    match formatted_source_for_write(path, source, &output.code) {
+        Ok(formatted) => Ok(formatted),
+        Err(message) => {
+            eprintln!("error: {message}");
+            Err(())
         }
     }
 }
