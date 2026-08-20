@@ -200,7 +200,7 @@ fn textus_to_ascii_conversio_emits_try_from_textus() {
 #[test]
 fn octeti_literal_compiles_to_vec_u8() {
     let session = test_session(Target::HirRust);
-    let source = "incipit {\n  fixum octeti sig ← |de ad be ef|\n  fixum octeti empty ← ||\n  nota sig\n}";
+    let source = "incipit {\n  fixum octeti sig ← |de ad be ef|\n  fixum octeti empty_octeti ← ||\n  nota sig\n}";
     let result = compile(&session, "test.fab", source);
 
     assert!(result.success());
