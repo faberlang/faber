@@ -88,20 +88,20 @@ pub fn analyze_modes(
     run(hir, types, false, true)
 }
 
-/// Rust-target analysis uses the same type-fact-driven language rules as the
-/// other HIR targets. Rust's compiler remains the authority for precise
-/// lifetime checking; this pass must not reject legal mutation of unmarked
-/// values or treat an unmarked parameter as an implicit reference.
+/// Legacy Rust-target analysis: declared access facts plus the Rust lifetime
+/// approximation used by [`PassConfig::for_target`](crate::PassConfig::for_target).
+/// Target-neutral callers use [`analyze_modes`], while the explicit qualification
+/// seam uses [`analyze_rust_lifetime`].
 ///
 /// # Errors
 ///
-/// Returns declared access-mode violations as a list of [`SemanticError`]s.
+/// Returns borrow/lifetime violations as a list of [`SemanticError`]s.
 pub fn analyze(
     hir: &HirModule,
     _resolver: &Resolver,
     types: &TypeTable,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, false, true)
+    run(hir, types, true, true)
 }
 
 /// Retired Rust lifetime simulation hook.
