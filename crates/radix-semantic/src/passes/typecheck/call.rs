@@ -545,7 +545,8 @@ impl TypeChecker<'_> {
         }
 
         self.typecheck_call_arg_exprs(args);
-        self.fresh_infer()
+        self.undefined_member("unknown_method", receiver.span);
+        self.error_type
     }
 
     fn check_sermo_stream_view_method(
