@@ -568,19 +568,25 @@ impl Parser {
         while !self.check(&TokenKind::RParen) && !self.is_at_end() {
             let start = self.current_span();
 
-            let mode = if self.eat_keyword_ident(TokenKind::De) {
-                AstParamMode::De
+            let (mode, has_prefix) = if self.eat_keyword_ident(TokenKind::De) {
+                (AstParamMode::De, true)
             } else if self.eat_keyword_ident(TokenKind::In) {
-                AstParamMode::In
+                (AstParamMode::In, true)
             } else if self.eat_keyword_ident(TokenKind::Ex) {
-                AstParamMode::Ex
+                (AstParamMode::Ex, true)
             } else {
-                AstParamMode::Owned
+                (AstParamMode::Owned, false)
             };
 
             let rest = self.eat_keyword_ident(TokenKind::Ceteri);
 
             let ty = self.parse_type()?;
+            if has_prefix && ty.mode.is_some() {
+                return Err(
+                    ParseError::structured(ParseErrorKind::InvalidParameter, ty.span)
+                        .with_arg("issue", "parameter_access_modifier_pair"),
+                );
+            }
 
             let name = self.parse_param_name()?;
 
