@@ -177,6 +177,62 @@ fn stub_mir_function(id: u32) -> MirFunction {
     }
 }
 
+// ── definition-source identity ──────────────────────────────────────────────
+
+#[test]
+fn package_mir_link_allows_same_source_monomorphs() {
+    // Two instances of one generic (nn.linear<2,2,2> and nn.linear<4,4,4>)
+    // share the declaration source; they are not a rewrite collision.
+    let span = Span::new(16509, 16663);
+    let mut first = stub_mir_function(35);
+    first.source = Some(DefId(2_000_000_143));
+    first.name = Some(Symbol(490));
+    first.span = span;
+    first.return_ty = MirType::semantic(TypeId(1357));
+    let mut second = stub_mir_function(37);
+    second.source = Some(DefId(2_000_000_143));
+    second.name = Some(Symbol(490));
+    second.span = span;
+    second.return_ty = MirType::semantic(TypeId(1352));
+
+    super::lower::ensure_unique_definition_sources(
+        &MirProgram {
+            functions: vec![first, second],
+        },
+        Path::new("nn.fab"),
+    )
+    .expect("same-name same-span monomorphs share a source");
+}
+
+#[test]
+fn package_mir_link_rejects_distinct_defs_on_one_source() {
+    let mut first = stub_mir_function(1);
+    first.source = Some(DefId(2_000_000_143));
+    first.name = Some(Symbol(1));
+    first.span = Span::new(10, 20);
+    let mut second = stub_mir_function(2);
+    second.source = Some(DefId(2_000_000_143));
+    second.name = Some(Symbol(2));
+    second.span = Span::new(40, 50);
+
+    let diagnostics = super::lower::ensure_unique_definition_sources(
+        &MirProgram {
+            functions: vec![first, second],
+        },
+        Path::new("nn.fab"),
+    )
+    .expect_err("distinct declarations must not share a source");
+
+    assert_eq!(diagnostics.len(), 1);
+    assert!(
+        diagnostics[0]
+            .message
+            .contains("duplicate function source def#2000000143"),
+        "collision diagnostic must name the shared source: {}",
+        diagnostics[0].message
+    );
+}
+
 // ── fnv1a64 ────────────────────────────────────────────────────────────────
 
 #[test]

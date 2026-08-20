@@ -1350,23 +1350,32 @@ pub(super) fn rebuild_merged_validated(
     Ok(())
 }
 
+/// `function.source` is the HIR declaration identity, not the MIR instance
+/// identity. EBNF `funcDecl` is one `IDENTIFIER` plus optional
+/// `genericParams`; `MirMonomorphizationKey` then distinguishes instances by
+/// `(source, type_args, shape_args)`. `radix_mir::names` already emits
+/// specialized names when several functions share a source. Reject only when
+/// two different declarations (name or span) claim one source.
 pub(super) fn ensure_unique_definition_sources(
     program: &MirProgram,
     path: &Path,
 ) -> Result<(), Vec<Diagnostic>> {
-    let mut seen = HashSet::new();
+    let mut seen = HashMap::new();
     for function in &program.functions {
         let Some(source) = function.source else {
             continue;
         };
-        if !seen.insert(source) {
-            return Err(vec![mir_diag(
-                path,
-                format!(
-                    "package MIR link found duplicate function source def#{}",
-                    source.0
-                ),
-            )]);
+        let identity = (function.name, function.span);
+        if let Some(existing) = seen.insert(source, identity) {
+            if existing != identity {
+                return Err(vec![mir_diag(
+                    path,
+                    format!(
+                        "package MIR link found duplicate function source def#{}",
+                        source.0
+                    ),
+                )]);
+            }
         }
     }
     Ok(())
