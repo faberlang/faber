@@ -48,8 +48,8 @@
 
 use crate::{
     FuncSig, ParamType, Primitive, Resolver, SemanticError, SemanticErrorKind, SemanticParamMode,
-    Type, TypeId, TypeTable, WarningKind, ISSUE_ASSIGN_THROUGH_REF, ISSUE_MUT_LOCAL,
-    ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_UNMARKED_INTO_OWN, SUGGESTION_COPY,
+    Type, TypeId, TypeTable, WarningKind, ISSUE_ASSIGN_THROUGH_REF, ISSUE_MUT_INTO_OWN,
+    ISSUE_MUT_LOCAL, ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_UNMARKED_INTO_OWN, SUGGESTION_COPY,
 };
 use radix_hir::visit::{walk_expr, HirVisitor};
 use radix_hir::{
@@ -479,6 +479,13 @@ impl<'a> BorrowChecker<'a> {
                 );
             }
             let dest_own = self.types.is_own_view(param.ty);
+            if self.arg_is_mut_view(&arg.expr) && dest_own {
+                self.error(
+                    SemanticErrorKind::ModeMismatch,
+                    ISSUE_MUT_INTO_OWN,
+                    arg.expr.span,
+                );
+            }
             if dest_own && self.arg_is_exclusive(&arg.expr) {
                 self.move_from_expr(&arg.expr);
                 continue;
@@ -715,6 +722,25 @@ impl<'a> BorrowChecker<'a> {
             HirExpressionKind::Field(object, _)
             | HirExpressionKind::Index(object, _)
             | HirExpressionKind::Deref(object) => self.arg_is_ref_view(object),
+            _ => false,
+        }
+    }
+
+    fn arg_is_mut_view(&self, expr: &HirExpression) -> bool {
+        if let Some(ty) = expr.ty {
+            if self.types.is_mut_view(ty) {
+                return true;
+            }
+        }
+        if let Some(def_id) = Self::root_def_id(expr) {
+            if self.mut_roots.contains(&def_id) {
+                return true;
+            }
+        }
+        match &expr.kind {
+            HirExpressionKind::Field(object, _)
+            | HirExpressionKind::Index(object, _)
+            | HirExpressionKind::Deref(object) => self.arg_is_mut_view(object),
             _ => false,
         }
     }
