@@ -1,0 +1,21 @@
++++
+term = "mutabilitas"
+kind = "reject"
+category = "type"
+summary = "MU-4 red: mut local after a live ref local of the same source is SEM052."
+syntax = "const ref list<int> r ← a; var mut list<int> b ← a"
+related = ["mut", "ref"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — mut vs live ref (MU-4)
+# =============================================================================
+# This exemplum intentionally fails to compile.
+
+main {
+    var list<int> a ← [1, 2, 3]
+    const ref list<int> r ← a
+    var mut list<int> b ← a
+    print r.length()
+    print b.length()
+}

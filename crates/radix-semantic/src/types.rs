@@ -36,6 +36,9 @@ pub const ISSUE_REF_INTO_OWN: &str = "ref_into_own";
 /// Own-bind from a `mut` source. Suggest `copy` (D-6).
 pub const ISSUE_MUT_INTO_OWN: &str = "mut_into_own";
 
+/// Local declared with a `mut` access marker (OQ-3: grammar allows, lints discourage).
+pub const ISSUE_MUT_LOCAL: &str = "mut_local";
+
 /// Own-bind from a field projection. Suggest `copy` (D-6).
 pub const ISSUE_FIELD_INTO_OWN: &str = "field_into_own";
 

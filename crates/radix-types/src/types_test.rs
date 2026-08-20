@@ -46,6 +46,9 @@ fn access_marker_facts_intern_as_ref_wrappers() {
     assert!(!types.equals(own, shared));
     assert!(types.is_ref_view(shared));
     assert!(!types.is_ref_view(own));
+    assert!(types.is_mut_view(exclusive));
+    assert!(!types.is_mut_view(shared));
+    assert!(!types.is_mut_view(own));
     assert!(types.is_mut_or_own_view(exclusive));
     assert!(types.is_mut_or_own_view(own));
     assert!(!types.is_mut_or_own_view(shared));

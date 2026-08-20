@@ -226,6 +226,9 @@ pub enum WarningKind {
     /// A string-typed `+` chain of 3+ operands contains at least one
     /// string-literal operand; a `§` string template would read better.
     PreferStringTemplate,
+    /// A local binding declared `mut`. Grammar allows it (borrowed-into-local);
+    /// the lint discourages the form in favor of a `mut` parameter (OQ-3).
+    DiscouragedMutLocal,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.

@@ -539,6 +539,12 @@ impl TypeTable {
         matches!(self.peel_access_marker(ty).0, Some(AccessMarker::Ref))
     }
 
+    /// Whether `ty` carries a declared `mut` access fact.
+    #[must_use]
+    pub fn is_mut_view(&self, ty: TypeId) -> bool {
+        matches!(self.peel_access_marker(ty).0, Some(AccessMarker::Mut))
+    }
+
     /// Whether `ty` carries a declared `mut` or `own` access fact.
     #[must_use]
     pub fn is_mut_or_own_view(&self, ty: TypeId) -> bool {

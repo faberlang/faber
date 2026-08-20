@@ -197,6 +197,7 @@ fn warning_codes_are_stable() {
         (WarningKind::MonomorphicHoleSolvedToUnion, "WARN016"),
         (WarningKind::UnionHoleSolvedMonomorphically, "WARN017"),
         (WarningKind::PreferStringTemplate, "WARN018"),
+        (WarningKind::DiscouragedMutLocal, "WARN019"),
     ];
     for (kind, expected_code) in &cases {
         let spec = semantic_spec(SemanticErrorKind::Warning(*kind));
