@@ -15,8 +15,8 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
-use crate::format_faber_type;
 use crate::IndexId;
+use crate::format_faber_type;
 use radix_hir::HirCallArg;
 
 const ISSUE_GENERIC_TYPE_ARG_DOMAIN: &str = "generic_type_arg_domain";
@@ -81,7 +81,7 @@ impl TypeChecker<'_> {
 
         self.check_call_args(&sig, args, span);
         if let Some(expected) = expected {
-            self.unify_assign_issue(sig.ret, expected, span, ISSUE_EXPRESSION_TYPE_MISMATCH);
+            self.unify_carrier_assign(sig.ret, expected, span, ISSUE_EXPRESSION_TYPE_MISMATCH);
         }
         // D6: a shape param bound by neither arguments nor the expected type is
         // an explicit error (SEM014), never a silent guess.

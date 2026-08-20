@@ -304,6 +304,34 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// Exact equality compares the carrier of a `ref` field read, not its
+    /// access-discipline view. Direct `ref` values still retain their wrapper
+    /// so equality does not generally erase the view contract.
+    fn exact_equality_types_for_operands(
+        &mut self,
+        lhs_expr: &HirExpression,
+        lhs: TypeId,
+        rhs_expr: &HirExpression,
+        rhs: TypeId,
+        span: radix_lexer::Span,
+    ) {
+        let lhs = self.equality_field_read_carrier(lhs_expr, lhs);
+        let rhs = self.equality_field_read_carrier(rhs_expr, rhs);
+        self.exact_equality_types(lhs, rhs, span);
+    }
+
+    fn equality_field_read_carrier(&mut self, expr: &HirExpression, ty: TypeId) -> TypeId {
+        if !matches!(expr.kind, HirExpressionKind::Field(_, _)) {
+            return ty;
+        }
+        let resolved = self.resolve_inferred_type(ty);
+        if self.types.is_ref_view(resolved) {
+            self.types.peel_access_marker(resolved).1
+        } else {
+            resolved
+        }
+    }
+
     fn integer_bin(&mut self, lhs: TypeId, rhs: TypeId, span: radix_lexer::Span) -> TypeId {
         let lhs_resolved = self.resolve_inferred_type(lhs);
         let rhs_resolved = self.resolve_inferred_type(rhs);
@@ -786,7 +814,7 @@ impl TypeChecker<'_> {
                     Type::Primitive(Primitive::Nihil)
                 );
                 if !(lhs_is_nil || rhs_is_nil) {
-                    self.exact_equality_types(lhs_ty, rhs_ty, lhs.span);
+                    self.exact_equality_types_for_operands(lhs, lhs_ty, rhs, rhs_ty, lhs.span);
                 }
                 self.bool_type()
             }
