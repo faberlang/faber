@@ -398,35 +398,53 @@ impl DeviceExecuteSession {
             code: "E_HOST_SPAWN".to_owned(),
             message: format!("failed to flush resident control request: {error}"),
         })?;
-        let mut line = String::new();
-        let read = self
-            .stdout
-            .read_line(&mut line)
-            .map_err(|error| HostSpawnError {
-                code: "E_HOST_SPAWN".to_owned(),
-                message: format!("failed to read resident control receipt: {error}"),
-            })?;
-        if read == 0 {
-            let status = self.child.try_wait().ok().flatten();
-            return Err(HostSpawnError {
-                code: "E_HOST_SPAWN".to_owned(),
-                message: format!(
-                    "resident device-execute exited before {operation} receipt: {status:?}"
-                ),
-            });
-        }
-        if let Ok(error) = serde_json::from_str::<WireHostError>(&line) {
-            if !error.code.is_empty() {
+        // Success responses are compact NDJSON, while the CLI's terminal
+        // HostError path uses the shared pretty JSON printer. Accumulate one
+        // complete JSON value instead of treating the first pretty-printed
+        // line (`{`) as a response. A second value in the same frame still
+        // fails closed because serde_json rejects trailing input.
+        let mut response = String::new();
+        loop {
+            let mut line = String::new();
+            let read = self
+                .stdout
+                .read_line(&mut line)
+                .map_err(|error| HostSpawnError {
+                    code: "E_HOST_SPAWN".to_owned(),
+                    message: format!("failed to read resident control receipt: {error}"),
+                })?;
+            if read == 0 {
+                let status = self.child.try_wait().ok().flatten();
                 return Err(HostSpawnError {
-                    code: error.code,
-                    message: error.message,
+                    code: "E_HOST_SPAWN".to_owned(),
+                    message: format!(
+                        "resident device-execute exited before {operation} receipt: {status:?}"
+                    ),
                 });
             }
+            response.push_str(&line);
+
+            match serde_json::from_str::<WireHostError>(&response) {
+                Ok(error) if !error.code.is_empty() => {
+                    return Err(HostSpawnError {
+                        code: error.code,
+                        message: error.message,
+                    });
+                }
+                Ok(_) | Err(_) => {}
+            }
+
+            match serde_json::from_str::<DeviceExecuteControlReceipt>(&response) {
+                Ok(receipt) => return Ok(receipt),
+                Err(error) if error.is_eof() => continue,
+                Err(error) => {
+                    return Err(HostSpawnError {
+                        code: "E_HOST_SPAWN".to_owned(),
+                        message: format!("resident control receipt JSON is invalid: {error}"),
+                    });
+                }
+            }
         }
-        serde_json::from_str(&line).map_err(|error| HostSpawnError {
-            code: "E_HOST_SPAWN".to_owned(),
-            message: format!("resident control receipt JSON is invalid: {error}"),
-        })
     }
 }
 

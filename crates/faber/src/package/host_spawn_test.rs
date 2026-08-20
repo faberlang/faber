@@ -58,6 +58,30 @@ done
     (dir, path)
 }
 
+fn pretty_error_resident_stub_cli() -> (tempfile::TempDir, PathBuf) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("faber-host-macos-arm64");
+    let script = r##"#!/bin/sh
+IFS= read -r command || exit 2
+cat <<'JSON'
+{
+  "code": "E_DEVICE_DESCRIPTOR",
+  "message": "prepared session descriptor is invalid",
+  "retryable": false
+}
+JSON
+exit 2
+"##;
+    std::fs::write(&path, script).expect("write pretty error resident stub");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod pretty error resident stub");
+    }
+    (dir, path)
+}
+
 fn order_violation_stub_cli() -> (tempfile::TempDir, PathBuf) {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("faber-host-macos-arm64");
@@ -241,6 +265,18 @@ fn resident_control_client_keeps_one_child_across_load_steps_reset_release() {
     assert_eq!(release.lifecycle.releases, 1);
     assert_eq!(release.lifecycle.live_handles, 0);
     assert!(session.release().is_err(), "a released owner refuses reuse");
+}
+
+#[test]
+fn resident_control_client_accepts_pretty_terminal_host_error() {
+    let (_dir, host) = pretty_error_resident_stub_cli();
+    let request = malformed_request();
+    let error = match open_device_session_at(&host, &request) {
+        Ok(_) => panic!("pretty terminal HostError must be surfaced structurally"),
+        Err(error) => error,
+    };
+    assert_eq!(error.code, "E_DEVICE_DESCRIPTOR");
+    assert_eq!(error.message, "prepared session descriptor is invalid");
 }
 
 #[test]

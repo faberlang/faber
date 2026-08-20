@@ -88,8 +88,8 @@ pub(crate) use device::host_partition_for_lowered;
 #[cfg(feature = "device-runtime")]
 #[allow(unused_imports)]
 pub(crate) use device::{
-    admit_device_program_section, dense_input_lifetime, device_program_for_lowered,
-    device_section_for_program, run_dense_full_model_metal_closeout,
+    admit_device_program_section, dense_input_initialization, dense_input_lifetime,
+    device_program_for_lowered, device_section_for_program, run_dense_full_model_metal_closeout,
     run_dense_full_model_spawn_timing,
 };
 pub(crate) use dispatch::{
