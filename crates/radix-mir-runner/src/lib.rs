@@ -1547,6 +1547,10 @@ mod octeti_index_test;
 mod octeti_endian_test;
 
 #[cfg(test)]
+#[path = "octeti_lista_test.rs"]
+mod octeti_lista_test;
+
+#[cfg(test)]
 #[path = "ascii1_index_test.rs"]
 mod ascii1_index_test;
 

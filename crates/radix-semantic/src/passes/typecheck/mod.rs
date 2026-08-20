@@ -642,6 +642,10 @@ mod numeric_value_equality_test;
 mod octeti_endian_conversio_test;
 
 #[cfg(test)]
+#[path = "octeti_lista_conversio_test.rs"]
+mod octeti_lista_conversio_test;
+
+#[cfg(test)]
 #[path = "octeti_index_test.rs"]
 mod octeti_index_test;
 

@@ -297,6 +297,19 @@ impl TypeChecker<'_> {
             return error_ty;
         }
 
+        if let Some(result_ty) =
+            self.check_octeti_to_lista_conversio(source_ty, target_resolved, span)
+        {
+            if !self.types.equals(result_ty, self.error_type) {
+                if let Some(recovery) = recovery {
+                    self.note_conversio_recovery_checked(recovery, target_resolved);
+                } else {
+                    self.check_conversio_propagation_channel(source_ty, target_resolved, span);
+                }
+            }
+            return result_ty;
+        }
+
         if recovery.is_some() && self.is_infallible_truthiness_conversio(source_ty, target_resolved)
         {
             self.invalid_conversion(ISSUE_BIVALENS_RECOVERY_UNSUPPORTED, span);
@@ -645,6 +658,37 @@ impl TypeChecker<'_> {
             }
             _ => false,
         }
+    }
+
+    /// `octeti ↦ lista<numerus<u8>>` is a representation change only.
+    /// Other lista element types fail closed — no silent widen, no pad.
+    fn check_octeti_to_lista_conversio(
+        &mut self,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        if !matches!(
+            self.types.get(self.resolve_inferred_type(source_ty)),
+            Type::Primitive(Primitive::Octeti)
+        ) {
+            return None;
+        }
+        let Type::Array(elem) = self.types.get(target_resolved).clone() else {
+            return None;
+        };
+        if self.is_numerus_u8(elem) {
+            return Some(target_resolved);
+        }
+        self.invalid_conversion(ISSUE_UNSUPPORTED_CONVERSIO, span);
+        Some(self.error_type)
+    }
+
+    fn is_numerus_u8(&self, ty: TypeId) -> bool {
+        matches!(
+            self.types.get(self.resolve_inferred_type(ty)),
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::U8)
+        )
     }
 
     /// Reject primitive `↦` pairs with no single obvious meaning (byte reinterpretation, etc.).
@@ -1174,7 +1218,9 @@ impl TypeChecker<'_> {
             // D17 / BB-2: `'x'` is `ascii<1>`. Same conversio family as bare
             // ascii so `'a' ↦ textus` / `s[i] ↦ numerus` stay explicit widens.
             // Multi-char `ascii<N>` stays out until BB-4.
-            Type::BoundedAscii { capacity } if matches!(self.types.get_index(*capacity), IndexExpr::Literal(1)) => {
+            Type::BoundedAscii { capacity }
+                if matches!(self.types.get_index(*capacity), IndexExpr::Literal(1)) =>
+            {
                 PrimitiveConversioFamily::Ascii
             }
             Type::Primitive(Primitive::Octeti) => PrimitiveConversioFamily::Octeti,

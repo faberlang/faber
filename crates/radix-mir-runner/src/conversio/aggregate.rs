@@ -28,10 +28,38 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         struct_defaults: &[MirStructFieldDefaults],
         span: Span,
     ) -> Result<Value, RunnerError> {
+        if let Value::Octeti(bytes) = value {
+            return self.convert_octeti_to_lista_u8(bytes, element, recovery, span);
+        }
         match self.convert_to_array_inner(value, source_ty, element, struct_defaults, span) {
             Ok(value) => Ok(value),
             Err(_) => self.recover_or_fail(recovery, span, "valor to lista conversion failed"),
         }
+    }
+
+    fn convert_octeti_to_lista_u8(
+        &mut self,
+        bytes: Vec<u8>,
+        element: radix_types::TypeId,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        if !matches!(
+            self.types.get(element),
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::U8)
+        ) {
+            return self.recover_or_fail(
+                recovery,
+                span,
+                "octeti to lista conversion requires lista<numerus<u8>>",
+            );
+        }
+        Ok(Value::Array(Rc::new(RefCell::new(
+            bytes
+                .into_iter()
+                .map(|byte| Value::Int(i64::from(byte)))
+                .collect(),
+        ))))
     }
 
     fn convert_to_array_inner(
