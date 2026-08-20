@@ -645,7 +645,7 @@ fn run_reader_locale_missing_package_path_surfaces_missing_path_error() {
 }
 
 #[test]
-fn test_reader_locale_accepts_direct_entry_file_input() {
+fn reader_locale_accepts_direct_entry_file_input() {
     let source = write_single_file(
         "test-reader-locale-single-file",
         r#"
@@ -670,7 +670,7 @@ fn test_reader_locale_accepts_direct_entry_file_input() {
 }
 
 #[test]
-fn test_reader_locale_accepts_manifest_file_input() {
+fn reader_locale_accepts_manifest_file_input() {
     let package = write_basic_package(
         "test-reader-locale-manifest",
         r#"
@@ -696,7 +696,7 @@ fn test_reader_locale_accepts_manifest_file_input() {
 }
 
 #[test]
-fn test_reader_locale_missing_package_path_surfaces_missing_path_error() {
+fn reader_locale_missing_package_path_surfaces_missing_path_error() {
     let (stdout, stderr, ok) = run_faber(&["test", "--locale", "th-TH", "missing-package"]);
 
     assert!(!ok, "missing package path should fail");
@@ -720,7 +720,7 @@ fn test_reader_locale_missing_package_path_surfaces_missing_path_error() {
 }
 
 #[test]
-fn test_reader_locale_rejects_existing_non_package_file() {
+fn reader_locale_rejects_existing_non_package_file() {
     let plain = write_plain_file("test-reader-locale-plain-file", "temp");
 
     let (stdout, stderr, ok) = run_faber(&[
@@ -745,7 +745,7 @@ fn test_reader_locale_rejects_existing_non_package_file() {
 }
 
 #[test]
-fn test_reader_locale_rejects_stdin_input() {
+fn reader_locale_rejects_stdin_input() {
     let (stdout, stderr, ok) = run_faber(&["test", "--locale", "zh-Hans", "-"]);
 
     assert!(!ok, "test should reject stdin reader-locale input");
