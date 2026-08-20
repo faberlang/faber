@@ -250,12 +250,12 @@ fn loader_resolved_use_index_rebuilt() {
 #[test]
 fn loader_fail_closed() {
     // Malformed: garbage bytes → Malformed variant.
-    // 0x03 = schema_version 3 (accepted prefix), then unterminated varints
+    // A current SCHEMA_VERSION prefix (accepted), then unterminated varints
     // that cause DeserializeBadVarint rather than DeserializeUnexpectedEnd.
     // A 0x01 prefix is the schema-v1 rejection path (UnsupportedSchemaVersion),
     // not Malformed — the version prefix is read before payload interpretation.
     let garbage: Vec<u8> = {
-        let mut v = vec![0x03u8]; // schema_version = 3
+        let mut v = vec![SCHEMA_VERSION as u8]; // schema_version = current (accepted) version
         v.extend(std::iter::repeat_n(0xFFu8, 256));
         v
     };
@@ -633,7 +633,7 @@ fn adversarial_version_mismatch() {
     match result {
         Err(HirArtifactError::UnsupportedSchemaVersion { found, expected }) => {
             assert_eq!(found, 99);
-            assert_eq!(expected, 3);
+            assert_eq!(expected, SCHEMA_VERSION);
         }
         Err(other) => panic!("expected UnsupportedSchemaVersion, got {other:?}"),
         Ok(_) => panic!("expected UnsupportedSchemaVersion, got Ok"),
