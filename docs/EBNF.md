@@ -711,7 +711,7 @@ The `↦` glyph (U+21A6, "rightwards arrow from bar") is the runtime value conve
 The second type argument of a `↦` target is the convert-hint slot. `Hex` / `Bin` / `Oct` / `Be` / `Le` are convert hints in that slot, not keywords and not new `baseType` productions. Target support is not a grammar production (see Target Support).
 
 - `"ff" ↦ numerus<i32, Hex>` — shipped; text parse at radix 16 (`Bin` = 2, `Oct` = 8). Hex/Bin/Oct text parse is unchanged by endian hints.
-- `octeti[lo‥hi] ↦ numerus<W, Be>` / `… ↦ numerus<W, Le>` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust and the MIR runner. Go and TypeScript are behind (fail-closed; they do not emit host-endian unpack). English `int<W, Be>` is the same form. `octeti` itself has no endian; `bytes ↦ numerus<u32>` without `Be`/`Le` stays rejected. A short window fails (no pad).
+- `octeti[lo‥hi] ↦ numerus<W, Be>` / `… ↦ numerus<W, Le>` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust, the MIR runner, Go, and TypeScript. TypeScript `i64`/`u64` stay fail-closed (JS number is not exact). English `int<W, Be>` is the same form. `octeti` itself has no endian; `bytes ↦ numerus<u32>` without `Be`/`Le` stays rejected. A short window fails (no pad).
 - `n ↦ octeti<N, Be>` / `… ↦ octeti<N, Le>` — proposed (not shipped); write convert after `octeti<N>` (`N` ∈ {2, 4, 8}). `Be`/`Le` stay Hex-slot hints, not a second capacity.
 
 Inline failure recovery uses `⇥` immediately after the conversio target (`↦ T ⇥ recovery-expr`). The unparenthesized recovery operand is a unary-precedence expression; parenthesize arithmetic, coalescing, ternary, or assignment recovery expressions. The recovery value must have type `T`.
@@ -855,23 +855,25 @@ Rank-N tensors use a list-shaped index expression such as `[[r, c]]` or a
 bound `lista<integer>` value. `grid[r, c]` is not syntax; `memberSuffix` still
 contains exactly one `expression` between brackets.
 
-`octeti` is a byte-buffer primitive, not an array, so bracket indexing is not
-accepted on it (read or write). Byte access is method-based:
+For `octeti`, bracket indexing is a byte or an exclusive window:
 
 ```fab
-# → numerus<u8> ∪ nihil; nullable and safe on out-of-bounds.
-buf.accipe(i)
-# Append one byte in place.
-buf.appende(b)
-# Byte length.
-buf.longitudo
+# One byte → numerus<u8>. O(1). Traps on out-of-bounds.
+buf[i]
+# Exclusive window → octeti. Fully in bounds or fail (no short slice, no pad).
+buf[lo‥hi]
 ```
 
-This is deliberate. `octeti` is the opaque boundary byte buffer used by HAL,
-crypto, and `|hex|` literals; its reads are nullable by default, and bracket
-syntax is reserved for the trapping access model. For byte-heavy indexing, use
-`lista<numerus<u8>>` internally (bracket read/write, trap on out-of-bounds) and
-keep `octeti` at the boundary.
+The index must be an integer or a range. A compile-time-provable out-of-range
+index on an octeti literal (`|de ad be ef|[0‥5]`) is a structured reject.
+Runtime out-of-bounds traps — the same trapping model as lista bracket access,
+not textus short-slice. Lista `[lo‥hi]` stays rejected.
+
+`octeti` is the endian host. Parse byte windows on the buffer
+(`buf[lo‥hi] ↦ numerus<W, Be|Le>`). Cross to a list once, for element work,
+via `octeti ↦ lista<numerus<u8>>` (representation change only; other element
+types fail closed). The reverse `lista<numerus<u8>> ↦ octeti` is live. Do not
+detour through `valor`. Lists stay for element work, not endian windows.
 
 ### Primary Expressions
 
