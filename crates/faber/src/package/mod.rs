@@ -224,7 +224,7 @@ pub(crate) fn missing_package_path_diagnostic(path: &Path) -> Box<Diagnostic> {
 
 /// Resolve a product input against the caller's working directory before
 /// entering the explicit-input compiler API. Ambient CWD lookup is a Faber
-/// command concern, not a radix-package concern.
+/// command concern, not a radix-program concern.
 ///
 /// `faber test` shares this seam because package discovery requires absolute
 /// inputs: a raw `.` lexically normalizes to an empty path and fails as
@@ -280,7 +280,7 @@ pub(crate) fn library_resolver_from_config(
     // Precedence: an explicit custom stdlib roots the library home; otherwise
     // `FABER_LIBRARY_HOME` and the workspace probe locate provider repos. The
     // auto-discovered dev stdlib is never a library home. The ambient probe is
-    // faber-owned (CTO memo); `radix-package` receives the resolved
+    // faber-owned (CTO memo); `radix-program` receives the resolved
     // home as an explicit input.
     if config.stdlib_explicit {
         return config
@@ -355,7 +355,7 @@ pub(crate) fn library_resolver_for_package(
     Ok(resolver)
 }
 
-// RP3: multi-unit analysis lives in `radix-package` (`analyze.rs`). These
+// RP3: multi-unit analysis lives in `radix-program` (`analyze.rs`). These
 // adapters supply the faber product-orchestration seams — reader-locale pack
 // loading, strict product-view manifest validation (FBR-P1-001), and
 // `FABER_LIBRARY_HOME` / workspace probing — while keeping the faber-internal
@@ -370,7 +370,7 @@ pub fn faber_analysis_seams() -> radix_program::analyze::AnalysisSeams {
 
 /// Faber-supplied package-emission seams. Go source assembly remains a product
 /// helper because it owns the generated multi-file package shape; the shared
-/// dispatch and Rust assembly live in `radix-package`.
+/// dispatch and Rust assembly live in `radix-program`.
 pub fn faber_emission_seams() -> radix_program::emit::EmissionSeams {
     radix_program::emit::EmissionSeams {
         analysis: faber_analysis_seams(),

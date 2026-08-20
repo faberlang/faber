@@ -1,6 +1,6 @@
 //! Faber-side remainder of the package-MIR tests (RP5).
 //!
-//! The compiler-owned tests moved to `radix-package/src/mir/mir_test.rs`
+//! The compiler-owned tests moved to `radix-program/src/mir/mir_test.rs`
 //! (constants, FNV-1a, manifest helpers, CLI planning, requirements, manifest
 //! validation, MIR append/merge). These tests stay faber-side because they
 //! exercise faber product surfaces the compiler subset never sees: the

@@ -1,6 +1,7 @@
 //! Canonical Faber HIR re-emission backend (leaf crate).
 //!
-//! Package `radix` re-exports the façade and supplies reader-locale surfaces.
+//! `radix-module` re-exports this leaf through its codegen surface and owns
+//! module-level target dispatch; the `radix` façade re-exports that module API.
 
 // structural: re-emission methods keep &self for a uniform visitor surface.
 #![allow(clippy::unused_self)]

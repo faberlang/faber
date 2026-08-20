@@ -16,7 +16,7 @@ path = "src/main.rs"
 [dependencies]
 # Private compiler workspace (local org layout). Not published with this crate.
 radix-module = { path = "../radix-module", default-features = false }
-# RP2a (radix-package goal): faber forwards the compiler view of the package
+# RP2a (radix-program goal): faber forwards the compiler view of the package
 # manifest + faber.lock consumption through `package/manifest.rs` and
 # `package/lockfile.rs`; product-only manifest interpretation stays here.
 radix-program = { path = "../radix-program", default-features = false }

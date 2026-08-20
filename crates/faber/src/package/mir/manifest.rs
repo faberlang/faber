@@ -2,7 +2,7 @@
 //!
 //! RP5: the compiler half of this module (artifact root/dir helpers, the
 //! `image.toml` writer, manifest validation, TOML escaping) moved to
-//! `radix-package/src/mir/manifest.rs`. The `[device]` manifest projection
+//! `radix-program/src/mir/manifest.rs`. The `[device]` manifest projection
 //! stays faber-side (ownership-freeze §4/§5.2): the product view reads the
 //! `[device]` table through faber's manifest helpers, and the compiler subset
 //! receives the resolved config through [`radix_program::mir::MirSeams`].
