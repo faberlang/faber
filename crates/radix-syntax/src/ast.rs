@@ -1374,24 +1374,30 @@ pub struct TypeExpr {
     /// member.
     pub nullable: bool,
 
-    /// Borrowing mode marker from `de` or `in`, if written in type position.
+    /// Access-discipline marker from `de`/`in`/`own`/`copy`, if written in type position.
     pub mode: Option<TypeMode>,
 
     pub kind: TypeExprKind,
     pub span: Span,
 }
 
-/// Borrowing mode written in type position.
+/// Access-discipline marker written in type position.
 ///
 /// This is syntax-level intent. Later phases decide whether the selected target
 /// or semantic context supports the mode.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TypeMode {
-    /// `de`: shared reference-like mode.
+    /// `de` / `ref`: shared reference-like mode.
     De,
 
-    /// `in`: mutable reference-like mode.
+    /// `in` / `mut`: mutable reference-like mode.
     In,
+
+    /// `own` / `penes`: exclusive value; transfer moves.
+    Own,
+
+    /// `copy` / `exemplum`: duplicate-then-own at acquisition.
+    Copy,
 }
 
 /// Type-level tensor shape (Figura) in `tensor<T, Figura>`.

@@ -50,8 +50,7 @@ use crate::numeric_width::WidthError;
 use crate::{
     BareVariantLookup, CollectionKind, FuncSig, IndexExpr, ParamType, Primitive,
     QualifiedVariantPathLookup, Resolver, SchemaColumnDef, SchemaDef, ScopeKind, SemanticError,
-    SemanticErrorKind, SemanticMutability, SemanticParamMode, Symbol, SymbolKind, Type, TypeId,
-    TypeTable,
+    SemanticErrorKind, SemanticParamMode, Symbol, SymbolKind, Type, TypeId, TypeTable,
 };
 use radix_hir::DefId;
 use radix_lexer::Interner;
@@ -2665,11 +2664,11 @@ fn lower_type_expr(
     };
 
     if let Some(mode) = ty.mode {
-        let mutability = match mode {
-            radix_syntax::TypeMode::De => SemanticMutability::Immutable,
-            radix_syntax::TypeMode::In => SemanticMutability::Mutable,
-        };
-        ty_id = types.reference(mutability, ty_id);
+        let marker = crate::access_marker_from_type_mode(mode);
+        if types.is_scalar_for_access_marker(ty_id) {
+            return Err(TypeLowerError::Issue(crate::ISSUE_SCALAR_ACCESS_MARKER));
+        }
+        ty_id = types.access_marker(marker, ty_id);
     }
 
     if ty.nullable {

@@ -1,0 +1,19 @@
++++
+term = "mutabilitas"
+kind = "concept"
+category = "type"
+canonical = true
+summary = "MU-1 baseline: shallow const list mutation stays legal."
+syntax = "const list<int> xs"
+related = ["fixum", "lista"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — unmarked shallow const (D-1)
+# =============================================================================
+
+main {
+    const list<int> xs ← []
+    xs.append(4)
+    print xs.length()
+}

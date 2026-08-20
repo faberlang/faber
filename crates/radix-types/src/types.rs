@@ -508,6 +508,35 @@ impl TypeTable {
         self.intern(Type::Ref(mutability, inner))
     }
 
+    /// Intern an access-discipline marker wrapping `inner`.
+    pub fn access_marker(&mut self, marker: AccessMarker, inner: TypeId) -> TypeId {
+        self.reference(marker.mutability(), inner)
+    }
+
+    /// Scalar numerics and `bivalens` reject `ref`/`mut`/`own`/`copy` markers.
+    ///
+    /// Referential types (collections, buffers, `textus`/`octeti`, tensors,
+    /// genus instances) keep the marker. Aliases peel. Inference holes do not
+    /// reject — the carrier is not yet known.
+    #[must_use]
+    pub fn is_scalar_for_access_marker(&self, ty: TypeId) -> bool {
+        match self.get(ty) {
+            Type::Alias(_, inner) => self.is_scalar_for_access_marker(*inner),
+            Type::Primitive(prim) => matches!(
+                prim,
+                Primitive::Numerus
+                    | Primitive::Fractus
+                    | Primitive::Bivalens
+                    | Primitive::Nihil
+                    | Primitive::Vacuum
+                    | Primitive::Numquam
+                    | Primitive::Instans
+            ),
+            Type::SizedNumeric(_, _) | Type::ModularWord(_) | Type::SizedInstans(_) => true,
+            _ => false,
+        }
+    }
+
     /// Allocate a `lista<T>` semantic collection.
     pub fn array(&mut self, element: TypeId) -> TypeId {
         self.intern(Type::Array(element))
@@ -1843,6 +1872,53 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
 pub enum SemanticMutability {
     Immutable,
     Mutable,
+    /// Exclusive value (`own` / `penes`).
+    Own,
+    /// Duplicate-then-own (`copy` / `exemplum`).
+    Copy,
+}
+
+/// Access-discipline marker fact stored in the type table.
+///
+/// `ref`/`mut` re-spell the existing `De`/`In` identities. `own`/`copy` are
+/// new identities. All four wrap the inner type as [`Type::Ref`] plus the
+/// matching [`SemanticMutability`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AccessMarker {
+    /// `de` / `ref`.
+    Ref,
+    /// `in` / `mut`.
+    Mut,
+    /// `own` / `penes`.
+    Own,
+    /// `copy` / `exemplum`.
+    Copy,
+}
+
+impl AccessMarker {
+    /// Type-table mutability used to intern this marker as [`Type::Ref`].
+    #[must_use]
+    pub fn mutability(self) -> SemanticMutability {
+        match self {
+            Self::Ref => SemanticMutability::Immutable,
+            Self::Mut => SemanticMutability::Mutable,
+            Self::Own => SemanticMutability::Own,
+            Self::Copy => SemanticMutability::Copy,
+        }
+    }
+}
+
+impl SemanticMutability {
+    /// Marker identity stored by this [`Type::Ref`] wrapper.
+    #[must_use]
+    pub fn access_marker(self) -> AccessMarker {
+        match self {
+            Self::Immutable => AccessMarker::Ref,
+            Self::Mutable => AccessMarker::Mut,
+            Self::Own => AccessMarker::Own,
+            Self::Copy => AccessMarker::Copy,
+        }
+    }
 }
 
 /// Semantic callable contract.

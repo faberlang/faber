@@ -75,6 +75,14 @@ fn contextual_keywords_are_identifier_like_only_for_owners() {
         Some("de")
     );
     assert_eq!(
+        keyword_allowed_as_ident(KeywordOwner::ParameterMode, &TokenKind::Own),
+        Some("own")
+    );
+    assert_eq!(
+        keyword_allowed_as_ident(KeywordOwner::ParameterMode, &TokenKind::Copy),
+        Some("copy")
+    );
+    assert_eq!(
         keyword_allowed_as_ident(KeywordOwner::FunctionModifier, &TokenKind::De),
         None
     );
@@ -88,6 +96,14 @@ fn contextual_keywords_are_identifier_like_only_for_owners() {
         KeywordOwner::BindingTarget,
     ] {
         assert_eq!(keyword_allowed_as_ident(owner, &TokenKind::De), Some("de"));
+        assert_eq!(
+            keyword_allowed_as_ident(owner, &TokenKind::Own),
+            Some("own")
+        );
+        assert_eq!(
+            keyword_allowed_as_ident(owner, &TokenKind::Copy),
+            Some("copy")
+        );
         assert_eq!(
             keyword_allowed_as_ident(owner, &TokenKind::Lege),
             Some("lege")

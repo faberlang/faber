@@ -528,7 +528,7 @@ fn kernel_solum_copy_copies_file() {
 
     solum_dispatch(
         &mut BufferHost::default(),
-        "copy",
+        "exscribe",
         &[
             Value::Str(src.to_string_lossy().into_owned()),
             Value::Str(dst_text.clone()),

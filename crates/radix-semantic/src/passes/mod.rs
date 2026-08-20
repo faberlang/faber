@@ -114,6 +114,14 @@ mod kernel_namespace_test;
 mod lint_test;
 
 #[cfg(test)]
+#[path = "mutability_baseline_test.rs"]
+mod mutability_baseline_test;
+
+#[cfg(test)]
+#[path = "mutability_markers_test.rs"]
+mod mutability_markers_test;
+
+#[cfg(test)]
 #[path = "resolve_test.rs"]
 mod resolve_test;
 

@@ -29,8 +29,8 @@
 
 use super::Lowerer;
 use crate::{
-    CollectionKind, FuncSig, IndexExpr, IndexId, InferVar, ParamType, Primitive,
-    SemanticMutability, SemanticParamMode, Type, TypeId,
+    CollectionKind, FuncSig, IndexExpr, IndexId, InferVar, ParamType, Primitive, SemanticParamMode,
+    Type, TypeId,
 };
 use radix_syntax::{FiguraExpr, Ident, TypeExpr, TypeExprKind};
 
@@ -91,11 +91,13 @@ impl Lowerer<'_> {
         };
 
         if let Some(mode) = ty.mode {
-            let mutability = match mode {
-                radix_syntax::TypeMode::De => SemanticMutability::Immutable,
-                radix_syntax::TypeMode::In => SemanticMutability::Mutable,
-            };
-            ty_id = self.types.reference(mutability, ty_id);
+            let marker = crate::access_marker_from_type_mode(mode);
+            if self.types.is_scalar_for_access_marker(ty_id) {
+                self.error(crate::ISSUE_SCALAR_ACCESS_MARKER);
+                ty_id = self.types.intern(Type::Error);
+            } else {
+                ty_id = self.types.access_marker(marker, ty_id);
+            }
         }
 
         if ty.nullable {

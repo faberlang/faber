@@ -12,10 +12,50 @@ use crate::NumericWidth;
 use crate::TypeId;
 use crate::{
     collection_type_specs, lookup_collection_type_spec, lookup_primitive_type_spec,
-    lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs, CollectionKind,
-    FuncSig, ParamType, Primitive, SemanticParamMode, TensorFamilyKind, Type, TypeParamConstraint,
-    TypeTable,
+    lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs, AccessMarker,
+    CollectionKind, FuncSig, ParamType, Primitive, SemanticMutability, SemanticParamMode,
+    TensorFamilyKind, Type, TypeParamConstraint, TypeTable,
 };
+
+#[test]
+fn access_marker_facts_intern_as_ref_wrappers() {
+    let mut types = TypeTable::new();
+    let lista = types.array(types.primitive(Primitive::Numerus));
+    let own = types.access_marker(AccessMarker::Own, lista);
+    let copy = types.access_marker(AccessMarker::Copy, lista);
+    let shared = types.access_marker(AccessMarker::Ref, lista);
+    let exclusive = types.access_marker(AccessMarker::Mut, lista);
+
+    assert!(matches!(
+        types.get(own),
+        Type::Ref(SemanticMutability::Own, inner) if *inner == lista
+    ));
+    assert!(matches!(
+        types.get(copy),
+        Type::Ref(SemanticMutability::Copy, inner) if *inner == lista
+    ));
+    assert!(matches!(
+        types.get(shared),
+        Type::Ref(SemanticMutability::Immutable, inner) if *inner == lista
+    ));
+    assert!(matches!(
+        types.get(exclusive),
+        Type::Ref(SemanticMutability::Mutable, inner) if *inner == lista
+    ));
+    assert!(!types.equals(own, copy));
+    assert!(!types.equals(own, shared));
+}
+
+#[test]
+fn scalar_carriers_reject_access_markers() {
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let bivalens = types.primitive(Primitive::Bivalens);
+    let textus = types.primitive(Primitive::Textus);
+    assert!(types.is_scalar_for_access_marker(numerus));
+    assert!(types.is_scalar_for_access_marker(bivalens));
+    assert!(!types.is_scalar_for_access_marker(textus));
+}
 
 #[test]
 fn allows_assigning_concrete_type_to_ignotum() {

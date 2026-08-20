@@ -1,0 +1,22 @@
++++
+term = "mutabilitas"
+kind = "concept"
+category = "type"
+summary = "MU-1 baseline: mutation through const into a mut param lands."
+syntax = "fn poke(mut list<int> xs)"
+related = ["in", "lista"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — const into mut param (D-1)
+# =============================================================================
+
+fn poke(mut list<int> xs) → void {
+    xs.append(4)
+}
+
+main {
+    const list<int> a ← [1, 2, 3]
+    poke(a)
+    print a.length()
+}

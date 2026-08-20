@@ -1749,6 +1749,7 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
             let forms = arg_value(args, "object_literal_forms")?;
             Some(format!("bare object literal is retired; use {forms}"))
         }
+        "scalar_access_marker" => Some("access markers apply only to referential types".to_owned()),
         "scrinium_arity" => Some("scrinium accepts at most one payload type parameter".to_owned()),
         "scrinium_missing_builtin" => Some("builtin scrinium type is not registered".to_owned()),
         "series_params" => Some("series cannot accept parameters".to_owned()),

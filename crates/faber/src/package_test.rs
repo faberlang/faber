@@ -2203,7 +2203,7 @@ main args args {
   const string moved ← solum.join(partes)
   solum.touch(source)
   solum.write_file(source, "alpha")
-  solum.copy(source, copy)
+  solum.exscribe(source, copy)
   solum.rename(copy, moved)
   print solum.read_file<string>(moved)
   solum.delete(source)
