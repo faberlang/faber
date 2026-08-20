@@ -1,9 +1,12 @@
-//! `faber format` author pipeline: `compile_author`, normalization, re-parse.
+//! `faber format` canonical pipeline: HIR re-emit at the source's own locale.
 
-use super::format::{formatted_source_for_write, normalize_trailing_newline, source_for_compare};
-use radix_module::driver::{Config, Session};
+use super::format::{
+    format_session, formatted_source_for_write, normalize_trailing_newline, source_for_compare,
+};
+use radix_module::forma::compile_canonical;
 use radix_module::forma::test_gate::{
-    assert_author_reparses, assert_author_reparses_with, author_format_once_with_session,
+    assert_canonical_idempotent_with_session, assert_canonical_reparses_with,
+    canonical_format_once_with_session,
 };
 use radix_module::locale::LocalePack;
 use std::fs;
@@ -22,28 +25,24 @@ fn english_pack() -> LocalePack {
     LocalePack::from_toml_path(path).expect("load English locale pack")
 }
 
-fn english_session() -> Session {
-    Session::new(Config::default().with_locale_pack(english_pack()))
+fn latin_pack() -> LocalePack {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/la/pack.toml");
+    LocalePack::from_toml_path(path).expect("load Latin locale pack")
 }
 
-fn author_format_pipeline(name: &str, source: &str) -> String {
-    let session = english_session();
-    let result = radix_module::forma::compile_author(&session, name, source);
+/// Format a real file through the exact CLI canonical pipeline.
+fn canonical_cli_pipeline(path: &Path) -> String {
+    let source = fs::read_to_string(path).expect("read source");
+    let session = format_session(path, None, &source).expect("format session");
+    let name = path.display().to_string();
+    let result = compile_canonical(&session, &name, &source);
     assert!(
         result.success(),
-        "author format failed for {name}: {:?}",
+        "canonical format failed for {name}: {:?}",
         result.diagnostics
     );
-    normalize_trailing_newline(&result.output.expect("output").code)
-}
-
-fn assert_author_idempotent(name: &str, source: &str) {
-    let session = english_session();
-    let first =
-        author_format_once_with_session(&session, name, source).expect("first author format pass");
-    let second =
-        author_format_once_with_session(&session, name, &first).expect("second author format pass");
-    assert_eq!(first, second, "{name}: author(author(x)) != author(x)");
+    formatted_source_for_write(path, &source, &result.output.expect("output").code)
+        .expect("format write pipeline")
 }
 
 /// Strip `#` comment lines so keyword-surface assertions only see emitted
@@ -57,37 +56,48 @@ pub(crate) fn code_only(code: &str) -> String {
 }
 
 #[test]
-fn format_author_output_reparses_without_errors() {
+fn format_canonical_output_reparses_without_errors() {
     let path = exempla("incipit/salve-munde.fab");
-    let source = fs::read_to_string(&path).expect("read salve-munde.fab");
-    let formatted = author_format_pipeline(&path.display().to_string(), &source);
-    assert_author_reparses_with(&formatted, "salve-munde pipeline", Some(&english_pack()))
+    let formatted = canonical_cli_pipeline(&path);
+    let body = radix_module::driver::split_frontmatter(&formatted)
+        .expect("split")
+        .body;
+    assert_canonical_reparses_with(body, "salve-munde pipeline", Some(&english_pack()))
         .expect("reparse");
 }
 
 #[test]
-fn format_author_path_preserves_salve_munde_comments() {
+fn format_canonical_path_preserves_salve_munde_comments() {
     let path = exempla("incipit/salve-munde.fab");
-    let source = fs::read_to_string(&path).expect("read salve-munde.fab");
-    let formatted = author_format_pipeline(&path.display().to_string(), &source);
+    let formatted = canonical_cli_pipeline(&path);
     assert!(
         formatted.contains("# incipit — canonical hello-world entry point"),
-        "author format should preserve leading comments"
+        "canonical format should preserve leading comments"
     );
     assert!(formatted.contains("print \"Salve, Munde!\""));
 }
 
 /// Strict comparison is canonicalized to the ≺/≻ glyphs; ≤/≥ stay as-is.
 #[test]
-fn author_format_rewrites_ascii_comparison_to_glyph() {
-    let source = r"class Proba {
+fn canonical_format_rewrites_ascii_comparison_to_glyph() {
+    let dir = std::env::temp_dir().join("faber-format-canonical-cmp");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("create scratch");
+    let path = dir.join("proba.fab");
+    let source = r#"+++
+locale = "en"
++++
+class Proba {
     float x
     float y
     fn compara(float other) → bool {
         return self.x < other and self.x > other and self.x ≤ other and self.x ≥ other
     }
-}";
-    let formatted = author_format_pipeline("proba.fab", source);
+}
+"#;
+    fs::write(&path, source).expect("write");
+    let formatted = canonical_cli_pipeline(&path);
+    let _ = fs::remove_dir_all(&dir);
     assert!(
         formatted.contains("self.x ≺ other"),
         "strict less-than should emit the ≺ glyph: {formatted}"
@@ -108,52 +118,81 @@ fn author_format_rewrites_ascii_comparison_to_glyph() {
     );
 }
 
-/// `<`/`>` remain ASCII generic application delimiters.
+/// `<`/`>` remain ASCII generic application delimiters; en types stay English.
 #[test]
-fn author_format_keeps_ascii_angle_brackets_for_generics() {
-    let source = r"fn normaliza(list<float> values) → list<float> {
+fn canonical_format_keeps_ascii_angle_brackets_for_generics() {
+    let dir = std::env::temp_dir().join("faber-format-canonical-generics");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("create scratch");
+    let path = dir.join("proba.fab");
+    let source = r#"+++
+locale = "en"
++++
+fn normaliza(list<float> values) → list<float> {
     return values
-}";
-    let formatted = author_format_pipeline("proba.fab", source);
+}
+"#;
+    fs::write(&path, source).expect("write");
+    let formatted = canonical_cli_pipeline(&path);
+    let _ = fs::remove_dir_all(&dir);
     assert!(
-        formatted.contains("lista<fractus>"),
-        "generic delimiters stay ASCII: {formatted}"
+        formatted.contains("list<float>"),
+        "en generic types stay English and ASCII-delimited: {formatted}"
+    );
+    assert!(
+        !formatted.contains("lista<fractus>"),
+        "en format must not relatinize generic types: {formatted}"
     );
 }
 
 #[test]
-fn format_author_pipeline_reparses_cura_fixture() {
+fn format_canonical_pipeline_reparses_cura_fixture() {
     let path = exempla("cura/cura.fab");
-    let source = fs::read_to_string(&path).expect("read cura.fab");
-    let formatted = author_format_pipeline(&path.display().to_string(), &source);
+    let formatted = canonical_cli_pipeline(&path);
     assert!(
-        formatted.contains("with \"arena\"") || formatted.contains("with \"page\""),
-        "cura exempla should keep quoted arena/page routes in the en surface:\n{formatted}"
+        formatted.contains("print \"in arena\"") || formatted.contains("# cura"),
+        "cura exempla should keep the arena-scoped body on the en surface:\n{formatted}"
     );
-    assert_author_reparses_with(&formatted, "cura pipeline", Some(&english_pack()))
-        .expect("reparse");
+    let body = radix_module::driver::split_frontmatter(&formatted)
+        .expect("split")
+        .body;
+    assert_canonical_reparses_with(body, "cura pipeline", Some(&english_pack())).expect("reparse");
 }
 
 #[test]
-fn format_author_pipeline_preserves_and_reparses_comment_fixture() {
-    let source = "# lead comment\n\nmain {\n  print \"ok\"\n}\n";
-    let formatted = author_format_pipeline("comment.fab", source);
+fn format_canonical_pipeline_preserves_and_reparses_comment_fixture() {
+    let dir = std::env::temp_dir().join("faber-format-canonical-comment");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("create scratch");
+    let path = dir.join("comment.fab");
+    let source = "+++\nlocale = \"en\"\n+++\n# lead comment\n\nmain {\n  print \"ok\"\n}\n";
+    fs::write(&path, source).expect("write");
+    let formatted = canonical_cli_pipeline(&path);
+    let session = format_session(&path, None, source).expect("session");
+    let _ = fs::remove_dir_all(&dir);
     assert!(formatted.contains("# lead comment"));
-    assert_author_reparses_with(&formatted, "comment pipeline", Some(&english_pack()))
+    let body = radix_module::driver::split_frontmatter(&formatted)
+        .expect("split")
+        .body;
+    assert_canonical_reparses_with(body, "comment pipeline", Some(&english_pack()))
         .expect("reparse");
-    assert_author_idempotent("comment.fab", source);
+    assert_canonical_idempotent_with_session(&session, "comment.fab", source).expect("idempotent");
 }
 
 #[test]
-fn format_test_gate_matches_compile_author_pipeline_for_salve() {
+fn format_test_gate_matches_compile_canonical_pipeline_for_salve() {
     let path = exempla("incipit/salve-munde.fab");
     let source = fs::read_to_string(&path).expect("read");
     let name = path.display().to_string();
-    let via_gate =
-        author_format_once_with_session(&english_session(), &name, &source).expect("gate");
-    let via_pipeline = author_format_pipeline(&name, &source);
+    let session = format_session(&path, None, &source).expect("session");
+    let via_gate = canonical_format_once_with_session(&session, &name, &source).expect("gate");
+    let via_pipeline = canonical_cli_pipeline(&path);
+    let body = radix_module::driver::split_frontmatter(&via_pipeline)
+        .expect("split")
+        .body;
     assert_eq!(
-        via_gate, via_pipeline,
+        normalize_trailing_newline(&via_gate),
+        normalize_trailing_newline(body),
         "test_gate and CLI pipeline must agree"
     );
 }
@@ -213,42 +252,93 @@ pub(crate) fn run_faber_format_stdout_with_args(args: &[&str]) -> String {
     normalize_trailing_newline(&stdout)
 }
 
-/// FORMAT-PRETTY S5: source whose layout the pretty-v1 engine expands at the
-/// 100-column soft width while normalise-v1 preserves the line structure — the
-/// distinguishing fixture for the precedence matrix. Declares the `la` reader
-/// locale (pack-authority): the fixture is Latin-identity source and must be
-/// read under the la surface, not the product-default `en` pack.
-const SOFT_WIDTH_SOURCE: &str = "+++\nlocale = \"la\"\n+++\nfunctio f() → numerus {\n    si this_is_a_very_long_condition_name_that_keeps_going_and_going ergo redde someVeryLongReturnValueIdentifierThatWillNotFit\n    redde 0\n}\n";
-
 /// Semantically valid block source (canonical reader-locale re-emit runs
 /// semantic analysis, so locale regression fixtures must name real
 /// identifiers). Latin-identity surface, read under the la reader (the
 /// product-default en pack is pack-authoritative).
 pub(crate) const VALID_BLOCK_SOURCE: &str = "+++\nlocale = \"la\"\n+++\nfunctio gradus(numerus x) → numerus {\n    si x ≻ 0 {\n        redde x\n    } sin x ≡ 0 {\n        redde 0\n    } secus {\n        redde 0 - x\n    }\n}\n";
 
-/// FORMAT-PRETTY S5: create a temporary package root with a valid
-/// `faber.toml` (carrying `[format] policy = <policy>` when given) and one
-/// source file. Returns the source file path.
-pub(crate) fn temp_format_package(root: &Path, policy: Option<&str>, source: &str) -> PathBuf {
-    fs::create_dir_all(root.join("src")).expect("create package src");
-    let mut manifest = String::from(
-        "[package]\nname = \"format-pkg\"\nversion = \"0.1.0\"\nedition = \"0.1\"\n\n[paths]\nsource = \"src\"\nentry = \"main.fab\"\n",
+const EN_TYPES_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nfn pack(int n, float x, string name, bytes buf) → string {\n    const int count ← n\n    const float scale ← x\n    const string label ← name\n    const bytes payload ← buf\n    print count\n    print scale\n    print label\n    print payload.length()\n    return label\n}\n";
+
+/// Need: `faber format --stdout` on an en-frontmatter source must
+/// keep English type spellings (the author engine relatinized them).
+#[test]
+fn format_cli_en_source_keeps_english_types() {
+    let fixture = std::env::temp_dir().join("faber-format-en-types-cli.fab");
+    fs::write(&fixture, EN_TYPES_SOURCE).expect("write en types fixture");
+
+    let formatted = run_faber_format_stdout(&fixture);
+    let _ = fs::remove_file(&fixture);
+
+    let body = radix_module::driver::split_frontmatter(&formatted)
+        .expect("split")
+        .body;
+    assert!(
+        body.contains("int")
+            && body.contains("float")
+            && body.contains("string")
+            && body.contains("bytes"),
+        "en format must keep English type spellings:\n{formatted}"
     );
-    if let Some(policy) = policy {
-        manifest.push_str(&format!("\n[format]\npolicy = \"{policy}\"\n"));
-    }
-    fs::write(root.join("faber.toml"), manifest).expect("write faber.toml");
-    let source_path = root.join("src").join("main.fab");
-    fs::write(&source_path, source).expect("write source");
-    source_path
+    assert!(
+        !(body.contains("numerus")
+            || body.contains("fractus")
+            || body.contains("textus")
+            || body.contains("octeti")),
+        "en format must not relatinize types:\n{formatted}"
+    );
+    assert_canonical_reparses_with(body, "en types CLI --stdout", Some(&english_pack()))
+        .expect("reparse");
+}
+
+/// Surface-faithful the other way: la source stays la through the CLI.
+#[test]
+fn format_cli_la_source_stays_latin() {
+    let fixture = std::env::temp_dir().join("faber-format-la-types-cli.fab");
+    fs::write(&fixture, VALID_BLOCK_SOURCE).expect("write la fixture");
+
+    let formatted = run_faber_format_stdout(&fixture);
+    let _ = fs::remove_file(&fixture);
+
+    let body = radix_module::driver::split_frontmatter(&formatted)
+        .expect("split")
+        .body;
+    assert!(
+        body.contains("functio") && body.contains("numerus") && body.contains("redde"),
+        "la format must keep Latin keyword and type spellings:\n{formatted}"
+    );
+    assert!(
+        !code_only(body).contains("fn ") && !code_only(body).contains("int "),
+        "la format must not anglicize the surface:\n{formatted}"
+    );
+    assert_canonical_reparses_with(body, "la types CLI --stdout", Some(&latin_pack()))
+        .expect("reparse");
+}
+
+/// CLI format is idempotent: format(format(x)) is byte-identical to format(x).
+#[test]
+fn format_cli_en_source_is_idempotent() {
+    let fixture = std::env::temp_dir().join("faber-format-en-idempotent.fab");
+    fs::write(&fixture, EN_TYPES_SOURCE).expect("write en fixture");
+    let first = run_faber_format_stdout(&fixture);
+    fs::write(&fixture, &first).expect("rewrite first pass");
+    let second = run_faber_format_stdout(&fixture);
+    let _ = fs::remove_file(&fixture);
+    assert_eq!(
+        first, second,
+        "format(format(x)) must equal format(x) via CLI"
+    );
 }
 
 /// Verification plan step 5: CLI `format --stdout` on comment fixture re-parses.
 #[test]
 fn format_cli_comment_fixture_reparses() {
     let fixture = std::env::temp_dir().join("faber-format-comment-unit.fab");
-    fs::write(&fixture, "# lead comment\n\nmain {\n  print \"ok\"\n}\n")
-        .expect("write comment fixture");
+    fs::write(
+        &fixture,
+        "+++\nlocale = \"en\"\n+++\n# lead comment\n\nmain {\n  print \"ok\"\n}\n",
+    )
+    .expect("write comment fixture");
 
     let formatted = run_faber_format_stdout(&fixture);
     let _ = fs::remove_file(&fixture);
@@ -257,13 +347,37 @@ fn format_cli_comment_fixture_reparses() {
         formatted.contains("# lead comment"),
         "CLI must preserve leading comment:\n{formatted}"
     );
-    assert_author_reparses(&formatted, "comment CLI --stdout").expect("reparse");
+    let body = radix_module::driver::split_frontmatter(&formatted)
+        .expect("split")
+        .body;
+    assert_canonical_reparses_with(body, "comment CLI --stdout", Some(&english_pack()))
+        .expect("reparse");
 }
 
-// ── FORMAT-PRETTY S4 steady-state flag surface ────────────────────────────
+/// `--stdin` reads exactly one source document from stdin and prints the
+/// formatted result to stdout — byte-identical to `--stdout` on the same
+/// source (the same canonical pipeline, different input mode).
+#[test]
+fn format_stdin_roundtrip_matches_canonical_pipeline() {
+    let source = "+++\nlocale = \"la\"\n+++\nincipit {\n  nota \"ok\"\n}\n";
+    let fixture = std::env::temp_dir().join("faber-format-stdin-roundtrip.fab");
+    fs::write(&fixture, source).expect("write roundtrip fixture");
+    let expected = run_faber_format_stdout(&fixture);
+    let _ = fs::remove_file(&fixture);
 
-/// Run `faber format --stdin` feeding `source` on stdin; return (stdout,
-/// stderr, success).
+    let (stdout, stderr, success) = run_faber_format_stdin(source);
+    assert!(success, "faber format --stdin must succeed: {stderr}");
+    assert_eq!(
+        normalize_trailing_newline(&stdout),
+        expected,
+        "--stdin output must match the --stdout canonical pipeline byte-exactly"
+    );
+    assert!(
+        stdout.contains("incipit {"),
+        "--stdin output must be the formatted source:\n{stdout}"
+    );
+}
+
 fn run_faber_format_stdin(source: &str) -> (String, String, bool) {
     let mut child = Command::new(faber_binary())
         .args(["format", "--stdin"])
@@ -293,38 +407,22 @@ fn run_faber_format_stdin(source: &str) -> (String, String, bool) {
     (stdout, stderr, success)
 }
 
-/// S4: `--stdin` reads exactly one source document from stdin and prints the
-/// formatted result to stdout — byte-identical to `--stdout` on the same
-/// source (the same author pipeline, different input mode).
-#[test]
-fn format_stdin_roundtrip_matches_author_pipeline() {
-    let source = "+++\nlocale = \"la\"\n+++\nincipit {\n  nota \"ok\"\n}\n";
-    let fixture = std::env::temp_dir().join("faber-format-stdin-roundtrip.fab");
-    fs::write(&fixture, source).expect("write roundtrip fixture");
-    let expected = run_faber_format_stdout(&fixture);
-    let _ = fs::remove_file(&fixture);
-
-    let (stdout, stderr, success) = run_faber_format_stdin(source);
-    assert!(success, "faber format --stdin must succeed: {stderr}");
-    assert_eq!(
-        normalize_trailing_newline(&stdout),
-        expected,
-        "--stdin output must match the --stdout author pipeline byte-exactly"
-    );
-    assert!(
-        stdout.contains("incipit {"),
-        "--stdin output must be the formatted source:\n{stdout}"
-    );
-}
-
-/// S4: `--stdout` is tightened to EXACTLY ONE input file — multiple files now
+/// `--stdout` is tightened to EXACTLY ONE input file — multiple files now
 /// fail clearly instead of printing `=== path ===` separators.
 #[test]
 fn format_stdout_rejects_multiple_files() {
     let first = std::env::temp_dir().join("faber-format-multi-a.fab");
     let second = std::env::temp_dir().join("faber-format-multi-b.fab");
-    fs::write(&first, "incipit {\n  nota \"a\"\n}\n").expect("write first fixture");
-    fs::write(&second, "incipit {\n  nota \"b\"\n}\n").expect("write second fixture");
+    fs::write(
+        &first,
+        "+++\nlocale = \"en\"\n+++\nmain {\n  print \"a\"\n}\n",
+    )
+    .expect("write first fixture");
+    fs::write(
+        &second,
+        "+++\nlocale = \"en\"\n+++\nmain {\n  print \"b\"\n}\n",
+    )
+    .expect("write second fixture");
 
     let output = Command::new(faber_binary())
         .args(["format", "--stdout"])
@@ -350,412 +448,13 @@ fn format_stdout_rejects_multiple_files() {
     );
 }
 
-/// S4: an unknown `--policy` slug fails clearly, exit nonzero, with a message
-/// distinct from formatting-difference output.
-#[test]
-fn format_unknown_policy_slug_fails_clearly() {
-    let fixture = std::env::temp_dir().join("faber-format-policy-bogus.fab");
-    fs::write(&fixture, "incipit {\n  nota \"ok\"\n}\n").expect("write fixture");
-
-    let output = Command::new(faber_binary())
-        .args(["format", "--policy", "not-a-policy"])
-        .arg(&fixture)
-        .output()
-        .expect("run faber format --policy bogus");
-    let _ = fs::remove_file(&fixture);
-
-    assert!(
-        !output.status.success(),
-        "unknown policy slug must exit nonzero"
-    );
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("not-a-policy"),
-        "the error must name the offending slug: {stderr}"
-    );
-    assert!(
-        stderr.contains("registered slugs"),
-        "the error must point at the rule-slug registry: {stderr}"
-    );
-}
-
-/// S4: `--policy normalise-v1` is the built-in baseline — output must be
-/// byte-identical to the flagless author pipeline.
-#[test]
-fn format_policy_normalise_v1_matches_default_output() {
-    let fixture = std::env::temp_dir().join("faber-format-policy-normalise.fab");
-    fs::write(&fixture, "+++\nlocale = \"la\"\n+++\nfunctio gradus(numerus x) → numerus {\n    si x ≻ 0 ergo redde x\n    secus ergo redde 0 - x\n}\n")
-        .expect("write fixture");
-
-    let with_policy = run_faber_format_stdout_with_args(&[
-        "format",
-        "--policy",
-        "normalise-v1",
-        "--stdout",
-        fixture.to_str().expect("utf8 path"),
-    ]);
-    let default = run_faber_format_stdout(&fixture);
-    let _ = fs::remove_file(&fixture);
-
-    assert_eq!(
-        with_policy, default,
-        "--policy normalise-v1 must be byte-identical to the default author output"
-    );
-}
-
-/// S4: `--policy pretty-v1` selects the pretty engine and succeeds on a plain
-/// block fixture (the engine may leave constructs unchanged fail-closed, but
-/// must never error on a supported block shape).
-#[test]
-fn format_policy_pretty_v1_succeeds_on_block_fixture() {
-    let fixture = std::env::temp_dir().join("faber-format-policy-pretty.fab");
-    fs::write(&fixture, "main {\n    print \"ok\"\n}\n").expect("write fixture");
-
-    let formatted = run_faber_format_stdout_with_args(&[
-        "format",
-        "--policy",
-        "pretty-v1",
-        "--stdout",
-        fixture.to_str().expect("utf8 path"),
-    ]);
-    let _ = fs::remove_file(&fixture);
-
-    assert!(
-        formatted.contains("incipit {"),
-        "pretty-v1 must emit the formatted block:\n{formatted}"
-    );
-    assert_author_reparses(&formatted, "pretty-v1 block fixture").expect("reparse");
-}
-
-// ---------------------------------------------------------------------------
-// FORMAT-PRETTY S5: `[format]` manifest schema + precedence.
-// ---------------------------------------------------------------------------
-
-/// The S5 fixture must genuinely distinguish the two engines, or the
-/// precedence matrix below is vacuous.
-#[test]
-fn format_s5_fixture_distinguishes_policies() {
-    let fixture = std::env::temp_dir().join("faber-format-s5-distinguish.fab");
-    fs::write(&fixture, SOFT_WIDTH_SOURCE).expect("write fixture");
-    let normalise = run_faber_format_stdout_with_args(&[
-        "format",
-        "--policy",
-        "normalise-v1",
-        "--stdout",
-        fixture.to_str().expect("utf8 path"),
-    ]);
-    let pretty = run_faber_format_stdout_with_args(&[
-        "format",
-        "--policy",
-        "pretty-v1",
-        "--stdout",
-        fixture.to_str().expect("utf8 path"),
-    ]);
-    let _ = fs::remove_file(&fixture);
-    assert_ne!(
-        normalise, pretty,
-        "the S5 fixture must distinguish normalise-v1 from pretty-v1"
-    );
-}
-
-/// S5 precedence matrix, row 1: a package with no `[format]` table keeps the
-/// built-in default — byte-identical to `--policy normalise-v1`.
-#[test]
-fn format_manifest_without_policy_uses_builtin_default() {
-    let root = std::env::temp_dir().join("faber-format-s5-default");
-    let _ = fs::remove_dir_all(&root);
-    let fixture = temp_format_package(&root, None, SOFT_WIDTH_SOURCE);
-
-    let default = run_faber_format_stdout(&fixture);
-    let normalise = run_faber_format_stdout_with_args(&[
-        "format",
-        "--policy",
-        "normalise-v1",
-        "--stdout",
-        fixture.to_str().expect("utf8 path"),
-    ]);
-    let _ = fs::remove_dir_all(&root);
-
-    assert_eq!(
-        default, normalise,
-        "a package without [format] must use the built-in default (normalise-v1)"
-    );
-}
-
-/// S5 precedence matrix, row 2a: `[format] policy = "normalise-v1"` is the
-/// built-in baseline — byte-identical to the flagless author pipeline.
-#[test]
-fn format_manifest_policy_normalise_v1_matches_default() {
-    let root = std::env::temp_dir().join("faber-format-s5-normalise");
-    let _ = fs::remove_dir_all(&root);
-    let fixture = temp_format_package(&root, Some("normalise-v1"), SOFT_WIDTH_SOURCE);
-
-    let from_manifest = run_faber_format_stdout(&fixture);
-    let explicit = run_faber_format_stdout_with_args(&[
-        "format",
-        "--policy",
-        "normalise-v1",
-        "--stdout",
-        fixture.to_str().expect("utf8 path"),
-    ]);
-    let _ = fs::remove_dir_all(&root);
-
-    assert_eq!(
-        from_manifest, explicit,
-        "manifest normalise-v1 must select the same output as the explicit flag"
-    );
-}
-
-/// S5 precedence matrix, row 2b: `[format] policy = "pretty-v1"` selects the
-/// pretty engine.
-#[test]
-fn format_manifest_policy_pretty_v1_selected() {
-    let root = std::env::temp_dir().join("faber-format-s5-pretty");
-    let _ = fs::remove_dir_all(&root);
-    let fixture = temp_format_package(&root, Some("pretty-v1"), SOFT_WIDTH_SOURCE);
-
-    let from_manifest = run_faber_format_stdout(&fixture);
-    let explicit = run_faber_format_stdout_with_args(&[
-        "format",
-        "--policy",
-        "pretty-v1",
-        "--stdout",
-        fixture.to_str().expect("utf8 path"),
-    ]);
-    let _ = fs::remove_dir_all(&root);
-
-    assert_eq!(
-        from_manifest, explicit,
-        "manifest pretty-v1 must select the same output as the explicit flag"
-    );
-    assert!(
-        from_manifest.contains("this_is_a_very_long_condition_name_that_keeps_going_and_going {"),
-        "pretty-v1 must expand the over-width ergo arm:\n{from_manifest}"
-    );
-}
-
-/// S5 precedence matrix, row 3a: CLI `--policy normalise-v1` overrides a
-/// package `[format] policy = "pretty-v1"`.
-#[test]
-fn format_cli_policy_overrides_manifest_pretty() {
-    let root = std::env::temp_dir().join("faber-format-s5-override-pretty");
-    let _ = fs::remove_dir_all(&root);
-    let fixture = temp_format_package(&root, Some("pretty-v1"), SOFT_WIDTH_SOURCE);
-
-    let with_cli = run_faber_format_stdout_with_args(&[
-        "format",
-        "--policy",
-        "normalise-v1",
-        "--stdout",
-        fixture.to_str().expect("utf8 path"),
-    ]);
-    let _ = fs::remove_dir_all(&root);
-
-    assert!(
-        with_cli.contains(
-            "si this_is_a_very_long_condition_name_that_keeps_going_and_going ergo redde someVeryLongReturnValueIdentifierThatWillNotFit"
-        ),
-        "CLI normalise-v1 must win over the manifest pretty-v1 (one-line arm survives):\n{with_cli}"
-    );
-    assert!(
-        !with_cli.contains("this_is_a_very_long_condition_name_that_keeps_going_and_going {"),
-        "no pretty expansion when the CLI override is normalise-v1:\n{with_cli}"
-    );
-}
-
-/// S5 precedence matrix, row 3b: CLI `--policy pretty-v1` overrides a package
-/// `[format] policy = "normalise-v1"`.
-#[test]
-fn format_cli_policy_overrides_manifest_normalise() {
-    let root = std::env::temp_dir().join("faber-format-s5-override-normalise");
-    let _ = fs::remove_dir_all(&root);
-    let fixture = temp_format_package(&root, Some("normalise-v1"), SOFT_WIDTH_SOURCE);
-
-    let with_cli = run_faber_format_stdout_with_args(&[
-        "format",
-        "--policy",
-        "pretty-v1",
-        "--stdout",
-        fixture.to_str().expect("utf8 path"),
-    ]);
-    let _ = fs::remove_dir_all(&root);
-
-    assert!(
-        with_cli.contains("this_is_a_very_long_condition_name_that_keeps_going_and_going {"),
-        "CLI pretty-v1 must win over the manifest normalise-v1 (over-width arm expanded):\n{with_cli}"
-    );
-}
-
-/// S5 discovery: a file outside any package falls back to the built-in
-/// default (normalise-v1) — the over-width arm survives, never pretty
-/// expansion.
-#[test]
-fn format_file_outside_package_uses_builtin_default() {
-    let dir = std::env::temp_dir().join("faber-format-s5-nopkg");
-    let _ = fs::remove_dir_all(&dir);
-    fs::create_dir_all(&dir).expect("create scratch dir");
-    let fixture = dir.join("main.fab");
-    fs::write(&fixture, SOFT_WIDTH_SOURCE).expect("write fixture");
-
-    let output = run_faber_format_stdout(&fixture);
-    let _ = fs::remove_dir_all(&dir);
-
-    assert!(
-        output.contains(
-            "si this_is_a_very_long_condition_name_that_keeps_going_and_going ergo redde someVeryLongReturnValueIdentifierThatWillNotFit"
-        ),
-        "a file outside any package must use the built-in default (normalise-v1):\n{output}"
-    );
-}
-
-/// S5 discovery: a multi-root invocation spanning two packages resolves each
-/// root's policy per package (per-root resolution, recorded in the CLI docs).
-#[test]
-fn format_multi_root_resolves_per_package() {
-    let base = std::env::temp_dir().join("faber-format-s5-multiroot");
-    let _ = fs::remove_dir_all(&base);
-    let pkg_a = temp_format_package(&base.join("pkg-a"), Some("pretty-v1"), SOFT_WIDTH_SOURCE);
-    let pkg_b = temp_format_package(&base.join("pkg-b"), Some("normalise-v1"), SOFT_WIDTH_SOURCE);
-
-    let a_pretty = run_faber_format_stdout_with_args(&[
-        "format",
-        "--policy",
-        "pretty-v1",
-        "--stdout",
-        pkg_a.to_str().expect("utf8 path"),
-    ]);
-    let b_normalise = run_faber_format_stdout_with_args(&[
-        "format",
-        "--policy",
-        "normalise-v1",
-        "--stdout",
-        pkg_b.to_str().expect("utf8 path"),
-    ]);
-
-    let output = Command::new(faber_binary())
-        .arg("format")
-        .arg(&pkg_a)
-        .arg(&pkg_b)
-        .output()
-        .expect("run faber format across two packages");
-    let a_after = fs::read_to_string(&pkg_a).expect("read pkg-a after");
-    let b_after = fs::read_to_string(&pkg_b).expect("read pkg-b after");
-    let _ = fs::remove_dir_all(&base);
-
-    assert!(
-        output.status.success(),
-        "multi-root format must succeed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert_eq!(
-        normalize_trailing_newline(&a_after),
-        a_pretty,
-        "pkg-a (pretty-v1) must be formatted with its own policy"
-    );
-    assert_eq!(
-        normalize_trailing_newline(&b_after),
-        b_normalise,
-        "pkg-b (normalise-v1) must be formatted with its own policy"
-    );
-}
-
-/// S5: an unknown manifest `[format] policy` slug fails clearly at
-/// parse/validation time, naming the key, the slug, and the registry.
-#[test]
-fn format_manifest_unknown_policy_slug_fails_clearly() {
-    let root = std::env::temp_dir().join("faber-format-s5-bogus-policy");
-    let _ = fs::remove_dir_all(&root);
-    let fixture = temp_format_package(&root, Some("not-a-policy"), SOFT_WIDTH_SOURCE);
-
-    let output = Command::new(faber_binary())
-        .args(["format", "--stdout"])
-        .arg(&fixture)
-        .output()
-        .expect("run faber format on a bogus-policy package");
-    let _ = fs::remove_dir_all(&root);
-
-    assert!(
-        !output.status.success(),
-        "an unknown manifest format.policy must fail closed"
-    );
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("format.policy"),
-        "the error must name the manifest key: {stderr}"
-    );
-    assert!(
-        stderr.contains("not-a-policy"),
-        "the error must name the offending slug: {stderr}"
-    );
-    assert!(
-        stderr.contains("registered slugs"),
-        "the error must point at the rule-slug registry: {stderr}"
-    );
-}
-
-/// S5: an empty manifest `[format] policy` fails clearly (never silently
-/// treated as the default).
-#[test]
-fn format_manifest_empty_policy_slug_fails_clearly() {
-    let root = std::env::temp_dir().join("faber-format-s5-empty-policy");
-    let _ = fs::remove_dir_all(&root);
-    let fixture = temp_format_package(&root, Some(""), SOFT_WIDTH_SOURCE);
-
-    let output = Command::new(faber_binary())
-        .args(["format", "--stdout"])
-        .arg(&fixture)
-        .output()
-        .expect("run faber format on an empty-policy package");
-    let _ = fs::remove_dir_all(&root);
-
-    assert!(
-        !output.status.success(),
-        "an empty format.policy must fail closed"
-    );
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("format.policy must not be empty"),
-        "the error must name the empty policy: {stderr}"
-    );
-}
-
-/// S5: `--config` stays the deferred warning stub — the flag still parses and
-/// prints the same not-implemented warning; the `[format]` manifest is the
-/// only config surface in v1.
-#[test]
-fn format_config_flag_stays_deferred_warning_stub() {
-    let fixture = std::env::temp_dir().join("faber-format-s5-config.fab");
-    fs::write(&fixture, "incipit {\n  nota \"ok\"\n}\n").expect("write fixture");
-    let config = std::env::temp_dir().join("faber-format-s5-forma.toml");
-    fs::write(&config, "[format]\npolicy = \"pretty-v1\"\n").expect("write forma.toml");
-
-    let output = Command::new(faber_binary())
-        .args(["format", "--config"])
-        .arg(&config)
-        .arg(&fixture)
-        .output()
-        .expect("run faber format --config");
-    let _ = fs::remove_file(&fixture);
-    let _ = fs::remove_file(&config);
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        output.status.success(),
-        "--config must remain a warning stub, not a failure: {stderr}"
-    );
-    assert!(
-        stderr.contains("--config is not implemented yet"),
-        "the deferred warning must still fire: {stderr}"
-    );
-}
-
-/// S4: `--write` is the explicit spelling of the in-place default — it writes
+/// `--write` is the explicit spelling of the in-place default — it writes
 /// the formatted source back to the file, byte-identical to what `--stdout`
 /// would print for the same file.
 #[test]
 fn format_write_flag_writes_in_place() {
     let fixture = std::env::temp_dir().join("faber-format-write-flag.fab");
-    let unformatted = "incipit {\n  nota \"ok\"\n}\n";
+    let unformatted = "+++\nlocale = \"en\"\n+++\nmain {\n  print \"ok\"\n}\n";
     fs::write(&fixture, unformatted).expect("write fixture");
 
     let expected = run_faber_format_stdout(&fixture);
@@ -779,6 +478,39 @@ fn format_write_flag_writes_in_place() {
     );
 }
 
+/// A leftover `[format]` table is an unknown manifest table (zero adopters;
+/// D-A). Fail closed; do not silently ignore.
+#[test]
+fn format_legacy_format_table_fails_as_unknown_table() {
+    let root = std::env::temp_dir().join("faber-format-legacy-format-table");
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("src")).expect("create package src");
+    fs::write(
+        root.join("faber.toml"),
+        "[package]\nname = \"format-pkg\"\nversion = \"0.1.0\"\nedition = \"0.1\"\n\n[paths]\nsource = \"src\"\nentry = \"main.fab\"\n\n[format]\npolicy = \"normalise-v1\"\n",
+    )
+    .expect("write faber.toml");
+    let fixture = root.join("src").join("main.fab");
+    fs::write(&fixture, EN_TYPES_SOURCE).expect("write source");
+
+    let output = Command::new(faber_binary())
+        .args(["format", "--stdout"])
+        .arg(&fixture)
+        .output()
+        .expect("run faber format on leftover [format] package");
+    let _ = fs::remove_dir_all(&root);
+
+    assert!(
+        !output.status.success(),
+        "a leftover [format] table must fail as an unknown table"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("format") || stderr.contains("unknown"),
+        "the error must name the unknown table: {stderr}"
+    );
+}
+
 #[test]
 fn format_check_compare_keeps_frontmatter_in_baseline() {
     let path = exempla("incipit/salve-munde.fab");
@@ -794,9 +526,7 @@ fn format_check_compare_keeps_frontmatter_in_baseline() {
 fn format_write_reprepends_exact_frontmatter_slice() {
     let path = exempla("incipit/salve-munde.fab");
     let raw = fs::read_to_string(&path).expect("read");
-    let formatted_body = author_format_pipeline(&path.display().to_string(), &raw);
-    let formatted =
-        formatted_source_for_write(&path, &raw, &formatted_body).expect("format source");
+    let formatted = canonical_cli_pipeline(&path);
     let split = radix_module::driver::split_frontmatter(&raw).expect("split frontmatter");
     let body_start = split.body_byte_offset as usize;
 
@@ -807,8 +537,12 @@ fn format_write_reprepends_exact_frontmatter_slice() {
     );
     assert!(formatted.starts_with("+++"));
     assert!(formatted.contains("term = \"incipit\""));
-    assert_author_reparses(&formatted[body_start..], "formatted salve-munde body")
-        .expect("reparse");
+    assert_canonical_reparses_with(
+        &formatted[body_start..],
+        "formatted salve-munde body",
+        Some(&english_pack()),
+    )
+    .expect("reparse");
 }
 
 // ── normalize_trailing_newline ────────────────────────────────────────────

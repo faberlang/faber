@@ -1,11 +1,10 @@
-//! `faber format` — author-mode formatter: check/stdout, the
-//! `--write`/`--stdin`/`--policy` steady-state flag surface (FORMAT-PRETTY
-//! S4) and the `[format]` manifest policy + precedence chain (S5).
-//! Reader-locale conversion lives in `faber convert` (`commands/convert.rs`).
+//! `faber format` — canonical HIR re-emit at the source's own locale
+//! (frontmatter → package `[locale]` → product default `en`). Keyword and
+//! type vocabulary stay on that surface. Reader-locale conversion lives in
+//! `faber convert` (`commands/convert.rs`).
 
 use radix_module::codegen::Target;
 use radix_module::driver::{peel_raw_source, split_frontmatter, Config, Session};
-use radix_module::forma::{compile_author_with_policy, FormatCompileResult, FormatPolicy};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -18,36 +17,12 @@ pub struct FormatCommand {
     pub stdout: bool,
     pub write: bool,
     pub stdin: bool,
-    pub policy: Option<String>,
-    pub config: Option<PathBuf>,
 }
 
 pub fn cmd_format(command: &FormatCommand) {
-    if command.config.is_some() {
-        eprintln!("warning: --config is not implemented yet (forma.toml deferred)");
-    }
-
-    // Policy resolution (rule-slug registry). The built-in default is
-    // `normalise-v1`; the CLI `--policy` override wins over the package
-    // `[format] policy` and the built-in default (FORMAT-PRETTY S5). An
-    // unknown CLI slug fails clearly before any file is touched, with a
-    // message distinct from formatting-difference output.
-    let cli_policy = match command.policy.as_deref() {
-        None => None,
-        Some(slug) => Some(match resolve_policy(Some(slug)) {
-            Ok(policy) => policy,
-            Err(message) => {
-                eprintln!("error: {message}");
-                std::process::exit(1);
-            }
-        }),
-    };
-
     // --stdin: read exactly one source document from stdin and print the
     // formatted result to stdout (implies stdout; no path arguments — enforced
     // at the CLI parse boundary). The diagnostic source name is `<stdin>`.
-    // A virtual source has no containing package manifest to consult, so the
-    // policy is the CLI override or the built-in default (FORMAT-PRETTY S5).
     if command.stdin {
         let mut source = String::new();
         if let Err(err) = std::io::stdin().read_to_string(&mut source) {
@@ -55,8 +30,7 @@ pub fn cmd_format(command: &FormatCommand) {
             std::process::exit(1);
         }
         let path = Path::new("<stdin>");
-        let policy = cli_policy.unwrap_or_default();
-        match format_single_doc(path, &source, policy) {
+        match format_single_doc(path, &source) {
             Ok(formatted) => {
                 print!("{formatted}");
                 return;
@@ -68,7 +42,7 @@ pub fn cmd_format(command: &FormatCommand) {
     // --write is the explicit spelling of the in-place default; the default
     // branch below already writes in place (the `--write`/`--stdout` conflict
     // is enforced at the CLI parse boundary).
-    drop(command.write);
+    let _ = command.write;
 
     let files = match resolve_format_paths(&command.paths) {
         Ok(files) => files,
@@ -83,10 +57,8 @@ pub fn cmd_format(command: &FormatCommand) {
         std::process::exit(1);
     }
 
-    // FORMAT-PRETTY S4: `--stdout` is tightened to EXACTLY ONE input file.
-    // The old multi-file `=== path ===` separator output is a deliberate
-    // behavior change (delivery §S4); multiple files with `--stdout` fail
-    // clearly instead of concatenating.
+    // `--stdout` is tightened to EXACTLY ONE input file. Multiple files with
+    // `--stdout` fail clearly instead of concatenating.
     if command.stdout && files.len() > 1 {
         eprintln!(
             "error: --stdout accepts exactly one input file, found {}; format one file at a time (or use the default in-place write / --check for multiple files)",
@@ -108,19 +80,7 @@ pub fn cmd_format(command: &FormatCommand) {
             }
         };
 
-        // Per-file policy resolution: the CLI override wins; otherwise the
-        // containing package's `[format] policy`; otherwise the built-in
-        // default (FORMAT-PRETTY S5, per-root resolution for multi-root runs).
-        let policy = match resolve_file_policy(path, cli_policy) {
-            Ok(policy) => policy,
-            Err(message) => {
-                eprintln!("error: {message}");
-                error_count += 1;
-                continue;
-            }
-        };
-
-        let formatted = match format_single_doc(path, &source, policy) {
+        let formatted = match format_single_doc(path, &source) {
             Ok(formatted) => formatted,
             Err(()) => {
                 error_count += 1;
@@ -165,42 +125,9 @@ pub fn cmd_format(command: &FormatCommand) {
     }
 }
 
-/// Resolve the effective format policy: built-in default (`normalise-v1`) <
-/// CLI `--policy` slug (validated against the radix rule-slug registry).
-fn resolve_policy(slug: Option<&str>) -> Result<FormatPolicy, String> {
-    match slug {
-        None => Ok(FormatPolicy::default()),
-        Some(slug) => FormatPolicy::from_slug(slug).map_err(|err| err.to_string()),
-    }
-}
-
-/// Resolve the effective format policy for ONE input file (FORMAT-PRETTY S5).
-///
-/// Precedence: CLI `--policy` > the containing package's `[format] policy` >
-/// the built-in default (`normalise-v1`). Each root's files resolve the
-/// package that CONTAINS them (nearest `faber.toml`, walking up from the
-/// file), so multi-root invocations spanning packages keep per-package
-/// policies. Files outside any package — legacy manifestless inputs, virtual
-/// sources such as `--stdin` — fall back to the built-in default. A package
-/// manifest naming an unknown `[format] policy` slug fails clearly (never a
-/// silent default).
-fn resolve_file_policy(
-    path: &Path,
-    cli_policy: Option<FormatPolicy>,
-) -> Result<FormatPolicy, String> {
-    if let Some(policy) = cli_policy {
-        return Ok(policy);
-    }
-    match crate::package::manifest_format_policy(path) {
-        Ok(Some(policy)) => Ok(policy),
-        Ok(None) => Ok(FormatPolicy::default()),
-        Err(diag) => Err(diag.message),
-    }
-}
-
 /// Convert ONE source document to an explicit target locale surface
 /// (`faber convert --to <LOCALE>`). Same HIR round-trip as the former
-/// `format --locale` mode; no format policy applies (canonical surface).
+/// `format --locale` mode (canonical HIR surface).
 /// `Err(())` means a diagnostic was already printed.
 #[cfg(feature = "hir-faber")]
 pub(super) fn convert_single_doc(path: &Path, to: &str, source: &str) -> Result<String, ()> {
@@ -237,49 +164,52 @@ pub(super) fn convert_single_doc(path: &Path, to: &str, source: &str) -> Result<
     }
 }
 
-/// Format ONE source document through the selected pipeline (author policy or
-/// reader-locale re-emit), printing diagnostics and returning the formatted
-/// output ready for write/stdout (frontmatter preserved). `Err(())` means a
-/// diagnostic was already printed.
-fn format_single_doc(path: &Path, source: &str, policy: FormatPolicy) -> Result<String, ()> {
-    let name = path.display().to_string();
-    let session = match format_session(path, None, source) {
-        Ok(session) => session,
-        Err(message) => {
-            eprintln!("error: {message}");
-            return Err(());
-        }
-    };
-    let result = match compile_author_with_policy(&session, &name, source, policy) {
-        Ok(result) => result,
-        Err(err) => {
-            eprintln!("error: {err}");
-            return Err(());
-        }
-    };
-
-    let mut had_error = false;
-    for diag in &result.diagnostics {
-        if diag.is_error() {
-            eprintln!("error: {}: {}", path.display(), diag.message);
-            had_error = true;
-        } else {
-            eprintln!("warning: {}: {}", path.display(), diag.message);
-        }
-    }
-
-    let Some(output) = result.output else {
-        if !had_error {
-            eprintln!("error: {}: format failed", path.display());
-        }
+/// Format ONE source document through canonical HIR emit at the source's own
+/// locale, printing diagnostics and returning the formatted output ready for
+/// write/stdout (frontmatter preserved). `Err(())` means a diagnostic was
+/// already printed.
+fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
+    #[cfg(not(feature = "hir-faber"))]
+    {
+        let _ = (path, source);
+        eprintln!("error: formatting requires a faber build with feature `hir-faber`");
         return Err(());
-    };
+    }
+    #[cfg(feature = "hir-faber")]
+    {
+        let name = path.display().to_string();
+        let session = match format_session(path, None, source) {
+            Ok(session) => session,
+            Err(message) => {
+                eprintln!("error: {message}");
+                return Err(());
+            }
+        };
+        let result = radix_module::forma::compile_canonical(&session, &name, source);
 
-    match formatted_source_for_write(path, source, &output.code) {
-        Ok(formatted) => Ok(formatted),
-        Err(message) => {
-            eprintln!("error: {message}");
-            Err(())
+        let mut had_error = false;
+        for diag in &result.diagnostics {
+            if diag.is_error() {
+                eprintln!("error: {}: {}", path.display(), diag.message);
+                had_error = true;
+            } else {
+                eprintln!("warning: {}: {}", path.display(), diag.message);
+            }
+        }
+
+        let Some(output) = result.output else {
+            if !had_error {
+                eprintln!("error: {}: format failed", path.display());
+            }
+            return Err(());
+        };
+
+        match formatted_source_for_write(path, source, &output.code) {
+            Ok(formatted) => Ok(formatted),
+            Err(message) => {
+                eprintln!("error: {message}");
+                Err(())
+            }
         }
     }
 }
@@ -416,9 +346,4 @@ fn should_skip_dir(path: &Path) -> bool {
 
 fn is_fab_file(path: &Path) -> bool {
     path.extension().and_then(|ext| ext.to_str()) == Some("fab")
-}
-
-#[allow(dead_code)]
-fn format_result_success(result: &FormatCompileResult) -> bool {
-    result.success()
 }

@@ -232,8 +232,6 @@ fn dispatch(command: Command) {
             stdout: args.stdout,
             write: args.write,
             stdin: args.stdin,
-            policy: args.policy,
-            config: args.config,
         }),
         Command::Host(args) => cmd_host(args.command),
         Command::Model(args) => cmd_model(args.command),

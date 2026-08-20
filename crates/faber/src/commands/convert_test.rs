@@ -4,12 +4,10 @@
 
 use super::super::format_test::{
     code_only, exempla, faber_binary, run_faber_format_stdout,
-    run_faber_format_stdout_with_args as run_faber_convert_stdout_with_args, temp_format_package,
-    VALID_BLOCK_SOURCE,
+    run_faber_format_stdout_with_args as run_faber_convert_stdout_with_args,
 };
 use std::fs;
 use std::io::Read;
-use std::path::Path;
 use std::process::{Command, Stdio};
 
 #[test]
@@ -47,47 +45,6 @@ fn convert_resolves_imports_in_corpus_fixture() {
     assert!(
         stdout.contains("importa ex \"norma:chorda\""),
         "import line should survive re-emit"
-    );
-}
-
-#[test]
-fn convert_is_not_affected_by_manifest_format_policy() {
-    let root_with = std::env::temp_dir().join("faber-format-s5-locale-with");
-    let root_without = std::env::temp_dir().join("faber-format-s5-locale-without");
-    let _ = fs::remove_dir_all(&root_with);
-    let _ = fs::remove_dir_all(&root_without);
-    let fixture_with = temp_format_package(&root_with, Some("pretty-v1"), VALID_BLOCK_SOURCE);
-    let fixture_without = temp_format_package(&root_without, None, VALID_BLOCK_SOURCE);
-
-    let run = |fixture: &Path| {
-        Command::new(faber_binary())
-            .args(["convert", "--to", "en", "--stdout"])
-            .arg(fixture)
-            .output()
-            .expect("run faber convert --to en")
-    };
-    let with = run(&fixture_with);
-    let without = run(&fixture_without);
-    let stderr_with = String::from_utf8_lossy(&with.stderr);
-    let stderr_without = String::from_utf8_lossy(&without.stderr);
-    let _ = fs::remove_dir_all(&root_with);
-    let _ = fs::remove_dir_all(&root_without);
-
-    assert!(
-        with.status.success(),
-        "manifest policy + --locale must succeed: {stderr_with}"
-    );
-    assert!(
-        without.status.success(),
-        "no-[format] package + --locale must succeed: {stderr_without}"
-    );
-    assert_eq!(
-        with.stdout, without.stdout,
-        "the [format] table must not change locale re-emission (byte-identical)"
-    );
-    assert!(
-        !stderr_with.contains("--policy"),
-        "manifest-declared policy must not trip the CLI --policy/--locale conflict: {stderr_with}"
     );
 }
 
