@@ -1,7 +1,7 @@
 use super::{
     decode_device_inputs, encode_device_inputs, encode_weight_map, execute_device_at,
-    resolve_host_cli_at, DeviceExecuteReceipt, DeviceExecuteRequest, HostSpawnError,
-    WeightFileRange,
+    open_device_session_at, resolve_host_cli_at, DeviceExecuteReceipt, DeviceExecuteRequest,
+    HostSpawnError, WeightFileRange,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -22,6 +22,40 @@ fn stub_host_cli(stdout: &str) -> (tempfile::TempDir, PathBuf) {
 fn spawn_via_stub_cli(request: DeviceExecuteRequest, stdout: &str) -> HostSpawnError {
     let (_dir, host) = stub_host_cli(stdout);
     execute_device_at(&host, &request).expect_err("cli error")
+}
+
+fn resident_stub_cli() -> (tempfile::TempDir, PathBuf) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("faber-host-macos-arm64");
+    let script = r##"#!/bin/sh
+IFS= read -r command || exit 2
+printf '%s\n' '{"operation":"load","lifecycle":{"prepares":1,"reuses":0,"resets":0,"releases":0,"module_reloads":0,"per_program_reallocs":0,"live_handles":3},"kernel_count":5219}'
+steps=0
+while IFS= read -r command; do
+  case "$command" in
+    *step*)
+      steps=$((steps + 1))
+      printf '%s\n' "{\"operation\":\"step\",\"lifecycle\":{\"prepares\":1,\"reuses\":$steps,\"resets\":0,\"releases\":0,\"module_reloads\":0,\"per_program_reallocs\":0,\"live_handles\":3},\"receipt\":{\"backend\":\"metal\",\"device_name\":\"fake\",\"launches\":1,\"launch_ids\":[1],\"launch_entries\":[\"addita\"],\"copy_ins\":1,\"outputs\":{\"3\":[4.0,6.0]},\"allocated_buffers\":[1,2,3],\"syncs\":1,\"transfers\":2,\"readbacks\":1,\"kernel_count\":5219,\"stage_timing\":{\"kernel_us\":7,\"transfer_us\":3,\"host_round_trip_us\":2}}}"
+      ;;
+    *reset*)
+      printf '%s\n' '{"operation":"reset","lifecycle":{"prepares":1,"reuses":2,"resets":1,"releases":0,"module_reloads":0,"per_program_reallocs":0,"live_handles":3},"kernel_count":5219,"reset_cleared":0}'
+      ;;
+    *release*)
+      printf '%s\n' '{"operation":"release","lifecycle":{"prepares":1,"reuses":2,"resets":1,"releases":1,"module_reloads":0,"per_program_reallocs":0,"live_handles":0},"kernel_count":5219}'
+      exit 0
+      ;;
+    *) exit 2 ;;
+  esac
+done
+"##;
+    std::fs::write(&path, script).expect("write resident stub");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod resident stub");
+    }
+    (dir, path)
 }
 
 fn malformed_request() -> DeviceExecuteRequest {
@@ -116,6 +150,37 @@ fn host_spawn_error_displays_code_and_message() {
         message: "missing binary".to_owned(),
     };
     assert_eq!(err.to_string(), "E_HOST_SPAWN: missing binary");
+}
+
+#[test]
+fn resident_control_client_keeps_one_child_across_load_steps_reset_release() {
+    let (_dir, host) = resident_stub_cli();
+    let request = malformed_request();
+    let (mut session, load) = open_device_session_at(&host, &request).expect("load");
+    assert_eq!(load.operation, "load");
+    assert_eq!(load.kernel_count, 5219);
+    assert_eq!(load.lifecycle.prepares, 1);
+    assert_eq!(load.lifecycle.live_handles, 3);
+
+    let inputs = BTreeMap::from([(2, vec![1.0, 2.0])]);
+    let step1 = session.step(&inputs).expect("step 1");
+    let step2 = session.step(&inputs).expect("step 2");
+    for (index, step) in [step1, step2].into_iter().enumerate() {
+        assert_eq!(step.operation, "step");
+        assert_eq!(step.lifecycle.reuses, index + 1);
+        assert_eq!(step.lifecycle.module_reloads, 0);
+        assert_eq!(step.lifecycle.per_program_reallocs, 0);
+        let receipt = step.receipt.expect("step receipt");
+        assert_eq!(receipt.kernel_count, 5219);
+        assert_eq!(receipt.stage_timing.total_us(), 12);
+    }
+    let reset = session.reset().expect("reset");
+    assert_eq!(reset.lifecycle.resets, 1);
+    assert_eq!(reset.reset_cleared, 0);
+    let release = session.release().expect("release");
+    assert_eq!(release.lifecycle.releases, 1);
+    assert_eq!(release.lifecycle.live_handles, 0);
+    assert!(session.release().is_err(), "a released owner refuses reuse");
 }
 
 fn assert_bit_exact(inputs: &BTreeMap<u32, Vec<f32>>) {
