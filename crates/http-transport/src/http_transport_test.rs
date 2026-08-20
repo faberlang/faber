@@ -1,5 +1,21 @@
 use super::*;
 use http_body_util::{BodyExt, Full};
+
+impl ConnectionTasks {
+    fn len(&mut self) -> usize {
+        self.reap_completed();
+        self.set.len()
+    }
+}
+
+impl HttpTransport {
+    fn tracked_connections(&self) -> usize {
+        self.connections
+            .lock()
+            .map(|mut tasks| tasks.len())
+            .unwrap_or(0)
+    }
+}
 use hyper::{Request, StatusCode};
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::Client;
