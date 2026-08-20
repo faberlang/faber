@@ -26,7 +26,8 @@
 //!   diagnostic policy promotes warning-kind diagnostics.
 
 use crate::{
-    error::WarningKind, Primitive, Resolver, SemanticError, SemanticErrorKind, Type, TypeTable,
+    error::WarningKind, locale::LocalePack, Primitive, Resolver, SemanticError, SemanticErrorKind,
+    Type, TypeTable,
 };
 use radix_hir::visit::{walk_expr, HirVisitor};
 use radix_hir::{
@@ -42,6 +43,7 @@ use radix_types::MirCollectionOp;
 use rustc_hash::FxHashSet;
 
 const ISSUE_DEPRECATED_PARAM_PREFIX: &str = "deprecated_param_prefix";
+const ISSUE_EMPTY_MARKER_SHADOWING: &str = "empty_marker_shadowing";
 const ISSUE_EXPLICIT_IGNOTUM_ANNOTATION: &str = "explicit_ignotum_annotation";
 const ISSUE_PREFER_STRING_TEMPLATE: &str = "prefer_string_template";
 const ISSUE_SHADOWED_VARIABLE: &str = "shadowed_variable";
@@ -64,8 +66,9 @@ pub fn lint(
     resolver: &Resolver,
     types: &TypeTable,
     interner: &Interner,
+    locale_pack: Option<&LocalePack>,
 ) -> Vec<SemanticError> {
-    let mut ctx = LintContext::new(resolver, types, interner);
+    let mut ctx = LintContext::new(resolver, types, interner, locale_pack);
     ctx.collect_items(hir);
     ctx.check_program(hir);
 
@@ -106,6 +109,8 @@ struct LintContext<'a> {
     /// Declaration names by `DefId`, so suggestions can render path operands
     /// back to their source spellings.
     def_names: rustc_hash::FxHashMap<radix_hir::DefId, radix_lexer::Symbol>,
+    /// Active reader-locale spellings that claim the empty-collection marker.
+    marker_spellings: FxHashSet<String>,
     /// True while the visitor descends into the left operand of a `+`: that
     /// operand belongs to the enclosing `+` chain and must not evaluate the
     /// chain itself.
@@ -114,7 +119,19 @@ struct LintContext<'a> {
 }
 
 impl<'a> LintContext<'a> {
-    fn new(resolver: &'a Resolver, types: &'a TypeTable, interner: &'a Interner) -> Self {
+    fn new(
+        resolver: &'a Resolver,
+        types: &'a TypeTable,
+        interner: &'a Interner,
+        locale_pack: Option<&LocalePack>,
+    ) -> Self {
+        let mut marker_spellings = FxHashSet::default();
+        if let Some(pack) = locale_pack {
+            marker_spellings.insert(pack.contextual_keyword_surface("vacua").to_owned());
+            marker_spellings.extend(pack.contextual_keyword_aliases("vacua").iter().cloned());
+        } else {
+            marker_spellings.insert("vacua".to_owned());
+        }
         Self {
             resolver,
             types,
@@ -130,6 +147,7 @@ impl<'a> LintContext<'a> {
             functions: Vec::new(),
             scope: Vec::new(),
             def_names: rustc_hash::FxHashMap::default(),
+            marker_spellings,
             inside_add_left_child: false,
             in_loop: false,
         }
@@ -211,13 +229,19 @@ impl<'a> LintContext<'a> {
 
     fn check_item(&mut self, item: &HirItem) {
         match &item.kind {
-            HirItemKind::Function(func) => self.check_function(func),
+            HirItemKind::Function(func) => {
+                self.warn_on_empty_marker_shadowing(func.name, item.span);
+                self.check_function(func);
+            }
             HirItemKind::Struct(strukt) => {
                 for method in &strukt.methods {
                     self.check_function(&method.func);
                 }
             }
-            HirItemKind::Constant(const_item) => self.check_expr(&const_item.value, false),
+            HirItemKind::Constant(const_item) => {
+                self.warn_on_empty_marker_shadowing(const_item.name, item.span);
+                self.check_expr(&const_item.value, false);
+            }
             _ => {}
         }
     }
@@ -225,6 +249,7 @@ impl<'a> LintContext<'a> {
     fn check_function(&mut self, func: &HirFunction) {
         self.push_scope();
         for param in &func.params {
+            self.warn_on_empty_marker_shadowing(param.name, param.span);
             self.def_names.insert(param.def_id, param.name);
             self.defs
                 .push((param.def_id, param.span, WarningKind::UnusedVariable));
@@ -290,6 +315,7 @@ impl<'a> LintContext<'a> {
     }
 
     fn check_local(&mut self, local: &HirLocal, span: Span) {
+        self.warn_on_empty_marker_shadowing(local.name, span);
         self.def_names.insert(local.def_id, local.name);
         self.defs
             .push((local.def_id, span, WarningKind::UnusedVariable));
@@ -312,6 +338,20 @@ impl<'a> LintContext<'a> {
         self.in_loop = in_loop;
         self.visit_expr(expr);
         self.in_loop = previous;
+    }
+
+    fn warn_on_empty_marker_shadowing(&mut self, name: radix_lexer::Symbol, span: Span) {
+        let Some(spelling) = self.interner.strings().get(name.0 as usize) else {
+            return;
+        };
+        if self.marker_spellings.contains(spelling) {
+            self.warnings.push((
+                WarningKind::EmptyMarkerShadowing,
+                ISSUE_EMPTY_MARKER_SHADOWING,
+                span,
+                None,
+            ));
+        }
     }
 
     fn check_shadowing(&mut self, name: radix_lexer::Symbol, def_id: radix_hir::DefId, span: Span) {
@@ -516,6 +556,13 @@ fn is_string_literal(expr: &HirExpression) -> bool {
 }
 
 impl HirVisitor for LintContext<'_> {
+    fn visit_param(&mut self, param: &HirParam) {
+        self.warn_on_empty_marker_shadowing(param.name, param.span);
+        if let Some(default) = &param.default {
+            self.visit_expr(default);
+        }
+    }
+
     fn visit_block(&mut self, block: &HirBlock) {
         self.check_block(block, self.in_loop);
     }

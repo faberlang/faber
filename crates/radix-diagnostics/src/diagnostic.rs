@@ -233,6 +233,9 @@ pub enum WarningKind {
     /// Still legal (corpus-compatible) but deprecated in favor of the
     /// type-position access marker (MU-5a); the prefix never errors.
     DeprecatedParamPrefix,
+    /// A value binding uses the active locale's empty-collection marker
+    /// spelling, making bare marker expressions visually ambiguous.
+    EmptyMarkerShadowing,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.

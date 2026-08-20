@@ -74,6 +74,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::PreferStringTemplate,
     WarningKind::DiscouragedMutLocal,
     WarningKind::DeprecatedParamPrefix,
+    WarningKind::EmptyMarkerShadowing,
 ];
 
 // STABLE CODES
@@ -338,6 +339,9 @@ pub fn semantic_message(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Opti
         SemanticErrorKind::Warning(WarningKind::DeprecatedParamPrefix) => {
             semantic_deprecated_param_prefix_message(args)
         }
+        SemanticErrorKind::Warning(WarningKind::EmptyMarkerShadowing) => {
+            semantic_empty_marker_shadowing_message(args)
+        }
     }
 }
 
@@ -365,6 +369,9 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
         }
         SemanticErrorKind::Warning(WarningKind::DeprecatedParamPrefix) => {
             Some("write the parameter mode on the type (`de`, `in`, `own`, `copy`) instead of the legacy prefix".to_owned())
+        }
+        SemanticErrorKind::Warning(WarningKind::EmptyMarkerShadowing) => {
+            Some("choose a different binding name when the empty-collection marker is needed".to_owned())
         }
         _ => None,
     }
@@ -1896,6 +1903,14 @@ fn semantic_lint_message(args: &[DiagnosticArg]) -> Option<String> {
         "unused_function" => Some("unused function".to_owned()),
         "unused_import" => Some("unused import".to_owned()),
         "unused_variable" => Some("unused variable".to_owned()),
+        "empty_marker_shadowing" => Some("binding shadows the empty-collection marker".to_owned()),
+        _ => None,
+    }
+}
+
+fn semantic_empty_marker_shadowing_message(args: &[DiagnosticArg]) -> Option<String> {
+    match arg_value(args, "issue")? {
+        "empty_marker_shadowing" => Some("binding shadows the empty-collection marker".to_owned()),
         _ => None,
     }
 }
@@ -2538,6 +2553,10 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::DeprecatedParamPrefix => DiagnosticSpec {
             code: "WARN020",
             help: Some("write the mode on the type (`de T`, `in T`, `own T`, `copy T`) instead of the legacy prefix"),
+        },
+        WarningKind::EmptyMarkerShadowing => DiagnosticSpec {
+            code: "WARN021",
+            help: Some("choose a different binding name when the empty-collection marker is needed"),
         },
     }
 }

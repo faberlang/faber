@@ -173,12 +173,11 @@ fn struct_field_default_provides_context_for_vacua() {
 }
 
 #[test]
-fn same_named_fn_does_not_defeat_bare_vacua_marker() {
-    // V-5: bare `vacua` in expression position is the empty-collection marker
-    // unconditionally. A top-level fn of the same spelling is legal and still
-    // callable as `vacua()`, but cannot steal the marker from field defaults
-    // or annotated initializers.
-    test_support::assert_accepts(
+fn same_named_fn_wins_over_bare_vacua_marker_and_typechecks_loudly() {
+    // F1: a live same-named function wins over the parser's Vacua claim in
+    // every expression position. The collection-typed field and initializer
+    // therefore report ordinary type errors, while `vacua()` remains callable.
+    test_support::assert_rejects_with_issue(
         r#"
 genus Header { textus name = "" }
 genus Headers { lista<Header> entries = vacua }
@@ -189,13 +188,15 @@ functio probe() → lista<Header> {
 }
 functio use_call() → Headers { redde vacua() }
 "#,
+        "field_default_type_mismatch",
     );
 }
 
 #[test]
-fn same_named_en_empty_fn_does_not_defeat_bare_marker() {
-    // Live shape: norma/src/http/headers.fab — `fn empty() → Headers` plus
-    // `list<Header> entries = empty` and `var list<string> out ← empty`.
+fn same_named_en_empty_fn_wins_over_bare_marker_and_typechecks_loudly() {
+    // The English reader pack claims `empty` as the marker, but the live
+    // `fn empty() → Headers` binding wins and makes collection positions type
+    // check against Headers instead of silently using Vec::new().
     let pack_path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path)
@@ -224,8 +225,16 @@ fn use_call() → Headers {
         config,
     );
     assert!(
-        result.is_ok(),
-        "bare empty must stay the marker beside fn empty(): {:?}",
+        !result.is_ok(),
+        "binding-wins marker collisions must typecheck loudly: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some("field_default_type_mismatch")),
+        "expected the field default collision to be diagnosed: {:?}",
         result.diagnostics
     );
 }

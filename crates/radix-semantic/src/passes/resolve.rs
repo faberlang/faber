@@ -1074,15 +1074,11 @@ fn resolve_expr(
             resolve_expr(resolver, interner, &expr.else_, errors);
         }
         ExprKind::Call(expr) => {
-            // WHY: V-5 — bare `vacua`/`empty` is the marker, but call position
-            // `vacua()` must still resolve a same-named function. The parser
-            // claims the ident as Vacua before postfix `()`, so the callee
-            // node is Vacua; record shadowing only on that call-callee node.
-            if let ExprKind::Vacua(ident) = &expr.callee.kind {
-                record_shadowed_builtin(resolver, expr.callee.id, ident.name);
-            } else {
-                resolve_expr(resolver, interner, &expr.callee, errors);
-            }
+            // WHY: V-5 — the callee is an ordinary expression position. The
+            // marker is only a fallback when no same-named value binding is
+            // live, so resolving it here keeps calls consistent with every
+            // other position (`arg`, receiver, index base, and chain base).
+            resolve_expr(resolver, interner, &expr.callee, errors);
             for arg in &expr.args {
                 resolve_expr(resolver, interner, &arg.value, errors);
             }
@@ -1290,10 +1286,11 @@ fn resolve_expr(
             }
         }
 
-        // WHY: V-5 — the empty-collection marker claims unconditionally in
-        // expression position. A same-named binding is legal and callable as
-        // `vacua()`, but cannot steal a bare marker use.
-        ExprKind::Vacua(_) => {}
+        // WHY: V-5 — the parser claims the marker spelling before resolution,
+        // but the marker is only the fallback when no same-named value binding
+        // is live. This makes binding lookup win uniformly in expression
+        // position while preserving the marker when the name is unbound.
+        ExprKind::Vacua(ident) => record_shadowed_builtin(resolver, expr.id, ident.name),
         ExprKind::Praefixum(expr) => match &expr.body {
             radix_syntax::PraefixumBody::Block(block) => {
                 resolve_block(resolver, interner, block, errors)
