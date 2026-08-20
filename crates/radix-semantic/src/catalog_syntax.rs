@@ -384,6 +384,9 @@ fn invalid_parameter_message(args: &[DiagnosticArg]) -> Option<String> {
                 "{keyword} was removed; use {optional_marker} for optional slots and {immutable_marker} for deferred immutable locals"
             ))
         }
+        "parameter_access_modifier_pair" => {
+            Some("parameter carries both a mode prefix and a type marker; use one".to_owned())
+        }
         _ => None,
     }
 }
@@ -397,6 +400,10 @@ fn invalid_parameter_help(args: &[DiagnosticArg]) -> Option<String> {
                 "mark optional parameter or field slots with {optional_marker} after the name"
             ))
         }
+        "parameter_access_modifier_pair" => Some(
+            "write either the parameter mode prefix or the type-position marker, not both"
+                .to_owned(),
+        ),
         _ => None,
     }
 }

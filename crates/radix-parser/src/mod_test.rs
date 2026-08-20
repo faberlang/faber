@@ -3536,6 +3536,53 @@ fn removed_fixus_in_genus_field_rejected() {
     assert_eq!(err.args[1].value, "fixus");
 }
 
+fn assert_parameter_access_modifier_pair_rejected(source: &str) {
+    let result = parse_program(source);
+    assert!(
+        !result.success(),
+        "parameter access-modifier pair must be rejected, got {:?}",
+        result.errors
+    );
+    let err = result
+        .errors
+        .iter()
+        .find(|err| {
+            err.kind == ParseErrorKind::InvalidParameter
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "parameter_access_modifier_pair")
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "parameter access-modifier pair diagnostic: {:?}",
+                result.errors
+            )
+        });
+    assert_parse_error_has_no_legacy_message(err);
+}
+
+#[test]
+fn ref_mut_parameter_pair_is_parse_rejected() {
+    assert_parameter_access_modifier_pair_rejected(
+        "functio f(de in lista<numerus> values) → vacuum {}",
+    );
+}
+
+#[test]
+fn mut_ref_parameter_pair_is_parse_rejected() {
+    assert_parameter_access_modifier_pair_rejected(
+        "functio f(in de lista<numerus> values) → vacuum {}",
+    );
+}
+
+#[test]
+fn mut_mut_parameter_pair_is_parse_rejected() {
+    assert_parameter_access_modifier_pair_rejected(
+        "functio f(in in lista<numerus> values) → vacuum {}",
+    );
+}
+
 #[test]
 fn removed_sed_expression_is_an_identifier_without_targeted_diagnostic() {
     // `sed "x"` is retired: no spelling gate, so the spellings parse as
