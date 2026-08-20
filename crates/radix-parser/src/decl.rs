@@ -555,7 +555,7 @@ impl Parser {
     ///
     /// GRAMMAR:
     ///   param-list := regular-param* (',' regular-param)*
-    ///   regular-param := [`de`|`in`|`ex`] [`ceteri`] type ident [`sponte`] [`ut` ident] [`vel` expr]
+    ///   regular-param := [`ceteri`] type ident [`sponte`] [`ut` ident] [`vel` expr]
     ///
     /// Generic parameters live in the angle-bracket list before `(`.
     fn parse_param_list(&mut self) -> Result<Vec<Param>, ParseError> {
@@ -568,25 +568,8 @@ impl Parser {
         while !self.check(&TokenKind::RParen) && !self.is_at_end() {
             let start = self.current_span();
 
-            let (mode, has_prefix) = if self.eat_keyword_ident(TokenKind::De) {
-                (AstParamMode::De, true)
-            } else if self.eat_keyword_ident(TokenKind::In) {
-                (AstParamMode::In, true)
-            } else if self.eat_keyword_ident(TokenKind::Ex) {
-                (AstParamMode::Ex, true)
-            } else {
-                (AstParamMode::Owned, false)
-            };
-
             let rest = self.eat_keyword_ident(TokenKind::Ceteri);
-
             let ty = self.parse_type()?;
-            if has_prefix && ty.mode.is_some() {
-                return Err(
-                    ParseError::structured(ParseErrorKind::InvalidParameter, ty.span)
-                        .with_arg("issue", "parameter_access_modifier_pair"),
-                );
-            }
 
             let name = self.parse_param_name()?;
 
@@ -607,7 +590,7 @@ impl Parser {
             let span = start.merge(self.previous_span());
             params.push(Param {
                 sponte,
-                mode,
+                mode: AstParamMode::Owned,
                 rest,
                 ty,
                 name,

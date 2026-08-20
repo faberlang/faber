@@ -209,8 +209,8 @@ impl super::FaberCodegen {
                     .map(|p| {
                         let ty = self.type_to_faber(p.ty, types, names, interner, surface);
                         // A type-position marker already rides the param type
-                        // (`de T` / `in T`); only emit an explicit mode prefix
-                        // when the mode is not already encoded on the type.
+                        // (`de T` / `in T`); synthesize that marker only when
+                        // an imported signature carries the mode separately.
                         let type_carries_mode = matches!(types.get(p.ty), Type::Ref(..));
                         match p.mode {
                             SemanticParamMode::Owned => ty,
@@ -221,7 +221,7 @@ impl super::FaberCodegen {
                                 format!("{} {}", surface.keyword(radix_lexer::TokenKind::In), ty)
                             }
                             SemanticParamMode::Move => {
-                                format!("{} {}", surface.keyword(radix_lexer::TokenKind::Ex), ty)
+                                format!("{} {}", surface.keyword(radix_lexer::TokenKind::Own), ty)
                             }
                             _ => ty,
                         }
@@ -620,8 +620,8 @@ mod tests {
             "(de textus) → vacuum"
         );
 
-        // A mode that is not encoded on the type (e.g. `ex` move) gets an
-        // explicit prefix keyword instead of being silently dropped.
+        // A mode that is not encoded on the type (e.g. `own` move) gets an
+        // explicit type-position marker instead of being silently dropped.
         let owned_sig = FuncSig {
             type_params: Vec::new(),
             type_param_constraints: Vec::new(),
@@ -638,7 +638,7 @@ mod tests {
         let move_func_ty = types.intern(radix_types::Type::Func(owned_sig));
         assert_eq!(
             codegen.type_to_faber(move_func_ty, &types, &names, &interner, &surface),
-            "(ex textus) → vacuum"
+            "(own textus) → vacuum"
         );
     }
 

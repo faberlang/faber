@@ -365,8 +365,8 @@ pub enum GpuBuiltinWire {
 /// modifier (serde variant removal changes the wire format). Version 4
 /// represents parameter modes as the unified mode unification fact: a
 /// parameter's `HirParamMode` (and the semantic `param_modes` entries) now
-/// derive from the type-position access marker when present, with the legacy
-/// parameter-prefix slot as a deprecated fallback (MU-5a). Type-position
+/// derive from the type-position access marker; the parameter-prefix slot is
+/// retired (MU-5b). Type-position
 /// markers model the mode on the marked `Type::Ref(...)` and fn-type/closure
 /// parameter slots now carry their own modes.
 ///
