@@ -240,8 +240,8 @@ fn textus_vacua_typechecks_as_bivalens() {
     let source = r#"
 incipit {
   fixum textus s ← ""
-  fixum bivalens empty ← s.vacua()
-  nota empty
+  fixum bivalens empty_flag ← s.vacua()
+  nota empty_flag
 }
 "#;
     let session = Session::new(Config::default());

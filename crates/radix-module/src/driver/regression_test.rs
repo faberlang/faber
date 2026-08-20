@@ -788,10 +788,10 @@ incipit {
 fn empty_array_and_spread_literals_no_longer_report_annotation_or_type_errors() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum _ empty ← []
+  fixum _ empty_list ← []
   fixum _ first ← [1, 2, 3]
   fixum _ extended ← [0, sparge first, 99]
-  nota empty, extended
+  nota empty_list, extended
 }";
     let result = compile(&session, "test.fab", source);
 

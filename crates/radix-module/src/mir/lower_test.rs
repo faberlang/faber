@@ -2397,8 +2397,8 @@ fn lowers_tensor_longitudo_to_collection_length() {
     let dump = dump_source(
         r"
 incipit {
-    fixum tensor<fractus<f32>, []> empty ← vacua
-    nota empty.longitudo()
+    fixum tensor<fractus<f32>, []> empty_tensor ← vacua
+    nota empty_tensor.longitudo()
 }
 ",
     );
