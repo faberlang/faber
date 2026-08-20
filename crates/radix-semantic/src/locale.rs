@@ -292,6 +292,16 @@ impl LocalePack {
             .map_or(latin_key, String::as_str)
     }
 
+    /// Pack aliases for a contextual keyword identity.
+    ///
+    /// Empty for identity rows (Latin, packs with no transition alias).
+    #[must_use]
+    pub fn contextual_keyword_aliases(&self, latin_key: &'static str) -> &[String] {
+        self.keywords
+            .get(latin_key)
+            .map_or(&[], |binding| binding.aliases.as_slice())
+    }
+
     /// Return the localized surface spelling for a primitive or collection type.
     ///
     /// Every [`TypeBindingKind`] has exactly one canonical Latin spelling in the
@@ -866,6 +876,12 @@ impl<'a> KeywordSurface<'a> {
     #[must_use]
     pub fn contextual_keyword(&self, latin_key: &'static str) -> &'a str {
         self.pack.contextual_keyword_surface(latin_key)
+    }
+
+    /// Pack aliases for a contextual keyword identity.
+    #[must_use]
+    pub fn contextual_keyword_aliases(&self, latin_key: &'static str) -> &'a [String] {
+        self.pack.contextual_keyword_aliases(latin_key)
     }
 
     /// Localized surface spelling for a primitive or collection type, with

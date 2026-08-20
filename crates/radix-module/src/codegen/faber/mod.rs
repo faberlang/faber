@@ -27,6 +27,12 @@ impl LeafKeywordSurface for LocaleKeywordBridge<'_> {
         locale::KeywordSurface::contextual_keyword(&self.0, latin_key)
     }
 
+    fn contextual_keyword_alias(&self, latin_key: &'static str, index: usize) -> Option<&str> {
+        locale::KeywordSurface::contextual_keyword_aliases(&self.0, latin_key)
+            .get(index)
+            .map(String::as_str)
+    }
+
     fn preserve_template_application_sugar(&self) -> bool {
         locale::KeywordSurface::preserve_template_application_sugar(&self.0)
     }

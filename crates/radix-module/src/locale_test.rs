@@ -1295,11 +1295,20 @@ fn en_pack_empty_marker_accepts_vacua_transition_alias() {
         "transition alias: en must still accept the Latin marker spelling"
     );
     assert_eq!(pack.contextual_keyword_surface("vacua"), "empty");
+    assert_eq!(
+        pack.contextual_keyword_aliases("vacua"),
+        ["vacua"],
+        "en transition alias is the capture-avoidance escape hatch"
+    );
     assert_eq!(pack.intrinsic_surface("vacua"), Some("is_empty"));
 
     let la = installed_pack("la");
     assert_eq!(la.keyword_latin_key("vacua"), Some("vacua"));
     assert_eq!(la.keyword_latin_key("empty"), None, "la must not treat `empty` as the marker");
+    assert!(
+        la.contextual_keyword_aliases("vacua").is_empty(),
+        "la identity row has no marker alias; a local named vacua has no emit escape hatch"
+    );
 }
 
 #[test]
