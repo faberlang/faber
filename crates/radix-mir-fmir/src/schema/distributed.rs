@@ -62,8 +62,9 @@ use radix_mir::distributed::{
     ResultRef, TransferDirection, TransferId, TransferOperation, TransportPath,
 };
 use radix_mir::kernel_plan::{
-    AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, CollectionKernelPlan,
-    GatherPlan, GroupedMatMulPlan, LayerNormalizationPlan, MatMulPlan, MatMulSharedMemory,
+    AxisReductionPlan, BarrierPhase, BarrierPoint, BatchedAttentionKind, BatchedAttentionPlan,
+    CausalMaskedSoftmaxPlan, CollectionKernelPlan, GatherPlan, GroupedMatMulPlan,
+    LayerNormalizationPlan, MatMulPlan, MatMulSharedMemory,
     OobPaddingPolicy, QuantizedMatMulPlan, ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan,
     RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
 };
@@ -72,8 +73,8 @@ use radix_mir::{MirFunctionId, MirType};
 use radix_types::TypeId;
 
 use super::wire::{
-    WireBarrierPhase, WireBarrierPoint, WireBufferIdentity, WireBufferLifetime, WireBufferRole,
-    WireBufferVersion, WireCollectionKernelPlan, WireDeviceProgram, WireKernelUnit,
+    WireBarrierPhase, WireBarrierPoint, WireBatchedAttentionKind, WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
+    WireCollectionKernelPlan, WireDeviceProgram, WireKernelUnit,
     WireOobPaddingPolicy, WirePackedStorageLayout, WireProgramLifetime, WireReduceOp,
     WireResourceAccess, WireResultBuffer, WireSharedMemoryLayout, WireStorageLayout,
 };
@@ -636,6 +637,29 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
                 tile: plan.tile,
                 workgroup_x: plan.workgroup_x,
                 workgroup_y: plan.workgroup_y,
+            })
+        }
+        WireCollectionKernelPlan::BatchedAttention(plan) => {
+            CollectionKernelPlan::BatchedAttention(BatchedAttentionPlan {
+                kind: match plan.kind {
+                    WireBatchedAttentionKind::ProjectionQ => BatchedAttentionKind::ProjectionQ,
+                    WireBatchedAttentionKind::ProjectionK => BatchedAttentionKind::ProjectionK,
+                    WireBatchedAttentionKind::ProjectionV => BatchedAttentionKind::ProjectionV,
+                    WireBatchedAttentionKind::Scores => BatchedAttentionKind::Scores,
+                    WireBatchedAttentionKind::Softmax => BatchedAttentionKind::Softmax,
+                    WireBatchedAttentionKind::ContextSequenceMajor => {
+                        BatchedAttentionKind::ContextSequenceMajor
+                    }
+                },
+                kv_heads: plan.kv_heads,
+                q_per_kv: plan.q_per_kv,
+                seq: plan.seq,
+                head_dim: plan.head_dim,
+                hidden: plan.hidden,
+                layout: plan.layout.map(wire_packed_layout),
+                rotate_half: plan.rotate_half,
+                output_strides: plan.output_strides,
+                scale_bits: plan.scale_bits,
             })
         }
         WireCollectionKernelPlan::SsmConv1d(plan) => {

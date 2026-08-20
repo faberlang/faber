@@ -533,6 +533,11 @@ impl Validator<'_, '_> {
             MirCollectionOp::TensorRmsNorm => 4,
             MirCollectionOp::TensorLayerNorm => 0,
             MirCollectionOp::TensorGather => 0,
+            // Compiler-owned M3 lowering carries tensor peers followed by a
+            // variable const contract: projections may carry fused rope and
+            // bias peers, while scores/context/softmax carry their normal
+            // tensor inputs.
+            MirCollectionOp::TensorBatchedAttention => 0,
         };
         if matches!(op, MirCollectionOp::TensorLayerNorm) {
             if !(3..=5).contains(&call.args.len()) {
@@ -543,6 +548,16 @@ impl Validator<'_, '_> {
             // an optional trailing GGML type-id const.
             if !(2..=3).contains(&call.args.len()) {
                 self.error(span, "collection TensorGather expects 2 or 3 MIR arguments");
+            }
+        } else if matches!(op, MirCollectionOp::TensorBatchedAttention) {
+            // This compiler-owned primitive has tensor peers followed by
+            // shape/layout constants. Fused projections may carry x/weight,
+            // cos/sin, and bias (up to twelve operands).
+            if !(7..=12).contains(&call.args.len()) {
+                self.error(
+                    span,
+                    "collection TensorBatchedAttention expects 7-12 MIR arguments",
+                );
             }
         } else if call.args.len() != expected_args {
             self.error(
@@ -1336,6 +1351,10 @@ impl Validator<'_, '_> {
                     );
                 }
             }
+            // This is a compiler-owned operation. Its tensor/const contract is
+            // validated by radix-mir::abi::contract after lowering, rather
+            // than by the source-level collection validator.
+            MirCollectionOp::TensorBatchedAttention => {}
             MirCollectionOp::IntervalLength => {
                 if !first_arg_ty
                     .is_some_and(|ty| matches!(self.type_kind(ty), Type::Intervallum(_)))

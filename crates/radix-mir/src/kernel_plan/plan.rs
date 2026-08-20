@@ -104,6 +104,10 @@ pub enum CollectionKernelPlan {
     /// name frozen; admission/resolution is R-PACK-03A). See
     /// [`GroupedMatMulPlan`].
     GroupedMatMul(GroupedMatMulPlan),
+    /// Head-batched attention materialization (M3-U1). This is deliberately a
+    /// distinct recipe from `GroupedMatMul`: attention carries explicit
+    /// group/head axes, GQA mapping, and a sequence-major context output.
+    BatchedAttention(BatchedAttentionPlan),
     /// Hybrid SSM conv1d recipe (R-PACK-01A: name frozen; admission is
     /// R-PACK-04A). See [`SsmConv1dPlan`].
     SsmConv1d(SsmConv1dPlan),
@@ -279,6 +283,50 @@ pub struct GroupedMatMulPlan {
     pub workgroup_x: u32,
     /// Workgroup lane count on `y`; must equal `tile`.
     pub workgroup_y: u32,
+}
+
+/// The target-neutral head-batched attention operation carried by M3.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BatchedAttentionKind {
+    /// Project the sequence-major hidden state into query heads.
+    ProjectionQ,
+    /// Project the sequence-major hidden state into key heads.
+    ProjectionK,
+    /// Project the sequence-major hidden state into value heads.
+    ProjectionV,
+    /// Compute grouped Q·Kᵀ scores and apply the frozen attention scale.
+    Scores,
+    /// Apply independent causal row softmax to every `(group, head)` row.
+    Softmax,
+    /// Compute grouped probabilities·V directly into sequence-major hidden
+    /// storage. This is the sentinel-proven layout seam: no scatter/permute.
+    ContextSequenceMajor,
+}
+
+/// M3 batched attention contract. All axes and strides are explicit facts;
+/// an emitter must not infer them from a physical byte length or a model name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BatchedAttentionPlan {
+    /// Operation family being materialized.
+    pub kind: BatchedAttentionKind,
+    /// Number of KV groups.
+    pub kv_heads: u64,
+    /// Query heads sharing each KV head (GQA mapping).
+    pub q_per_kv: u64,
+    /// Sequence extent.
+    pub seq: u64,
+    /// Per-head feature width.
+    pub head_dim: u64,
+    /// Hidden-state width (used by projections and sequence-major context).
+    pub hidden: u64,
+    /// Packed weight layout for projection operations; `None` otherwise.
+    pub layout: Option<crate::abi::PackedStorageLayout>,
+    /// Explicit NeoX rotate-half projection mapping, when fused into Q/K.
+    pub rotate_half: bool,
+    /// Row-major physical strides for the logical output view.
+    pub output_strides: [u64; 4],
+    /// IEEE-754 bits of the scale applied by scores before softmax.
+    pub scale_bits: u32,
 }
 
 /// SSM conv1d plan (R-PACK-01A: name frozen). Length, channel, and kernel

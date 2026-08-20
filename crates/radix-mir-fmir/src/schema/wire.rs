@@ -522,6 +522,9 @@ pub enum WireCollectionKernelPlan {
     /// `kernel_plan::GroupedMatMulPlan`). Plan fields only; accepted wire
     /// version unchanged.
     GroupedMatMul(WireGroupedMatMulPlan),
+    /// M3 head-batched attention recipe. The explicit GQA axes, projection
+    /// layout, strides, and rope mode are carried field-for-field.
+    BatchedAttention(WireBatchedAttentionPlan),
     /// SSM conv1d recipe (R-PACK-01C mechanical mirror of
     /// `kernel_plan::SsmConv1dPlan`). Plan fields only; accepted wire
     /// version unchanged.
@@ -714,6 +717,44 @@ pub struct WireGroupedMatMulPlan {
     pub workgroup_x: u32,
     /// Workgroup lane count on `y`.
     pub workgroup_y: u32,
+}
+
+/// M3 head-batched attention plan mirror.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireBatchedAttentionPlan {
+    /// Materialized operation kind.
+    pub kind: WireBatchedAttentionKind,
+    /// Number of KV groups.
+    pub kv_heads: u64,
+    /// Query heads per KV group.
+    pub q_per_kv: u64,
+    /// Sequence extent.
+    pub seq: u64,
+    /// Per-head feature width.
+    pub head_dim: u64,
+    /// Hidden-state width.
+    pub hidden: u64,
+    /// Packed projection layout, when present.
+    pub layout: Option<WirePackedStorageLayout>,
+    /// Explicit NeoX rotate-half projection mode.
+    pub rotate_half: bool,
+    /// Row-major output strides.
+    pub output_strides: [u64; 4],
+    /// IEEE-754 score scale bits.
+    pub scale_bits: u32,
+}
+
+/// Wire spelling of the M3 batched-attention operation kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireBatchedAttentionKind {
+    ProjectionQ,
+    ProjectionK,
+    ProjectionV,
+    Scores,
+    Softmax,
+    ContextSequenceMajor,
 }
 
 /// SSM conv1d plan (R-PACK-01C mechanical mirror of
