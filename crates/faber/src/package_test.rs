@@ -13636,7 +13636,7 @@ functio simple_loss(
 import from "testgrad:gradient" gradient
 
 main {
-    const tensor<f32, []> seed ← vacua
+    const tensor<f32, []> seed ← empty
     const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
     const tensor<f32, [2,2]> x ← seed.from_flat(data, [2, 2])
     const tensor<f32, [2,2]> w ← seed.from_flat(data, [2, 2])
@@ -13892,7 +13892,7 @@ functio simple_loss(
 import from "testgrad:gradient" gradient
 
 main {
-    const tensor<f32, []> seed ← vacua
+    const tensor<f32, []> seed ← empty
     const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
     const tensor<f32, [2,2]> x ← seed.from_flat(data, [2, 2])
     const tensor<f32, [2,2]> w ← seed.from_flat(data, [2, 2])
@@ -13998,7 +13998,7 @@ import from "testgrad:gradient" gradient
 import from "testgrad:math" math
 
 main {
-    const tensor<f32, []> seed ← vacua
+    const tensor<f32, []> seed ← empty
     const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
     const tensor<f32, [2,2]> x ← seed.from_flat(data, [2, 2])
     const tensor<f32, [2,2]> w ← seed.from_flat(data, [2, 2])
