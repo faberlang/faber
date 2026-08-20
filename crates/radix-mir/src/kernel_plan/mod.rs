@@ -39,5 +39,8 @@ pub use plan::*;
 pub use validate::*;
 
 #[cfg(test)]
+#[path = "exhaustiveness_test.rs"]
+mod exhaustiveness_test;
+#[cfg(test)]
 #[path = "kernel_plan_test.rs"]
 mod tests;
