@@ -177,7 +177,7 @@ fn layernorm_program(
 // -----------------------------------------------------------------------
 
 #[test]
-fn test_layernorm_valid_rank1_3args() {
+fn layernorm_valid_rank1_3args() {
     let mut types = TypeTable::new();
     let program = layernorm_program(
         &mut types,
@@ -196,7 +196,7 @@ fn test_layernorm_valid_rank1_3args() {
 }
 
 #[test]
-fn test_layernorm_valid_rank2_3args() {
+fn layernorm_valid_rank2_3args() {
     let mut types = TypeTable::new();
     let program = layernorm_program(
         &mut types,
@@ -215,7 +215,7 @@ fn test_layernorm_valid_rank2_3args() {
 }
 
 #[test]
-fn test_layernorm_valid_with_gamma() {
+fn layernorm_valid_with_gamma() {
     let mut types = TypeTable::new();
     // gamma is rank-1 [4] matching the input.
     let program = layernorm_program(
@@ -235,7 +235,7 @@ fn test_layernorm_valid_with_gamma() {
 }
 
 #[test]
-fn test_layernorm_valid_with_gamma_beta() {
+fn layernorm_valid_with_gamma_beta() {
     let mut types = TypeTable::new();
     let program = layernorm_program(
         &mut types,
@@ -254,7 +254,7 @@ fn test_layernorm_valid_with_gamma_beta() {
 }
 
 #[test]
-fn test_layernorm_valid_rank2_axis0() {
+fn layernorm_valid_rank2_axis0() {
     let mut types = TypeTable::new();
     let program = layernorm_program(
         &mut types,
@@ -277,7 +277,7 @@ fn test_layernorm_valid_rank2_axis0() {
 // -----------------------------------------------------------------------
 
 #[test]
-fn test_layernorm_invalid_not_tensor() {
+fn layernorm_invalid_not_tensor() {
     let mut types = TypeTable::new();
     let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
     let program = layernorm_program(
@@ -300,7 +300,7 @@ fn test_layernorm_invalid_not_tensor() {
 }
 
 #[test]
-fn test_layernorm_invalid_rank3() {
+fn layernorm_invalid_rank3() {
     let mut types = TypeTable::new();
     // Rank-3 tensor — validation limits layernorm to rank 1 or 2.
     let tid = tensor_type(&mut types, Primitive::Fractus, &[2, 4, 8]);
@@ -325,7 +325,7 @@ fn test_layernorm_invalid_rank3() {
 }
 
 #[test]
-fn test_layernorm_invalid_axis_out_of_range() {
+fn layernorm_invalid_axis_out_of_range() {
     let mut types = TypeTable::new();
     let program = layernorm_program(
         &mut types,
@@ -347,7 +347,7 @@ fn test_layernorm_invalid_axis_out_of_range() {
 }
 
 #[test]
-fn test_layernorm_invalid_axis_negative() {
+fn layernorm_invalid_axis_negative() {
     let mut types = TypeTable::new();
     let program = layernorm_program(
         &mut types,
@@ -369,7 +369,7 @@ fn test_layernorm_invalid_axis_negative() {
 }
 
 #[test]
-fn test_layernorm_invalid_axis_not_int() {
+fn layernorm_invalid_axis_not_int() {
     let mut types = TypeTable::new();
     // Only override axis: use float constant instead of int by constructing
     // the program manually — we need to replace the axis operand.
@@ -440,7 +440,7 @@ fn test_layernorm_invalid_axis_not_int() {
 }
 
 #[test]
-fn test_layernorm_invalid_epsilon_not_float() {
+fn layernorm_invalid_epsilon_not_float() {
     let mut types = TypeTable::new();
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
     let tid = tensor_type(&mut types, Primitive::Fractus, &[4]);
@@ -509,7 +509,7 @@ fn test_layernorm_invalid_epsilon_not_float() {
 }
 
 #[test]
-fn test_layernorm_invalid_epsilon_non_positive() {
+fn layernorm_invalid_epsilon_non_positive() {
     let mut types = TypeTable::new();
     let program = layernorm_program(
         &mut types,
@@ -533,7 +533,7 @@ fn test_layernorm_invalid_epsilon_non_positive() {
 }
 
 #[test]
-fn test_layernorm_invalid_gamma_not_tensor() {
+fn layernorm_invalid_gamma_not_tensor() {
     let mut types = TypeTable::new();
     let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
     let program = layernorm_program(
@@ -556,7 +556,7 @@ fn test_layernorm_invalid_gamma_not_tensor() {
 }
 
 #[test]
-fn test_layernorm_invalid_beta_not_tensor() {
+fn layernorm_invalid_beta_not_tensor() {
     let mut types = TypeTable::new();
     let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
     let program = layernorm_program(
@@ -579,7 +579,7 @@ fn test_layernorm_invalid_beta_not_tensor() {
 }
 
 #[test]
-fn test_layernorm_invalid_result_not_tensor() {
+fn layernorm_invalid_result_not_tensor() {
     let mut types = TypeTable::new();
     let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
     let program = layernorm_program(
@@ -602,7 +602,7 @@ fn test_layernorm_invalid_result_not_tensor() {
 }
 
 #[test]
-fn test_layernorm_invalid_arity_too_few() {
+fn layernorm_invalid_arity_too_few() {
     // Only one arg — should not panic from axis_idx underflow.
     let mut types = TypeTable::new();
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
@@ -672,7 +672,7 @@ fn test_layernorm_invalid_arity_too_few() {
 // -----------------------------------------------------------------------
 
 #[test]
-fn test_tuple_aggregate_valid() {
+fn tuple_aggregate_valid() {
     let mut types = TypeTable::new();
     let bivalens = types.primitive(Primitive::Bivalens);
     let tuple_tid = types.tuple(vec![bivalens, bivalens]);
@@ -737,7 +737,7 @@ fn test_tuple_aggregate_valid() {
 }
 
 #[test]
-fn test_tuple_aggregate_element_count_mismatch() {
+fn tuple_aggregate_element_count_mismatch() {
     let mut types = TypeTable::new();
     let bivalens = types.primitive(Primitive::Bivalens);
     // Tuple arity 2 but we provide 1 element
@@ -801,7 +801,7 @@ fn test_tuple_aggregate_element_count_mismatch() {
 }
 
 #[test]
-fn test_tuple_aggregate_element_type_mismatch() {
+fn tuple_aggregate_element_type_mismatch() {
     let mut types = TypeTable::new();
     let bivalens = types.primitive(Primitive::Bivalens);
     let tuple_tid = types.tuple(vec![bivalens, bivalens]);
@@ -870,7 +870,7 @@ fn test_tuple_aggregate_element_type_mismatch() {
 }
 
 #[test]
-fn test_tuple_aggregate_spread_rejected() {
+fn tuple_aggregate_spread_rejected() {
     let mut types = TypeTable::new();
     let bivalens = types.primitive(Primitive::Bivalens);
     let tuple_tid = types.tuple(vec![bivalens, bivalens]);
@@ -950,7 +950,7 @@ fn test_tuple_aggregate_spread_rejected() {
 }
 
 #[test]
-fn test_tuple_aggregate_empty() {
+fn tuple_aggregate_empty() {
     let mut types = TypeTable::new();
     // Empty tuple () is the unit type.
     let unit_tid = types.unit();
@@ -1013,7 +1013,7 @@ fn test_tuple_aggregate_empty() {
 // -----------------------------------------------------------------------
 
 #[test]
-fn test_tuple_index_projection_valid() {
+fn tuple_index_projection_valid() {
     let mut types = TypeTable::new();
     let bivalens = types.primitive(Primitive::Bivalens);
     let tuple_tid = types.tuple(vec![bivalens]);
@@ -1084,7 +1084,7 @@ fn test_tuple_index_projection_valid() {
 }
 
 #[test]
-fn test_tuple_index_projection_out_of_bounds() {
+fn tuple_index_projection_out_of_bounds() {
     let mut types = TypeTable::new();
     let bivalens = types.primitive(Primitive::Bivalens);
     let tuple_tid = types.tuple(vec![bivalens]);
@@ -1161,7 +1161,7 @@ fn test_tuple_index_projection_out_of_bounds() {
 }
 
 #[test]
-fn test_tuple_index_projection_non_constant() {
+fn tuple_index_projection_non_constant() {
     let mut types = TypeTable::new();
     let bivalens = types.primitive(Primitive::Bivalens);
     let numerus = types.primitive(Primitive::Numerus);
@@ -1242,7 +1242,7 @@ fn test_tuple_index_projection_non_constant() {
 }
 
 #[test]
-fn test_tuple_index_projection_rejects_negative_index() {
+fn tuple_index_projection_rejects_negative_index() {
     let mut types = TypeTable::new();
     let bivalens = types.primitive(Primitive::Bivalens);
     let tuple_tid = types.tuple(vec![bivalens]);
@@ -1469,7 +1469,7 @@ fn rejects_function_with_only_goto_cycle() {
 
 /// Neg on a bool operand should be rejected — Neg requires numeric.
 #[test]
-fn test_unary_neg_on_bivalens_rejected() {
+fn unary_neg_on_bivalens_rejected() {
     let types = TypeTable::new();
     let bivalens = types.primitive(Primitive::Bivalens);
     let bivalens_mty = MirType::semantic(bivalens);
@@ -1544,7 +1544,7 @@ fn test_unary_neg_on_bivalens_rejected() {
 
 /// Sqrt on a numerus operand should be rejected — float unary ops require fractus.
 #[test]
-fn test_unary_sqrt_on_numerus_rejected() {
+fn unary_sqrt_on_numerus_rejected() {
     let types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
     let numerus_mty = MirType::semantic(numerus);
@@ -1694,7 +1694,7 @@ fn unary_op_program(
 /// tensor operand (MLP fmir path); the F-035/F-036 scalar-only float check
 /// rejected them as "not fractus".
 #[test]
-fn test_unary_float_ops_on_tensor_f32_accepted() {
+fn unary_float_ops_on_tensor_f32_accepted() {
     for op in [
         MirUnOp::Sqrt,
         MirUnOp::Relu,
@@ -1719,7 +1719,7 @@ fn test_unary_float_ops_on_tensor_f32_accepted() {
 /// R-W1 hardening-preservation: a tensor whose ELEMENT type is non-float is
 /// still rejected — the F-035/F-036 intent extends to tensor element types.
 #[test]
-fn test_unary_sqrt_on_tensor_numerus_rejected() {
+fn unary_sqrt_on_tensor_numerus_rejected() {
     let mut types = TypeTable::new();
     let tensor_numerus = MirType::semantic(tensor_type(&mut types, Primitive::Numerus, &[4, 4]));
     let errors = validate(
@@ -1734,7 +1734,7 @@ fn test_unary_sqrt_on_tensor_numerus_rejected() {
 
 /// Binary Add with a bivalens lhs should be rejected — arithmetic needs numeric.
 #[test]
-fn test_binary_add_non_numeric_operand_rejected() {
+fn binary_add_non_numeric_operand_rejected() {
     let types = TypeTable::new();
     let bivalens = types.primitive(Primitive::Bivalens);
     let bivalens_mty = MirType::semantic(bivalens);
@@ -1811,7 +1811,7 @@ fn test_binary_add_non_numeric_operand_rejected() {
 
 /// Binary Eq should produce bivalens result, not numerus.
 #[test]
-fn test_binary_eq_result_not_bivalens_rejected() {
+fn binary_eq_result_not_bivalens_rejected() {
     let types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
     let numerus_mty = MirType::semantic(numerus);
@@ -1887,7 +1887,7 @@ fn test_binary_eq_result_not_bivalens_rejected() {
 
 /// Binary And with non-bivalens operands should be rejected.
 #[test]
-fn test_binary_and_non_bivalens_rejected() {
+fn binary_and_non_bivalens_rejected() {
     let types = TypeTable::new();
     let _numerus_mty = MirType::semantic(types.primitive(Primitive::Numerus));
     let bivalens_mty = MirType::semantic(types.primitive(Primitive::Bivalens));
@@ -1956,7 +1956,7 @@ fn test_binary_and_non_bivalens_rejected() {
 /// Field projection on a tuple uses Symbol.0 as raw index. This must be
 /// rejected — tuples have no named fields.
 #[test]
-fn test_tuple_field_projection_rejected() {
+fn tuple_field_projection_rejected() {
     let mut types = TypeTable::new();
     let bivalens = types.primitive(Primitive::Bivalens);
     let tuple_tid = types.tuple(vec![bivalens, bivalens]);
@@ -2034,7 +2034,7 @@ fn test_tuple_field_projection_rejected() {
 
 /// Calling a Value whose type is not a function must produce an error.
 #[test]
-fn test_value_callee_not_callable_rejected() {
+fn value_callee_not_callable_rejected() {
     let types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
     let numerus_mty = MirType::semantic(numerus);
@@ -2094,7 +2094,7 @@ fn test_value_callee_not_callable_rejected() {
 
 /// Gradient Read with a non-pointer-type handle should be rejected.
 #[test]
-fn test_gradient_read_handle_not_opaque_rejected() {
+fn gradient_read_handle_not_opaque_rejected() {
     let types = TypeTable::new();
     let numerus_mty = MirType::semantic(types.primitive(Primitive::Numerus));
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
@@ -2156,7 +2156,7 @@ fn test_gradient_read_handle_not_opaque_rejected() {
 
 /// Gradient Create with non-numerus rank should be rejected.
 #[test]
-fn test_gradient_create_rank_not_numerus_rejected() {
+fn gradient_create_rank_not_numerus_rejected() {
     let types = TypeTable::new();
     let bivalens_mty = MirType::semantic(types.primitive(Primitive::Bivalens));
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
@@ -2271,7 +2271,7 @@ fn test_gradient_create_rank_not_numerus_rejected() {
 
 /// Switch with an empty cases vector must be rejected.
 #[test]
-fn test_switch_empty_cases_rejected() {
+fn switch_empty_cases_rejected() {
     let types = TypeTable::new();
     let bivalens_mty = MirType::semantic(types.primitive(Primitive::Bivalens));
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
@@ -2336,7 +2336,7 @@ fn test_switch_empty_cases_rejected() {
 
 /// Switch with duplicate case constant values must be rejected.
 #[test]
-fn test_switch_duplicate_cases_rejected() {
+fn switch_duplicate_cases_rejected() {
     let types = TypeTable::new();
     let numerus_mty = MirType::semantic(types.primitive(Primitive::Numerus));
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
@@ -2432,7 +2432,7 @@ fn test_switch_duplicate_cases_rejected() {
 
 /// Cede on a non-Promissum type must be rejected.
 #[test]
-fn test_cede_non_promissum_rejected() {
+fn cede_non_promissum_rejected() {
     let types = TypeTable::new();
     let numerus_mty = MirType::semantic(types.primitive(Primitive::Numerus));
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
@@ -2755,7 +2755,7 @@ fn approximate_collection_program(
 }
 
 #[test]
-fn test_rms_norm_valid_rank2_consts_and_gamma() {
+fn rms_norm_valid_rank2_consts_and_gamma() {
     let mut types = TypeTable::new();
     let gamma_ty = tensor_mty(&mut types, &[8]);
     let return_ty = tensor_mty(&mut types, &[2, 8]);
@@ -2785,7 +2785,7 @@ fn test_rms_norm_valid_rank2_consts_and_gamma() {
 }
 
 #[test]
-fn test_rms_norm_rejects_out_of_range_axis_const() {
+fn rms_norm_rejects_out_of_range_axis_const() {
     let mut types = TypeTable::new();
     let return_ty = tensor_mty(&mut types, &[2, 8]);
     let program = cci_collection_program(
@@ -2807,7 +2807,7 @@ fn test_rms_norm_rejects_out_of_range_axis_const() {
 }
 
 #[test]
-fn test_rope_rejects_odd_dim_const() {
+fn rope_rejects_odd_dim_const() {
     let mut types = TypeTable::new();
     let return_ty = tensor_mty(&mut types, &[8]);
     let program = cci_collection_program(
@@ -2829,7 +2829,7 @@ fn test_rope_rejects_odd_dim_const() {
 }
 
 #[test]
-fn test_rms_norm_rejects_non_tensor_receiver() {
+fn rms_norm_rejects_non_tensor_receiver() {
     let mut types = TypeTable::new();
     let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
     let program = cci_collection_program(
@@ -2852,7 +2852,7 @@ fn test_rms_norm_rejects_non_tensor_receiver() {
 }
 
 #[test]
-fn test_rope_rejects_non_tensor_receiver() {
+fn rope_rejects_non_tensor_receiver() {
     let mut types = TypeTable::new();
     let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
     let program = cci_collection_program(
@@ -2874,7 +2874,7 @@ fn test_rope_rejects_non_tensor_receiver() {
 }
 
 #[test]
-fn test_gather_valid_ids_array_operand() {
+fn gather_valid_ids_array_operand() {
     let mut types = TypeTable::new();
     let return_ty = tensor_mty(&mut types, &[2, 3]);
     let program = cci_collection_program(
@@ -2920,7 +2920,7 @@ fn numerus_mty(types: &mut TypeTable) -> MirType {
 }
 
 #[test]
-fn test_rounding_f32_receiver_valid_for_all_rounding_ops() {
+fn rounding_f32_receiver_valid_for_all_rounding_ops() {
     for op in ROUNDING_OPS {
         let mut types = TypeTable::new();
         let receiver_ty = f32_receiver_mty(&mut types);
@@ -2935,7 +2935,7 @@ fn test_rounding_f32_receiver_valid_for_all_rounding_ops() {
 }
 
 #[test]
-fn test_rounding_plain_fractus_receiver_valid_for_all_rounding_ops() {
+fn rounding_plain_fractus_receiver_valid_for_all_rounding_ops() {
     for op in ROUNDING_OPS {
         let mut types = TypeTable::new();
         let receiver_ty = MirType::semantic(types.primitive(Primitive::Fractus));
@@ -2950,7 +2950,7 @@ fn test_rounding_plain_fractus_receiver_valid_for_all_rounding_ops() {
 }
 
 #[test]
-fn test_rounding_rejects_numerus_receiver() {
+fn rounding_rejects_numerus_receiver() {
     for op in ROUNDING_OPS {
         let mut types = TypeTable::new();
         let receiver_ty = numerus_mty(&mut types);
@@ -2969,7 +2969,7 @@ fn test_rounding_rejects_numerus_receiver() {
 // ── Approximate comparison: fractus-family receivers ───────────────────
 
 #[test]
-fn test_approximate_f32_receiver_valid() {
+fn approximate_f32_receiver_valid() {
     let mut types = TypeTable::new();
     let receiver_ty = f32_receiver_mty(&mut types);
     let program = approximate_collection_program(&mut types, receiver_ty, receiver_ty);
@@ -2981,7 +2981,7 @@ fn test_approximate_f32_receiver_valid() {
 }
 
 #[test]
-fn test_approximate_plain_fractus_receiver_valid() {
+fn approximate_plain_fractus_receiver_valid() {
     let mut types = TypeTable::new();
     let receiver_ty = fractus_mty(&mut types);
     let program = approximate_collection_program(&mut types, receiver_ty, receiver_ty);
@@ -2993,7 +2993,7 @@ fn test_approximate_plain_fractus_receiver_valid() {
 }
 
 #[test]
-fn test_approximate_rejects_numerus_receiver() {
+fn approximate_rejects_numerus_receiver() {
     let mut types = TypeTable::new();
     let receiver_ty = numerus_mty(&mut types);
     let program = approximate_collection_program(&mut types, receiver_ty, receiver_ty);
@@ -3028,7 +3028,7 @@ fn i32_receiver_mty(types: &mut TypeTable) -> MirType {
 }
 
 #[test]
-fn test_absolute_signum_f32_receiver_valid_for_all_ops() {
+fn absolute_signum_f32_receiver_valid_for_all_ops() {
     for op in ABSOLUTE_SIGNUM_OPS {
         let mut types = TypeTable::new();
         let receiver_ty = f32_receiver_mty(&mut types);
@@ -3044,7 +3044,7 @@ fn test_absolute_signum_f32_receiver_valid_for_all_ops() {
 }
 
 #[test]
-fn test_absolute_signum_plain_fractus_receiver_valid_for_all_ops() {
+fn absolute_signum_plain_fractus_receiver_valid_for_all_ops() {
     for op in ABSOLUTE_SIGNUM_OPS {
         let mut types = TypeTable::new();
         let receiver_ty = fractus_mty(&mut types);
@@ -3059,7 +3059,7 @@ fn test_absolute_signum_plain_fractus_receiver_valid_for_all_ops() {
 }
 
 #[test]
-fn test_absolute_signum_plain_numerus_receiver_valid_for_all_ops() {
+fn absolute_signum_plain_numerus_receiver_valid_for_all_ops() {
     // The corpus (`intrinseca/numerus-methodi.fab`) exercises int
     // `absolutum`/`signum`; the plain `numerus` surface must keep validating.
     for op in ABSOLUTE_SIGNUM_OPS {
@@ -3076,7 +3076,7 @@ fn test_absolute_signum_plain_numerus_receiver_valid_for_all_ops() {
 }
 
 #[test]
-fn test_absolute_signum_rejects_sized_numerus_receiver() {
+fn absolute_signum_rejects_sized_numerus_receiver() {
     for op in ABSOLUTE_SIGNUM_OPS {
         let mut types = TypeTable::new();
         let receiver_ty = i32_receiver_mty(&mut types);
@@ -3098,7 +3098,7 @@ fn test_absolute_signum_rejects_sized_numerus_receiver() {
 // -----------------------------------------------------------------------
 
 #[test]
-fn test_causal_masked_softmax_valid_rank2_receiver() {
+fn causal_masked_softmax_valid_rank2_receiver() {
     let mut types = TypeTable::new();
     let return_ty = tensor_mty(&mut types, &[2, 2]);
     let program = cci_collection_program(
@@ -3115,7 +3115,7 @@ fn test_causal_masked_softmax_valid_rank2_receiver() {
 }
 
 #[test]
-fn test_causal_masked_softmax_rejects_wrong_arity() {
+fn causal_masked_softmax_rejects_wrong_arity() {
     let mut types = TypeTable::new();
     let return_ty = tensor_mty(&mut types, &[2, 2]);
     let program = cci_collection_program(
