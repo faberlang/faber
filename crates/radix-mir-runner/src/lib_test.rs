@@ -208,7 +208,7 @@ fn converts_numeric_array_to_octeti_in_one_step() {
 }
 
 #[test]
-fn test_tensor_layernorm_rank2_no_affine() {
+fn tensor_layernorm_rank2_no_affine() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -307,7 +307,7 @@ fn test_tensor_layernorm_rank2_no_affine() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_tensor_softmax_rank1() {
+fn tensor_softmax_rank1() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -399,7 +399,7 @@ fn test_tensor_softmax_rank1() {
 }
 
 #[test]
-fn test_tensor_softmax_rank2() {
+fn tensor_softmax_rank2() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -498,7 +498,7 @@ fn test_tensor_softmax_rank2() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_tensor_gelu_rank1() {
+fn tensor_gelu_rank1() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -573,7 +573,7 @@ fn test_tensor_gelu_rank1() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_tensor_relu_rank1() {
+fn tensor_relu_rank1() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -647,7 +647,7 @@ fn test_tensor_relu_rank1() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_mir_unop_gelu_tensor() {
+fn mir_unop_gelu_tensor() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -717,7 +717,7 @@ fn test_mir_unop_gelu_tensor() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_mir_unop_tanh_tensor() {
+fn mir_unop_tanh_tensor() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -785,7 +785,7 @@ fn test_mir_unop_tanh_tensor() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_mir_unop_exp_tensor() {
+fn mir_unop_exp_tensor() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -854,7 +854,7 @@ fn test_mir_unop_exp_tensor() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_tensor_elementwise_or_scalar_broadcast() {
+fn tensor_elementwise_or_scalar_broadcast() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -934,7 +934,7 @@ fn test_tensor_elementwise_or_scalar_broadcast() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_tensor_elementwise_or_scalar_broadcast_div_scalar_tensor() {
+fn tensor_elementwise_or_scalar_broadcast_div_scalar_tensor() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -1014,7 +1014,7 @@ fn test_tensor_elementwise_or_scalar_broadcast_div_scalar_tensor() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_tensor_elementwise_or_scalar_broadcast_sub_scalar_tensor() {
+fn tensor_elementwise_or_scalar_broadcast_sub_scalar_tensor() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -1092,7 +1092,7 @@ fn test_tensor_elementwise_or_scalar_broadcast_sub_scalar_tensor() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_unop_sqrt_tensor() {
+fn unop_sqrt_tensor() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -1174,7 +1174,7 @@ fn test_unop_sqrt_tensor() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_tensor_fill_prefix_broadcast() {
+fn tensor_fill_prefix_broadcast() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -1263,7 +1263,7 @@ fn test_tensor_fill_prefix_broadcast() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_tensor_fill_suffix_broadcast() {
+fn tensor_fill_suffix_broadcast() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -1356,7 +1356,7 @@ fn test_tensor_fill_suffix_broadcast() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_tensor_crux_entropia_rank2() {
+fn tensor_crux_entropia_rank2() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -1559,7 +1559,7 @@ fn package_provider_routes_fail_closed() {
 }
 
 #[test]
-fn test_host_kernel_call_default_rejects() {
+fn host_kernel_call_default_rejects() {
     let mut host = MinimalHost;
     let result = host.kernel_call(KernelModule::Processus, "exec", &[], Span::default());
     assert!(
@@ -1574,42 +1574,42 @@ fn test_host_kernel_call_default_rejects() {
 }
 
 #[test]
-fn test_host_argumenta_default_rejects() {
+fn host_argumenta_default_rejects() {
     let host = MinimalHost;
     let result = host.argumenta();
     assert!(result.is_err(), "default argumenta must reject");
 }
 
 #[test]
-fn test_host_pid_default_rejects() {
+fn host_pid_default_rejects() {
     let host = MinimalHost;
     let result = host.pid();
     assert!(result.is_err(), "default pid must reject");
 }
 
 #[test]
-fn test_host_env_get_default_rejects() {
+fn host_env_get_default_rejects() {
     let host = MinimalHost;
     let result = host.env_get("PATH");
     assert!(result.is_err(), "default env_get must reject");
 }
 
 #[test]
-fn test_host_env_set_default_rejects() {
+fn host_env_set_default_rejects() {
     let mut host = MinimalHost;
     let result = host.env_set("PATH", "/usr/bin");
     assert!(result.is_err(), "default env_set must reject");
 }
 
 #[test]
-fn test_host_cwd_default_rejects() {
+fn host_cwd_default_rejects() {
     let host = MinimalHost;
     let result = host.cwd();
     assert!(result.is_err(), "default cwd must reject");
 }
 
 #[test]
-fn test_host_set_cwd_default_rejects() {
+fn host_set_cwd_default_rejects() {
     let mut host = MinimalHost;
     let result = host.set_cwd("/tmp");
     assert!(result.is_err(), "default set_cwd must reject");
@@ -1620,7 +1620,7 @@ fn test_host_set_cwd_default_rejects() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_tensor_elementwise_shape_mismatch_rejected() {
+fn tensor_elementwise_shape_mismatch_rejected() {
     use crate::value::TensorValue;
     use crate::Value;
     use radix_lexer::Interner;
@@ -1691,7 +1691,7 @@ fn test_tensor_elementwise_shape_mismatch_rejected() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_tensor_elementwise_backing_length_mismatch_rejected() {
+fn tensor_elementwise_backing_length_mismatch_rejected() {
     use crate::value::TensorValue;
     use crate::Value;
     use radix_lexer::Interner;
@@ -1758,7 +1758,7 @@ fn test_tensor_elementwise_backing_length_mismatch_rejected() {
 }
 
 #[test]
-fn test_tensor_elementwise_same_shape_succeeds() {
+fn tensor_elementwise_same_shape_succeeds() {
     use crate::value::TensorValue;
     use crate::Value;
     use radix_lexer::Interner;
@@ -1848,7 +1848,7 @@ fn test_tensor_elementwise_same_shape_succeeds() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_tensor_softmax_zero_width_rejected() {
+fn tensor_softmax_zero_width_rejected() {
     use crate::value::TensorValue;
     use crate::Value;
     use radix_lexer::Interner;
@@ -1898,7 +1898,7 @@ fn test_tensor_softmax_zero_width_rejected() {
 }
 
 #[test]
-fn test_tensor_softmax_rank2_zero_width_rejected() {
+fn tensor_softmax_rank2_zero_width_rejected() {
     use crate::value::TensorValue;
     use crate::Value;
     use radix_lexer::Interner;
@@ -1943,7 +1943,7 @@ fn test_tensor_softmax_rank2_zero_width_rejected() {
 }
 
 #[test]
-fn test_tensor_crux_entropia_zero_width_rejected() {
+fn tensor_crux_entropia_zero_width_rejected() {
     use crate::value::TensorValue;
     use crate::Value;
     use radix_lexer::Interner;
@@ -2005,31 +2005,31 @@ fn test_tensor_crux_entropia_zero_width_rejected() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_runner_issue_simple_message() {
+fn runner_issue_simple_message() {
     let issue = runner_issue("hello world");
     assert_eq!(issue, "runner_hello_world");
 }
 
 #[test]
-fn test_runner_issue_alphanumeric_only() {
+fn runner_issue_alphanumeric_only() {
     let issue = runner_issue("convert! fallback?");
     assert_eq!(issue, "runner_convert_fallback");
 }
 
 #[test]
-fn test_runner_issue_special_chars_collapsed() {
+fn runner_issue_special_chars_collapsed() {
     let issue = runner_issue("foo---bar___baz");
     assert_eq!(issue, "runner_foo_bar_baz");
 }
 
 #[test]
-fn test_runner_issue_trailing_underscore_trimmed() {
+fn runner_issue_trailing_underscore_trimmed() {
     let issue = runner_issue("shape mismatch!!! ");
     assert_eq!(issue, "runner_shape_mismatch");
 }
 
 #[test]
-fn test_runner_issue_empty_input() {
+fn runner_issue_empty_input() {
     let issue = runner_issue("");
     assert_eq!(issue, "runner");
 }
@@ -2039,32 +2039,32 @@ fn test_runner_issue_empty_input() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_regex_pattern_no_flags() {
+fn regex_pattern_no_flags() {
     let result = regex_pattern("^foo$", None);
     assert_eq!(result, "^foo$");
 }
 
 #[test]
-fn test_regex_pattern_with_flag() {
+fn regex_pattern_with_flag() {
     let result = regex_pattern("^foo$", Some("i"));
     assert_eq!(result, "(?i)^foo$");
 }
 
 #[test]
-fn test_regex_pattern_multiple_flags() {
+fn regex_pattern_multiple_flags() {
     let result = regex_pattern("foo", Some("imsUx"));
     assert_eq!(result, "(?imsUx)foo");
 }
 
 #[test]
-fn test_regex_pattern_rejects_unknown_flags() {
+fn regex_pattern_rejects_unknown_flags() {
     let result = regex_pattern("foo", Some("izwx"));
     // Only 'i' should be kept; 'z', 'w', 'x' are unknown but 'x' is valid per spec
     assert_eq!(result, "(?ix)foo");
 }
 
 #[test]
-fn test_regex_pattern_only_unknown_flags() {
+fn regex_pattern_only_unknown_flags() {
     let result = regex_pattern("foo", Some("zwq"));
     assert_eq!(result, "foo");
 }
@@ -2074,7 +2074,7 @@ fn test_regex_pattern_only_unknown_flags() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_constant_equals_value_int_equal() {
+fn constant_equals_value_int_equal() {
     let konst = MirConstant::Int(42);
     let value = Value::Int(42);
     let interner = Interner::new();
@@ -2082,7 +2082,7 @@ fn test_constant_equals_value_int_equal() {
 }
 
 #[test]
-fn test_constant_equals_value_int_not_equal() {
+fn constant_equals_value_int_not_equal() {
     let konst = MirConstant::Int(42);
     let value = Value::Int(7);
     let interner = Interner::new();
@@ -2090,7 +2090,7 @@ fn test_constant_equals_value_int_not_equal() {
 }
 
 #[test]
-fn test_constant_equals_value_uint_equal() {
+fn constant_equals_value_uint_equal() {
     let konst = MirConstant::UInt(100);
     let value = Value::UInt(100);
     let interner = Interner::new();
@@ -2098,7 +2098,7 @@ fn test_constant_equals_value_uint_equal() {
 }
 
 #[test]
-fn test_constant_equals_value_uint_not_equal() {
+fn constant_equals_value_uint_not_equal() {
     let konst = MirConstant::UInt(100);
     let value = Value::UInt(50);
     let interner = Interner::new();
@@ -2106,7 +2106,7 @@ fn test_constant_equals_value_uint_not_equal() {
 }
 
 #[test]
-fn test_constant_equals_value_int_uint_cross_equal() {
+fn constant_equals_value_int_uint_cross_equal() {
     let konst = MirConstant::Int(5);
     let value = Value::UInt(5);
     let interner = Interner::new();
@@ -2114,7 +2114,7 @@ fn test_constant_equals_value_int_uint_cross_equal() {
 }
 
 #[test]
-fn test_constant_equals_value_int_uint_cross_negative() {
+fn constant_equals_value_int_uint_cross_negative() {
     let konst = MirConstant::Int(-1);
     let value = Value::UInt(0);
     let interner = Interner::new();
@@ -2122,7 +2122,7 @@ fn test_constant_equals_value_int_uint_cross_negative() {
 }
 
 #[test]
-fn test_constant_equals_value_bool_equal() {
+fn constant_equals_value_bool_equal() {
     let konst = MirConstant::Bool(true);
     let value = Value::Bool(true);
     let interner = Interner::new();
@@ -2130,7 +2130,7 @@ fn test_constant_equals_value_bool_equal() {
 }
 
 #[test]
-fn test_constant_equals_value_bool_not_equal() {
+fn constant_equals_value_bool_not_equal() {
     let konst = MirConstant::Bool(true);
     let value = Value::Bool(false);
     let interner = Interner::new();
@@ -2138,7 +2138,7 @@ fn test_constant_equals_value_bool_not_equal() {
 }
 
 #[test]
-fn test_constant_equals_value_nil() {
+fn constant_equals_value_nil() {
     let konst = MirConstant::Nil;
     let value = Value::Nil;
     let interner = Interner::new();
@@ -2146,7 +2146,7 @@ fn test_constant_equals_value_nil() {
 }
 
 #[test]
-fn test_constant_equals_value_unit() {
+fn constant_equals_value_unit() {
     let konst = MirConstant::Unit;
     let value = Value::Unit;
     let interner = Interner::new();
@@ -2154,7 +2154,7 @@ fn test_constant_equals_value_unit() {
 }
 
 #[test]
-fn test_constant_equals_value_type_mismatch() {
+fn constant_equals_value_type_mismatch() {
     let konst = MirConstant::Int(42);
     let value = Value::Bool(false);
     let interner = Interner::new();
@@ -2167,7 +2167,7 @@ fn test_constant_equals_value_type_mismatch() {
 
 /// F-029 verify: `TensorAdd` near u8 width max must overflow.
 #[test]
-fn test_f029_tensor_add_u8_overflow_rejected() {
+fn f029_tensor_add_u8_overflow_rejected() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -2236,7 +2236,7 @@ fn test_f029_tensor_add_u8_overflow_rejected() {
 
 /// F-029 verify: `UInt` tensor elementwise add must succeed (not rejected).
 #[test]
-fn test_f029_uint_tensor_add_succeeds() {
+fn f029_uint_tensor_add_succeeds() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -2305,7 +2305,7 @@ fn test_f029_uint_tensor_add_succeeds() {
 
 /// F-029 verify: `TensorDiv` by zero must be rejected.
 #[test]
-fn test_f029_tensor_div_zero_rejected() {
+fn f029_tensor_div_zero_rejected() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -2374,7 +2374,7 @@ fn test_f029_tensor_div_zero_rejected() {
 
 /// F-029 verify: float `TensorDiv` by zero is still allowed (floats are width-agnostic).
 #[test]
-fn test_f029_float_tensor_div_zero_allowed() {
+fn f029_float_tensor_div_zero_allowed() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;
     use crate::Value;
@@ -2450,7 +2450,7 @@ fn test_f029_float_tensor_div_zero_allowed() {
 
 /// F-082: reversed intervallum bounds must be rejected at construction.
 #[test]
-fn test_f082_reversed_interval_bounds_rejected() {
+fn f082_reversed_interval_bounds_rejected() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
     use radix_mir::{
@@ -2509,7 +2509,7 @@ fn test_f082_reversed_interval_bounds_rejected() {
 
 /// F-082: valid (monotonic) intervallum bounds must succeed.
 #[test]
-fn test_f082_valid_interval_bounds_accepted() {
+fn f082_valid_interval_bounds_accepted() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
     use radix_mir::{
@@ -2571,7 +2571,7 @@ fn test_f082_valid_interval_bounds_accepted() {
 /// not panic — the clamp target has no valid output, so the source value is
 /// returned unchanged (identity on the empty set).
 #[test]
-fn test_f088_interval_clamp_empty_exclusive_interval_no_panic() {
+fn f088_interval_clamp_empty_exclusive_interval_no_panic() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
     use radix_mir::{
@@ -2628,7 +2628,7 @@ fn test_f088_interval_clamp_empty_exclusive_interval_no_panic() {
 /// F-088 companion: a non-empty exclusive interval still clamps the source
 /// into `[start, end)`.
 #[test]
-fn test_f088_interval_clamp_exclusive_interval_clamps_into_range() {
+fn f088_interval_clamp_exclusive_interval_clamps_into_range() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
     use radix_mir::{
@@ -2685,7 +2685,7 @@ fn test_f088_interval_clamp_exclusive_interval_clamps_into_range() {
 /// The integer Sum path applies the same width checks as other integer ops:
 /// a `numerus<u8>` sum that overflows u8 rejects instead of wrapping.
 #[test]
-fn test_sum_numeric_u8_overflow_rejects() {
+fn sum_numeric_u8_overflow_rejects() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
     use radix_mir::{
@@ -2734,7 +2734,7 @@ fn test_sum_numeric_u8_overflow_rejects() {
 /// A sum that stays within the declared width succeeds, and a `numerus<u64>`
 /// sum accumulates unsigned magnitudes without sign-encoding.
 #[test]
-fn test_sum_numeric_width_boundary_succeeds() {
+fn sum_numeric_width_boundary_succeeds() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
     use radix_mir::{
@@ -2803,7 +2803,7 @@ fn test_sum_numeric_width_boundary_succeeds() {
 /// a negative i64 — the i64 carrier cannot encode them, so the add fails
 /// closed exactly like every other out-of-width result.
 #[test]
-fn test_width_checked_add_u64_above_i64_max_fails_closed() {
+fn width_checked_add_u64_above_i64_max_fails_closed() {
     use radix_types::NumericWidth;
 
     let span = radix_lexer::Span::default();
@@ -2822,7 +2822,7 @@ fn test_width_checked_add_u64_above_i64_max_fails_closed() {
 
 /// F-083: optional enum variant field projection must return Nil, not error.
 #[test]
-fn test_f083_optional_variant_field_nil_fallback() {
+fn f083_optional_variant_field_nil_fallback() {
     use crate::host::BufferHost;
     use radix_hir::DefId;
     use radix_lexer::{Interner, Symbol};
@@ -2875,7 +2875,7 @@ fn test_f083_optional_variant_field_nil_fallback() {
 
 /// F-083: missing non-optional variant field must still error.
 #[test]
-fn test_f083_required_variant_field_errors() {
+fn f083_required_variant_field_errors() {
     use crate::host::BufferHost;
     use radix_hir::DefId;
     use radix_lexer::{Interner, Symbol};
@@ -2919,7 +2919,7 @@ fn test_f083_required_variant_field_errors() {
 
 /// F-084: JSON large u64 must surface as `UInt`, not lossy f64.
 #[test]
-fn test_f084_json_large_u64_not_lossy() {
+fn f084_json_large_u64_not_lossy() {
     use crate::kernel;
     use radix_mir::KernelModule;
 
@@ -2948,7 +2948,7 @@ fn test_f084_json_large_u64_not_lossy() {
 
 /// F-084: JSON normal i64 still surfaces as Int.
 #[test]
-fn test_f084_json_small_i64_is_int() {
+fn f084_json_small_i64_is_int() {
     use crate::kernel;
     use radix_mir::KernelModule;
 
@@ -2973,7 +2973,7 @@ fn test_f084_json_small_i64_is_int() {
 
 /// F-085: processus.exec must error on nonzero exit.
 #[test]
-fn test_f085_processus_exec_nonzero_exit() {
+fn f085_processus_exec_nonzero_exit() {
     use crate::kernel;
     use radix_mir::KernelModule;
 
@@ -3000,7 +3000,7 @@ fn test_f085_processus_exec_nonzero_exit() {
 
 /// F-085: processus.exec must succeed on zero exit.
 #[test]
-fn test_f085_processus_exec_zero_exit() {
+fn f085_processus_exec_zero_exit() {
     use crate::kernel;
     use radix_mir::KernelModule;
 
@@ -3025,7 +3025,7 @@ fn test_f085_processus_exec_zero_exit() {
 
 /// F-086: Octeti append on non-Place must return the modified Octeti.
 #[test]
-fn test_f086_octeti_append_non_place_returns_modified() {
+fn f086_octeti_append_non_place_returns_modified() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
     use radix_mir::{
@@ -3084,7 +3084,7 @@ fn test_f086_octeti_append_non_place_returns_modified() {
 
 /// F-087: inclusive range materialize must include `i64::MAX`.
 #[test]
-fn test_f087_inclusive_range_materialize_i64max() {
+fn f087_inclusive_range_materialize_i64max() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
     use radix_mir::{
@@ -3146,7 +3146,7 @@ fn test_f087_inclusive_range_materialize_i64max() {
 
 /// F-087: exclusive range with `i64::MAX` must still work (materialize empty).
 #[test]
-fn test_f087_exclusive_range_i64max_empty() {
+fn f087_exclusive_range_i64max_empty() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
     use radix_mir::{
@@ -3387,7 +3387,7 @@ fn assert_numeric_close(out: &[Value], expected: &[f64], tolerance: f64) {
 /// CCI-1: `rms_norm` follows the decoder oracle order (f64 sum of squares, f32
 /// mean, f32 scale, fused x·scale·gamma) with no mean subtraction.
 #[test]
-fn test_tensor_rms_norm_rank2_with_gamma() {
+fn tensor_rms_norm_rank2_with_gamma() {
     let input = tensor_value(
         vec![
             Value::Float(1.0),
@@ -3444,7 +3444,7 @@ fn test_tensor_rms_norm_rank2_with_gamma() {
 /// CCI-1: `rope_norm` applies the NORM consecutive-pair rotation with
 /// `freq_base` 100000 and preserves no trailing remainder when dim == width.
 #[test]
-fn test_tensor_rope_rank1_norm_pairs() {
+fn tensor_rope_rank1_norm_pairs() {
     let input = tensor_value(
         vec![
             Value::Float(1.0),
@@ -3489,7 +3489,7 @@ fn test_tensor_rope_rank1_norm_pairs() {
 
 /// CCI-1: `rope_norm` preserves elements beyond `dim` on the last axis.
 #[test]
-fn test_tensor_rope_preserves_remainder_beyond_dim() {
+fn tensor_rope_preserves_remainder_beyond_dim() {
     let input = tensor_value(
         vec![
             Value::Float(1.0),
@@ -3528,7 +3528,7 @@ fn test_tensor_rope_preserves_remainder_beyond_dim() {
 /// `theta[k]` as llama pair-rotate. A unit vector at x[0] lands in x[2]
 /// for dim=4 (not x[1]).
 #[test]
-fn test_tensor_rope_half_rank1_rotate_half_pairs() {
+fn tensor_rope_half_rank1_rotate_half_pairs() {
     let input = tensor_value(
         vec![
             Value::Float(1.0),
@@ -3572,7 +3572,7 @@ fn test_tensor_rope_half_rank1_rotate_half_pairs() {
 /// CCI-1: gather selects table rows by id, preserving repeated/out-of-order
 /// ids, and fails closed on an out-of-range id.
 #[test]
-fn test_tensor_gather_selects_rows_and_fails_closed_on_bad_id() {
+fn tensor_gather_selects_rows_and_fails_closed_on_bad_id() {
     // Table [3,2]: rows [1,2], [3,4], [5,6].
     let table = tensor_value(
         vec![
@@ -4020,7 +4020,7 @@ fn dense_float_tensor(rows: i64, cols: i64, fill: impl Fn(i64, i64) -> f64) -> V
 }
 
 #[test]
-fn test_tensor_matmul_float_2x3_by_3x4() {
+fn tensor_matmul_float_2x3_by_3x4() {
     // Same contraction as product-corpus/tensor-package/fmir-matmul.
     let left = dense_float_tensor(2, 3, |i, j| (i * 3 + j + 1) as f64);
     let right = dense_float_tensor(3, 4, |i, j| (i * 4 + j + 1) as f64);
@@ -4038,7 +4038,7 @@ fn test_tensor_matmul_float_2x3_by_3x4() {
 }
 
 #[test]
-fn test_tensor_matmul_int_2x2() {
+fn tensor_matmul_int_2x2() {
     let left = tensor_value(
         vec![Value::Int(1), Value::Int(2), Value::Int(3), Value::Int(4)],
         vec![2, 2],
@@ -4065,7 +4065,7 @@ fn test_tensor_matmul_int_2x2() {
 }
 
 #[test]
-fn test_tensor_matmul_mixed_promotes_to_float() {
+fn tensor_matmul_mixed_promotes_to_float() {
     let left = tensor_value(vec![Value::Int(2), Value::Int(4)], vec![1, 2]);
     let right = tensor_value(vec![Value::Float(0.5), Value::Float(1.5)], vec![2, 1]);
     let result = eval_tensor_matmul(left, right).expect("mixed matmul");
