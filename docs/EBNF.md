@@ -607,8 +607,8 @@ requiritStmt      := 'requirit' expression 'iace' expression
 - Use the explicit do block when a standalone block needs a handler: `fac { ... } cape err { ... }`.
 - `iace` = throw (recoverable), `mori` = panic (fatal).
 - A same-line `si <expr>` guard on `iace` and `mori` is line-sensitive parser sugar: `iace val si cond` desugars to `si cond { iace val }` at parse time. Its canonical, compression-safe spelling is the expanded `si` block. A source compressor must expand this sugar before removing line breaks; the guarded shorthand remains under language review.
-- `adfirma` is a runtime invariant check. It desugars conceptually to `mori "msg" si !cond`, with the positive condition kept in source form and the inversion applied during lowering. The optional particle is `mori` (en `panic`): `adfirma cond mori msg` / `assert cond panic msg`. This particle is proposed (not shipped). Bare `adfirma cond` stays legal. An `adfirma` failure is fatal and uncatchable by `cape` (it lowers to a panic, not a `Result`-channel error); in test context the harness isolates each `proba` so a failed assertion ends that test without ending the suite.
-- `requirit` is the recoverable require statement (en surface `require … throw …`), the typed-error-channel twin of `adfirma`. `requirit cond iace err` desugars to `si non (cond) { iace err }` at lowering; the thrown value enters the function's `⇥ E` channel and is catchable by `cape`/`fac`, unlike `adfirma` (fatal). A `requirit` statement in a `⇥`-less function is a compile error, same as `iace`. The particle is `iace` (en `throw`); this particle is proposed (not shipped).
+- `adfirma` is a runtime invariant check. It desugars conceptually to `mori "msg" si !cond`, with the positive condition kept in source form and the inversion applied during lowering. The optional particle is `mori` (en `panic`): `adfirma cond mori msg` / `assert cond panic msg`. Bare `adfirma cond` stays legal. An `adfirma` failure is fatal and uncatchable by `cape` (it lowers to a panic, not a `Result`-channel error); in test context the harness isolates each `proba` so a failed assertion ends that test without ending the suite.
+- `requirit` is the recoverable require statement (en surface `require … throw …`), the typed-error-channel twin of `adfirma`. `requirit cond iace err` desugars to `si non (cond) { iace err }` at lowering; the thrown value enters the function's `⇥ E` channel and is catchable by `cape`/`fac`, unlike `adfirma` (fatal). A `requirit` statement in a `⇥`-less function is a compile error, same as `iace`. The particle is `iace` (en `throw`) and is required.
 
 ---
 
@@ -626,9 +626,10 @@ or         := and (('aut') and)*
 and        := equality (('et') equality)*
 equality   := comparison equalityTail*
 equalityTail := ('≡' | '≠' | '≈' | '≉' | 'est' | 'non' 'est') comparison
-comparison := bitwiseOr (('<' | '>' | '≤' | '≥' | 'intra' | 'inter') bitwiseOr)*
-# Ordering operators use Unicode glyphs; membership uses Latin keywords `intra`/`inter`
-# (Faber prose identity). Glyph aliases such as `∈` are not in the active contract.
+comparison := bitwiseOr (('≺' | '≻' | '≤' | '≥' | 'intra' | 'inter') bitwiseOr)*
+# Ordering operators use the canonical Unicode glyphs `≺`/`≻`/`≤`/`≥`;
+# membership uses Latin keywords `intra`/`inter` (Faber prose identity).
+# Glyph aliases such as `∈` are not in the active contract.
 bitwiseOr  := bitwiseXor ('∨' bitwiseXor)*
 bitwiseXor := bitwiseAnd ('⊻' bitwiseAnd)*
 bitwiseAnd := shift ('∧' shift)*
@@ -679,8 +680,8 @@ that recognition to arbitrary declared types is a separate language decision.
 Use `≡` / `≠` for structural value equality and `↦` for runtime conversion.
 
 Retired predicate keywords are not prefix unary syntax. Use `expr est verum`,
-`expr est falsum`, `expr est nihil`, `expr non est nihil`, `expr < 0`, or
-`expr > 0`.
+`expr est falsum`, `expr est nihil`, `expr non est nihil`, `expr ≺ 0`, or
+`expr ≻ 0`.
 
 **Static type ascription (`∷` / verte):**
 
@@ -1082,11 +1083,8 @@ The former `ab` collection pipeline DSL is retired. Collection filtering,
 slicing, and aggregation are expressed through ordinary
 `textus`/`lista`/`tabula`/`copia` methods and closures instead of a
 grammar-level query expression. `textus`, `numerus`, `fractus`, `lista<T>`,
-`tabula<K,V>`, and `copia<T>` are compiler-owned core types; their canonical
-method surfaces are tracked in `docs/design/textus-intrinsics.md`,
-`docs/design/numerus-intrinsics.md`, `docs/design/fractus-intrinsics.md`,
-`docs/design/lista-intrinsics.md`, `docs/design/tabula-intrinsics.md`, and
-`docs/design/copia-intrinsics.md`, not in Norma declarations.
+`tabula<K,V>`, and `copia<T>` are compiler-owned core types; their method
+surfaces are not Norma declarations.
 
 `prima` and `ultima` are ordinary method names, not transform keywords. `ubi` is
 not active collection syntax.
@@ -1194,5 +1192,5 @@ policy around it, see:
 1. **Type-first parameters**: `functio f(numerus x)` NOT `functio f(x: numerus)`
 2. **Type-first declarations**: `fixum textus name` NOT `fixum name: textus`
 3. **Iteration loops**: `itera ex/de collection fixum/varia item { }` or `itera ab range fixum/varia item { }` (verb-first, source, then binding)
-4. **Parentheses around conditions are valid but not idiomatic**: prefer `si x > 0 { }` or `si flag est verum { }` over `si (x > 0) { }`
+4. **Parentheses around conditions are valid but not idiomatic**: prefer `si x ≻ 0 { }` or `si flag est verum { }` over `si (x ≻ 0) { }`
 5. **Scribe-family keywords claim statement-initial position only when not followed by `(`** — `nota x` is the output statement; a statement-initial `nota(x)` is a call to the identifier `nota`
