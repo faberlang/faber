@@ -10112,7 +10112,7 @@ import from "sqlite:sqlite" sqlite
 
 main {
   do {
-    const value ∪ nihil cell ← sqlite.scalar(":memory:", "SELECT 1", vacua)
+    const value ∪ nihil cell ← sqlite.scalar(":memory:", "SELECT 1", empty)
     print cell
   }
   catch err {
@@ -10152,7 +10152,7 @@ import from "sqlite:sqlite" sqlite
 
 main {
   do {
-    const value ∪ nihil _ ← sqlite.scalar(":memory:", "SELECT FROM", vacua)
+    const value ∪ nihil _ ← sqlite.scalar(":memory:", "SELECT FROM", empty)
     print "unexpected-ok"
   }
   catch err {
@@ -10193,7 +10193,7 @@ import from "sqlite:sqlite" sqlite
 
 main {
   do {
-    const value ∪ nihil _ ← sqlite.scalar("/no/such/faber/g8/path.sqlite", "SELECT 1", vacua)
+    const value ∪ nihil _ ← sqlite.scalar("/no/such/faber/g8/path.sqlite", "SELECT 1", empty)
     print "unexpected-ok"
   }
   catch err {
@@ -10261,7 +10261,7 @@ import from "sqlite:sqlite" sqlite
 
 main {
   do {
-    const value ∪ nihil cell ← sqlite.scalar(":memory:", "SELECT 1 WHERE 0", vacua)
+    const value ∪ nihil cell ← sqlite.scalar(":memory:", "SELECT 1 WHERE 0", empty)
     if cell ≡ nihil {
       print "empty-ok"
     }
