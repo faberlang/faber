@@ -303,7 +303,7 @@ pub(super) fn validate_batched_attention_plan(
         || plan.seq == 0
         || plan.head_dim == 0
         || plan.hidden == 0
-        || plan.output_strides.iter().any(|stride| *stride == 0)
+        || plan.output_strides.contains(&0)
     {
         return Err(PlanValidationError::BatchedAttentionInvalid);
     }
