@@ -4,6 +4,7 @@
 //! consumer may rely on. Consumers must not mix HIR, types, resolver, effects,
 //! or identity tables from different analysis runs.
 
+use crate::access_facts::{analyze_access_facts, AccessFactTable};
 use crate::function_facts::{analyze_function_facts, FunctionFactTable};
 use crate::qualified_identity::{build_qualified_identities, QualifiedIdentityTable};
 use crate::resolved_use::{analyze_resolved_uses, ResolvedUseIndex};
@@ -103,6 +104,7 @@ pub struct AnalyzedApplication {
     libraries: LibraryRegistry,
     radix_lanes: RadixLaneMetadata,
     gpu_builtins: Vec<(radix_hir::DefId, radix_types::MirKernelBuiltin)>,
+    access_facts: AccessFactTable,
     function_facts: FunctionFactTable,
     resolved_uses: ResolvedUseIndex,
     qualified_identities: QualifiedIdentityTable,
@@ -121,6 +123,7 @@ impl AnalyzedApplication {
         parts: AnalyzedApplicationParts,
         interner: &radix_lexer::Interner,
     ) -> Result<Self, AnalyzedApplicationError> {
+        let access_facts = analyze_access_facts(&parts.hir);
         let function_facts = analyze_function_facts(&parts.hir, &parts.types);
         let qualified_identities = build_qualified_identities(&parts.libraries, interner);
         let resolved_uses = analyze_resolved_uses(&parts.hir, &parts.types, &qualified_identities);
@@ -169,6 +172,7 @@ impl AnalyzedApplication {
             libraries: parts.libraries,
             radix_lanes: parts.radix_lanes,
             gpu_builtins: parts.gpu_builtins,
+            access_facts,
             function_facts,
             resolved_uses,
             qualified_identities,
@@ -214,6 +218,11 @@ impl AnalyzedApplication {
     #[must_use]
     pub fn gpu_builtins(&self) -> &[(radix_hir::DefId, radix_types::MirKernelBuiltin)] {
         &self.gpu_builtins
+    }
+
+    #[must_use]
+    pub fn access_facts(&self) -> &AccessFactTable {
+        &self.access_facts
     }
 
     #[must_use]
@@ -264,6 +273,7 @@ impl AnalyzedApplication {
             libraries: self.libraries,
             radix_lanes: self.radix_lanes,
             gpu_builtins: self.gpu_builtins,
+            access_facts: self.access_facts,
             function_facts: self.function_facts,
             resolved_uses: self.resolved_uses,
             qualified_identities: self.qualified_identities,
@@ -282,6 +292,7 @@ pub struct AnalyzedApplicationDriverFields {
     pub libraries: LibraryRegistry,
     pub radix_lanes: RadixLaneMetadata,
     pub gpu_builtins: Vec<(radix_hir::DefId, radix_types::MirKernelBuiltin)>,
+    pub access_facts: AccessFactTable,
     pub function_facts: FunctionFactTable,
     pub resolved_uses: ResolvedUseIndex,
     pub qualified_identities: QualifiedIdentityTable,

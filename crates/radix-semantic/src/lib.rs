@@ -34,6 +34,7 @@
 //! - Target-specific policy is expressed through [`PassConfig`]; this module
 //!   only runs the passes that configuration enables.
 
+pub mod access_facts;
 pub mod analyzed_application;
 pub mod annotation_contract;
 pub mod broadcast_reduction;
@@ -127,6 +128,7 @@ pub fn all_diagnostic_specs() -> Vec<DiagnosticSpec> {
 
 use crate::file_interface::{FileExportKind, FileInterface};
 use crate::locale::{LocalePack, TypeBindingKind};
+pub use access_facts::{analyze_access_facts, AccessFact, AccessFactTable};
 pub use analyzed_application::{
     qualify_for_target, AnalysisStamp, AnalyzedApplication, AnalyzedApplicationDriverFields,
     AnalyzedApplicationError, AnalyzedApplicationParts, QualificationStatus, TargetQualification,
@@ -824,6 +826,10 @@ fn register_locale_pack_type_spellings(
         }
     }
 }
+
+#[cfg(test)]
+#[path = "access_facts_test.rs"]
+mod access_facts_test;
 
 #[cfg(test)]
 #[path = "analyzed_application_test.rs"]
