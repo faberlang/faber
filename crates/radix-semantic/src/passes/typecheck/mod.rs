@@ -674,6 +674,10 @@ mod tensor_index_width_test;
 mod tensor_lattice_matrix_test;
 
 #[cfg(test)]
+#[path = "tensor_minus_test.rs"]
+mod tensor_minus_test;
+
+#[cfg(test)]
 #[path = "tensor_plus_test.rs"]
 mod tensor_plus_test;
 

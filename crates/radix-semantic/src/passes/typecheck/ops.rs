@@ -745,7 +745,17 @@ impl TypeChecker<'_> {
                     self.numeric_arithmetic_bin(lhs_ty, rhs_ty, lhs.span)
                 }
             }
-            HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod => {
+            HirBinOp::Sub => {
+                let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
+                if let Some(result) = self.check_addita_plus(lhs_ty, rhs_ty, lhs.span) {
+                    // Numeric tensor/vector/matrix `-` is the live `subtrahe` / `.subtract()` op.
+                    // Same-shape / tensor-broadcast contract as `+` — no extra broadcast.
+                    result
+                } else {
+                    self.numeric_arithmetic_bin(lhs_ty, rhs_ty, lhs.span)
+                }
+            }
+            HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
                 self.numeric_arithmetic_bin(lhs_ty, rhs_ty, lhs.span)
             }
@@ -1039,12 +1049,13 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// Numeric `+` on tensor / vector / matrix: the live `addita` / `.added()` op.
+    /// Numeric `+`/`-` on tensor / vector / matrix: live `addita` / `subtrahe`.
     ///
-    /// One Add arm covers the three families. Tensor broadcast is `addita`'s
-    /// `Figura'` (`constrain_elementwise_result_shape`). Vector/matrix follow
-    /// their live `addita` same-shape contracts. `None` means this is not an
-    /// addita-family pair — scalar arithmetic continues.
+    /// One arm covers the three families for both glyphs. Tensor broadcast is
+    /// `addita`'s `Figura'` (`constrain_elementwise_result_shape`); minus
+    /// shares that exact contract. Vector/matrix follow the live same-shape
+    /// contracts. `None` means this is not an addita-family pair — scalar
+    /// arithmetic continues.
     fn check_addita_plus(
         &mut self,
         lhs: TypeId,

@@ -1,0 +1,138 @@
+//! Numeric tensor / vector / matrix `-` is the live `subtrahe` / `.subtract()` op.
+//!
+//! Glyph/method identity: same-shape and tensor-broadcast `-` typecheck as
+//! `subtrahe`, mirroring `+` / `addita`. Mixed `tensor - textus` stays
+//! `numeric_operands_required` (minus has no string path).
+
+use radix_diagnostics::DiagnosticArg;
+
+fn accepts(source: &str) {
+    let result = crate::test_support::analyze_source(source);
+    assert!(
+        result.is_ok(),
+        "expected typecheck ok: {:?}",
+        result.diagnostics
+    );
+}
+
+fn rejects_with_issue(source: &str, issue: &str) {
+    let result = crate::test_support::analyze_source(source);
+    assert!(
+        !result.is_ok(),
+        "expected typecheck failure, but source was accepted"
+    );
+    let diagnostics = result.diagnostics.clone();
+    let issue_arg = DiagnosticArg::new("issue", issue);
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.args.contains(&issue_arg)),
+        "expected a diagnostic with issue `{issue}`, got: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn tensor_minus_same_shape_typechecks() {
+    accepts(
+        r"functio diff(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> {
+    redde a - b
+}",
+    );
+}
+
+#[test]
+fn tensor_minus_same_shape_integer_typechecks() {
+    accepts(
+        r"functio diff(tensor<i32, [2, 2]> a, tensor<i32, [2, 2]> b) → tensor<i32, [2, 2]> {
+    redde a - b
+}",
+    );
+}
+
+#[test]
+fn vector_minus_same_shape_typechecks() {
+    accepts(
+        r"functio diff(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
+    redde a - b
+}",
+    );
+}
+
+#[test]
+fn matrix_minus_same_shape_typechecks() {
+    accepts(
+        r"functio diff(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<f32, [2, 2]> {
+    redde a - b
+}",
+    );
+}
+
+#[test]
+fn tensor_minus_broadcast_unifies_result_shape() {
+    accepts(
+        r"incipit {
+  fixum tf32[2] a ← vacua
+  fixum tf32[2, 1] b ← vacua
+  fixum tf32[2, 2] c ← a - b
+  nota c.longitudo()
+}",
+    );
+}
+
+#[test]
+fn tensor_minus_incompatible_shapes_reject() {
+    rejects_with_issue(
+        r"incipit {
+  fixum tf32[3] a ← vacua
+  fixum tf32[2] b ← vacua
+  fixum tf32[3] c ← a - b
+  nota c.longitudo()
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn tensor_minus_non_numeric_element_rejects() {
+    rejects_with_issue(
+        r"incipit {
+  fixum tensor<textus, [2]> a ← vacua
+  fixum tensor<textus, [2]> b ← vacua
+  fixum tensor<textus, [2]> c ← a - b
+  nota c.longitudo()
+}",
+        "tensor_arithmetic_numeric_element_required",
+    );
+}
+
+#[test]
+fn tensor_minus_textus_rejects_numeric_operands() {
+    rejects_with_issue(
+        r"functio diff(tensor<f32, [2]> a, textus s) → textus {
+    redde a - s
+}",
+        "numeric_operands_required",
+    );
+}
+
+#[test]
+fn tensor_minus_linear_matmul_bias_typechecks() {
+    accepts(
+        r"functio residual<magnitudo M, magnitudo K, magnitudo N>(
+    tensor<f32, [M, K]> x,
+    tensor<f32, [K, N]> w,
+    tensor<f32, [M, N]> t
+) → tensor<f32, [M, N]> {
+    redde (x · w) - t
+}",
+    );
+}
+
+#[test]
+fn tensor_plus_still_typechecks_beside_minus() {
+    accepts(
+        r"functio sum(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> {
+    redde a + b
+}",
+    );
+}

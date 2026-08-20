@@ -1959,9 +1959,9 @@ impl<'a> FunctionBuilder<'a> {
         if op.is_glyph_product() {
             return self.lower_glyph_product(op, lhs, rhs, expr);
         }
-        // Numeric tensor/vector/matrix `+` takes the live `addita` method path
-        // (`TensorAdd` / elementwise `MirBinOp::Add`), never primitive scalar Add.
-        if op == HirBinOp::Add && self.is_addita_plus_operands(lhs, rhs) {
+        // Numeric tensor/vector/matrix `+`/`-` take the live `addita`/`subtrahe`
+        // method paths (`TensorAdd` / `TensorSub`), never primitive scalar ops.
+        if matches!(op, HirBinOp::Add | HirBinOp::Sub) && self.is_addita_plus_operands(lhs, rhs) {
             return self.lower_glyph_product(op, lhs, rhs, expr);
         }
         let Some(op) = mir_bin_op(op) else {
