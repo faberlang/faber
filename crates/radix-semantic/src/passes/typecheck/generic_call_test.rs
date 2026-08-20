@@ -131,6 +131,36 @@ incipit {
 }
 
 #[test]
+fn explicit_magnitudo_natural_args_reject_wrong_arity() {
+    rejects_with_issue(
+        r"functio take<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    redde x
+}
+
+incipit {
+    fixum tensor<f32, [2, 2]> a ← vacua
+    fixum tensor<f32, [2, 2]> b ← take<2>(a)
+}",
+        "wrong_number_of_type_arguments",
+    );
+}
+
+#[test]
+fn explicit_magnitudo_natural_args_reject_wrong_kind() {
+    rejects_with_issue(
+        r"functio take<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    redde x
+}
+
+incipit {
+    fixum tensor<f32, [2, 2]> a ← vacua
+    fixum tensor<f32, [2, 2]> b ← take<textus, numerus>(a)
+}",
+        "callee_type_args_unsupported",
+    );
+}
+
+#[test]
 fn explicit_generic_call_accepts_mixed_hole_and_concrete() {
     accepts(
         r#"functio both<A, B>(A a, B b) → A {

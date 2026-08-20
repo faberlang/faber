@@ -101,9 +101,9 @@ impl TypeChecker<'_> {
 
     /// Returns the shared error type when explicit args are invalid for `sig`.
     ///
-    /// Arity and the witness zip count **type params only**: shape params are
-    /// inferred from argument/expected shapes (D1) and never consume an
-    /// explicit type argument.
+    /// A NATURAL-only list whose length matches the full param list binds
+    /// magnitudo params. Otherwise arity counts Typus params; shape params
+    /// then bind from argument/expected shapes (D1).
     fn reject_invalid_explicit_type_args(
         &mut self,
         sig: &FuncSig,
@@ -114,10 +114,13 @@ impl TypeChecker<'_> {
     ) -> Option<TypeId> {
         debug_assert!(!explicit_type_args.is_empty());
 
-        if self.explicit_args_are_magnitudo_list(explicit_type_args)
-            && explicit_type_args.len() == sig.type_params.len()
-        {
-            return None;
+        if self.explicit_args_are_magnitudo_list(explicit_type_args) {
+            if explicit_type_args.len() == sig.type_params.len() {
+                return None;
+            }
+            self.wrong_arity("wrong_number_of_type_arguments", span);
+            self.typecheck_call_arg_exprs(args);
+            return Some(self.error_type);
         }
 
         let type_param_count = sig

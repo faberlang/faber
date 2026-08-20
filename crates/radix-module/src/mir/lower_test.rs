@@ -3678,6 +3678,38 @@ incipit {
 }
 
 #[test]
+fn mir_generic_shape_params_bind_explicit_natural_type_args() {
+    // Size-only generic: explicit NATURAL typeArguments bind magnitudo params.
+    // K is declared but absent from argument/return shapes, so D1 witnesses
+    // cannot supply it — the call-site list is the only source.
+    let source = r#"
+functio take<magnitudo M, magnitudo K, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    redde x
+}
+
+incipit {
+    fixum tensor<f32, [2, 2]> a ← vacua
+    fixum tensor<f32, [2, 2]> b ← take<2, 2, 2>(a)
+    nota b.longitudo()
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("explicit NATURAL size args must lower");
+    assert_eq!(lowered.monomorphizations.len(), 1);
+    let shape_args = lowered.monomorphizations[0].key.shape_args.clone();
+    assert_eq!(shape_args.len(), 3);
+    validate_program(&lowered.program, lowered.validated.validation())
+        .expect("explicit NATURAL size-arg monomorphization validates");
+    drop(lowered);
+    for shape in shape_args {
+        assert!(
+            matches!(unit.types.get_index(shape), IndexExpr::Literal(_)),
+            "explicit NATURAL size arg must bind a literal shape, got {shape:?}"
+        );
+    }
+}
+
+#[test]
 fn mir_generic_shape_params_distinct_shapes_produce_distinct_instances() {
     let source = r#"
 functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32, [B, D]> b) → tensor<f32, [B, D]> {

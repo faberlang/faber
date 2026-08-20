@@ -324,7 +324,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         let mut bindings = MirGenericBindings::default();
         let mut shape_bindings = MirShapeBindings::default();
         let source = template.source?;
-        self.bind_explicit_type_args(source, explicit_type_args, &mut bindings, span)?;
+        self.bind_explicit_type_args(source, explicit_type_args, &mut bindings, &mut shape_bindings, span)?;
         for (index, arg) in args.iter().enumerate() {
             let Some(expected) = template.params.get(index) else {
                 continue;
@@ -419,6 +419,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         source: DefId,
         explicit_type_args: &[MirType],
         bindings: &mut MirGenericBindings,
+        shape_bindings: &mut MirShapeBindings,
         span: Span,
     ) -> Option<()> {
         if explicit_type_args.is_empty() {
@@ -427,12 +428,47 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         let Some(params) = self.generic_param_order.get(&source).cloned() else {
             return Some(());
         };
-        // Explicit arguments are type arguments only (no shape-arg syntax);
-        // shape params bind implicitly from witness shapes (D1).
         let type_params = params
             .iter()
             .filter(|param| param.kind == ParamKind::Typus)
             .collect::<Vec<_>>();
+        let shape_params = params
+            .iter()
+            .filter(|param| param.kind == ParamKind::Magnitudo)
+            .collect::<Vec<_>>();
+        // Size-only generics: NATURAL typeArguments bind magnitudo params.
+        // Mixed/Typus callees keep D1 (type args zip Typus; shapes from witnesses).
+        if type_params.is_empty() && !shape_params.is_empty() {
+            if explicit_type_args.len() != shape_params.len() {
+                self.lowerer.errors.push(MirError::validation(
+                    span,
+                    format!(
+                        "generic call supplied {} type arguments for {} parameters",
+                        explicit_type_args.len(),
+                        shape_params.len()
+                    ),
+                ));
+                return None;
+            }
+            for (param, concrete) in shape_params.iter().zip(explicit_type_args.iter().copied()) {
+                let Some(value) = self.magnitudo_literal_of(concrete) else {
+                    self.lowerer.errors.push(MirError::validation(
+                        span,
+                        "generic call type argument does not match parameter kind",
+                    ));
+                    return None;
+                };
+                let Some(index) = find_literal_index(self.types(), value) else {
+                    self.lowerer.errors.push(MirError::validation(
+                        span,
+                        "generic call signature has unresolved type parameter",
+                    ));
+                    return None;
+                };
+                shape_bindings.insert(param.name, canonical_index(self.types(), index));
+            }
+            return Some(());
+        }
         if explicit_type_args.len() != type_params.len() {
             self.lowerer.errors.push(MirError::validation(
                 span,
@@ -458,6 +494,14 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             }
         }
         Some(())
+    }
+
+    fn magnitudo_literal_of(&self, ty: MirType) -> Option<u64> {
+        let Type::Param(sym) = self.types().get(ty.semantic_id()) else {
+            return None;
+        };
+        let sym = *sym;
+        radix_types::parse_natural_capacity(self.lowerer.unit.interner.resolve(sym))
     }
 
     fn ensure_instance(
@@ -905,6 +949,14 @@ fn resolve_parent_shape_binding(
 
 /// All generic parameters in declaration order — `magnitudo` shape params sit
 /// parallel to `typus` params so the witness binds both from the call site.
+fn find_literal_index(types: &TypeTable, value: u64) -> Option<IndexId> {
+    (0..types.index_count()).find_map(|index| {
+        #[expect(clippy::cast_possible_truncation, reason = "IndexId is a u32 arena index by design")]
+        let id = IndexId(index as u32);
+        matches!(types.get_index(id), IndexExpr::Literal(found) if *found == value).then_some(id)
+    })
+}
+
 fn generic_param_names(params: &[crate::hir::HirTypeParam]) -> Vec<OrderedParam> {
     params
         .iter()
