@@ -14,9 +14,9 @@ use crate::{
 };
 use radix_hir::{HirCallArg, HirExpression, HirExpressionKind};
 use radix_intrinsics::{
-    is_numeric_bitwise_operator, is_numeric_imperativus_operator, lookup_method,
-    lookup_method_for_type, receivers_for_type, IntrinsicParamKind, IntrinsicReceiver,
-    IntrinsicReturnKind, MethodIntrinsic,
+    is_mutating_receiver, is_numeric_bitwise_operator, is_numeric_imperativus_operator,
+    lookup_method, lookup_method_for_type, receivers_for_type, IntrinsicParamKind,
+    IntrinsicReceiver, IntrinsicReturnKind, MethodIntrinsic,
 };
 use radix_lexer::Symbol;
 
@@ -151,7 +151,8 @@ pub(super) fn check_intrinsic_method_call(
     span: radix_lexer::Span,
 ) -> Option<TypeId> {
     let receiver_resolved = checker.resolve_inferred_type(receiver_ty);
-    let resolved = checker.types.get(receiver_resolved);
+    let (_, payload_ty) = checker.types.peel_access_marker(receiver_resolved);
+    let resolved = checker.types.get(payload_ty);
     let method_name = checker.interner.map_or_else(
         || "method".to_owned(),
         |interner| interner.resolve(*name).to_owned(),
@@ -221,7 +222,15 @@ pub(super) fn check_intrinsic_method_call(
     } else {
         entry
     };
-    let ctx = IntrinsicTypeContext::from_receiver_type(checker, receiver_ty);
+    let ctx = IntrinsicTypeContext::from_receiver_type(checker, payload_ty);
+
+    if checker.expr_is_ref_view(receiver) && is_mutating_receiver(entry) {
+        checker.error_issue(
+            SemanticErrorKind::AssignToImmutableBorrow,
+            crate::ISSUE_MUTATING_RECEIVER_THROUGH_REF,
+            span,
+        );
+    }
 
     // WHY: tensor elementwise `subtrahe`/`multiplica` share names with numeric
     // imperativus ops but return `SameAsReceiver`; only `Vacuum` returns mutate.

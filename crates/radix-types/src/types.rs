@@ -513,6 +513,41 @@ impl TypeTable {
         self.reference(marker.mutability(), inner)
     }
 
+    /// Peel aliases and at most one access-marker wrapper.
+    ///
+    /// Returns the marker fact (if present) and the carrier payload. Used by
+    /// mode-scoped checks so payload typing stays independent of `ref`/`mut`/`own`.
+    #[must_use]
+    pub fn peel_access_marker(&self, ty: TypeId) -> (Option<AccessMarker>, TypeId) {
+        let mut id = ty;
+        let mut marker = None;
+        loop {
+            match self.get(id) {
+                Type::Alias(_, inner) => id = *inner,
+                Type::Ref(mutability, inner) if marker.is_none() => {
+                    marker = Some(mutability.access_marker());
+                    id = *inner;
+                }
+                _ => return (marker, id),
+            }
+        }
+    }
+
+    /// Whether `ty` carries a declared `ref` access fact.
+    #[must_use]
+    pub fn is_ref_view(&self, ty: TypeId) -> bool {
+        matches!(self.peel_access_marker(ty).0, Some(AccessMarker::Ref))
+    }
+
+    /// Whether `ty` carries a declared `mut` or `own` access fact.
+    #[must_use]
+    pub fn is_mut_or_own_view(&self, ty: TypeId) -> bool {
+        matches!(
+            self.peel_access_marker(ty).0,
+            Some(AccessMarker::Mut | AccessMarker::Own)
+        )
+    }
+
     /// Scalar numerics and `bivalens` reject `ref`/`mut`/`own`/`copy` markers.
     ///
     /// Referential types (collections, buffers, `textus`/`octeti`, tensors,

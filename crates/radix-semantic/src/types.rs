@@ -18,6 +18,15 @@ pub use radix_types::{SchemaColumnDef, SchemaDef};
 /// Stable lowering issue for a marker on a scalar carrier.
 pub const ISSUE_SCALAR_ACCESS_MARKER: &str = "scalar_access_marker";
 
+/// Mutating catalog intrinsic invoked through a `ref` root or view.
+pub const ISSUE_MUTATING_RECEIVER_THROUGH_REF: &str = "mutating_receiver_through_ref";
+
+/// Projection assignment through a `ref` root or view.
+pub const ISSUE_ASSIGN_THROUGH_REF: &str = "assign_through_ref";
+
+/// Passing a `ref` value into a `mut` or `own` position.
+pub const ISSUE_REF_TO_MUT_OR_OWN_POSITION: &str = "ref_to_mut_or_own_position";
+
 /// Map a type-position syntax marker onto the type-table access fact.
 #[must_use]
 pub fn access_marker_from_type_mode(mode: radix_syntax::TypeMode) -> AccessMarker {

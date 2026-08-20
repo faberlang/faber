@@ -368,7 +368,24 @@ impl TypeChecker<'_> {
         };
 
         let ty = if let Some(expected) = expected {
-            self.unify_assign_issue(ty, expected, expr.span, ISSUE_EXPRESSION_TYPE_MISMATCH)
+            let src_marked = self
+                .types
+                .peel_access_marker(self.resolve_inferred_type(ty))
+                .0
+                .is_some();
+            let dest_marked = self
+                .types
+                .peel_access_marker(self.resolve_inferred_type(expected))
+                .0
+                .is_some();
+            if src_marked || dest_marked {
+                // Keep the synthesized type so a `ref` Path retains its fact;
+                // payload compatibility is checked separately.
+                self.unify_carrier_assign(ty, expected, expr.span, ISSUE_EXPRESSION_TYPE_MISMATCH);
+                ty
+            } else {
+                self.unify_assign_issue(ty, expected, expr.span, ISSUE_EXPRESSION_TYPE_MISMATCH)
+            }
         } else {
             ty
         };
@@ -387,7 +404,10 @@ impl TypeChecker<'_> {
             return self.error_type;
         };
 
-        let resolved = self.resolve_inferred_type(expected);
+        let resolved = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(expected))
+            .1;
         if self.is_infer(resolved) {
             self.missing_type_annotation("vacua_requires_declared_type", span);
             return self.error_type;

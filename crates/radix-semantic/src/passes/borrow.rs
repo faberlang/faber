@@ -16,6 +16,9 @@
 //! ==============
 //! - Ownership violations are emitted as semantic errors.
 //! - Parameter-mode suggestions are emitted as semantic warnings.
+//! - Declared `ref` type facts (MU-2) reject projection assignment and
+//!   passing into `mut`/`own` positions. Mutating-receiver bans live with
+//!   catalog lookup in typecheck; this pass does not key them on void return.
 //! - The pass returns all findings together so the semantic driver can apply
 //!   the repository-wide warning/error policy through `SemanticErrorKind`.
 //!
@@ -35,15 +38,16 @@
 //!   diagnostic consumer treats warning-kind diagnostics as errors.
 
 use crate::{
-    FuncSig, Primitive, Resolver, SemanticError, SemanticErrorKind, SemanticParamMode, Type,
-    TypeId, TypeTable, WarningKind,
+    FuncSig, ParamType, Primitive, Resolver, SemanticError, SemanticErrorKind, SemanticParamMode,
+    Type, TypeId, TypeTable, WarningKind, ISSUE_ASSIGN_THROUGH_REF,
+    ISSUE_REF_TO_MUT_OR_OWN_POSITION,
 };
 use radix_hir::visit::{walk_expr, HirVisitor};
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirItem,
     HirItemKind, HirModule, HirParamMode, HirStatement, HirStatementKind,
 };
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 const ISSUE_ASSIGN_TO_DE_PARAMETER: &str = "assign_to_de_parameter";
 const ISSUE_BORROW_OF_MOVED: &str = "borrow_of_moved";
@@ -167,6 +171,8 @@ struct BorrowChecker<'a> {
     states: FxHashMap<DefId, BorrowState>,
     scopes: Vec<BorrowScope>,
     param_usage: FxHashMap<DefId, ParamUsage>,
+    /// Bindings whose declared type carries a `ref` access fact.
+    ref_roots: FxHashSet<DefId>,
     errors: Vec<SemanticError>,
 }
 
@@ -193,6 +199,7 @@ impl<'a> BorrowChecker<'a> {
             states: FxHashMap::default(),
             scopes: Vec::new(),
             param_usage: FxHashMap::default(),
+            ref_roots: FxHashSet::default(),
             errors: Vec::new(),
         }
     }
@@ -228,6 +235,7 @@ impl<'a> BorrowChecker<'a> {
         self.reset();
         for param in &func.params {
             self.ensure_state(param.def_id);
+            self.note_ref_root(param.def_id, param.ty);
             self.param_usage.insert(
                 param.def_id,
                 ParamUsage {
@@ -251,6 +259,7 @@ impl<'a> BorrowChecker<'a> {
         self.states.clear();
         self.scopes.clear();
         self.param_usage.clear();
+        self.ref_roots.clear();
     }
 
     fn check_block(&mut self, block: &HirBlock) {
@@ -268,6 +277,9 @@ impl<'a> BorrowChecker<'a> {
         match &stmt.kind {
             HirStatementKind::Local(local) => {
                 self.ensure_state(local.def_id);
+                if let Some(ty) = local.ty {
+                    self.note_ref_root(local.def_id, ty);
+                }
                 if let Some(init) = &local.init {
                     self.check_expr(init);
                 }
@@ -350,6 +362,13 @@ impl<'a> BorrowChecker<'a> {
                     }
                 }
             }
+            if self.arg_is_ref_view(&arg.expr) && self.dest_is_mut_or_own(param) {
+                self.error(
+                    SemanticErrorKind::ModeMismatch,
+                    ISSUE_REF_TO_MUT_OR_OWN_POSITION,
+                    arg.expr.span,
+                );
+            }
             match param.mode {
                 SemanticParamMode::Ref => {
                     if self.rust_lifetime {
@@ -382,6 +401,17 @@ impl<'a> BorrowChecker<'a> {
     }
 
     fn check_lvalue(&mut self, target: &HirExpression) {
+        if Self::is_projection(target) {
+            if let Some(def_id) = Self::root_def_id(target) {
+                if self.ref_roots.contains(&def_id) {
+                    self.error(
+                        SemanticErrorKind::AssignToImmutableBorrow,
+                        ISSUE_ASSIGN_THROUGH_REF,
+                        target.span,
+                    );
+                }
+            }
+        }
         if let Some(def_id) = Self::root_def_id(target) {
             self.check_projection_inputs(target);
             self.write_use(def_id, target.span);
@@ -437,6 +467,47 @@ impl<'a> BorrowChecker<'a> {
 
     fn ensure_state(&mut self, def_id: DefId) {
         self.states.entry(def_id).or_default();
+    }
+
+    fn note_ref_root(&mut self, def_id: DefId, ty: TypeId) {
+        if self.types.is_ref_view(ty) {
+            self.ref_roots.insert(def_id);
+        }
+    }
+
+    fn dest_is_mut_or_own(&self, param: &ParamType) -> bool {
+        matches!(
+            param.mode,
+            SemanticParamMode::MutRef | SemanticParamMode::Move
+        ) || self.types.is_mut_or_own_view(param.ty)
+    }
+
+    fn arg_is_ref_view(&self, expr: &HirExpression) -> bool {
+        if let Some(ty) = expr.ty {
+            if self.types.is_ref_view(ty) {
+                return true;
+            }
+        }
+        if let Some(def_id) = Self::root_def_id(expr) {
+            if self.ref_roots.contains(&def_id) {
+                return true;
+            }
+        }
+        match &expr.kind {
+            HirExpressionKind::Field(object, _)
+            | HirExpressionKind::Index(object, _)
+            | HirExpressionKind::Deref(object) => self.arg_is_ref_view(object),
+            _ => false,
+        }
+    }
+
+    fn is_projection(expr: &HirExpression) -> bool {
+        matches!(
+            expr.kind,
+            HirExpressionKind::Field(_, _)
+                | HirExpressionKind::Index(_, _)
+                | HirExpressionKind::Deref(_)
+        )
     }
 
     fn read_use(&mut self, def_id: DefId, span: radix_lexer::Span) {

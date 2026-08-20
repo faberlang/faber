@@ -407,11 +407,16 @@ impl TypeChecker<'_> {
         _span: radix_lexer::Span,
         expected: Option<TypeId>,
     ) -> TypeId {
-        let expected_elem =
-            expected.and_then(|ty| match self.types.get(self.resolve_inferred_type(ty)) {
+        let expected_elem = expected.and_then(|ty| {
+            let payload = self
+                .types
+                .peel_access_marker(self.resolve_inferred_type(ty))
+                .1;
+            match self.types.get(payload) {
                 Type::Array(inner) => Some(*inner),
                 _ => None,
-            });
+            }
+        });
 
         if elements.is_empty() {
             if let Some(inner) = expected_elem {

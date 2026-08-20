@@ -435,7 +435,7 @@ impl TypeChecker<'_> {
             return target_ty;
         }
         let value_ty = self.check_expr_with_expected(value, Some(target_ty));
-        self.unify_assign_issue(value_ty, target_ty, value.span, ASSIGNMENT_TYPE_MISMATCH);
+        self.unify_carrier_assign(value_ty, target_ty, value.span, ASSIGNMENT_TYPE_MISMATCH);
         target_ty
     }
 

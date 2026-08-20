@@ -1836,11 +1836,18 @@ fn semantic_invalid_assignment_target_message(args: &[DiagnosticArg]) -> Option<
 
 fn semantic_borrow_message(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
+        "assign_through_ref" => Some("cannot assign through a `ref` view".to_owned()),
         "assign_to_de_parameter" => Some("cannot assign to `de` parameter".to_owned()),
         "borrow_of_moved" => Some("borrow of moved value".to_owned()),
         "cannot_move_while_borrowed" => Some("cannot move out while borrowed".to_owned()),
         "de_to_in_or_ex_position" => {
             Some("cannot pass `de` parameter to `in` or `ex` position".to_owned())
+        }
+        "mutating_receiver_through_ref" => {
+            Some("cannot call a mutating receiver through a `ref` view".to_owned())
+        }
+        "ref_to_mut_or_own_position" => {
+            Some("cannot pass a `ref` value to a `mut` or `own` position".to_owned())
         }
         "mutable_borrow_conflict" => {
             Some("mutable borrow conflicts with existing borrow".to_owned())

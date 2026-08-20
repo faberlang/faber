@@ -1,0 +1,17 @@
++++
+term = "mutabilitas"
+kind = "concept"
+category = "type"
+summary = "MU-2: non-mutating methods through a ref root stay legal."
+syntax = "const ref list<int> xs; xs.length()"
+related = ["ref", "lista"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — ref read (MU-2)
+# =============================================================================
+
+main {
+    const ref list<int> xs ← [1, 2, 3]
+    print xs.length()
+}

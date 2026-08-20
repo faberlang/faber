@@ -6,9 +6,9 @@
 //! compiler driver.
 
 use super::{
-    is_atomic_operator_method, lookup_method, lookup_method_for_type, mir_atomic_op,
-    mir_collection_op, mir_is_higher_order_lista, receivers_for_type, IntrinsicReceiver,
-    INTRINSICS,
+    is_atomic_operator_method, is_mutating_receiver, lookup_method, lookup_method_for_type,
+    mir_atomic_op, mir_collection_op, mir_is_higher_order_lista, receivers_for_type,
+    IntrinsicReceiver, INTRINSICS,
 };
 use radix_types::{MirAtomicOp, MirCollectionOp, Primitive, Type};
 
@@ -74,6 +74,31 @@ fn mir_classification_accessors_partition_rows() {
     assert_eq!(mir_collection_op(summa), Some(MirCollectionOp::Sum));
     let load = lookup_method(IntrinsicReceiver::Atomic, "load", 0).expect("atomic load row");
     assert_eq!(mir_atomic_op(load), Some(MirAtomicOp::Load));
+}
+
+#[test]
+fn mutating_receiver_predicate_keys_on_catalog_rows() {
+    let appende = lookup_method(IntrinsicReceiver::Lista, "appende", 1).expect("lista appende");
+    assert!(
+        is_mutating_receiver(appende),
+        "Lista appende is the catalog mutating-receiver fact"
+    );
+    let longitudo =
+        lookup_method(IntrinsicReceiver::Lista, "longitudo", 0).expect("lista longitudo");
+    assert!(
+        !is_mutating_receiver(longitudo),
+        "Lista longitudo is a read"
+    );
+    let addita = lookup_method(IntrinsicReceiver::Lista, "addita", 1).expect("lista addita");
+    assert!(
+        !is_mutating_receiver(addita),
+        "Lista addita returns a new list"
+    );
+    let detrahe = lookup_method(IntrinsicReceiver::Lista, "detrahe", 0).expect("lista detrahe");
+    assert!(
+        is_mutating_receiver(detrahe),
+        "in-place pop mutates without a Vacuum return"
+    );
 }
 
 #[test]
