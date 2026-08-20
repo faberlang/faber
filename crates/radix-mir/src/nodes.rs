@@ -249,13 +249,20 @@ impl MirFunction {
     }
 }
 
-/// Shallow ownership encoding for `de` / `in` / `ex` parameter modes.
+/// Shallow ownership encoding for MIR parameter modes.
+///
+/// The serde labels preserve the pre-D-14 wire spellings while the Rust
+/// variants mirror [`radix_types::SemanticParamMode`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirParamMode {
+    #[serde(rename = "Owned")]
     Owned,
-    De,
-    In,
-    Ex,
+    #[serde(rename = "De")]
+    Ref,
+    #[serde(rename = "In")]
+    MutRef,
+    #[serde(rename = "Ex")]
+    Move,
 }
 
 /// Function parameter bound to the local slot that carries its runtime value.

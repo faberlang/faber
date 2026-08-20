@@ -753,7 +753,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "call argument count mismatch"));
         }
         for ((_, mode), operand) in param_modes.iter().zip(args) {
-            if *mode == MirParamMode::In && !matches!(operand, MirOperand::Place(_)) {
+            if *mode == MirParamMode::MutRef && !matches!(operand, MirOperand::Place(_)) {
                 return Err(RunnerError::internal(
                     span,
                     "mutable parameter requires a place argument",
@@ -776,7 +776,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 // `in` is a borrow contract, not a scalar copy. Keep a
                 // direct place alias while the caller frame is live; all
                 // other modes retain the existing value transfer behavior.
-                if mode == MirParamMode::In
+                if mode == MirParamMode::MutRef
                     && depth > 0
                     && matches!(operand, MirOperand::Place(place) if place.projections.is_empty())
                 {

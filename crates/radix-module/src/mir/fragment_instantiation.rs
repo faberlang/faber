@@ -465,7 +465,7 @@ impl InstantiationChecker<'_> {
     fn mode_legal(&self, expected: MirParamMode, arg: &MirOperand) -> bool {
         match expected {
             MirParamMode::Owned => true,
-            MirParamMode::De | MirParamMode::In | MirParamMode::Ex => matches!(arg, MirOperand::Place(_)),
+            MirParamMode::Ref | MirParamMode::MutRef | MirParamMode::Move => matches!(arg, MirOperand::Place(_)),
         }
     }
 
@@ -575,9 +575,9 @@ fn type_label(types: &TypeTable, ty: TypeId) -> String {
 fn mode_label(mode: MirParamMode) -> &'static str {
     match mode {
         MirParamMode::Owned => "owned",
-        MirParamMode::De => "de",
-        MirParamMode::In => "in",
-        MirParamMode::Ex => "ex",
+        MirParamMode::Ref => "de",
+        MirParamMode::MutRef => "in",
+        MirParamMode::Move => "ex",
     }
 }
 

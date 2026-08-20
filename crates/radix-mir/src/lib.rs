@@ -53,6 +53,8 @@ mod packed_gather_probe;
 mod packed_kernel_probe;
 #[cfg(test)]
 mod packed_negative_matrix;
+#[cfg(test)]
+mod param_mode_test;
 /// Shared statement/value read analysis for device-program lowering.
 mod read_analysis;
 #[allow(dead_code)]

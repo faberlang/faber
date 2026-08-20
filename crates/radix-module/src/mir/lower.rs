@@ -1389,13 +1389,13 @@ impl<'a> FunctionBuilder<'a> {
         };
         let mir_ty = MirType::semantic(storage_ty);
         // Keep the MIR ABI mode and local mutability paired. In particular,
-        // `in` must remain `MirParamMode::In` so call frames can preserve a
+        // `in` must remain `MirParamMode::MutRef` so call frames can preserve a
         // scalar mutable borrow instead of treating it as an owned value.
         let (mir_mode, mutable) = match mode {
             HirParamMode::Owned => (MirParamMode::Owned, false),
-            HirParamMode::De => (MirParamMode::De, false),
-            HirParamMode::In => (MirParamMode::In, true),
-            HirParamMode::Ex => (MirParamMode::Ex, false),
+            HirParamMode::De => (MirParamMode::Ref, false),
+            HirParamMode::In => (MirParamMode::MutRef, true),
+            HirParamMode::Ex => (MirParamMode::Move, false),
         };
         self.params
             .push(MirParam { local, name: Some(name), ty: mir_ty, mode: mir_mode, span });

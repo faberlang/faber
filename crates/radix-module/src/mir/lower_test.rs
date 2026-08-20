@@ -213,7 +213,7 @@ incipit {
     let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
     let function = &program.functions[0];
 
-    assert_eq!(function.params[0].mode, MirParamMode::In);
+    assert_eq!(function.params[0].mode, MirParamMode::MutRef);
     assert!(function.locals[0].mutable, "in parameter must be writable in MIR");
     assert!(function.blocks[0].statements.iter().any(|statement| {
         matches!(

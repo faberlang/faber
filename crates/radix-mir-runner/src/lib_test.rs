@@ -84,7 +84,7 @@ fn scalar_mut_param_propagates_through_runner_frames() {
             local: MirLocalId(1),
             name: None,
             ty: scalar,
-            mode: MirParamMode::In,
+            mode: MirParamMode::MutRef,
             span,
         }],
         locals: vec![MirLocal {

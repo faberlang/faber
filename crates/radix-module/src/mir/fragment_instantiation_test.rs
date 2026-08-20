@@ -402,7 +402,7 @@ fn argument_mode_mismatch_emits_type() {
     let helper = function(
         1,
         FRAGMENT,
-        vec![param(0, ty, MirParamMode::In)],
+        vec![param(0, ty, MirParamMode::MutRef)],
         ty,
         None,
         Vec::new(),
