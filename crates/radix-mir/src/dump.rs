@@ -622,6 +622,7 @@ fn collection_op(op: MirCollectionOp) -> &'static str {
         MirCollectionOp::TensorCausalMaskedSoftmax => "tensor-causal-masked-softmax",
         MirCollectionOp::TensorQuantizedMatMul => "tensor-quantized-matmul",
         MirCollectionOp::TensorGroupedMatMul => "tensor-grouped-matmul",
+        MirCollectionOp::TensorBatchedAttention => "tensor-batched-attention",
         MirCollectionOp::TensorSsmConv1d => "tensor-ssm-conv1d",
         MirCollectionOp::TensorSsmScan => "tensor-ssm-scan",
         MirCollectionOp::TensorDiv => "tensor_div",

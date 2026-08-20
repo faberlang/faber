@@ -271,6 +271,10 @@ pub enum MirCollectionOp {
     /// Grouped/segmented packed GEMM over rank-3 expert slices (R-PACK-01A:
     /// name frozen). Trailing GGML type-id const (`[left, right, layout_id]`).
     TensorGroupedMatMul,
+    /// Internal M3 head-batched attention primitive. This is compiler-owned,
+    /// not a source intrinsic: the target-neutral contract resolves explicit
+    /// group/head axes, GQA mapping, strides, dispatch, and layout.
+    TensorBatchedAttention,
     /// Hybrid SSM conv1d (R-PACK-01A: name frozen). Trailing GGML type-id
     /// const (`[input, kernel, layout_id]`).
     TensorSsmConv1d,

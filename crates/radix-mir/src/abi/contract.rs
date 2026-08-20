@@ -128,6 +128,33 @@ pub enum CollectionOpContract {
         /// Stored expert-weight layout.
         layout: PackedStorageLayout,
     },
+    /// M3 head-batched attention. The operation uses explicit group/head
+    /// axes and a flat output dispatch; the plan carries typed strides and
+    /// the sequence-major context fact consumed by the Metal materializer.
+    BatchedAttention {
+        /// Operation family encoded by the rank/shape contract.
+        kind: crate::kernel_plan::BatchedAttentionKind,
+        /// Number of KV groups.
+        kv_heads: u64,
+        /// Query heads per KV group.
+        q_per_kv: u64,
+        /// Sequence extent.
+        seq: u64,
+        /// Per-head feature width.
+        head_dim: u64,
+        /// Hidden-state width.
+        hidden: u64,
+        /// Packed projection layout, when this is a projection.
+        layout: Option<PackedStorageLayout>,
+        /// Whether the projection includes the Qwen rotate-half rope
+        /// mapping. The mode is a carried fact so the emitter never guesses
+        /// from a model name.
+        rotate_half: bool,
+        /// IEEE-754 scale bits for grouped scores.
+        scale_bits: u32,
+        /// Flat output element count.
+        output_elements: u64,
+    },
     /// SSM conv1d (R-PACK-01A). 1D elementwise-style dispatch over
     /// `length · channels`.
     SsmConv1d {
@@ -316,6 +343,14 @@ pub(crate) fn apply_collection_op_contract(
                 z: 1,
             };
         }
+        CollectionOpContract::BatchedAttention { output_elements, .. } => {
+            signature.workgroup = MirWorkgroupSize { x: 64, y: 1, z: 1 };
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: output_elements,
+                y: 1,
+                z: 1,
+            };
+        }
         CollectionOpContract::SsmConv1d {
             length, channels, ..
         } => {
@@ -371,6 +406,7 @@ pub fn collection_op_contract(
                 continue;
             };
             let MirStatementKind::RuntimeCall {
+                destination,
                 call: MirRuntimeCall { args, .. },
                 ..
             } = &statement.kind
@@ -468,6 +504,14 @@ pub fn collection_op_contract(
                 MirCollectionOp::TensorGroupedMatMul => {
                     return Ok(Some(grouped_matmul_contract(function, args, validation)?));
                 }
+                MirCollectionOp::TensorBatchedAttention => {
+                    return Ok(Some(batched_attention_contract(
+                        function,
+                        args,
+                        destination.as_ref(),
+                        validation,
+                    )?));
+                }
                 MirCollectionOp::TensorSsmConv1d => {
                     return Ok(Some(ssm_conv1d_contract(function, args, validation)?));
                 }
@@ -547,6 +591,158 @@ fn packed_rank2_matmul_operands(
         [right_dims[0], right_dims[1]],
         layout,
     ))
+}
+
+fn batched_attention_contract(
+    function: &MirFunction,
+    args: &[MirOperand],
+    destination: Option<&crate::MirPlace>,
+    validation: &MirValidationContext<'_>,
+) -> Result<CollectionOpContract, MirAbiError> {
+    if !(7..=12).contains(&args.len()) {
+        return Err(MirAbiError::new(
+            "batched attention has an unsupported operand/const arity",
+        ));
+    }
+    // The final five operands are always the explicit axes. The operation
+    // kind immediately precedes them; scores additionally carry the scale,
+    // and projections carry their packed layout immediately before the kind.
+    let axes_base = args.len() - 5;
+    let kind_index = axes_base - 1;
+    let base = axes_base;
+    let kind_value = const_nonnegative_u64(args, kind_index, "attention kind")?;
+    let (kind, rotate_half) = match kind_value {
+        0 => (crate::kernel_plan::BatchedAttentionKind::ProjectionQ, false),
+        1 => (crate::kernel_plan::BatchedAttentionKind::ProjectionK, false),
+        2 => (crate::kernel_plan::BatchedAttentionKind::ProjectionV, false),
+        // 6/7 are the same Q/K projection contracts with the explicit
+        // Qwen/NeoX rotate-half mapping carried as a plan fact.
+        6 => (crate::kernel_plan::BatchedAttentionKind::ProjectionQ, true),
+        7 => (crate::kernel_plan::BatchedAttentionKind::ProjectionK, true),
+        3 => (crate::kernel_plan::BatchedAttentionKind::Scores, false),
+        4 => (crate::kernel_plan::BatchedAttentionKind::Softmax, false),
+        5 => (crate::kernel_plan::BatchedAttentionKind::ContextSequenceMajor, false),
+        other => {
+            return Err(MirAbiError::new(format!(
+                "batched attention kind {other} is not admitted"
+            )))
+        }
+    };
+    let kv_heads = const_u64(args, base, "kv_heads")?;
+    let q_per_kv = const_u64(args, base + 1, "q_per_kv")?;
+    let seq = const_u64(args, base + 2, "sequence")?;
+    let head_dim = const_u64(args, base + 3, "head_dim")?;
+    let hidden = const_u64(args, base + 4, "hidden")?;
+    if kv_heads == 0 || q_per_kv == 0 || seq == 0 || head_dim == 0 || hidden == 0 {
+        return Err(MirAbiError::new(
+            "batched attention axes must be non-zero",
+        ));
+    }
+    let output_ty = destination
+        .and_then(crate::read_analysis::place_local_base)
+        .and_then(|local| crate::local_ty::local_ty(function, local))
+        .ok_or_else(|| MirAbiError::new("batched attention output has no typed local"))?;
+    let output_dims = crate::tensor_type::tensor_literal_dims(output_ty, validation)
+        .map_err(MirAbiError::new)?;
+    let expected = match kind {
+        crate::kernel_plan::BatchedAttentionKind::ProjectionQ
+        | crate::kernel_plan::BatchedAttentionKind::ProjectionK
+        | crate::kernel_plan::BatchedAttentionKind::ProjectionV => {
+            // Keep Q explicit as [kv_group, query_head, seq, head_dim]
+            // even when the physical projection has one contiguous head
+            // axis. The sentinel and context contract depend on this rank-4
+            // view, so no emitter may flatten the GQA mapping implicitly.
+            if matches!(kind, crate::kernel_plan::BatchedAttentionKind::ProjectionQ) {
+                vec![kv_heads, q_per_kv, seq, head_dim]
+            } else {
+                vec![kv_heads, seq, head_dim]
+            }
+        }
+        crate::kernel_plan::BatchedAttentionKind::Scores
+        | crate::kernel_plan::BatchedAttentionKind::Softmax => {
+            vec![kv_heads, q_per_kv, seq, seq]
+        }
+        crate::kernel_plan::BatchedAttentionKind::ContextSequenceMajor => vec![seq, hidden],
+    };
+    if output_dims != expected {
+        return Err(MirAbiError::new(format!(
+            "batched attention {:?} output dims {:?} do not match {:?}",
+            kind, output_dims, expected
+        )));
+    }
+    let layout = if matches!(
+        kind,
+        crate::kernel_plan::BatchedAttentionKind::ProjectionQ
+            | crate::kernel_plan::BatchedAttentionKind::ProjectionK
+            | crate::kernel_plan::BatchedAttentionKind::ProjectionV
+    ) {
+        Some(packed_layout_from_operand(
+            args.get(kind_index - 1).ok_or_else(|| {
+                MirAbiError::new("batched projection requires a GGML layout const")
+            })?,
+        )?)
+    } else {
+        None
+    };
+    let scale_bits = if matches!(kind, crate::kernel_plan::BatchedAttentionKind::Scores) {
+        let value = const_f64(args, kind_index - 1, "attention scale")? as f32;
+        if !value.is_finite() || value == 0.0 {
+            return Err(MirAbiError::new("attention scale must be finite and non-zero"));
+        }
+        value.to_bits()
+    } else {
+        0
+    };
+    let output_elements = expected.iter().try_fold(1u64, |product, dim| {
+        product
+            .checked_mul(*dim)
+            .ok_or_else(|| MirAbiError::new("batched attention output size overflow"))
+    })?;
+    Ok(CollectionOpContract::BatchedAttention {
+        kind,
+        kv_heads,
+        q_per_kv,
+        seq,
+        head_dim,
+        hidden,
+        layout,
+        rotate_half,
+        scale_bits,
+        output_elements,
+    })
+}
+
+fn const_nonnegative_u64(
+    args: &[MirOperand],
+    index: usize,
+    what: &str,
+) -> Result<u64, MirAbiError> {
+    match args.get(index) {
+        Some(MirOperand::Constant(MirConstant::Int(value))) if *value >= 0 => {
+            u64::try_from(*value).map_err(|_| MirAbiError::new(format!("{what} is too large")))
+        }
+        Some(MirOperand::Constant(MirConstant::UInt(value))) => Ok(*value),
+        _ => Err(MirAbiError::new(format!(
+            "batched attention {what} must be a non-negative const"
+        ))),
+    }
+}
+
+fn const_u64(args: &[MirOperand], index: usize, what: &str) -> Result<u64, MirAbiError> {
+    match args.get(index) {
+        Some(MirOperand::Constant(MirConstant::Int(value))) if *value > 0 => {
+            u64::try_from(*value).map_err(|_| MirAbiError::new(format!("{what} is too large")))
+        }
+        Some(MirOperand::Constant(MirConstant::UInt(value))) if *value > 0 => Ok(*value),
+        _ => Err(MirAbiError::new(format!("batched attention {what} must be a positive const"))),
+    }
+}
+
+fn const_f64(args: &[MirOperand], index: usize, what: &str) -> Result<f64, MirAbiError> {
+    match args.get(index) {
+        Some(MirOperand::Constant(MirConstant::Float(value))) => Ok(*value),
+        _ => Err(MirAbiError::new(format!("batched attention {what} must be a float const"))),
+    }
 }
 
 fn grouped_matmul_contract(

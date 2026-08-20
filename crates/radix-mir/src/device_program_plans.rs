@@ -20,10 +20,10 @@ use crate::device_program::{
     Binding, BufferRole, DeviceProgram, DeviceProgramError, DeviceResource, KernelLaunchPlan,
     KernelUnit,
 };
-use crate::kernel_plan::{CollectionKernelPlan, MatMulShapes, SharedMemoryLayout};
+use crate::kernel_plan::{BatchedAttentionKind, CollectionKernelPlan, MatMulShapes, SharedMemoryLayout};
 use crate::layout::MirTensorStorageLayout;
 use crate::{
-    MirCollectionOp, MirConstant, MirFunction, MirKernelDispatchSize, MirKernelWorkgroupCount,
+    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirKernelDispatchSize, MirKernelWorkgroupCount,
     MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirRuntimeCall, MirStatementKind, MirType,
     MirUnOp, MirValidationContext, MirWorkgroupSize,
 };
@@ -357,6 +357,8 @@ pub enum RecipeKind {
     QuantizedMatMul,
     /// Grouped packed GEMM recipe (R-PACK-01A).
     GroupedMatMul,
+    /// M3 head-batched attention recipe.
+    BatchedAttention,
     /// SSM conv1d recipe (R-PACK-01A).
     SsmConv1d,
     /// SSM linear-recurrence scan recipe (R-PACK-01A).
@@ -379,6 +381,7 @@ impl RecipeKind {
             CollectionKernelPlan::CausalMaskedSoftmax(_) => Self::CausalMaskedSoftmax,
             CollectionKernelPlan::QuantizedMatMul(_) => Self::QuantizedMatMul,
             CollectionKernelPlan::GroupedMatMul(_) => Self::GroupedMatMul,
+            CollectionKernelPlan::BatchedAttention(_) => Self::BatchedAttention,
             CollectionKernelPlan::SsmConv1d(_) => Self::SsmConv1d,
             CollectionKernelPlan::SsmScan(_) => Self::SsmScan,
         }
@@ -647,6 +650,21 @@ fn bind_dimensions(plan: &CollectionKernelPlan, output_extent: u64) -> (Vec<u64>
         CollectionKernelPlan::GroupedMatMul(plan) => {
             (vec![plan.groups, plan.m, plan.n], BindLayout::RowMajor)
         }
+        CollectionKernelPlan::BatchedAttention(plan) => {
+            let dims = match plan.kind {
+                BatchedAttentionKind::ProjectionQ => {
+                    vec![plan.kv_heads, plan.q_per_kv, plan.seq, plan.head_dim]
+                }
+                BatchedAttentionKind::ProjectionK | BatchedAttentionKind::ProjectionV => {
+                    vec![plan.kv_heads, plan.seq, plan.head_dim]
+                }
+                BatchedAttentionKind::Scores | BatchedAttentionKind::Softmax => {
+                    vec![plan.kv_heads, plan.q_per_kv, plan.seq, plan.seq]
+                }
+                BatchedAttentionKind::ContextSequenceMajor => vec![plan.seq, plan.hidden],
+            };
+            (dims, BindLayout::Strided)
+        }
         CollectionKernelPlan::Transpose(plan) => (vec![plan.m, plan.n], BindLayout::RowMajor),
         CollectionKernelPlan::TreeReduction(plan) => (vec![plan.length], BindLayout::Flat),
         CollectionKernelPlan::Elementwise
@@ -783,6 +801,7 @@ fn plan_shared_memory_bytes(plan: &CollectionKernelPlan) -> u64 {
         | CollectionKernelPlan::CausalMaskedSoftmax(_)
         | CollectionKernelPlan::QuantizedMatMul(_)
         | CollectionKernelPlan::GroupedMatMul(_)
+        | CollectionKernelPlan::BatchedAttention(_)
         | CollectionKernelPlan::SsmConv1d(_)
         | CollectionKernelPlan::SsmScan(_) => 0,
         CollectionKernelPlan::TreeReduction(plan) => {
@@ -857,6 +876,7 @@ pub fn is_recipe_op(op: MirCollectionOp) -> bool {
             | MirCollectionOp::TensorCausalMaskedSoftmax
             | MirCollectionOp::TensorQuantizedMatMul
             | MirCollectionOp::TensorGroupedMatMul
+            | MirCollectionOp::TensorBatchedAttention
             | MirCollectionOp::TensorSsmConv1d
             | MirCollectionOp::TensorSsmScan
     )
@@ -1233,6 +1253,60 @@ pub fn contract_shape_signature(
                 z: 1,
             };
         }
+        CollectionOpContract::BatchedAttention {
+            kind,
+            kv_heads,
+            q_per_kv,
+            seq,
+            head_dim,
+            hidden,
+            output_elements,
+            ..
+        } => {
+            let op = MirCollectionOp::TensorBatchedAttention;
+            // Whole functions carry ABI-only output/dispatch params, while a
+            // decomposed recipe subchain retains only the tensor locals read
+            // by the batched call. Resolve the call operands directly so both
+            // forms preserve every projection peer (cos/sin/bias included).
+            let operands = recipe_operand_locals(function)?;
+            let first = operands.first().ok_or_else(|| {
+                PlanMappingError::mapping(format!(
+                    "batched attention function {} has no tensor operands",
+                    function.id.0
+                ))
+            })?;
+            let (element_ty, _) = data_flow_element_ty_and_count(
+                function_local_ty(function, *first)?,
+                validation,
+            )?;
+            for (binding, local) in operands.iter().copied().enumerate() {
+                let (operand_ty, extent) =
+                    data_flow_element_ty_and_count(function_local_ty(function, local)?, validation)?;
+                if binding == 0 {
+                    signature.input = storage_input_with_local(0, operand_ty, extent, local);
+                } else {
+                    signature.extra_inputs.push(storage_input_with_local(
+                        u32::try_from(binding).unwrap_or(u32::MAX),
+                        operand_ty,
+                        extent,
+                        local,
+                    ));
+                }
+            }
+            signature.output = storage_output(
+                u32::try_from(operands.len()).unwrap_or(u32::MAX),
+                element_ty,
+                output_elements,
+            );
+            signature.output.source_local = recipe_destination_local_for(function, op);
+            signature.workgroup = MirWorkgroupSize { x: 64, y: 1, z: 1 };
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: output_elements,
+                y: 1,
+                z: 1,
+            };
+            let _ = (kind, kv_heads, q_per_kv, seq, head_dim, hidden);
+        }
         CollectionOpContract::SsmConv1d {
             length, channels, ..
         } => {
@@ -1554,17 +1628,13 @@ pub fn subchain_signature_for_emission_with_source(
     let mut signature = contract_shape_signature(function, contract, validation)?;
     let operands = recipe_operand_locals(function)?;
     let mut bound: Vec<MirLocalId> = Vec::new();
-    if let Some(first) = operands.first() {
-        signature.input.source_local = Some(*first);
-        bound.push(*first);
-    }
-    // Matmul binds its right operand as the contract-shaped signature's first
-    // extra input (binding 1).
-    if let Some(second) = operands.get(1) {
-        if let Some(right) = signature.extra_inputs.first_mut() {
-            right.source_local = Some(*second);
+    for (binding, local) in operands.iter().copied().enumerate() {
+        if binding == 0 {
+            signature.input.source_local = Some(local);
+        } else if let Some(extra) = signature.extra_inputs.get_mut(binding - 1) {
+            extra.source_local = Some(local);
         }
-        bound.push(*second);
+        bound.push(local);
     }
     finish_subchain_emission_signature(
         function,
@@ -1856,7 +1926,33 @@ fn recipe_operand_locals(function: &MirFunction) -> Result<Vec<MirLocalId>, Plan
             "subchain body has no recipe statement",
         ));
     };
+    let operand_end = if matches!(
+        call.intrinsic,
+        MirIntrinsic::Collection(MirCollectionOp::TensorBatchedAttention)
+    ) {
+        let axes_base = call.args.len().saturating_sub(5);
+        let kind_index = axes_base.saturating_sub(1);
+        let kind = match call.args.get(kind_index) {
+            Some(MirOperand::Constant(MirConstant::Int(value))) => *value,
+            Some(MirOperand::Constant(MirConstant::UInt(value))) => {
+                i64::try_from(*value).unwrap_or(-1)
+            }
+            _ => -1,
+        };
+        // Projection layout is the const immediately before the kind, while
+        // scores carry a scale const there. All other kinds put their final
+        // tensor operand immediately before the kind.
+        if matches!(kind, 0 | 1 | 2 | 3 | 6 | 7) {
+            kind_index.saturating_sub(1)
+        } else {
+            kind_index
+        }
+    } else {
+        call.args.len()
+    };
     call.args
+        .get(..operand_end)
+        .unwrap_or_default()
         .iter()
         .map(|arg| {
             crate::read_analysis::operand_local(arg).ok_or_else(|| {

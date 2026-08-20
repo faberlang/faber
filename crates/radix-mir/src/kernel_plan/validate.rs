@@ -295,6 +295,26 @@ pub(super) fn validate_quantized_matmul_plan(
 
 /// Grouped packed GEMM validation (R-PACK-01A). Positive M/K/N/groups and a
 /// non-zero tile; the workgroup must equal the tile on both axes.
+pub(super) fn validate_batched_attention_plan(
+    plan: &super::plan::BatchedAttentionPlan,
+) -> Result<(), PlanValidationError> {
+    if plan.kv_heads == 0
+        || plan.q_per_kv == 0
+        || plan.seq == 0
+        || plan.head_dim == 0
+        || plan.hidden == 0
+        || plan.output_strides.iter().any(|stride| *stride == 0)
+    {
+        return Err(PlanValidationError::BatchedAttentionInvalid);
+    }
+    if plan.kind == super::plan::BatchedAttentionKind::ContextSequenceMajor
+        && plan.hidden != plan.kv_heads.saturating_mul(plan.q_per_kv).saturating_mul(plan.head_dim)
+    {
+        return Err(PlanValidationError::BatchedAttentionInvalid);
+    }
+    Ok(())
+}
+
 pub(super) fn validate_grouped_matmul_plan(
     plan: &GroupedMatMulPlan,
 ) -> Result<(), PlanValidationError> {
@@ -597,6 +617,8 @@ pub enum PlanValidationError {
         groups: u64,
         tile: u32,
     },
+    /// A batched attention contract has a zero axis or an invalid stride.
+    BatchedAttentionInvalid,
     /// SSM conv1d requires positive length, channels, and kernel width.
     SsmConv1dZeroDimension {
         length: u64,
@@ -743,6 +765,10 @@ impl fmt::Display for PlanValidationError {
             } => write!(
                 f,
                 "grouped matmul requires positive M/K/N/groups and a non-zero tile, got M={m}, K={k}, N={n}, groups={groups}, tile={tile}"
+            ),
+            Self::BatchedAttentionInvalid => write!(
+                f,
+                "batched attention requires positive axes, coherent strides, and a sequence-major context width"
             ),
             Self::SsmConv1dZeroDimension {
                 length,

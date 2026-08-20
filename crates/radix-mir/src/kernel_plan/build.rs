@@ -1,21 +1,22 @@
 use super::plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, CollectionKernelPlan,
-    GatherPlan, GroupedMatMulPlan, LayerNormalizationPlan, MatMulPlan, MatMulShapes,
+    BatchedAttentionKind, BatchedAttentionPlan, GatherPlan, GroupedMatMulPlan, LayerNormalizationPlan, MatMulPlan, MatMulShapes,
     MatMulSharedMemory, OobPaddingPolicy, ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan,
     RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
     F32_ELEMENT_BYTE_WIDTH, MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE,
     REDUCTION_SHARED_BUFFER_NAME, TRANSPOSE_WORKGROUP_X,
 };
 use super::validate::{
-    validate_axis_reduction_plan, validate_causal_masked_softmax_plan, validate_gather_plan,
-    validate_grouped_matmul_plan, validate_matmul_plan, validate_quantized_matmul_plan,
+    validate_axis_reduction_plan, validate_batched_attention_plan,
+    validate_causal_masked_softmax_plan, validate_gather_plan, validate_grouped_matmul_plan,
+    validate_matmul_plan, validate_quantized_matmul_plan,
     validate_reduction_plan, validate_rms_normalization_plan, validate_rope_plan,
     validate_ssm_conv1d_plan, validate_ssm_scan_plan, validate_transpose_plan, PlanValidationError,
 };
 use crate::abi::{CollectionOpContract, MirKernelSignature};
 use crate::{
     MirCollectionOp, MirConstant, MirFunction, MirLocalId, MirOperand, MirParam, MirPlaceBase,
-    MirRuntimeCall, MirStatementKind, MirValidationContext,
+    MirRuntimeCall, MirStatementKind, MirValidationContext, MirWorkgroupSize,
 };
 use radix_types::Type;
 
@@ -237,6 +238,59 @@ impl CollectionKernelPlan {
                     tile: MATMUL_TILE,
                     workgroup_x: signature.workgroup.x,
                     workgroup_y: signature.workgroup.y,
+                }))
+            }
+            CollectionOpContract::BatchedAttention {
+                kind,
+                kv_heads,
+                q_per_kv,
+                seq,
+                head_dim,
+                hidden,
+                layout,
+                rotate_half,
+                scale_bits,
+                output_elements,
+            } => {
+                if op != MirCollectionOp::TensorBatchedAttention
+                    || signature.dispatch_size.x != output_elements
+                    || signature.dispatch_size.y != 1
+                    || signature.dispatch_size.z != 1
+                    || signature.workgroup != (MirWorkgroupSize { x: 64, y: 1, z: 1 })
+                {
+                    return None;
+                }
+                let output_strides = match kind {
+                    BatchedAttentionKind::ProjectionQ => [
+                        q_per_kv
+                            .saturating_mul(seq)
+                            .saturating_mul(head_dim),
+                        seq.saturating_mul(head_dim),
+                        head_dim,
+                        1,
+                    ],
+                    BatchedAttentionKind::ProjectionK | BatchedAttentionKind::ProjectionV => {
+                        [seq.saturating_mul(head_dim), head_dim, 1, 1]
+                    }
+                    BatchedAttentionKind::Scores | BatchedAttentionKind::Softmax => [
+                        q_per_kv.saturating_mul(seq).saturating_mul(seq),
+                        seq.saturating_mul(seq),
+                        seq,
+                        1,
+                    ],
+                    BatchedAttentionKind::ContextSequenceMajor => [hidden, 1, 1, 1],
+                };
+                Some(CollectionKernelPlan::BatchedAttention(BatchedAttentionPlan {
+                    kind,
+                    kv_heads,
+                    q_per_kv,
+                    seq,
+                    head_dim,
+                    hidden,
+                    layout,
+                    rotate_half,
+                    output_strides,
+                    scale_bits,
                 }))
             }
             CollectionOpContract::SsmConv1d {
@@ -488,6 +542,7 @@ impl CollectionKernelPlan {
             }
             CollectionKernelPlan::QuantizedMatMul(plan) => validate_quantized_matmul_plan(plan),
             CollectionKernelPlan::GroupedMatMul(plan) => validate_grouped_matmul_plan(plan),
+            CollectionKernelPlan::BatchedAttention(plan) => validate_batched_attention_plan(plan),
             CollectionKernelPlan::SsmConv1d(plan) => validate_ssm_conv1d_plan(plan),
             CollectionKernelPlan::SsmScan(plan) => validate_ssm_scan_plan(plan),
         }
