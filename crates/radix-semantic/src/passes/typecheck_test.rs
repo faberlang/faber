@@ -256,6 +256,23 @@ fn resolves_method_call_type() {
 }
 
 #[test]
+fn known_method_on_concrete_receiver_still_resolves() {
+    // lookup_method_signature keep: declared methods on a genus receiver still typecheck.
+    test_support::assert_accepts(
+        "genus Seed {\n  functio status() → numerus { redde 1 }\n}\
+         functio probe() → numerus { fixum Seed s ← Seed {} redde s.status() }",
+    );
+}
+
+#[test]
+fn ignotum_receiver_method_call_still_infers() {
+    // Dynamic/Ignotum receivers keep inferring unknown methods.
+    test_support::assert_accepts(
+        "functio probe(ignotum s) → ignotum { redde s.from_flat(3) }",
+    );
+}
+
+#[test]
 fn accepts_failable_call_in_ordinary_expression_position() {
     // Failable call in a redde within a ⇥-declaring function should propagate
     test_support::assert_accepts(
@@ -1169,6 +1186,16 @@ fn reports_unknown_struct_field_access() {
     test_support::assert_rejects_with_issue(
         "genus S { numerus f } incipit { fixum S s nota s.g }",
         "unknown_struct_field",
+    );
+}
+
+#[test]
+fn rejects_unknown_method_on_concrete_receiver() {
+    // Concrete genus receiver with no such method must emit unknown_method.
+    test_support::assert_rejects_with_issue(
+        "genus Seed {\n  functio status() → numerus { redde 1 }\n}\
+         functio probe() → numerus { fixum Seed s ← Seed {} redde s.from_flat(3) }",
+        "unknown_method",
     );
 }
 
