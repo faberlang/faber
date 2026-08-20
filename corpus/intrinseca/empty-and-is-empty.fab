@@ -1,0 +1,31 @@
++++
+term = "vacua"
+kind = "concept"
+category = "collection"
+canonical = false
+summary = "en empty-collection marker vs is_empty intrinsic in one file."
+syntax = "var list<T> xs ← empty"
+related = ["vacua"]
+locale = "en"
++++
+# =============================================================================
+# empty marker + is_empty intrinsic (en-pack-surface-fidelity V-1)
+# =============================================================================
+#
+# What this teaches:
+#   • The empty-collection marker spelling under en is `empty`.
+#   • The collection intrinsic is `is_empty` — a separate concept.
+#
+# Pin: both spellings in one file so the concepts cannot cross-contaminate.
+# Transition alias: `vacua` remains accepted on en until V-5; that spelling
+# is pinned by corpus/intrinseca/vacua-ascribere.fab.
+#
+# EXPECTED OUTPUT:
+#   Smoke asserts exit 0 only.
+
+main {
+    var list<int> xs ← empty
+    const _ vacant ← xs.is_empty()
+    xs.append(1)
+    print vacant, xs.is_empty(), xs.length()
+}

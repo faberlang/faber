@@ -1278,6 +1278,31 @@ fn llm_pack_resolves_morphology_keyword_latin_keys() {
 }
 
 #[test]
+fn en_pack_empty_marker_accepts_vacua_transition_alias() {
+    // Goal en-pack-surface-fidelity V-1: the en marker surface is `empty`;
+    // `vacua` remains an accepted spelling until V-5 removes the alias.
+    // The intrinsic row `vacua = "is_empty"` is a separate concept.
+    let pack = installed_pack("en");
+    assert!(
+        validate_locale_pack(&pack).is_empty(),
+        "en pack should validate: {:?}",
+        validate_locale_pack(&pack)
+    );
+    assert_eq!(pack.keyword_latin_key("empty"), Some("vacua"));
+    assert_eq!(
+        pack.keyword_latin_key("vacua"),
+        Some("vacua"),
+        "transition alias: en must still accept the Latin marker spelling"
+    );
+    assert_eq!(pack.contextual_keyword_surface("vacua"), "empty");
+    assert_eq!(pack.intrinsic_surface("vacua"), Some("is_empty"));
+
+    let la = installed_pack("la");
+    assert_eq!(la.keyword_latin_key("vacua"), Some("vacua"));
+    assert_eq!(la.keyword_latin_key("empty"), None, "la must not treat `empty` as the marker");
+}
+
+#[test]
 fn latin_pack_resolves_morphology_keyword_surfaces() {
     let pack = latin_locale_pack();
 
