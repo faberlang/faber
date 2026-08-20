@@ -33,7 +33,7 @@ use crate::distributed::types::{
     PlacementFact, PlacementObjective, PlanVersion, TransferDirection, TransferId,
     TransferOperation, TransportPath, LOGICAL_PLAN_VERSION,
 };
-use crate::kernel_plan::CollectionKernelPlan;
+use crate::kernel_plan::{BatchedAttentionKind, BatchedAttentionPlan, CollectionKernelPlan};
 use crate::layout::MirTensorStorageLayout;
 use crate::{MirFunctionId, MirType};
 use radix_types::{NumericWidth, Primitive, TypeTable};
@@ -1082,6 +1082,7 @@ fn collection_kernel_plan_carries_no_communication_variant() {
             CollectionKernelPlan::CausalMaskedSoftmax(_) => true,
             CollectionKernelPlan::QuantizedMatMul(_) => true,
             CollectionKernelPlan::GroupedMatMul(_) => true,
+            CollectionKernelPlan::BatchedAttention(_) => true,
             CollectionKernelPlan::SsmConv1d(_) => true,
             CollectionKernelPlan::SsmScan(_) => true,
         }
@@ -1110,4 +1111,43 @@ fn collection_kernel_plan_carries_no_communication_variant() {
     assert!(graph
         .iter()
         .any(|operation| matches!(operation, ExecutionOperation::Barrier(_))));
+}
+
+#[test]
+fn batched_attention_accepts_both_m3_gqa_shapes() {
+    const SEQ: u64 = 32;
+    const HEAD_DIM: u64 = 64;
+
+    // M3-U1 admits both live GQA shape classes. Context is written directly
+    // in sequence-major `[seq, hidden]` storage, so the carried hidden width
+    // and leading row stride must preserve the full grouped-head structure.
+    for (q_per_kv, kv_heads) in [(3, 5), (7, 2)] {
+        let hidden = kv_heads * q_per_kv * HEAD_DIM;
+        let plan = CollectionKernelPlan::BatchedAttention(BatchedAttentionPlan {
+            kind: BatchedAttentionKind::ContextSequenceMajor,
+            kv_heads,
+            q_per_kv,
+            seq: SEQ,
+            head_dim: HEAD_DIM,
+            hidden,
+            layout: None,
+            rotate_half: false,
+            output_strides: [hidden, 1, 1, 1],
+            scale_bits: f32::to_bits(0.125),
+        });
+
+        plan.validate().expect("both M3 GQA shapes must validate");
+        assert!(matches!(&plan, CollectionKernelPlan::BatchedAttention(_)));
+        if let CollectionKernelPlan::BatchedAttention(attention) = &plan {
+            assert_eq!(
+                (attention.q_per_kv, attention.kv_heads),
+                (q_per_kv, kv_heads)
+            );
+            assert_eq!(
+                attention.hidden,
+                attention.kv_heads * attention.q_per_kv * attention.head_dim
+            );
+            assert_eq!(attention.output_strides, [attention.hidden, 1, 1, 1]);
+        }
+    }
 }
