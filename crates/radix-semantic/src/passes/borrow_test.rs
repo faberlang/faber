@@ -1,8 +1,7 @@
 //! Coverage for borrow-check diagnostics.
 //!
-//! These tests prove that the borrow pass reports use-after-move for
-//! moved-by-default parameters and call arguments (Rust-output ownership
-//! semantics).
+//! These tests prove that the borrow pass reports ownership violations for
+//! declared access facts and call arguments (Rust-output ownership semantics).
 
 use super::borrow::{analyze, analyze_modes, analyze_rust_lifetime};
 use super::{DefId, Resolver, SemanticErrorKind, TypeTable, WarningKind};
@@ -583,7 +582,7 @@ fn reports_de_passed_to_in_position() {
 
 #[test]
 fn warns_when_in_parameter_is_never_mutated() {
-    let types = TypeTable::new();
+    let mut types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
     let read = HirExpression {
         id: radix_hir::HirId(1),
@@ -603,7 +602,7 @@ fn warns_when_in_parameter_is_never_mutated() {
                 params: vec![HirParam {
                     def_id: DefId(1),
                     name: radix_lexer::Symbol(2),
-                    ty: numerus,
+                    ty: types.access_marker(AccessMarker::Mut, numerus),
                     mode: HirParamMode::In,
                     optional: false,
                     sponte: false,
@@ -647,13 +646,13 @@ fn warns_when_in_parameter_is_never_mutated() {
     expect_structured_error(
         &errors,
         SemanticErrorKind::Warning(WarningKind::UnusedMutRefParam),
-        "unused_in_parameter",
+        "unused_mut_parameter",
     );
 }
 
 #[test]
 fn warns_when_ex_parameter_is_never_consumed() {
-    let types = TypeTable::new();
+    let mut types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
     let read = HirExpression {
         id: radix_hir::HirId(1),
@@ -673,7 +672,7 @@ fn warns_when_ex_parameter_is_never_consumed() {
                 params: vec![HirParam {
                     def_id: DefId(1),
                     name: radix_lexer::Symbol(2),
-                    ty: numerus,
+                    ty: types.access_marker(AccessMarker::Own, numerus),
                     mode: HirParamMode::Ex,
                     optional: false,
                     sponte: false,
@@ -717,7 +716,7 @@ fn warns_when_ex_parameter_is_never_consumed() {
     expect_structured_error(
         &errors,
         SemanticErrorKind::Warning(WarningKind::UnusedMoveParam),
-        "unused_ex_parameter",
+        "unused_own_parameter",
     );
 }
 
@@ -1247,13 +1246,13 @@ fn mutating_method_call_marks_param_as_mutated() {
         entry_is_async: false,
     };
 
-    // With an 'in' param mutated by a method call, the function should NOT
-    // warn about unused 'in' parameter.
+    // With a mut access parameter mutated by a method call, the function
+    // should not warn about an unused mut parameter.
     let result = analyze(&program, &Resolver::new(), &types);
-    // The method call mutates the param, so no unused_in_parameter warning.
+    // The method call mutates the parameter, so no unused-mut warning appears.
     assert!(
         result.is_ok(),
-        "mutating method call on 'in' param should suppress unused_in_parameter warning"
+        "mutating method call should suppress the unused mut parameter warning"
     );
 }
 
@@ -1304,7 +1303,7 @@ fn bodyless_function_with_in_param_has_no_warning() {
     let result = analyze(&program, &Resolver::new(), &types);
     assert!(
         result.is_ok(),
-        "bodyless function with 'in' param should not produce unused_in_parameter warning"
+        "bodyless function with a mut access parameter should not produce a warning"
     );
 }
 
@@ -1355,7 +1354,7 @@ fn bodyless_function_with_ex_param_has_no_warning() {
     let result = analyze(&program, &Resolver::new(), &types);
     assert!(
         result.is_ok(),
-        "bodyless function with 'ex' param should not produce unused_ex_parameter warning"
+        "bodyless function with an own access parameter should not produce a warning"
     );
 }
 
