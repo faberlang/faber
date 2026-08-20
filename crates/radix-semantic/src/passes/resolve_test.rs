@@ -2015,8 +2015,11 @@ incipit {
 }
 
 #[test]
-fn shadowed_vacua_binding_is_the_value_not_the_builtin() {
-    let result = compile_ok(
+fn bare_vacua_stays_the_marker_beside_a_same_named_binding() {
+    // V-5: a same-named binding is legal but unreferenceable in bare
+    // expression position; `nota vacua` is the marker, which needs a
+    // collection type.
+    let result = crate::test_support::analyze_source(
         r#"
 incipit {
   fixum textus vacua ← "empty"
@@ -2025,13 +2028,8 @@ incipit {
 "#,
     );
     assert!(
-        result.is_ok(),
-        "binding-named vacua must compile: {:?}",
-        result.diagnostics
-    );
-    assert!(
-        !has_issue(&result, "SEM014", "vacua_requires_declared_type"),
-        "vacua binding must win over the empty-collection marker: {:?}",
+        has_issue(&result, "SEM014", "vacua_requires_declared_type"),
+        "bare vacua must stay the marker: {:?}",
         result.diagnostics
     );
 }
@@ -2204,7 +2202,7 @@ incipit {
 }
 
 #[test]
-fn resolve_records_shadowing_for_bound_vacua() {
+fn resolve_does_not_record_shadowing_for_bound_vacua() {
     let (program, resolver, _) = resolve_ok(
         r#"
 incipit {
@@ -2221,8 +2219,33 @@ incipit {
     });
     assert_eq!(vacua_nodes.len(), 1, "expected one claimed vacua node");
     assert!(
-        resolver.shadowed_builtin(vacua_nodes[0]).is_some(),
-        "bound vacua must record shadowing"
+        resolver.shadowed_builtin(vacua_nodes[0]).is_none(),
+        "bare vacua must not record shadowing"
+    );
+}
+
+#[test]
+fn resolve_records_shadowing_for_vacua_in_call_position() {
+    let (program, resolver, _) = resolve_ok(
+        r#"
+functio vacua() → numerus { redde 1 }
+incipit {
+  fixum _ x ← vacua()
+}
+"#,
+    );
+    let mut vacua_callees = Vec::new();
+    walk_exprs(&program, &mut |expr| {
+        if let ExprKind::Call(call) = &expr.kind {
+            if matches!(call.callee.kind, ExprKind::Vacua(_)) {
+                vacua_callees.push(call.callee.id);
+            }
+        }
+    });
+    assert_eq!(vacua_callees.len(), 1, "expected one Vacua call callee");
+    assert!(
+        resolver.shadowed_builtin(vacua_callees[0]).is_some(),
+        "vacua() must record shadowing on the callee"
     );
 }
 

@@ -173,6 +173,64 @@ fn struct_field_default_provides_context_for_vacua() {
 }
 
 #[test]
+fn same_named_fn_does_not_defeat_bare_vacua_marker() {
+    // V-5: bare `vacua` in expression position is the empty-collection marker
+    // unconditionally. A top-level fn of the same spelling is legal and still
+    // callable as `vacua()`, but cannot steal the marker from field defaults
+    // or annotated initializers.
+    test_support::assert_accepts(
+        r#"
+genus Header { textus name = "" }
+genus Headers { lista<Header> entries = vacua }
+functio vacua() → Headers { redde Headers { } }
+functio probe() → lista<Header> {
+  varia lista<Header> out ← vacua
+  redde out
+}
+functio use_call() → Headers { redde vacua() }
+"#,
+    );
+}
+
+#[test]
+fn same_named_en_empty_fn_does_not_defeat_bare_marker() {
+    // Live shape: norma/src/http/headers.fab — `fn empty() → Headers` plus
+    // `list<Header> entries = empty` and `var list<string> out ← empty`.
+    let pack_path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path)
+        .expect("installed en pack should load");
+    let mut config = crate::PassConfig::for_target(Target::HirRust);
+    config.locale_pack = Some(pack);
+    let result = crate::test_support::analyze_source_with_config(
+        r#"
+class Header {
+    string name = ""
+}
+class Headers {
+    list<Header> entries = empty
+}
+fn empty() → Headers {
+    return Headers { }
+}
+fn probe() → list<Header> {
+    var list<Header> out ← empty
+    return out
+}
+fn use_call() → Headers {
+    return empty()
+}
+"#,
+        config,
+    );
+    assert!(
+        result.is_ok(),
+        "bare empty must stay the marker beside fn empty(): {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
 fn struct_literal_field_provides_context_for_vacua() {
     // Struct construction with vacua value for a collection-typed field.
     // The parser produces a Verte for `S { ... }`, which typecheck resolves
