@@ -309,7 +309,7 @@ fn faber_render_every_locale_output_reparses_and_round_trips() {
     for (locale, code, pack) in &locale_codes {
         let config = Config::default().with_locale_pack(pack.clone());
         let session = Session::new(config);
-        let result = radix_module::forma::compile::compile_canonical(&session, "render-trivia.re.fab", code);
+        let result = radix_module::codegen::faber::compile::compile_canonical(&session, "render-trivia.re.fab", code);
         assert!(
             result.success(),
             "{locale}: rendered output must reparse cleanly: {:?}\n{code}",

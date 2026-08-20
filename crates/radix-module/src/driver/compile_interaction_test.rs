@@ -985,7 +985,7 @@ fn incipit_argumenta_compiles_for_faber_target() {
     let source = r"incipit argumenta args {
   fixum _ first ← args.accipe(0)
 }";
-    let result = crate::forma::compile_canonical_str("test.fab", source);
+    let result = crate::codegen::faber::compile_canonical_str("test.fab", source);
 
     assert!(result.success(), "{:?}", result.diagnostics);
     assert!(result.output.is_some(), "expected Faber output from compile_canonical_str");
@@ -1025,7 +1025,7 @@ fn structured_cape_iace_fac_custodi_compile_for_faber_target() {
     nota err
   }
 }"#;
-    let result = crate::forma::compile_canonical_str("test.fab", source);
+    let result = crate::codegen::faber::compile_canonical_str("test.fab", source);
 
     assert!(result.success(), "{:?}", result.diagnostics);
 }
@@ -1038,7 +1038,7 @@ fn ergo_iace_mori_and_tacet_compile_for_faber_target() {
   mori "end"
   tacet
 }"#;
-    let result = crate::forma::compile_canonical_str("test.fab", source);
+    let result = crate::codegen::faber::compile_canonical_str("test.fab", source);
 
     assert!(result.success(), "{:?}", result.diagnostics);
 }
@@ -1108,7 +1108,7 @@ fn regex_conversio_no_longer_reports_unsupported_lowering_error() {
   fixum _ pattern ← "(?g)\d+" ↦ regex
   nota pattern
 }"#;
-    let result = crate::forma::compile_canonical_str("test.fab", source);
+    let result = crate::codegen::faber::compile_canonical_str("test.fab", source);
 
     assert!(result.success());
     let Some(output) = result.output else {

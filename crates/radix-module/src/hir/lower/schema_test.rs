@@ -140,26 +140,15 @@ fn schema_artifact_round_trip_preserves_ordered_metadata() {
 }
 
 #[test]
-fn forma_author_reemits_schema_decl() {
-    // The normalise-v1 author emitter must preserve schema decls (no silent
-    // drop, no crash) for the folded S2-U1 forma arms.
-    let result = crate::forma::compile_author_str("schema_test.fab", PERSONA_BREVIS);
-    assert!(result.success(), "author emit failed: {:?}", result.diagnostics);
-    let code = result.output.expect("author output").code;
+#[cfg(feature = "hir-faber")]
+fn canonical_reemits_schema_decl() {
+    // The HIR-backed emitter must preserve schema decls (no silent drop, no
+    // crash) so the schema surface still has a re-emit smoke.
+    let result = crate::codegen::faber::compile_canonical_str("schema_test.fab", PERSONA_BREVIS);
+    assert!(result.success(), "canonical emit failed: {:?}", result.diagnostics);
+    let code = result.output.expect("canonical output").code;
     assert!(code.contains("schema PersonaBrevis"));
     assert!(code.contains("columna numerus id"));
     assert!(code.contains("nomen : plenum"));
     assert!(code.contains("activa : statim"));
-}
-
-#[test]
-fn forma_pretty_reemits_schema_decl() {
-    // The pretty-v1 emitter handles schema decls explicitly, so the guard
-    // passes them and the canonical layout preserves the declaration.
-    let result = crate::forma::compile_pretty_author_str("schema_test.fab", PERSONA_BREVIS);
-    assert!(result.success(), "pretty emit failed: {:?}", result.diagnostics);
-    let code = result.output.expect("pretty output").code;
-    assert!(code.contains("schema PersonaBrevis"));
-    assert!(code.contains("columna numerus id"));
-    assert!(code.contains("nomen : plenum"));
 }

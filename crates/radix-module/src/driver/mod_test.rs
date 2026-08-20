@@ -7,10 +7,10 @@
 //! compile success tests live here. Topic-specific sub-modules are wired below.
 
 use super::compile;
+#[cfg(feature = "hir-faber")]
+use crate::codegen::faber::compile_canonical_str;
 use crate::codegen::Target;
 use crate::diagnostics::DiagnosticArg;
-#[cfg(feature = "hir-faber")]
-use crate::forma::compile_canonical_str;
 use crate::test_support::test_session;
 
 // -- shared helpers (available to child test modules via super::) --
@@ -575,7 +575,7 @@ fn mir_lowering_error_carries_source_span() {
 fn user_defined_item_named_status_is_not_silently_dropped_from_faber_output() {
     let source = "incipit {\n  fixum numerus custom_status ← 1\n}\n";
 
-    let result = crate::forma::compile_canonical_str("custom_status.fab", source);
+    let result = crate::codegen::faber::compile_canonical_str("custom_status.fab", source);
 
     assert!(
         result.success(),

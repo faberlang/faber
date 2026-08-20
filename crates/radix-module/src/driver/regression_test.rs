@@ -3,10 +3,10 @@
 //! feature-area regression guards.
 
 use super::compile;
+#[cfg(feature = "hir-faber")]
+use crate::codegen::faber::compile_canonical_str;
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
-#[cfg(feature = "hir-faber")]
-use crate::forma::compile_canonical_str;
 use crate::test_support::test_session;
 use std::path::PathBuf;
 

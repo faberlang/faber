@@ -6,9 +6,9 @@
 //! the converted output re-parses and typechecks under the en pack (the
 //! converted-output-compiles oracle).
 
+use super::compile_canonical;
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
-use crate::forma::compile_canonical;
 use crate::program::compile::clear_import_target_cache;
 use crate::services::check_diagnostics_for_source_with_locale_pack;
 use std::env;

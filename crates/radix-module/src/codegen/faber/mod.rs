@@ -6,6 +6,20 @@
 
 pub use radix_hir_faber::{emit, empty_presentation, FaberCodegen, FaberOutput};
 
+pub mod compile;
+pub use compile::{compile_canonical, compile_canonical_str, emit_from_analyzed, FormatCompileResult};
+
+#[doc(hidden)]
+pub mod test_gate;
+
+#[cfg(test)]
+#[path = "convert_regression_test.rs"]
+mod convert_regression_test;
+
+#[cfg(test)]
+#[path = "canonical_test.rs"]
+mod canonical_test;
+
 use crate::lexer::TokenKind;
 use crate::locale::{self, TypeBindingKind};
 use radix_hir_faber::KeywordSurface as LeafKeywordSurface;

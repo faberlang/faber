@@ -1,10 +1,8 @@
-//! Shared format gates for author and canonical (HIR) pipelines.
+//! Shared format gates for the canonical (HIR) pipeline.
 //!
-//! Used by `forma` integration tests and `faber-cli` format tests so one
-//! definition drives re-parse and idempotency checks.
+//! Used by Faber re-emit tests and `faber-cli` format tests so one definition
+//! drives re-parse and idempotency checks.
 
-use super::compile_author_str;
-#[cfg(feature = "hir-faber")]
 use super::compile_canonical;
 use crate::driver::Session;
 use crate::lexer;
@@ -23,7 +21,7 @@ pub fn lex_parse(code: &str) -> Result<(), String> {
 /// Lex and parse Faber source under an explicit reader pack (Latin default
 /// when `None`), returning a human-readable error on failure.
 ///
-/// Author-format output is emitted in the pack that lexed the input, so the
+/// Canonical-format output is emitted in the pack that lexed the input, so the
 /// re-parse gate must use that same pack: a Latin-default re-parse would reject
 /// (or mis-parse) localized keyword spellings.
 ///
@@ -48,23 +46,6 @@ pub fn lex_parse_with_pack(code: &str, pack: Option<&LocalePack>) -> Result<(), 
     Ok(())
 }
 
-/// One author-format pass via `compile_author_str`.
-///
-/// # Errors
-///
-/// Returns diagnostic error messages when formatting fails, or when formatting
-/// succeeds without producing output.
-pub fn author_format_once(name: &str, source: &str) -> Result<String, String> {
-    let result = compile_author_str(name, source);
-    format_result("author", result)
-}
-
-/// One author-format pass through a caller-selected reader locale.
-pub fn author_format_once_with_session(session: &Session, name: &str, source: &str) -> Result<String, String> {
-    let result = super::compile_author(session, name, source);
-    format_result("author", result)
-}
-
 /// One canonical (HIR) format pass via [`super::compile_canonical`].
 ///
 /// The session pack is the source's own locale (frontmatter, else Latin
@@ -74,7 +55,6 @@ pub fn author_format_once_with_session(session: &Session, name: &str, source: &s
 ///
 /// Returns diagnostic error messages when formatting fails, or when formatting
 /// succeeds without producing output.
-#[cfg(feature = "hir-faber")]
 pub fn canonical_format_once(name: &str, source: &str) -> Result<String, String> {
     let session = source_locale_session(name, source)?;
     canonical_format_once_with_session(&session, name, source)
@@ -86,7 +66,6 @@ pub fn canonical_format_once(name: &str, source: &str) -> Result<String, String>
 ///
 /// Returns diagnostic error messages when formatting fails, or when formatting
 /// succeeds without producing output.
-#[cfg(feature = "hir-faber")]
 pub fn canonical_format_once_with_session(session: &Session, name: &str, source: &str) -> Result<String, String> {
     let result = compile_canonical(session, name, source);
     format_result("canonical", result)
@@ -108,70 +87,6 @@ fn format_result(kind: &str, result: super::FormatCompileResult) -> Result<Strin
         .ok_or_else(|| format!("{kind} format succeeded without output"))
 }
 
-/// Formatted output must lex and parse without errors.
-///
-/// # Errors
-///
-/// Returns a description of the parse failure when the code does not re-parse.
-pub fn assert_author_reparses(code: &str, label: &str) -> Result<(), String> {
-    lex_parse(code).map_err(|detail| format!("{label}: {detail}"))
-}
-
-/// Formatted output must lex and parse under the reader pack that produced it
-/// (Latin default when `None`).
-///
-/// # Errors
-///
-/// Returns a description of the parse failure when the code does not re-parse.
-pub fn assert_author_reparses_with(code: &str, label: &str, pack: Option<&LocalePack>) -> Result<(), String> {
-    lex_parse_with_pack(code, pack).map_err(|detail| format!("{label}: {detail}"))
-}
-
-/// `author(author(x)) == author(x)` and both passes re-parse.
-///
-/// The reader pack is resolved from the source's frontmatter locale (Latin
-/// default when none), exactly as [`super::compile_author`] does, and the same
-/// session drives both passes: author output is body-only (frontmatter is
-/// stripped), so the second pass cannot re-resolve a localized locale from the
-/// first pass's output.
-///
-/// # Errors
-///
-/// Returns a string describing the failure when formatting is not idempotent,
-/// or when any pass fails to lex/parse.
-pub fn assert_author_idempotent(name: &str, source: &str) -> Result<String, String> {
-    let session = source_locale_session(name, source)?;
-    assert_author_idempotent_with_session(&session, name, source)
-}
-
-/// `author(author(x)) == author(x)` under a caller-selected session; both
-/// passes and both re-parse gates use the session's reader pack.
-///
-/// # Errors
-///
-/// Returns a string describing the failure when formatting is not idempotent,
-/// or when any pass fails to lex/parse.
-pub fn assert_author_idempotent_with_session(session: &Session, name: &str, source: &str) -> Result<String, String> {
-    let first = author_format_once_with_session(session, name, source)?;
-    assert_author_reparses_with_session(session, &first, &format!("{name} (first pass)"))?;
-    let second = author_format_once_with_session(session, name, &first)?;
-    if first != second {
-        return Err(format!("{name}: author(author(x)) != author(x)"));
-    }
-    assert_author_reparses_with_session(session, &second, &format!("{name} (second pass)"))?;
-    Ok(first)
-}
-
-/// Formatted output must lex and parse under a session's reader pack.
-///
-/// # Errors
-///
-/// Returns a description of the parse failure when the code does not re-parse.
-pub fn assert_author_reparses_with_session(session: &Session, code: &str, label: &str) -> Result<(), String> {
-    let pack = session.config.locale_pack.as_ref();
-    lex_parse_with_pack(code, pack).map_err(|detail| format!("{label}: {detail}"))
-}
-
 /// `canonical(canonical(x)) == canonical(x)` and both passes re-parse under
 /// the source's own locale pack.
 ///
@@ -179,7 +94,6 @@ pub fn assert_author_reparses_with_session(session: &Session, code: &str, label:
 ///
 /// Returns a string describing the failure when formatting is not idempotent,
 /// or when any pass fails to lex/parse.
-#[cfg(feature = "hir-faber")]
 pub fn assert_canonical_idempotent(name: &str, source: &str) -> Result<String, String> {
     let session = source_locale_session(name, source)?;
     assert_canonical_idempotent_with_session(&session, name, source)
@@ -192,7 +106,6 @@ pub fn assert_canonical_idempotent(name: &str, source: &str) -> Result<String, S
 ///
 /// Returns a string describing the failure when formatting is not idempotent,
 /// or when any pass fails to lex/parse.
-#[cfg(feature = "hir-faber")]
 pub fn assert_canonical_idempotent_with_session(session: &Session, name: &str, source: &str) -> Result<String, String> {
     let first = canonical_format_once_with_session(session, name, source)?;
     assert_canonical_reparses_with_session(session, &first, &format!("{name} (first pass)"))?;
@@ -209,7 +122,6 @@ pub fn assert_canonical_idempotent_with_session(session: &Session, name: &str, s
 /// # Errors
 ///
 /// Returns a description of the parse failure when the code does not re-parse.
-#[cfg(feature = "hir-faber")]
 pub fn assert_canonical_reparses(code: &str, label: &str) -> Result<(), String> {
     lex_parse(code).map_err(|detail| format!("{label}: {detail}"))
 }
@@ -220,7 +132,6 @@ pub fn assert_canonical_reparses(code: &str, label: &str) -> Result<(), String> 
 /// # Errors
 ///
 /// Returns a description of the parse failure when the code does not re-parse.
-#[cfg(feature = "hir-faber")]
 pub fn assert_canonical_reparses_with(code: &str, label: &str, pack: Option<&LocalePack>) -> Result<(), String> {
     lex_parse_with_pack(code, pack).map_err(|detail| format!("{label}: {detail}"))
 }
@@ -230,7 +141,6 @@ pub fn assert_canonical_reparses_with(code: &str, label: &str, pack: Option<&Loc
 /// # Errors
 ///
 /// Returns a description of the parse failure when the code does not re-parse.
-#[cfg(feature = "hir-faber")]
 pub fn assert_canonical_reparses_with_session(session: &Session, code: &str, label: &str) -> Result<(), String> {
     let pack = session.config.locale_pack.as_ref();
     lex_parse_with_pack(code, pack).map_err(|detail| format!("{label}: {detail}"))

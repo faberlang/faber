@@ -36,7 +36,7 @@
 //! - Missing semantic facts must be fixed before codegen; backend guessing is
 //!   not part of the contract.
 //! - Rust is the primary executable backend; canonical Faber re-emission is a
-//!   compiler backend used by the in-tree `forma` formatter and the developer CLI.
+//!   compiler backend used by `faber format` and the developer CLI.
 //! - CLI and library entry points both go through `driver` so diagnostics and
 //!   phase ordering remain consistent.
 //!
@@ -74,7 +74,6 @@ pub mod codegen;
 pub mod diagnostics;
 pub mod driver;
 pub mod file_interface;
-pub mod forma;
 #[cfg(test)]
 pub mod forma_render;
 pub mod hir;

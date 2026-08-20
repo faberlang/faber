@@ -159,7 +159,7 @@ fn fhir_core_renders_localized_surfaces_and_reparses_idempotently() {
     for (locale, code) in [("la", &la), ("en", &en), ("th-TH", &th)] {
         let config = Config::default().with_locale_pack(pack_for(locale));
         let session = Session::new(config);
-        let result = radix_module::forma::compile::compile_canonical(&session, "fhir-locale.re.fab", code);
+        let result = radix_module::codegen::faber::compile::compile_canonical(&session, "fhir-locale.re.fab", code);
         assert!(
             result.success(),
             "{locale}: rendered output must reparse cleanly: {:?}\n{code}",

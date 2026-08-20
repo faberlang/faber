@@ -42,7 +42,7 @@ pub fn cmd_format(command: &FormatCommand) {
     // --write is the explicit spelling of the in-place default; the default
     // branch below already writes in place (the `--write`/`--stdout` conflict
     // is enforced at the CLI parse boundary).
-    let _ = command.write;
+    let _write = command.write;
 
     let files = match resolve_format_paths(&command.paths) {
         Ok(files) => files,
@@ -139,7 +139,7 @@ pub(super) fn convert_single_doc(path: &Path, to: &str, source: &str) -> Result<
             return Err(());
         }
     };
-    let result = radix_module::forma::compile_canonical(&session, &name, source);
+    let result = radix_module::codegen::faber::compile_canonical(&session, &name, source);
     let mut had_error = false;
     for diag in &result.diagnostics {
         if diag.is_error() {
@@ -185,7 +185,7 @@ fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
                 return Err(());
             }
         };
-        let result = radix_module::forma::compile_canonical(&session, &name, source);
+        let result = radix_module::codegen::faber::compile_canonical(&session, &name, source);
 
         let mut had_error = false;
         for diag in &result.diagnostics {

@@ -640,7 +640,7 @@ fn conversio_glyph_form_roundtrips_through_faber_codegen() {
   fixum _ n ← "22" ↦ numerus
   nota n
 }"#;
-    let result = crate::forma::compile_canonical_str("test.fab", source);
+    let result = crate::codegen::faber::compile_canonical_str("test.fab", source);
 
     assert!(result.success());
     let Some(output) = result.output else {
@@ -656,7 +656,7 @@ fn conversio_with_recovery_roundtrips_through_faber_codegen() {
   fixum _ n ← "bad" ↦ numerus ⇥ 0
   nota n
 }"#;
-    let result = crate::forma::compile_canonical_str("test.fab", source);
+    let result = crate::codegen::faber::compile_canonical_str("test.fab", source);
 
     assert!(result.success());
     let Some(output) = result.output else {

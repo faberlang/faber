@@ -1,25 +1,23 @@
-#![cfg(feature = "hir-faber")]
-
-//! Integration tests for canonical Faber re-emission via `forma::canonical`.
+//! Canonical Faber re-emission tests via `codegen::faber`.
 //!
 //! These tests build HIR programs by hand and assert that `FaberCodegen`
 //! produces grammar-valid canonical Faber source. They lock the round-trip
 //! contract: every construct that the compiler can lower to HIR must re-emit
 //! to source that the parser would accept.
 
-use radix_module::codegen::faber::LocaleKeywordBridge;
-use radix_module::forma::canonical::FaberCodegen;
-use radix_module::hir::DefId;
-use radix_module::hir::{
+use super::FaberCodegen;
+use super::LocaleKeywordBridge;
+use crate::hir::DefId;
+use crate::hir::{
     HirAnnotation, HirArrayElement, HirBinOp, HirBlock, HirCallArg, HirCasuArm, HirEnum, HirExpression,
     HirExpressionKind, HirField, HirFunction, HirItem, HirItemKind, HirLiteral, HirMethod, HirModule, HirNonNullKind,
     HirObjectField, HirObjectKey, HirOptionalChainKind, HirParam, HirParamMode, HirPattern, HirReceiver, HirStatement,
     HirStatementKind, HirStruct, HirTestMetadata, HirTestModifier, HirUnOp, HirVariant, HirVariantField,
 };
-use radix_module::lexer::Interner;
-use radix_module::lexer::Span;
-use radix_module::semantic::InferVar;
-use radix_module::semantic::{Primitive, Type, TypeTable};
+use crate::lexer::Interner;
+use crate::lexer::Span;
+use crate::semantic::InferVar;
+use crate::semantic::{Primitive, Type, TypeTable};
 use radix_types::USER_DEF_ID_BASE;
 
 fn span() -> Span {
@@ -27,16 +25,10 @@ fn span() -> Span {
 }
 
 fn generate_faber(program: &HirModule, types: &TypeTable, interner: &Interner) -> String {
-    let latin = radix_module::locale::latin_locale_pack();
-    let surface = LocaleKeywordBridge(radix_module::locale::KeywordSurface::new(&latin));
+    let latin = crate::locale::latin_locale_pack();
+    let surface = LocaleKeywordBridge(crate::locale::KeywordSurface::new(&latin));
     FaberCodegen::default()
-        .generate(
-            program,
-            &radix_module::forma::canonical::empty_presentation(),
-            types,
-            interner,
-            &surface,
-        )
+        .generate(program, &super::empty_presentation(), types, interner, &surface)
         .expect("codegen")
         .code
 }
@@ -69,9 +61,9 @@ fn emits_basic_function_and_entry() {
         err_ty: None,
         body: Some(HirBlock {
             statements: vec![HirStatement {
-                id: radix_module::hir::HirId(2),
+                id: crate::hir::HirId(2),
                 kind: HirStatementKind::Redde(Some(HirExpression {
-                    id: radix_module::hir::HirId(3),
+                    id: crate::hir::HirId(3),
                     kind: HirExpressionKind::Literal(HirLiteral::String(name_text)),
                     ty: Some(textus),
                     span: span(),
@@ -96,7 +88,7 @@ fn emits_basic_function_and_entry() {
 
     let program = HirModule {
         items: vec![HirItem {
-            id: radix_module::hir::HirId(0),
+            id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
             span: span(),
@@ -124,7 +116,7 @@ fn emits_alternate_exit_signature() {
 
     let program = HirModule {
         items: vec![HirItem {
-            id: radix_module::hir::HirId(0),
+            id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(HirFunction {
                 cli_args: None,
@@ -176,7 +168,7 @@ fn emits_post_name_declaration_markers_for_params_and_fields() {
         optional: true,
         sponte: true,
         default: Some(HirExpression {
-            id: radix_module::hir::HirId(1),
+            id: crate::hir::HirId(1),
             kind: HirExpressionKind::Literal(HirLiteral::String(default_name)),
             ty: Some(textus),
             span: span(),
@@ -187,7 +179,7 @@ fn emits_post_name_declaration_markers_for_params_and_fields() {
     let program = HirModule {
         items: vec![
             HirItem {
-                id: radix_module::hir::HirId(2),
+                id: crate::hir::HirId(2),
                 def_id: DefId(USER_DEF_ID_BASE + 2),
                 kind: HirItemKind::Function(Box::new(HirFunction {
                     cli_args: None,
@@ -211,7 +203,7 @@ fn emits_post_name_declaration_markers_for_params_and_fields() {
                 span: span(),
             },
             HirItem {
-                id: radix_module::hir::HirId(3),
+                id: crate::hir::HirId(3),
                 def_id: DefId(3),
                 kind: HirItemKind::Struct(HirStruct {
                     name: profile,
@@ -257,8 +249,8 @@ fn renders_unresolved_infer_as_marker() {
         items: Vec::new(),
         entry: Some(HirBlock {
             statements: vec![HirStatement {
-                id: radix_module::hir::HirId(1),
-                kind: HirStatementKind::Local(radix_module::hir::HirLocal {
+                id: crate::hir::HirId(1),
+                kind: HirStatementKind::Local(crate::hir::HirLocal {
                     def_id: DefId(1),
                     name,
                     ty: Some(unresolved),
@@ -295,8 +287,8 @@ fn renders_option_types_as_nullable_union() {
         items: Vec::new(),
         entry: Some(HirBlock {
             statements: vec![HirStatement {
-                id: radix_module::hir::HirId(1),
-                kind: HirStatementKind::Local(radix_module::hir::HirLocal {
+                id: crate::hir::HirId(1),
+                kind: HirStatementKind::Local(crate::hir::HirLocal {
                     def_id: DefId(1),
                     name,
                     ty: Some(nested_option),
@@ -329,9 +321,9 @@ fn rejects_hir_error_nodes_in_direct_faber_codegen() {
         items: Vec::new(),
         entry: Some(HirBlock {
             statements: vec![HirStatement {
-                id: radix_module::hir::HirId(1),
+                id: crate::hir::HirId(1),
                 kind: HirStatementKind::Expr(HirExpression {
-                    id: radix_module::hir::HirId(2),
+                    id: crate::hir::HirId(2),
                     kind: HirExpressionKind::Error,
                     ty: None,
                     span: span(),
@@ -348,15 +340,9 @@ fn rejects_hir_error_nodes_in_direct_faber_codegen() {
     };
 
     let mut gen = FaberCodegen::default();
-    let latin = radix_module::locale::latin_locale_pack();
-    let surface = LocaleKeywordBridge(radix_module::locale::KeywordSurface::new(&latin));
-    let Err(error) = gen.generate(
-        &program,
-        &radix_module::forma::canonical::empty_presentation(),
-        &types,
-        &interner,
-        &surface,
-    ) else {
+    let latin = crate::locale::latin_locale_pack();
+    let surface = LocaleKeywordBridge(crate::locale::KeywordSurface::new(&latin));
+    let Err(error) = gen.generate(&program, &super::empty_presentation(), &types, &interner, &surface) else {
         panic!("expected faber codegen error");
     };
     assert!(error
@@ -392,9 +378,9 @@ fn emits_parameter_references_with_original_names() {
         err_ty: None,
         body: Some(HirBlock {
             statements: vec![HirStatement {
-                id: radix_module::hir::HirId(2),
+                id: crate::hir::HirId(2),
                 kind: HirStatementKind::Redde(Some(HirExpression {
-                    id: radix_module::hir::HirId(3),
+                    id: crate::hir::HirId(3),
                     kind: HirExpressionKind::Path(DefId(100)),
                     ty: Some(numerus),
                     span: span(),
@@ -419,7 +405,7 @@ fn emits_parameter_references_with_original_names() {
 
     let program = HirModule {
         items: vec![HirItem {
-            id: radix_module::hir::HirId(0),
+            id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
             span: span(),
@@ -448,19 +434,19 @@ fn emits_si_sin_secus_chain_with_ergo_redde() {
     let bivalens = types.primitive(Primitive::Bivalens);
 
     let expr = HirExpression {
-        id: radix_module::hir::HirId(10),
+        id: crate::hir::HirId(10),
         kind: HirExpressionKind::Si {
             cond: Box::new(HirExpression {
-                id: radix_module::hir::HirId(11),
+                id: crate::hir::HirId(11),
                 kind: HirExpressionKind::Literal(HirLiteral::Bool(true)),
                 ty: Some(bivalens),
                 span: span(),
             }),
             then_block: HirBlock {
                 statements: vec![HirStatement {
-                    id: radix_module::hir::HirId(12),
+                    id: crate::hir::HirId(12),
                     kind: HirStatementKind::Redde(Some(HirExpression {
-                        id: radix_module::hir::HirId(13),
+                        id: crate::hir::HirId(13),
                         kind: HirExpressionKind::Literal(HirLiteral::String(text_a)),
                         ty: Some(textus),
                         span: span(),
@@ -475,19 +461,19 @@ fn emits_si_sin_secus_chain_with_ergo_redde() {
             else_block: Some(HirBlock {
                 statements: Vec::new(),
                 expr: Some(Box::new(HirExpression {
-                    id: radix_module::hir::HirId(14),
+                    id: crate::hir::HirId(14),
                     kind: HirExpressionKind::Si {
                         cond: Box::new(HirExpression {
-                            id: radix_module::hir::HirId(15),
+                            id: crate::hir::HirId(15),
                             kind: HirExpressionKind::Literal(HirLiteral::Bool(false)),
                             ty: Some(bivalens),
                             span: span(),
                         }),
                         then_block: HirBlock {
                             statements: vec![HirStatement {
-                                id: radix_module::hir::HirId(16),
+                                id: crate::hir::HirId(16),
                                 kind: HirStatementKind::Redde(Some(HirExpression {
-                                    id: radix_module::hir::HirId(17),
+                                    id: crate::hir::HirId(17),
                                     kind: HirExpressionKind::Literal(HirLiteral::String(text_b)),
                                     ty: Some(textus),
                                     span: span(),
@@ -501,9 +487,9 @@ fn emits_si_sin_secus_chain_with_ergo_redde() {
                         then_catch: None,
                         else_block: Some(HirBlock {
                             statements: vec![HirStatement {
-                                id: radix_module::hir::HirId(18),
+                                id: crate::hir::HirId(18),
                                 kind: HirStatementKind::Redde(Some(HirExpression {
-                                    id: radix_module::hir::HirId(19),
+                                    id: crate::hir::HirId(19),
                                     kind: HirExpressionKind::Literal(HirLiteral::String(text_f)),
                                     ty: Some(textus),
                                     span: span(),
@@ -535,7 +521,7 @@ fn emits_si_sin_secus_chain_with_ergo_redde() {
         err_ty: None,
         body: Some(HirBlock {
             statements: vec![HirStatement {
-                id: radix_module::hir::HirId(20),
+                id: crate::hir::HirId(20),
                 kind: HirStatementKind::Expr(expr),
                 span: span(),
             }],
@@ -557,7 +543,7 @@ fn emits_si_sin_secus_chain_with_ergo_redde() {
 
     let program = HirModule {
         items: vec![HirItem {
-            id: radix_module::hir::HirId(0),
+            id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
             span: span(),
@@ -590,24 +576,20 @@ fn canonical_si_continuations_start_on_new_lines() {
     let bivalens = types.primitive(Primitive::Bivalens);
 
     let bool_expr = |id, value| HirExpression {
-        id: radix_module::hir::HirId(id),
+        id: crate::hir::HirId(id),
         kind: HirExpressionKind::Literal(HirLiteral::Bool(value)),
         ty: Some(bivalens),
         span: span(),
     };
     let tacet_block = |id| HirBlock {
-        statements: vec![HirStatement {
-            id: radix_module::hir::HirId(id),
-            kind: HirStatementKind::Tacet,
-            span: span(),
-        }],
+        statements: vec![HirStatement { id: crate::hir::HirId(id), kind: HirStatementKind::Tacet, span: span() }],
         expr: None,
         span: span(),
         ..Default::default()
     };
 
     let expr = HirExpression {
-        id: radix_module::hir::HirId(10),
+        id: crate::hir::HirId(10),
         kind: HirExpressionKind::Si {
             cond: Box::new(bool_expr(11, true)),
             then_block: tacet_block(12),
@@ -615,7 +597,7 @@ fn canonical_si_continuations_start_on_new_lines() {
             else_block: Some(HirBlock {
                 statements: Vec::new(),
                 expr: Some(Box::new(HirExpression {
-                    id: radix_module::hir::HirId(13),
+                    id: crate::hir::HirId(13),
                     kind: HirExpressionKind::Si {
                         cond: Box::new(bool_expr(14, false)),
                         then_block: tacet_block(15),
@@ -642,7 +624,7 @@ fn canonical_si_continuations_start_on_new_lines() {
         err_ty: None,
         body: Some(HirBlock {
             statements: vec![HirStatement {
-                id: radix_module::hir::HirId(17),
+                id: crate::hir::HirId(17),
                 kind: HirStatementKind::Expr(expr),
                 span: span(),
             }],
@@ -664,7 +646,7 @@ fn canonical_si_continuations_start_on_new_lines() {
 
     let program = HirModule {
         items: vec![HirItem {
-            id: radix_module::hir::HirId(0),
+            id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
             span: span(),
@@ -695,28 +677,28 @@ fn emits_canonical_operator_spellings_and_precedence() {
     let bivalens = types.primitive(Primitive::Bivalens);
 
     let int_expr = |id, value| HirExpression {
-        id: radix_module::hir::HirId(id),
+        id: crate::hir::HirId(id),
         kind: HirExpressionKind::Literal(HirLiteral::Int(value)),
         ty: Some(numerus),
         span: span(),
     };
 
     let comparison = HirExpression {
-        id: radix_module::hir::HirId(1),
+        id: crate::hir::HirId(1),
         kind: HirExpressionKind::Binary(
             HirBinOp::And,
             Box::new(HirExpression {
-                id: radix_module::hir::HirId(2),
+                id: crate::hir::HirId(2),
                 kind: HirExpressionKind::Binary(HirBinOp::Eq, Box::new(int_expr(3, 1)), Box::new(int_expr(4, 1))),
                 ty: Some(bivalens),
                 span: span(),
             }),
             Box::new(HirExpression {
-                id: radix_module::hir::HirId(5),
+                id: crate::hir::HirId(5),
                 kind: HirExpressionKind::Binary(
                     HirBinOp::LtEq,
                     Box::new(HirExpression {
-                        id: radix_module::hir::HirId(6),
+                        id: crate::hir::HirId(6),
                         kind: HirExpressionKind::Binary(
                             HirBinOp::Add,
                             Box::new(int_expr(7, 2)),
@@ -726,7 +708,7 @@ fn emits_canonical_operator_spellings_and_precedence() {
                         span: span(),
                     }),
                     Box::new(HirExpression {
-                        id: radix_module::hir::HirId(9),
+                        id: crate::hir::HirId(9),
                         kind: HirExpressionKind::Binary(
                             HirBinOp::Mul,
                             Box::new(int_expr(10, 4)),
@@ -745,22 +727,22 @@ fn emits_canonical_operator_spellings_and_precedence() {
     };
 
     let not_comparison = HirExpression {
-        id: radix_module::hir::HirId(12),
+        id: crate::hir::HirId(12),
         kind: HirExpressionKind::Unary(HirUnOp::Not, Box::new(comparison)),
         ty: Some(bivalens),
         span: span(),
     };
 
     let inc_stmt = HirStatement {
-        id: radix_module::hir::HirId(13),
-        kind: HirStatementKind::IncDec(radix_module::hir::HirIncDec {
+        id: crate::hir::HirId(13),
+        kind: HirStatementKind::IncDec(crate::hir::HirIncDec {
             target: HirExpression {
-                id: radix_module::hir::HirId(14),
+                id: crate::hir::HirId(14),
                 kind: HirExpressionKind::Path(DefId(1)),
                 ty: Some(numerus),
                 span: span(),
             },
-            op: radix_module::hir::HirIncDecOp::Inc,
+            op: crate::hir::HirIncDecOp::Inc,
         }),
         span: span(),
     };
@@ -770,8 +752,8 @@ fn emits_canonical_operator_spellings_and_precedence() {
         entry: Some(HirBlock {
             statements: vec![
                 HirStatement {
-                    id: radix_module::hir::HirId(16),
-                    kind: HirStatementKind::Local(radix_module::hir::HirLocal {
+                    id: crate::hir::HirId(16),
+                    kind: HirStatementKind::Local(crate::hir::HirLocal {
                         def_id: DefId(1),
                         name: total,
                         ty: Some(numerus),
@@ -782,11 +764,7 @@ fn emits_canonical_operator_spellings_and_precedence() {
                     }),
                     span: span(),
                 },
-                HirStatement {
-                    id: radix_module::hir::HirId(18),
-                    kind: HirStatementKind::Expr(not_comparison),
-                    span: span(),
-                },
+                HirStatement { id: crate::hir::HirId(18), kind: HirStatementKind::Expr(not_comparison), span: span() },
                 inc_stmt,
             ],
             expr: None,
@@ -815,7 +793,7 @@ fn emits_shared_argument_spelling_for_optional_and_non_null_calls() {
         name: None,
         spread,
         expr: HirExpression {
-            id: radix_module::hir::HirId(id),
+            id: crate::hir::HirId(id),
             kind: HirExpressionKind::Literal(HirLiteral::Int(value)),
             ty: Some(numerus),
             span: span(),
@@ -824,10 +802,10 @@ fn emits_shared_argument_spelling_for_optional_and_non_null_calls() {
     };
 
     let optional_call = HirExpression {
-        id: radix_module::hir::HirId(1),
+        id: crate::hir::HirId(1),
         kind: HirExpressionKind::OptionalChain(
             Box::new(HirExpression {
-                id: radix_module::hir::HirId(2),
+                id: crate::hir::HirId(2),
                 kind: HirExpressionKind::Path(DefId(1)),
                 ty: Some(numerus),
                 span: span(),
@@ -839,10 +817,10 @@ fn emits_shared_argument_spelling_for_optional_and_non_null_calls() {
     };
 
     let non_null_call = HirExpression {
-        id: radix_module::hir::HirId(5),
+        id: crate::hir::HirId(5),
         kind: HirExpressionKind::NonNull(
             Box::new(HirExpression {
-                id: radix_module::hir::HirId(6),
+                id: crate::hir::HirId(6),
                 kind: HirExpressionKind::Path(DefId(1)),
                 ty: Some(numerus),
                 span: span(),
@@ -858,8 +836,8 @@ fn emits_shared_argument_spelling_for_optional_and_non_null_calls() {
         entry: Some(HirBlock {
             statements: vec![
                 HirStatement {
-                    id: radix_module::hir::HirId(9),
-                    kind: HirStatementKind::Local(radix_module::hir::HirLocal {
+                    id: crate::hir::HirId(9),
+                    kind: HirStatementKind::Local(crate::hir::HirLocal {
                         def_id: DefId(1),
                         name: callable,
                         ty: Some(numerus),
@@ -870,16 +848,8 @@ fn emits_shared_argument_spelling_for_optional_and_non_null_calls() {
                     }),
                     span: span(),
                 },
-                HirStatement {
-                    id: radix_module::hir::HirId(10),
-                    kind: HirStatementKind::Expr(optional_call),
-                    span: span(),
-                },
-                HirStatement {
-                    id: radix_module::hir::HirId(11),
-                    kind: HirStatementKind::Expr(non_null_call),
-                    span: span(),
-                },
+                HirStatement { id: crate::hir::HirId(10), kind: HirStatementKind::Expr(optional_call), span: span() },
+                HirStatement { id: crate::hir::HirId(11), kind: HirStatementKind::Expr(non_null_call), span: span() },
             ],
             expr: None,
             span: span(),
@@ -908,13 +878,13 @@ fn emits_local_and_control_statement_forms() {
         entry: Some(HirBlock {
             statements: vec![
                 HirStatement {
-                    id: radix_module::hir::HirId(1),
-                    kind: HirStatementKind::Local(radix_module::hir::HirLocal {
+                    id: crate::hir::HirId(1),
+                    kind: HirStatementKind::Local(crate::hir::HirLocal {
                         def_id: DefId(1),
                         name: counter,
                         ty: Some(numerus),
                         init: Some(HirExpression {
-                            id: radix_module::hir::HirId(2),
+                            id: crate::hir::HirId(2),
                             kind: HirExpressionKind::Literal(HirLiteral::Int(0)),
                             ty: Some(numerus),
                             span: span(),
@@ -925,10 +895,10 @@ fn emits_local_and_control_statement_forms() {
                     }),
                     span: span(),
                 },
-                HirStatement { id: radix_module::hir::HirId(3), kind: HirStatementKind::Perge, span: span() },
-                HirStatement { id: radix_module::hir::HirId(4), kind: HirStatementKind::Rumpe, span: span() },
-                HirStatement { id: radix_module::hir::HirId(5), kind: HirStatementKind::Tacet, span: span() },
-                HirStatement { id: radix_module::hir::HirId(6), kind: HirStatementKind::Redde(None), span: span() },
+                HirStatement { id: crate::hir::HirId(3), kind: HirStatementKind::Perge, span: span() },
+                HirStatement { id: crate::hir::HirId(4), kind: HirStatementKind::Rumpe, span: span() },
+                HirStatement { id: crate::hir::HirId(5), kind: HirStatementKind::Tacet, span: span() },
+                HirStatement { id: crate::hir::HirId(6), kind: HirStatementKind::Redde(None), span: span() },
             ],
             expr: None,
             span: span(),
@@ -966,12 +936,12 @@ fn emits_synthetic_proba_functions_as_proba_cases() {
         err_ty: None,
         body: Some(HirBlock {
             statements: vec![HirStatement {
-                id: radix_module::hir::HirId(1),
+                id: crate::hir::HirId(1),
                 kind: HirStatementKind::Expr(HirExpression {
-                    id: radix_module::hir::HirId(2),
+                    id: crate::hir::HirId(2),
                     kind: HirExpressionKind::Adfirma(
                         Box::new(HirExpression {
-                            id: radix_module::hir::HirId(3),
+                            id: crate::hir::HirId(3),
                             kind: HirExpressionKind::Literal(HirLiteral::Bool(true)),
                             ty: Some(types.primitive(Primitive::Bivalens)),
                             span: span(),
@@ -1006,7 +976,7 @@ fn emits_synthetic_proba_functions_as_proba_cases() {
 
     let program = HirModule {
         items: vec![HirItem {
-            id: radix_module::hir::HirId(0),
+            id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
             span: span(),
@@ -1032,12 +1002,12 @@ fn discerne_cases_do_not_emit_nested_blocks() {
     let textus = types.primitive(Primitive::Textus);
 
     let arm_body = HirExpression {
-        id: radix_module::hir::HirId(3),
+        id: crate::hir::HirId(3),
         kind: HirExpressionKind::Block(HirBlock {
             statements: vec![HirStatement {
-                id: radix_module::hir::HirId(4),
+                id: crate::hir::HirId(4),
                 kind: HirStatementKind::Redde(Some(HirExpression {
-                    id: radix_module::hir::HirId(5),
+                    id: crate::hir::HirId(5),
                     kind: HirExpressionKind::Literal(HirLiteral::String(ok)),
                     ty: Some(textus),
                     span: span(),
@@ -1053,10 +1023,10 @@ fn discerne_cases_do_not_emit_nested_blocks() {
     };
 
     let discerne = HirExpression {
-        id: radix_module::hir::HirId(1),
+        id: crate::hir::HirId(1),
         kind: HirExpressionKind::Discerne {
             scrutinees: vec![HirExpression {
-                id: radix_module::hir::HirId(2),
+                id: crate::hir::HirId(2),
                 kind: HirExpressionKind::Literal(HirLiteral::Int(200)),
                 ty: Some(numerus),
                 span: span(),
@@ -1077,7 +1047,7 @@ fn discerne_cases_do_not_emit_nested_blocks() {
         items: Vec::new(),
         entry: Some(HirBlock {
             statements: vec![HirStatement {
-                id: radix_module::hir::HirId(6),
+                id: crate::hir::HirId(6),
                 kind: HirStatementKind::Expr(discerne),
                 span: span(),
             }],
@@ -1110,7 +1080,7 @@ fn discerne_patterns_preserve_bindings_aliases_variants_and_guards() {
     let textus = types.primitive(Primitive::Textus);
 
     let enum_item = HirItem {
-        id: radix_module::hir::HirId(0),
+        id: crate::hir::HirId(0),
         def_id: DefId(USER_DEF_ID_BASE),
         kind: HirItemKind::Enum(HirEnum {
             name: event,
@@ -1127,10 +1097,10 @@ fn discerne_patterns_preserve_bindings_aliases_variants_and_guards() {
     };
 
     let discerne = HirExpression {
-        id: radix_module::hir::HirId(3),
+        id: crate::hir::HirId(3),
         kind: HirExpressionKind::Discerne {
             scrutinees: vec![HirExpression {
-                id: radix_module::hir::HirId(4),
+                id: crate::hir::HirId(4),
                 kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
                 ty: Some(numerus),
                 span: span(),
@@ -1142,13 +1112,13 @@ fn discerne_patterns_preserve_bindings_aliases_variants_and_guards() {
                     Box::new(HirPattern::Variant(DefId(2), vec![HirPattern::Binding(DefId(3), payload)])),
                 )],
                 guard: Some(HirExpression {
-                    id: radix_module::hir::HirId(5),
+                    id: crate::hir::HirId(5),
                     kind: HirExpressionKind::Literal(HirLiteral::Bool(true)),
                     ty: Some(bivalens),
                     span: span(),
                 }),
                 body: HirExpression {
-                    id: radix_module::hir::HirId(6),
+                    id: crate::hir::HirId(6),
                     kind: HirExpressionKind::Literal(HirLiteral::String(ok)),
                     ty: Some(textus),
                     span: span(),
@@ -1165,7 +1135,7 @@ fn discerne_patterns_preserve_bindings_aliases_variants_and_guards() {
         items: vec![enum_item],
         entry: Some(HirBlock {
             statements: vec![HirStatement {
-                id: radix_module::hir::HirId(7),
+                id: crate::hir::HirId(7),
                 kind: HirStatementKind::Expr(discerne),
                 span: span(),
             }],
@@ -1197,10 +1167,10 @@ fn emits_object_literal_fields_from_innatum_entries() {
     let map_ty = types.map(textus, union_ty);
 
     let expr = HirExpression {
-        id: radix_module::hir::HirId(1),
+        id: crate::hir::HirId(1),
         kind: HirExpressionKind::Verte {
             source: Box::new(HirExpression {
-                id: radix_module::hir::HirId(2),
+                id: crate::hir::HirId(2),
                 kind: HirExpressionKind::Tuple(Vec::new(), None),
                 ty: None,
                 span: span(),
@@ -1210,7 +1180,7 @@ fn emits_object_literal_fields_from_innatum_entries() {
                 HirObjectField {
                     key: HirObjectKey::Ident(nomen),
                     value: Some(HirExpression {
-                        id: radix_module::hir::HirId(3),
+                        id: crate::hir::HirId(3),
                         kind: HirExpressionKind::Literal(HirLiteral::String(marcus)),
                         ty: Some(textus),
                         span: span(),
@@ -1219,7 +1189,7 @@ fn emits_object_literal_fields_from_innatum_entries() {
                 HirObjectField {
                     key: HirObjectKey::Ident(activus),
                     value: Some(HirExpression {
-                        id: radix_module::hir::HirId(4),
+                        id: crate::hir::HirId(4),
                         kind: HirExpressionKind::Literal(HirLiteral::Bool(true)),
                         ty: Some(bivalens),
                         span: span(),
@@ -1235,7 +1205,7 @@ fn emits_object_literal_fields_from_innatum_entries() {
         items: Vec::new(),
         entry: Some(HirBlock {
             statements: vec![HirStatement {
-                id: radix_module::hir::HirId(5),
+                id: crate::hir::HirId(5),
                 kind: HirStatementKind::Expr(expr),
                 span: span(),
             }],
@@ -1267,10 +1237,10 @@ fn forma_capture_with_spread_params_falls_back_to_struct_literal() {
     let forma_ty = types.intern(Type::Struct(DefId(42)));
 
     let expr = HirExpression {
-        id: radix_module::hir::HirId(1),
+        id: crate::hir::HirId(1),
         kind: HirExpressionKind::Verte {
             source: Box::new(HirExpression {
-                id: radix_module::hir::HirId(2),
+                id: crate::hir::HirId(2),
                 kind: HirExpressionKind::Tuple(Vec::new(), None),
                 ty: None,
                 span: span(),
@@ -1280,7 +1250,7 @@ fn forma_capture_with_spread_params_falls_back_to_struct_literal() {
                 HirObjectField {
                     key: HirObjectKey::Ident(template),
                     value: Some(HirExpression {
-                        id: radix_module::hir::HirId(3),
+                        id: crate::hir::HirId(3),
                         kind: HirExpressionKind::Literal(HirLiteral::String(message)),
                         ty: None,
                         span: span(),
@@ -1289,9 +1259,9 @@ fn forma_capture_with_spread_params_falls_back_to_struct_literal() {
                 HirObjectField {
                     key: HirObjectKey::Ident(params),
                     value: Some(HirExpression {
-                        id: radix_module::hir::HirId(4),
+                        id: crate::hir::HirId(4),
                         kind: HirExpressionKind::Array(vec![HirArrayElement::Spread(HirExpression {
-                            id: radix_module::hir::HirId(5),
+                            id: crate::hir::HirId(5),
                             kind: HirExpressionKind::Literal(HirLiteral::String(items)),
                             ty: None,
                             span: span(),
@@ -1308,7 +1278,7 @@ fn forma_capture_with_spread_params_falls_back_to_struct_literal() {
 
     let program = HirModule {
         items: vec![HirItem {
-            id: radix_module::hir::HirId(0),
+            id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE + 42),
             kind: HirItemKind::Struct(HirStruct {
                 name: forma,
@@ -1323,7 +1293,7 @@ fn forma_capture_with_spread_params_falls_back_to_struct_literal() {
         }],
         entry: Some(HirBlock {
             statements: vec![HirStatement {
-                id: radix_module::hir::HirId(6),
+                id: crate::hir::HirId(6),
                 kind: HirStatementKind::Expr(expr),
                 span: span(),
             }],
@@ -1355,9 +1325,9 @@ fn emits_regex_literals_with_flags() {
         items: Vec::new(),
         entry: Some(HirBlock {
             statements: vec![HirStatement {
-                id: radix_module::hir::HirId(1),
+                id: crate::hir::HirId(1),
                 kind: HirStatementKind::Expr(HirExpression {
-                    id: radix_module::hir::HirId(2),
+                    id: crate::hir::HirId(2),
                     kind: HirExpressionKind::Literal(HirLiteral::Regex(pattern, Some(flags))),
                     ty: Some(regex),
                     span: span(),
@@ -1396,7 +1366,7 @@ fn emits_braced_unit_marker_from_hir_annotation() {
         err_ty: None,
         body: Some(HirBlock {
             statements: vec![HirStatement {
-                id: radix_module::hir::HirId(1),
+                id: crate::hir::HirId(1),
                 kind: HirStatementKind::Redde(None),
                 span: span(),
             }],
@@ -1423,7 +1393,7 @@ fn emits_braced_unit_marker_from_hir_annotation() {
 
     let program = HirModule {
         items: vec![HirItem {
-            id: radix_module::hir::HirId(0),
+            id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
             span: span(),
@@ -1459,9 +1429,9 @@ fn emits_entry_annotations_before_incipit() {
         entry: Some(HirBlock { statements: Vec::new(), expr: None, span: span(), ..Default::default() }),
         entry_annotations: vec![HirAnnotation {
             family: cli,
-            fields: vec![radix_module::hir::HirAnnotationField {
+            fields: vec![crate::hir::HirAnnotationField {
                 name: nomen,
-                value: radix_module::hir::HirAnnotationValue::String(smoke),
+                value: crate::hir::HirAnnotationValue::String(smoke),
                 span: span(),
             }],
             raw_args: Vec::new(),
@@ -1489,11 +1459,11 @@ fn localized_emit_consults_locale_pack_surface() {
     // the spelling). This is the inverse of the old Latin-only emit behavior.
     let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     pack_path.push("../../stdlib/locale/th-TH/pack.toml");
-    let pack = radix_module::locale::LocalePack::from_toml_path(&pack_path).expect("installed th-TH pack should load");
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed th-TH pack should load");
 
-    let config = radix_module::driver::Config::default().with_locale_pack(pack);
-    let session = radix_module::driver::Session::new(config);
-    let result = radix_module::forma::compile::compile_canonical(&session, "salve.th.fab", "ฟังก์ชัน salve() { }\n");
+    let config = crate::driver::Config::default().with_locale_pack(pack);
+    let session = crate::driver::Session::new(config);
+    let result = super::compile::compile_canonical(&session, "salve.th.fab", "ฟังก์ชัน salve() { }\n");
 
     assert!(result.success(), "{:?}", result.diagnostics);
     let output = result.output.expect("emit should produce output");
@@ -1511,12 +1481,9 @@ fn localized_emit_consults_locale_pack_surface() {
 
 #[test]
 fn canonical_emit_preserves_legacy_posture_annotation_without_duplicate_word() {
-    let session = radix_module::driver::Session::new(radix_module::driver::Config::default());
-    let result = radix_module::forma::compile::compile_canonical(
-        &session,
-        "legacy-posture.fab",
-        "@ futura\nfunctio f() → vacuum { }\n",
-    );
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let result =
+        super::compile::compile_canonical(&session, "legacy-posture.fab", "@ futura\nfunctio f() → vacuum { }\n");
 
     assert!(result.success(), "{:?}", result.diagnostics);
     let output = result.output.expect("emit should produce output").code;
@@ -1531,10 +1498,10 @@ fn canonical_emit_preserves_legacy_posture_annotation_without_duplicate_word() {
 fn localized_emit_uses_llm_contextual_morphology_surface() {
     let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     pack_path.push("../../stdlib/locale/en/pack.toml");
-    let pack = radix_module::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
 
-    let config = radix_module::driver::Config::default().with_locale_pack(pack);
-    let session = radix_module::driver::Session::new(config);
+    let config = crate::driver::Config::default().with_locale_pack(pack);
+    let session = crate::driver::Session::new(config);
     let source = r"
 fn fetch() async → int { return 1 }
 fn forward() async → int { return_await fetch() }
@@ -1544,7 +1511,7 @@ fn stream() async_generator → int {
   yield value
 }
 ";
-    let result = radix_module::forma::compile::compile_canonical(&session, "morphology.llm.fab", source);
+    let result = super::compile::compile_canonical(&session, "morphology.llm.fab", source);
 
     assert!(result.success(), "{:?}", result.diagnostics);
     let output = result.output.expect("emit should produce output").code;
@@ -1575,9 +1542,9 @@ fn localized_emit_round_trips_under_same_pack() {
     // token kinds, so a second canonical pass is byte-identical (idempotent).
     let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     pack_path.push("../../stdlib/locale/th-TH/pack.toml");
-    let pack = radix_module::locale::LocalePack::from_toml_path(&pack_path).expect("installed th-TH pack should load");
-    let config = radix_module::driver::Config::default().with_locale_pack(pack);
-    let session = radix_module::driver::Session::new(config);
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed th-TH pack should load");
+    let config = crate::driver::Config::default().with_locale_pack(pack);
+    let session = crate::driver::Session::new(config);
 
     // Localized (Thai) source: exercises functio/fixum/textus/numerus/incipit/
     // nota/redde keywords + the textus/numerus primitives + the scriptum builtin.
@@ -1595,7 +1562,7 @@ fn localized_emit_round_trips_under_same_pack() {
 ";
 
     // First canonical pass over localized source.
-    let first = radix_module::forma::compile::compile_canonical(&session, "salve.th.fab", source);
+    let first = super::compile::compile_canonical(&session, "salve.th.fab", source);
     assert!(first.success(), "first pass should compile: {:?}", first.diagnostics);
     let first_code = first
         .output
@@ -1607,7 +1574,7 @@ fn localized_emit_round_trips_under_same_pack() {
 
     // Second pass: re-emit the localized output. Lossless round-trip requires the
     // localized spellings re-lex to the same token kinds, yielding identical output.
-    let second = radix_module::forma::compile::compile_canonical(&session, "salve.th.fab", &first_code);
+    let second = super::compile::compile_canonical(&session, "salve.th.fab", &first_code);
     assert!(second.success(), "round-trip re-parse should compile: {:?}", second.diagnostics);
     let second_code = second
         .output
@@ -1684,9 +1651,9 @@ fn re_emits_ego_as_self_keyword_not_type_name() {
             err_ty: None,
             body: Some(HirBlock {
                 statements: vec![HirStatement {
-                    id: radix_module::hir::HirId(1),
+                    id: crate::hir::HirId(1),
                     kind: HirStatementKind::Redde(Some(HirExpression {
-                        id: radix_module::hir::HirId(2),
+                        id: crate::hir::HirId(2),
                         kind: HirExpressionKind::Path(ray_def),
                         ty: None,
                         span: span(),
@@ -1710,7 +1677,7 @@ fn re_emits_ego_as_self_keyword_not_type_name() {
     };
     let program = HirModule {
         items: vec![HirItem {
-            id: radix_module::hir::HirId(0),
+            id: crate::hir::HirId(0),
             def_id: ray_def,
             kind: HirItemKind::Struct(HirStruct {
                 name: name_ray,
@@ -1742,18 +1709,18 @@ fn re_emits_ego_as_self_keyword_not_type_name() {
 // ── Conversion-directed assignment (↤, U+21A4) round-trip ───────────────────
 
 fn canonical_lex_parse(code: &str) {
-    let lex = radix_module::lexer::lex(code);
+    let lex = crate::lexer::lex(code);
     assert!(lex.success(), "emitted code should lex: {:?}", lex.errors);
-    let parse = radix_module::parser::parse(lex);
+    let parse = crate::parser::parse(lex);
     assert!(parse.success(), "emitted code should parse: {:?}", parse.errors);
 }
 
 fn canonical_round_trip(source: &str) -> (String, String) {
-    let result = radix_module::forma::compile_canonical_str("conversio-assign.fab", source);
+    let result = super::compile_canonical_str("conversio-assign.fab", source);
     assert!(result.success(), "canonical emit failed: {:?}", result.diagnostics);
     let first = result.output.expect("output").code;
     canonical_lex_parse(&first);
-    let second = radix_module::forma::compile_canonical_str("conversio-assign.fab", &first);
+    let second = super::compile_canonical_str("conversio-assign.fab", &first);
     assert!(second.success(), "re-parse should compile: {:?}", second.diagnostics);
     let second_code = second.output.expect("output").code;
     assert_eq!(first, second_code, "canonical(canonical(x)) must equal canonical(x)");

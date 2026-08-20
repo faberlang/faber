@@ -1,7 +1,4 @@
 //! Canonical Faber source emission for analyzed HIR.
-//!
-//! Emits grammar-valid canonical Faber from HIR; comments and author
-//! formatting require `radix::forma::author`.
 
 use crate::surface::KeywordSurface;
 use crate::trivia::{write_leading_trivia, TriviaIndex};

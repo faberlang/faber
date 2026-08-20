@@ -10,9 +10,9 @@
 //!    3b. **All → Latin** — every locale input compiled to Latin output
 //! 4. **Full fan-out** — every input locale × every output locale (7×7 = 49 pairs)
 
+use crate::codegen::faber::compile_canonical;
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
-use crate::forma::compile_canonical;
 use crate::locale::LocalePack;
 use crate::locale::TypeBindingKind;
 use crate::semantic::{CollectionKind, Primitive, TensorFamilyKind};
