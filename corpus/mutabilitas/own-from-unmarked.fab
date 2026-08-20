@@ -1,0 +1,20 @@
++++
+term = "mutabilitas"
+kind = "reject"
+category = "type"
+summary = "MU-3 red: live unmarked source into own rejects with copy suggestion."
+syntax = "const own list<int> b ← unmarked_a"
+related = ["own", "copy"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — unmarked live into own (MU-3)
+# =============================================================================
+# This exemplum intentionally fails to compile.
+
+main {
+    const list<int> a ← [1, 2, 3]
+    const own list<int> b ← a
+    print a.length()
+    print b.length()
+}

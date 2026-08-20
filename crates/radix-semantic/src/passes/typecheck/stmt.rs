@@ -109,6 +109,9 @@ impl TypeChecker<'_> {
                     init.span,
                     ISSUE_INITIALIZER_ANNOTATION_MISMATCH,
                 );
+                if self.types.is_own_view(*ty) {
+                    self.check_own_bind_rhs(init);
+                }
                 super::tensor_index::record_shape_witness_from_init(self, local.def_id, init);
                 *ty
             }

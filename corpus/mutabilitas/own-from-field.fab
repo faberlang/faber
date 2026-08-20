@@ -1,0 +1,22 @@
++++
+term = "mutabilitas"
+kind = "reject"
+category = "type"
+summary = "MU-3 red: field projection into own rejects with copy suggestion."
+syntax = "const own list<int> b ← p.friends"
+related = ["own", "copy"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — field into own bind (MU-3)
+# =============================================================================
+# This exemplum intentionally fails to compile.
+
+class Person {
+    list<int> friends
+}
+
+main {
+    const Person p ← Person { friends = [1, 2] }
+    const own list<int> b ← p.friends
+}

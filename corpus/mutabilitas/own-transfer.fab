@@ -1,0 +1,18 @@
++++
+term = "mutabilitas"
+kind = "concept"
+category = "type"
+summary = "MU-3: own-to-own bind transfers; source is not used after."
+syntax = "const own list<int> b ← a"
+related = ["own"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — own transfer (MU-3)
+# =============================================================================
+
+main {
+    const own list<int> a ← [1, 2, 3]
+    const own list<int> b ← a
+    print b.length()
+}

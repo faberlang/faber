@@ -436,6 +436,9 @@ impl TypeChecker<'_> {
         }
         let value_ty = self.check_expr_with_expected(value, Some(target_ty));
         self.unify_carrier_assign(value_ty, target_ty, value.span, ASSIGNMENT_TYPE_MISMATCH);
+        if self.types.is_own_view(target_ty) {
+            self.check_own_bind_rhs(value);
+        }
         target_ty
     }
 

@@ -1,0 +1,18 @@
++++
+term = "mutabilitas"
+kind = "concept"
+category = "type"
+summary = "MU-3: unmarked last-use into own is a provably-dead source."
+syntax = "const own list<int> b ← unmarked_a"
+related = ["own"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — unmarked dead into own (MU-3)
+# =============================================================================
+
+main {
+    const list<int> a ← [1, 2, 3]
+    const own list<int> b ← a
+    print b.length()
+}

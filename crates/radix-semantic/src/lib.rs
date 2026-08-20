@@ -192,8 +192,10 @@ pub use types::{
     PrimitiveTypeSpec, SchemaColumnDef, SchemaDef, SemanticMutability, SemanticParamMode,
     TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId, TypeParamConstraint, TypeTable,
     TypeTableSnapshot, ATOMIC_ELEMENT_MSG, INTERVALLUM_BOUND_MSG, ISSUE_ASSIGN_THROUGH_REF,
-    ISSUE_MUTATING_RECEIVER_THROUGH_REF, ISSUE_REF_TO_MUT_OR_OWN_POSITION,
-    ISSUE_SCALAR_ACCESS_MARKER,
+    ISSUE_DEREF_INTO_OWN, ISSUE_FIELD_INTO_OWN, ISSUE_INDEX_INTO_OWN,
+    ISSUE_MUTATING_RECEIVER_THROUGH_REF, ISSUE_MUT_INTO_OWN, ISSUE_PROJECTION_INTO_OWN,
+    ISSUE_REF_INTO_OWN, ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_SCALAR_ACCESS_MARKER,
+    ISSUE_SHARED_INTO_OWN, ISSUE_UNMARKED_INTO_OWN, SUGGESTION_COPY,
 };
 pub use vector_width::{
     is_vector_width_shape, literal_vector_width, lower_vector_width_expr, VectorWidthError,

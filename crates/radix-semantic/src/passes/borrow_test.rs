@@ -9,7 +9,7 @@ use super::{DefId, Resolver, SemanticErrorKind, TypeTable, WarningKind};
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::test_span;
 use crate::SemanticParamMode;
-use crate::{FuncSig, ParamType, Primitive, SemanticError};
+use crate::{AccessMarker, FuncSig, ParamType, Primitive, SemanticError};
 use radix_hir::{
     HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirItem, HirItemKind,
     HirLiteral, HirModule, HirParam, HirParamMode, HirStatement, HirStatementKind,
@@ -726,12 +726,13 @@ fn analyze_modes_rejects_use_after_move_without_rust_lifetime() {
     use super::borrow::analyze_modes;
     let mut types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
+    let own_numerus = types.access_marker(AccessMarker::Own, numerus);
     let func_ty = types.function(FuncSig {
         type_params: Vec::new(),
         type_param_constraints: Vec::new(),
         params: vec![ParamType {
-            ty: numerus,
-            mode: SemanticParamMode::Move,
+            ty: own_numerus,
+            mode: SemanticParamMode::Owned,
             optional: false,
         }],
         ret: numerus,
@@ -756,7 +757,7 @@ fn analyze_modes_rejects_use_after_move_without_rust_lifetime() {
                 expr: HirExpression {
                     id: radix_hir::HirId(4),
                     kind: HirExpressionKind::Path(DefId(1)),
-                    ty: None,
+                    ty: Some(own_numerus),
                     span: test_span(),
                 },
                 span: test_span(),
@@ -769,7 +770,7 @@ fn analyze_modes_rejects_use_after_move_without_rust_lifetime() {
     let read = HirExpression {
         id: radix_hir::HirId(5),
         kind: HirExpressionKind::Path(DefId(1)),
-        ty: Some(numerus),
+        ty: Some(own_numerus),
         span: test_span(),
     };
 
@@ -784,7 +785,7 @@ fn analyze_modes_rejects_use_after_move_without_rust_lifetime() {
                 params: vec![HirParam {
                     def_id: DefId(1),
                     name: radix_lexer::Symbol(2),
-                    ty: numerus,
+                    ty: own_numerus,
                     mode: HirParamMode::Owned,
                     optional: false,
                     sponte: false,
@@ -829,7 +830,10 @@ fn analyze_modes_rejects_use_after_move_without_rust_lifetime() {
     };
 
     let result = analyze_modes(&program, &Resolver::new(), &types);
-    assert!(result.is_err(), "mode analysis must reject use-after-ex");
+    assert!(
+        result.is_err(),
+        "mode analysis must reject use-after-move of own"
+    );
     expect_structured_error(
         &result.unwrap_err(),
         SemanticErrorKind::UseAfterMove,

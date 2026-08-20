@@ -1849,6 +1849,14 @@ fn semantic_borrow_message(args: &[DiagnosticArg]) -> Option<String> {
         "ref_to_mut_or_own_position" => {
             Some("cannot pass a `ref` value to a `mut` or `own` position".to_owned())
         }
+        "unmarked_into_own" => Some("cannot bind an unmarked value into `own`".to_owned()),
+        "ref_into_own" => Some("cannot bind a `ref` value into `own`".to_owned()),
+        "mut_into_own" => Some("cannot bind a `mut` value into `own`".to_owned()),
+        "field_into_own" => Some("cannot bind a field projection into `own`".to_owned()),
+        "index_into_own" => Some("cannot bind an index projection into `own`".to_owned()),
+        "deref_into_own" => Some("cannot bind a dereference into `own`".to_owned()),
+        "projection_into_own" => Some("cannot bind a projection into `own`".to_owned()),
+        "shared_into_own" => Some("cannot bind a shared value into `own`".to_owned()),
         "mutable_borrow_conflict" => {
             Some("mutable borrow conflicts with existing borrow".to_owned())
         }

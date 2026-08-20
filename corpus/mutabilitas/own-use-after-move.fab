@@ -1,0 +1,20 @@
++++
+term = "mutabilitas"
+kind = "reject"
+category = "type"
+summary = "MU-3 red: use of an own source after bind-site transfer is SEM050."
+syntax = "const own list<int> b ← a; print a"
+related = ["own"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — own use after move (MU-3)
+# =============================================================================
+# This exemplum intentionally fails to compile.
+
+main {
+    const own list<int> a ← [1, 2, 3]
+    const own list<int> b ← a
+    print a.length()
+    print b.length()
+}

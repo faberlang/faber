@@ -548,6 +548,27 @@ impl TypeTable {
         )
     }
 
+    /// Whether `ty` is a declared `own` destination (`own` / `penes`).
+    ///
+    /// `copy` elaborates to `own` but is a different acquisition event, so it
+    /// is not an own-bind destination.
+    #[must_use]
+    pub fn is_own_view(&self, ty: TypeId) -> bool {
+        matches!(self.peel_access_marker(ty).0, Some(AccessMarker::Own))
+    }
+
+    /// Whether `ty` is an exclusive value that transfers on own-bind.
+    ///
+    /// `copy` elaborates to `own` (D-6), so a copy binding is a transferable
+    /// source. Unmarked / `ref` / `mut` are not.
+    #[must_use]
+    pub fn is_exclusive_value(&self, ty: TypeId) -> bool {
+        matches!(
+            self.peel_access_marker(ty).0,
+            Some(AccessMarker::Own | AccessMarker::Copy)
+        )
+    }
+
     /// Scalar numerics and `bivalens` reject `ref`/`mut`/`own`/`copy` markers.
     ///
     /// Referential types (collections, buffers, `textus`/`octeti`, tensors,

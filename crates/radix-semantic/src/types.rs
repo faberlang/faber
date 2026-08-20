@@ -27,6 +27,33 @@ pub const ISSUE_ASSIGN_THROUGH_REF: &str = "assign_through_ref";
 /// Passing a `ref` value into a `mut` or `own` position.
 pub const ISSUE_REF_TO_MUT_OR_OWN_POSITION: &str = "ref_to_mut_or_own_position";
 
+/// Own-bind from a live unmarked source. Suggest `copy` (D-6).
+pub const ISSUE_UNMARKED_INTO_OWN: &str = "unmarked_into_own";
+
+/// Own-bind from a `ref` source. Suggest `copy` (D-6).
+pub const ISSUE_REF_INTO_OWN: &str = "ref_into_own";
+
+/// Own-bind from a `mut` source. Suggest `copy` (D-6).
+pub const ISSUE_MUT_INTO_OWN: &str = "mut_into_own";
+
+/// Own-bind from a field projection. Suggest `copy` (D-6).
+pub const ISSUE_FIELD_INTO_OWN: &str = "field_into_own";
+
+/// Own-bind from an index projection. Suggest `copy` (D-6).
+pub const ISSUE_INDEX_INTO_OWN: &str = "index_into_own";
+
+/// Own-bind from a dereference. Suggest `copy` (D-6).
+pub const ISSUE_DEREF_INTO_OWN: &str = "deref_into_own";
+
+/// Own-bind from optional/non-null chaining. Suggest `copy` (D-6).
+pub const ISSUE_PROJECTION_INTO_OWN: &str = "projection_into_own";
+
+/// Own-bind from any other shared/aliased RHS. Suggest `copy` (D-6).
+pub const ISSUE_SHARED_INTO_OWN: &str = "shared_into_own";
+
+/// Suggested spelling attached to every illegal own-bind.
+pub const SUGGESTION_COPY: &str = "copy";
+
 /// Map a type-position syntax marker onto the type-table access fact.
 #[must_use]
 pub fn access_marker_from_type_mode(mode: radix_syntax::TypeMode) -> AccessMarker {

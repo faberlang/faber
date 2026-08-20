@@ -1,0 +1,17 @@
++++
+term = "mutabilitas"
+kind = "concept"
+category = "type"
+summary = "MU-3: own bind from a fresh literal is legal."
+syntax = "const own list<int> xs ← [1, 2, 3]"
+related = ["own", "lista"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — own fresh RHS (MU-3)
+# =============================================================================
+
+main {
+    const own list<int> xs ← [1, 2, 3]
+    print xs.length()
+}

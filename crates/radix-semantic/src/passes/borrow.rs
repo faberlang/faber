@@ -19,6 +19,10 @@
 //! - Declared `ref` type facts (MU-2) reject projection assignment and
 //!   passing into `mut`/`own` positions. Mutating-receiver bans live with
 //!   catalog lookup in typecheck; this pass does not key them on void return.
+//! - Declared `own` type facts (MU-3) transfer at bind sites and own-param
+//!   calls. SEM050 (`use_after_move`) is a language rule, mode-scoped to
+//!   exclusive (`own`/`copy`) values. Unmarked Move-mode args still move only
+//!   under the Rust-lifetime qualification.
 //! - The pass returns all findings together so the semantic driver can apply
 //!   the repository-wide warning/error policy through `SemanticErrorKind`.
 //!
@@ -40,7 +44,7 @@
 use crate::{
     FuncSig, ParamType, Primitive, Resolver, SemanticError, SemanticErrorKind, SemanticParamMode,
     Type, TypeId, TypeTable, WarningKind, ISSUE_ASSIGN_THROUGH_REF,
-    ISSUE_REF_TO_MUT_OR_OWN_POSITION,
+    ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_UNMARKED_INTO_OWN, SUGGESTION_COPY,
 };
 use radix_hir::visit::{walk_expr, HirVisitor};
 use radix_hir::{
@@ -173,6 +177,13 @@ struct BorrowChecker<'a> {
     param_usage: FxHashMap<DefId, ParamUsage>,
     /// Bindings whose declared type carries a `ref` access fact.
     ref_roots: FxHashSet<DefId>,
+    /// Bindings whose declared type is an exclusive `own`/`copy` value.
+    own_roots: FxHashSet<DefId>,
+    /// Unmarked sources used as an own-bind RHS; a later use proves them live.
+    unmarked_own_binds: FxHashMap<DefId, radix_lexer::Span>,
+    /// Function param contracts keyed by callee `DefId` (named calls leave
+    /// `callee.ty` unset; this index supplies own-param dest facts).
+    func_params: FxHashMap<DefId, Vec<ParamType>>,
     errors: Vec<SemanticError>,
 }
 
@@ -200,11 +211,17 @@ impl<'a> BorrowChecker<'a> {
             scopes: Vec::new(),
             param_usage: FxHashMap::default(),
             ref_roots: FxHashSet::default(),
+            own_roots: FxHashSet::default(),
+            unmarked_own_binds: FxHashMap::default(),
+            func_params: FxHashMap::default(),
             errors: Vec::new(),
         }
     }
 
     fn check_program(&mut self, hir: &HirModule) {
+        for item in &hir.items {
+            self.index_item(item);
+        }
         for item in &hir.items {
             self.check_item(item);
         }
@@ -213,6 +230,36 @@ impl<'a> BorrowChecker<'a> {
             self.reset();
             self.check_block(entry);
         }
+    }
+
+    fn index_item(&mut self, item: &HirItem) {
+        match &item.kind {
+            HirItemKind::Function(func) => self.index_function(item.def_id, func),
+            HirItemKind::Struct(strukt) => {
+                for method in &strukt.methods {
+                    self.index_function(method.def_id, &method.func);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn index_function(&mut self, def_id: DefId, func: &HirFunction) {
+        let params = func
+            .params
+            .iter()
+            .map(|param| ParamType {
+                ty: param.ty,
+                mode: match param.mode {
+                    HirParamMode::Owned => SemanticParamMode::Owned,
+                    HirParamMode::De => SemanticParamMode::Ref,
+                    HirParamMode::In => SemanticParamMode::MutRef,
+                    HirParamMode::Ex => SemanticParamMode::Move,
+                },
+                optional: param.optional,
+            })
+            .collect();
+        self.func_params.insert(def_id, params);
     }
 
     fn check_item(&mut self, item: &HirItem) {
@@ -236,6 +283,7 @@ impl<'a> BorrowChecker<'a> {
         for param in &func.params {
             self.ensure_state(param.def_id);
             self.note_ref_root(param.def_id, param.ty);
+            self.note_own_root(param.def_id, param.ty);
             self.param_usage.insert(
                 param.def_id,
                 ParamUsage {
@@ -260,6 +308,8 @@ impl<'a> BorrowChecker<'a> {
         self.scopes.clear();
         self.param_usage.clear();
         self.ref_roots.clear();
+        self.own_roots.clear();
+        self.unmarked_own_binds.clear();
     }
 
     fn check_block(&mut self, block: &HirBlock) {
@@ -279,9 +329,14 @@ impl<'a> BorrowChecker<'a> {
                 self.ensure_state(local.def_id);
                 if let Some(ty) = local.ty {
                     self.note_ref_root(local.def_id, ty);
+                    self.note_own_root(local.def_id, ty);
                 }
                 if let Some(init) = &local.init {
-                    self.check_expr(init);
+                    if local.ty.is_some_and(|ty| self.types.is_own_view(ty)) {
+                        self.bind_own_from(init);
+                    } else {
+                        self.check_expr(init);
+                    }
                 }
             }
             HirStatementKind::Expr(expr) => self.check_expr(expr),
@@ -321,22 +376,30 @@ impl<'a> BorrowChecker<'a> {
         }
     }
 
+    fn call_params(&self, callee: &HirExpression) -> Option<&[ParamType]> {
+        if let Some(ty) = callee.ty {
+            return Self::callee_signature(self.types, ty).map(|sig| sig.params.as_slice());
+        }
+        match &callee.kind {
+            HirExpressionKind::Path(def_id) => self.func_params.get(def_id).map(Vec::as_slice),
+            _ => None,
+        }
+    }
+
     fn check_call_args(&mut self, callee: &HirExpression, args: &[HirCallArg]) {
-        let Some(callee_ty) = callee.ty else {
+        let Some(params) = self.call_params(callee) else {
             for arg in args {
                 self.check_expr(&arg.expr);
             }
             return;
         };
+        let params = params.to_vec();
+        // Named function Paths leave `callee.ty` unset. Applying Ref/MutRef
+        // rust-lifetime simulation to those calls would reject D-1 unmarked
+        // `const` → `mut` param use. Own-param transfers still run below.
+        let rust_sim = callee.ty.is_some();
 
-        let Some(sig) = Self::callee_signature(self.types, callee_ty) else {
-            for arg in args {
-                self.check_expr(&arg.expr);
-            }
-            return;
-        };
-
-        for (arg, param) in args.iter().zip(sig.params.iter()) {
+        for (arg, param) in args.iter().zip(params.iter()) {
             if let Some(arg_def_id) = Self::root_def_id(&arg.expr) {
                 if let Some(arg_usage) = self.param_usage.get_mut(&arg_def_id) {
                     if matches!(
@@ -369,6 +432,15 @@ impl<'a> BorrowChecker<'a> {
                     arg.expr.span,
                 );
             }
+            let dest_own = self.types.is_own_view(param.ty);
+            if dest_own && self.arg_is_exclusive(&arg.expr) {
+                self.move_from_expr(&arg.expr);
+                continue;
+            }
+            if !rust_sim {
+                self.check_expr(&arg.expr);
+                continue;
+            }
             match param.mode {
                 SemanticParamMode::Ref => {
                     if self.rust_lifetime {
@@ -394,7 +466,22 @@ impl<'a> BorrowChecker<'a> {
                         self.check_expr(&arg.expr);
                     }
                 }
-                SemanticParamMode::Move => self.move_from_expr(&arg.expr),
+                SemanticParamMode::Move => {
+                    // Language: only exclusive values move. Rust lifetime still
+                    // consumes every Move-mode argument (existing simulation).
+                    if self.rust_lifetime || self.arg_is_exclusive(&arg.expr) {
+                        self.move_from_expr(&arg.expr);
+                    } else {
+                        self.check_expr(&arg.expr);
+                    }
+                }
+                SemanticParamMode::Owned if dest_own => {
+                    if self.arg_is_exclusive(&arg.expr) {
+                        self.move_from_expr(&arg.expr);
+                    } else {
+                        self.check_expr(&arg.expr);
+                    }
+                }
                 SemanticParamMode::Owned => self.check_expr(&arg.expr),
             }
         }
@@ -475,6 +562,48 @@ impl<'a> BorrowChecker<'a> {
         }
     }
 
+    fn note_own_root(&mut self, def_id: DefId, ty: TypeId) {
+        if self.types.is_exclusive_value(ty) {
+            self.own_roots.insert(def_id);
+        }
+    }
+
+    /// Bind-site move tracking for an `own` destination.
+    ///
+    /// Exclusive sources transfer (SEM050 on later use). Unmarked sources are
+    /// tentatively accepted as provably-dead; a later use rejects the bind
+    /// with a `copy` suggestion. Fresh RHS is a no-move read of the tree.
+    fn bind_own_from(&mut self, rhs: &HirExpression) {
+        match &rhs.kind {
+            HirExpressionKind::Path(_) if self.arg_is_exclusive(rhs) => {
+                self.move_from_expr(rhs);
+            }
+            HirExpressionKind::Path(def_id) => {
+                self.check_expr(rhs);
+                self.unmarked_own_binds.insert(*def_id, rhs.span);
+            }
+            _ => self.check_expr(rhs),
+        }
+    }
+
+    fn arg_is_exclusive(&self, expr: &HirExpression) -> bool {
+        if let Some(ty) = expr.ty {
+            if self.types.is_exclusive_value(ty) {
+                return true;
+            }
+        }
+        match Self::root_def_id(expr) {
+            Some(def_id) => self.own_roots.contains(&def_id),
+            None => false,
+        }
+    }
+
+    fn note_live_unmarked_own_bind(&mut self, def_id: DefId) {
+        if let Some(span) = self.unmarked_own_binds.remove(&def_id) {
+            self.error_own_bind(ISSUE_UNMARKED_INTO_OWN, span);
+        }
+    }
+
     fn dest_is_mut_or_own(&self, param: &ParamType) -> bool {
         matches!(
             param.mode,
@@ -511,6 +640,7 @@ impl<'a> BorrowChecker<'a> {
     }
 
     fn read_use(&mut self, def_id: DefId, span: radix_lexer::Span) {
+        self.note_live_unmarked_own_bind(def_id);
         let state = self.states.entry(def_id).or_default();
         if state.moved {
             self.error(SemanticErrorKind::UseAfterMove, ISSUE_USE_AFTER_MOVE, span);
@@ -526,6 +656,7 @@ impl<'a> BorrowChecker<'a> {
     }
 
     fn write_use(&mut self, def_id: DefId, span: radix_lexer::Span) {
+        self.note_live_unmarked_own_bind(def_id);
         if let Some(usage) = self.param_usage.get_mut(&def_id) {
             if matches!(usage.mode, HirParamMode::De) {
                 self.error(
@@ -552,6 +683,7 @@ impl<'a> BorrowChecker<'a> {
     }
 
     fn move_use(&mut self, def_id: DefId, span: radix_lexer::Span) {
+        self.note_live_unmarked_own_bind(def_id);
         if let Some(usage) = self.param_usage.get_mut(&def_id) {
             usage.moved = true;
         }
@@ -671,6 +803,14 @@ impl<'a> BorrowChecker<'a> {
             .push(SemanticError::structured(kind, span).with_arg("issue", issue));
     }
 
+    fn error_own_bind(&mut self, issue: &str, span: radix_lexer::Span) {
+        self.errors.push(
+            SemanticError::structured(SemanticErrorKind::ModeMismatch, span)
+                .with_arg("issue", issue)
+                .with_arg("suggestion", SUGGESTION_COPY),
+        );
+    }
+
     fn emit_mode_lints(&mut self) {
         let mut warnings = Vec::new();
         for usage in self.param_usage.values() {
@@ -738,7 +878,13 @@ impl HirVisitor for BorrowChecker<'_> {
             }
             HirExpressionKind::Assign(target, value) => {
                 self.check_lvalue(target);
-                self.visit_expr(value);
+                if target.ty.is_some_and(|ty| self.types.is_own_view(ty))
+                    || Self::root_def_id(target).is_some_and(|id| self.own_roots.contains(&id))
+                {
+                    self.bind_own_from(value);
+                } else {
+                    self.visit_expr(value);
+                }
             }
             // `↤` writes the target place (ownership mode / borrow rules for
             // `de`/`in` params apply) before visiting the conversion source
