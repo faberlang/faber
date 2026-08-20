@@ -346,7 +346,7 @@ fn reduction_program() -> DeviceProgram {
 // -----------------------------------------------------------------------
 
 #[test]
-fn test_program_fields_and_ordered_kernels() {
+fn program_fields_and_ordered_kernels() {
     let mut program = reduction_program();
 
     // Append an elementwise kernel as the second declaration.
@@ -413,7 +413,7 @@ fn test_program_fields_and_ordered_kernels() {
 }
 
 #[test]
-fn test_reuses_collection_kernel_plan() {
+fn reuses_collection_kernel_plan() {
     let signature = reduction_signature(16, 8, 2);
     let plan = reduction_plan(&signature, 16, 8, 2);
     let kernel = reduction_kernel_default(&signature, plan);
@@ -466,7 +466,7 @@ fn test_reuses_collection_kernel_plan() {
 }
 
 #[test]
-fn test_elementwise_plan_accepted() {
+fn elementwise_plan_accepted() {
     let signature = elementwise_signature(16, 8);
     let kernel = KernelUnit {
         function: signature.function,
@@ -510,7 +510,7 @@ fn test_elementwise_plan_accepted() {
 // -----------------------------------------------------------------------
 
 #[test]
-fn test_launch_plan_from_signature_matmul() {
+fn launch_plan_from_signature_matmul() {
     // The shared ABI rule: matmul launches the tile grid verbatim.
     let signature = matmul_signature(16, 16, 16);
     let function = body_function(MirCollectionOp::TensorMatMul);
@@ -527,7 +527,7 @@ fn test_launch_plan_from_signature_matmul() {
 }
 
 #[test]
-fn test_launch_plan_from_signature_quantized_matmul_is_verbatim_tile_grid() {
+fn launch_plan_from_signature_quantized_matmul_is_verbatim_tile_grid() {
     // Packed QMM uses the same tile-grid dispatch as TensorMatMul. The
     // generic ceil(dispatch/workgroup) path under-launches (1×1 instead
     // of 2×2 here) and leaves the last output row zero.
@@ -546,7 +546,7 @@ fn test_launch_plan_from_signature_quantized_matmul_is_verbatim_tile_grid() {
 }
 
 #[test]
-fn test_launch_plan_from_signature_reduction() {
+fn launch_plan_from_signature_reduction() {
     // Everything else: ceil(dispatch / workgroup) per axis.
     let signature = reduction_signature(16, 8, 2);
     let function = body_function(MirCollectionOp::Sum);
@@ -563,7 +563,7 @@ fn test_launch_plan_from_signature_reduction() {
 }
 
 #[test]
-fn test_resources_map_from_kernel_resource() {
+fn resources_map_from_kernel_resource() {
     let mut types = TypeTable::new();
     let element_ty = f32_ty(&mut types);
     let resource = MirKernelResource {
@@ -611,7 +611,7 @@ fn test_resources_map_from_kernel_resource() {
 }
 
 #[test]
-fn test_buffer_role_abi_mapping() {
+fn buffer_role_abi_mapping() {
     assert_eq!(
         BufferRole::from_abi_role(MirKernelResourceRole::Input, MirKernelResourceAccess::Read),
         Some(BufferRole::Input)
@@ -660,7 +660,7 @@ fn test_buffer_role_abi_mapping() {
 // -----------------------------------------------------------------------
 
 #[test]
-fn test_multi_output_results() {
+fn multi_output_results() {
     let mut program = reduction_program();
 
     // Second kernel: a second reduction over a larger tensor.
@@ -730,7 +730,7 @@ fn test_multi_output_results() {
 }
 
 #[test]
-fn test_shape_change_is_new_version() {
+fn shape_change_is_new_version() {
     // Buffer B: version 1 with 8 elements written by kernel 0, then a new
     // version 2 with 16 elements written by kernel 1. A new shape is a new
     // version — this is the shape-changing contract, and it validates.
@@ -800,7 +800,7 @@ fn test_shape_change_is_new_version() {
 }
 
 #[test]
-fn test_in_place_reinterpretation_rejected() {
+fn in_place_reinterpretation_rejected() {
     // Rebinding an existing version to a different shape is in-place
     // reinterpretation and must be rejected.
     let signature = reduction_signature(16, 8, 2);
@@ -840,7 +840,7 @@ fn test_in_place_reinterpretation_rejected() {
 }
 
 #[test]
-fn test_identity_conflict_rejected() {
+fn identity_conflict_rejected() {
     let signature = reduction_signature(16, 8, 2);
     let plan = reduction_plan(&signature, 16, 8, 2);
     let mut kernel = reduction_kernel_default(&signature, plan);
@@ -881,7 +881,7 @@ fn test_identity_conflict_rejected() {
 // -----------------------------------------------------------------------
 
 #[test]
-fn test_empty_kernels_and_launches_rejected() {
+fn empty_kernels_and_launches_rejected() {
     let empty = DeviceProgram::new(DeviceProgramLifetime::SingleRun);
     assert!(matches!(
         empty.validate(),
@@ -901,7 +901,7 @@ fn test_empty_kernels_and_launches_rejected() {
 }
 
 #[test]
-fn test_empty_entry_name_rejected() {
+fn empty_entry_name_rejected() {
     let signature = reduction_signature(16, 8, 2);
     let plan = reduction_plan(&signature, 16, 8, 2);
     let mut kernel = reduction_kernel_default(&signature, plan);
@@ -919,7 +919,7 @@ fn test_empty_entry_name_rejected() {
 }
 
 #[test]
-fn test_plan_validation_propagates() {
+fn plan_validation_propagates() {
     // A reduction plan over a non-power-of-two workgroup passes the contract
     // match but fails the recipe validation; the program surfaces it.
     let signature = reduction_signature(16, 3, 6);
@@ -954,7 +954,7 @@ fn test_plan_validation_propagates() {
 }
 
 #[test]
-fn test_duplicate_binding_rejected() {
+fn duplicate_binding_rejected() {
     let signature = reduction_signature(16, 8, 2);
     let plan = reduction_plan(&signature, 16, 8, 2);
     let mut kernel = reduction_kernel_default(&signature, plan);
@@ -994,7 +994,7 @@ fn test_duplicate_binding_rejected() {
 }
 
 #[test]
-fn test_zero_version_rejected() {
+fn zero_version_rejected() {
     let signature = reduction_signature(16, 8, 2);
     let plan = reduction_plan(&signature, 16, 8, 2);
     let mut kernel = reduction_kernel_default(&signature, plan);
@@ -1028,7 +1028,7 @@ fn test_zero_version_rejected() {
 }
 
 #[test]
-fn test_role_access_mismatch_rejected() {
+fn role_access_mismatch_rejected() {
     let signature = reduction_signature(16, 8, 2);
     let plan = reduction_plan(&signature, 16, 8, 2);
     let mut kernel = reduction_kernel_default(&signature, plan);
@@ -1063,7 +1063,7 @@ fn test_role_access_mismatch_rejected() {
 }
 
 #[test]
-fn test_launch_out_of_range_rejected() {
+fn launch_out_of_range_rejected() {
     let mut program = reduction_program();
     program.launches.push(LaunchUnit {
         id: LaunchId(1),
@@ -1084,7 +1084,7 @@ fn test_launch_out_of_range_rejected() {
 }
 
 #[test]
-fn test_duplicate_launch_id_rejected() {
+fn duplicate_launch_id_rejected() {
     let mut program = reduction_program();
     program.launches.push(LaunchUnit {
         id: LaunchId(0),
@@ -1099,7 +1099,7 @@ fn test_duplicate_launch_id_rejected() {
 }
 
 #[test]
-fn test_result_role_rejected() {
+fn result_role_rejected() {
     let mut program = reduction_program();
     program.results.push(ResultBuffer {
         buffer: identity(
@@ -1123,7 +1123,7 @@ fn test_result_role_rejected() {
 }
 
 #[test]
-fn test_result_role_buffer_role_mismatch_rejected() {
+fn result_role_buffer_role_mismatch_rejected() {
     // A result's observation role must agree with the buffer's identity role.
     // `InOut` on an `Output` buffer (or vice versa) is a contradictory schema
     // fact: each role is individually valid, so only the cross-check catches
@@ -1161,7 +1161,7 @@ fn test_result_role_buffer_role_mismatch_rejected() {
 }
 
 #[test]
-fn test_unknown_producing_launch_rejected() {
+fn unknown_producing_launch_rejected() {
     let mut program = reduction_program();
     program.results.push(ResultBuffer {
         buffer: identity(
@@ -1185,7 +1185,7 @@ fn test_unknown_producing_launch_rejected() {
 }
 
 #[test]
-fn test_result_not_produced_rejected() {
+fn result_not_produced_rejected() {
     let mut program = reduction_program();
     // The launch exists, but its kernel does not write buffer 5 version 1.
     program.results.push(ResultBuffer {
@@ -1222,7 +1222,7 @@ fn test_result_not_produced_rejected() {
 /// cadence that contradicts the lifetime (a per-step readback of a per-step
 /// final, or an end-of-run readback of an observation point) fails closed.
 #[test]
-fn test_result_cadence_must_match_buffer_lifetime() {
+fn result_cadence_must_match_buffer_lifetime() {
     // A one-kernel program whose output buffer carries the requested
     // lifetime; validating it with the requested cadence exercises exactly
     // the cadence/lifetime coupling (the kernel slot and the result row
@@ -1335,7 +1335,7 @@ fn test_result_cadence_must_match_buffer_lifetime() {
 // -----------------------------------------------------------------------
 
 #[test]
-fn test_registry_chain_and_data_flow_pairs() {
+fn registry_chain_and_data_flow_pairs() {
     // kernel 0 (producer) reads A and writes intermediate B; kernel 1
     // (consumer) reads B and writes result C.
     let mut types = TypeTable::new();
