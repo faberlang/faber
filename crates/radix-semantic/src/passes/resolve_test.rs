@@ -12,7 +12,7 @@ use crate::file_interface::{
 use crate::passes::collect;
 use crate::test_support;
 use crate::test_support::args_have_no_legacy_message;
-use crate::{Primitive, Type};
+use crate::{Primitive, SemanticParamMode, Type};
 use radix_lexer::lex;
 use radix_lexer::{Interner, Span};
 use radix_parser::parse;
@@ -392,6 +392,43 @@ fn resolves_type_alias_to_builtin() {
     let def_id = resolver.lookup(alias_sym).expect("alias def");
     let symbol = resolver.get_symbol(def_id).expect("alias symbol");
     assert_eq!(symbol.ty, Some(types.primitive(Primitive::Numerus)));
+}
+
+#[test]
+fn resolves_fn_type_param_modes_from_type_position() {
+    let mut parsed = parse(lex(
+        "typus Handler = (de textus, in lista<numerus>, own lista<numerus>, copy lista<numerus>) → vacuum",
+    ));
+    assert!(
+        parsed.errors.is_empty(),
+        "parse errors: {:?}",
+        parsed.errors
+    );
+    let program = parsed.program.as_ref().expect("program");
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    collect::collect(program, &mut resolver, &mut types).expect("collect");
+    resolve::resolve(program, &mut resolver, &parsed.interner, &mut types).expect("resolve");
+
+    let alias_sym = parsed.interner.intern("Handler");
+    let def_id = resolver.lookup(alias_sym).expect("alias def");
+    let symbol = resolver.get_symbol(def_id).expect("alias symbol");
+    let alias_ty = symbol.ty.expect("alias must carry a lowered type");
+    let Type::Func(sig) = types.get(alias_ty) else {
+        panic!("expected fn type alias, got {:?}", types.get(alias_ty));
+    };
+    assert_eq!(
+        sig.params
+            .iter()
+            .map(|param| param.mode)
+            .collect::<Vec<_>>(),
+        vec![
+            SemanticParamMode::Ref,
+            SemanticParamMode::MutRef,
+            SemanticParamMode::Owned,
+            SemanticParamMode::Owned,
+        ]
+    );
 }
 
 #[test]

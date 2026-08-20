@@ -97,6 +97,30 @@ typus Handler = (de textus, own lista<numerus>, numerus) → vacuum
 }
 
 #[test]
+fn legacy_parameter_prefix_warns_without_rejecting() {
+    let result = analyze_source(
+        r#"
+functio legacy(de lista<numerus> values) → vacuum {
+    redde
+}
+"#,
+    );
+    assert!(
+        result.is_ok(),
+        "legacy prefix remains legal, got {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result.diagnostics.iter().any(|err| {
+            err.kind == crate::SemanticErrorKind::Warning(crate::WarningKind::DeprecatedParamPrefix)
+                && issue(err) == Some("deprecated_param_prefix")
+        }),
+        "legacy prefix should emit WARN020, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
 fn scalar_type_position_marker_stays_rejected() {
     // The scalar-marker rule is unchanged in MU-5a: a scalar cannot carry a
     // type-position access marker (fork remains operator-pending).
@@ -108,8 +132,10 @@ incipit {
 ",
     );
     assert!(
-        result.diagnostics.iter().any(|err| err.is_error()
-            && issue(err) == Some(crate::ISSUE_SCALAR_ACCESS_MARKER)),
+        result
+            .diagnostics
+            .iter()
+            .any(|err| err.is_error() && issue(err) == Some(crate::ISSUE_SCALAR_ACCESS_MARKER)),
         "scalar access marker must stay rejected, got {:?}",
         result.diagnostics
     );
