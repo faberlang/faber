@@ -624,13 +624,25 @@ fn cli_rejects_format_stdin_with_check() {
 }
 
 #[test]
-fn cli_parses_format_policy() {
-    let format = Cli::try_parse_from(["faber", "format", "--policy", "pretty-v1", "main.fab"])
-        .expect("parse format --policy");
-    let Some(crate::cli::Command::Format(args)) = format.command else {
-        panic!("expected format subcommand");
-    };
-    assert_eq!(args.policy.as_deref(), Some("pretty-v1"));
+fn cli_rejects_format_policy_flag() {
+    let error = Cli::try_parse_from(["faber", "format", "--policy", "pretty-v1", "main.fab"])
+        .expect_err("format --policy is retired");
+    let rendered = error.to_string();
+    assert!(
+        rendered.contains("--policy"),
+        "retired --policy must fail at parse: {rendered}"
+    );
+}
+
+#[test]
+fn cli_rejects_format_config_flag() {
+    let error = Cli::try_parse_from(["faber", "format", "--config", "forma.toml", "main.fab"])
+        .expect_err("format --config is retired");
+    let rendered = error.to_string();
+    assert!(
+        rendered.contains("--config"),
+        "retired --config must fail at parse: {rendered}"
+    );
 }
 
 #[test]

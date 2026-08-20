@@ -1,6 +1,6 @@
 //! Subprocess checks for `faber format --stdout` (requires built `faber` binary).
 
-use radix_module::forma::test_gate::{assert_author_idempotent, assert_author_reparses_with};
+use radix_module::forma::test_gate::assert_canonical_reparses_with;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -21,6 +21,11 @@ fn exempla(path: &str) -> PathBuf {
 fn english_pack() -> radix_module::locale::LocalePack {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
     radix_module::locale::LocalePack::from_toml_path(path).expect("load English locale pack")
+}
+
+fn latin_pack() -> radix_module::locale::LocalePack {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/la/pack.toml");
+    radix_module::locale::LocalePack::from_toml_path(path).expect("load Latin locale pack")
 }
 
 fn normalize_trailing_newline(text: &str) -> String {
@@ -69,7 +74,7 @@ fn format_cmd_stdout_reparses_salve_munde() {
         formatted.starts_with("+++"),
         "stdout must include frontmatter"
     );
-    assert_author_reparses_with(
+    assert_canonical_reparses_with(
         body_for_parse(&formatted),
         "salve-munde CLI --stdout",
         Some(&english_pack()),
@@ -97,10 +102,10 @@ fn format_cmd_stdout_reparses_cura() {
     let path = exempla("cura/cura.fab");
     let formatted = run_faber_format_stdout(&path);
     assert!(
-        formatted.contains("with \"arena\"") || formatted.contains("with \"page\""),
-        "cura routes must stay quoted in the en surface:\n{formatted}"
+        formatted.contains("print \"in arena\"") || formatted.contains("# cura"),
+        "cura exempla should keep the arena-scoped body on the en surface:\n{formatted}"
     );
-    assert_author_reparses_with(
+    assert_canonical_reparses_with(
         body_for_parse(&formatted),
         "cura CLI --stdout",
         Some(&english_pack()),
@@ -108,13 +113,68 @@ fn format_cmd_stdout_reparses_cura() {
     .expect("reparse");
 }
 
+/// Need: CLI `format --stdout` keeps English types on an en source.
+#[test]
+fn format_cmd_en_source_keeps_english_types() {
+    let temp_root = TempDir::new("faber-format", "en-types");
+    let fixture = temp_root.join("pack.fab");
+    fs::write(
+        &fixture,
+        "+++\nlocale = \"en\"\n+++\nfn pack(int n, float x, string name, bytes buf) → string {\n    return name\n}\n",
+    )
+    .expect("write en types fixture");
+
+    let formatted = run_faber_format_stdout(&fixture);
+    let body = body_for_parse(&formatted);
+    assert!(
+        body.contains("int")
+            && body.contains("float")
+            && body.contains("string")
+            && body.contains("bytes"),
+        "en format must keep English type spellings:\n{formatted}"
+    );
+    assert!(
+        !(body.contains("numerus")
+            || body.contains("fractus")
+            || body.contains("textus")
+            || body.contains("octeti")),
+        "en format must not relatinize types:\n{formatted}"
+    );
+    assert_canonical_reparses_with(body, "en types CLI --stdout", Some(&english_pack()))
+        .expect("reparse");
+}
+
+/// Surface-faithful: la source stays la through the CLI.
+#[test]
+fn format_cmd_la_source_stays_latin() {
+    let temp_root = TempDir::new("faber-format", "la-types");
+    let fixture = temp_root.join("pack.fab");
+    fs::write(
+        &fixture,
+        "+++\nlocale = \"la\"\n+++\nfunctio pack(numerus n, textus nomen) → textus {\n    redde nomen\n}\n",
+    )
+    .expect("write la fixture");
+
+    let formatted = run_faber_format_stdout(&fixture);
+    let body = body_for_parse(&formatted);
+    assert!(
+        body.contains("functio") && body.contains("numerus") && body.contains("textus"),
+        "la format must keep Latin spellings:\n{formatted}"
+    );
+    assert_canonical_reparses_with(body, "la types CLI --stdout", Some(&latin_pack()))
+        .expect("reparse");
+}
+
 /// SC-3/verification step 5: CLI `format --stdout` on comment fixture re-parses.
 #[test]
 fn format_cmd_comment_fixture_cli_reparses() {
     let temp_root = TempDir::new("faber-format", "comment-fixture");
     let fixture = temp_root.join("fixture.fab");
-    fs::write(&fixture, "# lead comment\n\nincipit {\n  nota \"ok\"\n}\n")
-        .expect("write comment fixture");
+    fs::write(
+        &fixture,
+        "+++\nlocale = \"en\"\n+++\n# lead comment\n\nmain {\n  print \"ok\"\n}\n",
+    )
+    .expect("write comment fixture");
 
     let formatted = run_faber_format_stdout(&fixture);
     let _ = fs::remove_file(&fixture);
@@ -123,11 +183,10 @@ fn format_cmd_comment_fixture_cli_reparses() {
         formatted.contains("# lead comment"),
         "CLI must preserve leading comment:\n{formatted}"
     );
-    assert_author_reparses_with(&formatted, "comment CLI --stdout", Some(&english_pack()))
-        .expect("reparse");
-    assert_author_idempotent(
-        "comment.fab",
-        "# lead comment\n\nincipit {\n  nota \"ok\"\n}\n",
+    assert_canonical_reparses_with(
+        body_for_parse(&formatted),
+        "comment CLI --stdout",
+        Some(&english_pack()),
     )
-    .expect("idempotent");
+    .expect("reparse");
 }

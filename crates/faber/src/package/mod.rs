@@ -118,7 +118,6 @@ pub(crate) use manifest::validate_manifest;
 #[allow(unused_imports)]
 pub(crate) use manifest::{
     manifest_backend_selection, manifest_build_target_for_input, manifest_device_inputs,
-    manifest_format_policy,
 };
 pub use manifest::{
     read_manifest, FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,

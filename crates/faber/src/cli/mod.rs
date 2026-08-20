@@ -88,9 +88,9 @@ pub enum Command {
     /// Compile to target for stdout (compatibility alias for `radix emit`)
     Emit(EmitArgs),
 
-    /// Format Faber source (author mode by default)
+    /// Format Faber source (HIR re-emit at the source's own locale)
     #[command(
-        long_about = "Format Faber source. Policy precedence: CLI --policy > package [format] policy (faber.toml) > built-in default (normalise-v1). Each input root resolves the package that contains it, so multi-root runs spanning packages keep per-package policies; files outside any package (and --stdin) use the built-in default. --config (forma.toml) is deferred. Unknown policy slugs fail clearly."
+        long_about = "Format Faber source. Re-emits through the canonical HIR path at the source's own locale (frontmatter → package [locale] → product default en). Keyword and type vocabulary stay surface-faithful. --stdout accepts exactly one file; --stdin reads one document from stdin; --check reports drift without writing."
     )]
     Format(FormatArgs),
 
@@ -114,9 +114,8 @@ pub enum Command {
 pub struct FormatArgs {
     /// Files or directories to format (default: current package directory).
     ///
-    /// Each root resolves the package that CONTAINS it (nearest faber.toml,
-    /// walking up), so a multi-root invocation spanning packages formats each
-    /// package with its own `[format]` policy.
+    /// Each root resolves the package that contains it (nearest faber.toml,
+    /// walking up).
     #[arg(value_name = "PATH")]
     pub paths: Vec<PathBuf>,
 
@@ -138,16 +137,6 @@ pub struct FormatArgs {
     /// result to stdout (implies --stdout; incompatible with path arguments)
     #[arg(long, conflicts_with_all = ["check", "paths"])]
     pub stdin: bool,
-
-    /// Format policy slug from the rule-slug registry (normalise-v1 |
-    /// pretty-v1); overrides the package `[format]` policy and the built-in
-    /// default
-    #[arg(long, value_name = "SLUG")]
-    pub policy: Option<String>,
-
-    /// Path to forma.toml override (schema deferred)
-    #[arg(long, value_name = "PATH")]
-    pub config: Option<PathBuf>,
 }
 
 /// Arguments for `faber convert`.
