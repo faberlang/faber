@@ -61,19 +61,46 @@ mod types;
 
 use crate::cli::{CliProgram, CliType};
 use crate::locale::LocalePack;
-use crate::{AnnotationContractMetadata, Primitive, Resolver, Type, TypeId, TypeTable};
+use crate::{AnnotationContractMetadata, Primitive, Resolver, SemanticParamMode, Type, TypeId, TypeTable};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
     HirBlock, HirBlockEnd, HirExpression, HirId, HirItem, HirModule, HirModuleEnd, HirOwnerRef,
-    HirPresentation, HirSourceAnchorId, HirStatement, HirStatementKind, HirTestMetadata,
-    HirTestModifier, HirTrivia, HirTriviaAttachment, HirTriviaOwner, HirTriviaOwnerKind,
+    HirParamMode, HirPresentation, HirSourceAnchorId, HirStatement, HirStatementKind,
+    HirTestMetadata, HirTestModifier, HirTrivia, HirTriviaAttachment, HirTriviaOwner,
+    HirTriviaOwnerKind,
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_syntax::{
     BlockStmt, GenericParamKind, PraeparaBlock, PraeparaKind, ProbaCase, ProbaModifier,
-    ProbandumDecl, Program, Stmt, StmtKind, Trivia,
+    ProbandumDecl, Program, Stmt, StmtKind, Trivia, TypeMode,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
+
+/// Map a type-position access marker onto the HIR parameter-mode fact.
+///
+/// The type-position marker set (de/in/own/copy) is the source of truth for
+/// parameter mode after MU-5. `own`/`copy` are value-transfer markers whose
+/// fine distinction lives on the marked type; the HIR param mode collapses
+/// both to `Owned` (owned-by-callee), matching the legacy default.
+pub(super) fn type_mode_hir_param_mode(mode: TypeMode) -> HirParamMode {
+    match mode {
+        TypeMode::De => HirParamMode::De,
+        TypeMode::In => HirParamMode::In,
+        TypeMode::Own | TypeMode::Copy => HirParamMode::Owned,
+    }
+}
+
+/// Map a type-position access marker onto the semantic parameter mode.
+///
+/// This is the fn-type/closure counterpart to [`type_mode_hir_param_mode`]:
+/// de → shared ref, in → mutable ref, own/copy → value-owned.
+pub(super) fn type_mode_semantic_param_mode(mode: TypeMode) -> SemanticParamMode {
+    match mode {
+        TypeMode::De => SemanticParamMode::Ref,
+        TypeMode::In => SemanticParamMode::MutRef,
+        TypeMode::Own | TypeMode::Copy => SemanticParamMode::Owned,
+    }
+}
 
 /// Stateful coordinator for one AST-to-HIR lowering run.
 ///

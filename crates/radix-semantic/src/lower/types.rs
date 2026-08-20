@@ -69,10 +69,16 @@ impl Lowerer<'_> {
                 let params = func
                     .params
                     .iter()
-                    .map(|param| ParamType {
-                        ty: self.lower_type(param),
-                        mode: SemanticParamMode::Owned,
-                        optional: false,
+                    .map(|param| {
+                        let ty = self.lower_type(param);
+                        ParamType {
+                            ty,
+                            mode: match param.mode {
+                                Some(type_mode) => super::type_mode_semantic_param_mode(type_mode),
+                                None => SemanticParamMode::Owned,
+                            },
+                            optional: false,
+                        }
                     })
                     .collect();
                 let ret = self.lower_type(&func.ret);

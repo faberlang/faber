@@ -493,20 +493,28 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        match param.mode {
-            radix_hir::HirParamMode::De => {
-                writer.write(surface.keyword(TokenKind::De));
-                writer.write(" ");
+        // A type-position mode marker already rides the param type (`de T`),
+        // and `type_to_faber` prints it. Only emit the legacy prefix mode here
+        // when the type does not already encode the access marker — that keeps
+        // the corpus's prefix spellings byte-identical while avoiding
+        // double-emission for the new type-position spellings.
+        let type_carries_mode = matches!(types.get(param.ty), radix_types::Type::Ref(..));
+        if !type_carries_mode {
+            match param.mode {
+                radix_hir::HirParamMode::De => {
+                    writer.write(surface.keyword(TokenKind::De));
+                    writer.write(" ");
+                }
+                radix_hir::HirParamMode::In => {
+                    writer.write(surface.keyword(TokenKind::In));
+                    writer.write(" ");
+                }
+                radix_hir::HirParamMode::Ex => {
+                    writer.write(surface.keyword(TokenKind::Ex));
+                    writer.write(" ");
+                }
+                radix_hir::HirParamMode::Owned => {}
             }
-            radix_hir::HirParamMode::In => {
-                writer.write(surface.keyword(TokenKind::In));
-                writer.write(" ");
-            }
-            radix_hir::HirParamMode::Ex => {
-                writer.write(surface.keyword(TokenKind::Ex));
-                writer.write(" ");
-            }
-            radix_hir::HirParamMode::Owned => {}
         }
         writer.write(&self.type_to_faber(param.ty, types, names, interner, surface));
         writer.write(" ");

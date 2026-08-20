@@ -778,11 +778,16 @@ impl Lowerer<'_> {
         self.push_scope();
         for param in &closure.params {
             let def_id = self.next_def_id();
+            let ty = self.lower_type(&param.ty);
+            let mode = match param.ty.mode {
+                Some(type_mode) => super::type_mode_hir_param_mode(type_mode),
+                None => radix_hir::HirParamMode::Owned,
+            };
             params.push(radix_hir::HirParam {
                 def_id,
                 name: param.name.name,
-                ty: self.lower_type(&param.ty),
-                mode: radix_hir::HirParamMode::Owned,
+                ty,
+                mode,
                 optional: false,
                 sponte: false,
 

@@ -10,7 +10,8 @@ use crate::surface::{KeywordSurface, TypeBindingKind};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Symbol};
 use radix_types::{
-    CollectionKind, Primitive, SemanticMutability, TensorFamilyKind, Type, TypeId, TypeTable,
+    CollectionKind, Primitive, SemanticMutability, SemanticParamMode, TensorFamilyKind, Type,
+    TypeId, TypeTable,
 };
 use rustc_hash::FxHashMap;
 
@@ -205,7 +206,26 @@ impl super::FaberCodegen {
                 let params: Vec<String> = sig
                     .params
                     .iter()
-                    .map(|p| self.type_to_faber(p.ty, types, names, interner, surface))
+                    .map(|p| {
+                        let ty = self.type_to_faber(p.ty, types, names, interner, surface);
+                        // A type-position marker already rides the param type
+                        // (`de T` / `in T`); only emit an explicit mode prefix
+                        // when the mode is not already encoded on the type.
+                        let type_carries_mode = matches!(types.get(p.ty), Type::Ref(..));
+                        match p.mode {
+                            SemanticParamMode::Owned => ty,
+                            SemanticParamMode::Ref if !type_carries_mode => {
+                                format!("{} {}", surface.keyword(radix_lexer::TokenKind::De), ty)
+                            }
+                            SemanticParamMode::MutRef if !type_carries_mode => {
+                                format!("{} {}", surface.keyword(radix_lexer::TokenKind::In), ty)
+                            }
+                            SemanticParamMode::Move => {
+                                format!("{} {}", surface.keyword(radix_lexer::TokenKind::Ex), ty)
+                            }
+                            _ => ty,
+                        }
+                    })
                     .collect();
                 let ret = self.type_to_faber(sig.ret, types, names, interner, surface);
                 if let Some(err) = sig.err {
@@ -563,6 +583,62 @@ mod tests {
         assert_eq!(
             codegen.type_to_faber(i32_ty, &types, &names, &interner, &surface),
             "numerus<i32>"
+        );
+    }
+
+    #[test]
+    fn type_to_faber_emits_fn_type_param_modes() {
+        use radix_types::{FuncSig, ParamType, SemanticParamMode};
+        let codegen = FaberCodegen::default();
+        let mut types = TypeTable::new();
+        let names = FxHashMap::default();
+        let interner = Interner::new();
+        let surface = LatinSurface;
+
+        let textus = types.primitive(Primitive::Textus);
+        let vacuum = types.primitive(Primitive::Vacuum);
+        let ref_textus = types.reference(SemanticMutability::Immutable, textus);
+
+        // A type-position `de textus` param carries the marker on the type, so
+        // the underlying `Type::Ref` prints it and no separate prefix is added.
+        let sig = FuncSig {
+            type_params: Vec::new(),
+            type_param_constraints: Vec::new(),
+            params: vec![ParamType {
+                ty: ref_textus,
+                mode: SemanticParamMode::Ref,
+                optional: false,
+            }],
+            ret: vacuum,
+            err: None,
+            is_async: false,
+            is_generator: false,
+        };
+        let func_ty = types.intern(radix_types::Type::Func(sig));
+        assert_eq!(
+            codegen.type_to_faber(func_ty, &types, &names, &interner, &surface),
+            "(de textus) → vacuum"
+        );
+
+        // A mode that is not encoded on the type (e.g. `ex` move) gets an
+        // explicit prefix keyword instead of being silently dropped.
+        let owned_sig = FuncSig {
+            type_params: Vec::new(),
+            type_param_constraints: Vec::new(),
+            params: vec![ParamType {
+                ty: textus,
+                mode: SemanticParamMode::Move,
+                optional: false,
+            }],
+            ret: vacuum,
+            err: None,
+            is_async: false,
+            is_generator: false,
+        };
+        let move_func_ty = types.intern(radix_types::Type::Func(owned_sig));
+        assert_eq!(
+            codegen.type_to_faber(move_func_ty, &types, &names, &interner, &surface),
+            "(ex textus) → vacuum"
         );
     }
 
