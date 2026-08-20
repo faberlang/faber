@@ -2052,11 +2052,11 @@ incipit {
 }
 
 #[test]
-fn bare_vacua_stays_the_marker_beside_a_same_named_binding() {
-    // V-5: a same-named binding is legal but unreferenceable in bare
-    // expression position; `nota vacua` is the marker, which needs a
-    // collection type.
-    let result = crate::test_support::analyze_source(
+fn bound_vacua_is_the_value_beside_a_same_named_binding() {
+    // F1: the parser's Vacua claim is only a fallback. A live same-named
+    // value binding wins in bare expression position, just as it does for
+    // calls and other postfix expression bases.
+    let result = compile_ok(
         r#"
 incipit {
   fixum textus vacua ← "empty"
@@ -2065,8 +2065,13 @@ incipit {
 "#,
     );
     assert!(
-        has_issue(&result, "SEM014", "vacua_requires_declared_type"),
-        "bare vacua must stay the marker: {:?}",
+        !has_issue(&result, "SEM014", "vacua_requires_declared_type"),
+        "bound vacua must not use the marker: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        has_issue(&result, "WARN021", "empty_marker_shadowing"),
+        "marker-named binding should warn: {:?}",
         result.diagnostics
     );
 }
@@ -2160,6 +2165,11 @@ fn walk_exprs<'a>(program: &'a Program, visit: &mut impl FnMut(&'a Expr)) {
                 }
                 IfBody::Ergo(inner) => walk_stmt(inner, visit),
             },
+            StmtKind::Block(block) => {
+                for inner in &block.statements {
+                    walk_stmt(inner, visit);
+                }
+            }
             StmtKind::Func(func) => {
                 if let Some(body) = &func.body {
                     for inner in &body.statements {
@@ -2180,6 +2190,36 @@ fn walk_exprs<'a>(program: &'a Program, visit: &mut impl FnMut(&'a Expr)) {
                     walk_expr(&arg.value, visit);
                 }
             }
+            ExprKind::Member(member) => walk_expr(&member.object, visit),
+            ExprKind::Index(index) => {
+                walk_expr(&index.object, visit);
+                walk_expr(&index.index, visit);
+            }
+            ExprKind::OptionalChain(chain) => {
+                walk_expr(&chain.object, visit);
+                match &chain.chain {
+                    radix_syntax::OptionalChainKind::Member(_) => {}
+                    radix_syntax::OptionalChainKind::Index(index) => walk_expr(index, visit),
+                    radix_syntax::OptionalChainKind::Call(args) => {
+                        for arg in args {
+                            walk_expr(&arg.value, visit);
+                        }
+                    }
+                }
+            }
+            ExprKind::NonNull(chain) => {
+                walk_expr(&chain.object, visit);
+                match &chain.chain {
+                    radix_syntax::NonNullKind::Member(_) => {}
+                    radix_syntax::NonNullKind::Index(index) => walk_expr(index, visit),
+                    radix_syntax::NonNullKind::Call(args) => {
+                        for arg in args {
+                            walk_expr(&arg.value, visit);
+                        }
+                    }
+                }
+            }
+            ExprKind::Paren(inner) => walk_expr(inner, visit),
             ExprKind::Scriptum(scriptum) => {
                 for arg in &scriptum.args {
                     walk_expr(arg, visit);
@@ -2239,7 +2279,7 @@ incipit {
 }
 
 #[test]
-fn resolve_does_not_record_shadowing_for_bound_vacua() {
+fn resolve_records_shadowing_for_bound_vacua() {
     let (program, resolver, _) = resolve_ok(
         r#"
 incipit {
@@ -2256,8 +2296,8 @@ incipit {
     });
     assert_eq!(vacua_nodes.len(), 1, "expected one claimed vacua node");
     assert!(
-        resolver.shadowed_builtin(vacua_nodes[0]).is_none(),
-        "bare vacua must not record shadowing"
+        resolver.shadowed_builtin(vacua_nodes[0]).is_some(),
+        "bound vacua must record shadowing"
     );
 }
 
@@ -2283,6 +2323,143 @@ incipit {
     assert!(
         resolver.shadowed_builtin(vacua_callees[0]).is_some(),
         "vacua() must record shadowing on the callee"
+    );
+}
+
+#[test]
+fn resolve_binding_wins_in_every_marker_expression_position() {
+    let (program, resolver, _) = resolve_ok(
+        r#"
+incipit {
+  fixum lista<numerus> vacua ← [1, 2, 3]
+  nota vacua
+  nota vacua.longitudo()
+  nota vacua[0]
+  nota vacua?.longitudo()
+}
+"#,
+    );
+    let mut vacua_nodes = Vec::new();
+    walk_exprs(&program, &mut |expr| {
+        if matches!(expr.kind, ExprKind::Vacua(_)) {
+            vacua_nodes.push(expr.id);
+        }
+    });
+    assert_eq!(
+        vacua_nodes.len(),
+        4,
+        "expected marker claims in all four positions"
+    );
+    assert!(
+        vacua_nodes
+            .iter()
+            .all(|node| resolver.shadowed_builtin(*node).is_some()),
+        "every marker expression position must resolve the live binding"
+    );
+}
+
+#[test]
+fn initializer_self_reference_falls_back_to_marker_without_outer_binding() {
+    let (program, resolver, _) = resolve_ok(
+        r#"
+functio probe() → lista<numerus> {
+  fixum lista<numerus> vacua ← vacua
+  redde vacua
+}
+"#,
+    );
+    let mut vacua_nodes = Vec::new();
+    walk_exprs(&program, &mut |expr| {
+        if matches!(expr.kind, ExprKind::Vacua(_)) {
+            vacua_nodes.push(expr.id);
+        }
+    });
+    assert_eq!(
+        vacua_nodes.len(),
+        1,
+        "expected one initializer marker claim"
+    );
+    assert!(
+        resolver.shadowed_builtin(vacua_nodes[0]).is_none(),
+        "a declaration is not live until its initializer completes"
+    );
+}
+
+#[test]
+fn initializer_self_reference_uses_live_outer_binding() {
+    let (program, resolver, _) = resolve_ok(
+        r#"
+functio probe() → lista<numerus> {
+  fixum lista<numerus> vacua ← [1, 2, 3]
+  {
+    fixum lista<numerus> vacua ← vacua
+    redde vacua
+  }
+}
+"#,
+    );
+    let mut vacua_nodes = Vec::new();
+    walk_exprs(&program, &mut |expr| {
+        if matches!(expr.kind, ExprKind::Vacua(_)) {
+            vacua_nodes.push(expr.id);
+        }
+    });
+    assert_eq!(
+        vacua_nodes.len(),
+        1,
+        "expected one outer-binding initializer claim"
+    );
+    assert!(
+        resolver.shadowed_builtin(vacua_nodes[0]).is_some(),
+        "an outer same-named binding must win in the initializer"
+    );
+}
+
+#[test]
+fn marker_resolution_reverts_after_scope_exit() {
+    let (program, resolver, _) = resolve_ok(
+        r#"
+incipit {
+  {
+    fixum lista<numerus> vacua ← [1, 2, 3]
+    nota vacua
+  }
+  nota vacua
+}
+"#,
+    );
+    let mut vacua_nodes = Vec::new();
+    walk_exprs(&program, &mut |expr| {
+        if matches!(expr.kind, ExprKind::Vacua(_)) {
+            vacua_nodes.push(expr.id);
+        }
+    });
+    assert_eq!(
+        vacua_nodes.len(),
+        2,
+        "expected inner binding and post-scope marker claims"
+    );
+    assert!(
+        resolver.shadowed_builtin(vacua_nodes[0]).is_some(),
+        "the inner reference must use the inner binding"
+    );
+    assert!(
+        resolver.shadowed_builtin(vacua_nodes[1]).is_none(),
+        "scope exit must restore the unbound marker fallback"
+    );
+}
+
+#[test]
+fn set_typed_marker_binding_is_a_list_argument_type_error() {
+    test_support::assert_rejects_with_issue(
+        r#"
+functio probe(lista<numerus> xs) { }
+incipit {
+  fixum copia<numerus> vacua ← [1, 2] ↦ copia<numerus>
+  probe(vacua)
+}
+"#,
+        "argument_type_mismatch",
     );
 }
 

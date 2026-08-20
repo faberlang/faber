@@ -1360,6 +1360,47 @@ fn en_empty_named_binding_rhs_claims_as_marker() {
 }
 
 #[test]
+fn marker_named_bindings_warn_under_en_and_la_packs() {
+    for (locale, source, issue) in [
+        (
+            "en",
+            "main { const list<int> empty ← [1] print empty.length() }",
+            "empty_marker_shadowing",
+        ),
+        (
+            "la",
+            "incipit { fixum lista<numerus> vacua ← [1] nota vacua }",
+            "empty_marker_shadowing",
+        ),
+    ] {
+        let pack = installed_pack(locale);
+        let result = compile(
+            &Session::new(
+                Config::default()
+                    .with_target(Target::HirRust)
+                    .with_locale_pack(pack)
+                    .with_locale_pack_explicit(),
+            ),
+            &format!("{locale}-marker-shadow.fab"),
+            source,
+        );
+        assert!(
+            result.success(),
+            "{locale} marker receiver should resolve, got {:?}",
+            result.diagnostics
+        );
+        assert!(
+            result
+                .diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.code == Some("WARN021") && diagnostic.issue() == Some(issue) }),
+            "{locale} marker-named binding should emit WARN021, got {:?}",
+            result.diagnostics
+        );
+    }
+}
+
+#[test]
 fn en_vacua_spelling_does_not_claim_marker() {
     let pack = installed_pack("en");
     let result = parse(lex_with_locale_pack("var list<int> xs ← vacua", &pack));

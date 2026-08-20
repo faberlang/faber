@@ -89,6 +89,7 @@ fn warns_on_unused_local() {
         &Resolver::new(),
         &TypeTable::new(),
         &Interner::new(),
+        None,
     );
     expect_structured_error(
         &errors,
@@ -137,6 +138,7 @@ fn does_not_warn_on_used_local() {
         &Resolver::new(),
         &TypeTable::new(),
         &Interner::new(),
+        None,
     );
     assert!(
         !errors
@@ -186,6 +188,7 @@ fn warns_on_varia_local_never_mutated() {
         &Resolver::new(),
         &TypeTable::new(),
         &Interner::new(),
+        None,
     );
     assert!(errors
         .iter()
@@ -224,6 +227,7 @@ fn does_not_warn_on_unused_varia_local() {
         &Resolver::new(),
         &TypeTable::new(),
         &Interner::new(),
+        None,
     );
     assert!(errors
         .iter()
@@ -281,6 +285,7 @@ fn does_not_warn_on_varia_local_reassigned() {
         &Resolver::new(),
         &TypeTable::new(),
         &Interner::new(),
+        None,
     );
     assert!(!errors
         .iter()
@@ -352,7 +357,7 @@ fn does_not_warn_on_varia_local_mutated_by_intrinsic_method() {
         entry_is_async: false,
     };
 
-    let errors = lint(&program, &Resolver::new(), &types, &interner);
+    let errors = lint(&program, &Resolver::new(), &types, &interner, None);
     assert!(!errors
         .iter()
         .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryVaria)));
@@ -397,6 +402,7 @@ fn unused_local_warning_uses_declaration_span() {
         &Resolver::new(),
         &TypeTable::new(),
         &Interner::new(),
+        None,
     );
     assert!(errors.iter().any(|err| {
         err.kind == SemanticErrorKind::Warning(WarningKind::UnusedVariable)
@@ -439,6 +445,7 @@ fn warns_on_unreachable_code() {
         &Resolver::new(),
         &TypeTable::new(),
         &Interner::new(),
+        None,
     );
     expect_structured_error(
         &errors,
@@ -475,6 +482,7 @@ fn warns_on_unused_import() {
         &Resolver::new(),
         &TypeTable::new(),
         &Interner::new(),
+        None,
     );
     assert!(errors
         .iter()
@@ -528,6 +536,7 @@ fn warns_on_shadowed_variable() {
         &Resolver::new(),
         &TypeTable::new(),
         &Interner::new(),
+        None,
     );
     expect_structured_error(
         &errors,
@@ -571,7 +580,7 @@ fn warns_on_unnecessary_cast() {
         entry_is_async: false,
     };
 
-    let errors = lint(&program, &Resolver::new(), &types, &Interner::new());
+    let errors = lint(&program, &Resolver::new(), &types, &Interner::new(), None);
     assert!(errors
         .iter()
         .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryCast)));
@@ -616,7 +625,7 @@ fn warns_on_unnecessary_cast_through_alias() {
         entry_is_async: false,
     };
 
-    let errors = lint(&program, &Resolver::new(), &types, &Interner::new());
+    let errors = lint(&program, &Resolver::new(), &types, &Interner::new(), None);
     assert!(errors
         .iter()
         .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryCast)));
@@ -667,7 +676,7 @@ fn no_warning_on_verte_with_entries() {
         entry_is_async: false,
     };
 
-    let errors = lint(&program, &Resolver::new(), &types, &Interner::new());
+    let errors = lint(&program, &Resolver::new(), &types, &Interner::new(), None);
     // Should NOT contain an UnnecessaryCast warning
     assert!(
         !errors
@@ -723,6 +732,7 @@ fn warns_on_unreachable_after_break() {
         &Resolver::new(),
         &TypeTable::new(),
         &Interner::new(),
+        None,
     );
     assert!(errors
         .iter()
@@ -758,7 +768,7 @@ fn warns_on_explicit_ignotum_annotation() {
         entry_is_async: false,
     };
 
-    let errors = lint(&program, &Resolver::new(), &types, &Interner::new());
+    let errors = lint(&program, &Resolver::new(), &types, &Interner::new(), None);
     expect_structured_error(
         &errors,
         SemanticErrorKind::Warning(WarningKind::ExplicitIgnotumAnnotation),
@@ -801,6 +811,7 @@ fn warnings_only_findings_are_non_fatal() {
         &Resolver::new(),
         &TypeTable::new(),
         &Interner::new(),
+        None,
     );
     assert!(
         findings
@@ -1004,6 +1015,7 @@ fn does_not_warn_on_numeric_chain() {
         &Resolver::new(),
         &types,
         &Interner::new(),
+        None,
     );
     assert!(
         !has_prefer_string_template(&errors),
@@ -1028,7 +1040,13 @@ fn warns_on_chain_with_ascii_literal_and_folds_text_into_suggestion() {
         path_typed(radix_hir::DefId(1), Some(textus)),
         Some(textus),
     );
-    let errors = lint(&chain_program(chain), &Resolver::new(), &types, &interner);
+    let errors = lint(
+        &chain_program(chain),
+        &Resolver::new(),
+        &types,
+        &interner,
+        None,
+    );
     let err = expect_structured_error(
         &errors,
         SemanticErrorKind::Warning(WarningKind::PreferStringTemplate),

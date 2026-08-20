@@ -620,7 +620,13 @@ pub fn analyze_with_cli(
 
         // lint findings include non-fatal warnings (Warning-kind entries);
         // fatality is decided downstream via SemanticError::is_error.
-        diagnostics.extend(passes::lint::lint(&hir, &resolver, &types, interner));
+        diagnostics.extend(passes::lint::lint(
+            &hir,
+            &resolver,
+            &types,
+            interner,
+            config.locale_pack.as_ref(),
+        ));
     }
 
     SemanticResult {
