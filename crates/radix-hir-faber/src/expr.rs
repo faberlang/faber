@@ -25,12 +25,9 @@
 //! string payloads are written from interned text without claiming source escape
 //! preservation.
 //!
-//! Adfirma message particles still emit hardcoded `secus` (`e0fbae339`). The
-//! grammar particle is Mori (`panic`); leftover Secus is PARSE001
-//! `adfirma_else_rejected` (`7805f8e1a`). Five exempla (`adfirma.fab`,
-//! `in-functione.fab`, `conversio/instans.fab`, `instans.fab`, `requirit.fab`)
-//! fail the second-pass roundtrip. Pre-FR-3 HIR residual — not a rewire miss.
-//! Fix: `surface.keyword(TokenKind::Mori)` on the message arm.
+//! Adfirma optional message particles emit `surface.keyword(TokenKind::Mori)`
+//! (`panic`). Leftover Secus is PARSE001 `adfirma_else_rejected` (`7805f8e1a`);
+//! hardcoded `secus` (`e0fbae339`) is not a valid particle.
 
 use crate::surface::KeywordSurface;
 use radix_codegen_shared::CodeWriter;
@@ -526,8 +523,9 @@ impl super::FaberCodegen {
                 writer.write(" ");
                 self.write_expr(cond, types, names, interner, surface, writer);
                 if let Some(message) = message {
-                    // Residual: grammar particle is Mori; leftover Secus is rejected.
-                    writer.write(" secus ");
+                    writer.write(" ");
+                    writer.write(surface.keyword(TokenKind::Mori));
+                    writer.write(" ");
                     self.write_expr(message, types, names, interner, surface, writer);
                 }
             }
