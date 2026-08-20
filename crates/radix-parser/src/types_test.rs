@@ -124,6 +124,50 @@ fn invalid_type_tensor_sugar_angle_form_carries_sugar_discriminator() {
 }
 
 #[test]
+fn parses_own_and_copy_type_position_markers() {
+    let result = parse_ok(
+        "fixum own lista<numerus> owned ← vacua\nfixum copy lista<numerus> copied ← vacua",
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(owned) = &program.statements[0].kind else {
+        panic!("expected owned binding");
+    };
+    let StmtKind::Var(copied) = &program.statements[1].kind else {
+        panic!("expected copied binding");
+    };
+    assert!(matches!(
+        owned.ty.as_ref().expect("type").mode,
+        Some(radix_syntax::TypeMode::Own)
+    ));
+    assert!(matches!(
+        copied.ty.as_ref().expect("type").mode,
+        Some(radix_syntax::TypeMode::Copy)
+    ));
+}
+
+#[test]
+fn parses_own_copy_markers_on_function_params() {
+    let result = parse_ok("functio f(own lista<numerus> xs, copy lista<numerus> ys) → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    assert!(matches!(
+        func.params[0].ty.mode,
+        Some(radix_syntax::TypeMode::Own)
+    ));
+    assert!(matches!(
+        func.params[1].ty.mode,
+        Some(radix_syntax::TypeMode::Copy)
+    ));
+}
+
+#[test]
+fn own_and_copy_remain_binding_names() {
+    let _ = parse_ok("incipit { fixum numerus own ← 1\n fixum numerus copy ← 2 }");
+}
+
+#[test]
 fn union_type_preserves_member_modes_when_flattening() {
     let result = parse_ok("typus MaybeBorrow = de textus ∪ nihil");
     let program = result.program.as_ref().expect("program");

@@ -1,0 +1,23 @@
++++
+term = "mutabilitas"
+kind = "concept"
+category = "type"
+summary = "MU-1 baseline: mutation through an unmarked param lands (D-8; summa-proof.fab out shape)."
+syntax = "fn poke(list<int> xs)"
+related = ["lista", "cuda"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — unmarked param mutation (D-8)
+# =============================================================================
+# CPU analog of corpus/cuda/summa-proof.fab:31 (`tf32[1] out` unmarked).
+
+fn poke(list<int> xs) → void {
+    xs.append(4)
+}
+
+main {
+    const list<int> a ← [1, 2, 3]
+    poke(a)
+    print a.length()
+}

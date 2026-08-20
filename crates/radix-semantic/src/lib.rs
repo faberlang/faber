@@ -185,12 +185,13 @@ pub use scope::{
 };
 use std::collections::BTreeMap;
 pub use types::{
-    collection_type_specs, is_atomic_element_type, is_intervallum_bound_type,
-    lookup_collection_type_spec, lookup_primitive_type_spec, lookup_tensor_family_type_spec,
-    primitive_type_specs, tensor_family_type_specs, CollectionKind, CollectionTypeSpec, FuncSig,
-    InferVar, MarkerFamily, ParamType, Primitive, PrimitiveTypeSpec, SchemaColumnDef, SchemaDef,
-    SemanticMutability, SemanticParamMode, TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId,
-    TypeParamConstraint, TypeTable, TypeTableSnapshot, ATOMIC_ELEMENT_MSG, INTERVALLUM_BOUND_MSG,
+    access_marker_from_type_mode, collection_type_specs, is_atomic_element_type,
+    is_intervallum_bound_type, lookup_collection_type_spec, lookup_primitive_type_spec,
+    lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs, AccessMarker,
+    CollectionKind, CollectionTypeSpec, FuncSig, InferVar, MarkerFamily, ParamType, Primitive,
+    PrimitiveTypeSpec, SchemaColumnDef, SchemaDef, SemanticMutability, SemanticParamMode,
+    TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId, TypeParamConstraint, TypeTable,
+    TypeTableSnapshot, ATOMIC_ELEMENT_MSG, INTERVALLUM_BOUND_MSG, ISSUE_SCALAR_ACCESS_MARKER,
 };
 pub use vector_width::{
     is_vector_width_shape, literal_vector_width, lower_vector_width_expr, VectorWidthError,

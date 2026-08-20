@@ -180,6 +180,8 @@ impl super::FaberCodegen {
                 let prefix = match mutability {
                     SemanticMutability::Immutable => surface.keyword(radix_lexer::TokenKind::De),
                     SemanticMutability::Mutable => surface.keyword(radix_lexer::TokenKind::In),
+                    SemanticMutability::Own => surface.keyword(radix_lexer::TokenKind::Own),
+                    SemanticMutability::Copy => surface.keyword(radix_lexer::TokenKind::Copy),
                 };
                 format!(
                     "{} {}",
@@ -413,6 +415,8 @@ mod tests {
                 TokenKind::Argumenta => "argumenta",
                 TokenKind::De => "de",
                 TokenKind::In => "in",
+                TokenKind::Own => "own",
+                TokenKind::Copy => "copy",
                 TokenKind::Functio => "functio",
                 TokenKind::Redde => "redde",
                 TokenKind::Sic => "sic",

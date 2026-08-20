@@ -672,7 +672,7 @@ impl<'a> Lowerer<'a> {
     }
 
     /// Record a recoverable lowering diagnostic at the current source span.
-    fn error(&mut self, issue: &'static str) {
+    pub(super) fn error(&mut self, issue: &'static str) {
         self.error_with_args(vec![DiagnosticArg::new("issue", issue)]);
     }
 

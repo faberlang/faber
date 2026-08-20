@@ -130,6 +130,8 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
             let prefix = match mutability {
                 SemanticMutability::Immutable => "de",
                 SemanticMutability::Mutable => "in",
+                SemanticMutability::Own => "own",
+                SemanticMutability::Copy => "copy",
             };
             format!(
                 "{} {}",

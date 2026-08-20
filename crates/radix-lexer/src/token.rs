@@ -214,6 +214,8 @@ pub enum TokenKind {
     De,
     Ex,
     In,
+    Own,
+    Copy,
     Lege,
     Lineam,
     Omnia,
@@ -435,6 +437,8 @@ impl TokenKind {
                 | De
                 | Ex
                 | In
+                | Own
+                | Copy
                 | Lege
                 | Lineam
                 | Omnia

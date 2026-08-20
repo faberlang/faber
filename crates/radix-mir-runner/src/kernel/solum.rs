@@ -244,12 +244,12 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
             remove_file(&path, span)?;
             Ok(Value::Unit)
         }
-        "copy" => {
+        "exscribe" => {
             let [origo, finis] = args else {
-                return Err(RunnerError::internal(span, "solum.copy provider arity"));
+                return Err(RunnerError::internal(span, "solum.exscribe provider arity"));
             };
-            let source = expect_str(origo, span, "solum.copy source")?;
-            let destination = expect_str(finis, span, "solum.copy destination")?;
+            let source = expect_str(origo, span, "solum.exscribe source")?;
+            let destination = expect_str(finis, span, "solum.exscribe destination")?;
             copy_file(&source, &destination, span)?;
             Ok(Value::Unit)
         }
@@ -471,7 +471,7 @@ fn remove_file(path: &str, span: Span) -> Result<(), RunnerError> {
 fn copy_file(source: &str, destination: &str, span: Span) -> Result<(), RunnerError> {
     fs::copy(source, destination)
         .map(|_| ())
-        .map_err(|err| RunnerError::internal(span, format!("solum.copy failed: {err}")))
+        .map_err(|err| RunnerError::internal(span, format!("solum.exscribe failed: {err}")))
 }
 
 fn rename_path(source: &str, destination: &str, span: Span) -> Result<(), RunnerError> {

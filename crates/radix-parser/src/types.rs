@@ -7,7 +7,7 @@
 //! later phases resolve.
 //!
 //! Faber type syntax is explicit and conservative. Ownership modes are prefix
-//! markers (`de`, `in`), arrays use `lista<T>`, function types use arrow
+//! markers (`de`, `in`, `own`, `copy`), arrays use `lista<T>`, function types use arrow
 //! syntax, and nullable value slots are expressed by unioning with `nihil`.
 //! Optional declaration slots are not type suffixes; they are parsed as
 //! post-name `sponte` markers by declaration parsers.
@@ -34,6 +34,8 @@ impl Parser {
     pub(super) fn try_parse_type(&mut self) -> Result<Option<TypeExpr>, ParseError> {
         if self.check_keyword_ident(TokenKind::De)
             || self.check_keyword_ident(TokenKind::In)
+            || self.check_keyword_ident(TokenKind::Own)
+            || self.check_keyword_ident(TokenKind::Copy)
             || self.check_keyword_ident(TokenKind::Iuncta)
             || self.check_keyword_ident(TokenKind::Modulus)
             || matches!(self.peek().kind, TokenKind::Underscore(_))
@@ -50,7 +52,7 @@ impl Parser {
     /// Parse a required type expression.
     ///
     /// GRAMMAR:
-    ///   type := [de|in] (func-type | named-type | union-type)
+    ///   type := [de|in|own|copy] (func-type | named-type | union-type)
     ///   func-type := ( type-list ) arrow type
     ///   named-type := ident [ < type-argument (, type-argument)* > ]
     ///   type-argument := type | NATURAL
@@ -63,11 +65,15 @@ impl Parser {
     pub(super) fn parse_type(&mut self) -> Result<TypeExpr, ParseError> {
         let start = self.current_span();
 
-        // Ownership mode: de/in (prefix). Nullable is no longer a prefix; use T ∪ nihil.
+        // Access marker: de/in/own/copy (prefix). Nullable is no longer a prefix; use T ∪ nihil.
         let mode = if self.eat_keyword_ident(TokenKind::De) {
             Some(TypeMode::De)
         } else if self.eat_keyword_ident(TokenKind::In) {
             Some(TypeMode::In)
+        } else if self.eat_keyword_ident(TokenKind::Own) {
+            Some(TypeMode::Own)
+        } else if self.eat_keyword_ident(TokenKind::Copy) {
+            Some(TypeMode::Copy)
         } else {
             None
         };

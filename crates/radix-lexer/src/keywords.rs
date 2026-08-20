@@ -943,6 +943,18 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         category: KeywordCategory::Misc,
     },
     KeywordSpec {
+        text: "own",
+        token_kind: Some(TokenKind::Own),
+        scope: KeywordScope::Contextual(PARAMETER_MODE),
+        category: KeywordCategory::Misc,
+    },
+    KeywordSpec {
+        text: "copy",
+        token_kind: Some(TokenKind::Copy),
+        scope: KeywordScope::Contextual(PARAMETER_MODE),
+        category: KeywordCategory::Misc,
+    },
+    KeywordSpec {
         text: "lege",
         token_kind: Some(TokenKind::Lege),
         scope: KeywordScope::Contextual(BUILTIN_CALL),

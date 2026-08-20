@@ -1,0 +1,19 @@
++++
+term = "mutabilitas"
+kind = "concept"
+category = "type"
+summary = "MU-1 baseline: containers alias on bind."
+syntax = "b ← a; b.append(4)"
+related = ["fixum", "lista"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — alias on bind (D-1)
+# =============================================================================
+
+main {
+    const list<int> a ← [1, 2, 3]
+    const list<int> b ← a
+    b.append(4)
+    print a.length()
+}

@@ -1141,11 +1141,13 @@ fn apply_type_target_wrappers(
     mut ty_id: TypeId,
 ) -> TypeId {
     if let Some(mode) = ty.mode {
-        let mutability = match mode {
-            radix_syntax::TypeMode::De => crate::SemanticMutability::Immutable,
-            radix_syntax::TypeMode::In => crate::SemanticMutability::Mutable,
-        };
-        ty_id = lowerer.types.reference(mutability, ty_id);
+        let marker = crate::access_marker_from_type_mode(mode);
+        if lowerer.types.is_scalar_for_access_marker(ty_id) {
+            lowerer.error(crate::ISSUE_SCALAR_ACCESS_MARKER);
+            ty_id = lowerer.types.intern(crate::Type::Error);
+        } else {
+            ty_id = lowerer.types.access_marker(marker, ty_id);
+        }
     }
     if ty.nullable {
         ty_id = lowerer.types.option(ty_id);
