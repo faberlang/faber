@@ -1,0 +1,19 @@
++++
+term = "mutabilitas"
+kind = "reject"
+category = "type"
+summary = "MU-3 red: branched shared RHS into own rejects with copy suggestion."
+syntax = "const own list<int> c ← if cond { a } else { b }"
+related = ["own", "copy"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — shared branch into own bind (MU-3)
+# =============================================================================
+# This exemplum intentionally fails to compile.
+
+main {
+    const list<int> a ← [1]
+    const list<int> b ← [2]
+    const own list<int> c ← true ? a : b
+}

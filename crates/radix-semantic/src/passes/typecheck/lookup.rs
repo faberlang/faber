@@ -38,6 +38,15 @@ impl TypeChecker<'_> {
             .push(SemanticError::structured(kind, span).with_arg("issue", issue));
     }
 
+    /// Reject an illegal own-bind RHS and attach the D-6 `copy` suggestion.
+    pub fn reject_own_bind(&mut self, issue: &'static str, span: radix_lexer::Span) {
+        self.errors.push(
+            SemanticError::structured(SemanticErrorKind::ModeMismatch, span)
+                .with_arg("issue", issue)
+                .with_arg("suggestion", crate::SUGGESTION_COPY),
+        );
+    }
+
     pub fn invalid_operand_types(&mut self, issue: &'static str, span: radix_lexer::Span) {
         self.error_issue(SemanticErrorKind::InvalidOperandTypes, issue, span);
     }

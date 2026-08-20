@@ -1,0 +1,18 @@
++++
+term = "mutabilitas"
+kind = "reject"
+category = "type"
+summary = "MU-3 red: index projection into own rejects with copy suggestion."
+syntax = "const own list<int> b ← xs[0]"
+related = ["own", "copy"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — index into own bind (MU-3)
+# =============================================================================
+# This exemplum intentionally fails to compile.
+
+main {
+    const list<list<int>> xs ← [[1], [2]]
+    const own list<int> b ← xs[0]
+}

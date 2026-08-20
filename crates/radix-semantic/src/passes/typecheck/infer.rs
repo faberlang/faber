@@ -266,8 +266,8 @@ impl TypeChecker<'_> {
 
     /// Unify assignment on carrier payloads, ignoring access-marker wrappers.
     ///
-    /// `ref`/`mut`/`own` are type facts, not a different payload shape. Mode
-    /// legality is enforced by the borrow pass.
+    /// `ref`/`mut`/`own` are type facts, not a different payload shape. Own-bind
+    /// legality (MU-3) is enforced in typecheck plus bind-site moves in borrow.
     pub fn unify_carrier_assign(
         &mut self,
         a: TypeId,

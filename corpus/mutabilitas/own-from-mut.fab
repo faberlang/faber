@@ -1,0 +1,18 @@
++++
+term = "mutabilitas"
+kind = "reject"
+category = "type"
+summary = "MU-3 red: mut source into own rejects with copy suggestion."
+syntax = "const own list<int> b ← mut_a"
+related = ["own", "mut", "copy"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — mut into own bind (MU-3)
+# =============================================================================
+# This exemplum intentionally fails to compile.
+
+main {
+    var mut list<int> a ← [1, 2, 3]
+    const own list<int> b ← a
+}

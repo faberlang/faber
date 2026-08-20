@@ -49,6 +49,13 @@ fn access_marker_facts_intern_as_ref_wrappers() {
     assert!(types.is_mut_or_own_view(exclusive));
     assert!(types.is_mut_or_own_view(own));
     assert!(!types.is_mut_or_own_view(shared));
+    assert!(types.is_own_view(own));
+    assert!(!types.is_own_view(copy));
+    assert!(!types.is_own_view(shared));
+    assert!(types.is_exclusive_value(own));
+    assert!(types.is_exclusive_value(copy));
+    assert!(!types.is_exclusive_value(shared));
+    assert!(!types.is_exclusive_value(exclusive));
     let (marker, payload) = types.peel_access_marker(shared);
     assert_eq!(marker, Some(AccessMarker::Ref));
     assert_eq!(payload, lista);

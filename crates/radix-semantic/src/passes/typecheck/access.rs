@@ -327,6 +327,83 @@ impl TypeChecker<'_> {
         self.types.access_marker(AccessMarker::Ref, field_ty)
     }
 
+    /// Own-bind RHS legality (MU-3 / D-6 exclusivity).
+    ///
+    /// Legal: transfer from `own`/`copy`, or a fresh value. Unmarked paths are
+    /// left to the borrow pass (provably-dead is legal; a later use rejects).
+    /// Every other shape rejects here with a `copy` suggestion.
+    pub(super) fn check_own_bind_rhs(&mut self, rhs: &HirExpression) {
+        match &rhs.kind {
+            HirExpressionKind::Literal(_)
+            | HirExpressionKind::Vacua
+            | HirExpressionKind::Array(_)
+            | HirExpressionKind::Struct(_, _)
+            | HirExpressionKind::Tuple(_, _)
+            | HirExpressionKind::Call(_, _, _)
+            | HirExpressionKind::MethodCall(_, _, _, _)
+            | HirExpressionKind::Gradient { .. }
+            | HirExpressionKind::Binary(_, _, _)
+            | HirExpressionKind::Unary(_, _)
+            | HirExpressionKind::Clausura(_, _, _, _)
+            | HirExpressionKind::Intervallum { .. }
+            | HirExpressionKind::Scriptum(_, _)
+            | HirExpressionKind::Conversio { .. }
+            | HirExpressionKind::Verte { .. }
+            | HirExpressionKind::ReadLine(_)
+            | HirExpressionKind::Ad { .. }
+            | HirExpressionKind::Praefixum(_)
+            | HirExpressionKind::TypeCheck { .. }
+            | HirExpressionKind::Error => {}
+            HirExpressionKind::Path(_) => match self.rhs_access_marker(rhs) {
+                Some(AccessMarker::Own | AccessMarker::Copy) | None => {}
+                Some(AccessMarker::Ref) => {
+                    self.reject_own_bind(crate::ISSUE_REF_INTO_OWN, rhs.span);
+                }
+                Some(AccessMarker::Mut) => {
+                    self.reject_own_bind(crate::ISSUE_MUT_INTO_OWN, rhs.span);
+                }
+            },
+            HirExpressionKind::Field(_, _) => {
+                self.reject_own_bind(crate::ISSUE_FIELD_INTO_OWN, rhs.span);
+            }
+            HirExpressionKind::Index(_, _) => {
+                self.reject_own_bind(crate::ISSUE_INDEX_INTO_OWN, rhs.span);
+            }
+            HirExpressionKind::Deref(_) => {
+                self.reject_own_bind(crate::ISSUE_DEREF_INTO_OWN, rhs.span);
+            }
+            HirExpressionKind::OptionalChain(_, _) | HirExpressionKind::NonNull(_, _) => {
+                self.reject_own_bind(crate::ISSUE_PROJECTION_INTO_OWN, rhs.span);
+            }
+            HirExpressionKind::Ref(_, _) => {
+                self.reject_own_bind(crate::ISSUE_REF_INTO_OWN, rhs.span);
+            }
+            HirExpressionKind::Block(block) => {
+                if let Some(expr) = &block.expr {
+                    self.check_own_bind_rhs(expr);
+                }
+            }
+            _ => self.reject_own_bind(crate::ISSUE_SHARED_INTO_OWN, rhs.span),
+        }
+    }
+
+    fn rhs_access_marker(&self, expr: &HirExpression) -> Option<AccessMarker> {
+        if let Some(ty) = expr.ty {
+            return self
+                .types
+                .peel_access_marker(self.resolve_inferred_type(ty))
+                .0;
+        }
+        match &expr.kind {
+            HirExpressionKind::Path(def_id) => self.lookup_binding(*def_id).and_then(|binding| {
+                self.types
+                    .peel_access_marker(self.resolve_inferred_type(binding.ty))
+                    .0
+            }),
+            _ => None,
+        }
+    }
+
     /// Whether `expr` is a declared `ref` root or a projection of one.
     pub(super) fn expr_is_ref_view(&self, expr: &HirExpression) -> bool {
         if let Some(ty) = expr.ty {
