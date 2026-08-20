@@ -7,10 +7,10 @@
 
 use super::{
     is_atomic_operator_method, is_mutating_receiver, lookup_method, lookup_method_for_type,
-    mir_atomic_op, mir_collection_op, mir_is_higher_order_lista, receivers_for_type,
-    IntrinsicReceiver, INTRINSICS,
+    lookup_method_for_type_id, mir_atomic_op, mir_collection_op, mir_is_higher_order_lista,
+    receivers_for_type, receivers_for_type_id, IntrinsicReceiver, INTRINSICS,
 };
-use radix_types::{MirAtomicOp, MirCollectionOp, Primitive, Type};
+use radix_types::{MirAtomicOp, MirCollectionOp, Primitive, SemanticMutability, Type};
 
 #[test]
 fn registry_rows_are_unique_per_receiver_name_and_arity() {
@@ -44,6 +44,22 @@ fn receivers_for_type_maps_semantic_families() {
         &[IntrinsicReceiver::Fractus, IntrinsicReceiver::Numeric]
     );
     assert!(receivers_for_type(&Type::Error).is_empty());
+}
+
+#[test]
+fn marked_receiver_dispatch_peels_access_marker() {
+    let mut types = radix_types::TypeTable::new();
+    let element = types.intern(Type::Primitive(Primitive::Numerus));
+    let lista = types.intern(Type::Array(element));
+    let marked = types.reference(SemanticMutability::Mutable, lista);
+
+    assert_eq!(
+        receivers_for_type_id(marked, &types),
+        &[IntrinsicReceiver::Lista]
+    );
+    let entry = lookup_method_for_type_id(marked, &types, "longitudo", 0)
+        .expect("marked lista receiver resolves read intrinsic");
+    assert_eq!(entry.receiver, IntrinsicReceiver::Lista);
 }
 
 #[test]

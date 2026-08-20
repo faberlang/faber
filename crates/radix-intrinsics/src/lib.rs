@@ -14,7 +14,7 @@ pub use registry::{
 };
 
 use radix_types::{MirAtomicOp, MirCollectionOp};
-use radix_types::{Primitive, Type};
+use radix_types::{Primitive, Type, TypeId, TypeTable};
 
 /// Lookup a promoted intrinsic by receiver family, Faber name, and arity.
 #[must_use]
@@ -66,6 +66,21 @@ pub fn receivers_for_type(ty: &Type) -> &'static [IntrinsicReceiver] {
     }
 }
 
+/// Map a receiver type ID to intrinsic families after peeling aliases and
+/// access markers. The plain [`receivers_for_type`] API accepts a fully
+/// resolved [`Type`] and therefore cannot inspect a `Type::Ref` payload ID.
+#[must_use]
+pub fn receivers_for_type_id(type_id: TypeId, types: &TypeTable) -> &'static [IntrinsicReceiver] {
+    let mut payload_id = type_id;
+    loop {
+        match types.get(payload_id) {
+            Type::Alias(_, inner) | Type::Ref(_, inner) => payload_id = *inner,
+            _ => break,
+        }
+    }
+    receivers_for_type(types.get(payload_id))
+}
+
 /// Resolve a promoted intrinsic from a semantic receiver type.
 #[must_use]
 pub fn lookup_method_for_type(
@@ -77,6 +92,27 @@ pub fn lookup_method_for_type(
         return None;
     }
     for family in receivers_for_type(receiver_ty) {
+        if let Some(entry) = lookup_method(*family, method, arg_count) {
+            return Some(entry);
+        }
+    }
+    None
+}
+
+/// Resolve a promoted intrinsic from a type-table receiver ID, peeling aliases
+/// and access markers before receiver-family lookup.
+#[must_use]
+pub fn lookup_method_for_type_id(
+    receiver_type: TypeId,
+    types: &TypeTable,
+    method: &str,
+    arg_count: usize,
+) -> Option<&'static MethodIntrinsic> {
+    let (_, payload_id) = types.peel_access_marker(receiver_type);
+    if matches!(types.get(payload_id), Type::ModularWord(_)) && !is_modular_word_method(method) {
+        return None;
+    }
+    for family in receivers_for_type_id(receiver_type, types) {
         if let Some(entry) = lookup_method(*family, method, arg_count) {
             return Some(entry);
         }

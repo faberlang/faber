@@ -142,6 +142,23 @@ incipit {
 }
 
 #[test]
+fn mut_view_into_own_param_rejects() {
+    assert_rejects_with_issue(
+        r"
+functio take(own lista<numerus> xs) → vacuum {
+    nota xs.longitudo()
+}
+incipit {
+    fixum lista<numerus> a ← [1, 2, 3]
+    varia in lista<numerus> b ← a
+    take(b)
+}
+",
+        ISSUE_MUT_INTO_OWN,
+    );
+}
+
+#[test]
 fn field_into_own_rejects_with_copy_suggestion() {
     assert_own_bind_rejects(
         r"
