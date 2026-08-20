@@ -1,6 +1,9 @@
 //! Focused proofs for target-neutral fresh-storage access facts.
 
-use super::{analyze_access_facts, AccessFact, AccessFactTable};
+use super::{
+    analyze_access_facts, analyze_access_facts_with_types, AccessFact, AccessFactTable,
+    DeadSourceReason,
+};
 use crate::test_support::analyze_ok;
 use crate::{AnalyzedApplication, AnalyzedApplicationParts, PassConfig};
 use radix_hir::{
@@ -26,6 +29,27 @@ fn local_rows(source: &str) -> (radix_hir::HirModule, Vec<HirLocal>) {
         })
         .collect();
     (hir, locals)
+}
+
+fn typed_local_rows(source: &str) -> (radix_hir::HirModule, crate::TypeTable, Vec<HirLocal>) {
+    let fixture = analyze_ok(source);
+    let hir = fixture
+        .result
+        .hir
+        .expect("successful analysis should produce HIR");
+    let types = fixture.result.types;
+    let locals = hir
+        .entry
+        .as_ref()
+        .expect("fixture should have an entry")
+        .statements
+        .iter()
+        .filter_map(|statement| match &statement.kind {
+            HirStatementKind::Local(local) => Some(local.clone()),
+            _ => None,
+        })
+        .collect();
+    (hir, types, locals)
 }
 
 #[test]
@@ -74,6 +98,113 @@ incipit {
         facts.expression(locals[2].init.as_ref().expect("call initializer").id),
         AccessFact::Unknown
     );
+}
+
+#[test]
+fn own_transfer_records_dead_source_identity_and_spans() {
+    let (hir, types, locals) = typed_local_rows(
+        r#"
+incipit {
+    fixum own lista<numerus> source ← [1, 2, 3]
+    fixum own lista<numerus> destination ← source
+}
+"#,
+    );
+    let source = &locals[0];
+    let destination = &locals[1];
+    let transfer = destination.init.as_ref().expect("own transfer initializer");
+    let facts = analyze_access_facts_with_types(&hir, &types);
+
+    let dead = facts
+        .dead_sources_of(source.def_id)
+        .find(|fact| fact.reason == DeadSourceReason::OwnTransfer)
+        .expect("own transfer should produce a dead-source fact");
+    assert_eq!(dead.site, Some(transfer.id));
+    assert_eq!(dead.source, source.def_id);
+    assert_eq!(
+        dead.source_span,
+        source.init.as_ref().expect("source initializer").span
+    );
+    assert_eq!(dead.site_span, transfer.span);
+}
+
+#[test]
+fn provably_dead_unmarked_source_records_transfer_death() {
+    let (hir, types, locals) = typed_local_rows(
+        r#"
+incipit {
+    fixum lista<numerus> source ← [1, 2, 3]
+    fixum own lista<numerus> destination ← source
+}
+"#,
+    );
+    let source = &locals[0];
+    let facts = analyze_access_facts_with_types(&hir, &types);
+
+    assert!(facts
+        .dead_sources_of(source.def_id)
+        .any(|fact| fact.reason == DeadSourceReason::OwnTransfer));
+}
+
+#[test]
+fn explicit_copy_keeps_the_exclusive_source_live() {
+    let (hir, types, locals) = typed_local_rows(
+        r#"
+incipit {
+    fixum own lista<numerus> source ← [1, 2, 3]
+    fixum copy lista<numerus> copied ← source
+    nota source.longitudo()
+}
+"#,
+    );
+    let source = &locals[0];
+    let facts = analyze_access_facts_with_types(&hir, &types);
+
+    assert!(facts
+        .dead_sources_of(source.def_id)
+        .all(|fact| { fact.reason != DeadSourceReason::OwnTransfer }));
+}
+
+#[test]
+fn scope_exit_records_an_unused_exclusive_source() {
+    let (hir, types, locals) = typed_local_rows(
+        r#"
+incipit {
+    fixum own lista<numerus> scoped ← [1, 2, 3]
+}
+"#,
+    );
+    let source = &locals[0];
+    let facts = analyze_access_facts_with_types(&hir, &types);
+
+    let dead = facts
+        .dead_sources_of(source.def_id)
+        .find(|fact| fact.reason == DeadSourceReason::ScopeEnd)
+        .expect("scope end should produce a dead-source fact");
+    assert!(dead.site.is_none());
+    assert!(dead.site_span.end >= dead.site_span.start);
+}
+
+#[test]
+fn unknown_branch_does_not_widen_path_local_death() {
+    let (hir, types, locals) = typed_local_rows(
+        r#"
+functio incertum() → bivalens {
+    redde verum
+}
+incipit {
+    fixum own lista<numerus> source ← [1, 2, 3]
+    si incertum() {
+        fixum own lista<numerus> destination ← source
+    }
+}
+"#,
+    );
+    let source = &locals[0];
+    let facts = analyze_access_facts_with_types(&hir, &types);
+
+    assert_eq!(facts.dead_source_count(), 0);
+    assert!(facts.dead_sources_of(source.def_id).next().is_none());
 }
 
 #[test]
