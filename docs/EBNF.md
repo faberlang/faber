@@ -118,7 +118,7 @@ paramList    := (parameter (',' parameter)*)?
 genericParams := '<' genericParam (',' genericParam)* '>'
 genericParam  := IDENTIFIER | 'magnitudo' IDENTIFIER
 callTypeArgs  := '<' typeAnnotation (',' typeAnnotation)* '>'
-parameter    := ('de' | 'in' | 'ex')? 'ceteri'? typeAnnotation IDENTIFIER 'sponte'? ('ut' IDENTIFIER)? ('vel' expression)?
+parameter    := 'ceteri'? typeAnnotation IDENTIFIER 'sponte'? ('ut' IDENTIFIER)? ('vel' expression)?
 funcModifier := 'argumenta' IDENTIFIER | 'curata' IDENTIFIER ('ut' IDENTIFIER)? | 'errata' IDENTIFIER | 'exitus' (IDENTIFIER | NUMBER) | 'immutata' | 'iacit' | 'optiones' IDENTIFIER
 callablePosture := 'fiet' | 'fiunt' | 'fient'
 returnClause := '→' typeAnnotation
@@ -136,7 +136,7 @@ clausuraParam  := typeAnnotation IDENTIFIER
 
 - Return syntax: `→` declares the normal success type. A bodyful function with no `→` is effect-only (`vacuum`) and must not contain `redde`. A statement-bodied closure (`fac { ... }` or legacy block body) must also spell `→ T` before it can use `redde`; expression-bodied closures may infer their result from the expression.
 - Recoverable alternate-exit syntax: `⇥` declares the error-channel type. It can appear after `→ T` or alone on an effect-only failable function or closure. A closure body that uses an escaping `iace` must declare its own `⇥ E`; it cannot inherit the enclosing function's error channel. A local `fac { ... } cape err { ... }` may catch `iace` without an enclosing `⇥`. A failable function call (`→ T ⇥ E`) inside a `⇥`-declaring function propagates to the function's alternate exit without a `fac`/`cape` wrapper, mirroring how bare `↦` conversio and `iace` throws already behave; the call lowers to Rust `?`. A closure must still declare its own `⇥` to propagate a failable call — the enclosing function's error channel does not cross the closure boundary.
-- Parameter prefixes: `de` (read), `in` (mutate), `ex` (consume)
+- Parameter access markers live in the type position: `de`/`ref` (read), `in`/`mut` (mutate), `own` (consume), and `copy` (duplicate then own). The retired parameter-prefix slot is not part of the grammar; `ex`/`from` remains the import/iteration/extraction token identity.
 - Post-name marker: `sponte` (voluntary/optional provision)
 - `ceteri` marks rest parameter
 - `curata NAME ('ut' LOCAL)?` declares an allocator requirement; `LOCAL` is the function-body alias.
@@ -342,7 +342,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 
 ```ebnf
 typeAnnotation := ownedType ('∪' ownedType)*
-ownedType      := ('de' | 'in')? baseType
+ownedType      := ('de' | 'in' | 'own' | 'copy')? baseType
 baseType       := holeType | functionType | widthTypeSugar | qualifiedType typeArguments? | '(' typeAnnotation ')'
 holeType       := '_' | '∪'
 qualifiedType  := IDENTIFIER ('.' IDENTIFIER)*
