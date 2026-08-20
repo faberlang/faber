@@ -128,7 +128,10 @@ pub fn all_diagnostic_specs() -> Vec<DiagnosticSpec> {
 
 use crate::file_interface::{FileExportKind, FileInterface};
 use crate::locale::{LocalePack, TypeBindingKind};
-pub use access_facts::{analyze_access_facts, AccessFact, AccessFactTable};
+pub use access_facts::{
+    analyze_access_facts, analyze_access_facts_with_types, AccessFact, AccessFactTable,
+    DeadSourceFact, DeadSourceReason,
+};
 pub use analyzed_application::{
     qualify_for_target, AnalysisStamp, AnalyzedApplication, AnalyzedApplicationDriverFields,
     AnalyzedApplicationError, AnalyzedApplicationParts, QualificationStatus, TargetQualification,
