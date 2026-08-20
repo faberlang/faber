@@ -255,7 +255,7 @@ fn loader_fail_closed() {
     // A 0x01 prefix is the schema-v1 rejection path (UnsupportedSchemaVersion),
     // not Malformed — the version prefix is read before payload interpretation.
     let garbage: Vec<u8> = {
-        let mut v = vec![SCHEMA_VERSION as u8]; // schema_version = current (accepted) version
+        let mut v = vec![radix_hir_fhir::SCHEMA_VERSION as u8]; // schema_version = current (accepted) version
         v.extend(std::iter::repeat_n(0xFFu8, 256));
         v
     };
@@ -633,7 +633,7 @@ fn adversarial_version_mismatch() {
     match result {
         Err(HirArtifactError::UnsupportedSchemaVersion { found, expected }) => {
             assert_eq!(found, 99);
-            assert_eq!(expected, SCHEMA_VERSION);
+            assert_eq!(expected, radix_hir_fhir::SCHEMA_VERSION);
         }
         Err(other) => panic!("expected UnsupportedSchemaVersion, got {other:?}"),
         Ok(_) => panic!("expected UnsupportedSchemaVersion, got Ok"),
