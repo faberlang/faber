@@ -563,6 +563,12 @@ impl TypeTable {
         matches!(self.peel_access_marker(ty).0, Some(AccessMarker::Own))
     }
 
+    /// Whether `ty` is a declared duplicate-then-own acquisition (`copy`).
+    #[must_use]
+    pub fn is_copy_view(&self, ty: TypeId) -> bool {
+        matches!(self.peel_access_marker(ty).0, Some(AccessMarker::Copy))
+    }
+
     /// Whether `ty` is an exclusive value that transfers on own-bind.
     ///
     /// `copy` elaborates to `own` (D-6), so a copy binding is a transferable
