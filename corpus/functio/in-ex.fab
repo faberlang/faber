@@ -39,8 +39,8 @@ locale = "en"
 #   salve
 #
 # BACKEND: Rust emission propagates the scalar mutable borrow as `&mut i64`.
-# The MIR runner still drops that scalar borrow during execution; the gap is
-# recorded in the mutability-engine ledger and is a non-blocking residual.
+# The MIR runner preserves that scalar borrow during execution and writes the
+# updated value back to the caller; MU-5b-R1 closed the former gap.
 
 # --- Shared borrow: read label without taking ownership ---
 
