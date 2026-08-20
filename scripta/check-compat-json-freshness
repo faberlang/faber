@@ -25,9 +25,16 @@ if [[ -z "${CONVERSIO_MATRIX_FIXTURES:-}" ]] && [[ ! -d "../examples/conversio-m
 fi
 
 tmp="$(mktemp -d -t compat-json-freshness.XXXXXX)"
-trap 'rm -rf "$tmp"' EXIT
+emit_log="$(mktemp -t compat-json-freshness-emit.XXXXXX)"
+trap 'rm -rf "$tmp" "$emit_log"' EXIT
 
-COMPAT_OUT="$tmp" ./scripta/emit-compat-json.py >/dev/null 2>&1
+# emit-compat-json.py is noisy on success (cargo --nocapture). Keep success
+# quiet; dump the captured tail if regen fails so stage 4a is fail-loud.
+if ! COMPAT_OUT="$tmp" ./scripta/emit-compat-json.py >"$emit_log" 2>&1; then
+  echo "error: ./scripta/emit-compat-json.py failed" >&2
+  tail -n 80 "$emit_log" >&2 || true
+  exit 1
+fi
 
 if ! diff -rq -x README.md corpus/measurement "$tmp" >/dev/null; then
   echo "error: corpus/measurement JSON is stale; regenerate with:" >&2
