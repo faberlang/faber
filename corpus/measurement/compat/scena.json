@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 245,
-    "analyzable": 288
+    "capable": 242,
+    "analyzable": 285
   },
   "terms": [
     {
@@ -420,8 +420,8 @@
     {
       "term": "functio",
       "rule": "keyword",
-      "capable": 7,
-      "analyzable": 7
+      "capable": 6,
+      "analyzable": 6
     },
     {
       "term": "futura",
@@ -504,8 +504,8 @@
     {
       "term": "in",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 0,
+      "analyzable": 0
     },
     {
       "term": "incipiet",
@@ -714,8 +714,8 @@
     {
       "term": "octeti",
       "rule": "keyword",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "implendum",

@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 6,
-    "analyzable": 288
+    "analyzable": 285
   },
   "terms": [
     {
@@ -421,7 +421,7 @@
       "term": "functio",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 7
+      "analyzable": 6
     },
     {
       "term": "futura",
@@ -505,7 +505,7 @@
       "term": "in",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 0
     },
     {
       "term": "incipiet",
@@ -715,7 +715,7 @@
       "term": "octeti",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 2
+      "analyzable": 1
     },
     {
       "term": "implendum",
