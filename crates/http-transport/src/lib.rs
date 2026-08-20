@@ -222,12 +222,6 @@ impl ConnectionTasks {
     fn reap_completed(&mut self) {
         while self.set.try_join_next().is_some() {}
     }
-
-    #[cfg(test)]
-    fn len(&mut self) -> usize {
-        self.reap_completed();
-        self.set.len()
-    }
 }
 
 impl HttpTransport {
@@ -298,14 +292,6 @@ impl HttpTransport {
 
     pub fn is_cancelled(&self) -> bool {
         self.cancel.load(Ordering::SeqCst)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn tracked_connections(&self) -> usize {
-        self.connections
-            .lock()
-            .map(|mut tasks| tasks.len())
-            .unwrap_or(0)
     }
 
     /// Signal accept loop to stop; in-flight handlers observe cancel mid-body when timed.
