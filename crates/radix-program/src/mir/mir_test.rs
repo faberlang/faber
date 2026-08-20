@@ -224,12 +224,18 @@ fn package_mir_link_rejects_distinct_defs_on_one_source() {
     .expect_err("distinct declarations must not share a source");
 
     assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].code, Some("PKG001"));
+    assert_eq!(
+        diagnostics[0].issue(),
+        Some("package_mir_duplicate_function_source")
+    );
     assert!(
         diagnostics[0]
-            .message
-            .contains("duplicate function source def#2000000143"),
-        "collision diagnostic must name the shared source: {}",
-        diagnostics[0].message
+            .args
+            .iter()
+            .any(|arg| arg.name == "def_id" && arg.value == "2000000143"),
+        "collision diagnostic must name the shared source def, got {:?}",
+        diagnostics[0].args
     );
 }
 
