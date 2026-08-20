@@ -11,10 +11,11 @@ use super::{
 use crate::diagnostics::DiagnosticConvert;
 use crate::diagnostics::{Diagnostic, DiagnosticArg};
 use crate::file_interface::{InterfaceLibraryIdentity, InterfaceMemberKind};
-use crate::lexer::{LexError, LexErrorKind, LocaleSuggestion, Span, TokenKind};
+use crate::lexer::{lex_with_locale_pack, LexError, LexErrorKind, LocaleSuggestion, Span, TokenKind};
 use crate::locale::TypeBindingKind;
-use crate::parser::{ParseError, ParseErrorKind};
+use crate::parser::{parse, ParseError, ParseErrorKind};
 use crate::semantic::{CollectionKind, Primitive, SemanticError, SemanticErrorKind, TensorFamilyKind};
+use crate::syntax::{BindingPattern, ExprKind, StmtKind};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
@@ -1278,10 +1279,10 @@ fn llm_pack_resolves_morphology_keyword_latin_keys() {
 }
 
 #[test]
-fn en_pack_empty_marker_accepts_vacua_transition_alias() {
-    // Goal en-pack-surface-fidelity V-1: the en marker surface is `empty`;
-    // `vacua` remains an accepted spelling until V-5 removes the alias.
-    // The intrinsic row `vacua = "is_empty"` is a separate concept.
+fn en_pack_empty_marker_rejects_vacua_alias() {
+    // Goal en-pack-surface-fidelity V-5: en accepts only `empty` as the
+    // empty-collection marker. The intrinsic row `vacua = "is_empty"` is a
+    // separate concept and stays.
     let pack = installed_pack("en");
     assert!(
         validate_locale_pack(&pack).is_empty(),
@@ -1291,14 +1292,13 @@ fn en_pack_empty_marker_accepts_vacua_transition_alias() {
     assert_eq!(pack.keyword_latin_key("empty"), Some("vacua"));
     assert_eq!(
         pack.keyword_latin_key("vacua"),
-        Some("vacua"),
-        "transition alias: en must still accept the Latin marker spelling"
+        None,
+        "en must not accept the Latin marker spelling after alias removal"
     );
     assert_eq!(pack.contextual_keyword_surface("vacua"), "empty");
-    assert_eq!(
-        pack.contextual_keyword_aliases("vacua"),
-        ["vacua"],
-        "en transition alias is the capture-avoidance escape hatch"
+    assert!(
+        pack.contextual_keyword_aliases("vacua").is_empty(),
+        "en marker row has no transition alias"
     );
     assert_eq!(pack.intrinsic_surface("vacua"), Some("is_empty"));
 
@@ -1307,7 +1307,56 @@ fn en_pack_empty_marker_accepts_vacua_transition_alias() {
     assert_eq!(la.keyword_latin_key("empty"), None, "la must not treat `empty` as the marker");
     assert!(
         la.contextual_keyword_aliases("vacua").is_empty(),
-        "la identity row has no marker alias; a local named vacua has no emit escape hatch"
+        "la identity row has no marker alias"
+    );
+}
+
+#[test]
+fn en_empty_named_binding_rhs_claims_as_marker() {
+    // Parse pin: `var list<int> empty ← empty` — the binding is legal; the
+    // RHS spelling claims as the marker. The name is unreferenceable in
+    // expression position (null-like shadowing).
+    let pack = installed_pack("en");
+    let result = parse(lex_with_locale_pack("var list<int> empty ← empty", &pack));
+    assert!(
+        result.success(),
+        "en empty-named binding with marker RHS must parse: {:?}",
+        result.errors
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration, got {:?}", program.statements[0].kind);
+    };
+    let BindingPattern::Ident(name) = &var.binding else {
+        panic!("expected identifier binding, got {:?}", var.binding);
+    };
+    assert_eq!(result.interner.resolve(name.name), "empty", "binding name `empty` is legal");
+    let init = var.init.as_deref().expect("initializer");
+    assert!(
+        matches!(init.kind, ExprKind::Vacua(_)),
+        "RHS `empty` must claim as the marker, got {:?}",
+        init.kind
+    );
+}
+
+#[test]
+fn en_vacua_spelling_does_not_claim_marker() {
+    let pack = installed_pack("en");
+    let result = parse(lex_with_locale_pack("var list<int> xs ← vacua", &pack));
+    assert!(
+        result.success(),
+        "en `vacua` must parse as an ordinary identifier: {:?}",
+        result.errors
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let init = var.init.as_deref().expect("initializer");
+    assert!(
+        matches!(init.kind, ExprKind::Ident(_)),
+        "en `vacua` must not claim the empty-collection marker, got {:?}",
+        init.kind
     );
 }
 

@@ -25,15 +25,6 @@ pub trait KeywordSurface {
         latin_key
     }
 
-    /// Pack alias at `index` for a contextual keyword identity.
-    ///
-    /// Used when the canonical surface would capture a collected binding
-    /// (`empty` vs a local named `empty`): emit an uncaptured alias instead.
-    /// Default: no aliases.
-    fn contextual_keyword_alias(&self, _latin_key: &'static str, _index: usize) -> Option<&str> {
-        None
-    }
-
     /// Whether template application (`"template"(args)`) is emitted as the
     /// postfix sugar rather than the expanded named `scriptum("template", …)`
     /// call. Canonical emission expands (default); reader-locale emission

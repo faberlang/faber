@@ -49,7 +49,7 @@ main {
     ]
     const list<int> shape ← [2, 3]
 
-    const tf32[] seed ← vacua
+    const tf32[] seed ← empty
     var tf32[2, 3] grid ← seed.from_flat(flat, shape)
     const list<int> dims ← grid.shape()
 

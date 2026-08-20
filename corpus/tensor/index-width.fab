@@ -47,7 +47,7 @@ locale = "en"
 #   index-width.fab stdout contract (u32 thread-id index, rank-2 u32 origin).
 
 main {
-    const tf32[] seed ← vacua
+    const tf32[] seed ← empty
     var tf32[4] input ← seed.create(0.0, [4])
 
     # u32 thread id flowing directly into accipe — no bare-numerus detour.

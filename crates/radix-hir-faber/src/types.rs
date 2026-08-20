@@ -620,13 +620,6 @@ mod tests {
             }
         }
 
-        fn contextual_keyword_alias(&self, latin_key: &'static str, index: usize) -> Option<&str> {
-            match (latin_key, index) {
-                ("vacua", 0) => Some("VACUA_ALIAS"),
-                _ => None,
-            }
-        }
-
         fn type_surface(&self, kind: TypeBindingKind) -> &str {
             match kind {
                 TypeBindingKind::TensorFamily(TensorFamilyKind::Tensor) => "TENSOR_MARKER",
@@ -764,9 +757,10 @@ mod tests {
     }
 
     #[test]
-    fn vacua_emit_uses_alias_when_surface_spelling_is_bound() {
-        // A collected binding that shares the marker surface must not capture
-        // the re-emitted marker: emit the pack alias instead.
+    fn vacua_emit_uses_canonical_when_surface_spelling_is_bound() {
+        // A collected binding that shares the marker surface does not divert
+        // emission: the marker always prints the canonical surface. Re-parse
+        // re-claims the spelling as the marker (null-like shadowing).
         let mut interner = Interner::new();
         let bound = interner.intern("VACUA_MARKER");
         let hir = HirModule {
@@ -809,13 +803,13 @@ mod tests {
         )
         .expect("shadowed vacua program must emit");
         assert!(
-            out.code.contains("VACUA_ALIAS"),
-            "Vacua emit must use the uncaptured alias when the surface is bound, got:\n{}",
+            out.code.contains("← VACUA_MARKER"),
+            "Vacua emit must stay canonical when a same-spelled binding exists, got:\n{}",
             out.code
         );
         assert!(
-            !out.code.contains("← VACUA_MARKER"),
-            "Vacua emit must not print the captured surface as the initializer, got:\n{}",
+            !out.code.contains("VACUA_ALIAS"),
+            "Vacua emit must not fall back to a pack alias, got:\n{}",
             out.code
         );
     }

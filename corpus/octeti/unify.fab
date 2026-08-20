@@ -48,7 +48,7 @@ fn appendByte(mut bytes buf, int<u8> b) → bytes {
 
 fn fromBytes() → bytes {
     # WHY: lista<numerus<u8>> assigns into octeti bidirectionally.
-    var list<int<u8>> bytes ← vacua
+    var list<int<u8>> bytes ← empty
     bytes.append(0xde ∷ int<u8>)
     bytes.append(0xad ∷ int<u8>)
     const bytes asBytes ← bytes

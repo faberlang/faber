@@ -43,7 +43,7 @@ locale = "en"
 # whitelist: tabula/methodi-accessus.fab).
 
 main {
-    var map<string, int> puncta ← vacua
+    var map<string, int> puncta ← empty
     puncta.put("aelia", 95)
     puncta.put("balbus", 87)
 

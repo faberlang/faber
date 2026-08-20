@@ -93,7 +93,7 @@ fn f32le(bytes buf, int off) → f32 {
 }
 
 fn decodeFlat(bytes buf, int off, int count) → list<f32> {
-    var list<f32> out ← vacua
+    var list<f32> out ← empty
     var int i ← 0
     while i < count {
         out.append(f32le(buf, off + i * 4))

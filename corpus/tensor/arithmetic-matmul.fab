@@ -48,7 +48,7 @@ locale = "en"
 main {
     const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
     const list<f32> flat_b ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
-    const tf32[] seed ← vacua
+    const tf32[] seed ← empty
     var tf32[2, 3] a ← seed.from_flat(flat_a, [2, 3])
     var tf32[3, 4] b ← seed.from_flat(flat_b, [3, 4])
     var tf32[2, 4] c ← a.matmul(b)

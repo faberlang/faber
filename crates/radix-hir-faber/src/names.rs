@@ -10,7 +10,6 @@
 //! `def_N` fallback is deliberately synthetic so degraded backend output is
 //! visible instead of silently borrowing an unrelated spelling.
 
-use crate::surface::KeywordSurface;
 use radix_hir::visit::HirVisitor;
 use radix_hir::{DefId, HirModule};
 use radix_lexer::{Interner, Symbol};
@@ -61,42 +60,6 @@ impl super::FaberCodegen {
     /// Convert an interned symbol back into its source spelling.
     pub(super) fn symbol_to_string(&self, sym: Symbol, interner: &Interner) -> String {
         interner.resolve(sym).to_owned()
-    }
-
-    /// Contextual-keyword spelling that a collected binding does not capture.
-    ///
-    /// Mirrors imported/companion DefId spellings: those maps keep emitted
-    /// names from falling back to a synthetic spelling a local could steal.
-    /// For identifier-like markers (`vacua` → en `empty`), the collected
-    /// name table is the occupancy set; if the canonical surface matches a
-    /// binding, emit the first uncaptured pack alias.
-    pub(super) fn uncaptured_contextual_keyword<'a>(
-        &self,
-        latin_key: &'static str,
-        names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
-        surface: &'a impl KeywordSurface,
-    ) -> &'a str {
-        let canonical = surface.contextual_keyword(latin_key);
-        if !Self::collected_spelling_is_bound(canonical, names, interner) {
-            return canonical;
-        }
-        let mut index = 0;
-        while let Some(alias) = surface.contextual_keyword_alias(latin_key, index) {
-            if !Self::collected_spelling_is_bound(alias, names, interner) {
-                return alias;
-            }
-            index += 1;
-        }
-        canonical
-    }
-
-    fn collected_spelling_is_bound(
-        spelling: &str,
-        names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
-    ) -> bool {
-        names.values().any(|sym| interner.resolve(*sym) == spelling)
     }
 
     /// Collect `DefId` -> Symbol mappings for all definitions in the program.

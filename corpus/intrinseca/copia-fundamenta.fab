@@ -39,7 +39,7 @@ locale = "en"
 # BACKEND: Go e2e whitelist — copia method surface not yet lowered for Go.
 
 main {
-    var set<int> numeri ← vacua
+    var set<int> numeri ← empty
 
     numeri.add(1)
     numeri.add(2)

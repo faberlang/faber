@@ -42,7 +42,7 @@ fn identity(tensor<float<f32>, []> value) → tensor<float<f32>, []> {
 }
 
 main {
-    const tensor<float<f32>, []> empty ← vacua
+    const tensor<float<f32>, []> empty ← empty
     const tensor<float<f32>, []> roundtrip ← identity(empty)
 
     print roundtrip.length()

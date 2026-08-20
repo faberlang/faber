@@ -40,7 +40,7 @@ locale = "en"
 #   Scalar longitudo() and indexed accipe only (lista.expected).
 
 main {
-    const list<int> vacuares ← vacua
+    const list<int> vacuares ← empty
     const _ numeri ← [1, 2, 3, 4, 5]
     const _ nomina ← ["Marcus", "Julia", "Gaius"]
     const _ vexilla ← [true, false, true]

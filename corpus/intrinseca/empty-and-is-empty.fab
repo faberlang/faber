@@ -17,8 +17,8 @@ locale = "en"
 #   • The collection intrinsic is `is_empty` — a separate concept.
 #
 # Pin: both spellings in one file so the concepts cannot cross-contaminate.
-# Transition alias: `vacua` remains accepted on en until V-5; that spelling
-# is pinned by corpus/intrinseca/vacua-ascribere.fab.
+# en rejects `vacua` as the marker (V-5); null-like shadowing of a binding
+# named `empty` is pinned by corpus/intrinseca/vacua-ascribere.fab.
 #
 # EXPECTED OUTPUT:
 #   Smoke asserts exit 0 only.

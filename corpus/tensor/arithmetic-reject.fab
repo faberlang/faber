@@ -37,13 +37,13 @@ locale = "en"
 # per-backend EXPECTED_FAILURES lists.
 
 main {
-    const tensor<string, [2]> words_a ← vacua
-    const tensor<string, [2]> words_b ← vacua
+    const tensor<string, [2]> words_a ← empty
+    const tensor<string, [2]> words_b ← empty
     const tensor<string, [2]> words_sum ← words_a.added(words_b)
     print words_sum.length()
 
-    const tensor<int<i32>, [2]> i32_a ← vacua
-    const tensor<int<i64>, [2]> i64_b ← vacua
+    const tensor<int<i32>, [2]> i32_a ← empty
+    const tensor<int<i64>, [2]> i64_b ← empty
     const tensor<int<i32>, [2]> mixed ← i32_a.added(i64_b)
     print mixed.length()
 }

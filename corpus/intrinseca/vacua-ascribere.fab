@@ -3,41 +3,32 @@ term = "vacua"
 kind = "concept"
 category = "collection"
 canonical = false
-summary = "Typed empty collection construction with vacua."
-syntax = "varia <collection-type> <name> ← vacua"
+summary = "Empty-collection marker with an empty-named binding (null-like shadowing)."
+syntax = "var list<int> empty ← empty"
 related = ["vacua", "lista", "tabula", "copia"]
 locale = "en"
 +++
 # =============================================================================
-# vacua — Typed empty collection construction with vacua
+# empty — typed empty collections, plus an empty-named binding
 # =============================================================================
 #
 # What this teaches:
-#   • Typed empty collection construction with vacua.
-#   • Related keywords: vacua, lista, tabula, copia
+#   • Typed empty collection construction with the en marker `empty`.
+#   • A binding named `empty` is legal; RHS `empty` claims as the marker.
+#   • The name is unreferenceable in expression position (null-like shadowing).
 #
 # Common mistakes:
-#   • Using `vacua` without an explicit declared type — the compiler cannot infer the collection type from `vacua` alone; always annotate the type (SEM014).
+#   • Using `vacua` under en — the Latin spelling is rejected after V-5.
+#   • Using `empty` without an explicit declared type — the compiler cannot infer the collection type from `empty` alone; always annotate the type (SEM014).
 #
-# See also: vacua, lista, tabula, copia
+# See also: empty, list, map, set
 # =============================================================================
-
-# vacua — typed empty collection construction (forma innata)
-#
-# Compiler-owned vacua initializer for tabula, lista, and copia types.
 #
 # GRAMMAR:
-#   varia tabula<K,V> t ← vacua
-#   varia lista<T> res ← vacua
-#   varia copia<T> visi ← vacua
-#   fixum lista<T> xs ← […] ∷ lista<T>   (ascription when type is not inferable)
-#
-# vacua reads the declared collection type and emits the target-native empty
-# container — no literal syntax required. ∷ ascription is for expressions that
-# already exist but need an explicit collection type.
-#
-# intrinseca/ exempla document compiler-owned type surfaces (methodi, vacua),
-# distinct from lista/ and tabula/ construct smoke tests.
+#   var map<K,V> t ← empty
+#   var list<T> res ← empty
+#   var set<T> visi ← empty
+#   var list<int> empty ← empty   (binding legal; RHS is the marker)
 #
 # EXPECTED OUTPUT:
 #   Smoke asserts exit 0 only.
@@ -45,15 +36,15 @@ locale = "en"
 # BACKEND: Go e2e whitelist — collection method surface not yet lowered for Go.
 
 main {
-    var map<string, int> map ← vacua
+    var map<string, int> map ← empty
     map["primus"] ← 42
     map["secundus"] ← 99
 
-    var list<string> res ← vacua
+    var list<string> res ← empty
     res.append("alpha")
     res.append("beta")
 
-    var set<int> visi ← vacua
+    var set<int> visi ← empty
     visi.add(1)
     visi.add(2)
 
@@ -63,4 +54,7 @@ main {
 
     print map["primus"], res.length(), visi.has(2)
     print puncta["aelia"], numeri.first(), claves.last()
+
+    # Shadowing pin last so earlier `empty` inits stay the marker.
+    var list<int> empty ← empty
 }

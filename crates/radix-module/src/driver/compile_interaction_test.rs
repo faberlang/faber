@@ -81,9 +81,9 @@ fn compile_en_empty_marker_and_is_empty_intrinsic() {
 }
 
 #[test]
-fn compile_en_vacua_marker_transition_alias() {
-    // Transition window (goal en-pack-surface-fidelity): `vacua` stays an
-    // accepted en marker spelling until V-5 removes the alias.
+fn compile_en_vacua_marker_rejected() {
+    // V-5: en rejects the Latin marker spelling; `vacua` is an ordinary
+    // identifier and fails as unknown.
     let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
     let config = Config::default()
@@ -93,8 +93,16 @@ fn compile_en_vacua_marker_transition_alias() {
     let source = "fn f() → int {\n  var list<int> xs ← vacua\n  return 0\n}";
     let result = compile(&session, "test.fab", source);
     assert!(
-        result.success(),
-        "en `vacua` marker alias must still claim: {:?}",
+        !result.success(),
+        "en `vacua` must not claim as the empty-collection marker: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("SEM001") && d.issue() == Some("unknown_identifier")),
+        "expected SEM001 unknown_identifier, got: {:?}",
         result.diagnostics
     );
 }

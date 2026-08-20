@@ -36,7 +36,7 @@ locale = "en"
 
 main {
     const list<string> flat ← ["alpha", "beta", "gamma"]
-    const tensor<string, []> seed ← vacua
+    const tensor<string, []> seed ← empty
     const tensor<string, [3]> grid ← seed.from_flat(flat, [3])
     const string cell ← grid.get([0]) coalesce ""
     print cell

@@ -42,7 +42,7 @@ locale = "en"
 #   longitudo() plus keyed lookups for alpha/beta/gamma (tabula.expected).
 
 main {
-    var map<string, int> puncta ← vacua
+    var map<string, int> puncta ← empty
     puncta["alpha"] ← 1
     puncta["beta"] ← 2
     puncta["gamma"] ← 3

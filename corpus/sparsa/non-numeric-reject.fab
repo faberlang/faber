@@ -32,6 +32,6 @@ locale = "en"
 # per-backend EXPECTED_FAILURES lists.
 
 main {
-    const sparsa<string, [2]> words ← vacua
+    const sparsa<string, [2]> words ← empty
     print words.length()
 }

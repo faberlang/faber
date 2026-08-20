@@ -49,10 +49,10 @@ main {
     print adde(3, 4)
 
     const _ numeri ← [1, 2, 3]
-    var list<int> duplicati ← vacua
+    var list<int> duplicati ← empty
     # predicate closure
     const _ par ← int x → bool ∴ x % 2 ≡ 0
-    var list<int> pares ← vacua
+    var list<int> pares ← empty
     for from numeri const n {
         duplicati.append(duplica(n))
         if par(n) {

@@ -216,8 +216,8 @@ fn phase4_full_cross_locale_fanout() {
 /// localized emit surface.
 const TENSOR_VACUA_SOURCE: &str = "\
 incipit {
-  fixum tensor<fractus<f32>, []> empty ← vacua
   fixum lista<fractus<f32>> xs ← vacua
+  fixum tensor<fractus<f32>, []> empty ← vacua
   fixum numerus n ← 0
   nota n
 }
@@ -252,6 +252,10 @@ fn en_tensor_vacua_roundtrip_uses_pack_surface() {
             "emitted en output is missing pack surface {head:?} ({expected:?}):\n{body}"
         );
     }
+    assert!(
+        !body.contains("vacua"),
+        "en emit must stay on canonical `empty` even with an empty-named binding, got:\n{body}"
+    );
 
     // Re-parse the emitted (English-surface) program under the en session and
     // require stable re-emission (phase-2 same-HIR stability proof).
@@ -368,5 +372,57 @@ fn th_locale_vacua_acceptance_is_bounded_to_owned_rows() {
     assert!(
         !result.success(),
         "unmapped th-TH spelling must not be implicitly accepted as vacua"
+    );
+}
+
+#[test]
+fn en_vacua_marker_rejects_after_alias_removal() {
+    let session = session_for("en");
+    let source = with_frontmatter("en", "main {\n  var list<int> xs ← vacua\n  print xs.length()\n}\n");
+    let result = compile_canonical(&session, "en-vacua-reject.fab", &source);
+    assert!(
+        !result.success(),
+        "en `vacua` must not claim as the empty-collection marker: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("SEM001") && d.issue() == Some("unknown_identifier")),
+        "en `vacua` must fail as an unknown identifier, got: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn en_empty_marker_compiles() {
+    let session = session_for("en");
+    let source = with_frontmatter("en", "main {\n  var list<int> xs ← empty\n  print xs.length()\n}\n");
+    let result = compile_canonical(&session, "en-empty-marker.fab", &source);
+    assert!(result.success(), "en `empty` marker must compile: {:?}", result.diagnostics);
+}
+
+#[test]
+fn en_empty_named_binding_compiles_with_marker_rhs() {
+    let session = session_for("en");
+    let source = with_frontmatter("en", "main {\n  var list<int> empty ← empty\n  print 0\n}\n");
+    let result = compile_canonical(&session, "en-empty-shadow.fab", &source);
+    assert!(
+        result.success(),
+        "en `var list<int> empty ← empty` must compile (RHS is the marker): {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn la_vacua_marker_still_compiles() {
+    let session = session_for("la");
+    let source = with_frontmatter("la", "incipit {\n  varia lista<numerus> xs ← vacua\n  nota xs.longitudo()\n}\n");
+    let result = compile_canonical(&session, "la-vacua-marker.fab", &source);
+    assert!(
+        result.success(),
+        "la `vacua` marker must still compile: {:?}",
+        result.diagnostics
     );
 }
