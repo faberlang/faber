@@ -126,7 +126,7 @@ fn contextual_keywords_are_identifier_like_only_for_owners() {
 }
 
 #[test]
-fn test_annotation_names_are_owned_by_annotation_policy() {
+fn annotation_names_are_owned_by_annotation_policy() {
     for (kind, spelling) in [
         (TokenKind::Metior, "metior"),
         (TokenKind::Omitte, "omitte"),
