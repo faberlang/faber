@@ -13,8 +13,9 @@
 
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(feature = "device-runtime")]
@@ -64,6 +65,61 @@ pub struct WeightFileRange {
     pub len: u64,
     /// Logical f32 element count of the host buffer.
     pub elems: u64,
+}
+
+/// Receipt timing split shared by one-shot and resident control steps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct StageTimingReceipt {
+    pub kernel_us: u64,
+    pub transfer_us: u64,
+    pub host_round_trip_us: u64,
+}
+
+impl StageTimingReceipt {
+    #[must_use]
+    pub const fn total_us(self) -> u64 {
+        self.kernel_us
+            .saturating_add(self.transfer_us)
+            .saturating_add(self.host_round_trip_us)
+    }
+}
+
+/// Resident session lifecycle counters returned by the hosts control entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct DeviceExecuteLifecycle {
+    pub prepares: usize,
+    pub reuses: usize,
+    pub resets: usize,
+    pub releases: usize,
+    pub module_reloads: usize,
+    pub per_program_reallocs: usize,
+    pub live_handles: usize,
+}
+
+/// One response from the local load/step/reset/release stream.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DeviceExecuteControlReceipt {
+    pub operation: String,
+    pub lifecycle: DeviceExecuteLifecycle,
+    #[serde(default)]
+    pub kernel_count: usize,
+    #[serde(default)]
+    pub reset_cleared: usize,
+    #[serde(default)]
+    pub receipt: Option<DeviceExecuteReceipt>,
+}
+
+/// Client-side handle for one long-lived hosts control owner.
+///
+/// The child process is intentionally reused for every operation. Dropping an
+/// unreleased handle kills the child, but successful delivery requires an
+/// explicit `release` so the receipt proves zero live handles.
+pub struct DeviceExecuteSession {
+    child: Child,
+    stdin: ChildStdin,
+    stdout: BufReader<ChildStdout>,
+    released: bool,
+    _work: WorkDir,
 }
 
 /// Receipt the hosts CLI prints on exit 0.
@@ -138,6 +194,12 @@ pub struct DeviceExecuteReceipt {
     /// Parent `Command::output` wall (process start through child exit).
     #[serde(default)]
     pub parent_child_wait_us: u64,
+    /// Number of declared physical kernel bodies in the admitted descriptor.
+    #[serde(default)]
+    pub kernel_count: usize,
+    /// Stage timing for this one-shot or resident step.
+    #[serde(default)]
+    pub stage_timing: StageTimingReceipt,
 }
 
 impl DeviceExecuteReceipt {
@@ -196,6 +258,173 @@ pub fn execute_device(
     build_if_missing: bool,
 ) -> Result<DeviceExecuteReceipt, HostSpawnError> {
     execute_device_at(&resolve_host_cli(build_if_missing)?, request)
+}
+
+/// Start one long-lived hosts control owner and perform its explicit `load`.
+#[allow(dead_code)] // live from the dense device-runtime route
+pub fn open_device_session(
+    request: &DeviceExecuteRequest,
+    build_if_missing: bool,
+) -> Result<(DeviceExecuteSession, DeviceExecuteControlReceipt), HostSpawnError> {
+    open_device_session_at(&resolve_host_cli(build_if_missing)?, request)
+}
+
+fn open_device_session_at(
+    host: &Path,
+    request: &DeviceExecuteRequest,
+) -> Result<(DeviceExecuteSession, DeviceExecuteControlReceipt), HostSpawnError> {
+    let work = WorkDir::create()?;
+    let descriptor_path = work.path.join("descriptor.json");
+    let module_path = work.path.join("module.bin");
+    let inputs_path = work.path.join("inputs.json");
+    let weight_map_path = work.path.join("weight-map.json");
+    write_file(&descriptor_path, &request.descriptor_json)?;
+    write_file(&module_path, &request.module_image)?;
+    write_file(&inputs_path, &request.inputs_json)?;
+    if let Some(map) = &request.weight_map_json {
+        write_file(&weight_map_path, map)?;
+    }
+
+    let mut command = Command::new(host);
+    command
+        .arg("device-execute")
+        .arg("--control")
+        .args(["--backend", &request.backend])
+        .args(["--descriptor", &path_text(&descriptor_path)?])
+        .args(["--module", &path_text(&module_path)?])
+        .args(["--inputs", &path_text(&inputs_path)?])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    if let (Some(weights), Some(_)) = (&request.weights_path, &request.weight_map_json) {
+        command.args([
+            "--weights",
+            &path_text(weights)?,
+            "--weight-map",
+            &path_text(&weight_map_path)?,
+        ]);
+    }
+    let mut child = command.spawn().map_err(|error| HostSpawnError {
+        code: "E_HOST_SPAWN".to_owned(),
+        message: format!("failed to spawn resident device-execute: {error}"),
+    })?;
+    let stdin = child.stdin.take().ok_or_else(|| HostSpawnError {
+        code: "E_HOST_SPAWN".to_owned(),
+        message: "resident device-execute stdin was not piped".to_owned(),
+    })?;
+    let stdout = child.stdout.take().ok_or_else(|| HostSpawnError {
+        code: "E_HOST_SPAWN".to_owned(),
+        message: "resident device-execute stdout was not piped".to_owned(),
+    })?;
+    let mut session = DeviceExecuteSession {
+        child,
+        stdin,
+        stdout: BufReader::new(stdout),
+        released: false,
+        _work: work,
+    };
+    let loaded = session.control("load", None)?;
+    Ok((session, loaded))
+}
+
+impl DeviceExecuteSession {
+    /// Execute one repeated invocation through the loaded session.
+    pub fn step(
+        &mut self,
+        inputs: &BTreeMap<u32, Vec<f32>>,
+    ) -> Result<DeviceExecuteControlReceipt, HostSpawnError> {
+        self.control("step", Some(inputs))
+    }
+
+    /// Reset resident state while retaining once-loaded weights.
+    pub fn reset(&mut self) -> Result<DeviceExecuteControlReceipt, HostSpawnError> {
+        self.control("reset", None)
+    }
+
+    /// Explicitly release the resident session and assert zero live handles.
+    pub fn release(&mut self) -> Result<DeviceExecuteControlReceipt, HostSpawnError> {
+        let receipt = self.control("release", None)?;
+        self.released = true;
+        Ok(receipt)
+    }
+
+    fn control(
+        &mut self,
+        operation: &str,
+        inputs: Option<&BTreeMap<u32, Vec<f32>>>,
+    ) -> Result<DeviceExecuteControlReceipt, HostSpawnError> {
+        if self.released {
+            return Err(HostSpawnError {
+                code: "E_INVALID_ARGS".to_owned(),
+                message: "resident device session is already released".to_owned(),
+            });
+        }
+        let mut command = serde_json::Map::new();
+        command.insert(
+            "op".to_owned(),
+            serde_json::Value::String(operation.to_owned()),
+        );
+        if let Some(inputs) = inputs {
+            let encoded = encode_device_inputs(inputs)?;
+            let values = serde_json::from_slice(&encoded).map_err(|error| HostSpawnError {
+                code: "E_DEVICE_DESCRIPTOR".to_owned(),
+                message: format!("failed to encode control inputs: {error}"),
+            })?;
+            command.insert("inputs".to_owned(), values);
+        }
+        serde_json::to_writer(&mut self.stdin, &command).map_err(|error| HostSpawnError {
+            code: "E_HOST_SPAWN".to_owned(),
+            message: format!("failed to write resident control request: {error}"),
+        })?;
+        self.stdin
+            .write_all(b"\n")
+            .map_err(|error| HostSpawnError {
+                code: "E_HOST_SPAWN".to_owned(),
+                message: format!("failed to write resident control request: {error}"),
+            })?;
+        self.stdin.flush().map_err(|error| HostSpawnError {
+            code: "E_HOST_SPAWN".to_owned(),
+            message: format!("failed to flush resident control request: {error}"),
+        })?;
+        let mut line = String::new();
+        let read = self
+            .stdout
+            .read_line(&mut line)
+            .map_err(|error| HostSpawnError {
+                code: "E_HOST_SPAWN".to_owned(),
+                message: format!("failed to read resident control receipt: {error}"),
+            })?;
+        if read == 0 {
+            let status = self.child.try_wait().ok().flatten();
+            return Err(HostSpawnError {
+                code: "E_HOST_SPAWN".to_owned(),
+                message: format!(
+                    "resident device-execute exited before {operation} receipt: {status:?}"
+                ),
+            });
+        }
+        if let Ok(error) = serde_json::from_str::<WireHostError>(&line) {
+            if !error.code.is_empty() {
+                return Err(HostSpawnError {
+                    code: error.code,
+                    message: error.message,
+                });
+            }
+        }
+        serde_json::from_str(&line).map_err(|error| HostSpawnError {
+            code: "E_HOST_SPAWN".to_owned(),
+            message: format!("resident control receipt JSON is invalid: {error}"),
+        })
+    }
+}
+
+impl Drop for DeviceExecuteSession {
+    fn drop(&mut self) {
+        if !self.released {
+            let _ = self.child.kill();
+        }
+        let _ = self.child.wait();
+    }
 }
 
 /// Invoke a resolved host binary. Tests pass a stub CLI here so the decode
