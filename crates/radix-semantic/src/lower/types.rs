@@ -57,6 +57,19 @@ impl Lowerer<'_> {
         self.lower_type_with_context(ty, true)
     }
 
+    /// Lower a type nested inside another type expression.
+    ///
+    /// Access markers describe acquisition sites, not stored element types.
+    /// Reject them before lowering the nested carrier so `lista<copy T>` and
+    /// its ref/mut/own counterparts cannot become type-table facts.
+    fn lower_nested_type(&mut self, ty: &TypeExpr) -> TypeId {
+        if ty.mode.is_some() {
+            self.error("nested_access_marker");
+            return self.types.intern(Type::Error);
+        }
+        self.lower_type(ty)
+    }
+
     fn lower_type_with_context(&mut self, ty: &TypeExpr, allow_scalar_ref_mut: bool) -> TypeId {
         self.current_span = ty.span;
 
@@ -75,8 +88,8 @@ impl Lowerer<'_> {
             TypeExprKind::Sparsa(elem, figura) => self.lower_sparsa_type(elem, figura),
             TypeExprKind::Atomic(elem) => self.lower_atomic_type(elem),
             TypeExprKind::PromissumFailable(success, alternate) => {
-                let success = self.lower_type(success);
-                let alternate = self.lower_type(alternate);
+                let success = self.lower_nested_type(success);
+                let alternate = self.lower_nested_type(alternate);
                 self.types.promissum_failable(success, alternate)
             }
             TypeExprKind::Named(name, params) => self.lower_named_type(name, params),
@@ -97,8 +110,8 @@ impl Lowerer<'_> {
                         }
                     })
                     .collect();
-                let ret = self.lower_type(&func.ret);
-                let err = func.err.as_ref().map(|err| self.lower_type(err));
+                let ret = self.lower_nested_type(&func.ret);
+                let err = func.err.as_ref().map(|err| self.lower_nested_type(err));
                 self.types.function(FuncSig {
                     type_params: Vec::new(),
                     type_param_constraints: Vec::new(),
@@ -151,7 +164,7 @@ impl Lowerer<'_> {
         let mut had_nihil = false;
 
         for member in members {
-            let lowered = self.lower_type(member);
+            let lowered = self.lower_nested_type(member);
             if let Type::Primitive(Primitive::Nihil) = self.types.get(lowered) {
                 had_nihil = true;
                 continue;
@@ -262,7 +275,7 @@ impl Lowerer<'_> {
                 self.error("intervallum_arity");
                 return self.types.intern(Type::Error);
             }
-            let bound = self.lower_type(&params[0]);
+            let bound = self.lower_nested_type(&params[0]);
             if !crate::is_intervallum_bound_type(self.types, bound) {
                 self.error("intervallum_bound");
                 return self.types.intern(Type::Error);
@@ -277,7 +290,7 @@ impl Lowerer<'_> {
             };
             let payload_ty = match params {
                 [] => self.types.primitive(Primitive::Valor),
-                [payload] => self.lower_type(payload),
+                [payload] => self.lower_nested_type(payload),
                 _ => {
                     self.error("scrinium_arity");
                     return self.types.intern(Type::Error);
@@ -325,7 +338,10 @@ impl Lowerer<'_> {
         }
 
         if name_str == "iuncta" {
-            let elements: Vec<TypeId> = params.iter().map(|p| self.lower_type(p)).collect();
+            let elements: Vec<TypeId> = params
+                .iter()
+                .map(|param| self.lower_nested_type(param))
+                .collect();
             return self.types.tuple(elements);
         }
 
@@ -378,7 +394,10 @@ impl Lowerer<'_> {
             return base;
         }
 
-        let args = params.iter().map(|param| self.lower_type(param)).collect();
+        let args = params
+            .iter()
+            .map(|param| self.lower_nested_type(param))
+            .collect();
         self.types.intern(Type::Applied(base, args))
     }
 
@@ -538,7 +557,7 @@ impl Lowerer<'_> {
         }
         let lowered = params
             .iter()
-            .map(|param| self.lower_type(param))
+            .map(|param| self.lower_nested_type(param))
             .collect::<Vec<_>>();
         collection.lower(self.types, &lowered)
     }
@@ -546,11 +565,11 @@ impl Lowerer<'_> {
     fn lower_lista_type(&mut self, params: &[TypeExpr]) -> TypeId {
         match params {
             [elem] => {
-                let elem = self.lower_type(elem);
+                let elem = self.lower_nested_type(elem);
                 self.types.array(elem)
             }
             [elem, capacity] => {
-                let elem = self.lower_type(elem);
+                let elem = self.lower_nested_type(elem);
                 let Some(capacity) = self.lower_capacity_index(capacity) else {
                     return self.types.intern(Type::Error);
                 };
@@ -588,7 +607,10 @@ impl Lowerer<'_> {
             if params.is_empty() {
                 return type_id;
             }
-            let args = params.iter().map(|param| self.lower_type(param)).collect();
+            let args = params
+                .iter()
+                .map(|param| self.lower_nested_type(param))
+                .collect();
             return self.types.intern(Type::Applied(type_id, args));
         }
         if self
@@ -604,7 +626,10 @@ impl Lowerer<'_> {
                 if params.is_empty() {
                     return type_id;
                 }
-                let args = params.iter().map(|param| self.lower_type(param)).collect();
+                let args = params
+                    .iter()
+                    .map(|param| self.lower_nested_type(param))
+                    .collect();
                 return self.types.intern(Type::Applied(type_id, args));
             }
         }
@@ -613,7 +638,7 @@ impl Lowerer<'_> {
     }
 
     fn lower_tensor_type(&mut self, elem: &TypeExpr, figura: &FiguraExpr) -> TypeId {
-        let elem_ty = self.lower_type(elem);
+        let elem_ty = self.lower_nested_type(elem);
         match self.lower_figura_expr(figura) {
             Ok(shape) => self.types.tensor_with_shape(elem_ty, shape),
             Err(message) => {
@@ -624,7 +649,7 @@ impl Lowerer<'_> {
     }
 
     fn lower_vector_type(&mut self, elem: &TypeExpr, width: &FiguraExpr) -> TypeId {
-        let elem_ty = self.lower_type(elem);
+        let elem_ty = self.lower_nested_type(elem);
         match self.lower_vector_width_expr(width) {
             Ok(width_id) => self.types.vector_with_width(elem_ty, width_id),
             Err(message) => {
@@ -635,7 +660,7 @@ impl Lowerer<'_> {
     }
 
     fn lower_matrix_type(&mut self, elem: &TypeExpr, shape: &FiguraExpr) -> TypeId {
-        let elem_ty = self.lower_type(elem);
+        let elem_ty = self.lower_nested_type(elem);
         match self.lower_matrix_shape_expr(shape) {
             Ok(shape_id) => self.types.matrix_with_shape(elem_ty, shape_id),
             Err(message) => {
@@ -646,7 +671,7 @@ impl Lowerer<'_> {
     }
 
     fn lower_sparsa_type(&mut self, elem: &TypeExpr, figura: &FiguraExpr) -> TypeId {
-        let elem_ty = self.lower_type(elem);
+        let elem_ty = self.lower_nested_type(elem);
         if !crate::numeric_width::is_tensor_numeric_element(self.types, elem_ty) {
             self.error("sparsa_element_non_numeric");
             return self.types.intern(Type::Error);
@@ -661,7 +686,7 @@ impl Lowerer<'_> {
     }
 
     fn lower_atomic_type(&mut self, elem: &TypeExpr) -> TypeId {
-        let elem_ty = self.lower_type(elem);
+        let elem_ty = self.lower_nested_type(elem);
         if !crate::is_atomic_element_type(self.types, elem_ty) {
             self.error("atomic_element");
             return self.types.intern(Type::Error);

@@ -196,6 +196,8 @@ struct BorrowChecker<'a> {
     mut_roots: FxHashSet<DefId>,
     /// Bindings whose declared type is an exclusive `own`/`copy` value.
     own_roots: FxHashSet<DefId>,
+    /// Bindings whose declared type acquires a duplicate-then-own `copy` value.
+    copy_roots: FxHashSet<DefId>,
     /// Unmarked sources used as an own-bind RHS; a later use proves them live.
     unmarked_own_binds: FxHashMap<DefId, radix_lexer::Span>,
     /// Function param contracts keyed by callee `DefId` (named calls leave
@@ -231,6 +233,7 @@ impl<'a> BorrowChecker<'a> {
             ref_roots: FxHashSet::default(),
             mut_roots: FxHashSet::default(),
             own_roots: FxHashSet::default(),
+            copy_roots: FxHashSet::default(),
             unmarked_own_binds: FxHashMap::default(),
             func_params: FxHashMap::default(),
             errors: Vec::new(),
@@ -303,6 +306,7 @@ impl<'a> BorrowChecker<'a> {
             self.ensure_state(param.def_id);
             self.note_ref_root(param.def_id, param.ty);
             self.note_mut_root(param.def_id, param.ty);
+            self.note_copy_root(param.def_id, param.ty);
             self.note_own_root(param.def_id, param.ty);
             self.param_usage.insert(
                 param.def_id,
@@ -330,6 +334,7 @@ impl<'a> BorrowChecker<'a> {
         self.ref_roots.clear();
         self.mut_roots.clear();
         self.own_roots.clear();
+        self.copy_roots.clear();
         self.unmarked_own_binds.clear();
     }
 
@@ -351,13 +356,16 @@ impl<'a> BorrowChecker<'a> {
                 if let Some(ty) = local.ty {
                     self.note_ref_root(local.def_id, ty);
                     self.note_mut_root(local.def_id, ty);
+                    self.note_copy_root(local.def_id, ty);
                     self.note_own_root(local.def_id, ty);
                     if self.language_conflicts && self.types.is_mut_view(ty) {
                         self.warn_mut_local(stmt.span);
                     }
                 }
                 if let Some(init) = &local.init {
-                    if local.ty.is_some_and(|ty| self.types.is_own_view(ty)) {
+                    if local.ty.is_some_and(|ty| self.types.is_copy_view(ty)) {
+                        self.bind_copy_from(init);
+                    } else if local.ty.is_some_and(|ty| self.types.is_own_view(ty)) {
                         self.bind_own_from(init);
                     } else if self.language_conflicts
                         && local.ty.is_some_and(|ty| self.types.is_mut_view(ty))
@@ -478,6 +486,7 @@ impl<'a> BorrowChecker<'a> {
                     arg.expr.span,
                 );
             }
+            let dest_copy = self.types.is_copy_view(param.ty);
             let dest_own = self.types.is_own_view(param.ty);
             if self.arg_is_mut_view(&arg.expr) && dest_own {
                 self.error(
@@ -485,6 +494,10 @@ impl<'a> BorrowChecker<'a> {
                     ISSUE_MUT_INTO_OWN,
                     arg.expr.span,
                 );
+            }
+            if dest_copy {
+                self.bind_copy_from(&arg.expr);
+                continue;
             }
             if dest_own && self.arg_is_exclusive(&arg.expr) {
                 self.move_from_expr(&arg.expr);
@@ -630,6 +643,12 @@ impl<'a> BorrowChecker<'a> {
         }
     }
 
+    fn note_copy_root(&mut self, def_id: DefId, ty: TypeId) {
+        if self.types.is_copy_view(ty) {
+            self.copy_roots.insert(def_id);
+        }
+    }
+
     fn note_own_root(&mut self, def_id: DefId, ty: TypeId) {
         if self.types.is_exclusive_value(ty) {
             self.own_roots.insert(def_id);
@@ -654,6 +673,15 @@ impl<'a> BorrowChecker<'a> {
     /// Shared-borrow bind of a `ref` local from a path (or projection root).
     fn bind_ref_from(&mut self, rhs: &HirExpression) {
         self.borrow_from_expr(rhs, BorrowKind::Shared);
+    }
+
+    /// Bind-site duplicate acquisition for a `copy` destination.
+    ///
+    /// The source is read, never moved. MU-6 materializes the deep duplicate;
+    /// this pass records the semantic event by preserving source liveness while
+    /// the destination remains an exclusive value.
+    fn bind_copy_from(&mut self, rhs: &HirExpression) {
+        self.check_expr(rhs);
     }
 
     /// Bind-site move tracking for an `own` destination.
@@ -997,7 +1025,11 @@ impl HirVisitor for BorrowChecker<'_> {
             }
             HirExpressionKind::Assign(target, value) => {
                 self.check_lvalue(target);
-                if target.ty.is_some_and(|ty| self.types.is_own_view(ty))
+                if target.ty.is_some_and(|ty| self.types.is_copy_view(ty))
+                    || Self::root_def_id(target).is_some_and(|id| self.copy_roots.contains(&id))
+                {
+                    self.bind_copy_from(value);
+                } else if target.ty.is_some_and(|ty| self.types.is_own_view(ty))
                     || Self::root_def_id(target).is_some_and(|id| self.own_roots.contains(&id))
                 {
                     self.bind_own_from(value);
