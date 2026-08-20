@@ -72,6 +72,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::MonomorphicHoleSolvedToUnion,
     WarningKind::UnionHoleSolvedMonomorphically,
     WarningKind::PreferStringTemplate,
+    WarningKind::DiscouragedMutLocal,
 ];
 
 // STABLE CODES
@@ -311,7 +312,9 @@ pub fn semantic_message(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Opti
             | WarningKind::UnusedVariable,
         ) => semantic_lint_message(args),
         SemanticErrorKind::Warning(
-            WarningKind::UnusedMoveParam | WarningKind::UnusedMutRefParam,
+            WarningKind::UnusedMoveParam
+                | WarningKind::UnusedMutRefParam
+                | WarningKind::DiscouragedMutLocal,
         ) => semantic_borrow_message(args),
         SemanticErrorKind::Warning(WarningKind::WildcardAbsorbsNull) => {
             semantic_wildcard_absorbs_null_message(args)
@@ -1857,6 +1860,7 @@ fn semantic_borrow_message(args: &[DiagnosticArg]) -> Option<String> {
         "deref_into_own" => Some("cannot bind a dereference into `own`".to_owned()),
         "projection_into_own" => Some("cannot bind a projection into `own`".to_owned()),
         "shared_into_own" => Some("cannot bind a shared value into `own`".to_owned()),
+        "mut_local" => Some("`mut` locals are discouraged; prefer a `mut` parameter".to_owned()),
         "mutable_borrow_conflict" => {
             Some("mutable borrow conflicts with existing borrow".to_owned())
         }
@@ -2510,6 +2514,10 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::PreferStringTemplate => DiagnosticSpec {
             code: "WARN018",
             help: Some("use a string template (`\"…§…\"(args)`) for long concatenation chains"),
+        },
+        WarningKind::DiscouragedMutLocal => DiagnosticSpec {
+            code: "WARN019",
+            help: Some("declare the exclusive borrow as a `mut` parameter instead of a local"),
         },
     }
 }

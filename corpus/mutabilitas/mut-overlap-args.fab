@@ -1,0 +1,23 @@
++++
+term = "mutabilitas"
+kind = "reject"
+category = "type"
+summary = "MU-4 red: the same value passed to two mut parameters conflicts."
+syntax = "fn swap(mut list<int> a, mut list<int> b); swap(xs, xs)"
+related = ["mut"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — overlapping mut arguments (MU-4)
+# =============================================================================
+# This exemplum intentionally fails to compile.
+
+fn swap(mut list<int> a, mut list<int> b) → void {
+    a.append(1)
+    b.append(2)
+}
+
+main {
+    var list<int> xs ← [1, 2, 3]
+    swap(xs, xs)
+}

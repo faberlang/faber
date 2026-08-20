@@ -1,0 +1,21 @@
++++
+term = "mutabilitas"
+kind = "reject"
+category = "type"
+summary = "MU-4 red: two mut locals from one source conflict (SEM052)."
+syntax = "var mut list<int> b ← a; var mut list<int> c ← a"
+related = ["mut"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — overlapping mut locals (MU-4)
+# =============================================================================
+# This exemplum intentionally fails to compile.
+
+main {
+    var list<int> a ← [1, 2, 3]
+    var mut list<int> b ← a
+    var mut list<int> c ← a
+    print b.length()
+    print c.length()
+}

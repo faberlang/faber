@@ -130,6 +130,10 @@ mod mutability_ref_test;
 mod mutability_own_test;
 
 #[cfg(test)]
+#[path = "mutability_mut_test.rs"]
+mod mutability_mut_test;
+
+#[cfg(test)]
 #[path = "resolve_test.rs"]
 mod resolve_test;
 

@@ -4,7 +4,7 @@
 //! moved-by-default parameters and call arguments (Rust-output ownership
 //! semantics).
 
-use super::borrow::analyze;
+use super::borrow::{analyze, analyze_modes};
 use super::{DefId, Resolver, SemanticErrorKind, TypeTable, WarningKind};
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::test_span;
@@ -1493,5 +1493,127 @@ incipit { }
         }),
         "missing assign_to_de_parameter: {:?}",
         result.diagnostics
+    );
+}
+
+fn dual_explicit_ref_program(param_ty: radix_types::TypeId) -> HirModule {
+    let shared = HirExpression {
+        id: radix_hir::HirId(1),
+        kind: HirExpressionKind::Ref(
+            radix_hir::HirRefKind::Shared,
+            Box::new(HirExpression {
+                id: radix_hir::HirId(2),
+                kind: HirExpressionKind::Path(DefId(1)),
+                ty: Some(param_ty),
+                span: test_span(),
+            }),
+        ),
+        ty: None,
+        span: test_span(),
+    };
+    let mutable = HirExpression {
+        id: radix_hir::HirId(3),
+        kind: HirExpressionKind::Ref(
+            radix_hir::HirRefKind::Mutable,
+            Box::new(HirExpression {
+                id: radix_hir::HirId(4),
+                kind: HirExpressionKind::Path(DefId(1)),
+                ty: Some(param_ty),
+                span: test_span(),
+            }),
+        ),
+        ty: None,
+        span: test_span(),
+    };
+    HirModule {
+        items: vec![HirItem {
+            id: radix_hir::HirId(0),
+            def_id: DefId(0),
+            kind: HirItemKind::Function(Box::new(HirFunction {
+                cli_args: None,
+                name: radix_lexer::Symbol(1),
+                type_params: Vec::new(),
+                params: vec![HirParam {
+                    def_id: DefId(1),
+                    name: radix_lexer::Symbol(2),
+                    ty: param_ty,
+                    mode: HirParamMode::Owned,
+                    optional: false,
+                    sponte: false,
+                    default: None,
+                    span: test_span(),
+                }],
+                ret_ty: None,
+                err_ty: None,
+                body: Some(HirBlock {
+                    statements: vec![
+                        HirStatement {
+                            id: radix_hir::HirId(5),
+                            kind: HirStatementKind::Expr(shared),
+                            span: test_span(),
+                        },
+                        HirStatement {
+                            id: radix_hir::HirId(6),
+                            kind: HirStatementKind::Expr(mutable),
+                            span: test_span(),
+                        },
+                    ],
+                    expr: None,
+                    span: test_span(),
+                    ..Default::default()
+                }),
+                posture: radix_syntax::CallablePosture::SyncFinite,
+                is_async: false,
+                is_generator: false,
+                is_kernel: false,
+                nucleum_fragment: false,
+                is_vertex: false,
+                is_fragment: false,
+                annotations: Vec::new(),
+                test: None,
+            })),
+            span: test_span(),
+        }],
+        entry: None,
+        entry_annotations: Vec::new(),
+        entry_args_name: None,
+        entry_is_async: false,
+    }
+}
+
+#[test]
+fn analyze_modes_does_not_reject_unmarked_explicit_ref_conflict() {
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let result = analyze_modes(
+        &dual_explicit_ref_program(numerus),
+        &Resolver::new(),
+        &types,
+    );
+    assert!(
+        result.is_ok(),
+        "unmarked explicit refs stay Rust-lifetime-only, got: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn analyze_modes_rejects_mut_root_explicit_ref_conflict() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let mut_ty = types.access_marker(AccessMarker::Mut, numerus);
+    let result = analyze_modes(
+        &dual_explicit_ref_program(mut_ty),
+        &Resolver::new(),
+        &types,
+    );
+    assert!(
+        result.is_err(),
+        "mut-root explicit refs are a language conflict"
+    );
+    expect_structured_error(
+        &result.unwrap_err(),
+        SemanticErrorKind::MutableBorrowConflict,
+        "mutable_borrow_conflict",
     );
 }

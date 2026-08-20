@@ -23,6 +23,11 @@
 //!   calls. SEM050 (`use_after_move`) is a language rule, mode-scoped to
 //!   exclusive (`own`/`copy`) values. Unmarked Move-mode args still move only
 //!   under the Rust-lifetime qualification.
+//! - Declared `mut` type facts (MU-4) make the mutable-borrow-conflict family
+//!   (SEM052) a language rule, mode-scoped to exclusive-borrow operations:
+//!   mut-local binds, `mut`/`ref` dest calls, and explicit refs of `mut` roots.
+//!   Unmarked overlapping `&`/`&mut` still fire only under Rust-lifetime
+//!   qualification. `mut` locals parse and warn (OQ-3).
 //! - The pass returns all findings together so the semantic driver can apply
 //!   the repository-wide warning/error policy through `SemanticErrorKind`.
 //!
@@ -43,7 +48,7 @@
 
 use crate::{
     FuncSig, ParamType, Primitive, Resolver, SemanticError, SemanticErrorKind, SemanticParamMode,
-    Type, TypeId, TypeTable, WarningKind, ISSUE_ASSIGN_THROUGH_REF,
+    Type, TypeId, TypeTable, WarningKind, ISSUE_ASSIGN_THROUGH_REF, ISSUE_MUT_LOCAL,
     ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_UNMARKED_INTO_OWN, SUGGESTION_COPY,
 };
 use radix_hir::visit::{walk_expr, HirVisitor};
@@ -67,8 +72,9 @@ const ISSUE_WRITE_WHILE_BORROWED: &str = "write_while_borrowed";
 
 /// Target-neutral Faber parameter-mode analysis (`de`/`in`/`ex`).
 ///
-/// Does not apply Rust lifetime/borrow conflict approximation. Use this during
-/// base analysis so all HIR targets share mode validity.
+/// Language `ref`/`mut`/`own` facts run here. Rust lifetime/borrow conflict
+/// approximation for unmarked values does not. Use this during base analysis
+/// so all HIR targets share mode validity.
 ///
 /// # Errors
 ///
@@ -78,7 +84,7 @@ pub fn analyze_modes(
     _resolver: &Resolver,
     types: &TypeTable,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, false)
+    run(hir, types, false, true)
 }
 
 /// Full Rust check: mode rules plus borrow/lifetime conflict approximation.
@@ -93,7 +99,7 @@ pub fn analyze(
     _resolver: &Resolver,
     types: &TypeTable,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, true)
+    run(hir, types, true, true)
 }
 
 /// Rust-only lifetime/borrow conflicts after modes already ran.
@@ -110,7 +116,7 @@ pub fn analyze_rust_lifetime(
     _resolver: &Resolver,
     types: &TypeTable,
 ) -> Result<(), Vec<SemanticError>> {
-    let mut checker = BorrowChecker::new(types, true);
+    let mut checker = BorrowChecker::new(types, true, false);
     checker.check_program(hir);
     checker.errors.retain(|err| {
         err.args.iter().any(|arg| {
@@ -133,8 +139,13 @@ pub fn analyze_rust_lifetime(
     }
 }
 
-fn run(hir: &HirModule, types: &TypeTable, rust_lifetime: bool) -> Result<(), Vec<SemanticError>> {
-    let mut checker = BorrowChecker::new(types, rust_lifetime);
+fn run(
+    hir: &HirModule,
+    types: &TypeTable,
+    rust_lifetime: bool,
+    language_conflicts: bool,
+) -> Result<(), Vec<SemanticError>> {
+    let mut checker = BorrowChecker::new(types, rust_lifetime, language_conflicts);
     checker.check_program(hir);
 
     if checker.errors.is_empty() {
@@ -170,13 +181,19 @@ struct BorrowChecker<'a> {
     /// Semantic type table produced before analysis; call signatures determine
     /// whether each argument is read, borrowed, or moved.
     types: &'a TypeTable,
-    /// When true, emit Rust shared/mutable borrow conflict diagnostics.
+    /// When true, emit Rust shared/mutable borrow conflict diagnostics
+    /// for unmarked values (legacy lifetime simulation).
     rust_lifetime: bool,
+    /// When true, emit the mutable-borrow-conflict family as language rules
+    /// (mut-local binds, `mut`/`ref` dests, explicit refs of `mut` roots).
+    language_conflicts: bool,
     states: FxHashMap<DefId, BorrowState>,
     scopes: Vec<BorrowScope>,
     param_usage: FxHashMap<DefId, ParamUsage>,
     /// Bindings whose declared type carries a `ref` access fact.
     ref_roots: FxHashSet<DefId>,
+    /// Bindings whose declared type carries a `mut` access fact.
+    mut_roots: FxHashSet<DefId>,
     /// Bindings whose declared type is an exclusive `own`/`copy` value.
     own_roots: FxHashSet<DefId>,
     /// Unmarked sources used as an own-bind RHS; a later use proves them live.
@@ -203,14 +220,16 @@ struct ParamUsage {
 }
 
 impl<'a> BorrowChecker<'a> {
-    fn new(types: &'a TypeTable, rust_lifetime: bool) -> Self {
+    fn new(types: &'a TypeTable, rust_lifetime: bool, language_conflicts: bool) -> Self {
         Self {
             types,
             rust_lifetime,
+            language_conflicts,
             states: FxHashMap::default(),
             scopes: Vec::new(),
             param_usage: FxHashMap::default(),
             ref_roots: FxHashSet::default(),
+            mut_roots: FxHashSet::default(),
             own_roots: FxHashSet::default(),
             unmarked_own_binds: FxHashMap::default(),
             func_params: FxHashMap::default(),
@@ -283,6 +302,7 @@ impl<'a> BorrowChecker<'a> {
         for param in &func.params {
             self.ensure_state(param.def_id);
             self.note_ref_root(param.def_id, param.ty);
+            self.note_mut_root(param.def_id, param.ty);
             self.note_own_root(param.def_id, param.ty);
             self.param_usage.insert(
                 param.def_id,
@@ -308,6 +328,7 @@ impl<'a> BorrowChecker<'a> {
         self.scopes.clear();
         self.param_usage.clear();
         self.ref_roots.clear();
+        self.mut_roots.clear();
         self.own_roots.clear();
         self.unmarked_own_binds.clear();
     }
@@ -329,11 +350,23 @@ impl<'a> BorrowChecker<'a> {
                 self.ensure_state(local.def_id);
                 if let Some(ty) = local.ty {
                     self.note_ref_root(local.def_id, ty);
+                    self.note_mut_root(local.def_id, ty);
                     self.note_own_root(local.def_id, ty);
+                    if self.language_conflicts && self.types.is_mut_view(ty) {
+                        self.warn_mut_local(stmt.span);
+                    }
                 }
                 if let Some(init) = &local.init {
                     if local.ty.is_some_and(|ty| self.types.is_own_view(ty)) {
                         self.bind_own_from(init);
+                    } else if self.language_conflicts
+                        && local.ty.is_some_and(|ty| self.types.is_mut_view(ty))
+                    {
+                        self.bind_mut_from(init);
+                    } else if self.language_conflicts
+                        && local.ty.is_some_and(|ty| self.types.is_ref_view(ty))
+                    {
+                        self.bind_ref_from(init);
                     } else {
                         self.check_expr(init);
                     }
@@ -396,8 +429,14 @@ impl<'a> BorrowChecker<'a> {
         let params = params.to_vec();
         // Named function Paths leave `callee.ty` unset. Applying Ref/MutRef
         // rust-lifetime simulation to those calls would reject D-1 unmarked
-        // `const` → `mut` param use. Own-param transfers still run below.
+        // `const` → `mut` param use. Language `mut` dest borrows are
+        // call-scoped so sequential use after a single `mut` param call stays
+        // legal. Own-param transfers still run below.
         let rust_sim = callee.ty.is_some();
+        let language_call_borrows = self.language_conflicts && !(rust_sim && self.rust_lifetime);
+        if language_call_borrows {
+            self.push_scope();
+        }
 
         for (arg, param) in args.iter().zip(params.iter()) {
             if let Some(arg_def_id) = Self::root_def_id(&arg.expr) {
@@ -437,8 +476,14 @@ impl<'a> BorrowChecker<'a> {
                 self.move_from_expr(&arg.expr);
                 continue;
             }
-            if !rust_sim {
-                self.check_expr(&arg.expr);
+            if language_call_borrows {
+                if self.dest_is_mut(param) {
+                    self.borrow_from_expr(&arg.expr, BorrowKind::Mutable);
+                } else if self.dest_is_ref(param) {
+                    self.borrow_from_expr(&arg.expr, BorrowKind::Shared);
+                } else {
+                    self.check_expr(&arg.expr);
+                }
                 continue;
             }
             match param.mode {
@@ -484,6 +529,9 @@ impl<'a> BorrowChecker<'a> {
                 }
                 SemanticParamMode::Owned => self.check_expr(&arg.expr),
             }
+        }
+        if language_call_borrows {
+            self.pop_scope();
         }
     }
 
@@ -562,10 +610,36 @@ impl<'a> BorrowChecker<'a> {
         }
     }
 
+    fn note_mut_root(&mut self, def_id: DefId, ty: TypeId) {
+        if self.types.is_mut_view(ty) {
+            self.mut_roots.insert(def_id);
+        }
+    }
+
     fn note_own_root(&mut self, def_id: DefId, ty: TypeId) {
         if self.types.is_exclusive_value(ty) {
             self.own_roots.insert(def_id);
         }
+    }
+
+    /// Explicit `&`/`&mut` on unmarked values stay Rust-lifetime only.
+    /// `mut` roots are language (MU-4). Combined analysis tracks both.
+    fn tracks_explicit_ref(&self, def_id: DefId) -> bool {
+        if self.rust_lifetime {
+            self.language_conflicts || !self.mut_roots.contains(&def_id)
+        } else {
+            self.language_conflicts && self.mut_roots.contains(&def_id)
+        }
+    }
+
+    /// Exclusive-borrow bind of a `mut` local from a path (or projection root).
+    fn bind_mut_from(&mut self, rhs: &HirExpression) {
+        self.borrow_from_expr(rhs, BorrowKind::Mutable);
+    }
+
+    /// Shared-borrow bind of a `ref` local from a path (or projection root).
+    fn bind_ref_from(&mut self, rhs: &HirExpression) {
+        self.borrow_from_expr(rhs, BorrowKind::Shared);
     }
 
     /// Bind-site move tracking for an `own` destination.
@@ -611,6 +685,14 @@ impl<'a> BorrowChecker<'a> {
         ) || self.types.is_mut_or_own_view(param.ty)
     }
 
+    fn dest_is_mut(&self, param: &ParamType) -> bool {
+        matches!(param.mode, SemanticParamMode::MutRef) || self.types.is_mut_view(param.ty)
+    }
+
+    fn dest_is_ref(&self, param: &ParamType) -> bool {
+        matches!(param.mode, SemanticParamMode::Ref) || self.types.is_ref_view(param.ty)
+    }
+
     fn arg_is_ref_view(&self, expr: &HirExpression) -> bool {
         if let Some(ty) = expr.ty {
             if self.types.is_ref_view(ty) {
@@ -646,7 +728,7 @@ impl<'a> BorrowChecker<'a> {
             self.error(SemanticErrorKind::UseAfterMove, ISSUE_USE_AFTER_MOVE, span);
             return;
         }
-        if self.rust_lifetime && state.mutable {
+        if state.mutable {
             self.error(
                 SemanticErrorKind::MutableBorrowConflict,
                 ISSUE_USE_WHILE_MUTABLY_BORROWED,
@@ -673,7 +755,7 @@ impl<'a> BorrowChecker<'a> {
             self.error(SemanticErrorKind::UseAfterMove, ISSUE_USE_AFTER_MOVE, span);
             return;
         }
-        if self.rust_lifetime && (state.mutable || state.shared > 0) {
+        if state.mutable || state.shared > 0 {
             self.error(
                 SemanticErrorKind::MutableBorrowConflict,
                 ISSUE_WRITE_WHILE_BORROWED,
@@ -692,7 +774,7 @@ impl<'a> BorrowChecker<'a> {
             self.error(SemanticErrorKind::UseAfterMove, ISSUE_USE_AFTER_MOVE, span);
             return;
         }
-        if self.rust_lifetime && (state.mutable || state.shared > 0) {
+        if state.mutable || state.shared > 0 {
             self.error(
                 SemanticErrorKind::CannotMoveOut,
                 ISSUE_CANNOT_MOVE_WHILE_BORROWED,
@@ -720,9 +802,6 @@ impl<'a> BorrowChecker<'a> {
                 },
                 span,
             );
-            return;
-        }
-        if !self.rust_lifetime {
             return;
         }
         if state.mutable {
@@ -755,9 +834,6 @@ impl<'a> BorrowChecker<'a> {
                 },
                 span,
             );
-            return;
-        }
-        if !self.rust_lifetime {
             return;
         }
         if state.mutable || state.shared > 0 {
@@ -801,6 +877,16 @@ impl<'a> BorrowChecker<'a> {
     fn error(&mut self, kind: SemanticErrorKind, issue: &str, span: radix_lexer::Span) {
         self.errors
             .push(SemanticError::structured(kind, span).with_arg("issue", issue));
+    }
+
+    fn warn_mut_local(&mut self, span: radix_lexer::Span) {
+        self.errors.push(
+            SemanticError::structured(
+                SemanticErrorKind::Warning(WarningKind::DiscouragedMutLocal),
+                span,
+            )
+            .with_arg("issue", ISSUE_MUT_LOCAL),
+        );
     }
 
     fn error_own_bind(&mut self, issue: &str, span: radix_lexer::Span) {
@@ -882,6 +968,12 @@ impl HirVisitor for BorrowChecker<'_> {
                     || Self::root_def_id(target).is_some_and(|id| self.own_roots.contains(&id))
                 {
                     self.bind_own_from(value);
+                } else if self.language_conflicts
+                    && (target.ty.is_some_and(|ty| self.types.is_mut_view(ty))
+                        || Self::root_def_id(target)
+                            .is_some_and(|id| self.mut_roots.contains(&id)))
+                {
+                    self.bind_mut_from(value);
                 } else {
                     self.visit_expr(value);
                 }
@@ -909,14 +1001,14 @@ impl HirVisitor for BorrowChecker<'_> {
                 self.pop_scope();
             }
             HirExpressionKind::Ref(kind, inner) => match Self::root_def_id(inner) {
-                Some(def_id) => {
+                Some(def_id) if self.tracks_explicit_ref(def_id) => {
                     self.check_projection_inputs(inner);
                     match kind {
                         radix_hir::HirRefKind::Shared => self.borrow_shared(def_id, expr.span),
                         radix_hir::HirRefKind::Mutable => self.borrow_mut(def_id, expr.span),
                     }
                 }
-                None => self.visit_expr(inner),
+                _ => self.visit_expr(inner),
             },
             HirExpressionKind::MethodCall(receiver, _method, _type_args, args) => {
                 // Determine receiver semantics from the method call's return type.

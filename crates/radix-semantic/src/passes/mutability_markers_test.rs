@@ -61,6 +61,7 @@ incipit {
 
 #[test]
 fn mut_list_locals_still_parse() {
+    // OQ-3: grammar allows mut locals. MU-4's WARN019 is non-fatal.
     analyze_ok(
         r"
 incipit {
