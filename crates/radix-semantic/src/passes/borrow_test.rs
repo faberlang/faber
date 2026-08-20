@@ -1602,11 +1602,7 @@ fn analyze_modes_rejects_mut_root_explicit_ref_conflict() {
     let mut types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
     let mut_ty = types.access_marker(AccessMarker::Mut, numerus);
-    let result = analyze_modes(
-        &dual_explicit_ref_program(mut_ty),
-        &Resolver::new(),
-        &types,
-    );
+    let result = analyze_modes(&dual_explicit_ref_program(mut_ty), &Resolver::new(), &types);
     assert!(
         result.is_err(),
         "mut-root explicit refs are a language conflict"

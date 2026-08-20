@@ -314,8 +314,8 @@ pub fn semantic_message(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Opti
         ) => semantic_lint_message(args),
         SemanticErrorKind::Warning(
             WarningKind::UnusedMoveParam
-                | WarningKind::UnusedMutRefParam
-                | WarningKind::DiscouragedMutLocal,
+            | WarningKind::UnusedMutRefParam
+            | WarningKind::DiscouragedMutLocal,
         ) => semantic_borrow_message(args),
         SemanticErrorKind::Warning(WarningKind::WildcardAbsorbsNull) => {
             semantic_wildcard_absorbs_null_message(args)

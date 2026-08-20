@@ -977,8 +977,7 @@ impl HirVisitor for BorrowChecker<'_> {
                     self.bind_own_from(value);
                 } else if self.language_conflicts
                     && (target.ty.is_some_and(|ty| self.types.is_mut_view(ty))
-                        || Self::root_def_id(target)
-                            .is_some_and(|id| self.mut_roots.contains(&id)))
+                        || Self::root_def_id(target).is_some_and(|id| self.mut_roots.contains(&id)))
                 {
                     self.bind_mut_from(value);
                 } else {

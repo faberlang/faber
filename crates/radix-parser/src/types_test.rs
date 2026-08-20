@@ -204,11 +204,7 @@ fn parses_type_position_markers_on_closure_params() {
     let StmtKind::Var(binding) = &program.statements[0].kind else {
         panic!("expected fixum");
     };
-    let ExprKind::Clausura(clausura) = &binding
-        .init
-        .as_ref()
-        .expect("init")
-        .kind else {
+    let ExprKind::Clausura(clausura) = &binding.init.as_ref().expect("init").kind else {
         panic!("expected clausura");
     };
     assert!(matches!(

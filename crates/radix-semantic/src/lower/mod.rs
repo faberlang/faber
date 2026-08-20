@@ -61,7 +61,9 @@ mod types;
 
 use crate::cli::{CliProgram, CliType};
 use crate::locale::LocalePack;
-use crate::{AnnotationContractMetadata, Primitive, Resolver, SemanticParamMode, Type, TypeId, TypeTable};
+use crate::{
+    AnnotationContractMetadata, Primitive, Resolver, SemanticParamMode, Type, TypeId, TypeTable,
+};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
     HirBlock, HirBlockEnd, HirExpression, HirId, HirItem, HirModule, HirModuleEnd, HirOwnerRef,

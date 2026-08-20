@@ -2094,7 +2094,8 @@ fn emit_fhir_serializes_valid_faber_to_fhir_bytes() {
     // Schema version serializes as a postcard varint (single byte for <128).
     assert!(!bytes.is_empty(), "serialized artifact should be non-empty");
     assert_eq!(
-        bytes[0], radix_hir_fhir::SCHEMA_VERSION as u8,
+        bytes[0],
+        radix_hir_fhir::SCHEMA_VERSION as u8,
         "FHIR artifact must start with schema version; first byte: {:02x?}",
         bytes[0]
     );
