@@ -61,6 +61,57 @@ fn compile_rejects_en_require_in_arrowless_function() {
 }
 
 #[test]
+fn compile_en_empty_marker_and_is_empty_intrinsic() {
+    // en-pack-surface-fidelity V-1: the empty-collection marker is `empty`,
+    // and the collection intrinsic remains `is_empty`. Both spellings must
+    // compile in one source so the concepts cannot cross-contaminate.
+    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
+    let config = Config::default()
+        .with_target(Target::HirRust)
+        .with_locale_pack(pack);
+    let session = Session::new(config);
+    let source = "fn f() → int {\n  var list<int> xs ← empty\n  const _ vacant ← xs.is_empty()\n  return 0\n}";
+    let result = compile(&session, "test.fab", source);
+    assert!(
+        result.success(),
+        "en `empty` marker plus `is_empty` intrinsic must compile: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn compile_en_vacua_marker_transition_alias() {
+    // Transition window (goal en-pack-surface-fidelity): `vacua` stays an
+    // accepted en marker spelling until V-5 removes the alias.
+    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
+    let config = Config::default()
+        .with_target(Target::HirRust)
+        .with_locale_pack(pack);
+    let session = Session::new(config);
+    let source = "fn f() → int {\n  var list<int> xs ← vacua\n  return 0\n}";
+    let result = compile(&session, "test.fab", source);
+    assert!(
+        result.success(),
+        "en `vacua` marker alias must still claim: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn compile_la_vacua_marker_untouched() {
+    let pack = crate::locale::latin_locale_pack();
+    let config = Config::default()
+        .with_target(Target::HirRust)
+        .with_locale_pack(pack);
+    let session = Session::new(config);
+    let source = "functio f() → numerus {\n  varia lista<numerus> xs ← vacua\n  redde 0\n}";
+    let result = compile(&session, "test.fab", source);
+    assert!(result.success(), "la `vacua` marker must still claim: {:?}", result.diagnostics);
+}
+
+#[test]
 fn compile_rejects_undeclared_latin_keyword_in_grammar_position() {
     // S2-U2 pack-authoritative gate: the zh-Hans pack does not declare the
     // Latin spelling `functio`, so it must NOT claim the function-declaration
