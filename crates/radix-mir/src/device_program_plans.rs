@@ -385,6 +385,94 @@ impl RecipeKind {
     }
 }
 
+/// Version of the additive executor-plan bind extension frozen by M0.
+///
+/// This extension carries library selection facts beside the existing
+/// `DeviceProgram` shape. It is intentionally not a WIRE-v8 schema change:
+/// callers that do not consume the extension continue to use the generated
+/// kernel entry and its existing resource/launch facts.
+pub const EXECUTOR_PLAN_BIND_ABI_VERSION: u16 = 1;
+
+/// Target-neutral layout family for a library body bind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BindLayout {
+    /// A flat one-dimensional body.
+    Flat,
+    /// Contiguous row-major storage.
+    RowMajor,
+    /// A non-contiguous view described by the carried strides.
+    Strided,
+    /// RoPE consecutive-pair layout.
+    RopeConsecutivePair { rotated_width: u64 },
+    /// RoPE rotate-half layout.
+    RopeRotateHalf { rotated_width: u64 },
+}
+
+/// Dimensions, strides, layout, and grid bound to one library body.
+///
+/// The descriptor is a typed executor-plan fact. Backends may lower it to
+/// uniforms or native launch metadata, but they must not infer it from an
+/// emitted kernel body or from a physical buffer length.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BindDescriptor {
+    /// Logical dimensions in outer-to-inner order.
+    pub dims: Vec<u64>,
+    /// Physical element strides in the same order as [`Self::dims`].
+    pub strides: Vec<u64>,
+    /// Logical interpretation of the dimensions and strides.
+    pub layout: BindLayout,
+    /// Backend-neutral workgroup grid.
+    pub grid: MirKernelWorkgroupCount,
+}
+
+impl BindDescriptor {
+    fn row_major(dims: Vec<u64>, grid: MirKernelWorkgroupCount, layout: BindLayout) -> Self {
+        let mut strides = vec![1u64; dims.len()];
+        for axis in (0..dims.len()).rev().skip(1) {
+            strides[axis] = strides[axis + 1].saturating_mul(dims[axis + 1]);
+        }
+        Self {
+            dims,
+            strides,
+            layout,
+            grid,
+        }
+    }
+
+    /// Whether this descriptor has structurally coherent rank and extents.
+    #[must_use]
+    pub fn is_well_formed(&self) -> bool {
+        !self.dims.is_empty()
+            && self.dims.len() == self.strides.len()
+            && self.dims.iter().all(|dim| *dim > 0)
+            && self.strides.iter().all(|stride| *stride > 0)
+            && self.grid.x > 0
+            && self.grid.y > 0
+            && self.grid.z > 0
+    }
+}
+
+/// One optional library selection and its launch bind facts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LibrarySelection {
+    /// Index into [`DeviceProgram`]`::kernels`.
+    pub kernel_index: usize,
+    /// The logical body selected by the executor. `None` retains the
+    /// generated-kernel fallback for a recipe not yet owned by library v0.
+    pub library_entry: Option<String>,
+    /// Shape/layout/grid facts supplied to the selected body.
+    pub bind: BindDescriptor,
+}
+
+/// M0-frozen additive executor-plan extension for library calls.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExecutorPlanExtension {
+    /// Extension schema version.
+    pub abi_version: u16,
+    /// Ordered selection/bind records, one per declared kernel.
+    pub selections: Vec<LibrarySelection>,
+}
+
 /// One typed buffer slot in a launch descriptor.
 ///
 /// A program fact snapshot of a [`DeviceResource`]: the binding indices, the
@@ -416,6 +504,9 @@ pub struct KernelLaunchDescriptor {
     pub kernel_index: usize,
     /// Target-neutral logical entry name (backends map it to their syntax).
     pub entry: String,
+    /// M2 library-v0 bind descriptor. The descriptor is carried separately
+    /// from the entry so one body can serve multiple concrete shapes.
+    pub bind: BindDescriptor,
     /// Recipe family tag.
     pub recipe: RecipeKind,
     /// Threads per workgroup.
@@ -442,6 +533,7 @@ impl KernelLaunchDescriptor {
         Self {
             kernel_index,
             entry: kernel.entry.clone(),
+            bind: bind_descriptor_for_kernel(kernel),
             recipe: RecipeKind::from_plan(&kernel.plan),
             workgroup: kernel.launch.workgroup,
             dispatch: kernel.launch.dispatch_size,
@@ -463,6 +555,124 @@ pub fn launch_descriptors(program: &DeviceProgram) -> Vec<KernelLaunchDescriptor
         .enumerate()
         .map(|(index, kernel)| KernelLaunchDescriptor::from_kernel_unit(kernel, index))
         .collect()
+}
+
+/// Derive the M2 library-v0 bind facts for one carried kernel.
+///
+/// This is the only planner-side projection needed by the additive executor
+/// extension. It preserves the existing `KernelUnit` and `DeviceProgram`
+/// schema: generated kernels continue to carry their original entry, resources,
+/// and launch plan, while library consumers receive the same typed dimensions,
+/// strides, layout, and grid as a sidecar fact.
+#[must_use]
+pub fn bind_descriptor_for_kernel(kernel: &KernelUnit) -> BindDescriptor {
+    let output_extent = kernel
+        .resources
+        .iter()
+        .find(|resource| {
+            matches!(
+                resource.access,
+                MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+            )
+        })
+        .map_or_else(
+            || {
+                kernel
+                    .resources
+                    .first()
+                    .map_or(1, |resource| resource.version.element_count)
+            },
+            |resource| resource.version.element_count,
+        );
+    let (dims, layout) = bind_dimensions(&kernel.plan, output_extent);
+    BindDescriptor::row_major(dims, kernel.launch.workgroup_count, layout)
+}
+
+/// Build the additive M0 executor-plan section without changing the existing
+/// device-program or FMIR wire shape.
+#[must_use]
+pub fn executor_plan_extension(program: &DeviceProgram) -> ExecutorPlanExtension {
+    ExecutorPlanExtension {
+        abi_version: EXECUTOR_PLAN_BIND_ABI_VERSION,
+        selections: program
+            .kernels
+            .iter()
+            .enumerate()
+            .map(|(kernel_index, kernel)| {
+                let recipe = RecipeKind::from_plan(&kernel.plan);
+                LibrarySelection {
+                    kernel_index,
+                    library_entry: library_entry_for_kernel(kernel, recipe),
+                    bind: bind_descriptor_for_kernel(kernel),
+                }
+            })
+            .collect(),
+    }
+}
+
+fn bind_dimensions(plan: &CollectionKernelPlan, output_extent: u64) -> (Vec<u64>, BindLayout) {
+    match plan {
+        CollectionKernelPlan::RmsNormalization(plan) => {
+            if plan.width > 0 && output_extent % plan.width == 0 {
+                (
+                    vec![output_extent / plan.width, plan.width],
+                    BindLayout::RowMajor,
+                )
+            } else {
+                (vec![output_extent], BindLayout::Flat)
+            }
+        }
+        CollectionKernelPlan::Rope(plan) => {
+            let layout = if plan.rotate_half {
+                BindLayout::RopeRotateHalf {
+                    rotated_width: plan.dim,
+                }
+            } else {
+                BindLayout::RopeConsecutivePair {
+                    rotated_width: plan.dim,
+                }
+            };
+            let rows = if plan.width > 0 && output_extent % plan.width == 0 {
+                output_extent / plan.width
+            } else {
+                plan.rows.max(1)
+            };
+            (vec![rows, plan.width.max(1)], layout)
+        }
+        CollectionKernelPlan::CausalMaskedSoftmax(plan) => {
+            (vec![plan.rows, plan.cols], BindLayout::RowMajor)
+        }
+        CollectionKernelPlan::TiledMatMul(plan) => (vec![plan.m, plan.n], BindLayout::RowMajor),
+        CollectionKernelPlan::QuantizedMatMul(plan) => (vec![plan.m, plan.n], BindLayout::RowMajor),
+        CollectionKernelPlan::GroupedMatMul(plan) => {
+            (vec![plan.groups, plan.m, plan.n], BindLayout::RowMajor)
+        }
+        CollectionKernelPlan::Transpose(plan) => (vec![plan.m, plan.n], BindLayout::RowMajor),
+        CollectionKernelPlan::TreeReduction(plan) => (vec![plan.length], BindLayout::Flat),
+        CollectionKernelPlan::Elementwise
+        | CollectionKernelPlan::AxisReduction(_)
+        | CollectionKernelPlan::RowSoftmax(_)
+        | CollectionKernelPlan::LayerNormalization(_)
+        | CollectionKernelPlan::Gather(_)
+        | CollectionKernelPlan::SsmConv1d(_)
+        | CollectionKernelPlan::SsmScan(_) => (vec![output_extent.max(1)], BindLayout::Flat),
+    }
+}
+
+fn library_entry_for_kernel(kernel: &KernelUnit, recipe: RecipeKind) -> Option<String> {
+    let entry = match recipe {
+        RecipeKind::RmsNormalization => Some("rms"),
+        RecipeKind::Rope => Some("rope"),
+        RecipeKind::RowSoftmax | RecipeKind::CausalMaskedSoftmax => Some("softmax"),
+        RecipeKind::Elementwise if kernel.entry.starts_with("swiglu") => Some("swiglu"),
+        RecipeKind::Elementwise
+            if kernel.entry.contains("residual") || kernel.entry.starts_with("sum_o_") =>
+        {
+            Some("residual")
+        }
+        _ => None,
+    }?;
+    Some(entry.to_owned())
 }
 
 fn launch_buffer_slot(resource: &DeviceResource) -> LaunchBufferSlot {
