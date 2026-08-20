@@ -165,6 +165,37 @@ functio facere() → C<numerus> {
     );
 }
 
+#[test]
+fn generic_constructor_type_args_standalone_is_name_not_value() {
+    // Current behavior: type args on a constructor in expression position are
+    // not the construction idiom (expected-type context is). Pin the diagnostic
+    // shape; do not improve it here.
+    test_support::assert_rejects_with_issue(
+        r"genus Something<A> {
+}
+
+incipit {
+    Something<numerus> { }
+}",
+        "name_not_value",
+    );
+}
+
+#[test]
+fn generic_constructor_type_args_annotated_binding_is_expected_expression() {
+    // Direct annotated binding with extra constructor type-args is a parse
+    // miss today (PARSE030), not a semantic arity error.
+    test_support::assert_rejects_with_issue(
+        r"genus Something<A> {
+}
+
+incipit {
+    Something<numerus, textus> s ← Something { }
+}",
+        "expected_expression",
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Non-generic regression surface (no substitution, no applied result)
 // ---------------------------------------------------------------------------
