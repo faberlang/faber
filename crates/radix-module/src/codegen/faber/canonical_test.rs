@@ -1154,7 +1154,7 @@ fn discerne_patterns_preserve_bindings_aliases_variants_and_guards() {
 }
 
 #[test]
-fn emits_object_literal_fields_from_innatum_entries() {
+fn emits_object_literal_fields_from_verte_entries() {
     let mut interner = Interner::new();
     let nomen = interner.intern("nomen");
     let activus = interner.intern("activus");
