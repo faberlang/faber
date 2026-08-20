@@ -20,12 +20,14 @@ use crate::device_program::{
     Binding, BufferRole, DeviceProgram, DeviceProgramError, DeviceResource, KernelLaunchPlan,
     KernelUnit,
 };
-use crate::kernel_plan::{BatchedAttentionKind, CollectionKernelPlan, MatMulShapes, SharedMemoryLayout};
+use crate::kernel_plan::{
+    BatchedAttentionKind, CollectionKernelPlan, MatMulShapes, SharedMemoryLayout,
+};
 use crate::layout::MirTensorStorageLayout;
 use crate::{
-    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirKernelDispatchSize, MirKernelWorkgroupCount,
-    MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirRuntimeCall, MirStatementKind, MirType,
-    MirUnOp, MirValidationContext, MirWorkgroupSize,
+    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirKernelDispatchSize,
+    MirKernelWorkgroupCount, MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirRuntimeCall,
+    MirStatementKind, MirType, MirUnOp, MirValidationContext, MirWorkgroupSize,
 };
 use radix_types::{NumericWidth, Primitive, Type, TypeId};
 use rustc_hash::FxHashMap;
@@ -1275,13 +1277,13 @@ pub fn contract_shape_signature(
                     function.id.0
                 ))
             })?;
-            let (element_ty, _) = data_flow_element_ty_and_count(
-                function_local_ty(function, *first)?,
-                validation,
-            )?;
+            let (element_ty, _) =
+                data_flow_element_ty_and_count(function_local_ty(function, *first)?, validation)?;
             for (binding, local) in operands.iter().copied().enumerate() {
-                let (operand_ty, extent) =
-                    data_flow_element_ty_and_count(function_local_ty(function, local)?, validation)?;
+                let (operand_ty, extent) = data_flow_element_ty_and_count(
+                    function_local_ty(function, local)?,
+                    validation,
+                )?;
                 if binding == 0 {
                     signature.input = storage_input_with_local(0, operand_ty, extent, local);
                 } else {

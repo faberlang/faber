@@ -308,7 +308,11 @@ pub(super) fn validate_batched_attention_plan(
         return Err(PlanValidationError::BatchedAttentionInvalid);
     }
     if plan.kind == super::plan::BatchedAttentionKind::ContextSequenceMajor
-        && plan.hidden != plan.kv_heads.saturating_mul(plan.q_per_kv).saturating_mul(plan.head_dim)
+        && plan.hidden
+            != plan
+                .kv_heads
+                .saturating_mul(plan.q_per_kv)
+                .saturating_mul(plan.head_dim)
     {
         return Err(PlanValidationError::BatchedAttentionInvalid);
     }

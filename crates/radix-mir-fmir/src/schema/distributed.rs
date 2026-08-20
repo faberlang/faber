@@ -64,19 +64,20 @@ use radix_mir::distributed::{
 use radix_mir::kernel_plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, BatchedAttentionKind, BatchedAttentionPlan,
     CausalMaskedSoftmaxPlan, CollectionKernelPlan, GatherPlan, GroupedMatMulPlan,
-    LayerNormalizationPlan, MatMulPlan, MatMulSharedMemory,
-    OobPaddingPolicy, QuantizedMatMulPlan, ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan,
-    RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
+    LayerNormalizationPlan, MatMulPlan, MatMulSharedMemory, OobPaddingPolicy, QuantizedMatMulPlan,
+    ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, RowSoftmaxPlan, SharedMemoryLayout,
+    SsmConv1dPlan, SsmScanPlan, TransposePlan,
 };
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::{MirFunctionId, MirType};
 use radix_types::TypeId;
 
 use super::wire::{
-    WireBarrierPhase, WireBarrierPoint, WireBatchedAttentionKind, WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
-    WireCollectionKernelPlan, WireDeviceProgram, WireKernelUnit,
-    WireOobPaddingPolicy, WirePackedStorageLayout, WireProgramLifetime, WireReduceOp,
-    WireResourceAccess, WireResultBuffer, WireSharedMemoryLayout, WireStorageLayout,
+    WireBarrierPhase, WireBarrierPoint, WireBatchedAttentionKind, WireBufferIdentity,
+    WireBufferLifetime, WireBufferRole, WireBufferVersion, WireCollectionKernelPlan,
+    WireDeviceProgram, WireKernelUnit, WireOobPaddingPolicy, WirePackedStorageLayout,
+    WireProgramLifetime, WireReduceOp, WireResourceAccess, WireResultBuffer,
+    WireSharedMemoryLayout, WireStorageLayout,
 };
 use crate::error::FmirImageError;
 

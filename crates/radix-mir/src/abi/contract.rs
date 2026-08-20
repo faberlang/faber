@@ -343,7 +343,9 @@ pub(crate) fn apply_collection_op_contract(
                 z: 1,
             };
         }
-        CollectionOpContract::BatchedAttention { output_elements, .. } => {
+        CollectionOpContract::BatchedAttention {
+            output_elements, ..
+        } => {
             signature.workgroup = MirWorkgroupSize { x: 64, y: 1, z: 1 };
             signature.dispatch_size = MirKernelDispatchSize {
                 x: output_elements,
@@ -621,7 +623,10 @@ fn batched_attention_contract(
         7 => (crate::kernel_plan::BatchedAttentionKind::ProjectionK, true),
         3 => (crate::kernel_plan::BatchedAttentionKind::Scores, false),
         4 => (crate::kernel_plan::BatchedAttentionKind::Softmax, false),
-        5 => (crate::kernel_plan::BatchedAttentionKind::ContextSequenceMajor, false),
+        5 => (
+            crate::kernel_plan::BatchedAttentionKind::ContextSequenceMajor,
+            false,
+        ),
         other => {
             return Err(MirAbiError::new(format!(
                 "batched attention kind {other} is not admitted"
@@ -634,16 +639,14 @@ fn batched_attention_contract(
     let head_dim = const_u64(args, base + 3, "head_dim")?;
     let hidden = const_u64(args, base + 4, "hidden")?;
     if kv_heads == 0 || q_per_kv == 0 || seq == 0 || head_dim == 0 || hidden == 0 {
-        return Err(MirAbiError::new(
-            "batched attention axes must be non-zero",
-        ));
+        return Err(MirAbiError::new("batched attention axes must be non-zero"));
     }
     let output_ty = destination
         .and_then(crate::read_analysis::place_local_base)
         .and_then(|local| crate::local_ty::local_ty(function, local))
         .ok_or_else(|| MirAbiError::new("batched attention output has no typed local"))?;
-    let output_dims = crate::tensor_type::tensor_literal_dims(output_ty, validation)
-        .map_err(MirAbiError::new)?;
+    let output_dims =
+        crate::tensor_type::tensor_literal_dims(output_ty, validation).map_err(MirAbiError::new)?;
     let expected = match kind {
         crate::kernel_plan::BatchedAttentionKind::ProjectionQ
         | crate::kernel_plan::BatchedAttentionKind::ProjectionK
@@ -687,7 +690,9 @@ fn batched_attention_contract(
     let scale_bits = if matches!(kind, crate::kernel_plan::BatchedAttentionKind::Scores) {
         let value = const_f64(args, kind_index - 1, "attention scale")? as f32;
         if !value.is_finite() || value == 0.0 {
-            return Err(MirAbiError::new("attention scale must be finite and non-zero"));
+            return Err(MirAbiError::new(
+                "attention scale must be finite and non-zero",
+            ));
         }
         value.to_bits()
     } else {
@@ -734,14 +739,18 @@ fn const_u64(args: &[MirOperand], index: usize, what: &str) -> Result<u64, MirAb
             u64::try_from(*value).map_err(|_| MirAbiError::new(format!("{what} is too large")))
         }
         Some(MirOperand::Constant(MirConstant::UInt(value))) if *value > 0 => Ok(*value),
-        _ => Err(MirAbiError::new(format!("batched attention {what} must be a positive const"))),
+        _ => Err(MirAbiError::new(format!(
+            "batched attention {what} must be a positive const"
+        ))),
     }
 }
 
 fn const_f64(args: &[MirOperand], index: usize, what: &str) -> Result<f64, MirAbiError> {
     match args.get(index) {
         Some(MirOperand::Constant(MirConstant::Float(value))) => Ok(*value),
-        _ => Err(MirAbiError::new(format!("batched attention {what} must be a float const"))),
+        _ => Err(MirAbiError::new(format!(
+            "batched attention {what} must be a float const"
+        ))),
     }
 }
 
