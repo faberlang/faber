@@ -1,7 +1,7 @@
 use super::{
     decode_device_inputs, encode_device_inputs, encode_weight_map, execute_device_at,
-    open_device_session_at, resolve_host_cli_at, DeviceExecuteReceipt, DeviceExecuteRequest,
-    HostSpawnError, WeightFileRange,
+    open_device_session_at, resolve_host_cli_at, start_device_session_at, DeviceExecuteReceipt,
+    DeviceExecuteRequest, HostSpawnError, WeightFileRange,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -56,6 +56,66 @@ done
             .expect("chmod resident stub");
     }
     (dir, path)
+}
+
+fn order_violation_stub_cli() -> (tempfile::TempDir, PathBuf) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("faber-host-macos-arm64");
+    let script = r##"#!/bin/sh
+loaded=0
+while IFS= read -r command; do
+  case "$command" in
+    *'"op":"load"'*)
+      if [ "$loaded" -eq 1 ]; then
+        printf '%s\n' '{"code":"E_INVALID_ARGS","message":"resident device session is already loaded"}'
+      else
+        loaded=1
+        printf '%s\n' '{"operation":"load","lifecycle":{"prepares":1,"reuses":0,"resets":0,"releases":0,"module_reloads":0,"per_program_reallocs":0,"live_handles":1}}'
+      fi
+      ;;
+    *'"op":"step"'*)
+      if [ "$loaded" -eq 0 ]; then
+        printf '%s\n' '{"code":"E_INVALID_ARGS","message":"resident step requires load first"}'
+      else
+        printf '%s\n' '{"operation":"step","lifecycle":{"prepares":1,"reuses":1,"resets":0,"releases":0,"module_reloads":0,"per_program_reallocs":0,"live_handles":1}}'
+      fi
+      ;;
+    *'"op":"reset"'*)
+      case "$command" in
+        *'"inputs":'*)
+          printf '%s\n' '{"code":"E_INVALID_ARGS","message":"resident reset does not accept inputs"}'
+          ;;
+        *)
+          printf '%s\n' '{"operation":"reset","lifecycle":{"prepares":1,"reuses":0,"resets":1,"releases":0,"module_reloads":0,"per_program_reallocs":0,"live_handles":1}}'
+          ;;
+      esac
+      ;;
+    *'"op":"end"'*)
+      printf '%s\n' '{"code":"E_INVALID_ARGS","message":"resident end requires release first"}'
+      ;;
+    *'"op":"release"'*)
+      printf '%s\n' '{"operation":"release","lifecycle":{"prepares":1,"reuses":0,"resets":0,"releases":1,"module_reloads":0,"per_program_reallocs":0,"live_handles":0}}'
+      exit 0
+      ;;
+    *)
+      printf '%s\n' '{"code":"E_INVALID_ARGS","message":"unknown resident operation"}'
+      ;;
+  esac
+done
+"##;
+    std::fs::write(&path, script).expect("write order violation stub");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod order violation stub");
+    }
+    (dir, path)
+}
+
+fn assert_order_error(error: HostSpawnError, message: &str) {
+    assert_eq!(error.code, "E_INVALID_ARGS");
+    assert_eq!(error.message, message);
 }
 
 fn malformed_request() -> DeviceExecuteRequest {
@@ -181,6 +241,51 @@ fn resident_control_client_keeps_one_child_across_load_steps_reset_release() {
     assert_eq!(release.lifecycle.releases, 1);
     assert_eq!(release.lifecycle.live_handles, 0);
     assert!(session.release().is_err(), "a released owner refuses reuse");
+}
+
+#[test]
+fn resident_step_before_load_returns_structured_order_error() {
+    let (_dir, host) = order_violation_stub_cli();
+    let request = malformed_request();
+    let mut session = start_device_session_at(&host, &request).expect("start session");
+    let inputs = BTreeMap::from([(2, vec![1.0, 2.0])]);
+    let error = session.step(&inputs).expect_err("step before load");
+    assert_order_error(error, "resident step requires load first");
+}
+
+#[test]
+fn resident_double_load_returns_structured_order_error() {
+    let (_dir, host) = order_violation_stub_cli();
+    let request = malformed_request();
+    let mut session = start_device_session_at(&host, &request).expect("start session");
+    session.control("load", None).expect("first load");
+    let error = session.control("load", None).expect_err("double load");
+    assert_order_error(error, "resident device session is already loaded");
+}
+
+#[test]
+fn resident_reset_with_inputs_returns_structured_order_error() {
+    let (_dir, host) = order_violation_stub_cli();
+    let request = malformed_request();
+    let mut session = start_device_session_at(&host, &request).expect("start session");
+    session.control("load", None).expect("load");
+    let inputs = BTreeMap::from([(2, vec![1.0, 2.0])]);
+    let error = session
+        .control("reset", Some(&inputs))
+        .expect_err("reset with inputs");
+    assert_order_error(error, "resident reset does not accept inputs");
+}
+
+#[test]
+fn resident_end_without_release_returns_structured_order_error() {
+    let (_dir, host) = order_violation_stub_cli();
+    let request = malformed_request();
+    let mut session = start_device_session_at(&host, &request).expect("start session");
+    session.control("load", None).expect("load");
+    let error = session
+        .control("end", None)
+        .expect_err("end without release");
+    assert_order_error(error, "resident end requires release first");
 }
 
 fn assert_bit_exact(inputs: &BTreeMap<u32, Vec<f32>>) {

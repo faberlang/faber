@@ -273,6 +273,20 @@ fn open_device_session_at(
     host: &Path,
     request: &DeviceExecuteRequest,
 ) -> Result<(DeviceExecuteSession, DeviceExecuteControlReceipt), HostSpawnError> {
+    let mut session = start_device_session_at(host, request)?;
+    let loaded = session.control("load", None)?;
+    Ok((session, loaded))
+}
+
+/// Start a resident control owner without sending its first operation.
+///
+/// Keeping process startup separate from the initial `load` gives the client
+/// tests a way to exercise the host's fail-closed operation ordering without
+/// changing the production open-session contract.
+fn start_device_session_at(
+    host: &Path,
+    request: &DeviceExecuteRequest,
+) -> Result<DeviceExecuteSession, HostSpawnError> {
     let work = WorkDir::create()?;
     let descriptor_path = work.path.join("descriptor.json");
     let module_path = work.path.join("module.bin");
@@ -316,15 +330,13 @@ fn open_device_session_at(
         code: "E_HOST_SPAWN".to_owned(),
         message: "resident device-execute stdout was not piped".to_owned(),
     })?;
-    let mut session = DeviceExecuteSession {
+    Ok(DeviceExecuteSession {
         child,
         stdin,
         stdout: BufReader::new(stdout),
         released: false,
         _work: work,
-    };
-    let loaded = session.control("load", None)?;
-    Ok((session, loaded))
+    })
 }
 
 impl DeviceExecuteSession {
