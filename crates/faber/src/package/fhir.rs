@@ -13,7 +13,7 @@
 //! - [`run_loaded_package_fhir`] runs a loaded package in-process.
 //!
 //! RP5: the writer half ([`radix_program::fhir::build_package_fhir`]) moved to
-//! `radix-package/src/fhir.rs` (compiler-owned). This module keeps only the
+//! `radix-program/src/fhir.rs` (compiler-owned). This module keeps only the
 //! Faber-side loader and execution adapter, which consume the typed artifact
 //! through the Faber analysis/MIR seams (ownership-freeze §5.3).
 #![allow(dead_code)] // Binary build/run and lib tests exercise different surfaces.

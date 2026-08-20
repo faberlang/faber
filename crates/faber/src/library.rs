@@ -1,12 +1,12 @@
 //! Library import resolution for package compilation (faber seam).
 //!
 //! RP2c: the resolver family (specifier → interface file) moved to
-//! `radix-package` with the explicit-input posture — `radix-package` never
+//! `radix-program` with the explicit-input posture — `radix-program` never
 //! reads the ambient environment. This module keeps the faber-owned ambient
 //! discovery seam — `FABER_LIBRARY_HOME` env reading and the
 //! workspace-ancestor probe (CTO memo) — and constructs the explicit
 //! resolver inputs the compiler crate requires. The resolver types are supplied
-//! by `radix-package`; this module adds the Faber-only ambient discovery seam.
+//! by `radix-program`; this module adds the Faber-only ambient discovery seam.
 
 #[cfg(test)]
 #[path = "library_test.rs"]

@@ -5,7 +5,7 @@
 //! checks, and fail-closed referential-integrity validation.
 //!
 //! This is a format crate, not a compiler driver: `AnalyzedModule`
-//! reconstruction and driver orchestration stay in the `radix` package, which
+//! reconstruction and driver orchestration stay in `radix-module`, which
 //! calls [`decode`] and rebuilds arenas from the returned [`HirArtifact`].
 //! Schema evolution and package/library requirements remain the authority of
 //! the `hir-artifact-fhir` campaign.

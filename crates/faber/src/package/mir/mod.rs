@@ -1,7 +1,7 @@
 //! Faber package-MIR product surface (RP5 residual).
 //!
 //! RP5: the compiler-owned subset of this module moved to
-//! `radix-package/src/mir/` (lowering/linking/image/routes/driver/cli/diag/
+//! `radix-program/src/mir/` (lowering/linking/image/routes/driver/cli/diag/
 //! manifest writer + test support). This module keeps the faber product
 //! surface:
 //!
@@ -13,7 +13,7 @@
 //!   builder, host-route policy, runner writer, toolchain version) that the
 //!   compiler subset receives.
 //! - Faber product entry adapters that inject those seams into the typed
-//!   `radix-package` MIR operations. These adapters are product boundaries,
+//!   `radix-program` MIR operations. These adapters are product boundaries,
 //!   not compiler compatibility modules.
 #![allow(dead_code)] // Binary and library targets exercise different package runner surfaces.
 
@@ -31,13 +31,13 @@ use std::path::Path;
 
 use radix_program::mir::{mir_diag, DeviceSelection};
 
-// Faber's fmir-bin runner writer is the seam body radix-package's binary
+// Faber's fmir-bin runner writer is the seam body radix-program's binary
 // bundle builder receives (`MirSeams::bin_runner_writer`).
 use bin_runner::write_fmir_bin_runner;
 
 /// The faber-supplied package-MIR seams (RP5). Every faber product input the
 /// moved compiler subset needs enters as an explicit function — no ambient
-/// reads inside `radix-package`.
+/// reads inside `radix-program`.
 pub(crate) fn faber_mir_seams() -> radix_program::mir::MirSeams {
     radix_program::mir::MirSeams {
         analysis: super::faber_analysis_seams(),

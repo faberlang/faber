@@ -1,10 +1,10 @@
 //! Compiler-owned multi-file package compilation surface.
 //!
-//! `radix-program` sits above the `radix` facade and composes the existing
-//! single-unit compiler into package analysis and artifact assembly through
-//! module-level typed seams. The crate owns package orchestration — never a
-//! second lexer/parser/typechecker, never global or thread-local state, never a
-//! hidden output root.
+//! `radix-program` is the whole-program layer consumed by the `radix` façade.
+//! It composes the existing single-unit compiler into package analysis and
+//! artifact assembly through module-level typed seams. The crate owns package
+//! orchestration — never a second lexer/parser/typechecker, never global or
+//! thread-local state, never a hidden output root.
 
 use std::path::PathBuf;
 

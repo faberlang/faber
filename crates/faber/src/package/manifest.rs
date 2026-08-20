@@ -2,12 +2,12 @@
 //!
 //! RP2a: the compiler view (package identity, source paths, library identity,
 //! build target, locale, dependencies, lock-resolved inputs) moved to
-//! `radix-package`. This module keeps the product-only manifest
+//! `radix-program`. This module keeps the product-only manifest
 //! interpretation — `[device]`, `[product]`, `[dispatch]`,
 //! product emit — plus the strict one-pass parse (`deny_unknown_fields`)
 //! that discovery and product flows validate against (goal §Manifest
 //! boundary). Compiler-view types and target selection are consumed directly
-//! from `radix-package`; this module retains only the product projection.
+//! from `radix-program`; this module retains only the product projection.
 
 use std::collections::BTreeMap;
 use std::fs;
