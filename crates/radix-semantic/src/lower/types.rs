@@ -40,8 +40,24 @@ impl Lowerer<'_> {
     /// This is the only HIR-lowering entry point that may turn type syntax into
     /// reusable `TypeId`s. It preserves source span context for diagnostics,
     /// normalizes nullable unions, and applies AST modifiers in parser order
-    /// without resolving type compatibility.
+    /// without resolving type compatibility. Bind declarations and other
+    /// ordinary type positions keep the scalar-marker rejection; parameter
+    /// positions use [`Self::lower_parameter_type`] so scalar `ref`/`mut`
+    /// markers can describe the parameter ABI.
     pub fn lower_type(&mut self, ty: &TypeExpr) -> TypeId {
+        self.lower_type_with_context(ty, false)
+    }
+
+    /// Lower a type written in a parameter slot.
+    ///
+    /// `ref`/`mut` on scalar parameters are intentional ABI markers, while
+    /// `own`/`copy` remain rejected on scalars and all markers remain rejected
+    /// in ordinary binding/type positions.
+    pub(super) fn lower_parameter_type(&mut self, ty: &TypeExpr) -> TypeId {
+        self.lower_type_with_context(ty, true)
+    }
+
+    fn lower_type_with_context(&mut self, ty: &TypeExpr, allow_scalar_ref_mut: bool) -> TypeId {
         self.current_span = ty.span;
 
         let mut ty_id = match &ty.kind {
@@ -70,7 +86,7 @@ impl Lowerer<'_> {
                     .params
                     .iter()
                     .map(|param| {
-                        let ty = self.lower_type(param);
+                        let ty = self.lower_parameter_type(param);
                         ParamType {
                             ty,
                             mode: match param.mode {
@@ -98,7 +114,13 @@ impl Lowerer<'_> {
 
         if let Some(mode) = ty.mode {
             let marker = crate::access_marker_from_type_mode(mode);
-            if self.types.is_scalar_for_access_marker(ty_id) {
+            if self.types.is_scalar_for_access_marker(ty_id)
+                && !(allow_scalar_ref_mut
+                    && matches!(
+                        mode,
+                        radix_syntax::TypeMode::De | radix_syntax::TypeMode::In
+                    ))
+            {
                 self.error(crate::ISSUE_SCALAR_ACCESS_MARKER);
                 ty_id = self.types.intern(Type::Error);
             } else {

@@ -74,6 +74,10 @@ incipit {
 #[test]
 fn scalar_access_marker_rejects_at_the_marker() {
     assert_rejects_with_issue(
+        "incipit { fixum de numerus x ← 5 }",
+        ISSUE_SCALAR_ACCESS_MARKER,
+    );
+    assert_rejects_with_issue(
         "incipit { varia in numerus x ← 5 }",
         ISSUE_SCALAR_ACCESS_MARKER,
     );

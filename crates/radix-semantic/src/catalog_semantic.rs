@@ -73,7 +73,6 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::UnionHoleSolvedMonomorphically,
     WarningKind::PreferStringTemplate,
     WarningKind::DiscouragedMutLocal,
-    WarningKind::DeprecatedParamPrefix,
 ];
 
 // STABLE CODES
@@ -335,9 +334,6 @@ pub fn semantic_message(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Opti
         SemanticErrorKind::Warning(WarningKind::PreferStringTemplate) => {
             semantic_prefer_string_template_message(args)
         }
-        SemanticErrorKind::Warning(WarningKind::DeprecatedParamPrefix) => {
-            semantic_deprecated_param_prefix_message(args)
-        }
     }
 }
 
@@ -362,9 +358,6 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
         }
         SemanticErrorKind::Warning(WarningKind::UnionHoleSolvedMonomorphically) => {
             semantic_union_hole_solved_monomorphically_help(args)
-        }
-        SemanticErrorKind::Warning(WarningKind::DeprecatedParamPrefix) => {
-            Some("write the parameter mode on the type (`de`, `in`, `own`, `copy`) instead of the legacy prefix".to_owned())
         }
         _ => None,
     }
@@ -1759,7 +1752,10 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
             let forms = arg_value(args, "object_literal_forms")?;
             Some(format!("bare object literal is retired; use {forms}"))
         }
-        "scalar_access_marker" => Some("access markers apply only to referential types".to_owned()),
+        "scalar_access_marker" => Some(
+            "`ref`/`mut` apply to scalar parameter types only; `own`/`copy` do not apply to scalar types, and bind declarations reject all access markers"
+                .to_owned(),
+        ),
         "scrinium_arity" => Some("scrinium accepts at most one payload type parameter".to_owned()),
         "scrinium_missing_builtin" => Some("builtin scrinium type is not registered".to_owned()),
         "series_params" => Some("series cannot accept parameters".to_owned()),
@@ -1910,15 +1906,6 @@ fn semantic_prefer_string_template_message(args: &[DiagnosticArg]) -> Option<Str
                 message.push('`');
             }
             Some(message)
-        }
-        _ => None,
-    }
-}
-
-fn semantic_deprecated_param_prefix_message(args: &[DiagnosticArg]) -> Option<String> {
-    match arg_value(args, "issue")? {
-        "deprecated_param_prefix" => {
-            Some("parameter mode prefix is deprecated; write the mode on the type".to_owned())
         }
         _ => None,
     }
@@ -2534,10 +2521,6 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::DiscouragedMutLocal => DiagnosticSpec {
             code: "WARN019",
             help: Some("declare the exclusive borrow as a `mut` parameter instead of a local"),
-        },
-        WarningKind::DeprecatedParamPrefix => DiagnosticSpec {
-            code: "WARN020",
-            help: Some("write the mode on the type (`de T`, `in T`, `own T`, `copy T`) instead of the legacy prefix"),
         },
     }
 }

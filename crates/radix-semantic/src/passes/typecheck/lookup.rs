@@ -219,8 +219,11 @@ impl TypeChecker<'_> {
     }
 
     pub fn is_integer(&self, ty: TypeId) -> bool {
+        let (_, payload) = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(ty));
         matches!(
-            self.types.get(self.resolve_inferred_type(ty)),
+            self.types.get(payload),
             Type::Primitive(Primitive::Numerus)
                 | Type::SizedNumeric(Primitive::Numerus, _)
                 | Type::ModularWord(_)
@@ -228,22 +231,28 @@ impl TypeChecker<'_> {
     }
 
     pub fn is_fractus(&self, ty: TypeId) -> bool {
+        let (_, payload) = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(ty));
         matches!(
-            self.types.get(self.resolve_inferred_type(ty)),
+            self.types.get(payload),
             Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
         )
     }
 
     pub fn is_textus(&self, ty: TypeId) -> bool {
-        matches!(
-            self.types.get(self.resolve_inferred_type(ty)),
-            Type::Primitive(Primitive::Textus)
-        )
+        let (_, payload) = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(ty));
+        matches!(self.types.get(payload), Type::Primitive(Primitive::Textus))
     }
 
     pub fn is_bool(&self, ty: TypeId) -> bool {
+        let (_, payload) = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(ty));
         matches!(
-            self.types.get(self.resolve_inferred_type(ty)),
+            self.types.get(payload),
             Type::Primitive(Primitive::Bivalens)
         )
     }

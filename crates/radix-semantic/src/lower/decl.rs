@@ -142,7 +142,7 @@ impl Lowerer<'_> {
         } else {
             &param.name
         };
-        let ty = self.lower_type(&param.ty);
+        let ty = self.lower_parameter_type(&param.ty);
         let mode = match param.ty.mode {
             Some(type_mode) => super::type_mode_hir_param_mode(type_mode),
             None => lower_param_mode(param.mode),

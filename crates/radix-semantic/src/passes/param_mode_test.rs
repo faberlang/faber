@@ -1,9 +1,9 @@
 //! MU-5a type-position parameter-mode fixtures.
 //!
 //! Proves the mode-unification fact: HIR parameter modes derive from the
-//! type-position access marker when present (closure params and fn-type
-//! params), and the marked type carries the mode. The legacy prefix slot stays
-//! legal and is covered by the corpus + lint deprecation warning, not here.
+//! type-position access marker when present (named and closure params and
+//! fn-type params), and the marked type carries the mode. Parameter prefixes
+//! are retired at the parser boundary.
 
 use crate::test_support::{analyze_ok, analyze_source, issue};
 use crate::{SemanticMutability, Type};
@@ -97,46 +97,92 @@ typus Handler = (de textus, own lista<numerus>, numerus) → vacuum
 }
 
 #[test]
-fn legacy_parameter_prefix_warns_without_rejecting() {
+fn retired_parameter_prefix_is_a_parse_error() {
     let result = analyze_source(
         r#"
-functio legacy(de lista<numerus> values) → vacuum {
+functio legacy(ex lista<numerus> values) → vacuum {
     redde
 }
 "#,
     );
     assert!(
-        result.is_ok(),
-        "legacy prefix remains legal, got {:?}",
-        result.diagnostics
-    );
-    assert!(
-        result.diagnostics.iter().any(|err| {
-            err.kind == crate::SemanticErrorKind::Warning(crate::WarningKind::DeprecatedParamPrefix)
-                && issue(err) == Some("deprecated_param_prefix")
-        }),
-        "legacy prefix should emit WARN020, got {:?}",
+        !result.is_ok(),
+        "retired parameter prefix must reject, got {:?}",
         result.diagnostics
     );
 }
 
 #[test]
-fn scalar_type_position_marker_stays_rejected() {
-    // The scalar-marker rule is unchanged in MU-5a: a scalar cannot carry a
-    // type-position access marker (fork remains operator-pending).
-    let result = analyze_source(
-        r"
-incipit {
-    fixum _ f ← (in numerus n) ∴ n
+fn scalar_ref_and_mut_parameter_markers_are_admitted() {
+    let result = analyze_ok(
+        r#"
+functio read(de numerus value) → numerus {
+    redde value
 }
+functio bump(in numerus value) → vacuum {
+    value ← value + 1
+}
+"#,
+    );
+    let functions = result
+        .hir
+        .as_ref()
+        .expect("hir")
+        .items
+        .iter()
+        .filter_map(|item| match &item.kind {
+            radix_hir::HirItemKind::Function(func) => Some(func),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(functions.len(), 2);
+    assert_eq!(functions[0].params[0].mode, radix_hir::HirParamMode::De);
+    assert_eq!(functions[1].params[0].mode, radix_hir::HirParamMode::In);
+    assert!(matches!(
+        result.types.get(functions[0].params[0].ty),
+        Type::Ref(SemanticMutability::Immutable, _)
+    ));
+    assert!(matches!(
+        result.types.get(functions[1].params[0].ty),
+        Type::Ref(SemanticMutability::Mutable, _)
+    ));
+}
+
+#[test]
+fn scalar_own_and_copy_parameter_markers_remain_rejected() {
+    for marker in ["own", "copy"] {
+        let result = analyze_source(&format!(
+            "functio reject({marker} numerus value) → vacuum {{ redde }}"
+        ));
+        assert!(
+            result
+                .diagnostics
+                .iter()
+                .any(|err| err.is_error() && issue(err) == Some(crate::ISSUE_SCALAR_ACCESS_MARKER)),
+            "scalar {marker} marker must reject, got {:?}",
+            result.diagnostics
+        );
+    }
+}
+
+#[test]
+fn scalar_function_type_mut_marker_is_admitted() {
+    let fixture = analyze_ok(
+        r"
+typus Handler = (in numerus) → vacuum
 ",
     );
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|err| err.is_error() && issue(err) == Some(crate::ISSUE_SCALAR_ACCESS_MARKER)),
-        "scalar access marker must stay rejected, got {:?}",
-        result.diagnostics
-    );
+    let signature = (0..fixture.types.type_count()).find_map(|index| {
+        match fixture.types.get(crate::TypeId(index as u32)) {
+            Type::Func(sig) if sig.params.len() == 1 => Some(sig.clone()),
+            _ => None,
+        }
+    });
+    let signature = signature.expect("function type present");
+    assert_eq!(signature.params[0].mode, crate::SemanticParamMode::MutRef);
+    assert!(matches!(
+        fixture.types.get(signature.params[0].ty),
+        Type::Ref(SemanticMutability::Mutable, inner)
+            if matches!(fixture.types.get(*inner), Type::Primitive(crate::Primitive::Numerus))
+    ));
 }

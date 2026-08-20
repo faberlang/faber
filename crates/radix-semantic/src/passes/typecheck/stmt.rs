@@ -67,7 +67,7 @@ impl TypeChecker<'_> {
         };
 
         if let Some(expected) = self.current_return {
-            self.unify_assign_issue(value_ty, expected, span, ISSUE_RETURN_TYPE_MISMATCH);
+            self.unify_carrier_assign(value_ty, expected, span, ISSUE_RETURN_TYPE_MISMATCH);
             return;
         }
 

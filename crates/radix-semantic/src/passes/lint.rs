@@ -31,8 +31,7 @@ use crate::{
 use radix_hir::visit::{walk_expr, HirVisitor};
 use radix_hir::{
     HirBinOp, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirImport, HirItem,
-    HirItemKind, HirLiteral, HirLocal, HirModule, HirParam, HirParamMode, HirStatement,
-    HirStatementKind,
+    HirItemKind, HirLiteral, HirLocal, HirModule, HirStatement, HirStatementKind,
 };
 use radix_intrinsics::{
     is_numeric_imperativus_operator, lookup_method_for_type, mir_collection_op, IntrinsicReturnKind,
@@ -41,7 +40,6 @@ use radix_lexer::{Interner, Span};
 use radix_types::MirCollectionOp;
 use rustc_hash::FxHashSet;
 
-const ISSUE_DEPRECATED_PARAM_PREFIX: &str = "deprecated_param_prefix";
 const ISSUE_EXPLICIT_IGNOTUM_ANNOTATION: &str = "explicit_ignotum_annotation";
 const ISSUE_PREFER_STRING_TEMPLATE: &str = "prefer_string_template";
 const ISSUE_SHADOWED_VARIABLE: &str = "shadowed_variable";
@@ -231,7 +229,6 @@ impl<'a> LintContext<'a> {
             self.check_shadowing(param.name, param.def_id, param.span);
             self.insert_name(param.name, param.def_id);
             self.warn_on_explicit_ignotum(param.ty, param.span);
-            self.warn_on_deprecated_param_prefix(param);
         }
         if let Some(body) = &func.body {
             self.check_block(body, false);
@@ -351,26 +348,6 @@ impl<'a> LintContext<'a> {
                 None,
             ));
         }
-    }
-
-    /// Warn when a parameter mode came from the legacy `de`/`in`/`ex` prefix
-    /// instead of a type-position marker. The prefix is still legal and never
-    /// errors (corpus-compatible); a type positioned marker (`de T`) encodes
-    /// the mode on the type, so a param whose type already carries an access
-    /// marker is NOT from the prefix and does not warn.
-    fn warn_on_deprecated_param_prefix(&mut self, param: &HirParam) {
-        if param.mode == HirParamMode::Owned {
-            return;
-        }
-        if matches!(self.types.get(param.ty), Type::Ref(..)) {
-            return;
-        }
-        self.warnings.push((
-            WarningKind::DeprecatedParamPrefix,
-            ISSUE_DEPRECATED_PARAM_PREFIX,
-            param.span,
-            None,
-        ));
     }
 
     fn mark_place_mutated(&mut self, expr: &HirExpression) {
