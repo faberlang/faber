@@ -897,6 +897,48 @@ fn cli_verify_library_uses_default_rust_target() {
 }
 
 #[test]
+fn verify_library_long_help_states_faber_toml_requirement() {
+    let mut command = Cli::command();
+    let verify_library = command
+        .find_subcommand_mut("verify-library")
+        .expect("verify-library subcommand");
+    let help = verify_library.render_long_help().to_string();
+
+    assert!(
+        help.contains("Requires a faber.toml manifest at the library root"),
+        "verify-library --help must state the faber.toml requirement:\n{help}"
+    );
+}
+
+#[test]
+fn verify_library_missing_manifest_names_sought_faber_toml_path() {
+    let dir = std::env::temp_dir().join(format!(
+        "faber-verify-library-missing-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).expect("create manifest-less dir");
+    let sought = dir.join("faber.toml");
+    let diagnostics = crate::package::verify_library_bindings(&dir, "rust")
+        .expect_err("manifest-less dir must fail at faber.toml");
+    std::fs::remove_dir_all(&dir).ok();
+
+    let names_sought = diagnostics.iter().any(|diagnostic| {
+        diagnostic.file == sought.display().to_string()
+            || diagnostic
+                .args
+                .iter()
+                .any(|arg| arg.name == "path" && arg.value == sought.display().to_string())
+    });
+    assert!(
+        names_sought,
+        "verify-library on a manifest-less dir must name the sought faber.toml path: {diagnostics:?}"
+    );
+}
+
+#[test]
 fn cli_test_rejects_conflicting_ignored_modes() {
     let error = Cli::try_parse_from(["faber", "test", "pkg", "--ignored", "--include-ignored"])
         .expect_err("test ignored mode conflict");

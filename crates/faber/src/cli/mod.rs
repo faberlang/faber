@@ -45,6 +45,14 @@ does not classify a library as Package from manifest metadata and is not
 an alias for application `faber check`.
 ";
 
+const VERIFY_LIBRARY_LONG_ABOUT: &str = "\
+Verify a library package's target binding manifest.
+
+Requires a faber.toml manifest at the library root. Pass the package
+directory or that faber.toml path. A directory without faber.toml fails
+when reading the sought <root>/faber.toml.
+";
+
 /// Root parser for the `faber` binary.
 #[derive(Parser, Debug)]
 #[command(
@@ -93,6 +101,7 @@ pub enum Command {
     Verify(VerifyArgs),
 
     /// Verify a library package's target binding manifest
+    #[command(long_about = VERIFY_LIBRARY_LONG_ABOUT)]
     VerifyLibrary(VerifyLibraryArgs),
 
     /// Create a new Faber package
@@ -345,7 +354,7 @@ pub struct VerifyLibraryArgs {
     #[arg(long, default_value = "rust")]
     pub target: String,
 
-    /// Library package root or faber.toml path.
+    /// Library package root or faber.toml path. Requires a faber.toml at the library root.
     pub input: PathBuf,
 }
 
