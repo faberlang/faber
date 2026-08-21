@@ -42,6 +42,23 @@ proba "one equals one" {
 }
 
 #[test]
+fn captures_case_stdout_and_stderr() {
+    let report = run(
+        r#"
+proba "output" {
+    nota "stdout line"
+    mone "stderr line"
+    adfirma 1 ≡ 1
+}
+"#,
+        TestSelection::default(),
+    );
+    let case = &report.results[0];
+    assert_eq!(case.stdout, vec!["stdout line"]);
+    assert_eq!(case.stderr, vec!["stderr line"]);
+}
+
+#[test]
 fn report_attributes_case_to_source_unit() {
     let report = run_proba_source(
         &session(),

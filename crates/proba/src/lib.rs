@@ -93,6 +93,27 @@ pub struct CaseResult {
     pub name: String,
     pub suite_path: String,
     pub outcome: CaseOutcome,
+    /// Lines written to stdout while the case ran.
+    pub stdout: Vec<String>,
+    /// Lines written to stderr while the case ran.
+    pub stderr: Vec<String>,
+}
+
+#[derive(Debug)]
+struct CaseExecution {
+    outcome: CaseOutcome,
+    stdout: Vec<String>,
+    stderr: Vec<String>,
+}
+
+impl CaseExecution {
+    fn without_output(outcome: CaseOutcome) -> Self {
+        Self {
+            outcome,
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        }
+    }
 }
 
 impl CaseResult {
@@ -474,6 +495,8 @@ fn run_proba_cases(
                     name: case.name.clone(),
                     suite_path: case.suite_path.clone(),
                     outcome: CaseOutcome::Skipped { reason },
+                    stdout: Vec::new(),
+                    stderr: Vec::new(),
                 });
             }
             continue;
@@ -485,24 +508,28 @@ fn run_proba_cases(
                 name: case.name.clone(),
                 suite_path: case.suite_path.clone(),
                 outcome: CaseOutcome::Skipped { reason },
+                stdout: Vec::new(),
+                stderr: Vec::new(),
             });
             continue;
         }
 
-        let outcome = match function_id_for_case(case) {
+        let execution = match function_id_for_case(case) {
             Some(function_id) => execute_case(validated, function_id),
-            None => CaseOutcome::Blocked {
+            None => CaseExecution::without_output(CaseOutcome::Blocked {
                 reason: format!(
                     "proba case {:?} has no lowered MIR function (def #{})",
                     case.name, case.def_id.0
                 ),
-            },
+            }),
         };
         results.push(CaseResult {
             unit_path: unit_path.to_path_buf(),
             name: case.name.clone(),
             suite_path: case.suite_path.clone(),
-            outcome,
+            outcome: execution.outcome,
+            stdout: execution.stdout,
+            stderr: execution.stderr,
         });
     }
 
@@ -518,7 +545,7 @@ fn mir_function_id_for_def(validated: &ValidatedMir<'_>, def_id: DefId) -> Optio
         .map(|function| function.id)
 }
 
-fn execute_case(validated: &ValidatedMir<'_>, function_id: MirFunctionId) -> CaseOutcome {
+fn execute_case(validated: &ValidatedMir<'_>, function_id: MirFunctionId) -> CaseExecution {
     let mut host = BufferHost::default();
     // Assertion failures call Host::abort which panics on BufferHost; catch as fail.
     // Silence the default panic hook so failed cases do not dump a backtrace to stderr.
@@ -528,18 +555,33 @@ fn execute_case(validated: &ValidatedMir<'_>, function_id: MirFunctionId) -> Cas
         run_function(validated, function_id, &mut host)
     }));
     std::panic::set_hook(previous_hook);
-    match trapped {
+    let outcome = match trapped {
         Ok(Ok(())) => CaseOutcome::Passed,
         Ok(Err(errors)) => case_outcome_from_runner_errors(&errors),
         Err(payload) => {
             if let Some(reason) = host.last_abort.clone() {
-                return CaseOutcome::Failed { message: reason };
+                CaseOutcome::Failed { message: reason }
+            } else {
+                let message = abort_message_from_payload(payload.as_ref())
+                    .unwrap_or_else(|| "proba case aborted".to_owned());
+                CaseOutcome::Failed { message }
             }
-            let message = abort_message_from_payload(payload.as_ref())
-                .unwrap_or_else(|| "proba case aborted".to_owned());
-            CaseOutcome::Failed { message }
         }
+    };
+    let stdout = captured_stdout(&host);
+    CaseExecution {
+        outcome,
+        stdout,
+        stderr: host.stderr_lines,
     }
+}
+
+fn captured_stdout(host: &BufferHost) -> Vec<String> {
+    let mut stdout = host.stdout_lines.clone();
+    if !host.pending_stdout.is_empty() {
+        stdout.push(host.pending_stdout.clone());
+    }
+    stdout
 }
 
 fn case_outcome_from_runner_errors(errors: &[RunnerError]) -> CaseOutcome {

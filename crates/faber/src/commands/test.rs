@@ -242,6 +242,8 @@ fn run_package(
                                     unit_path.display()
                                 ),
                             },
+                            stdout: Vec::new(),
+                            stderr: Vec::new(),
                         });
                     }
                 }
@@ -257,16 +259,20 @@ fn run_package(
     combined
 }
 
-fn print_report(report: &ProbaReport, _nocapture: bool) {
+fn print_report(report: &ProbaReport, nocapture: bool) {
     for result in &report.results {
         let path = format!("{}::{}", result.unit_path.display(), result.display_path());
         match &result.outcome {
             CaseOutcome::Passed => {
                 println!("ok   {path}");
+                if nocapture {
+                    replay_output(result);
+                }
             }
             CaseOutcome::Failed { message } => {
                 // Always show failure detail so CI can name the case.
                 println!("FAIL {path}");
+                replay_output(result);
                 eprintln!("  {message}");
             }
             CaseOutcome::Blocked { reason } => {
@@ -279,6 +285,15 @@ fn print_report(report: &ProbaReport, _nocapture: bool) {
         }
     }
     println!("{}", format_summary(report));
+}
+
+fn replay_output(result: &CaseResult) {
+    for line in &result.stdout {
+        println!("{line}");
+    }
+    for line in &result.stderr {
+        eprintln!("{line}");
+    }
 }
 
 fn fail_package_analysis(diagnostics: &[radix_module::diagnostics::Diagnostic]) -> ! {
