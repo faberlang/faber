@@ -38,6 +38,10 @@ const ISSUE_INVALID_ATTACHMENT: &str = "annotatio_invalid_attachment";
 const ISSUE_METHOD_UNSUPPORTED: &str = "annotatio_method_unsupported";
 const ISSUE_INVALID_MARKER: &str = "annotatio_invalid_marker";
 const ISSUE_DUPLICATE_MARKER: &str = "annotatio_duplicate_marker";
+const ISSUE_COMMUNE_ON_NON_UNION: &str = "commune_on_non_union";
+const ISSUE_DUPLICATE_COMMUNE_FIELD: &str = "duplicate_commune_field";
+const ISSUE_VARIANT_REDECLARES_COMMUNE: &str = "union_variant_redeclares_shared_field";
+const FAMILY_COMMUNE: &str = "commune";
 
 /// Where a contract may be attached in v1.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -223,6 +227,8 @@ pub fn collect_local_contracts(
     for stmt in &program.statements {
         collect_declaration_contract(stmt, resolver, interner, &mut registry, &mut errors);
         reject_misplaced_annotatio(stmt, interner, &mut errors);
+        reject_misplaced_commune(stmt, interner, &mut errors);
+        reject_commune_field_uniqueness(stmt, &mut errors);
     }
 
     if errors.is_empty() {
@@ -561,6 +567,83 @@ fn parse_contract_field_type(
     }
 }
 
+fn annotation_is_commune(annotation: &Annotation, interner: &Interner) -> bool {
+    matches!(
+        &annotation.kind,
+        AnnotationKind::Statement(stmt)
+            if stmt.args.is_empty() && interner.resolve(stmt.name.name) == FAMILY_COMMUNE
+    )
+}
+
+fn reject_commune_on_list(
+    annotations: &[Annotation],
+    interner: &Interner,
+    errors: &mut Vec<SemanticError>,
+) {
+    for annotation in annotations {
+        if annotation_is_commune(annotation, interner) {
+            errors.push(
+                invalid_annotation(annotation.span, ISSUE_COMMUNE_ON_NON_UNION)
+                    .with_arg("annotation", "@ commune"),
+            );
+        }
+    }
+}
+
+fn reject_misplaced_commune(stmt: &Stmt, interner: &Interner, errors: &mut Vec<SemanticError>) {
+    reject_commune_on_list(&stmt.annotations, interner, errors);
+    match &stmt.kind {
+        StmtKind::Func(func) => reject_commune_on_list(&func.annotations, interner, errors),
+        StmtKind::Class(class) => {
+            for member in &class.members {
+                reject_commune_on_list(&member.annotations, interner, errors);
+                if let ClassMemberKind::Method(method) = &member.kind {
+                    reject_commune_on_list(&method.annotations, interner, errors);
+                }
+            }
+        }
+        StmtKind::Interface(iface) => {
+            for method in &iface.methods {
+                reject_commune_on_list(&method.annotations, interner, errors);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn reject_commune_field_uniqueness(stmt: &Stmt, errors: &mut Vec<SemanticError>) {
+    let StmtKind::Union(union) = &stmt.kind else {
+        return;
+    };
+    let mut seen = Vec::new();
+    for field in &union.shared_fields {
+        if seen.contains(&field.field.name.name) {
+            errors.push(
+                SemanticError::structured(
+                    SemanticErrorKind::DuplicateDefinition,
+                    field.field.name.span,
+                )
+                .with_arg("issue", ISSUE_DUPLICATE_COMMUNE_FIELD),
+            );
+        } else {
+            seen.push(field.field.name.name);
+        }
+    }
+    for variant in &union.variants {
+        for field in &variant.fields {
+            if seen.contains(&field.name.name) {
+                errors.push(
+                    SemanticError::structured(
+                        SemanticErrorKind::DuplicateDefinition,
+                        field.name.span,
+                    )
+                    .with_arg("issue", ISSUE_VARIANT_REDECLARES_COMMUNE),
+                );
+            }
+        }
+    }
+}
+
 fn reject_misplaced_annotatio(stmt: &Stmt, interner: &Interner, errors: &mut Vec<SemanticError>) {
     if matches!(stmt.kind, StmtKind::Class(_)) {
         // Allowed on the genus itself; still reject on members below.
@@ -840,6 +923,7 @@ fn is_compiler_owned_family(name: &str) -> bool {
             | "nondum"
             | "verte"
             | "nucleum"
+            | FAMILY_COMMUNE
             // CLI/JSON metadata families consumed by lowering (corpus + exempla).
             | "alias"
             | "descriptio"

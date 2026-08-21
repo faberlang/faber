@@ -487,9 +487,12 @@ impl<'a> TypeChecker<'a> {
     /// members).
     pub fn collect_imported_enum_variants(&mut self) {
         for (enum_def, _, variants) in self.resolver.imported_file_enums() {
+            let commune = self.resolver.commune_fields(enum_def);
             for variant in &variants {
-                let fields = variant.fields.iter().map(|f| f.ty).collect();
-                let field_names = variant.fields.iter().map(|f| f.name).collect();
+                let mut fields: Vec<TypeId> = commune.iter().map(|field| field.ty).collect();
+                fields.extend(variant.fields.iter().map(|f| f.ty));
+                let mut field_names: Vec<Symbol> = commune.iter().map(|field| field.name).collect();
+                field_names.extend(variant.fields.iter().map(|f| f.name));
                 self.variant_fields.insert(variant.def_id, fields);
                 self.variant_field_names.insert(variant.def_id, field_names);
                 self.variant_parent.insert(variant.def_id, enum_def);
@@ -704,6 +707,10 @@ mod type_hole_union_join_test;
 #[cfg(test)]
 #[path = "type_hole_union_warnings_test.rs"]
 mod type_hole_union_warnings_test;
+
+#[cfg(test)]
+#[path = "union_commune_test.rs"]
+mod union_commune_test;
 
 #[cfg(test)]
 #[path = "union_construction_test.rs"]

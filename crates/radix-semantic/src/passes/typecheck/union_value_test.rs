@@ -29,6 +29,7 @@ fn token_union_interface() -> FileInterface {
         kind: FileExportKind::Enum(InterfaceNominalExport {
             name: "TokenKind".to_owned(),
             methods: Vec::new(),
+            shared_fields: Vec::new(),
             variants: vec![
                 InterfaceEnumVariant {
                     name: "Palabra".to_owned(),

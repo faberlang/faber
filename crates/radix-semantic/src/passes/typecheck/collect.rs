@@ -313,9 +313,12 @@ impl TypeChecker<'_> {
     }
 
     fn collect_enum(&mut self, enum_item: &radix_hir::HirEnum, enum_def: DefId) {
+        let commune = self.resolver.commune_fields(enum_def);
         for variant in &enum_item.variants {
-            let fields = variant.fields.iter().map(|f| f.ty).collect();
-            let field_names = variant.fields.iter().map(|f| f.name).collect();
+            let mut fields: Vec<TypeId> = commune.iter().map(|field| field.ty).collect();
+            fields.extend(variant.fields.iter().map(|f| f.ty));
+            let mut field_names: Vec<Symbol> = commune.iter().map(|field| field.name).collect();
+            field_names.extend(variant.fields.iter().map(|f| f.name));
             self.variant_fields.insert(variant.def_id, fields);
             self.variant_field_names.insert(variant.def_id, field_names);
             self.variant_parent.insert(variant.def_id, enum_def);

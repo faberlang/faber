@@ -72,7 +72,17 @@ impl TypeChecker<'_> {
                     self.error_type
                 }
             }
-            HirExpressionKind::Field(object, name) => self.check_field(object, *name),
+            HirExpressionKind::Field(object, name) => {
+                let ty = self.check_field(object, *name);
+                if let Some(object_ty) = object.ty {
+                    if let Some(enum_def) = self.enum_def_from_type(object_ty) {
+                        if self.resolver.commune_field(enum_def, *name).is_some() {
+                            self.immutable_assignment("assignment_to_commune_field", target.span);
+                        }
+                    }
+                }
+                ty
+            }
             HirExpressionKind::Index(object, index) => self.check_index_lvalue(object, index),
             _ => {
                 self.error_issue(
@@ -310,6 +320,15 @@ impl TypeChecker<'_> {
             }
             self.undefined_member("unknown_struct_field", span);
             return self.error_type;
+        }
+        if let Some(enum_def) = self.enum_def_from_type(object_ty) {
+            if let Some(field) = self.resolver.commune_field(enum_def, name) {
+                return self.project_ref_view(object_ty, field.ty);
+            }
+            if !self.resolver.commune_fields(enum_def).is_empty() {
+                self.undefined_member("unknown_union_field", span);
+                return self.error_type;
+            }
         }
         if matches!(
             self.types.get(self.resolve_inferred_type(object_ty)),

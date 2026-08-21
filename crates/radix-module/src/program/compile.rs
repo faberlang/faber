@@ -1131,7 +1131,12 @@ fn file_export_from_stmt(
             };
             Some(FileExport {
                 name: name.clone(),
-                kind: FileExportKind::Enum(InterfaceNominalExport { name, methods: Vec::new(), variants }),
+                kind: FileExportKind::Enum(InterfaceNominalExport {
+                    name,
+                    methods: Vec::new(),
+                    variants,
+                    shared_fields: Vec::new(),
+                }),
             })
         }
         StmtKind::Union(decl) => {
@@ -1144,13 +1149,14 @@ fn file_export_from_stmt(
             // empty-variant surface the module-boundary + error-masking
             // diagnostics pin (SEM001.unknown_variant / SEM008 on imported
             // union refs).
-            let variants = if ctx.module_identity.is_some() {
+            let (variants, shared_fields) = if ctx.module_identity.is_some() {
                 let type_param_names: BTreeSet<&str> = decl
                     .type_params
                     .iter()
                     .map(|tp| interner.resolve(tp.name.name))
                     .collect();
-                decl.variants
+                let variants = decl
+                    .variants
                     .iter()
                     .map(|variant| {
                         let fields = variant
@@ -1173,13 +1179,37 @@ fn file_export_from_stmt(
                             .collect::<Vec<_>>();
                         InterfaceEnumVariant { name: interner.resolve(variant.name.name).to_owned(), fields }
                     })
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<_>>();
+                let shared_fields = decl
+                    .shared_fields
+                    .iter()
+                    .filter_map(|shared| {
+                        Some(InterfaceStructField {
+                            name: interner.resolve(shared.field.name.name).to_owned(),
+                            ty: interface_type_from_type_expr(
+                                &shared.field.ty,
+                                interner,
+                                &type_param_names,
+                                nominal_kinds,
+                                ctx,
+                            )?,
+                            optional: false,
+                            required: true,
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                (variants, shared_fields)
             } else {
-                Vec::new()
+                (Vec::new(), Vec::new())
             };
             Some(FileExport {
                 name: name.clone(),
-                kind: FileExportKind::Enum(InterfaceNominalExport { name, methods: Vec::new(), variants }),
+                kind: FileExportKind::Enum(InterfaceNominalExport {
+                    name,
+                    methods: Vec::new(),
+                    variants,
+                    shared_fields,
+                }),
             })
         }
         StmtKind::Interface(decl) => {
@@ -1190,6 +1220,7 @@ fn file_export_from_stmt(
                     name,
                     methods: Vec::new(),
                     variants: Vec::new(),
+                    shared_fields: Vec::new(),
                 }),
             })
         }

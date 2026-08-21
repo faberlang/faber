@@ -36,7 +36,7 @@
 //! payload type information for later pattern and type analysis.
 
 use super::Lowerer;
-use crate::{IndexExpr, NumericWidth, Primitive, Type, TypeId};
+use crate::{CommuneField, IndexExpr, NumericWidth, Primitive, Type, TypeId};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
     DefId, HirAnnotation, HirBlock, HirConst, HirEnum, HirExpression, HirExpressionKind, HirField,
@@ -668,6 +668,9 @@ impl Lowerer<'_> {
 
         self.push_type_params(type_params.iter().map(|param| (param.name, param.kind)));
 
+        let commune = self.lower_commune_fields(decl);
+        self.resolver.register_commune_fields(def_id, commune);
+
         let variants = decl
             .variants
             .iter()
@@ -689,6 +692,17 @@ impl Lowerer<'_> {
             kind: HirItemKind::Enum(enum_item),
             span: stmt.span,
         })
+    }
+
+    fn lower_commune_fields(&mut self, decl: &UnionDecl) -> Vec<CommuneField> {
+        decl.shared_fields
+            .iter()
+            .map(|shared| CommuneField {
+                name: shared.field.name.name,
+                ty: self.lower_type(&shared.field.ty),
+                span: shared.field.name.span,
+            })
+            .collect()
     }
 
     fn lower_interface_method(&mut self, method: &InterfaceMethod) -> HirInterfaceMethod {

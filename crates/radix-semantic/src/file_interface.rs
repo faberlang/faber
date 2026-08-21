@@ -161,6 +161,11 @@ pub struct InterfaceNominalExport {
     /// across the import boundary so consumers can reference library enum
     /// variants as values and construct them (codex-gap S1 U2 VALUE members).
     pub variants: Vec<InterfaceEnumVariant>,
+    /// Union `@ commune` fields shared by every variant. Empty for `ordo`
+    /// members and unions without a commune region. Member access on the
+    /// imported union type (`e.message`) reads this table, not variant
+    /// payloads.
+    pub shared_fields: Vec<InterfaceStructField>,
 }
 
 /// One enum variant carried by a [`InterfaceNominalExport`].

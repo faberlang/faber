@@ -1,0 +1,62 @@
++++
+term = "commune"
+kind = "annotation"
+category = "type"
+canonical = true
+summary = "Declares shared fields once on a tagged union."
+syntax = "@ commune"
+aliases = ["shared"]
+related = ["discretio", "discerne", "finge"]
+locale = "en"
++++
+
+# =============================================================================
+# commune — Declares shared fields once on a tagged union.
+# =============================================================================
+#
+# What this teaches:
+#   • Shared fields — `@ commune` (English `@ shared`) declares fields every
+#     variant carries. Construction supplies them next to the variant payload.
+#   • Member access — `e.message` reads the commune field on the union value.
+#     Matching still binds the same field in case arms.
+#
+# Common mistakes:
+#   • Redeclaring a commune field on a variant — the field is already on the
+#     union; repeating it on a variant is rejected.
+#   • Annotating `@ commune` on a genus field — the region is union-only.
+#
+# See also: discretio, discerne, finge
+# =============================================================================
+#
+# BACKEND:
+#   Semantic contract only (TEU2). Emit of commune payloads is TEU3.
+
+union ShapeError {
+    @ shared
+    string message
+
+    Incompatible,
+    ElementMismatch {
+        int expected
+        int actual
+    }
+}
+
+fn describe(ShapeError e) → string {
+    match e {
+        case Incompatible const message { return message }
+        case ElementMismatch const message, expected, actual { return message }
+    }
+}
+
+fn render(ShapeError e) → string {
+    return e.message
+}
+
+main {
+    const ShapeError a ← variant Incompatible { message = "incompatible" }
+    const ShapeError b ← variant ElementMismatch { message = "mismatch", expected = 1, actual = 2 }
+    print describe(a)
+    print describe(b)
+    print render(a)
+}

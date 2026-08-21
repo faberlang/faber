@@ -370,9 +370,9 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
         SemanticErrorKind::Warning(WarningKind::EmptyMarkerShadowing) => Some(
             "choose a different binding name when the empty-collection marker is needed".to_owned(),
         ),
-        SemanticErrorKind::Warning(WarningKind::UnboundedTextusIndex) => Some(
-            "convert to textus<N> for O(1) indexing or iterate scalars".to_owned(),
-        ),
+        SemanticErrorKind::Warning(WarningKind::UnboundedTextusIndex) => {
+            Some("convert to textus<N> for O(1) indexing or iterate scalars".to_owned())
+        }
         _ => None,
     }
 }
@@ -1472,6 +1472,10 @@ fn semantic_unavailable_declaration_help(args: &[DiagnosticArg]) -> Option<Strin
 fn semantic_duplicate_definition_message(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
         "duplicate_definition" => Some("duplicate definition".to_owned()),
+        "duplicate_commune_field" => Some("duplicate commune field".to_owned()),
+        "union_variant_redeclares_shared_field" => {
+            Some("variant redeclares a commune field".to_owned())
+        }
         "inferred_import_name_collision" => {
             Some("inferred import name conflicts with an existing definition".to_owned())
         }
@@ -1497,6 +1501,12 @@ fn semantic_duplicate_definition_help(args: &[DiagnosticArg]) -> Option<String> 
             "add an explicit import alias with `ut` so the imported binding has a unique name"
                 .to_owned(),
         ),
+        "duplicate_commune_field" => {
+            Some("declare each commune field once in the union region".to_owned())
+        }
+        "union_variant_redeclares_shared_field" => {
+            Some("omit the commune field from the variant payload".to_owned())
+        }
         _ => None,
     }
 }
@@ -1553,6 +1563,7 @@ fn semantic_undefined_member_message(args: &[DiagnosticArg]) -> Option<String> {
         "unknown_struct_field" => Some("unknown struct field".to_owned()),
         "unknown_tuple_element_label" => Some("unknown tuple element label".to_owned()),
         "unknown_variant_field" => Some("unknown variant field".to_owned()),
+        "unknown_union_field" => Some("unknown union field".to_owned()),
         _ => None,
     }
 }
@@ -1582,6 +1593,7 @@ fn semantic_undefined_member_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("use a label declared on the iuncta annotation, or index by position".to_owned())
         }
         "unknown_variant_field" => Some("check the variant field name".to_owned()),
+        "unknown_union_field" => Some("check the union's `@ commune` field name".to_owned()),
         _ => None,
     }
 }
@@ -1892,6 +1904,7 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
 fn semantic_definite_assignment_message(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
         "assignment_to_constant" => Some("assignment to constant".to_owned()),
+        "assignment_to_commune_field" => Some("assignment to commune field".to_owned()),
         "immutable_second_assignment" => Some("second assignment to immutable binding".to_owned()),
         "imperativus_operator_method_requires_varia_receiver" => {
             Some("imperativus operator method requires varia receiver".to_owned())
@@ -2433,6 +2446,9 @@ fn semantic_invalid_annotation_message(args: &[DiagnosticArg]) -> Option<String>
         "annotatio_duplicate_marker" => {
             Some("duplicate `@ annotatio` marker on the same genus declaration".to_owned())
         }
+        "commune_on_non_union" => {
+            Some("`@ commune` is only valid on union shared fields".to_owned())
+        }
         _ => None,
     }
 }
@@ -2477,6 +2493,9 @@ fn semantic_invalid_annotation_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("use a string, number, boolean, or `nihil` literal matching the field type".to_owned())
         }
         "annotatio_invalid_attachment" => Some("apply this contract only to `functio` declarations".to_owned()),
+        "commune_on_non_union" => {
+            Some("declare shared fields in a union `@ commune` region".to_owned())
+        }
         _ => None,
     }
 }

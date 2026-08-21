@@ -217,6 +217,7 @@ fn snapshot_interface(
         name: analysis.interner.resolve(interface.name).to_owned(),
         methods,
         variants: Vec::new(),
+        shared_fields: Vec::new(),
     })
 }
 
@@ -266,6 +267,7 @@ fn snapshot_enum(
         name: analysis.interner.resolve(enm.name).to_owned(),
         methods: Vec::new(),
         variants,
+        shared_fields: Vec::new(),
     })
 }
 

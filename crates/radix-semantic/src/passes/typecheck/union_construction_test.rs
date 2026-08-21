@@ -69,6 +69,7 @@ fn token_union_interface() -> FileInterface {
         kind: FileExportKind::Enum(InterfaceNominalExport {
             name: "TokenKind".to_owned(),
             methods: Vec::new(),
+            shared_fields: Vec::new(),
             variants: vec![
                 InterfaceEnumVariant {
                     name: "Palabra".to_owned(),
@@ -278,6 +279,7 @@ fn two_import_interfaces() -> BTreeMap<String, FileInterface> {
         kind: FileExportKind::Enum(InterfaceNominalExport {
             name: "A".to_owned(),
             methods: Vec::new(),
+            shared_fields: Vec::new(),
             variants: vec![InterfaceEnumVariant {
                 name: "X".to_owned(),
                 fields: Vec::new(),
@@ -290,6 +292,7 @@ fn two_import_interfaces() -> BTreeMap<String, FileInterface> {
         kind: FileExportKind::Enum(InterfaceNominalExport {
             name: "B".to_owned(),
             methods: Vec::new(),
+            shared_fields: Vec::new(),
             variants: vec![
                 InterfaceEnumVariant {
                     name: "X".to_owned(),
@@ -509,6 +512,7 @@ fn colliding_import_interface() -> FileInterface {
         kind: FileExportKind::Enum(InterfaceNominalExport {
             name: "Foreign".to_owned(),
             methods: Vec::new(),
+            shared_fields: Vec::new(),
             variants: vec![
                 InterfaceEnumVariant {
                     name: "ElementaMismatch".to_owned(),

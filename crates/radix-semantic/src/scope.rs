@@ -332,6 +332,17 @@ pub struct ImportedEnumVariant {
     pub fields: Vec<ImportedFileStructField>,
 }
 
+/// One `@ commune` field on a union, local or imported.
+///
+/// Construction and matching concatenate these in front of each variant's own
+/// payload. Member access on the union type looks them up here.
+#[derive(Debug, Clone, Copy)]
+pub struct CommuneField {
+    pub name: LexSymbol,
+    pub ty: TypeId,
+    pub span: Span,
+}
+
 fn exported_member_kind(export: &FileExportKind) -> InterfaceMemberKind {
     match export {
         FileExportKind::Function(_) => InterfaceMemberKind::Function,
@@ -648,6 +659,11 @@ pub struct Resolver {
     /// by typecheck (variant references) and the MIR lowering context (variant
     /// aggregates).
     imported_enum_variants: FxHashMap<DefId, Vec<ImportedEnumVariant>>,
+    /// `@ commune` fields keyed by the union's `DefId` (local after lowering,
+    /// imported after file-interface install). Runtime-only: FHIR snapshots
+    /// rebuild imported rows from the interface; TEU3 carries the region on
+    /// HIR for local emit.
+    commune_fields: FxHashMap<DefId, Vec<CommuneField>>,
     /// Namespace bindings referenced from qualified type paths.
     used_namespaces: FxHashSet<LexSymbol>,
     /// Resolved relational schema metadata keyed by schema definition
@@ -710,6 +726,7 @@ impl Resolver {
             canonical_imported_nominal_types: FxHashMap::default(),
             canonical_imported_nominal_defs: FxHashMap::default(),
             imported_enum_variants: FxHashMap::default(),
+            commune_fields: FxHashMap::default(),
             used_namespaces: FxHashSet::default(),
             schemas: FxHashMap::default(),
             locale_pack_type_aliases: FxHashMap::default(),
@@ -1365,6 +1382,20 @@ impl Resolver {
             })
             .collect();
         self.imported_enum_variants.insert(enum_def, remapped);
+        let commune = nominal
+            .shared_fields
+            .iter()
+            .filter_map(|field| {
+                import_interface_type_with_resolver(&field.ty, types, interner, self)
+                    .ok()
+                    .map(|ty| CommuneField {
+                        name: interner.intern(&field.name),
+                        ty,
+                        span: Span::default(),
+                    })
+            })
+            .collect();
+        self.commune_fields.insert(enum_def, commune);
     }
 
     /// Import methods, skipping signatures that cannot be remapped.
@@ -2153,6 +2184,28 @@ impl Resolver {
     /// Enums install as `Type` exports; the variant metadata lives in the
     /// resolver's `imported_enum_variants` table keyed by the consumer enum
     /// `DefId`.
+    /// Record `@ commune` fields for a union definition.
+    pub fn register_commune_fields(&mut self, enum_def: DefId, fields: Vec<CommuneField>) {
+        self.commune_fields.insert(enum_def, fields);
+    }
+
+    /// Commune fields declared on `enum_def`, empty when the union has no region.
+    #[must_use]
+    pub fn commune_fields(&self, enum_def: DefId) -> &[CommuneField] {
+        self.commune_fields
+            .get(&enum_def)
+            .map_or(&[], Vec::as_slice)
+    }
+
+    /// Lookup one commune field by name.
+    #[must_use]
+    pub fn commune_field(&self, enum_def: DefId, name: LexSymbol) -> Option<CommuneField> {
+        self.commune_fields(enum_def)
+            .iter()
+            .copied()
+            .find(|field| field.name == name)
+    }
+
     #[must_use]
     pub fn imported_file_enums(&self) -> Vec<(DefId, TypeId, Vec<ImportedEnumVariant>)> {
         self.file_interfaces
@@ -3101,6 +3154,7 @@ impl Resolver {
             canonical_imported_nominal_types: FxHashMap::default(),
             canonical_imported_nominal_defs: FxHashMap::default(),
             imported_enum_variants: FxHashMap::default(),
+            commune_fields: FxHashMap::default(),
             used_namespaces,
             schemas: FxHashMap::default(),
             locale_pack_type_aliases: FxHashMap::default(),

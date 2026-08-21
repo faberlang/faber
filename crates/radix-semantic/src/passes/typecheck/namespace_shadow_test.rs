@@ -29,6 +29,7 @@ fn shape_namespace_interface() -> FileInterface {
         kind: FileExportKind::Enum(InterfaceNominalExport {
             name: "ShapeError".to_owned(),
             methods: Vec::new(),
+            shared_fields: Vec::new(),
             variants: vec![InterfaceEnumVariant {
                 name: "Invalid".to_owned(),
                 fields: Vec::new(),
