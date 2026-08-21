@@ -508,12 +508,21 @@ pub fn collection_op_contract(
                     let (left_dims, right_dims, layout) =
                         packed_rank2_matmul_operands(function, args, validation)?;
                     let tile: u64 = 8;
+                    let m = left_dims[0];
+                    let n = right_dims[1];
+                    // M=1 decode: two simdgroups per 8×8 workgroup, one output
+                    // column each. Prefill keeps the tiled GEMM grid.
+                    let (dispatch_x, dispatch_y) = if m == 1 {
+                        (n.div_ceil(2), 1)
+                    } else {
+                        (n.div_ceil(tile), m.div_ceil(tile))
+                    };
                     return Ok(Some(CollectionOpContract::QuantizedMatMul {
-                        dispatch_x: right_dims[1].div_ceil(tile),
-                        dispatch_y: left_dims[0].div_ceil(tile),
-                        m: left_dims[0],
+                        dispatch_x,
+                        dispatch_y,
+                        m,
                         k: left_dims[1],
-                        n: right_dims[1],
+                        n,
                         layout,
                     }));
                 }
