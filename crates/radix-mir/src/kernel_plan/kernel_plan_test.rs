@@ -1533,8 +1533,20 @@ fn packed_storage_layout_binds_pinned_ggml_block_geometry() {
         assert_eq!(PackedStorageLayout::from_ggml_type_id(id), Some(layout));
         assert_eq!(layout.block_elements(), elements);
         assert_eq!(layout.block_bytes(), bytes);
+        assert_eq!(
+            layout.packed_bytes_for_elements(u64::from(elements)),
+            Some(u64::from(bytes))
+        );
     }
     assert_eq!(PackedStorageLayout::from_ggml_type_id(99), None);
+    assert_eq!(
+        PackedStorageLayout::Q5_0.packed_bytes_for_elements(960 * 960),
+        Some((960 * 960 / 32) * 22)
+    );
+    assert_eq!(
+        PackedStorageLayout::Q4_K.packed_bytes_for_elements(255),
+        None
+    );
 }
 
 #[test]

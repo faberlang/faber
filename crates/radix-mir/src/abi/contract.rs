@@ -269,6 +269,20 @@ impl PackedStorageLayout {
             Self::MXFP4 => 17,
         }
     }
+
+    /// Native packed-region byte length for `logical_elems` stored values.
+    ///
+    /// Returns `None` when the element count is not a whole number of blocks
+    /// (fail closed — never a guessed pad to F32).
+    #[must_use]
+    pub const fn packed_bytes_for_elements(self, logical_elems: u64) -> Option<u64> {
+        let block_elements = self.block_elements() as u64;
+        let block_bytes = self.block_bytes() as u64;
+        if block_elements == 0 || logical_elems % block_elements != 0 {
+            return None;
+        }
+        (logical_elems / block_elements).checked_mul(block_bytes)
+    }
 }
 
 /// Apply the collection-op dispatch contract to a kernel signature in place.

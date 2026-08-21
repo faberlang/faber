@@ -3446,3 +3446,98 @@ fn kernel_plan_for_function_derives_q4k_quantized_matmul_plan() {
     assert_eq!(plan.layout, crate::abi::PackedStorageLayout::Q4_K);
     assert_eq!((plan.m, plan.k, plan.n), (8, 16, 16));
 }
+
+#[test]
+fn executor_plan_exposes_packed_region_and_decode_gemv_facts() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let plan = CollectionKernelPlan::QuantizedMatMul(crate::kernel_plan::QuantizedMatMulPlan {
+        m: 1,
+        k: 32,
+        n: 32,
+        layout: crate::abi::PackedStorageLayout::Q8_0,
+        tile: 8,
+        workgroup_x: 8,
+        workgroup_y: 8,
+    });
+    let kernel = KernelUnit {
+        function: MirFunctionId(0),
+        entry: "qmm".to_owned(),
+        plan,
+        resources: vec![
+            resource(
+                identity(1, "left", BufferRole::InOut),
+                version(1, ty, 32),
+                0,
+                MirKernelResourceAccess::Read,
+            ),
+            resource(
+                identity(2, "weights", BufferRole::Input),
+                version(1, ty, 32 * 32),
+                1,
+                MirKernelResourceAccess::Read,
+            ),
+            resource(
+                identity(3, "out", BufferRole::Output),
+                version(1, ty, 32),
+                2,
+                MirKernelResourceAccess::Write,
+            ),
+        ],
+        launch: KernelLaunchPlan {
+            workgroup: MirWorkgroupSize { x: 8, y: 8, z: 1 },
+            dispatch_size: MirKernelDispatchSize { x: 1, y: 1, z: 1 },
+            workgroup_count: MirKernelWorkgroupCount { x: 1, y: 1, z: 1 },
+        },
+    };
+    let program = DeviceProgram {
+        kernels: vec![kernel],
+        launches: vec![LaunchUnit {
+            id: LaunchId(1),
+            kernel_index: 0,
+        }],
+        lifetime: DeviceProgramLifetime::SingleRun,
+        results: Vec::new(),
+    };
+    let extension = executor_plan_extension(&program);
+    extension
+        .validate_for_kernel_count(1)
+        .expect("packed executor-plan section is well-formed");
+    let selection = &extension.selections[0];
+    assert_eq!(
+        selection.library_entry.as_deref(),
+        Some(QUANTIZED_GEMV_ENTRY)
+    );
+    let packed_bytes = crate::abi::PackedStorageLayout::Q8_0
+        .packed_bytes_for_elements(32 * 32)
+        .expect("Q8_0 32x32 packs");
+    assert_eq!(selection.binds[1].dims, vec![packed_bytes]);
+    assert_eq!(
+        selection
+            .uniforms
+            .iter()
+            .find(|uniform| uniform.name == DECODE_GEMV_UNIFORM)
+            .map(|uniform| uniform.bits),
+        Some(1)
+    );
+    assert_eq!(
+        selection
+            .uniforms
+            .iter()
+            .find(|uniform| uniform.name == PACKED_LAYOUT_GGML_TYPE_ID_UNIFORM)
+            .map(|uniform| uniform.bits),
+        Some(8)
+    );
+    assert_eq!(
+        selection
+            .uniforms
+            .iter()
+            .find(|uniform| uniform.name == PACKED_BYTES_UNIFORM)
+            .map(|uniform| uniform.bits),
+        Some(u32::try_from(packed_bytes).expect("packed bytes fit u32"))
+    );
+    assert_eq!(
+        selection.backend_requirements[0].feature,
+        QUANTIZED_GEMV_ENTRY
+    );
+}

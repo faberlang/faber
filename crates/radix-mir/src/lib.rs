@@ -116,7 +116,9 @@ pub use device_program_plans::{
     plan_for_collection_op, subchain_signature_for_emission, BackendRequirement, BindDescriptor,
     BindLayout, ExecutorPlanExtension, KernelLaunchDescriptor, LaunchBufferSlot, LibraryBind,
     LibrarySelection, LogicalSignature, OffsetBinding, PlanMappingError, PlanProvenance,
-    RecipeKind, UniformBinding, UniformType, WorkspaceBinding,
+    RecipeKind, UniformBinding, UniformType, WorkspaceBinding, DECODE_GEMV_UNIFORM,
+    PACKED_BLOCK_BYTES_UNIFORM, PACKED_BLOCK_ELEMENTS_UNIFORM, PACKED_BYTES_UNIFORM,
+    PACKED_LAYOUT_GGML_TYPE_ID_UNIFORM, QUANTIZED_GEMM_ENTRY, QUANTIZED_GEMV_ENTRY,
 };
 pub use dump::dump_program;
 pub use elementwise_plan::{
