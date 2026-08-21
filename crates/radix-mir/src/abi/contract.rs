@@ -11,8 +11,11 @@ use super::{
     ERR_KERNEL_BUILTIN_UNKNOWN_NAME,
 };
 
-/// Number of SIMD lanes used by the sequence-one projection GEMV body.
-const DECODE_GEMV_LANES: u64 = 32;
+/// Dispatch multiplier for sequence-one projection GEMV.
+///
+/// Four output columns share one 32-lane simdgroup (`NR0=4`, the llama.cpp
+/// `mul_mat_vec_q` mapping), so the flat launch is `N × 8` threads.
+const DECODE_GEMV_LANES: u64 = 8;
 
 pub(crate) fn combined_builtin_dependencies(
     input_builtins: impl IntoIterator<Item = MirKernelBuiltin>,
@@ -513,10 +516,11 @@ pub fn collection_op_contract(
                     let tile: u64 = 8;
                     let m = left_dims[0];
                     let n = right_dims[1];
-                    // M=1 decode: two simdgroups per 8×8 workgroup, one output
-                    // column each. Prefill keeps the tiled GEMM grid.
+                    // M=1 decode: two simdgroups per 8×8 workgroup, four
+                    // output columns each (`NR0=4`). Prefill keeps the tiled
+                    // GEMM grid (same `ceil(N/8)` workgroups along x).
                     let (dispatch_x, dispatch_y) = if m == 1 {
-                        (n.div_ceil(2), 1)
+                        (n.div_ceil(tile), 1)
                     } else {
                         (n.div_ceil(tile), m.div_ceil(tile))
                     };
@@ -729,9 +733,9 @@ fn batched_attention_contract(
             .checked_mul(*dim)
             .ok_or_else(|| MirAbiError::new("batched attention output size overflow"))
     })?;
-    // Sequence-one Q/K/V projections are lowered as one simdgroup per output
-    // column.  The logical output shape stays unchanged; only the flat launch
-    // domain expands so each of the 32 lanes can contribute one K slice.
+    // Sequence-one Q/K/V projections are lowered as one simdgroup per four
+    // output columns (`NR0=4`).  The logical output shape stays unchanged;
+    // the flat launch is `N × 8` so 32 lanes reduce four packed columns.
     let output_elements = if matches!(
         kind,
         crate::kernel_plan::BatchedAttentionKind::ProjectionQ

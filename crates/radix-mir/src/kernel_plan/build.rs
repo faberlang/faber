@@ -591,7 +591,7 @@ fn shapes_match_matmul_dispatch(
 ) -> bool {
     let tile = u64::from(tile);
     if shapes.m == 1 {
-        dispatch_y == 1 && dispatch_x == shapes.n.div_ceil(2)
+        dispatch_y == 1 && dispatch_x == shapes.n.div_ceil(tile)
     } else {
         dispatch_y == shapes.m.div_ceil(tile) && dispatch_x == shapes.n.div_ceil(tile)
     }
