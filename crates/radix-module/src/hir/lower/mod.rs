@@ -3,11 +3,6 @@
 pub use radix_semantic::lower::*;
 
 #[cfg(test)]
-pub use crate::hir::{HirAnnotation, HirAnnotationField, HirAnnotationValue, HirAvailability};
-#[cfg(test)]
-pub use radix_semantic::lower::annotation::*;
-
-#[cfg(test)]
 #[path = "annotation_test.rs"]
 mod annotation_test;
 

@@ -1,4 +1,5 @@
-use super::*;
+use super::annotation::try_parse_nondum_annotation;
+use crate::hir::{HirAnnotation, HirAnnotationField, HirAnnotationValue, HirAvailability};
 use crate::lexer::{Interner, Span};
 
 #[test]
