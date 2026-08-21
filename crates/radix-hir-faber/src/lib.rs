@@ -21,6 +21,9 @@ pub mod trivia;
 pub mod types;
 
 #[cfg(test)]
+mod comma_law_test;
+
+#[cfg(test)]
 mod trivia_test;
 
 pub use module::{emit, empty_presentation, FaberCodegen, FaberOutput};
