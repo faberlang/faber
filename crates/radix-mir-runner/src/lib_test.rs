@@ -159,7 +159,10 @@ fn scalar_mut_param_propagates_through_runner_frames() {
         Err(error) => error,
         Ok(_) => panic!("in parameter must reject a non-place argument"),
     };
-    assert_eq!(error.message, "mutable parameter requires a place argument");
+    assert_eq!(
+        error.issue,
+        "runner_mutable_parameter_requires_a_place_argument"
+    );
 
     for operand in [
         MirOperand::Constant(MirConstant::String(mutabile)),
