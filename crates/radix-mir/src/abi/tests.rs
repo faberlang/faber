@@ -1544,7 +1544,10 @@ fn projection_gemv_dispatch_uses_step_rows_not_seq_const() {
         panic!("expected BatchedAttention, got {contract:?}");
     };
     assert_eq!(kind, crate::kernel_plan::BatchedAttentionKind::ProjectionV);
-    assert_eq!(seq, 1, "plan seq is THIS step's row count, not the seq const");
+    assert_eq!(
+        seq, 1,
+        "plan seq is THIS step's row count, not the seq const"
+    );
     assert_eq!(
         output_elements, 64,
         "logical 2*1*4=8 columns × 8 GEMV lanes"
