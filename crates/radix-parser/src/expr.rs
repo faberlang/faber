@@ -1314,6 +1314,10 @@ impl Parser {
                 // identifier.
                 if self.keyword_claim_key(ident.name) == Some("vacua") {
                     ExprKind::Vacua(ident)
+                } else if self.interner.resolve(ident.name) == "ratio"
+                    && self.check(&TokenKind::LtAscii)
+                {
+                    self.parse_ratio_constructor(ident)?
                 } else if let Some(constructor) =
                     self.try_parse_qualified_typed_constructor(&ident)?
                 {
@@ -1376,6 +1380,49 @@ impl Parser {
 
         let span = start.merge(self.previous_span());
         Ok(Expr { id, kind, span })
+    }
+
+    /// Parse the ratio constructor claim: `ratio<label: T, …> { field = value, … }`.
+    ///
+    /// The canonical identifier is claimed only in this angle-bracket slot, so
+    /// ordinary bindings named `ratio` remain ordinary identifiers.
+    fn parse_ratio_constructor(&mut self, name: Ident) -> Result<ExprKind, ParseError> {
+        self.expect(&TokenKind::LtAscii, "expected '<' after 'ratio'")?;
+
+        let mut type_args = Vec::new();
+        let mut labels = HashSet::new();
+        loop {
+            type_args.push(self.parse_ratio_type_argument(&mut labels)?);
+            if !self.consume_item_separator(&TokenKind::GtAscii, "ratio_type_arguments")? {
+                break;
+            }
+        }
+        self.expect(&TokenKind::GtAscii, "expected '>'")?;
+        let type_span = name.span.merge(self.previous_span());
+
+        self.expect(
+            &TokenKind::LBrace,
+            "expected '{' after ratio type arguments",
+        )?;
+        let fields = self.parse_object_fields()?;
+        self.expect(&TokenKind::RBrace, "expected '}' after ratio fields")?;
+
+        let object = Expr {
+            id: self.next_id(),
+            kind: ExprKind::Object(ObjectExpr { fields }),
+            span: type_span.merge(self.previous_span()),
+        };
+        let ty = TypeExpr {
+            nullable: false,
+            mode: None,
+            kind: TypeExprKind::Named(name, type_args),
+            span: type_span,
+            iuncta_label: None,
+        };
+        Ok(ExprKind::Verte(VerteExpr {
+            expr: Box::new(object),
+            ty,
+        }))
     }
 
     fn try_parse_qualified_typed_constructor(
