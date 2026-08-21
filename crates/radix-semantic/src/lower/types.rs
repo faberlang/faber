@@ -357,6 +357,10 @@ impl Lowerer<'_> {
             return self.types.tuple(elements);
         }
 
+        if name_str == "ratio" {
+            return self.lower_ratio_type(params);
+        }
+
         if let Some(collection) = CollectionKind::from_name(name_str) {
             return self.lower_collection_type(collection, params);
         }
@@ -413,6 +417,31 @@ impl Lowerer<'_> {
         self.types.intern(Type::Applied(base, args))
     }
 
+    /// Lower `ratio<label: T, …>` into interned `Type::Record`.
+    ///
+    /// Labels become the record field keys and never enter any other type's
+    /// identity. Parser already requires a label on every ratio slot.
+    /// `_` lowers as a monomorphic hole (solved later from the field witness);
+    /// a standalone `∪` is not a valid ratio element and is rejected here so
+    /// the issue points at the slot instead of leaking WARN017.
+    fn lower_ratio_type(&mut self, params: &[TypeExpr]) -> TypeId {
+        let mut fields = Vec::with_capacity(params.len());
+        for param in params {
+            let Some(label) = param.iuncta_label.as_ref() else {
+                continue;
+            };
+            let ty = if matches!(param.kind, TypeExprKind::UnionHole) {
+                self.current_span = param.span;
+                self.error("ratio_union_type_arg_unsupported");
+                self.types.intern(Type::Error)
+            } else {
+                self.lower_nested_type(param)
+            };
+            fields.push((label.name, ty));
+        }
+        self.types.record(fields)
+    }
+
     fn lower_locale_pack_type(&mut self, name: &str, params: &[TypeExpr]) -> Option<TypeId> {
         let binding = self.locale_pack?.type_binding_kind(name)?;
         match binding {
@@ -436,6 +465,7 @@ impl Lowerer<'_> {
             // the hardcoded name paths in `lower_named_type` (bare `series`
             // keeps its dynamic row-map special case).
             crate::locale::TypeBindingKind::Relational(_) => None,
+            crate::locale::TypeBindingKind::Ratio => Some(self.lower_ratio_type(params)),
         }
     }
 

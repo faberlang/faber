@@ -31,10 +31,9 @@
 
 use super::types::{FuncSig, Type, TypeId, TypeTable};
 use crate::file_interface::{
-    FileExportKind, FileInterface, FileInterfaceError, InterfaceLibraryIdentity,
-    InterfaceMemberKind, InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind,
-    InterfaceStructExport, import_interface_callable_with_resolver,
-    import_interface_type_with_resolver,
+    import_interface_callable_with_resolver, import_interface_type_with_resolver, FileExportKind,
+    FileInterface, FileInterfaceError, InterfaceLibraryIdentity, InterfaceMemberKind,
+    InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind, InterfaceStructExport,
 };
 use crate::locale::LocalePack;
 use crate::passes::visibility_annotation::VisibilityTier;

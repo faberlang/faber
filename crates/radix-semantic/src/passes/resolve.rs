@@ -59,7 +59,7 @@ use radix_syntax::{
     ExprKind, FiguraExpr, IfBody, Pattern, PatternBind, ProbandumDecl, Program, SiStmt, Stmt,
     StmtKind, TypeExpr, TypeExprKind, TypeParam,
 };
-use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
+use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
 
 const ISSUE_DUPLICATE_DEFINITION: &str = "duplicate_definition";
 const ISSUE_EMPTY_QUALIFIED_TYPE_PATH: &str = "empty_qualified_type_path";
@@ -2223,6 +2223,7 @@ fn is_builtin_type(name: &str) -> bool {
             | "matrix"
             | "intervallum"
             | "iuncta"
+            | "ratio"
             | "sparsa"
             | "series"
             | "json"
@@ -2733,7 +2734,11 @@ fn lower_type_expr_with_context(
             } else {
                 types.intern(Type::Union(cleaned))
             };
-            if had_nihil { types.option(base) } else { base }
+            if had_nihil {
+                types.option(base)
+            } else {
+                base
+            }
         }
     };
 
@@ -3083,6 +3088,18 @@ fn lower_named_type(
             return Err(TypeLowerError::Issue(ISSUE_MATRIX_INCOMPLETE));
         }
         return Err(TypeLowerError::Issue(ISSUE_MATRIX_MISSING_FIGURA));
+    }
+
+    if name_str == "ratio" {
+        let mut fields = Vec::with_capacity(params.len());
+        for param in params {
+            let Some(label) = param.iuncta_label.as_ref() else {
+                continue;
+            };
+            let field_ty = lower_type_expr(param, resolver, interner, types)?;
+            fields.push((label.name, field_ty));
+        }
+        return Ok(types.record(fields));
     }
 
     if let Some(collection) = CollectionKind::from_name(name_str) {
