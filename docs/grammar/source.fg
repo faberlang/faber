@@ -1,5 +1,5 @@
-# Faber grammar source — verbatim transcription of docs/EBNF.md (GSD-3).
-# @grammar 1. No renames. No repairs.
+# Faber grammar source — EBNF.md transcription with GSD-4 repairs.
+# @grammar 1. No renames. Orphans joined; lexicon pinned; keyword table derived.
 
 @grammar 1
 @start fabFile
@@ -545,7 +545,214 @@ explain_consumer = "radix/corpus/**/*.fab via faber explain"
 explain_symbolic_gaps = []
 tree_sitter_extra = ["!", "⊜"]
 tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
+@keywords
+## Keyword Reference
+#
+# Derived table (GSD-4): every quoted latin keyword literal from the productions.
+# | Category | Faber | Meaning |
+# | --- | --- | --- |
+# | Declarations | `abstractus` | abstract genus modifier |
+# | Declarations | `discretio` | tagged union |
+# | Declarations | `fixum` | immutable binding |
+# | Declarations | `functio` | function |
+# | Declarations | `genus` | class |
+# | Declarations | `implendum` | interface contract |
+# | Declarations | `importa` | import |
+# | Declarations | `incipiet` | async entrypoint |
+# | Declarations | `incipit` | entrypoint |
+# | Declarations | `magnitudo` | size/index generic parameter |
+# | Declarations | `nomen` | import binding name |
+# | Declarations | `ordo` | enum |
+# | Declarations | `publica` | public visibility |
+# | Declarations | `sit` | inferred immutable local |
+# | Declarations | `sponte` | optional declaration slot |
+# | Declarations | `typus` | type alias |
+# | Declarations | `varia` | mutable binding |
+# | Declarations | `visibilitas` | visibility field |
+# | Genus | `generis` | static member |
+# | Genus | `implet` | implements |
+# | Genus | `nexum` | link field |
+# | Genus | `sub` | extends |
+# | Control | `casu` | case |
+# | Control | `ceterum` | default case |
+# | Control | `custodi` | guard |
+# | Control | `discerne` | pattern match |
+# | Control | `dum` | while / postfix until |
+# | Control | `elige` | switch |
+# | Control | `ergo` | compact statement-body joint |
+# | Control | `fac` | do block / post-test loop |
+# | Control | `itera` | for |
+# | Control | `perge` | continue |
+# | Control | `redde` | return |
+# | Control | `rumpe` | break |
+# | Control | `secus` | else |
+# | Control | `si` | if |
+# | Control | `sic` | then (ternary) |
+# | Control | `sin` | else-if |
+# | Control | `tacet` | no-op |
+# | Error | `adfirma` | assert |
+# | Error | `cape` | local handler |
+# | Error | `iace` | throw |
+# | Error | `iacit` | throws marker |
+# | Error | `mori` | panic |
+# | Error | `requirit` | require |
+# | Async | `cede` | yield |
+# | Async | `fient` | async stream posture |
+# | Async | `fiet` | async finite posture |
+# | Async | `figendum` | await-bind immutable |
+# | Async | `fiunt` | sync stream posture |
+# | Async | `reddet` | await-return |
+# | Async | `tacebit` | await-discard |
+# | Async | `variandum` | await-bind mutable |
+# | Endpoints | `ad` | capability call |
+# | Boolean | `aut` | or |
+# | Boolean | `est` | is / equality |
+# | Boolean | `et` | and |
+# | Boolean | `falsum` | false |
+# | Boolean | `non` | not |
+# | Boolean | `vel` | nullable default |
+# | Boolean | `verum` | true |
+# | Objects | `clausura` | legacy closure |
+# | Objects | `cura` | with-resource |
+# | Objects | `ego` | self |
+# | Objects | `finge` | construct variant |
+# | Objects | `iuncta` | tuple type/constructor |
+# | Objects | `praefixum` | prefix expression |
+# | Type | `copy` | copy ownership |
+# | Type | `de` | borrow / for-in keys |
+# | Type | `in` | ownership in |
+# | Type | `own` | owned |
+# | Iteration | `ab` | range iteration |
+# | Iteration | `ante` | range until exclusive |
+# | Iteration | `ex` | for-of / import from |
+# | Iteration | `inter` | between |
+# | Iteration | `intra` | membership |
+# | Iteration | `per` | range step |
+# | Iteration | `usque` | range until inclusive |
+# | Params | `argumenta` | CLI arguments modifier |
+# | Params | `ceteri` | rest |
+# | Params | `curata` | curated options |
+# | Params | `errata` | error channel |
+# | Params | `exitus` | exit code |
+# | Params | `immutata` | immutable modifier |
+# | Params | `omnia` | all / glob |
+# | Params | `optiones` | options modifier |
+# | Params | `sparge` | spread |
+# | Params | `ut` | as / alias |
+# | Diagnostics | `mone` | warn |
+# | Diagnostics | `nota` | note |
+# | Diagnostics | `scribe` | diagnostic channel |
+# | Diagnostics | `vide` | debug |
+# | Literals | `nihil` | none |
+# | JSON | `false` | JSON false |
+# | JSON | `null` | JSON null |
+# | JSON | `true` | JSON true |
+# | Builtin | `lege` | read |
+# | Builtin | `lineam` | line |
+# | Builtin | `scriptum` | write |
+# | Annotation | `fragment` | nucleum fragment |
+# | Annotation | `nucleum` | kernel annotation |
+# | Testing | `fragilis` | flaky |
+# | Testing | `futurum` | future |
+# | Testing | `metior` | benchmark |
+# | Testing | `omitte` | skip |
+# | Testing | `postpara` | teardown |
+# | Testing | `postparabit` | async teardown |
+# | Testing | `praepara` | setup |
+# | Testing | `praeparabit` | async setup |
+# | Testing | `proba` | test |
+# | Testing | `probandum` | test suite |
+# | Testing | `repete` | repeat |
+# | Testing | `solum` | only |
+# | Testing | `solum_in` | only-in |
+# | Testing | `tag` | tag |
+# | Testing | `temporis` | timeout |
+#
+## End derived keyword table
+
 @lexicon
+# Lexical tier. Empty RHS; status is capture-pending. radix-lexer / driver /
+# parser is the authority (crates/radix-lexer/src/). Not a second lexer spec.
+
+# scan.rs scan_identifier; Unicode XID_Start or '_' then XID_Continue or '_'; NFKC intern; TokenKind::Ident (keywords also lex as identifiers)
+@status capture-pending
+IDENTIFIER ::=
+
+# scan.rs scan_number; decimal/hex/bin/oct integers and floats with '_' separators; TokenKind::Integer(u64) or Float(f64)
+@status capture-pending
+NUMBER ::=
+
+# not a distinct lexer token; type-position TokenKind::Integer used as magnitudo capacity (no fraction/exponent)
+@status capture-pending
+NATURAL ::=
+
+# scan.rs scan_string / scan_guillemet_block_string; double-quoted or guillemet block; TokenKind::String
+@status capture-pending
+STRING ::=
+
+# scan.rs scan_ascii_string; single-quoted; TokenKind::AsciiString
+@status capture-pending
+ASCII_STRING ::=
+
+# scan.rs scan_backtick_string; backtick forma template; TokenKind::BacktickString
+@status capture-pending
+BACKTICK_STRING ::=
+
+# scan.rs scan_octeti_string; pipe-delimited hex; TokenKind::OctetiString
+@status capture-pending
+OCTETI_STRING ::=
+
+# scan.rs scan_line_break; LF or CRLF; TokenKind::Newline
+@status capture-pending
+NEWLINE ::=
+
+# parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64/f16/f32/f64; not a lexer token
+@status capture-pending
+WIDTH_MARKER ::=
+
+# parser type-position l + WIDTH_MARKER; not a lexer token
+@status capture-pending
+LISTA_WIDTH_SUGAR ::=
+
+# parser type-position t + WIDTH_MARKER; not a lexer token
+@status capture-pending
+TENSOR_WIDTH_SUGAR ::=
+
+# parser type-position s + WIDTH_MARKER; not a lexer token
+@status capture-pending
+SPARSA_WIDTH_SUGAR ::=
+
+# parser type-position v + WIDTH_MARKER; not a lexer token
+@status capture-pending
+VECTOR_WIDTH_SUGAR ::=
+
+# parser type-position m + WIDTH_MARKER; not a lexer token
+@status capture-pending
+MATRIX_WIDTH_SUGAR ::=
+
+# driver peels a line whose trimmed content is exactly +++ before lexing
+@status capture-pending
+FRONTMATTER_DELIMITER ::=
+
+# driver; TOML body between FRONTMATTER_DELIMITER lines
+@status capture-pending
+TOML_LINES ::=
+
+# parser; identifier spelling after @, including keyword spellings
+@status capture-pending
+ANNOTATION_NAME ::=
+
+# parser; identifier spelling in annotation field position
+@status capture-pending
+ANNOTATION_FIELD_NAME ::=
+
+# parser; one ordinary token other than TokenKind::Newline
+@status capture-pending
+NON_NEWLINE_TOKEN ::=
+
+# parser zero-width constraint: adjacent parts stay on the same logical line
+@status capture-pending
+NO_NEWLINE ::=
 @rewrite
 
 fabFile       := frontmatter? program
@@ -556,11 +763,12 @@ statementCore := importDecl | bindingDecl | funcDecl | genusDecl | implendumDecl
                | typeAliasDecl | enumDecl | discretioDecl
                | ifStmt | whileStmt | iteraStmt
                | eligeStmt | discerneStmt | guardStmt | curaStmt | facBlockStmt
-               | returnStmt | breakStmt | continueStmt | noopStmt | throwStmt
+               | returnStmt | returnAwaitStmt | awaitDiscardStmt | yieldStmt
+               | breakStmt | continueStmt | noopStmt | throwStmt
                | assertStmt | requiritStmt | outputStmt | incipitStmt | incipietStmt
                | extractStmt | probandumDecl | probaStmt | blockStmt
                | incDecStmt | exprStmt
-bindingDecl   := varDecl | sitDecl | arrayDestruct | objectDestruct
+bindingDecl   := varDecl | sitDecl | arrayDestruct | objectDestruct | awaitVarDecl
 exprStmt      := expression
 blockStmt     := '{' statement* '}'
 
