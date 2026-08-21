@@ -25,6 +25,7 @@ use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::{lookup_keyword_spec, KeywordOwner, KeywordScope, Span, Symbol, TokenKind};
 #[allow(clippy::wildcard_imports)]
 use radix_syntax::*;
+use std::collections::HashSet;
 
 // EXPRESSION ENTRY POINT
 
@@ -804,7 +805,11 @@ impl Parser {
         type_args: Vec<TypeExpr>,
     ) -> Result<Expr, ParseError> {
         self.advance();
-        let args = self.parse_argument_list()?;
+        let allows_template_labels = matches!(
+            &callee.kind,
+            ExprKind::Literal(Literal::String(_) | Literal::Forma(_))
+        );
+        let args = self.parse_argument_list(allows_template_labels)?;
         self.expect(&TokenKind::RParen, "expected ')'")?;
         Ok(self.postfix_expr(
             start,
@@ -909,7 +914,7 @@ impl Parser {
         object: Expr,
     ) -> Result<Expr, ParseError> {
         self.advance();
-        let args = self.parse_argument_list()?;
+        let args = self.parse_argument_list(false)?;
         self.expect(&TokenKind::RParen, "expected ')'")?;
         Ok(self.optional_chain_expr(start, object, OptionalChainKind::Call(args)))
     }
@@ -951,7 +956,7 @@ impl Parser {
         object: Expr,
     ) -> Result<Expr, ParseError> {
         self.advance();
-        let args = self.parse_argument_list()?;
+        let args = self.parse_argument_list(false)?;
         self.expect(&TokenKind::RParen, "expected ')'")?;
         Ok(self.non_null_expr(start, object, NonNullKind::Call(args)))
     }
@@ -1786,19 +1791,73 @@ impl Parser {
     ///
     /// GRAMMAR:
     ///   args := [[`sparge`] expr (',' [`sparge`] expr)*]
+    ///   template_argument := (IDENTIFIER ':')? expression
     ///
-    /// Arguments can use `sparge` to unpack arrays or objects. The closing `)` is
-    /// left to the caller so this helper can be shared by normal and optional
-    /// call postfix parsing.
-    pub(super) fn parse_argument_list(&mut self) -> Result<Vec<Argument>, ParseError> {
+    /// Arguments can use `sparge` to unpack arrays or objects. Labeled actuals
+    /// are admitted only when the caller has identified a direct string or
+    /// forma literal callee. The closing `)` is left to the caller so this
+    /// helper can be shared by normal and optional call postfix parsing.
+    pub(super) fn parse_argument_list(
+        &mut self,
+        allows_template_labels: bool,
+    ) -> Result<Vec<Argument>, ParseError> {
         let mut args = Vec::new();
+        let mut labels = HashSet::new();
 
         while !self.check(&TokenKind::RParen) && !self.is_at_end() {
             let start = self.current_span();
+            let (label, label_span) = if self.argument_label_start() {
+                let label = self.parse_contextual_ident(KeywordOwner::DeclarationName)?;
+                let label_span = label.span;
+                if !allows_template_labels {
+                    return Err(ParseError::structured(ParseErrorKind::Expected, label_span)
+                        .with_arg("issue", "labeled_actual_non_template_call")
+                        .with_arg("label", self.interner.resolve(label.name).to_owned()));
+                }
+                self.expect(&TokenKind::Colon, "expected ':' after argument label")?;
+                (Some(label.name), Some(label_span))
+            } else {
+                (None, None)
+            };
+
             let spread = self.eat_keyword_ident(TokenKind::Sparge);
+            if label.is_some() && spread {
+                return Err(ParseError::structured(
+                    ParseErrorKind::Expected,
+                    label_span.expect("labeled argument span"),
+                )
+                .with_arg("issue", "labeled_actual_spread_unsupported"));
+            }
+
+            if self.argument_bind_start() {
+                let bind_span = self.peek_at(1).span;
+                let label = match self.peek().kind {
+                    TokenKind::Ident(symbol) => self.interner.resolve(symbol).to_owned(),
+                    TokenKind::Tag => "tag".to_owned(),
+                    _ => String::new(),
+                };
+                return Err(ParseError::structured(ParseErrorKind::Expected, bind_span)
+                    .with_arg("issue", "label_bind_distinction")
+                    .with_arg("label", label)
+                    .with_arg("label_operator", ":")
+                    .with_arg("binding_operator", "="));
+            }
+
+            if let Some(label) = label {
+                if !labels.insert(label) {
+                    return Err(ParseError::structured(
+                        ParseErrorKind::Expected,
+                        label_span.expect("labeled argument span"),
+                    )
+                    .with_arg("issue", "duplicate_tuple_element_label")
+                    .with_arg("label", self.interner.resolve(label).to_owned()));
+                }
+            }
+
             let value = Box::new(self.parse_expression()?);
             let span = start.merge(self.previous_span());
             args.push(Argument {
+                label,
                 spread,
                 value,
                 span,
@@ -1810,6 +1869,16 @@ impl Parser {
         }
 
         Ok(args)
+    }
+
+    fn argument_label_start(&self) -> bool {
+        matches!(self.peek().kind, TokenKind::Ident(_) | TokenKind::Tag)
+            && self.peek_at(1).kind == TokenKind::Colon
+    }
+
+    fn argument_bind_start(&self) -> bool {
+        matches!(self.peek().kind, TokenKind::Ident(_) | TokenKind::Tag)
+            && self.peek_at(1).kind == TokenKind::Eq
     }
 
     fn parse_array_elements(&mut self) -> Result<Vec<ArrayElement>, ParseError> {

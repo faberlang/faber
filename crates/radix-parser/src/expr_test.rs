@@ -6,7 +6,7 @@
 
 use crate::parse;
 use crate::test_support::args_have_no_legacy_message;
-use crate::test_support::parse_ok;
+use crate::test_support::{assert_parse_error_issue, parse_ok};
 use crate::ParseResult;
 use radix_lexer::lex;
 use radix_syntax::{
@@ -1279,5 +1279,92 @@ fn empty_gradient_selector_list_fails_parse() {
     crate::test_support::assert_parse_error_issue(
         "fixum _ g ← loss(x, y) ∇ []",
         "gradient_empty_selector_list",
+    );
+}
+
+#[test]
+fn template_call_carries_labeled_actual_on_string_literal_callee() {
+    let result = parse_ok(r#"fixum _ out ← "§{greet} world"(greet: "salve")"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Call(call) = &expr.kind else {
+        panic!("expected template call, got {:?}", expr.kind);
+    };
+    assert_eq!(call.args.len(), 1);
+    let label = call.args[0].label.expect("labeled actual");
+    assert_eq!(result.interner.resolve(label), "greet");
+    assert!(!call.args[0].spread);
+}
+
+#[test]
+fn template_call_carries_labeled_actual_on_forma_literal_callee() {
+    let result = parse_ok(r#"fixum _ out ← `… §{id}`(id: 1)"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Call(call) = &expr.kind else {
+        panic!("expected forma template call, got {:?}", expr.kind);
+    };
+    let label = call.args[0].label.expect("labeled actual");
+    assert_eq!(result.interner.resolve(label), "id");
+}
+
+#[test]
+fn labeled_actual_on_ordinary_call_is_rejected_at_parse() {
+    assert_parse_error_issue(
+        r#"fixum _ out ← f(greet: "x")"#,
+        "labeled_actual_non_template_call",
+    );
+}
+
+#[test]
+fn labeled_actual_on_optional_literal_call_is_rejected_at_parse() {
+    assert_parse_error_issue(
+        r#"fixum _ out ← "§{greet}"?(greet: "x")"#,
+        "labeled_actual_non_template_call",
+    );
+}
+
+#[test]
+fn equals_actual_reports_label_bind_distinction() {
+    let result = crate::test_support::parse_program(r#"fixum _ out ← "§ world"(greet = "x")"#);
+    assert!(
+        result.errors.iter().any(|error| {
+            error
+                .args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "label_bind_distinction")
+                && error
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "label_operator" && arg.value == ":")
+                && error
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "binding_operator" && arg.value == "=")
+        }),
+        "expected label/bind diagnostic, got {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn duplicate_labeled_actual_is_rejected_at_parse() {
+    assert_parse_error_issue(
+        r#"fixum _ out ← "§{greet}"(greet: "a", greet: "b")"#,
+        "duplicate_tuple_element_label",
+    );
+}
+
+#[test]
+fn labeled_spread_actual_is_rejected_at_parse() {
+    assert_parse_error_issue(
+        r#"fixum _ out ← "§{items}"(items: sparge values)"#,
+        "labeled_actual_spread_unsupported",
     );
 }

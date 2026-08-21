@@ -1115,6 +1115,10 @@ pub struct CallExpr {
 
 #[derive(Debug)]
 pub struct Argument {
+    /// Template-call label, when this actual addresses a named hole.
+    ///
+    /// Labels are parser-surface metadata and are erased before HIR lowering.
+    pub label: Option<Symbol>,
     pub spread: bool, // sparge
     pub value: Box<Expr>,
     pub span: Span,
