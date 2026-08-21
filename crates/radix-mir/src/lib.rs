@@ -11,6 +11,7 @@ pub mod boundary_abi;
 pub mod capability;
 mod collection_ops;
 pub mod control;
+pub mod cost_analysis;
 pub mod device;
 pub mod device_plan_compiler;
 pub mod device_plan_ingress;
@@ -97,6 +98,10 @@ pub use ai_workbench_stage5::{
 pub use boundary_abi::{
     validate_boundary_abi, BoundaryAbiClass, BoundaryAbiError, BoundaryCall, PreparedRegion,
     HOST_CALL_ABI_VERSION,
+};
+pub use cost_analysis::{
+    amplify_class, basis_tag, classify_conversion, conversion_family, foldable_tag, uncosted_tag,
+    CostBasisRow, CostClass, CostFamily, CostTag, COST_BASIS,
 };
 // Vocabulary moved down to radix-types (feature-granularity §2); re-exported
 pub use device::{
