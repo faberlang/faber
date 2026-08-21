@@ -22,7 +22,7 @@
 //!   colon aliases.
 
 use super::{ParseError, ParseErrorKind, Parser};
-use radix_lexer::{KeywordOwner, KeywordScope, Span, Symbol, TokenKind, lookup_keyword_spec};
+use radix_lexer::{lookup_keyword_spec, KeywordOwner, KeywordScope, Span, Symbol, TokenKind};
 #[allow(clippy::wildcard_imports)]
 use radix_syntax::*;
 
