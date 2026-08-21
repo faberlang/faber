@@ -613,8 +613,7 @@ impl HirVisitor for DeadSourceAnalyzer<'_> {
                     local.def_id,
                     binding_span,
                     local.ty.is_some_and(|ty| self.types.is_exclusive_value(ty)),
-                    local.init.is_some()
-                        && self.facts.binding(local.def_id) == AccessFact::Fresh,
+                    local.init.is_some() && self.facts.binding(local.def_id) == AccessFact::Fresh,
                 );
                 if let Some(init) = &local.init {
                     if self.destination_is_own(local.ty) && !self.destination_is_copy(local.ty) {
