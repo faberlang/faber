@@ -296,6 +296,7 @@ fn device_section_with_distributed(
             v: WIRE_DEVICE_PROGRAM_VERSION,
             program: wire_program_fixture(),
         },
+        executor_plan: None,
         selection: FmirDeviceSelection::Auto,
         artifacts: FmirDeviceArtifactsSection {
             artifact: Vec::new(),

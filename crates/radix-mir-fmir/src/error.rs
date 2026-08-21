@@ -189,6 +189,21 @@ pub enum FmirImageError {
         expected: u32,
     },
 
+    /// The separately versioned executor-plan section is unsupported.
+    UnsupportedExecutorPlanSectionVersion {
+        /// Version encoded in the executor-plan section.
+        actual: u32,
+        /// Version this loader accepts.
+        expected: u32,
+    },
+
+    /// The executor-plan section contradicts the carried device program or
+    /// contains incomplete typed selection facts.
+    ExecutorPlanSectionInvalid {
+        /// Focused fail-closed detail.
+        detail: String,
+    },
+
     /// The device program's carried semantic facts violate a fail-closed
     /// rule (Stage 3R F1–F7): identity aliasing, generation errors, graph
     /// cycles, illegal roots, missing dependencies, or duplicate/
@@ -358,6 +373,13 @@ impl fmt::Display for FmirImageError {
                     f,
                     "incompatible device-program wire version {actual}; this loader accepts wire version {expected} — the serialized device program was produced by a different (incompatible) radix wire revision"
                 )
+            }
+            Self::UnsupportedExecutorPlanSectionVersion { actual, expected } => write!(
+                f,
+                "unsupported executor-plan section version {actual}; expected {expected}"
+            ),
+            Self::ExecutorPlanSectionInvalid { detail } => {
+                write!(f, "invalid executor-plan section: {detail}")
             }
             Self::WireProgramInvalid { detail } => {
                 write!(f, "invalid device program: {detail}")

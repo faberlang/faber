@@ -1,4 +1,7 @@
-use super::device::{FmirDeviceSection, FmirSessionSection, WIRE_SESSION_SECTION_VERSION};
+use super::device::{
+    FmirDeviceSection, FmirExecutorPlanSection, FmirSessionSection, EXECUTOR_PLAN_SECTION_VERSION,
+    WIRE_SESSION_SECTION_VERSION,
+};
 use super::distributed::{
     expected_plan_for_section, wire_plan_to_plan, FmirDistributedExecutionSection,
 };
@@ -282,6 +285,116 @@ pub(crate) fn check_artifact_encodings(
 /// violates (payload encodings, artifact ABI versions, typed targets +
 /// combinations, entrypoint uniqueness, digest re-verification, backend
 /// selection, and the optional distributed/session sections).
+fn admit_executor_plan_section(
+    section: &FmirExecutorPlanSection,
+    kernel_count: usize,
+) -> Result<(), crate::error::FmirImageError> {
+    if section.v != EXECUTOR_PLAN_SECTION_VERSION {
+        return Err(
+            crate::error::FmirImageError::UnsupportedExecutorPlanSectionVersion {
+                actual: section.v,
+                expected: EXECUTOR_PLAN_SECTION_VERSION,
+            },
+        );
+    }
+    if section.plans.len() != kernel_count {
+        return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {
+            detail: format!(
+                "selection count {} does not match kernel count {}",
+                section.plans.len(),
+                kernel_count
+            ),
+        });
+    }
+    for (position, plan) in section.plans.iter().enumerate() {
+        if usize::try_from(plan.kernel_index).ok() != Some(position) {
+            return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {
+                detail: format!(
+                    "selection index {} is not the ordered kernel index {}",
+                    plan.kernel_index, position
+                ),
+            });
+        }
+        if plan.logical_signature.operation.is_empty() || plan.provenance.pass.is_empty() {
+            return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {
+                detail: format!("selection {position} has incomplete signature/provenance"),
+            });
+        }
+        if plan.primary_bind.dims.is_empty()
+            || plan.primary_bind.dims.len() != plan.primary_bind.strides.len()
+            || plan.primary_bind.dims.iter().any(|dim| *dim == 0)
+            || plan.primary_bind.strides.iter().any(|stride| *stride == 0)
+            || plan.primary_bind.grid.iter().any(|axis| *axis == 0)
+            || plan.primary_bind.layout.is_empty()
+        {
+            return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {
+                detail: format!("selection {position} has an invalid primary bind"),
+            });
+        }
+        if plan
+            .logical_signature
+            .inputs
+            .iter()
+            .chain(&plan.logical_signature.outputs)
+            .any(String::is_empty)
+            || plan.provenance.source_nodes.is_empty()
+        {
+            return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {
+                detail: format!("selection {position} has empty logical names or provenance"),
+            });
+        }
+        for bind in &plan.binds {
+            if bind.name.is_empty()
+                || bind.dims.is_empty()
+                || bind.dims.len() != bind.strides.len()
+                || bind.dims.iter().any(|dim| *dim == 0)
+                || bind.strides.iter().any(|stride| *stride == 0)
+            {
+                return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {
+                    detail: format!("selection {position} has an invalid bind for {}", bind.name),
+                });
+            }
+        }
+        for uniform in &plan.uniforms {
+            if uniform.name.is_empty()
+                || !matches!(uniform.ty.as_str(), "F32" | "F16" | "U32" | "I32")
+            {
+                return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {
+                    detail: format!("selection {position} has an unknown uniform type"),
+                });
+            }
+        }
+        for requirement in &plan.backend_requirements {
+            if requirement.backend.is_empty() || requirement.feature.is_empty() {
+                return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {
+                    detail: format!("selection {position} has an incomplete backend requirement"),
+                });
+            }
+        }
+        for offset in &plan.offsets {
+            if offset.name.is_empty()
+                || offset.strides.is_empty()
+                || offset.strides.iter().any(|stride| *stride == 0)
+            {
+                return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {
+                    detail: format!(
+                        "selection {position} has an invalid offset/stride row for {}",
+                        offset.name
+                    ),
+                });
+            }
+        }
+        if let Some(workspace) = plan.workspace {
+            if workspace.alignment == 0 || workspace.bytes % u64::from(workspace.alignment) != 0 {
+                return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {
+                    detail: format!("selection {position} has an invalid workspace alignment"),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn admit_device_section_with_compat(
     device: &FmirDeviceSection,
     table: &ArtifactCompatibilityTable,
@@ -297,6 +410,9 @@ pub fn admit_device_section_with_compat(
         );
     }
     validate_wire_program(&device.device_program.program)?;
+    if let Some(executor_plan) = &device.executor_plan {
+        admit_executor_plan_section(executor_plan, device.device_program.program.kernels.len())?;
+    }
     check_artifact_encodings(device)?;
     check_artifact_abi_versions(device)?;
     check_artifact_targets(device, table)?;

@@ -12,6 +12,7 @@ pub mod capability;
 mod collection_ops;
 pub mod control;
 pub mod device;
+pub mod device_plan_compiler;
 pub mod device_program;
 pub mod device_program_plans;
 pub mod device_semantics;
@@ -110,9 +111,11 @@ pub use device_program::{
     RegistryVersion, ResultBuffer,
 };
 pub use device_program_plans::{
-    carried_plan_agrees, kernel_plan_for_function, launch_descriptors, plan_for_collection_op,
-    subchain_signature_for_emission, KernelLaunchDescriptor, LaunchBufferSlot, PlanMappingError,
-    RecipeKind,
+    carried_plan_agrees, executor_plan_extension, kernel_plan_for_function, launch_descriptors,
+    plan_for_collection_op, subchain_signature_for_emission, BackendRequirement, BindDescriptor,
+    BindLayout, ExecutorPlanExtension, KernelLaunchDescriptor, LaunchBufferSlot, LibraryBind,
+    LibrarySelection, LogicalSignature, OffsetBinding, PlanMappingError, PlanProvenance,
+    RecipeKind, UniformBinding, UniformType, WorkspaceBinding,
 };
 pub use dump::dump_program;
 pub use elementwise_plan::{
