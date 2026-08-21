@@ -146,3 +146,123 @@ functio first(iuncta<gx: f32, numerus> p) → f32 {
 ";
     let _result = analyze(source);
 }
+
+fn function_locals(source: &str) -> Vec<(String, HirExpressionKind)> {
+    let unit = analyze(source);
+    let hir = unit.hir.as_ref().expect("hir");
+    let item = hir.items.first().expect("function item");
+    let HirItemKind::Function(func) = &item.kind else {
+        panic!("expected function item");
+    };
+    func.body
+        .as_ref()
+        .expect("function body")
+        .statements
+        .iter()
+        .filter_map(|stmt| match &stmt.kind {
+            HirStatementKind::Local(local) => Some((
+                unit.interner.resolve(local.name).to_owned(),
+                local.init.as_ref()?.kind.clone(),
+            )),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn iuncta_label_destructuring_lowers_fields_by_position() {
+    let locals = function_locals(
+        r"
+functio split(iuncta<gx: f32, gw: numerus> pair) → f32 {
+    fixum {gw, gx} ← pair
+    redde gx
+}
+",
+    );
+    assert!(matches!(
+        locals.iter().find(|(name, _)| name == "gx").map(|(_, kind)| kind),
+        Some(HirExpressionKind::Index(_, index))
+            if matches!(index.kind, HirExpressionKind::Literal(HirLiteral::Int(0)))
+    ));
+    assert!(matches!(
+        locals.iter().find(|(name, _)| name == "gw").map(|(_, kind)| kind),
+        Some(HirExpressionKind::Index(_, index))
+            if matches!(index.kind, HirExpressionKind::Literal(HirLiteral::Int(1)))
+    ));
+}
+
+#[test]
+fn iuncta_label_destructuring_allows_partial_binding() {
+    let _locals = function_locals(
+        r"
+functio first(iuncta<gx: f32, gw: numerus> pair) → f32 {
+    fixum {gx} ← pair
+    redde gx
+}
+",
+    );
+}
+
+#[test]
+fn iuncta_label_destructuring_rest_is_the_unbound_subtuple() {
+    let locals = function_locals(
+        r"
+functio second(iuncta<gx: f32, gw: numerus> pair) → numerus {
+    fixum {gx, ceteri tail} ← pair
+    redde tail[0]
+}
+",
+    );
+    let (_, tail) = locals
+        .iter()
+        .find(|(name, _)| name == "tail")
+        .expect("tail local");
+    let HirExpressionKind::Tuple(items, None) = tail else {
+        panic!("expected tail to be a tuple, got {tail:?}");
+    };
+    assert_eq!(items.len(), 1);
+    assert!(matches!(
+        items[0].kind,
+        HirExpressionKind::Index(_, ref index)
+            if matches!(index.kind, HirExpressionKind::Literal(HirLiteral::Int(1)))
+    ));
+}
+
+#[test]
+fn iuncta_label_destructuring_unknown_label_is_rejected() {
+    test_support::assert_rejects_with_issue(
+        r"
+functio bad(iuncta<gx: f32, gw: numerus> pair) → f32 {
+    fixum {other} ← pair
+    redde other
+}
+",
+        "unknown_tuple_element_label",
+    );
+}
+
+#[test]
+fn iuncta_label_destructuring_unlabeled_tuple_is_rejected() {
+    test_support::assert_rejects_with_issue(
+        r"
+functio bad(iuncta<f32, numerus> pair) → f32 {
+    fixum {gx} ← pair
+    redde gx
+}
+",
+        "unknown_tuple_element_label",
+    );
+}
+
+#[test]
+fn iuncta_label_destructuring_mixed_pattern_stays_rejected() {
+    let result = test_support::analyze_source(
+        r"
+functio bad(iuncta<gx: f32, gw: numerus> pair) → f32 {
+    fixum [gx, {gw}] ← pair
+    redde gx
+}
+",
+    );
+    assert!(!result.is_ok(), "expected mixed pattern rejection");
+}

@@ -261,6 +261,13 @@ impl Lowerer<'_> {
             return Vec::new();
         };
 
+        // `objectPattern` is also the named face of an `iuncta` tuple. The
+        // resolver's side table is keyed by the subject binding, so ordinary
+        // genus/record destructuring keeps the existing Field lowering path.
+        let tuple_labels = self.tuple_labels_for_subject(init);
+        let mut bound_positions = tuple_labels
+            .as_ref()
+            .map(|labels| vec![false; labels.len()]);
         let mut out = Vec::new();
         let mutable = decl.mutability == radix_syntax::AstMutability::Mutable;
         let is_await = decl.is_await;
@@ -272,11 +279,30 @@ impl Lowerer<'_> {
                 .map_or(field.name.name, |ident| ident.name);
             let def_id = self.next_def_id();
             self.bind_local(name, def_id);
-            let init_expr = HirExpression {
-                id: self.next_hir_id(),
-                kind: HirExpressionKind::Field(Box::new(self.lower_expr(init)), field.name.name),
-                ty: None,
-                span: field.name.span,
+            let init_expr = if let Some(labels) = tuple_labels.as_ref() {
+                match crate::tuple_labels::position_of(labels, field.name.name) {
+                    Some(position) => {
+                        if let Some(bound) = bound_positions.as_mut() {
+                            bound[position] = true;
+                        }
+                        self.lower_tuple_destructure_index(init, position, field.name.span)
+                    }
+                    None => {
+                        self.current_span = field.name.span;
+                        self.error("unknown_tuple_element_label");
+                        error_expr(self, field.name.span)
+                    }
+                }
+            } else {
+                HirExpression {
+                    id: self.next_hir_id(),
+                    kind: HirExpressionKind::Field(
+                        Box::new(self.lower_expr(init)),
+                        field.name.name,
+                    ),
+                    ty: None,
+                    span: field.name.span,
+                }
             };
             out.push(HirStatement {
                 id: self.next_hir_id(),
@@ -294,6 +320,28 @@ impl Lowerer<'_> {
         }
 
         if let Some(rest_ident) = rest {
+            let init_expr = if let Some(labels) = tuple_labels.as_ref() {
+                let elements = labels
+                    .iter()
+                    .enumerate()
+                    .filter(|(position, _)| {
+                        bound_positions
+                            .as_ref()
+                            .is_none_or(|bound| !bound[*position])
+                    })
+                    .map(|(position, _)| {
+                        self.lower_tuple_destructure_index(init, position, rest_ident.span)
+                    })
+                    .collect();
+                HirExpression {
+                    id: self.next_hir_id(),
+                    kind: HirExpressionKind::Tuple(elements, None),
+                    ty: None,
+                    span: rest_ident.span,
+                }
+            } else {
+                self.lower_expr(init)
+            };
             let def_id = self.next_def_id();
             self.bind_local(rest_ident.name, def_id);
             out.push(HirStatement {
@@ -302,7 +350,7 @@ impl Lowerer<'_> {
                     def_id,
                     name: rest_ident.name,
                     ty: None,
-                    init: Some(self.lower_expr(init)),
+                    init: Some(init_expr),
                     mutable,
                     is_await,
                     runtime_provided: false,
@@ -312,6 +360,44 @@ impl Lowerer<'_> {
         }
 
         out
+    }
+
+    /// Return the label table for a direct binding subject, including a parenthesized
+    /// subject. Other expressions retain the ordinary record-field path.
+    fn tuple_labels_for_subject(
+        &self,
+        expr: &radix_syntax::Expr,
+    ) -> Option<Vec<Option<radix_lexer::Symbol>>> {
+        match &expr.kind {
+            radix_syntax::ExprKind::Ident(ident) => self
+                .lookup_name(ident.name)
+                .and_then(|def_id| self.resolver.tuple_element_labels(def_id))
+                .map(ToOwned::to_owned),
+            radix_syntax::ExprKind::Paren(inner) => self.tuple_labels_for_subject(inner),
+            _ => None,
+        }
+    }
+
+    /// Lower a tuple destructuring read with the same constant-index HIR shape
+    /// used by positional destructuring and `.label` member access.
+    fn lower_tuple_destructure_index(
+        &mut self,
+        init: &radix_syntax::Expr,
+        position: usize,
+        span: Span,
+    ) -> HirExpression {
+        let index = HirExpression {
+            id: self.next_hir_id(),
+            kind: HirExpressionKind::Literal(HirLiteral::Int(position as u64)),
+            ty: None,
+            span,
+        };
+        HirExpression {
+            id: self.next_hir_id(),
+            kind: HirExpressionKind::Index(Box::new(self.lower_expr(init)), Box::new(index)),
+            ty: None,
+            span,
+        }
     }
 
     fn lower_ex_stmt(&mut self, stmt: &radix_syntax::ExStmt) -> Vec<HirStatement> {
