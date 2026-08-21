@@ -349,28 +349,21 @@ impl super::FaberCodegen {
         interner: &Interner,
         surface: &impl KeywordSurface,
     ) -> String {
-        let tabula = surface.type_surface(TypeBindingKind::Collection(CollectionKind::Tabula));
-        if fields.is_empty() {
-            return format!(
-                "{tabula}<{}, {}>",
-                surface.type_surface(TypeBindingKind::Primitive(Primitive::Textus)),
-                surface.type_surface(TypeBindingKind::Primitive(Primitive::Valor))
-            );
-        }
-
-        // Parenthesize `name: type` fields so the record stays one type in
-        // every position; comma-splitting would break precedence on re-parse.
-        let entries: Vec<String> = fields
-            .iter()
+        let entries: Vec<String> = sorted_record_fields(fields, interner)
+            .into_iter()
             .map(|(name, ty)| {
                 format!(
                     "{}: {}",
-                    self.symbol_to_string(*name, interner),
-                    self.type_to_faber(*ty, types, names, interner, surface)
+                    self.symbol_to_string(name, interner),
+                    self.type_to_faber(ty, types, names, interner, surface)
                 )
             })
             .collect();
-        format!("({})", entries.join(", "))
+        format!(
+            "{}<{}>",
+            surface.contextual_keyword("ratio"),
+            entries.join(", ")
+        )
     }
 
     fn format_tensor_type(
@@ -412,6 +405,16 @@ impl super::FaberCodegen {
     }
 }
 
+/// Canonical ratio field order: sorted by label spelling.
+fn sorted_record_fields(
+    fields: &FxHashMap<Symbol, TypeId>,
+    interner: &Interner,
+) -> Vec<(Symbol, TypeId)> {
+    let mut ordered: Vec<_> = fields.iter().map(|(&name, &ty)| (name, ty)).collect();
+    ordered.sort_by(|(left, _), (right, _)| interner.resolve(*left).cmp(interner.resolve(*right)));
+    ordered
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -419,8 +422,8 @@ mod tests {
     use radix_hir::{
         DefId, HirAnnotation, HirBlock, HirCallArg, HirCape, HirCasuArm, HirEnum, HirExpression,
         HirExpressionKind, HirFunction, HirId, HirImport, HirImportItem, HirItem, HirItemKind,
-        HirLiteral, HirLocal, HirModule, HirPattern, HirStatement, HirStatementKind, HirStruct,
-        HirVariant,
+        HirLiteral, HirLocal, HirModule, HirObjectField, HirObjectKey, HirPattern, HirStatement,
+        HirStatementKind, HirStruct, HirVariant,
     };
     use radix_lexer::{Interner, Span, TokenKind};
 
@@ -1487,17 +1490,120 @@ mod tests {
         let record_id = types.intern(radix_types::Type::Record(fields));
 
         let result = codegen.type_to_faber(record_id, &types, &names, &interner, &surface);
+        assert_eq!(result, "ratio<age: numerus, desc: textus, name: textus>");
+    }
+
+    #[test]
+    fn record_type_renders_as_sorted_ratio() {
+        let codegen = FaberCodegen::default();
+        let mut types = TypeTable::new();
+        let names = FxHashMap::default();
+        let mut interner = Interner::new();
+        let surface = LatinSurface;
+
+        let g = interner.intern("g");
+        let w = interner.intern("w");
+        let f32_ty = types.sized_numeric(Primitive::Fractus, radix_types::NumericWidth::F32);
+        let numerus = types.primitive(Primitive::Numerus);
+        let record = types.record([(w, numerus), (g, f32_ty)]);
+
+        assert_eq!(
+            codegen.type_to_faber(record, &types, &names, &interner, &surface),
+            "ratio<g: f32, w: numerus>"
+        );
+    }
+
+    #[test]
+    fn record_construction_emits_sorted_ratio_form_and_reparses() {
+        let mut types = TypeTable::new();
+        let mut interner = Interner::new();
+        let g = interner.intern("g");
+        let w = interner.intern("w");
+        let r = interner.intern("r");
+        let f32_ty = types.sized_numeric(Primitive::Fractus, radix_types::NumericWidth::F32);
+        let numerus = types.primitive(Primitive::Numerus);
+        let record = types.record([(w, numerus), (g, f32_ty)]);
+
+        let verte = HirExpression {
+            id: HirId(2),
+            kind: HirExpressionKind::Verte {
+                source: Box::new(HirExpression {
+                    id: HirId(3),
+                    kind: HirExpressionKind::Literal(HirLiteral::Nil),
+                    ty: None,
+                    span: span(),
+                }),
+                target: record,
+                entries: Some(vec![
+                    HirObjectField {
+                        key: HirObjectKey::Ident(w),
+                        value: Some(HirExpression {
+                            id: HirId(4),
+                            kind: HirExpressionKind::Literal(HirLiteral::Int(2)),
+                            ty: Some(numerus),
+                            span: span(),
+                        }),
+                    },
+                    HirObjectField {
+                        key: HirObjectKey::Ident(g),
+                        value: Some(HirExpression {
+                            id: HirId(5),
+                            kind: HirExpressionKind::Literal(HirLiteral::Float(1.0)),
+                            ty: Some(f32_ty),
+                            span: span(),
+                        }),
+                    },
+                ]),
+            },
+            ty: Some(record),
+            span: span(),
+        };
+
+        let program = HirModule {
+            items: Vec::new(),
+            entry: Some(HirBlock::simple(
+                vec![HirStatement {
+                    id: HirId(1),
+                    kind: HirStatementKind::Local(HirLocal {
+                        def_id: DefId(1),
+                        name: r,
+                        ty: Some(record),
+                        init: Some(verte),
+                        mutable: false,
+                        is_await: false,
+                        runtime_provided: false,
+                    }),
+                    span: span(),
+                }],
+                None,
+                span(),
+            )),
+            entry_annotations: Vec::new(),
+            entry_args_name: None,
+            entry_is_async: false,
+        };
+
+        let code = generate_faber(&program, &types, &interner);
         assert!(
-            result.contains("name"),
-            "record type must contain field name 'name', got: {result}"
+            code.contains("ratio<g: f32, w: numerus> r ← ratio<g: f32, w: numerus> {"),
+            "ratio construction must emit the sorted typed constructor, got:\n{code}"
         );
         assert!(
-            result.contains("desc"),
-            "record type must contain field name 'desc', got: {result}"
+            code.contains("g = 1.0") && code.contains("w = 2"),
+            "construction fields must keep genus `field = value` form, got:\n{code}"
         );
+        let g_at = code.find("g = 1.0").expect("g field");
+        let w_at = code.find("w = 2").expect("w field");
         assert!(
-            result.contains("age"),
-            "record type must contain field name 'age', got: {result}"
+            g_at < w_at,
+            "construction fields must be sorted by label, got:\n{code}"
+        );
+
+        let parsed = radix_parser::parse(radix_lexer::lex(&code));
+        assert!(
+            parsed.success(),
+            "emitted ratio construction must re-parse, got:\n{code}\nerrors: {:?}",
+            parsed.errors
         );
     }
 

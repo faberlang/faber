@@ -632,6 +632,7 @@ dependencies = [
  "radix-diagnostics",
  "radix-hir",
  "radix-lexer",
+ "radix-parser",
  "radix-syntax",
  "radix-types",
  "rustc-hash",

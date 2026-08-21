@@ -5,7 +5,8 @@
 
 use super::{format_figura, MarkerFamily, Primitive, SemanticMutability, Type, TypeId, TypeTable};
 use radix_hir::DefId;
-use radix_lexer::Interner;
+use radix_lexer::{Interner, Symbol};
+use rustc_hash::FxHashMap;
 
 /// Recover Faber source type syntax for one resolved [`TypeId`].
 pub fn format_faber_type<F: Fn(DefId) -> String>(
@@ -47,7 +48,7 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
             format_faber_type(*value, types, interner, resolve_def)
         ),
 
-        Type::Record(_) => "ignotum".to_owned(),
+        Type::Record(fields) => format_record_type(fields, types, interner, resolve_def),
 
         Type::Set(elem) => format!(
             "copia<{}>",
@@ -189,6 +190,35 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
         Type::Union(_) => "ignotum".to_owned(),
         Type::Error => "<error>".to_owned(),
     }
+}
+
+/// Canonical ratio field order: sorted by label spelling.
+fn sorted_record_fields(
+    fields: &FxHashMap<Symbol, TypeId>,
+    interner: &Interner,
+) -> Vec<(Symbol, TypeId)> {
+    let mut ordered: Vec<_> = fields.iter().map(|(&name, &ty)| (name, ty)).collect();
+    ordered.sort_by(|(left, _), (right, _)| interner.resolve(*left).cmp(interner.resolve(*right)));
+    ordered
+}
+
+fn format_record_type<F: Fn(DefId) -> String>(
+    fields: &FxHashMap<Symbol, TypeId>,
+    types: &TypeTable,
+    interner: &Interner,
+    resolve_def: &F,
+) -> String {
+    let entries: Vec<String> = sorted_record_fields(fields, interner)
+        .into_iter()
+        .map(|(name, ty)| {
+            format!(
+                "{}: {}",
+                interner.resolve(name),
+                format_faber_type(ty, types, interner, resolve_def)
+            )
+        })
+        .collect();
+    format!("ratio<{}>", entries.join(", "))
 }
 
 fn flatten_option(mut type_id: TypeId, types: &TypeTable) -> TypeId {

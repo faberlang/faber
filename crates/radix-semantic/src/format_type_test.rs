@@ -5,7 +5,8 @@
 
 use super::format_faber_type;
 use crate::{index::IndexExpr, NumericWidth, Primitive, TypeTable};
-use radix_lexer::Interner;
+use radix_lexer::{lex, Interner};
+use radix_parser::parse;
 
 #[test]
 fn format_faber_type_renders_indexed_tensor() {
@@ -73,4 +74,42 @@ fn format_faber_type_renders_failable_promissum_channels() {
     let rendered = format_faber_type(future, &types, &interner, &name);
 
     assert_eq!(rendered, "promissum<numerus ⇥ textus>");
+}
+
+#[test]
+fn format_faber_type_renders_record_as_sorted_ratio() {
+    let mut interner = Interner::new();
+    let mut types = TypeTable::new();
+    let w = interner.intern("w");
+    let g = interner.intern("g");
+    let fractus_f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let numerus = types.primitive(Primitive::Numerus);
+    // Insertion order is w then g; canonical render is sorted by label.
+    let record = types.record([(w, numerus), (g, fractus_f32)]);
+
+    let name = |_| "unused".to_owned();
+    let rendered = format_faber_type(record, &types, &interner, &name);
+    assert_eq!(rendered, "ratio<g: fractus<f32>, w: numerus>");
+}
+
+#[test]
+fn format_faber_type_record_render_round_trips_through_parser() {
+    let mut interner = Interner::new();
+    let mut types = TypeTable::new();
+    let w = interner.intern("w");
+    let g = interner.intern("g");
+    let fractus_f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let numerus = types.primitive(Primitive::Numerus);
+    let record = types.record([(w, numerus), (g, fractus_f32)]);
+
+    let name = |_| "unused".to_owned();
+    let rendered = format_faber_type(record, &types, &interner, &name);
+    assert_eq!(rendered, "ratio<g: fractus<f32>, w: numerus>");
+    let source = format!("functio f({rendered} value) → vacuum {{}}");
+    let parsed = parse(lex(&source));
+    assert!(
+        parsed.success(),
+        "ratio diagnostic form must re-parse, got {rendered:?}: {:?}",
+        parsed.errors
+    );
 }

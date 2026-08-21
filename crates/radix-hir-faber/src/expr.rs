@@ -762,7 +762,24 @@ impl super::FaberCodegen {
                     writer.write("}");
                     return;
                 }
-                Type::Map(_, _) | Type::Record(_) | Type::Array(_) | Type::Set(_) => {
+                Type::Record(_) => {
+                    writer.write(&self.type_to_faber(target, types, names, interner, surface));
+                    let ordered = sorted_record_entries(entries, interner);
+                    if ordered.is_empty() {
+                        writer.write(" {}");
+                    } else {
+                        writer.write(" { ");
+                        for (idx, field) in ordered.into_iter().enumerate() {
+                            if idx > 0 {
+                                writer.write(", ");
+                            }
+                            self.write_genus_field(field, types, names, interner, surface, writer);
+                        }
+                        writer.write(" }");
+                    }
+                    return;
+                }
+                Type::Map(_, _) | Type::Array(_) | Type::Set(_) => {
                     self.write_json_object_entries(
                         entries, types, names, interner, surface, writer,
                     );
@@ -1188,4 +1205,22 @@ impl super::FaberCodegen {
             }
         }
     }
+}
+
+/// Canonical ratio construction order: sorted by field label spelling.
+fn sorted_record_entries<'a>(
+    entries: &'a [HirObjectField],
+    interner: &Interner,
+) -> Vec<&'a HirObjectField> {
+    let mut ordered: Vec<&'a HirObjectField> = entries.iter().collect();
+    ordered.sort_by(|left, right| match (&left.key, &right.key) {
+        (
+            HirObjectKey::Ident(left_name) | HirObjectKey::String(left_name),
+            HirObjectKey::Ident(right_name) | HirObjectKey::String(right_name),
+        ) => interner
+            .resolve(*left_name)
+            .cmp(interner.resolve(*right_name)),
+        _ => std::cmp::Ordering::Equal,
+    });
+    ordered
 }
