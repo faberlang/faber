@@ -278,7 +278,7 @@ impl PackedStorageLayout {
     pub const fn packed_bytes_for_elements(self, logical_elems: u64) -> Option<u64> {
         let block_elements = self.block_elements() as u64;
         let block_bytes = self.block_bytes() as u64;
-        if block_elements == 0 || logical_elems % block_elements != 0 {
+        if block_elements == 0 || !logical_elems.is_multiple_of(block_elements) {
             return None;
         }
         (logical_elems / block_elements).checked_mul(block_bytes)
