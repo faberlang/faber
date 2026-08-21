@@ -37,7 +37,7 @@ while IFS= read -r command; do
   case "$command" in
     *step*)
       steps=$((steps + 1))
-      printf '%s\n' "{\"operation\":\"step\",\"lifecycle\":{\"prepares\":1,\"reuses\":$steps,\"resets\":0,\"releases\":0,\"module_reloads\":0,\"per_program_reallocs\":0,\"live_handles\":3},\"receipt\":{\"backend\":\"metal\",\"device_name\":\"fake\",\"launches\":1,\"launch_ids\":[1],\"launch_entries\":[\"addita\"],\"copy_ins\":1,\"outputs\":{\"3\":[4.0,6.0]},\"allocated_buffers\":[1,2,3],\"syncs\":1,\"transfers\":2,\"readbacks\":1,\"kernel_count\":5219,\"stage_timing\":{\"kernel_us\":7,\"transfer_us\":3,\"host_round_trip_us\":2}}}"
+      printf '%s\n' "{\"operation\":\"step\",\"lifecycle\":{\"prepares\":1,\"reuses\":$steps,\"resets\":0,\"releases\":0,\"module_reloads\":0,\"per_program_reallocs\":0,\"live_handles\":3},\"receipt\":{\"backend\":\"metal\",\"device_name\":\"fake\",\"launches\":1,\"launch_ids\":[1],\"launch_entries\":[\"addita\"],\"copy_ins\":1,\"outputs\":{\"3\":[4.0,6.0]},\"allocated_buffers\":[1,2,3],\"syncs\":1,\"transfers\":2,\"readbacks\":1,\"kernel_count\":5219,\"encode_us\":11,\"submit_us\":22,\"wait_us\":33,\"gpu_encode_submit_wait_us\":66,\"stage_timing\":{\"kernel_us\":7,\"transfer_us\":3,\"host_round_trip_us\":2}}}"
       ;;
     *reset*)
       printf '%s\n' '{"operation":"reset","lifecycle":{"prepares":1,"reuses":2,"resets":1,"releases":0,"module_reloads":0,"per_program_reallocs":0,"live_handles":3},"kernel_count":5219,"reset_cleared":0}'
@@ -350,6 +350,10 @@ fn resident_control_client_keeps_one_child_across_load_steps_reset_release() {
         assert_eq!(step.lifecycle.per_program_reallocs, 0);
         let receipt = step.receipt.expect("step receipt");
         assert_eq!(receipt.kernel_count, 5219);
+        assert_eq!(receipt.encode_us, 11);
+        assert_eq!(receipt.submit_us, 22);
+        assert_eq!(receipt.wait_us, 33);
+        assert_eq!(receipt.gpu_encode_submit_wait_us, 66);
         assert_eq!(receipt.stage_timing.total_us(), 12);
     }
     let reset = session.reset().expect("reset");

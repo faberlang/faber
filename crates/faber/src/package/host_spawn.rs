@@ -446,7 +446,16 @@ pub struct DeviceExecuteReceipt {
     /// Host→device copy-in wall (packed-weight upload on SingleRun).
     #[serde(default)]
     pub copy_in_us: u64,
-    /// Kernel encode + submit + blocking wait (true GPU step time).
+    /// Host command encoding wall copied from the F4H1 steady-state phase.
+    #[serde(default)]
+    pub encode_us: u64,
+    /// Command-buffer or driver submit wall copied from the F4H1 steady-state phase.
+    #[serde(default)]
+    pub submit_us: u64,
+    /// Blocking device wait wall copied from the F4H1 steady-state phase.
+    #[serde(default)]
+    pub wait_us: u64,
+    /// Deprecated fused encode + submit + wait wall. Prefer the phase fields.
     #[serde(default)]
     pub gpu_encode_submit_wait_us: u64,
     /// Per-encoder GPU timestamps in launch order (µs). Empty when unsampled.
