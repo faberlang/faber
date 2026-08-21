@@ -874,7 +874,9 @@ ordo_decl   := 'ordo' IDENTIFIER '{' enum_member (',' enum_member)* '}'
 enum_member := IDENTIFIER ('=' ('-'? NUMBER | STRING))?
 
 @formerly discretioDecl
-discretio_decl := 'discretio' IDENTIFIER generic_params? '{' variant (',' variant)* '}'
+discretio_decl := 'discretio' IDENTIFIER generic_params? '{' union_member* variant (',' variant)* '}'
+@formerly unionMember
+union_member  := annotation* field_decl
 variant       := IDENTIFIER ('{' variant_fields '}')?
 @formerly variantFields
 variant_fields := (type_annotation IDENTIFIER)*
