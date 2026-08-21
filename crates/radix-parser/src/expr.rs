@@ -1578,14 +1578,17 @@ impl Parser {
 
         let mut params = Vec::new();
         loop {
-            if self.check(&TokenKind::Arrow) || self.check(&TokenKind::Colon) {
+            if self.check(&TokenKind::Arrow)
+                || self.check(&TokenKind::Colon)
+                || self.check(&TokenKind::LBrace)
+            {
                 break;
             }
 
             params.push(self.parse_clausura_param()?);
 
             if !self.consume_item_separator_before(
-                &[TokenKind::Arrow, TokenKind::Colon],
+                &[TokenKind::Arrow, TokenKind::Colon, TokenKind::LBrace],
                 "closure_parameters",
             )? {
                 break;

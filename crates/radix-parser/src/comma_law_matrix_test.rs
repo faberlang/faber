@@ -247,6 +247,7 @@ functio f() → vacuum { }"#,
     ),
     // 18. keyword-clausura signature params
     accept(18, "fixum _ f ← clausura numerus a, numerus b: a"),
+    accept(18, "fixum _ f ← clausura numerus a { redde a }"),
     trailing(
         18,
         "closure_parameters",
