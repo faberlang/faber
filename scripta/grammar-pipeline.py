@@ -3,8 +3,11 @@
 
 `--audit-md` retains the GSD-1 Markdown sin report for historical and locale
 analysis. `--validate` checks dialect closure and reachability. GSD-6's
-`--render` and `--emit` produce the identity EBNF and one-way grammar.jsonl;
-`--check` is the fail-closed normative-triple gate used by stage 1.
+`--render` and `--emit` produce the identity EBNF and one-way grammar.jsonl.
+Locale packs are the identity render plus `§{…}` keyed substitution
+(`faber/docs/design/ebnf-substitution.md`): region-scoped, unknown-key-fatal,
+zero-residual in designated regions. `--check` is the fail-closed
+normative-triple + locale-render gate used by stage 1.
 """
 
 from __future__ import annotations
@@ -66,6 +69,11 @@ TRIPLE_SCHEMA = "faber-grammar/v1"
 SOURCE_REGION_RE = re.compile(r"^@(rewrite|lexicon|keywords|glyphs)\s*$")
 METADATA_RE = re.compile(r"^@([A-Za-z_][A-Za-z0-9_-]*)(?:\s+(.*))?$")
 KEYWORD_ROW_RE = re.compile(r"^# \| \*?([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*$")
+# Named-hole label shape matches radix-semantic template_holes.rs: first `_`
+# or alphabetic, then `_` / alphanumeric. Docs substitution only fills
+# `§{label}` in designated regions; `§` / `§N` stay literal.
+GLOSSARY_SCHEMA = "grammar-glossary/v1"
+LOCALES = ("ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant")
 
 
 @dataclass
@@ -862,6 +870,310 @@ def grammar_fence(grammar: Grammar) -> str:
     return "\n".join(lines)
 
 
+class SubstitutionError(ValueError):
+    """Keyed `§{…}` substitution failed (unknown key or residual marker)."""
+
+
+def is_hole_label(label: str) -> bool:
+    """True when `label` is a named-template-hole identifier spelling."""
+    if not label:
+        return False
+    characters = iter(label)
+    first = next(characters)
+    if not (first == "_" or first.isalpha()):
+        return False
+    return all(char == "_" or char.isalnum() for char in characters)
+
+
+def find_named_holes(text: str) -> list[tuple[int, int, str]]:
+    """Return `(start, end, label)` for each `§{ident}` named hole."""
+    holes: list[tuple[int, int, str]] = []
+    cursor = 0
+    while True:
+        start = text.find("§{", cursor)
+        if start < 0:
+            break
+        close = text.find("}", start + 2)
+        if close < 0:
+            break
+        label = text[start + 2 : close]
+        if is_hole_label(label):
+            holes.append((start, close + 1, label))
+            cursor = close + 1
+        else:
+            cursor = start + 2
+    return holes
+
+
+def iter_markdown_parts(text: str) -> list[tuple[str, str, str, str]]:
+    """Split markdown into `(kind, prefix, inner, suffix)` slices.
+
+    `kind` is `ebnf`, `fab`, `fence`, `inline`, or `prose`. Reconstruction
+    `prefix + inner + suffix` over every part must equal `text`.
+    """
+    parts: list[tuple[str, str, str, str]] = []
+    index = 0
+    length = len(text)
+    prose_start = 0
+
+    def flush_prose(end: int) -> None:
+        if end > prose_start:
+            parts.append(("prose", "", text[prose_start:end], ""))
+
+    while index < length:
+        at_line = index == 0 or text[index - 1] == "\n"
+        if at_line and text.startswith("```", index):
+            flush_prose(index)
+            line_end = text.find("\n", index)
+            if line_end < 0:
+                break
+            info = text[index + 3 : line_end].strip()
+            lang = info.split()[0] if info else ""
+            inner_start = line_end + 1
+            close = None
+            close_end = length
+            search = inner_start
+            while search < length:
+                if (search == 0 or text[search - 1] == "\n") and text.startswith(
+                    "```", search
+                ):
+                    rest = search + 3
+                    while rest < length and text[rest] in " \t":
+                        rest += 1
+                    if rest == length or text[rest] == "\n":
+                        close = search
+                        close_end = rest if rest == length else rest + 1
+                        break
+                search += 1
+            if close is None:
+                inner = text[inner_start:]
+                kind = "ebnf" if lang == "ebnf" else "fab" if lang == "fab" else "fence"
+                parts.append((kind, text[index:inner_start], inner, ""))
+                prose_start = length
+                index = length
+                break
+            inner = text[inner_start:close]
+            kind = "ebnf" if lang == "ebnf" else "fab" if lang == "fab" else "fence"
+            parts.append(
+                (kind, text[index:inner_start], inner, text[close:close_end])
+            )
+            index = close_end
+            prose_start = index
+            continue
+        if text[index] == "`":
+            flush_prose(index)
+            ticks = 1
+            while index + ticks < length and text[index + ticks] == "`":
+                ticks += 1
+            close = text.find("`" * ticks, index + ticks)
+            if close < 0:
+                index += ticks
+                continue
+            inner = text[index + ticks : close]
+            opener = text[index : index + ticks]
+            closer = text[close : close + ticks]
+            parts.append(("inline", opener, inner, closer))
+            index = close + ticks
+            prose_start = index
+            continue
+        index += 1
+    flush_prose(length)
+    return parts
+
+
+def transform_substituted_regions(
+    text: str,
+    ebnf_fn,
+    inline_fn,
+) -> str:
+    """Rewrite fenced `ebnf` bodies and inline code spans; leave the rest."""
+    out: list[str] = []
+    for kind, prefix, inner, suffix in iter_markdown_parts(text):
+        if kind == "ebnf":
+            inner = ebnf_fn(inner)
+        elif kind == "inline":
+            inner = inline_fn(inner)
+        out.append(prefix + inner + suffix)
+    return "".join(out)
+
+
+def mark_ebnf_keyword_holes(text: str, keys: set[str]) -> str:
+    """Wrap quoted Latin keyword terminals as `§{key}` holes."""
+
+    def repl(match: re.Match[str]) -> str:
+        literal = match.group(1)
+        if literal in keys:
+            return f"'§{{{literal}}}'"
+        return match.group(0)
+
+    return LIT_RE.sub(repl, text)
+
+
+def mark_ident_keyword_holes(text: str, keys: set[str]) -> str:
+    def repl(match: re.Match[str]) -> str:
+        token = match.group(0)
+        return f"§{{{token}}}" if token in keys else token
+
+    return IDENT_RE.sub(repl, text)
+
+
+def mark_inline_keyword_holes(text: str, keys: set[str]) -> str:
+    """Wrap keyword identifier tokens; leave existing `§{…}` spans intact."""
+    holes = find_named_holes(text)
+    if not holes:
+        return mark_ident_keyword_holes(text, keys)
+    pieces: list[str] = []
+    cursor = 0
+    for start, end, _label in holes:
+        pieces.append(mark_ident_keyword_holes(text[cursor:start], keys))
+        pieces.append(text[start:end])
+        cursor = end
+    pieces.append(mark_ident_keyword_holes(text[cursor:], keys))
+    return "".join(pieces)
+
+
+def mark_template(text: str, keys: set[str]) -> str:
+    """Insert `§{key}` holes in designated regions of an identity render."""
+    return transform_substituted_regions(
+        text,
+        lambda body: mark_ebnf_keyword_holes(body, keys),
+        lambda body: mark_inline_keyword_holes(body, keys),
+    )
+
+
+def substitute_named_holes(
+    text: str,
+    glossary: dict[str, str],
+    *,
+    region: str,
+    path: str,
+) -> str:
+    holes = find_named_holes(text)
+    pieces: list[str] = []
+    cursor = 0
+    for start, end, label in holes:
+        pieces.append(text[cursor:start])
+        if label not in glossary:
+            raise SubstitutionError(
+                f"unknown glossary key {label!r} in {region} ({path})"
+            )
+        pieces.append(glossary[label])
+        cursor = end
+    pieces.append(text[cursor:])
+    rendered = "".join(pieces)
+    if "§{" in rendered:
+        raise SubstitutionError(
+            f"zero-residual: leftover §{{ in {region} ({path})"
+        )
+    return rendered
+
+
+def apply_glossary(text: str, glossary: dict[str, str], *, path: str = "") -> str:
+    """Fill `§{key}` holes in designated regions. Fab fences and prose are inert."""
+    return transform_substituted_regions(
+        text,
+        lambda body: substitute_named_holes(
+            body, glossary, region="ebnf", path=path
+        ),
+        lambda body: substitute_named_holes(
+            body, glossary, region="inline", path=path
+        ),
+    )
+
+
+def identity_glossary(keys: set[str] | list[str]) -> dict[str, str]:
+    return {key: key for key in keys}
+
+
+def keyword_spine(source_text: str, source_path: Path) -> set[str]:
+    grammar = canonical_source_grammar(source_text, source_path)
+    return set(keyword_literals(grammar))
+
+
+IDENTITY_BANNER = (
+    "This file is generated from `docs/grammar/source.fg`; hand edits fail the\n"
+    "stage-1 normative-triple gate."
+)
+
+
+def stamp_locale_banner(text: str, locale: str) -> str:
+    replacement = (
+        f"This file is generated from `docs/grammar/source.fg` and "
+        f"`docs/grammar/glossary.{locale}.toml`;\n"
+        "hand edits fail the locale-render gate."
+    )
+    if IDENTITY_BANNER not in text:
+        raise SubstitutionError(
+            "identity banner missing; cannot stamp locale render"
+        )
+    return text.replace(IDENTITY_BANNER, replacement, 1)
+
+
+def render_with_glossary(
+    identity_markdown: str,
+    glossary: dict[str, str],
+    keys: set[str],
+    *,
+    path: str = "",
+    locale: str | None = None,
+) -> str:
+    template = mark_template(identity_markdown, keys)
+    rendered = apply_glossary(template, glossary, path=path)
+    if locale:
+        rendered = stamp_locale_banner(rendered, locale)
+    return rendered
+
+
+def load_glossary(path: Path, *, spine: set[str]) -> dict[str, str]:
+    if not path.is_file():
+        raise SubstitutionError(f"missing locale glossary: {display_path(path)}")
+    with path.open("rb") as handle:
+        data = tomllib.load(handle)
+    keywords = data.get("keywords")
+    if not isinstance(keywords, dict):
+        raise SubstitutionError(f"{display_path(path)}: keywords must be a table")
+    mapping = {str(key): str(value) for key, value in keywords.items()}
+    extra = sorted(set(mapping) - spine)
+    missing = sorted(spine - set(mapping))
+    problems: list[str] = []
+    if extra:
+        problems.append(
+            "glossary key(s) not in keyword spine: " + ", ".join(extra)
+        )
+    if missing:
+        problems.append("glossary missing spine key(s): " + ", ".join(missing))
+    if problems:
+        raise SubstitutionError(f"{display_path(path)}: " + "; ".join(problems))
+    return mapping
+
+
+def default_glossary_path(locale: str) -> Path:
+    return default_source_path().with_name(f"glossary.{locale}.toml")
+
+
+def default_locale_ebnf_path(locale: str) -> Path:
+    return default_ebnf_path().with_name(f"EBNF.{locale}.md")
+
+
+def dumps_glossary(locale: str, mapping: dict[str, str]) -> str:
+    lines = [
+        f"# Grammar locale glossary ({locale}).",
+        "# Keys are canonical Latin keyword terminals from source.fg.",
+        "# Values are the locale surface spellings. Hand-maintained;",
+        "# extra or missing keys fail the locale render gate.",
+        "",
+        f'schema = "{GLOSSARY_SCHEMA}"',
+        f'locale = "{locale}"',
+        "",
+        "[keywords]",
+    ]
+    for key in sorted(mapping):
+        value = mapping[key]
+        lines.append(f"{key} = {json.dumps(value, ensure_ascii=False)}")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def render_identity(
     source_text: str, source_path: Path, sidecar_text: str
 ) -> str:
@@ -989,6 +1301,95 @@ def check_triple(
     return not mismatches, payload
 
 
+def check_locales(
+    source_path: Path,
+    sidecar_path: Path,
+    ebnf_path: Path,
+    glossary_dir: Path | None = None,
+) -> tuple[bool, dict[str, object]]:
+    source_text = source_path.read_text(encoding="utf-8")
+    sidecar_text = sidecar_path.read_text(encoding="utf-8")
+    identity = render_identity(source_text, source_path, sidecar_text)
+    keys = keyword_spine(source_text, source_path)
+    mismatches: list[str] = []
+    errors: list[str] = []
+    rendered: list[str] = []
+    try:
+        identity_roundtrip = render_with_glossary(
+            identity,
+            identity_glossary(keys),
+            keys,
+            path=display_path(ebnf_path),
+        )
+        if identity_roundtrip != identity:
+            mismatches.append("identity-pack")
+    except SubstitutionError as exc:
+        errors.append(str(exc))
+        mismatches.append("identity-pack")
+
+    directory = glossary_dir if glossary_dir is not None else source_path.parent
+    for locale in LOCALES:
+        glossary_path = directory / f"glossary.{locale}.toml"
+        output_path = ebnf_path.with_name(f"EBNF.{locale}.md")
+        if not glossary_path.is_file():
+            continue
+        rendered.append(locale)
+        try:
+            glossary = load_glossary(glossary_path, spine=keys)
+            expected = render_with_glossary(
+                identity,
+                glossary,
+                keys,
+                path=display_path(output_path),
+                locale=locale,
+            )
+        except SubstitutionError as exc:
+            errors.append(str(exc))
+            mismatches.append(display_path(output_path))
+            continue
+        actual = (
+            output_path.read_text(encoding="utf-8") if output_path.is_file() else ""
+        )
+        if actual != expected:
+            mismatches.append(display_path(output_path))
+    payload = {
+        "schema": TRIPLE_SCHEMA,
+        "ok": not mismatches and not errors,
+        "identity": display_path(ebnf_path),
+        "locales": rendered,
+        "mismatches": mismatches,
+        "errors": errors,
+        "spine": len(keys),
+    }
+    return not mismatches and not errors, payload
+
+
+def render_locale_file(
+    source_path: Path,
+    sidecar_path: Path,
+    locale: str,
+    *,
+    output: Path | None = None,
+    glossary_path: Path | None = None,
+) -> tuple[str, Path]:
+    source_text = source_path.read_text(encoding="utf-8")
+    sidecar_text = sidecar_path.read_text(encoding="utf-8")
+    identity = render_identity(source_text, source_path, sidecar_text)
+    keys = keyword_spine(source_text, source_path)
+    glossary_file = glossary_path or default_glossary_path(locale)
+    glossary = load_glossary(glossary_file, spine=keys)
+    rendered = render_with_glossary(
+        identity,
+        glossary,
+        keys,
+        path=display_path(glossary_file),
+        locale=locale,
+    )
+    dest = output or default_locale_ebnf_path(locale)
+    dest.write_text(rendered, encoding="utf-8")
+    return rendered, dest
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
@@ -1021,7 +1422,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="fail when source, identity render, or grammar.jsonl drift",
+        help="fail when source, identity render, grammar.jsonl, or locale packs drift",
+    )
+    parser.add_argument(
+        "--render-locales",
+        action="store_true",
+        help="render EBNF.{locale}.md from identity + glossary.{locale}.toml",
+    )
+    parser.add_argument(
+        "--locale",
+        action="append",
+        dest="locales",
+        metavar="LOCALE",
+        help="locale id for --render-locales (repeatable; default: all with glossaries)",
     )
     parser.add_argument(
         "--source",
@@ -1145,7 +1558,43 @@ def run_check(args: argparse.Namespace) -> tuple[dict[str, object], int]:
             "mismatches": [str(exc)],
         }
         ok = False
+    try:
+        locale_ok, locale_payload = check_locales(
+            source_path, sidecar_path, ebnf_path
+        )
+    except (OSError, ValueError, tomllib.TOMLDecodeError, SubstitutionError) as exc:
+        locale_ok = False
+        locale_payload = {
+            "ok": False,
+            "mismatches": [str(exc)],
+            "errors": [str(exc)],
+            "locales": [],
+        }
+    payload["locales"] = locale_payload.get("locales", [])
+    payload["locale_mismatches"] = locale_payload.get("mismatches", [])
+    payload["locale_errors"] = locale_payload.get("errors", [])
+    payload["spine"] = locale_payload.get("spine")
+    if not locale_ok:
+        ok = False
+        payload["ok"] = False
+        payload["mismatches"] = list(payload.get("mismatches") or []) + [
+            f"locale:{item}" for item in payload["locale_mismatches"]
+        ]
     return payload, 0 if ok else 1
+
+
+def run_render_locales(args: argparse.Namespace) -> list[Path]:
+    source_path = (args.source or default_source_path()).resolve()
+    sidecar_path = (args.sidecar or default_sidecar_path()).resolve()
+    requested = tuple(args.locales) if args.locales else LOCALES
+    written: list[Path] = []
+    for locale in requested:
+        glossary = default_glossary_path(locale)
+        if args.locales is None and not glossary.is_file():
+            continue
+        _, dest = render_locale_file(source_path, sidecar_path, locale)
+        written.append(dest)
+    return written
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1161,10 +1610,25 @@ def main(argv: list[str] | None = None) -> int:
             if payload.get("ok"):
                 print(f"productions: {payload.get('productions', '?')}")
                 print("source, identity render, and grammar.jsonl agree")
+                locales = payload.get("locales") or []
+                if locales:
+                    print(f"locale renders: {', '.join(locales)}")
             else:
                 for mismatch in payload.get("mismatches", []):
                     print(f"  - drift: {mismatch}")
+                for error in payload.get("locale_errors") or []:
+                    print(f"  - locale: {error}")
         return code
+
+    if args.render_locales:
+        try:
+            written = run_render_locales(args)
+            for path in written:
+                print(f"rendered {display_path(path)}")
+            return 0
+        except (OSError, ValueError, tomllib.TOMLDecodeError, SubstitutionError) as exc:
+            print(f"grammar pipeline: {exc}", file=sys.stderr)
+            return 1
 
     if args.render or args.emit:
         try:

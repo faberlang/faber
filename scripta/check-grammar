@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Stage-1 normative grammar gate: validate source.fg and compare the generated
-# identity EBNF.md and grammar.jsonl byte-for-byte with deterministic renders.
+# identity EBNF.md, grammar.jsonl, and locale EBNF.{locale}.md renders.
 
 set -euo pipefail
 
