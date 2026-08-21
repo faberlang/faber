@@ -7,6 +7,8 @@ LLM Guidance:
   2. Discover commands:
      faber --help
      faber <command> --help
+     faber doctor
+     faber check-library <name>
   3. Establish project shape before compiling:
      faber init my-app
      faber targets
@@ -98,6 +100,10 @@ Common flows:
   Single-file check (non-package):
     faber check crates/exempla/corpus/salve-munde.fab
 
+  Inspect resolved library home (FABER_LIBRARY_HOME or ancestor probing):
+    faber doctor
+    faber check-library norma
+
   Package-aware check/emit (directory or faber.toml):
     faber check path/to/pkg
     faber emit -t rust path/to/pkg
@@ -130,4 +136,6 @@ Output contract:
   - `explain`: human text on stdout; `--json` for one term only
   - `lex`, `parse`, `hir`, `cli-ir`: JSON on stdout (same as `radix`)
   - `targets`: capability rows on stdout
+  - `doctor`: resolved library home and per-library availability as key=value on stdout
+  - `check-library`: selected home/root as key=value on stdout; diagnostics on stderr
   - errors: stderr with hints (e.g. `faber explain --list`)

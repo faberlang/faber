@@ -963,3 +963,63 @@ fn cli_defaults_emit_target_to_rust() {
     };
     assert_eq!(args.target, FaberCliTarget::HirRust);
 }
+
+#[test]
+fn cli_parses_doctor_subcommand() {
+    let cli = Cli::try_parse_from(["faber", "doctor"]).expect("parse doctor");
+    assert!(matches!(cli.command, Some(crate::cli::Command::Doctor)));
+}
+
+#[test]
+fn cli_parses_check_library_subcommand() {
+    let cli =
+        Cli::try_parse_from(["faber", "check-library", "norma"]).expect("parse check-library");
+    let Some(crate::cli::Command::CheckLibrary(args)) = cli.command else {
+        panic!("expected check-library subcommand");
+    };
+    assert_eq!(args.name, "norma");
+}
+
+#[test]
+fn check_long_help_discloses_library_resolution() {
+    let mut command = Cli::command();
+    let check = command
+        .find_subcommand_mut("check")
+        .expect("check subcommand");
+    let help = check.render_long_help().to_string();
+
+    assert!(
+        help.contains("FABER_LIBRARY_HOME"),
+        "check --help must name FABER_LIBRARY_HOME:\n{help}"
+    );
+    assert!(
+        help.contains("ancestor probing from the input path"),
+        "check --help must name ancestor probing from the input path:\n{help}"
+    );
+    assert!(
+        help.contains("faber.toml"),
+        "check --help must name the manifest requirement:\n{help}"
+    );
+    assert!(
+        help.contains("locale = \"la\""),
+        "check --help must document the locale = \"la\" pin trap:\n{help}"
+    );
+    assert!(
+        help.contains("builtin"),
+        "check --help must name the builtin-vs-package taxonomy:\n{help}"
+    );
+}
+
+#[test]
+fn check_library_long_help_states_v1_library_home_rule() {
+    let mut command = Cli::command();
+    let check_library = command
+        .find_subcommand_mut("check-library")
+        .expect("check-library subcommand");
+    let help = check_library.render_long_help().to_string();
+
+    assert!(help.contains("library home"));
+    assert!(help.contains("does not parse"));
+    assert!(help.contains("cista.toml"));
+    assert!(help.contains("scripta/check-source"));
+}

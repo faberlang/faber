@@ -17,15 +17,95 @@ use radix_program::library::LibraryResolver;
 
 pub(crate) const FABER_LIBRARY_HOME_ENV: &str = "FABER_LIBRARY_HOME";
 
+/// Well-known sibling library names doctor always reports (found or not).
+///
+/// The faber lib artifact does not call doctor/check-library; the binary does.
+#[allow(dead_code)]
+pub(crate) const KNOWN_LIBRARIES: &[&str] = &["norma", "triga", "gradus", "tela"];
+
+/// How the library home was selected. Env wins; otherwise the workspace probe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LibraryHomeSource {
+    Env,
+    AncestorProbe,
+}
+
+impl LibraryHomeSource {
+    #[allow(dead_code)]
+    pub(crate) fn as_key(self) -> &'static str {
+        match self {
+            Self::Env => "env",
+            Self::AncestorProbe => "ancestor-probe",
+        }
+    }
+}
+
+/// Resolved library home plus the provenance `faber doctor` reports.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ResolvedLibraryHome {
+    pub path: PathBuf,
+    pub source: LibraryHomeSource,
+}
+
+/// Identity derived from the import specifier's provider segment.
+///
+/// WHY: `LibraryProvider` is not a manifest fact. `norma` stays
+/// `Builtin("norma")` even when a checkout has `cista.toml` or `faber.toml`.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SpecifierIdentity {
+    Builtin,
+    Package,
+}
+
+impl SpecifierIdentity {
+    #[allow(dead_code)]
+    pub(crate) fn as_key(self) -> &'static str {
+        match self {
+            Self::Builtin => "builtin",
+            Self::Package => "package",
+        }
+    }
+}
+
+/// On-disk availability at a provider checkout. Presence only — never a parse
+/// of `cista.toml` (v1 does not read that schema).
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LibraryAvailability {
+    FaberPackage,
+    CistaSourcePackage,
+    NotFound,
+}
+
+impl LibraryAvailability {
+    #[allow(dead_code)]
+    pub(crate) fn as_key(self) -> &'static str {
+        match self {
+            Self::FaberPackage => "faber-package",
+            Self::CistaSourcePackage => "cista-source-package",
+            Self::NotFound => "not-found",
+        }
+    }
+}
+
 /// Build a resolver from the ambient library home: an explicit
 /// `FABER_LIBRARY_HOME`, or the sibling workspace dev layout when present.
 pub(crate) fn default_library_resolver() -> LibraryResolver {
     LibraryResolver::with_optional_home(default_library_home())
 }
 
-fn default_library_home() -> Option<PathBuf> {
+pub(crate) fn default_library_home() -> Option<PathBuf> {
+    resolved_library_home().map(|home| home.path)
+}
+
+/// Ambient library home with provenance for doctor / check-library reporting.
+pub(crate) fn resolved_library_home() -> Option<ResolvedLibraryHome> {
     if let Some(value) = std::env::var_os(FABER_LIBRARY_HOME_ENV) {
-        return Some(PathBuf::from(value));
+        return Some(ResolvedLibraryHome {
+            path: PathBuf::from(value),
+            source: LibraryHomeSource::Env,
+        });
     }
 
     // Walk ancestors from the crate parent for a sibling `norma/src` layout.
@@ -35,9 +115,74 @@ fn default_library_home() -> Option<PathBuf> {
     for candidate in workspace_root.ancestors() {
         let norma_src = candidate.join("norma/src");
         if norma_src.is_dir() && norma_src.join("solum.fab").is_file() {
-            return Some(candidate.to_path_buf());
+            return Some(ResolvedLibraryHome {
+                path: candidate.to_path_buf(),
+                source: LibraryHomeSource::AncestorProbe,
+            });
         }
     }
 
     None
+}
+
+/// Identity from the provider name in an import specifier (`norma:solum`).
+///
+/// Never inspects a manifest. Passing `faber.toml` / `cista.toml` metadata
+/// here would be the U3 identity-guardrail defect.
+#[allow(dead_code)]
+pub(crate) fn specifier_identity(provider: &str) -> SpecifierIdentity {
+    if provider == "norma" {
+        SpecifierIdentity::Builtin
+    } else {
+        SpecifierIdentity::Package
+    }
+}
+
+/// Classify a provider checkout without parsing Cista schema.
+#[allow(dead_code)]
+pub(crate) fn library_availability(provider_repo: &Path) -> LibraryAvailability {
+    if !provider_repo.is_dir() {
+        return LibraryAvailability::NotFound;
+    }
+    if provider_repo.join("faber.toml").is_file() {
+        return LibraryAvailability::FaberPackage;
+    }
+    // Presence of `cista.toml` only — never a schema parse.
+    if provider_repo.join("cista.toml").is_file() {
+        return LibraryAvailability::CistaSourcePackage;
+    }
+    LibraryAvailability::NotFound
+}
+
+/// Resolver root rule for a provider checkout: `faber.toml` else `<repo>/src`.
+///
+/// Presence only — this does not parse `cista.toml`. `None` means the checkout
+/// has neither a Faber manifest nor a `src` directory.
+#[allow(dead_code)]
+pub(crate) fn library_root_rule(provider_repo: &Path) -> Option<LibraryRootRule> {
+    if provider_repo.join("faber.toml").is_file() {
+        return Some(LibraryRootRule::FaberToml);
+    }
+    if provider_repo.join("src").is_dir() {
+        return Some(LibraryRootRule::SrcFallback);
+    }
+    None
+}
+
+/// Which resolver root rule selected the checkout source tree.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LibraryRootRule {
+    FaberToml,
+    SrcFallback,
+}
+
+impl LibraryRootRule {
+    #[allow(dead_code)]
+    pub(crate) fn as_key(self) -> &'static str {
+        match self {
+            Self::FaberToml => "faber.toml",
+            Self::SrcFallback => "src-fallback",
+        }
+    }
 }

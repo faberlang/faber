@@ -9,6 +9,42 @@ use std::path::PathBuf;
 
 const FABER_AFTER_HELP: &str = include_str!("../../docs/help/faber-after-help.md");
 
+const CHECK_LONG_ABOUT: &str = "\
+Run semantic analysis on a file or package.
+
+Package directories and faber.toml inputs use package mode. A directory
+without a faber.toml manifest is treated as a legacy package whose entry is
+<main.fab>; named libraries without that manifest use `faber check-library`
+instead.
+
+Library resolution: FABER_LIBRARY_HOME overrides the library home. Otherwise
+ancestor probing from the input path (and the compiled workspace) locates a
+sibling `norma/src` provider layout. `faber doctor` prints the resolved home
+and per-library availability.
+
+Availability taxonomy: `norma` is the builtin identity row (LibraryProvider::Builtin);
+other provider names are package identity. On disk a checkout is a faber
+package (faber.toml), a cista source package (cista.toml / src fallback), or
+not found. Identity always follows the import specifier, never the manifest.
+
+Packages that pin locale = \"la\" parse on the Latin keyword surface. English
+sources in those packages fail until the pin matches the source locale.
+";
+
+const CHECK_LIBRARY_LONG_ABOUT: &str = "\
+Check a named library's complete interface graph from the library home.
+
+v1 resolves <name> from the library home only (FABER_LIBRARY_HOME, else
+ancestor probing). The source root mirrors the import resolver: top-level
+faber.toml if present, otherwise <home>/<name>/src. v1 does not parse
+cista.toml, does not discover CISTAE_HOME or faber.lock store roots, and
+does not replace `scripta/check-source` or run .proba tests.
+
+Identity is the import specifier (`norma` stays builtin). This command
+does not classify a library as Package from manifest metadata and is not
+an alias for application `faber check`.
+";
+
 /// Root parser for the `faber` binary.
 #[derive(Parser, Debug)]
 #[command(
@@ -43,7 +79,15 @@ pub enum Command {
     Targets,
 
     /// Run semantic analysis on a file or package
+    #[command(long_about = CHECK_LONG_ABOUT)]
     Check(CheckArgs),
+
+    /// Check a named library from the library home (dev checkout root only)
+    #[command(name = "check-library", long_about = CHECK_LIBRARY_LONG_ABOUT)]
+    CheckLibrary(CheckLibraryArgs),
+
+    /// Show resolved library home, probing provenance, and availability
+    Doctor,
 
     /// Run aspect verification on a single file
     Verify(VerifyArgs),
@@ -241,6 +285,14 @@ pub struct VerifyArgs {
 
     /// Input file, or '-' / omitted for stdin
     pub input: Vec<String>,
+}
+
+/// Arguments for `faber check-library`.
+#[derive(clap::Args, Debug)]
+pub struct CheckLibraryArgs {
+    /// Provider name resolved from the library home (`norma`, `triga`, …).
+    /// v1 does not accept a path; use `faber check` for a package directory.
+    pub name: String,
 }
 
 /// Arguments for `faber check`.

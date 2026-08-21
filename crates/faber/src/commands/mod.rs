@@ -4,10 +4,18 @@
 //! handlers live in [`init`], [`explain`], [`run`], and [`test`].
 
 mod archive;
+mod check_library;
+#[cfg(test)]
+#[path = "check_library_test.rs"]
+mod check_library_test;
 #[cfg(test)]
 #[path = "check_test.rs"]
 mod check_test;
 mod convert;
+mod doctor;
+#[cfg(test)]
+#[path = "doctor_test.rs"]
+mod doctor_test;
 mod emit;
 mod explain;
 mod format;
@@ -37,7 +45,9 @@ use radix_module::services::{
     BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand,
 };
 
+use check_library::cmd_check_library;
 use convert::cmd_convert;
+use doctor::cmd_doctor;
 use explain::cmd_explain;
 use format::cmd_format;
 use host::cmd_host;
@@ -124,6 +134,8 @@ fn dispatch(command: Command) {
             );
         }
         Command::Targets => cmd_targets(),
+        Command::CheckLibrary(args) => cmd_check_library(args),
+        Command::Doctor => cmd_doctor(),
         Command::Check(args) => {
             reject_reader_locale_without_package(args.locale.as_deref(), &args.input, args.package);
             validate_deny_codes(&args.deny);

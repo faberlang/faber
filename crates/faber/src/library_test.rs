@@ -52,5 +52,77 @@ fn explicit_library_home_wins_over_workspace_probe() {
     let explicit = PathBuf::from("/tmp/faber-explicit-library-home-test");
     std::env::set_var(FABER_LIBRARY_HOME_ENV, &explicit);
 
-    assert_eq!(default_library_home(), Some(explicit));
+    assert_eq!(default_library_home(), Some(explicit.clone()));
+    let resolved = resolved_library_home().expect("env home");
+    assert_eq!(resolved.path, explicit);
+    assert_eq!(resolved.source, LibraryHomeSource::Env);
+}
+
+#[test]
+fn unset_home_records_ancestor_probe_provenance() {
+    let _guard = env_guard();
+    let _env = EnvRestore::capture();
+    std::env::remove_var(FABER_LIBRARY_HOME_ENV);
+
+    let resolved = resolved_library_home().expect("workspace probe");
+    assert_eq!(resolved.source, LibraryHomeSource::AncestorProbe);
+    assert!(resolved.path.join("norma/src/solum.fab").is_file());
+}
+
+#[test]
+fn specifier_identity_is_not_manifest_derived() {
+    assert_eq!(specifier_identity("norma"), SpecifierIdentity::Builtin);
+    assert_eq!(specifier_identity("triga"), SpecifierIdentity::Package);
+    assert_eq!(specifier_identity("gradus"), SpecifierIdentity::Package);
+    assert_eq!(specifier_identity("tela"), SpecifierIdentity::Package);
+    assert_eq!(
+        specifier_identity("anything-else"),
+        SpecifierIdentity::Package
+    );
+}
+
+#[test]
+fn availability_uses_file_presence_and_does_not_need_cista_parse() {
+    let root = tempfile::tempdir().expect("temp");
+    let faber_pkg = root.path().join("triga");
+    std::fs::create_dir_all(faber_pkg.join("src")).expect("triga src");
+    std::fs::write(
+        faber_pkg.join("faber.toml"),
+        "[package]\nname = \"triga\"\n",
+    )
+    .expect("triga manifest");
+    assert_eq!(
+        library_availability(&faber_pkg),
+        LibraryAvailability::FaberPackage
+    );
+
+    let cista = root.path().join("norma");
+    std::fs::create_dir_all(cista.join("src")).expect("norma src");
+    std::fs::write(cista.join("cista.toml"), "this is not toml {{{").expect("garbage cista");
+    assert_eq!(
+        library_availability(&cista),
+        LibraryAvailability::CistaSourcePackage
+    );
+
+    assert_eq!(
+        library_availability(&root.path().join("missing")),
+        LibraryAvailability::NotFound
+    );
+    assert_eq!(LibraryAvailability::FaberPackage.as_key(), "faber-package");
+    assert_eq!(
+        LibraryAvailability::CistaSourcePackage.as_key(),
+        "cista-source-package"
+    );
+    assert_eq!(LibraryHomeSource::Env.as_key(), "env");
+    assert_eq!(SpecifierIdentity::Builtin.as_key(), "builtin");
+    assert!(KNOWN_LIBRARIES.contains(&"norma"));
+    assert_eq!(
+        library_root_rule(&faber_pkg),
+        Some(LibraryRootRule::FaberToml)
+    );
+    assert_eq!(
+        library_root_rule(&cista),
+        Some(LibraryRootRule::SrcFallback)
+    );
+    assert_eq!(LibraryRootRule::SrcFallback.as_key(), "src-fallback");
 }
