@@ -590,7 +590,11 @@ fn shapes_match_matmul_dispatch(
     tile: u32,
 ) -> bool {
     let tile = u64::from(tile);
-    dispatch_y == shapes.m.div_ceil(tile) && dispatch_x == shapes.n.div_ceil(tile)
+    if shapes.m == 1 {
+        dispatch_y == 1 && dispatch_x == shapes.n.div_ceil(2)
+    } else {
+        dispatch_y == shapes.m.div_ceil(tile) && dispatch_x == shapes.n.div_ceil(tile)
+    }
 }
 
 /// The reduction signature must already carry the contract it was built
