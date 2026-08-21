@@ -1,7 +1,9 @@
 use super::{
-    decode_device_inputs, encode_device_inputs, encode_weight_map, execute_device_at,
-    open_device_session_at, resolve_host_cli_at, start_device_session_at, DeviceExecuteReceipt,
-    DeviceExecuteRequest, HostSpawnError, WeightFileRange,
+    decode_device_inputs, encode_device_execute_invocation, encode_device_inputs,
+    encode_weight_map, execute_device_at, open_device_session_at, resolve_host_cli_at,
+    start_device_session_at, validate_protocol_invocation, DeviceExecuteInvocation,
+    DeviceExecuteInvocationMode, DeviceExecuteProgram, DeviceExecuteProtocol, DeviceExecuteReceipt,
+    DeviceExecuteRequest, DeviceExecuteV2Request, HostSpawnError, WeightFileRange,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -188,6 +190,98 @@ fn receipt_json_parses_string_keyed_outputs() {
     let receipt: DeviceExecuteReceipt = serde_json::from_slice(json).expect("receipt");
     assert_eq!(receipt.output(3).expect("out"), &[4.0, 6.0]);
     assert_eq!(receipt.launches, 1);
+}
+
+#[test]
+fn protocol_v2_invocation_encodes_token_and_position_without_inputs() {
+    let invocation = DeviceExecuteInvocation {
+        mode: DeviceExecuteInvocationMode::ScalarDecode,
+        token: Some(42),
+        position: 17,
+        sequence_epoch: 3,
+        prefix_before: 17,
+        valid_len_after: 18,
+        query_start: 17,
+    };
+    let bytes = encode_device_execute_invocation(&invocation).expect("encode v2 invocation");
+    let value: serde_json::Value = serde_json::from_slice(&bytes).expect("json");
+    assert_eq!(value["mode"], "scalar_decode");
+    assert_eq!(value["token"], 42);
+    assert_eq!(value["position"], 17);
+    assert!(
+        value.get("inputs").is_none(),
+        "decode has no legacy inputs map"
+    );
+}
+
+#[test]
+fn protocol_v1_rejects_kv_invocation_before_spawn() {
+    let invocation = DeviceExecuteInvocation {
+        mode: DeviceExecuteInvocationMode::ScalarDecode,
+        token: Some(7),
+        position: 2,
+        sequence_epoch: 1,
+        prefix_before: 2,
+        valid_len_after: 3,
+        query_start: 2,
+    };
+    let error = validate_protocol_invocation(DeviceExecuteProtocol::V1, &invocation)
+        .expect_err("v1 cannot carry KV execution");
+    assert_eq!(error.code, "E_INVALID_ARGS");
+    assert!(error.message.contains("protocol v1"), "{error}");
+}
+
+#[test]
+fn protocol_v2_request_requires_both_programs_and_shared_identities() {
+    let request = DeviceExecuteV2Request {
+        backend: "metal".to_owned(),
+        prefill: DeviceExecuteProgram {
+            descriptor_json: b"prefill".to_vec(),
+            module_image: b"prefill.msl".to_vec(),
+        },
+        decode: DeviceExecuteProgram {
+            descriptor_json: b"decode".to_vec(),
+            module_image: b"decode.msl".to_vec(),
+        },
+        prefill_inputs_json: br#"{"1":[1]}"#.to_vec(),
+        model_identity: "smollm2".to_owned(),
+        session_identity: "prompt-7".to_owned(),
+        weights_path: None,
+        weight_map_json: None,
+    };
+    request.validate().expect("complete paired request");
+
+    let mut missing = request.clone();
+    missing.decode.module_image.clear();
+    let error = missing.validate().expect_err("decode program is mandatory");
+    assert_eq!(error.code, "E_DEVICE_DESCRIPTOR");
+
+    let mut unnamed = request;
+    unnamed.session_identity.clear();
+    let error = unnamed
+        .validate()
+        .expect_err("session identity is mandatory");
+    assert_eq!(error.code, "E_INVALID_ARGS");
+}
+
+#[test]
+fn v2_receipt_json_preserves_identities_and_lifecycle_counts() {
+    let json = br#"{
+        "operation":"load",
+        "protocol":2,
+        "model_identity":"smollm2",
+        "session_identity":"prompt-7",
+        "program_identities":{"prefill":"sha256:p","scalar_decode":"sha256:d"},
+        "lifecycle":{"prepares":1,"reuses":4,"resets":1,"releases":0,"live_handles":9}
+    }"#;
+    let receipt: super::DeviceExecuteControlReceipt =
+        serde_json::from_slice(json).expect("receipt");
+    assert_eq!(receipt.protocol, 2);
+    assert_eq!(receipt.model_identity.as_deref(), Some("smollm2"));
+    assert_eq!(receipt.session_identity.as_deref(), Some("prompt-7"));
+    assert_eq!(receipt.lifecycle.prepares, 1);
+    assert_eq!(receipt.lifecycle.reuses, 4);
+    assert_eq!(receipt.program_identities.len(), 2);
 }
 
 #[test]

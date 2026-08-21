@@ -56,6 +56,97 @@ pub struct DeviceExecuteRequest {
     pub weight_map_json: Option<Vec<u8>>,
 }
 
+/// Version of the local `device-execute` control protocol.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum DeviceExecuteProtocol {
+    V1 = 1,
+    V2 = 2,
+}
+
+impl DeviceExecuteProtocol {
+    #[must_use]
+    pub const fn version(self) -> u32 {
+        self as u32
+    }
+}
+
+fn default_protocol_version() -> u32 {
+    DeviceExecuteProtocol::V1.version()
+}
+
+/// Explicit invocation regime carried by protocol v2.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeviceExecuteInvocationMode {
+    Prefill,
+    ScalarDecode,
+}
+
+/// Cursor and token facts for one protocol-v2 invocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeviceExecuteInvocation {
+    pub mode: DeviceExecuteInvocationMode,
+    #[serde(default)]
+    pub token: Option<u32>,
+    pub position: u32,
+    pub sequence_epoch: u32,
+    pub prefix_before: u32,
+    pub valid_len_after: u32,
+    pub query_start: u32,
+}
+
+/// One static program admitted by a v2 load.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceExecuteProgram {
+    pub descriptor_json: Vec<u8>,
+    pub module_image: Vec<u8>,
+}
+
+/// One load owns both statically prepared invocation programs. The shared
+/// model/session identities are explicit and are not inferred from byte size.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceExecuteV2Request {
+    pub backend: String,
+    pub prefill: DeviceExecuteProgram,
+    pub decode: DeviceExecuteProgram,
+    pub prefill_inputs_json: Vec<u8>,
+    pub model_identity: String,
+    pub session_identity: String,
+    pub weights_path: Option<PathBuf>,
+    pub weight_map_json: Option<Vec<u8>>,
+}
+
+impl DeviceExecuteV2Request {
+    fn validate(&self) -> Result<(), HostSpawnError> {
+        if self.model_identity.is_empty() || self.session_identity.is_empty() {
+            return Err(HostSpawnError {
+                code: "E_INVALID_ARGS".to_owned(),
+                message: "protocol v2 requires non-empty model_identity and session_identity"
+                    .to_owned(),
+            });
+        }
+        if self.prefill.descriptor_json.is_empty()
+            || self.prefill.module_image.is_empty()
+            || self.decode.descriptor_json.is_empty()
+            || self.decode.module_image.is_empty()
+        {
+            return Err(HostSpawnError {
+                code: "E_DEVICE_DESCRIPTOR".to_owned(),
+                message: "protocol v2 load requires both prefill and scalar_decode programs"
+                    .to_owned(),
+            });
+        }
+        if self.weight_map_json.is_some() != self.weights_path.is_some() {
+            return Err(HostSpawnError {
+                code: "E_HOST_SPAWN".to_owned(),
+                message: "weight-map and weights path must be passed together".to_owned(),
+            });
+        }
+        Ok(())
+    }
+}
+
 /// Inputs to the device-executor cache identity seam.
 ///
 /// The spawn client owns the byte-level identities because it is the boundary
@@ -226,6 +317,7 @@ impl StageTimingReceipt {
 
 /// Resident session lifecycle counters returned by the hosts control entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(default)]
 pub struct DeviceExecuteLifecycle {
     pub prepares: usize,
     pub reuses: usize,
@@ -240,7 +332,15 @@ pub struct DeviceExecuteLifecycle {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DeviceExecuteControlReceipt {
     pub operation: String,
+    #[serde(default = "default_protocol_version")]
+    pub protocol: u32,
     pub lifecycle: DeviceExecuteLifecycle,
+    #[serde(default)]
+    pub model_identity: Option<String>,
+    #[serde(default)]
+    pub session_identity: Option<String>,
+    #[serde(default)]
+    pub program_identities: BTreeMap<String, String>,
     /// Client-measured load wall, including host-process admission.
     #[serde(default)]
     pub load_us: u64,
@@ -261,6 +361,7 @@ pub struct DeviceExecuteSession {
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
+    protocol: DeviceExecuteProtocol,
     released: bool,
     _work: WorkDir,
 }
@@ -272,6 +373,18 @@ pub struct DeviceExecuteReceipt {
     pub backend: String,
     /// Selected-hardware name.
     pub device_name: String,
+    #[serde(default = "default_protocol_version")]
+    pub protocol: u32,
+    #[serde(default)]
+    pub model_identity: Option<String>,
+    #[serde(default)]
+    pub session_identity: Option<String>,
+    #[serde(default)]
+    pub program_identities: BTreeMap<String, String>,
+    #[serde(default)]
+    pub lifecycle: DeviceExecuteLifecycle,
+    #[serde(default)]
+    pub invocation_mode: Option<DeviceExecuteInvocationMode>,
     /// Launches dispatched.
     pub launches: usize,
     /// Descriptor launch identities, in order.
@@ -430,6 +543,17 @@ pub fn open_device_session(
     open_device_session_at(&resolve_host_cli(build_if_missing)?, request)
 }
 
+/// Start a protocol-v2 owner. One load carries both prefill and scalar-decode
+/// programs plus explicit model/session identities.
+#[allow(dead_code)]
+pub fn open_device_session_v2(
+    request: &DeviceExecuteV2Request,
+    build_if_missing: bool,
+) -> Result<(DeviceExecuteSession, DeviceExecuteControlReceipt), HostSpawnError> {
+    request.validate()?;
+    open_device_session_v2_at(&resolve_host_cli(build_if_missing)?, request)
+}
+
 fn open_device_session_at(
     host: &Path,
     request: &DeviceExecuteRequest,
@@ -437,6 +561,17 @@ fn open_device_session_at(
     let mut session = start_device_session_at(host, request)?;
     let started = std::time::Instant::now();
     let mut loaded = session.control("load", None)?;
+    loaded.load_us = elapsed_us(started);
+    Ok((session, loaded))
+}
+
+fn open_device_session_v2_at(
+    host: &Path,
+    request: &DeviceExecuteV2Request,
+) -> Result<(DeviceExecuteSession, DeviceExecuteControlReceipt), HostSpawnError> {
+    let mut session = start_device_session_v2_at(host, request)?;
+    let started = std::time::Instant::now();
+    let mut loaded = session.control_v2_load()?;
     loaded.load_us = elapsed_us(started);
     Ok((session, loaded))
 }
@@ -497,6 +632,72 @@ fn start_device_session_at(
         child,
         stdin,
         stdout: BufReader::new(stdout),
+        protocol: DeviceExecuteProtocol::V1,
+        released: false,
+        _work: work,
+    })
+}
+
+fn start_device_session_v2_at(
+    host: &Path,
+    request: &DeviceExecuteV2Request,
+) -> Result<DeviceExecuteSession, HostSpawnError> {
+    let work = WorkDir::create()?;
+    let prefill_descriptor = work.path.join("prefill-descriptor.json");
+    let prefill_module = work.path.join("prefill-module.bin");
+    let decode_descriptor = work.path.join("decode-descriptor.json");
+    let decode_module = work.path.join("decode-module.bin");
+    let inputs_path = work.path.join("inputs.json");
+    let weight_map_path = work.path.join("weight-map.json");
+    write_file(&prefill_descriptor, &request.prefill.descriptor_json)?;
+    write_file(&prefill_module, &request.prefill.module_image)?;
+    write_file(&decode_descriptor, &request.decode.descriptor_json)?;
+    write_file(&decode_module, &request.decode.module_image)?;
+    write_file(&inputs_path, &request.prefill_inputs_json)?;
+    if let Some(map) = &request.weight_map_json {
+        write_file(&weight_map_path, map)?;
+    }
+    let mut command = Command::new(host);
+    command
+        .arg("device-execute")
+        .arg("--control")
+        .args(["--protocol", "v2"])
+        .args(["--backend", &request.backend])
+        .args(["--prefill-descriptor", &path_text(&prefill_descriptor)?])
+        .args(["--prefill-module", &path_text(&prefill_module)?])
+        .args(["--decode-descriptor", &path_text(&decode_descriptor)?])
+        .args(["--decode-module", &path_text(&decode_module)?])
+        .args(["--model-identity", &request.model_identity])
+        .args(["--session-identity", &request.session_identity])
+        .args(["--inputs", &path_text(&inputs_path)?])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    if let (Some(weights), Some(_)) = (&request.weights_path, &request.weight_map_json) {
+        command.args([
+            "--weights",
+            &path_text(weights)?,
+            "--weight-map",
+            &path_text(&weight_map_path)?,
+        ]);
+    }
+    let mut child = command.spawn().map_err(|error| HostSpawnError {
+        code: "E_HOST_SPAWN".to_owned(),
+        message: format!("failed to spawn protocol-v2 device-execute: {error}"),
+    })?;
+    let stdin = child.stdin.take().ok_or_else(|| HostSpawnError {
+        code: "E_HOST_SPAWN".to_owned(),
+        message: "protocol-v2 device-execute stdin was not piped".to_owned(),
+    })?;
+    let stdout = child.stdout.take().ok_or_else(|| HostSpawnError {
+        code: "E_HOST_SPAWN".to_owned(),
+        message: "protocol-v2 device-execute stdout was not piped".to_owned(),
+    })?;
+    Ok(DeviceExecuteSession {
+        child,
+        stdin,
+        stdout: BufReader::new(stdout),
+        protocol: DeviceExecuteProtocol::V2,
         released: false,
         _work: work,
     })
@@ -511,6 +712,22 @@ impl DeviceExecuteSession {
         self.control("step", Some(inputs))
     }
 
+    /// Send one explicit v2 invocation. Scalar decode has no legacy inputs map.
+    pub fn invoke_v2(
+        &mut self,
+        invocation: DeviceExecuteInvocation,
+    ) -> Result<DeviceExecuteControlReceipt, HostSpawnError> {
+        validate_protocol_invocation(DeviceExecuteProtocol::V2, &invocation)?;
+        if self.protocol != DeviceExecuteProtocol::V2 {
+            return Err(HostSpawnError {
+                code: "E_INVALID_ARGS".to_owned(),
+                message: "protocol v1 session cannot carry KV execution; open a v2 session"
+                    .to_owned(),
+            });
+        }
+        self.control_invocation(invocation)
+    }
+
     /// Reset resident state while retaining once-loaded weights.
     pub fn reset(&mut self) -> Result<DeviceExecuteControlReceipt, HostSpawnError> {
         self.control("reset", None)
@@ -521,6 +738,16 @@ impl DeviceExecuteSession {
         let receipt = self.control("release", None)?;
         self.released = true;
         Ok(receipt)
+    }
+
+    fn control_v2_load(&mut self) -> Result<DeviceExecuteControlReceipt, HostSpawnError> {
+        if self.protocol != DeviceExecuteProtocol::V2 {
+            return Err(HostSpawnError {
+                code: "E_INVALID_ARGS".to_owned(),
+                message: "protocol v2 load requires a v2 session owner".to_owned(),
+            });
+        }
+        self.control("load", None)
     }
 
     fn control(
@@ -538,6 +765,10 @@ impl DeviceExecuteSession {
         command.insert(
             "op".to_owned(),
             serde_json::Value::String(operation.to_owned()),
+        );
+        command.insert(
+            "protocol".to_owned(),
+            serde_json::Value::Number(serde_json::Number::from(self.protocol.version())),
         );
         if let Some(inputs) = inputs {
             let encoded = encode_device_inputs(inputs)?;
@@ -605,6 +836,86 @@ impl DeviceExecuteSession {
                         code: "E_HOST_SPAWN".to_owned(),
                         message: format!("resident control receipt JSON is invalid: {error}"),
                     });
+                }
+            }
+        }
+    }
+    fn control_invocation(
+        &mut self,
+        invocation: DeviceExecuteInvocation,
+    ) -> Result<DeviceExecuteControlReceipt, HostSpawnError> {
+        let mut command = serde_json::to_value(invocation)
+            .map_err(|error| HostSpawnError {
+                code: "E_DEVICE_DESCRIPTOR".to_owned(),
+                message: format!("failed to encode protocol-v2 invocation: {error}"),
+            })?
+            .as_object()
+            .cloned()
+            .ok_or_else(|| HostSpawnError {
+                code: "E_DEVICE_DESCRIPTOR".to_owned(),
+                message: "protocol-v2 invocation did not encode as an object".to_owned(),
+            })?;
+        command.insert(
+            "op".to_owned(),
+            serde_json::Value::String("invoke".to_owned()),
+        );
+        command.insert(
+            "protocol".to_owned(),
+            serde_json::Value::Number(serde_json::Number::from(
+                DeviceExecuteProtocol::V2.version(),
+            )),
+        );
+        serde_json::to_writer(&mut self.stdin, &command).map_err(|error| HostSpawnError {
+            code: "E_HOST_SPAWN".to_owned(),
+            message: format!("failed to write resident control request: {error}"),
+        })?;
+        self.stdin
+            .write_all(b"\n")
+            .map_err(|error| HostSpawnError {
+                code: "E_HOST_SPAWN".to_owned(),
+                message: format!("failed to write resident control request: {error}"),
+            })?;
+        self.stdin.flush().map_err(|error| HostSpawnError {
+            code: "E_HOST_SPAWN".to_owned(),
+            message: format!("failed to flush resident control request: {error}"),
+        })?;
+        let mut response = String::new();
+        loop {
+            let mut line = String::new();
+            let read = self
+                .stdout
+                .read_line(&mut line)
+                .map_err(|error| HostSpawnError {
+                    code: "E_HOST_SPAWN".to_owned(),
+                    message: format!("failed to read resident control receipt: {error}"),
+                })?;
+            if read == 0 {
+                let status = self.child.try_wait().ok().flatten();
+                return Err(HostSpawnError {
+                    code: "E_HOST_SPAWN".to_owned(),
+                    message: format!(
+                        "resident device-execute exited before invoke receipt: {status:?}"
+                    ),
+                });
+            }
+            response.push_str(&line);
+            match serde_json::from_str::<WireHostError>(&response) {
+                Ok(error) if !error.code.is_empty() => {
+                    return Err(HostSpawnError {
+                        code: error.code,
+                        message: error.message,
+                    })
+                }
+                Ok(_) | Err(_) => {}
+            }
+            match serde_json::from_str::<DeviceExecuteControlReceipt>(&response) {
+                Ok(receipt) => return Ok(receipt),
+                Err(error) if error.is_eof() => continue,
+                Err(error) => {
+                    return Err(HostSpawnError {
+                        code: "E_HOST_SPAWN".to_owned(),
+                        message: format!("resident control receipt JSON is invalid: {error}"),
+                    })
                 }
             }
         }
@@ -1038,6 +1349,37 @@ fn add_buffer_version(
         element_count,
     });
     Ok(())
+}
+
+/// Validate that a dynamic invocation is carried only by the v2 protocol.
+pub fn validate_protocol_invocation(
+    protocol: DeviceExecuteProtocol,
+    invocation: &DeviceExecuteInvocation,
+) -> Result<(), HostSpawnError> {
+    if protocol != DeviceExecuteProtocol::V2 {
+        return Err(HostSpawnError {
+            code: "E_INVALID_ARGS".to_owned(),
+            message: "protocol v1 cannot carry KV execution; request protocol v2".to_owned(),
+        });
+    }
+    if invocation.mode == DeviceExecuteInvocationMode::ScalarDecode && invocation.token.is_none() {
+        return Err(HostSpawnError {
+            code: "E_INVALID_ARGS".to_owned(),
+            message: "scalar_decode invocation requires token".to_owned(),
+        });
+    }
+    Ok(())
+}
+
+/// Encode the protocol-v2 invocation object. No legacy `inputs` map is added.
+pub fn encode_device_execute_invocation(
+    invocation: &DeviceExecuteInvocation,
+) -> Result<Vec<u8>, HostSpawnError> {
+    validate_protocol_invocation(DeviceExecuteProtocol::V2, invocation)?;
+    serde_json::to_vec(invocation).map_err(|error| HostSpawnError {
+        code: "E_DEVICE_DESCRIPTOR".to_owned(),
+        message: format!("failed to encode protocol-v2 invocation: {error}"),
+    })
 }
 
 /// Encode `{ "<buffer-id>": [f32, ...] }` for the hosts CLI `--inputs` file.
