@@ -969,6 +969,75 @@ fn parses_iuncta_with_nested_types() {
     assert_eq!(inner_params.len(), 2);
 }
 
+#[test]
+fn parses_ratio_type_with_mandatory_labels_and_holes() {
+    let result = parse_ok("functio f(ratio<g: f32, w: _, fixum: fractus> value) → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let TypeExprKind::Named(name, params) = &func.params[0].ty.kind else {
+        panic!("expected ratio type");
+    };
+    assert_eq!(result.interner.resolve(name.name), "ratio");
+    assert_eq!(params.len(), 3);
+    assert!(matches!(params[0].kind, TypeExprKind::Named(_, _)));
+    assert!(matches!(params[1].kind, TypeExprKind::Infer));
+    assert!(matches!(params[2].kind, TypeExprKind::Named(_, _)));
+    let labels = params
+        .iter()
+        .map(|param| {
+            param
+                .iuncta_label
+                .as_ref()
+                .map(|label| result.interner.resolve(label.name))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(labels, vec![Some("g"), Some("w"), Some("fixum")]);
+}
+
+#[test]
+fn parses_ratio_as_an_ordinary_binding_name() {
+    let _ = parse_ok("fixum numerus ratio ← 3\nfunctio f(f32 ratio) → vacuum {}");
+}
+
+#[test]
+fn rejects_unlabeled_ratio_type_argument_with_targeted_issue() {
+    expect_expected_issue(
+        "functio f(ratio<f32, w: numerus> value) → vacuum {}",
+        "ratio_type_arg_label_required",
+    );
+}
+
+#[test]
+fn rejects_duplicate_ratio_labels_at_the_duplicate_label() {
+    let source = "functio f(ratio<g: f32, g: numerus> value) → vacuum {}";
+    let result = parse_program(source);
+    let error = result
+        .errors
+        .iter()
+        .find(|error| {
+            error.kind == ParseErrorKind::Expected
+                && error
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "duplicate_tuple_element_label")
+        })
+        .expect("duplicate label diagnostic");
+    let duplicate_label_start = source.rfind("g").expect("duplicate label") as u32;
+    assert_eq!(error.span.start, duplicate_label_start);
+    assert_eq!(error.span.end, duplicate_label_start + 1);
+}
+
+#[test]
+fn rejects_trailing_comma_in_ratio_type_arguments() {
+    parse_errors_include_issue(
+        "functio f(ratio<g: f32,> value) → vacuum {}",
+        ParseErrorKind::Expected,
+        "item_list_trailing_comma",
+    );
+}
+
 // =============================================================================
 // union hole type (`∪`)
 // =============================================================================

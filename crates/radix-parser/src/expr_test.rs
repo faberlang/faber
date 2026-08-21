@@ -571,6 +571,74 @@ functio main() → numerus {
 }
 
 #[test]
+fn parses_ratio_construction_as_verte_with_labeled_type() {
+    let result =
+        parse_ok(r#"incipit { fixum _ point ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 } }"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let radix_syntax::IfBody::Block(block) = &incipit.body else {
+        panic!("expected block body");
+    };
+    let StmtKind::Var(var) = &block.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let init = var.init.as_deref().expect("initializer");
+    let ExprKind::Verte(verte) = &init.kind else {
+        panic!(
+            "expected ratio construction to be Verte, got {:?}",
+            init.kind
+        );
+    };
+    let TypeExprKind::Named(name, params) = &verte.ty.kind else {
+        panic!("expected ratio constructor type");
+    };
+    assert_eq!(result.interner.resolve(name.name), "ratio");
+    assert_eq!(params.len(), 2);
+    assert_eq!(
+        result
+            .interner
+            .resolve(params[0].iuncta_label.as_ref().expect("g label").name),
+        "g"
+    );
+    assert_eq!(
+        result
+            .interner
+            .resolve(params[1].iuncta_label.as_ref().expect("w label").name),
+        "w"
+    );
+    let ExprKind::Object(object) = &verte.expr.kind else {
+        panic!("expected ratio construction object");
+    };
+    assert_eq!(object.fields.len(), 2);
+}
+
+#[test]
+fn rejects_unlabeled_ratio_constructor_type_argument() {
+    assert_parse_error_issue(
+        r#"incipit { fixum _ point ← ratio<f32, w: numerus> { g = 1.0, w = 2 } }"#,
+        "ratio_type_arg_label_required",
+    );
+}
+
+#[test]
+fn rejects_trailing_comma_in_ratio_constructor_type_arguments() {
+    assert_parse_error_issue(
+        r#"incipit { fixum _ point ← ratio<g: f32,> { g = 1.0 } }"#,
+        "item_list_trailing_comma",
+    );
+}
+
+#[test]
+fn rejects_trailing_comma_in_ratio_constructor_fields() {
+    assert_parse_error_issue(
+        r#"incipit { fixum _ point ← ratio<g: f32> { g = 1.0, } }"#,
+        "item_list_trailing_comma",
+    );
+}
+
+#[test]
 fn qualified_genus_construction_keeps_faber_equals_grammar() {
     let result = parse_ok(
         r#"
