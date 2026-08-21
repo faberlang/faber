@@ -31,7 +31,7 @@ use crate::{
 };
 use radix_types::{NumericWidth, Primitive, Type, TypeId};
 use rustc_hash::FxHashMap;
-use std::fmt;
+use std::{borrow::Borrow, fmt};
 
 /// A typed plan-mapping failure (contract resolution, operand shapes, or a
 /// recipe mismatch). Carries a stable message; the emitters map it onto their
@@ -473,7 +473,7 @@ impl BindDescriptor {
 }
 
 /// Versioned scalar types accepted by library-call uniforms.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UniformType {
     /// IEEE-754 single precision value.
     F32,
@@ -641,6 +641,629 @@ impl ExecutorPlanExtension {
         }
         Ok(())
     }
+}
+
+/// Version of the executor-plan section used when launch bindings carry
+/// runtime state. Static plans deliberately retain [`EXECUTOR_PLAN_BIND_ABI_VERSION`]
+/// and the v1 shape above; dynamic plans use this version and the additive
+/// allocation/view/binding facts below.
+pub const EXECUTOR_PLAN_RUNTIME_BIND_ABI_VERSION: u16 = 2;
+
+/// The scalar data type of an allocation or typed source.
+///
+/// This is an alias of the existing uniform type vocabulary so the producer
+/// and the v1 constant surface cannot disagree about byte widths. The KV
+/// campaign's integrated route uses `F32`; `F16` remains an explicit type,
+/// not an implicit narrowing.
+pub type AllocationDType = UniformType;
+/// Short alias used by consumers that call the field simply `dtype`.
+pub type DType = AllocationDType;
+
+impl UniformType {
+    /// Number of bytes occupied by one scalar of this type.
+    #[must_use]
+    pub const fn byte_width(self) -> u64 {
+        match self {
+            Self::F16 => 2,
+            Self::F32 | Self::U32 | Self::I32 => 4,
+        }
+    }
+}
+
+/// The typed invocation-state fields admitted as runtime binding sources.
+///
+/// These are tags, not string sentinels or magic uniform names. Every field is
+/// carried as a `u32` by the invocation-state buffer and can therefore be
+/// shared by append and attention launches without changing static plan
+/// identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RuntimeSource {
+    /// Absolute write position / current prefix position.
+    Position,
+    /// Prefix length after the current append.
+    ValidLenAfter,
+    /// Number of query rows in this invocation.
+    QueryRows,
+    /// Monotonic sequence/reset epoch.
+    SequenceEpoch,
+}
+
+impl RuntimeSource {
+    /// The scalar type carried by every invocation-state field.
+    #[must_use]
+    pub const fn ty(self) -> UniformType {
+        UniformType::U32
+    }
+
+    /// Stable field spelling for diagnostics and wire mirrors.
+    #[must_use]
+    pub const fn spelling(self) -> &'static str {
+        match self {
+            Self::Position => "position",
+            Self::ValidLenAfter => "valid_len_after",
+            Self::QueryRows => "query_rows",
+            Self::SequenceEpoch => "sequence_epoch",
+        }
+    }
+}
+
+/// A tagged source for a v2 launch binding.
+///
+/// The enum tag is the source contract: a constant is a typed bit pattern and
+/// a runtime value is one of the closed invocation-state fields. A consumer
+/// must never reinterpret a v1 constant as a runtime cursor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ExecutorPlanSource {
+    /// A compile-time scalar value.
+    Constant { ty: UniformType, bits: u32 },
+    /// A value read from the typed invocation-state buffer.
+    Runtime(RuntimeSource),
+}
+
+impl ExecutorPlanSource {
+    /// Construct a typed constant source.
+    #[must_use]
+    pub const fn constant(ty: UniformType, bits: u32) -> Self {
+        Self::Constant { ty, bits }
+    }
+
+    /// Construct a typed runtime source.
+    #[must_use]
+    pub const fn runtime(source: RuntimeSource) -> Self {
+        Self::Runtime(source)
+    }
+
+    /// The scalar type consumed by this source.
+    #[must_use]
+    pub const fn ty(self) -> UniformType {
+        match self {
+            Self::Constant { ty, .. } => ty,
+            Self::Runtime(source) => source.ty(),
+        }
+    }
+
+    /// Whether this source is dynamic.
+    #[must_use]
+    pub const fn is_runtime(self) -> bool {
+        matches!(self, Self::Runtime(_))
+    }
+}
+
+/// Compatibility spelling for the shared field table.
+pub type TypedSource = ExecutorPlanSource;
+/// Compatibility spelling for consumers that name this a plan source.
+pub type PlanSource = ExecutorPlanSource;
+
+/// The independent initialization fact of an allocation.
+pub use crate::device_semantics::InitializationPolicy;
+
+/// Typed fixed-capacity storage facts for one allocation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AllocationFact {
+    /// Stable program-level buffer identity.
+    pub buffer: crate::device_program::BufferIdentity,
+    /// Element data type of the allocation.
+    pub dtype: AllocationDType,
+    /// Physical allocation capacity in bytes, distinct from every view span.
+    pub capacity_bytes: u64,
+    /// Allocation lifetime, repeated explicitly for the v2 ABI contract.
+    pub lifetime: crate::device_program::BufferLifetime,
+    /// How the allocation reaches its first defined state.
+    pub initialization: InitializationPolicy,
+}
+
+/// A bounded logical view over an allocation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViewFact {
+    /// Allocation identity shared by this view and any sibling views.
+    pub allocation: crate::device_program::BufferId,
+    /// Logical dimensions in outer-to-inner order.
+    pub logical_dims: Vec<u64>,
+    /// Element strides in the same order as [`Self::logical_dims`].
+    pub strides: Vec<u64>,
+    /// Static base element offset in the allocation.
+    pub static_base: u64,
+    /// Maximum byte span from the static base, not allocation capacity.
+    pub maximum_span: u64,
+}
+
+/// Compatibility spelling for the shared field table.
+pub type AllocationView = ViewFact;
+/// Compatibility spelling for consumers that call this a view fact.
+pub type View = ViewFact;
+
+/// One v2 launch binding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LaunchBinding {
+    /// Kernel selection receiving this binding.
+    pub kernel_index: usize,
+    /// Allocation handle/identity bound by the launch.
+    pub handle: crate::device_program::BufferId,
+    /// Target-neutral binding index.
+    pub binding: crate::device_program::Binding,
+    /// Byte offset from the allocation base.
+    pub byte_offset: u64,
+    /// Byte span exposed to this launch.
+    pub view_span: u64,
+    /// Typed constant or invocation-state source for the binding.
+    pub runtime_source: ExecutorPlanSource,
+}
+
+impl LaunchBinding {
+    /// Construct a launch binding while keeping the field table explicit.
+    #[must_use]
+    pub const fn new(
+        kernel_index: usize,
+        handle: crate::device_program::BufferId,
+        binding: crate::device_program::Binding,
+        byte_offset: u64,
+        view_span: u64,
+        runtime_source: ExecutorPlanSource,
+    ) -> Self {
+        Self {
+            kernel_index,
+            handle,
+            binding,
+            byte_offset,
+            view_span,
+            runtime_source,
+        }
+    }
+}
+
+/// All dynamic facts supplied to the v2 producer.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ExecutorPlanV2Facts {
+    /// Fixed-capacity physical allocations.
+    pub allocations: Vec<AllocationFact>,
+    /// Logical bounded views over those allocations.
+    pub views: Vec<ViewFact>,
+    /// Per-kernel launch bindings.
+    pub launch_bindings: Vec<LaunchBinding>,
+}
+
+/// Compatibility spelling for the producer input.
+pub type RuntimeBindingFacts = ExecutorPlanV2Facts;
+
+/// A typed v2 executor-plan section.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExecutorPlanExtensionV2 {
+    /// Section schema version.
+    pub abi_version: u16,
+    /// The same ordered library/fallback selections as the static plan.
+    pub selections: Vec<LibrarySelection>,
+    /// Allocation facts shared by all views and launches.
+    pub allocations: Vec<AllocationFact>,
+    /// Bounded logical views over those allocations.
+    pub views: Vec<ViewFact>,
+    /// Launch bindings carrying byte ranges and tagged sources.
+    pub launch_bindings: Vec<LaunchBinding>,
+}
+
+/// Compatibility spelling for the v2 payload.
+pub type ExecutorPlanV2 = ExecutorPlanExtensionV2;
+
+/// Typed v2 producer failure. Validation happens before the static selection
+/// projection so malformed or overflowing spans cannot reach emission.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExecutorPlanV2Error {
+    /// An allocation identity appeared more than once.
+    DuplicateAllocation {
+        buffer: crate::device_program::BufferId,
+    },
+    /// An allocation's repeated identity/capacity facts are malformed.
+    InvalidAllocation {
+        buffer: crate::device_program::BufferId,
+        detail: String,
+    },
+    /// A view refers to no allocation or has malformed/overflowing span facts.
+    InvalidView {
+        allocation: crate::device_program::BufferId,
+        detail: String,
+    },
+    /// A binding points outside the ordered kernel/resource facts.
+    InvalidLaunchBinding { kernel_index: usize, detail: String },
+    /// Two bindings claim the same kernel slot.
+    DuplicateLaunchBinding {
+        kernel_index: usize,
+        group: u32,
+        binding: u32,
+    },
+    /// A v2 section without any dynamic source is an accidental static plan.
+    MissingRuntimeSource,
+    /// A v2 section has a stale or skewed selection count/order.
+    SelectionSkew { detail: String },
+}
+
+impl fmt::Display for ExecutorPlanV2Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DuplicateAllocation { buffer } => {
+                write!(f, "executor-plan v2 repeats allocation {}", buffer.0)
+            }
+            Self::InvalidAllocation { buffer, detail } => {
+                write!(
+                    f,
+                    "executor-plan v2 allocation {} is invalid: {detail}",
+                    buffer.0
+                )
+            }
+            Self::InvalidView { allocation, detail } => {
+                write!(
+                    f,
+                    "executor-plan v2 view for allocation {} is invalid: {detail}",
+                    allocation.0
+                )
+            }
+            Self::InvalidLaunchBinding {
+                kernel_index,
+                detail,
+            } => write!(
+                f,
+                "executor-plan v2 binding for kernel {kernel_index} is invalid: {detail}"
+            ),
+            Self::DuplicateLaunchBinding {
+                kernel_index,
+                group,
+                binding,
+            } => write!(
+                f,
+                "executor-plan v2 repeats kernel {kernel_index} binding ({group}, {binding})"
+            ),
+            Self::MissingRuntimeSource => {
+                write!(f, "executor-plan v2 carries no tagged runtime source")
+            }
+            Self::SelectionSkew { detail } => {
+                write!(f, "executor-plan v2 selection skew: {detail}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ExecutorPlanV2Error {}
+
+impl ExecutorPlanV2Facts {
+    /// Validate dynamic facts against the typed device program before any
+    /// executor-plan selection is projected.
+    pub fn validate_for_program(&self, program: &DeviceProgram) -> Result<(), ExecutorPlanV2Error> {
+        let mut allocations = std::collections::BTreeMap::new();
+        for allocation in &self.allocations {
+            let id = allocation.buffer.id;
+            if allocations.insert(id, allocation).is_some() {
+                return Err(ExecutorPlanV2Error::DuplicateAllocation { buffer: id });
+            }
+            if allocation.capacity_bytes == 0 {
+                return Err(ExecutorPlanV2Error::InvalidAllocation {
+                    buffer: id,
+                    detail: "capacity bytes must be nonzero".to_owned(),
+                });
+            }
+            if allocation.lifetime != allocation.buffer.lifetime {
+                return Err(ExecutorPlanV2Error::InvalidAllocation {
+                    buffer: id,
+                    detail: "lifetime disagrees with buffer identity".to_owned(),
+                });
+            }
+        }
+
+        for view in &self.views {
+            let Some(allocation) = allocations.get(&view.allocation) else {
+                return Err(ExecutorPlanV2Error::InvalidView {
+                    allocation: view.allocation,
+                    detail: "view refers to an unknown allocation".to_owned(),
+                });
+            };
+            validate_view_span(view, allocation)?;
+        }
+
+        let mut seen_bindings = std::collections::BTreeSet::new();
+        let mut has_runtime_source = false;
+        for launch_binding in &self.launch_bindings {
+            let key = (
+                launch_binding.kernel_index,
+                launch_binding.binding.group,
+                launch_binding.binding.binding,
+            );
+            if !seen_bindings.insert(key) {
+                return Err(ExecutorPlanV2Error::DuplicateLaunchBinding {
+                    kernel_index: launch_binding.kernel_index,
+                    group: launch_binding.binding.group,
+                    binding: launch_binding.binding.binding,
+                });
+            }
+            let Some(kernel) = program.kernels.get(launch_binding.kernel_index) else {
+                return Err(ExecutorPlanV2Error::InvalidLaunchBinding {
+                    kernel_index: launch_binding.kernel_index,
+                    detail: "kernel index is outside the program".to_owned(),
+                });
+            };
+            let Some(resource) = kernel
+                .resources
+                .iter()
+                .find(|resource| resource.binding == launch_binding.binding)
+            else {
+                return Err(ExecutorPlanV2Error::InvalidLaunchBinding {
+                    kernel_index: launch_binding.kernel_index,
+                    detail: format!(
+                        "binding ({}, {}) is not declared by the kernel",
+                        launch_binding.binding.group, launch_binding.binding.binding
+                    ),
+                });
+            };
+            if resource.buffer.id != launch_binding.handle {
+                return Err(ExecutorPlanV2Error::InvalidLaunchBinding {
+                    kernel_index: launch_binding.kernel_index,
+                    detail: format!(
+                        "handle {} disagrees with declared resource handle {}",
+                        launch_binding.handle.0, resource.buffer.id.0
+                    ),
+                });
+            }
+            let Some(allocation) = allocations.get(&launch_binding.handle) else {
+                return Err(ExecutorPlanV2Error::InvalidLaunchBinding {
+                    kernel_index: launch_binding.kernel_index,
+                    detail: "binding refers to an unknown allocation".to_owned(),
+                });
+            };
+            if launch_binding.view_span == 0 {
+                return Err(ExecutorPlanV2Error::InvalidLaunchBinding {
+                    kernel_index: launch_binding.kernel_index,
+                    detail: "view span must be nonzero".to_owned(),
+                });
+            }
+            let Some(end) = launch_binding
+                .byte_offset
+                .checked_add(launch_binding.view_span)
+            else {
+                return Err(ExecutorPlanV2Error::InvalidLaunchBinding {
+                    kernel_index: launch_binding.kernel_index,
+                    detail: "byte offset plus view span overflows".to_owned(),
+                });
+            };
+            if end > allocation.capacity_bytes {
+                return Err(ExecutorPlanV2Error::InvalidLaunchBinding {
+                    kernel_index: launch_binding.kernel_index,
+                    detail: format!(
+                        "binding end {end} exceeds allocation capacity {}",
+                        allocation.capacity_bytes
+                    ),
+                });
+            }
+            if view_base_bytes_for_binding(
+                &self.views,
+                allocation,
+                launch_binding.byte_offset,
+                launch_binding.view_span,
+            )
+            .is_none()
+            {
+                return Err(ExecutorPlanV2Error::InvalidLaunchBinding {
+                    kernel_index: launch_binding.kernel_index,
+                    detail: "byte range does not match a bounded allocation view".to_owned(),
+                });
+            }
+            has_runtime_source |= launch_binding.runtime_source.is_runtime();
+        }
+        if !has_runtime_source {
+            return Err(ExecutorPlanV2Error::MissingRuntimeSource);
+        }
+        Ok(())
+    }
+}
+
+fn validate_view_span(
+    view: &ViewFact,
+    allocation: &AllocationFact,
+) -> Result<(), ExecutorPlanV2Error> {
+    if view.logical_dims.is_empty() || view.logical_dims.len() != view.strides.len() {
+        return Err(ExecutorPlanV2Error::InvalidView {
+            allocation: view.allocation,
+            detail: "logical dimensions and strides must have the same nonzero rank".to_owned(),
+        });
+    }
+    if view
+        .logical_dims
+        .iter()
+        .chain(view.strides.iter())
+        .any(|value| *value == 0)
+    {
+        return Err(ExecutorPlanV2Error::InvalidView {
+            allocation: view.allocation,
+            detail: "logical dimensions and strides must be positive".to_owned(),
+        });
+    }
+    if view.maximum_span == 0 {
+        return Err(ExecutorPlanV2Error::InvalidView {
+            allocation: view.allocation,
+            detail: "maximum span must be nonzero".to_owned(),
+        });
+    }
+    let max_element = view
+        .logical_dims
+        .iter()
+        .zip(&view.strides)
+        .try_fold(0u64, |acc, (dim, stride)| {
+            dim.checked_sub(1)
+                .and_then(|extent| extent.checked_mul(*stride))
+                .and_then(|extent| acc.checked_add(extent))
+        })
+        .ok_or_else(|| ExecutorPlanV2Error::InvalidView {
+            allocation: view.allocation,
+            detail: "logical span arithmetic overflows".to_owned(),
+        })?;
+    let required_elements =
+        max_element
+            .checked_add(1)
+            .ok_or_else(|| ExecutorPlanV2Error::InvalidView {
+                allocation: view.allocation,
+                detail: "logical span arithmetic overflows".to_owned(),
+            })?;
+    let required_span = required_elements
+        .checked_mul(allocation.dtype.byte_width())
+        .ok_or_else(|| ExecutorPlanV2Error::InvalidView {
+            allocation: view.allocation,
+            detail: "byte span arithmetic overflows".to_owned(),
+        })?;
+    if view.maximum_span < required_span {
+        return Err(ExecutorPlanV2Error::InvalidView {
+            allocation: view.allocation,
+            detail: format!(
+                "maximum span {} is smaller than required span {required_span}",
+                view.maximum_span
+            ),
+        });
+    }
+    let base_bytes = view
+        .static_base
+        .checked_mul(allocation.dtype.byte_width())
+        .ok_or_else(|| ExecutorPlanV2Error::InvalidView {
+            allocation: view.allocation,
+            detail: "static base byte arithmetic overflows".to_owned(),
+        })?;
+    let end = base_bytes.checked_add(view.maximum_span).ok_or_else(|| {
+        ExecutorPlanV2Error::InvalidView {
+            allocation: view.allocation,
+            detail: "view end arithmetic overflows".to_owned(),
+        }
+    })?;
+    if end > allocation.capacity_bytes {
+        return Err(ExecutorPlanV2Error::InvalidView {
+            allocation: view.allocation,
+            detail: format!(
+                "view end {end} exceeds allocation capacity {}",
+                allocation.capacity_bytes
+            ),
+        });
+    }
+    Ok(())
+}
+
+fn view_base_bytes_for_binding(
+    views: &[ViewFact],
+    allocation: &AllocationFact,
+    byte_offset: u64,
+    view_span: u64,
+) -> Option<u64> {
+    let dtype_width = allocation.dtype.byte_width();
+    views.iter().find_map(|view| {
+        if view.allocation != allocation.buffer.id || view.maximum_span < view_span {
+            return None;
+        }
+        let required_span = view_required_span(view, dtype_width)?;
+        if view_span < required_span {
+            return None;
+        }
+        let base_bytes = view.static_base.checked_mul(dtype_width)?;
+        (base_bytes == byte_offset).then_some(base_bytes)
+    })
+}
+
+fn view_required_span(view: &ViewFact, dtype_width: u64) -> Option<u64> {
+    let max_element =
+        view.logical_dims
+            .iter()
+            .zip(&view.strides)
+            .try_fold(0u64, |acc, (dim, stride)| {
+                dim.checked_sub(1)
+                    .and_then(|extent| extent.checked_mul(*stride))
+                    .and_then(|extent| acc.checked_add(extent))
+            })?;
+    max_element.checked_add(1)?.checked_mul(dtype_width)
+}
+
+impl ExecutorPlanExtensionV2 {
+    /// Validate version, ordered selections, and binding ownership before a
+    /// consumer interprets any v2 field.
+    pub fn validate_for_kernel_count(&self, kernel_count: usize) -> Result<(), String> {
+        if self.abi_version != EXECUTOR_PLAN_RUNTIME_BIND_ABI_VERSION {
+            return Err(format!(
+                "executor-plan section version {} is not supported (expected {})",
+                self.abi_version, EXECUTOR_PLAN_RUNTIME_BIND_ABI_VERSION
+            ));
+        }
+        if self.selections.len() != kernel_count {
+            return Err(format!(
+                "executor-plan selection count {} does not match kernel count {}",
+                self.selections.len(),
+                kernel_count
+            ));
+        }
+        for (position, selection) in self.selections.iter().enumerate() {
+            if selection.kernel_index != position || !selection.bind.is_well_formed() {
+                return Err(format!(
+                    "executor-plan v2 selection {} is not an ordered well-formed selection",
+                    position
+                ));
+            }
+        }
+        for binding in &self.launch_bindings {
+            if binding.kernel_index >= kernel_count {
+                return Err(format!(
+                    "executor-plan v2 binding references kernel {} but there are {} kernels",
+                    binding.kernel_index, kernel_count
+                ));
+            }
+        }
+        if !self
+            .launch_bindings
+            .iter()
+            .any(|binding| binding.runtime_source.is_runtime())
+        {
+            return Err("executor-plan v2 carries no tagged runtime source".to_owned());
+        }
+        Ok(())
+    }
+}
+
+/// Produce a v2 executor plan after validating every allocation, view, and
+/// launch binding against the typed program. The v1 [`executor_plan_extension`]
+/// producer remains the static compatibility path and is not changed.
+pub fn executor_plan_extension_v2<B: Borrow<ExecutorPlanV2Facts>>(
+    program: &DeviceProgram,
+    facts: B,
+) -> Result<ExecutorPlanExtensionV2, ExecutorPlanV2Error> {
+    let facts = facts.borrow();
+    facts.validate_for_program(program)?;
+    let static_plan = executor_plan_extension(program);
+    let extension = ExecutorPlanExtensionV2 {
+        abi_version: EXECUTOR_PLAN_RUNTIME_BIND_ABI_VERSION,
+        selections: static_plan.selections,
+        allocations: facts.allocations.clone(),
+        views: facts.views.clone(),
+        launch_bindings: facts.launch_bindings.clone(),
+    };
+    extension
+        .validate_for_kernel_count(program.kernels.len())
+        .map_err(|detail| ExecutorPlanV2Error::SelectionSkew { detail })?;
+    Ok(extension)
+}
+
+/// Descriptive alias for callers at the runtime-binding seam.
+pub fn executor_plan_extension_with_runtime_bindings<B: Borrow<ExecutorPlanV2Facts>>(
+    program: &DeviceProgram,
+    facts: B,
+) -> Result<ExecutorPlanExtensionV2, ExecutorPlanV2Error> {
+    executor_plan_extension_v2(program, facts)
 }
 
 /// One typed buffer slot in a launch descriptor.

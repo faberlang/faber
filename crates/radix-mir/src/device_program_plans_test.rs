@@ -3541,3 +3541,126 @@ fn executor_plan_exposes_packed_region_and_decode_gemv_facts() {
         QUANTIZED_GEMV_ENTRY
     );
 }
+
+#[test]
+fn static_executor_plan_remains_v1() {
+    let program = elementwise_device_program();
+    let extension = executor_plan_extension(&program);
+    assert_eq!(extension.abi_version, EXECUTOR_PLAN_BIND_ABI_VERSION);
+    extension
+        .validate_for_kernel_count(program.kernels.len())
+        .expect("legacy static executor plan remains valid");
+}
+
+fn v2_facts_for_elementwise() -> ExecutorPlanV2Facts {
+    let program = elementwise_device_program();
+    let input = &program.kernels[0].resources[0].buffer;
+    ExecutorPlanV2Facts {
+        allocations: vec![AllocationFact {
+            buffer: input.clone(),
+            dtype: UniformType::F32,
+            capacity_bytes: 64,
+            lifetime: BufferLifetime::PerProgram,
+            initialization: InitializationPolicy::HostProvided,
+        }],
+        views: vec![
+            ViewFact {
+                allocation: input.id,
+                logical_dims: vec![4],
+                strides: vec![1],
+                static_base: 0,
+                maximum_span: 16,
+            },
+            // A second view proves that capacity and view extent are separate
+            // facts and that two views may share one allocation identity.
+            ViewFact {
+                allocation: input.id,
+                logical_dims: vec![2],
+                strides: vec![1],
+                static_base: 4,
+                maximum_span: 8,
+            },
+        ],
+        launch_bindings: vec![LaunchBinding::new(
+            0,
+            input.id,
+            Binding {
+                group: 0,
+                binding: 0,
+            },
+            0,
+            16,
+            ExecutorPlanSource::runtime(RuntimeSource::Position),
+        )],
+    }
+}
+
+#[test]
+fn runtime_bindings_emit_v2_with_typed_sources_and_views() {
+    let program = elementwise_device_program();
+    let facts = v2_facts_for_elementwise();
+    let extension = executor_plan_extension_v2(&program, &facts)
+        .expect("typed allocation/view facts should produce a v2 plan");
+
+    assert_eq!(
+        extension.abi_version,
+        EXECUTOR_PLAN_RUNTIME_BIND_ABI_VERSION
+    );
+    assert_eq!(extension.allocations[0].buffer.id, BufferId(1));
+    assert_eq!(extension.allocations[0].capacity_bytes, 64);
+    assert_eq!(extension.views.len(), 2);
+    assert_eq!(extension.views[1].static_base, 4);
+    assert_eq!(extension.views[1].maximum_span, 8);
+    assert_eq!(extension.launch_bindings[0].handle, BufferId(1));
+    assert_eq!(extension.launch_bindings[0].binding.binding, 0);
+    assert_eq!(
+        extension.launch_bindings[0].runtime_source,
+        ExecutorPlanSource::Runtime(RuntimeSource::Position)
+    );
+    extension
+        .validate_for_kernel_count(program.kernels.len())
+        .expect("v2 plan remains valid after production");
+}
+
+#[test]
+fn overflowing_view_span_fails_before_v2_emission() {
+    let program = elementwise_device_program();
+    let mut facts = v2_facts_for_elementwise();
+    facts.views[0] = ViewFact {
+        allocation: BufferId(1),
+        logical_dims: vec![u64::MAX],
+        strides: vec![2],
+        static_base: 0,
+        maximum_span: u64::MAX,
+    };
+    let error = executor_plan_extension_v2(&program, &facts)
+        .expect_err("overflowing logical span must be rejected before emission");
+    assert!(
+        error.to_string().contains("overflows"),
+        "expected an overflow diagnostic, got {error}"
+    );
+}
+
+#[test]
+fn overflowing_launch_span_fails_before_v2_emission() {
+    let program = elementwise_device_program();
+    let mut facts = v2_facts_for_elementwise();
+    facts.launch_bindings[0].byte_offset = u64::MAX - 1;
+    facts.launch_bindings[0].view_span = 2;
+    let error = executor_plan_extension_v2(&program, &facts)
+        .expect_err("overflowing launch span must be rejected before emission");
+    assert!(
+        error.to_string().contains("overflows"),
+        "expected an overflow diagnostic, got {error}"
+    );
+}
+
+#[test]
+fn untagged_static_sources_do_not_claim_v2_runtime_bindings() {
+    let program = elementwise_device_program();
+    let mut facts = v2_facts_for_elementwise();
+    facts.launch_bindings[0].runtime_source = ExecutorPlanSource::constant(UniformType::U32, 7);
+    let error = executor_plan_extension_v2(&program, &facts)
+        .expect_err("a static-only binding set must stay on the v1 producer");
+    assert_eq!(error, ExecutorPlanV2Error::MissingRuntimeSource);
+}
