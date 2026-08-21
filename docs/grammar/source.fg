@@ -617,6 +617,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
 # | Objects | `ego` | self |
 # | Objects | `finge` | construct variant |
 # | Objects | `iuncta` | tuple type/constructor |
+# | Objects | `ratio` | named-field aggregate type/constructor |
 # | Objects | `praefixum` | prefix expression |
 # | Type | `copy` | copy ownership |
 # | Type | `de` | borrow / for-in keys |
@@ -912,7 +913,8 @@ type_annotation := owned_type ('∪' owned_type)*
 @formerly ownedType
 owned_type      := ('de' | 'in' | 'own' | 'copy')? base_type
 @formerly baseType
-base_type       := hole_type | function_type | width_type_sugar | qualified_type type_arguments? | '(' type_annotation ')'
+base_type       := hole_type | function_type | width_type_sugar | ratio_type | qualified_type type_arguments? | '(' type_annotation ')'
+ratio_type      := 'ratio' '<' labeled_type_argument (',' labeled_type_argument)* '>'
 @formerly holeType
 hole_type       := '_' | '∪'
 @formerly qualifiedType
