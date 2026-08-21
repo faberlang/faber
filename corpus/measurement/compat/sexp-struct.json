@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 227,
-    "analyzable": 288
+    "capable": 228,
+    "analyzable": 291
   },
   "terms": [
     {
@@ -511,7 +511,7 @@
       "term": "in",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 0
+      "analyzable": 1
     },
     {
       "term": "incipiet",
@@ -541,7 +541,7 @@
       "term": "instans",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 2
+      "analyzable": 3
     },
     {
       "term": "itera",
@@ -732,8 +732,8 @@
     {
       "term": "octeti",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "implendum",
