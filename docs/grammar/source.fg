@@ -920,7 +920,9 @@ qualified_type  := IDENTIFIER ('.' IDENTIFIER)*
 @formerly typeArguments
 type_arguments  := '<' type_argument (',' type_argument)* '>'
 @formerly typeArgument
-type_argument   := type_annotation | NATURAL | '[' figura_list? ']'
+type_argument   := labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
+@formerly labeledTypeArgument
+labeled_type_argument := IDENTIFIER ':' type_annotation
 @formerly widthTypeSugar
 width_type_sugar := WIDTH_MARKER | LISTA_WIDTH_SUGAR
                 | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix?
@@ -1089,7 +1091,9 @@ optional_suffix := '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')
 non_null_suffix := '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
 @formerly argumentList
 argument_list  := (argument (',' argument)*)?
-argument      := 'sparge'? expression
+argument      := template_argument | 'sparge'? expression
+@formerly templateArgument
+template_argument := 'sparge'? IDENTIFIER ':' expression
 
 literal := NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING
          | 'verum' | 'falsum' | 'nihil'
