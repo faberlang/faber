@@ -460,6 +460,25 @@ impl Parser {
         }
     }
 
+    /// Parse the type-argument list in an `iuncta` construction.
+    ///
+    /// Construction type arguments use the same labeled-element production as
+    /// declaration type positions. Keeping the label set local to the list
+    /// preserves the per-tuple uniqueness rule without changing erased type
+    /// identity.
+    pub(super) fn finish_iuncta_type_args_list(&mut self) -> Result<Vec<TypeExpr>, ParseError> {
+        let mut args = Vec::new();
+        let mut labels = HashSet::new();
+        loop {
+            args.push(self.parse_iuncta_type_argument(&mut labels)?);
+            if !self.eat(&TokenKind::Comma) {
+                break;
+            }
+        }
+        self.expect(&TokenKind::GtAscii, "expected '>'")?;
+        Ok(args)
+    }
+
     /// Parse one `iuncta` element, optionally preceded by its contextual label.
     ///
     /// The label rides `TypeExpr::iuncta_label` so later phases can build a

@@ -747,6 +747,38 @@ fn parses_iuncta_construction_with_two_elements() {
 }
 
 #[test]
+fn parses_labeled_iuncta_construction() {
+    let result = parse_ok(
+        r#"incipit { fixum _ pair ← iuncta<gx: textus, gw: numerus> ["salve", 42] }"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let radix_syntax::IfBody::Block(block) = &incipit.body else {
+        panic!("expected block body");
+    };
+    let StmtKind::Var(var) = &block.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Iuncta(iuncta) = &expr.kind else {
+        panic!("expected iuncta expression, got {:?}", expr.kind);
+    };
+    assert_eq!(iuncta.type_args.len(), 2);
+    let first_label = iuncta.type_args[0]
+        .iuncta_label
+        .as_ref()
+        .expect("first element label");
+    assert_eq!(result.interner.resolve(first_label.name), "gx");
+    let second_label = iuncta.type_args[1]
+        .iuncta_label
+        .as_ref()
+        .expect("second element label");
+    assert_eq!(result.interner.resolve(second_label.name), "gw");
+}
+
+#[test]
 fn parses_iuncta_construction_with_single_element() {
     let result = parse_ok(r#"incipit { fixum _ wrap ← iuncta<textus> ["solum"] }"#);
     let program = result.program.as_ref().expect("program");
