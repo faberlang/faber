@@ -1,0 +1,46 @@
++++
+term = "named-holes"
+kind = "existing-home"
+category = "template"
+canonical = true
+summary = "Named template holes, positional rendering, and forma capture."
+syntax = "\"§{label} …\"(label: value)"
+related = ["forma", "scriptum", "string", "textus", "§"]
+locale = "en"
++++
+
+# =============================================================================
+# named-holes — Named template holes and erased positional rendering.
+# =============================================================================
+#
+# What this teaches:
+#   • named-only template application: "§{greet} world"(greet: "Salve")
+#   • mixed named and anonymous STRING holes with positional actuals
+#   • forma capture with a labeled actual; the captured template is erased to §
+#   • named holes erase before rendering, so the output is ordinary text
+#
+# Reject teaching rows (comments only; these must not become stage-3 inputs):
+#   • ordinary-call label: f(greet: "x")
+#   • `=` form: "§ world"(greet = "x")
+#   • unknown label: "§{greet} world"(other: "x")
+#
+# See also: forma, scriptum, string, textus, §
+# =============================================================================
+
+main {
+    # A labeled actual fills the named hole.
+    const _ named ← "§{greet} world"(greet: "Salve")
+    print named
+
+    # A named and an anonymous hole share one positional sequence.
+    const _ mixed ← "§{greet} §"("Salve", "Mundus")
+    print mixed
+
+    # Named-hole erasure renders the same as the positional § form.
+    const _ erased ← "§{greet} world"("Salve")
+    print erased
+
+    # Forma capture accepts labels but stores only erased template text.
+    const _ captured ← `where id = §{id}`(id: "42")
+    print captured.template
+}
