@@ -837,7 +837,10 @@ fn validate_wire_kv_cache_semantic_v2(
             )));
         }
     }
-    if !semantic.query_head_count.is_multiple_of(semantic.kv_head_count) {
+    if !semantic
+        .query_head_count
+        .is_multiple_of(semantic.kv_head_count)
+    {
         return Err(session_invalid(format!(
             "KV semantic record declares query_head_count {} not divisible by kv_head_count {}; GQA requires an integral query-to-KV head ratio",
             semantic.query_head_count, semantic.kv_head_count
