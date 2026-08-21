@@ -1,6 +1,6 @@
 # GOAL: typed-error-union — `@ commune` shared variant fields + typed error identity
 
-**Status**: active — 4/9 units landed: TEU1 grammar+parser (`a5140f879`+`b258b80`), TEU2 semantic contract (`d6e869059`), TEU5 lean-B1 ruling (`6fb6897`), TEU3 emit primaries (`9f3ae1dce` — HIR commune_fields, Rust+TS payloads, MIR lowering + stepper; Mind re-verified 4/4 + 5/5 commune filters at the commit); TEU4 next; TEU7/8 gated on X1 defect-sprint
+**Status**: active — 5/9 units landed: TEU1 (`a5140f879`+`b258b80`), TEU2 (`d6e869059`), TEU3 (`9f3ae1dce`), TEU5 (`6fb6897`), TEU4 (`25919c4c6` — all eight tail leaves + fire-9 enumeration); TEU6 GATED on receiver-method MIR lowering (fd83825f — done-when requires gradus probas green); TEU7/8 gated on X1 defect-sprint; TEU9 closeout last
 **Created**: 2026-08-21
 **Campaign:** `—` (standalone; operator design session 2026-08-21)
 **Source:** [`docs/design/typed-error-union.md`](../../design/typed-error-union.md) (operator session decisions; 316 lines); Vivi task `c72f9481`; origin chain `be9013ce` → `0606c6d6` → `b0bb1fb8` → `640db2ff`
@@ -180,9 +180,9 @@ compiler unit; gradus `scripta/check-source`/`check-compile`; stages 4–6,
 | TEU1 | done | — | `a5140f879`+`b258b80` | grammar+parser |
 | TEU2 | done | — | `d6e869059` | semantic contract |
 | TEU3 | done | aa1bc13b | `9f3ae1dce` | emit primaries; HIR commune_fields + Rust/TS payloads + MIR stepper |
-| TEU4 | pending | — | — | emit tail |
+| TEU4 | done | 69eeb1c5 | `25919c4c6` | all 8 tail leaves + fire-9 enumeration (Mind: commit + scope verified; per-leaf filters in seat report) |
 | TEU5 | done | — | `6fb6897` | lean-B1 ruling recorded |
-| TEU6 | pending | — | — | clean break v1.2.2 |
+| TEU6 | pending | — | — | clean break v1.2.2; GATED on fd83825f (probas-green requirement) |
 | TEU7 | pending | — | — | blocked on X1 |
 | TEU8 | pending | — | — | blocked on X1 |
 | TEU9 | pending | — | — | closeout |
