@@ -386,6 +386,24 @@ impl TypeChecker<'_> {
                     .collect();
                 return self.types.tuple(elements);
             }
+            (Type::Record(from), Type::Record(to)) => {
+                if from.len() != to.len() {
+                    self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+                    return self.error_type;
+                }
+                let mut fields = Vec::with_capacity(from.len());
+                for (name, from_ty) in from {
+                    let Some(to_ty) = to.get(&name).copied() else {
+                        self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+                        return self.error_type;
+                    };
+                    fields.push((
+                        name,
+                        self.unify_with_policy(from_ty, to_ty, span, issue, policy),
+                    ));
+                }
+                return self.types.record(fields);
+            }
             (Type::Ref(ma, a), Type::Ref(mb, b)) if ma == mb => {
                 let inner = self.unify_with_policy(a, b, span, issue, policy);
                 return self.types.reference(ma, inner);

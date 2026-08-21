@@ -1,8 +1,8 @@
 //! Typecheck probes for exact-type equality (`≡`, `≠`, `est`, `non est`).
 
-use crate::SemanticErrorKind;
 use crate::semantic_message;
 use crate::test_support;
+use crate::SemanticErrorKind;
 
 const EXACT_EQ_ISSUE: &str = "equality_exact_types_required";
 

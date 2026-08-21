@@ -16,12 +16,12 @@ use radix_target::Target;
 use radix_hir::{DefId, HirItemKind, HirModule, HirStatementKind};
 
 use super::typecheck::{typecheck, TypeChecker};
+use crate::file_interface::{FileExport, FileExportKind, FileInterface, InterfaceStructExport};
+use crate::passes::visibility_annotation::VisibilityTier;
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::test_span;
 use crate::SemanticErrorKind;
 use crate::{Primitive, Resolver, Type, TypeTable};
-use crate::file_interface::{FileExport, FileExportKind, FileInterface, InterfaceStructExport};
-use crate::passes::visibility_annotation::VisibilityTier;
 use radix_hir::{HirCallArg, HirExpression, HirExpressionKind, HirLiteral, HirPattern};
 use radix_lexer::Span;
 use std::collections::BTreeMap;
