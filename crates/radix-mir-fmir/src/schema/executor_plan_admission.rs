@@ -1,10 +1,9 @@
 //! Focused admission for the KV-B executor-plan v2 payload.
 //!
-//! This helper is deliberately not wired into the shared device-section
-//! admission yet. A4V owns the outer section-version carrier and A5R owns the
-//! shared admission integration. Until then, this module proves the v2
-//! boundary in isolation: version skew fails before field interpretation,
-//! runtime sources are closed, and allocation/view arithmetic fails closed.
+//! Version skew fails before field interpretation, runtime sources are closed,
+//! unknown dtypes reject, and allocation/view arithmetic fails closed. A5R
+//! consumes the v2 helper at the session-section boundary. Legacy v1 static
+//! sections remain a separate carrier and never carry runtime facts.
 
 use super::executor_plan::{
     WireAllocationFact, WireExecutorPlanSource, WireExecutorPlanV2, WireRuntimeSource,
@@ -49,6 +48,11 @@ pub enum ExecutorPlanAdmissionError {
         /// Focused fact diagnostic.
         detail: String,
     },
+    /// An allocation dtype is outside the closed scalar surface.
+    UnknownDtype {
+        /// The unknown dtype spelling carried by the payload.
+        dtype: String,
+    },
 }
 
 impl fmt::Display for ExecutorPlanAdmissionError {
@@ -76,6 +80,9 @@ impl fmt::Display for ExecutorPlanAdmissionError {
             }
             Self::InvalidFact { detail } => {
                 write!(formatter, "invalid executor-plan fact: {detail}")
+            }
+            Self::UnknownDtype { dtype } => {
+                write!(formatter, "unknown executor-plan dtype `{dtype}`")
             }
         }
     }
@@ -159,6 +166,23 @@ pub fn admit_executor_plan_section_v2(
     )
 }
 
+/// Admit a previously serialized static executor-plan section.
+///
+/// Version 1 remains valid only for the static selection carrier. Runtime
+/// facts belong on the v2 payload; this carrier has no field that could hold
+/// them, so a v1 section cannot smuggle a cursor through admission.
+pub fn admit_legacy_static_executor_plan_section(
+    section: &super::device::FmirExecutorPlanSection,
+) -> Result<(), ExecutorPlanAdmissionError> {
+    if section.v != super::device::LEGACY_EXECUTOR_PLAN_SECTION_VERSION {
+        return Err(ExecutorPlanAdmissionError::UnsupportedSectionVersion {
+            actual: section.v,
+            expected: super::device::LEGACY_EXECUTOR_PLAN_SECTION_VERSION,
+        });
+    }
+    Ok(())
+}
+
 fn admit_allocations(
     facts: &[WireAllocationFact],
 ) -> Result<BTreeMap<u32, &WireAllocationFact>, ExecutorPlanAdmissionError> {
@@ -222,7 +246,7 @@ fn validate_view(
             detail: format!("allocation {} has an invalid view shape", view.allocation),
         });
     }
-    let dtype_width = dtype_width(&allocation.dtype);
+    let dtype_width = dtype_width(&allocation.dtype)?;
     let required_elements = checked_view_elements(&view.logical_dims, &view.strides)?;
     let required_span = required_elements.checked_mul(dtype_width).ok_or(
         ExecutorPlanAdmissionError::ArithmeticOverflow {
@@ -277,13 +301,13 @@ fn checked_view_elements(dims: &[u64], strides: &[u64]) -> Result<u64, ExecutorP
         })
 }
 
-fn dtype_width(dtype: &str) -> u64 {
+fn dtype_width(dtype: &str) -> Result<u64, ExecutorPlanAdmissionError> {
     match dtype {
-        "F16" => 2,
-        // The producer's closed scalar surface uses F32/U32/I32. Unknown
-        // future spellings are not guessed into a narrower width here; the
-        // shared semantic admission owns the dtype allowlist.
-        _ => 4,
+        "F16" => Ok(2),
+        "F32" | "U32" | "I32" => Ok(4),
+        other => Err(ExecutorPlanAdmissionError::UnknownDtype {
+            dtype: other.to_owned(),
+        }),
     }
 }
 
@@ -618,5 +642,37 @@ mod tests {
             },
         };
         assert_eq!(legacy.uniforms[0].bits, 7);
+        let section = crate::schema::device::FmirExecutorPlanSection {
+            v: crate::schema::device::LEGACY_EXECUTOR_PLAN_SECTION_VERSION,
+            plans: vec![legacy],
+        };
+        admit_legacy_static_executor_plan_section(&section)
+            .expect("a v1 static selection carrier still admits");
+    }
+
+    #[test]
+    fn v1_section_version_with_runtime_facts_fails_closed() {
+        let payload = payload();
+        assert!(matches!(
+            admit_executor_plan_section_v2_with_version(
+                crate::schema::device::LEGACY_EXECUTOR_PLAN_SECTION_VERSION,
+                &payload,
+                1
+            ),
+            Err(ExecutorPlanAdmissionError::UnsupportedSectionVersion {
+                actual: 1,
+                expected: 2
+            })
+        ));
+    }
+
+    #[test]
+    fn unknown_dtype_fails_closed() {
+        let mut payload = payload();
+        payload.allocations[0].dtype = "F64".to_owned();
+        assert!(matches!(
+            admit_executor_plan_v2(&payload, 1),
+            Err(ExecutorPlanAdmissionError::UnknownDtype { dtype }) if dtype == "F64"
+        ));
     }
 }

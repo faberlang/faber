@@ -112,19 +112,33 @@ pub struct FmirExecutorPlanSection {
 }
 
 impl FmirExecutorPlanSection {
-    /// Project the legacy target-neutral MIR executor section onto its v1
-    /// static wire mirror. This constructor intentionally does not upgrade a
-    /// static plan: v1 constants are never treated as runtime bindings.
+    /// Project the target-neutral MIR executor section onto the admitted
+    /// static wire mirror.
+    ///
+    /// Shared device-section admission requires [`EXECUTOR_PLAN_SECTION_VERSION`].
+    /// This producer stamps that version so a produced image does not fail its
+    /// own decode boundary. The payload remains the static selection records;
+    /// those constants are never treated as runtime cursor facts.
+    /// [`LEGACY_EXECUTOR_PLAN_SECTION_VERSION`] names previously serialized
+    /// static carriers only.
     #[must_use]
     pub fn from_executor_plan(plan: &radix_mir::ExecutorPlanExtension) -> Self {
         Self {
-            v: LEGACY_EXECUTOR_PLAN_SECTION_VERSION,
+            v: EXECUTOR_PLAN_SECTION_VERSION,
             plans: plan
                 .selections
                 .iter()
                 .map(WireExecutorPlan::from_mir)
                 .collect(),
         }
+    }
+
+    /// Return whether this carrier has the section version admitted on the
+    /// device-section path. A legacy v1 static image is a different carrier
+    /// and is not treated as a runtime-binding payload.
+    #[must_use]
+    pub const fn has_supported_version(&self) -> bool {
+        self.v == EXECUTOR_PLAN_SECTION_VERSION
     }
 }
 
@@ -152,11 +166,28 @@ impl FmirExecutorPlanSectionV2 {
     }
 
     /// Project the B2 producer payload onto the v2 section carrier.
+    ///
+    /// Version 2 is stamped only when a launch binding carries a tagged
+    /// runtime source. A purely static plan stays on
+    /// [`LEGACY_EXECUTOR_PLAN_SECTION_VERSION`] and must not claim the v2
+    /// ratchet.
     #[must_use]
     pub fn from_executor_plan(
         plan: &radix_mir::device_program_plans::ExecutorPlanExtensionV2,
     ) -> Self {
-        Self::from_runtime_bindings(WireExecutorPlanV2::from_mir(plan))
+        let v = if plan
+            .launch_bindings
+            .iter()
+            .any(|binding| binding.runtime_source.is_runtime())
+        {
+            EXECUTOR_PLAN_SECTION_VERSION
+        } else {
+            LEGACY_EXECUTOR_PLAN_SECTION_VERSION
+        };
+        Self {
+            v,
+            runtime_bindings: WireExecutorPlanV2::from_mir(plan),
+        }
     }
 
     /// Return whether this carrier has the exact v2 section version. A

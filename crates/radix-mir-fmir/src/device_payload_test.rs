@@ -14,11 +14,12 @@ use crate::codec::{
 };
 use crate::error::FmirImageError;
 use crate::schema::{
-    canonical_program_bytes, canonical_unpadded_base64, content_sha256, device_identity_hash,
-    packet_sha256_canonical, DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId,
-    FmirArtifactReflection, FmirBinaryImageFile, FmirDeviceArtifact, FmirDeviceArtifactsSection,
-    FmirDeviceBackend, FmirDeviceInput, FmirDeviceProgramSection, FmirDeviceSection,
-    FmirDeviceSelection, FmirDeviceSymbol, FmirExecutorPlanSection, FmirReflectedKernel,
+    admit_executor_plan_section_v2_with_version, canonical_program_bytes,
+    canonical_unpadded_base64, content_sha256, device_identity_hash, packet_sha256_canonical,
+    DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId, FmirArtifactReflection,
+    FmirBinaryImageFile, FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend,
+    FmirDeviceInput, FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection,
+    FmirDeviceSymbol, FmirExecutorPlanSection, FmirExecutorPlanSectionV2, FmirReflectedKernel,
     FmirReflectedResource, FmirTextCliRootSection, FmirTextCliSection, FmirTextImageFile,
     FmirTextProgramSection, FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
     FmirTextToolchainSection, FmirTextTypesSection, MaterializationStage, WireAxisReductionPlan,
@@ -33,7 +34,8 @@ use crate::schema::{
     WireReducedProjection, WireResourceAccess, WireResultBuffer, WireRmsNormalizationPlan,
     WireRopePlan, WireRowSoftmaxPlan, WireSemanticValue, WireSemanticValueOrigin,
     WireSsmConv1dPlan, WireSsmScanPlan, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
-    ARTIFACT_ABI_VERSION, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
+    ARTIFACT_ABI_VERSION, EXECUTOR_PLAN_SECTION_VERSION, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
+    LEGACY_EXECUTOR_PLAN_SECTION_VERSION, PACKAGE_MIR_ARTIFACT_VERSION,
     WIRE_DEVICE_PROGRAM_VERSION,
 };
 use radix_mir::MirProgram;
@@ -252,6 +254,137 @@ fn executor_plan_section_version_skew_fails_closed_before_field_admission() {
             actual: 3,
             expected: 2
         }
+    ));
+}
+
+fn static_executor_plan() -> radix_mir::ExecutorPlanExtension {
+    radix_mir::ExecutorPlanExtension {
+        abi_version: 1,
+        selections: vec![radix_mir::LibrarySelection {
+            kernel_index: 0,
+            library_entry: Some("addita".to_owned()),
+            logical_signature: radix_mir::LogicalSignature {
+                operation: "addita".to_owned(),
+                inputs: vec!["x".to_owned()],
+                outputs: vec!["y".to_owned()],
+            },
+            bind: radix_mir::BindDescriptor {
+                dims: vec![4],
+                strides: vec![1],
+                layout: radix_mir::BindLayout::Flat,
+                grid: radix_mir::MirKernelWorkgroupCount { x: 1, y: 1, z: 1 },
+            },
+            binds: Vec::new(),
+            uniforms: Vec::new(),
+            offsets: Vec::new(),
+            workspace: None,
+            backend_requirements: Vec::new(),
+            provenance: radix_mir::PlanProvenance {
+                pass: "device-program-plan".to_owned(),
+                revision: 1,
+                source_nodes: vec![0],
+            },
+        }],
+    }
+}
+
+fn runtime_executor_plan_v2() -> radix_mir::device_program_plans::ExecutorPlanExtensionV2 {
+    use radix_mir::device_program_plans::{
+        AllocationFact, ExecutorPlanExtensionV2, ExecutorPlanSource, LaunchBinding, RuntimeSource,
+        ViewFact, EXECUTOR_PLAN_RUNTIME_BIND_ABI_VERSION,
+    };
+    ExecutorPlanExtensionV2 {
+        abi_version: EXECUTOR_PLAN_RUNTIME_BIND_ABI_VERSION,
+        selections: static_executor_plan().selections,
+        allocations: vec![AllocationFact {
+            buffer: radix_mir::BufferIdentity {
+                id: radix_mir::BufferId(7),
+                name: "cache_k".to_owned(),
+                role: radix_mir::BufferRole::InOut,
+                storage: radix_mir::MirTensorStorageLayout::DeviceHandle,
+                lifetime: radix_mir::BufferLifetime::PerProgram,
+            },
+            dtype: radix_mir::UniformType::F32,
+            capacity_bytes: 4096,
+            lifetime: radix_mir::BufferLifetime::PerProgram,
+            initialization: radix_mir::device_semantics::InitializationPolicy::ZeroFill,
+        }],
+        views: vec![ViewFact {
+            allocation: radix_mir::BufferId(7),
+            logical_dims: vec![4],
+            strides: vec![1],
+            static_base: 0,
+            maximum_span: 16,
+        }],
+        launch_bindings: vec![LaunchBinding::new(
+            0,
+            radix_mir::BufferId(7),
+            radix_mir::Binding {
+                group: 0,
+                binding: 3,
+            },
+            0,
+            16,
+            ExecutorPlanSource::runtime(RuntimeSource::Position),
+        )],
+    }
+}
+
+#[test]
+fn producer_executor_plan_round_trips_through_binary_image() {
+    let mut section = sample_device_section();
+    let produced = FmirExecutorPlanSection::from_executor_plan(&static_executor_plan());
+    assert_eq!(produced.v, EXECUTOR_PLAN_SECTION_VERSION);
+    assert!(produced.has_supported_version());
+    section.executor_plan = Some(produced.clone());
+
+    let image = binary_image_with_device(Some(section));
+    let bytes = encode_binary_image(&image).expect("encode binary image");
+    let decoded = decode_binary_image(&bytes, TOOLCHAIN)
+        .expect("a produced executor-plan section must admit and decode");
+    let plan = decoded
+        .device
+        .expect("device section present")
+        .executor_plan
+        .expect("executor-plan section present");
+    assert_eq!(plan, produced);
+    assert_eq!(plan.v, EXECUTOR_PLAN_SECTION_VERSION);
+    assert_eq!(plan.plans[0].logical_signature.operation, "addita");
+}
+
+#[test]
+fn producer_runtime_bindings_admit_and_decode_at_v2() {
+    let produced = FmirExecutorPlanSectionV2::from_executor_plan(&runtime_executor_plan_v2());
+    assert_eq!(produced.v, EXECUTOR_PLAN_SECTION_VERSION);
+    assert!(produced.has_supported_version());
+
+    let bytes = postcard::to_allocvec(&produced).expect("v2 producer payload serializes");
+    let decoded: FmirExecutorPlanSectionV2 =
+        postcard::from_bytes(&bytes).expect("v2 producer payload decodes");
+    assert_eq!(decoded, produced);
+    admit_executor_plan_section_v2_with_version(decoded.v, &decoded.runtime_bindings, 1)
+        .expect("a produced v2 runtime-binding section admits");
+}
+
+#[test]
+fn producer_static_v2_plan_stays_on_legacy_version() {
+    let mut plan = runtime_executor_plan_v2();
+    plan.launch_bindings[0].runtime_source =
+        radix_mir::device_program_plans::ExecutorPlanSource::constant(
+            radix_mir::UniformType::U32,
+            7,
+        );
+    let produced = FmirExecutorPlanSectionV2::from_executor_plan(&plan);
+    assert_eq!(produced.v, LEGACY_EXECUTOR_PLAN_SECTION_VERSION);
+    assert!(!produced.has_supported_version());
+    assert!(matches!(
+        admit_executor_plan_section_v2_with_version(produced.v, &produced.runtime_bindings, 1),
+        Err(
+            crate::schema::ExecutorPlanAdmissionError::UnsupportedSectionVersion {
+                actual: 1,
+                expected: 2
+            }
+        )
     ));
 }
 
