@@ -4,7 +4,6 @@
 //! not attempt fixes, and does not parse `cista.toml`.
 
 use std::collections::BTreeSet;
-use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use crate::library::{
@@ -113,29 +112,24 @@ fn interface_root_for_faber_checkout(provider_repo: &Path) -> Option<PathBuf> {
 /// Render `key=value` lines. Empty optional values are omitted for `root`.
 pub(crate) fn render_doctor_report(report: &DoctorReport) -> String {
     let mut out = String::new();
-    let _ = writeln!(out, "cwd={}", report.cwd.display());
+    out.push_str(&format!("cwd={}\n", report.cwd.display()));
     match report.library_home.as_ref() {
-        Some(path) => {
-            let _ = writeln!(out, "library_home={}", path.display());
-        }
-        None => {
-            let _ = writeln!(out, "library_home=");
-        }
+        Some(path) => out.push_str(&format!("library_home={}\n", path.display())),
+        None => out.push_str("library_home=\n"),
     }
     let source = report
         .library_home_source
         .map(LibraryHomeSource::as_key)
         .unwrap_or("unset");
-    let _ = writeln!(out, "library_home_source={source}");
+    out.push_str(&format!("library_home_source={source}\n"));
     for row in &report.libraries {
-        let _ = writeln!(
-            out,
-            "library.{}.availability={}",
+        out.push_str(&format!(
+            "library.{}.availability={}\n",
             row.name, row.availability
-        );
-        let _ = writeln!(out, "library.{}.identity={}", row.name, row.identity);
+        ));
+        out.push_str(&format!("library.{}.identity={}\n", row.name, row.identity));
         if let Some(root) = row.root.as_ref() {
-            let _ = writeln!(out, "library.{}.root={}", row.name, root.display());
+            out.push_str(&format!("library.{}.root={}\n", row.name, root.display()));
         }
     }
     out

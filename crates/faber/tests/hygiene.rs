@@ -26,9 +26,9 @@ const BUDGETS: Budgets = Budgets {
     unreachable: 2,
     todo: 0,
     unimplemented: 0,
-    // WHY: deliberate discards in library resolution and diagnostic paths
-    // (io_buf, prefill_run) — pre-existing drift documented by the prior
-    // ratchet (expect 1→2, let_ 3→8→4 after 2026-08-19 burndown).
+    // WHY: four documented discards — unused device-runtime cfg tuple in
+    // mir/mod.rs, and three Drop best-effort cleanups in host_spawn.rs
+    // (kill, wait, workdir teardown).
     let_underscore: 4,
     inline_test_modules: 0,
     // WHY: one feature-gated ignored device-runtime probe remains in

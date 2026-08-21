@@ -6,7 +6,6 @@
 //! re-derive `LibraryProvider` from a manifest.
 
 use std::collections::BTreeMap;
-use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use radix_module::codegen::Target;
@@ -169,18 +168,15 @@ fn spec_for_root_rule(
 }
 
 pub(crate) fn render_checkout(checkout: &DevLibraryCheckout) -> String {
-    let mut out = String::new();
-    let _ = writeln!(out, "library_home={}", checkout.home.path.display());
-    let _ = writeln!(out, "library_home_source={}", checkout.home.source.as_key());
-    let _ = writeln!(out, "name={}", checkout.name);
-    let _ = writeln!(
-        out,
-        "identity={}",
-        specifier_identity(&checkout.name).as_key()
-    );
-    let _ = writeln!(out, "root={}", checkout.source_root.display());
-    let _ = writeln!(out, "root_rule={}", checkout.root_rule.as_key());
-    out
+    format!(
+        "library_home={}\nlibrary_home_source={}\nname={}\nidentity={}\nroot={}\nroot_rule={}\n",
+        checkout.home.path.display(),
+        checkout.home.source.as_key(),
+        checkout.name,
+        specifier_identity(&checkout.name).as_key(),
+        checkout.source_root.display(),
+        checkout.root_rule.as_key(),
+    )
 }
 
 fn check_target(provider_repo: &Path, root_rule: LibraryRootRule) -> Target {
