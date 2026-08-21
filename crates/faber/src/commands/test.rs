@@ -259,7 +259,7 @@ fn run_package(
 
 fn print_report(report: &ProbaReport, _nocapture: bool) {
     for result in &report.results {
-        let path = result.display_path();
+        let path = format!("{}::{}", result.unit_path.display(), result.display_path());
         match &result.outcome {
             CaseOutcome::Passed => {
                 println!("ok   {path}");

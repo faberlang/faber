@@ -88,6 +88,8 @@ pub enum CaseOutcome {
 /// Result for one inventoriable case in report order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CaseResult {
+    /// Source unit containing the case.
+    pub unit_path: PathBuf,
     pub name: String,
     pub suite_path: String,
     pub outcome: CaseOutcome,
@@ -313,8 +315,9 @@ pub fn run_proba_source(
 ) -> Result<ProbaReport, RunSourceError> {
     let mut analysis =
         analyze_prepared_program_name(session, name, source).map_err(RunSourceError::Frontend)?;
-    run_proba_on_analyzed(
+    run_proba_on_analyzed_with_unit_path(
         &mut analysis,
+        Path::new(name),
         selection,
         harness_filter,
         exact,
@@ -334,10 +337,29 @@ pub fn run_proba_on_analyzed(
     exact: bool,
     include_ignored: bool,
 ) -> Result<ProbaReport, RunSourceError> {
+    run_proba_on_analyzed_with_unit_path(
+        unit,
+        Path::new(""),
+        selection,
+        harness_filter,
+        exact,
+        include_ignored,
+    )
+}
+
+fn run_proba_on_analyzed_with_unit_path(
+    unit: &mut AnalyzedModule,
+    unit_path: &Path,
+    selection: &TestSelection,
+    harness_filter: Option<&str>,
+    exact: bool,
+    include_ignored: bool,
+) -> Result<ProbaReport, RunSourceError> {
     let cases = inventory_cases(&unit.hir, &unit.interner);
     let lowered = lower_analyzed_unit_with_context(unit).map_err(RunSourceError::Mir)?;
-    Ok(run_proba_on_validated(
+    Ok(run_proba_on_validated_with_unit_path(
         &lowered.validated,
+        unit_path,
         &cases,
         selection,
         harness_filter,
@@ -358,8 +380,29 @@ pub fn run_proba_on_validated(
     exact: bool,
     include_ignored: bool,
 ) -> ProbaReport {
+    run_proba_on_validated_with_unit_path(
+        validated,
+        Path::new(""),
+        cases,
+        selection,
+        harness_filter,
+        exact,
+        include_ignored,
+    )
+}
+
+fn run_proba_on_validated_with_unit_path(
+    validated: &ValidatedMir<'_>,
+    unit_path: &Path,
+    cases: &[ProbaCase],
+    selection: &TestSelection,
+    harness_filter: Option<&str>,
+    exact: bool,
+    include_ignored: bool,
+) -> ProbaReport {
     run_proba_cases(
         validated,
+        unit_path,
         cases,
         selection,
         harness_filter,
@@ -389,6 +432,7 @@ pub fn run_proba_on_validated_with_function_ids(
     let module_path = module_path.to_path_buf();
     run_proba_cases(
         validated,
+        &module_path,
         cases,
         selection,
         harness_filter,
@@ -404,6 +448,7 @@ pub fn run_proba_on_validated_with_function_ids(
 
 fn run_proba_cases(
     validated: &ValidatedMir<'_>,
+    unit_path: &Path,
     cases: &[ProbaCase],
     selection: &TestSelection,
     harness_filter: Option<&str>,
@@ -425,6 +470,7 @@ fn run_proba_cases(
             // not Cargo's “ignored suite”.
             if include_ignored {
                 results.push(CaseResult {
+                    unit_path: unit_path.to_path_buf(),
                     name: case.name.clone(),
                     suite_path: case.suite_path.clone(),
                     outcome: CaseOutcome::Skipped { reason },
@@ -435,6 +481,7 @@ fn run_proba_cases(
 
         if let Some(reason) = source_skip_reason(case) {
             results.push(CaseResult {
+                unit_path: unit_path.to_path_buf(),
                 name: case.name.clone(),
                 suite_path: case.suite_path.clone(),
                 outcome: CaseOutcome::Skipped { reason },
@@ -452,6 +499,7 @@ fn run_proba_cases(
             },
         };
         results.push(CaseResult {
+            unit_path: unit_path.to_path_buf(),
             name: case.name.clone(),
             suite_path: case.suite_path.clone(),
             outcome,

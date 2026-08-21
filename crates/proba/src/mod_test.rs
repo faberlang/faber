@@ -3,6 +3,7 @@
 use super::*;
 use radix::module::{Config, Session};
 use radix::program::analyze_prepared_program_name;
+use std::path::PathBuf;
 
 fn session() -> Session {
     Session::new(Config::default())
@@ -38,6 +39,34 @@ proba "one equals one" {
     assert!(report.success());
     assert_eq!(report.results[0].name, "one equals one");
     assert!(matches!(report.results[0].outcome, CaseOutcome::Passed));
+}
+
+#[test]
+fn report_attributes_case_to_source_unit() {
+    let report = run_proba_source(
+        &session(),
+        "rel/path.proba",
+        r#"
+probandum "suite" {
+    proba "name" {
+        adfirma 1 ≡ 1
+    }
+}
+"#,
+        &TestSelection::default(),
+        None,
+        false,
+        false,
+    )
+    .expect("run");
+
+    let case = &report.results[0];
+    assert_eq!(case.unit_path, PathBuf::from("rel/path.proba"));
+    assert_eq!(case.display_path(), "suite/name");
+    assert_eq!(
+        format!("{}::{}", case.unit_path.display(), case.display_path()),
+        "rel/path.proba::suite/name"
+    );
 }
 
 #[test]
