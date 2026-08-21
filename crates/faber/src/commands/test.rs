@@ -11,7 +11,7 @@ use proba::{
 };
 use radix_module::driver::{Config, Session};
 use radix_program::test_source_filter::TestSourceFilter;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 use std::time::Instant;
 
@@ -529,7 +529,7 @@ fn run_package_with_options(
                     &cases,
                     options,
                     focused,
-                    "unit failed to link/lower for runner proba execution",
+                    &unit_link_block_reason(&diagnostics),
                 );
                 let stop = report.results.iter().any(result_is_failure);
                 combined.results.extend(report.results);
@@ -630,7 +630,7 @@ fn run_package(
                             exact,
                             include_ignored,
                             focused,
-                            "unit failed to link/lower for runner proba execution",
+                            &unit_link_block_reason(&diagnostics),
                         )
                         .results,
                     );
@@ -1090,6 +1090,71 @@ fn print_report(
     }
 }
 
+/// Unit-link failure reason: name the blocking MIR gap from diagnostics when
+/// present, otherwise the generic link/lower fallback.
+fn unit_link_block_reason(diagnostics: &[radix_module::diagnostics::Diagnostic]) -> String {
+    blocking_gap_from_diagnostics(diagnostics)
+        .unwrap_or_else(|| "unit failed to link/lower for runner proba execution".to_owned())
+}
+
+fn blocking_gap_from_diagnostics(
+    diagnostics: &[radix_module::diagnostics::Diagnostic],
+) -> Option<String> {
+    diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.is_error())
+        .map(|diagnostic| diagnostic.message.as_str())
+        .find(|message| is_named_mir_gap(message))
+        .map(str::to_owned)
+}
+
+fn is_named_mir_gap(message: &str) -> bool {
+    message.contains("unsupported MIR lowering")
+        || message.contains("FaberScript unsupported:")
+        || message.contains("missing type information for MIR lowering")
+        || message.contains("invalid MIR:")
+}
+
+/// Stable MIR-gap identity for census grouping. Strips the unit-path suffix
+/// `blocked_unit_report*` appends and known diagnostic prefixes.
+fn blocking_gap(reason: &str) -> String {
+    classify_blocking_gap(strip_trailing_unit_path(reason))
+}
+
+fn strip_trailing_unit_path(reason: &str) -> &str {
+    if let Some(start) = reason.rfind(" (") {
+        if reason.ends_with(')') {
+            return reason[..start].trim();
+        }
+    }
+    reason.trim()
+}
+
+fn classify_blocking_gap(reason: &str) -> String {
+    if let Some(rest) = reason.strip_prefix("unsupported MIR lowering: ") {
+        return rest.trim().to_owned();
+    }
+    if let Some(rest) = reason.strip_prefix("MIR lowering failed: unsupported MIR lowering: ") {
+        return rest.trim().to_owned();
+    }
+    if let Some(rest) = reason.strip_prefix("invalid MIR: ") {
+        return rest.trim().to_owned();
+    }
+    if reason.starts_with("FaberScript unsupported:") {
+        return reason.trim().to_owned();
+    }
+    if reason.contains("missing type information for MIR lowering") {
+        return "missing type information for MIR lowering".to_owned();
+    }
+    if reason.contains("no lowered MIR function") {
+        return "no lowered MIR function".to_owned();
+    }
+    if reason.contains("unit failed to link/lower") {
+        return "unit failed to link/lower".to_owned();
+    }
+    reason.trim().to_owned()
+}
+
 fn json_report_value(
     report: &ProbaReport,
     metadata: &RunMetadata,
@@ -1099,20 +1164,23 @@ fn json_report_value(
         .results
         .iter()
         .map(|result| {
-            let outcome = match &result.outcome {
-                CaseOutcome::Passed => ("passed", None),
-                CaseOutcome::Failed { message } => ("failed", Some(message.as_str())),
-                CaseOutcome::Blocked { reason } => ("blocked", Some(reason.as_str())),
-                CaseOutcome::Skipped { reason } => ("skipped", Some(reason.as_str())),
+            let (status, reason, gap) = match &result.outcome {
+                CaseOutcome::Passed => ("passed", None, None),
+                CaseOutcome::Failed { message } => ("failed", Some(message.as_str()), None),
+                CaseOutcome::Blocked { reason } => {
+                    ("blocked", Some(reason.as_str()), Some(blocking_gap(reason)))
+                }
+                CaseOutcome::Skipped { reason } => ("skipped", Some(reason.as_str()), None),
             };
             serde_json::json!({
                 "path": result_key(result),
                 "unit": result.unit_path,
                 "name": result.name,
                 "suite": result.suite_path,
-                "status": if list { "listed" } else { outcome.0 },
+                "status": if list { "listed" } else { status },
                 "duration_ms": metadata.durations_ms.get(&result_key(result)).copied().unwrap_or(0),
-                "reason": outcome.1,
+                "reason": reason,
+                "gap": if list { None } else { gap },
             })
         })
         .collect();
@@ -1123,6 +1191,59 @@ fn json_report_value(
         "blocked": report.blocked(),
         "skipped": report.skipped(),
         "cases": cases,
+        "census": json_census_value(report, list),
+    })
+}
+
+fn json_census_value(report: &ProbaReport, list: bool) -> serde_json::Value {
+    if list {
+        return serde_json::json!({
+            "blocked": [],
+            "gaps": [],
+        });
+    }
+    let blocked: Vec<_> = report
+        .results
+        .iter()
+        .filter_map(|result| match &result.outcome {
+            CaseOutcome::Blocked { reason } => Some(serde_json::json!({
+                "path": result_key(result),
+                "unit": result.unit_path,
+                "name": result.name,
+                "suite": result.suite_path,
+                "gap": blocking_gap(reason),
+                "reason": reason,
+            })),
+            _ => None,
+        })
+        .collect();
+    let mut grouped: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for item in &blocked {
+        let Some(gap) = item.get("gap").and_then(serde_json::Value::as_str) else {
+            continue;
+        };
+        let Some(path) = item.get("path").and_then(serde_json::Value::as_str) else {
+            continue;
+        };
+        grouped
+            .entry(gap.to_owned())
+            .or_default()
+            .push(path.to_owned());
+    }
+    let gaps: Vec<_> = grouped
+        .into_iter()
+        .map(|(gap, mut cases)| {
+            cases.sort();
+            serde_json::json!({
+                "gap": gap,
+                "count": cases.len(),
+                "cases": cases,
+            })
+        })
+        .collect();
+    serde_json::json!({
+        "blocked": blocked,
+        "gaps": gaps,
     })
 }
 
@@ -1215,4 +1336,4 @@ mod tests;
 
 #[cfg(test)]
 #[path = "test_selection_test.rs"]
-mod selection_tests;
+mod test_selection_tests;

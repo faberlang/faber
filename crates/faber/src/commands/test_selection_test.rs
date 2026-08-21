@@ -98,6 +98,112 @@ fn list_report_does_not_execute_and_json_contains_duration() {
     let json = json_report_value(&report, &metadata, true);
     assert_eq!(json["cases"][0]["status"], "listed");
     assert_eq!(json["cases"][0]["duration_ms"], 17);
+    assert!(json["cases"][0]["gap"].is_null());
+    assert!(json["census"]["blocked"].as_array().unwrap().is_empty());
+    assert!(json["census"]["gaps"].as_array().unwrap().is_empty());
+}
+
+fn blocked_result(unit: &str, name: &str, suite: &str, reason: &str) -> CaseResult {
+    CaseResult {
+        unit_path: unit.into(),
+        name: name.to_owned(),
+        suite_path: suite.to_owned(),
+        outcome: CaseOutcome::Blocked {
+            reason: reason.to_owned(),
+        },
+        stdout: Vec::new(),
+        stderr: Vec::new(),
+    }
+}
+
+#[test]
+fn json_census_names_every_blocked_case_with_its_mir_gap() {
+    let passed = CaseResult {
+        outcome: CaseOutcome::Passed,
+        ..blocked_result("src/math.proba", "ok", "math", "")
+    };
+    let method = blocked_result(
+        "src/math.proba",
+        "adds",
+        "math",
+        "unsupported MIR lowering: method call before runtime/provider MIR lowering (src/math.proba)",
+    );
+    let projection = blocked_result(
+        "src/math.proba",
+        "dot",
+        "math",
+        "unsupported MIR lowering: projection base that does not resolve to a local value (src/math.proba)",
+    );
+    let method_again = blocked_result(
+        "src/vec.proba",
+        "norm",
+        "",
+        "unsupported MIR lowering: method call before runtime/provider MIR lowering (src/vec.proba)",
+    );
+    let report = ProbaReport {
+        results: vec![passed, method, projection, method_again],
+    };
+    let json = json_report_value(&report, &RunMetadata::default(), false);
+
+    assert!(json["cases"][0]["gap"].is_null());
+    assert_eq!(
+        json["cases"][1]["gap"],
+        "method call before runtime/provider MIR lowering"
+    );
+    assert_eq!(
+        json["cases"][2]["gap"],
+        "projection base that does not resolve to a local value"
+    );
+    assert_eq!(json["census"]["blocked"].as_array().unwrap().len(), 3);
+    assert_eq!(json["census"]["blocked"][0]["name"], "adds");
+    assert_eq!(
+        json["census"]["blocked"][0]["gap"],
+        "method call before runtime/provider MIR lowering"
+    );
+
+    let gaps = json["census"]["gaps"].as_array().unwrap();
+    assert_eq!(gaps.len(), 2);
+    let method_gap = gaps
+        .iter()
+        .find(|gap| gap["gap"] == "method call before runtime/provider MIR lowering")
+        .expect("method-call gap");
+    assert_eq!(method_gap["count"], 2);
+    assert_eq!(method_gap["cases"].as_array().unwrap().len(), 2);
+    let projection_gap = gaps
+        .iter()
+        .find(|gap| gap["gap"] == "projection base that does not resolve to a local value")
+        .expect("projection gap");
+    assert_eq!(projection_gap["count"], 1);
+}
+
+#[test]
+fn blocking_gap_strips_prefixes_and_unit_path_suffix() {
+    assert_eq!(
+        blocking_gap(
+            "unsupported MIR lowering: itera ex over tabula before map value iteration MIR lowering (src/t.proba)"
+        ),
+        "itera ex over tabula before map value iteration MIR lowering"
+    );
+    assert_eq!(
+        blocking_gap("FaberScript unsupported: provider package:./mathesis::mathesis::PI"),
+        "FaberScript unsupported: provider package:./mathesis::mathesis::PI"
+    );
+    assert_eq!(
+        blocking_gap("missing type information for MIR lowering"),
+        "missing type information for MIR lowering"
+    );
+    assert_eq!(
+        blocking_gap("proba case \"x\" has no lowered MIR function (def #3)"),
+        "no lowered MIR function"
+    );
+    assert_eq!(
+        blocking_gap("unit failed to link/lower for runner proba execution (src/bad.proba)"),
+        "unit failed to link/lower"
+    );
+    assert_eq!(
+        blocking_gap("invalid MIR: named aggregate field type mismatch (src/material.proba)"),
+        "named aggregate field type mismatch"
+    );
 }
 
 #[test]

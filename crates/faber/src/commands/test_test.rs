@@ -392,6 +392,24 @@ targets = ["rust"]
     assert!(report.results.iter().any(|result| {
         result.name == "blocked" && matches!(result.outcome, proba::CaseOutcome::Blocked { .. })
     }));
+    let blocked = report
+        .results
+        .iter()
+        .find(|result| result.name == "blocked")
+        .expect("blocked case");
+    let proba::CaseOutcome::Blocked { reason } = &blocked.outcome else {
+        panic!("expected blocked outcome: {blocked:?}");
+    };
+    let gap = super::blocking_gap(reason);
+    assert_ne!(
+        gap, "unit failed to link/lower",
+        "unit-link block must name the MIR gap, not the generic fallback: {reason}"
+    );
+    let json = super::json_report_value(&report, &super::RunMetadata::default(), false);
+    assert_eq!(json["census"]["blocked"].as_array().unwrap().len(), 1);
+    assert_eq!(json["census"]["blocked"][0]["name"], "blocked");
+    assert_eq!(json["census"]["blocked"][0]["gap"], gap);
+    assert!(!json["census"]["gaps"].as_array().unwrap().is_empty());
 }
 
 #[test]
@@ -416,5 +434,22 @@ fn cmd_test_applies_empty_run_law_and_does_not_widen_unmatched_include() {
     assert!(
         production.contains("report.results.is_empty()"),
         "cmd_test must fail closed on zero selected cases"
+    );
+}
+
+#[test]
+fn cmd_test_json_report_emits_blocked_census() {
+    let source = include_str!("test.rs");
+    let production = source
+        .split("#[cfg(test)]")
+        .next()
+        .expect("production source");
+    assert!(
+        production.contains("json_census_value"),
+        "JSON report must include a blocked census worklist"
+    );
+    assert!(
+        production.contains("blocking_gap"),
+        "JSON blocked cases must name the blocking MIR gap"
     );
 }
