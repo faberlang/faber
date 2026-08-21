@@ -1,0 +1,77 @@
++++
+term = "iuncta"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Labeled iuncta elements: type args, construction, member access, objectPattern, and holes."
+syntax = "tuple<gx: A, B>"
+related = ["lista", "ceteri", "∪"]
+locale = "en"
++++
+
+# =============================================================================
+# iuncta — Labeled tuple elements (identity-erased alias layer).
+# =============================================================================
+#
+# What this teaches:
+#   • labeled type args: tuple<gx: string, gw: int>
+#   • mixed labeled/unlabeled: tuple<gx: string, int>
+#   • labeled construction: tuple<gx: string, gw: int> ["salve", 42]
+#   • by-label member access: pair.gx (same as pair[0])
+#   • objectPattern destructuring: const {gx, gw} ← pair
+#   • partial + rest: const {loss, rest leftover} ← metrics
+#   • element holes: tuple<f32, _> solved from the construction witness
+#   • binary cup element: tuple<f32, string ∪ null>
+#
+# Reject teaching rows (comments only; these must not become stage-3 inputs):
+#   • ∪ element slot: tuple<f32, ∪>
+#   • mixed positional/label pattern: const [gx, {gw}] ← pair
+#   • .0 positional member: pair.0
+#   • unknown label: pair.other
+#   • by-label on an unlabeled tuple: const {gx} ← unlabeled
+#   • duplicate labels: tuple<gx: f32, gx: int>
+#   • call-site labels: f<gx: T>(x)
+#
+# See also: lista, ceteri, ∪
+# =============================================================================
+
+main {
+    # Labeled type args, labeled construction, and by-label member access.
+    const tuple<gx: string, gw: int> pair ← tuple<gx: string, gw: int> ["salve", 42]
+    print pair.gx
+    print pair.gw
+    print pair[0]
+
+    # Mixed labeled/unlabeled type args; unlabeled slots stay positional.
+    const tuple<gx: string, int> mixed ← tuple<gx: string, int> ["mundus", 7]
+    print mixed.gx
+    print mixed[1]
+
+    # Element hole solved from the construction witness.
+    const tuple<f32, _> hole ← tuple<f32, int> [1.0, 2]
+    print hole[1]
+
+    # Labels compose with holes.
+    const tuple<loss: _, int> labeled_hole ← tuple<f32, int> [1.0, 3]
+    print labeled_hole.loss
+    print labeled_hole[1]
+
+    # A wanted union element is a binary cup, not ∪ in the slot.
+    const tuple<f32, string ∪ null> cup ← tuple<f32, string ∪ null> [1.0, "x"]
+    print cup[1]
+
+    # objectPattern binds by label.
+    const {gx, gw} ← pair
+    print gx
+    print gw
+
+    # Partial by-label binding; rest is the unbound sub-tuple.
+    const tuple<loss: f32, steps: int> metrics ← tuple<loss: f32, steps: int> [1.0, 4]
+    const {loss, rest leftover} ← metrics
+    print loss
+    print leftover[0]
+
+    # Labels are identity-erased: labeled and unlabeled forms assign.
+    const tuple<string, int> plain ← pair
+    print plain[1]
+}
