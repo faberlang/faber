@@ -1,8 +1,8 @@
 # Faber grammar source — EBNF.md transcription with GSD-4 repairs.
-# @grammar 1. No renames. Orphans joined; lexicon pinned; keyword table derived.
+# @grammar 2. ID-spine rename pass: snake_case, Latin introducers, and aliases.
 
-@grammar 1
-@start fabFile
+@grammar 2
+@start fab_file
 
 @glyphs
 # GSD-2 glyph/glossary registry.
@@ -47,252 +47,252 @@ glyph = "!"
 codepoint = "U+0021"
 unicode_name = "EXCLAMATION MARK"
 role = "access"
-claiming_slots = ["nonNullSuffix"]
+claiming_slots = ["non_null_suffix"]
 
 [[glyphs]]
 glyph = "%"
 codepoint = "U+0025"
 unicode_name = "PERCENT SIGN"
 role = "arithmetic"
-claiming_slots = ["multiplicative"]
+claiming_slots = ["multiplicative_expr"]
 
 [[glyphs]]
 glyph = "+"
 codepoint = "U+002B"
 unicode_name = "PLUS SIGN"
 role = "arithmetic"
-claiming_slots = ["additive"]
+claiming_slots = ["additive_expr"]
 
 [[glyphs]]
 glyph = "-"
 codepoint = "U+002D"
 unicode_name = "HYPHEN-MINUS"
 role = "arithmetic"
-claiming_slots = ["additive", "enumMember", "unary"]
+claiming_slots = ["additive_expr", "enum_member", "unary_expr"]
 
 [[glyphs]]
 glyph = "."
 codepoint = "U+002E"
 unicode_name = "FULL STOP"
 role = "access"
-claiming_slots = ["memberSuffix", "nonNullSuffix", "optionalSuffix", "qualifiedIdent", "qualifiedType"]
+claiming_slots = ["member_suffix", "non_null_suffix", "optional_suffix", "qualified_ident", "qualified_type"]
 
 [[glyphs]]
 glyph = "/"
 codepoint = "U+002F"
 unicode_name = "SOLIDUS"
 role = "arithmetic"
-claiming_slots = ["multiplicative"]
+claiming_slots = ["multiplicative_expr"]
 
 [[glyphs]]
 glyph = ":"
 codepoint = "U+003A"
 unicode_name = "COLON"
 role = "conditional"
-claiming_slots = ["jsonMember", "legacyClausuraExpr", "ternary"]
+claiming_slots = ["json_member", "clausura_legacy_expr", "ternary"]
 
 [[glyphs]]
 glyph = "<"
 codepoint = "U+003C"
 unicode_name = "LESS-THAN SIGN"
 role = "generic"
-claiming_slots = ["callTypeArgs", "genericParams", "typeArguments"]
+claiming_slots = ["call_type_args", "generic_params", "type_arguments"]
 
 [[glyphs]]
 glyph = "="
 codepoint = "U+003D"
 unicode_name = "EQUALS SIGN"
 role = "assignment"
-claiming_slots = ["annotationField", "enumMember", "fieldDecl", "fieldInit", "importAliasField", "importNameField", "importSourceField", "importVisibilityField", "importWildcardField", "nucleumField", "typeAliasDecl"]
+claiming_slots = ["annotation_field", "enum_member", "field_decl", "field_init", "ut_field", "nomen_field", "ex_field", "visibilitas_field", "omnia_field", "nucleum_field", "typus_decl"]
 
 [[glyphs]]
 glyph = ">"
 codepoint = "U+003E"
 unicode_name = "GREATER-THAN SIGN"
 role = "generic"
-claiming_slots = ["callTypeArgs", "genericParams", "typeArguments"]
+claiming_slots = ["call_type_args", "generic_params", "type_arguments"]
 
 [[glyphs]]
 glyph = "?"
 codepoint = "U+003F"
 unicode_name = "QUESTION MARK"
 role = "conditional"
-claiming_slots = ["optionalSuffix", "ternary"]
+claiming_slots = ["optional_suffix", "ternary"]
 
 [[glyphs]]
 glyph = "@"
 codepoint = "U+0040"
 unicode_name = "COMMERCIAL AT"
 role = "annotation"
-claiming_slots = ["annotationSugar", "bracedAnnotation", "nucleumBraced", "nucleumSugar"]
+claiming_slots = ["annotation_sugar", "braced_annotation", "nucleum_braced", "nucleum_sugar"]
 
 [[glyphs]]
 glyph = "¬"
 codepoint = "U+00AC"
 unicode_name = "NOT SIGN"
 role = "unary"
-claiming_slots = ["unary"]
+claiming_slots = ["unary_expr"]
 
 [[glyphs]]
 glyph = "·"
 codepoint = "U+00B7"
 unicode_name = "MIDDLE DOT"
 role = "tensor_product"
-claiming_slots = ["multiplicative"]
+claiming_slots = ["multiplicative_expr"]
 
 [[glyphs]]
 glyph = "×"
 codepoint = "U+00D7"
 unicode_name = "MULTIPLICATION SIGN"
 role = "tensor_product"
-claiming_slots = ["multiplicative"]
+claiming_slots = ["multiplicative_expr"]
 
 [[glyphs]]
 glyph = "‥"
 codepoint = "U+2025"
 unicode_name = "TWO DOT LEADER"
 role = "range"
-claiming_slots = ["rangeTail", "velRangeTail"]
+claiming_slots = ["range_tail", "vel_range_tail"]
 
 [[glyphs]]
 glyph = "…"
 codepoint = "U+2026"
 unicode_name = "HORIZONTAL ELLIPSIS"
 role = "range"
-claiming_slots = ["rangeTail", "velRangeTail"]
+claiming_slots = ["range_tail", "vel_range_tail"]
 
 [[glyphs]]
 glyph = "←"
 codepoint = "U+2190"
 unicode_name = "LEFTWARDS ARROW"
 role = "assignment"
-claiming_slots = ["arrayDestruct", "assignment", "awaitVarDecl", "objectDestruct", "sitDecl", "varDecl"]
+claiming_slots = ["array_destruct", "assignment", "figendum_decl", "object_destruct", "sit_decl", "fixum_decl"]
 
 [[glyphs]]
 glyph = "↑"
 codepoint = "U+2191"
 unicode_name = "UPWARDS ARROW"
 role = "increment"
-claiming_slots = ["incDecStmt"]
+claiming_slots = ["inc_dec_stmt"]
 
 [[glyphs]]
 glyph = "→"
 codepoint = "U+2192"
 unicode_name = "RIGHTWARDS ARROW"
 role = "return_type"
-claiming_slots = ["functionType", "legacyClausuraExpr", "returnClause"]
+claiming_slots = ["function_type", "clausura_legacy_expr", "return_clause"]
 
 [[glyphs]]
 glyph = "↓"
 codepoint = "U+2193"
 unicode_name = "DOWNWARDS ARROW"
 role = "increment"
-claiming_slots = ["incDecStmt"]
+claiming_slots = ["inc_dec_stmt"]
 
 [[glyphs]]
 glyph = "↤"
 codepoint = "U+21A4"
 unicode_name = "LEFTWARDS ARROW FROM BAR"
 role = "assignment"
-claiming_slots = ["assignment", "varDecl"]
+claiming_slots = ["assignment", "fixum_decl"]
 
 [[glyphs]]
 glyph = "↦"
 codepoint = "U+21A6"
 unicode_name = "RIGHTWARDS ARROW FROM BAR"
 role = "conversion"
-claiming_slots = ["conversio"]
+claiming_slots = ["conversio_expr"]
 
 [[glyphs]]
 glyph = "⇐"
 codepoint = "U+21D0"
 unicode_name = "LEFTWARDS DOUBLE ARROW"
 role = "shift"
-claiming_slots = ["shift"]
+claiming_slots = ["shift_expr"]
 
 [[glyphs]]
 glyph = "⇒"
 codepoint = "U+21D2"
 unicode_name = "RIGHTWARDS DOUBLE ARROW"
 role = "shift"
-claiming_slots = ["shift"]
+claiming_slots = ["shift_expr"]
 
 [[glyphs]]
 glyph = "⇥"
 codepoint = "U+21E5"
 unicode_name = "RIGHTWARDS ARROW TO BAR"
 role = "alternate_exit"
-claiming_slots = ["alternateExitClause", "inlineRecovery"]
+claiming_slots = ["alternate_exit_clause", "inline_recovery"]
 
 [[glyphs]]
 glyph = "∇"
 codepoint = "U+2207"
 unicode_name = "NABLA"
 role = "gradient"
-claiming_slots = ["gradientExpr"]
+claiming_slots = ["gradient_expr"]
 
 [[glyphs]]
 glyph = "∧"
 codepoint = "U+2227"
 unicode_name = "LOGICAL AND"
 role = "bitwise"
-claiming_slots = ["bitwiseAnd"]
+claiming_slots = ["bitwise_and_expr"]
 
 [[glyphs]]
 glyph = "∨"
 codepoint = "U+2228"
 unicode_name = "LOGICAL OR"
 role = "bitwise"
-claiming_slots = ["bitwiseOr"]
+claiming_slots = ["bitwise_or_expr"]
 
 [[glyphs]]
 glyph = "∪"
 codepoint = "U+222A"
 unicode_name = "UNION"
 role = "type_union"
-claiming_slots = ["holeType", "typeAnnotation"]
+claiming_slots = ["hole_type", "type_annotation"]
 
 [[glyphs]]
 glyph = "∴"
 codepoint = "U+2234"
 unicode_name = "THEREFORE"
 role = "closure_joint"
-claiming_slots = ["clausuraJoint"]
+claiming_slots = ["clausura_joint"]
 
 [[glyphs]]
 glyph = "∷"
 codepoint = "U+2237"
 unicode_name = "PROPORTION"
 role = "type_ascription"
-claiming_slots = ["cast", "fingeExpr"]
+claiming_slots = ["cast_expr", "finge_expr"]
 
 [[glyphs]]
 glyph = "≈"
 codepoint = "U+2248"
 unicode_name = "ALMOST EQUAL TO"
 role = "equality"
-claiming_slots = ["equalityTail"]
+claiming_slots = ["equality_tail"]
 
 [[glyphs]]
 glyph = "≉"
 codepoint = "U+2249"
 unicode_name = "NOT ALMOST EQUAL TO"
 role = "equality"
-claiming_slots = ["equalityTail"]
+claiming_slots = ["equality_tail"]
 
 [[glyphs]]
 glyph = "≠"
 codepoint = "U+2260"
 unicode_name = "NOT EQUAL TO"
 role = "equality"
-claiming_slots = ["equalityTail"]
+claiming_slots = ["equality_tail"]
 
 [[glyphs]]
 glyph = "≡"
 codepoint = "U+2261"
 unicode_name = "IDENTICAL TO"
 role = "equality"
-claiming_slots = ["equalityTail"]
+claiming_slots = ["equality_tail"]
 
 [[glyphs]]
 glyph = "≤"
@@ -327,21 +327,21 @@ glyph = "⊗"
 codepoint = "U+2297"
 unicode_name = "CIRCLED TIMES"
 role = "tensor_product"
-claiming_slots = ["multiplicative"]
+claiming_slots = ["multiplicative_expr"]
 
 [[glyphs]]
 glyph = "⊙"
 codepoint = "U+2299"
 unicode_name = "CIRCLED DOT OPERATOR"
 role = "tensor_product"
-claiming_slots = ["multiplicative"]
+claiming_slots = ["multiplicative_expr"]
 
 [[glyphs]]
 glyph = "⊻"
 codepoint = "U+22BB"
 unicode_name = "XOR"
 role = "bitwise"
-claiming_slots = ["bitwiseXor"]
+claiming_slots = ["bitwise_xor_expr"]
 
 [[glyphs]]
 glyph = "§"
@@ -755,257 +755,426 @@ NON_NEWLINE_TOKEN ::=
 NO_NEWLINE ::=
 @rewrite
 
-fabFile       := frontmatter? program
+@formerly fabFile
+fab_file       := frontmatter? program
 frontmatter   := FRONTMATTER_DELIMITER NEWLINE TOML_LINES FRONTMATTER_DELIMITER NEWLINE?
 program       := statement*
-statement     := annotation* statementCore
-statementCore := importDecl | bindingDecl | funcDecl | genusDecl | implendumDecl
-               | typeAliasDecl | enumDecl | discretioDecl
-               | ifStmt | whileStmt | iteraStmt
-               | eligeStmt | discerneStmt | guardStmt | curaStmt | facBlockStmt
-               | returnStmt | returnAwaitStmt | awaitDiscardStmt | yieldStmt
-               | breakStmt | continueStmt | noopStmt | throwStmt
-               | assertStmt | requiritStmt | outputStmt | incipitStmt | incipietStmt
-               | extractStmt | probandumDecl | probaStmt | blockStmt
-               | incDecStmt | exprStmt
-bindingDecl   := varDecl | sitDecl | arrayDestruct | objectDestruct | awaitVarDecl
-exprStmt      := expression
-blockStmt     := '{' statement* '}'
+statement     := annotation* statement_core
+@formerly statementCore
+statement_core := importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl
+               | typus_decl | ordo_decl | discretio_decl
+               | si_stmt | dum_stmt | itera_stmt
+               | elige_stmt | discerne_stmt | custodi_stmt | cura_stmt | fac_stmt
+               | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt
+               | rumpe_stmt | perge_stmt | tacet_stmt | iace_stmt
+               | adfirma_stmt | requirit_stmt | nota_stmt | incipit_stmt | incipiet_stmt
+               | ex_stmt | probandum_decl | proba_stmt | block_stmt
+               | inc_dec_stmt | expr_stmt
+@formerly bindingDecl
+binding_decl   := fixum_decl | sit_decl | array_destruct | object_destruct | figendum_decl
+@formerly exprStmt
+expr_stmt      := expression
+@formerly blockStmt
+block_stmt     := '{' statement* '}'
 
-varDecl      := ('fixum' | 'varia') typeAnnotation IDENTIFIER (('←' expression) | ('↤' assignment inlineRecovery?))?
-awaitVarDecl := ('figendum' | 'variandum') typeAnnotation IDENTIFIER '←' expression
-sitDecl      := 'sit' IDENTIFIER ('←' expression)?
-arrayDestruct := ('fixum' | 'varia') arrayPattern '←' expression
-objectDestruct := ('fixum' | 'varia') objectPattern '←' expression
+@formerly varDecl
+fixum_decl      := ('fixum' | 'varia') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?))?
+@formerly awaitVarDecl
+figendum_decl := ('figendum' | 'variandum') type_annotation IDENTIFIER '←' expression
+@formerly sitDecl
+sit_decl      := 'sit' IDENTIFIER ('←' expression)?
+@formerly arrayDestruct
+array_destruct := ('fixum' | 'varia') array_pattern '←' expression
+@formerly objectDestruct
+object_destruct := ('fixum' | 'varia') object_pattern '←' expression
 
-funcDecl     := 'functio' IDENTIFIER genericParams? '(' paramList ')' funcModifier* callablePosture? returnClause? alternateExitClause? blockStmt
-paramList    := (parameter (',' parameter)*)?
-genericParams := '<' genericParam (',' genericParam)* '>'
-genericParam  := IDENTIFIER | 'magnitudo' IDENTIFIER
-callTypeArgs  := '<' typeAnnotation (',' typeAnnotation)* '>'
-parameter    := 'ceteri'? typeAnnotation IDENTIFIER 'sponte'? ('ut' IDENTIFIER)? ('vel' expression)?
-funcModifier := 'argumenta' IDENTIFIER | 'curata' IDENTIFIER ('ut' IDENTIFIER)? | 'errata' IDENTIFIER | 'exitus' (IDENTIFIER | NUMBER) | 'immutata' | 'iacit' | 'optiones' IDENTIFIER
-callablePosture := 'fiet' | 'fiunt' | 'fient'
-returnClause := '→' typeAnnotation
-alternateExitClause := '⇥' typeAnnotation
-stmtBodyJoint  := 'ergo'
-clausuraJoint  := '∴'
-clausuraExpr   := compactClausuraExpr | legacyClausuraExpr
-compactClausuraExpr := clausuraSignature clausuraJoint (expression | closureFacBlock)
-clausuraSignature := (clausuraParam | '(' clausuraParams? ')') returnClause? alternateExitClause?
-closureFacBlock := 'fac' blockStmt catchClause?
-legacyClausuraExpr := 'clausura' clausuraParams? ('→' typeAnnotation)? (':' expression | blockStmt)
-clausuraParams := clausuraParam (',' clausuraParam)*
-clausuraParam  := typeAnnotation IDENTIFIER
+@formerly funcDecl
+functio_decl     := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
+@formerly paramList
+param_list    := (parameter (',' parameter)*)?
+@formerly genericParams
+generic_params := '<' generic_param (',' generic_param)* '>'
+@formerly genericParam
+generic_param  := IDENTIFIER | 'magnitudo' IDENTIFIER
+@formerly callTypeArgs
+call_type_args  := '<' type_annotation (',' type_annotation)* '>'
+parameter    := 'ceteri'? type_annotation IDENTIFIER 'sponte'? ('ut' IDENTIFIER)? ('vel' expression)?
+@formerly funcModifier
+func_modifier := 'argumenta' IDENTIFIER | 'curata' IDENTIFIER ('ut' IDENTIFIER)? | 'errata' IDENTIFIER | 'exitus' (IDENTIFIER | NUMBER) | 'immutata' | 'iacit' | 'optiones' IDENTIFIER
+@formerly callablePosture
+callable_posture := 'fiet' | 'fiunt' | 'fient'
+@formerly returnClause
+return_clause := '→' type_annotation
+@formerly alternateExitClause
+alternate_exit_clause := '⇥' type_annotation
+@formerly stmtBodyJoint
+ergo_joint  := 'ergo'
+@formerly clausuraJoint
+clausura_joint  := '∴'
+@formerly clausuraExpr
+clausura_expr   := compact_clausura_expr | clausura_legacy_expr
+@formerly compactClausuraExpr
+compact_clausura_expr := clausura_signature clausura_joint (expression | fac_block)
+@formerly clausuraSignature
+clausura_signature := (clausura_param | '(' clausura_params? ')') return_clause? alternate_exit_clause?
+@formerly closureFacBlock
+fac_block := 'fac' block_stmt cape_clause?
+@formerly legacyClausuraExpr
+clausura_legacy_expr := 'clausura' clausura_params? ('→' type_annotation)? (':' expression | block_stmt)
+@formerly clausuraParams
+clausura_params := clausura_param (',' clausura_param)*
+@formerly clausuraParam
+clausura_param  := type_annotation IDENTIFIER
 
-genusDecl    := 'abstractus'? 'genus' IDENTIFIER genericParams? ('sub' IDENTIFIER)? ('implet' IDENTIFIER (',' IDENTIFIER)*)? '{' genusMember* '}'
-genusMember  := annotation* (fieldDecl | methodDecl)
-fieldDecl    := 'generis'? 'nexum'? typeAnnotation IDENTIFIER 'sponte'? ('=' expression)?
-methodDecl   := 'functio' IDENTIFIER genericParams? '(' paramList ')' funcModifier* callablePosture? returnClause? alternateExitClause? blockStmt
+@formerly genusDecl
+genus_decl    := 'abstractus'? 'genus' IDENTIFIER generic_params? ('sub' IDENTIFIER)? ('implet' IDENTIFIER (',' IDENTIFIER)*)? '{' genus_member* '}'
+@formerly genusMember
+genus_member  := annotation* (field_decl | functio_method_decl)
+@formerly fieldDecl
+field_decl    := 'generis'? 'nexum'? type_annotation IDENTIFIER 'sponte'? ('=' expression)?
+@formerly methodDecl
+functio_method_decl   := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 
-annotation            := nucleumAnnotation | bracedAnnotation | annotationSugar
-annotationName        := ANNOTATION_NAME
-bracedAnnotation      := '@' annotationName '{' annotationFieldList? '}'
-annotationFieldList   := annotationField (',' annotationField)*
-annotationField       := ANNOTATION_FIELD_NAME '=' (expression | typeAnnotation)
-annotationSugar       := '@' annotationName NON_NEWLINE_TOKEN* NEWLINE
-nucleumAnnotation     := nucleumSugar | nucleumBraced
-nucleumSugar          := '@' 'nucleum' nucleumModifier? NEWLINE
-nucleumBraced         := '@' 'nucleum' '{' nucleumFieldList? '}'
-nucleumModifier       := 'fragment'
-nucleumFieldList      := nucleumField (',' nucleumField)*
-nucleumField          := 'fragment' '=' ('verum' | 'falsum')
+annotation            := nucleum_annotation | braced_annotation | annotation_sugar
+@formerly annotationName
+annotation_name        := ANNOTATION_NAME
+@formerly bracedAnnotation
+braced_annotation      := '@' annotation_name '{' annotation_field_list? '}'
+@formerly annotationFieldList
+annotation_field_list   := annotation_field (',' annotation_field)*
+@formerly annotationField
+annotation_field       := ANNOTATION_FIELD_NAME '=' (expression | type_annotation)
+@formerly annotationSugar
+annotation_sugar       := '@' annotation_name NON_NEWLINE_TOKEN* NEWLINE
+@formerly nucleumAnnotation
+nucleum_annotation     := nucleum_sugar | nucleum_braced
+@formerly nucleumSugar
+nucleum_sugar          := '@' 'nucleum' nucleum_modifier? NEWLINE
+@formerly nucleumBraced
+nucleum_braced         := '@' 'nucleum' '{' nucleum_field_list? '}'
+@formerly nucleumModifier
+nucleum_modifier       := 'fragment'
+@formerly nucleumFieldList
+nucleum_field_list      := nucleum_field (',' nucleum_field)*
+@formerly nucleumField
+nucleum_field          := 'fragment' '=' ('verum' | 'falsum')
 
-implendumDecl   := 'implendum' IDENTIFIER genericParams? '{' implendumMethod* '}'
-implendumMethod := annotation* 'functio' IDENTIFIER '(' paramList ')' funcModifier* callablePosture? returnClause? alternateExitClause?
+@formerly implendumDecl
+implendum_decl   := 'implendum' IDENTIFIER generic_params? '{' implendum_method_decl* '}'
+@formerly implendumMethod
+implendum_method_decl := annotation* 'functio' IDENTIFIER '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
 
-typeAliasDecl := 'typus' IDENTIFIER genericParams? '=' typeAnnotation
+@formerly typeAliasDecl
+typus_decl := 'typus' IDENTIFIER generic_params? '=' type_annotation
 
-enumDecl   := 'ordo' IDENTIFIER '{' enumMember (',' enumMember)* '}'
-enumMember := IDENTIFIER ('=' ('-'? NUMBER | STRING))?
+@formerly enumDecl
+ordo_decl   := 'ordo' IDENTIFIER '{' enum_member (',' enum_member)* '}'
+@formerly enumMember
+enum_member := IDENTIFIER ('=' ('-'? NUMBER | STRING))?
 
-discretioDecl := 'discretio' IDENTIFIER genericParams? '{' variant (',' variant)* '}'
-variant       := IDENTIFIER ('{' variantFields '}')?
-variantFields := (typeAnnotation IDENTIFIER)*
+@formerly discretioDecl
+discretio_decl := 'discretio' IDENTIFIER generic_params? '{' variant (',' variant)* '}'
+variant       := IDENTIFIER ('{' variant_fields '}')?
+@formerly variantFields
+variant_fields := (type_annotation IDENTIFIER)*
 
-importDecl     := importRecord | importSugar
-importRecord   := 'importa' '{' importFieldList? '}'
-importFieldList := importField (',' importField)*
-importField    := importSourceField | importVisibilityField | importNameField
-                | importAliasField | importWildcardField
-importSourceField := 'ex' '=' STRING
-importVisibilityField := 'visibilitas' '=' visibility
-importNameField := 'nomen' '=' IDENTIFIER
-importAliasField := 'ut' '=' IDENTIFIER
-importWildcardField := 'omnia' '=' IDENTIFIER
+@formerly importDecl
+importa_decl     := importa_record | importa_sugar
+@formerly importRecord
+importa_record   := 'importa' '{' import_field_list? '}'
+@formerly importFieldList
+import_field_list := import_field (',' import_field)*
+@formerly importField
+import_field    := ex_field | visibilitas_field | nomen_field
+                | ut_field | omnia_field
+@formerly importSourceField
+ex_field := 'ex' '=' STRING
+@formerly importVisibilityField
+visibilitas_field := 'visibilitas' '=' publica
+@formerly importNameField
+nomen_field := 'nomen' '=' IDENTIFIER
+@formerly importAliasField
+ut_field := 'ut' '=' IDENTIFIER
+@formerly importWildcardField
+omnia_field := 'omnia' '=' IDENTIFIER
 
-importSugar    := 'importa' 'ex' STRING visibility? (namedImport | wildcardImport)?
-visibility    := 'publica'
-namedImport   := IDENTIFIER ('ut' IDENTIFIER)?
-wildcardImport := '*' 'ut' IDENTIFIER
+@formerly importSugar
+importa_sugar    := 'importa' 'ex' STRING publica? (named_import | wildcard_import)?
+@formerly visibility
+publica    := 'publica'
+@formerly namedImport
+named_import   := IDENTIFIER ('ut' IDENTIFIER)?
+@formerly wildcardImport
+wildcard_import := '*' 'ut' IDENTIFIER
 
-typeAnnotation := ownedType ('∪' ownedType)*
-ownedType      := ('de' | 'in' | 'own' | 'copy')? baseType
-baseType       := holeType | functionType | widthTypeSugar | qualifiedType typeArguments? | '(' typeAnnotation ')'
-holeType       := '_' | '∪'
-qualifiedType  := IDENTIFIER ('.' IDENTIFIER)*
-typeArguments  := '<' typeArgument (',' typeArgument)* '>'
-typeArgument   := typeAnnotation | NATURAL | '[' figuraList? ']'
-widthTypeSugar := WIDTH_MARKER | LISTA_WIDTH_SUGAR
-                | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shapeSuffix?
-                | MATRIX_WIDTH_SUGAR shapeSuffix
-shapeSuffix    := '[' figuraList? ']'
-figura         := '_' | NATURAL | IDENTIFIER | '[' figuraList? ']'
-figuraList     := figura (',' figura)*
-functionType   := '(' typeList? ')' '→' typeAnnotation alternateExitClause?
-typeList       := typeAnnotation (',' typeAnnotation)*
+@formerly typeAnnotation
+type_annotation := owned_type ('∪' owned_type)*
+@formerly ownedType
+owned_type      := ('de' | 'in' | 'own' | 'copy')? base_type
+@formerly baseType
+base_type       := hole_type | function_type | width_type_sugar | qualified_type type_arguments? | '(' type_annotation ')'
+@formerly holeType
+hole_type       := '_' | '∪'
+@formerly qualifiedType
+qualified_type  := IDENTIFIER ('.' IDENTIFIER)*
+@formerly typeArguments
+type_arguments  := '<' type_argument (',' type_argument)* '>'
+@formerly typeArgument
+type_argument   := type_annotation | NATURAL | '[' figura_list? ']'
+@formerly widthTypeSugar
+width_type_sugar := WIDTH_MARKER | LISTA_WIDTH_SUGAR
+                | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix?
+                | MATRIX_WIDTH_SUGAR shape_suffix
+@formerly shapeSuffix
+shape_suffix    := '[' figura_list? ']'
+figura         := '_' | NATURAL | IDENTIFIER | '[' figura_list? ']'
+@formerly figuraList
+figura_list     := figura (',' figura)*
+@formerly functionType
+function_type   := '(' type_list? ')' '→' type_annotation alternate_exit_clause?
+@formerly typeList
+type_list       := type_annotation (',' type_annotation)*
 
-ifStmt     := 'si' expression arm ('sin' ifStmt | elseClause)?
-elseClause := 'secus' elseArm
-arm        := (blockStmt | stmtBodyJoint statement) catchClause?
-elseArm    := (blockStmt | stmtBodyJoint statement) catchClause?
+@formerly ifStmt
+si_stmt     := 'si' expression arm ('sin' si_stmt | secus_clause)?
+@formerly elseClause
+secus_clause := 'secus' else_arm
+arm        := (block_stmt | ergo_joint statement) cape_clause?
+@formerly elseArm
+else_arm    := (block_stmt | ergo_joint statement) cape_clause?
 
-whileStmt  := 'dum' expression (blockStmt | stmtBodyJoint statement) catchClause?
-iteraStmt  := 'itera' (('ex' | 'de') expression | 'ab' expression) ('fixum' | 'varia') IDENTIFIER (blockStmt | stmtBodyJoint statement) catchClause?
+@formerly whileStmt
+dum_stmt  := 'dum' expression (block_stmt | ergo_joint statement) cape_clause?
+@formerly iteraStmt
+itera_stmt  := 'itera' (('ex' | 'de') expression | 'ab' expression) ('fixum' | 'varia') IDENTIFIER (block_stmt | ergo_joint statement) cape_clause?
 
-eligeStmt    := 'elige' expression '{' eligeCase* defaultCase? '}' catchClause?
-eligeCase    := 'casu' expression (blockStmt | stmtBodyJoint statement)
-defaultCase  := 'ceterum' (blockStmt | stmtBodyJoint statement)
+@formerly eligeStmt
+elige_stmt    := 'elige' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
+@formerly eligeCase
+casu_elige_clause    := 'casu' expression (block_stmt | ergo_joint statement)
+@formerly defaultCase
+ceterum_clause  := 'ceterum' (block_stmt | ergo_joint statement)
 
-discerneStmt := 'discerne' 'omnia'? discriminants '{' variantCase* defaultCase? '}'
+@formerly discerneStmt
+discerne_stmt := 'discerne' 'omnia'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
 discriminants := expression (',' expression)*
-variantCase  := 'casu' patterns (blockStmt | stmtBodyJoint statement)
+@formerly variantCase
+casu_variant_clause  := 'casu' patterns (block_stmt | ergo_joint statement)
 patterns     := pattern ((',' | 'et') pattern)*
-pattern      := '_' | literal | (IDENTIFIER patternBind?)
-patternBind  := ('ut' IDENTIFIER) | (('fixum' | 'varia') patternBinding (',' patternBinding)*)
-patternBinding := IDENTIFIER ('ut' IDENTIFIER)?
+pattern      := '_' | literal | (IDENTIFIER ut_pattern?)
+@formerly patternBind
+ut_pattern  := ('ut' IDENTIFIER) | (('fixum' | 'varia') pattern_binding (',' pattern_binding)*)
+@formerly patternBinding
+pattern_binding := IDENTIFIER ('ut' IDENTIFIER)?
 
-guardStmt   := 'custodi' '{' guardClause+ '}'
-guardClause := 'si' expression (blockStmt | stmtBodyJoint statement)
+@formerly guardStmt
+custodi_stmt   := 'custodi' '{' si_guard_clause+ '}'
+@formerly guardClause
+si_guard_clause := 'si' expression (block_stmt | ergo_joint statement)
 
-curaStmt    := 'cura' STRING ('fixum' | 'varia') typeAnnotation IDENTIFIER blockStmt catchClause?
+@formerly curaStmt
+cura_stmt    := 'cura' STRING ('fixum' | 'varia') type_annotation IDENTIFIER block_stmt cape_clause?
 
-extractStmt   := 'ex' expression ('fixum' | 'varia') extractFields
-extractFields := extractField (',' extractField)* (',' restField)? | restField
-extractField  := IDENTIFIER ('ut' IDENTIFIER)?
-restField     := 'ceteri' IDENTIFIER
+@formerly extractStmt
+ex_stmt   := 'ex' expression ('fixum' | 'varia') extract_fields
+@formerly extractFields
+extract_fields := extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
+@formerly extractField
+extract_field  := IDENTIFIER ('ut' IDENTIFIER)?
+@formerly restField
+ceteri_field     := 'ceteri' IDENTIFIER
 
-returnStmt   := 'redde' expression?
-returnAwaitStmt := 'reddet' expression
-awaitDiscardStmt := 'tacebit' expression
-yieldStmt    := 'cede' expression
-breakStmt    := 'rumpe'
-continueStmt := 'perge'
-noopStmt     := 'tacet'
+@formerly returnStmt
+redde_stmt   := 'redde' expression?
+@formerly returnAwaitStmt
+reddet_stmt := 'reddet' expression
+@formerly awaitDiscardStmt
+tacebit_stmt := 'tacebit' expression
+@formerly yieldStmt
+cede_stmt    := 'cede' expression
+@formerly breakStmt
+rumpe_stmt    := 'rumpe'
+@formerly continueStmt
+perge_stmt := 'perge'
+@formerly noopStmt
+tacet_stmt     := 'tacet'
 
-throwStmt         := bareThrow | guardedThrowSugar
-bareThrow         := ('iace' | 'mori') expression
-guardedThrowSugar := ('iace' | 'mori') expression NO_NEWLINE 'si' expression
-catchClause       := 'cape' IDENTIFIER blockStmt
-assertStmt        := 'adfirma' expression ('mori' expression)?
-requiritStmt      := 'requirit' expression 'iace' expression
+@formerly throwStmt
+iace_stmt         := iace_expr | iace_guarded_expr
+@formerly bareThrow
+iace_expr         := ('iace' | 'mori') expression
+@formerly guardedThrowSugar
+iace_guarded_expr := ('iace' | 'mori') expression NO_NEWLINE 'si' expression
+@formerly catchClause
+cape_clause       := 'cape' IDENTIFIER block_stmt
+@formerly assertStmt
+adfirma_stmt        := 'adfirma' expression ('mori' expression)?
+@formerly requiritStmt
+requirit_stmt      := 'requirit' expression 'iace' expression
 
 expression := assignment
-assignment := ternary ('←' assignment | '↤' assignment inlineRecovery?)?
-incDecStmt := place ('↑' | '↓')
-place      := call  (* semantic analysis requires an assignable target *)
-ternary    := or (('?' expression ':' | 'sic' expression 'secus') ternary)?
-or         := and (('aut') and)*
-and        := equality (('et') equality)*
-equality   := comparison equalityTail*
-equalityTail := ('≡' | '≠' | '≈' | '≉' | 'est' | 'non' 'est') comparison
-comparison := bitwiseOr (('≺' | '≻' | '≤' | '≥' | 'intra' | 'inter') bitwiseOr)*
+assignment := ternary ('←' assignment | '↤' assignment inline_recovery?)?
+@formerly incDecStmt
+inc_dec_stmt := place ('↑' | '↓')
+place      := call_expr  (* semantic analysis requires an assignable target *)
+ternary    := aut_expr (('?' expression ':' | 'sic' expression 'secus') ternary)?
+@formerly or
+aut_expr         := et_expr (('aut') et_expr)*
+@formerly and
+et_expr        := equality (('et') equality)*
+equality   := comparison equality_tail*
+@formerly equalityTail
+equality_tail := ('≡' | '≠' | '≈' | '≉' | 'est' | 'non' 'est') comparison
+comparison := bitwise_or_expr (('≺' | '≻' | '≤' | '≥' | 'intra' | 'inter') bitwise_or_expr)*
 # Ordering operators use the canonical Unicode glyphs `≺`/`≻`/`≤`/`≥`;
 # membership uses Latin keywords `intra`/`inter` (Faber prose identity).
 # Glyph aliases such as `∈` are not in the active contract.
-bitwiseOr  := bitwiseXor ('∨' bitwiseXor)*
-bitwiseXor := bitwiseAnd ('⊻' bitwiseAnd)*
-bitwiseAnd := shift ('∧' shift)*
-shift      := range (('⇐' | '⇒') range)*
-range      := additive rangeTail?
-rangeTail  := ('‥' | '…' | 'ante' | 'usque') additive ('per' additive)?
-additive   := multiplicative (('+' | '-') multiplicative)*
+@formerly bitwiseOr
+bitwise_or_expr  := bitwise_xor_expr ('∨' bitwise_xor_expr)*
+@formerly bitwiseXor
+bitwise_xor_expr := bitwise_and_expr ('⊻' bitwise_and_expr)*
+@formerly bitwiseAnd
+bitwise_and_expr := shift_expr ('∧' shift_expr)*
+@formerly shift
+shift_expr      := range_expr (('⇐' | '⇒') range_expr)*
+@formerly range
+range_expr      := additive_expr range_tail?
+@formerly rangeTail
+range_tail  := ('‥' | '…' | 'ante' | 'usque') additive_expr ('per' additive_expr)?
+@formerly additive
+additive_expr   := multiplicative_expr (('+' | '-') multiplicative_expr)*
 # Glyph products (`·` `×` `⊗` `⊙`) bind at the multiplicative level with `*`,
 # left-associative. `·` inner product dispatches dot/matvec/matmul by rank.
-multiplicative := coalesce (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙') coalesce)*
+@formerly multiplicative
+multiplicative_expr := vel_expr (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙') vel_expr)*
 # `vel` is local nullable elimination (`T ∪ nihil vel T → T`), not logical `aut`.
 # It binds tighter than arithmetic so `prefix + item vel ""` is `prefix + (item vel "")`.
 # `velRhs` greedily consumes a following range tail, so `a vel b‥c` is `a vel (b‥c)`.
-coalesce   := unary ('vel' velRhs)*
-velRhs     := unary velRangeTail?
-velRangeTail := ('‥' | '…' | 'ante' | 'usque') unary ('per' unary)?
-unary      := ('-' | '¬' | 'non') unary | fingeExpr | cast
+@formerly coalesce
+vel_expr   := unary_expr ('vel' vel_rhs)*
+@formerly velRhs
+vel_rhs     := unary_expr vel_range_tail?
+@formerly velRangeTail
+vel_range_tail := ('‥' | '…' | 'ante' | 'usque') unary_expr ('per' unary_expr)?
+@formerly unary
+unary_expr      := ('-' | '¬' | 'non') unary_expr | finge_expr | cast_expr
 # `∇` is a structural POSTFIX gradient-selection operator, never a prefix unary
 # form. It binds in the expression postfix fold after calls have been formed,
 # and its optional selector bracket is consumed as part of the gradient suffix
 # before ordinary postfix continuation resumes. The concrete parser accepts an
 # ordinary expression as the left side; semantic analysis must require it to
 # resolve to an eligible differentiable forward call.
-gradientExpr := call ('∇' gradientSelection?)?
-gradientSelection := '[' gradientPlace (',' gradientPlace)* ']'
-gradientPlace := expression  (* semantic analysis requires a direct call argument place *)
-cast       := gradientExpr ('∷' typeAnnotation | conversio)*
-conversio        := '↦' typeAnnotation inlineRecovery?
-inlineRecovery   := '⇥' unary
+@formerly gradientExpr
+gradient_expr := call_expr ('∇' gradient_selection?)?
+@formerly gradientSelection
+gradient_selection := '[' gradient_place (',' gradient_place)* ']'
+@formerly gradientPlace
+gradient_place := expression  (* semantic analysis requires a direct call_expr argument place *)
+@formerly cast
+cast_expr       := gradient_expr ('∷' type_annotation | conversio_expr)*
+@formerly conversio
+conversio_expr        := '↦' type_annotation inline_recovery?
+@formerly inlineRecovery
+inline_recovery   := '⇥' unary_expr
 
-call          := primary (callSuffix | memberSuffix | optionalSuffix | nonNullSuffix)*
-callSuffix    := callTypeArgs? '(' argumentList ')'
-memberSuffix  := '.' IDENTIFIER | '[' expression ']'
-optionalSuffix := '?.' IDENTIFIER | '?[' expression ']' | '?(' argumentList ')'
-nonNullSuffix := '!.' IDENTIFIER | '![' expression ']' | '!(' argumentList ')'
-argumentList  := (argument (',' argument)*)?
+@formerly call
+call_expr          := primary (call_suffix | member_suffix | optional_suffix | non_null_suffix)*
+@formerly callSuffix
+call_suffix    := call_type_args? '(' argument_list ')'
+@formerly memberSuffix
+member_suffix  := '.' IDENTIFIER | '[' expression ']'
+@formerly optionalSuffix
+optional_suffix := '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
+@formerly nonNullSuffix
+non_null_suffix := '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
+@formerly argumentList
+argument_list  := (argument (',' argument)*)?
 argument      := 'sparge'? expression
 
 literal := NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING
          | 'verum' | 'falsum' | 'nihil'
 primary := IDENTIFIER | literal | 'ego'
-         | arrayLiteral | jsonLiteral | typedConstructor | iunctaExpr
-         | adExpr | clausuraExpr | praefixumExpr | scriptumExpr | legeExpr
+         | array_literal | json_literal | typed_constructor | iuncta_expr
+         | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr
          | '(' expression ')'
-adExpr    := 'ad' ASCII_STRING adOpener?
-adOpener  := '(' expression ')'
-arrayLiteral := '[' argumentList? ']'
-iunctaExpr := 'iuncta' typeArguments '[' argumentList? ']'
+@formerly adExpr
+ad_expr    := 'ad' ASCII_STRING ad_opener?
+@formerly adOpener
+ad_opener  := '(' expression ')'
+@formerly arrayLiteral
+array_literal := '[' argument_list? ']'
+@formerly iunctaExpr
+iuncta_expr := 'iuncta' type_arguments '[' argument_list? ']'
 # Bare `{ ... }` is a JSON document literal. Keys are quoted JSON strings separated
 # by `:`; values are JSON constants. Anonymous Faber objects (`{ key = expr }`)
 # are retired (literal-family Stage 6). Genus construction uses `typedConstructor`.
-jsonLiteral := '{' (jsonMember (',' jsonMember)*)? '}'
-jsonMember  := STRING ':' jsonValue
-typedConstructor := typeAnnotation '{' fieldList? '}'
-fieldList := fieldInit (',' fieldInit)*
-fieldInit := ('sparge' expression) | (fieldKey '=' expression) | IDENTIFIER
-fieldKey := IDENTIFIER | STRING | '[' expression ']'
+@formerly jsonLiteral
+json_literal := '{' (json_member (',' json_member)*)? '}'
+@formerly jsonMember
+json_member  := STRING ':' json_value
+@formerly typedConstructor
+typed_constructor := type_annotation '{' field_list? '}'
+@formerly fieldList
+field_list := field_init (',' field_init)*
+@formerly fieldInit
+field_init := ('sparge' expression) | (field_key '=' expression) | IDENTIFIER
+@formerly fieldKey
+field_key := IDENTIFIER | STRING | '[' expression ']'
 # JSON values: constants only (no Faber expressions, no variable references).
-jsonValue := jsonObject | jsonArray | jsonString | jsonNumber | 'true' | 'false' | 'null'
-jsonObject := '{' (jsonMember (',' jsonMember)*)? '}'
-jsonArray  := '[' (jsonValue (',' jsonValue)*)? ']'
-jsonString := STRING
+@formerly jsonValue
+json_value := json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
+@formerly jsonObject
+json_object := '{' (json_member (',' json_member)*)? '}'
+@formerly jsonArray
+json_array  := '[' (json_value (',' json_value)*)? ']'
+@formerly jsonString
+json_string := STRING
 # Numerus when no decimal point or exponent is present; otherwise Fractus.
-jsonNumber := NUMBER
+@formerly jsonNumber
+json_number := NUMBER
 
-fingeExpr     := 'finge' qualifiedIdent ('{' fieldList '}')? ('∷' typeAnnotation)?
-qualifiedIdent := IDENTIFIER ('.' IDENTIFIER)*
-praefixumExpr := 'praefixum' (blockStmt | '(' expression ')')
-scriptumExpr  := 'scriptum' '(' STRING (',' expression)* ')'
-legeExpr      := 'lege' 'lineam'?
+@formerly fingeExpr
+finge_expr     := 'finge' qualified_ident ('{' field_list '}')? ('∷' type_annotation)?
+@formerly qualifiedIdent
+qualified_ident := IDENTIFIER ('.' IDENTIFIER)*
+@formerly praefixumExpr
+praefixum_expr := 'praefixum' (block_stmt | '(' expression ')')
+@formerly scriptumExpr
+scriptum_expr  := 'scriptum' '(' STRING (',' expression)* ')'
+@formerly legeExpr
+lege_expr      := 'lege' 'lineam'?
 
-objectPattern  := '{' patternProperty (',' patternProperty)* '}'
-patternProperty := 'ceteri'? IDENTIFIER ('ut' IDENTIFIER)?
-arrayPattern   := '[' arrayPatternElement (',' arrayPatternElement)* ']'
-arrayPatternElement := '_' | 'ceteri'? IDENTIFIER
+@formerly objectPattern
+object_pattern  := '{' pattern_property (',' pattern_property)* '}'
+@formerly patternProperty
+pattern_property := 'ceteri'? IDENTIFIER ('ut' IDENTIFIER)?
+@formerly arrayPattern
+array_pattern   := '[' array_pattern_element (',' array_pattern_element)* ']'
+@formerly arrayPatternElement
+array_pattern_element := '_' | 'ceteri'? IDENTIFIER
 
-outputStmt := ('nota' | 'vide' | 'mone' | 'scribe') expression (',' expression)*
+@formerly outputStmt
+nota_stmt := ('nota' | 'vide' | 'mone' | 'scribe') expression (',' expression)*
 
-entryHeader  := ('argumenta' IDENTIFIER)? ('exitus' expression)?
-incipitStmt  := 'incipit' entryHeader blockStmt
-incipietStmt := 'incipiet' entryHeader blockStmt
+@formerly entryHeader
+entry_header  := ('argumenta' IDENTIFIER)? ('exitus' expression)?
+@formerly incipitStmt
+incipit_stmt  := 'incipit' entry_header block_stmt
+@formerly incipietStmt
+incipiet_stmt := 'incipiet' entry_header block_stmt
 
-probandumDecl := 'probandum' STRING probaModifier* '{' probandumBody '}'
-probandumBody := (praeparaBlock | probandumDecl | probaStmt)*
-probaStmt     := 'proba' STRING probaModifier* blockStmt
-probaModifier := 'omitte' STRING | 'futurum' STRING | 'solum' | 'tag' STRING
+@formerly probandumDecl
+probandum_decl := 'probandum' STRING proba_modifier* '{' probandum_body '}'
+@formerly probandumBody
+probandum_body := (praepara_block | probandum_decl | proba_stmt)*
+@formerly probaStmt
+proba_stmt     := 'proba' STRING proba_modifier* block_stmt
+@formerly probaModifier
+proba_modifier := 'omitte' STRING | 'futurum' STRING | 'solum' | 'tag' STRING
               | 'temporis' NUMBER | 'metior' | 'repete' NUMBER | 'fragilis' NUMBER
               | 'solum_in' STRING
-praeparaBlock := ('praepara' | 'praeparabit' | 'postpara' | 'postparabit') 'omnia'? blockStmt
+@formerly praeparaBlock
+praepara_block := ('praepara' | 'praeparabit' | 'postpara' | 'postparabit') 'omnia'? block_stmt
 
-facBlockStmt := 'fac' blockStmt catchClause? ('dum' expression)?
+@formerly facBlockStmt
+fac_stmt := 'fac' block_stmt cape_clause? ('dum' expression)?
