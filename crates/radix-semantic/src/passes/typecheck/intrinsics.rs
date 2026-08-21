@@ -49,7 +49,7 @@ impl IntrinsicTypeContext {
     fn from_receiver_type(checker: &mut TypeChecker<'_>, receiver_ty: TypeId) -> Self {
         let resolved = checker.resolve_inferred_type(receiver_ty);
         match checker.types.get(resolved) {
-            Type::Array(inner) => Self {
+            Type::Array(inner) | Type::BoundedArray { element: inner, .. } => Self {
                 inner: Some(*inner),
                 key: None,
                 value: None,
@@ -222,6 +222,8 @@ pub(super) fn check_intrinsic_method_call(
     } else {
         entry
     };
+    let bounded_appende =
+        entry.faber_name == "appende" && matches!(resolved, Type::BoundedArray { .. });
     let ctx = IntrinsicTypeContext::from_receiver_type(checker, payload_ty);
 
     if checker.expr_is_ref_view(receiver) && is_mutating_receiver(entry) {
@@ -376,6 +378,20 @@ pub(super) fn check_intrinsic_method_call(
                 || matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Sparsa)
             {
                 check_tensor_method_args(checker, entry, &params, args, ret, span)
+            } else if bounded_appende {
+                // D6: bounded `appende` is a typed recoverable alternate exit.
+                // Unbounded `lista<T>.appende` stays vacuum with no error channel.
+                let err = checker.textus_type();
+                let sig = FuncSig {
+                    type_params: Vec::new(),
+                    type_param_constraints: Vec::new(),
+                    params,
+                    ret,
+                    err: Some(err),
+                    is_async: false,
+                    is_generator: false,
+                };
+                checker.check_instantiated_call(&sig, &[], args, span, None)
             } else {
                 checker.check_known_method_args(args, params, ret, span)
             };

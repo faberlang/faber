@@ -578,6 +578,10 @@ mod bounded_capacity_slot_test;
 mod bounded_identity_test;
 
 #[cfg(test)]
+#[path = "bounded_lista_test.rs"]
+mod bounded_lista_test;
+
+#[cfg(test)]
 #[path = "convert_test.rs"]
 mod convert_test;
 

@@ -290,6 +290,15 @@ impl TypeChecker<'_> {
             return target_resolved;
         }
 
+        if self.is_bounded_lista_conversio(source_ty, target_resolved) {
+            if let Some(recovery) = recovery {
+                self.note_conversio_recovery_checked(recovery, target_resolved);
+            } else {
+                self.check_conversio_propagation_channel(source_ty, target_resolved, span);
+            }
+            return target_resolved;
+        }
+
         if matches!(
             self.types.get(target_resolved),
             Type::Primitive(Primitive::Regex)
@@ -1239,6 +1248,22 @@ impl TypeChecker<'_> {
         )
     }
 
+    /// D7's explicit bounded-list bridges. Bounded → unbounded copies the
+    /// initialized prefix; unbounded → bounded keeps `N` for the host carrier
+    /// to enforce with a fail-closed overflow.
+    fn is_bounded_lista_conversio(&self, source_ty: TypeId, target_ty: TypeId) -> bool {
+        match (
+            self.types.get(self.resolve_inferred_type(source_ty)),
+            self.types.get(self.resolve_inferred_type(target_ty)),
+        ) {
+            (Type::BoundedArray { element: from, .. }, Type::Array(to))
+            | (Type::Array(from), Type::BoundedArray { element: to, .. }) => {
+                self.types.equals(*from, *to)
+            }
+            _ => false,
+        }
+    }
+
     fn primitive_conversio_family(&self, ty: TypeId) -> PrimitiveConversioFamily {
         match self.types.get(self.resolve_inferred_type(ty)) {
             Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
@@ -1439,7 +1464,7 @@ impl TypeChecker<'_> {
             | (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Textus) => true,
             _ => matches!(
                 (self.types.get(source), self.types.get(target)),
-                (Type::Array(_), Type::Tensor(_, _))
+                (Type::Array(_), Type::Tensor(_, _)) | (Type::Array(_), Type::BoundedArray { .. })
             ),
         }
     }

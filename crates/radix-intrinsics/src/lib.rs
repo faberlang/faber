@@ -36,7 +36,7 @@ pub fn lookup_method(
 #[must_use]
 pub fn receivers_for_type(ty: &Type) -> &'static [IntrinsicReceiver] {
     match ty {
-        Type::Array(_) => &[IntrinsicReceiver::Lista],
+        Type::Array(_) | Type::BoundedArray { .. } => &[IntrinsicReceiver::Lista],
         // WHY: `octeti` is semantic sugar for `lista<numerus<u8>>`. Routing it to
         // the Lista receiver family gives octeti values every `lista` method.
         // The assignability rule in `semantic/types.rs` makes the two types

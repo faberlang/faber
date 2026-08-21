@@ -10,7 +10,7 @@ use super::{
     lookup_method_for_type_id, mir_atomic_op, mir_collection_op, mir_is_higher_order_lista,
     receivers_for_type, receivers_for_type_id, IntrinsicReceiver, INTRINSICS,
 };
-use radix_types::{MirAtomicOp, MirCollectionOp, Primitive, SemanticMutability, Type};
+use radix_types::{IndexExpr, MirAtomicOp, MirCollectionOp, Primitive, SemanticMutability, Type};
 
 #[test]
 fn registry_rows_are_unique_per_receiver_name_and_arity() {
@@ -38,6 +38,9 @@ fn receivers_for_type_maps_semantic_families() {
     let element = types.intern(Type::Primitive(Primitive::Numerus));
     let lista = Type::Array(element);
     assert_eq!(receivers_for_type(&lista), &[IntrinsicReceiver::Lista]);
+    let capacity = types.intern_index(IndexExpr::Literal(8));
+    let bounded = Type::BoundedArray { element, capacity };
+    assert_eq!(receivers_for_type(&bounded), &[IntrinsicReceiver::Lista]);
     let fractus = Type::Primitive(Primitive::Fractus);
     assert_eq!(
         receivers_for_type(&fractus),

@@ -422,7 +422,7 @@ impl TypeChecker<'_> {
         }
 
         let tensor_shape = match self.types.get(resolved) {
-            Type::Array(_) | Type::Map(_, _) | Type::Set(_) => {
+            Type::Array(_) | Type::BoundedArray { .. } | Type::Map(_, _) | Type::Set(_) => {
                 return resolved;
             }
             Type::Tensor(_, shape) | Type::Sparsa(_, shape) => Some(*shape),

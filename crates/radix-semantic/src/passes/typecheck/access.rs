@@ -138,7 +138,9 @@ impl TypeChecker<'_> {
             return self.check_tensor_bracket_index(elem, shape, idx_ty, object_span, index_span);
         }
         let kind = match resolved_kind {
-            Type::Array(elem) => Some((Some(elem), None, None)),
+            Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
+                Some((Some(elem), None, None))
+            }
             Type::Map(key, value) => Some((None, Some(key), Some(value))),
             Type::Tuple(_elements) => {
                 // Without the index expression we cannot validate a constant
