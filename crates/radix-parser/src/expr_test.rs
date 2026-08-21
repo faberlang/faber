@@ -816,9 +816,8 @@ fn parses_iuncta_construction_with_two_elements() {
 
 #[test]
 fn parses_labeled_iuncta_construction() {
-    let result = parse_ok(
-        r#"incipit { fixum _ pair ← iuncta<gx: textus, gw: numerus> ["salve", 42] }"#,
-    );
+    let result =
+        parse_ok(r#"incipit { fixum _ pair ← iuncta<gx: textus, gw: numerus> ["salve", 42] }"#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
         panic!("expected incipit");

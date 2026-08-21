@@ -809,6 +809,7 @@ fn latin_type_surface(kind: TypeBindingKind) -> &'static str {
             RelationalTypeKind::Series => "series",
             RelationalTypeKind::Census => "census",
         },
+        TypeBindingKind::Ratio => "ratio",
     }
 }
 
@@ -959,6 +960,8 @@ pub enum TypeBindingKind {
     /// Census relational type names (`relational-views.md` §7): the inert
     /// plan type, the admitted row type, and the finite result type.
     Relational(RelationalTypeKind),
+    /// Labeled ad-hoc aggregate (`ratio<label: T, …>` → `Type::Record`).
+    Ratio,
 }
 
 /// The three census relational type identities behind
@@ -1256,6 +1259,7 @@ pub fn latin_locale_pack() -> LocalePack {
             "census",
             TypeBindingKind::Relational(RelationalTypeKind::Census),
         ),
+        ("ratio", TypeBindingKind::Ratio),
     ] {
         types.insert(
             key.to_owned(),
@@ -2260,6 +2264,7 @@ fn type_binding_kind_for_key(key: &str) -> Option<TypeBindingKind> {
         "filtrum" => return Some(TypeBindingKind::Relational(RelationalTypeKind::Filtrum)),
         "series" => return Some(TypeBindingKind::Relational(RelationalTypeKind::Series)),
         "census" => return Some(TypeBindingKind::Relational(RelationalTypeKind::Census)),
+        "ratio" => return Some(TypeBindingKind::Ratio),
         _ => {}
     }
     primitive_type_specs()

@@ -3,7 +3,7 @@
 //! These tests prove that the second AST pass resolves names and type aliases
 //! in the typed resolver and digests file-interface type snapshots.
 
-use super::{Resolver, SemanticErrorKind, TypeTable, resolve};
+use super::{resolve, Resolver, SemanticErrorKind, TypeTable};
 use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceCallable, InterfaceLibraryIdentity,
     InterfaceMemberKind, InterfaceMethodExport, InterfaceNominalKind, InterfaceNominalType,
@@ -201,16 +201,14 @@ incipit {
         "unknown_identifier",
     );
 
-    assert!(
-        err.args
-            .iter()
-            .any(|arg| arg.name == "spelling" && arg.value == "greting")
-    );
-    assert!(
-        err.args
-            .iter()
-            .any(|arg| arg.name == "suggestion" && arg.value == "greeting")
-    );
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "spelling" && arg.value == "greting"));
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "suggestion" && arg.value == "greeting"));
 }
 
 #[test]
@@ -324,16 +322,14 @@ incipit {
         "unknown_identifier",
     );
 
-    assert!(
-        err.args
-            .iter()
-            .any(|arg| arg.name == "spelling" && arg.value == "res")
-    );
-    assert!(
-        err.args
-            .iter()
-            .any(|arg| arg.name == "suggestion" && arg.value == "rēs")
-    );
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "spelling" && arg.value == "res"));
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "suggestion" && arg.value == "rēs"));
 }
 
 #[test]
@@ -369,16 +365,14 @@ fn reports_return_outside_function() {
     let diagnostics = compile_and_expect("redde", "SEM032", "return_outside_function");
     let err = expect_diagnostic(&diagnostics, "SEM032", "return_outside_function");
     assert!(err.is_error());
-    assert!(
-        err.args
-            .iter()
-            .any(|arg| arg.name == "keyword" && arg.value == "redde")
-    );
-    assert!(
-        err.args
-            .iter()
-            .any(|arg| arg.name == "context" && arg.value == "function")
-    );
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "keyword" && arg.value == "redde"));
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "context" && arg.value == "function"));
 }
 
 #[test]
@@ -609,11 +603,10 @@ fn reports_invalid_width_marker_with_structured_event() {
             .expect_err("resolve should fail");
         let err = expect_structured_error(&errors, SemanticErrorKind::UndefinedType, issue);
 
-        assert!(
-            err.args
-                .iter()
-                .any(|arg| arg.name == "primitive" && arg.value == primitive)
-        );
+        assert!(err
+            .args
+            .iter()
+            .any(|arg| arg.name == "primitive" && arg.value == primitive));
     }
 }
 
@@ -821,32 +814,24 @@ exemplars = ["test.fab"]
         .expect("localized file interface import");
 
     let namespace = interner.intern("math");
-    assert!(
-        resolver
-            .namespace_file_function(namespace, interner.intern("sum"))
-            .is_some()
-    );
+    assert!(resolver
+        .namespace_file_function(namespace, interner.intern("sum"))
+        .is_some());
     assert!(
         resolver
             .namespace_file_function(namespace, interner.intern("summa"))
             .is_none(),
         "unmapped canonical spelling must not resolve under a non-la pack that defines the identity"
     );
-    assert!(
-        resolver
-            .namespace_file_type(namespace, interner.intern("VectorEn"))
-            .is_some()
-    );
-    assert!(
-        resolver
-            .namespace_file_type(namespace, interner.intern("Vector"))
-            .is_none()
-    );
-    assert!(
-        resolver
-            .namespace_file_type(namespace, interner.intern("pi"))
-            .is_some()
-    );
+    assert!(resolver
+        .namespace_file_type(namespace, interner.intern("VectorEn"))
+        .is_some());
+    assert!(resolver
+        .namespace_file_type(namespace, interner.intern("Vector"))
+        .is_none());
+    assert!(resolver
+        .namespace_file_type(namespace, interner.intern("pi"))
+        .is_some());
 
     let vector = resolver
         .imported_file_type_exports(namespace)
@@ -986,21 +971,15 @@ exemplars = ["test.fab"]
         .expect("localized file interface import");
 
     let namespace = interner.intern("math");
-    assert!(
-        resolver
-            .namespace_file_function(namespace, interner.intern("salve"))
-            .is_some()
-    );
-    assert!(
-        resolver
-            .namespace_file_type(namespace, interner.intern("ThingEn"))
-            .is_some()
-    );
-    assert!(
-        resolver
-            .namespace_file_type(namespace, interner.intern("Thing"))
-            .is_none()
-    );
+    assert!(resolver
+        .namespace_file_function(namespace, interner.intern("salve"))
+        .is_some());
+    assert!(resolver
+        .namespace_file_type(namespace, interner.intern("ThingEn"))
+        .is_some());
+    assert!(resolver
+        .namespace_file_type(namespace, interner.intern("Thing"))
+        .is_none());
 
     let bad_field = skipped
         .iter()
@@ -1655,16 +1634,14 @@ fn reports_break_outside_breakable_block() {
     let diagnostics = compile_and_expect("rumpe", "SEM030", "break_outside_breakable");
     let err = expect_diagnostic(&diagnostics, "SEM030", "break_outside_breakable");
     assert!(err.is_error());
-    assert!(
-        err.args
-            .iter()
-            .any(|arg| arg.name == "keyword" && arg.value == "rumpe")
-    );
-    assert!(
-        err.args
-            .iter()
-            .any(|arg| arg.name == "context" && arg.value == "breakable block")
-    );
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "keyword" && arg.value == "rumpe"));
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "context" && arg.value == "breakable block"));
 }
 
 #[test]
@@ -1672,16 +1649,14 @@ fn reports_continue_outside_loop() {
     let diagnostics = compile_and_expect("perge", "SEM031", "continue_outside_loop");
     let err = expect_diagnostic(&diagnostics, "SEM031", "continue_outside_loop");
     assert!(err.is_error());
-    assert!(
-        err.args
-            .iter()
-            .any(|arg| arg.name == "keyword" && arg.value == "perge")
-    );
-    assert!(
-        err.args
-            .iter()
-            .any(|arg| arg.name == "context" && arg.value == "loop")
-    );
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "keyword" && arg.value == "perge"));
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "context" && arg.value == "loop"));
 }
 
 #[test]
@@ -1814,11 +1789,10 @@ fn warns_on_unrecognized_curata_allocator() {
         SemanticErrorKind::Warning(crate::error::WarningKind::UnrecognizedCurataAllocator),
         "unrecognized_curata_allocator",
     );
-    assert!(
-        err.args
-            .iter()
-            .any(|arg| arg.name == "name" && arg.value == "evil")
-    );
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "name" && arg.value == "evil"));
     assert!(!err.is_error(), "curata lint must stay warning-level");
 }
 

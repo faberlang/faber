@@ -15,8 +15,8 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
-use crate::IndexId;
 use crate::format_faber_type;
+use crate::IndexId;
 use radix_hir::HirCallArg;
 
 const ISSUE_GENERIC_TYPE_ARG_DOMAIN: &str = "generic_type_arg_domain";
