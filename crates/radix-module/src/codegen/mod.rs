@@ -59,8 +59,7 @@ mod coherence_test;
 #[path = "failable_facts_test.rs"]
 mod failable_facts_test;
 
-#[cfg(test)]
-#[cfg(feature = "mir-core")]
+#[cfg(all(test, feature = "hir-haskell"))]
 #[path = "haskell_emit_test.rs"]
 mod haskell_emit_test;
 
@@ -132,7 +131,7 @@ fn mir_backed_requires_driver() -> CodegenError {
 }
 
 /// Build the failable-def set and per-definition error-type overrides shared by
-/// the Go/TS/Swift backend fact structs.
+/// the non-Rust backend fact structs.
 ///
 /// Dispatch-boundary conversion that consumes the monolith's
 /// `FunctionFactTable`. Leaf crates deliberately never depend on
