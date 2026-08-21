@@ -874,6 +874,12 @@
       "analyzable": 1
     },
     {
+      "term": "ratio",
+      "rule": "keyword",
+      "capable": 0,
+      "analyzable": 0
+    },
+    {
       "term": "redde",
       "rule": "keyword",
       "capable": 1,
