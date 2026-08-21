@@ -10593,7 +10593,7 @@ import from "triga:math" triga
 main {
   const triga.Color initium ← triga.Color { r = 0.0, g = 0.0, b = 0.0 }
   const triga.Color finis ← triga.Color { r = 1.0, g = 0.5, b = 0.25 }
-  const triga.Color midpoint ← triga.color_interpolata(initium, finis, 0.5)
+  const triga.Color midpoint ← initium.interpolata(finis, 0.5)
   assert midpoint.r ≡ (0.5 ∷ f32) panic "color call-arg"
 }
 "#,
@@ -10621,15 +10621,10 @@ main {
         output.code
     );
     assert!(
-        !output
+        output
             .code
-            .contains("color_interpolata(&crate::triga::Euler")
-            && !output.code.contains("color_interpolata(&triga::Euler")
-            && !output
-                .code
-                .contains("color_interpolata(&crate::math::Euler")
-            && !output.code.contains("color_interpolata(&math::Euler"),
-        "Color call-arg must not emit as Euler:\n{}",
+            .contains("initium.interpolata(faber::Valor::from(finis.clone()), 0.5)"),
+        "Color receiver call-arg must emit with the migrated method:\n{}",
         output.code
     );
 }
