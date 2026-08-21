@@ -234,14 +234,14 @@ fn run_package(
             Err(diagnostics) => {
                 super::eprint_compile_diagnostics(&diagnostics);
                 eprintln!("error: package MIR test link failed");
-                let mut failed = ProbaReport::default();
+                let mut blocked = ProbaReport::default();
                 for (unit_path, cases) in failed_units {
                     for case in cases {
-                        failed.results.push(CaseResult {
+                        blocked.results.push(CaseResult {
                             name: case.name,
                             suite_path: case.suite_path,
-                            outcome: CaseOutcome::Failed {
-                                message: format!(
+                            outcome: CaseOutcome::Blocked {
+                                reason: format!(
                                     "package failed to link for runner proba execution ({})",
                                     unit_path.display()
                                 ),
@@ -249,7 +249,7 @@ fn run_package(
                         });
                     }
                 }
-                failed
+                blocked
             }
         }
     };
@@ -272,6 +272,10 @@ fn print_report(report: &ProbaReport, _nocapture: bool) {
                 // Always show failure detail so CI can name the case.
                 println!("FAIL {path}");
                 eprintln!("  {message}");
+            }
+            CaseOutcome::Blocked { reason } => {
+                println!("block {path}");
+                eprintln!("  {reason}");
             }
             CaseOutcome::Skipped { reason } => {
                 println!("skip {path} ({reason})");

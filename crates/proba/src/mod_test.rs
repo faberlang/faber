@@ -33,6 +33,7 @@ proba "one equals one" {
     );
     assert_eq!(report.passed(), 1);
     assert_eq!(report.failed(), 0);
+    assert_eq!(report.blocked(), 0);
     assert_eq!(report.skipped(), 0);
     assert!(report.success());
     assert_eq!(report.results[0].name, "one equals one");
@@ -51,6 +52,7 @@ proba "broken equality" {
     );
     assert_eq!(report.passed(), 0);
     assert_eq!(report.failed(), 1);
+    assert_eq!(report.blocked(), 0);
     assert!(!report.success());
     assert_eq!(report.results[0].name, "broken equality");
     match &report.results[0].outcome {
@@ -224,4 +226,102 @@ probandum "math" {
     .expect("run");
     assert_eq!(report.results.len(), 1);
     assert_eq!(report.results[0].name, "add");
+}
+
+fn report_with_missing_mir_function() -> ProbaReport {
+    let mut analysis = analyze_prepared_program_name(
+        &session(),
+        "blocked.fab",
+        r#"
+proba "ok" {
+    adfirma 1 ≡ 1
+}
+"#,
+    )
+    .expect("analyze");
+    let cases = inventory_cases(&analysis.hir, &analysis.interner);
+    let lowered = super::lower_analyzed_unit_with_context(&mut analysis).expect("lower");
+    let mut ghost = cases[0].clone();
+    ghost.def_id = super::DefId(u32::MAX);
+    ghost.name = "ghost".to_owned();
+    run_proba_on_validated(
+        &lowered.validated,
+        &[ghost],
+        &TestSelection::default(),
+        None,
+        false,
+        false,
+    )
+}
+
+#[test]
+fn missing_mir_function_is_blocked_not_failed() {
+    let report = report_with_missing_mir_function();
+    assert_eq!(report.results.len(), 1);
+    assert_eq!(report.passed(), 0);
+    assert_eq!(report.failed(), 0);
+    assert_eq!(report.blocked(), 1);
+    assert_eq!(report.skipped(), 0);
+    assert!(!report.success());
+    match &report.results[0].outcome {
+        CaseOutcome::Blocked { reason } => {
+            assert!(
+                reason.contains("no lowered MIR function"),
+                "blocked reason should name the missing MIR function: {reason}"
+            );
+        }
+        other => panic!("expected Blocked, got {other:?}"),
+    }
+}
+
+#[test]
+fn blocked_counts_separately_from_failed_and_summary_does_not_claim_fail() {
+    let failed = run(
+        r#"
+proba "broken equality" {
+    adfirma 1 ≡ 2
+}
+"#,
+        TestSelection::default(),
+    );
+    let mut report = report_with_missing_mir_function();
+    report.results.extend(failed.results);
+
+    assert_eq!(report.blocked(), 1);
+    assert_eq!(report.failed(), 1);
+    assert_eq!(report.passed(), 0);
+    assert!(!report.success());
+    assert!(
+        !matches!(report.results[0].outcome, CaseOutcome::Failed { .. }),
+        "blocked case must not render as Failed: {:?}",
+        report.results[0].outcome
+    );
+
+    let mixed = format_summary(&report);
+    assert!(
+        mixed.contains("1 failed"),
+        "mixed summary should count the real failure: {mixed}"
+    );
+    assert!(
+        mixed.contains("1 blocked"),
+        "mixed summary should count blocked separately: {mixed}"
+    );
+
+    let blocked_only = format_summary(&report_with_missing_mir_function());
+    assert!(
+        blocked_only.starts_with("test result: BLOCKED."),
+        "blocked-only summary must not claim FAILED: {blocked_only}"
+    );
+    assert!(
+        blocked_only.contains("0 failed"),
+        "blocked-only summary must report zero failures: {blocked_only}"
+    );
+    assert!(
+        blocked_only.contains("1 blocked"),
+        "blocked-only summary must count the blocked case: {blocked_only}"
+    );
+    assert!(
+        !blocked_only.contains("FAILED"),
+        "a blocked case that never ran must not render as a failed test: {blocked_only}"
+    );
 }

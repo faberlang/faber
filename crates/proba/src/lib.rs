@@ -71,8 +71,18 @@ pub enum ProbaModifierView {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CaseOutcome {
     Passed,
-    Failed { message: String },
-    Skipped { reason: String },
+    Failed {
+        message: String,
+    },
+    /// Runner cannot execute the case (unsupported lowering, missing MIR
+    /// function, unit link failure). Distinct from [`Self::Failed`]: the
+    /// assertion never ran.
+    Blocked {
+        reason: String,
+    },
+    Skipped {
+        reason: String,
+    },
 }
 
 /// Result for one inventoriable case in report order.
@@ -126,10 +136,19 @@ impl ProbaReport {
             .count()
     }
 
+    #[must_use]
+    pub fn blocked(&self) -> usize {
+        self.results
+            .iter()
+            .filter(|r| matches!(r.outcome, CaseOutcome::Blocked { .. }))
+            .count()
+    }
+
     /// True when every selected runnable case passed (skips allowed).
+    /// Blocked cases are fail-closed: the runner never executed them.
     #[must_use]
     pub fn success(&self) -> bool {
-        self.failed() == 0
+        self.failed() == 0 && self.blocked() == 0
     }
 }
 
@@ -425,8 +444,8 @@ fn run_proba_cases(
 
         let outcome = match function_id_for_case(case) {
             Some(function_id) => execute_case(validated, function_id),
-            None => CaseOutcome::Failed {
-                message: format!(
+            None => CaseOutcome::Blocked {
+                reason: format!(
                     "proba case {:?} has no lowered MIR function (def #{})",
                     case.name, case.def_id.0
                 ),
@@ -463,9 +482,7 @@ fn execute_case(validated: &ValidatedMir<'_>, function_id: MirFunctionId) -> Cas
     std::panic::set_hook(previous_hook);
     match trapped {
         Ok(Ok(())) => CaseOutcome::Passed,
-        Ok(Err(errors)) => CaseOutcome::Failed {
-            message: format_runner_errors(&errors),
-        },
+        Ok(Err(errors)) => case_outcome_from_runner_errors(&errors),
         Err(payload) => {
             if let Some(reason) = host.last_abort.clone() {
                 return CaseOutcome::Failed { message: reason };
@@ -475,6 +492,21 @@ fn execute_case(validated: &ValidatedMir<'_>, function_id: MirFunctionId) -> Cas
             CaseOutcome::Failed { message }
         }
     }
+}
+
+fn case_outcome_from_runner_errors(errors: &[RunnerError]) -> CaseOutcome {
+    let message = format_runner_errors(errors);
+    if is_capability_gap_message(&message) {
+        CaseOutcome::Blocked { reason: message }
+    } else {
+        CaseOutcome::Failed { message }
+    }
+}
+
+fn is_capability_gap_message(message: &str) -> bool {
+    message.contains("unsupported MIR lowering")
+        || message.contains("FaberScript unsupported:")
+        || message.contains("missing type information for MIR lowering")
 }
 
 fn format_runner_errors(errors: &[RunnerError]) -> String {
@@ -505,11 +537,18 @@ fn strip_abort_prefix(message: &str) -> String {
 /// Format a human-readable summary line for CLI output.
 #[must_use]
 pub fn format_summary(report: &ProbaReport) -> String {
+    let verdict = if report.failed() > 0 {
+        "FAILED"
+    } else if report.blocked() > 0 {
+        "BLOCKED"
+    } else {
+        "ok"
+    };
     format!(
-        "test result: {}. {} passed; {} failed; {} skipped",
-        if report.success() { "ok" } else { "FAILED" },
+        "test result: {verdict}. {} passed; {} failed; {} blocked; {} skipped",
         report.passed(),
         report.failed(),
+        report.blocked(),
         report.skipped()
     )
 }
