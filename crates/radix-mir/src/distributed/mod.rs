@@ -32,16 +32,22 @@
 //!   contract §3).
 //! - **Deterministic derivation**: [`derive`] is a pure function —
 //!   identical input yields byte-identical output (exit-gate bullet 1).
+//! - **N=1 synthesis**: [`synthesize`] is a pure constructor — a
+//!   single-device `DeviceProgram` becomes a 1-partition plan with an
+//!   empty communication graph (MD3H-R1 / MD-A15). Run-time only; never
+//!   hashed into A10 program bytes.
 //! - **Canonical encoding**: [`encode_logical_plan`] is the stable
 //!   field-ordered substrate for `logical_distributed_plan_hash` (MD2-H1/W1).
 
 pub mod canonical;
 pub mod derive;
+pub mod synthesize;
 pub mod types;
 pub mod validate;
 
 pub use canonical::{encode_logical_plan, CANONICAL_MAGIC, CANONICAL_REVISION};
 pub use derive::derive;
+pub use synthesize::synthesize;
 pub use types::*;
 
 #[cfg(test)]
