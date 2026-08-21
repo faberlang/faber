@@ -139,8 +139,8 @@ fn cli_parses_test_subcommand_selection_and_harness_flags() {
     assert_eq!(args.path, std::path::PathBuf::from("pkg"));
     assert_eq!(args.filter.as_deref(), Some("smoke"));
     assert_eq!(args.name.as_deref(), Some("suite_case"));
-    assert_eq!(args.suite.as_deref(), Some("suite/path"));
-    assert_eq!(args.tag.as_deref(), Some("slow"));
+    assert_eq!(args.suite, vec!["suite/path".to_owned()]);
+    assert_eq!(args.tag, vec!["slow".to_owned()]);
     assert!(args.exact);
     assert!(args.nocapture);
     assert_eq!(args.test_threads, Some(4));
@@ -156,7 +156,7 @@ fn cli_parses_test_filter_long_flag() {
     let Some(crate::cli::Command::Test(args)) = cli.command else {
         panic!("expected test");
     };
-    assert_eq!(args.filter_flag.as_deref(), Some("smoke"));
+    assert_eq!(args.filter_flag, vec!["smoke".to_owned()]);
     assert!(args.filter.is_none());
 }
 

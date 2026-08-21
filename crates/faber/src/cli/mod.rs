@@ -2,7 +2,7 @@
 
 mod emit;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 pub use emit::{EmitArgs, FaberCliTarget};
 use radix_program::mir::DeviceSelection;
 use std::path::PathBuf;
@@ -428,6 +428,16 @@ pub struct FmirRunArgs {
     pub args: Vec<String>,
 }
 
+/// Output format for `faber test` reports.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+pub enum TestOutputFormat {
+    /// Human-readable one-line-per-case output.
+    #[default]
+    Text,
+    /// Machine-readable JSON report.
+    Json,
+}
+
 /// Arguments for `faber test` (MIR runner — no Cargo / rustc on the package).
 #[derive(clap::Args, Debug)]
 pub struct TestArgs {
@@ -451,14 +461,19 @@ pub struct TestArgs {
     #[arg(long = "deny", value_name = "CODE")]
     pub deny: Vec<String>,
 
-    /// Substring filter on case path (`suite/name`) or title.
-    /// Positional form: `faber test . smoke`. Long form: `faber test . --filter smoke`.
+    /// Repeatable substring filter on case path (`suite/name`) or title.
+    /// Matching filters are combined with OR. File-scoped filters use
+    /// `path.proba::name`.
     #[arg(long = "filter", value_name = "FILTER")]
-    pub filter_flag: Option<String>,
+    pub filter_flag: Vec<String>,
 
-    /// Positional harness filter (same meaning as `--filter`)
+    /// Positional harness filter (same meaning as one `--filter`)
     #[arg(value_name = "FILTER")]
     pub filter: Option<String>,
+
+    /// Repeatable negated filter. Matching cases are excluded after filters.
+    #[arg(long = "skip", value_name = "FILTER")]
+    pub skip: Vec<String>,
 
     /// Load only `*.proba` sources matching this path pattern (repeatable).
     /// Patterns are relative to the package source root (`*` wildcards allowed).
@@ -474,13 +489,27 @@ pub struct TestArgs {
     #[arg(long)]
     pub name: Option<String>,
 
-    /// Select tests by source-level probandum suite path, joined with `/`
-    #[arg(long)]
-    pub suite: Option<String>,
+    /// Select tests by source-level probandum suite path, joined with `/`.
+    /// Repeatable values are combined with OR.
+    #[arg(long, value_name = "SUITE")]
+    pub suite: Vec<String>,
 
-    /// Select tests by source-level tag modifier
+    /// Select tests by source-level tag modifier. Repeatable values are
+    /// combined with OR.
+    #[arg(long, value_name = "TAG")]
+    pub tag: Vec<String>,
+
+    /// List selected cases without executing them
     #[arg(long)]
-    pub tag: Option<String>,
+    pub list: bool,
+
+    /// Report format
+    #[arg(long, value_enum, default_value_t = TestOutputFormat::Text)]
+    pub format: TestOutputFormat,
+
+    /// Stop after the first failed or blocked case
+    #[arg(long = "fail-fast")]
+    pub fail_fast: bool,
 
     /// Select only cases marked with the source-level `solum` focus modifier
     #[arg(long)]

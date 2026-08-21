@@ -1,6 +1,6 @@
 //! `faber test` — interpret proba cases on the MIR runner (not a Cargo harness).
 
-use crate::cli::TestArgs;
+use crate::cli::{TestArgs, TestOutputFormat};
 use crate::input_shape::locale_without_package_error;
 use crate::package;
 use proba::{
@@ -13,6 +13,24 @@ use radix_module::driver::{Config, Session};
 use radix_program::test_source_filter::TestSourceFilter;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
+use std::time::Instant;
+
+#[derive(Debug, Clone, Default)]
+struct TestRunOptions {
+    filters: Vec<String>,
+    skips: Vec<String>,
+    suites: Vec<String>,
+    tags: Vec<String>,
+    name: Option<String>,
+    exact: bool,
+    list: bool,
+    fail_fast: bool,
+}
+
+#[derive(Debug, Default)]
+struct RunMetadata {
+    durations_ms: HashMap<String, u128>,
+}
 
 /// Discover, select, and run proba cases exclusively on the MIR runner.
 pub(super) fn cmd_test(args: &TestArgs) {
@@ -42,10 +60,19 @@ pub(super) fn cmd_test(args: &TestArgs) {
         std::process::exit(1);
     }
 
-    let selection = TestSelection {
+    let mut filters = args.filter_flag.clone();
+    if let Some(filter) = args.filter.clone() {
+        filters.push(filter);
+    }
+    let options = TestRunOptions {
+        filters,
+        skips: args.skip.clone(),
+        suites: args.suite.clone(),
+        tags: args.tag.clone(),
         name: args.name.clone(),
-        suite: args.suite.clone(),
-        tag: args.tag.clone(),
+        exact: args.exact,
+        list: args.list,
+        fail_fast: args.fail_fast,
     };
 
     let proba_filter = if args.include.is_empty() && args.exclude.is_empty() {
@@ -56,9 +83,6 @@ pub(super) fn cmd_test(args: &TestArgs) {
             exclude: args.exclude.clone(),
         })
     };
-
-    // Prefer explicit `--filter`; fall back to positional FILTER.
-    let harness_filter = args.filter_flag.as_deref().or(args.filter.as_deref());
 
     // `--ignored` alone means “only source-skipped (omitte/futurum) cases” —
     // not yet supported as a positive suite; document via fail-closed message.
@@ -97,49 +121,45 @@ pub(super) fn cmd_test(args: &TestArgs) {
         }
     };
 
-    let (report, unmatched_include) = match package::test_input_route(&input_path, args.no_package)
-    {
-        package::TestInputRoute::SingleFile => (
-            run_single_file(
+    let (report, unmatched_include, metadata) =
+        match package::test_input_route(&input_path, args.no_package) {
+            package::TestInputRoute::SingleFile => {
+                let (report, metadata) = run_single_file_with_options(
+                    &config,
+                    &input_path,
+                    &options,
+                    args.include_ignored,
+                    args.focused,
+                );
+                (report, false, metadata)
+            }
+            package::TestInputRoute::Package => run_package_with_options(
                 &config,
                 &input_path,
-                &selection,
-                harness_filter,
-                args.exact,
+                &options,
+                proba_filter.as_ref(),
                 args.include_ignored,
                 args.focused,
             ),
-            false,
-        ),
-        package::TestInputRoute::Package => run_package(
-            &config,
-            &input_path,
-            &selection,
-            proba_filter.as_ref(),
-            harness_filter,
-            args.exact,
-            args.include_ignored,
-            args.focused,
-        ),
-        package::TestInputRoute::ManifestLessDirectory => {
-            eprintln!("error: {}", package::MANIFEST_LESS_TEST_MESSAGE);
-            std::process::exit(1);
-        }
-    };
+            package::TestInputRoute::ManifestLessDirectory => {
+                eprintln!("error: {}", package::MANIFEST_LESS_TEST_MESSAGE);
+                std::process::exit(1);
+            }
+        };
 
     if report.results.is_empty() {
         let detail = empty_run_detail(unmatched_include);
         let code = empty_run_exit_code(args.allow_no_tests);
         if code == 0 {
             eprintln!("warning: {detail}");
-            print_report(&report, args.nocapture);
+            print_report(&report, args.nocapture, args.format, &metadata, args.list);
         } else {
             eprintln!("error: {detail}");
         }
         std::process::exit(code);
     }
 
-    print_report(&report, args.nocapture);
+    print_report(&report, args.nocapture, args.format, &metadata, args.list);
     if report.success() {
         std::process::exit(0);
     }
@@ -215,6 +235,88 @@ fn run_single_file(
             std::process::exit(1);
         }
     }
+}
+
+fn run_single_file_with_options(
+    config: &Config,
+    path: &Path,
+    options: &TestRunOptions,
+    include_ignored: bool,
+    focused: bool,
+) -> (ProbaReport, RunMetadata) {
+    let source = match std::fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(err) => {
+            eprintln!("error: could not read {}: {err}", path.display());
+            std::process::exit(1);
+        }
+    };
+    let session = Session::new(config.clone());
+    let name = path.display().to_string();
+    match run_source_with_options(&session, &name, &source, options, include_ignored, focused) {
+        Ok(result) => result,
+        Err(error) => {
+            print_run_error(&error);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn run_source_with_options(
+    session: &Session,
+    name: &str,
+    source: &str,
+    options: &TestRunOptions,
+    include_ignored: bool,
+    focused: bool,
+) -> Result<(ProbaReport, RunMetadata), radix_module::mir::RunSourceError> {
+    let mut analysis = radix_program::analyze_prepared_program_name(session, name, source)
+        .map_err(radix_module::mir::RunSourceError::Frontend)?;
+    let all_cases = inventory_cases(&analysis.hir, &analysis.interner);
+    let focused = focused || has_solum_cases(&all_cases);
+    let available = if focused {
+        focused_cases(&all_cases)
+    } else {
+        all_cases
+    };
+    let cases: Vec<_> = available
+        .iter()
+        .filter(|case| case_matches_options(Path::new(name), case, options))
+        .cloned()
+        .collect();
+    if options.list {
+        return Ok((list_report(Path::new(name), &cases), RunMetadata::default()));
+    }
+    if cases.is_empty() {
+        return Ok((ProbaReport::default(), RunMetadata::default()));
+    }
+
+    let lowered = radix_module::mir::lower_analyzed_unit_with_context(&mut analysis)
+        .map_err(radix_module::mir::RunSourceError::Mir)?;
+    let mut report = ProbaReport::default();
+    let mut metadata = RunMetadata::default();
+    for case in cases {
+        let started = Instant::now();
+        let mut one = run_proba_on_validated(
+            &lowered.validated,
+            std::slice::from_ref(&case),
+            &TestSelection::default(),
+            None,
+            false,
+            include_ignored,
+        );
+        let elapsed = started.elapsed().as_millis();
+        for result in &mut one.results {
+            result.unit_path = Path::new(name).to_path_buf();
+            metadata.durations_ms.insert(result_key(result), elapsed);
+        }
+        let stop = one.results.iter().any(result_is_failure);
+        report.results.extend(one.results);
+        if options.fail_fast && stop {
+            break;
+        }
+    }
+    Ok((report, metadata))
 }
 
 fn run_source_with_focus(
@@ -294,7 +396,11 @@ fn is_solum_case(case: &ProbaCase) -> bool {
 }
 
 fn focused_cases(cases: &[ProbaCase]) -> Vec<ProbaCase> {
-    cases.iter().filter(|case| is_solum_case(case)).cloned().collect()
+    cases
+        .iter()
+        .filter(|case| is_solum_case(case))
+        .cloned()
+        .collect()
 }
 
 fn append_focus_skips(
@@ -326,6 +432,114 @@ fn append_focus_skips(
             stderr: Vec::new(),
         });
     }
+}
+
+fn run_package_with_options(
+    config: &Config,
+    input: &Path,
+    options: &TestRunOptions,
+    proba_filter: Option<&TestSourceFilter>,
+    include_ignored: bool,
+    focused: bool,
+) -> (ProbaReport, bool, RunMetadata) {
+    let package = match radix_program::analyze::analyze_package_for_tests(
+        config,
+        input,
+        proba_filter,
+        &package::faber_analysis_seams(),
+    ) {
+        Ok(package) => package,
+        Err(diagnostics) => fail_package_analysis(&diagnostics),
+    };
+    if package
+        .diagnostics
+        .iter()
+        .any(radix_module::diagnostics::Diagnostic::is_error)
+    {
+        fail_package_analysis(&package.diagnostics);
+    }
+
+    let unmatched_include = proba_filter.is_some_and(|filter| {
+        unmatched_include_filter(
+            &filter.include,
+            package.nodes.values().map(|unit| &unit.path),
+        )
+    });
+    if unmatched_include {
+        return (ProbaReport::default(), true, RunMetadata::default());
+    }
+
+    let mut test_units = Vec::new();
+    for unit in package.nodes.values() {
+        let cases = inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
+        if !cases.is_empty() {
+            test_units.push((unit.path.clone(), cases));
+        }
+    }
+    let focused = focused || test_units.iter().any(|(_, cases)| has_solum_cases(cases));
+    let metadata = RunMetadata::default();
+    if options.list {
+        let mut report = ProbaReport::default();
+        for (unit_path, all_cases) in test_units {
+            let available = if focused {
+                focused_cases(&all_cases)
+            } else {
+                all_cases
+            };
+            let selected: Vec<_> = available
+                .iter()
+                .filter(|case| case_matches_options(&unit_path, case, options))
+                .cloned()
+                .collect();
+            report
+                .results
+                .extend(list_report(&unit_path, &selected).results);
+        }
+        return (report, false, metadata);
+    }
+
+    let mut metadata = metadata;
+    let mut combined = ProbaReport::default();
+    for (unit_path, cases) in test_units {
+        match run_package_test_unit_with_options(
+            config,
+            input,
+            proba_filter,
+            &unit_path,
+            options,
+            include_ignored,
+            focused,
+            &mut metadata,
+        ) {
+            Ok(report) => {
+                let stop = report.results.iter().any(result_is_failure);
+                combined.results.extend(report.results);
+                if options.fail_fast && stop {
+                    break;
+                }
+            }
+            Err(diagnostics) => {
+                super::eprint_compile_diagnostics(&diagnostics);
+                eprintln!(
+                    "error: package MIR test link failed for {}",
+                    unit_path.display()
+                );
+                let report = blocked_unit_report_with_options(
+                    &unit_path,
+                    &cases,
+                    options,
+                    focused,
+                    "unit failed to link/lower for runner proba execution",
+                );
+                let stop = report.results.iter().any(result_is_failure);
+                combined.results.extend(report.results);
+                if options.fail_fast && stop {
+                    break;
+                }
+            }
+        }
+    }
+    (combined, false, metadata)
 }
 
 fn run_package(
@@ -434,6 +648,105 @@ fn run_package(
 /// The package analyzer gives us the complete graph so local imports still
 /// resolve. The MIR linker only receives this unit's local import closure, so
 /// an unrelated unit's unsupported lowering cannot fail this run.
+fn run_package_test_unit_with_options(
+    config: &Config,
+    input: &Path,
+    proba_filter: Option<&TestSourceFilter>,
+    unit_path: &Path,
+    options: &TestRunOptions,
+    include_ignored: bool,
+    focused: bool,
+    metadata: &mut RunMetadata,
+) -> Result<ProbaReport, Vec<radix_module::diagnostics::Diagnostic>> {
+    let mut package = radix_program::analyze::analyze_package_for_tests(
+        config,
+        input,
+        proba_filter,
+        &package::faber_analysis_seams(),
+    )?;
+    if package
+        .diagnostics
+        .iter()
+        .any(radix_module::diagnostics::Diagnostic::is_error)
+    {
+        return Err(package.diagnostics);
+    }
+
+    let Some((root_id, _)) = package.node_by_path(unit_path) else {
+        return Err(vec![radix_module::diagnostics::Diagnostic::error(format!(
+            "test unit disappeared during package re-analysis: {}",
+            unit_path.display()
+        ))
+        .with_file(unit_path.display().to_string())]);
+    };
+    let root_id = root_id.clone();
+    let included = package.imports.local_closure(std::iter::once(&root_id));
+    package.nodes.retain(|id, _| included.contains(id));
+    package.entry = Some(root_id.clone());
+    package.roots = vec![root_id.clone()];
+
+    let Some(unit) = package.nodes.get(&root_id) else {
+        return Err(vec![radix_module::diagnostics::Diagnostic::error(format!(
+            "test unit was not retained in its local package closure: {}",
+            unit_path.display()
+        ))
+        .with_file(unit_path.display().to_string())]);
+    };
+    let all_cases = inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
+    let available = if focused {
+        focused_cases(&all_cases)
+    } else {
+        all_cases.clone()
+    };
+    let cases: Vec<_> = available
+        .iter()
+        .filter(|case| case_matches_options(unit_path, case, options))
+        .cloned()
+        .collect();
+    if cases.is_empty() {
+        return Ok(ProbaReport::default());
+    }
+
+    let functions = cases
+        .iter()
+        .map(|case| (unit.path.clone(), case.def_id))
+        .collect();
+    let scope = radix_program::mir::TestPackageScope::for_program(&package, functions);
+
+    package::mir::with_linked_test_package_mir(
+        package,
+        &scope,
+        config,
+        |validated, function_ids| {
+            let mut report = ProbaReport::default();
+            for case in &cases {
+                let started = Instant::now();
+                let mut one = run_proba_on_validated_with_function_ids(
+                    validated,
+                    unit_path,
+                    std::slice::from_ref(case),
+                    function_ids,
+                    &TestSelection::default(),
+                    None,
+                    false,
+                    include_ignored,
+                );
+                let elapsed = started.elapsed().as_millis();
+                for result in &mut one.results {
+                    result.unit_path = unit_path.to_path_buf();
+                    metadata.durations_ms.insert(result_key(result), elapsed);
+                }
+                let stop = one.results.iter().any(result_is_failure);
+                report.results.extend(one.results);
+                if options.fail_fast && stop {
+                    break;
+                }
+            }
+            report
+        },
+    )
+}
+
 fn run_package_test_unit(
     config: &Config,
     input: &Path,
@@ -538,6 +851,50 @@ fn run_package_test_unit(
     )
 }
 
+fn blocked_unit_report_with_options(
+    unit_path: &Path,
+    cases: &[ProbaCase],
+    options: &TestRunOptions,
+    focused: bool,
+    reason: &str,
+) -> ProbaReport {
+    let available = if focused {
+        focused_cases(cases)
+    } else {
+        cases.to_vec()
+    };
+    let mut report = ProbaReport::default();
+    for case in available {
+        if !case_matches_options(unit_path, &case, options) {
+            continue;
+        }
+        if let Some(skip_reason) = source_skip_reason(&case) {
+            report.results.push(CaseResult {
+                unit_path: unit_path.to_path_buf(),
+                name: case.name,
+                suite_path: case.suite_path,
+                outcome: CaseOutcome::Skipped {
+                    reason: skip_reason,
+                },
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+            });
+            continue;
+        }
+        report.results.push(CaseResult {
+            unit_path: unit_path.to_path_buf(),
+            name: case.name,
+            suite_path: case.suite_path,
+            outcome: CaseOutcome::Blocked {
+                reason: format!("{reason} ({})", unit_path.display()),
+            },
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        });
+    }
+    report
+}
+
 fn blocked_unit_report(
     unit_path: &Path,
     cases: Vec<ProbaCase>,
@@ -596,32 +953,185 @@ fn blocked_unit_report(
     report
 }
 
-fn print_report(report: &ProbaReport, nocapture: bool) {
+fn case_matches_options(unit_path: &Path, case: &ProbaCase, options: &TestRunOptions) -> bool {
+    if let Some(name) = options.name.as_deref() {
+        if case.name != name {
+            return false;
+        }
+    }
+    if !options.suites.is_empty() && !options.suites.iter().any(|suite| suite == &case.suite_path) {
+        return false;
+    }
+    if !options.tags.is_empty()
+        && !options.tags.iter().any(|tag| {
+            case.modifiers.iter().any(
+                |modifier| matches!(modifier, proba::ProbaModifierView::Tag(value) if value == tag),
+            )
+        })
+    {
+        return false;
+    }
+
+    let filters_match = options.filters.is_empty()
+        || options
+            .filters
+            .iter()
+            .any(|filter| case_query_matches(filter, unit_path, case, options.exact));
+    if !filters_match {
+        return false;
+    }
+    !options
+        .skips
+        .iter()
+        .any(|skip| case_query_matches(skip, unit_path, case, options.exact))
+}
+
+fn case_query_matches(query: &str, unit_path: &Path, case: &ProbaCase, exact: bool) -> bool {
+    if let Some((file, case_query)) = query.split_once("::") {
+        if file.is_empty() || case_query.is_empty() {
+            return false;
+        }
+        return path_query_matches(file, unit_path)
+            && (case_display_path(case) == case_query || case.name == case_query);
+    }
+    let display = case_display_path(case);
+    if exact {
+        display == query || case.name == query
+    } else {
+        display.contains(query) || case.name.contains(query)
+    }
+}
+
+fn case_display_path(case: &ProbaCase) -> String {
+    if case.suite_path.is_empty() {
+        case.name.clone()
+    } else {
+        format!("{}/{}", case.suite_path, case.name)
+    }
+}
+
+fn path_query_matches(query: &str, path: &Path) -> bool {
+    let query = query.replace('\\', "/");
+    let path = path.to_string_lossy().replace('\\', "/");
+    path == query || path.ends_with(&format!("/{query}"))
+}
+
+fn result_key(result: &CaseResult) -> String {
+    format!("{}::{}", result.unit_path.display(), result.display_path())
+}
+
+fn result_is_failure(result: &CaseResult) -> bool {
+    matches!(
+        result.outcome,
+        CaseOutcome::Failed { .. } | CaseOutcome::Blocked { .. }
+    )
+}
+
+fn list_report(unit_path: &Path, cases: &[ProbaCase]) -> ProbaReport {
+    ProbaReport {
+        results: cases
+            .iter()
+            .map(|case| CaseResult {
+                unit_path: unit_path.to_path_buf(),
+                name: case.name.clone(),
+                suite_path: case.suite_path.clone(),
+                outcome: CaseOutcome::Skipped {
+                    reason: "listed; not executed".to_owned(),
+                },
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+            })
+            .collect(),
+    }
+}
+
+fn print_report(
+    report: &ProbaReport,
+    nocapture: bool,
+    format: TestOutputFormat,
+    metadata: &RunMetadata,
+    list: bool,
+) {
+    if format == TestOutputFormat::Json {
+        print_json_report(report, metadata, list);
+        return;
+    }
     for result in &report.results {
-        let path = format!("{}::{}", result.unit_path.display(), result.display_path());
+        let path = result_key(result);
+        let duration = metadata.durations_ms.get(&path).copied().unwrap_or(0);
+        if list {
+            println!("{path}");
+            continue;
+        }
         match &result.outcome {
             CaseOutcome::Passed => {
-                println!("ok   {path}");
+                println!("ok   {path} ({duration} ms)");
                 if nocapture {
                     replay_output(result);
                 }
             }
             CaseOutcome::Failed { message } => {
                 // Always show failure detail so CI can name the case.
-                println!("FAIL {path}");
+                println!("FAIL {path} ({duration} ms)");
                 replay_output(result);
                 eprintln!("  {message}");
             }
             CaseOutcome::Blocked { reason } => {
-                println!("block {path}");
+                println!("block {path} ({duration} ms)");
                 eprintln!("  {reason}");
             }
             CaseOutcome::Skipped { reason } => {
-                println!("skip {path} ({reason})");
+                println!("skip {path} ({reason}; {duration} ms)");
             }
         }
     }
-    println!("{}", format_summary(report));
+    if !list {
+        println!("{}", format_summary(report));
+    }
+}
+
+fn json_report_value(
+    report: &ProbaReport,
+    metadata: &RunMetadata,
+    list: bool,
+) -> serde_json::Value {
+    let cases: Vec<_> = report
+        .results
+        .iter()
+        .map(|result| {
+            let outcome = match &result.outcome {
+                CaseOutcome::Passed => ("passed", None),
+                CaseOutcome::Failed { message } => ("failed", Some(message.as_str())),
+                CaseOutcome::Blocked { reason } => ("blocked", Some(reason.as_str())),
+                CaseOutcome::Skipped { reason } => ("skipped", Some(reason.as_str())),
+            };
+            serde_json::json!({
+                "path": result_key(result),
+                "unit": result.unit_path,
+                "name": result.name,
+                "suite": result.suite_path,
+                "status": if list { "listed" } else { outcome.0 },
+                "duration_ms": metadata.durations_ms.get(&result_key(result)).copied().unwrap_or(0),
+                "reason": outcome.1,
+            })
+        })
+        .collect();
+    serde_json::json!({
+        "success": report.success(),
+        "passed": report.passed(),
+        "failed": report.failed(),
+        "blocked": report.blocked(),
+        "skipped": report.skipped(),
+        "cases": cases,
+    })
+}
+
+fn print_json_report(report: &ProbaReport, metadata: &RunMetadata, list: bool) {
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json_report_value(report, metadata, list))
+            .expect("serialize test report")
+    );
 }
 
 fn replay_output(result: &CaseResult) {
@@ -702,3 +1212,7 @@ fn print_run_error(error: &radix_module::mir::RunSourceError) {
 #[cfg(test)]
 #[path = "test_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "test_selection_test.rs"]
+mod selection_tests;
