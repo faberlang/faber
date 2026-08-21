@@ -239,7 +239,7 @@ impl Parser {
                             self.parse_type_argument()?
                         };
                         params.push(param);
-                        if !self.eat(&TokenKind::Comma) {
+                        if !self.consume_item_separator(&TokenKind::GtAscii, "type_parameters")? {
                             break;
                         }
                     }
@@ -336,7 +336,7 @@ impl Parser {
         let mut params = Vec::new();
         while !self.check(&TokenKind::RParen) && !self.is_at_end() {
             params.push(self.parse_type()?);
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::RParen, "function_type_parameters")? {
                 break;
             }
         }
@@ -523,7 +523,7 @@ impl Parser {
             if !self.check(&TokenKind::RBracket) {
                 loop {
                     dims.push(self.parse_figura()?);
-                    if !self.eat(&TokenKind::Comma) {
+                    if !self.consume_item_separator(&TokenKind::RBracket, "figura_dimensions")? {
                         break;
                     }
                 }

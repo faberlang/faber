@@ -34,12 +34,29 @@ impl Parser {
 
         loop {
             patterns.push(self.parse_pattern()?);
-            if !self.eat(&TokenKind::Comma) && !self.eat_keyword_ident(TokenKind::Et) {
-                break;
+            if self.eat(&TokenKind::Comma) {
+                let comma_span = self.previous_span();
+                if self.check(&TokenKind::LBrace) || self.check_keyword_ident(TokenKind::Ergo) {
+                    return Err(ParseError::structured(ParseErrorKind::Expected, comma_span)
+                        .with_arg("issue", "item_list_trailing_comma")
+                        .with_arg("family", "item_list")
+                        .with_arg("position", "pattern_list"));
+                }
+                continue;
+            }
+            if self.eat_keyword_ident(TokenKind::Et) {
+                continue;
             }
             if self.check(&TokenKind::LBrace) || self.check_keyword_ident(TokenKind::Ergo) {
                 break;
             }
+            return Err(
+                ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                    .with_arg("issue", "item_list_missing_separator")
+                    .with_arg("family", "item_list")
+                    .with_arg("position", "pattern_list")
+                    .with_arg("expected", "comma between patterns"),
+            );
         }
 
         Ok(patterns)
@@ -137,8 +154,18 @@ impl Parser {
                 None
             };
             bindings.push(ExField { name, alias });
-            if !self.eat(&TokenKind::Comma) {
-                break;
+            if self.eat(&TokenKind::Comma) {
+                let comma_span = self.previous_span();
+                if self.check(&TokenKind::LBrace)
+                    || self.check_keyword_ident(TokenKind::Ergo)
+                    || self.check_keyword_ident(TokenKind::Et)
+                {
+                    return Err(ParseError::structured(ParseErrorKind::Expected, comma_span)
+                        .with_arg("issue", "item_list_trailing_comma")
+                        .with_arg("family", "item_list")
+                        .with_arg("position", "pattern_bindings"));
+                }
+                continue;
             }
             if self.check(&TokenKind::LBrace)
                 || self.check_keyword_ident(TokenKind::Ergo)
@@ -146,6 +173,13 @@ impl Parser {
             {
                 break;
             }
+            return Err(
+                ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                    .with_arg("issue", "item_list_missing_separator")
+                    .with_arg("family", "item_list")
+                    .with_arg("position", "pattern_bindings")
+                    .with_arg("expected", "comma between bindings"),
+            );
         }
         Ok(bindings)
     }

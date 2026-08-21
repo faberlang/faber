@@ -73,7 +73,7 @@ discretio Color {
 fn enum_per_line_comment_attaches_to_next_member() {
     let source = "\
 ordo Color {
-    Red
+    Red,
     # doc
     Green
 }
@@ -124,7 +124,7 @@ ordo Color {
 fn union_per_line_variants_attach_leading_trivia() {
     let source = "\
 discretio Resultatum {
-    Bene
+    Bene,
     # success payload
     Error
 }
@@ -244,7 +244,7 @@ fn enum_block_end_comment_stays_invalid_placement() {
     // PARSE060 invalid_comment_placement, never silently discarded.
     let source = "\
 ordo Color {
-    Red,
+    Red
     # doc
 }
 ";

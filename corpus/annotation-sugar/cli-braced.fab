@@ -36,6 +36,6 @@ locale = "en"
     brevis = "v",
     longum = "verbose",
     typus = bool,
-    descriptio = "Verbose mode",
+    descriptio = "Verbose mode"
 }
 main args args { }

@@ -866,7 +866,7 @@ impl Parser {
             let mut selectors = Vec::new();
             loop {
                 selectors.push(self.parse_expression()?);
-                if !self.eat(&TokenKind::Comma) {
+                if !self.consume_item_separator(&TokenKind::RBracket, "gradient_selectors")? {
                     break;
                 }
             }
@@ -1459,7 +1459,9 @@ impl Parser {
                 let value = Box::new(self.parse_expression()?);
                 let span = field_start.merge(self.previous_span());
                 fields.push(FingeFieldInit { name, value, span });
-                self.eat(&TokenKind::Comma);
+                if !self.consume_item_separator(&TokenKind::RBrace, "variant_field_initializers")? {
+                    break;
+                }
             }
             self.expect(&TokenKind::RBrace, "expected '}'")?;
             fields
@@ -1504,7 +1506,7 @@ impl Parser {
         let mut elements = Vec::new();
         while !self.check(&TokenKind::RBracket) && !self.is_at_end() {
             elements.push(self.parse_expression()?);
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::RBracket, "iuncta_elements")? {
                 break;
             }
         }
@@ -1534,7 +1536,10 @@ impl Parser {
 
             params.push(self.parse_clausura_param()?);
 
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator_before(
+                &[TokenKind::Arrow, TokenKind::Colon],
+                "closure_parameters",
+            )? {
                 break;
             }
         }
@@ -1697,7 +1702,7 @@ impl Parser {
         let mut params = Vec::new();
         while !self.check(end) && !self.is_at_end() {
             params.push(self.parse_clausura_param()?);
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(end, "closure_parameters")? {
                 break;
             }
         }
@@ -1863,7 +1868,7 @@ impl Parser {
                 span,
             });
 
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::RParen, "call_arguments")? {
                 break;
             }
         }
@@ -1891,7 +1896,7 @@ impl Parser {
                 elements.push(ArrayElement::Expr(Box::new(self.parse_expression()?)));
             }
 
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::RBracket, "array_elements")? {
                 break;
             }
         }
@@ -1950,7 +1955,7 @@ impl Parser {
                 });
             }
 
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::RBrace, "object_fields")? {
                 break;
             }
         }
@@ -1988,7 +1993,7 @@ impl Parser {
                 key,
                 value,
             });
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::RBrace, "json_object_members")? {
                 break;
             }
         }
@@ -2074,7 +2079,7 @@ impl Parser {
         let mut elements = Vec::new();
         while !self.check(&TokenKind::RBracket) && !self.is_at_end() {
             elements.push(self.parse_json_value()?);
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::RBracket, "json_array_elements")? {
                 break;
             }
         }
@@ -2142,7 +2147,7 @@ impl Parser {
         let mut args = Vec::new();
         loop {
             args.push(self.parse_type_argument()?);
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::GtAscii, "type_arguments")? {
                 break;
             }
         }
@@ -2179,7 +2184,27 @@ impl Parser {
         let template = self.parse_string()?;
 
         let mut args = Vec::new();
-        while self.eat(&TokenKind::Comma) {
+        loop {
+            if !self.eat(&TokenKind::Comma) {
+                if self.starts_item_list_entry() {
+                    return Err(ParseError::structured(
+                        ParseErrorKind::Expected,
+                        self.current_span(),
+                    )
+                    .with_arg("issue", "item_list_missing_separator")
+                    .with_arg("family", "item_list")
+                    .with_arg("position", "scriptum_arguments")
+                    .with_arg("expected", "comma between items"));
+                }
+                break;
+            }
+            let comma_span = self.previous_span();
+            if self.check(&TokenKind::RParen) {
+                return Err(ParseError::structured(ParseErrorKind::Expected, comma_span)
+                    .with_arg("issue", "item_list_trailing_comma")
+                    .with_arg("family", "item_list")
+                    .with_arg("position", "scriptum_arguments"));
+            }
             args.push(self.parse_expression()?);
         }
 

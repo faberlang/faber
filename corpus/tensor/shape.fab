@@ -45,7 +45,7 @@ main {
         3.0,
         4.0,
         5.0,
-        6.0,
+        6.0
     ]
     const list<int> shape ← [2, 3]
 

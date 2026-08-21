@@ -218,7 +218,7 @@ fn parses_braced_futura_cli_and_optio_annotations() {
     brevis = "v",
     longum = "verbose",
     typus = bivalens,
-    descriptio = "Verbose mode",
+    descriptio = "Verbose mode"
 }
 functio f() → vacuum { }
 "#,

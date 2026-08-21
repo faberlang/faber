@@ -43,7 +43,7 @@ main {
         3.0,
         4.0,
         5.0,
-        6.0,
+        6.0
     ]
     const tf32[] seed ← empty
     var tf32[2, 3] grid ← seed.from_flat(flat, [2, 3])

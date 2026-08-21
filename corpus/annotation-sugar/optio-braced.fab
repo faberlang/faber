@@ -37,6 +37,6 @@ locale = "en"
     longum = "verbose",
     typus = bool,
     descriptio = "Verbose mode",
-    ubique = true,
+    ubique = true
 }
 main args args { }

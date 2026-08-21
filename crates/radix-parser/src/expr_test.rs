@@ -497,16 +497,27 @@ fn json_literal_nested_objects_and_arrays() {
 }
 
 #[test]
-fn json_literal_trailing_commas_allowed_in_object_and_array() {
-    let value = json_literal_of(r#"fixum _ v ← { "x": 1, "y": [1, 2, 3,], }"#);
-    let JsonValue::Object(members) = value else {
-        panic!("expected object")
-    };
-    assert_eq!(members.len(), 2);
-    let JsonValue::Array(elements) = &members[1].value else {
-        panic!("expected array")
-    };
-    assert_eq!(elements.len(), 3);
+fn json_literal_trailing_commas_rejected_in_object_and_array() {
+    for source in [
+        r#"fixum _ v ← { "x": 1, }"#,
+        r#"fixum _ v ← { "x": [1, 2, 3,] }"#,
+    ] {
+        let result = parse(lex(source));
+        assert!(
+            result.errors.iter().any(|error| {
+                error
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "item_list_trailing_comma")
+                    && error.args.iter().any(|arg| {
+                        arg.name == "migration_help"
+                            && arg.value == "remove the trailing comma; JSON follows RFC 8259"
+                    })
+            }),
+            "expected strict JSON trailing-comma diagnostic, got {:?}",
+            result.errors
+        );
+    }
 }
 
 #[test]
