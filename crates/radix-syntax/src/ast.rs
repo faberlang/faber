@@ -1384,11 +1384,11 @@ pub struct TypeExpr {
     pub kind: TypeExprKind,
     pub span: Span,
 
-    /// Optional `iuncta` element label at this type-argument position.
+    /// Optional contextual aggregate label at this type-argument position.
     ///
-    /// `None` on every non-`iuncta` type expression and on unlabeled `iuncta`
-    /// slots. Identity consumers read `kind` only; labels are a checker-side
-    /// alias layer populated from this field.
+    /// `iuncta` and `ratio` lists use the same carrier, while `None` denotes an
+    /// unlabeled slot. Identity consumers read `kind` only; labels are a
+    /// checker-side alias layer populated from this field.
     pub iuncta_label: Option<Ident>,
 }
 

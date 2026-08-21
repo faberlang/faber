@@ -235,6 +235,8 @@ impl Parser {
                     loop {
                         let param = if name_str == "iuncta" {
                             self.parse_iuncta_type_argument(&mut labels)?
+                        } else if path.len() == 1 && name_str == "ratio" {
+                            self.parse_ratio_type_argument(&mut labels)?
                         } else {
                             self.parse_type_argument()?
                         };
@@ -505,6 +507,36 @@ impl Parser {
         };
         let mut ty = self.parse_type_argument()?;
         ty.iuncta_label = iuncta_label;
+        Ok(ty)
+    }
+
+    /// Parse one `ratio` element, which must have its contextual label.
+    ///
+    /// The label rides the same per-position syntax carrier as `iuncta`, while
+    /// the ratio grammar rejects the unlabeled inverse form at parse time.
+    pub(super) fn parse_ratio_type_argument(
+        &mut self,
+        labels: &mut HashSet<Symbol>,
+    ) -> Result<TypeExpr, ParseError> {
+        let is_label = matches!(self.peek().kind, TokenKind::Ident(_) | TokenKind::Tag)
+            && matches!(self.peek_at(1).kind, TokenKind::Colon);
+        if !is_label {
+            return Err(
+                ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                    .with_arg("issue", "ratio_type_arg_label_required"),
+            );
+        }
+
+        let label = self.parse_contextual_ident(KeywordOwner::DeclarationName)?;
+        if !labels.insert(label.name) {
+            return Err(ParseError::structured(ParseErrorKind::Expected, label.span)
+                .with_arg("issue", "duplicate_tuple_element_label")
+                .with_arg("label", self.interner.resolve(label.name).to_owned()));
+        }
+        self.expect(&TokenKind::Colon, "expected ':' after ratio element label")?;
+
+        let mut ty = self.parse_type()?;
+        ty.iuncta_label = Some(label);
         Ok(ty)
     }
 
