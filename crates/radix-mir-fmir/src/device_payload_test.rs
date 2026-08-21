@@ -238,7 +238,7 @@ fn sample_device_section() -> FmirDeviceSection {
 fn executor_plan_section_version_skew_fails_closed_before_field_admission() {
     let mut section = sample_device_section();
     section.executor_plan = Some(FmirExecutorPlanSection {
-        v: 2,
+        v: 3,
         plans: Vec::new(),
     });
     let error = crate::schema::admit_device_section_with_compat(
@@ -248,10 +248,7 @@ fn executor_plan_section_version_skew_fails_closed_before_field_admission() {
     .expect_err("executor-plan version skew must fail closed");
     assert!(matches!(
         error,
-        FmirImageError::UnsupportedExecutorPlanSectionVersion {
-            actual: 2,
-            expected: 1
-        }
+        FmirImageError::UnsupportedExecutorPlanSectionVersion { actual: 3, expected: 2 }
     ));
 }
 
