@@ -1,42 +1,1040 @@
-# Faber भाषा विनिर्देश
+# Faber Language Specification
 
-> **Reader-locale EBNF (Hindi).** Latin/source-of-truth grammar remains [`EBNF.md`](EBNF.md).
-> This file is the Hindi reader surface of that grammar (keywords, commentary, examples).
-> Pack keyword/type spellings are extracted from the glossary appendix at the end.
-> Glyphs (`← → ∴ ≡ ∪ ⇥` …) never localize; `ergo` localizes, `∴` is clausura-only.
+This file is generated from `docs/grammar/source.fg` and `docs/grammar/glossary.hi.toml`;
+hand edits fail the locale-render gate. Production IDs are the grammar's stable
+snake_case spine and their anchors are derived from those IDs.
 
-Faber प्रोग्रामिंग भाषा का औपचारिक व्याकरण। सक्रिय कार्यान्वयन मूल Rust workspace में है: `crates/faber` पैकेज और प्रोजेक्ट tooling के लिए तथा `crates/radix` compiler pipeline के लिए।
+## Grammar {#grammar}
 
-Latin [`EBNF.md`](EBNF.md) canonical grammar है; यह फ़ाइल उसकी Hindi reader surface है। चलने वाले भाषा-संदर्भ programs public sibling [`../examples/corpus/`](../examples/corpus/) में रहते हैं; उनके साथ वैकल्पिक `+++` frontmatter (`term`, `syntax`, `related` आदि) हो सकता है। Generated manifest [`../examples/corpus/index.toml`](../examples/corpus/index.toml) है। `faber explain` reference pack को disk से load करता है। नए संदर्भ काम के लिए language corpus और यह EBNF साथ पढ़ें।
+The grammar below is the identity rendering of the validated source. Normative detail is kept in this English sidecar and rendered as documentation; the source remains the syntax authority.
+
+```ebnf
+# formerly: fabFile
+# [001] fab_file
+fab_file ::= frontmatter? program
+# [002] frontmatter
+frontmatter ::= FRONTMATTER_DELIMITER NEWLINE TOML_LINES FRONTMATTER_DELIMITER NEWLINE?
+# [003] program
+program ::= statement*
+# [004] statement
+statement ::= annotation* statement_core
+# formerly: statementCore
+# [005] statement_core
+statement_core ::= importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl | typus_decl | ordo_decl | discretio_decl | si_stmt | dum_stmt | itera_stmt | elige_stmt | discerne_stmt | custodi_stmt | cura_stmt | fac_stmt | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt | rumpe_stmt | perge_stmt | tacet_stmt | iace_stmt | adfirma_stmt | requirit_stmt | nota_stmt | incipit_stmt | incipiet_stmt | ex_stmt | probandum_decl | proba_stmt | block_stmt | inc_dec_stmt | expr_stmt
+# formerly: bindingDecl
+# [006] binding_decl
+binding_decl ::= fixum_decl | sit_decl | array_destruct | object_destruct | figendum_decl
+# formerly: exprStmt
+# [007] expr_stmt
+expr_stmt ::= expression
+# formerly: blockStmt
+# [008] block_stmt
+block_stmt ::= '{' statement* '}'
+# formerly: varDecl
+# [009] fixum_decl
+fixum_decl ::= ('स्थिर' | 'चर') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?))?
+# formerly: awaitVarDecl
+# [010] figendum_decl
+figendum_decl ::= ('रुको_स्थिर' | 'रुको_चर') type_annotation IDENTIFIER '←' expression
+# formerly: sitDecl
+# [011] sit_decl
+sit_decl ::= 'बैठा' IDENTIFIER ('←' expression)?
+# formerly: arrayDestruct
+# [012] array_destruct
+array_destruct ::= ('स्थिर' | 'चर') array_pattern '←' expression
+# formerly: objectDestruct
+# [013] object_destruct
+object_destruct ::= ('स्थिर' | 'चर') object_pattern '←' expression
+# formerly: funcDecl
+# [014] functio_decl
+functio_decl ::= 'फलन' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
+# formerly: paramList
+# [015] param_list
+param_list ::= (parameter (',' parameter)*)?
+# formerly: genericParams
+# [016] generic_params
+generic_params ::= '<' generic_param (',' generic_param)* '>'
+# formerly: genericParam
+# [017] generic_param
+generic_param ::= IDENTIFIER | 'आकार' IDENTIFIER
+# formerly: callTypeArgs
+# [018] call_type_args
+call_type_args ::= '<' type_annotation (',' type_annotation)* '>'
+# [019] parameter
+parameter ::= 'बाकी'? type_annotation IDENTIFIER 'स्वेच्छा'? ('रूपमें' IDENTIFIER)? ('डिफ़ॉल्ट' expression)?
+# formerly: funcModifier
+# [020] func_modifier
+func_modifier ::= 'तर्क' IDENTIFIER | 'आवंटक' IDENTIFIER ('रूपमें' IDENTIFIER)? | 'त्रुटि' IDENTIFIER | 'निर्गम' (IDENTIFIER | NUMBER) | 'अपरिवर्तित' | 'फेंकता' | 'चयन' IDENTIFIER
+# formerly: callablePosture
+# [021] callable_posture
+callable_posture ::= 'async' | 'जनक' | 'async_जनक'
+# formerly: returnClause
+# [022] return_clause
+return_clause ::= '→' type_annotation
+# formerly: alternateExitClause
+# [023] alternate_exit_clause
+alternate_exit_clause ::= '⇥' type_annotation
+# formerly: stmtBodyJoint
+# [024] ergo_joint
+ergo_joint ::= 'अतः'
+# formerly: clausuraJoint
+# [025] clausura_joint
+clausura_joint ::= '∴'
+# formerly: clausuraExpr
+# [026] clausura_expr
+clausura_expr ::= compact_clausura_expr | clausura_legacy_expr
+# formerly: compactClausuraExpr
+# [027] compact_clausura_expr
+compact_clausura_expr ::= clausura_signature clausura_joint (expression | fac_block)
+# formerly: clausuraSignature
+# [028] clausura_signature
+clausura_signature ::= (clausura_param | '(' clausura_params? ')') return_clause? alternate_exit_clause?
+# formerly: closureFacBlock
+# [029] fac_block
+fac_block ::= 'करो' block_stmt cape_clause?
+# formerly: legacyClausuraExpr
+# [030] clausura_legacy_expr
+clausura_legacy_expr ::= 'समापन' clausura_params? ('→' type_annotation)? (':' expression | block_stmt)
+# formerly: clausuraParams
+# [031] clausura_params
+clausura_params ::= clausura_param (',' clausura_param)*
+# formerly: clausuraParam
+# [032] clausura_param
+clausura_param ::= type_annotation IDENTIFIER
+# formerly: genusDecl
+# [033] genus_decl
+genus_decl ::= 'अमूर्त'? 'वर्ग' IDENTIFIER generic_params? ('अधीन' IDENTIFIER)? ('लागूकरता' IDENTIFIER (',' IDENTIFIER)*)? '{' genus_member* '}'
+# formerly: genusMember
+# [034] genus_member
+genus_member ::= annotation* (field_decl | functio_method_decl)
+# formerly: fieldDecl
+# [035] field_decl
+field_decl ::= 'स्थैतिक'? 'संबद्ध'? type_annotation IDENTIFIER 'स्वेच्छा'? ('=' expression)?
+# formerly: methodDecl
+# [036] functio_method_decl
+functio_method_decl ::= 'फलन' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
+# [037] annotation
+annotation ::= nucleum_annotation | braced_annotation | annotation_sugar
+# formerly: annotationName
+# [038] annotation_name
+annotation_name ::= ANNOTATION_NAME
+# formerly: bracedAnnotation
+# [039] braced_annotation
+braced_annotation ::= '@' annotation_name '{' annotation_field_list? '}'
+# formerly: annotationFieldList
+# [040] annotation_field_list
+annotation_field_list ::= annotation_field (',' annotation_field)*
+# formerly: annotationField
+# [041] annotation_field
+annotation_field ::= ANNOTATION_FIELD_NAME '=' (expression | type_annotation)
+# formerly: annotationSugar
+# [042] annotation_sugar
+annotation_sugar ::= '@' annotation_name NON_NEWLINE_TOKEN* NEWLINE
+# formerly: nucleumAnnotation
+# [043] nucleum_annotation
+nucleum_annotation ::= nucleum_sugar | nucleum_braced
+# formerly: nucleumSugar
+# [044] nucleum_sugar
+nucleum_sugar ::= '@' 'कर्नेल' nucleum_modifier? NEWLINE
+# formerly: nucleumBraced
+# [045] nucleum_braced
+nucleum_braced ::= '@' 'कर्नेल' '{' nucleum_field_list? '}'
+# formerly: nucleumModifier
+# [046] nucleum_modifier
+nucleum_modifier ::= 'खंड'
+# formerly: nucleumFieldList
+# [047] nucleum_field_list
+nucleum_field_list ::= nucleum_field (',' nucleum_field)*
+# formerly: nucleumField
+# [048] nucleum_field
+nucleum_field ::= 'खंड' '=' ('सत्य' | 'असत्य')
+# formerly: implendumDecl
+# [049] implendum_decl
+implendum_decl ::= 'अनुबन्ध' IDENTIFIER generic_params? '{' implendum_method_decl* '}'
+# formerly: implendumMethod
+# [050] implendum_method_decl
+implendum_method_decl ::= annotation* 'फलन' IDENTIFIER '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
+# formerly: typeAliasDecl
+# [051] typus_decl
+typus_decl ::= 'प्रकार' IDENTIFIER generic_params? '=' type_annotation
+# formerly: enumDecl
+# [052] ordo_decl
+ordo_decl ::= 'क्रम' IDENTIFIER '{' enum_member (',' enum_member)* '}'
+# formerly: enumMember
+# [053] enum_member
+enum_member ::= IDENTIFIER ('=' ('-'? NUMBER | STRING))?
+# formerly: discretioDecl
+# [054] discretio_decl
+discretio_decl ::= 'विभेद' IDENTIFIER generic_params? '{' variant (',' variant)* '}'
+# [055] variant
+variant ::= IDENTIFIER ('{' variant_fields '}')?
+# formerly: variantFields
+# [056] variant_fields
+variant_fields ::= (type_annotation IDENTIFIER)*
+# formerly: importDecl
+# [057] importa_decl
+importa_decl ::= importa_record | importa_sugar
+# formerly: importRecord
+# [058] importa_record
+importa_record ::= 'आयात' '{' import_field_list? '}'
+# formerly: importFieldList
+# [059] import_field_list
+import_field_list ::= import_field (',' import_field)*
+# formerly: importField
+# [060] import_field
+import_field ::= ex_field | visibilitas_field | nomen_field | ut_field | omnia_field
+# formerly: importSourceField
+# [061] ex_field
+ex_field ::= 'सेवन' '=' STRING
+# formerly: importVisibilityField
+# [062] visibilitas_field
+visibilitas_field ::= 'visibilitas' '=' publica
+# formerly: importNameField
+# [063] nomen_field
+nomen_field ::= 'नाम' '=' IDENTIFIER
+# formerly: importAliasField
+# [064] ut_field
+ut_field ::= 'रूपमें' '=' IDENTIFIER
+# formerly: importWildcardField
+# [065] omnia_field
+omnia_field ::= 'सब' '=' IDENTIFIER
+# formerly: importSugar
+# [066] importa_sugar
+importa_sugar ::= 'आयात' 'सेवन' STRING publica? (named_import | wildcard_import)?
+# formerly: visibility
+# [067] publica
+publica ::= 'सार्वजनिक'
+# formerly: namedImport
+# [068] named_import
+named_import ::= IDENTIFIER ('रूपमें' IDENTIFIER)?
+# formerly: wildcardImport
+# [069] wildcard_import
+wildcard_import ::= '*' 'रूपमें' IDENTIFIER
+# formerly: typeAnnotation
+# [070] type_annotation
+type_annotation ::= owned_type ('∪' owned_type)*
+# formerly: ownedType
+# [071] owned_type
+owned_type ::= ('से' | 'में' | 'स्वामित्व' | 'प्रतिलिपि')? base_type
+# formerly: baseType
+# [072] base_type
+base_type ::= hole_type | function_type | width_type_sugar | ratio_type | qualified_type type_arguments? | '(' type_annotation ')'
+# [073] ratio_type
+ratio_type ::= 'ratio' '<' labeled_type_argument (',' labeled_type_argument)* '>'
+# formerly: holeType
+# [074] hole_type
+hole_type ::= '_' | '∪'
+# formerly: qualifiedType
+# [075] qualified_type
+qualified_type ::= IDENTIFIER ('.' IDENTIFIER)*
+# formerly: typeArguments
+# [076] type_arguments
+type_arguments ::= '<' type_argument (',' type_argument)* '>'
+# formerly: typeArgument
+# [077] type_argument
+type_argument ::= labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
+# formerly: labeledTypeArgument
+# [078] labeled_type_argument
+labeled_type_argument ::= IDENTIFIER ':' type_annotation
+# formerly: widthTypeSugar
+# [079] width_type_sugar
+width_type_sugar ::= WIDTH_MARKER | LISTA_WIDTH_SUGAR | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix? | MATRIX_WIDTH_SUGAR shape_suffix
+# formerly: shapeSuffix
+# [080] shape_suffix
+shape_suffix ::= '[' figura_list? ']'
+# [081] figura
+figura ::= '_' | NATURAL | IDENTIFIER | '[' figura_list? ']'
+# formerly: figuraList
+# [082] figura_list
+figura_list ::= figura (',' figura)*
+# formerly: functionType
+# [083] function_type
+function_type ::= '(' type_list? ')' '→' type_annotation alternate_exit_clause?
+# formerly: typeList
+# [084] type_list
+type_list ::= type_annotation (',' type_annotation)*
+# formerly: ifStmt
+# [085] si_stmt
+si_stmt ::= 'यदि' expression arm ('अन्यथायदि' si_stmt | secus_clause)?
+# formerly: elseClause
+# [086] secus_clause
+secus_clause ::= 'अन्यथा' else_arm
+# [087] arm
+arm ::= (block_stmt | ergo_joint statement) cape_clause?
+# formerly: elseArm
+# [088] else_arm
+else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
+# formerly: whileStmt
+# [089] dum_stmt
+dum_stmt ::= 'जबतक' expression (block_stmt | ergo_joint statement) cape_clause?
+# formerly: iteraStmt
+# [090] itera_stmt
+itera_stmt ::= 'दोहराओ' (('सेवन' | 'से') expression | 'सीमा' expression) ('स्थिर' | 'चर') IDENTIFIER (block_stmt | ergo_joint statement) cape_clause?
+# formerly: eligeStmt
+# [091] elige_stmt
+elige_stmt ::= 'चुनो' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
+# formerly: eligeCase
+# [092] casu_elige_clause
+casu_elige_clause ::= 'स्थिति' expression (block_stmt | ergo_joint statement)
+# formerly: defaultCase
+# [093] ceterum_clause
+ceterum_clause ::= 'अन्यतम' (block_stmt | ergo_joint statement)
+# formerly: discerneStmt
+# [094] discerne_stmt
+discerne_stmt ::= 'मिलाओ' 'सब'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
+# [095] discriminants
+discriminants ::= expression (',' expression)*
+# formerly: variantCase
+# [096] casu_variant_clause
+casu_variant_clause ::= 'स्थिति' patterns (block_stmt | ergo_joint statement)
+# [097] patterns
+patterns ::= pattern ((',' | 'और') pattern)*
+# [098] pattern
+pattern ::= '_' | literal | (IDENTIFIER ut_pattern?)
+# formerly: patternBind
+# [099] ut_pattern
+ut_pattern ::= ('रूपमें' IDENTIFIER) | (('स्थिर' | 'चर') pattern_binding (',' pattern_binding)*)
+# formerly: patternBinding
+# [100] pattern_binding
+pattern_binding ::= IDENTIFIER ('रूपमें' IDENTIFIER)?
+# formerly: guardStmt
+# [101] custodi_stmt
+custodi_stmt ::= 'रक्षक' '{' si_guard_clause+ '}'
+# formerly: guardClause
+# [102] si_guard_clause
+si_guard_clause ::= 'यदि' expression (block_stmt | ergo_joint statement)
+# formerly: curaStmt
+# [103] cura_stmt
+cura_stmt ::= 'देखभाल' STRING ('स्थिर' | 'चर') type_annotation IDENTIFIER block_stmt cape_clause?
+# formerly: extractStmt
+# [104] ex_stmt
+ex_stmt ::= 'सेवन' expression ('स्थिर' | 'चर') extract_fields
+# formerly: extractFields
+# [105] extract_fields
+extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
+# formerly: extractField
+# [106] extract_field
+extract_field ::= IDENTIFIER ('रूपमें' IDENTIFIER)?
+# formerly: restField
+# [107] ceteri_field
+ceteri_field ::= 'बाकी' IDENTIFIER
+# formerly: returnStmt
+# [108] redde_stmt
+redde_stmt ::= 'लौटाओ' expression?
+# formerly: returnAwaitStmt
+# [109] reddet_stmt
+reddet_stmt ::= 'रुको_लौटाओ' expression
+# formerly: awaitDiscardStmt
+# [110] tacebit_stmt
+tacebit_stmt ::= 'रुको' expression
+# formerly: yieldStmt
+# [111] cede_stmt
+cede_stmt ::= 'आगेबढ़ो' expression
+# formerly: breakStmt
+# [112] rumpe_stmt
+rumpe_stmt ::= 'तोड़ो'
+# formerly: continueStmt
+# [113] perge_stmt
+perge_stmt ::= 'जारी'
+# formerly: noopStmt
+# [114] tacet_stmt
+tacet_stmt ::= 'मौन'
+# formerly: throwStmt
+# [115] iace_stmt
+iace_stmt ::= iace_expr | iace_guarded_expr
+# formerly: bareThrow
+# [116] iace_expr
+iace_expr ::= ('इधरफेंको' | 'मरोजाओ') expression
+# formerly: guardedThrowSugar
+# [117] iace_guarded_expr
+iace_guarded_expr ::= ('इधरफेंको' | 'मरोजाओ') expression NO_NEWLINE 'यदि' expression
+# formerly: catchClause
+# [118] cape_clause
+cape_clause ::= 'पकड़ो' IDENTIFIER block_stmt
+# formerly: assertStmt
+# [119] adfirma_stmt
+adfirma_stmt ::= 'पुष्टि' expression ('मरोजाओ' expression)?
+# formerly: requiritStmt
+# [120] requirit_stmt
+requirit_stmt ::= 'आवश्यक' expression 'इधरफेंको' expression
+# [121] expression
+expression ::= assignment
+# [122] assignment
+assignment ::= ternary ('←' assignment | '↤' assignment inline_recovery?)?
+# formerly: incDecStmt
+# [123] inc_dec_stmt
+inc_dec_stmt ::= place ('↑' | '↓')
+# [124] place
+place ::= call_expr
+# [125] ternary
+ternary ::= aut_expr (('?' expression ':' | 'ऐसा' expression 'अन्यथा') ternary)?
+# formerly: or
+# [126] aut_expr
+aut_expr ::= et_expr (('या') et_expr)*
+# formerly: and
+# [127] et_expr
+et_expr ::= equality (('और') equality)*
+# [128] equality
+equality ::= comparison equality_tail*
+# formerly: equalityTail
+# [129] equality_tail
+equality_tail ::= ('≡' | '≠' | '≈' | '≉' | 'है' | 'नहीं' 'है') comparison
+# [130] comparison
+comparison ::= bitwise_or_expr (('≺' | '≻' | '≤' | '≥' | 'भीतर' | 'बीच') bitwise_or_expr)*
+# formerly: bitwiseOr
+# [131] bitwise_or_expr
+bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
+# formerly: bitwiseXor
+# [132] bitwise_xor_expr
+bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
+# formerly: bitwiseAnd
+# [133] bitwise_and_expr
+bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
+# formerly: shift
+# [134] shift_expr
+shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
+# formerly: range
+# [135] range_expr
+range_expr ::= additive_expr range_tail?
+# formerly: rangeTail
+# [136] range_tail
+range_tail ::= ('‥' | '…' | 'पहले' | 'तक') additive_expr ('प्रति' additive_expr)?
+# formerly: additive
+# [137] additive_expr
+additive_expr ::= multiplicative_expr (('+' | '-') multiplicative_expr)*
+# formerly: multiplicative
+# [138] multiplicative_expr
+multiplicative_expr ::= vel_expr (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙') vel_expr)*
+# formerly: coalesce
+# [139] vel_expr
+vel_expr ::= unary_expr ('डिफ़ॉल्ट' vel_rhs)*
+# formerly: velRhs
+# [140] vel_rhs
+vel_rhs ::= unary_expr vel_range_tail?
+# formerly: velRangeTail
+# [141] vel_range_tail
+vel_range_tail ::= ('‥' | '…' | 'पहले' | 'तक') unary_expr ('प्रति' unary_expr)?
+# formerly: unary
+# [142] unary_expr
+unary_expr ::= ('-' | '¬' | 'नहीं') unary_expr | finge_expr | cast_expr
+# formerly: gradientExpr
+# [143] gradient_expr
+gradient_expr ::= call_expr ('∇' gradient_selection?)?
+# formerly: gradientSelection
+# [144] gradient_selection
+gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
+# formerly: gradientPlace
+# [145] gradient_place
+gradient_place ::= expression
+# formerly: cast
+# [146] cast_expr
+cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)*
+# formerly: conversio
+# [147] conversio_expr
+conversio_expr ::= '↦' type_annotation inline_recovery?
+# formerly: inlineRecovery
+# [148] inline_recovery
+inline_recovery ::= '⇥' unary_expr
+# formerly: call
+# [149] call_expr
+call_expr ::= primary (call_suffix | member_suffix | optional_suffix | non_null_suffix)*
+# formerly: callSuffix
+# [150] call_suffix
+call_suffix ::= call_type_args? '(' argument_list ')'
+# formerly: memberSuffix
+# [151] member_suffix
+member_suffix ::= '.' IDENTIFIER | '[' expression ']'
+# formerly: optionalSuffix
+# [152] optional_suffix
+optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
+# formerly: nonNullSuffix
+# [153] non_null_suffix
+non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
+# formerly: argumentList
+# [154] argument_list
+argument_list ::= (argument (',' argument)*)?
+# [155] argument
+argument ::= template_argument | 'फैलाओ'? expression
+# formerly: templateArgument
+# [156] template_argument
+template_argument ::= 'फैलाओ'? IDENTIFIER ':' expression
+# [157] literal
+literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'सत्य' | 'असत्य' | 'शून्य'
+# [158] primary
+primary ::= IDENTIFIER | literal | 'मैं' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | '(' expression ')'
+# formerly: adExpr
+# [159] ad_expr
+ad_expr ::= 'सेवा' ASCII_STRING ad_opener?
+# formerly: adOpener
+# [160] ad_opener
+ad_opener ::= '(' expression ')'
+# formerly: arrayLiteral
+# [161] array_literal
+array_literal ::= '[' argument_list? ']'
+# formerly: iunctaExpr
+# [162] iuncta_expr
+iuncta_expr ::= 'टपल' type_arguments '[' argument_list? ']'
+# formerly: jsonLiteral
+# [163] json_literal
+json_literal ::= '{' (json_member (',' json_member)*)? '}'
+# formerly: jsonMember
+# [164] json_member
+json_member ::= STRING ':' json_value
+# formerly: typedConstructor
+# [165] typed_constructor
+typed_constructor ::= type_annotation '{' field_list? '}'
+# formerly: fieldList
+# [166] field_list
+field_list ::= field_init (',' field_init)*
+# formerly: fieldInit
+# [167] field_init
+field_init ::= ('फैलाओ' expression) | (field_key '=' expression) | IDENTIFIER
+# formerly: fieldKey
+# [168] field_key
+field_key ::= IDENTIFIER | STRING | '[' expression ']'
+# formerly: jsonValue
+# [169] json_value
+json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
+# formerly: jsonObject
+# [170] json_object
+json_object ::= '{' (json_member (',' json_member)*)? '}'
+# formerly: jsonArray
+# [171] json_array
+json_array ::= '[' (json_value (',' json_value)*)? ']'
+# formerly: jsonString
+# [172] json_string
+json_string ::= STRING
+# formerly: jsonNumber
+# [173] json_number
+json_number ::= NUMBER
+# formerly: fingeExpr
+# [174] finge_expr
+finge_expr ::= 'गढ़ो' qualified_ident ('{' field_list '}')? ('∷' type_annotation)?
+# formerly: qualifiedIdent
+# [175] qualified_ident
+qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
+# formerly: praefixumExpr
+# [176] praefixum_expr
+praefixum_expr ::= 'उपसर्ग' (block_stmt | '(' expression ')')
+# formerly: scriptumExpr
+# [177] scriptum_expr
+scriptum_expr ::= 'लिखित' '(' STRING (',' expression)* ')'
+# formerly: legeExpr
+# [178] lege_expr
+lege_expr ::= 'पढ़ो' 'पंक्ति'?
+# formerly: objectPattern
+# [179] object_pattern
+object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
+# formerly: patternProperty
+# [180] pattern_property
+pattern_property ::= 'बाकी'? IDENTIFIER ('रूपमें' IDENTIFIER)?
+# formerly: arrayPattern
+# [181] array_pattern
+array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
+# formerly: arrayPatternElement
+# [182] array_pattern_element
+array_pattern_element ::= '_' | 'बाकी'? IDENTIFIER
+# formerly: outputStmt
+# [183] nota_stmt
+nota_stmt ::= ('दिखाओ' | 'देखो' | 'चेताओ' | 'लिखो') expression (',' expression)*
+# formerly: entryHeader
+# [184] entry_header
+entry_header ::= ('तर्क' IDENTIFIER)? ('निर्गम' expression)?
+# formerly: incipitStmt
+# [185] incipit_stmt
+incipit_stmt ::= 'आरंभ' entry_header block_stmt
+# formerly: incipietStmt
+# [186] incipiet_stmt
+incipiet_stmt ::= 'आरंभasync' entry_header block_stmt
+# formerly: probandumDecl
+# [187] probandum_decl
+probandum_decl ::= 'परीक्षणसमूह' STRING proba_modifier* '{' probandum_body '}'
+# formerly: probandumBody
+# [188] probandum_body
+probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
+# formerly: probaStmt
+# [189] proba_stmt
+proba_stmt ::= 'परीक्षण' STRING proba_modifier* block_stmt
+# formerly: probaModifier
+# [190] proba_modifier
+proba_modifier ::= 'छोड़ो' STRING | 'लंबित' STRING | 'केवल' | 'टैग' STRING | 'समय' NUMBER | 'मापो' | 'पुनरावृत्ति' NUMBER | 'नाज़ुक' NUMBER | 'केवलमें' STRING
+# formerly: praeparaBlock
+# [191] praepara_block
+praepara_block ::= ('पूर्वतैयार' | 'पूर्वतैयारasync' | 'पश्चतैयार' | 'पश्चतैयारasync') 'सब'? block_stmt
+# formerly: facBlockStmt
+# [192] fac_stmt
+fac_stmt ::= 'करो' block_stmt cape_clause? ('जबतक' expression)?
+# [193] IDENTIFIER
+IDENTIFIER ::=
+# [194] NUMBER
+NUMBER ::=
+# [195] NATURAL
+NATURAL ::=
+# [196] STRING
+STRING ::=
+# [197] ASCII_STRING
+ASCII_STRING ::=
+# [198] BACKTICK_STRING
+BACKTICK_STRING ::=
+# [199] OCTETI_STRING
+OCTETI_STRING ::=
+# [200] NEWLINE
+NEWLINE ::=
+# [201] WIDTH_MARKER
+WIDTH_MARKER ::=
+# [202] LISTA_WIDTH_SUGAR
+LISTA_WIDTH_SUGAR ::=
+# [203] TENSOR_WIDTH_SUGAR
+TENSOR_WIDTH_SUGAR ::=
+# [204] SPARSA_WIDTH_SUGAR
+SPARSA_WIDTH_SUGAR ::=
+# [205] VECTOR_WIDTH_SUGAR
+VECTOR_WIDTH_SUGAR ::=
+# [206] MATRIX_WIDTH_SUGAR
+MATRIX_WIDTH_SUGAR ::=
+# [207] FRONTMATTER_DELIMITER
+FRONTMATTER_DELIMITER ::=
+# [208] TOML_LINES
+TOML_LINES ::=
+# [209] ANNOTATION_NAME
+ANNOTATION_NAME ::=
+# [210] ANNOTATION_FIELD_NAME
+ANNOTATION_FIELD_NAME ::=
+# [211] NON_NEWLINE_TOKEN
+NON_NEWLINE_TOKEN ::=
+# [212] NO_NEWLINE
+NO_NEWLINE ::=
+```
+
+## Production Index {#production-index}
+
+| ID | Anchor | Status | Former names |
+|---|---|---|---|
+| [`IDENTIFIER`](#identifier) | `#identifier` | capture-pending | — |
+| [`NUMBER`](#number) | `#number` | capture-pending | — |
+| [`NATURAL`](#natural) | `#natural` | capture-pending | — |
+| [`STRING`](#string) | `#string` | capture-pending | — |
+| [`ASCII_STRING`](#ascii-string) | `#ascii-string` | capture-pending | — |
+| [`BACKTICK_STRING`](#backtick-string) | `#backtick-string` | capture-pending | — |
+| [`OCTETI_STRING`](#octeti-string) | `#octeti-string` | capture-pending | — |
+| [`NEWLINE`](#newline) | `#newline` | capture-pending | — |
+| [`WIDTH_MARKER`](#width-marker) | `#width-marker` | capture-pending | — |
+| [`LISTA_WIDTH_SUGAR`](#lista-width-sugar) | `#lista-width-sugar` | capture-pending | — |
+| [`TENSOR_WIDTH_SUGAR`](#tensor-width-sugar) | `#tensor-width-sugar` | capture-pending | — |
+| [`SPARSA_WIDTH_SUGAR`](#sparsa-width-sugar) | `#sparsa-width-sugar` | capture-pending | — |
+| [`VECTOR_WIDTH_SUGAR`](#vector-width-sugar) | `#vector-width-sugar` | capture-pending | — |
+| [`MATRIX_WIDTH_SUGAR`](#matrix-width-sugar) | `#matrix-width-sugar` | capture-pending | — |
+| [`FRONTMATTER_DELIMITER`](#frontmatter-delimiter) | `#frontmatter-delimiter` | capture-pending | — |
+| [`TOML_LINES`](#toml-lines) | `#toml-lines` | capture-pending | — |
+| [`ANNOTATION_NAME`](#annotation-name) | `#annotation-name` | capture-pending | — |
+| [`ANNOTATION_FIELD_NAME`](#annotation-field-name) | `#annotation-field-name` | capture-pending | — |
+| [`NON_NEWLINE_TOKEN`](#non-newline-token) | `#नहीं-newline-token` | capture-pending | — |
+| [`NO_NEWLINE`](#no-newline) | `#no-newline` | capture-pending | — |
+| [`fab_file`](#fab-file) | `#fab-file` | live | fabFile |
+| [`frontmatter`](#frontmatter) | `#frontmatter` | live | — |
+| [`program`](#program) | `#program` | live | — |
+| [`statement`](#statement) | `#statement` | live | — |
+| [`statement_core`](#statement-core) | `#statement-core` | live | statementCore |
+| [`binding_decl`](#binding-decl) | `#binding-decl` | live | bindingDecl |
+| [`expr_stmt`](#expr-stmt) | `#expr-stmt` | live | exprStmt |
+| [`block_stmt`](#block-stmt) | `#block-stmt` | live | blockStmt |
+| [`fixum_decl`](#fixum-decl) | `#स्थिर-decl` | live | varDecl |
+| [`figendum_decl`](#figendum-decl) | `#रुको_स्थिर-decl` | live | awaitVarDecl |
+| [`sit_decl`](#sit-decl) | `#बैठा-decl` | live | sitDecl |
+| [`array_destruct`](#array-destruct) | `#array-destruct` | live | arrayDestruct |
+| [`object_destruct`](#object-destruct) | `#object-destruct` | live | objectDestruct |
+| [`functio_decl`](#functio-decl) | `#फलन-decl` | live | funcDecl |
+| [`param_list`](#param-list) | `#param-list` | live | paramList |
+| [`generic_params`](#generic-params) | `#generic-params` | live | genericParams |
+| [`generic_param`](#generic-param) | `#generic-param` | live | genericParam |
+| [`call_type_args`](#call-type-args) | `#call-type-args` | live | callTypeArgs |
+| [`parameter`](#parameter) | `#parameter` | live | — |
+| [`func_modifier`](#func-modifier) | `#func-modifier` | live | funcModifier |
+| [`callable_posture`](#callable-posture) | `#callable-posture` | live | callablePosture |
+| [`return_clause`](#return-clause) | `#return-clause` | live | returnClause |
+| [`alternate_exit_clause`](#alternate-exit-clause) | `#alternate-exit-clause` | live | alternateExitClause |
+| [`ergo_joint`](#ergo-joint) | `#अतः-joint` | live | stmtBodyJoint |
+| [`clausura_joint`](#clausura-joint) | `#समापन-joint` | live | clausuraJoint |
+| [`clausura_expr`](#clausura-expr) | `#समापन-expr` | live | clausuraExpr |
+| [`compact_clausura_expr`](#compact-clausura-expr) | `#compact-समापन-expr` | live | compactClausuraExpr |
+| [`clausura_signature`](#clausura-signature) | `#समापन-signature` | live | clausuraSignature |
+| [`fac_block`](#fac-block) | `#करो-block` | live | closureFacBlock |
+| [`clausura_legacy_expr`](#clausura-legacy-expr) | `#समापन-legacy-expr` | live | legacyClausuraExpr |
+| [`clausura_params`](#clausura-params) | `#समापन-params` | live | clausuraParams |
+| [`clausura_param`](#clausura-param) | `#समापन-param` | live | clausuraParam |
+| [`genus_decl`](#genus-decl) | `#वर्ग-decl` | live | genusDecl |
+| [`genus_member`](#genus-member) | `#वर्ग-member` | live | genusMember |
+| [`field_decl`](#field-decl) | `#field-decl` | live | fieldDecl |
+| [`functio_method_decl`](#functio-method-decl) | `#फलन-method-decl` | live | methodDecl |
+| [`annotation`](#annotation) | `#annotation` | live | — |
+| [`annotation_name`](#annotation-name) | `#annotation-name` | live | annotationName |
+| [`braced_annotation`](#braced-annotation) | `#braced-annotation` | live | bracedAnnotation |
+| [`annotation_field_list`](#annotation-field-list) | `#annotation-field-list` | live | annotationFieldList |
+| [`annotation_field`](#annotation-field) | `#annotation-field` | live | annotationField |
+| [`annotation_sugar`](#annotation-sugar) | `#annotation-sugar` | live | annotationSugar |
+| [`nucleum_annotation`](#nucleum-annotation) | `#कर्नेल-annotation` | live | nucleumAnnotation |
+| [`nucleum_sugar`](#nucleum-sugar) | `#कर्नेल-sugar` | live | nucleumSugar |
+| [`nucleum_braced`](#nucleum-braced) | `#कर्नेल-braced` | live | nucleumBraced |
+| [`nucleum_modifier`](#nucleum-modifier) | `#कर्नेल-modifier` | live | nucleumModifier |
+| [`nucleum_field_list`](#nucleum-field-list) | `#कर्नेल-field-list` | live | nucleumFieldList |
+| [`nucleum_field`](#nucleum-field) | `#कर्नेल-field` | live | nucleumField |
+| [`implendum_decl`](#implendum-decl) | `#अनुबन्ध-decl` | live | implendumDecl |
+| [`implendum_method_decl`](#implendum-method-decl) | `#अनुबन्ध-method-decl` | live | implendumMethod |
+| [`typus_decl`](#typus-decl) | `#प्रकार-decl` | live | typeAliasDecl |
+| [`ordo_decl`](#ordo-decl) | `#क्रम-decl` | live | enumDecl |
+| [`enum_member`](#enum-member) | `#enum-member` | live | enumMember |
+| [`discretio_decl`](#discretio-decl) | `#विभेद-decl` | live | discretioDecl |
+| [`variant`](#variant) | `#variant` | live | — |
+| [`variant_fields`](#variant-fields) | `#variant-fields` | live | variantFields |
+| [`importa_decl`](#importa-decl) | `#आयात-decl` | live | importDecl |
+| [`importa_record`](#importa-record) | `#आयात-record` | live | importRecord |
+| [`import_field_list`](#import-field-list) | `#import-field-list` | live | importFieldList |
+| [`import_field`](#import-field) | `#import-field` | live | importField |
+| [`ex_field`](#ex-field) | `#सेवन-field` | live | importSourceField |
+| [`visibilitas_field`](#visibilitas-field) | `#visibilitas-field` | live | importVisibilityField |
+| [`nomen_field`](#nomen-field) | `#नाम-field` | live | importNameField |
+| [`ut_field`](#ut-field) | `#रूपमें-field` | live | importAliasField |
+| [`omnia_field`](#omnia-field) | `#सब-field` | live | importWildcardField |
+| [`importa_sugar`](#importa-sugar) | `#आयात-sugar` | live | importSugar |
+| [`सार्वजनिक`](#publica) | `#सार्वजनिक` | live | visibility |
+| [`named_import`](#named-import) | `#named-import` | live | namedImport |
+| [`wildcard_import`](#wildcard-import) | `#wildcard-import` | live | wildcardImport |
+| [`type_annotation`](#type-annotation) | `#type-annotation` | live | typeAnnotation |
+| [`owned_type`](#owned-type) | `#owned-type` | live | ownedType |
+| [`base_type`](#base-type) | `#base-type` | live | baseType |
+| [`ratio_type`](#ratio-type) | `#ratio-type` | live | — |
+| [`hole_type`](#hole-type) | `#hole-type` | live | holeType |
+| [`qualified_type`](#qualified-type) | `#qualified-type` | live | qualifiedType |
+| [`type_arguments`](#type-arguments) | `#type-arguments` | live | typeArguments |
+| [`type_argument`](#type-argument) | `#type-argument` | live | typeArgument |
+| [`labeled_type_argument`](#labeled-type-argument) | `#labeled-type-argument` | live | labeledTypeArgument |
+| [`width_type_sugar`](#width-type-sugar) | `#width-type-sugar` | live | widthTypeSugar |
+| [`shape_suffix`](#shape-suffix) | `#shape-suffix` | live | shapeSuffix |
+| [`figura`](#figura) | `#figura` | live | — |
+| [`figura_list`](#figura-list) | `#figura-list` | live | figuraList |
+| [`function_type`](#function-type) | `#function-type` | live | functionType |
+| [`type_list`](#type-list) | `#type-list` | live | typeList |
+| [`si_stmt`](#si-stmt) | `#यदि-stmt` | live | ifStmt |
+| [`secus_clause`](#secus-clause) | `#अन्यथा-clause` | live | elseClause |
+| [`arm`](#arm) | `#arm` | live | — |
+| [`else_arm`](#else-arm) | `#else-arm` | live | elseArm |
+| [`dum_stmt`](#dum-stmt) | `#जबतक-stmt` | live | whileStmt |
+| [`itera_stmt`](#itera-stmt) | `#दोहराओ-stmt` | live | iteraStmt |
+| [`elige_stmt`](#elige-stmt) | `#चुनो-stmt` | live | eligeStmt |
+| [`casu_elige_clause`](#casu-elige-clause) | `#स्थिति-चुनो-clause` | live | eligeCase |
+| [`ceterum_clause`](#ceterum-clause) | `#अन्यतम-clause` | live | defaultCase |
+| [`discerne_stmt`](#discerne-stmt) | `#मिलाओ-stmt` | live | discerneStmt |
+| [`discriminants`](#discriminants) | `#discriminants` | live | — |
+| [`casu_variant_clause`](#casu-variant-clause) | `#स्थिति-variant-clause` | live | variantCase |
+| [`patterns`](#patterns) | `#patterns` | live | — |
+| [`pattern`](#pattern) | `#pattern` | live | — |
+| [`ut_pattern`](#ut-pattern) | `#रूपमें-pattern` | live | patternBind |
+| [`pattern_binding`](#pattern-binding) | `#pattern-binding` | live | patternBinding |
+| [`custodi_stmt`](#custodi-stmt) | `#रक्षक-stmt` | live | guardStmt |
+| [`si_guard_clause`](#si-guard-clause) | `#यदि-guard-clause` | live | guardClause |
+| [`cura_stmt`](#cura-stmt) | `#देखभाल-stmt` | live | curaStmt |
+| [`ex_stmt`](#ex-stmt) | `#सेवन-stmt` | live | extractStmt |
+| [`extract_fields`](#extract-fields) | `#extract-fields` | live | extractFields |
+| [`extract_field`](#extract-field) | `#extract-field` | live | extractField |
+| [`ceteri_field`](#ceteri-field) | `#बाकी-field` | live | restField |
+| [`redde_stmt`](#redde-stmt) | `#लौटाओ-stmt` | live | returnStmt |
+| [`reddet_stmt`](#reddet-stmt) | `#रुको_लौटाओ-stmt` | live | returnAwaitStmt |
+| [`tacebit_stmt`](#tacebit-stmt) | `#रुको-stmt` | live | awaitDiscardStmt |
+| [`cede_stmt`](#cede-stmt) | `#आगेबढ़ो-stmt` | live | yieldStmt |
+| [`rumpe_stmt`](#rumpe-stmt) | `#तोड़ो-stmt` | live | breakStmt |
+| [`perge_stmt`](#perge-stmt) | `#जारी-stmt` | live | continueStmt |
+| [`tacet_stmt`](#tacet-stmt) | `#मौन-stmt` | live | noopStmt |
+| [`iace_stmt`](#iace-stmt) | `#इधरफेंको-stmt` | live | throwStmt |
+| [`iace_expr`](#iace-expr) | `#इधरफेंको-expr` | live | bareThrow |
+| [`iace_guarded_expr`](#iace-guarded-expr) | `#इधरफेंको-guarded-expr` | live | guardedThrowSugar |
+| [`cape_clause`](#cape-clause) | `#पकड़ो-clause` | live | catchClause |
+| [`adfirma_stmt`](#adfirma-stmt) | `#पुष्टि-stmt` | live | assertStmt |
+| [`requirit_stmt`](#requirit-stmt) | `#आवश्यक-stmt` | live | requiritStmt |
+| [`expression`](#expression) | `#expression` | live | — |
+| [`assignment`](#assignment) | `#assignment` | live | — |
+| [`inc_dec_stmt`](#inc-dec-stmt) | `#inc-dec-stmt` | live | incDecStmt |
+| [`place`](#place) | `#place` | live | — |
+| [`ternary`](#ternary) | `#ternary` | live | — |
+| [`aut_expr`](#aut-expr) | `#या-expr` | live | or |
+| [`et_expr`](#et-expr) | `#और-expr` | live | and |
+| [`equality`](#equality) | `#equality` | live | — |
+| [`equality_tail`](#equality-tail) | `#equality-tail` | live | equalityTail |
+| [`comparison`](#comparison) | `#comparison` | live | — |
+| [`bitwise_or_expr`](#bitwise-or-expr) | `#bitwise-or-expr` | live | bitwiseOr |
+| [`bitwise_xor_expr`](#bitwise-xor-expr) | `#bitwise-xor-expr` | live | bitwiseXor |
+| [`bitwise_and_expr`](#bitwise-and-expr) | `#bitwise-and-expr` | live | bitwiseAnd |
+| [`shift_expr`](#shift-expr) | `#shift-expr` | live | shift |
+| [`range_expr`](#range-expr) | `#range-expr` | live | range |
+| [`range_tail`](#range-tail) | `#range-tail` | live | rangeTail |
+| [`additive_expr`](#additive-expr) | `#additive-expr` | live | additive |
+| [`multiplicative_expr`](#multiplicative-expr) | `#multiplicative-expr` | live | multiplicative |
+| [`vel_expr`](#vel-expr) | `#डिफ़ॉल्ट-expr` | live | coalesce |
+| [`vel_rhs`](#vel-rhs) | `#डिफ़ॉल्ट-rhs` | live | velRhs |
+| [`vel_range_tail`](#vel-range-tail) | `#डिफ़ॉल्ट-range-tail` | live | velRangeTail |
+| [`unary_expr`](#unary-expr) | `#unary-expr` | live | unary |
+| [`gradient_expr`](#gradient-expr) | `#gradient-expr` | live | gradientExpr |
+| [`gradient_selection`](#gradient-selection) | `#gradient-selection` | live | gradientSelection |
+| [`gradient_place`](#gradient-place) | `#gradient-place` | live | gradientPlace |
+| [`cast_expr`](#cast-expr) | `#cast-expr` | live | cast |
+| [`conversio_expr`](#conversio-expr) | `#conversio-expr` | live | conversio |
+| [`inline_recovery`](#inline-recovery) | `#inline-recovery` | live | inlineRecovery |
+| [`call_expr`](#call-expr) | `#call-expr` | live | call |
+| [`call_suffix`](#call-suffix) | `#call-suffix` | live | callSuffix |
+| [`member_suffix`](#member-suffix) | `#member-suffix` | live | memberSuffix |
+| [`optional_suffix`](#optional-suffix) | `#optional-suffix` | live | optionalSuffix |
+| [`non_null_suffix`](#non-null-suffix) | `#नहीं-null-suffix` | live | nonNullSuffix |
+| [`argument_list`](#argument-list) | `#argument-list` | live | argumentList |
+| [`argument`](#argument) | `#argument` | live | — |
+| [`template_argument`](#template-argument) | `#template-argument` | live | templateArgument |
+| [`literal`](#literal) | `#literal` | live | — |
+| [`primary`](#primary) | `#primary` | live | — |
+| [`ad_expr`](#ad-expr) | `#सेवा-expr` | live | adExpr |
+| [`ad_opener`](#ad-opener) | `#सेवा-opener` | live | adOpener |
+| [`array_literal`](#array-literal) | `#array-literal` | live | arrayLiteral |
+| [`iuncta_expr`](#iuncta-expr) | `#टपल-expr` | live | iunctaExpr |
+| [`json_literal`](#json-literal) | `#json-literal` | live | jsonLiteral |
+| [`json_member`](#json-member) | `#json-member` | live | jsonMember |
+| [`typed_constructor`](#typed-constructor) | `#typed-constructor` | live | typedConstructor |
+| [`field_list`](#field-list) | `#field-list` | live | fieldList |
+| [`field_init`](#field-init) | `#field-init` | live | fieldInit |
+| [`field_key`](#field-key) | `#field-key` | live | fieldKey |
+| [`json_value`](#json-value) | `#json-value` | live | jsonValue |
+| [`json_object`](#json-object) | `#json-object` | live | jsonObject |
+| [`json_array`](#json-array) | `#json-array` | live | jsonArray |
+| [`json_string`](#json-string) | `#json-string` | live | jsonString |
+| [`json_number`](#json-number) | `#json-number` | live | jsonNumber |
+| [`finge_expr`](#finge-expr) | `#गढ़ो-expr` | live | fingeExpr |
+| [`qualified_ident`](#qualified-ident) | `#qualified-ident` | live | qualifiedIdent |
+| [`praefixum_expr`](#praefixum-expr) | `#उपसर्ग-expr` | live | praefixumExpr |
+| [`scriptum_expr`](#scriptum-expr) | `#लिखित-expr` | live | scriptumExpr |
+| [`lege_expr`](#lege-expr) | `#पढ़ो-expr` | live | legeExpr |
+| [`object_pattern`](#object-pattern) | `#object-pattern` | live | objectPattern |
+| [`pattern_property`](#pattern-property) | `#pattern-property` | live | patternProperty |
+| [`array_pattern`](#array-pattern) | `#array-pattern` | live | arrayPattern |
+| [`array_pattern_element`](#array-pattern-element) | `#array-pattern-element` | live | arrayPatternElement |
+| [`nota_stmt`](#nota-stmt) | `#दिखाओ-stmt` | live | outputStmt |
+| [`entry_header`](#entry-header) | `#entry-header` | live | entryHeader |
+| [`incipit_stmt`](#incipit-stmt) | `#आरंभ-stmt` | live | incipitStmt |
+| [`incipiet_stmt`](#incipiet-stmt) | `#आरंभasync-stmt` | live | incipietStmt |
+| [`probandum_decl`](#probandum-decl) | `#परीक्षणसमूह-decl` | live | probandumDecl |
+| [`probandum_body`](#probandum-body) | `#परीक्षणसमूह-body` | live | probandumBody |
+| [`proba_stmt`](#proba-stmt) | `#परीक्षण-stmt` | live | probaStmt |
+| [`proba_modifier`](#proba-modifier) | `#परीक्षण-modifier` | live | probaModifier |
+| [`praepara_block`](#praepara-block) | `#पूर्वतैयार-block` | live | praeparaBlock |
+| [`fac_stmt`](#fac-stmt) | `#करो-stmt` | live | facBlockStmt |
+
+## Lexicon Appendix {#lexicon}
+
+The lexical tier is descriptive and remains owned by the live lexer and
+driver. `capture-pending` rows intentionally carry no invented token shape.
+
+| Terminal | Status | Capture notes |
+|---|---|---|
+| `IDENTIFIER` | `capture-pending` | Lexical tier. Empty RHS; status is capture-pending. radix-lexer / driver / parser is the authority (crates/radix-lexer/src/). Not a second lexer spec. scan.rs scan_identifier; Unicode XID_Start or '_' then XID_Continue or '_'; NFKC intern; TokenKind::Ident (keywords also lex as identifiers) |
+| `NUMBER` | `capture-pending` | scan.rs scan_number; decimal/hex/bin/oct integers and floats with '_' separators; TokenKind::Integer(u64) or Float(f64) |
+| `NATURAL` | `capture-pending` | not a distinct lexer token; type-position TokenKind::Integer used as magnitudo capacity (no fraction/exponent) |
+| `STRING` | `capture-pending` | scan.rs scan_string / scan_guillemet_block_string; double-quoted or guillemet block; TokenKind::String |
+| `ASCII_STRING` | `capture-pending` | scan.rs scan_ascii_string; single-quoted; TokenKind::AsciiString |
+| `BACKTICK_STRING` | `capture-pending` | scan.rs scan_backtick_string; backtick forma template; TokenKind::BacktickString |
+| `OCTETI_STRING` | `capture-pending` | scan.rs scan_octeti_string; pipe-delimited hex; TokenKind::OctetiString |
+| `NEWLINE` | `capture-pending` | scan.rs scan_line_break; LF or CRLF; TokenKind::Newline |
+| `WIDTH_MARKER` | `capture-pending` | parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64/f16/f32/f64; not a lexer token |
+| `LISTA_WIDTH_SUGAR` | `capture-pending` | parser type-position l + WIDTH_MARKER; not a lexer token |
+| `TENSOR_WIDTH_SUGAR` | `capture-pending` | parser type-position t + WIDTH_MARKER; not a lexer token |
+| `SPARSA_WIDTH_SUGAR` | `capture-pending` | parser type-position s + WIDTH_MARKER; not a lexer token |
+| `VECTOR_WIDTH_SUGAR` | `capture-pending` | parser type-position v + WIDTH_MARKER; not a lexer token |
+| `MATRIX_WIDTH_SUGAR` | `capture-pending` | parser type-position m + WIDTH_MARKER; not a lexer token |
+| `FRONTMATTER_DELIMITER` | `capture-pending` | driver peels a line whose trimmed content is exactly +++ before lexing |
+| `TOML_LINES` | `capture-pending` | driver; TOML body between FRONTMATTER_DELIMITER lines |
+| `ANNOTATION_NAME` | `capture-pending` | parser; identifier spelling after @, including keyword spellings |
+| `ANNOTATION_FIELD_NAME` | `capture-pending` | parser; identifier spelling in annotation field position |
+| `NON_NEWLINE_TOKEN` | `capture-pending` | parser; one ordinary token other than TokenKind::Newline |
+| `NO_NEWLINE` | `capture-pending` | parser zero-width constraint: adjacent parts stay on the same logical line |
+
+## Keyword Reference {#keyword-reference}
+
+This table is derived from the quoted Latin literals in the source
+productions. It is not a second keyword authority.
+
+| Category | Faber | Meaning |
+|---|---|---|
+| Iteration | `सीमा` | range iteration |
+| Declarations | `अमूर्त` | abstract genus modifier |
+| Endpoints | `सेवा` | capability call |
+| Error | `पुष्टि` | assert |
+| Iteration | `पहले` | range until exclusive |
+| Params | `तर्क` | CLI arguments modifier |
+| Boolean | `या` | or |
+| Error | `पकड़ो` | local handler |
+| Control | `स्थिति` | case |
+| Async | `आगेबढ़ो` | yield |
+| Params | `बाकी` | rest |
+| Control | `अन्यतम` | default case |
+| Objects | `समापन` | legacy closure |
+| Type | `प्रतिलिपि` | copy ownership |
+| Objects | `देखभाल` | with-resource |
+| Params | `आवंटक` | curated options |
+| Control | `रक्षक` | guard |
+| Type | `से` | borrow / for-in keys |
+| Control | `मिलाओ` | pattern match |
+| Declarations | `विभेद` | tagged union |
+| Control | `जबतक` | while / postfix until |
+| Objects | `मैं` | self |
+| Control | `चुनो` | switch |
+| Control | `अतः` | compact statement-body joint |
+| Params | `त्रुटि` | error channel |
+| Boolean | `है` | is / equality |
+| Boolean | `और` | and |
+| Iteration | `सेवन` | for-of / import from |
+| Params | `निर्गम` | exit code |
+| Control | `करो` | do block / post-test loop |
+| JSON | `false` | JSON false |
+| Boolean | `असत्य` | false |
+| Async | `async_जनक` | async stream posture |
+| Async | `async` | async finite posture |
+| Async | `रुको_स्थिर` | await-bind immutable |
+| Objects | `गढ़ो` | construct variant |
+| Async | `जनक` | sync stream posture |
+| Declarations | `स्थिर` | immutable binding |
+| Testing | `नाज़ुक` | flaky |
+| Annotation | `खंड` | nucleum fragment |
+| Declarations | `फलन` | function |
+| Testing | `लंबित` | future |
+| Genus | `स्थैतिक` | static member |
+| Declarations | `वर्ग` | class |
+| Error | `इधरफेंको` | throw |
+| Error | `फेंकता` | throws marker |
+| Params | `अपरिवर्तित` | immutable modifier |
+| Declarations | `अनुबन्ध` | interface contract |
+| Genus | `लागूकरता` | implements |
+| Declarations | `आयात` | import |
+| Type | `में` | ownership in |
+| Declarations | `आरंभasync` | async entrypoint |
+| Declarations | `आरंभ` | entrypoint |
+| Iteration | `बीच` | between |
+| Iteration | `भीतर` | membership |
+| Control | `दोहराओ` | for |
+| Objects | `टपल` | tuple type/constructor |
+| Builtin | `पढ़ो` | read |
+| Builtin | `पंक्ति` | line |
+| Declarations | `आकार` | size/index generic parameter |
+| Testing | `मापो` | benchmark |
+| Diagnostics | `चेताओ` | warn |
+| Error | `मरोजाओ` | panic |
+| Genus | `संबद्ध` | link field |
+| Literals | `शून्य` | none |
+| Declarations | `नाम` | import binding name |
+| Boolean | `नहीं` | not |
+| Diagnostics | `दिखाओ` | note |
+| Annotation | `कर्नेल` | kernel annotation |
+| JSON | `null` | JSON null |
+| Testing | `छोड़ो` | skip |
+| Params | `सब` | all / glob |
+| Params | `चयन` | options modifier |
+| Declarations | `क्रम` | enum |
+| Type | `स्वामित्व` | owned |
+| Iteration | `प्रति` | range step |
+| Control | `जारी` | continue |
+| Testing | `पश्चतैयार` | teardown |
+| Testing | `पश्चतैयारasync` | async teardown |
+| Objects | `उपसर्ग` | prefix expression |
+| Testing | `पूर्वतैयार` | setup |
+| Testing | `पूर्वतैयारasync` | async setup |
+| Testing | `परीक्षण` | test |
+| Testing | `परीक्षणसमूह` | test suite |
+| Declarations | `सार्वजनिक` | public visibility |
+| Objects | `ratio` | named-field aggregate type/constructor |
+| Control | `लौटाओ` | return |
+| Async | `रुको_लौटाओ` | await-return |
+| Testing | `पुनरावृत्ति` | repeat |
+| Error | `आवश्यक` | require |
+| Control | `तोड़ो` | break |
+| Diagnostics | `लिखो` | diagnostic channel |
+| Builtin | `लिखित` | write |
+| Control | `अन्यथा` | else |
+| Control | `यदि` | if |
+| Control | `ऐसा` | then (ternary) |
+| Control | `अन्यथायदि` | else-if |
+| Declarations | `बैठा` | inferred immutable local |
+| Testing | `केवल` | only |
+| Testing | `केवलमें` | only-in |
+| Params | `फैलाओ` | spread |
+| Declarations | `स्वेच्छा` | optional declaration slot |
+| Genus | `अधीन` | extends |
+| Async | `रुको` | await-discard |
+| Control | `मौन` | no-op |
+| Testing | `टैग` | tag |
+| Testing | `समय` | timeout |
+| JSON | `true` | JSON true |
+| Declarations | `प्रकार` | type alias |
+| Iteration | `तक` | range until inclusive |
+| Params | `रूपमें` | as / alias |
+| Declarations | `चर` | mutable binding |
+| Async | `रुको_चर` | await-bind mutable |
+| Boolean | `डिफ़ॉल्ट` | nullable default |
+| Boolean | `सत्य` | true |
+| Diagnostics | `देखो` | debug |
+| Declarations | `visibilitas` | visibility field |
+
+## Comma Separator Table {#comma-separator-law}
+
+Optional commas are forbidden. The source currently has no `','?`
+positions; every comma-bearing production is either required or absent.
+
+| Production | Source row |
+|---|---|
+| — | no optional comma positions |
+
+## Normative Language Notes {#normative-language-notes}
+
+Formal grammar for the Faber programming language. This file is the canonical
+grammar and spec-commentary surface for the public language; the compiler
+(Radix) implements it. The rendered, localized grammar is published on
+[the documentation site](https://faberlang.dev/en-US/reference/grammar.html).
+
+Documentation contract: runnable language reference programs live in the public
+sibling [`examples/corpus/`](../../examples/corpus/) with optional `+++`
+frontmatter (`term`, `syntax`, `related`, …); the generated manifest is
+[`examples/corpus/index.toml`](../../examples/corpus/index.toml). `faber
+explain` loads the exempla reference pack from disk. Prefer the language corpus
++ EBNF for new reference work.
 
 ---
 
-## प्रोग्राम संरचना
+## Program Structure
 
-Faber source files को lexer चलने से पहले driver raw text के रूप में पढ़ता है। वैकल्पिक TOML frontmatter token grammar का भाग नहीं है।
+Faber source files are raw text peeled by the driver before lexing. Optional TOML
+frontmatter is not part of the token grammar. Within Faber syntax, spaces,
+tabs, and newlines are trivia unless a production explicitly names `NEWLINE`.
+Canonical forms are safe to compress onto one line. Any line-sensitive syntax is
+explicitly sugar; a compressor must expand it when a lossless canonical mapping
+exists, and otherwise preserve its boundary or reject compression. Line comments
+remain line-oriented trivia and must be removed or relocated safely by a compressor.
 
-```ebnf
-fabFile       := frontmatter? program
-frontmatter   := '+++' NEWLINE tomlBody NEWLINE '+++' NEWLINE?
-program       := statement*
-statement     := importDecl | varDecl | funcDecl | genusDecl | implendumDecl
-               | typeAliasDecl | enumDecl | discretioDecl
-               | ifStmt | whileStmt | iteraStmt
-               | eligeStmt | discerneStmt | guardStmt | curaStmt | facBlockStmt
-               | returnStmt | breakStmt | continueStmt | noopStmt | throwStmt
-               | assertStmt | requiritStmt | outputStmt | adStmt | incipitStmt
-               | incipietStmt | extractStmt
-               | probandumDecl | probaStmt | blockStmt | incDecStmt | exprStmt
-blockStmt     := '{' statement* '}'
-```
 
-### फ़ाइल frontmatter (`+++`)
+Uppercase names are lexical terminals. `FRONTMATTER_DELIMITER` is a line whose
+trimmed content is exactly `+++`; `TOML_LINES` is the possibly empty sequence of
+complete TOML lines before the closing delimiter. `NON_NEWLINE_TOKEN` means one
+ordinary source token other than a newline. `ANNOTATION_NAME` and
+`ANNOTATION_FIELD_NAME` are identifier spellings in annotation-owned contexts;
+they include spellings that are keywords in other contexts. `NO_NEWLINE` is a
+zero-width constraint requiring adjacent grammar parts to remain on the same
+logical line.
 
-Frontmatter होने पर वह **पंक्ति 1** पर ठीक `+++` से खुलना चाहिए। बाद की वह पंक्ति जो trim करने पर ठीक `+++` हो, block बंद करती है। Closing delimiter के बाद के bytes Faber `program` हैं। केवल whitespace वाला body वैध खाली program है।
+### File frontmatter (`+++`)
 
-Frontmatter compiler driver में generic TOML document के रूप में parse होता है, Faber statements के रूप में नहीं। लेखक मनमाने metadata keys रख सकते हैं। Tooling `group`, `sectio` और `[probanda]` जैसे ज्ञात keys accessors से पढ़ता है। Package tooling package keys consume करता है। `[package]`, `[paths]` और `[build]` की authority `faber.toml` ही रहती है; package mode में विरोधी frontmatter values अस्वीकार होती हैं।
+When present, frontmatter must open on **line 1** with exactly `+++`. A later line
+that trims to exactly `+++` ends the block. Bytes after the closing delimiter are
+the Faber `program`. An empty body (whitespace only) is a valid empty program.
 
-उदाहरण:
+Frontmatter is parsed as a generic TOML document in the compiler driver — not
+parsed as Faber statements. Authors may attach arbitrary metadata keys; tooling
+reads known keys such as `group`, `sectio`, and `[probanda]` via accessors.
+`faber` package tooling consumes those package keys. Package authority for
+`[package]`, `[paths]`, and `[build]` remains `faber.toml`; conflicting
+frontmatter values are rejected in package mode.
+
+Example:
 
 ```fab
 +++
@@ -44,873 +1042,827 @@ group = "exempla.directiva"
 sectio = "smoke"
 +++
 
-आरंभ {}
+incipit {}
 ```
 
-पंक्ति-आरंभ `§` file directives हटा दिए गए हैं। File metadata के लिए `+++` frontmatter रखें। Quoted strings में `§` अभी भी string-template hole है।
+Line-start `§` file directives were removed. Put file metadata in `+++`
+frontmatter instead. Inside quoted strings, `§` remains the string-template hole
+(see **Call and Member Access** below).
+
+### Comma separator law
+
+Every comma position is either required or forbidden. Optional commas do not
+exist.
+
+**Item lists** — homogeneous entries inside a bounded header (`lista` literals,
+call arguments, parameters, type argument lists, figura lists, field-init
+lists, `क्रम` members, `विभेद` variant lists, JSON members and array
+elements, annotation / import / nucleum fields, output statement lists) —
+require a comma between adjacent items and forbid one after the last.
+
+**Declaration blocks** — self-annotating declarations (statements, `वर्ग`
+members, `अनुबन्ध` methods, `विभेद` payload fields) — contain no commas.
+Entries are trivia-delimited.
 
 ---
 
-## घोषणाएँ
+## Declarations
 
-### चर
+### Variables
 
-```ebnf
-varDecl      := ('स्थिर' | 'चर') typeAnnotation IDENTIFIER (('←' expression) | ('↤' assignment inlineRecovery?))?
-sitDecl      := 'बैठा' IDENTIFIER ('←' expression)?
-arrayDestruct := ('स्थिर' | 'चर') arrayPattern '←' expression
-objectDestruct := ('स्थिर' | 'चर') objectPattern '←' expression
-```
 
-- `स्थिर` immutable binding है। इसे initializer के बिना घोषित किया जा सकता है, बाद में ठीक एक बार assign किया जा सकता है और फिर frozen रहता है।
-- `चर` mutable binding है, जैसे `let`।
-- यदि initializer type निर्धारित करता है तो type annotation के लिए `_` लिखें: `स्थिर _ नाम ← मान`।
-- `बैठा नाम ← मान`, inferred immutable local `स्थिर _ नाम ← मान` का sugar है।
-- `बैठा नाम` बिना initializer का inferred deferred immutable है। किसी read से पहले ठीक एक assignment दें।
-- `स्थिर संख्या x` या `बैठा x` uninitialized immutable slot बनाता है। उसे किसी read से पहले ठीक एक बार assign करना होगा; दूसरी assignment अस्वीकार होगी। Definite-assignment pass (semantic Phase 3a) यह नियम लागू करता है।
+- `स्थिर` = immutable binding (write-once): it may be declared without an
+  initializer and assigned exactly once later, then frozen. `चर` = mutable
+  binding (reassignable), like `let`.
+- `रुको_स्थिर` / `रुको_चर` await a `promissum<T>` or `promissum<T ⇥ E>`, bind
+  the resolved `T`, and propagate a compatible alternate `E`.
+- Use `_` as the type annotation when the initializer determines the type: `स्थिर _ name ← value`
+- `बैठा name ← value` is sugar for `स्थिर _ name ← value` (inferred immutable local)
+- `बैठा name` (no initializer) is sugar for `स्थिर _ name` — the inferred deferred
+  immutable. Assign exactly once before any read.
+- Typed `स्थिर`/`चर` initializers accept `↤` (`स्थिर numerus x ↤ "42"`):
+  the written type is the conversion destination, then the binding is
+  initialized. `रुको_स्थिर`/`रुको_चर` keep `←`; `स्थिर _`, `बैठा`, and untyped
+  destructuring reject `↤` (no concrete destination type).
+- Deferred init: `स्थिर numerus x` or `बैठा x` declares an uninitialized immutable
+  slot that must be assigned exactly once before any read; a second assignment is
+  rejected. The definite-assignment pass (semantic Phase 3a) enforces this.
 
-### फलन
+### Functions
 
-```ebnf
-funcDecl     := 'फलन' IDENTIFIER genericParams? '(' paramList ')' funcModifier* returnClause? alternateExitClause? blockStmt?
-paramList    := (parameter (',' parameter)*)?
-genericParams := '<' genericParam (',' genericParam)* '>'
-genericParam  := IDENTIFIER | 'आकार' IDENTIFIER
-typeArgs      := '<' typeAnnotation (',' typeAnnotation)* '>'
-parameter    := ('से' | 'में' | 'सेवन')? 'बाकी'? typeAnnotation IDENTIFIER 'स्वेच्छा'? ('रूपमें' IDENTIFIER)? ('या' expression)?
-funcModifier := 'तर्क' IDENTIFIER | 'आवंटक' IDENTIFIER ('रूपमें' IDENTIFIER)? | 'त्रुटि' IDENTIFIER | 'निर्गम' (IDENTIFIER | NUMBER) | 'अपरिवर्तित' | 'फेंकता' | 'विकल्प' IDENTIFIER
-returnClause := '→' typeAnnotation
-alternateExitClause := '⇥' typeAnnotation
-stmtBodyJoint  := 'अतः'
-clausuraJoint  := '∴'
-clausuraExpr   := compactClausuraExpr | legacyClausuraExpr
-compactClausuraExpr := clausuraSignature clausuraJoint (expression | closureFacBlock)
-clausuraSignature := (clausuraParam | '(' clausuraParams? ')') returnClause? alternateExitClause?
-closureFacBlock := 'करो' blockStmt catchClause?
-legacyClausuraExpr := 'समापन' clausuraParams? ('→' typeAnnotation)? (':' expression | blockStmt)
-clausuraParams := clausuraParam (',' clausuraParam)*
-clausuraParam  := typeAnnotation IDENTIFIER
-```
 
-`→` सामान्य success type घोषित करता है। Body वाले फलन में `→` न हो तो वह effect-only (`रिक्त`) है और उसमें `लौटाओ` नहीं हो सकता। Statement-bodied closure (`करो { ... }` या legacy block body) को `लौटाओ` से पहले `→ T` लिखना होगा। Expression-bodied closure अपना result expression से infer कर सकता है।
+- Return syntax: `→` declares the normal success type. A bodyful function with no `→` is effect-only (`vacuum`) and must not contain `लौटाओ`. A statement-bodied closure (`करो { ... }` or legacy block body) must also spell `→ T` before it can use `लौटाओ`; expression-bodied closures may infer their result from the expression.
+- Recoverable alternate-exit syntax: `⇥` declares the error-channel type. It can appear after `→ T` or alone on an effect-only failable function or closure. A closure body that uses an escaping `इधरफेंको` must declare its own `⇥ E`; it cannot inherit the enclosing function's error channel. A local `करो { ... } पकड़ो err { ... }` may catch `इधरफेंको` without an enclosing `⇥`. A failable function call (`→ T ⇥ E`) inside a `⇥`-declaring function propagates to the function's alternate exit without a `करो`/`पकड़ो` wrapper, mirroring how bare `↦` conversio and `इधरफेंको` throws already behave; the call lowers to Rust `?`. A closure must still declare its own `⇥` to propagate a failable call — the enclosing function's error channel does not cross the closure boundary.
+- Parameter access markers live in the type position: `से`/`ref` (read), `में`/`mut` (mutate), `स्वामित्व` (consume), and `प्रतिलिपि` (duplicate then own). The retired parameter-prefix slot is not part of the grammar; `सेवन`/`from` remains the import/iteration/extraction token identity.
+- Post-name marker: `स्वेच्छा` (voluntary/optional provision)
+- `बाकी` marks rest parameter
+- `आवंटक NAME ('रूपमें' LOCAL)?` declares an allocator requirement; `LOCAL` is the function-body alias.
+- Ordinary `फलन` declarations and genus methods require bodies. Signature-only methods belong in `अनुबन्ध`.
+- `त्रुटि NAME` is a legacy runtime-injected `ignotum` local, and `फेंकता` is a legacy marker with no current semantic effect. Neither declares the typed alternate-exit contract. New failable APIs should use `⇥ E`; whether either legacy modifier should survive is unresolved.
+- `अतः` is the compact **statement-body** joint only (one-statement `यदि`/`जबतक`/`स्थिति`/… arms).
+- `∴` is the compact **clausura** joint only. The two are not aliases.
+- Compact closure block bodies must use `करो { ... }`; a closure-local `करो` body may attach `पकड़ो`, but cannot use postfix `जबतक`.
 
-`⇥` recoverable alternate-exit channel का type घोषित करता है। यह `→ T` के बाद या अकेले effect-only failable फलन या closure पर आ सकता है। Escaping `इधरफेंको` वाली closure को अपना `⇥ E` घोषित करना होगा; enclosing फलन का error channel closure सीमा पार नहीं करता। Local `करो { ... } पकड़ो त्रुटि { ... }` enclosing `⇥` के बिना भी `इधरफेंको` पकड़ सकता है। `→ T ⇥ E` वाला failable call किसी `⇥`-declaring function के भीतर सीधे alternate exit में propagate होता है; यह Rust `?` में lower होता है। Closure को propagation के लिए अपना `⇥` फिर भी घोषित करना होगा।
+### Classes
 
-- Parameter prefixes `से`, `में`, `सेवन` क्रमशः read, mutate और consume हैं।
-- नाम के बाद `स्वेच्छा` voluntary/optional provision marker है।
-- `बाकी` rest parameter बताता है।
-- `आवंटक NAME ('रूपमें' LOCAL)?` allocator requirement और function-body alias बताता है।
-- `अतः` केवल compact **statement-body** joint है: one-statement `यदि`/`जबतक`/`स्थिति` आदि arms के लिए।
-- `∴` केवल compact **clausura** joint है। दोनों aliases नहीं हैं।
-- Compact closure block body को `करो { ... }` लिखना होगा। Closure-local `करो` body `पकड़ो` ले सकता है, पर postfix `जबतक` नहीं।
 
-### वर्ग
+### Annotations
 
-```ebnf
-genusDecl    := 'अमूर्त'? 'वर्ग' IDENTIFIER typeParams? ('अधीन' IDENTIFIER)? ('लागू' IDENTIFIER (',' IDENTIFIER)*)? '{' genusMember* '}'
-genusMember  := annotation* (fieldDecl | methodDecl)
-fieldDecl    := 'स्थैतिक'? 'संबद्ध'? typeAnnotation IDENTIFIER 'स्वेच्छा'? ('=' expression)?
-methodDecl   := 'फलन' IDENTIFIER '(' paramList ')' funcModifier* returnClause? alternateExitClause? blockStmt?
-```
 
-### एनोटेशन
+`@ कर्नेल खंड` is a modifier on the `कर्नेल` annotation (sugar or
+braced `खंड = सत्य` / `असत्य`), not a fused annotation name and not the
+graphics `@ खंड` stage. Standalone `@ खंड` is unchanged.
 
-```ebnf
-annotation            := '@' annotationName annotationBody?
-annotationName        := IDENTIFIER | 'सार्वजनिक' | 'संरक्षित' | 'निजी' | 'भविष्य' | 'कर्सर'
-                        | 'टैग' | 'केवल' | 'छोड़ो' | 'मापो'
-annotationBody        := bracedAnnotation | annotationArgs
-bracedAnnotation      := '{' annotationFieldList? '}'
-annotationFieldList   := annotationField (',' annotationField)* ','?
-annotationField       := IDENTIFIER '=' (expression | typeAnnotation)
+Braced annotation records (`@ futura { }`, `@ optio { binding = verbose, ... }`)
+are canonical and compression-safe. Unbraced annotations are line-sensitive,
+non-compression-safe sugar that consumes through `NEWLINE`; the newline is part
+of this sugar grammar, not a general Faber statement separator. A compressor may
+rewrite promoted families only when their named-field mapping is known. It must
+otherwise preserve the line break or reject compression. Promoted sugar and
+braced forms lower to the same `HirAnnotation` records. Unpromoted positional
+families preserve raw arguments and do not yet have a lossless braced expansion.
 
-cliProgramAnnotation := '@' 'cli' STRING
-imperiumAnnotation := '@' 'आज्ञा' STRING
-optioAnnotation    := '@' 'विकल्प' IDENTIFIER optioModifier*
-optioModifier      := 'लघु' STRING | 'दीर्घ' STRING | 'प्रकार' typeAnnotation
-                    | 'विवरण' STRING | 'सर्वत्र' | 'या' expression
-operandusAnnotation := '@' 'ऑपरैंड' ('बाकी')? typeAnnotation IDENTIFIER operandusModifier*
-operandusModifier  := 'विवरण' STRING | 'सर्वत्र' | 'या' expression
-annotationArgs     := (STRING | IDENTIFIER | expression)+
+The current Radix parser still accepts only a fixed token subset in unbraced
+payloads and ends them with declaration-boundary heuristics rather than `NEWLINE`.
+Those are implementation mismatches with this specification, not alternate
+language rules.
 
-(* एनोटेशन contracts — compile-time metadata schemas *)
-annotatioMarker     := '@' 'एनोटेशन' ( '{' annotatioFieldList? '}' )?
-annotatioFieldList  := annotatioField (',' annotatioField)* ','?
-annotatioField      := 'लक्ष्य' '=' annotatioTarget
-annotatioTarget     := 'फलन' | STRING | IDENTIFIER
-contractApplication := '@' IDENTIFIER ( '{' annotationFieldList? '}' )?
+**Annotation contracts:** `@ annotatio` (optionally `@ annotatio { target = फलन }`)
+marks a top-level `वर्ग` as a compile-time annotation contract. Ordinary genera
+are not annotation schemas. Applications use `@ ContractName { field = constant }`
+and resolve through local declarations or imported file-interface exports.
+Resolved applications lower to `HirAnnotation` with `contract_id: Some(DefId)`
+and constant field values. v1 attachment target is `फलन` only; payload
+scalars are `textus`, `numerus`, `fractus`, and `bivalens` (optional via
+`स्वेच्छा` or `T ∪ शून्य`). No compiler-owned `@ web` / controller / route families.
 
-jsonGenusAnnotation := '@' 'json'
-jsonFieldAnnotation := '@' 'json' '{' 'नाम' '=' STRING '}'
-```
+**JSON genera:** `@ json` on a `वर्ग` is a compiler-owned data-model contract,
+not a generic annotation schema. Fields must be JSON-safe (`textus`, `ascii`,
+`numerus`, `fractus`, `bivalens`, `instans`, `शून्य`, `lista<T>`,
+`tabula<textus, T>`, nullable `T ∪ शून्य`, or another `@ json वर्ग`). Field
+metadata `@ json { नाम = "wire_name" }` changes the emitted object key used by
+`value ↦ valor`, `value ↦ json`, and `json ↦ Genus`; JSON text remains a Norma
+wire operation such as `json.pange(value ↦ json)`.
 
-Braced annotation records और उनके sugar forms एक ही `HirAnnotation` records में lower होते हैं। `@ एनोटेशन` (वैकल्पिक `@ एनोटेशन { लक्ष्य = फलन }`) top-level `वर्ग` को compile-time annotation contract बनाता है। सामान्य genera annotation schemas नहीं हैं। `@ ContractName { field = constant }` local declarations या imported file-interface exports से resolve होकर constant field values वाले `HirAnnotation` में lower होता है। v1 attachment target केवल `फलन` है; payload scalars `पाठ`, `संख्या`, `भिन्न` और `तार्किक` हैं, और `स्वेच्छा` या `T ∪ शून्य` से optional हो सकते हैं। Compiler-owned `@ web`, controller या route families नहीं हैं।
+- `@ radix` is reserved for compiler-owned metadata. The historical
+  morphology-stem meaning is retired; morphology remains a source naming
+  discipline, not compiler-generated conjugation. Accepted directive forms are
+  `@ radix lane "air"` / `"mir"` / `"hir-direct"` on top-level functions for
+  explicit compiler-lane routing; unsupported lane/target combinations reject
+  with diagnostics instead of being ignored.
+- `@ verte` defines codegen transformation (method name or template)
+- `@ nondum [TARGET] ["REASON"]` marks a declaration as present in an interface but unavailable for the target
+- `@ cli "NAME"` marks an `आरंभ` entry as a CLI program
+- `@ imperium "NAME"` marks a function as a CLI command entry point
+- `@ optio NAME ...` defines a CLI option; use `प्रकार bivalens` for boolean flags
+- `@ operandus [बाकी] TYPE NAME ...` defines a CLI positional argument
+- `@ futura` marks a function as async (legacy — prefer `async` posture word)
+- `@ cursor` marks a function as generator (legacy — prefer `जनक` posture word)
+- Callable posture words (`async`/`जनक`/`async_जनक`) are recognized in the signature
+  slot after modifiers and before `→`/`⇥`/body; bare means synchronous finite
+- `@ सार्वजनिक` marks a declaration for the file's importable (export) surface; `@ interna` marks it package-internal (same-package importable only); `@ privata` is an explicit module-private marker. Unmarked top-level declarations are module-private by default; a declaration mixing distinct visibility tiers is rejected with `SEM019` (`conflicting_visibility`)
+- `@ protecta` is reserved and rejected with a semantic diagnostic; it has no package, subclass, or sibling-file visibility meaning
 
-`@ json` compiler-owned data-model contract है, generic annotation schema नहीं। उसके fields JSON-safe होने चाहिए: `पाठ`, `ascii`, `संख्या`, `भिन्न`, `तार्किक`, `क्षण`, `शून्य`, `सूची<T>`, `तालिका<पाठ, T>`, nullable `T ∪ शून्य`, या कोई दूसरा `@ json वर्ग`। `@ json { नाम = "wire_name" }` emitted object key बदलता है। `value ↦ valor`, `value ↦ json` और `json ↦ Genus` में यही key प्रयुक्त होती है। JSON text Norma wire operation जैसे `json.pange(value ↦ json)` से बनता है।
+- `अधीन` = extends, `लागूकरता` = implements
+- `स्थैतिक` = static, `संबद्ध` = bound/property
 
-- `@ radix` compiler-owned metadata के लिए आरक्षित है। पुराना morphology-stem अर्थ समाप्त है। मान्य forms top-level functions पर `@ radix lane "air"`, `"mir"` या `"hir-direct"` हैं। Unsupported lane/target combinations diagnostic देते हैं।
-- `@ verte` codegen transformation (method name या template) परिभाषित करता है।
-- `@ nondum [TARGET] ["REASON"]` interface में declaration मौजूद पर target के लिए unavailable होने का संकेत है।
-- `@ cli "NAME"` `आरंभ` entry को CLI program बनाता है।
-- `@ आज्ञा "NAME"` function को CLI command entry point बनाता है।
-- `@ विकल्प NAME ...` CLI option बनाता है; boolean flag के लिए `प्रकार तार्किक` लिखें।
-- `@ ऑपरैंड [बाकी] TYPE NAME ...` CLI positional argument बनाता है।
-- `@ भविष्य` function को async और `@ कर्सर` generator बनाता है।
-- `@ सार्वजनिक` export सतह चिह्नित करता है, `@ interna` package-internal, और `@ निजी` स्पष्ट module-private मार्कर; बिना चिह्नित शीर्ष-स्तरीय घोषणाएँ डिफ़ॉल्ट रूप से module-private हैं, और अलग-अलग visibility स्तरों का मिश्रण `SEM019` देता है।
-- `@ संरक्षित` आरक्षित है और semantic diagnostic देता है।
+### Interfaces
 
-`अधीन` extends है, `लागू` implements है, `स्थैतिक` static है और `संबद्ध` bound/property है।
 
-### इंटरफ़ेस
+`अनुबन्ध` is the **contract** construct: signature-only methods for `लागूकरता`
+(gerundive of *implere* — that which must be fulfilled). Import namespaces are
+`.fab` file boundaries; exported declarations live at file top level.
 
-```ebnf
-implendumDecl   := 'अनुबन्ध' IDENTIFIER typeParams? '{' implendumMethod* '}'
-implendumMethod := annotation* 'फलन' IDENTIFIER '(' paramList ')' funcModifier* returnClause? alternateExitClause?
-```
+### Type Aliases
 
-`अनुबन्ध` contract construct है। इसमें `लागू` करने वाले genera के लिए केवल signature वाले methods होते हैं। Import namespaces `.fab` file boundaries हैं; exported declarations file top level पर रहती हैं।
 
-### प्रकार उपनाम
+### Enums
 
-```ebnf
-typeAliasDecl := 'प्रकार' IDENTIFIER genericParams? '=' typeAnnotation
-```
 
-### एनम
+### Tagged Unions
 
-```ebnf
-enumDecl   := 'क्रम' IDENTIFIER '{' enumMember (',' enumMember)* ','? '}'
-enumMember := IDENTIFIER ('=' ('-'? NUMBER | STRING))?
-```
 
-### टैगयुक्त यूनियन
+Variant lists are an item list: comma required between variants, forbidden
+after the last. Payload fields inside a variant are a declaration block
+(genus-style, no commas).
 
-```ebnf
-discretioDecl := 'विभेद' IDENTIFIER typeParams? '{' variant (',' variant)* ','? '}'
-variant       := IDENTIFIER ('{' variantFields '}')?
-variantFields := (typeAnnotation IDENTIFIER (',' typeAnnotation IDENTIFIER)*)?
-```
+### Identifier Naming
 
-### पहचानकर्ता नामकरण
+Faber has no globally reserved words. Keyword ownership is contextual per
+spelling: a keyword claims only its owning grammar slot. Every user-chosen
+name slot accepts every keyword spelling — declaration names, parameters,
+members, binding targets (`स्थिर`/`चर`/`बैठा` patterns and captures),
+import aliases, and loop/iteration bindings. Type-name slots stay out.
 
-Mixed-case lower-initial names syntactically स्वीकार हैं, पर language, stdlib, host routes और compiler-owned intrinsic APIs में Faber एक शब्द पसंद करता है। अर्थ बड़ा हो तो snake_case केवल दुर्लभ मामलों में उपयोग करें। यदि वह भी पर्याप्त न हो, तो method core surface का हिस्सा नहीं होना चाहिए जब तक वह आवश्यक न हो। Stdlib encode/decode के mechanical verbs modules में `pange` / `solve` / `tempta` हैं। Public text library `norma:chorda` है।
+Outside a spelling's owning contexts, that spelling may be an `IDENTIFIER`.
+An owning context may itself be effectively global when its production
+applies everywhere a statement or expression may begin. Builtin claims
+(`पढ़ो`/`पंक्ति`/`लिखित`/`vacua`, and the scribe family in
+statement-initial position) are defaults, not reservations: a user binding
+of the same surface spelling wins.
 
-### आयात
+Radix still emits globally reserved tokens for some spellings and selectively
+reinterprets them as identifiers. That is transitional implementation behavior;
+it does not replace the contextual language rule above.
 
-```ebnf
-importDecl     := importRecord | importSugar
-importRecord   := 'आयात' '{' importFieldList? '}'
-importFieldList := importField (',' importField)* ','?
-importField    := importSourceField | importVisibilityField | importNameField
-                | importAliasField | importWildcardField
-importSourceField := 'सेवन' '=' STRING
-importVisibilityField := 'दृश्यता' '=' visibility
-importNameField := 'नाम' '=' IDENTIFIER
-importAliasField := 'रूपमें' '=' IDENTIFIER
-importWildcardField := 'सब' '=' IDENTIFIER
+Mixed-case lower-initial names are syntactically accepted but not
+Faber-preferred for language, stdlib, host routes, or compiler-owned intrinsic APIs.
+Prefer one word. If one word cannot carry the meaning, use snake_case only in
+rare cases. If neither shape works, the method probably does not belong in the
+core surface unless it is critical. Stdlib encode/decode uses the
+mechanical verb trio `pange` / `solve` / `tempta` across modules — see
+`docs/stdlib/stdlib-mechanical-verbs.md`. The public text library is
+`norma:chorda` — see `docs/stdlib/chorda-methods.md`.
 
-importSugar    := 'आयात' 'सेवन' STRING visibility? (namedImport | wildcardImport)?
-visibility    := 'सार्वजनिक'
-namedImport   := IDENTIFIER ('रूपमें' IDENTIFIER)?
-wildcardImport := '*' 'रूपमें' IDENTIFIER
-```
+### Imports
 
-उदाहरण:
+
+Example:
 
 ```fab
-आयात सेवन "hono" Hono
-आयात सेवन "hono" Context
-आयात सेवन "norma:chorda"
-आयात { सेवन = "norma:json/solve", रूपमें = solve_mod }
-आयात सेवन "norma:consolum" consolum
-आयात सेवन "faber:*" faber
-आयात सेवन "lodash" * रूपमें _
-आयात सेवन "./types" सार्वजनिक User
+importa ex "hono" Hono
+importa ex "hono" Context
+# No marker: no re-export.
+importa ex "norma:chorda"
+importa { ex = "norma:json/solve", ut = solve_mod }
+importa ex "norma:consolum" consolum
+# Kernel manifest glob.
+importa ex "faber:*" faber
+importa ex "lodash" * ut _
+# Re-export.
+importa ex "./types" publica User
 ```
 
-Import marker `निजी` हटा दिया गया (VM-U3): बिना marker वाला import re-export नहीं करता, और `सार्वजनिक` re-export marker है। Named binding न देने पर import path का अंतिम segment लिया जाता है, यदि वह valid और non-conflicting identifier हो। Invalid या colliding inferred name के लिए explicit `नाम` या `रूपमें` लिखें। `आयात सेवन "faber:*" faber` kernel-विशिष्ट sugar है: glob path string के भीतर है और released binary के kernel manifest को `faber.<module>.<verb>` calls में फैलाता है। यह wildcard re-export नहीं है और runtime aggregate value नहीं बनाता।
+The `privata` import marker was removed (VM-U3); an import without a marker
+does not re-export, and `सार्वजनिक` is the re-export marker. Missing named binding
+defaults to the
+last import path segment when it is a valid, non-conflicting identifier. If the
+inferred name is invalid or collides with an existing top-level binding, spell an
+explicit `नाम` or `रूपमें` binding.
+
+`आयात सेवन "faber:*" faber` is kernel-specific sugar: the glob lives
+inside the import path string and expands the released binary's kernel manifest
+into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not create a runtime aggregate value.
 
 ---
 
-## प्रकार
+## Types
 
-```ebnf
-typeAnnotation := ('से' | 'में')? baseType ( '∪' typeAnnotation )*
-baseType       := holeType | functionType | qualifiedType typeParams? | '(' typeAnnotation ')'
-holeType       := '_' | '∪'
-qualifiedType  := IDENTIFIER ('.' IDENTIFIER)*
-functionType   := '(' typeList? ')' '→' typeAnnotation alternateExitClause?
-typeList       := typeAnnotation (',' typeAnnotation)*
-typeParams     := genericParams
+
+- Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
+- Applied `NATURAL` arguments are `आकार` capacity facts, not width markers. Proposed (not shipped) bounded forms use that slot: `lista<T, N>`, `textus<N>`, `ascii<N>`, `octeti<N>`. Width-marker families such as `numerus<i32>` stay the separate `widthTypeSugar` production below.
+- A second applied argument on a `↦` target (`numerus<W, Hex>`, `numerus<W, Be>`) is a convert-slot hint, not a type identity, not a width marker, and not a keyword. Live text-parse hints are `Hex` / `Bin` / `Oct`. `Be` / `Le` occupy that same Hex slot for endian unpack. `typeArguments` is unchanged: these are ordinary `IDENTIFIER` arguments interpreted by conversio, not new `baseType` productions.
+- Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
+- Explicit generic call-site lists use the same `typeArguments` production: `id<_>(x)` is a type hole (equivalent to omitted `id(x)` for a one-param callee), and mixed lists such as `both<_, textus>(a, b)` are legal. Arity stays exact (`both<_>` is still one argument). `∪` in that list is rejected (`explicit_union_type_arg_unsupported`): a callee type param is a monomorphic witness slot.
+- `labeledTypeArgument` is the optional label prefix on `टपल` type arguments only (`टपल<gx: f32, T>`; mixed labeled/unlabeled legal). A label in a non-`टपल` list (`f<gx: T>(x)`, `lista<gx: T>`) is a parse error. Absence is the only unlabeled form; there is no `_: T` spelling. Keyword spellings are legal labels under the contextual law (`टपल<स्थिर: A>`).
+- Labels are unique within one tuple type.
+- Labels are erased from type identity: `टपल<gx: A, B> ≡ टपल<A, B>` for assignment, `≡`/`↦`, unify, and every emitter.
+- Bracket index on a tuple requires a literal integer (`i[0]`); every element is reachable by position, labeled or not. Non-literal index expressions stay rejected. Positions are brackets only — no `.0`.
+- Member-by-label (`i.gx`) requires that label to be present on the receiver's `टपल` annotation.
+- `टपल` element slots admit `_` (monomorphic hole, solved element-wise from the single position witness) and reject `∪`. A wanted union element is declared with binary cup (`टपल<f32, textus ∪ शून्य>`). `lista<∪>` / `tabula<K, ∪>` keep heterogeneous-union behavior. Labels compose with holes (`टपल<loss: _, T>`).
+- `ratio` type arguments require a label for every element, labels are unique, `_` is admitted as a monomorphic element hole, and `∪` is rejected in an element slot. A `ratio` has no positional or bracket access, and it has no structural equivalence with another ratio or a genus; fields are accessed by label only.
+- Arrays are written `lista<T>` (unbounded, shipped). Postfix `T[]` is not accepted. `lista<T, N>` is a proposed (not shipped) bounded form; see Generic Collections.
+- `से`/`में` mark ownership (borrow/mut-borrow) on the immediately following union member. Parenthesize when grouping must be explicit.
+- Two hole kinds share the `holeType` production. `_` is the monomorphic hole ("infer exactly one inhabitant type"); the standalone `∪` is the union hole ("infer a finite multi-member union"). Both are legal wherever a base type is: bindings, returns, params, fields, and type arguments (`lista<∪>`, `tabula<K, ∪>`, `→ ∪`).
+- **Lone-`∪` rule:** a `∪` hole consumes the whole type expression — any following `∪` is a parse error (`A ∪ ∪`, `∪ B` rejected, issue `unexpected_cup_after_union_hole`). `_` keeps today's behavior and may still appear as a binary-cup member (`_ ∪ B`).
+- **Binary-cup disambiguation:** `∪` between two non-hole types remains the inline value-union operator (`A ∪ B`, nullable `T ∪ शून्य`); the hole reading applies only when `∪` stands alone in a base-type position.
+- Inline union `T ∪ U` (cup) for ad-hoc value unions; `T ∪ शून्य` is the canonical nullable type form (lowers to Option<T>).
+- Unions are parsed as a flat member list; duplicates and `शून्य`-only cases are diagnosed in semantic lowering.
+- `स्वेच्छा` is a declaration marker (post-name on params/fields), never a prefix on types.
+- Qualified type paths such as `terminus.Terminus` name a type through an
+  imported namespace binding. The prefix must resolve to a namespace; the final
+  segment must resolve to a type-bearing declaration.
+
+Function types enable higher-order function signatures:
+
+```fab
+functio filtrata((T) → bivalens pred) → lista<T>
+functio compose((A) → B f, (B) → C g) → (A) → C
+functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ textus
 ```
 
-Arrays `सूची<T>` लिखे जाते हैं; postfix `T[]` अस्वीकार है। `से`/`में` ownership prefixes हैं। Inline union `T ∪ U` ad-hoc value union के लिए है; canonical nullable form `T ∪ शून्य` है। Grammar में unions right-associative हैं, पर parser उन्हें flat पढ़ता है; duplicates और केवल `शून्य` वाले cases semantic lowering में diagnostic देते हैं। `स्वेच्छा` declaration marker है, type prefix नहीं। Qualified paths जैसे `terminus.Terminus` imported namespace binding के भीतर type का नाम लेते हैं।
+### Primitive Types
 
-### मूल प्रकार
+| Faber      | Meaning |
+| ---------- | ------- |
+| `textus`   | Unicode string |
+| `textus<N>` | proposed — not shipped; bounded Unicode string; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `textus<_>` is the capacity hole (infer `N`). |
+| `ascii`    | ASCII-only string |
+| `ascii<N>` | proposed — not shipped; bounded ASCII string; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `ascii<_>` is the capacity hole (infer `N`). |
+| `forma`    | captured template + params |
+| `numerus`  | integer (default `i64`) |
+| `modulus<W>` | unsigned modular word; arithmetic wraps modulo 2^W |
+| `fractus`  | float (default `f64`) |
+| `bivalens` | boolean |
+| `शून्य`    | null |
+| `vacuum`   | void |
+| `numquam`  | never |
+| `ignotum`  | unknown |
+| `octeti`   | bytes |
+| `octeti<N>` | proposed — not shipped; bounded byte buffer; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `octeti<_>` is the capacity hole (infer `N`). |
 
-| Faber | अर्थ |
-|---|---|
-| `पाठ` | Unicode string |
-| `ascii` | ASCII-only string |
-| `forma` | captured template और parameters |
-| `संख्या` | integer, default `i64` |
-| `मॉड्यूल<W>` | unsigned modular word; arithmetic `2^W` modulo wrap करता है |
-| `भिन्न` | float, default `f64` |
-| `तार्किक` | boolean |
-| `शून्य` | null |
-| `रिक्त` | void |
-| `कभीनहीं` | never |
-| `अज्ञात` | unknown |
-| `बाइट` | bytes |
-| `regex` | compiled pattern |
-| `json` | JSON value |
-| `मान` | dynamic value carrier |
-| `क्षण` | time/instance value |
-| `वस्तु` | JSON object |
-| `कुछभी` | unconstrained value |
+Bare `textus` / `ascii` / `octeti` remain the unbounded productions. The
+proposed (not shipped) forms `textus<N>`, `ascii<N>`, and `octeti<N>` take
+one `आकार` / `NATURAL` applied argument. That `N` is capacity, not a
+width marker and not a language-wide default. `_` in that slot (`ascii<_>`,
+`textus<_>`, `octeti<_>`, `lista<T, _>`) is a capacity hole: the form stays
+bounded, and `N` is inferred from a same-family bounded witness. Bare
+`ascii` is not a hole.
 
-Sized primitives एक optional width marker लेते हैं। `संख्या<W>` के लिए `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`; `भिन्न<W>` के लिए `f16`, `f32`, `f64`; `मॉड्यूल<W>` के लिए केवल unsigned markers मान्य हैं। Bare `संख्या` और `भिन्न` क्रमशः `संख्या<i64>` और `भिन्न<f64>` के shorthand हैं।
+Sized primitives accept one optional **width marker** (not a user type parameter):
 
-`मॉड्यूल<W>` अलग semantic family है। यह `संख्या<W>` से implicit arithmetic mix नहीं करता; explicit same-width conversion उपलब्ध है। Literals `0..=2^W-1` में होने चाहिए। Shift counts modular हैं: `x ⇐ W` पूर्ण wrap है। Cross-width modular arithmetic अस्वीकार है।
+| Family | Markers | Invalid example |
+| ------ | ------- | --------------- |
+| `numerus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64` | `numerus<f32>` → use `fractus<f32>` |
+| `fractus<W>` | `f16`, `f32`, `f64` | `fractus<i32>` → use `numerus<i32>`; `bf16` is deferred |
+| `modulus<W>` | `u8`, `u16`, `u32`, `u64` | `modulus<i32>` → signed widths are not modular words |
 
-### सामान्य संग्रह
+Bare `numerus` / `fractus` remain shorthand for `numerus<i64>` / `fractus<f64>`.
+`numerus<_>`, `fractus<_>`, `modulus<_>`, and `instans<_>` are marker holes:
+the family stays identity and only the width/precision is inferred from a
+same-family witness (exact marker, no lattice widening). Unsolved `_` is an
+error, never the bare default. Convert-hint holes (`numerus<u32, _>`) are
+not this form.
 
-| Faber | अर्थ |
-|---|---|
-| `सूची<T>` | array |
-| `तालिका<K,V>` | map |
-| `समुच्चय<T>` | set |
-| `वादा<T>` | promise |
-| `कर्सर<T>` | iterator |
-| `tensor<T, Figura>` | static-shape dense homogeneous buffer |
-| `vector<T, N>` | static-width register-class numeric vector |
-| `matrix<T, [R, C]>` | ठीक दो static dimensions वाली register-class numeric matrix |
-| `atomic<T>` | storage-sensitive atomic cell; v1 में केवल `i32`/`u32` |
-| `sparsa<T, Figura>` | static-shape sparse homogeneous buffer |
+`modulus<W>` is a distinct semantic family: arithmetic does not mix implicitly
+with `numerus<W>`, while explicit same-width conversion remains available.
+Literals must be in `0..=2^W-1` (for `modulus<u64>` up to
+`18446744073709551615`). Shift counts are themselves modular: `x ⇐ W` is a
+full wrap. Cross-width modular arithmetic is rejected.
 
-`Figura := _ | natural | ident | [ figura-list ]`; खाली `[]` rank-0 है। Bare `tensor<T>` अधूरा है; rank-0 के लिए `tensor<T, []>` या inferred shape के लिए `tensor<T, _>` लिखें। `vacua` rank-0 tensor के लिए एक default-initialized slot और किसी भी shape के `sparsa` के लिए बिना stored entries वाला all-zero sparse tensor बनाता है। `matrix<T, Figura>` को ठीक दो dimensions चाहिए; bare `matrix<T>`, एक-axis और तीन-axis shapes अस्वीकार हैं। `atomic<T>` में v1 पर `T` केवल `i32` या `u32` हो सकता है; atomic methods के बिना element type से interchange नहीं करें।
+### Generic Collections
 
-Multi-dimensional tensors `crea` / `structa` / `↦` से बनते हैं। `Type(...)` construction form नहीं है; `vector<f32, 4>(...)`, `matrix<f32, [2, 2]>(...)`, `tensor<f32, [2, 2]>(...)` और scalar `संख्या("42")` अस्वीकार हैं। `value ↦ Type`, named library constructors या `Genus { field = value }` records का उपयोग करें। Tensor index/shape intrinsic slots (`accipe`, `ponde`, `forma`, `crea`, `structa`) call sites पर canonical `सूची<संख्या>` / `&[i64]` boundary लेते हैं। यह structural exception केवल उन slots तक सीमित है।
+| Faber          | Meaning  |
+| -------------- | -------- |
+| `lista<T>`     | array    |
+| `lista<T, N>`  | proposed — not shipped; bounded array; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `lista<T, _>` is the capacity hole (infer `N`). |
+| `tabula<K,V>`  | map      |
+| `copia<T>`     | set      |
+| `promissum<T>` | promise  |
+| `cursor<T>`    | iterator |
+| `tensor<T, Figura>` | dense homogeneous buffer with static shape `Figura`; numeric methods require numeric element types |
+| `vector<T, N>` | register-class numeric vector with static width `N` (single dimension, not buffer-backed) |
+| `matrix<T, [R, C]>` | register-class numeric matrix with exactly two static dimensions (not buffer-backed and not a tensor alias) |
+| `atomic<T>` | storage-sensitive atomic cell; v1 accepts `i32` / `u32` elements only and access must go through atomic methods |
+| `sparsa<T, Figura>` | sparse homogeneous buffer with static shape `Figura`; omitted coordinates equal zero; numeric methods require numeric element types |
 
-Value unions inline `T ∪ U` हैं। Tagged unions `विभेद` से बनते हैं। `copia.unio()` set method है, type constructor नहीं।
+A `figura` is `_`, a natural number, a size identifier, or a bracketed list of nested figura values; empty `[]` is rank-0. Bare `tensor<T>` is incomplete — use `tensor<T, []>` for rank-0 or `tensor<T, _>` to infer shape.
 
-### प्रकार sugar
+`vacua` for `tensor<T, []>` produces a rank-0 tensor (one default-initialized element slot).
+`vacua` for `sparsa<T, Figura>` (any shape) produces an all-zero sparse tensor with no stored entries.
+`matrix<T, Figura>` requires exactly two dimensions; bare `matrix<T>` and one- or three-axis matrix shapes are rejected.
+`atomic<T>` requires `T` to be `i32` or `u32` in v1. Atomic cells are not interchangeable with their element type; use `load`, `store`, `exchange`, and `compare_exchange` receiver methods.
+Construct multi-dimensional tensors via `crea` / `structa` / `↦`.
+`Type(...)` is not a construction form: `vector<f32, 4>(...)`, `matrix<f32, [2, 2]>(...)`, `tensor<f32, [2, 2]>(...)`, and scalar forms such as `numerus("42")` are rejected. Use `value ↦ Type`, named library constructors, or `Genus { field = value }` records.
 
-Type sugar type-position only है और long form से semantically identical है। Width markers `i8`/`i16`/`i32`/`i64`, `u8`/`u16`/`u32`/`u64`, `f16`/`f32`/`f64` हैं। Bare width scalar numeric type देता है; family prefix उसी width की collection देता है।
+Tensor index/shape intrinsic slots (`accipe`, `ponde`, `forma`, `crea`, `structa`) accept integer lists that fit the canonical `lista<numerus>` / `&[i64]` runtime boundary at call sites (e.g. `lista<u32>` for GPU thread ids; not `lista<u64>`). This is a structural exception scoped to those slots — it does not widen the signed↔unsigned numeric lattice (see Index vector parameter policy in `tensor-intrinsics.md`).
+
+Value unions use inline `T ∪ U` (nullable: `T ∪ शून्य`). The standalone `∪` hole infers a multi-member union; `_` infers a single inhabitant (see `docs/design/type-hole-union.md`). Tagged unions use `विभेद`.
+`copia.unio()` is a set method, not a type constructor.
+
+### Type Sugar
+
+Explicit long forms such as `numerus<u32>` and `lista<numerus<u32>>` are the
+canonical spellings. Type sugar is an ergonomic alternate spelling for numeric
+and collection types. It is **type-position only** and **semantically identical**
+to the long form — the compiler treats both the same. This is the single
+canonical reference for sugar; the rest of the specification uses long form.
+
+Sugar combines a width marker with an optional one-letter family prefix. Width
+markers are `i8`/`i16`/`i32`/`i64` (signed), `u8`/`u16`/`u32`/`u64` (unsigned),
+and `f16`/`f32`/`f64` (float). A bare width marker (no prefix) sugars the scalar
+numeric type; a family prefix sugars a collection of that width. In the grammar,
+`WIDTH_MARKER` is a bare marker; `LISTA_WIDTH_SUGAR`, `TENSOR_WIDTH_SUGAR`,
+`SPARSA_WIDTH_SUGAR`, `VECTOR_WIDTH_SUGAR`, and `MATRIX_WIDTH_SUGAR` are that
+marker prefixed with `l`, `t`, `s`, `v`, and `m`, respectively.
 
 | Sugar | Long form | Bracket rule |
-|---|---|---|
-| `i8` … `u64`, `f16`/`f32`/`f64` | `संख्या<W>`, `भिन्न<W>` | कोई bracket नहीं |
-| `lf32`, `lu32`, `li64`, … | `सूची<f32>`, `सूची<u32>`, `सूची<i64>`, … | कोई bracket नहीं |
-| `tf32`, `tf32[2, 3]`, `ti64[N]` | `tensor<f32, _>`, `tensor<f32, [2, 3]>`, `tensor<i64, [N]>` | वैकल्पिक `Figura` |
-| `sf32`, `sf32[2, 3]`, `si64[N]` | `sparsa<f32, _>`, `sparsa<f32, [2, 3]>`, `sparsa<i64, [N]>` | वैकल्पिक `Figura` |
-| `vf32`, `vf32[4]`, `vu32[3]` | `vector<f32, _>`, `vector<f32, 4>`, `vector<u32, 3>` | वैकल्पिक एक width |
-| `mf32[4, 4]`, `mf16[2, 2]`, `mu32[3, 3]` | `matrix<f32, [4, 4]>`, `matrix<f16, [2, 2]>`, `matrix<u32, [3, 3]>` | **अनिवार्य**, दो dimensions |
+| ----- | --------- | ------------ |
+| `i8` … `u64`, `f16`/`f32`/`f64` | `numerus<W>`, `fractus<W>` | none (bare marker) |
+| `lf32`, `lu32`, `li64`, … | `lista<f32>`, `lista<u32>`, `lista<i64>`, … | none |
+| `tf32`, `tf32[2, 3]`, `ti64[N]` | `tensor<f32, _>`, `tensor<f32, [2, 3]>`, `tensor<i64, [N]>` | optional `Figura` |
+| `sf32`, `sf32[2, 3]`, `si64[N]` | `sparsa<f32, _>`, `sparsa<f32, [2, 3]>`, `sparsa<i64, [N]>` | optional `Figura` |
+| `vf32`, `vf32[4]`, `vu32[3]` | `vector<f32, _>`, `vector<f32, 4>`, `vector<u32, 3>` | optional single width |
+| `mf32[4, 4]`, `mf16[2, 2]`, `mu32[3, 3]` | `matrix<f32, [4, 4]>`, `matrix<f16, [2, 2]>`, `matrix<u32, [3, 3]>` | **required**, two dimensions |
 
-`[]` rank-0 है, `[2, 3]` fixed shape है और बिना bracket shape infer होती है (`_`)। Matrix में ठीक दो dimensions चाहिए। Non-width element types के लिए full form लिखें, जैसे `tensor<पाठ, [3]>`। Value identifiers `tf32`, `lf32` आदि type sugar से नहीं बदलते। `मॉड्यूल<W>` का sugar नहीं है; `मॉड्यूल<u32>` पूरा लिखें।
+Bracket shapes: `[]` is rank-0, `[2, 3]` is a fixed shape, and no bracket infers
+the shape (`_`). Matrix requires exactly two dimensions. Sugar never uses `<>`.
+For non-width element types (e.g. `tensor<textus, [3]>`), use the full form.
 
----
+Sugar is reserved in type syntax only — value identifiers named `tf32`, `lf32`,
+etc. are unchanged.
 
-## नियंत्रण प्रवाह
+`modulus<W>` has no sugar; write `modulus<u32>` in full.
 
-### शर्तें
-
-```ebnf
-ifStmt     := 'यदि' expression arm ('अन्यथायदि' ifStmt | elseClause)?
-elseClause := 'अन्यथा' elseArm
-arm        := (blockStmt | stmtBodyJoint statement) catchClause?
-elseArm    := (blockStmt | stmtBodyJoint statement) catchClause?
-```
-
-`यदि` if, `अन्यथायदि` else-if और `अन्यथा` else हैं। एक-statement body में `अतः लौटाओ`, `अतः इधरफेंको`, `अतः मरोजाओ` और `अतः मौन` मान्य हैं। `मौन` explicit no-op है।
-
-### लूप
-
-```ebnf
-whileStmt  := 'जबतक' expression (blockStmt | stmtBodyJoint statement) catchClause?
-iteraStmt  := 'दोहराओ' (('सेवन' | 'से') expression | 'पूर्व' expression) ('स्थिर' | 'चर') IDENTIFIER (blockStmt | stmtBodyJoint statement) catchClause?
-```
-
-`दोहराओ सेवन...स्थिर/चर` values पर for-of है। `दोहराओ से...स्थिर/चर` keys पर for-in है। Range iteration `दोहराओ पूर्व range स्थिर/चर i` रूप में होती है; उदाहरण `दोहराओ पूर्व 0‥10 प्रति 2 स्थिर i { दिखाओ i }` में `प्रति` range expression का भाग है।
-
-### चयन/मिलान
-
-```ebnf
-eligeStmt    := 'चुनो' expression '{' eligeCase* defaultCase? '}' catchClause?
-eligeCase    := 'स्थिति' expression (blockStmt | stmtBodyJoint statement)
-defaultCase  := 'अन्यतम' (blockStmt | stmtBodyJoint statement)
-```
-
-### पैटर्न मिलान
-
-```ebnf
-discerneStmt := 'मिलाओ' 'सब'? discriminants '{' variantCase* defaultCase? '}'
-discriminants := expression (',' expression)*
-variantCase  := 'स्थिति' patterns (blockStmt | stmtBodyJoint statement)
-patterns     := pattern ((',' | 'और') pattern)*
-pattern      := '_' | literal | (IDENTIFIER patternBind?)
-patternBind  := ('रूपमें' IDENTIFIER) | (('स्थिर' | 'चर') patternBinding (',' patternBinding)*)
-patternBinding := IDENTIFIER ('रूपमें' IDENTIFIER)?
-```
-
-### गार्ड
-
-```ebnf
-guardStmt   := 'रक्षक' '{' guardClause+ '}'
-guardClause := 'यदि' expression (blockStmt | stmtBodyJoint statement)
-```
-
-### संसाधन प्रबंधन
-
-```ebnf
-curaStmt    := 'देखभाल' STRING ('स्थिर' | 'चर') typeAnnotation IDENTIFIER blockStmt catchClause?
-```
-
-### विघटन निष्कर्षण
-
-```ebnf
-extractStmt   := 'सेवन' expression ('स्थिर' | 'चर') extractFields
-extractFields := extractField (',' extractField)* (',' restField)? | restField
-extractField  := IDENTIFIER ('रूपमें' IDENTIFIER)?
-restField     := 'बाकी' IDENTIFIER
-```
-
-### नियंत्रण स्थानांतरण
-
-```ebnf
-returnStmt   := 'लौटाओ' expression?
-breakStmt    := 'तोड़ो'
-continueStmt := 'जारी'
-noopStmt     := 'मौन'
-```
+**Spelling preference (author convention, not grammar):** general Faber code
+tends toward long form for readability; numeric/tensor-primary modules may
+prefer sugar. Choose per module or file.
 
 ---
 
-## त्रुटि प्रबंधन
+## Control Flow
 
-```ebnf
-throwStmt   := ('इधरफेंको' | 'मरोजाओ') expression ['यदि' expression]
-catchClause := 'पकड़ो' IDENTIFIER blockStmt
-assertStmt  := 'पुष्टि' expression ('मरोजाओ' expression)?
-requiritStmt := 'आवश्यक' expression 'इधरफेंको' expression
-```
+### Conditionals
 
-`पकड़ो` structured statements और conditional arms से जुड़ता है। यह मनमाने bare block से नहीं जुड़ता। `करो { ... } पकड़ो त्रुटि { ... }` canonical one-shot local recoverable-error boundary है। `प्रयास` legacy try/catch surface है और `अंततः` legacy finally surface; दोनों migration diagnostic के साथ अस्वीकार हैं। `इधरफेंको` recoverable throw है और `मरोजाओ` fatal panic। Optional `यदि <expr>` guard parser sugar है: `इधरफेंको मान यदि शर्त` parse समय पर `यदि शर्त { इधरफेंको मान }` बनता है। `पुष्टि` रनटाइम इनवेरिएंट चेक है; यह संकल्पात्मक रूप से `मरोजाओ "msg" यदि !cond` में अवमूदन होता है, स्रोत में सकारात्मक स्थिति रखते हुए। `secus` गलत-पथ संदेश पेश करता है।
+
+- `यदि` = if, `अन्यथायदि` = else-if, `अन्यथा` = else
+- `अतः` for one-statement bodies, including `अतः लौटाओ`, `अतः इधरफेंको`, `अतः मरोजाओ`, and `अतः मौन` (`∴` is not accepted here)
+- `मौन` for explicit no-op (from musical notation: "it is silent")
+
+### Loops
+
+
+- `जबतक` = while
+- `दोहराओ सेवन...स्थिर`/`दोहराओ सेवन...चर` = for-of (values)
+- `दोहराओ से...स्थिर`/`दोहराओ से...चर` = for-in (keys)
+- `दोहराओ सीमा range स्थिर/चर i` = range iteration (e.g. `दोहराओ सीमा 0‥10 प्रति 2 स्थिर i { दिखाओ i }`; `प्रति` belongs to the range expression)
+
+### Switch/Match
+
+
+### Pattern Matching
+
+
+### Guards
+
+
+### Resource Management
+
+
+### Destructuring Extraction
+
+
+### Control Transfer
+
+
+- `रुको_लौटाओ` awaits a compatible promise and returns its success value from a
+  `async` function.
+- `रुको` awaits a compatible promise to completion and discards any success
+  value.
+- `आगेबढ़ो` is statement-initial yield from `जनक` / `async_जनक`; it is not an
+  expression-form await.
 
 ---
 
-## अभिव्यक्तियाँ
+## Error Handling
 
-### ऑपरेटर — precedence में निम्न से उच्च
 
-```ebnf
-expression := assignment
-assignment := ternary ('←' assignment | '↤' assignment inlineRecovery?)?
-incDecStmt := place ('↑' | '↓')
-ternary    := or (('?' expression ':' | 'ऐसा' expression 'अन्यथा') ternary)?
-or         := and (('या') and)*
-and        := equality (('और') equality)*
-equality   := comparison (('≡' | '≠' | '≈' | '≉' | 'है' | 'नहीं' 'है') comparison)*
-comparison := bitwiseOr (('<' | '>' | '≤' | '≥' | 'भीतर' | 'बीच') bitwiseOr)*
-bitwiseOr  := bitwiseXor ('∨' bitwiseXor)*
-bitwiseXor := bitwiseAnd ('⊻' bitwiseAnd)*
-bitwiseAnd := shift ('∧' shift)*
-shift      := range (('⇐' | '⇒') range)*
-range      := additive (('‥' | '…' | 'पहले' | 'तक') additive ('प्रति' additive)?)?
-additive   := multiplicative (('+' | '-') multiplicative)*
-multiplicative := coalesce (('*' | '/' | '%') coalesce)*
-coalesce   := unary ('डिफ़ॉल्ट' velRhs)*
-velRhs     := unary (('‥' | '…' | 'पहले' | 'तक') unary ('प्रति' unary)?)?
-unary      := ('-' | '¬' | 'नहीं' | 'आगेबढ़ो' | 'गढ़ो') unary | cast
-cast       := call ('∷' typeAnnotation | conversio)*
-conversio        := '↦' typeAnnotation typeParams? inlineRecovery?
-inlineRecovery   := '⇥' unary
-```
+- `पकड़ो` attaches to the structured forms whose productions name `catchClause`: conditional arms, `जबतक`, `दोहराओ`, `चुनो`, `देखभाल`, and `करो`. It does not attach to arbitrary bare blocks.
+- Use the explicit do block when a standalone block needs a handler: `करो { ... } पकड़ो err { ... }`.
+- `इधरफेंको` = throw (recoverable), `मरोजाओ` = panic (fatal).
+- A same-line `यदि <expr>` guard on `इधरफेंको` and `मरोजाओ` is line-sensitive parser sugar: `इधरफेंको val यदि cond` desugars to `यदि cond { इधरफेंको val }` at parse time. Its canonical, compression-safe spelling is the expanded `यदि` block. A source compressor must expand this sugar before removing line breaks; the guarded shorthand remains under language review.
+- `पुष्टि` is a runtime invariant check. It desugars conceptually to `मरोजाओ "msg" यदि !cond`, with the positive condition kept in source form and the inversion applied during lowering. The optional particle is `मरोजाओ` (en `panic`): `पुष्टि cond मरोजाओ msg` / `assert cond panic msg`. Bare `पुष्टि cond` stays legal. An `पुष्टि` failure is fatal and uncatchable by `पकड़ो` (it lowers to a panic, not a `Result`-channel error); in test context the harness isolates each `परीक्षण` so a failed assertion ends that test without ending the suite.
+- `आवश्यक` is the recoverable require statement (en surface `require … throw …`), the typed-error-channel twin of `पुष्टि`. `आवश्यक cond इधरफेंको err` desugars to `यदि नहीं (cond) { इधरफेंको err }` at lowering; the thrown value enters the function's `⇥ E` channel and is catchable by `पकड़ो`/`करो`, unlike `पुष्टि` (fatal). A `आवश्यक` statement in a `⇥`-less function is a compile error, same as `इधरफेंको`. The particle is `इधरफेंको` (en `throw`) and is required.
 
-`↤` परिवर्तन-निर्देशित असाइनमेंट है: दाएँ पक्ष का मूल्यांकन करें, उसे `↦` मार्ग से बाएँ स्थान के स्थिर प्रकार में परिवर्तित करें, फिर असाइन करें। `⇥` रिकवरी केवल `↤` पर मान्य है, `←` के बाद नहीं।
+---
 
-`डिफ़ॉल्ट` local nullable elimination है: `T ∪ शून्य डिफ़ॉल्ट T → T`। यह logical `या` नहीं है। इसका binding arithmetic से tighter है; `prefix + item डिफ़ॉल्ट ""` का अर्थ `prefix + (item डिफ़ॉल्ट "")` है। RHS interval constructor पूरा कर सकता है। Retired predicate keywords prefix unary syntax नहीं हैं। `expr है सत्य`, `expr है असत्य`, `expr है शून्य`, `expr नहीं है शून्य`, `expr < 0` या `expr > 0` लिखें।
+## Expressions
 
-**Static type ascription (`∷` / verte):** `∷` glyph expression पर target type का compile-time ascription देता है। Primitive/alias पर runtime effect नहीं होता; built-in collection पर target-shaped collection value मिलता है; variant expression पर enum/interface target ascription मिलता है। साधारण genus values के लिए typed construction और empty collections के लिए `vacua` पसंद करें। केवल glyph `∷` स्वीकार है; पुराने Latin aliases `qua`, `innatum` और `novum` हट चुके हैं।
+### Operators (by precedence, lowest to highest)
 
-**Runtime conversion (`↦` / conversio):** `↦` actual parsing/conversion करता है और fail हो सकता है। उदाहरण: `"22" ↦ संख्या`, `"bad" ↦ संख्या ⇥ 0`, `42 ↦ पाठ`। Inline recovery में `⇥` target के तुरंत बाद आता है और recovery expression का type target type से मिलना चाहिए। `डिफ़ॉल्ट` conversio recovery के लिए अस्वीकार है; यह केवल local nullable elimination है।
 
-### कॉल और सदस्य अभिगम
+**Conversion-directed assignment (`↤` / conversio-assign):** `place ↤ value`
+evaluates the right side, converts it to the statically known type of the left
+place through the existing `↦` route, then assigns. It binds at the same
+precedence as `←` and is right-associative; `⇥ inlineRecovery` is **legal only
+on `↤`** — a `⇥` recovery after ordinary `←` is rejected, and in a
+right-associated `↤` chain the recovery attaches to the nearest `↤`. The
+operator is preserved verbatim through syntax and emission; it is never
+rewritten to `←` or `↦`. Typed `स्थिर`/`चर` initializers accept `↤`
+(convert to the written type, then initialize); `स्थिर _`, `बैठा`, and untyped
+destructuring have no concrete destination and are rejected.
 
-```ebnf
-call          := primary (callSuffix | memberSuffix | optionalSuffix | nonNullSuffix)*
-callSuffix    := typeArgs? '(' argumentList ')'
-memberSuffix  := '.' IDENTIFIER | '[' expression ']'
-optionalSuffix := '?.' IDENTIFIER | '?[' expression ']' | '?(' argumentList ')'
-nonNullSuffix := '!.' IDENTIFIER | '![' expression ']' | '!(' argumentList ')'
-argumentList  := (argument (',' argument)*)?
-argument      := 'फैलाओ'? expression
-```
+`है` and `नहीं है` inspect an existing value; they never convert it. Core type
+spellings on the right perform runtime variant/type tests, while `शून्य`,
+`सत्य`, `असत्य`, and ordinary value expressions use the value-test path. Radix
+currently recognizes type targets through a fixed core-type vocabulary. Extending
+that recognition to arbitrary declared types is a separate language decision.
+Use `≡` / `≠` for structural value equality and `↦` for runtime conversion.
 
-### स्ट्रिंग और टेम्पलेट शाब्दिक
+Retired predicate keywords are not prefix unary syntax. Use `expr है सत्य`,
+`expr है असत्य`, `expr है शून्य`, `expr नहीं है शून्य`, `expr ≺ 0`, or
+`expr ≻ 0`.
 
-Faber delimiter semantics उपयोग करता है; हर quote form अलग source shape बताता है। ये interchangeable synonyms नहीं हैं।
+**Static type ascription (`∷` / verte):**
 
-| Form | Type | भूमिका |
-|---|---|---|
-| `'...'` | `ascii` | fixed machine tokens; `§` और `(...)` नहीं |
-| `"..."` | `पाठ` | short Unicode line string; `(...)` render करता है |
-| `«...»` | `पाठ` | block/multiline Unicode; `(...)` render करता है |
-| `` `...` `` | `forma` | captured template; `(...)` capture करता है |
-| `{ ... }` | `json` | compile-time object-rooted JSON document |
-| `\|...\|` | `बाइट` | compile-time hex bytes |
-| `"..." ↦ regex` | `regex` | text से compiled pattern |
-| `[ ... ]` | `सूची<T>` | Faber list, JSON array या bytes नहीं |
+The `∷` glyph (U+2237, "proportion") explicitly ascribes a target type to an expression. Use it when the source expression already exists and the compiler needs a static target shape:
 
-Unicode forms (`"`, `«`, `` ` ``) में `§` template hole है। `ascii` literals में `§` नहीं आ सकता। Rendered `पाठ` templates `scriptum("...", args...)` में lower होते हैं। Captured `forma` templates template text और parameters को render किए बिना capture करते हैं; bound SQL/URL payload के लिए इन्हें उपयोग करें। Block text के लिए `«...»` है।
+- Primitive/alias → cast (no runtime effect): `data ∷ textus` → TypeScript: `(data as string)`
+- Built-in collection → target-shaped collection value: `[1, 2, 3] ∷ lista<numerus>`
+- Variant expression → enum/interface target ascription: `गढ़ो Click { x = 10 } ∷ Event`
 
-Implementation status: `"..."`, `«...»`, `'...'`, `` `...` ``, `|...|`, `{ ... }`, और text/ascii `↦ regex` shipped हैं। Slash-delimited `/.../` regex literals अभी pending हैं।
-
-उदाहरण:
+Prefer typed construction for ordinary `वर्ग` values and `vacua` for ordinary empty collection values:
 
 ```fab
-स्थिर _ टैग ← «inline»
-स्थिर _ blob ← «
+fixum _ point ← Point { x = 10 }
+fixum lista<numerus> xs ← vacua
+```
+
+Only the `∷` glyph is accepted as the postfix static type-ascription operator. The Latin forms `qua`, `innatum`, and `novum` were aliases and have been removed (see verte-alias-clean-break).
+
+**Runtime conversion (`↦` / conversio):**
+
+The `↦` glyph (U+21A6, "rightwards arrow from bar") is the runtime value conversion operator. Unlike `∷` (compile-time cast), this performs actual parsing/conversion that can fail:
+
+- `"22" ↦ numerus` → Rust: `"22".parse::<i64>().unwrap()`
+- `"bad" ↦ numerus ⇥ 0` → Rust: `"bad".parse::<i64>().unwrap_or(0)`
+- `42 ↦ textus` → Rust: `42.to_string()`
+
+The second type argument of a `↦` target is the convert-hint slot. `Hex` / `Bin` / `Oct` / `Be` / `Le` are convert hints in that slot, not keywords and not new `baseType` productions. Target support is not a grammar production (see Target Support).
+
+- `"ff" ↦ numerus<i32, Hex>` — shipped; text parse at radix 16 (`Bin` = 2, `Oct` = 8). Hex/Bin/Oct text parse is unchanged by endian hints.
+- `octeti[lo‥hi] ↦ numerus<W, Be>` / `… ↦ numerus<W, Le>` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust, the MIR runner, Go, and TypeScript. TypeScript `i64`/`u64` stay fail-closed (JS number is not exact). English `int<W, Be>` is the same form. `octeti` itself has no endian; `bytes ↦ numerus<u32>` without `Be`/`Le` stays rejected. A short window fails (no pad).
+- `n ↦ octeti<N, Be>` / `… ↦ octeti<N, Le>` — proposed (not shipped); write convert after `octeti<N>` (`N` ∈ {2, 4, 8}). `Be`/`Le` stay Hex-slot hints, not a second capacity.
+
+Inline failure recovery uses `⇥` immediately after the conversio target (`↦ T ⇥ recovery-expr`). The unparenthesized recovery operand is a unary-precedence expression; parenthesize arithmetic, coalescing, ternary, or assignment recovery expressions. The recovery value must have type `T`.
+
+Using `डिफ़ॉल्ट` as conversio recovery is rejected with a migration diagnostic. `डिफ़ॉल्ट` is local nullable elimination only (`x डिफ़ॉल्ट y`, parameter defaults) — not logical `या`. A parenthesized conversio result may still combine with `डिफ़ॉल्ट` as ordinary defaulting.
+
+### Call and Member Access
+
+
+### String And Template Literals
+
+Faber uses **delimiter semantics**: each quote form means a different source shape.
+They are not interchangeable synonyms.
+
+| Form | Type | Role |
+| --- | --- | --- |
+| `'...'` | `ascii` | fixed machine tokens; no `§`; no `(...)` |
+| `"..."` | `textus` | short Unicode line strings; `(...)` renders |
+| `«...»` | `textus` | block/multiline Unicode; `(...)` renders |
+| `` `...` `` | `forma` | captured templates; `(...)` captures |
+| `{ ... }` | `json` | compile-time object-rooted JSON document (`:` inside) |
+| `\|...\|` | `octeti` | compile-time hex bytes |
+| `"..." ↦ regex` | `regex` | compiled pattern from text conversion |
+| `[ ... ]` | `lista<T>` | Faber list (not JSON array, not bytes) |
+
+`§` (U+00A7) is a template hole in Unicode forms (`"`, `«`, `` ` ``).
+§{label} names a hole with an identifier label; the label is unique within
+its template and may use a keyword spelling under the contextual law. Named
+holes are not available in `ascii` literals, where `§` remains forbidden.
+
+**Rendered templates** (`textus`): `"..."(...)` and `«...»(...)` lower to
+`लिखित("...", args...)`.
+
+**Captured templates** (`forma`): `` `...`(args) `` captures template text and
+parameters without rendering. Safe for bound SQL/URL payloads; do not use
+`«...»(...)` for that job.
+
+Block `textus` uses guillemets `«...»`. The heavy quotation-mark
+pair is retired (too visually close to `"` in many fonts).
+
+Implementation status (2026-06-30):
+
+- Shipped: `"..."`, `«...»` block `textus`, `'...'` → `ascii`, `` `...` `` → `forma`, `|...|` → `octeti`, `{ ... }` → `json`, and text/ascii `↦ regex`.
+- Pending factory delivery: slash-delimited `/.../` regex literals.
+
+Inline block example:
+
+```fab
+fixum _ tag ← «inline»
+```
+
+Multiline block example (newline after opening `«`):
+
+```fab
+fixum _ blob ← «
     select id, email
     from accounts
 »
-स्थिर _ प्रश्न ← `select * from accounts where id = §`(accountId)
-स्थिर _ हस्ताक्षर ← |de ad be ef|
-स्थिर _ नमस्ते ← |48 65 6c 6c 6f|
 ```
 
-### फ़ॉर्मैट-टेम्पलेट अनुप्रयोग
-
-String literal call syntax canonical source form है:
+Captured template example:
 
 ```fab
-"स्थिति: § (§)"(sample_status(), "ठीक")
-"स्थिति: §1 (§0)"("ठीक", sample_status())
+fixum _ q ← `select * from accounts where id = §`(accountId)
 ```
 
-यह compiler के `scriptum("...", args...)` form में lower होता है। सामान्य source में string-template form रखें; `scriptum(...)` केवल explicit desugaring और compiler-facing documentation के लिए है।
-
-`पाठ` bracket indexing Unicode-scalar आधारित है:
+Octeti hex literal example:
 
 ```fab
+fixum _ sig ← |de ad be ef|
+fixum _ hello ← |48 65 6c 6c 6f|
+```
+
+### Format-Template Application
+
+String literal call syntax is the canonical source form for format-template application:
+
+```fab
+"§{greet} world"(greet: "salve")
+"status: § (§)"(sample_status(), "ok")
+"status: §1 (§0)"("ok", sample_status())
+```
+
+The position law counts named and anonymous holes together in order of
+appearance: "§{greet} §" = `[greet: 0, anonymous: 1]`. Named labels are
+erased at lowering, so "§{greet} world"(greet: "salve") lowers identically
+to the positional form `"§ world"("salve")` and its canonical
+`लिखित("§ world", "salve")` form.
+
+This lowers to the compiler's `लिखित("...", args...)` form. Use the string-template form in ordinary source; reserve `लिखित(...)` for explicit desugaring examples and compiler-facing documentation.
+
+For `textus`, bracket indexing is Unicode-scalar based:
+
+```fab
+# Produces "§".
 "Salve, §!"[7]
+# Produces "hello".
 "hello world"[0‥5]
-"hello world"[0 तक 10]
-"abcdef"[0‥6 प्रति 2]
+# Produces "hello world".
+"hello world"[0 usque 10]
+# Produces "ace".
+"abcdef"[0‥6 per 2]
 ```
 
-Text slices में `प्रति` सहित full range form मान्य है। `सूची<T>` bracket access एक element देता है; index एक integer होना चाहिए; out-of-bounds पर trap होता है। Copied range के लिए `sectio(start, end)` उपयोग करें। Nullable list access के लिए `xs.accipe(i) → T ∪ शून्य` और `डिफ़ॉल्ट` उपयोग करें।
+Text slices accept the full range form, including `प्रति`.
 
-`tensor<T, Figura>` bracket indexing intrinsic surface का sugar है:
+For `lista<T>`, bracket indexing is a single-element access. The index must be
+one integer; range slices are not accepted (use `sectio(start, end)` for a
+copied range):
 
 ```fab
-vector[id]        # vector.accipe([id])
-vector[id] ← v    # vector.ponde([id], v)
-grid[[r, c]]      # grid.accipe([r, c])
-grid[[r, c]] ← v  # grid.ponde([r, c], v)
+# Element at position i.
+xs[i]
+# Write element at position i.
+xs[i] ← v
 ```
 
-Reads `T ∪ शून्य` लौटाते हैं। Rank-1 tensor scalar integer index लेता है; rank-N tensor list-shaped index expression लेता है। `grid[r, c]` syntax नहीं है।
+Lista bracket access is **plain**, not nullable: it returns the bare element
+`T` and traps on out-of-bounds. This differs from `tensor`, whose bracket read
+is `accipe` sugar and returns `T ∪ शून्य`. For nullable list access, use
+`xs.accipe(i) → T ∪ शून्य` with `डिफ़ॉल्ट`.
 
-`बाइट` byte-buffer primitive है, array नहीं। Bracket indexing स्वीकार नहीं है; byte access method-based है:
+For `tensor<T, Figura>`, bracket indexing is sugar over the tensor intrinsic
+surface:
 
 ```fab
-buf.accipe(i)      # → संख्या<u8> ∪ शून्य
-buf.appende(b)     # एक byte in place जोड़ें
-buf.longitudo      # byte length
+# vector.accipe([id])
+vector[id]
+# vector.ponde([id], v)
+vector[id] ← v
+# grid.accipe([r, c])
+grid[[r, c]]
+# grid.ponde([r, c], v)
+grid[[r, c]] ← v
 ```
 
-### प्राथमिक अभिव्यक्तियाँ
+Reads return `T ∪ शून्य`, matching `accipe`; use `डिफ़ॉल्ट` or another ordinary
+option-handling form before arithmetic. Rank-1 tensors accept scalar integer
+indices that fit the tensor `i64` runtime boundary (`u64` is rejected).
+Rank-N tensors use a list-shaped index expression such as `[[r, c]]` or a
+bound `lista<integer>` value. `grid[r, c]` is not syntax; `memberSuffix` still
+contains exactly one `expression` between brackets.
 
-`vacua` contextual empty-collection marker है, reserved keyword नहीं। Explicit collection type दें।
+For `octeti`, bracket indexing is a byte or an exclusive window:
 
-```ebnf
-primary := IDENTIFIER | NUMBER | STRING | ASCII_STRING | BACKTICK_STRING
-         | 'मैं' | 'सत्य' | 'असत्य' | 'शून्य'
-         | 'vacua' | arrayLiteral | jsonLiteral | typedConstructor
-         | adExpr
-         | '(' expression ')'
-adExpr    := 'सेवा' asciiLiteral adOpener?
-arrayLiteral := '[' argumentList? ']'
-# Bare { ... } JSON document literal है। Keys quoted JSON strings हैं और : से जुड़ते हैं।
-jsonLiteral := '{' (jsonMember (',' jsonMember)* ','?)? '}'
-jsonMember  := STRING ':' jsonValue
-typedConstructor := typeAnnotation '{' fieldList? '}'
-fieldList := fieldInit (',' fieldInit)*
-fieldInit := ('फैलाओ' expression) | (fieldKey '=' expression) | IDENTIFIER
-fieldKey := IDENTIFIER | STRING | '[' expression ']'
-# JSON values केवल constants हैं; Faber expressions या variable references नहीं।
-jsonValue := jsonObject | jsonArray | jsonString | jsonNumber | 'true' | 'false' | 'null'
-jsonObject := '{' (jsonMember (',' jsonMember)* ','?)? '}'
-jsonArray  := '[' (jsonValue (',' jsonValue)* ','?)? ']'
-jsonString := STRING
-jsonNumber := NUMBER
+```fab
+# One byte → numerus<u8>. O(1). Traps on out-of-bounds.
+buf[i]
+# Exclusive window → octeti. Fully in bounds or fail (no short slice, no pad).
+buf[lo‥hi]
 ```
 
-Bare `{ ... }` object-rooted JSON document (`json`) बनाता है। Keys quoted JSON strings हैं और duplicate key error है। `↦ मान` broad dynamic carrier में explicit widening देता है। `Type { field = expr }` Faber typed construction है।
+The index must be an integer or a range. A compile-time-provable out-of-range
+index on an octeti literal (`|से सेवा be ef|[0‥5]`) is a structured reject.
+Runtime out-of-bounds traps — the same trapping model as lista bracket access,
+not textus short-slice. Lista `[lo‥hi]` stays rejected.
 
-### विशेष अभिव्यक्तियाँ
+`octeti` is the endian host. Parse byte windows on the buffer
+(`buf[lo‥hi] ↦ numerus<W, Be|Le>`). Cross to a list once, for element work,
+via `octeti ↦ lista<numerus<u8>>` (representation change only; other element
+types fail closed). The reverse `lista<numerus<u8>> ↦ octeti` is live. Do not
+detour through `valor`. Lists stay for element work, not endian windows.
 
-```ebnf
-// verte (∷) cast production में postfix है
-fingeExpr     := 'गढ़ो' IDENTIFIER ('{' fieldList '}')? ('∷' IDENTIFIER)?
-praefixumExpr := 'उपसर्ग' (blockStmt | '(' expression ')')
-formatStringExpr := STRING '(' argumentList ')'      # scriptum से पाठ render करता है
-formaTemplateExpr := BACKTICK_STRING '(' argumentList ')' # forma capture करता है
-scriptumExpr  := 'लिखित' '(' STRING (',' expression)* ')'   # explicit/desugared form
-legeExpr      := 'पढ़ो' 'पंक्ति'?
-regexFromText := (STRING | ASCII_STRING) '↦' 'regex'
-# Slash-delimited regex literals अभी active grammar नहीं हैं। / division operator है।
-```
+### Primary Expressions
+
+`vacua` is a contextual empty-collection marker (identifier form, not a reserved keyword).
+Use it with an explicit collection type: `स्थिर lista<numerus> xs ← vacua` or `स्थिर tensor<fractus<f32>, []> t ← vacua`.
+
+
+`STRING` includes short strings delimited by `"` and block strings delimited by
+`«` and `»`. `'...'` (`ascii`) and backtick
+`` `...` `` (`forma`) are separate literal forms (see String And Template
+Literals above).
+
+A bare `{ ... }` now produces an object-rooted JSON document of type `json`:
+`{ "name": "Alice", "age": 30, "active": true }`. Keys are quoted JSON strings
+separated by `:`; values are JSON constants only. Duplicate keys are an error
+(second occurrence). Ascribing to `tabula<K,V>` lowers a real constant map.
+Use `↦ valor` for explicit widening to the broad dynamic carrier. Genus/variant
+construction `Type { field = expr }` uses the Faber `=` grammar unchanged.
+
+- Ratio construction uses `ratioType '{' fieldInit (',' fieldInit)* '}'` through `typedConstructor`; every field initializer is named, and the resulting fields remain accessible only by label.
+
+### Special Expressions
+
+
+`लिखित` and `पढ़ो`/`पंक्ति` are builtin claims that resolve to a user binding
+when the surface spelling is bound in scope (parameter, local, function, or any
+in-scope definition); otherwise they are the builtin. The same binding-wins rule
+applies to `लिखित`'s paren-claimed form and to the `vacua` empty-collection
+marker: builtin claims are defaults, not reservations.
+
+`गढ़ो` variant construction accepts a qualified variant path
+(`गढ़ो pkg.Bonum { … }`), so an imported union's variants construct through
+the import alias, and the `∷` cast is a full type annotation
+(`∷ pkg.Exitus`) exactly as the general postfix ascription (uvf-u3).
+
+`∷` remains the general postfix ascription in `cast`. Rendered text templates
+(`STRING '(' argumentList ')'`) and captured `forma` templates
+(`BACKTICK_STRING '(' argumentList ')'`) use the ordinary call suffix. Regex
+construction uses the ordinary conversio grammar: `(STRING | ASCII_STRING) '↦'
+'regex'`.
+
+Slash-delimited regex literals are not active grammar yet. `/` lexes as the
+division operator, while `//` and `/* ... */` are rejected as invalid comments.
+Use `"..." ↦ regex` for compiled regex values.
 
 ---
 
-## पैटर्न
+## Patterns
 
-```ebnf
-objectPattern  := '{' patternProperty (',' patternProperty)* '}'
-patternProperty := 'बाकी'? IDENTIFIER ('रूपमें' IDENTIFIER)?
-arrayPattern   := '[' arrayPatternElement (',' arrayPatternElement)* ']'
-arrayPatternElement := '_' | 'बाकी'? IDENTIFIER
-```
 
 ---
 
-## नैदानिकी
+## Diagnostics
 
-```ebnf
-outputStmt := ('दिखाओ' | 'देखो' | 'चेताओ' | 'लिखो') expression (',' expression)*
-```
 
-`दिखाओ` neutral diagnostic note है, `देखो` debug/inspect है, `चेताओ` warning है और `लिखो` diagnostic channel spelling है। वास्तविक output के लिए current stdlib methods उपयोग करें।
+The scribe family (`दिखाओ`/`देखो`/`चेताओ`/`लिखो` — en `print`/`debug`/`warn`/`write`)
+claims the statement-initial position only when **not** immediately followed by
+`(`. `दिखाओ expr` is the output statement; a statement-initial `दिखाओ(...)` is an
+expression statement whose callee is the identifier `दिखाओ` — a user function
+call, never the intrinsic.
 
-### टिप्पणियाँ
+- `दिखाओ` = neutral diagnostic note, `देखो` = debug/inspect, `चेताओ` = warn
+- `लिखो` is a diagnostic channel spelling; use current stdlib methods for real output
 
-Faber केवल line comments स्वीकार करता है: logical line के अंत तक `#`। `#` logical line का पहला non-whitespace token होना चाहिए; केवल leading ASCII spaces या tabs skip होते हैं। किसी अन्य token के बाद `#` lex error है। Valid line-start comments अगले statement/declaration पर `leading_trivia` की तरह attach होते हैं। String, `ascii`, `forma` और दूसरे delimited literals में `#` comment नहीं है।
+### Comments
 
----
+Faber accepts **line comments only**: `#` through end of line. The `#` must be the
+first non-whitespace token on the logical line (optional leading ASCII spaces or
+tabs only — other Unicode space separators are not skipped by the lexer).
+A `#` that follows any other token on the same line is a **lex error** with the
+message `# comments must start a line; move this comment above the code`.
 
-## प्रवेश बिंदु
-
-```ebnf
-incipitStmt  := 'आरंभ' blockStmt
-incipietStmt := 'आरंभasync' blockStmt
-```
-
-`आरंभ` sync entry है और `आरंभasync` async entry है।
-
----
-
-## परीक्षण
-
-```ebnf
-probandumDecl := 'परीक्षणसमूह' STRING probaModifier* '{' probandumBody '}'
-probandumBody := (praeparaBlock | probandumDecl | probaStmt)*
-probaStmt     := 'परीक्षण' STRING probaModifier* blockStmt
-probaModifier := 'छोड़ो' STRING | 'भविष्य' STRING | 'केवल' | 'टैग' STRING
-              | 'समय' NUMBER | 'मापो' | 'दोहराओ' NUMBER | 'नाज़ुक' NUMBER
-              | 'आवश्यक' STRING | 'केवलमें' STRING
-praeparaBlock := ('पूर्वतैयार' | 'पूर्वतैयारasync' | 'पश्चतैयार' | 'पश्चतैयारasync') 'सब'? blockStmt
-```
+Valid line-start comments attach forward as `leading_trivia` on the following
+statement or declaration (see comment-preservation). `#` inside string literals,
+`ascii` literals, `forma` templates, and other delimited literals is **not** a
+comment.
 
 ---
 
-## CLI ढाँचा
+## Entry Points
 
-```ebnf
-cliDecl       := annotation* (incipitStmt | funcDecl)
-cliAnnotation := cliProgramAnnotation | imperiumAnnotation | optioAnnotation | operandusAnnotation
-```
 
-Faber automatic argument parsing और help generation के साथ CLI applications बना सकता है।
+- `आरंभ` = sync entry, `आरंभasync` = async entry.
+- `तर्क` binds parsed command-line arguments; `निर्गम` supplies the process exit expression. Their order is fixed by `entryHeader`.
 
-### CLI प्रवेश बिंदु
+---
+
+## Testing
+
+
+---
+
+## CLI Framework
+
+CLI metadata uses the ordinary reachable `annotation* statementCore` grammar.
+The promoted `cli`, `imperium`, `optio`, and `operandus` families validate their
+own named-field schemas after parsing.
+
+Faber supports building CLI applications with automatic argument parsing and help generation.
+
+### CLI Entry Point
 
 ```fab
 @ cli "faber"
-@ विकल्प verbose दीर्घ "verbose" प्रकार तार्किक
-आरंभ तर्क args {
-    # CLI ढाँचा arguments अपने-आप parse करता है
+@ optio verbose longum "verbose" typus bivalens
+incipit argumenta args {
+    # CLI framework automatically parses arguments
 }
 ```
 
-### CLI विकल्प और तर्क
+### CLI Options and Arguments
 
 ```fab
-@ आज्ञा "deploy"
-@ विकल्प target लघु "t" दीर्घ "target" प्रकार पाठ विवरण "Deployment target"
-@ विकल्प verbose लघु "v" दीर्घ "verbose" प्रकार तार्किक विवरण "Enable verbose output"
-@ ऑपरैंड पाठ file विवरण "File to deploy"
-फलन deploy() तर्क args {
-    # Arguments अपने-आप parse होकर pass होते हैं
+@ imperium "deploy"
+@ optio target brevis "t" longum "target" typus textus descriptio "Deployment target"
+@ optio verbose brevis "v" longum "verbose" typus bivalens descriptio "Enable verbose output"
+@ operandus textus file descriptio "File to deploy"
+functio deploy() argumenta args {
+    # Arguments automatically parsed and passed
 }
 ```
 
 ---
 
-## क्षमता कॉल
+## Capability Calls
 
-Expression-form `सेवा` ही समर्थित `ad` surface है। Legacy typed `ad "route" (args) → T { }` और statement-level stream blocks (`meus`/`tuus`) parse time पर अस्वीकार हैं।
+Expression-form `सेवा` is the only supported `सेवा` surface. Legacy typed
+`सेवा "route" (args) → T { }` and statement-level stream blocks
+`सेवा 'route' { meus/tuus … }` are rejected at parse time.
 
-```ebnf
-adExpr        := 'सेवा' asciiLiteral adOpener?
-adOpener      := '(' expression ')'
-conversioExpr := expr '↦' typeAnnotation
-```
+The active `adExpr` production is defined under **Primary Expressions**. Its
+ordinary postfix `conversio` materializes the resulting conversation handle.
 
-Route `asciiLiteral` है, double-quoted `STRING` नहीं। Opener optional single expression है और request `data` को `valor` बनाता है। Expression `सेवा` blockless है और `sermo` conversation handle देता है। `s.meus<T>()` outbound `da`/`fini` view है। `s.tuus<T>()` inbound `accipe`/`cursor`/`exhauri`/`fini` view है। Inbound frames पर `s.tuus<T>().cursor()` iterate करें; सीधे `दोहराओ सेवन s.tuus<T>()` न लिखें। `sermo ↦ T` inbound frames को `T` के type-directed collector से एक value में materialize करता है। Compiler-owned types `scrinium`, `status` और opaque `sermo` handle हैं।
+- Route: `ASCII_STRING` (`'केवल:पढ़ो'`), not double-quoted `STRING`.
+- Opener: optional single `expression` → Request `data` as `valor`.
+- **Expression `सेवा`**: blockless; evaluates to a `sermo` conversation handle.
+  Use postfix `↦ T` (materialization), assign to `sermo`, or open live directional
+  views: `s.meus<T>()` (outbound `da` / `fini`) and `s.tuus<T>()` (inbound
+  `accipe` / `cursor` / `exhauri` / `fini`). Iterate inbound content frames with
+  `s.tuus<T>().cursor()`, not direct `दोहराओ सेवन s.tuus<T>()`.
+- **Removed (parse error):** legacy typed `सेवा "route"` and block `meus`/`tuus` arms.
+- Types: compiler-owned `scrinium`, `status`; opaque `sermo` conversation handle.
+- `sermo ↦ T` materializes inbound frames into one value of type `T` using
+  the type-directed collector for `T`.
 
----
-
-## संग्रह संचालन
-
-पुराना `ab` collection-pipeline DSL retired है। Filtering, slicing और aggregation ordinary `पाठ`/`सूची`/`तालिका`/`समुच्चय` methods और closures से व्यक्त होते हैं। `textus`, `संख्या`, `भिन्न`, `सूची<T>`, `तालिका<K,V>` और `समुच्चय<T>` compiler-owned core types हैं; उनके method surfaces अलग intrinsic design documents में tracked हैं। `prima` और `ultima` ordinary method names हैं। `ubi` active collection syntax नहीं है। `सेवन` iteration और imports दोनों में प्रयुक्त होता है।
-
----
-
-## Fac ब्लॉक
-
-```ebnf
-facBlockStmt := 'करो' blockStmt catchClause? ('जबतक' expression)?
-```
-
-`करो { ... }` scoped block को एक बार चलाता है। `करो { ... } पकड़ो err { ... }` canonical local recoverable-error boundary है। `करो { ... } जबतक condition` post-test loop form है। Postfix `जबतक` केवल `करो` पर attach होता है, किसी भी पिछले block पर नहीं।
+See [`docs/design/frame-stream-types.md`](docs/design/frame-stream-types.md).
 
 ---
 
-## लक्ष्य समर्थन
+## Collection Operations
 
-लक्ष्य समर्थन grammar का भाग नहीं है। कौन-सा grammar किस compilation target पर lower होता है और runtime policy क्या है, इसके लिए `EBNF_MATRIX.md` और target-capability matrix पढ़ें।
+The former `सीमा` collection pipeline DSL is retired. Collection filtering,
+slicing, and aggregation are expressed through ordinary
+`textus`/`lista`/`tabula`/`copia` methods and closures instead of a
+grammar-level query expression. `textus`, `numerus`, `fractus`, `lista<T>`,
+`tabula<K,V>`, and `copia<T>` are compiler-owned core types; their method
+surfaces are not Norma declarations.
 
----
+`prima` and `ultima` are ordinary method names, not transform keywords. `ubi` is
+not active collection syntax.
 
-## कीवर्ड संदर्भ
-
-| श्रेणी | Faber | अर्थ |
-|---|---|---|
-| घोषणाएँ | `विभेद` | tagged union |
-|  | `स्थिर` | const |
-|  | `फलन` | function |
-|  | `वर्ग` | class |
-|  | `अनुबन्ध` | interface contract |
-|  | `आकार` | size/index generic parameter |
-|  | `क्रम` | enum |
-|  | `बैठा` | inferred immutable local |
-|  | `स्वेच्छा` | optional declaration slot |
-|  | `प्रकार` | type alias |
-|  | `vacua` | contextual empty collection marker |
-|  | `चर` | let |
-| Control flow | `यदि` / `अन्यथायदि` / `अन्यथा` | if / else-if / else |
-|  | `रक्षक` | guard |
-|  | `मिलाओ` | pattern match |
-|  | `जबतक` | while |
-|  | `चुनो` / `स्थिति` | switch / case |
-|  | `करो` | scoped block / local error boundary |
-|  | `दोहराओ सेवन...स्थिर` | for-of values |
-|  | `दोहराओ से...स्थिर` | for-in keys |
-|  | `दोहराओ पूर्व...स्थिर` | range iteration |
-|  | `जारी` | continue |
-|  | `लौटाओ` | return |
-|  | `तोड़ो` | break |
-|  | `मौन` | no-op |
-|  | `अतः` | compact one-statement body joint |
-|  | `∴` | compact clausura joint only |
-| Error handling | `पकड़ो` | structured local handler |
-|  | `पुष्टि` | assert |
-|  | `आवश्यक` | require (recoverable) |
-|  | `इधरफेंको` | recoverable throw |
-|  | `फेंकता` | throws modifier |
-|  | `मरोजाओ` | panic |
-| Async | `@ भविष्य` | async annotation |
-|  | `@ कर्सर` | generator annotation |
-|  | `आगेबढ़ो` | await/yield by context |
-| Endpoints | `सेवा` | capability call expression |
-|  | `उत्सर्जित` | retired statement-level frame emit |
-| Boolean | `सत्य` | true |
-|  | `या` | or |
-|  | `और` | and |
-|  | `असत्य` | false |
-|  | `नहीं` | not |
-|  | `डिफ़ॉल्ट` | local nullable defaulting |
-| Objects | `मैं` | this/self |
-|  | `गढ़ो` | construct variant |
-| Type shape | `∷` | static type ascription / compile-time cast |
-| Type conversion | `↦ target` | runtime value conversion |
-| Bitwise | `∧` / `∨` / `⊻` / `¬` | and/or/xor/not |
-|  | `⇐` / `⇒` | left/right shift |
-| Diagnostics | `दिखाओ` | neutral note |
-|  | `चेताओ` | warn |
-|  | `लिखो` | diagnostic channel |
-|  | `देखो` | debug/inspect |
+`सेवन` is used for iteration (`दोहराओ सेवन items स्थिर x`) and imports (`आयात सेवन "path"`).
 
 ---
 
-## महत्वपूर्ण syntax नियम
+## Fac Block
 
-1. **Type-first parameters:** `फलन f(संख्या x)`, `फलन f(x: संख्या)` नहीं।
-2. **Type-first declarations:** `स्थिर पाठ नाम`, `स्थिर नाम: पाठ` नहीं।
-3. **Iteration loops:** `दोहराओ सेवन/से collection स्थिर/चर item { }` या `दोहराओ पूर्व range स्थिर/चर item { }`।
-4. Conditions के चारों ओर parentheses मान्य हैं, पर idiomatic नहीं; `यदि x > 0 { }` या `यदि flag है सत्य { }` लिखें।
-5. Diagnostic keywords statements हैं, functions नहीं। `दिखाओ x` और grouped expression `दिखाओ(x)` parse होते हैं, पर `दिखाओ` callable value नहीं है।
+
+- `करो { ... }` is the explicit `do` block and executes its body once.
+- `करो { ... } जबतक condition` is the post-test loop form; postfix `जबतक` attaches only to `करो`, not arbitrary preceding blocks.
+- `पकड़ो` is an attachment shared by several structured forms, not a semantic mode owned by `करो`. A plain `करो` is often used when an otherwise unattached block needs a local handler: `करो { ... } पकड़ो err { ... }`.
 
 ---
 
-## रीडर पैक शब्दावली (मशीन निष्कर्षण)
+## Target Support
 
-### कीवर्ड
+Target support is **not** part of the grammar — this file defines only the
+language. For which grammar each compilation target lowers, and the runtime
+policy around it, see:
 
-| Latin | Localized |
-|---|---|
-| discretio | विभेद |
-| fixum | स्थिर |
-| functio | फलन |
-| genus | वर्ग |
-| implendum | अनुबन्ध |
-| importa | आयात |
-| modulus | मॉड्यूल |
-| ordo | क्रम |
-| sit | बैठा |
-| typus | प्रकार |
-| varia | चर |
-| abstractus | अमूर्त |
-| ceteri | बाकी |
-| curata | आवंटक |
-| errata | त्रुटि |
-| exitus | निर्गम |
-| generis | स्थैतिक |
-| iacit | फेंकता |
-| immutata | अपरिवर्तित |
-| interna | आंतरिक |
-| magnitudo | आकार |
-| nexum | संबद्ध |
-| optiones | विकल्प |
-| prae | पूर्व |
-| privata | निजी |
-| protecta | संरक्षित |
-| publica | सार्वजनिक |
-| sponte | स्वेच्छा |
-| casu | स्थिति |
-| ceterum | अन्यतम |
-| custodi | रक्षक |
-| discerne | मिलाओ |
-| dum | जबतक |
-| elige | चुनो |
-| ergo | अतः |
-| fac | करो |
-| itera | दोहराओ |
-| secus | अन्यथा |
-| si | यदि |
-| sic | ऐसा |
-| sin | अन्यथायदि |
-| perge | जारी |
-| redde | लौटाओ |
-| rumpe | तोड़ो |
-| tacet | मौन |
-| adfirma | पुष्टि |
-| cape | पकड़ो |
-| cede | आगेबढ़ो |
-| iace | इधरफेंको |
-| mori | मरोजाओ |
-| clausura | समापन |
-| falsum | असत्य |
-| nihil | शून्य |
-| verum | सत्य |
-| aut | या |
-| est | है |
-| et | और |
-| non | नहीं |
-| vel | डिफ़ॉल्ट |
-| ego | मैं |
-| finge | गढ़ो |
-| implet | लागूकरता |
-| sub | अधीन |
-| mone | चेताओ |
-| nota | दिखाओ |
-| scribe | लिखो |
-| vide | देखो |
-| argumenta | तर्क |
-| cura | देखभाल |
-| incipiet | आरंभasync |
-| incipit | आरंभ |
-| ad | सेवा |
-| de | से |
-| ex | सेवन |
-| in | में |
-| lege | पढ़ो |
-| lineam | पंक्ति |
-| omnia | सब |
-| praefixum | उपसर्ग |
-| scriptum | लिखित |
-| sparge | फैलाओ |
-| ut | रूपमें |
-| ante | पहले |
-| inter | बीच |
-| intra | भीतर |
-| per | प्रति |
-| usque | तक |
-| fragilis | नाज़ुक |
-| futurum | भविष्य |
-| metior | मापो |
-| omitte | छोड़ो |
-| postpara | पश्चतैयार |
-| postparabit | पश्चतैयारasync |
-| praepara | पूर्वतैयार |
-| praeparabit | पूर्वतैयारasync |
-| proba | परीक्षण |
-| probandum | परीक्षणसमूह |
-| repete | पुनरावृत्ति |
-| requirit | आवश्यक |
-| solum | केवल |
-| solum_in | केवलमें |
-| tag | टैग |
-| temporis | समय |
-| negativum | ऋणात्मक |
-| nonnihil | अशून्य |
-| nonnulla | कुछ |
-| nulla | शून्यवत् |
-| positivum | धनात्मक |
+- [`EBNF_MATRIX.md`](EBNF_MATRIX.md) — generated grammar×target lowerability matrix (the official rows).
+- [`docs/design/target-capability-matrix.md`](docs/design/target-capability-matrix.md) — runtime/contract policy (erase/warn/defer), pipeline routing, per-target contracts.
 
-### प्रकार
+---
 
-| Latin | Localized |
-|---|---|
-| ascii | ascii |
-| textus | पाठ |
-| numerus | संख्या |
-| modulus | मॉड्यूल |
-| fractus | भिन्न |
-| bivalens | तार्किक |
-| nihil | शून्य |
-| vacuum | रिक्त |
-| numquam | कभीनहीं |
-| ignotum | अज्ञात |
-| octeti | बाइट |
-| regex | regex |
-| json | json |
-| valor | मान |
-| instans | क्षण |
-| objectum | वस्तु |
-| quidlibet | कुछभी |
-| lista | सूची |
-| tabula | तालिका |
-| copia | समुच्चय |
-| promissum | वादा |
-| cursor | कर्सर |
+## Critical Syntax Rules
 
-### pass1 / पैक की तुलना में शब्दावली परिवर्तन
-
-| Latin | Pass1 / pack | New (this EBNF) | Why |
-|---|---|---|---|
-| genus | `वर्ग` / pack `प्रकार` | `वर्ग` | `प्रकार` को `typus` के लिए सुरक्षित रखकर reverse-map collision हटाया। |
-| implendum | `भरना` | `अनुबन्ध` | Interface contract के लिए स्पष्ट, स्वतंत्र single-token Hindi surface। |
-| ceterum | `डिफ़ॉल्ट` | `अन्यतम` | `default` को `ceterum` के लिए अलग किया; `vel` के local defaulting surface से भी collision हटाया। |
-| vel | `या_डिफ़ॉल्ट` | `डिफ़ॉल्ट` | Keyword identifier में underscore हटाया और semantic भूमिका स्पष्ट की। |
-| de | `से` | `से` | Ownership/import context में pass1 का अच्छा surface रखा। |
-| ex | `बाहर` | `सेवन` | `de`/`ex` के reverse-map collision और extraction/iteration ambiguity से बचने के लिए अलग surface। |
-| cede | `त्यागो` | `आगेबढ़ो` | await/yield अर्थ को discard अर्थ से अलग किया। |
-| repete | `पुनरावृत्त` | `पुनरावृत्ति` | Testing modifier में noun-like repetition अर्थ को `itera` के `दोहराओ` से अलग रखा। |
-| curata | `साफ` | `आवंटक` | Allocator requirement का technical अर्थ सीधे बताता है। |
-| iacit | `फेंकता` | `फेंकता` | throws modifier के लिए स्थिर surface रखा। |
-| अन्य canonical keys | आंशिक/मिश्रित | पूर्ण 111 keyword और 22 type mappings | Source grammar के सभी sections और machine extraction के लिए completeness। |
-
-`ergo` का localized surface `अतः` है। `∴` clausura glyph है और हर जगह अपरिवर्तित रखा गया है। Glyphs `← → ∴ ≡ ∪ ⇥ ‥ … ≤ ≥ ≠ ≈ ∷ ↦` को localize नहीं किया गया है।
+1. **Type-first parameters**: `फलन f(numerus x)` NOT `फलन f(x: numerus)`
+2. **Type-first declarations**: `स्थिर textus name` NOT `स्थिर name: textus`
+3. **Iteration loops**: `दोहराओ सेवन/से collection स्थिर/चर item { }` or `दोहराओ सीमा range स्थिर/चर item { }` (verb-first, source, then binding)
+4. **Parentheses around conditions are valid but not idiomatic**: prefer `यदि x ≻ 0 { }` or `यदि flag है सत्य { }` over `यदि (x ≻ 0) { }`
+5. **Scribe-family keywords claim statement-initial position only when not followed by `(`** — `दिखाओ x` is the output statement; a statement-initial `दिखाओ(x)` is a call to the identifier `दिखाओ`
