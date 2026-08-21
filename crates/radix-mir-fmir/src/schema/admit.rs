@@ -1,9 +1,12 @@
 use super::device::{
-    FmirDeviceSection, FmirExecutorPlanSection, FmirSessionSection, EXECUTOR_PLAN_SECTION_VERSION,
-    WIRE_SESSION_SECTION_VERSION,
+    FmirDeviceSection, FmirExecutorPlanSection, FmirExecutorPlanSectionV2, FmirSessionSection,
+    FmirSessionSectionV2, EXECUTOR_PLAN_SECTION_VERSION, WIRE_SESSION_SECTION_VERSION,
 };
 use super::distributed::{
     expected_plan_for_section, wire_plan_to_plan, FmirDistributedExecutionSection,
+};
+use super::executor_plan_admission::{
+    admit_executor_plan_section_v2_with_version, ExecutorPlanAdmissionError,
 };
 use super::requirements::{
     default_compatibility_table, validate_artifact_combination, validate_compiled_in_target_in,
@@ -12,8 +15,9 @@ use super::requirements::{
 use super::wire::WireDeviceProgram;
 use super::{
     logical_distributed_plan_hash, validate_wire_distributed_section, validate_wire_program,
-    validate_wire_session_section, FmirDeviceBackend, MaterializationStage,
-    PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION,
+    validate_wire_session_section, validate_wire_session_section_v2, FmirDeviceBackend,
+    MaterializationStage, PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
+    WIRE_DISTRIBUTED_SECTION_VERSION,
 };
 use crate::schema::ARTIFACT_ABI_VERSION;
 
@@ -478,6 +482,58 @@ pub(crate) fn admit_session_section(
     Ok(())
 }
 
+/// Admit the complete KV-cache v2 boundary before host construction.
+///
+/// A4V carries the semantic and runtime records as separate, explicitly
+/// versioned carriers. This function is the shared FMIR integration point:
+/// it checks both carrier versions first, validates the A4S semantic record
+/// against the delivered program, and delegates every runtime fact to B2's
+/// focused helper rather than reproducing its arithmetic/source checks.
+///
+/// The runtime section is required here because a semantic session without
+/// its fixed-capacity runtime bindings is not an admitted KV route.
+#[allow(dead_code)]
+pub(crate) fn admit_session_section_v2(
+    section: &FmirSessionSectionV2,
+    executor_plan: &FmirExecutorPlanSectionV2,
+    wire_program: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    if section.v != WIRE_SESSION_SECTION_VERSION {
+        return Err(
+            crate::error::FmirImageError::UnsupportedSessionSectionVersion {
+                actual: section.v,
+                expected: WIRE_SESSION_SECTION_VERSION,
+            },
+        );
+    }
+
+    // Consume B2's outer-section and payload-version gates before interpreting
+    // runtime fields. Its focused helper owns source closure and checked
+    // allocation/view/launch arithmetic.
+    admit_executor_plan_section_v2_with_version(
+        executor_plan.v,
+        &executor_plan.runtime_bindings,
+        wire_program.kernels.len(),
+    )
+    .map_err(map_executor_plan_admission_error)?;
+
+    validate_wire_session_section_v2(section, wire_program)
+}
+
+#[allow(dead_code)]
+fn map_executor_plan_admission_error(
+    error: ExecutorPlanAdmissionError,
+) -> crate::error::FmirImageError {
+    match error {
+        ExecutorPlanAdmissionError::UnsupportedSectionVersion { actual, expected } => {
+            crate::error::FmirImageError::UnsupportedExecutorPlanSectionVersion { actual, expected }
+        }
+        other => crate::error::FmirImageError::ExecutorPlanSectionInvalid {
+            detail: other.to_string(),
+        },
+    }
+}
+
 /// Fail-closed admission of the optional distributed execution section
 /// (MD2-W1). Runs when the section is present, in order:
 ///
@@ -560,4 +616,284 @@ pub(crate) fn equivalence_gate(
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod kv_cache_admission_tests {
+    use super::super::device::{
+        FmirExecutorPlanSectionV2, FmirSessionSectionV2, EXECUTOR_PLAN_SECTION_VERSION,
+        WIRE_SESSION_SECTION_VERSION,
+    };
+    use super::super::executor_plan::{
+        WireAllocationFact, WireAllocationIdentity, WireBindDescriptor, WireExecutorPlan,
+        WireExecutorPlanSource, WireExecutorPlanV2, WireLaunchBinding, WireLogicalSignature,
+        WirePlanProvenance, WireRuntimeSource, WireViewFact,
+    };
+    use super::super::wire::{
+        WireBinding, WireBufferLifetime, WireBufferRole, WireCollectionKernelPlan,
+        WireDeviceProgram, WireInitializationPolicy, WireInvocationMode, WireKernelLaunchPlan,
+        WireKernelUnit, WireKvCacheAttentionFamily, WireKvCacheCapacityPolicy, WireKvCacheDtype,
+        WireKvCacheRopePairing, WireKvCacheSemanticV2, WireKvCacheVLayout,
+        WireSessionObservationCadence, WireStorageLayout, WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION,
+    };
+    use super::admit_session_section_v2;
+    use crate::error::FmirImageError;
+
+    fn semantic() -> WireKvCacheSemanticV2 {
+        WireKvCacheSemanticV2 {
+            semantic_contract_version: WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION,
+            kv_dtype_k: WireKvCacheDtype::F32,
+            kv_dtype_v: WireKvCacheDtype::F32,
+            v_layout: WireKvCacheVLayout::Straight,
+            attention_family: WireKvCacheAttentionFamily::Flash,
+            query_head_count: 16,
+            kv_head_count: 4,
+            head_dim: 64,
+            layer_count: 32,
+            context_capacity: 8192,
+            capacity_policy: WireKvCacheCapacityPolicy::Fixed,
+            rope_dimension: 64,
+            rope_frequency_base: 100_000.0,
+            rope_frequency_scale: 1.0,
+            rope_pairing: WireKvCacheRopePairing::RotateHalf,
+            k_stored_post_rope: true,
+        }
+    }
+
+    fn session() -> FmirSessionSectionV2 {
+        FmirSessionSectionV2::from_semantic(
+            Vec::new(),
+            vec![
+                WireInvocationMode::Prefill,
+                WireInvocationMode::ScalarDecode,
+            ],
+            WireSessionObservationCadence::PerInvocation,
+            semantic(),
+        )
+    }
+
+    fn wire_program() -> WireDeviceProgram {
+        WireDeviceProgram {
+            kernels: vec![WireKernelUnit {
+                function: 0,
+                entry: "kv_append".to_owned(),
+                plan: WireCollectionKernelPlan::Elementwise,
+                resources: Vec::new(),
+                launch: WireKernelLaunchPlan {
+                    workgroup: super::super::wire::WireWorkgroupSize { x: 1, y: 1, z: 1 },
+                    dispatch_size: super::super::wire::WireDispatchSize { x: 1, y: 1, z: 1 },
+                    workgroup_count: super::super::wire::WireWorkgroupCount { x: 1, y: 1, z: 1 },
+                },
+            }],
+            ..WireDeviceProgram::default()
+        }
+    }
+
+    fn runtime() -> FmirExecutorPlanSectionV2 {
+        FmirExecutorPlanSectionV2::from_runtime_bindings(WireExecutorPlanV2 {
+            abi_version: super::super::executor_plan::EXECUTOR_PLAN_V2_VERSION,
+            selections: vec![WireExecutorPlan {
+                kernel_index: 0,
+                library_entry: Some("kv_append".to_owned()),
+                logical_signature: WireLogicalSignature {
+                    operation: "kv_append".to_owned(),
+                    inputs: vec!["k".to_owned()],
+                    outputs: vec!["cache_k".to_owned()],
+                },
+                primary_bind: WireBindDescriptor {
+                    dims: vec![1],
+                    strides: vec![1],
+                    layout: "strided".to_owned(),
+                    grid: [1, 1, 1],
+                },
+                binds: Vec::new(),
+                uniforms: Vec::new(),
+                offsets: Vec::new(),
+                workspace: None,
+                backend_requirements: Vec::new(),
+                provenance: WirePlanProvenance {
+                    pass: "kv-cache-plan".to_owned(),
+                    revision: 2,
+                    source_nodes: vec![1],
+                },
+            }],
+            allocations: vec![WireAllocationFact {
+                buffer: WireAllocationIdentity {
+                    id: 1,
+                    name: "cache_k".to_owned(),
+                    role: WireBufferRole::InOut,
+                    storage: WireStorageLayout::DeviceHandle,
+                    lifetime: WireBufferLifetime::PerProgram,
+                },
+                dtype: "F32".to_owned(),
+                capacity_bytes: 64,
+                lifetime: WireBufferLifetime::PerProgram,
+                initialization: WireInitializationPolicy::ZeroFill,
+            }],
+            views: vec![WireViewFact {
+                allocation: 1,
+                logical_dims: vec![1],
+                strides: vec![1],
+                static_base: 0,
+                maximum_span: 4,
+            }],
+            launch_bindings: vec![WireLaunchBinding {
+                kernel_index: 0,
+                handle: 1,
+                binding: WireBinding {
+                    group: 0,
+                    binding: 0,
+                },
+                byte_offset: 0,
+                view_span: 4,
+                runtime_source: WireExecutorPlanSource::Runtime {
+                    source: WireRuntimeSource::Position,
+                },
+            }],
+        })
+    }
+
+    fn admit(
+        section: &FmirSessionSectionV2,
+        executor_plan: &FmirExecutorPlanSectionV2,
+    ) -> Result<(), FmirImageError> {
+        admit_session_section_v2(section, executor_plan, &wire_program())
+    }
+
+    #[test]
+    fn v2_semantic_and_runtime_sections_admit_together() {
+        admit(&session(), &runtime()).expect("the complete v2 KV boundary admits");
+    }
+
+    #[test]
+    fn gqa_ratio_fails_before_host_construction() {
+        let mut section = session();
+        section.semantic.query_head_count = 15;
+        let error = admit(&section, &runtime()).expect_err("non-divisible GQA must fail");
+        assert!(
+            matches!(error, FmirImageError::SessionSectionInvalid { detail } if detail.contains("not divisible"))
+        );
+    }
+
+    #[test]
+    fn semantic_bounds_and_rope_pairing_fail_closed() {
+        let mut section = session();
+        section.semantic.context_capacity = 0;
+        let error = admit(&section, &runtime()).expect_err("zero capacity must fail");
+        assert!(
+            matches!(error, FmirImageError::SessionSectionInvalid { detail } if detail.contains("context_capacity"))
+        );
+
+        let mut section = session();
+        section.semantic.rope_dimension = 63;
+        let error = admit(&section, &runtime()).expect_err("odd paired RoPE dimension must fail");
+        assert!(
+            matches!(error, FmirImageError::SessionSectionInvalid { detail } if detail.contains("even"))
+        );
+
+        let mut section = session();
+        section.semantic.rope_dimension = 66;
+        let error = admit(&section, &runtime()).expect_err("out-of-head RoPE dimension must fail");
+        assert!(
+            matches!(error, FmirImageError::SessionSectionInvalid { detail } if detail.contains("larger than head_dim"))
+        );
+    }
+
+    #[test]
+    fn semantic_dimensions_must_be_positive() {
+        let cases: [(&str, fn(&mut super::super::wire::WireKvCacheSemanticV2)); 5] = [
+            ("query_head_count", |semantic| semantic.query_head_count = 0),
+            ("kv_head_count", |semantic| semantic.kv_head_count = 0),
+            ("head_dim", |semantic| semantic.head_dim = 0),
+            ("layer_count", |semantic| semantic.layer_count = 0),
+            ("context_capacity", |semantic| semantic.context_capacity = 0),
+        ];
+        for (name, mutate) in cases {
+            let mut section = session();
+            mutate(&mut section.semantic);
+            let error = admit(&section, &runtime()).expect_err("zero semantic fact must fail");
+            assert!(
+                matches!(error, FmirImageError::SessionSectionInvalid { ref detail } if detail.contains(name)),
+                "diagnostic must name {name}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn semantic_version_storage_rule_and_modes_fail_closed() {
+        let mut section = session();
+        section.semantic.semantic_contract_version = 1;
+        let error = admit(&section, &runtime()).expect_err("semantic version skew must fail");
+        assert!(
+            matches!(error, FmirImageError::SessionSectionInvalid { detail } if detail.contains("contract version"))
+        );
+
+        let mut section = session();
+        section.semantic.k_stored_post_rope = false;
+        let error = admit(&section, &runtime()).expect_err("pre-RoPE K storage must fail");
+        assert!(
+            matches!(error, FmirImageError::SessionSectionInvalid { detail } if detail.contains("before RoPE"))
+        );
+
+        let mut section = session();
+        section.invocation_modes.clear();
+        let error = admit(&section, &runtime()).expect_err("an empty mode set must fail");
+        assert!(
+            matches!(error, FmirImageError::SessionSectionInvalid { detail } if detail.contains("no invocation mode"))
+        );
+    }
+
+    #[test]
+    fn either_v2_section_version_skew_fails_closed() {
+        let mut section = session();
+        section.v = WIRE_SESSION_SECTION_VERSION - 1;
+        assert!(matches!(
+            admit(&section, &runtime()),
+            Err(FmirImageError::UnsupportedSessionSectionVersion {
+                actual: 1,
+                expected: 2
+            })
+        ));
+
+        let mut runtime = runtime();
+        runtime.v = EXECUTOR_PLAN_SECTION_VERSION - 1;
+        assert!(matches!(
+            admit(&session(), &runtime),
+            Err(FmirImageError::UnsupportedExecutorPlanSectionVersion {
+                actual: 1,
+                expected: 2
+            })
+        ));
+    }
+
+    #[test]
+    fn b2_runtime_source_and_overflow_diagnostics_are_preserved() {
+        let mut unknown_runtime = runtime();
+        unknown_runtime.runtime_bindings.launch_bindings[0].runtime_source =
+            WireExecutorPlanSource::Runtime {
+                source: WireRuntimeSource::Unknown("future_cursor".to_owned()),
+            };
+        let error =
+            admit(&session(), &unknown_runtime).expect_err("unknown runtime source must fail");
+        assert!(
+            matches!(error, FmirImageError::ExecutorPlanSectionInvalid { detail } if detail.contains("future_cursor"))
+        );
+
+        let mut overflow_runtime = runtime();
+        overflow_runtime.runtime_bindings.launch_bindings[0].byte_offset = u64::MAX - 1;
+        overflow_runtime.runtime_bindings.launch_bindings[0].view_span = 2;
+        let error =
+            admit(&session(), &overflow_runtime).expect_err("overflowing runtime span must fail");
+        assert!(
+            matches!(error, FmirImageError::ExecutorPlanSectionInvalid { detail } if detail.contains("arithmetic overflow"))
+        );
+
+        let mut skewed_runtime = runtime();
+        skewed_runtime.runtime_bindings.abi_version = 1;
+        let error =
+            admit(&session(), &skewed_runtime).expect_err("runtime payload version skew must fail");
+        assert!(
+            matches!(error, FmirImageError::ExecutorPlanSectionInvalid { detail } if detail.contains("payload version"))
+        );
+    }
 }

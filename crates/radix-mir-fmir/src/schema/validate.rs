@@ -5,13 +5,14 @@
 //! or proceed to host construction. Plan-internal consistency of a
 //! reconstructed distributed plan belongs to the fail-before-launch gate.
 
-use super::device::FmirSessionSection;
+use super::device::{FmirSessionSection, FmirSessionSectionV2};
 use super::distributed::FmirDistributedExecutionSection;
 use super::wire::{
     WireBroadcastDeclaration, WireBufferIdentity, WireBufferLifetime, WireCollectionKernelPlan,
     WireDeviceProgram, WireInitializationPolicy, WireInputUpdateCadence, WireInvocationMode,
-    WireKvCacheDtype, WireObservationCadence, WireProgramLifetime, WireReduceOp,
-    WireReducedProjection, WireResourceAccess, WireSessionObservationCadence,
+    WireKvCacheCapacityPolicy, WireKvCacheDtype, WireKvCacheRopePairing, WireKvCacheSemanticV2,
+    WireObservationCadence, WireProgramLifetime, WireReduceOp, WireReducedProjection,
+    WireResourceAccess, WireSessionInput, WireSessionObservationCadence,
 };
 use super::SHA256_IDENTITY_PREFIX;
 
@@ -775,14 +776,136 @@ pub(crate) fn validate_wire_session_section(
             "kv layout declares dtype {kv:?}; the dtype surface is closed to f32 (a dtype change is a contract revision, never a silent widening)"
         )));
     }
-    if section.invocation_modes.is_empty() {
+    validate_session_schedule(
+        &section.inputs,
+        &section.invocation_modes,
+        section.observation_cadence,
+        wire,
+    )
+}
+
+/// Admit the A4S v2 static semantic record and the shared session schedule.
+///
+/// The v2 carrier is intentionally separate from the legacy layout carrier:
+/// no field is defaulted or inferred from `WireKvCacheLayout`. The semantic
+/// version is checked before any model fact is interpreted, then every typed
+/// fact is checked against the closed KV contract.
+#[allow(dead_code)]
+pub(crate) fn validate_wire_session_section_v2(
+    section: &FmirSessionSectionV2,
+    wire: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    validate_wire_kv_cache_semantic_v2(&section.semantic)?;
+    validate_session_schedule(
+        &section.inputs,
+        &section.invocation_modes,
+        section.observation_cadence,
+        wire,
+    )
+}
+
+#[allow(dead_code)]
+fn validate_wire_kv_cache_semantic_v2(
+    semantic: &WireKvCacheSemanticV2,
+) -> Result<(), crate::error::FmirImageError> {
+    if semantic.semantic_contract_version != super::wire::WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION {
+        return Err(session_invalid(format!(
+            "KV semantic contract version {} is unsupported; expected {}",
+            semantic.semantic_contract_version,
+            super::wire::WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION
+        )));
+    }
+    if !matches!(semantic.kv_dtype_k, WireKvCacheDtype::F32)
+        || !matches!(semantic.kv_dtype_v, WireKvCacheDtype::F32)
+    {
+        return Err(session_invalid(format!(
+            "KV semantic record carries K dtype {} and V dtype {}; both distinct dtype facts must be present on the closed f32 surface",
+            semantic.kv_dtype_k.spelling(),
+            semantic.kv_dtype_v.spelling()
+        )));
+    }
+    for (name, value) in [
+        ("query_head_count", semantic.query_head_count),
+        ("kv_head_count", semantic.kv_head_count),
+        ("head_dim", semantic.head_dim),
+        ("layer_count", semantic.layer_count),
+        ("context_capacity", semantic.context_capacity),
+    ] {
+        if value == 0 {
+            return Err(session_invalid(format!(
+                "KV semantic record declares `{name}` 0; {name} must be positive"
+            )));
+        }
+    }
+    if semantic.query_head_count % semantic.kv_head_count != 0 {
+        return Err(session_invalid(format!(
+            "KV semantic record declares query_head_count {} not divisible by kv_head_count {}; GQA requires an integral query-to-KV head ratio",
+            semantic.query_head_count, semantic.kv_head_count
+        )));
+    }
+    if !matches!(semantic.capacity_policy, WireKvCacheCapacityPolicy::Fixed) {
+        return Err(session_invalid(format!(
+            "KV semantic record declares capacity policy {}; only fixed-capacity caches are admitted",
+            semantic.capacity_policy.spelling()
+        )));
+    }
+    if !semantic.rope_frequency_base.is_finite() || semantic.rope_frequency_base <= 0.0 {
+        return Err(session_invalid(format!(
+            "KV semantic record declares RoPE frequency base {}; it must be finite and positive",
+            semantic.rope_frequency_base
+        )));
+    }
+    if !semantic.rope_frequency_scale.is_finite() || semantic.rope_frequency_scale <= 0.0 {
+        return Err(session_invalid(format!(
+            "KV semantic record declares RoPE frequency scale {}; it must be finite and positive",
+            semantic.rope_frequency_scale
+        )));
+    }
+    if semantic.rope_dimension == 0 {
+        return Err(session_invalid(
+            "KV semantic record declares `rope_dimension` 0; the rotated dimension must be positive"
+                .to_owned(),
+        ));
+    }
+    if semantic.rope_dimension > semantic.head_dim {
+        return Err(session_invalid(format!(
+            "KV semantic record declares rope_dimension {} larger than head_dim {}; RoPE cannot address dimensions outside one head",
+            semantic.rope_dimension, semantic.head_dim
+        )));
+    }
+    let pairing_requires_pairs = match semantic.rope_pairing {
+        WireKvCacheRopePairing::ConsecutivePair | WireKvCacheRopePairing::RotateHalf => true,
+    };
+    if pairing_requires_pairs && semantic.rope_dimension % 2 != 0 {
+        return Err(session_invalid(format!(
+            "KV semantic record declares rope_dimension {} with {} pairing; the typed pairing requires an even rotated dimension",
+            semantic.rope_dimension,
+            semantic.rope_pairing.spelling()
+        )));
+    }
+    if !semantic.k_stored_post_rope {
+        return Err(session_invalid(
+            "KV semantic record declares cached K before RoPE; the contract requires K stored after RoPE"
+                .to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_session_schedule(
+    inputs: &[WireSessionInput],
+    invocation_modes: &[WireInvocationMode],
+    observation_cadence: WireSessionObservationCadence,
+    wire: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    if invocation_modes.is_empty() {
         return Err(session_invalid(
             "session declares no invocation mode; a session that executes no workload mode is a contradiction"
                 .to_owned(),
         ));
     }
-    for (index, mode) in section.invocation_modes.iter().enumerate() {
-        if section.invocation_modes[index + 1..].contains(mode) {
+    for (index, mode) in invocation_modes.iter().enumerate() {
+        if invocation_modes[index + 1..].contains(mode) {
             return Err(session_invalid(format!(
                 "session declares invocation mode {} more than once",
                 mode.spelling()
@@ -790,8 +913,8 @@ pub(crate) fn validate_wire_session_section(
         }
     }
     let buffers = wire_buffers(wire);
-    for (index, input) in section.inputs.iter().enumerate() {
-        if section.inputs[index + 1..]
+    for (index, input) in inputs.iter().enumerate() {
+        if inputs[index + 1..]
             .iter()
             .any(|other| other.slot == input.slot)
         {
@@ -807,7 +930,7 @@ pub(crate) fn validate_wire_session_section(
             )));
         }
     }
-    for input in &section.inputs {
+    for input in inputs {
         let Some(buffer) = buffers.iter().find(|buffer| buffer.id == input.slot) else {
             continue;
         };
@@ -836,15 +959,13 @@ pub(crate) fn validate_wire_session_section(
             _ => {}
         }
     }
-    if section
-        .invocation_modes
-        .contains(&WireInvocationMode::ScalarDecode)
-        && section.observation_cadence != WireSessionObservationCadence::PerInvocation
+    if invocation_modes.contains(&WireInvocationMode::ScalarDecode)
+        && observation_cadence != WireSessionObservationCadence::PerInvocation
     {
         return Err(session_invalid(format!(
             "session executes {} (a one-token decode step) but declares observation cadence {}; per-token decode reads back its observation per token (the full-vocab logits are sampled host-side on every invocation)",
             WireInvocationMode::ScalarDecode.spelling(),
-            section.observation_cadence.spelling()
+            observation_cadence.spelling()
         )));
     }
     Ok(())
