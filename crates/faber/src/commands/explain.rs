@@ -60,7 +60,7 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
     };
 
     if diagnostic_explain::is_diagnostic_query(&term) {
-        match diagnostic_explain::lookup_installed_diagnostic(
+        match diagnostic_explain::lookup_embedded_diagnostic(
             &term,
             args.diagnostics_locale.as_deref(),
         ) {

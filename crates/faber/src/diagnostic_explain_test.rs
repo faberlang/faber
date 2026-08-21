@@ -1,5 +1,5 @@
 use crate::diagnostic_explain::{
-    is_diagnostic_query, lookup_diagnostic_in_pack, lookup_installed_diagnostic, render_json,
+    is_diagnostic_query, lookup_diagnostic_in_pack, lookup_embedded_diagnostic, render_json,
     render_plain,
 };
 use radix_module::locale::LocalePack;
@@ -76,7 +76,7 @@ fn diagnostic_lookup_does_not_fallback_to_code_row_for_missing_issue() {
 
 #[test]
 fn embedded_default_pack_resolves_diagnostic_issue_structurally() {
-    let explanation = lookup_installed_diagnostic("SEM010.initializer_annotation_mismatch", None)
+    let explanation = lookup_embedded_diagnostic("SEM010.initializer_annotation_mismatch", None)
         .expect("embedded lookup should not fail")
         .expect("embedded issue should resolve");
 
@@ -96,7 +96,7 @@ fn embedded_default_pack_resolves_diagnostic_issue_structurally() {
 #[test]
 fn embedded_nonlatin_pack_resolves_diagnostic_issue_structurally() {
     let explanation =
-        lookup_installed_diagnostic("SEM010.initializer_annotation_mismatch", Some("zh-Hans"))
+        lookup_embedded_diagnostic("SEM010.initializer_annotation_mismatch", Some("zh-Hans"))
             .expect("embedded lookup should not fail")
             .expect("embedded issue should resolve");
 
@@ -182,7 +182,7 @@ fn diagnostic_json_render_for_code_only_includes_all_fields() {
 
 #[test]
 fn missing_embedded_locale_pack_fails_closed() {
-    let err = lookup_installed_diagnostic("SEM001", Some("zz"))
+    let err = lookup_embedded_diagnostic("SEM001", Some("zz"))
         .expect_err("unknown locale must fail closed");
     let message = &err.message;
     assert!(
@@ -209,7 +209,7 @@ fn missing_embedded_locale_pack_fails_closed() {
 
 #[test]
 fn embedded_english_pack_resolves_diagnostic_code() {
-    let explanation = lookup_installed_diagnostic("SEM001", Some("en"))
+    let explanation = lookup_embedded_diagnostic("SEM001", Some("en"))
         .expect("diagnostic lookup")
         .expect("SEM001 explanation");
     assert_eq!(explanation.locale, "en");
@@ -219,6 +219,6 @@ fn embedded_english_pack_resolves_diagnostic_code() {
 #[test]
 fn empty_diagnostics_locale_is_rejected() {
     let err =
-        lookup_installed_diagnostic("SEM001", Some("   ")).expect_err("empty locale must fail");
+        lookup_embedded_diagnostic("SEM001", Some("   ")).expect_err("empty locale must fail");
     assert!(err.message.contains("--locale must not be empty"));
 }

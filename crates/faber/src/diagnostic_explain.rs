@@ -74,7 +74,7 @@ pub fn is_diagnostic_query(query: &str) -> bool {
 }
 
 /// Resolve a diagnostic explanation from an embedded reader pack.
-pub fn lookup_installed_diagnostic(
+pub fn lookup_embedded_diagnostic(
     query: &str,
     locale: Option<&str>,
 ) -> Result<Option<DiagnosticExplanation>, ExplainError> {

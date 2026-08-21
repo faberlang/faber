@@ -3,7 +3,7 @@
 //! `faber convert <path> --to <LOCALE>` re-emits a Faber source file in the
 //! target reader-locale surface (HIR-backed round-trip — the machinery the
 //! former `faber format --locale` mode used). Conversion is never implicit:
-//! `--to` is required, unknown locales fail closed listing installed packs.
+//! `--to` is required, unknown locales fail closed listing embedded packs.
 //! See `docs/operator/convert-command.md`.
 
 use crate::package::available_locales;
@@ -130,7 +130,7 @@ fn validate_target_locale(locale: &str) {
         return;
     }
     eprintln!(
-        "error: unknown or unsupported reader locale '{locale}'; installed pack locales: {}",
+        "error: unknown or unsupported reader locale '{locale}'; embedded pack locales: {}",
         available.join(" ")
     );
     std::process::exit(1);
