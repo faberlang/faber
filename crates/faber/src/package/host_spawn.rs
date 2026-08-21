@@ -188,6 +188,9 @@ pub struct DeviceExecuteReceipt {
     /// Kernel encode + submit + blocking wait (true GPU step time).
     #[serde(default)]
     pub gpu_encode_submit_wait_us: u64,
+    /// Per-encoder GPU timestamps in launch order (µs). Empty when unsampled.
+    #[serde(default)]
+    pub launch_gpu_us: Vec<u64>,
     /// Observation readback wall.
     #[serde(default)]
     pub readback_us: u64,
