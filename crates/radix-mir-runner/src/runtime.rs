@@ -158,7 +158,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         Ok(Value::Unit)
     }
 
-    #[allow(clippy::single_match_else)]
     fn eval_sermo_op(
         &mut self,
         op: &MirSermoOp,
@@ -166,62 +165,56 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         return_ty: MirType,
         span: Span,
     ) -> Result<Value, RunnerError> {
+        if let MirSermoOp::DrainCursor = op {
+            let [cursor] = args else {
+                return Err(RunnerError::internal(span, "sermo cursor drain arity"));
+            };
+            let Value::Array(frames) = self.eval_operand(cursor, span)? else {
+                return Err(RunnerError::internal(
+                    span,
+                    "sermo cursor drain requires cursor carrier",
+                ));
+            };
+            let frames = frames.borrow().clone();
+            return Ok(Value::Array(Rc::new(RefCell::new(frames))));
+        }
+        let Some(receiver) = args.first() else {
+            return Err(RunnerError::internal(
+                span,
+                "sermo operation requires receiver",
+            ));
+        };
+        let Value::Sermo(sermo) = self.eval_operand(receiver, span)? else {
+            return Err(RunnerError::internal(
+                span,
+                "sermo operation receiver mismatch",
+            ));
+        };
         match op {
-            MirSermoOp::DrainCursor => {
-                let [cursor] = args else {
-                    return Err(RunnerError::internal(span, "sermo cursor drain arity"));
-                };
-                let Value::Array(frames) = self.eval_operand(cursor, span)? else {
+            MirSermoOp::ViewMeus | MirSermoOp::ViewTuus => Ok(Value::Sermo(sermo)),
+            MirSermoOp::Send => Ok(Value::Unit),
+            MirSermoOp::Finish => {
+                let Type::Enum(status) = self.types.get(return_ty.semantic_id()) else {
                     return Err(RunnerError::internal(
                         span,
-                        "sermo cursor drain requires cursor carrier",
+                        "sermo finish status type mismatch",
                     ));
                 };
-                let frames = frames.borrow().clone();
-                Ok(Value::Array(Rc::new(RefCell::new(frames))))
+                Ok(Value::EnumVariant(
+                    *status,
+                    Rc::new(RefCell::new(FxHashMap::default())),
+                ))
             }
-            _ => {
-                let Some(receiver) = args.first() else {
-                    return Err(RunnerError::internal(
-                        span,
-                        "sermo operation requires receiver",
-                    ));
-                };
-                let Value::Sermo(sermo) = self.eval_operand(receiver, span)? else {
-                    return Err(RunnerError::internal(
-                        span,
-                        "sermo operation receiver mismatch",
-                    ));
-                };
-                match op {
-                    MirSermoOp::ViewMeus | MirSermoOp::ViewTuus => Ok(Value::Sermo(sermo)),
-                    MirSermoOp::Send => Ok(Value::Unit),
-                    MirSermoOp::Finish => {
-                        let Type::Enum(status) = self.types.get(return_ty.semantic_id()) else {
-                            return Err(RunnerError::internal(
-                                span,
-                                "sermo finish status type mismatch",
-                            ));
-                        };
-                        Ok(Value::EnumVariant(
-                            *status,
-                            Rc::new(RefCell::new(FxHashMap::default())),
-                        ))
-                    }
-                    MirSermoOp::Receive { frame, data_field } => {
-                        Ok(sermo_frame_value(&sermo.borrow(), *frame, *data_field))
-                    }
-                    MirSermoOp::Cursor { frame, data_field } => {
-                        Ok(array_value(vec![sermo_frame_value(
-                            &sermo.borrow(),
-                            *frame,
-                            *data_field,
-                        )]))
-                    }
-                    MirSermoOp::DrainCursor => {
-                        Err(RunnerError::internal(span, "nested cursor drain dispatch"))
-                    }
-                }
+            MirSermoOp::Receive { frame, data_field } => {
+                Ok(sermo_frame_value(&sermo.borrow(), *frame, *data_field))
+            }
+            MirSermoOp::Cursor { frame, data_field } => Ok(array_value(vec![sermo_frame_value(
+                &sermo.borrow(),
+                *frame,
+                *data_field,
+            )])),
+            MirSermoOp::DrainCursor => {
+                Err(RunnerError::internal(span, "nested cursor drain dispatch"))
             }
         }
     }
@@ -305,8 +298,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         while self.frames.len() > depth {
             self.frames.pop();
         }
-        // The generator's own return value is discarded; CursorStream returns
-        // the collected yield list.
         self.return_value = None;
         self.return_error = None;
         Ok(Value::Array(Rc::new(RefCell::new(yields))))
@@ -555,26 +546,17 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     })?;
                 // F-082: reject reversed bounds (start > end) — an interval must
                 // be monotonic so every materialized element is reachable.
-                match (&start, &end) {
-                    (Value::Int(a), Value::Int(b)) if a > b => {
-                        return Err(RunnerError::internal(
-                            span,
-                            "interval bounds must be monotonic (start ≤ end)",
-                        ));
-                    }
-                    (Value::UInt(a), Value::UInt(b)) if a > b => {
-                        return Err(RunnerError::internal(
-                            span,
-                            "interval bounds must be monotonic (start ≤ end)",
-                        ));
-                    }
-                    (Value::Float(a), Value::Float(b)) if a > b => {
-                        return Err(RunnerError::internal(
-                            span,
-                            "interval bounds must be monotonic (start ≤ end)",
-                        ));
-                    }
-                    _ => {}
+                let reversed = match (&start, &end) {
+                    (Value::Int(a), Value::Int(b)) => a > b,
+                    (Value::UInt(a), Value::UInt(b)) => a > b,
+                    (Value::Float(a), Value::Float(b)) => a > b,
+                    _ => false,
+                };
+                if reversed {
+                    return Err(RunnerError::internal(
+                        span,
+                        "interval bounds must be monotonic (start ≤ end)",
+                    ));
                 }
                 Ok(interval_value(start, end, inclusive))
             }
@@ -1273,12 +1255,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::Maximum => self.map_numeric_pair(args, span, f64::max),
             MirCollectionOp::Approximate => self.approximate_fractus(args, span),
             MirCollectionOp::Sum => self.sum_numeric_array(args, return_ty, span),
-            MirCollectionOp::TensorSumAxis => {
-                // TensorSumAxis is a backward-only op used in the LayerNorm
-                // VJP. It sums across a specified axis, producing a tensor
-                // with rank = input.rank - 1.
-                self.tensor_sum_axis(args, span, return_ty)
-            }
+            MirCollectionOp::TensorSumAxis => self.tensor_sum_axis(args, span, return_ty),
             MirCollectionOp::TensorShape => self.tensor_shape(args, span),
             MirCollectionOp::TensorReshape => self.tensor_reshape(args, span),
             MirCollectionOp::TensorGet => self.tensor_get(args, span),
@@ -1415,19 +1392,17 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 match receiver {
                     Value::Array(cell) => {
                         let borrow = cell.borrow();
-                        let start = if matches!(op, MirCollectionOp::DropFirst) {
-                            count.min(borrow.len())
-                        } else {
-                            0
-                        };
-                        let end = if matches!(op, MirCollectionOp::Take) {
-                            count.min(borrow.len())
-                        } else {
-                            borrow.len()
-                        };
-                        let start = match op {
-                            MirCollectionOp::TakeLast => borrow.len().saturating_sub(count),
-                            _ => start,
+                        let len = borrow.len();
+                        let (start, end) = match op {
+                            MirCollectionOp::Take => (0, count.min(len)),
+                            MirCollectionOp::DropFirst => (count.min(len), len),
+                            MirCollectionOp::TakeLast => (len.saturating_sub(count), len),
+                            _ => {
+                                return Err(RunnerError::internal(
+                                    span,
+                                    "collection copy/view arity",
+                                ))
+                            }
                         };
                         Ok(array_value(borrow[start..end].to_vec()))
                     }
@@ -1630,7 +1605,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             if let Some(stop) = end.checked_add(1) {
                 (start..stop).map(Value::Int).collect()
             } else {
-                // end == i64::MAX — inclusive range through the final value.
                 (start..=end).map(Value::Int).collect()
             }
         } else {
@@ -1939,10 +1913,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(tensor_value(data, tensor.shape.clone()))
             }
-            _ => {
-                // Both scalars: return the raw scalar result (not a tensor).
-                op(&left_val, &right_val, width, span)
-            }
+            _ => op(&left_val, &right_val, width, span),
         }
     }
 
@@ -2248,9 +2219,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
 
     /// Sum across a specified axis: `sum(x, axis)`.
     ///
-    /// Reduces the tensor by summing along one axis. Result rank is
-    /// input rank - 1. v1: rank-2 only with axis 0 (sum rows) or
-    /// axis = last (sum columns).
+    /// Backward-only LayerNorm VJP helper. Result rank is input rank - 1.
+    /// v1: rank-2 only with axis 0 (sum rows) or axis = last (sum columns).
     ///
     /// Args layout: `[input, axis_const]`.
     fn tensor_sum_axis(
