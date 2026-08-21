@@ -638,8 +638,19 @@ fn run_reader_locale_missing_package_path_surfaces_missing_path_error() {
         !stderr.contains("--locale th-TH requires a package path or .fab entry file"),
         "missing package path should reach the underlying filesystem error, got:\n{stderr}"
     );
+    // R1 absolutizes `faber run` inputs before the read-error emitter.
+    let missing_path = std::env::current_dir()
+        .expect("cwd")
+        .join("missing-package");
     assert!(
-        stderr.contains("cannot read 'missing-package': No such file or directory"),
+        !stderr.contains("cannot read 'missing-package':"),
+        "run must not print the raw relative token after input absolutization, got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains(&format!(
+            "cannot read '{}': No such file or directory",
+            missing_path.display()
+        )),
         "expected missing path error, got:\n{stderr}"
     );
 }
@@ -893,6 +904,15 @@ fn check_reader_locale_missing_package_path_surfaces_missing_path_error() {
     assert!(
         !stderr.contains("--locale th-TH requires a package path or .fab entry file"),
         "missing package path should reach the underlying filesystem error, got:\n{stderr}"
+    );
+    // `faber check` still routes a missing non-package path through file-mode
+    // `read_source`, which prints the raw relative token.
+    let absolutized = std::env::current_dir()
+        .expect("cwd")
+        .join("missing-package");
+    assert!(
+        !stderr.contains(&format!("cannot read '{}'", absolutized.display())),
+        "check file-mode must not print the absolutized path, got:\n{stderr}"
     );
     assert!(
         stderr.contains("cannot read 'missing-package': No such file or directory"),
