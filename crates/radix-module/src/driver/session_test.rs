@@ -25,6 +25,7 @@ fn config_default_values_are_stable() {
         "default config should discover the workspace stdlib when present"
     );
     assert!(config.locale_pack.is_none());
+    assert!(!config.emit_nvvm_device_module);
 }
 
 #[test]
@@ -75,6 +76,12 @@ fn session_wraps_config() {
     let session = Session::new(config);
 
     assert_eq!(session.config.target, Target::HirTypeScript);
+}
+
+#[test]
+fn config_builder_enables_nvvm_device_module() {
+    let config = Config::new().with_nvvm_device_module();
+    assert!(config.emit_nvvm_device_module);
 }
 
 #[test]

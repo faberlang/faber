@@ -105,6 +105,11 @@ pub struct Config {
     /// Disable the AIR-level op-fusion pass (on by default in all builds).
     pub no_fuse: bool,
 
+    /// When true, `llvm-text` emit for modules with device roles writes the
+    /// NVVM device module (kernel bodies, `; @nucleum device-entry`) instead
+    /// of the host-partition CPU stub. Set by `radix emit --cuda-descriptor`.
+    pub emit_nvvm_device_module: bool,
+
     /// Import path templates for `§name/rest` validation and resolution.
     ///
     /// Package mode populates this from `[paths.templates]` (values are package-root
@@ -130,6 +135,7 @@ impl Default for Config {
             output_mode: OutputMode::Application,
             module_name: None,
             no_fuse: false,
+            emit_nvvm_device_module: false,
             import_path_templates: None,
         }
     }
@@ -215,6 +221,16 @@ impl Config {
     #[must_use]
     pub fn with_no_fuse(mut self) -> Self {
         self.no_fuse = true;
+        self
+    }
+
+    /// Emit the NVVM device module from `llvm-text` when device roles exist.
+    ///
+    /// Default llvm-text stays the host-partition CPU stub. This flag is the
+    /// `--cuda-descriptor` route used by the CUDA proof.
+    #[must_use]
+    pub fn with_nvvm_device_module(mut self) -> Self {
+        self.emit_nvvm_device_module = true;
         self
     }
 

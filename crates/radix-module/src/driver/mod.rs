@@ -220,6 +220,7 @@ pub fn compile_with_module_import_contract(
         session.config.output_mode,
         session.config.module_name.as_deref(),
         session.config.no_fuse,
+        session.config.emit_nvvm_device_module,
     ) {
         Ok(output) => CompileResult { output: Some(output), diagnostics: analysis.diagnostics },
         Err(err) => compile_codegen_error(analysis, name, err),
@@ -496,6 +497,7 @@ fn compile_codegen_error(analysis: AnalyzedModule, name: &str, err: SpannedCodeg
     compile_error(analysis, diagnostic)
 }
 
+#[cfg_attr(not(feature = "mir-llvm"), allow(unused_variables))]
 fn generate_output(
     target: Target,
     analysis: &mut AnalyzedModule,
@@ -503,6 +505,7 @@ fn generate_output(
     output_mode: codegen::OutputMode,
     module_name: Option<&str>,
     no_fuse: bool,
+    emit_nvvm_device_module: bool,
 ) -> Result<crate::Output, SpannedCodegenError> {
     match target {
         Target::MirStepper => Err(codegen::CodegenError {
@@ -527,7 +530,7 @@ fn generate_output(
             // the modular-word family (modulus<u8|u16|u32|u64>) as unsigned
             // integral scalars. All other unsupported targets keep the gate.
             // `llvm-host` is the product routing name for the SAME emitter.
-            generate_llvm_text_output(analysis, no_fuse)
+            generate_llvm_text_output(analysis, no_fuse, emit_nvvm_device_module)
         }
         #[cfg(not(feature = "mir-llvm"))]
         Target::MirLlvm | Target::MirLlvmHost => Err(unavailable_target_spanned(Target::MirLlvm)),
@@ -676,6 +679,7 @@ fn generate_wasm_text_output(
 fn generate_llvm_text_output(
     analysis: &mut AnalyzedModule,
     no_fuse: bool,
+    emit_nvvm_device_module: bool,
 ) -> Result<crate::Output, SpannedCodegenError> {
     #[cfg(not(feature = "mir-llvm"))]
     {
@@ -686,13 +690,14 @@ fn generate_llvm_text_output(
         prepare_mir_lowering_interner(analysis);
         let device_roles = crate::mir::device_roles_from_hir(&analysis.hir);
         let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
-        // DDCP3-U2 (b) mixed-path disambiguation: `llvm-text`/`llvm-host` is the
-        // CPU-module path. A package that carries device roles routes through the
-        // HOST-PARTITION lane (direct declarations/calls, no device bodies) —
-        // `emit_llvm_text_probe_with_device_roles` remains the NVVM device-
-        // artifact probe path (the CUDA descriptor machinery), never a CPU
-        // module. No route silently emits device bodies into a CPU module.
-        let code = if device_roles.is_empty() {
+        // DDCP3-U2 (b) mixed-path disambiguation: default `llvm-text`/`llvm-host`
+        // is the CPU-module path. A package that carries device roles routes
+        // through the HOST-PARTITION lane (direct declarations/calls, no device
+        // bodies). `emit_llvm_text_probe_with_device_roles` is the NVVM device-
+        // artifact path: `--cuda-descriptor` selects it so the emitted `.ll`
+        // matches the sidecar. No default route silently emits device bodies
+        // into a CPU module.
+        let code = if emit_nvvm_device_module || device_roles.is_empty() {
             crate::mir::emit_llvm_text_probe_with_device_roles(&device_roles, &mir.validated, &mir.interner)
                 .map_err(llvm_text_codegen_error)?
         } else {
@@ -725,10 +730,11 @@ fn generate_llvm_text_output(
 /// The sidecar is re-derived from the same source through the public
 /// front-half pipeline (`analyze_source` → MIR lowering → device context), so
 /// `radix emit --cuda-descriptor <path>` can write it without the compiled
-/// [`crate::Output`] carrying MIR; analysis is deterministic, so the
-/// descriptor matches the emitted text. Fail closed: a session whose target is
-/// not `llvm-text`, a failed analysis/lowering, or a module with no
-/// kernel-role functions rejects with diagnostics.
+/// [`crate::Output`] carrying MIR. With `--cuda-descriptor`, llvm-text stdout
+/// is the NVVM device module, so the descriptor matches the emitted text.
+/// Fail closed: a session whose target is not `llvm-text`, a failed
+/// analysis/lowering, or a module with no kernel-role functions rejects with
+/// diagnostics.
 ///
 /// # Errors
 ///
@@ -3639,6 +3645,11 @@ fn retarget_cli_program_symbols(
 #[cfg(feature = "mir-core")]
 #[path = "mod_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[cfg(feature = "mir-llvm")]
+#[path = "nvvm_device_emit_test.rs"]
+mod nvvm_device_emit_tests;
 
 #[cfg(test)]
 #[cfg(feature = "hir-faber")]
