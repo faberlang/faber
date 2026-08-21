@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 225,
-    "analyzable": 287
+    "capable": 226,
+    "analyzable": 288
   },
   "terms": [
     {
@@ -402,6 +402,12 @@
     {
       "term": "fixum",
       "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "forma",
+      "rule": "existing-home",
       "capable": 1,
       "analyzable": 1
     },
