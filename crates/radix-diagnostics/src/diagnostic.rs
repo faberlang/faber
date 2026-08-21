@@ -538,11 +538,26 @@ impl Diagnostic {
     }
 
     /// Convert a filesystem read failure into a path-scoped diagnostic.
+    ///
+    /// The attempted path belongs to [`Self::file`], so keeping it out of the
+    /// message prevents plain renderers from displaying it twice. The named
+    /// arguments preserve the path facts for structured renderers and tools.
     #[must_use]
     pub fn io_error(path: &Path, err: &std::io::Error) -> Self {
-        Self::error(format!("cannot read '{}': {}", path.display(), err))
-            .with_phase(DiagnosticPhase::Io)
-            .with_file(path.display().to_string())
+        let base = path
+            .parent()
+            .filter(|base| !base.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        let artifact = io_artifact(path);
+        Self::error(format!(
+            "cannot read {artifact} resolved against '{}': {err}",
+            base.display()
+        ))
+        .with_phase(DiagnosticPhase::Io)
+        .with_file(path.display().to_string())
+        .with_arg("path", path.display().to_string())
+        .with_arg("base", base.display().to_string())
+        .with_arg("artifact", artifact)
     }
 
     /// Create a backend diagnostic when generation fails outside source spans.
@@ -551,6 +566,21 @@ impl Diagnostic {
         Self::error(format!("code generation failed: {message}"))
             .with_phase(DiagnosticPhase::Codegen)
             .with_code("CODEGEN001")
+    }
+}
+
+fn io_artifact(path: &Path) -> &'static str {
+    match path.file_name().and_then(|name| name.to_str()) {
+        Some("faber.toml") => "manifest",
+        Some("pack.toml") => "locale pack",
+        _ if path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| matches!(extension, "fab" | "proba")) =>
+        {
+            "source file"
+        }
+        _ => "file",
     }
 }
 

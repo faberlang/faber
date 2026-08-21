@@ -137,7 +137,7 @@ use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::Config;
 use radix_program::discovery::PackageSpec;
 use radix_program::library::{LibraryInterfaceCache, LibraryResolver, LockedLibraryPackage};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 executed-lane
 /// routing; authoritative decision record
@@ -210,16 +210,97 @@ pub(crate) use locale::{
 
 pub(super) const MANIFEST_FILE: &str = "faber.toml";
 
+fn resolution_base() -> std::path::PathBuf {
+    radix_program::paths::normalize_path(
+        &std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")),
+    )
+}
+
 pub(crate) fn missing_package_path_diagnostic(path: &Path) -> Box<Diagnostic> {
+    let path = absolutize_path(path);
+    let base = resolution_base();
+    let error = std::io::Error::from_raw_os_error(2);
     Box::new(
         crate::package_diagnostic_error(format!(
-            "package input path '{}' does not exist",
-            path.display()
+            "cannot read manifest at '{}' resolved against '{}': {error}",
+            path.display(),
+            base.display()
         ))
+        .with_phase(radix_module::diagnostics::DiagnosticPhase::Io)
         .with_file(path.display().to_string())
         .with_arg("issue", "package_path_missing")
-        .with_arg("path", path.display().to_string()),
+        .with_arg("path", path.display().to_string())
+        .with_arg("base", base.display().to_string())
+        .with_arg("artifact", "manifest"),
     )
+}
+
+/// Attach path facts to a package I/O diagnostic whose lower-level loader
+/// could not carry them across the product seam (currently locale-pack reads).
+///
+/// The package code and issue remain owned by the originating diagnostic. This
+/// adapter only fills the stable path/base/artifact facts at the CLI boundary.
+pub(crate) fn attach_path_diagnostic_context(mut diagnostic: Box<Diagnostic>) -> Box<Diagnostic> {
+    if ["path", "base", "artifact"]
+        .iter()
+        .all(|name| diagnostic.args.iter().any(|arg| arg.name == *name))
+    {
+        return diagnostic;
+    }
+
+    let Some(pack_path) = locale_pack_path_from_diagnostic(&diagnostic.message) else {
+        return diagnostic;
+    };
+    let base = pack_path.parent().unwrap_or_else(|| Path::new("."));
+    let read_marker = ": cannot read reader pack '";
+    if let Some(read_start) = diagnostic.message.find(read_marker) {
+        let read_start = read_start + read_marker.len();
+        if let Some(error_start) = diagnostic.message[read_start..].find("': ") {
+            let error_start = read_start + error_start + 3;
+            diagnostic.message = format!(
+                "cannot read locale pack '{}' resolved against '{}': {}",
+                pack_path.display(),
+                base.display(),
+                &diagnostic.message[error_start..]
+            );
+        }
+    }
+    diagnostic.file = pack_path.display().to_string();
+    diagnostic
+        .args
+        .push(radix_module::diagnostics::DiagnosticArg::new(
+            "issue",
+            "locale_pack_missing",
+        ));
+    diagnostic
+        .args
+        .push(radix_module::diagnostics::DiagnosticArg::new(
+            "path",
+            pack_path.display().to_string(),
+        ));
+    diagnostic
+        .args
+        .push(radix_module::diagnostics::DiagnosticArg::new(
+            "base",
+            base.display().to_string(),
+        ));
+    diagnostic
+        .args
+        .push(radix_module::diagnostics::DiagnosticArg::new(
+            "artifact",
+            "locale pack",
+        ));
+    diagnostic
+}
+
+fn locale_pack_path_from_diagnostic(message: &str) -> Option<PathBuf> {
+    if !message.contains("cannot read reader pack") {
+        return None;
+    }
+    let marker = " pack '";
+    let start = message.find(marker)? + marker.len();
+    let end = message[start..].find("':")? + start;
+    Some(PathBuf::from(&message[start..end]))
 }
 
 /// Resolve a product input against the caller's working directory before
@@ -233,15 +314,14 @@ pub(crate) fn absolutize_path(path: &Path) -> std::path::PathBuf {
     let path = if path.is_absolute() {
         path.to_path_buf()
     } else {
-        std::env::current_dir()
-            .unwrap_or_else(|_| std::path::PathBuf::from("."))
-            .join(path)
+        resolution_base().join(path)
     };
     radix_program::paths::normalize_path(&path)
 }
 
 pub(crate) fn discover_package(input: &Path) -> Result<PackageSpec, Box<Diagnostic>> {
-    let spec = radix_program::discovery::discover_package(&absolutize_path(input))?;
+    let path = absolutize_path(input);
+    let spec = radix_program::discovery::discover_package_with_base(&path, &resolution_base())?;
     if spec.manifest_backed {
         let manifest_path = spec.package_root.join(MANIFEST_FILE);
         if manifest_path.exists() {

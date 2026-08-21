@@ -49,7 +49,22 @@ fn exit_target_feature_unavailable(target_name: &str, feature: &str) -> ! {
 
 /// Report a diagnostic's message and terminate.
 fn fail_with_diagnostic(diag: &radix_module::Diagnostic) -> ! {
-    eprintln!("error: {}", diag.message);
+    let has_path_context = ["path", "base", "artifact"]
+        .iter()
+        .all(|name| diag.args.iter().any(|arg| arg.name == *name));
+    if diag.phase == radix_module::diagnostics::DiagnosticPhase::Io && diag.code.is_none() {
+        eprintln!("{}", radix_module::diagnostics::render_plain(diag));
+    } else if has_path_context {
+        if let Some(label) = diag.display_label() {
+            eprintln!("error[{label}]: {}", diag.message);
+        } else {
+            eprintln!("error: {}", diag.message);
+        }
+    } else if diag.phase == radix_module::diagnostics::DiagnosticPhase::Io {
+        eprintln!("{}", radix_module::diagnostics::render_plain(diag));
+    } else {
+        eprintln!("error: {}", diag.message);
+    }
     std::process::exit(1);
 }
 
@@ -100,7 +115,10 @@ pub fn cmd_build(command: radix_module::services::BuildCommand, format: bool, li
             command.diagnostics_locale.as_deref(),
         ) {
             Ok((config, pack)) => (config.with_warn_policy(warn_policy), pack),
-            Err(diag) => fail_with_diagnostic(&diag),
+            Err(diag) => {
+                let diag = super::attach_path_diagnostic_context(diag);
+                fail_with_diagnostic(&diag)
+            }
         }
     } else {
         let config = match super::locale::default_config_with_locale(target) {
@@ -709,7 +727,10 @@ pub fn cmd_check_package(command: radix_module::services::CheckCommand) {
             }),
             pack,
         ),
-        Err(diag) => fail_with_diagnostic(&diag),
+        Err(diag) => {
+            let diag = super::attach_path_diagnostic_context(diag);
+            fail_with_diagnostic(&diag)
+        }
     };
     let mut diagnostics =
         radix_program::analyze::check_package(&config, &input_path, &super::faber_analysis_seams());
@@ -849,7 +870,10 @@ fn compile_package_input(
     let (config, locale_pack) = match config_with_locale(target, &path, locale, diagnostics_locale)
     {
         Ok(selection) => selection,
-        Err(diag) => fail_with_diagnostic(&diag),
+        Err(diag) => {
+            let diag = super::attach_path_diagnostic_context(diag);
+            fail_with_diagnostic(&diag)
+        }
     };
     (
         radix_program::emit::compile_package(&config, &path, &super::faber_emission_seams()),

@@ -140,3 +140,38 @@ fn build_layout_binary_name_returns_sanitized_name() {
     let layout = BuildLayout::from_package_root("/tmp/pkg", "My-Package");
     assert_eq!(layout.binary_name(), "my-package");
 }
+
+#[test]
+fn missing_package_input_names_path_base_and_manifest_artifact() {
+    let base = Path::new("/tmp/faber-check-discoverability");
+    let input = base.join("missing-package");
+
+    let diagnostic = discover_package_with_base(&input, base).expect_err("missing package");
+
+    assert_eq!(diagnostic.code, Some("PKG001"));
+    assert_eq!(diagnostic.issue(), Some("package_path_missing"));
+    assert_eq!(
+        diagnostic
+            .args
+            .iter()
+            .find(|arg| arg.name == "path")
+            .map(|arg| arg.value.as_str()),
+        Some(input.to_str().expect("UTF-8 input path"))
+    );
+    assert_eq!(
+        diagnostic
+            .args
+            .iter()
+            .find(|arg| arg.name == "base")
+            .map(|arg| arg.value.as_str()),
+        Some(base.to_str().expect("UTF-8 base path"))
+    );
+    assert_eq!(
+        diagnostic
+            .args
+            .iter()
+            .find(|arg| arg.name == "artifact")
+            .map(|arg| arg.value.as_str()),
+        Some("manifest")
+    );
+}

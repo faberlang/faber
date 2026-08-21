@@ -27,6 +27,10 @@ pub use spec::{
 };
 
 #[cfg(test)]
+#[path = "diagnostic_test.rs"]
+mod diagnostic_tests;
+
+#[cfg(test)]
 mod smoke_tests {
     use super::*;
 

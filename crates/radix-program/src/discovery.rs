@@ -141,6 +141,28 @@ pub fn sanitize_crate_name(name: &str) -> String {
 
 type PackageDiscoveryResult = Result<PackageSpec, Box<Diagnostic>>;
 
+fn missing_package_path_diagnostic(path: &Path, base: &Path) -> Box<Diagnostic> {
+    let base = if base.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        base
+    };
+    let error = std::io::Error::from_raw_os_error(2);
+    Box::new(
+        crate::package_diagnostic_error(format!(
+            "cannot read manifest at '{}' resolved against '{}': {error}",
+            path.display(),
+            base.display()
+        ))
+        .with_phase(radix_module::diagnostics::DiagnosticPhase::Io)
+        .with_file(path.display().to_string())
+        .with_arg("issue", "package_path_missing")
+        .with_arg("path", path.display().to_string())
+        .with_arg("base", base.display().to_string())
+        .with_arg("artifact", "manifest"),
+    )
+}
+
 pub fn is_manifest_backed_or_directory_package_input(input: &Path) -> bool {
     let input = normalize_path(input);
     if input.file_name().and_then(|name| name.to_str()) == Some(MANIFEST_FILE) {
@@ -153,13 +175,23 @@ pub fn is_manifest_backed_or_directory_package_input(input: &Path) -> bool {
 }
 
 pub fn discover_package(input: &Path) -> PackageDiscoveryResult {
-    let display_path = input.to_path_buf();
+    let base = input
+        .parent()
+        .filter(|base| !base.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    discover_package_with_base(input, base)
+}
+
+/// Discover a package while retaining the base used to resolve the CLI path.
+///
+/// The default [`discover_package`] entry point derives a package-local base
+/// for compiler callers. Product callers that absolutize a relative CLI input
+/// should pass the original resolution base so missing-path diagnostics explain
+/// the user's invocation rather than the normalized path's parent.
+pub fn discover_package_with_base(input: &Path, base: &Path) -> PackageDiscoveryResult {
     let input = normalize_path(input);
     if !input.exists() {
-        return Err(Box::new(Diagnostic::io_error(
-            &display_path,
-            &std::io::Error::from_raw_os_error(2),
-        )));
+        return Err(missing_package_path_diagnostic(&input, base));
     }
 
     if input.file_name().and_then(|name| name.to_str()) == Some(MANIFEST_FILE) {
