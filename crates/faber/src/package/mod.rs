@@ -200,11 +200,6 @@ pub(crate) use embedded_locale::{
 };
 #[allow(unused_imports)]
 pub use locale::available_locales;
-/// Installed reader-pack path resolution shared by lib surfaces
-/// (`diagnostic_explain`) and package code-locale lookup. Used by the lib
-/// crate only; the bin's copy is legitimately unused.
-#[allow(unused_imports)]
-pub(crate) use locale::installed_locale_pack_path;
 #[allow(unused_imports)]
 pub use locale::locale_pack_for_emit;
 #[allow(unused_imports)]

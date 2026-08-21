@@ -75,10 +75,10 @@ fn diagnostic_lookup_does_not_fallback_to_code_row_for_missing_issue() {
 }
 
 #[test]
-fn installed_default_pack_resolves_diagnostic_issue_structurally() {
+fn embedded_default_pack_resolves_diagnostic_issue_structurally() {
     let explanation = lookup_installed_diagnostic("SEM010.initializer_annotation_mismatch", None)
-        .expect("installed lookup should not fail")
-        .expect("installed issue should resolve");
+        .expect("embedded lookup should not fail")
+        .expect("embedded issue should resolve");
 
     assert_eq!(explanation.code, "SEM010");
     assert_eq!(
@@ -94,11 +94,11 @@ fn installed_default_pack_resolves_diagnostic_issue_structurally() {
 }
 
 #[test]
-fn installed_nonlatin_pack_resolves_diagnostic_issue_structurally() {
+fn embedded_nonlatin_pack_resolves_diagnostic_issue_structurally() {
     let explanation =
         lookup_installed_diagnostic("SEM010.initializer_annotation_mismatch", Some("zh-Hans"))
-            .expect("installed lookup should not fail")
-            .expect("installed issue should resolve");
+            .expect("embedded lookup should not fail")
+            .expect("embedded issue should resolve");
 
     assert_eq!(explanation.code, "SEM010");
     assert_eq!(
@@ -181,30 +181,34 @@ fn diagnostic_json_render_for_code_only_includes_all_fields() {
 }
 
 #[test]
-fn missing_locale_pack_fails_closed_with_next_action() {
-    // D6: explain on a missing locale produces a nonzero, actionable error
-    // naming the missing pack and one next action.
+fn missing_embedded_locale_pack_fails_closed() {
     let err = lookup_installed_diagnostic("SEM001", Some("zz"))
-        .expect_err("missing locale pack must fail closed");
+        .expect_err("unknown locale must fail closed");
     let message = &err.message;
     assert!(
         message.contains("failed to load reader locale 'zz'"),
         "unexpected message: {message}"
     );
     assert!(
+        message.contains("no embedded reader pack"),
+        "error must name the embedded source: {message}"
+    );
+    assert!(
         message.contains("next action"),
         "error must carry one next action: {message}"
     );
     assert!(
-        message.contains("share/faber/locale/zz/pack.toml"),
-        "error must name the installed pack location: {message}"
+        !message.contains("reinstall"),
+        "reinstall-the-dev-kit path is deleted: {message}"
+    );
+    assert!(
+        !message.contains("share/faber"),
+        "installed pack path is deleted: {message}"
     );
 }
 
 #[test]
-fn installed_locale_pack_dev_resolution_loads_english_pack() {
-    // Development builds resolve the English reader pack from the sibling
-    // radix tree; lookup must succeed and report the requested locale.
+fn embedded_english_pack_resolves_diagnostic_code() {
     let explanation = lookup_installed_diagnostic("SEM001", Some("en"))
         .expect("diagnostic lookup")
         .expect("SEM001 explanation");

@@ -6,9 +6,9 @@
 
 use crate::explain::ExplainError;
 use crate::io_buf::writeln_buf;
+use crate::package::{load_embedded_locale_pack, EMBEDDED_LOCALE_IDS};
 use radix_module::locale::{DiagnosticTemplate, LocalePack};
 use serde::Serialize;
-use std::path::PathBuf;
 
 const DEFAULT_READER_LOCALE: &str = "en";
 
@@ -73,7 +73,7 @@ pub fn is_diagnostic_query(query: &str) -> bool {
     DiagnosticLookupKey::parse(query).is_some()
 }
 
-/// Resolve a diagnostic explanation from an installed reader pack.
+/// Resolve a diagnostic explanation from an embedded reader pack.
 pub fn lookup_installed_diagnostic(
     query: &str,
     locale: Option<&str>,
@@ -82,7 +82,7 @@ pub fn lookup_installed_diagnostic(
         return Ok(None);
     };
     let locale = locale.unwrap_or(DEFAULT_READER_LOCALE);
-    let pack = load_installed_locale_pack(locale)?;
+    let pack = load_embedded_reader_pack(locale)?;
     Ok(resolve_diagnostic_in_pack(query, &pack, key))
 }
 
@@ -151,41 +151,25 @@ pub fn render_json(explanation: &DiagnosticExplanation) -> Result<String, Explai
         .map_err(|err| ExplainError::new(format!("failed to render diagnostic JSON: {err}")))
 }
 
-fn load_installed_locale_pack(locale: &str) -> Result<LocalePack, ExplainError> {
+fn load_embedded_reader_pack(locale: &str) -> Result<LocalePack, ExplainError> {
     if locale.trim().is_empty() {
         return Err(ExplainError::new("--locale must not be empty"));
     }
-    let path = installed_locale_pack_path(locale.trim());
-    let pack = LocalePack::from_toml_path(&path).map_err(|err| {
+    let locale = locale.trim();
+    let pack = load_embedded_locale_pack(locale).map_err(|err| {
         ExplainError::new(format!(
-            "failed to load reader locale '{}' pack '{}': {err}\n\
-             next action: reinstall the matching faber dev kit so the pack ships at \
-             share/faber/locale/{}/pack.toml beside the faber binary",
-            locale,
-            path.display(),
-            locale
+            "failed to load reader locale '{locale}': {err}\n\
+             next action: choose one of the embedded reader locales ({})",
+            EMBEDDED_LOCALE_IDS.join(", ")
         ))
     })?;
     if pack.metadata.id != locale {
         return Err(ExplainError::new(format!(
-            "reader locale '{}' selected pack '{}' with id '{}'",
-            locale,
-            path.display(),
+            "reader locale '{locale}' selected embedded pack with id '{}'",
             pack.metadata.id
         )));
     }
     Ok(pack)
-}
-
-/// Resolve the installed reader-pack path for `locale`.
-///
-/// Installed binaries resolve `<prefix>/share/faber/locale/<locale>/pack.toml`
-/// relative to the running binary — never a `CARGO_MANIFEST_DIR`-baked build
-/// path (E8) and never an ambient walk-up (E5/G2). Development builds fall back
-/// to a sibling `radix/stdlib/locale/<locale>/pack.toml`. See
-/// [`crate::package::locale::installed_locale_pack_path_in`] for the pure core.
-fn installed_locale_pack_path(locale: &str) -> PathBuf {
-    crate::package::installed_locale_pack_path(locale)
 }
 
 impl DiagnosticLookupKey {

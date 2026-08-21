@@ -5,25 +5,29 @@ use radix_module::locale::LocalePack;
 use std::path::{Path, PathBuf};
 
 use super::discover_package;
+use super::embedded_locale::{load_embedded_locale_pack, EmbeddedLocaleError, EMBEDDED_LOCALE_IDS};
 use super::manifest::{manifest_for_spec, FaberManifest};
 use radix_program::discovery::PackageSpec;
 use radix_program::paths::normalize_path;
 
 pub(crate) const DEFAULT_CODE_LOCALE: &str = "en";
 
+fn embedded_locales_list() -> String {
+    EMBEDDED_LOCALE_IDS.join(", ")
+}
+
+fn embedded_load_diagnostic(locale: &str, err: EmbeddedLocaleError) -> Diagnostic {
+    crate::package_diagnostic_error(format!(
+        "failed to load reader locale '{locale}': {err}\n\
+         next action: choose one of the embedded reader locales ({})",
+        embedded_locales_list()
+    ))
+}
+
 /// Build the product-default code config for inputs without package context.
 pub(crate) fn default_config_with_locale(target: Target) -> Result<Config, Box<Diagnostic>> {
-    let pack_path = installed_locale_pack_path(DEFAULT_CODE_LOCALE);
-    let pack = LocalePack::from_toml_path(&pack_path).map_err(|err| {
-        Box::new(crate::package_diagnostic_error(format!(
-            "failed to load default code locale '{}' pack '{}': {err}\n\
-             next action: reinstall the matching faber dev kit so the pack ships at \
-             share/faber/locale/{}/pack.toml beside the faber binary",
-            DEFAULT_CODE_LOCALE,
-            pack_path.display(),
-            DEFAULT_CODE_LOCALE
-        )))
-    })?;
+    let pack = load_embedded_locale_pack(DEFAULT_CODE_LOCALE)
+        .map_err(|err| Box::new(embedded_load_diagnostic(DEFAULT_CODE_LOCALE, err)))?;
     Ok(Config::default().with_target(target).with_locale_pack(pack))
 }
 
@@ -89,31 +93,8 @@ pub(crate) fn load_locale_pack_for_input(
     let Some(locale) = selected_locale(cli_locale, manifest.as_ref())? else {
         return Ok(None);
     };
-    let pack_path = locale_pack_path(&package_root, &locale, cli_locale, manifest.as_ref());
-    let pack = LocalePack::from_toml_path(&pack_path).map_err(|err| {
-        Box::new(
-            crate::package_diagnostic_error(format!(
-                "failed to load reader locale '{locale}' pack '{}': {err}\n\
-                 next action: install the matching reader pack for locale '{locale}' \
-                 (share/faber/locale/{locale}/pack.toml beside the faber binary) or fix the \
-                 package pack path",
-                pack_path.display()
-            ))
-            .with_file(input.display().to_string()),
-        )
-    })?;
-
-    if pack.metadata.id != locale {
-        return Err(Box::new(
-            crate::package_diagnostic_error(format!(
-                "reader locale '{locale}' selected pack '{}' with id '{}'",
-                pack_path.display(),
-                pack.metadata.id
-            ))
-            .with_file(input.display().to_string()),
-        ));
-    }
-
+    let pack =
+        load_selected_locale_pack(input, &package_root, &locale, cli_locale, manifest.as_ref())?;
     Ok(Some(pack))
 }
 
@@ -141,12 +122,39 @@ fn selected_locale<'a>(
     ))
 }
 
-fn locale_pack_path(
+fn load_selected_locale_pack(
+    input: &Path,
     package_root: &Path,
     locale: &str,
     cli_locale: Option<&str>,
     manifest: Option<&FaberManifest>,
-) -> PathBuf {
+) -> Result<LocalePack, Box<Diagnostic>> {
+    if let Some(pack_path) = file_locale_pack_path(package_root, locale, cli_locale, manifest) {
+        return load_locale_pack_from_file(input, locale, &pack_path);
+    }
+    let pack = load_embedded_locale_pack(locale).map_err(|err| {
+        Box::new(embedded_load_diagnostic(locale, err).with_file(input.display().to_string()))
+    })?;
+    if pack.metadata.id != locale {
+        return Err(Box::new(
+            crate::package_diagnostic_error(format!(
+                "reader locale '{locale}' selected embedded pack with id '{}'",
+                pack.metadata.id
+            ))
+            .with_file(input.display().to_string()),
+        ));
+    }
+    Ok(pack)
+}
+
+/// Manifest `[locale] pack` path, else package-local `locale/<locale>.toml`
+/// when that file exists. `None` means the embedded pack is the source.
+fn file_locale_pack_path(
+    package_root: &Path,
+    locale: &str,
+    cli_locale: Option<&str>,
+    manifest: Option<&FaberManifest>,
+) -> Option<PathBuf> {
     let manifest_pack = manifest.and_then(|manifest| {
         let manifest_locale = manifest.locale.locale.as_deref();
         if cli_locale.is_none() || manifest_locale == Some(locale) {
@@ -157,15 +165,41 @@ fn locale_pack_path(
     });
 
     if let Some(pack) = manifest_pack {
-        return normalize_path(&package_root.join(pack));
+        return Some(normalize_path(&package_root.join(pack)));
     }
 
     let package_pack = normalize_path(&package_root.join("locale").join(format!("{locale}.toml")));
-    if package_pack.exists() {
-        return package_pack;
+    package_pack.exists().then_some(package_pack)
+}
+
+fn load_locale_pack_from_file(
+    input: &Path,
+    locale: &str,
+    pack_path: &Path,
+) -> Result<LocalePack, Box<Diagnostic>> {
+    let pack = LocalePack::from_toml_path(pack_path).map_err(|err| {
+        Box::new(
+            crate::package_diagnostic_error(format!(
+                "failed to load reader locale '{locale}' pack '{}': {err}\n\
+                 next action: fix the package pack path",
+                pack_path.display()
+            ))
+            .with_file(input.display().to_string()),
+        )
+    })?;
+
+    if pack.metadata.id != locale {
+        return Err(Box::new(
+            crate::package_diagnostic_error(format!(
+                "reader locale '{locale}' selected pack '{}' with id '{}'",
+                pack_path.display(),
+                pack.metadata.id
+            ))
+            .with_file(input.display().to_string()),
+        ));
     }
 
-    installed_locale_pack_path(locale)
+    Ok(pack)
 }
 
 fn package_root_for_selection(spec: &PackageSpec, manifest_path: Option<&Path>) -> PathBuf {
@@ -178,10 +212,10 @@ fn package_root_for_selection(spec: &PackageSpec, manifest_path: Option<&Path>) 
 /// Resolve a CLI reader locale to a pack for single-file emit while retaining
 /// the structured diagnostic produced by package discovery and locale loading.
 ///
-/// File input uses the package-aware resolver (package-local pack, else the
-/// installed pack); stdin falls back to the installed pack directly, since
-/// there is no package context to consult. An omitted locale selects the
-/// product-default `en` pack.
+/// File input uses the package-aware resolver (manifest pack path, else
+/// package-local pack, else the embedded pack); stdin uses the embedded pack
+/// directly, since there is no package context to consult. An omitted locale
+/// selects the product-default `en` pack.
 pub(crate) fn locale_pack_for_emit_with_diagnostic(
     input: &[String],
     cli_locale: Option<&str>,
@@ -206,18 +240,10 @@ pub(crate) fn locale_pack_for_emit_with_diagnostic(
         };
     }
 
-    // Stdin: no package context, use the installed pack for the locale.
-    let pack_path = installed_locale_pack_path(locale);
-    LocalePack::from_toml_path(&pack_path)
+    // Stdin: no package context, use the embedded pack for the locale.
+    load_embedded_locale_pack(locale)
         .map(Some)
-        .map_err(|err| {
-            Box::new(crate::package_diagnostic_error(format!(
-                "failed to load reader locale '{locale}' pack '{}': {err}\n\
-                 next action: reinstall the matching faber dev kit so the pack ships at \
-                 share/faber/locale/{locale}/pack.toml beside the faber binary",
-                pack_path.display()
-            )))
-        })
+        .map_err(|err| Box::new(embedded_load_diagnostic(locale, err)))
 }
 
 /// Compatibility wrapper for library callers that only need the normalized
@@ -239,149 +265,13 @@ fn path_is_missing(path: &Path) -> bool {
     )
 }
 
-/// Installed reader-pack path for `locale` (env + exe + cwd resolution).
-pub(crate) fn installed_locale_pack_path(locale: &str) -> PathBuf {
-    installed_locale_pack_path_in(
-        std::env::current_exe().ok().as_deref(),
-        std::env::current_dir().ok().as_deref(),
-        cfg!(debug_assertions),
-        locale,
-    )
-}
-
-/// Reader-locale names with an installed pack, for CLI error listing
+/// Reader-locale ids with an embedded pack, for CLI error listing
 /// (`faber convert --to <unknown>` fails closed naming the real options).
-/// Install roots first, then dev-tree roots — mirrors the pack resolution
-/// order in [`installed_locale_pack_path_in`].
 pub fn available_locales() -> Vec<String> {
-    let exe = std::env::current_exe().ok();
-    let cwd = std::env::current_dir().ok();
-    let mut roots: Vec<PathBuf> = Vec::new();
-    if let Some(bin_dir) = exe.as_deref().and_then(Path::parent) {
-        roots.push(bin_dir.join("../share/faber/locale"));
-        roots.push(bin_dir.join("../lib/faber/locale"));
-    }
-    if cfg!(debug_assertions) {
-        for start in [cwd, exe.as_deref().map(Path::to_path_buf)]
-            .into_iter()
-            .flatten()
-        {
-            let mut dir = start;
-            loop {
-                roots.push(dir.join("radix").join("stdlib").join("locale"));
-                if !dir.pop() {
-                    break;
-                }
-            }
-        }
-    }
-    let mut locales: Vec<String> = Vec::new();
-    for root in roots {
-        let Ok(entries) = std::fs::read_dir(&root) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            if entry.path().join("pack.toml").is_file() {
-                if let Some(name) = entry.file_name().to_str() {
-                    if !locales.iter().any(|existing| existing == name) {
-                        locales.push(name.to_owned());
-                    }
-                }
-            }
-        }
-    }
-    locales.sort();
-    locales
-}
-
-/// The pure installed-pack resolution core, injectable for tests.
-///
-/// Installed binaries resolve `<prefix>/share/faber/locale/<locale>/pack.toml`
-/// relative to the running binary — never a `CARGO_MANIFEST_DIR`-baked build
-/// path (E8) and never an ambient walk-up (E5/G2). Development builds may fall
-/// back to a sibling `radix/stdlib/locale/<locale>/pack.toml`. When no pack is
-/// found the returned path does not exist; callers turn the load failure into
-/// a nonzero, actionable error naming the missing pack and one next action.
-///
-/// `dev_tree_allowed` is `cfg!(debug_assertions)` in production: only
-/// development builds may walk up to a sibling checkout; a released binary
-/// resolves strictly from the install prefix.
-pub(crate) fn installed_locale_pack_path_in(
-    exe: Option<&Path>,
-    cwd: Option<&Path>,
-    dev_tree_allowed: bool,
-    locale: &str,
-) -> PathBuf {
-    if let Some(path) = install_locale_pack(exe, locale) {
-        return path;
-    }
-    if dev_tree_allowed {
-        if let Some(path) = dev_locale_pack(cwd, exe, locale) {
-            return path;
-        }
-    }
-    fallback_installed_locale_pack(exe, locale)
-}
-
-fn install_locale_pack(exe: Option<&Path>, locale: &str) -> Option<PathBuf> {
-    let bin_dir = exe?.parent()?;
-    for relative in ["../share/faber/locale", "../lib/faber/locale"] {
-        let candidate = bin_dir.join(relative).join(locale).join("pack.toml");
-        if candidate.is_file() {
-            return candidate.canonicalize().ok().or(Some(candidate));
-        }
-    }
-    None
-}
-
-fn dev_locale_pack(cwd: Option<&Path>, exe: Option<&Path>, locale: &str) -> Option<PathBuf> {
-    // The binary's own checkout is authoritative for a development build: it
-    // is the tree the binary was built from, so its reader pack is current by
-    // construction. The cwd ancestry is a fallback only — walking it first
-    // lets a stale or foreign `radix/stdlib` checkout (e.g. `/tmp/radix` from
-    // a prior session) silently shadow the correct pack with an outdated one
-    // whose surfaces predate later pack rows.
-    let mut starts = Vec::new();
-    if let Some(exe) = exe {
-        if let Some(parent) = exe.parent() {
-            starts.push(parent.to_path_buf());
-        }
-    }
-    if let Some(cwd) = cwd {
-        starts.push(cwd.to_path_buf());
-    }
-    for mut dir in starts {
-        loop {
-            let candidate = dir
-                .join("radix")
-                .join("stdlib")
-                .join("locale")
-                .join(locale)
-                .join("pack.toml");
-            if candidate.is_file() {
-                return candidate.canonicalize().ok().or(Some(candidate));
-            }
-            if !dir.pop() {
-                break;
-            }
-        }
-    }
-    None
-}
-
-fn fallback_installed_locale_pack(exe: Option<&Path>, locale: &str) -> PathBuf {
-    exe.as_deref()
-        .and_then(Path::parent)
-        .map(|bin| {
-            bin.join("../share/faber/locale")
-                .join(locale)
-                .join("pack.toml")
-        })
-        .unwrap_or_else(|| {
-            PathBuf::from("share/faber/locale")
-                .join(locale)
-                .join("pack.toml")
-        })
+    EMBEDDED_LOCALE_IDS
+        .iter()
+        .map(|id| (*id).to_owned())
+        .collect()
 }
 
 #[cfg(test)]

@@ -21,7 +21,7 @@ fn temp_dir(label: &str) -> PathBuf {
     dir
 }
 
-/// Minimal package so pack resolution can fall through to installed stdlib packs.
+/// Minimal package so pack resolution can fall through to embedded packs.
 fn temp_package_entry() -> (PathBuf, PathBuf) {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -126,18 +126,24 @@ fn empty_diagnostics_locale_is_rejected() {
 }
 
 #[test]
-fn missing_installed_locale_pack_fails_closed_with_next_action() {
-    // D6: package reads on a missing locale exit nonzero naming the missing
-    // pack and one next action (installed-binary path, no CARGO_MANIFEST_DIR).
-    let err = locale_pack_for_emit(&[], Some("zz")).expect_err("missing locale pack");
+fn missing_embedded_locale_pack_fails_closed() {
+    let err = locale_pack_for_emit(&[], Some("zz")).expect_err("unknown locale");
     assert!(
         err.contains("failed to load reader locale 'zz'"),
         "unexpected message: {err}"
     );
+    assert!(
+        err.contains("no embedded reader pack"),
+        "missing embedded source: {err}"
+    );
     assert!(err.contains("next action"), "missing next action: {err}");
     assert!(
-        err.contains("share/faber/locale/zz/pack.toml"),
-        "missing pack location: {err}"
+        !err.contains("reinstall"),
+        "reinstall-the-dev-kit path is deleted: {err}"
+    );
+    assert!(
+        !err.contains("share/faber"),
+        "installed pack path is deleted: {err}"
     );
 }
 
@@ -161,141 +167,81 @@ fn missing_emit_package_path_is_a_structured_diagnostic() {
 }
 
 #[test]
-fn dev_installed_locale_pack_resolves_english_from_sibling_radix() {
-    // Development builds resolve the installed pack from the sibling radix
-    // tree without any CARGO_MANIFEST_DIR bake.
-    let pack = installed_locale_pack_path("en");
-    assert!(pack.is_file(), "en pack must resolve in the dev workspace");
-    let display = pack.display().to_string();
+fn available_locales_are_the_static_eight() {
+    let expected: Vec<String> = ["ar", "en", "hi", "la", "th-TH", "vi", "zh-Hans", "zh-Hant"]
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    assert_eq!(available_locales(), expected);
+}
+
+#[test]
+fn stdin_emit_loads_embedded_english_pack() {
+    let pack = locale_pack_for_emit(&[], Some("en")).expect("embedded en");
+    assert_eq!(
+        pack.as_ref().map(|pack| pack.metadata.id.as_str()),
+        Some("en")
+    );
+}
+
+#[test]
+fn package_local_override_is_selected_before_embedded() {
+    let (root, entry) = temp_package_entry();
+    let pack_path = root.join("locale").join("en.toml");
+    fs::create_dir_all(pack_path.parent().expect("locale dir")).expect("locale dir");
+    fs::write(&pack_path, "not a pack").expect("override");
+
+    let err = load_locale_pack_for_input(&entry, Some("en")).expect_err("override must load");
+    let display = pack_path.display().to_string();
     assert!(
-        display.contains("radix/stdlib/locale/en/pack.toml"),
-        "unexpected dev resolution: {display}"
+        err.message.contains(&display),
+        "package-local path must be named, got: {}",
+        err.message
     );
-}
-
-#[test]
-fn installed_locale_pack_resolves_install_prefix() {
-    let prefix = temp_dir("faber-locale-prefix");
-    let pack = prefix.join("share/faber/locale/la/pack.toml");
-    fs::create_dir_all(pack.parent().expect("pack dir")).expect("pack dir");
-    fs::write(&pack, "ignored content").expect("pack");
-    let exe = prefix.join("bin/faber");
-    fs::create_dir_all(exe.parent().expect("bin dir")).expect("bin dir");
-
-    let resolved = installed_locale_pack_path_in(Some(&exe), Some(&prefix), false, "la");
-    assert_eq!(
-        resolved,
-        pack.canonicalize().unwrap_or(pack.clone()),
-        "resolved must match the canonicalized pack path"
-    );
-    let _ = fs::remove_dir_all(&prefix);
-}
-
-#[test]
-fn installed_locale_pack_dev_fallback_resolves_sibling_radix() {
-    let work = temp_dir("faber-locale-dev");
-    let faber_dir = work.join("faber");
-    fs::create_dir_all(&faber_dir).expect("faber dir");
-    let pack = work.join("radix/stdlib/locale/en/pack.toml");
-    fs::create_dir_all(pack.parent().expect("pack dir")).expect("pack dir");
-    fs::write(&pack, "ignored content").expect("pack");
-
-    let resolved = installed_locale_pack_path_in(None, Some(&faber_dir), true, "en");
-    assert_eq!(
-        resolved,
-        pack.canonicalize().unwrap_or(pack.clone()),
-        "resolved must match the canonicalized pack path"
-    );
-    let _ = fs::remove_dir_all(&work);
-}
-
-#[test]
-fn installed_locale_pack_fails_closed_with_nonexistent_path() {
-    let hermetic = temp_dir("faber-locale-missing");
-    let exe = hermetic.join("bin/faber");
-    fs::create_dir_all(exe.parent().expect("bin dir")).expect("bin dir");
-
-    // Installed binary with no pack and no sibling checkout: the resolved path
-    // must not exist and must name the install layout (fail closed, E5).
-    let resolved = installed_locale_pack_path_in(Some(&exe), Some(&hermetic), false, "zz");
-    assert!(!resolved.is_file(), "resolved path must not exist");
-    let display = resolved.display().to_string();
     assert!(
-        display.contains("share/faber/locale/zz/pack.toml"),
-        "missing pack must name the installed location: {display}"
+        !err.message.contains("no embedded reader pack"),
+        "must not fall through to embedded: {}",
+        err.message
     );
-    let _ = fs::remove_dir_all(&hermetic);
+
+    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
-fn installed_locale_pack_resolves_both_layout_suffixes() {
-    // The install prefix may be `share/faber/locale` or `lib/faber/locale`.
-    let prefix = temp_dir("faber-locale-lib");
-    let pack = prefix.join("lib/faber/locale/th-TH/pack.toml");
-    fs::create_dir_all(pack.parent().expect("pack dir")).expect("pack dir");
-    fs::write(&pack, "ignored content").expect("pack");
-    let exe = prefix.join("bin/faber");
-    fs::create_dir_all(exe.parent().expect("bin dir")).expect("bin dir");
+fn manifest_pack_path_is_selected_before_embedded() {
+    let (root, entry) = temp_package_entry();
+    fs::write(
+        root.join("faber.toml"),
+        r#"[package]
+name = "diag-locale-test"
+version = "0.0.0"
 
-    let resolved = installed_locale_pack_path_in(Some(&exe), Some(&prefix), false, "th-TH");
-    assert_eq!(
-        resolved,
-        pack.canonicalize().unwrap_or(pack.clone()),
-        "resolved must match the canonicalized pack path"
-    );
-    let _ = fs::remove_dir_all(&prefix);
-}
+[paths]
+source = "src"
+entry = "main.fab"
 
-#[test]
-fn dev_walkup_is_never_an_installed_binary_fallback() {
-    // A release-shaped binary beside a stray sibling radix checkout must not
-    // resolve the locale pack (E5 false-green eliminated for installed
-    // binaries); development builds still may.
-    let work = temp_dir("faber-locale-stray");
-    let faber_dir = work.join("faber");
-    fs::create_dir_all(&faber_dir).expect("faber dir");
-    let pack = work.join("radix/stdlib/locale/en/pack.toml");
-    fs::create_dir_all(pack.parent().expect("pack dir")).expect("pack dir");
-    fs::write(&pack, "ignored content").expect("pack");
-    let exe = work.join("faber/bin/faber");
+[build]
+target = "rust"
+kind = "bin"
 
-    let installed = installed_locale_pack_path_in(Some(&exe), Some(&faber_dir), false, "en");
+[locale]
+locale = "en"
+pack = "./locale/custom.toml"
+"#,
+    )
+    .expect("manifest with pack path");
+
+    let err = load_locale_pack_for_input(&entry, None).expect_err("manifest pack must load");
     assert!(
-        !installed.is_file(),
-        "installed binary must not resolve a stray checkout"
+        err.message.contains("custom.toml"),
+        "manifest pack path must be named, got: {}",
+        err.message
+    );
+    assert!(
+        !err.message.contains("no embedded reader pack"),
+        "must not fall through to embedded: {}",
+        err.message
     );
 
-    let dev = installed_locale_pack_path_in(None, Some(&faber_dir), true, "en");
-    assert_eq!(
-        dev,
-        pack.canonicalize().unwrap_or(pack.clone()),
-        "development builds still resolve the sibling radix pack"
-    );
-    let _ = fs::remove_dir_all(&work);
-}
-
-#[test]
-fn dev_resolution_prefers_own_checkout_over_stale_cwd_ancestor() {
-    // A dev binary built from a checkout must resolve that checkout's reader
-    // pack, not a stale `radix/stdlib` tree found higher in the cwd ancestry
-    // (e.g. `/tmp/radix` from a prior session whose en pack predates the
-    // identity rows — such a pack silently drops identity-row members and
-    // produces SEM004 for e.g. `chorda.pange` under en).
-    let work = temp_dir("faber-locale-own-checkout");
-    let stale = work.join("radix/stdlib/locale/en/pack.toml");
-    fs::create_dir_all(stale.parent().expect("stale pack dir")).expect("stale pack dir");
-    fs::write(&stale, "stale pack").expect("stale pack");
-    let own = work.join("faber/radix/stdlib/locale/en/pack.toml");
-    fs::create_dir_all(own.parent().expect("own pack dir")).expect("own pack dir");
-    fs::write(&own, "current pack").expect("own pack");
-    let exe = work.join("faber/radix/target/debug/faber");
-    fs::create_dir_all(exe.parent().expect("bin dir")).expect("bin dir");
-
-    let resolved = installed_locale_pack_path_in(Some(&exe), Some(&work), true, "en");
-    assert_eq!(
-        resolved,
-        own.canonicalize().unwrap_or(own.clone()),
-        "the binary's own checkout must win over a stale cwd-ancestor checkout"
-    );
-    let _ = fs::remove_dir_all(&work);
+    let _ = fs::remove_dir_all(root);
 }
