@@ -191,6 +191,10 @@ pub struct DeviceExecuteReceipt {
     /// Per-encoder GPU timestamps in launch order (µs). Empty when unsampled.
     #[serde(default)]
     pub launch_gpu_us: Vec<u64>,
+    /// Per-encoder GPU start times in launch order (µs, relative to the
+    /// first encoder start). Empty when unsampled.
+    #[serde(default)]
+    pub launch_gpu_start_us: Vec<u64>,
     /// Observation readback wall.
     #[serde(default)]
     pub readback_us: u64,
