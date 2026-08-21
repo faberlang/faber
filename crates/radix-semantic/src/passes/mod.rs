@@ -170,5 +170,9 @@ mod iuncta_label_test;
 mod ratio_test;
 
 #[cfg(test)]
+#[path = "typecheck/ratio_hole_test.rs"]
+mod ratio_hole_test;
+
+#[cfg(test)]
 #[path = "visibility_annotation_test.rs"]
 mod visibility_annotation_test;

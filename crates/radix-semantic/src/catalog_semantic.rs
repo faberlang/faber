@@ -1866,6 +1866,9 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
         "iuncta_union_type_arg_unsupported" => {
             Some("iuncta element type argument `∪` is unsupported".to_owned())
         }
+        "ratio_union_type_arg_unsupported" => {
+            Some("ratio element type argument `∪` is unsupported".to_owned())
+        }
         "unknown_type_name" => Some("unknown type name".to_owned()),
         "vector_width_single_dim" => Some("vector width must be a single dimension".to_owned()),
         "width_marker_params" => Some("width marker cannot accept parameters".to_owned()),

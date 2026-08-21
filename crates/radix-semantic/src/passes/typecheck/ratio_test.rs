@@ -256,19 +256,15 @@ incipit {
 
 #[test]
 fn genus_to_ratio_conversio_rejects() {
-    // Conversio targets that spell `ratio<…>` are claimed as constructors
-    // (parser `is_conversio_type_keyword` has no `ratio` row). A capitalized
-    // alias is the type-slot spelling the conversio parser already accepts.
     test_support::assert_rejects_with_issue(
         r"
-typus R = ratio<g: f32>
 genus P {
     f32 g
 }
 
 incipit {
     fixum P p ← P { g = 1.0 }
-    fixum ratio<g: f32> r ← p ↦ R
+    fixum ratio<g: f32> r ← p ↦ ratio<g: f32>
     nota r.g
 }
 ",

@@ -421,13 +421,23 @@ impl Lowerer<'_> {
     ///
     /// Labels become the record field keys and never enter any other type's
     /// identity. Parser already requires a label on every ratio slot.
+    /// `_` lowers as a monomorphic hole (solved later from the field witness);
+    /// a standalone `∪` is not a valid ratio element and is rejected here so
+    /// the issue points at the slot instead of leaking WARN017.
     fn lower_ratio_type(&mut self, params: &[TypeExpr]) -> TypeId {
         let mut fields = Vec::with_capacity(params.len());
         for param in params {
             let Some(label) = param.iuncta_label.as_ref() else {
                 continue;
             };
-            fields.push((label.name, self.lower_nested_type(param)));
+            let ty = if matches!(param.kind, TypeExprKind::UnionHole) {
+                self.current_span = param.span;
+                self.error("ratio_union_type_arg_unsupported");
+                self.types.intern(Type::Error)
+            } else {
+                self.lower_nested_type(param)
+            };
+            fields.push((label.name, ty));
         }
         self.types.record(fields)
     }
@@ -455,6 +465,7 @@ impl Lowerer<'_> {
             // the hardcoded name paths in `lower_named_type` (bare `series`
             // keeps its dynamic row-map special case).
             crate::locale::TypeBindingKind::Relational(_) => None,
+            crate::locale::TypeBindingKind::Ratio => Some(self.lower_ratio_type(params)),
         }
     }
 

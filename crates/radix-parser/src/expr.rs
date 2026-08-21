@@ -1190,6 +1190,7 @@ impl Parser {
                 | "intervallum"
                 | "sparsa"
                 | "series"
+                | "ratio"
         )
     }
 
