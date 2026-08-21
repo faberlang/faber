@@ -369,6 +369,70 @@ fn argument_type_mismatch_emits_type() {
 }
 
 #[test]
+fn argument_mismatch_is_scoped_to_caller_function() {
+    let mut types = TypeTable::new();
+    let f32 = f32_ty(&mut types);
+    let u32 = crate::mir::test_support::u32_type(&mut types);
+    let helper = function(
+        1,
+        FRAGMENT,
+        vec![param(0, f32, MirParamMode::Owned)],
+        f32,
+        None,
+        Vec::new(),
+        None,
+        None,
+    );
+    let entry = function(
+        0,
+        ENTRY,
+        vec![param(0, u32, MirParamMode::Owned)],
+        f32,
+        Some(MirCallee::Function(MirFunctionId(1))),
+        vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+        Some(MirPlace::local(MirLocalId(0))),
+        Some(MirKernelShaderStage::Compute),
+    );
+    // Callee first: a program-wide local-id scan would see helper's f32 and miss the mismatch.
+    expect_issue(&check_fns(&[helper, entry], &types), ISSUE_TYPE, "argument");
+}
+
+#[test]
+fn shape_mismatch_survives_untyped_prior_operand() {
+    let mut types = TypeTable::new();
+    let f32 = f32_ty(&mut types);
+    let element = types.sized_numeric(crate::semantic::Primitive::Fractus, crate::semantic::NumericWidth::F32);
+    let shape4 = types.intern_index(crate::semantic::IndexExpr::Literal(4));
+    let shape8 = types.intern_index(crate::semantic::IndexExpr::Literal(8));
+    let t4 = MirType::semantic(types.tensor_with_shape(element, shape4));
+    let t8 = MirType::semantic(types.tensor_with_shape(element, shape8));
+    let helper = function(
+        1,
+        FRAGMENT,
+        vec![param(0, f32, MirParamMode::Owned), param(1, t4, MirParamMode::Owned)],
+        t4,
+        None,
+        Vec::new(),
+        None,
+        None,
+    );
+    let entry = function(
+        0,
+        ENTRY,
+        vec![param(0, t8, MirParamMode::Owned)],
+        t4,
+        Some(MirCallee::Function(MirFunctionId(1))),
+        vec![
+            MirOperand::Constant(crate::mir::MirConstant::Float(1.0)),
+            MirOperand::Place(MirPlace::local(MirLocalId(0))),
+        ],
+        Some(MirPlace::local(MirLocalId(0))),
+        Some(MirKernelShaderStage::Compute),
+    );
+    expect_issue(&check_fns(&[entry, helper], &types), ISSUE_TYPE, "shape");
+}
+
+#[test]
 fn unsolved_generic_bindings_emit_type() {
     let mut types = TypeTable::new();
     let param_ty = MirType::semantic(types.intern(crate::semantic::Type::Param(crate::lexer::Symbol(7))));

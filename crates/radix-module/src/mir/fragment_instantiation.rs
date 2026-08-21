@@ -98,18 +98,26 @@ struct InstantiationChecker<'a> {
     errors: Vec<FragmentInstantiationError>,
 }
 
-impl InstantiationChecker<'_> {
+impl<'a> InstantiationChecker<'a> {
     fn check_program(&mut self) {
         for function in self.functions {
             let caller = self.role_of_function(function);
             for block in &function.blocks {
                 for stmt in &block.statements {
                     if let MirStatementKind::Call { callee, args, destination } = &stmt.kind {
-                        self.check_call(caller, callee, args, destination.as_ref(), false, stmt.span);
+                        self.check_call(caller, function, callee, args, destination.as_ref(), false, stmt.span);
                     }
                 }
                 if let MirTerminatorKind::TryCall { callee, args, destination, .. } = &block.terminator.kind {
-                    self.check_call(caller, callee, args, destination.as_ref(), true, block.terminator.span);
+                    self.check_call(
+                        caller,
+                        function,
+                        callee,
+                        args,
+                        destination.as_ref(),
+                        true,
+                        block.terminator.span,
+                    );
                 }
             }
         }
@@ -118,6 +126,7 @@ impl InstantiationChecker<'_> {
     fn check_call(
         &mut self,
         caller: RoleKind,
+        caller_fn: &'a MirFunction,
         callee: &MirCallee,
         args: &[MirOperand],
         destination: Option<&MirPlace>,
@@ -149,7 +158,7 @@ impl InstantiationChecker<'_> {
                 self.context(caller, "host_callable", span, Some(definition_span));
             }
             (RoleKind::Entry | RoleKind::Fragment, RoleKind::Fragment) => {
-                self.check_instantiation(caller, callee, callee_id, args, destination, failable, span);
+                self.check_instantiation(caller, caller_fn, callee, callee_id, args, destination, failable, span);
             }
             _ => {}
         }
@@ -158,6 +167,7 @@ impl InstantiationChecker<'_> {
     fn check_instantiation(
         &mut self,
         caller: RoleKind,
+        caller_fn: &'a MirFunction,
         callee: &MirCallee,
         callee_id: MirFunctionId,
         args: &[MirOperand],
@@ -165,19 +175,19 @@ impl InstantiationChecker<'_> {
         failable: bool,
         span: Span,
     ) {
-        let Some(sig) = self.specialized_signature(callee_id) else {
+        let Some(sig) = self.function_by_id(callee_id) else {
             return;
         };
         let definition_span = Some(sig.span);
-        if !self.bindings_solved(callee, &sig) {
+        if !self.bindings_solved(callee, sig) {
             self.ty(caller, "bindings", span, definition_span, None, None);
             return;
         }
-        if let Some((expected, actual)) = self.shape_mismatch(&sig, args) {
+        if let Some((expected, actual)) = self.shape_mismatch(caller_fn, sig, args) {
             self.ty(caller, "shape", span, definition_span, Some(&expected), Some(&actual));
             return;
         }
-        if let Some((expected, actual)) = self.layout_mismatch(&sig, args) {
+        if let Some((expected, actual)) = self.layout_mismatch(caller_fn, sig, args) {
             self.ty(caller, "layout", span, definition_span, Some(&expected), Some(&actual));
             return;
         }
@@ -193,7 +203,7 @@ impl InstantiationChecker<'_> {
             return;
         }
         for (param, arg) in sig.params.iter().zip(args.iter()) {
-            if let Some(actual) = self.operand_ty(arg) {
+            if let Some(actual) = self.operand_ty(caller_fn, arg) {
                 if !self.types_fit(param.ty, actual) {
                     let expected = self.type_label(param.ty);
                     let actual = self.type_label(actual);
@@ -213,12 +223,12 @@ impl InstantiationChecker<'_> {
                 return;
             }
         }
-        if let Some(illegal) = self.target_illegal_type(&sig) {
+        if let Some(illegal) = self.target_illegal_type(sig) {
             self.ty(caller, "target", span, definition_span, None, Some(&illegal));
             return;
         }
         if let Some(dest) = destination {
-            if let Some(expected_ty) = self.place_ty(dest) {
+            if let Some(expected_ty) = self.place_ty(caller_fn, dest) {
                 if !self.types_fit(expected_ty, sig.return_ty) {
                     let expected = self.type_label(expected_ty);
                     let actual = self.type_label(sig.return_ty);
@@ -227,30 +237,12 @@ impl InstantiationChecker<'_> {
                 }
             }
         }
-        if failable || !self.effect_fits(&sig) {
+        if failable || !self.effect_fits(sig) {
             self.ty(caller, "effect", span, definition_span, None, None);
         }
     }
 
-    fn specialized_signature(&self, callee_id: MirFunctionId) -> Option<SpecializedSignature> {
-        let function = self.function_by_id(callee_id)?;
-        Some(SpecializedSignature {
-            id: function.id,
-            source: function.source,
-            span: function.span,
-            params: function
-                .params
-                .iter()
-                .map(|param| SpecializedParam { ty: param.ty, mode: param.mode })
-                .collect(),
-            return_ty: function.return_ty,
-            error_ty: function.error_ty,
-            is_async: function.is_async,
-            is_generator: function.is_generator,
-        })
-    }
-
-    fn bindings_solved(&self, callee: &MirCallee, sig: &SpecializedSignature) -> bool {
+    fn bindings_solved(&self, callee: &MirCallee, sig: &MirFunction) -> bool {
         if signature_has_unsolved_params(self.types, sig) {
             return false;
         }
@@ -276,9 +268,16 @@ impl InstantiationChecker<'_> {
         }
     }
 
-    fn shape_mismatch(&self, sig: &SpecializedSignature, args: &[MirOperand]) -> Option<(String, String)> {
+    fn shape_mismatch(
+        &self,
+        caller_fn: &MirFunction,
+        sig: &MirFunction,
+        args: &[MirOperand],
+    ) -> Option<(String, String)> {
         for (param, arg) in sig.params.iter().zip(args.iter()) {
-            let actual = self.operand_ty(arg)?;
+            let Some(actual) = self.operand_ty(caller_fn, arg) else {
+                continue;
+            };
             if let Some((expected, got)) = self.tensor_shape_pair(param.ty, actual) {
                 if expected != got {
                     return Some((format!("{expected:?}"), format!("{got:?}")));
@@ -288,12 +287,19 @@ impl InstantiationChecker<'_> {
         None
     }
 
-    fn layout_mismatch(&self, sig: &SpecializedSignature, args: &[MirOperand]) -> Option<(String, String)> {
+    fn layout_mismatch(
+        &self,
+        caller_fn: &MirFunction,
+        sig: &MirFunction,
+        args: &[MirOperand],
+    ) -> Option<(String, String)> {
         for (param, arg) in sig.params.iter().zip(args.iter()) {
             if !self.needs_device_layout(param.ty) {
                 continue;
             }
-            let actual = self.operand_ty(arg)?;
+            let Some(actual) = self.operand_ty(caller_fn, arg) else {
+                continue;
+            };
             let expected_layout = self.layouts.layout_for_type(param.ty).ok()?;
             let Ok(actual_layout) = self.layouts.layout_for_type(actual) else {
                 return Some((format!("{:?}", expected_layout.kind), "missing".to_owned()));
@@ -305,7 +311,7 @@ impl InstantiationChecker<'_> {
         None
     }
 
-    fn target_illegal_type(&self, sig: &SpecializedSignature) -> Option<String> {
+    fn target_illegal_type(&self, sig: &MirFunction) -> Option<String> {
         for param in &sig.params {
             if !self.is_device_safe_type(param.ty) {
                 return Some(self.type_label(param.ty));
@@ -320,7 +326,7 @@ impl InstantiationChecker<'_> {
         None
     }
 
-    fn effect_fits(&self, sig: &SpecializedSignature) -> bool {
+    fn effect_fits(&self, sig: &MirFunction) -> bool {
         if sig.error_ty.is_some() || sig.is_async || sig.is_generator {
             return false;
         }
@@ -377,49 +383,39 @@ impl InstantiationChecker<'_> {
         }
     }
 
-    fn function_by_id(&self, id: MirFunctionId) -> Option<&MirFunction> {
+    fn function_by_id(&self, id: MirFunctionId) -> Option<&'a MirFunction> {
         self.functions.iter().find(|function| function.id == id)
     }
 
-    fn operand_ty(&self, operand: &MirOperand) -> Option<MirType> {
+    fn operand_ty(&self, function: &MirFunction, operand: &MirOperand) -> Option<MirType> {
         match operand {
-            MirOperand::Place(place) => self.place_ty(place),
-            MirOperand::Temp(id) => self
-                .functions
-                .iter()
-                .find_map(|function| function.temp_ty(*id)),
-            MirOperand::Value(id) => self.functions.iter().find_map(|function| {
-                function.blocks.iter().find_map(|block| {
-                    block.statements.iter().find_map(|stmt| match &stmt.kind {
-                        MirStatementKind::Assign { value, .. } if value.id == *id => Some(value.ty),
-                        _ => None,
-                    })
+            MirOperand::Place(place) => self.place_ty(function, place),
+            MirOperand::Temp(id) => function.temp_ty(*id),
+            MirOperand::Value(id) => function.blocks.iter().find_map(|block| {
+                block.statements.iter().find_map(|stmt| match &stmt.kind {
+                    MirStatementKind::Assign { value, .. } if value.id == *id => Some(value.ty),
+                    _ => None,
                 })
             }),
             MirOperand::Constant(_) => None,
         }
     }
 
-    fn place_ty(&self, place: &MirPlace) -> Option<MirType> {
+    fn place_ty(&self, function: &MirFunction, place: &MirPlace) -> Option<MirType> {
         match place.base {
-            MirPlaceBase::Local(id) => self.functions.iter().find_map(|function| {
-                function
-                    .params
-                    .iter()
-                    .find(|param| param.local == id)
-                    .map(|param| param.ty)
-                    .or_else(|| {
-                        function
-                            .locals
-                            .iter()
-                            .find(|local| local.id == id)
-                            .map(|local| local.ty)
-                    })
-            }),
-            MirPlaceBase::Temp(id) => self
-                .functions
+            MirPlaceBase::Local(id) => function
+                .params
                 .iter()
-                .find_map(|function| function.temp_ty(id)),
+                .find(|param| param.local == id)
+                .map(|param| param.ty)
+                .or_else(|| {
+                    function
+                        .locals
+                        .iter()
+                        .find(|local| local.id == id)
+                        .map(|local| local.ty)
+                }),
+            MirPlaceBase::Temp(id) => function.temp_ty(id),
         }
     }
 
@@ -500,23 +496,7 @@ impl InstantiationChecker<'_> {
     }
 }
 
-struct SpecializedSignature {
-    id: MirFunctionId,
-    source: Option<DefId>,
-    span: Span,
-    params: Vec<SpecializedParam>,
-    return_ty: MirType,
-    error_ty: Option<MirType>,
-    is_async: bool,
-    is_generator: bool,
-}
-
-struct SpecializedParam {
-    ty: MirType,
-    mode: MirParamMode,
-}
-
-fn signature_has_unsolved_params(types: &TypeTable, sig: &SpecializedSignature) -> bool {
+fn signature_has_unsolved_params(types: &TypeTable, sig: &MirFunction) -> bool {
     sig.params
         .iter()
         .any(|param| type_contains_param(types, param.ty.semantic_id()))
@@ -539,7 +519,7 @@ fn is_device_safe_type(types: &TypeTable, ty: TypeId) -> bool {
         Type::Primitive(_) | Type::SizedNumeric(_, _) | Type::ModularWord(_) | Type::SizedInstans(_) => true,
         Type::Tensor(_, _) | Type::Vector(_, _) | Type::Matrix(_, _) | Type::Sparsa(_, _) | Type::Atomic(_) => true,
         Type::Struct(_) => true,
-        Type::Alias(_, inner) | Type::Applied(inner, _) => is_device_safe_type(types, *inner),
+        Type::Applied(inner, _) => is_device_safe_type(types, *inner),
         Type::Param(_) | Type::Infer(_) => false,
         Type::Array(_)
         | Type::Map(_, _)
