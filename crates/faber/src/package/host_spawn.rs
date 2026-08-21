@@ -56,6 +56,146 @@ pub struct DeviceExecuteRequest {
     pub weight_map_json: Option<Vec<u8>>,
 }
 
+/// Inputs to the device-executor cache identity seam.
+///
+/// The spawn client owns the byte-level identities because it is the boundary
+/// that has both the emitted artifact and the complete weight-map request.
+/// The plan cache adds the semantic identity and persists these facts as the
+/// backend-artifact, packed-weight, and prepared-session key classes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DeviceCacheKeyMaterial {
+    /// Selected backend spelling.
+    pub(crate) backend: String,
+    /// Typed target feature ids, sorted for canonical identity.
+    pub(crate) target_features: Vec<String>,
+    /// Device capability class.
+    pub(crate) device_class: String,
+    /// Artifact ABI/schema version.
+    pub(crate) artifact_abi: u32,
+    /// Kernel-library revision.
+    pub(crate) kernel_library_revision: u32,
+    /// Packet/content identity of the emitted backend artifact.
+    pub(crate) artifact_identity: String,
+    /// Full source-artifact identity of the GGUF file.
+    pub(crate) packed_source_identity: Option<String>,
+    /// Repack layout/version used to make packed regions.
+    pub(crate) repack_layout_version: u32,
+    /// Identity of the declared packed byte ranges.
+    pub(crate) range_map_identity: String,
+    /// Concrete session/KV configuration.
+    pub(crate) session_config: String,
+    /// Process resource that owns a prepared session.
+    pub(crate) process_id: u32,
+    /// Device resource name admitted by the host.
+    pub(crate) device_resource: String,
+}
+
+/// Options for [`cache_key_seam`].
+#[derive(Debug, Clone)]
+pub(crate) struct CacheKeyOptions<'a> {
+    pub(crate) device_class: &'a str,
+    pub(crate) target_features: &'a [String],
+    pub(crate) artifact_abi: u32,
+    pub(crate) kernel_library_revision: u32,
+    pub(crate) repack_layout_version: u32,
+    pub(crate) session_config: &'a str,
+    pub(crate) process_id: u32,
+    pub(crate) device_resource: &'a str,
+    /// Prefer the artifact packet digest when the typed artifact carrier has
+    /// already verified it. `None` derives an identity from request bytes.
+    pub(crate) artifact_identity: Option<&'a str>,
+    /// The dense loader already hashed the complete GGUF. `None` makes this
+    /// seam hash the full file itself; a header prefix is never accepted.
+    pub(crate) source_identity: Option<&'a str>,
+}
+
+/// Derive the byte/resource identities used by the plan-cache key classes.
+///
+/// This is deliberately a pure seam over the request. It does not spawn a
+/// host process and it never treats a GGUF header hash or file metadata as a
+/// full source identity.
+pub(crate) fn cache_key_seam(
+    request: &DeviceExecuteRequest,
+    options: CacheKeyOptions<'_>,
+) -> Result<DeviceCacheKeyMaterial, HostSpawnError> {
+    let packed_source_identity = match (&request.weights_path, options.source_identity) {
+        (Some(_), Some(identity)) if identity.is_empty() => {
+            return Err(HostSpawnError {
+                code: "E_HOST_SPAWN".to_owned(),
+                message: "packed-weight source identity is empty".to_owned(),
+            });
+        }
+        (Some(_), Some(identity)) if !identity.starts_with("sha256:") => {
+            return Err(HostSpawnError {
+                code: "E_HOST_SPAWN".to_owned(),
+                message: "packed-weight source identity is not a full sha256 identity".to_owned(),
+            });
+        }
+        (Some(_), Some(identity)) => Some(identity.to_owned()),
+        (Some(path), None) => Some(full_source_identity(path)?),
+        (None, None) => None,
+        (None, Some(_)) => {
+            return Err(HostSpawnError {
+                code: "E_HOST_SPAWN".to_owned(),
+                message: "packed-weight source identity has no source path".to_owned(),
+            });
+        }
+    };
+    let range_map_identity = request
+        .weight_map_json
+        .as_deref()
+        .map(handroll::sha256_hex)
+        .unwrap_or_else(|| handroll::sha256_hex(b"no-packed-ranges"));
+    let artifact_identity = options
+        .artifact_identity
+        .filter(|identity| !identity.is_empty())
+        .map(str::to_owned)
+        .unwrap_or_else(|| {
+            digest_parts(&[
+                request.backend.as_bytes(),
+                &request.descriptor_json,
+                &request.module_image,
+            ])
+        });
+    let mut target_features = options.target_features.to_vec();
+    target_features.sort();
+    Ok(DeviceCacheKeyMaterial {
+        backend: request.backend.clone(),
+        target_features,
+        device_class: options.device_class.to_owned(),
+        artifact_abi: options.artifact_abi,
+        kernel_library_revision: options.kernel_library_revision,
+        artifact_identity,
+        packed_source_identity,
+        repack_layout_version: options.repack_layout_version,
+        range_map_identity,
+        session_config: options.session_config.to_owned(),
+        process_id: options.process_id,
+        device_resource: options.device_resource.to_owned(),
+    })
+}
+
+/// Hash the complete source artifact, including its payload.
+fn full_source_identity(path: &Path) -> Result<String, HostSpawnError> {
+    let bytes = fs::read(path).map_err(|error| HostSpawnError {
+        code: "E_HOST_SPAWN".to_owned(),
+        message: format!(
+            "failed to read packed-weight source {}: {error}",
+            path.display()
+        ),
+    })?;
+    Ok(format!("sha256:{}", handroll::sha256_hex(bytes)))
+}
+
+fn digest_parts(parts: &[&[u8]]) -> String {
+    let mut bytes = Vec::new();
+    for part in parts {
+        bytes.extend_from_slice(&(part.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(part);
+    }
+    format!("sha256:{}", handroll::sha256_hex(bytes))
+}
+
 /// One GGUF byte range the child copies into a native packed device region.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WeightFileRange {
@@ -101,6 +241,9 @@ pub struct DeviceExecuteLifecycle {
 pub struct DeviceExecuteControlReceipt {
     pub operation: String,
     pub lifecycle: DeviceExecuteLifecycle,
+    /// Client-measured load wall, including host-process admission.
+    #[serde(default)]
+    pub load_us: u64,
     #[serde(default)]
     pub kernel_count: usize,
     #[serde(default)]
@@ -176,6 +319,11 @@ pub struct DeviceExecuteReceipt {
     /// Session create wall (module compile + PerProgram alloc).
     #[serde(default)]
     pub session_create_us: u64,
+    /// Load wall exposed at the spawn seam. For one-shot execution this is
+    /// the child-reported session-create wall; resident load is measured on
+    /// [`DeviceExecuteControlReceipt`].
+    #[serde(default)]
+    pub load_us: u64,
     /// Module compile + pipeline-create wall inside session create.
     #[serde(default)]
     pub load_module_us: u64,
@@ -287,7 +435,9 @@ fn open_device_session_at(
     request: &DeviceExecuteRequest,
 ) -> Result<(DeviceExecuteSession, DeviceExecuteControlReceipt), HostSpawnError> {
     let mut session = start_device_session_at(host, request)?;
-    let loaded = session.control("load", None)?;
+    let started = std::time::Instant::now();
+    let mut loaded = session.control("load", None)?;
+    loaded.load_us = elapsed_us(started);
     Ok((session, loaded))
 }
 
@@ -523,6 +673,9 @@ fn execute_device_at(
         decode_device_execute_output(output.status.code(), &output.stdout, &output.stderr)?;
     receipt.parent_write_files_us = parent_write_files_us;
     receipt.parent_child_wait_us = parent_child_wait_us;
+    if receipt.load_us == 0 {
+        receipt.load_us = receipt.session_create_us;
+    }
     Ok(receipt)
 }
 
