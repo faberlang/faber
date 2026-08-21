@@ -759,6 +759,29 @@ impl Parser {
         }))
     }
 
+    /// Parse the field portion shared by genus and union declaration members.
+    fn parse_field_decl(&mut self) -> Result<FieldDecl, ParseError> {
+        let is_static = self.eat_keyword_ident(TokenKind::Generis);
+        let is_bound = self.eat_keyword_ident(TokenKind::Nexum);
+        let ty = self.parse_type()?;
+        let name = self.parse_param_name()?;
+        let sponte = self.parse_post_name_marker()?;
+        let init = if self.eat(&TokenKind::Eq) {
+            Some(Box::new(self.parse_expression()?))
+        } else {
+            None
+        };
+
+        Ok(FieldDecl {
+            is_static,
+            is_bound,
+            sponte,
+            ty,
+            name,
+            init,
+        })
+    }
+
     /// Parse a class member, preserving annotations at the member boundary.
     fn parse_class_member(&mut self) -> Result<ClassMember, ParseError> {
         let leading_trivia = self.parse_leading_trivia();
@@ -772,28 +795,7 @@ impl Parser {
             };
             ClassMemberKind::Method(func)
         } else {
-            let is_static = self.eat_keyword_ident(TokenKind::Generis);
-            let is_bound = self.eat_keyword_ident(TokenKind::Nexum);
-
-            let ty = self.parse_type()?;
-            let name = self.parse_param_name()?;
-
-            let sponte = self.parse_post_name_marker()?;
-
-            let init = if self.eat(&TokenKind::Eq) {
-                Some(Box::new(self.parse_expression()?))
-            } else {
-                None
-            };
-
-            ClassMemberKind::Field(FieldDecl {
-                is_static,
-                is_bound,
-                sponte,
-                ty,
-                name,
-                init,
-            })
+            ClassMemberKind::Field(self.parse_field_decl()?)
         };
 
         let span = start.merge(self.previous_span());
@@ -1115,7 +1117,8 @@ impl Parser {
     /// Parse tagged union declaration.
     ///
     /// GRAMMAR:
-    ///   union-decl := discretio ident [type-params] { variant* }
+    ///   union-decl := discretio ident [type-params] { union-field* variant* }
+    ///   union-field := annotation* field_decl
     ///   variant := ident [ { field* } ]
     ///   field := type ident
     fn parse_union_decl(&mut self) -> Result<StmtKind, ParseError> {
@@ -1125,9 +1128,44 @@ impl Parser {
 
         self.expect(&TokenKind::LBrace, "expected '{'")?;
 
+        let mut shared_fields = Vec::new();
         let mut variants = Vec::new();
+        let mut declaration_region_started = false;
+        let mut parsing_variants = false;
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let leading_trivia = self.parse_leading_trivia();
+
+            if !parsing_variants {
+                let start = self.current_span();
+                if self.check(&TokenKind::At) {
+                    declaration_region_started = true;
+                    let annotations = self.parse_annotations()?;
+                    let field = self.parse_field_decl()?;
+                    shared_fields.push(UnionField {
+                        leading_trivia,
+                        annotations,
+                        field,
+                        span: start.merge(self.previous_span()),
+                    });
+                    continue;
+                }
+
+                if declaration_region_started {
+                    let checkpoint = self.checkpoint();
+                    if let Ok(field) = self.parse_field_decl() {
+                        shared_fields.push(UnionField {
+                            leading_trivia,
+                            annotations: Vec::new(),
+                            field,
+                            span: start.merge(self.previous_span()),
+                        });
+                        continue;
+                    }
+                    self.restore(checkpoint);
+                }
+            }
+
+            parsing_variants = true;
             let start = self.current_span();
             let variant_name = self.parse_ident()?;
 
@@ -1137,6 +1175,13 @@ impl Parser {
                     let field_start = self.current_span();
                     let ty = self.parse_type()?;
                     let field_name = self.parse_ident()?;
+                    if self.variant_redeclares_commune_field(field_name.name, &shared_fields) {
+                        return Err(ParseError::structured(
+                            ParseErrorKind::Expected,
+                            field_name.span,
+                        )
+                        .with_arg("issue", "union_variant_redeclares_shared_field"));
+                    }
                     let field_span = field_start.merge(self.previous_span());
                     fields.push(VariantField {
                         ty,
@@ -1169,8 +1214,32 @@ impl Parser {
         Ok(StmtKind::Union(UnionDecl {
             name,
             type_params,
+            shared_fields,
             variants,
         }))
+    }
+
+    fn variant_redeclares_commune_field(
+        &self,
+        field_name: radix_lexer::Symbol,
+        shared_fields: &[UnionField],
+    ) -> bool {
+        shared_fields.iter().any(|shared| {
+            shared.field.name.name == field_name
+                && shared
+                    .annotations
+                    .iter()
+                    .any(|annotation| self.annotation_is_commune(annotation))
+        })
+    }
+
+    fn annotation_is_commune(&self, annotation: &Annotation) -> bool {
+        matches!(
+            &annotation.kind,
+            AnnotationKind::Statement(statement)
+                if statement.args.is_empty()
+                    && self.interner.resolve(statement.name.name) == "commune"
+        )
     }
 
     // IMPORT DECLARATIONS
@@ -1658,6 +1727,14 @@ impl Parser {
             return self.parse_nucleum_annotation();
         }
 
+        if self.interner.resolve(name.name) == "commune" {
+            self.expect_annotation_end("unexpected token after @ commune")?;
+            return Ok(AnnotationKind::Statement(AnnotationStmt {
+                name,
+                args: Vec::new(),
+            }));
+        }
+
         if self.check(&TokenKind::LBrace) {
             return self.parse_braced_annotation(name);
         }
@@ -2035,10 +2112,16 @@ impl Parser {
         let span = token.span;
         match token.kind {
             TokenKind::Ident(sym) | TokenKind::Underscore(sym) => {
-                // Surface → Latin family identity (`kernel` → `nucleum`). Unknown
-                // / user contract names stay as authored spellings.
+                // Surface → Latin family identity (`kernel` → `nucleum`). The
+                // shared-field annotation is deliberately kept out of the
+                // contextual keyword table: both locale spellings are raw
+                // annotation names, normalized here to one AST marker.
                 let source = self.interner.resolve(sym);
-                let latin = self.keyword_claim_key(sym).unwrap_or(source).to_owned();
+                let latin = match self.keyword_claim_key(sym) {
+                    Some("shared" | "commune") => "commune".to_owned(),
+                    Some(latin) => latin.to_owned(),
+                    None => source.to_owned(),
+                };
                 Ok(self.keyword_ident(&latin, span))
             }
             TokenKind::Publica => Ok(self.keyword_ident("publica", span)),
@@ -2199,7 +2282,10 @@ impl Parser {
     }
 
     fn is_annotation_arg(&self) -> bool {
-        if self.check(&TokenKind::At) || self.is_declaration_start_token() {
+        if self.check(&TokenKind::At)
+            || self.is_declaration_start_token()
+            || self.raw_newline_before_next_word()
+        {
             return false;
         }
 

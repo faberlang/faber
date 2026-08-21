@@ -471,7 +471,17 @@ pub enum EnumValue {
 pub struct UnionDecl {
     pub name: Ident,
     pub type_params: Vec<TypeParam>,
+    /// Declaration-region fields shared by every variant.
+    pub shared_fields: Vec<UnionField>,
     pub variants: Vec<Variant>,
+}
+
+#[derive(Debug)]
+pub struct UnionField {
+    pub leading_trivia: Vec<Trivia>,
+    pub annotations: Vec<Annotation>,
+    pub field: FieldDecl,
+    pub span: Span,
 }
 
 #[derive(Debug)]

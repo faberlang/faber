@@ -92,6 +92,9 @@ fn claim_stmt(stmt: &Stmt, claimed: &mut HashSet<u32>) {
             }
         }
         StmtKind::Union(union_decl) => {
+            for field in &union_decl.shared_fields {
+                claim_trivia(&field.leading_trivia, claimed);
+            }
             for variant in &union_decl.variants {
                 claim_trivia(&variant.leading_trivia, claimed);
             }

@@ -1068,6 +1068,10 @@ mod comma_law_test;
 mod comma_law_matrix_test;
 
 #[cfg(test)]
+#[path = "union_commune_test.rs"]
+mod union_commune_test;
+
+#[cfg(test)]
 mod non_trivia_index_tests {
     use super::*;
     use radix_lexer::lex;

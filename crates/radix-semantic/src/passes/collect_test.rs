@@ -221,6 +221,7 @@ fn collects_union_variants() {
     let program = program(vec![stmt(StmtKind::Union(UnionDecl {
         name: union_name,
         type_params: Vec::new(),
+        shared_fields: Vec::new(),
         variants: vec![ok, error],
     }))]);
 
@@ -257,6 +258,7 @@ fn cross_union_variant_names_do_not_collide() {
     let union_a = UnionDecl {
         name: ident(&mut interner, "A"),
         type_params: Vec::new(),
+        shared_fields: Vec::new(),
         variants: vec![Variant {
             leading_trivia: Vec::new(),
             name: ident(&mut interner, "X"),
@@ -267,6 +269,7 @@ fn cross_union_variant_names_do_not_collide() {
     let union_b = UnionDecl {
         name: ident(&mut interner, "B"),
         type_params: Vec::new(),
+        shared_fields: Vec::new(),
         variants: vec![Variant {
             leading_trivia: Vec::new(),
             name: ident(&mut interner, "X"),
@@ -319,6 +322,7 @@ fn same_union_duplicate_variant_still_fails() {
     let union = UnionDecl {
         name: ident(&mut interner, "A"),
         type_params: Vec::new(),
+        shared_fields: Vec::new(),
         variants: vec![
             Variant {
                 leading_trivia: Vec::new(),
