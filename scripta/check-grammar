@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Advisory grammar markdown-audit (GSD-1). Prints the mechanical sin list.
+# Not wired into stage 1 until GSD-6.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+exec python3 scripta/grammar-pipeline.py --audit-md "$@"
