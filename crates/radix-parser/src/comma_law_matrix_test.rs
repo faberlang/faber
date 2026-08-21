@@ -1,6 +1,6 @@
 //! CS-4 accept/reject matrix for every CS-1 parser comma position.
 //!
-//! Completeness oracle: `docs/factory/comma-separator-law/audit.md` §4
+//! Completeness oracle: `docs/archived/comma-separator-law/audit.md` §4
 //! (37 parser sites). Each row has ≥1 lawful accept source and ≥1 reject
 //! source (missing separator, trailing comma, or an inserted declaration-block
 //! comma). Fixed-shape sites reject with their existing targeted issues.
