@@ -1495,7 +1495,7 @@ impl Parser {
         self.expect_keyword_ident(TokenKind::Iuncta, "expected 'iuncta'")?;
 
         self.expect(&TokenKind::LtAscii, "expected '<' after 'iuncta'")?;
-        let type_args = self.finish_type_args_list()?;
+        let type_args = self.finish_iuncta_type_args_list()?;
 
         self.expect(
             &TokenKind::LBracket,
