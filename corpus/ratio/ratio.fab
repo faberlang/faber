@@ -1,0 +1,62 @@
++++
+term = "ratio"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Labeled ad-hoc record type: construction, .name access, objectPattern, and holes."
+syntax = "record<label: type, …> { label = value }"
+related = ["genus", "ceteri", "iuncta"]
+locale = "en"
++++
+
+# =============================================================================
+# ratio — Labeled ad-hoc aggregate (promoted Type::Record).
+# =============================================================================
+#
+# What this teaches:
+#   • labeled type args: record<g: f32, w: int>
+#   • construction: ratio<g: f32, w: int> { g = 1.0, w = 2 }
+#     (constructor slot claims the canonical ident; en type-head is record)
+#   • .name access: point.g (labels only — no bracket form)
+#   • objectPattern destructuring: const {g, w} ← point
+#   • partial + rest: const {loss, rest leftover} ← metrics
+#   • element holes: record<g: _> solved from the construction witness
+#   • binary cup element: record<g: string ∪ null>
+#
+# Reject teaching rows (comments only; these must not become stage-3 inputs):
+#   • positional access attempt: point[0] / point.0
+#   • missing label: record<f32>
+#   • ∪ slot: record<g: ∪>
+#   • record ↦ class fence: r ↦ P  (use reconstruction P { g = r.g })
+#
+# See also: genus, ceteri, iuncta
+# =============================================================================
+
+main {
+    # Construction and .name access.
+    # Type-head is the en spelling `record`; the constructor slot claims the
+    # canonical ident `ratio` (RR-1).
+    const record<g: f32, w: int> point ← ratio<g: f32, w: int> { g = 1.0, w = 2 }
+    print point.g
+    print point.w
+
+    # Element hole solved from the construction witness.
+    const record<g: _, w: int> hole ← ratio<g: f32, w: int> { g = 1.0, w = 2 }
+    print hole.g + 0.0
+    print hole.w
+
+    # A wanted union element is a binary cup, not ∪ in the slot.
+    const record<g: string ∪ null> cup ← ratio<g: string ∪ null> { g = "x" }
+    print cup.g
+
+    # objectPattern binds by label.
+    const {g, w} ← point
+    print g
+    print w
+
+    # Partial by-label binding; rest is the unbound sub-record.
+    const record<loss: f32, steps: int> metrics ← ratio<loss: f32, steps: int> { loss = 3.0, steps = 4 }
+    const {loss, rest leftover} ← metrics
+    print loss
+    print leftover.steps
+}
