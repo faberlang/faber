@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 279,
-    "analyzable": 285
+    "capable": 282,
+    "analyzable": 288
   },
   "terms": [
     {
@@ -406,6 +406,12 @@
       "analyzable": 1
     },
     {
+      "term": "forma",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
       "term": "fragilis",
       "rule": "keyword",
       "capable": 1,
@@ -544,6 +550,12 @@
       "analyzable": 5
     },
     {
+      "term": "iuncta",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
       "term": "lege",
       "rule": "keyword",
       "capable": 1,
@@ -624,6 +636,12 @@
     {
       "term": "modulus<u8>",
       "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "named-holes",
+      "rule": "existing-home",
       "capable": 1,
       "analyzable": 1
     },
