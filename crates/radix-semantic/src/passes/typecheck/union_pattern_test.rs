@@ -32,7 +32,7 @@ fn same_module_union_match_binds_named_arms_and_payload() {
     // binds the payload field and the arm body uses it.
     test_support::assert_accepts(
         r#"discretio Eventum {
-    Ictus { numerus vis }
+    Ictus { numerus vis },
     Sonitus
 }
 
@@ -55,7 +55,7 @@ incipit {
 fn same_module_union_match_missing_variant_still_errors() {
     // uvf-u1 done_when (d): a genuinely-missing variant name still errors.
     test_support::assert_rejects_with_issue(
-        r#"discretio Eventum { Ictus Sonitus }
+        r#"discretio Eventum { Ictus, Sonitus }
 
 functio describe(Eventum e) → textus {
     discerne e {
@@ -214,7 +214,7 @@ fn enum_match_behavior_unchanged() {
     // `ordo`.
     test_support::assert_accepts(
         r#"ordo Colores {
-    Rubrum
+    Rubrum,
     Viride
 }
 
@@ -226,7 +226,7 @@ functio describe(Colores c) → textus {
 }"#,
     );
     test_support::assert_rejects_with_issue(
-        r#"ordo Colores { Rubrum Viride }
+        r#"ordo Colores { Rubrum, Viride }
 
 functio describe(Colores c) → textus {
     discerne c {
@@ -312,7 +312,7 @@ fn imported_union_full_path_with_local_shadow_binds_imported_identity() {
     let source = r#"importa ex "./token" token
 
 discretio TokenKind {
-    Numerus { numerus code }
+    Numerus { numerus code },
     Palabra
 }
 

@@ -1209,7 +1209,7 @@ functio f() → vacuum { redde }
     typus = lista<textus>,
     descriptio = "Target language",
     ubique = verum,
-    vel = "rust",
+    vel = "rust"
 }
 functio f() → vacuum { redde }
 "#;

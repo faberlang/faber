@@ -1077,7 +1077,7 @@ fn union_probe_error_issues(source: &str) -> Vec<String> {
 }
 
 const EVENTUM_SCRUTINY: &str = r"discretio Eventum {
-    Ictus { numerus vis }
+    Ictus { numerus vis },
     Sonitus
 }";
 

@@ -28,7 +28,7 @@ fn same_module_qualified_finge_construction_checks_green() {
     // exactly like the bare `finge Ictus { … } ∷ Eventum` construction.
     test_support::assert_accepts(
         r"discretio Eventum {
-    Ictus { numerus vis }
+    Ictus { numerus vis },
     Sonitus
 }
 
@@ -45,7 +45,7 @@ fn same_module_missing_qualified_variant_still_errors() {
     // A qualified construction naming a variant the union does not define
     // keeps failing closed (never a silent identity).
     test_support::assert_rejects_with_issue(
-        r"discretio Eventum { Ictus Sonitus }
+        r"discretio Eventum { Ictus, Sonitus }
 
 incipit {
     fixum Eventum a ← finge Eventum.Perculsus { } ∷ Eventum
@@ -154,7 +154,7 @@ fn imported_union_full_path_with_local_shadow_binds_imported_identity() {
     let source = r#"importa ex "./token" token
 
 discretio TokenKind {
-    Numerus { numerus code }
+    Numerus { numerus code },
     Palabra
 }
 
@@ -555,7 +555,7 @@ fn local_union_shared_variant_name_resolves_bare() {
     let source = r#"importa ex "./token" token
 
 discretio LocalError {
-    ElementaMismatch { textus causa }
+    ElementaMismatch { textus causa },
     TerminusExcedit { textus causa }
 }
 

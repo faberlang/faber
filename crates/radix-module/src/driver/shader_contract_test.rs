@@ -20,7 +20,7 @@ const VERTEX_LAYOUT_FN: &str = r#"
 functio vertex_layout_matches(
 numerus geo, numerus index, textus source_name,
 numerus location, numerus format_code, numerus offset_bytes,
-numerus stride_bytes, numerus step_mode_code, numerus role_code,
+numerus stride_bytes, numerus step_mode_code, numerus role_code
 ) → bivalens {
 redde verum
 }
@@ -67,14 +67,14 @@ fn contract_graphics_pipeline_assembly_produces_generic_reflection() {
 @ shader_contract "varying"
 functio varying_matches(
 textus source_name, numerus location, numerus format_code,
-numerus interpolation_code, numerus role_code,
+numerus interpolation_code, numerus role_code
 ) → bivalens {{
 redde verum
 }}
 
 @ shader_contract "fragment_output"
 functio fragment_output_matches(
-numerus location, numerus format_code, numerus role_code,
+numerus location, numerus format_code, numerus role_code
 ) → bivalens {{
 redde verum
 }}
@@ -83,7 +83,7 @@ redde verum
 functio pipeline_matches(
 numerus color_target_format_code, numerus depth_compare_code,
 numerus depth_write_enabled_code, numerus primitive_topology_code,
-numerus vertex_count,
+numerus vertex_count
 ) → bivalens {{
 redde verum
 }}
@@ -92,7 +92,7 @@ redde verum
 functio resource_binding_matches(
 numerus group, numerus binding, numerus kind_code, numerus role_code,
 numerus access_code, numerus element_count, numerus layout_code,
-textus source_name, numerus stage_io_role_code,
+textus source_name, numerus stage_io_role_code
 ) → bivalens {{
 redde verum
 }}
@@ -247,7 +247,7 @@ fn contract_malformed_arity_is_distinct_diagnostic() {
 functio vertex_layout_matches(
 numerus geo, numerus index, textus source_name,
 numerus location, numerus format_code, numerus offset_bytes,
-numerus stride_bytes, numerus step_mode_code sponte,
+numerus stride_bytes, numerus step_mode_code sponte
 ) → bivalens {
 redde verum
 }

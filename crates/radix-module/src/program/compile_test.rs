@@ -1306,7 +1306,7 @@ importa ex "probe:math" math
 
 @ publica
 discretio SceneNodeKind {
-    SceneGroup { },
+    SceneGroup { }
 }
 
 @ publica
@@ -2669,13 +2669,13 @@ fn interface_snapshot_projects_union_and_enum_variants() {
         r#"
 @ publica
 discretio Eventum {
-    Ictus { numerus vis }
+    Ictus { numerus vis },
     Sonitus
 }
 
 @ publica
 ordo Gradus {
-    Parvus
+    Parvus,
     Magnus
 }
 "#,
@@ -2802,7 +2802,7 @@ targets = ["rust"]
         r#"
 @ publica
 discretio Eventum {
-    Ictus { numerus vis }
+    Ictus { numerus vis },
     Sonitus
 }
 "#,

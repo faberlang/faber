@@ -115,7 +115,7 @@ fn accepts_exhaustive_enum_discerne_without_catchall() {
     assert_accepts(
         "discretio Lumen {
             Lucet,
-            Tenebrae,
+            Tenebrae
         }
         functio narra(Lumen l) → numerus {
             discerne l {

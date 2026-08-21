@@ -134,7 +134,7 @@ fn fac_do_while_roundtrips_through_faber_codegen() {
 #[cfg(feature = "hir-faber")]
 fn discerne_alias_and_multi_subject_roundtrip_through_faber_codegen() {
     let source = r#"discretio Event {
-  Click { numerus x, numerus y },
+  Click { numerus x numerus y },
   Quit
 }
 

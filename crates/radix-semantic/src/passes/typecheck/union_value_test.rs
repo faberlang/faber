@@ -225,7 +225,7 @@ fn same_module_union_value_references_regression_checks_green() {
     // unchanged — the enum shorthand (`Eventum.Sonitus`) still binds.
     test_support::assert_accepts(
         r"discretio Eventum {
-    Ictus { numerus vis }
+    Ictus { numerus vis },
     Sonitus
 }
 

@@ -204,7 +204,7 @@ incipit {
 fn non_generic_variant_construction_unchanged() {
     test_support::assert_accepts(
         r"discretio Eventum {
-    Ictus { numerus vis }
+    Ictus { numerus vis },
     Sonitus
 }
 
@@ -238,7 +238,7 @@ functio facere() → Plana {
 fn non_generic_variant_construction_wrong_payload_still_rejected() {
     test_support::assert_rejects_with_issue(
         r#"discretio Eventum {
-    Ictus { numerus vis }
+    Ictus { numerus vis },
     Sonitus
 }
 

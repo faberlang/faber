@@ -1352,7 +1352,7 @@ fn slash_block_comment_is_not_faber_syntax() {
 fn compile_accepts_finge_variant_construction() {
     let session = test_session(Target::HirRust);
     let source = r"discretio Event {
-  Click { numerus x, numerus y },
+  Click { numerus x numerus y },
   Quit
 }
 

@@ -1053,7 +1053,7 @@ functio describe(Status status) → vacuum {
 fn lowers_payload_variant_discerne_to_branch_chain_and_field_bindings() {
     let dump = dump_source(
         r#"discretio Event {
-  Click { numerus x, numerus y },
+  Click { numerus x numerus y },
   Quit
 }
 

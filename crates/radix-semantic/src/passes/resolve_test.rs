@@ -1579,7 +1579,7 @@ fn single_union_bare_variant_surfaces_unchanged() {
     // casu arms, and expression position resolves exactly as before the
     // variant identity re-key.
     let result = compile_ok(
-        "discretio Nodus {\n  Groupus { lista<numerus> filii },\n  Tessera { numerus geometria },\n}\n\
+        "discretio Nodus {\n  Groupus { lista<numerus> filii },\n  Tessera { numerus geometria }\n}\n\
          functio make(numerus g) → Nodus {\n  redde finge Tessera { geometria = g } ∷ Nodus\n}\n\
          functio read(Nodus n) → numerus {\n  discerne n {\n\
          \x20   casu Tessera fixum geometria { redde geometria }\n\
