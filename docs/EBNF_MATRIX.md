@@ -33,23 +33,23 @@ pages of the documentation site.
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| rust | 285 | 287 | 99% |
-| go | 264 | 287 | 92% |
-| ts | 287 | 287 | 100% |
-| faber | 287 | 287 | 100% |
+| rust | 288 | 290 | 99% |
+| go | 267 | 290 | 92% |
+| ts | 290 | 290 | 100% |
+| faber | 290 | 290 | 100% |
 
 **Systems lane (MIR → device/IR artifacts)**
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| llvm-text | 281 | 287 | 98% |
-| wasm-text | 260 | 287 | 91% |
-| wasm | 260 | 287 | 91% |
-| metal-text | 6 | 287 | 2% |
-| wgsl-text | 6 | 287 | 2% |
-| sexp-struct | 226 | 287 | 79% |
-| sexp | 226 | 287 | 79% |
-| scena | 245 | 287 | 85% |
+| llvm-text | 279 | 285 | 98% |
+| wasm-text | 256 | 285 | 90% |
+| wasm | 256 | 285 | 90% |
+| metal-text | 6 | 285 | 2% |
+| wgsl-text | 6 | 285 | 2% |
+| sexp-struct | 223 | 285 | 78% |
+| sexp | 223 | 285 | 78% |
+| scena | 242 | 285 | 85% |
 
 ## Keywords — application lane
 
@@ -296,7 +296,7 @@ pages of the documentation site.
 | <a id="immutata"></a>`immutata` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
 | <a id="implet"></a>`implet` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="importa"></a>`importa` | ✓ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ◐ |
-| <a id="in"></a>`in` | ✓ | ✓ | ✓ | ✕ | ✕ | ✕ | ✕ | ✓ |
+| <a id="in"></a>`in` | — | — | — | — | — | — | — | — |
 | <a id="incipiet"></a>`incipiet` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="incipit"></a>`incipit` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="inter"></a>`inter` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |

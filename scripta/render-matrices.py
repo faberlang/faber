@@ -99,6 +99,11 @@ def glyph(capable: int, denom: int, term: str, target: str, planned: dict) -> st
     return "◐"
 
 
+def slug_anchor(term: str) -> str:
+    """Return the stable Latin slug used by grammar matrix row anchors."""
+    return re.sub(r"[^a-z0-9]+", "-", term.lower()).strip("-")
+
+
 # --- compat JSON loading -----------------------------------------------------
 
 def load_compat(targets: list[str]) -> dict[str, dict]:
@@ -150,7 +155,12 @@ def render_ebnf_matrix(planned: dict) -> list[str]:
             for t, counts in zip(targets, by_term[term]):
                 capable, denom = counts if counts else (0, 0)
                 glyphs.append(glyph(capable, denom, term, t, planned))
-            rows.append(f"| `{term}` | " + " | ".join(glyphs) + " |")
+            anchor = slug_anchor(term)
+            rows.append(
+                f'| <a id="{anchor}"></a>`{term}` | '
+                + " | ".join(glyphs)
+                + " |"
+            )
         return rows
 
     def lane_section(
