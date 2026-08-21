@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
-"""Grammar pipeline: markdown-audit of EBNF.md and dialect-1 validation.
+"""Grammar pipeline: validate, render, emit, and drift-check the Faber grammar.
 
-GSD-1 skeleton. `--audit-md` parses fenced `ebnf` blocks in the current
-`faber/docs/EBNF.md` (and locale packs) and emits the mechanical sin list:
-orphans, undefined terminals, keyword-table gaps, comma variance, locale
-drift. `--validate` parses a dialect-1 `.fg` file and checks closure plus
-reachability from `@start` (appendix smoke-check).
-
-Advisory only. Not wired into stage 1 until GSD-6.
+`--audit-md` retains the GSD-1 Markdown sin report for historical and locale
+analysis. `--validate` checks dialect closure and reachability. GSD-6's
+`--render` and `--emit` produce the identity EBNF and one-way grammar.jsonl;
+`--check` is the fail-closed normative-triple gate used by stage 1.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
+import tomllib
 from collections import Counter, deque
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -63,6 +62,10 @@ VERIFIED_KEYWORD_GAPS = (
 )
 
 SCHEMA = "grammar-pipeline-audit/v1"
+TRIPLE_SCHEMA = "faber-grammar/v1"
+SOURCE_REGION_RE = re.compile(r"^@(rewrite|lexicon|keywords|glyphs)\s*$")
+METADATA_RE = re.compile(r"^@([A-Za-z_][A-Za-z0-9_-]*)(?:\s+(.*))?$")
+KEYWORD_ROW_RE = re.compile(r"^# \| \*?([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*$")
 
 
 @dataclass
@@ -71,6 +74,8 @@ class Production:
     line: int
     rhs: str
     path: str = ""
+    region: str = "grammar"
+    metadata: dict[str, list[str]] = field(default_factory=dict)
 
 
 @dataclass
@@ -239,18 +244,30 @@ def parse_markdown_grammar(text: str, *, path: str) -> Grammar:
     return grammar_from_productions(productions, path=path)
 
 
-def parse_dialect(text: str, *, path: str) -> Grammar:
+def parse_source(text: str, *, path: str) -> Grammar:
+    """Parse a dialect source while retaining regions and downward metadata."""
     start: str | None = None
     grammar_n: int | None = None
-    kept: list[str] = []
-    original_lines = text.splitlines()
-    for raw in original_lines:
+    region = "preamble"
+    productions: list[Production] = []
+    by_name: dict[str, Production] = {}
+    pending: dict[str, list[str]] = {}
+    current: Production | None = None
+
+    for line_no, raw in enumerate(text.splitlines(), start=1):
         cleaned = strip_ebnf_noise(raw).rstrip()
         stripped = cleaned.strip()
         if not stripped:
-            kept.append("")
             continue
-        directive = DIRECTIVE_RE.match(stripped)
+
+        region_match = SOURCE_REGION_RE.match(stripped)
+        if region_match:
+            region = region_match.group(1)
+            current = None
+            pending = {}
+            continue
+
+        directive = METADATA_RE.match(stripped)
         if directive and not PROD_HEAD_RE.match(stripped):
             name = directive.group(1)
             rest = (directive.group(2) or "").strip()
@@ -261,15 +278,48 @@ def parse_dialect(text: str, *, path: str) -> Grammar:
                     grammar_n = int(rest.split()[0])
                 except ValueError:
                     grammar_n = None
-            kept.append("")
+            elif name not in {"rewrite", "lexicon", "keywords", "glyphs"}:
+                pending.setdefault(name, []).append(rest)
             continue
-        kept.append(cleaned)
-    productions = parse_production_block(
-        "\n".join(kept), path=path, start_line=1
+
+        match = PROD_HEAD_RE.match(cleaned)
+        if match:
+            name, rhs = match.group(1), match.group(2)
+            if name in by_name:
+                production = by_name[name]
+                production.rhs = (production.rhs + " " + rhs).strip()
+                production.metadata.update(
+                    {key: list(values) for key, values in pending.items()}
+                )
+            else:
+                production = Production(
+                    name=name,
+                    line=line_no,
+                    rhs=rhs,
+                    path=path,
+                    region=region,
+                    metadata={key: list(values) for key, values in pending.items()},
+                )
+                productions.append(production)
+                by_name[name] = production
+            current = production
+            pending = {}
+            continue
+
+        if current is not None and (raw[:1].isspace() or stripped.startswith("|")):
+            current.rhs = (current.rhs + " " + stripped).strip()
+
+    return Grammar(
+        path=path,
+        productions=productions,
+        start=start,
+        grammar_n=grammar_n,
+        by_name=by_name,
     )
-    return grammar_from_productions(
-        productions, path=path, start=start, grammar_n=grammar_n
-    )
+
+
+def parse_dialect(text: str, *, path: str) -> Grammar:
+    return parse_source(text, path=path)
 
 
 def reference_counts(grammar: Grammar) -> Counter[str]:
@@ -650,6 +700,295 @@ def default_findings_path() -> Path:
     return SCRIPT.with_name("grammar-pipeline-findings.json")
 
 
+def default_source_path() -> Path:
+    return default_ebnf_path().parent / "grammar" / "source.fg"
+
+
+def default_sidecar_path() -> Path:
+    return default_source_path().with_name("sidecar.en.toml")
+
+
+def default_jsonl_path() -> Path:
+    return default_source_path().with_name("grammar.jsonl")
+
+
+def production_anchor(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
+
+def source_keyword_rows(source_text: str, grammar: Grammar) -> list[tuple[str, str, str]]:
+    """Return one derived row per quoted Latin literal in the source."""
+    known: dict[str, tuple[str, str]] = {}
+    in_keywords = False
+    for raw in source_text.splitlines():
+        stripped = raw.strip()
+        if stripped == "@keywords":
+            in_keywords = True
+            continue
+        if in_keywords and stripped.startswith("@lexicon"):
+            break
+        if not in_keywords:
+            continue
+        match = KEYWORD_ROW_RE.match(raw)
+        if not match:
+            continue
+        category, spellings, meaning = (part.strip() for part in match.groups())
+        if category.lower() in {"category", "---"}:
+            continue
+        for literal in re.findall(r"`([^`]+)`", spellings):
+            for word in re.findall(r"[a-z][a-z0-9_]*", literal):
+                known.setdefault(word, (category, meaning))
+
+    rows: list[tuple[str, str, str]] = []
+    literals = sorted(keyword_literals(grammar))
+    for literal in literals:
+        category, meaning = known.get(
+            literal, ("Grammar", "keyword literal derived from the production")
+        )
+        rows.append((category, literal, meaning))
+    return rows
+
+
+def source_lexicon_rows(source_text: str) -> list[tuple[str, str, str]]:
+    rows: list[tuple[str, str, str]] = []
+    in_lexicon = False
+    status = "live"
+    comments: list[str] = []
+    for raw in source_text.splitlines():
+        stripped = raw.strip()
+        if stripped == "@lexicon":
+            in_lexicon = True
+            continue
+        if in_lexicon and stripped == "@rewrite":
+            break
+        if not in_lexicon:
+            continue
+        if stripped.startswith("@status"):
+            status = stripped.split(None, 1)[1] if " " in stripped else "live"
+            continue
+        match = PROD_HEAD_RE.match(stripped)
+        if match:
+            rows.append((match.group(1), status, " ".join(comments).strip()))
+            status = "live"
+            comments = []
+            continue
+        if stripped.startswith("#"):
+            comments.append(stripped[1:].strip())
+    return rows
+
+
+def load_sidecar(path: Path) -> dict[str, object]:
+    if not path.is_file():
+        raise FileNotFoundError(f"missing grammar sidecar: {path}")
+    with path.open("rb") as handle:
+        data = tomllib.load(handle)
+    productions = data.get("productions", {})
+    if not isinstance(productions, dict):
+        raise ValueError(f"{path}: productions must be a TOML table")
+    return data
+
+
+def canonical_source_grammar(source_text: str, source_path: Path) -> Grammar:
+    grammar = parse_source(source_text, path=display_path(source_path))
+    payload = validate_dialect(grammar)
+    if not payload["ok"]:
+        raise ValueError(
+            "source grammar is not closed/reachable: "
+            + json.dumps(payload, sort_keys=True)
+        )
+    return grammar
+
+
+def jsonl_records(
+    source_text: str, source_path: Path, sidecar_text: str
+) -> list[dict[str, object]]:
+    grammar = canonical_source_grammar(source_text, source_path)
+    sidecar_hash = "sha256:" + hashlib.sha256(sidecar_text.encode("utf-8")).hexdigest()
+    keyword_counts = keyword_literals(grammar)
+    records: list[dict[str, object]] = []
+    for production in grammar.productions:
+        formerly = production.metadata.get("formerly", [])
+        record = {
+            "schema": TRIPLE_SCHEMA,
+            "grammar": grammar.grammar_n,
+            "id": production.name,
+            "anchor": production_anchor(production.name),
+            "region": production.region,
+            "line": production.line,
+            "rhs": " ".join(production.rhs.split()),
+            "status": (production.metadata.get("status") or ["live"])[-1],
+            "formerly": formerly,
+            "keywords": sorted(
+                literal
+                for literal in rhs_literals(production.rhs)
+                if literal in keyword_counts
+            ),
+            "sidecar": sidecar_hash,
+        }
+        records.append(record)
+    return records
+
+
+def dumps_jsonl(records: list[dict[str, object]]) -> str:
+    return "".join(
+        json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        + "\n"
+        for record in records
+    )
+
+
+def grammar_fence(grammar: Grammar) -> str:
+    lines = ["```ebnf"]
+    # Markdown audit infers its start from the first production. Render the
+    # rewrite grammar before the lexical appendix so the identity starts at
+    # @start (`fab_file`) while retaining every lexical definition.
+    ordered = [
+        production
+        for production in grammar.productions
+        if production.region == "rewrite"
+    ] + [
+        production
+        for production in grammar.productions
+        if production.region != "rewrite"
+    ]
+    for index, production in enumerate(ordered, start=1):
+        if production.metadata.get("formerly"):
+            aliases = ", ".join(production.metadata["formerly"])
+            lines.append(f"# formerly: {aliases}")
+        rhs = " ".join(production.rhs.split())
+        lines.append(f"# [{index:03d}] {production.name}")
+        lines.append(f"{production.name} ::= {rhs}".rstrip())
+    lines.append("```")
+    return "\n".join(lines)
+
+
+def render_identity(
+    source_text: str, source_path: Path, sidecar_text: str
+) -> str:
+    grammar = canonical_source_grammar(source_text, source_path)
+    sidecar = tomllib.loads(sidecar_text)
+    document = sidecar.get("document", {})
+    if not isinstance(document, dict):
+        document = {}
+    intro = str(document.get("intro", ""))
+    prose = str(document.get("prose_markdown", "")).strip()
+    lexicon = source_lexicon_rows(source_text)
+    keywords = source_keyword_rows(source_text, grammar)
+    comma_rows = comma_variance_rows(source_text, path=display_path(source_path))
+
+    lines = [
+        "# Faber Language Specification",
+        "",
+        "This file is generated from `docs/grammar/source.fg`; hand edits fail the",
+        "stage-1 normative-triple gate. Production IDs are the grammar's stable",
+        "snake_case spine and their anchors are derived from those IDs.",
+        "",
+        "## Grammar {#grammar}",
+        "",
+    ]
+    if intro:
+        lines.extend([intro.strip(), ""])
+    lines.extend([grammar_fence(grammar), ""])
+    lines.extend(
+        [
+            "## Production Index {#production-index}",
+            "",
+            "| ID | Anchor | Status | Former names |",
+            "|---|---|---|---|",
+        ]
+    )
+    for production in grammar.productions:
+        status = (production.metadata.get("status") or ["live"])[-1]
+        former = ", ".join(production.metadata.get("formerly", [])) or "—"
+        anchor = production_anchor(production.name)
+        lines.append(
+            f"| [`{production.name}`](#{anchor}) | `#{anchor}` | {status} | {former} |"
+        )
+    lines.extend(["", "## Lexicon Appendix {#lexicon}", ""])
+    lines.extend(
+        [
+            "The lexical tier is descriptive and remains owned by the live lexer and",
+            "driver. `capture-pending` rows intentionally carry no invented token shape.",
+            "",
+            "| Terminal | Status | Capture notes |",
+            "|---|---|---|",
+        ]
+    )
+    for name, status, note in lexicon:
+        lines.append(f"| `{name}` | `{status}` | {note or '—'} |")
+    lines.extend(["", "## Keyword Reference {#keyword-reference}", ""])
+    lines.extend(
+        [
+            "This table is derived from the quoted Latin literals in the source",
+            "productions. It is not a second keyword authority.",
+            "",
+            "| Category | Faber | Meaning |",
+            "|---|---|---|",
+        ]
+    )
+    for category, literal, meaning in keywords:
+        lines.append(f"| {category} | `{literal}` | {meaning} |")
+    lines.extend(["", "## Comma Separator Table {#comma-separator-law}", ""])
+    lines.extend(
+        [
+            "Optional commas are forbidden. The source currently has no `','?`",
+            "positions; every comma-bearing production is either required or absent.",
+            "",
+            "| Production | Source row |",
+            "|---|---|",
+        ]
+    )
+    if comma_rows:
+        for row in comma_rows:
+            lines.append(
+                f"| `{row.get('production') or 'unknown'}` | `{row['snippet']}` |"
+            )
+    else:
+        lines.append("| — | no optional comma positions |")
+
+    lines.extend(["", "## Normative Language Notes {#normative-language-notes}", ""])
+    if prose:
+        lines.extend(prose.splitlines())
+    else:
+        lines.append("Normative details are maintained in `docs/grammar/sidecar.en.toml`.")
+    lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def generated_artifacts(
+    source_path: Path, sidecar_path: Path
+) -> tuple[str, str]:
+    source_text = source_path.read_text(encoding="utf-8")
+    sidecar_text = sidecar_path.read_text(encoding="utf-8")
+    return (
+        render_identity(source_text, source_path, sidecar_text),
+        dumps_jsonl(jsonl_records(source_text, source_path, sidecar_text)),
+    )
+
+
+def check_triple(
+    source_path: Path, sidecar_path: Path, ebnf_path: Path, jsonl_path: Path
+) -> tuple[bool, dict[str, object]]:
+    expected_ebnf, expected_jsonl = generated_artifacts(source_path, sidecar_path)
+    actual_ebnf = ebnf_path.read_text(encoding="utf-8") if ebnf_path.is_file() else ""
+    actual_jsonl = jsonl_path.read_text(encoding="utf-8") if jsonl_path.is_file() else ""
+    mismatches: list[str] = []
+    if actual_ebnf != expected_ebnf:
+        mismatches.append(display_path(ebnf_path))
+    if actual_jsonl != expected_jsonl:
+        mismatches.append(display_path(jsonl_path))
+    payload = {
+        "schema": TRIPLE_SCHEMA,
+        "ok": not mismatches,
+        "source": display_path(source_path),
+        "render": display_path(ebnf_path),
+        "jsonl": display_path(jsonl_path),
+        "mismatches": mismatches,
+        "productions": len(expected_jsonl.splitlines()),
+    }
+    return not mismatches, payload
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
@@ -668,6 +1007,51 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="dialect-1 path for --validate (default: scripta/fixtures/grammar/dialect-1.fg)",
+    )
+    parser.add_argument(
+        "--render",
+        action="store_true",
+        help="render the canonical identity EBNF.md from source.fg",
+    )
+    parser.add_argument(
+        "--emit",
+        action="store_true",
+        help="emit grammar.jsonl from source.fg",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="fail when source, identity render, or grammar.jsonl drift",
+    )
+    parser.add_argument(
+        "--source",
+        type=Path,
+        default=None,
+        help="source.fg path for renderer modes",
+    )
+    parser.add_argument(
+        "--sidecar",
+        type=Path,
+        default=None,
+        help="sidecar.en.toml path for renderer modes",
+    )
+    parser.add_argument(
+        "--jsonl",
+        type=Path,
+        default=None,
+        help="grammar.jsonl path for --emit/--check",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="render output path for --render (default: sibling faber/docs/EBNF.md)",
+    )
+    parser.add_argument(
+        "--jsonl-output",
+        type=Path,
+        default=None,
+        help="emit output path (default: docs/grammar/grammar.jsonl)",
     )
     parser.add_argument(
         "--ebnf",
@@ -726,9 +1110,75 @@ def run_validate(args: argparse.Namespace) -> tuple[dict[str, object], int]:
     return payload, 0 if payload["ok"] else 1
 
 
+def run_render(args: argparse.Namespace) -> tuple[str, Path]:
+    source_path = (args.source or default_source_path()).resolve()
+    sidecar_path = (args.sidecar or default_sidecar_path()).resolve()
+    output = (args.output or default_ebnf_path()).resolve()
+    rendered, _ = generated_artifacts(source_path, sidecar_path)
+    output.write_text(rendered, encoding="utf-8")
+    return rendered, output
+
+
+def run_emit(args: argparse.Namespace) -> tuple[str, Path]:
+    source_path = (args.source or default_source_path()).resolve()
+    sidecar_path = (args.sidecar or default_sidecar_path()).resolve()
+    output = (args.jsonl_output or args.jsonl or default_jsonl_path()).resolve()
+    _, emitted = generated_artifacts(source_path, sidecar_path)
+    output.write_text(emitted, encoding="utf-8")
+    return emitted, output
+
+
+def run_check(args: argparse.Namespace) -> tuple[dict[str, object], int]:
+    source_path = (args.source or default_source_path()).resolve()
+    sidecar_path = (args.sidecar or default_sidecar_path()).resolve()
+    ebnf_path = (args.ebnf or default_ebnf_path()).resolve()
+    jsonl_path = (args.jsonl or default_jsonl_path()).resolve()
+    try:
+        ok, payload = check_triple(source_path, sidecar_path, ebnf_path, jsonl_path)
+    except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
+        payload = {
+            "schema": TRIPLE_SCHEMA,
+            "ok": False,
+            "source": display_path(source_path),
+            "render": display_path(ebnf_path),
+            "jsonl": display_path(jsonl_path),
+            "mismatches": [str(exc)],
+        }
+        ok = False
+    return payload, 0 if ok else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
+    if args.check:
+        payload, code = run_check(args)
+        if args.json:
+            sys.stdout.write(dumps_findings(payload))
+        else:
+            status = "OK" if payload.get("ok") else "FAIL"
+            print(f"=== grammar triple: {status} ===")
+            if payload.get("ok"):
+                print(f"productions: {payload.get('productions', '?')}")
+                print("source, identity render, and grammar.jsonl agree")
+            else:
+                for mismatch in payload.get("mismatches", []):
+                    print(f"  - drift: {mismatch}")
+        return code
+
+    if args.render or args.emit:
+        try:
+            if args.render:
+                _, output = run_render(args)
+                print(f"rendered {display_path(output)}")
+            if args.emit:
+                _, output = run_emit(args)
+                print(f"emitted {display_path(output)}")
+            return 0
+        except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
+            print(f"grammar pipeline: {exc}", file=sys.stderr)
+            return 1
+
     if args.validate:
         payload, code = run_validate(args)
         if args.json:
