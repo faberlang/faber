@@ -81,11 +81,11 @@ impl AttentionFacts {
             && self.hidden == hidden
     }
 
-    fn q_dims(self) -> Vec<u64> {
+    pub(crate) fn q_dims(self) -> Vec<u64> {
         vec![self.kv_heads, self.q_per_kv, self.seq, self.head_dim]
     }
 
-    fn kv_dims(self) -> Vec<u64> {
+    pub(crate) fn kv_dims(self) -> Vec<u64> {
         vec![self.kv_heads, self.seq, self.head_dim]
     }
 

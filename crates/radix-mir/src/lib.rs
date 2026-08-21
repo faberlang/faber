@@ -13,6 +13,7 @@ mod collection_ops;
 pub mod control;
 pub mod device;
 pub mod device_plan_compiler;
+pub mod device_plan_ingress;
 pub mod device_program;
 pub mod device_program_plans;
 pub mod device_semantics;

@@ -2164,9 +2164,16 @@ fn recipe_operand_locals(function: &MirFunction) -> Result<Vec<MirLocalId>, Plan
             _ => -1,
         };
         // Projection layout is the const immediately before the kind, while
-        // scores carry a scale const there. All other kinds put their final
-        // tensor operand immediately before the kind.
-        if matches!(kind, 0 | 1 | 2 | 3 | 6 | 7) {
+        // scores carry a scale const there. Fused CausalAttention reuses the
+        // context kind with three tensor operands plus a scale const before
+        // the kind so WIRE v8 stays unchanged.
+        if matches!(kind, 0 | 1 | 2 | 3 | 6 | 7)
+            || (kind == 5
+                && matches!(
+                    call.args.get(kind_index.saturating_sub(1)),
+                    Some(MirOperand::Constant(MirConstant::Float(_)))
+                ))
+        {
             kind_index.saturating_sub(1)
         } else {
             kind_index
