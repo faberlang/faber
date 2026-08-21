@@ -1,0 +1,41 @@
++++
+term = "textus"
+kind = "type"
+category = "type"
+canonical = false
+summary = "Bounded textus<N>: scalar capacity N; longitudo is len; equality ignores spare slots."
+syntax = "textus<N>"
+related = ["longitudo", "appende", "accipe", "sectio", "vacua", "ascii"]
+locale = "en"
++++
+
+# =============================================================================
+# textus<N> — bounded Unicode buffer (BB-8R)
+# =============================================================================
+#
+# Latin spelling: textus<8>
+# English surface: string<8>
+#
+# What this teaches:
+#   • `textus<N>` is a distinct type from unbounded `textus`.
+#   • `N` counts Unicode scalars; `longitudo` is runtime `len`.
+#   • Two values with the same prefix compare equal (`≡`).
+#
+# Common mistakes:
+#   • Counting UTF-8 bytes as `N` — capacity is scalars.
+#   • Assigning a bare `textus` into `textus<N>` without `↦`.
+#
+# See also: lista<numerus, N>, ascii<N>, octeti<N>
+# =============================================================================
+
+main {
+    const string raw ← "ab"
+    const string<8> a ← raw ↦ string<8>
+    const string<8> b ← raw ↦ string<8>
+    const int n ← a.length()
+    const bool vacant ← a.is_empty()
+    print n
+    print vacant
+    print a.slice(0, 1)
+    if a ≡ b { print 1 }
+}

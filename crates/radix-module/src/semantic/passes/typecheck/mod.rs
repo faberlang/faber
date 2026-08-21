@@ -32,5 +32,9 @@ mod bounded_textus_test;
 mod bounded_octeti_test;
 
 #[cfg(test)]
+#[path = "bounded_ops_test.rs"]
+mod bounded_ops_test;
+
+#[cfg(test)]
 #[path = "modular_word_width_test.rs"]
 mod modular_word_width_test;

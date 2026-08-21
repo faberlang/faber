@@ -41,6 +41,33 @@ fn receivers_for_type_maps_semantic_families() {
     let capacity = types.intern_index(IndexExpr::Literal(8));
     let bounded = Type::BoundedArray { element, capacity };
     assert_eq!(receivers_for_type(&bounded), &[IntrinsicReceiver::Lista]);
+    let bounded_textus = Type::BoundedTextus { capacity };
+    assert_eq!(
+        receivers_for_type(&bounded_textus),
+        &[IntrinsicReceiver::Textus]
+    );
+    let bounded_ascii = Type::BoundedAscii { capacity };
+    assert_eq!(
+        receivers_for_type(&bounded_ascii),
+        &[IntrinsicReceiver::Ascii]
+    );
+    let bounded_octeti = Type::BoundedOcteti { capacity };
+    assert_eq!(
+        receivers_for_type(&bounded_octeti),
+        &[IntrinsicReceiver::Lista]
+    );
+    assert_eq!(
+        lookup_method_for_type(&bounded_ascii, "longitudo", 0)
+            .expect("ascii<N>.longitudo")
+            .faber_name,
+        "longitudo"
+    );
+    assert_eq!(
+        lookup_method_for_type(&bounded_textus, "appende", 1)
+            .expect("textus<N>.appende")
+            .faber_name,
+        "appende"
+    );
     let fractus = Type::Primitive(Primitive::Fractus);
     assert_eq!(
         receivers_for_type(&fractus),

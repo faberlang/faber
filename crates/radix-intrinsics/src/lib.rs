@@ -41,11 +41,19 @@ pub fn receivers_for_type(ty: &Type) -> &'static [IntrinsicReceiver] {
         // the Lista receiver family gives octeti values every `lista` method.
         // The assignability rule in `semantic/types.rs` makes the two types
         // bidirectionally assignable; this arm makes method dispatch agree.
-        Type::Primitive(Primitive::Octeti) => &[IntrinsicReceiver::Lista],
+        // Bounded `octeti<N>` keeps the same family; `N` is identity, not a
+        // second method table.
+        Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. } => {
+            &[IntrinsicReceiver::Lista]
+        }
         Type::Map(_, _) => &[IntrinsicReceiver::Tabula],
         Type::Set(_) => &[IntrinsicReceiver::Copia],
-        Type::Primitive(Primitive::Textus) => &[IntrinsicReceiver::Textus],
-        Type::Primitive(Primitive::Ascii) => &[IntrinsicReceiver::Ascii],
+        Type::Primitive(Primitive::Textus) | Type::BoundedTextus { .. } => {
+            &[IntrinsicReceiver::Textus]
+        }
+        Type::Primitive(Primitive::Ascii) | Type::BoundedAscii { .. } => {
+            &[IntrinsicReceiver::Ascii]
+        }
         Type::Primitive(Primitive::Regex) => &[IntrinsicReceiver::Regex],
         Type::Primitive(Primitive::Numerus) => &[IntrinsicReceiver::Numeric],
         Type::Primitive(Primitive::Fractus) => {
@@ -96,7 +104,8 @@ pub fn lookup_method_for_type(
             return Some(entry);
         }
     }
-    None
+    bounded_ascii_cord_ops(receiver_ty, method, arg_count)
+        .or_else(|| bounded_cord_appende(receiver_ty, method, arg_count))
 }
 
 /// Resolve a promoted intrinsic from a type-table receiver ID, peeling aliases
@@ -117,7 +126,44 @@ pub fn lookup_method_for_type_id(
             return Some(entry);
         }
     }
-    None
+    let payload = types.get(payload_id);
+    bounded_ascii_cord_ops(payload, method, arg_count)
+        .or_else(|| bounded_cord_appende(payload, method, arg_count))
+}
+
+/// Bounded `ascii<N>` shares the live cord vocabulary with `textus`. Bare
+/// `ascii` stays cursor-only (do not route unbounded ascii through Textus).
+fn bounded_ascii_cord_ops(
+    receiver_ty: &Type,
+    method: &str,
+    arg_count: usize,
+) -> Option<&'static MethodIntrinsic> {
+    if matches!(receiver_ty, Type::BoundedAscii { .. }) {
+        lookup_method(IntrinsicReceiver::Textus, method, arg_count)
+    } else {
+        None
+    }
+}
+
+/// Bounded cords reuse lista `appende` (Inner, Vacuum, Append) so overflow is
+/// the same recoverable alternate exit. Unbounded `textus`/`ascii` stay
+/// without `appende` — concatenation is `+`, not a capacity-checked grow.
+fn bounded_cord_appende(
+    receiver_ty: &Type,
+    method: &str,
+    arg_count: usize,
+) -> Option<&'static MethodIntrinsic> {
+    if method == "appende"
+        && arg_count == 1
+        && matches!(
+            receiver_ty,
+            Type::BoundedTextus { .. } | Type::BoundedAscii { .. }
+        )
+    {
+        lookup_method(IntrinsicReceiver::Lista, "appende", 1)
+    } else {
+        None
+    }
 }
 
 /// Modular words expose only operations with an explicit u32 lowering. Do not

@@ -48,6 +48,19 @@ struct IntrinsicTypeContext {
 impl IntrinsicTypeContext {
     fn from_receiver_type(checker: &mut TypeChecker<'_>, receiver_ty: TypeId) -> Self {
         let resolved = checker.resolve_inferred_type(receiver_ty);
+        let bounded_cord = matches!(
+            checker.types.get(resolved),
+            Type::BoundedTextus { .. } | Type::BoundedAscii { .. }
+        );
+        if bounded_cord {
+            let inner = checker.ascii_one_type();
+            return Self {
+                inner: Some(inner),
+                key: None,
+                value: None,
+                receiver_ty: Some(resolved),
+            };
+        }
         match checker.types.get(resolved) {
             Type::Array(inner) | Type::BoundedArray { element: inner, .. } => Self {
                 inner: Some(*inner),
@@ -99,7 +112,7 @@ impl IntrinsicTypeContext {
             },
             // WHY: `octeti` unifies with `lista<numerus<u8>>` (DEFER-029). Its
             // element type for intrinsic param/return resolution is `numerus<u8>`.
-            Type::Primitive(Primitive::Octeti) => {
+            Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. } => {
                 let u8 = checker
                     .types
                     .find_sized_numeric(Primitive::Numerus, NumericWidth::U8)
@@ -222,8 +235,14 @@ pub(super) fn check_intrinsic_method_call(
     } else {
         entry
     };
-    let bounded_appende =
-        entry.faber_name == "appende" && matches!(resolved, Type::BoundedArray { .. });
+    let bounded_appende = entry.faber_name == "appende"
+        && matches!(
+            resolved,
+            Type::BoundedArray { .. }
+                | Type::BoundedTextus { .. }
+                | Type::BoundedAscii { .. }
+                | Type::BoundedOcteti { .. }
+        );
     let ctx = IntrinsicTypeContext::from_receiver_type(checker, payload_ty);
 
     if checker.expr_is_ref_view(receiver) && is_mutating_receiver(entry) {
