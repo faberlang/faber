@@ -1,0 +1,108 @@
+//! Position-law fixtures for named template holes.
+
+use super::template_holes::{analyze_template, Hole, HoleKind};
+
+fn hole(kind: HoleKind, position: usize) -> Hole {
+    Hole { kind, position }
+}
+
+#[test]
+fn named_hole_uses_the_first_automatic_position_and_erases() {
+    let analysis = analyze_template("§{greet} world");
+
+    assert_eq!(
+        analysis.holes,
+        vec![hole(HoleKind::Named("greet".to_owned()), 0)]
+    );
+    assert_eq!(analysis.label_position("greet"), Some(0));
+    assert_eq!(analysis.erased, "§ world");
+    assert!(analysis.labels_are_unique());
+}
+
+#[test]
+fn named_and_anonymous_holes_share_one_position_domain() {
+    let analysis = analyze_template("§{greet} §");
+
+    assert_eq!(
+        analysis.holes,
+        vec![
+            hole(HoleKind::Named("greet".to_owned()), 0),
+            hole(HoleKind::Auto, 1),
+        ]
+    );
+    assert_eq!(analysis.erased, "§ §");
+}
+
+#[test]
+fn explicit_index_before_named_hole_keeps_existing_auto_positioning() {
+    let analysis = analyze_template("§1 §{greet}");
+
+    assert_eq!(
+        analysis.holes,
+        vec![
+            hole(HoleKind::Index(1), 1),
+            hole(HoleKind::Named("greet".to_owned()), 0),
+        ]
+    );
+    assert_eq!(analysis.label_position("greet"), Some(0));
+    assert_eq!(analysis.erased, "§1 §");
+}
+
+#[test]
+fn explicit_index_can_address_a_named_hole_position() {
+    let analysis = analyze_template("§{greet} §0");
+
+    assert_eq!(
+        analysis.holes,
+        vec![
+            hole(HoleKind::Named("greet".to_owned()), 0),
+            hole(HoleKind::Index(0), 0),
+        ]
+    );
+    assert_eq!(analysis.erased, "§ §0");
+}
+
+#[test]
+fn duplicate_named_labels_are_reported_without_replacing_the_first_position() {
+    let analysis = analyze_template("§{a} §{a}");
+
+    assert_eq!(analysis.duplicate_labels, vec!["a"]);
+    assert_eq!(analysis.label_position("a"), Some(0));
+    assert!(!analysis.labels_are_unique());
+    assert_eq!(analysis.erased, "§ §");
+}
+
+#[test]
+fn templates_without_holes_pass_through_unchanged() {
+    let analysis = analyze_template("plain text {not a hole}");
+
+    assert!(analysis.holes.is_empty());
+    assert!(analysis.duplicate_labels.is_empty());
+    assert!(analysis.label_positions.is_empty());
+    assert_eq!(analysis.erased, "plain text {not a hole}");
+}
+
+#[test]
+fn invalid_label_body_falls_back_to_literal_text_after_an_auto_hole() {
+    let analysis = analyze_template("§{a b}");
+
+    assert_eq!(analysis.holes, vec![hole(HoleKind::Auto, 0)]);
+    assert!(analysis.label_positions.is_empty());
+    assert!(analysis.duplicate_labels.is_empty());
+    assert_eq!(analysis.erased, "§{a b}");
+}
+
+#[test]
+fn explicit_indexes_do_not_consume_automatic_positions() {
+    let analysis = analyze_template("§2 § §{named}");
+
+    assert_eq!(
+        analysis.holes,
+        vec![
+            hole(HoleKind::Index(2), 2),
+            hole(HoleKind::Auto, 0),
+            hole(HoleKind::Named("named".to_owned()), 1),
+        ]
+    );
+    assert_eq!(analysis.erased, "§2 § §");
+}

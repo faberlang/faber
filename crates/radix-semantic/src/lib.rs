@@ -57,6 +57,7 @@ pub mod radix_lane;
 pub mod resolved_use;
 pub mod scope;
 pub mod target_qualification;
+pub mod template_holes;
 pub mod tensor_bracket;
 pub mod tensor_element_lattice;
 pub mod tensor_type_directed;
@@ -922,6 +923,10 @@ mod tensor_bracket_test;
 #[cfg(test)]
 #[path = "tensor_element_lattice_test.rs"]
 mod tensor_element_lattice_test;
+
+#[cfg(test)]
+#[path = "template_holes_test.rs"]
+mod template_holes_test;
 
 #[cfg(test)]
 #[path = "types_test.rs"]
