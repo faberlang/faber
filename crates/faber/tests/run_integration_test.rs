@@ -649,6 +649,10 @@ fn reader_locale_accepts_direct_entry_file_input() {
     let source = write_single_file(
         "test-reader-locale-single-file",
         r#"
+测试 "pass" {
+    断言 1 ≡ 1
+}
+
 入口 {
   显示 "salve"
 }
@@ -674,6 +678,10 @@ fn reader_locale_accepts_manifest_file_input() {
     let package = write_basic_package(
         "test-reader-locale-manifest",
         r#"
+测试 "pass" {
+    断言 1 ≡ 1
+}
+
 入口 {
   显示 "salve"
 }

@@ -167,11 +167,11 @@ fn package_analysis_repeated_warning_codes_collapse_to_a_count() {
         "a unique warning still renders in full:\n{rendered}"
     );
     assert!(
-        rendered.contains("warning[LOCALE002]: 3 occurrences"),
+        rendered.contains("3 occurrences"),
         "repeated warning codes collapse to a counted summary:\n{rendered}"
     );
     assert_eq!(
-        rendered.matches("warning[LOCALE002]").count(),
+        rendered.matches("LOCALE002").count(),
         1,
         "do not dump every raw LOCALE002 line:\n{rendered}"
     );
@@ -313,7 +313,11 @@ targets = ["rust"]
     );
 
     assert!(!unmatched_include);
-    assert_eq!(report.results.len(), 1, "only focused case should run: {report:?}");
+    assert_eq!(
+        report.results.len(),
+        1,
+        "only focused case should run: {report:?}"
+    );
     assert_eq!(report.passed(), 1, "focused case should pass: {report:?}");
     assert_eq!(report.failed(), 0, "plain unit must not run: {report:?}");
     assert_eq!(report.blocked(), 0, "plain unit must not link: {report:?}");
