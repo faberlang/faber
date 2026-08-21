@@ -298,6 +298,16 @@ pub fn run_function_with_step_budget<H: Host + ?Sized>(
             format!("no MIR function with id {}", function_id.0),
         )]);
     }
+    if let Some(function) = program
+        .functions
+        .iter()
+        .find(|function| function_contains_bounded_textus(function, context.types))
+    {
+        return Err(vec![RunnerError::unsupported(
+            function.span,
+            "bounded textus runner carrier",
+        )]);
+    }
     let mut runner = Runner::new(program, context, context.types, interner, host);
     runner.step_limit = step_budget;
     runner.push_frame(function_id, MirBlockId(0));
@@ -307,6 +317,26 @@ pub fn run_function_with_step_budget<H: Host + ?Sized>(
     } else {
         Err(runner.errors)
     }
+}
+
+fn function_contains_bounded_textus(function: &MirFunction, types: &TypeTable) -> bool {
+    let has_type =
+        |ty: radix_mir::MirType| matches!(types.get(ty.semantic_id()), Type::BoundedTextus { .. });
+    function.params.iter().any(|param| has_type(param.ty))
+        || has_type(function.return_ty)
+        || function.error_ty.is_some_and(has_type)
+        || function.locals.iter().any(|local| has_type(local.ty))
+        || function.temps.iter().any(|temp| has_type(temp.ty))
+        || function.blocks.iter().any(|block| {
+            block
+                .statements
+                .iter()
+                .any(|statement| match &statement.kind {
+                    MirStatementKind::Assign { value, .. } => has_type(value.ty),
+                    MirStatementKind::RuntimeCall { call, .. } => has_type(call.return_ty),
+                    MirStatementKind::Call { .. } | MirStatementKind::Construct { .. } => false,
+                })
+        })
 }
 
 /// Gaussian Error Linear Unit using the tanh approximation:

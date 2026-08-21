@@ -290,6 +290,15 @@ impl TypeChecker<'_> {
             return target_resolved;
         }
 
+        if self.is_bounded_textus_conversio(source_ty, target_resolved) {
+            if let Some(recovery) = recovery {
+                self.note_conversio_recovery_checked(recovery, target_resolved);
+            } else {
+                self.check_conversio_propagation_channel(source_ty, target_resolved, span);
+            }
+            return target_resolved;
+        }
+
         if self.is_bounded_lista_conversio(source_ty, target_resolved) {
             if let Some(recovery) = recovery {
                 self.note_conversio_recovery_checked(recovery, target_resolved);
@@ -1245,6 +1254,25 @@ impl TypeChecker<'_> {
                 Type::BoundedAscii { .. },
                 Type::Primitive(Primitive::Ascii | Primitive::Textus)
             ) | (Type::Primitive(Primitive::Ascii), Type::BoundedAscii { .. })
+        )
+    }
+
+    /// D7's explicit bounded-text bridges. Bounded → unbounded copies the
+    /// initialized scalar prefix; unbounded → bounded keeps `N` for the host
+    /// carrier to enforce with a fail-closed overflow.
+    fn is_bounded_textus_conversio(&self, source_ty: TypeId, target_ty: TypeId) -> bool {
+        matches!(
+            (
+                self.types.get(self.resolve_inferred_type(source_ty)),
+                self.types.get(self.resolve_inferred_type(target_ty)),
+            ),
+            (
+                Type::BoundedTextus { .. },
+                Type::Primitive(Primitive::Textus)
+            ) | (
+                Type::Primitive(Primitive::Textus),
+                Type::BoundedTextus { .. }
+            )
         )
     }
 
