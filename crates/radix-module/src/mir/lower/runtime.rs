@@ -74,12 +74,10 @@ impl FunctionBuilder<'_> {
         }
 
         let imported_method_target = receiver.ty.and_then(|receiver_ty| {
-            let Type::Struct(def_id) = self.normalized_type(receiver_ty) else {
-                return None;
-            };
+            let def_id = self.method_receiver_struct_def(receiver_ty)?;
             self.context
                 .imported_method_providers
-                .get(&(*def_id, method))
+                .get(&(def_id, method))
                 .cloned()
         });
         if let Some(target) = imported_method_target {
@@ -146,8 +144,8 @@ impl FunctionBuilder<'_> {
         }
 
         if let Some(receiver_ty) = receiver.ty {
-            let normalized = self.normalized_type(receiver_ty);
-            if let Some(entry) = crate::intrinsics::lookup_method_for_type(normalized, &method_name, args.len()) {
+            let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
+            if let Some(entry) = crate::intrinsics::lookup_method_for_type(payload, &method_name, args.len()) {
                 if crate::intrinsics::mir_is_higher_order_lista(entry) {
                     let closure = &args[0].expr;
                     return match entry.mir_kind {
@@ -1725,10 +1723,8 @@ impl FunctionBuilder<'_> {
 
     fn genus_method_target(&self, receiver: &HirExpression, method: Symbol) -> Option<MethodTarget> {
         let receiver_ty = receiver.ty?;
-        let Type::Struct(def_id) = self.normalized_type(receiver_ty) else {
-            return None;
-        };
-        self.context.method_targets.get(&(*def_id, method)).copied()
+        let def_id = self.method_receiver_struct_def(receiver_ty)?;
+        self.context.method_targets.get(&(def_id, method)).copied()
     }
 
     /// Lower a direct call, enum variant constructor, or failable call.
@@ -2007,8 +2003,8 @@ impl FunctionBuilder<'_> {
             return None;
         };
         let method_name = self.resolve_method_name(method)?;
-        let receiver_ty = self.normalized_type(receiver_ty);
-        let entry = crate::intrinsics::lookup_method_for_type(receiver_ty, method_name, args.len())?;
+        let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
+        let entry = crate::intrinsics::lookup_method_for_type(payload, method_name, args.len())?;
         crate::intrinsics::mir_collection_op(entry)
     }
 

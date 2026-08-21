@@ -223,15 +223,7 @@ impl FunctionBuilder<'_> {
         let Some(receiver_ty) = expr.ty else {
             return false;
         };
-        let def_id = match self.normalized_type(receiver_ty) {
-            Type::Struct(def_id) => Some(*def_id),
-            Type::Applied(base, _) => match self.normalized_type(*base) {
-                Type::Struct(def_id) => Some(*def_id),
-                _ => None,
-            },
-            _ => None,
-        };
-        let Some(def_id) = def_id else {
+        let Some(def_id) = self.method_receiver_struct_def(receiver_ty) else {
             return false;
         };
         self.context.method_targets.contains_key(&(def_id, name))

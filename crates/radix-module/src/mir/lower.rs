@@ -2498,6 +2498,27 @@ impl<'a> FunctionBuilder<'a> {
             }
         }
     }
+
+    /// Carrier under `ref`/`mut`/`own`/`copy` wrappers.
+    ///
+    /// Typecheck peels access markers before method lookup. MIR method
+    /// resolution must too: a `mut list.get` or `ref Struct.method()` otherwise
+    /// fail-closes as "method call before runtime/provider MIR lowering".
+    fn method_receiver_payload_id(&self, ty: TypeId) -> TypeId {
+        self.types.peel_access_marker(ty).1
+    }
+
+    fn method_receiver_struct_def(&self, ty: TypeId) -> Option<DefId> {
+        let payload = self.method_receiver_payload_id(ty);
+        match self.types.get(payload) {
+            Type::Struct(def_id) => Some(*def_id),
+            Type::Applied(base, _) => match self.types.get(*base) {
+                Type::Struct(def_id) => Some(*def_id),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
 }
 
 fn mir_un_op(op: HirUnOp) -> Option<MirUnOp> {

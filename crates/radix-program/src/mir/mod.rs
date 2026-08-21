@@ -593,3 +593,7 @@ mod reachability_tests;
 #[cfg(test)]
 #[path = "lane_test.rs"]
 mod lane_tests;
+
+#[cfg(test)]
+#[path = "receiver_method_lane_test.rs"]
+mod receiver_method_lane_tests;
