@@ -393,6 +393,7 @@ fn inject_status(
             name: interner.intern(STATUS_NAME),
             type_params: Vec::new(),
             annotations: Vec::new(),
+            commune_fields: Vec::new(),
             variants,
         }),
         span: Span::default(),

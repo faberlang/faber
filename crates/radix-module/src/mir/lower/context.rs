@@ -408,14 +408,27 @@ impl<'a> LoweringContextMaps<'a> {
                 .collect::<Vec<_>>();
             self.enum_variants.insert(enum_def, variant_defs.clone());
             self.validation.enum_variants.insert(enum_def, variant_defs);
+            let commune = unit
+                .resolver
+                .commune_fields(enum_def)
+                .iter()
+                .map(|field| (field.name, field.ty))
+                .collect::<Vec<_>>();
             for variant in &variants {
                 self.variant_parents.insert(variant.def_id, enum_def);
                 self.validation
                     .variant_parents
                     .insert(variant.def_id, enum_def);
-                self.variant_fields
-                    .insert(variant.def_id, variant.fields.iter().map(|field| field.name).collect());
+                let field_names = commune
+                    .iter()
+                    .map(|(name, _)| *name)
+                    .chain(variant.fields.iter().map(|field| field.name))
+                    .collect::<Vec<_>>();
+                self.variant_fields.insert(variant.def_id, field_names);
                 let mut fields = FxHashMap::default();
+                for (name, ty) in &commune {
+                    fields.insert(*name, MirType::semantic(*ty));
+                }
                 for field in &variant.fields {
                     fields.insert(field.name, MirType::semantic(field.ty));
                 }
@@ -535,10 +548,15 @@ impl<'a> LoweringContextMaps<'a> {
             self.validation
                 .variant_parents
                 .insert(variant.def_id, enum_def_id);
-            self.variant_fields
-                .insert(variant.def_id, variant.fields.iter().map(|field| field.name).collect());
+            let field_names = enum_item
+                .commune_fields
+                .iter()
+                .chain(variant.fields.iter())
+                .map(|field| field.name)
+                .collect::<Vec<_>>();
+            self.variant_fields.insert(variant.def_id, field_names);
             let mut fields = FxHashMap::default();
-            for field in &variant.fields {
+            for field in enum_item.commune_fields.iter().chain(variant.fields.iter()) {
                 fields.insert(field.name, MirType::semantic(field.ty));
             }
             self.variant_field_tys

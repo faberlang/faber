@@ -29,7 +29,8 @@ locale = "en"
 # =============================================================================
 #
 # BACKEND:
-#   Semantic contract only (TEU2). Emit of commune payloads is TEU3.
+#   TEU3: commune fields emit on the primary lanes (Rust enum payloads, TS
+#   tagged unions) and MIR lowering/stepper. Tail backends are TEU4.
 
 union ShapeError {
     @ shared

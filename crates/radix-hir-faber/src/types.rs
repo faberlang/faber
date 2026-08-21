@@ -1788,6 +1788,7 @@ mod tests {
             name: interner.intern("DType"),
             type_params: Vec::new(),
             annotations: Vec::new(),
+            commune_fields: Vec::new(),
             variants: vec![
                 HirVariant {
                     def_id: DefId(1),
@@ -1892,6 +1893,7 @@ mod tests {
                 name: interner.intern("DType"),
                 type_params: Vec::new(),
                 annotations: vec![HirAnnotation::with_fields(publica, Vec::new(), span())],
+                commune_fields: Vec::new(),
                 variants: vec![HirVariant {
                     def_id: DefId(1),
                     name: interner.intern("F32"),
@@ -1967,6 +1969,7 @@ mod tests {
             name: interner.intern("DType"),
             type_params: Vec::new(),
             annotations: Vec::new(),
+            commune_fields: Vec::new(),
             variants: vec![HirVariant {
                 def_id: variant_def,
                 name: interner.intern("F32"),
@@ -2060,6 +2063,7 @@ mod tests {
             name: interner.intern("TensorError"),
             type_params: Vec::new(),
             annotations: Vec::new(),
+            commune_fields: Vec::new(),
             variants: vec![HirVariant {
                 def_id: variant_def,
                 name: interner.intern("FormaInvalida"),

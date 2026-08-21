@@ -621,6 +621,7 @@ impl Lowerer<'_> {
             name: decl.name.name,
             type_params: Vec::new(),
             annotations: self.lower_annotations(&stmt.annotations),
+            commune_fields: Vec::new(),
             variants,
         };
 
@@ -669,7 +670,8 @@ impl Lowerer<'_> {
         self.push_type_params(type_params.iter().map(|param| (param.name, param.kind)));
 
         let commune = self.lower_commune_fields(decl);
-        self.resolver.register_commune_fields(def_id, commune);
+        self.resolver
+            .register_commune_fields(def_id, commune.clone());
 
         let variants = decl
             .variants
@@ -683,6 +685,14 @@ impl Lowerer<'_> {
             name: decl.name.name,
             type_params,
             annotations: self.lower_annotations(&stmt.annotations),
+            commune_fields: commune
+                .into_iter()
+                .map(|field| HirVariantField {
+                    name: field.name,
+                    ty: field.ty,
+                    span: field.span,
+                })
+                .collect(),
             variants,
         };
 

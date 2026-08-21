@@ -117,11 +117,56 @@ impl Validator<'_, '_> {
                 );
                 Some(MirType::semantic(value))
             }
+            Type::Enum(def_id) => self.project_enum_commune_field(def_id, field, span),
             _ => {
                 self.error(span, "field projection base is not a struct or record");
                 None
             }
         }
+    }
+
+    /// `@ commune` fields are present on every variant payload. Member access
+    /// `e.message` is a Field projection on the enum type; it is legal only when
+    /// every variant carries the same field at the same type.
+    fn project_enum_commune_field(
+        &mut self,
+        enum_def: DefId,
+        field: Symbol,
+        span: Span,
+    ) -> Option<MirType> {
+        let Some(variants) = self.context.enum_variants.get(&enum_def).cloned() else {
+            self.error(span, "enum field projection is missing variant metadata");
+            return None;
+        };
+        if variants.is_empty() {
+            self.error(span, "enum field projection has no variants");
+            return None;
+        }
+        let mut field_ty = None;
+        for variant in variants {
+            let Some(ty) = self
+                .context
+                .variant_fields
+                .get(&variant)
+                .and_then(|fields| fields.get(&field))
+                .copied()
+            else {
+                self.error(
+                    span,
+                    "enum field projection is not present on every variant",
+                );
+                return None;
+            };
+            match field_ty {
+                None => field_ty = Some(ty),
+                Some(existing) if existing == ty => {}
+                Some(_) => {
+                    self.error(span, "enum field projection type disagrees across variants");
+                    return None;
+                }
+            }
+        }
+        field_ty
     }
 
     pub(crate) fn project_vector_lane(

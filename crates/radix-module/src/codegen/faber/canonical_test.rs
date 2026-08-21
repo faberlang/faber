@@ -1086,6 +1086,7 @@ fn discerne_patterns_preserve_bindings_aliases_variants_and_guards() {
             name: event,
             type_params: Vec::new(),
             annotations: Vec::new(),
+            commune_fields: Vec::new(),
             variants: vec![HirVariant {
                 def_id: DefId(2),
                 name: click,

@@ -125,6 +125,7 @@ fn program_with_match(enum_def: DefId, match_expr: HirExpression) -> HirModule {
                 name: radix_lexer::Symbol(1),
                 type_params: Vec::new(),
                 annotations: Vec::new(),
+                commune_fields: Vec::new(),
                 variants: vec![
                     HirVariant {
                         def_id: DefId(2),
@@ -525,6 +526,7 @@ fn program_with_variants(
                 name: radix_lexer::Symbol(1),
                 type_params: Vec::new(),
                 annotations: Vec::new(),
+                commune_fields: Vec::new(),
                 variants,
             }),
             span: test_span(),

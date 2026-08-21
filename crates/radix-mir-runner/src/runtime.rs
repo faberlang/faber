@@ -3340,6 +3340,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .cloned()
                     .ok_or_else(|| RunnerError::internal(span, "tuple field out of bounds"))
             }
+            Value::EnumVariant(_, cell) => cell.borrow().get(&field).cloned().ok_or_else(|| {
+                RunnerError::internal(span, format!("missing enum field sym#{}", field.0))
+            }),
             _ => Err(RunnerError::internal(
                 span,
                 "field projection on non-aggregate",

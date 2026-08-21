@@ -64,6 +64,7 @@ fn enum_program(exprs: Vec<HirExpression>) -> HirModule {
             name: crate::lexer::Symbol(1),
             type_params: Vec::new(),
             annotations: Vec::new(),
+            commune_fields: Vec::new(),
             variants: vec![
                 HirVariant {
                     def_id: DefId(2),

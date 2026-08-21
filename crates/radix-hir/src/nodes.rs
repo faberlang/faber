@@ -569,6 +569,14 @@ pub struct HirEnum {
     /// canonical Faber emitter can preserve declaration visibility through
     /// convert round-trips.
     pub annotations: Vec<HirAnnotation>,
+    /// Fields declared in the union's `@ commune` region.
+    ///
+    /// Backends prepend these fields to every variant payload. Keeping the
+    /// declaration separate from variant-owned fields lets emitters recognize
+    /// unconditional member access without inferring a shared contract from
+    /// coincidentally identical variant shapes.
+    #[serde(default)]
+    pub commune_fields: Vec<HirVariantField>,
     pub variants: Vec<HirVariant>,
 }
 
