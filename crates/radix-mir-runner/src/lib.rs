@@ -154,6 +154,10 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     host: &'a mut H,
     frames: Vec<Frame>,
     errors: Vec<RunnerError>,
+    /// Remaining-capacity counter: `None` means unlimited. One unit is one
+    /// MIR basic-block visit in `run_until_depth`.
+    step_limit: Option<u64>,
+    steps_taken: u64,
     return_value: Option<Value>,
     return_error: Option<Value>,
     /// Stack of yield buffers, one per active `CursorStream` materialization.
@@ -206,6 +210,8 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             host,
             frames: Vec::new(),
             errors: Vec::new(),
+            step_limit: None,
+            steps_taken: 0,
             return_value: None,
             return_error: None,
             generator_yields: Vec::new(),
@@ -260,6 +266,24 @@ pub fn run_function<H: Host + ?Sized>(
     function_id: MirFunctionId,
     host: &mut H,
 ) -> Result<(), Vec<RunnerError>> {
+    run_function_with_step_budget(validated, function_id, host, None)
+}
+
+/// Run a specific MIR function with an optional deterministic step budget.
+///
+/// One step is one MIR basic-block visit. `None` is unlimited. Exhaustion
+/// records `interpreter step budget exhausted after N steps` and stops.
+///
+/// # Errors
+///
+/// Returns a list of runner errors if the program cannot be executed or the
+/// step budget is exhausted.
+pub fn run_function_with_step_budget<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+    step_budget: Option<u64>,
+) -> Result<(), Vec<RunnerError>> {
     let context = validated.validation();
     let program = validated.program();
     let interner = context.interner.ok_or_else(|| {
@@ -275,6 +299,7 @@ pub fn run_function<H: Host + ?Sized>(
         )]);
     }
     let mut runner = Runner::new(program, context, context.types, interner, host);
+    runner.step_limit = step_budget;
     runner.push_frame(function_id, MirBlockId(0));
     runner.run_until_depth(0);
     if runner.errors.is_empty() {
@@ -427,8 +452,28 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// Count one interpreter step (one MIR basic-block visit). Returns `false`
+    /// when the optional step budget is exhausted; an error is recorded.
+    fn consume_step(&mut self, span: Span) -> bool {
+        let Some(limit) = self.step_limit else {
+            return true;
+        };
+        if self.steps_taken >= limit {
+            self.errors.push(RunnerError::internal(
+                span,
+                format!("interpreter step budget exhausted after {limit} steps"),
+            ));
+            return false;
+        }
+        self.steps_taken += 1;
+        true
+    }
+
     fn run_until_depth(&mut self, min_depth: usize) {
         while self.frames.len() > min_depth {
+            if !self.consume_step(Span::default()) {
+                break;
+            }
             let Some(frame) = self.frames.last() else {
                 break;
             };

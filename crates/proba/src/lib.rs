@@ -13,8 +13,8 @@ mod tests;
 use radix::hir::{DefId, HirItemKind, HirModule, HirTestMetadata, HirTestModifier};
 use radix::lexer::Interner;
 use radix::mir::{
-    lower_analyzed_unit_with_context, run_function, BufferHost, MirFunctionId, RunSourceError,
-    RunnerError, ValidatedMir,
+    lower_analyzed_unit_with_context, run_function_with_step_budget, BufferHost, MirFunctionId,
+    RunSourceError, RunnerError, ValidatedMir,
 };
 use radix::module::{AnalyzedModule, Session};
 use radix::program::analyze_prepared_program_name;
@@ -302,6 +302,113 @@ pub fn source_skip_reason(case: &ProbaCase) -> Option<String> {
     None
 }
 
+/// How a case's remaining modifiers (`temporis` / `repete` / `solum_in` /
+/// `fragilis` / `metior`) are enforced. Every parsed modifier is either
+/// consumed here or rejected; none is silently ignored.
+enum ExecutionPlan {
+    Reject {
+        reason: String,
+    },
+    Skip {
+        reason: String,
+    },
+    Run {
+        step_budget: Option<u64>,
+        repeats: u64,
+    },
+}
+
+fn execution_plan(modifiers: &[ProbaModifierView]) -> ExecutionPlan {
+    let mut step_budget = None;
+    let mut repeats = 1_u64;
+    let mut solum_in = None;
+    for modifier in modifiers {
+        match modifier {
+            ProbaModifierView::Omitte(_)
+            | ProbaModifierView::Futurum(_)
+            | ProbaModifierView::Solum
+            | ProbaModifierView::Tag(_) => {}
+            ProbaModifierView::Temporis(n) => match u64::try_from(*n) {
+                Ok(budget) => step_budget = Some(budget),
+                Err(_) => {
+                    return ExecutionPlan::Reject {
+                        reason: format!(
+                            "faber: temporis requires a non-negative step budget, got {n}"
+                        ),
+                    };
+                }
+            },
+            ProbaModifierView::Repete(n) => match u64::try_from(*n) {
+                Ok(count) if count > 0 => repeats = count,
+                _ => {
+                    return ExecutionPlan::Reject {
+                        reason: format!("faber: repete requires a positive count, got {n}"),
+                    };
+                }
+            },
+            ProbaModifierView::Fragilis(_) => {
+                return ExecutionPlan::Reject {
+                    reason: "faber: fragilis is rejected — flaky retries are not executed"
+                        .to_owned(),
+                };
+            }
+            ProbaModifierView::Metior => {
+                return ExecutionPlan::Reject {
+                    reason: "faber: metior is rejected — benchmarks are not executed by faber test"
+                        .to_owned(),
+                };
+            }
+            ProbaModifierView::SolumIn(env) => solum_in = Some(env.clone()),
+        }
+    }
+    if let Some(env) = solum_in {
+        if !solum_in_matches(&env) {
+            return ExecutionPlan::Skip {
+                reason: format!("faber: solum_in - only in {env}"),
+            };
+        }
+    }
+    ExecutionPlan::Run {
+        step_budget,
+        repeats,
+    }
+}
+
+/// `solum_in "name"` runs only in that named environment.
+///
+/// Match order: `FABER_SOLUM_IN` exact value, then `std::env::consts::OS`,
+/// then a process env var of the same name (also tried uppercased).
+fn solum_in_matches(requested: &str) -> bool {
+    solum_in_matches_in(
+        requested,
+        std::env::var("FABER_SOLUM_IN").ok().as_deref(),
+        std::env::consts::OS,
+        |name| std::env::var(name).ok(),
+    )
+}
+
+fn solum_in_matches_in(
+    requested: &str,
+    faber_solum_in: Option<&str>,
+    os: &str,
+    env_get: impl Fn(&str) -> Option<String>,
+) -> bool {
+    if faber_solum_in == Some(requested) {
+        return true;
+    }
+    if requested == os {
+        return true;
+    }
+    if env_get(requested).is_some_and(|value| !value.is_empty()) {
+        return true;
+    }
+    let upper = requested.to_ascii_uppercase();
+    if upper != requested {
+        return env_get(&upper).is_some_and(|value| !value.is_empty());
+    }
+    false
+}
+
 /// Optional harness-style substring filter on case display path (`suite/name`).
 #[must_use]
 pub fn harness_filter_matches(case: &ProbaCase, filter: Option<&str>, exact: bool) -> bool {
@@ -514,14 +621,27 @@ fn run_proba_cases(
             continue;
         }
 
-        let execution = match function_id_for_case(case) {
-            Some(function_id) => execute_case(validated, function_id),
-            None => CaseExecution::without_output(CaseOutcome::Blocked {
-                reason: format!(
-                    "proba case {:?} has no lowered MIR function (def #{})",
-                    case.name, case.def_id.0
-                ),
-            }),
+        let execution = match execution_plan(&case.modifiers) {
+            ExecutionPlan::Reject { reason } => {
+                CaseExecution::without_output(CaseOutcome::Failed { message: reason })
+            }
+            ExecutionPlan::Skip { reason } => {
+                CaseExecution::without_output(CaseOutcome::Skipped { reason })
+            }
+            ExecutionPlan::Run {
+                step_budget,
+                repeats,
+            } => match function_id_for_case(case) {
+                Some(function_id) => {
+                    execute_case_repeated(validated, function_id, step_budget, repeats)
+                }
+                None => CaseExecution::without_output(CaseOutcome::Blocked {
+                    reason: format!(
+                        "proba case {:?} has no lowered MIR function (def #{})",
+                        case.name, case.def_id.0
+                    ),
+                }),
+            },
         };
         results.push(CaseResult {
             unit_path: unit_path.to_path_buf(),
@@ -545,14 +665,34 @@ fn mir_function_id_for_def(validated: &ValidatedMir<'_>, def_id: DefId) -> Optio
         .map(|function| function.id)
 }
 
-fn execute_case(validated: &ValidatedMir<'_>, function_id: MirFunctionId) -> CaseExecution {
+fn execute_case_repeated(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    step_budget: Option<u64>,
+    repeats: u64,
+) -> CaseExecution {
+    let mut last = CaseExecution::without_output(CaseOutcome::Passed);
+    for _ in 0..repeats {
+        last = execute_case(validated, function_id, step_budget);
+        if !matches!(last.outcome, CaseOutcome::Passed) {
+            return last;
+        }
+    }
+    last
+}
+
+fn execute_case(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    step_budget: Option<u64>,
+) -> CaseExecution {
     let mut host = BufferHost::default();
     // Assertion failures call Host::abort which panics on BufferHost; catch as fail.
     // Silence the default panic hook so failed cases do not dump a backtrace to stderr.
     let previous_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(|_| {}));
     let trapped = catch_unwind(AssertUnwindSafe(|| {
-        run_function(validated, function_id, &mut host)
+        run_function_with_step_budget(validated, function_id, &mut host, step_budget)
     }));
     std::panic::set_hook(previous_hook);
     let outcome = match trapped {
@@ -586,11 +726,19 @@ fn captured_stdout(host: &BufferHost) -> Vec<String> {
 
 fn case_outcome_from_runner_errors(errors: &[RunnerError]) -> CaseOutcome {
     let message = format_runner_errors(errors);
-    if is_capability_gap_message(&message) {
+    if is_step_budget_exhausted(&message) {
+        CaseOutcome::Failed {
+            message: format!("temporis: {message}"),
+        }
+    } else if is_capability_gap_message(&message) {
         CaseOutcome::Blocked { reason: message }
     } else {
         CaseOutcome::Failed { message }
     }
+}
+
+fn is_step_budget_exhausted(message: &str) -> bool {
+    message.contains("interpreter step budget exhausted")
 }
 
 fn is_capability_gap_message(message: &str) -> bool {

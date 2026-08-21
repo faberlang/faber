@@ -371,3 +371,179 @@ proba "broken equality" {
         "a blocked case that never ran must not render as a failed test: {blocked_only}"
     );
 }
+
+#[test]
+fn temporis_runaway_loop_exhausts_step_budget() {
+    // Without the budget this `dum verum` case hangs the runner forever.
+    let report = run(
+        r#"
+proba "runaway" temporis 64 {
+    dum verum {
+        tacet
+    }
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.results.len(), 1);
+    assert_eq!(report.passed(), 0);
+    assert_eq!(report.failed(), 1);
+    assert_eq!(report.blocked(), 0);
+    match &report.results[0].outcome {
+        CaseOutcome::Failed { message } => {
+            assert!(
+                message.contains("temporis"),
+                "budget exhaustion should name temporis: {message}"
+            );
+            assert!(
+                message.contains("step budget exhausted"),
+                "budget exhaustion should name the step budget: {message}"
+            );
+            assert!(
+                message.contains("64"),
+                "budget exhaustion should name the limit: {message}"
+            );
+        }
+        other => panic!("expected Failed budget exhaustion, got {other:?}"),
+    }
+}
+
+#[test]
+fn temporis_sufficient_budget_still_passes() {
+    let report = run(
+        r#"
+proba "bounded" temporis 10000 {
+    adfirma 1 ≡ 1
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.passed(), 1);
+    assert_eq!(report.failed(), 0);
+    assert!(report.success());
+}
+
+#[test]
+fn repete_runs_and_passes() {
+    let report = run(
+        r#"
+proba "repeat me" repete 3 {
+    adfirma 1 ≡ 1
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.passed(), 1);
+    assert_eq!(report.failed(), 0);
+    assert!(report.success());
+}
+
+#[test]
+fn repete_still_fails_on_assertion() {
+    let report = run(
+        r#"
+proba "always broken" repete 3 {
+    adfirma 1 ≡ 2
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.passed(), 0);
+    assert_eq!(report.failed(), 1);
+    assert!(!report.success());
+}
+
+#[test]
+fn fragilis_is_rejected_and_body_is_not_executed() {
+    let report = run(
+        r#"
+proba "flaky" fragilis 3 {
+    adfirma 1 ≡ 2
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.failed(), 1);
+    assert_eq!(report.passed(), 0);
+    match &report.results[0].outcome {
+        CaseOutcome::Failed { message } => {
+            assert!(
+                message.contains("fragilis is rejected"),
+                "fragilis must fail closed instead of silently running: {message}"
+            );
+            assert!(
+                !message.contains("1 ≡ 2") && !message.contains("adfirma"),
+                "rejected fragilis must not execute the assertion: {message}"
+            );
+        }
+        other => panic!("expected Failed rejection, got {other:?}"),
+    }
+}
+
+#[test]
+fn metior_is_rejected() {
+    let report = run(
+        r#"
+proba "bench" metior {
+    adfirma 1 ≡ 1
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.failed(), 1);
+    match &report.results[0].outcome {
+        CaseOutcome::Failed { message } => {
+            assert!(
+                message.contains("metior is rejected"),
+                "metior must fail closed instead of silently running: {message}"
+            );
+        }
+        other => panic!("expected Failed rejection, got {other:?}"),
+    }
+}
+
+#[test]
+fn solum_in_skips_when_environment_does_not_match() {
+    let report = run(
+        r#"
+proba "gated" solum_in "proba-u10-absent-env" {
+    adfirma 1 ≡ 2
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.skipped(), 1);
+    assert_eq!(report.failed(), 0);
+    assert!(report.success());
+    match &report.results[0].outcome {
+        CaseOutcome::Skipped { reason } => {
+            assert!(
+                reason.contains("solum_in"),
+                "skip reason should name solum_in: {reason}"
+            );
+            assert!(
+                reason.contains("proba-u10-absent-env"),
+                "skip reason should name the required environment: {reason}"
+            );
+        }
+        other => panic!("expected Skipped, got {other:?}"),
+    }
+}
+
+#[test]
+fn solum_in_match_helper_covers_env_os_and_var() {
+    assert!(super::solum_in_matches_in(
+        "ci",
+        Some("ci"),
+        "linux",
+        |_| None
+    ));
+    assert!(!super::solum_in_matches_in("ci", None, "linux", |_| None));
+    assert!(super::solum_in_matches_in("linux", None, "linux", |_| None));
+    assert!(super::solum_in_matches_in("ci", None, "macos", |name| {
+        (name == "CI").then(|| "true".to_owned())
+    }));
+    assert!(super::solum_in_matches_in("CI", None, "macos", |name| {
+        (name == "CI").then(|| "1".to_owned())
+    }));
+}
