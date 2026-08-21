@@ -139,7 +139,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             }
             let mut rewrites = Vec::with_capacity(call_sites.len());
             for site in call_sites {
-                if let Some(rewrite) = self.apply_call_site(site) {
+                if let Some(rewrite) = self.rewrite_for_call(site) {
                     if rewrite.fresh_instance {
                         worklist.push(rewrite.target);
                     }
@@ -231,23 +231,6 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         sites
     }
 
-    /// Re-run the rewrite decision for one snapshotted call site. The witness
-    /// and scope are owned by `CallSite`, so `rewrite_for_call` can be `&mut self`.
-    fn apply_call_site(&mut self, site: CallSite) -> Option<Rewrite> {
-        let CallSite { function, block_index, location, destination, callee, args, error_place, span, scope } = site;
-        self.rewrite_for_call(
-            function,
-            block_index,
-            location,
-            destination.as_ref(),
-            &callee,
-            &args,
-            error_place.as_ref(),
-            span,
-            &scope,
-        )
-    }
-
     fn is_generic_callee(&self, callee: &MirCallee) -> bool {
         matches!(
             callee,
@@ -255,19 +238,9 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         )
     }
 
-    fn rewrite_for_call(
-        &mut self,
-        function: MirFunctionId,
-        block_index: usize,
-        location: CallLocation,
-        destination: Option<&MirPlace>,
-        callee: &MirCallee,
-        args: &[MirOperand],
-        error_place: Option<&MirPlace>,
-        span: Span,
-        scope: &FunctionTypeScope,
-    ) -> Option<Rewrite> {
-        let MirCallee::Definition { source, type_args: explicit_type_args } = callee else {
+    fn rewrite_for_call(&mut self, site: CallSite) -> Option<Rewrite> {
+        let CallSite { function, block_index, location, destination, callee, args, error_place, span, scope } = site;
+        let MirCallee::Definition { source, type_args: explicit_type_args } = &callee else {
             return None;
         };
         if !self.generic_param_order.contains_key(source) {
@@ -282,7 +255,13 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             None
         })?;
 
-        let witness = CallWitness { args, destination, error_place, span, scope };
+        let witness = CallWitness {
+            args: &args,
+            destination: destination.as_ref(),
+            error_place: error_place.as_ref(),
+            span,
+            scope: &scope,
+        };
         let parent_shape_bindings = self.instance_shape_bindings(function);
         let key = self.key_for_call(&template, explicit_type_args, witness, &parent_shape_bindings)?;
         let (target, fresh_instance) = self.ensure_instance(&template, &key, span)?;
@@ -510,7 +489,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         key: &MirMonomorphizationKey,
         span: Span,
     ) -> Option<(MirFunctionId, bool)> {
-        if let Some(existing) = self.find_instance(key) {
+        if let Some(existing) = self.instance_index.get(key).copied() {
             return Some((existing, false));
         }
         if self.monomorphizations.len() >= MAX_MONOMORPHIZATIONS {
@@ -535,7 +514,6 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         self.next_id = MirFunctionId(self.next_id.0 + 1);
         let mut instance = template.clone();
         instance.id = id;
-        instance.name = template.name;
         if !self.substitute_function(&mut instance, &bindings, span) {
             return None;
         }
@@ -603,14 +581,13 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     }
 
     fn substitute_value(&mut self, value: &mut MirValue, bindings: &MirGenericBindings, span: Span) -> bool {
-        value.ty = match self.substitute_ty(value.ty, bindings, span) {
-            Some(ty) => ty,
-            None => return false,
-        };
-        if let MirValueKind::Option(MirOptionOp::Chain { link: MirOptionChainLink::Call { .. }, .. }) = &value.kind {
-            return true;
+        match self.substitute_ty(value.ty, bindings, span) {
+            Some(ty) => {
+                value.ty = ty;
+                true
+            }
+            None => false,
         }
-        true
     }
 
     fn substitute_runtime_call(
@@ -837,10 +814,6 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             MirConstant::ShapeSize { .. } => Primitive::Fractus,
         };
         Some(MirType::semantic(self.lowerer.unit.types.primitive(primitive)))
-    }
-
-    fn find_instance(&self, key: &MirMonomorphizationKey) -> Option<MirFunctionId> {
-        self.instance_index.get(key).copied()
     }
 
     fn is_template_function(&self, function: &MirFunction) -> bool {
