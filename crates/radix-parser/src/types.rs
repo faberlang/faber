@@ -19,8 +19,9 @@
 //!   nullable flag would be lost.
 
 use super::{ParseError, ParseErrorKind, Parser};
-use radix_lexer::{Span, TokenKind};
+use radix_lexer::{KeywordOwner, Span, Symbol, TokenKind};
 use radix_syntax::{FiguraExpr, FuncTypeExpr, Ident, TypeExpr, TypeExprKind, TypeMode};
+use std::collections::HashSet;
 
 // TYPE PARSING
 
@@ -229,8 +230,14 @@ impl Parser {
                     }
                 } else {
                     let mut params = Vec::new();
+                    let mut labels = HashSet::new();
                     loop {
-                        params.push(self.parse_type_argument()?);
+                        let param = if name_str == "iuncta" {
+                            self.parse_iuncta_type_argument(&mut labels)?
+                        } else {
+                            self.parse_type_argument()?
+                        };
+                        params.push(param);
                         if !self.eat(&TokenKind::Comma) {
                             break;
                         }
@@ -447,6 +454,30 @@ impl Parser {
             kind: TypeExprKind::Named(self.keyword_ident(width, span), Vec::new()),
             span,
         }
+    }
+
+    /// Parse one `iuncta` element, optionally preceded by its contextual label.
+    ///
+    /// Labels are parser-local aliases at this stage. They are consumed here so
+    /// the existing `TypeExprKind::Named("iuncta", params)` carrier keeps its
+    /// identity-erased shape for later phases. `_` is deliberately excluded from
+    /// the label lookahead: an unlabeled element is represented by absence.
+    fn parse_iuncta_type_argument(
+        &mut self,
+        labels: &mut HashSet<Symbol>,
+    ) -> Result<TypeExpr, ParseError> {
+        let is_label = matches!(self.peek().kind, TokenKind::Ident(_) | TokenKind::Tag)
+            && matches!(self.peek_at(1).kind, TokenKind::Colon);
+        if is_label {
+            let label = self.parse_contextual_ident(KeywordOwner::DeclarationName)?;
+            if !labels.insert(label.name) {
+                return Err(ParseError::structured(ParseErrorKind::Expected, label.span)
+                    .with_arg("issue", "duplicate_tuple_element_label")
+                    .with_arg("label", self.interner.resolve(label.name).to_owned()));
+            }
+            self.expect(&TokenKind::Colon, "expected ':' after tuple element label")?;
+        }
+        self.parse_type_argument()
     }
 
     /// Parse one applied type argument: a type, or a NATURAL capacity.

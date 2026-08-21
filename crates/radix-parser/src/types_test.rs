@@ -3,7 +3,7 @@
 //! Contract: each type form produces the expected `TypeExprKind` variant or a structured diagnostic.
 
 use crate::test_support::args_have_no_legacy_message;
-use crate::test_support::parse_ok;
+use crate::test_support::{parse_ok, parse_program};
 use crate::{parse, ParseErrorKind};
 use radix_lexer::lex;
 use radix_syntax::{ClassMemberKind, ExprKind, FiguraExpr, StmtKind, TypeExprKind};
@@ -759,6 +759,113 @@ fn parses_iuncta_tuple_type_with_two_elements() {
         panic!("expected second element type");
     };
     assert_eq!(result.interner.resolve(second.name), "numerus");
+}
+
+#[test]
+fn parses_labeled_and_unlabeled_iuncta_type_arguments() {
+    let result =
+        parse_ok("functio f(iuncta<gx: textus, numerus, fixum: fractus> pair) → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let TypeExprKind::Named(name, params) = &func.params[0].ty.kind else {
+        panic!("expected iuncta type");
+    };
+    assert_eq!(result.interner.resolve(name.name), "iuncta");
+    assert_eq!(params.len(), 3);
+    assert!(matches!(params[0].kind, TypeExprKind::Named(_, _)));
+    assert!(matches!(params[1].kind, TypeExprKind::Named(_, _)));
+    assert!(matches!(params[2].kind, TypeExprKind::Named(_, _)));
+}
+
+#[test]
+fn parses_labeled_iuncta_infer_argument() {
+    let result = parse_ok("functio f(iuncta<loss: _, T> pair) → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let TypeExprKind::Named(_, params) = &func.params[0].ty.kind else {
+        panic!("expected iuncta type");
+    };
+    assert!(matches!(params[0].kind, TypeExprKind::Infer));
+    assert!(matches!(params[1].kind, TypeExprKind::Named(_, _)));
+}
+
+#[test]
+fn rejects_duplicate_iuncta_labels_at_the_duplicate_label() {
+    let source = "functio f(iuncta<gx: f32, gx: numerus> pair) → vacuum {}";
+    let result = parse_program(source);
+    let error = result
+        .errors
+        .iter()
+        .find(|error| {
+            error.kind == ParseErrorKind::Expected
+                && error
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "duplicate_tuple_element_label")
+        })
+        .expect("duplicate label diagnostic");
+    let duplicate_label_start = source.rfind("gx").expect("duplicate label") as u32;
+    assert_eq!(error.span.start, duplicate_label_start);
+    assert_eq!(error.span.end, duplicate_label_start + 2);
+}
+
+#[test]
+fn rejects_iuncta_label_spelling_on_call_site_type_arguments() {
+    let source = "incipit { fixum _ x ← f<gx: numerus>(x) }";
+    let result = parse_program(source);
+    let error = result
+        .errors
+        .first()
+        .expect("call-site label must produce a parse error");
+    assert_eq!(error.kind, ParseErrorKind::InvalidExpression);
+    assert_eq!(
+        error.span.start,
+        source.find(':').expect("label colon") as u32
+    );
+}
+
+#[test]
+fn unlabeled_iuncta_elements_are_not_spelled_with_an_underscore_label() {
+    let result = parse_program("functio f(iuncta<_: f32> pair) → vacuum {}");
+    assert!(!result.success());
+    assert!(result
+        .errors
+        .iter()
+        .any(|error| error.kind == ParseErrorKind::Expected));
+}
+
+#[test]
+fn labeled_iuncta_arity_cap_counts_labeled_elements() {
+    let args = (0..16)
+        .map(|index| format!("e{index}: u8"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let accepted = parse_ok(&format!("functio f(iuncta<{args}> many) → vacuum {{}}"));
+    let program = accepted.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let TypeExprKind::Named(_, params) = &func.params[0].ty.kind else {
+        panic!("expected iuncta type");
+    };
+    assert_eq!(params.len(), 16);
+
+    let args = (0..17)
+        .map(|index| format!("e{index}: u8"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let rejected = parse_program(&format!("functio f(iuncta<{args}> many) → vacuum {{}}"));
+    assert!(rejected.errors.iter().any(|error| {
+        error.kind == ParseErrorKind::InvalidType
+            && error
+                .args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "iuncta_arity_exceeded")
+    }));
 }
 
 #[test]
