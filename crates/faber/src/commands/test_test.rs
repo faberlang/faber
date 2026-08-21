@@ -256,6 +256,71 @@ fn cli_parses_allow_no_tests() {
 }
 
 #[test]
+fn cli_parses_focused_flag() {
+    use clap::Parser;
+    let cli = crate::cli::Cli::try_parse_from(["faber", "test", ".", "--focused"])
+        .expect("parse --focused");
+    let Some(crate::cli::Command::Test(args)) = cli.command else {
+        panic!("expected test subcommand");
+    };
+    assert!(args.focused);
+}
+
+#[test]
+fn package_solum_focus_applies_to_every_test_unit() {
+    let root = scratch_dir().join("u8-package-wide-solum");
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("src")).expect("fixture src");
+    fs::write(
+        root.join("faber.toml"),
+        r#"[package]
+name = "u8_package_wide_solum"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "u8_package_wide_solum"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("fixture manifest");
+    fs::write(
+        root.join("src/a.proba"),
+        "test \"focused\" only {\n    assert 1 ≡ 1\n}\n",
+    )
+    .expect("focused unit");
+    fs::write(
+        root.join("src/b.proba"),
+        "test \"plain\" {\n    assert 1 ≡ 2\n}\n",
+    )
+    .expect("plain unit");
+
+    let (report, unmatched_include) = super::run_package(
+        &Config::default(),
+        &root,
+        &TestSelection::default(),
+        None,
+        None,
+        false,
+        false,
+        false,
+    );
+
+    assert!(!unmatched_include);
+    assert_eq!(report.results.len(), 1, "only focused case should run: {report:?}");
+    assert_eq!(report.passed(), 1, "focused case should pass: {report:?}");
+    assert_eq!(report.failed(), 0, "plain unit must not run: {report:?}");
+    assert_eq!(report.blocked(), 0, "plain unit must not link: {report:?}");
+    assert_eq!(report.results[0].name, "focused");
+}
+
+#[test]
 fn package_test_degrades_per_unit_when_one_unit_cannot_lower() {
     let root = scratch_dir().join("e10-two-unit");
     let _ = fs::remove_dir_all(&root);
@@ -296,6 +361,7 @@ targets = ["rust"]
         &TestSelection::default(),
         None,
         None,
+        false,
         false,
         false,
     );

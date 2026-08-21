@@ -482,6 +482,10 @@ pub struct TestArgs {
     #[arg(long)]
     pub tag: Option<String>,
 
+    /// Select only cases marked with the source-level `solum` focus modifier
+    #[arg(long)]
+    pub focused: bool,
+
     /// Require the filter to match the full case path or title exactly
     #[arg(long)]
     pub exact: bool,

@@ -5,8 +5,9 @@ use crate::input_shape::locale_without_package_error;
 use crate::package;
 use proba::{
     format_summary, harness_filter_matches, has_solum_cases, inventory_cases,
-    run_proba_on_validated_with_function_ids, run_proba_source, selection_skip_reason,
-    source_skip_reason, CaseOutcome, CaseResult, ProbaCase, ProbaReport, TestSelection,
+    run_proba_on_validated, run_proba_on_validated_with_function_ids, run_proba_source,
+    selection_skip_reason, source_skip_reason, CaseOutcome, CaseResult, ProbaCase, ProbaReport,
+    TestSelection,
 };
 use radix_module::driver::{Config, Session};
 use radix_program::test_source_filter::TestSourceFilter;
@@ -106,6 +107,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
                 harness_filter,
                 args.exact,
                 args.include_ignored,
+                args.focused,
             ),
             false,
         ),
@@ -117,6 +119,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
             harness_filter,
             args.exact,
             args.include_ignored,
+            args.focused,
         ),
         package::TestInputRoute::ManifestLessDirectory => {
             eprintln!("error: {}", package::MANIFEST_LESS_TEST_MESSAGE);
@@ -185,6 +188,7 @@ fn run_single_file(
     harness_filter: Option<&str>,
     exact: bool,
     include_ignored: bool,
+    focused: bool,
 ) -> ProbaReport {
     let source = match std::fs::read_to_string(path) {
         Ok(s) => s,
@@ -195,7 +199,7 @@ fn run_single_file(
     };
     let session = Session::new(config.clone());
     let name = path.display().to_string();
-    match run_proba_source(
+    match run_source_with_focus(
         &session,
         &name,
         &source,
@@ -203,12 +207,124 @@ fn run_single_file(
         harness_filter,
         exact,
         include_ignored,
+        focused,
     ) {
         Ok(report) => report,
         Err(error) => {
             print_run_error(&error);
             std::process::exit(1);
         }
+    }
+}
+
+fn run_source_with_focus(
+    session: &Session,
+    name: &str,
+    source: &str,
+    selection: &TestSelection,
+    harness_filter: Option<&str>,
+    exact: bool,
+    include_ignored: bool,
+    focused: bool,
+) -> Result<ProbaReport, radix_module::mir::RunSourceError> {
+    if !focused {
+        return run_proba_source(
+            session,
+            name,
+            source,
+            selection,
+            harness_filter,
+            exact,
+            include_ignored,
+        );
+    }
+    let mut analysis = radix_program::analyze_prepared_program_name(session, name, source)
+        .map_err(radix_module::mir::RunSourceError::Frontend)?;
+    let all_cases = inventory_cases(&analysis.hir, &analysis.interner);
+    let focused = focused || has_solum_cases(&all_cases);
+    let cases = if focused {
+        focused_cases(&all_cases)
+    } else {
+        all_cases.clone()
+    };
+    if cases.is_empty() {
+        let mut report = ProbaReport::default();
+        append_focus_skips(
+            &mut report,
+            Path::new(name),
+            &all_cases,
+            focused,
+            selection,
+            harness_filter,
+            exact,
+            include_ignored,
+        );
+        return Ok(report);
+    }
+    let lowered = radix_module::mir::lower_analyzed_unit_with_context(&mut analysis)
+        .map_err(radix_module::mir::RunSourceError::Mir)?;
+    let mut report = run_proba_on_validated(
+        &lowered.validated,
+        &cases,
+        selection,
+        harness_filter,
+        exact,
+        include_ignored,
+    );
+    for result in &mut report.results {
+        result.unit_path = Path::new(name).to_path_buf();
+    }
+    append_focus_skips(
+        &mut report,
+        Path::new(name),
+        &all_cases,
+        focused,
+        selection,
+        harness_filter,
+        exact,
+        include_ignored,
+    );
+    Ok(report)
+}
+
+fn is_solum_case(case: &ProbaCase) -> bool {
+    case.modifiers
+        .iter()
+        .any(|modifier| matches!(modifier, proba::ProbaModifierView::Solum))
+}
+
+fn focused_cases(cases: &[ProbaCase]) -> Vec<ProbaCase> {
+    cases.iter().filter(|case| is_solum_case(case)).cloned().collect()
+}
+
+fn append_focus_skips(
+    report: &mut ProbaReport,
+    unit_path: &Path,
+    cases: &[ProbaCase],
+    focused: bool,
+    selection: &TestSelection,
+    harness_filter: Option<&str>,
+    exact: bool,
+    include_ignored: bool,
+) {
+    if !focused || !include_ignored {
+        return;
+    }
+    for case in cases {
+        if is_solum_case(case) || !harness_filter_matches(case, harness_filter, exact) {
+            continue;
+        }
+        let Some(reason) = selection_skip_reason(case, selection, true) else {
+            continue;
+        };
+        report.results.push(CaseResult {
+            unit_path: unit_path.to_path_buf(),
+            name: case.name.clone(),
+            suite_path: case.suite_path.clone(),
+            outcome: CaseOutcome::Skipped { reason },
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        });
     }
 }
 
@@ -220,6 +336,7 @@ fn run_package(
     harness_filter: Option<&str>,
     exact: bool,
     include_ignored: bool,
+    focused: bool,
 ) -> (ProbaReport, bool) {
     let package = match radix_program::analyze::analyze_package_for_tests(
         config,
@@ -258,6 +375,11 @@ fn run_package(
         test_units.push((unit.path.clone(), cases));
     }
 
+    // A `solum` marker anywhere in the package makes focus a package-wide
+    // decision. The per-unit runner still owns linking, but every unit receives
+    // the same focused case set instead of deciding focus from local inventory.
+    let focused = focused || test_units.iter().any(|(_, cases)| has_solum_cases(cases));
+
     // Link and lower each test unit independently. A package-level link would
     // let one unsupported unit poison every otherwise runnable case (E10).
     // Re-analysis gives each unit a fresh owned package graph; the helper then
@@ -276,6 +398,7 @@ fn run_package(
                 harness_filter,
                 exact,
                 include_ignored,
+                focused,
             ) {
                 Ok(report) => combined.results.extend(report.results),
                 Err(diagnostics) => {
@@ -292,6 +415,7 @@ fn run_package(
                             harness_filter,
                             exact,
                             include_ignored,
+                            focused,
                             "unit failed to link/lower for runner proba execution",
                         )
                         .results,
@@ -319,6 +443,7 @@ fn run_package_test_unit(
     harness_filter: Option<&str>,
     exact: bool,
     include_ignored: bool,
+    focused: bool,
 ) -> Result<ProbaReport, Vec<radix_module::diagnostics::Diagnostic>> {
     let mut package = radix_program::analyze::analyze_package_for_tests(
         config,
@@ -354,9 +479,28 @@ fn run_package_test_unit(
         ))
         .with_file(unit_path.display().to_string())]);
     };
-    let cases = inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
-    if cases.is_empty() {
+    let all_cases = inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
+    if all_cases.is_empty() {
         return Ok(ProbaReport::default());
+    }
+    let cases = if focused {
+        focused_cases(&all_cases)
+    } else {
+        all_cases.clone()
+    };
+    if cases.is_empty() {
+        let mut report = ProbaReport::default();
+        append_focus_skips(
+            &mut report,
+            unit_path,
+            &all_cases,
+            focused,
+            selection,
+            harness_filter,
+            exact,
+            include_ignored,
+        );
+        return Ok(report);
     }
     let functions = cases
         .iter()
@@ -369,7 +513,7 @@ fn run_package_test_unit(
         &scope,
         config,
         |validated, function_ids| {
-            run_proba_on_validated_with_function_ids(
+            let mut report = run_proba_on_validated_with_function_ids(
                 validated,
                 unit_path,
                 &cases,
@@ -378,7 +522,18 @@ fn run_package_test_unit(
                 harness_filter,
                 exact,
                 include_ignored,
-            )
+            );
+            append_focus_skips(
+                &mut report,
+                unit_path,
+                &all_cases,
+                focused,
+                selection,
+                harness_filter,
+                exact,
+                include_ignored,
+            );
+            report
         },
     )
 }
@@ -390,9 +545,10 @@ fn blocked_unit_report(
     harness_filter: Option<&str>,
     exact: bool,
     include_ignored: bool,
+    focused: bool,
     reason: &str,
 ) -> ProbaReport {
-    let has_solum = has_solum_cases(&cases);
+    let has_solum = focused || has_solum_cases(&cases);
     let mut report = ProbaReport::default();
     for case in cases {
         if !harness_filter_matches(&case, harness_filter, exact) {
