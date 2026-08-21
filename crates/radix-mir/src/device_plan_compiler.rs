@@ -499,16 +499,7 @@ impl PlanCompiler {
                 .source_nodes
                 .iter()
                 .find_map(|id| graph.node(*id).and_then(|node| node.attention));
-            let seq_extent = attention_facts
-                .map(|facts| facts.seq)
-                .or_else(|| {
-                    candidate.source_nodes.first().and_then(|id| {
-                        graph
-                            .node(*id)
-                            .and_then(|node| node.shape.dims.first().copied())
-                    })
-                })
-                .unwrap_or(0);
+            let seq_extent = Self::projection_step_rows(graph, candidate, attention_facts);
             selections.push(self.selection_for_candidate(
                 candidate,
                 index,
@@ -858,6 +849,33 @@ impl PlanCompiler {
             layout: BindLayout::RowMajor,
             grid: MirKernelWorkgroupCount { x: 1, y: 1, z: 1 },
         })
+    }
+
+    /// Row count of THIS QKV/SwiGLU step (M), not a longer context seq const.
+    fn projection_step_rows(
+        graph: &TypedModelGraph,
+        candidate: &Candidate,
+        attention_facts: Option<AttentionFacts>,
+    ) -> u64 {
+        let from_shape = candidate.source_nodes.first().and_then(|id| {
+            graph.node(*id).and_then(|node| match node.op {
+                TypedOp::ProjectionQ => node.shape.dims.get(2).copied(),
+                TypedOp::ProjectionK | TypedOp::ProjectionV => node.shape.dims.get(1).copied(),
+                _ => node.shape.dims.first().copied(),
+            })
+        });
+        if matches!(
+            candidate.operation,
+            LibraryOperation::QkvProjection | LibraryOperation::SwiGlu
+        ) {
+            return from_shape
+                .or_else(|| attention_facts.map(|facts| facts.seq))
+                .unwrap_or(0);
+        }
+        attention_facts
+            .map(|facts| facts.seq)
+            .or(from_shape)
+            .unwrap_or(0)
     }
 
     fn selection_for_candidate(

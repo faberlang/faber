@@ -1437,3 +1437,136 @@ fn quantized_matmul_contract_rejects_unknown_layout() {
         error.message
     );
 }
+
+fn rank3_ty(types: &mut TypeTable, dims: [u64; 3]) -> MirType {
+    let f32_id = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let dim_ids = dims
+        .iter()
+        .map(|&dim| types.intern_index(IndexExpr::Literal(dim)))
+        .collect::<Vec<_>>();
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    MirType::semantic(types.intern(Type::Tensor(f32_id, shape)))
+}
+
+/// V projection: input `[M, hidden]`, weights `[hidden, kv_heads * head_dim]`,
+/// output `[kv_heads, M, head_dim]`. The seq const may differ from M — that
+/// is the decode-regime case (context N+1, this step one row).
+fn v_projection_function(
+    types: &mut TypeTable,
+    m: u64,
+    seq_const: u64,
+    kv_heads: u64,
+    q_per_kv: u64,
+    head_dim: u64,
+    hidden: u64,
+) -> MirFunction {
+    let input = rank2_ty(types, [m, hidden]);
+    let weights = rank2_ty(types, [hidden, kv_heads * head_dim]);
+    let output = rank3_ty(types, [kv_heads, m, head_dim]);
+    let u32_ty = MirType::semantic(types.sized_numeric(Primitive::Numerus, NumericWidth::U32));
+    let span = Span::default();
+    let param = |local: u32, ty: MirType| MirParam {
+        local: MirLocalId(local),
+        name: None,
+        ty,
+        mode: MirParamMode::Owned,
+        span,
+    };
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![
+            param(0, input),
+            param(1, weights),
+            param(2, output),
+            param(3, u32_ty),
+        ],
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(2))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(
+                            MirCollectionOp::TensorBatchedAttention,
+                        ),
+                        args: vec![
+                            MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                            MirOperand::Constant(MirConstant::Int(6)), // Q5_0
+                            MirOperand::Constant(MirConstant::Int(2)), // KIND_V
+                            MirOperand::Constant(MirConstant::Int(kv_heads as i64)),
+                            MirOperand::Constant(MirConstant::Int(q_per_kv as i64)),
+                            MirOperand::Constant(MirConstant::Int(seq_const as i64)),
+                            MirOperand::Constant(MirConstant::Int(head_dim as i64)),
+                            MirOperand::Constant(MirConstant::Int(hidden as i64)),
+                        ],
+                        return_ty: output,
+                    },
+                },
+                span,
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span,
+            },
+            span,
+        }],
+        return_ty: MirType::semantic(types.primitive(Primitive::Vacuum)),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
+#[test]
+fn projection_gemv_dispatch_uses_step_rows_not_seq_const() {
+    // Decode continuation: seq const is N+1 (literal sequence position), but
+    // THIS step has one row (M=1). GEMV launch must expand by NR0=4 → ×8.
+    let mut types = TypeTable::new();
+    let function = v_projection_function(&mut types, 1, 10, 2, 3, 4, 24);
+    let validation = MirValidationContext::new(&types);
+    let contract = collection_op_contract(&function, &validation)
+        .expect("M=1 V projection at seq=N+1 must resolve")
+        .expect("batched attention contract");
+    let CollectionOpContract::BatchedAttention {
+        kind,
+        seq,
+        output_elements,
+        ..
+    } = contract
+    else {
+        panic!("expected BatchedAttention, got {contract:?}");
+    };
+    assert_eq!(kind, crate::kernel_plan::BatchedAttentionKind::ProjectionV);
+    assert_eq!(seq, 1, "plan seq is THIS step's row count, not the seq const");
+    assert_eq!(
+        output_elements, 64,
+        "logical 2*1*4=8 columns × 8 GEMV lanes"
+    );
+}
+
+#[test]
+fn projection_prefill_does_not_expand_when_step_has_many_rows() {
+    let mut types = TypeTable::new();
+    let function = v_projection_function(&mut types, 10, 10, 2, 3, 4, 24);
+    let validation = MirValidationContext::new(&types);
+    let contract = collection_op_contract(&function, &validation)
+        .expect("M=10 V projection must resolve")
+        .expect("batched attention contract");
+    let CollectionOpContract::BatchedAttention {
+        seq,
+        output_elements,
+        ..
+    } = contract
+    else {
+        panic!("expected BatchedAttention, got {contract:?}");
+    };
+    assert_eq!(seq, 10);
+    assert_eq!(output_elements, 80, "logical 2*10*4=80, no GEMV expansion");
+}

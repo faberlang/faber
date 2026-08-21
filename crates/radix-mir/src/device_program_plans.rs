@@ -406,7 +406,7 @@ pub const PACKED_BLOCK_BYTES_UNIFORM: &str = "packed_block_bytes";
 pub const PACKED_BLOCK_ELEMENTS_UNIFORM: &str = "packed_block_elements";
 /// Uniform name for the native packed-region byte length.
 pub const PACKED_BYTES_UNIFORM: &str = "packed_bytes";
-/// Uniform name for decode GEMV selection (`1` when M/seq is 1).
+/// Uniform name for decode GEMV selection (`1` when THIS step's row count M is 1).
 pub const DECODE_GEMV_UNIFORM: &str = "decode_gemv";
 /// Library entry for a packed GEMM body (M ≠ 1).
 pub const QUANTIZED_GEMM_ENTRY: &str = "quantized_gemm";

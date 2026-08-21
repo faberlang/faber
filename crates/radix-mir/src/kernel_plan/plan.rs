@@ -313,7 +313,7 @@ pub struct BatchedAttentionPlan {
     pub kv_heads: u64,
     /// Query heads sharing each KV head (GQA mapping).
     pub q_per_kv: u64,
-    /// Sequence extent.
+    /// Sequence extent of THIS op (projection input rows M for Q/K/V).
     pub seq: u64,
     /// Per-head feature width.
     pub head_dim: u64,

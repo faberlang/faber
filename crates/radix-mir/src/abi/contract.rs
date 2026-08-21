@@ -144,7 +144,9 @@ pub enum CollectionOpContract {
         kv_heads: u64,
         /// Query heads per KV group.
         q_per_kv: u64,
-        /// Sequence extent.
+        /// Sequence extent of THIS op: projection input rows (M) for Q/K/V,
+        /// context length for scores/softmax/context. Distinct from a seq
+        /// const that may still name conversation position N+1.
         seq: u64,
         /// Per-head feature width.
         head_dim: u64,
@@ -671,6 +673,20 @@ fn batched_attention_contract(
     if kv_heads == 0 || q_per_kv == 0 || seq == 0 || head_dim == 0 || hidden == 0 {
         return Err(MirAbiError::new("batched attention axes must be non-zero"));
     }
+    let is_projection = matches!(
+        kind,
+        crate::kernel_plan::BatchedAttentionKind::ProjectionQ
+            | crate::kernel_plan::BatchedAttentionKind::ProjectionK
+            | crate::kernel_plan::BatchedAttentionKind::ProjectionV
+    );
+    // Projection GEMV is selected by THIS step's input row count (M), not
+    // the seq const (which may be the N+1 conversation position on a
+    // dense continuation while the step itself is a single decode row).
+    let step_rows = if is_projection {
+        projection_step_rows(function, args, validation, hidden)?
+    } else {
+        seq
+    };
     let output_ty = destination
         .and_then(crate::read_analysis::place_local_base)
         .and_then(|local| crate::local_ty::local_ty(function, local))
@@ -681,14 +697,14 @@ fn batched_attention_contract(
         crate::kernel_plan::BatchedAttentionKind::ProjectionQ
         | crate::kernel_plan::BatchedAttentionKind::ProjectionK
         | crate::kernel_plan::BatchedAttentionKind::ProjectionV => {
-            // Keep Q explicit as [kv_group, query_head, seq, head_dim]
+            // Keep Q explicit as [kv_group, query_head, M, head_dim]
             // even when the physical projection has one contiguous head
             // axis. The sentinel and context contract depend on this rank-4
             // view, so no emitter may flatten the GQA mapping implicitly.
             if matches!(kind, crate::kernel_plan::BatchedAttentionKind::ProjectionQ) {
-                vec![kv_heads, q_per_kv, seq, head_dim]
+                vec![kv_heads, q_per_kv, step_rows, head_dim]
             } else {
-                vec![kv_heads, seq, head_dim]
+                vec![kv_heads, step_rows, head_dim]
             }
         }
         crate::kernel_plan::BatchedAttentionKind::Scores
@@ -703,12 +719,7 @@ fn batched_attention_contract(
             kind, output_dims, expected
         )));
     }
-    let layout = if matches!(
-        kind,
-        crate::kernel_plan::BatchedAttentionKind::ProjectionQ
-            | crate::kernel_plan::BatchedAttentionKind::ProjectionK
-            | crate::kernel_plan::BatchedAttentionKind::ProjectionV
-    ) {
+    let layout = if is_projection {
         Some(packed_layout_from_operand(
             args.get(kind_index - 1).ok_or_else(|| {
                 MirAbiError::new("batched projection requires a GGML layout const")
@@ -733,16 +744,10 @@ fn batched_attention_contract(
             .checked_mul(*dim)
             .ok_or_else(|| MirAbiError::new("batched attention output size overflow"))
     })?;
-    // Sequence-one Q/K/V projections are lowered as one simdgroup per four
+    // Single-row Q/K/V projections are lowered as one simdgroup per four
     // output columns (`NR0=4`).  The logical output shape stays unchanged;
     // the flat launch is `N × 8` so 32 lanes reduce four packed columns.
-    let output_elements = if matches!(
-        kind,
-        crate::kernel_plan::BatchedAttentionKind::ProjectionQ
-            | crate::kernel_plan::BatchedAttentionKind::ProjectionK
-            | crate::kernel_plan::BatchedAttentionKind::ProjectionV
-    ) && seq == 1
-    {
+    let output_elements = if is_projection && step_rows == 1 {
         output_elements
             .checked_mul(DECODE_GEMV_LANES)
             .ok_or_else(|| MirAbiError::new("decode GEMV dispatch size overflow"))?
@@ -753,7 +758,7 @@ fn batched_attention_contract(
         kind,
         kv_heads,
         q_per_kv,
-        seq,
+        seq: step_rows,
         head_dim,
         hidden,
         layout,
@@ -761,6 +766,45 @@ fn batched_attention_contract(
         scale_bits,
         output_elements,
     })
+}
+
+/// Row count of THIS projection step: the input tensor's leading dim.
+///
+/// Distinct from the seq const, which may carry a longer context length
+/// (decode at conversation position N+1) while the step itself is M=1.
+fn projection_step_rows(
+    function: &MirFunction,
+    args: &[MirOperand],
+    validation: &MirValidationContext<'_>,
+    hidden: u64,
+) -> Result<u64, MirAbiError> {
+    let Some(input_ty) = args
+        .first()
+        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+    else {
+        return Err(MirAbiError::new(
+            "batched projection requires a rank-2 input tensor",
+        ));
+    };
+    let dims =
+        crate::tensor_type::tensor_literal_dims(input_ty, validation).map_err(MirAbiError::new)?;
+    if dims.len() != 2 {
+        return Err(MirAbiError::new(
+            "batched projection input must be rank-2 [M, hidden]",
+        ));
+    }
+    if dims[0] == 0 {
+        return Err(MirAbiError::new(
+            "batched projection row count must be non-zero",
+        ));
+    }
+    if dims[1] != hidden {
+        return Err(MirAbiError::new(format!(
+            "batched projection input hidden {} does not match axis {hidden}",
+            dims[1]
+        )));
+    }
+    Ok(dims[0])
 }
 
 fn const_nonnegative_u64(
