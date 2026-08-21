@@ -374,6 +374,18 @@ impl TypeChecker<'_> {
                 let inner = self.unify_with_policy(a, b, span, issue, policy);
                 return self.types.option(inner);
             }
+            (Type::Tuple(from), Type::Tuple(to)) => {
+                if from.len() != to.len() {
+                    self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+                    return self.error_type;
+                }
+                let elements = from
+                    .into_iter()
+                    .zip(to)
+                    .map(|(from, to)| self.unify_with_policy(from, to, span, issue, policy))
+                    .collect();
+                return self.types.tuple(elements);
+            }
             (Type::Ref(ma, a), Type::Ref(mb, b)) if ma == mb => {
                 let inner = self.unify_with_policy(a, b, span, issue, policy);
                 return self.types.reference(ma, inner);

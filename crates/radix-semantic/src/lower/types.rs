@@ -340,7 +340,19 @@ impl Lowerer<'_> {
         if name_str == "iuncta" {
             let elements: Vec<TypeId> = params
                 .iter()
-                .map(|param| self.lower_nested_type(param))
+                .map(|param| {
+                    if matches!(param.kind, TypeExprKind::UnionHole) {
+                        // A standalone ∪ is a heterogeneous accumulation hole for
+                        // collection elements, not a valid monomorphic tuple
+                        // position. Reject it here so the issue points at the
+                        // offending iuncta element instead of leaking WARN017.
+                        self.current_span = param.span;
+                        self.error("iuncta_union_type_arg_unsupported");
+                        self.types.intern(Type::Error)
+                    } else {
+                        self.lower_nested_type(param)
+                    }
+                })
                 .collect();
             return self.types.tuple(elements);
         }

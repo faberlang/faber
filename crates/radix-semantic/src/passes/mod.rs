@@ -106,6 +106,10 @@ mod fragment_definition_test;
 mod import_path_test;
 
 #[cfg(test)]
+#[path = "typecheck/iuncta_hole_test.rs"]
+mod iuncta_hole_test;
+
+#[cfg(test)]
 #[path = "kernel_namespace_test.rs"]
 mod kernel_namespace_test;
 

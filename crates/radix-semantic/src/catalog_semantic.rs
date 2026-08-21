@@ -1816,6 +1816,9 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
         "unknown_lowering_error" => Some("HIR lowering failed".to_owned()),
         "unknown_namespace" => Some("unknown namespace".to_owned()),
         "unknown_type_lowering_error" => Some("type lowering failed".to_owned()),
+        "iuncta_union_type_arg_unsupported" => {
+            Some("iuncta element type argument `∪` is unsupported".to_owned())
+        }
         "unknown_type_name" => Some("unknown type name".to_owned()),
         "vector_width_single_dim" => Some("vector width must be a single dimension".to_owned()),
         "width_marker_params" => Some("width marker cannot accept parameters".to_owned()),
