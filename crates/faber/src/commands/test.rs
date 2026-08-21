@@ -4,8 +4,9 @@ use crate::cli::TestArgs;
 use crate::input_shape::locale_without_package_error;
 use crate::package;
 use proba::{
-    format_summary, inventory_cases, run_proba_on_validated_with_function_ids, run_proba_source,
-    CaseOutcome, CaseResult, ProbaReport, TestSelection,
+    format_summary, harness_filter_matches, has_solum_cases, inventory_cases,
+    run_proba_on_validated_with_function_ids, run_proba_source, selection_skip_reason,
+    source_skip_reason, CaseOutcome, CaseResult, ProbaCase, ProbaReport, TestSelection,
 };
 use radix_module::driver::{Config, Session};
 use radix_program::test_source_filter::TestSourceFilter;
@@ -249,71 +250,194 @@ fn run_package(
     }
 
     let mut test_units = Vec::new();
-    let mut functions = Vec::new();
     for unit in package.nodes.values() {
         let cases = inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
         if cases.is_empty() {
             continue;
         }
-        functions.extend(cases.iter().map(|case| (unit.path.clone(), case.def_id)));
         test_units.push((unit.path.clone(), cases));
     }
 
+    // Link and lower each test unit independently. A package-level link would
+    // let one unsupported unit poison every otherwise runnable case (E10).
+    // Re-analysis gives each unit a fresh owned package graph; the helper then
+    // narrows that graph to the unit's local import closure before linking.
     let combined = if test_units.is_empty() {
         ProbaReport::default()
     } else {
-        let scope = radix_program::mir::TestPackageScope::for_program(&package, functions);
-        let failed_units = test_units.clone();
-        match package::mir::with_linked_test_package_mir(
-            package,
-            &scope,
-            config,
-            |validated, function_ids| {
-                let mut combined = ProbaReport::default();
-                for (unit_path, cases) in &test_units {
-                    let report = run_proba_on_validated_with_function_ids(
-                        validated,
-                        unit_path,
-                        cases,
-                        function_ids,
-                        selection,
-                        harness_filter,
-                        exact,
-                        include_ignored,
+        let mut combined = ProbaReport::default();
+        for (unit_path, cases) in test_units {
+            match run_package_test_unit(
+                config,
+                input,
+                proba_filter,
+                &unit_path,
+                selection,
+                harness_filter,
+                exact,
+                include_ignored,
+            ) {
+                Ok(report) => combined.results.extend(report.results),
+                Err(diagnostics) => {
+                    super::eprint_compile_diagnostics(&diagnostics);
+                    eprintln!(
+                        "error: package MIR test link failed for {}",
+                        unit_path.display()
                     );
-                    combined.results.extend(report.results);
+                    combined.results.extend(
+                        blocked_unit_report(
+                            &unit_path,
+                            cases,
+                            selection,
+                            harness_filter,
+                            exact,
+                            include_ignored,
+                            "unit failed to link/lower for runner proba execution",
+                        )
+                        .results,
+                    );
                 }
-                combined
-            },
-        ) {
-            Ok(report) => report,
-            Err(diagnostics) => {
-                super::eprint_compile_diagnostics(&diagnostics);
-                eprintln!("error: package MIR test link failed");
-                let mut blocked = ProbaReport::default();
-                for (unit_path, cases) in failed_units {
-                    for case in cases {
-                        blocked.results.push(CaseResult {
-                            unit_path: unit_path.clone(),
-                            name: case.name,
-                            suite_path: case.suite_path,
-                            outcome: CaseOutcome::Blocked {
-                                reason: format!(
-                                    "package failed to link for runner proba execution ({})",
-                                    unit_path.display()
-                                ),
-                            },
-                            stdout: Vec::new(),
-                            stderr: Vec::new(),
-                        });
-                    }
-                }
-                blocked
             }
         }
+        combined
     };
 
     (combined, false)
+}
+
+/// Analyze, isolate, link, and run one test unit.
+///
+/// The package analyzer gives us the complete graph so local imports still
+/// resolve. The MIR linker only receives this unit's local import closure, so
+/// an unrelated unit's unsupported lowering cannot fail this run.
+fn run_package_test_unit(
+    config: &Config,
+    input: &Path,
+    proba_filter: Option<&TestSourceFilter>,
+    unit_path: &Path,
+    selection: &TestSelection,
+    harness_filter: Option<&str>,
+    exact: bool,
+    include_ignored: bool,
+) -> Result<ProbaReport, Vec<radix_module::diagnostics::Diagnostic>> {
+    let mut package = radix_program::analyze::analyze_package_for_tests(
+        config,
+        input,
+        proba_filter,
+        &package::faber_analysis_seams(),
+    )?;
+    if package
+        .diagnostics
+        .iter()
+        .any(radix_module::diagnostics::Diagnostic::is_error)
+    {
+        return Err(package.diagnostics);
+    }
+
+    let Some((root_id, _)) = package.node_by_path(unit_path) else {
+        return Err(vec![radix_module::diagnostics::Diagnostic::error(format!(
+            "test unit disappeared during package re-analysis: {}",
+            unit_path.display()
+        ))
+        .with_file(unit_path.display().to_string())]);
+    };
+    let root_id = root_id.clone();
+    let included = package.imports.local_closure(std::iter::once(&root_id));
+    package.nodes.retain(|id, _| included.contains(id));
+    package.entry = Some(root_id.clone());
+    package.roots = vec![root_id.clone()];
+
+    let Some(unit) = package.nodes.get(&root_id) else {
+        return Err(vec![radix_module::diagnostics::Diagnostic::error(format!(
+            "test unit was not retained in its local package closure: {}",
+            unit_path.display()
+        ))
+        .with_file(unit_path.display().to_string())]);
+    };
+    let cases = inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
+    if cases.is_empty() {
+        return Ok(ProbaReport::default());
+    }
+    let functions = cases
+        .iter()
+        .map(|case| (unit.path.clone(), case.def_id))
+        .collect();
+    let scope = radix_program::mir::TestPackageScope::for_program(&package, functions);
+
+    package::mir::with_linked_test_package_mir(
+        package,
+        &scope,
+        config,
+        |validated, function_ids| {
+            run_proba_on_validated_with_function_ids(
+                validated,
+                unit_path,
+                &cases,
+                function_ids,
+                selection,
+                harness_filter,
+                exact,
+                include_ignored,
+            )
+        },
+    )
+}
+
+fn blocked_unit_report(
+    unit_path: &Path,
+    cases: Vec<ProbaCase>,
+    selection: &TestSelection,
+    harness_filter: Option<&str>,
+    exact: bool,
+    include_ignored: bool,
+    reason: &str,
+) -> ProbaReport {
+    let has_solum = has_solum_cases(&cases);
+    let mut report = ProbaReport::default();
+    for case in cases {
+        if !harness_filter_matches(&case, harness_filter, exact) {
+            continue;
+        }
+        if let Some(skip_reason) = selection_skip_reason(&case, selection, has_solum) {
+            if include_ignored {
+                report.results.push(CaseResult {
+                    unit_path: unit_path.to_path_buf(),
+                    name: case.name,
+                    suite_path: case.suite_path,
+                    outcome: CaseOutcome::Skipped {
+                        reason: skip_reason,
+                    },
+                    stdout: Vec::new(),
+                    stderr: Vec::new(),
+                });
+            }
+            continue;
+        }
+        if let Some(skip_reason) = source_skip_reason(&case) {
+            report.results.push(CaseResult {
+                unit_path: unit_path.to_path_buf(),
+                name: case.name,
+                suite_path: case.suite_path,
+                outcome: CaseOutcome::Skipped {
+                    reason: skip_reason,
+                },
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+            });
+            continue;
+        }
+        report.results.push(CaseResult {
+            unit_path: unit_path.to_path_buf(),
+            name: case.name,
+            suite_path: case.suite_path,
+            outcome: CaseOutcome::Blocked {
+                reason: format!("{reason} ({})", unit_path.display()),
+            },
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        });
+    }
+    report
 }
 
 fn print_report(report: &ProbaReport, nocapture: bool) {

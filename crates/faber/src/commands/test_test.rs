@@ -256,6 +256,75 @@ fn cli_parses_allow_no_tests() {
 }
 
 #[test]
+fn package_test_degrades_per_unit_when_one_unit_cannot_lower() {
+    let root = scratch_dir().join("e10-two-unit");
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("src")).expect("fixture src");
+    fs::write(
+        root.join("faber.toml"),
+        r#"[package]
+name = "e10_two_unit"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "e10_two_unit"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("fixture manifest");
+    fs::write(
+        root.join("src/good.proba"),
+        "test \"green\" {\n    assert 1 ≡ 1\n}\n",
+    )
+    .expect("green unit");
+    fs::write(
+        root.join("src/bad.proba"),
+        "fn unsupported() → int {\n    return [1, 2].foo()\n}\n\ntest \"blocked\" {\n    assert 1 ≡ 1\n}\n",
+    )
+    .expect("unsupported unit");
+
+    let (report, unmatched_include) = super::run_package(
+        &Config::default(),
+        &root,
+        &TestSelection::default(),
+        None,
+        None,
+        false,
+        false,
+    );
+
+    assert!(!unmatched_include);
+    assert_eq!(
+        report.passed(),
+        1,
+        "green unit must still execute: {report:?}"
+    );
+    assert_eq!(
+        report.failed(),
+        0,
+        "link degradation is not a test failure: {report:?}"
+    );
+    assert_eq!(
+        report.blocked(),
+        1,
+        "only the unsupported unit is blocked: {report:?}"
+    );
+    assert!(report.results.iter().any(|result| {
+        result.name == "green" && matches!(result.outcome, proba::CaseOutcome::Passed)
+    }));
+    assert!(report.results.iter().any(|result| {
+        result.name == "blocked" && matches!(result.outcome, proba::CaseOutcome::Blocked { .. })
+    }));
+}
+
+#[test]
 fn cmd_test_applies_empty_run_law_and_does_not_widen_unmatched_include() {
     let source = include_str!("test.rs");
     let production = source
