@@ -5,8 +5,9 @@
 
 use super::{
     FmirArtifactReflection, FmirReflectedKernel, FmirReflectedResource, WireInputUpdateCadence,
-    WireInvocationMode, WireKvCacheDtype, WireKvCacheLayout, WireKvReservePolicy, WireSessionInput,
-    WireSessionObservationCadence,
+    WireInvocationMode, WireKvCacheAttentionFamily, WireKvCacheCapacityPolicy, WireKvCacheDtype,
+    WireKvCacheLayout, WireKvCacheRopePairing, WireKvCacheSemanticV2, WireKvCacheVLayout,
+    WireKvReservePolicy, WireSessionInput, WireSessionObservationCadence,
 };
 
 #[test]
@@ -110,6 +111,97 @@ fn kv_layout_round_trips_with_all_carried_facts_preserved() {
     // The dtype surface is closed: the wire carries exactly the declared f32
     // representation (a dtype change is a contract revision).
     assert!(matches!(decoded.dtype, WireKvCacheDtype::F32));
+}
+
+#[test]
+fn kv_semantic_v2_round_trips_all_static_facts() {
+    let semantic = WireKvCacheSemanticV2 {
+        semantic_contract_version: super::WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION,
+        // These are separate fields even though the integrated route uses F32
+        // for both sides of the cache.
+        kv_dtype_k: WireKvCacheDtype::F32,
+        kv_dtype_v: WireKvCacheDtype::F32,
+        v_layout: WireKvCacheVLayout::Straight,
+        attention_family: WireKvCacheAttentionFamily::Flash,
+        query_head_count: 15,
+        kv_head_count: 5,
+        head_dim: 64,
+        layer_count: 32,
+        context_capacity: 8192,
+        capacity_policy: WireKvCacheCapacityPolicy::Fixed,
+        rope_dimension: 64,
+        rope_frequency_base: 100_000.0,
+        rope_frequency_scale: 1.0,
+        rope_pairing: WireKvCacheRopePairing::RotateHalf,
+        k_stored_post_rope: true,
+    };
+
+    let bytes = postcard::to_allocvec(&semantic).expect("semantic v2 serializes");
+    let decoded: WireKvCacheSemanticV2 = postcard::from_bytes(&bytes).expect("semantic v2 decodes");
+    assert_eq!(decoded, semantic);
+    assert_eq!(decoded.semantic_contract_version, 2);
+    assert_eq!(decoded.kv_dtype_k, WireKvCacheDtype::F32);
+    assert_eq!(decoded.kv_dtype_v, WireKvCacheDtype::F32);
+    assert_eq!(decoded.query_head_count % decoded.kv_head_count, 0);
+    assert_eq!(decoded.rope_pairing.spelling(), "rotate_half");
+    assert!(decoded.k_stored_post_rope);
+}
+
+#[test]
+fn kv_semantic_v2_wire_has_no_runtime_fact_fields() {
+    let semantic = WireKvCacheSemanticV2 {
+        semantic_contract_version: super::WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION,
+        kv_dtype_k: WireKvCacheDtype::F32,
+        kv_dtype_v: WireKvCacheDtype::F32,
+        v_layout: WireKvCacheVLayout::Transposed,
+        attention_family: WireKvCacheAttentionFamily::Classic,
+        query_head_count: 8,
+        kv_head_count: 8,
+        head_dim: 64,
+        layer_count: 1,
+        context_capacity: 2048,
+        capacity_policy: WireKvCacheCapacityPolicy::Fixed,
+        rope_dimension: 64,
+        rope_frequency_base: 100_000.0,
+        rope_frequency_scale: 1.0,
+        rope_pairing: WireKvCacheRopePairing::ConsecutivePair,
+        k_stored_post_rope: true,
+    };
+
+    let value = serde_json::to_value(semantic).expect("semantic v2 JSON serializes");
+    let object = value.as_object().expect("semantic v2 is an object");
+    let mut keys: Vec<String> = object.keys().cloned().collect();
+    keys.sort();
+    assert_eq!(
+        keys,
+        vec![
+            "attention_family",
+            "capacity_policy",
+            "context_capacity",
+            "head_dim",
+            "k_stored_post_rope",
+            "kv_dtype_k",
+            "kv_dtype_v",
+            "kv_head_count",
+            "layer_count",
+            "query_head_count",
+            "rope_dimension",
+            "rope_frequency_base",
+            "rope_frequency_scale",
+            "rope_pairing",
+            "semantic_contract_version",
+            "v_layout",
+        ]
+    );
+    assert_eq!(
+        object["rope_pairing"],
+        serde_json::json!("consecutive_pair")
+    );
+    assert!(!object.contains_key("cursor"));
+    assert!(!object.contains_key("buffer_identity"));
+    assert!(!object.contains_key("allocation"));
+    assert!(!object.contains_key("view"));
+    assert!(!object.contains_key("backend_binding"));
 }
 
 #[test]

@@ -995,6 +995,138 @@ impl WireKvCacheDtype {
     }
 }
 
+/// Version of the static KV-cache semantic contract carried by
+/// [`WireKvCacheSemanticV2`]. This is the semantic payload version, distinct
+/// from the enclosing session-section version.
+pub const WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION: u32 = 2;
+
+/// The layout of cached V rows. K layout is determined by the post-RoPE rule
+/// carried on [`WireKvCacheSemanticV2`]; this enum describes only V storage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WireKvCacheVLayout {
+    /// V rows are stored in the transposed layout used by classic attention.
+    Transposed,
+    /// V rows are stored in the straight layout used by flash attention.
+    Straight,
+}
+
+impl WireKvCacheVLayout {
+    /// Stable diagnostic spelling.
+    #[must_use]
+    pub const fn spelling(self) -> &'static str {
+        match self {
+            Self::Transposed => "transposed",
+            Self::Straight => "straight",
+        }
+    }
+}
+
+/// Attention algorithm family associated with the static cache semantics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WireKvCacheAttentionFamily {
+    /// The classic causal attention family.
+    Classic,
+    /// The flash attention family.
+    Flash,
+}
+
+impl WireKvCacheAttentionFamily {
+    /// Stable diagnostic spelling.
+    #[must_use]
+    pub const fn spelling(self) -> &'static str {
+        match self {
+            Self::Classic => "classic",
+            Self::Flash => "flash",
+        }
+    }
+}
+
+/// Capacity policy of the logical cache. Runtime cursor and allocation/view
+/// state do not belong here; KV-B carries those facts separately.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WireKvCacheCapacityPolicy {
+    /// The cache has one immutable context capacity for its lifetime.
+    Fixed,
+}
+
+impl WireKvCacheCapacityPolicy {
+    /// Stable diagnostic spelling.
+    #[must_use]
+    pub const fn spelling(self) -> &'static str {
+        match self {
+            Self::Fixed => "fixed",
+        }
+    }
+}
+
+/// RoPE pairing convention carried by the semantic contract.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WireKvCacheRopePairing {
+    /// Consecutive pairs: `(x[0], x[1]), (x[2], x[3]), ...`.
+    ConsecutivePair,
+    /// Rotate-half pairs: the first half is paired with the second half.
+    RotateHalf,
+}
+
+impl WireKvCacheRopePairing {
+    /// Stable wire/diagnostic spelling.
+    #[must_use]
+    pub const fn spelling(self) -> &'static str {
+        match self {
+            Self::ConsecutivePair => "consecutive_pair",
+            Self::RotateHalf => "rotate_half",
+        }
+    }
+}
+
+/// Version-2 static KV-cache semantic record.
+///
+/// This is deliberately only the model/cache meaning shared by Gradus and
+/// Radix. It carries distinct K/V dtype facts, dimensions, layout and
+/// attention choices, fixed-capacity semantics, and typed RoPE facts. It does
+/// **not** carry a runtime cursor, buffer identity, allocation or view, or
+/// backend binding; those facts belong to KV-B's executor-plan surface.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireKvCacheSemanticV2 {
+    /// Semantic contract version, independent of the enclosing section version.
+    pub semantic_contract_version: u32,
+    /// Stored K element dtype. Kept separate from [`Self::kv_dtype_v`].
+    pub kv_dtype_k: WireKvCacheDtype,
+    /// Stored V element dtype. Kept separate from [`Self::kv_dtype_k`].
+    pub kv_dtype_v: WireKvCacheDtype,
+    /// Static layout of cached V rows.
+    pub v_layout: WireKvCacheVLayout,
+    /// Static attention family consuming the cache.
+    pub attention_family: WireKvCacheAttentionFamily,
+    /// Number of query heads.
+    pub query_head_count: u32,
+    /// Number of stored KV heads.
+    pub kv_head_count: u32,
+    /// Width of one attention head.
+    pub head_dim: u32,
+    /// Number of transformer layers represented by the cache.
+    pub layer_count: u32,
+    /// Immutable logical context capacity.
+    pub context_capacity: u32,
+    /// Capacity policy for the logical cache.
+    pub capacity_policy: WireKvCacheCapacityPolicy,
+    /// Number of dimensions rotated by RoPE.
+    pub rope_dimension: u32,
+    /// RoPE frequency base (theta).
+    pub rope_frequency_base: f32,
+    /// RoPE position/frequency scale multiplier.
+    pub rope_frequency_scale: f32,
+    /// Typed RoPE pairing convention.
+    pub rope_pairing: WireKvCacheRopePairing,
+    /// The semantic rule that cached K is stored after RoPE.
+    pub k_stored_post_rope: bool,
+}
+
 /// The KV reserve policy wire mirror (GI4-1 §3): the declared headroom on
 /// top of the deterministic storage figure — a separate fact, never folded
 /// silently into storage.
