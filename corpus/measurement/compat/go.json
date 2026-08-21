@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 270,
-    "analyzable": 293
+    "capable": 271,
+    "analyzable": 294
   },
   "terms": [
     {
@@ -876,8 +876,8 @@
     {
       "term": "ratio",
       "rule": "keyword",
-      "capable": 0,
-      "analyzable": 0
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "redde",
