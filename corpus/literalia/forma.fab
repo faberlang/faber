@@ -45,7 +45,7 @@ main {
 
     print q.template
 
-    const _ indexed ← `where tenant_id = §0 or parent_tenant_id = §0`(tenantId)
+    const _ indexed ← `where tenant_id = §0 or parent_tenant_id = §0`(tenantId, tenantId)
     print indexed.template
 
     const _ bare ← `select 1`
