@@ -140,6 +140,12 @@ pub struct DeviceExecuteReceipt {
     /// Host→device copy-ins.
     #[serde(default)]
     pub copy_ins: usize,
+    /// Temporary PerStep/ObservationPoint handles allocated by this step.
+    #[serde(default)]
+    pub pool_allocations: usize,
+    /// Temporary handles reused from the session-scoped pool this step.
+    #[serde(default)]
+    pub pool_reuses: usize,
     /// Declared observation outputs (`buffer id` → f32 values).
     pub outputs: BTreeMap<String, Vec<f32>>,
     /// Allocated program-level buffer ids.
