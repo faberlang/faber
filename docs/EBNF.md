@@ -745,8 +745,15 @@ callSuffix    := callTypeArgs? '(' argumentList ')'
 memberSuffix  := '.' IDENTIFIER | '[' expression ']'
 optionalSuffix := '?.' IDENTIFIER | '?[' expression ']' | '?(' argumentList ')'
 nonNullSuffix := '!.' IDENTIFIER | '![' expression ']' | '!(' argumentList ')'
-argumentList  := (argument (',' argument)*)?
-argument      := 'sparge'? expression
+argumentList      := (argument (',' argument)*)?
+argument          := templateArgument | 'sparge'? expression
+templateArgument  := 'sparge'? IDENTIFIER ':' expression
+
+`templateArgument` is the labeled form for a template-call-site argument. It is
+legal only when the callee is a string or `forma` template; labels are not
+named-function argument syntax. `:` labels an existing slot, `=` binds at
+compile time, and `←` assigns at runtime, so `=` is not an alternate label
+spelling.
 ```
 
 ### String And Template Literals
@@ -765,8 +772,10 @@ They are not interchangeable synonyms.
 | `"..." ↦ regex` | `regex` | compiled pattern from text conversion |
 | `[ ... ]` | `lista<T>` | Faber list (not JSON array, not bytes) |
 
-`§` (U+00A7) is a template hole in Unicode forms (`"`, `«`, `` ` ``). It cannot
-appear in `ascii` literals.
+`§` (U+00A7) is a template hole in Unicode forms (`"`, `«`, `` ` ``).
+`§{label}` names a hole with an identifier label; the label is unique within
+its template and may use a keyword spelling under the contextual law. Named
+holes are not available in `ascii` literals, where `§` remains forbidden.
 
 **Rendered templates** (`textus`): `"..."(...)` and `«...»(...)` lower to
 `scriptum("...", args...)`.
@@ -816,9 +825,16 @@ fixum _ hello ← |48 65 6c 6c 6f|
 String literal call syntax is the canonical source form for format-template application:
 
 ```fab
+"§{greet} world"(greet: "salve")
 "status: § (§)"(sample_status(), "ok")
 "status: §1 (§0)"("ok", sample_status())
 ```
+
+The position law counts named and anonymous holes together in order of
+appearance: `"§{greet} §"` = `[greet: 0, anonymous: 1]`. Named labels are
+erased at lowering, so `"§{greet} world"(greet: "salve")` lowers identically
+to the positional form `"§ world"("salve")` and its canonical
+`scriptum("§ world", "salve")` form.
 
 This lowers to the compiler's `scriptum("...", args...)` form. Use the string-template form in ordinary source; reserve `scriptum(...)` for explicit desugaring examples and compiler-facing documentation.
 
