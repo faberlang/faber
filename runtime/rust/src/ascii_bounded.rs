@@ -122,6 +122,12 @@ impl<const N: usize> AsciiN<N> {
         self.len == 0
     }
 
+    /// Rust empty predicate. Same as [`Self::vacua`].
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.vacua()
+    }
+
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes[..self.len]
@@ -294,6 +300,16 @@ mod tests {
         assert_eq!(a.get(2), None);
         assert_eq!(a.get(7), None);
         assert_eq!(format!("{a:?}"), r#"AsciiN { n: 8, payload: "ab" }"#);
+    }
+
+    #[test]
+    fn is_empty_matches_vacua() {
+        let empty = AsciiN::<8>::empty();
+        assert_eq!(empty.is_empty(), empty.vacua());
+        assert!(empty.is_empty());
+        let filled = AsciiN::<8>::new("ab").unwrap();
+        assert_eq!(filled.is_empty(), filled.vacua());
+        assert!(!filled.is_empty());
     }
 
     #[test]

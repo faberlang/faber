@@ -108,6 +108,12 @@ impl<const N: usize> OctetiN<N> {
         self.len == 0
     }
 
+    /// Rust empty predicate. Same as [`Self::vacua`].
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.vacua()
+    }
+
     /// Initialized prefix only. Spare `len..N` is not in this slice.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
@@ -273,6 +279,16 @@ mod tests {
         assert_eq!(a.get(7), None);
         assert_eq!(format!("{a:?}"), "OctetiN { n: 8, payload: [171, 205] }");
         assert_eq!(format!("{a}"), "<2 bytes>");
+    }
+
+    #[test]
+    fn is_empty_matches_vacua() {
+        let empty = OctetiN::<8>::empty();
+        assert_eq!(empty.is_empty(), empty.vacua());
+        assert!(empty.is_empty());
+        let filled = OctetiN::<8>::new(&[0xab, 0xcd]).unwrap();
+        assert_eq!(filled.is_empty(), filled.vacua());
+        assert!(!filled.is_empty());
     }
 
     #[test]

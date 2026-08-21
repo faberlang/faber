@@ -104,6 +104,12 @@ impl<T, const N: usize> ListaN<T, N> {
         self.len == 0
     }
 
+    /// Rust empty predicate. Same as [`Self::vacua`].
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.vacua()
+    }
+
     /// Read an initialized element. Spare slots return `None`.
     #[must_use]
     pub fn get(&self, index: usize) -> Option<&T> {
@@ -326,6 +332,17 @@ mod tests {
             }
         );
         assert_eq!(lista.as_slice(), &[1, 2]);
+    }
+
+    #[test]
+    fn is_empty_matches_vacua() {
+        let empty = ListaN::<i64, 8>::empty();
+        assert_eq!(empty.is_empty(), empty.vacua());
+        assert!(empty.is_empty());
+        let mut filled = ListaN::<i64, 8>::empty();
+        filled.appende(1).unwrap();
+        assert_eq!(filled.is_empty(), filled.vacua());
+        assert!(!filled.is_empty());
     }
 
     #[test]

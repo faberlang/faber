@@ -108,6 +108,12 @@ impl<const N: usize> TextusN<N> {
         self.len == 0
     }
 
+    /// Rust empty predicate. Same as [`Self::vacua`].
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.vacua()
+    }
+
     /// Initialized scalar prefix. Direct slot access is O(1); spare `len..N`
     /// is not in this slice.
     #[must_use]
@@ -241,6 +247,16 @@ mod tests {
         );
         assert_eq!(t.to_textus(), "ab");
         assert_eq!(t.len(), 2);
+    }
+
+    #[test]
+    fn is_empty_matches_vacua() {
+        let empty = TextusN::<4>::empty();
+        assert_eq!(empty.is_empty(), empty.vacua());
+        assert!(empty.is_empty());
+        let filled = TextusN::<4>::new("πΩ").unwrap();
+        assert_eq!(filled.is_empty(), filled.vacua());
+        assert!(!filled.is_empty());
     }
 
     #[test]
