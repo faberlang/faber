@@ -15,6 +15,9 @@ radix-syntax = { path = "../radix-syntax" }
 radix-types = { path = "../radix-types" }
 rustc-hash = "2"
 
+[dev-dependencies]
+radix-parser = { path = "../radix-parser" }
+
 [lints.clippy]
 # Group first at lower priority so per-lint allows below win package-wide.
 pedantic = { level = "deny", priority = -1 }
