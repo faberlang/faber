@@ -1,6 +1,7 @@
 //! Typecheck pipeline tests — driver/codegen proofs that cannot live in the leaf.
-
-pub use radix_semantic::*;
+//!
+//! Production typecheck is crate-private in `radix-semantic`. This module
+//! hosts remaining integration proofs that need the module compiler.
 
 #[cfg(test)]
 #[path = "test_support.rs"]
