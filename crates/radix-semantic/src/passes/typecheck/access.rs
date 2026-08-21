@@ -110,7 +110,7 @@ impl TypeChecker<'_> {
         // Range indices (e.g. textus[0‥5]) still return a textus substring.
         if matches!(
             resolved_kind,
-            Type::Primitive(Primitive::Textus | Primitive::Ascii)
+            Type::Primitive(Primitive::Textus | Primitive::Ascii) | Type::BoundedAscii { .. }
         ) {
             if !self.is_textus_index_type(idx_ty) {
                 self.invalid_operand_types(ISSUE_TEXTUS_INDEX_MUST_BE_NUMERUS_OR_RANGE, index_span);

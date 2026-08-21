@@ -11,7 +11,6 @@
 
 use super::TypeChecker;
 use crate::semantic_message;
-use crate::test_support;
 use crate::{IndexExpr, Primitive, Resolver, SemanticErrorKind, Type, TypeTable};
 use radix_lexer::{Interner, Span};
 use radix_target::Target;
@@ -190,4 +189,73 @@ fn ascii_literal_capacity_boundary() {
         "incipit {{ fixum ascii big ← '{}' nota big }}",
         "a".repeat(65)
     ));
+}
+
+/// A bounded literal is checked against the declared carrier capacity, while
+/// the same payload remains legal for bare unbounded `ascii`.
+#[test]
+fn bounded_ascii_literal_rejects_payload_over_capacity() {
+    rejects_with_issue(
+        "incipit { fixum ascii<8> too_long ← 'abcdefghi' nota too_long }",
+        "ascii_literal_too_long",
+    );
+    accepts(&format!(
+        "incipit {{ fixum ascii<8> fits ← '{}' nota fits }}",
+        "a".repeat(8)
+    ));
+}
+
+#[test]
+fn bounded_ascii_scalar_index_returns_ascii_one() {
+    accepts(
+        r"incipit {
+    fixum ascii<8> source ← 'abc'
+    fixum ascii<1> c ← source[1]
+    nota c
+}",
+    );
+}
+
+#[test]
+fn bounded_ascii_capacity_widens_only_directionally() {
+    accepts(
+        r"incipit {
+    fixum ascii<8> narrow ← 'abc'
+    fixum ascii<16> wide ← narrow
+    nota wide
+}",
+    );
+    rejects_with_issue(
+        r"incipit {
+    fixum ascii<16> wide ← 'abc'
+    fixum ascii<8> narrow ← wide
+    nota narrow
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn bounded_ascii_d7_conversions_are_explicit() {
+    accepts(
+        r"incipit {
+    fixum ascii<8> bounded ← 'abc'
+    fixum ascii unbounded ← bounded ↦ ascii
+    fixum textus text ← bounded ↦ textus
+    fixum ascii<8> roundtrip ← unbounded ↦ ascii<8>
+    nota roundtrip
+}",
+    );
+}
+
+#[test]
+fn bounded_ascii_equivalence_stays_same_type_only() {
+    rejects_with_issue(
+        r"incipit {
+    fixum ascii<8> narrow ← 'abc'
+    fixum ascii<16> wide ← 'abc'
+    si narrow ≡ wide { nota 'same' }
+}",
+        EXACT_EQ_ISSUE,
+    );
 }

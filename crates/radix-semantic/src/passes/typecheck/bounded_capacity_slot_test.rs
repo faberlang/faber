@@ -79,13 +79,12 @@ fn lista_element_and_capacity_holes() {
 }
 
 #[test]
-fn bare_ascii_still_rejects_char_literal() {
-    test_support::assert_rejects_with_issue(
+fn bare_ascii_accepts_char_literal() {
+    test_support::assert_accepts(
         r"incipit {
     fixum ascii c ← 'x'
     nota c
 }",
-        "expression_type_mismatch",
     );
 }
 
@@ -101,25 +100,23 @@ fn ascii_hole_accepts_char_literal() {
 }
 
 #[test]
-fn ascii_hole_solved_to_one_rejects_eight() {
-    test_support::assert_rejects_with_issue(
+fn ascii_hole_solved_to_one_widens_to_eight() {
+    test_support::assert_accepts(
         r"incipit {
     fixum ascii<_> c ← 'x'
     fixum ascii<8> d ← c
     nota d
 }",
-        "incompatible_tensor_index",
     );
 }
 
 #[test]
-fn ascii_eight_still_rejects_char_literal() {
-    test_support::assert_rejects_with_issue(
+fn ascii_eight_accepts_char_literal() {
+    test_support::assert_accepts(
         r"incipit {
     fixum ascii<8> c ← 'x'
     nota c
 }",
-        "incompatible_tensor_index",
     );
 }
 

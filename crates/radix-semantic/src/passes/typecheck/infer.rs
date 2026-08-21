@@ -286,6 +286,28 @@ impl TypeChecker<'_> {
         self.unify_assign_issue(a, b, span, issue)
     }
 
+    /// Concrete bounded ASCII capacities widen only from a smaller buffer to
+    /// a larger one. Unknown/index-parameter capacities fail closed here;
+    /// equality is handled by the `TypeTable` index relation before this
+    /// helper is needed.
+    fn bounded_ascii_capacity_assignable(
+        &mut self,
+        from: crate::IndexId,
+        to: crate::IndexId,
+    ) -> bool {
+        let from = self.resolve_index(from);
+        let to = self.resolve_index(to);
+        match (self.types.get_index(from), self.types.get_index(to)) {
+            (IndexExpr::Literal(from), IndexExpr::Literal(to)) => from <= to,
+            _ => false,
+        }
+    }
+
+    fn bounded_ascii_capacity_is_one(&mut self, capacity: crate::IndexId) -> bool {
+        let capacity = self.resolve_index(capacity);
+        matches!(self.types.get_index(capacity), IndexExpr::Literal(1))
+    }
+
     fn unify_with_policy(
         &mut self,
         a: TypeId,
@@ -441,7 +463,23 @@ impl TypeChecker<'_> {
                 };
                 return self.types.sparsa_with_shape(elem, shape);
             }
+            // D17: the one-byte bounded carrier produced by a char literal or
+            // scalar index may flow into bare unbounded ascii. The reverse
+            // direction remains explicit-only.
+            (Type::BoundedAscii { capacity }, Type::Primitive(Primitive::Ascii))
+                if matches!(policy, UnifyPolicy::Assign)
+                    && self.bounded_ascii_capacity_is_one(capacity) =>
+            {
+                return right;
+            }
             (Type::BoundedAscii { capacity: ca }, Type::BoundedAscii { capacity: cb }) => {
+                // Capacity widening is directional assignment only. Joins and
+                // equality-shaped inference remain invariant in `N`.
+                if matches!(policy, UnifyPolicy::Assign)
+                    && self.bounded_ascii_capacity_assignable(ca, cb)
+                {
+                    return right;
+                }
                 let Ok(capacity) =
                     super::tensor_index::unify_tensor_shape_indices(self, ca, cb, span)
                 else {

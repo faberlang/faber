@@ -281,6 +281,15 @@ impl TypeChecker<'_> {
             return error_ty;
         }
 
+        if self.is_bounded_ascii_conversio(source_ty, target_resolved) {
+            if let Some(recovery) = recovery {
+                self.note_conversio_recovery_checked(recovery, target_resolved);
+            } else {
+                self.check_conversio_propagation_channel(source_ty, target_resolved, span);
+            }
+            return target_resolved;
+        }
+
         if matches!(
             self.types.get(target_resolved),
             Type::Primitive(Primitive::Regex)
@@ -1212,6 +1221,22 @@ impl TypeChecker<'_> {
             }
             _ => ISSUE_CROSS_COLLECTION_UNSUPPORTED,
         }
+    }
+
+    /// D7's explicit ASCII buffer bridges. Bounded values copy their valid
+    /// prefix into an unbounded carrier; the reverse direction is fallible and
+    /// keeps the declared capacity for the Rust carrier to enforce.
+    fn is_bounded_ascii_conversio(&self, source_ty: TypeId, target_ty: TypeId) -> bool {
+        matches!(
+            (
+                self.types.get(self.resolve_inferred_type(source_ty)),
+                self.types.get(self.resolve_inferred_type(target_ty)),
+            ),
+            (
+                Type::BoundedAscii { .. },
+                Type::Primitive(Primitive::Ascii | Primitive::Textus)
+            ) | (Type::Primitive(Primitive::Ascii), Type::BoundedAscii { .. })
+        )
     }
 
     fn primitive_conversio_family(&self, ty: TypeId) -> PrimitiveConversioFamily {

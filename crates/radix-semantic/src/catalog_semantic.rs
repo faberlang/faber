@@ -1068,9 +1068,10 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             Some("use textus for Unicode text or keep ascii payloads ASCII-only".to_owned())
         }
         "ascii_literal_unescaped_control" => Some("escape control characters in ascii literals".to_owned()),
-        "ascii_literal_too_long" => {
-            Some("shorten the ascii literal to fit N, or use unbounded ascii".to_owned())
-        }
+        "ascii_literal_too_long" => Some(
+            "shorten the ascii<N> literal to fit its declared capacity, or use unbounded ascii"
+                .to_owned(),
+        ),
         "boolean_operands_required" => Some("use bivalens operands for this operator".to_owned()),
         "atomic_method_requires_atomic_receiver" => {
             Some("call load/store/exchange/compare_exchange on atomic<T>".to_owned())

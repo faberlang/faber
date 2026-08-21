@@ -1595,7 +1595,7 @@ fn bounded_forms_are_distinct_from_bare_primitives_and_each_other() {
 
     assert!(!types.assignable(ascii8, ascii));
     assert!(!types.assignable(ascii, ascii8));
-    assert!(!types.assignable(ascii8, ascii9));
+    assert!(types.assignable(ascii8, ascii9));
     assert!(!types.assignable(ascii9, ascii8));
     assert!(!types.assignable(lista8, lista));
     assert!(!types.assignable(lista, lista8));
@@ -1657,10 +1657,7 @@ fn bounded_ascii_one_assigns_to_textus_like_bare_ascii() {
         "ascii<8> ↛ textus until BB-4"
     );
     assert!(!types.assignable(textus, ascii1), "textus ↛ ascii<1>");
-    assert!(
-        !types.assignable(ascii1, ascii),
-        "ascii<1> ↛ ascii until BB-4"
-    );
+    assert!(types.assignable(ascii1, ascii), "ascii<1> → ascii (D17)");
 }
 
 #[test]

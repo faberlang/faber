@@ -1209,8 +1209,10 @@ impl TypeTable {
                 self.assignable(*from_elem, *to_elem) && self.index_equals(*from_shape, *to_shape)
             }
 
-            // Bounded buffers: element-covariant, capacity invariant. Bare
-            // primitives are not assignable to or from any bounded form (D4/D5).
+            // Bounded buffers: element-covariant, capacity invariant except
+            // for ascii's directional widening rule. Bare primitives are not
+            // assignable to or from bounded forms (D4/D5); the one-byte char
+            // carrier is the sole implicit bridge into bare ascii (D17).
             (
                 Type::BoundedArray {
                     element: from_elem,
@@ -1226,16 +1228,30 @@ impl TypeTable {
                 Type::BoundedTextus { capacity: to_cap },
             )
             | (
-                Type::BoundedAscii { capacity: from_cap },
-                Type::BoundedAscii { capacity: to_cap },
-            )
-            | (
                 Type::BoundedOcteti { capacity: from_cap },
                 Type::BoundedOcteti { capacity: to_cap },
             ) => self.index_equals(*from_cap, *to_cap),
+            (
+                Type::BoundedAscii { capacity: from_cap },
+                Type::BoundedAscii { capacity: to_cap },
+            ) => self.bounded_ascii_capacity_assignable(*from_cap, *to_cap),
+            (Type::BoundedAscii { capacity }, Type::Primitive(Primitive::Ascii)) => {
+                self.bounded_ascii_capacity_is_one(*capacity)
+            }
 
             _ => false,
         }
+    }
+
+    fn bounded_ascii_capacity_assignable(&self, from: IndexId, to: IndexId) -> bool {
+        match (self.get_index(from), self.get_index(to)) {
+            (IndexExpr::Literal(from), IndexExpr::Literal(to)) => from <= to,
+            _ => false,
+        }
+    }
+
+    fn bounded_ascii_capacity_is_one(&self, capacity: IndexId) -> bool {
+        matches!(self.get_index(capacity), IndexExpr::Literal(1))
     }
 
     /// Bare `ascii` and D17 `'x'` (`ascii<1>`) widen to `textus`.

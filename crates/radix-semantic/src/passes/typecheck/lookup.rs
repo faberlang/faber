@@ -473,7 +473,7 @@ impl TypeChecker<'_> {
                 .expected_fractus_literal_type(expected)
                 .unwrap_or_else(|| self.fractus_type()),
             HirLiteral::String(_) => self.textus_type(),
-            HirLiteral::Ascii(sym) => self.check_ascii_literal(*sym, span),
+            HirLiteral::Ascii(sym) => self.check_ascii_literal(*sym, span, expected),
             HirLiteral::Octeti(sym) => self.check_octeti_literal(*sym, span),
             HirLiteral::JsonValor(value) => self.check_json_valor_literal(value, span, expected),
             HirLiteral::Regex(sym, _) => self.check_regex_literal(*sym, span),
@@ -521,12 +521,40 @@ impl TypeChecker<'_> {
         self.interner.map(|interner| interner.resolve(sym))
     }
 
-    fn check_ascii_literal(&mut self, sym: Symbol, span: radix_lexer::Span) -> TypeId {
+    fn check_ascii_literal(
+        &mut self,
+        sym: Symbol,
+        span: radix_lexer::Span,
+        expected: Option<TypeId>,
+    ) -> TypeId {
         let Some(raw) = self.interned_literal_payload(sym) else {
             return self.ascii_type();
         };
         match radix_lexer::ascii_literal::decode_ascii_literal(raw) {
             Ok(decoded) => {
+                // A bounded expected type is the literal's real carrier
+                // contract. Check concrete capacities here so a literal cannot
+                // silently widen to bare `ascii` before the assignment check.
+                if let Some(expected) = expected.map(|ty| self.resolve_inferred_type(ty)) {
+                    if let Type::BoundedAscii { capacity } = self.types.get(expected) {
+                        let capacity = self.resolve_index(*capacity);
+                        if let IndexExpr::Literal(capacity) = self.types.get_index(capacity) {
+                            if decoded.len() as u64 > *capacity {
+                                self.invalid_operand_types_with_args(
+                                    "ascii_literal_too_long",
+                                    span,
+                                    &[("capacity", capacity.to_string())],
+                                );
+                                return self.error_type;
+                            }
+                            // Keep the expected concrete carrier so Rust emit
+                            // constructs `AsciiN<N>` rather than widening the
+                            // literal to bare `Ascii`.
+                            return expected;
+                        }
+                    }
+                }
+
                 // Bare ascii is unbounded: `ascii_literal_too_long` is reserved
                 // for `ascii<N>` (BB-4). One-byte payloads stay `ascii<1>`.
                 if decoded.len() == 1 {

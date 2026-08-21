@@ -1248,6 +1248,15 @@ fn lower_conversio_target_type(
             apply_type_target_wrappers(lowerer, ty, ty_id)
         }
         radix_syntax::TypeExprKind::Named(ident, target_params)
+            if Primitive::from_name(lowerer.interner.resolve(ident.name))
+                == Some(Primitive::Ascii)
+                && !target_params.is_empty() =>
+        {
+            // Bounded ascii is a real conversion target, not a radix hint.
+            // Preserve its capacity so typecheck and Rust emit can enforce D7.
+            lowerer.lower_type(ty)
+        }
+        radix_syntax::TypeExprKind::Named(ident, target_params)
             if let Some(prim) = Primitive::from_name(lowerer.interner.resolve(ident.name))
                 && matches!(prim, Primitive::Numerus | Primitive::Fractus) =>
         {
