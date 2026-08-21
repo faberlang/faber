@@ -9,6 +9,69 @@ use radix_hir::DefId;
 use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
 
+fn family_marker_function(op: Option<MirCollectionOp>) -> MirFunction {
+    let ty = MirType::semantic(TypeId(0));
+    let mut function = scalar_kernel_function(ty);
+    if let Some(op) = op {
+        function.blocks[0].statements.push(MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: None,
+                call: MirRuntimeCall {
+                    intrinsic: MirIntrinsic::Collection(op),
+                    args: Vec::new(),
+                    return_ty: ty,
+                },
+            },
+            span: Span::default(),
+        });
+    }
+    function
+}
+
+#[test]
+fn launch_geometry_authority_pins_dispatch_families() {
+    let cases = [
+        (
+            "reduction",
+            Some(MirCollectionOp::Sum),
+            MirKernelDispatchSize {
+                x: 8192,
+                y: 1,
+                z: 1,
+            },
+            MirWorkgroupSize { x: 256, y: 1, z: 1 },
+            MirKernelWorkgroupCount { x: 32, y: 1, z: 1 },
+        ),
+        (
+            "matmul",
+            Some(MirCollectionOp::TensorMatMul),
+            MirKernelDispatchSize { x: 2, y: 2, z: 1 },
+            MirWorkgroupSize { x: 8, y: 8, z: 1 },
+            MirKernelWorkgroupCount { x: 2, y: 2, z: 1 },
+        ),
+        (
+            "elementwise",
+            None,
+            MirKernelDispatchSize {
+                x: 4097,
+                y: 1,
+                z: 1,
+            },
+            MirWorkgroupSize { x: 1, y: 1, z: 1 },
+            MirKernelWorkgroupCount {
+                x: 4097,
+                y: 1,
+                z: 1,
+            },
+        ),
+    ];
+
+    for (family, op, dispatch_size, effective, expected) in cases {
+        let actual = launch_geometry(&family_marker_function(op), dispatch_size, effective);
+        assert_eq!(actual, expected, "{family} launch geometry");
+    }
+}
+
 /// One-param scalar kernel: `functio add_one(x: f32) -> f32 { x }`.
 fn scalar_kernel_function(ty: MirType) -> MirFunction {
     MirFunction {

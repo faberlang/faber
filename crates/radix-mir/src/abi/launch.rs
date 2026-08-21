@@ -1,16 +1,16 @@
-use crate::{MirLocalId, MirScalarLayout, MirType};
+use crate::{MirFunction, MirLocalId, MirScalarLayout, MirType};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 use super::{
-    ceil_div_dimension, MirAbiError, MirFragmentOutputReflection, MirInputStepMode,
-    MirKernelBufferBindingType, MirKernelBuiltin, MirKernelBuiltinInputReflection,
-    MirKernelDispatchSize, MirKernelReflection, MirKernelResourceAccess, MirKernelResourceKind,
-    MirKernelResourceReflection, MirKernelResourceRole, MirKernelShaderAccess,
-    MirKernelWorkgroupCount, MirVaryingReflection, MirVertexInputReflection, MirWorkgroupSize,
-    ERR_FRAGMENT_OUTPUT_DUPLICATE_LOCATION, ERR_VARYING_DUPLICATE_LOCATION,
-    ERR_VARYING_FRAGMENT_WITHOUT_VERTEX, ERR_VARYING_STAGE_MISMATCH,
-    ERR_VERTEX_INPUT_DUPLICATE_LOCATION,
+    ceil_div_dimension, collection_op_workgroup_count, MirAbiError, MirFragmentOutputReflection,
+    MirInputStepMode, MirKernelBufferBindingType, MirKernelBuiltin,
+    MirKernelBuiltinInputReflection, MirKernelDispatchSize, MirKernelReflection,
+    MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceReflection,
+    MirKernelResourceRole, MirKernelShaderAccess, MirKernelWorkgroupCount, MirVaryingReflection,
+    MirVertexInputReflection, MirWorkgroupSize, ERR_FRAGMENT_OUTPUT_DUPLICATE_LOCATION,
+    ERR_VARYING_DUPLICATE_LOCATION, ERR_VARYING_FRAGMENT_WITHOUT_VERTEX,
+    ERR_VARYING_STAGE_MISMATCH, ERR_VERTEX_INPUT_DUPLICATE_LOCATION,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -873,6 +873,29 @@ pub(crate) fn layout_entry_for_launch_binding(
         source_local: binding.source_local,
         source_name: binding.source_name.clone(),
     }
+}
+
+/// Canonical native-grid geometry for a kernel launch.
+///
+/// The storage meaning of `dispatch_size` is family-specific, but every lane
+/// derives its native workgroup grid here:
+///
+/// | family | `dispatch_size` stores | derived grid |
+/// | --- | --- | --- |
+/// | reduction (`Sum`/`Mean`) | tensor length | `ceil(length / effective.x)` |
+/// | matmul | tile/workgroup count | the dispatch grid verbatim |
+/// | elementwise | `N` threads | `ceil(N / 1)` = `N` |
+///
+/// This entry point deliberately delegates the family-aware decision to
+/// [`collection_op_workgroup_count`]. Keep that function as the semantic owner
+/// rather than re-implementing collection-family detection in this module.
+#[must_use]
+pub fn launch_geometry(
+    function: &MirFunction,
+    dispatch_size: MirKernelDispatchSize,
+    effective: MirWorkgroupSize,
+) -> MirKernelWorkgroupCount {
+    collection_op_workgroup_count(function, dispatch_size, effective)
 }
 
 pub(crate) fn dispatch_size_for_1d_elements(element_count: u64) -> MirKernelDispatchSize {
