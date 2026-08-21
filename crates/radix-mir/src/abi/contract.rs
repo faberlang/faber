@@ -11,6 +11,9 @@ use super::{
     ERR_KERNEL_BUILTIN_UNKNOWN_NAME,
 };
 
+/// Number of SIMD lanes used by the sequence-one projection GEMV body.
+const DECODE_GEMV_LANES: u64 = 32;
+
 pub(crate) fn combined_builtin_dependencies(
     input_builtins: impl IntoIterator<Item = MirKernelBuiltin>,
     called_builtins: &[MirKernelBuiltin],
@@ -726,6 +729,22 @@ fn batched_attention_contract(
             .checked_mul(*dim)
             .ok_or_else(|| MirAbiError::new("batched attention output size overflow"))
     })?;
+    // Sequence-one Q/K/V projections are lowered as one simdgroup per output
+    // column.  The logical output shape stays unchanged; only the flat launch
+    // domain expands so each of the 32 lanes can contribute one K slice.
+    let output_elements = if matches!(
+        kind,
+        crate::kernel_plan::BatchedAttentionKind::ProjectionQ
+            | crate::kernel_plan::BatchedAttentionKind::ProjectionK
+            | crate::kernel_plan::BatchedAttentionKind::ProjectionV
+    ) && seq == 1
+    {
+        output_elements
+            .checked_mul(DECODE_GEMV_LANES)
+            .ok_or_else(|| MirAbiError::new("decode GEMV dispatch size overflow"))?
+    } else {
+        output_elements
+    };
     Ok(CollectionOpContract::BatchedAttention {
         kind,
         kv_heads,
