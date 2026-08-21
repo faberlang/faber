@@ -1248,11 +1248,13 @@ fn json_census_value(report: &ProbaReport, list: bool) -> serde_json::Value {
 }
 
 fn print_json_report(report: &ProbaReport, metadata: &RunMetadata, list: bool) {
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&json_report_value(report, metadata, list))
-            .expect("serialize test report")
-    );
+    match serde_json::to_string_pretty(&json_report_value(report, metadata, list)) {
+        Ok(json) => println!("{json}"),
+        Err(error) => {
+            eprintln!("failed to serialize test report: {error}");
+            std::process::exit(70);
+        }
+    }
 }
 
 fn replay_output(result: &CaseResult) {
