@@ -2,12 +2,14 @@ use super::*;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock,
     MirBlockId, MirCallee, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirGradientOp,
-    MirIntrinsic, MirLocal, MirLocalId, MirOperand, MirPlace, MirPlaceBase, MirProgram,
-    MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirSwitchCase, MirTerminator,
-    MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId, MirValueKind,
+    MirIntrinsic, MirLocal, MirLocalId, MirNamedOperand, MirOperand, MirPlace, MirPlaceBase,
+    MirProgram, MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirSwitchCase,
+    MirTerminator, MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId, MirValueKind,
 };
+use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
-use radix_types::{IndexExpr, Primitive, TypeId, TypeTable};
+use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
+use rustc_hash::FxHashMap;
 
 // -----------------------------------------------------------------------
 // Helpers
@@ -33,7 +35,11 @@ fn tensor_type(types: &mut TypeTable, element: Primitive, dims: &[u64]) -> TypeI
 /// Run validation on a program and return the error messages.
 fn validate(program: &MirProgram, types: &TypeTable) -> Vec<String> {
     let context = MirValidationContext::new(types);
-    match validate_program(program, &context) {
+    validate_with(program, &context)
+}
+
+fn validate_with(program: &MirProgram, context: &MirValidationContext<'_>) -> Vec<String> {
+    match validate_program(program, context) {
         Ok(()) => vec![],
         Err(errors) => errors.into_iter().map(|e| e.message).collect(),
     }
@@ -3172,5 +3178,132 @@ fn access_mode_axis_rejects_incoherent_role_access_pairs() {
     assert_eq!(
         BufferRole::from_abi_role(MirKernelResourceRole::Output, MirKernelResourceAccess::Read),
         None
+    );
+}
+
+// -----------------------------------------------------------------------
+// Named aggregate fitting-int (Family B / triga Material.side)
+// -----------------------------------------------------------------------
+
+/// Struct `{ int<u32> side }` constructed with a single named field.
+fn named_int_u32_field_program(
+    types: &mut TypeTable,
+    field_value: MirOperand,
+) -> (MirProgram, DefId, Symbol) {
+    let def_id = DefId(1);
+    let field = Symbol(0);
+    let _int_u32 = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let struct_ty = MirType::semantic(types.intern(Type::Struct(def_id)));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: struct_ty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Construct {
+                        destination: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(0)),
+                            projections: vec![],
+                        },
+                        aggregate: MirAggregate {
+                            kind: MirAggregateKind::Struct(def_id),
+                            ty: struct_ty,
+                            fields: MirAggregateFields::Named(vec![MirNamedOperand {
+                                name: field,
+                                value: field_value,
+                            }]),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    (program, def_id, field)
+}
+
+fn named_int_u32_context<'a>(
+    types: &'a TypeTable,
+    def_id: DefId,
+    field: Symbol,
+) -> MirValidationContext<'a> {
+    let int_u32 = types
+        .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+        .expect("int<u32> interned");
+    let mut context = MirValidationContext::new(types);
+    let mut fields = FxHashMap::default();
+    fields.insert(field, MirType::semantic(int_u32));
+    context.struct_fields.insert(def_id, fields);
+    context
+}
+
+#[test]
+fn named_aggregate_accepts_fitting_int_literal() {
+    // HIR already accepts `Material { side = 0 }` for `int<u32> side`.
+    // MIR constants carry plain `numerus`; collections honor the fitting-int
+    // exception, named aggregates must too.
+    let mut types = TypeTable::new();
+    let (program, def_id, field) =
+        named_int_u32_field_program(&mut types, MirOperand::Constant(MirConstant::Int(0)));
+    let context = named_int_u32_context(&types, def_id, field);
+    let errors = validate_with(&program, &context);
+    assert!(
+        errors.is_empty(),
+        "expected fitting numerus literal into int<u32> named field, got: {errors:?}"
+    );
+}
+
+#[test]
+fn named_aggregate_rejects_out_of_range_int_literal() {
+    let mut types = TypeTable::new();
+    let (program, def_id, field) = named_int_u32_field_program(
+        &mut types,
+        MirOperand::Constant(MirConstant::Int(i64::from(u32::MAX) + 1)),
+    );
+    let context = named_int_u32_context(&types, def_id, field);
+    let errors = validate_with(&program, &context);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("named aggregate field type mismatch")),
+        "expected out-of-range literal still rejected, got: {errors:?}"
+    );
+}
+
+#[test]
+fn named_aggregate_rejects_non_integer_field_mismatch() {
+    let mut types = TypeTable::new();
+    let (program, def_id, field) =
+        named_int_u32_field_program(&mut types, MirOperand::Constant(MirConstant::Bool(false)));
+    let context = named_int_u32_context(&types, def_id, field);
+    let errors = validate_with(&program, &context);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("named aggregate field type mismatch")),
+        "expected bool into int<u32> field still rejected, got: {errors:?}"
     );
 }

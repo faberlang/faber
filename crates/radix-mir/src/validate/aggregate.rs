@@ -482,7 +482,8 @@ impl Validator<'_, '_> {
                 continue;
             }
             if let Some(value_ty) = value_ty {
-                self.require_assignable(
+                self.require_assignable_or_fitting_constant(
+                    &item.value,
                     value_ty,
                     expected_ty,
                     span,
