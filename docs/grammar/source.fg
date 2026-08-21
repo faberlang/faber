@@ -1,0 +1,803 @@
+# Faber grammar source — verbatim transcription of docs/EBNF.md (GSD-3).
+# @grammar 1. No renames. No repairs.
+
+@grammar 1
+@start fabFile
+
+@glyphs
+# GSD-2 glyph/glossary registry.
+#
+# Each `glyph` is one source codepoint.  Multi-codepoint terminals such as
+# `?.`, `![`, and `+++` claim their component codepoints here; the complete
+# terminal remains named by the claiming production slot.  Findings are
+# report-only reconciliation rows and do not grant a consumer glyph grammar
+# authority.
+
+[registry]
+schema = 1
+source = "docs/EBNF.md"
+role_table = [
+  "access",
+  "alternate_exit",
+  "annotation",
+  "arithmetic",
+  "assignment",
+  "bitwise",
+  "closure_joint",
+  "comparison",
+  "conditional",
+  "conversion",
+  "equality",
+  "generic",
+  "gradient",
+  "increment",
+  "range",
+  "return_type",
+  "shift",
+  "string_delimiter",
+  "template_hole",
+  "tensor_product",
+  "type_ascription",
+  "type_union",
+  "unary",
+]
+
+[[glyphs]]
+glyph = "!"
+codepoint = "U+0021"
+unicode_name = "EXCLAMATION MARK"
+role = "access"
+claiming_slots = ["nonNullSuffix"]
+
+[[glyphs]]
+glyph = "%"
+codepoint = "U+0025"
+unicode_name = "PERCENT SIGN"
+role = "arithmetic"
+claiming_slots = ["multiplicative"]
+
+[[glyphs]]
+glyph = "+"
+codepoint = "U+002B"
+unicode_name = "PLUS SIGN"
+role = "arithmetic"
+claiming_slots = ["additive"]
+
+[[glyphs]]
+glyph = "-"
+codepoint = "U+002D"
+unicode_name = "HYPHEN-MINUS"
+role = "arithmetic"
+claiming_slots = ["additive", "enumMember", "unary"]
+
+[[glyphs]]
+glyph = "."
+codepoint = "U+002E"
+unicode_name = "FULL STOP"
+role = "access"
+claiming_slots = ["memberSuffix", "nonNullSuffix", "optionalSuffix", "qualifiedIdent", "qualifiedType"]
+
+[[glyphs]]
+glyph = "/"
+codepoint = "U+002F"
+unicode_name = "SOLIDUS"
+role = "arithmetic"
+claiming_slots = ["multiplicative"]
+
+[[glyphs]]
+glyph = ":"
+codepoint = "U+003A"
+unicode_name = "COLON"
+role = "conditional"
+claiming_slots = ["jsonMember", "legacyClausuraExpr", "ternary"]
+
+[[glyphs]]
+glyph = "<"
+codepoint = "U+003C"
+unicode_name = "LESS-THAN SIGN"
+role = "generic"
+claiming_slots = ["callTypeArgs", "genericParams", "typeArguments"]
+
+[[glyphs]]
+glyph = "="
+codepoint = "U+003D"
+unicode_name = "EQUALS SIGN"
+role = "assignment"
+claiming_slots = ["annotationField", "enumMember", "fieldDecl", "fieldInit", "importAliasField", "importNameField", "importSourceField", "importVisibilityField", "importWildcardField", "nucleumField", "typeAliasDecl"]
+
+[[glyphs]]
+glyph = ">"
+codepoint = "U+003E"
+unicode_name = "GREATER-THAN SIGN"
+role = "generic"
+claiming_slots = ["callTypeArgs", "genericParams", "typeArguments"]
+
+[[glyphs]]
+glyph = "?"
+codepoint = "U+003F"
+unicode_name = "QUESTION MARK"
+role = "conditional"
+claiming_slots = ["optionalSuffix", "ternary"]
+
+[[glyphs]]
+glyph = "@"
+codepoint = "U+0040"
+unicode_name = "COMMERCIAL AT"
+role = "annotation"
+claiming_slots = ["annotationSugar", "bracedAnnotation", "nucleumBraced", "nucleumSugar"]
+
+[[glyphs]]
+glyph = "¬"
+codepoint = "U+00AC"
+unicode_name = "NOT SIGN"
+role = "unary"
+claiming_slots = ["unary"]
+
+[[glyphs]]
+glyph = "·"
+codepoint = "U+00B7"
+unicode_name = "MIDDLE DOT"
+role = "tensor_product"
+claiming_slots = ["multiplicative"]
+
+[[glyphs]]
+glyph = "×"
+codepoint = "U+00D7"
+unicode_name = "MULTIPLICATION SIGN"
+role = "tensor_product"
+claiming_slots = ["multiplicative"]
+
+[[glyphs]]
+glyph = "‥"
+codepoint = "U+2025"
+unicode_name = "TWO DOT LEADER"
+role = "range"
+claiming_slots = ["rangeTail", "velRangeTail"]
+
+[[glyphs]]
+glyph = "…"
+codepoint = "U+2026"
+unicode_name = "HORIZONTAL ELLIPSIS"
+role = "range"
+claiming_slots = ["rangeTail", "velRangeTail"]
+
+[[glyphs]]
+glyph = "←"
+codepoint = "U+2190"
+unicode_name = "LEFTWARDS ARROW"
+role = "assignment"
+claiming_slots = ["arrayDestruct", "assignment", "awaitVarDecl", "objectDestruct", "sitDecl", "varDecl"]
+
+[[glyphs]]
+glyph = "↑"
+codepoint = "U+2191"
+unicode_name = "UPWARDS ARROW"
+role = "increment"
+claiming_slots = ["incDecStmt"]
+
+[[glyphs]]
+glyph = "→"
+codepoint = "U+2192"
+unicode_name = "RIGHTWARDS ARROW"
+role = "return_type"
+claiming_slots = ["functionType", "legacyClausuraExpr", "returnClause"]
+
+[[glyphs]]
+glyph = "↓"
+codepoint = "U+2193"
+unicode_name = "DOWNWARDS ARROW"
+role = "increment"
+claiming_slots = ["incDecStmt"]
+
+[[glyphs]]
+glyph = "↤"
+codepoint = "U+21A4"
+unicode_name = "LEFTWARDS ARROW FROM BAR"
+role = "assignment"
+claiming_slots = ["assignment", "varDecl"]
+
+[[glyphs]]
+glyph = "↦"
+codepoint = "U+21A6"
+unicode_name = "RIGHTWARDS ARROW FROM BAR"
+role = "conversion"
+claiming_slots = ["conversio"]
+
+[[glyphs]]
+glyph = "⇐"
+codepoint = "U+21D0"
+unicode_name = "LEFTWARDS DOUBLE ARROW"
+role = "shift"
+claiming_slots = ["shift"]
+
+[[glyphs]]
+glyph = "⇒"
+codepoint = "U+21D2"
+unicode_name = "RIGHTWARDS DOUBLE ARROW"
+role = "shift"
+claiming_slots = ["shift"]
+
+[[glyphs]]
+glyph = "⇥"
+codepoint = "U+21E5"
+unicode_name = "RIGHTWARDS ARROW TO BAR"
+role = "alternate_exit"
+claiming_slots = ["alternateExitClause", "inlineRecovery"]
+
+[[glyphs]]
+glyph = "∇"
+codepoint = "U+2207"
+unicode_name = "NABLA"
+role = "gradient"
+claiming_slots = ["gradientExpr"]
+
+[[glyphs]]
+glyph = "∧"
+codepoint = "U+2227"
+unicode_name = "LOGICAL AND"
+role = "bitwise"
+claiming_slots = ["bitwiseAnd"]
+
+[[glyphs]]
+glyph = "∨"
+codepoint = "U+2228"
+unicode_name = "LOGICAL OR"
+role = "bitwise"
+claiming_slots = ["bitwiseOr"]
+
+[[glyphs]]
+glyph = "∪"
+codepoint = "U+222A"
+unicode_name = "UNION"
+role = "type_union"
+claiming_slots = ["holeType", "typeAnnotation"]
+
+[[glyphs]]
+glyph = "∴"
+codepoint = "U+2234"
+unicode_name = "THEREFORE"
+role = "closure_joint"
+claiming_slots = ["clausuraJoint"]
+
+[[glyphs]]
+glyph = "∷"
+codepoint = "U+2237"
+unicode_name = "PROPORTION"
+role = "type_ascription"
+claiming_slots = ["cast", "fingeExpr"]
+
+[[glyphs]]
+glyph = "≈"
+codepoint = "U+2248"
+unicode_name = "ALMOST EQUAL TO"
+role = "equality"
+claiming_slots = ["equalityTail"]
+
+[[glyphs]]
+glyph = "≉"
+codepoint = "U+2249"
+unicode_name = "NOT ALMOST EQUAL TO"
+role = "equality"
+claiming_slots = ["equalityTail"]
+
+[[glyphs]]
+glyph = "≠"
+codepoint = "U+2260"
+unicode_name = "NOT EQUAL TO"
+role = "equality"
+claiming_slots = ["equalityTail"]
+
+[[glyphs]]
+glyph = "≡"
+codepoint = "U+2261"
+unicode_name = "IDENTICAL TO"
+role = "equality"
+claiming_slots = ["equalityTail"]
+
+[[glyphs]]
+glyph = "≤"
+codepoint = "U+2264"
+unicode_name = "LESS-THAN OR EQUAL TO"
+role = "comparison"
+claiming_slots = ["comparison"]
+
+[[glyphs]]
+glyph = "≥"
+codepoint = "U+2265"
+unicode_name = "GREATER-THAN OR EQUAL TO"
+role = "comparison"
+claiming_slots = ["comparison"]
+
+[[glyphs]]
+glyph = "≺"
+codepoint = "U+227A"
+unicode_name = "PRECEDES"
+role = "comparison"
+claiming_slots = ["comparison"]
+
+[[glyphs]]
+glyph = "≻"
+codepoint = "U+227B"
+unicode_name = "SUCCEEDS"
+role = "comparison"
+claiming_slots = ["comparison"]
+
+[[glyphs]]
+glyph = "⊗"
+codepoint = "U+2297"
+unicode_name = "CIRCLED TIMES"
+role = "tensor_product"
+claiming_slots = ["multiplicative"]
+
+[[glyphs]]
+glyph = "⊙"
+codepoint = "U+2299"
+unicode_name = "CIRCLED DOT OPERATOR"
+role = "tensor_product"
+claiming_slots = ["multiplicative"]
+
+[[glyphs]]
+glyph = "⊻"
+codepoint = "U+22BB"
+unicode_name = "XOR"
+role = "bitwise"
+claiming_slots = ["bitwiseXor"]
+
+[[glyphs]]
+glyph = "§"
+codepoint = "U+00A7"
+unicode_name = "SECTION SIGN"
+role = "template_hole"
+claiming_slots = ["string_template"]
+source_refs = ["EBNF.md:768"]
+
+[[glyphs]]
+glyph = "«"
+codepoint = "U+00AB"
+unicode_name = "LEFT-POINTING DOUBLE ANGLE QUOTATION MARK"
+role = "string_delimiter"
+claiming_slots = ["block_string_literal"]
+source_refs = ["EBNF.md:760", "EBNF.md:779"]
+
+[[glyphs]]
+glyph = "»"
+codepoint = "U+00BB"
+unicode_name = "RIGHT-POINTING DOUBLE ANGLE QUOTATION MARK"
+role = "string_delimiter"
+claiming_slots = ["block_string_literal"]
+source_refs = ["EBNF.md:760", "EBNF.md:779"]
+
+# Read-only reconciliation findings.  These rows record consumer/corpus drift;
+# they do not add a glyph to the grammar registry.
+[[findings]]
+kind = "corpus-stray"
+glyph = "↔"
+codepoint = "U+2194"
+unicode_name = "LEFT RIGHT ARROW"
+source = "radix/corpus/**/*.fab"
+occurrences = 22
+status = "not-claimed"
+note = "Corpus prose uses ↔ for bidirectional conversion; no EBNF production claims it."
+
+[[findings]]
+kind = "corpus-stray"
+glyph = "∈"
+codepoint = "U+2208"
+unicode_name = "ELEMENT OF"
+source = "radix/corpus/itera/nidificatus.fab"
+occurrences = 2
+status = "not-claimed"
+note = "Comment-only mathematical notation; EBNF.md explicitly says ∈ is not an active glyph alias."
+
+[[findings]]
+kind = "corpus-stray"
+glyph = "−"
+codepoint = "U+2212"
+unicode_name = "MINUS SIGN"
+source = "radix/corpus/binarius/binarius.fab"
+occurrences = 2
+status = "not-claimed"
+note = "Comment-only typographic minus; the active arithmetic terminal is ASCII '-'."
+
+[[findings]]
+kind = "corpus-stray"
+glyph = "≯"
+codepoint = "U+226F"
+unicode_name = "NOT GREATER-THAN"
+source = "radix/corpus/si/si.fab"
+occurrences = 1
+status = "not-claimed"
+note = "Comment-only skipped example; no EBNF production claims it."
+
+[[findings]]
+kind = "corpus-prose"
+glyph = "–"
+codepoint = "U+2013"
+unicode_name = "EN DASH"
+source = "radix/corpus/**/*.fab"
+occurrences = 3
+status = "documentation-only"
+note = "Prose punctuation, not a Faber terminal."
+
+[[findings]]
+kind = "corpus-prose"
+glyph = "—"
+codepoint = "U+2014"
+unicode_name = "EM DASH"
+source = "radix/corpus/**/*.fab"
+occurrences = 1500
+status = "documentation-only"
+note = "Prose punctuation, not a Faber terminal."
+
+[[findings]]
+kind = "corpus-prose"
+glyph = "•"
+codepoint = "U+2022"
+unicode_name = "BULLET"
+source = "radix/corpus/**/*.fab"
+occurrences = 1048
+status = "documentation-only"
+note = "Prose list marker, not a Faber terminal."
+
+[[findings]]
+kind = "corpus-prose"
+glyph = "❝"
+codepoint = "U+275D"
+unicode_name = "HEAVY DOUBLE TURNED COMMA QUOTATION MARK ORNAMENT"
+source = "radix/corpus/literalia/block-string.fab"
+occurrences = 1
+status = "documentation-only"
+note = "Comment-only retired block-string delimiter example; active block strings use «...»."
+
+[[findings]]
+kind = "corpus-prose"
+glyph = "❞"
+codepoint = "U+275E"
+unicode_name = "HEAVY DOUBLE COMMA QUOTATION MARK ORNAMENT"
+source = "radix/corpus/literalia/block-string.fab"
+occurrences = 1
+status = "documentation-only"
+note = "Comment-only retired block-string delimiter example; active block strings use «...»."
+
+[[findings]]
+kind = "consumer-extra"
+glyph = "!"
+codepoint = "U+0021"
+unicode_name = "EXCLAMATION MARK"
+source = "tree-sitter-faber/grammar.js:526"
+status = "consumer-only"
+note = "tree-sitter-faber lists bare !; EBNF claims ! only as part of !., ![, and !( in nonNullSuffix."
+
+[[findings]]
+kind = "consumer-extra"
+glyph = "⊜"
+codepoint = "U+229C"
+unicode_name = "SQUARED DOT OPERATOR"
+source = "tree-sitter-faber/grammar.js:562"
+status = "consumer-only"
+note = "tree-sitter-faber lists ⊜, but no EBNF production or corpus language example claims it."
+
+[[findings]]
+kind = "consumer-missing"
+glyph = "·"
+codepoint = "U+00B7"
+unicode_name = "MIDDLE DOT"
+source = "tree-sitter-faber/grammar.js:521-566"
+status = "registry-only"
+note = "EBNF and corpus claim the tensor inner-product glyph; tree-sitter's operator choice does not list it."
+
+[[findings]]
+kind = "consumer-missing"
+glyph = "×"
+codepoint = "U+00D7"
+unicode_name = "MULTIPLICATION SIGN"
+source = "tree-sitter-faber/grammar.js:521-566"
+status = "registry-only"
+note = "EBNF and corpus claim the tensor cross-product glyph; tree-sitter's operator choice does not list it."
+
+[[findings]]
+kind = "consumer-missing"
+glyph = "∇"
+codepoint = "U+2207"
+unicode_name = "NABLA"
+source = "tree-sitter-faber/grammar.js:521-566"
+status = "registry-only"
+note = "EBNF claims postfix gradient selection; tree-sitter's operator choice does not list it."
+
+[[findings]]
+kind = "consumer-missing"
+glyph = "≺"
+codepoint = "U+227A"
+unicode_name = "PRECEDES"
+source = "tree-sitter-faber/grammar.js:521-566"
+status = "registry-only"
+note = "EBNF claims canonical less-than ordering; tree-sitter's operator choice does not list it."
+
+[[findings]]
+kind = "consumer-missing"
+glyph = "≻"
+codepoint = "U+227B"
+unicode_name = "SUCCEEDS"
+source = "tree-sitter-faber/grammar.js:521-566"
+status = "registry-only"
+note = "EBNF claims canonical greater-than ordering; tree-sitter's operator choice does not list it."
+
+[[findings]]
+kind = "consumer-missing"
+glyph = "⊗"
+codepoint = "U+2297"
+unicode_name = "CIRCLED TIMES"
+source = "tree-sitter-faber/grammar.js:521-566"
+status = "registry-only"
+note = "EBNF and corpus claim the tensor outer-product glyph; tree-sitter's operator choice does not list it."
+
+[[findings]]
+kind = "consumer-missing"
+glyph = "⊙"
+codepoint = "U+2299"
+unicode_name = "CIRCLED DOT OPERATOR"
+source = "tree-sitter-faber/grammar.js:521-566"
+status = "registry-only"
+note = "EBNF and corpus claim the tensor Hadamard glyph; tree-sitter's operator choice does not list it."
+
+[reconciliation]
+explain_consumer = "radix/corpus/**/*.fab via faber explain"
+explain_symbolic_gaps = []
+tree_sitter_extra = ["!", "⊜"]
+tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
+@lexicon
+@rewrite
+
+fabFile       := frontmatter? program
+frontmatter   := FRONTMATTER_DELIMITER NEWLINE TOML_LINES FRONTMATTER_DELIMITER NEWLINE?
+program       := statement*
+statement     := annotation* statementCore
+statementCore := importDecl | bindingDecl | funcDecl | genusDecl | implendumDecl
+               | typeAliasDecl | enumDecl | discretioDecl
+               | ifStmt | whileStmt | iteraStmt
+               | eligeStmt | discerneStmt | guardStmt | curaStmt | facBlockStmt
+               | returnStmt | breakStmt | continueStmt | noopStmt | throwStmt
+               | assertStmt | requiritStmt | outputStmt | incipitStmt | incipietStmt
+               | extractStmt | probandumDecl | probaStmt | blockStmt
+               | incDecStmt | exprStmt
+bindingDecl   := varDecl | sitDecl | arrayDestruct | objectDestruct
+exprStmt      := expression
+blockStmt     := '{' statement* '}'
+
+varDecl      := ('fixum' | 'varia') typeAnnotation IDENTIFIER (('←' expression) | ('↤' assignment inlineRecovery?))?
+awaitVarDecl := ('figendum' | 'variandum') typeAnnotation IDENTIFIER '←' expression
+sitDecl      := 'sit' IDENTIFIER ('←' expression)?
+arrayDestruct := ('fixum' | 'varia') arrayPattern '←' expression
+objectDestruct := ('fixum' | 'varia') objectPattern '←' expression
+
+funcDecl     := 'functio' IDENTIFIER genericParams? '(' paramList ')' funcModifier* callablePosture? returnClause? alternateExitClause? blockStmt
+paramList    := (parameter (',' parameter)*)?
+genericParams := '<' genericParam (',' genericParam)* '>'
+genericParam  := IDENTIFIER | 'magnitudo' IDENTIFIER
+callTypeArgs  := '<' typeAnnotation (',' typeAnnotation)* '>'
+parameter    := 'ceteri'? typeAnnotation IDENTIFIER 'sponte'? ('ut' IDENTIFIER)? ('vel' expression)?
+funcModifier := 'argumenta' IDENTIFIER | 'curata' IDENTIFIER ('ut' IDENTIFIER)? | 'errata' IDENTIFIER | 'exitus' (IDENTIFIER | NUMBER) | 'immutata' | 'iacit' | 'optiones' IDENTIFIER
+callablePosture := 'fiet' | 'fiunt' | 'fient'
+returnClause := '→' typeAnnotation
+alternateExitClause := '⇥' typeAnnotation
+stmtBodyJoint  := 'ergo'
+clausuraJoint  := '∴'
+clausuraExpr   := compactClausuraExpr | legacyClausuraExpr
+compactClausuraExpr := clausuraSignature clausuraJoint (expression | closureFacBlock)
+clausuraSignature := (clausuraParam | '(' clausuraParams? ')') returnClause? alternateExitClause?
+closureFacBlock := 'fac' blockStmt catchClause?
+legacyClausuraExpr := 'clausura' clausuraParams? ('→' typeAnnotation)? (':' expression | blockStmt)
+clausuraParams := clausuraParam (',' clausuraParam)*
+clausuraParam  := typeAnnotation IDENTIFIER
+
+genusDecl    := 'abstractus'? 'genus' IDENTIFIER genericParams? ('sub' IDENTIFIER)? ('implet' IDENTIFIER (',' IDENTIFIER)*)? '{' genusMember* '}'
+genusMember  := annotation* (fieldDecl | methodDecl)
+fieldDecl    := 'generis'? 'nexum'? typeAnnotation IDENTIFIER 'sponte'? ('=' expression)?
+methodDecl   := 'functio' IDENTIFIER genericParams? '(' paramList ')' funcModifier* callablePosture? returnClause? alternateExitClause? blockStmt
+
+annotation            := nucleumAnnotation | bracedAnnotation | annotationSugar
+annotationName        := ANNOTATION_NAME
+bracedAnnotation      := '@' annotationName '{' annotationFieldList? '}'
+annotationFieldList   := annotationField (',' annotationField)*
+annotationField       := ANNOTATION_FIELD_NAME '=' (expression | typeAnnotation)
+annotationSugar       := '@' annotationName NON_NEWLINE_TOKEN* NEWLINE
+nucleumAnnotation     := nucleumSugar | nucleumBraced
+nucleumSugar          := '@' 'nucleum' nucleumModifier? NEWLINE
+nucleumBraced         := '@' 'nucleum' '{' nucleumFieldList? '}'
+nucleumModifier       := 'fragment'
+nucleumFieldList      := nucleumField (',' nucleumField)*
+nucleumField          := 'fragment' '=' ('verum' | 'falsum')
+
+implendumDecl   := 'implendum' IDENTIFIER genericParams? '{' implendumMethod* '}'
+implendumMethod := annotation* 'functio' IDENTIFIER '(' paramList ')' funcModifier* callablePosture? returnClause? alternateExitClause?
+
+typeAliasDecl := 'typus' IDENTIFIER genericParams? '=' typeAnnotation
+
+enumDecl   := 'ordo' IDENTIFIER '{' enumMember (',' enumMember)* '}'
+enumMember := IDENTIFIER ('=' ('-'? NUMBER | STRING))?
+
+discretioDecl := 'discretio' IDENTIFIER genericParams? '{' variant (',' variant)* '}'
+variant       := IDENTIFIER ('{' variantFields '}')?
+variantFields := (typeAnnotation IDENTIFIER)*
+
+importDecl     := importRecord | importSugar
+importRecord   := 'importa' '{' importFieldList? '}'
+importFieldList := importField (',' importField)*
+importField    := importSourceField | importVisibilityField | importNameField
+                | importAliasField | importWildcardField
+importSourceField := 'ex' '=' STRING
+importVisibilityField := 'visibilitas' '=' visibility
+importNameField := 'nomen' '=' IDENTIFIER
+importAliasField := 'ut' '=' IDENTIFIER
+importWildcardField := 'omnia' '=' IDENTIFIER
+
+importSugar    := 'importa' 'ex' STRING visibility? (namedImport | wildcardImport)?
+visibility    := 'publica'
+namedImport   := IDENTIFIER ('ut' IDENTIFIER)?
+wildcardImport := '*' 'ut' IDENTIFIER
+
+typeAnnotation := ownedType ('∪' ownedType)*
+ownedType      := ('de' | 'in' | 'own' | 'copy')? baseType
+baseType       := holeType | functionType | widthTypeSugar | qualifiedType typeArguments? | '(' typeAnnotation ')'
+holeType       := '_' | '∪'
+qualifiedType  := IDENTIFIER ('.' IDENTIFIER)*
+typeArguments  := '<' typeArgument (',' typeArgument)* '>'
+typeArgument   := typeAnnotation | NATURAL | '[' figuraList? ']'
+widthTypeSugar := WIDTH_MARKER | LISTA_WIDTH_SUGAR
+                | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shapeSuffix?
+                | MATRIX_WIDTH_SUGAR shapeSuffix
+shapeSuffix    := '[' figuraList? ']'
+figura         := '_' | NATURAL | IDENTIFIER | '[' figuraList? ']'
+figuraList     := figura (',' figura)*
+functionType   := '(' typeList? ')' '→' typeAnnotation alternateExitClause?
+typeList       := typeAnnotation (',' typeAnnotation)*
+
+ifStmt     := 'si' expression arm ('sin' ifStmt | elseClause)?
+elseClause := 'secus' elseArm
+arm        := (blockStmt | stmtBodyJoint statement) catchClause?
+elseArm    := (blockStmt | stmtBodyJoint statement) catchClause?
+
+whileStmt  := 'dum' expression (blockStmt | stmtBodyJoint statement) catchClause?
+iteraStmt  := 'itera' (('ex' | 'de') expression | 'ab' expression) ('fixum' | 'varia') IDENTIFIER (blockStmt | stmtBodyJoint statement) catchClause?
+
+eligeStmt    := 'elige' expression '{' eligeCase* defaultCase? '}' catchClause?
+eligeCase    := 'casu' expression (blockStmt | stmtBodyJoint statement)
+defaultCase  := 'ceterum' (blockStmt | stmtBodyJoint statement)
+
+discerneStmt := 'discerne' 'omnia'? discriminants '{' variantCase* defaultCase? '}'
+discriminants := expression (',' expression)*
+variantCase  := 'casu' patterns (blockStmt | stmtBodyJoint statement)
+patterns     := pattern ((',' | 'et') pattern)*
+pattern      := '_' | literal | (IDENTIFIER patternBind?)
+patternBind  := ('ut' IDENTIFIER) | (('fixum' | 'varia') patternBinding (',' patternBinding)*)
+patternBinding := IDENTIFIER ('ut' IDENTIFIER)?
+
+guardStmt   := 'custodi' '{' guardClause+ '}'
+guardClause := 'si' expression (blockStmt | stmtBodyJoint statement)
+
+curaStmt    := 'cura' STRING ('fixum' | 'varia') typeAnnotation IDENTIFIER blockStmt catchClause?
+
+extractStmt   := 'ex' expression ('fixum' | 'varia') extractFields
+extractFields := extractField (',' extractField)* (',' restField)? | restField
+extractField  := IDENTIFIER ('ut' IDENTIFIER)?
+restField     := 'ceteri' IDENTIFIER
+
+returnStmt   := 'redde' expression?
+returnAwaitStmt := 'reddet' expression
+awaitDiscardStmt := 'tacebit' expression
+yieldStmt    := 'cede' expression
+breakStmt    := 'rumpe'
+continueStmt := 'perge'
+noopStmt     := 'tacet'
+
+throwStmt         := bareThrow | guardedThrowSugar
+bareThrow         := ('iace' | 'mori') expression
+guardedThrowSugar := ('iace' | 'mori') expression NO_NEWLINE 'si' expression
+catchClause       := 'cape' IDENTIFIER blockStmt
+assertStmt        := 'adfirma' expression ('mori' expression)?
+requiritStmt      := 'requirit' expression 'iace' expression
+
+expression := assignment
+assignment := ternary ('←' assignment | '↤' assignment inlineRecovery?)?
+incDecStmt := place ('↑' | '↓')
+place      := call  (* semantic analysis requires an assignable target *)
+ternary    := or (('?' expression ':' | 'sic' expression 'secus') ternary)?
+or         := and (('aut') and)*
+and        := equality (('et') equality)*
+equality   := comparison equalityTail*
+equalityTail := ('≡' | '≠' | '≈' | '≉' | 'est' | 'non' 'est') comparison
+comparison := bitwiseOr (('≺' | '≻' | '≤' | '≥' | 'intra' | 'inter') bitwiseOr)*
+# Ordering operators use the canonical Unicode glyphs `≺`/`≻`/`≤`/`≥`;
+# membership uses Latin keywords `intra`/`inter` (Faber prose identity).
+# Glyph aliases such as `∈` are not in the active contract.
+bitwiseOr  := bitwiseXor ('∨' bitwiseXor)*
+bitwiseXor := bitwiseAnd ('⊻' bitwiseAnd)*
+bitwiseAnd := shift ('∧' shift)*
+shift      := range (('⇐' | '⇒') range)*
+range      := additive rangeTail?
+rangeTail  := ('‥' | '…' | 'ante' | 'usque') additive ('per' additive)?
+additive   := multiplicative (('+' | '-') multiplicative)*
+# Glyph products (`·` `×` `⊗` `⊙`) bind at the multiplicative level with `*`,
+# left-associative. `·` inner product dispatches dot/matvec/matmul by rank.
+multiplicative := coalesce (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙') coalesce)*
+# `vel` is local nullable elimination (`T ∪ nihil vel T → T`), not logical `aut`.
+# It binds tighter than arithmetic so `prefix + item vel ""` is `prefix + (item vel "")`.
+# `velRhs` greedily consumes a following range tail, so `a vel b‥c` is `a vel (b‥c)`.
+coalesce   := unary ('vel' velRhs)*
+velRhs     := unary velRangeTail?
+velRangeTail := ('‥' | '…' | 'ante' | 'usque') unary ('per' unary)?
+unary      := ('-' | '¬' | 'non') unary | fingeExpr | cast
+# `∇` is a structural POSTFIX gradient-selection operator, never a prefix unary
+# form. It binds in the expression postfix fold after calls have been formed,
+# and its optional selector bracket is consumed as part of the gradient suffix
+# before ordinary postfix continuation resumes. The concrete parser accepts an
+# ordinary expression as the left side; semantic analysis must require it to
+# resolve to an eligible differentiable forward call.
+gradientExpr := call ('∇' gradientSelection?)?
+gradientSelection := '[' gradientPlace (',' gradientPlace)* ']'
+gradientPlace := expression  (* semantic analysis requires a direct call argument place *)
+cast       := gradientExpr ('∷' typeAnnotation | conversio)*
+conversio        := '↦' typeAnnotation inlineRecovery?
+inlineRecovery   := '⇥' unary
+
+call          := primary (callSuffix | memberSuffix | optionalSuffix | nonNullSuffix)*
+callSuffix    := callTypeArgs? '(' argumentList ')'
+memberSuffix  := '.' IDENTIFIER | '[' expression ']'
+optionalSuffix := '?.' IDENTIFIER | '?[' expression ']' | '?(' argumentList ')'
+nonNullSuffix := '!.' IDENTIFIER | '![' expression ']' | '!(' argumentList ')'
+argumentList  := (argument (',' argument)*)?
+argument      := 'sparge'? expression
+
+literal := NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING
+         | 'verum' | 'falsum' | 'nihil'
+primary := IDENTIFIER | literal | 'ego'
+         | arrayLiteral | jsonLiteral | typedConstructor | iunctaExpr
+         | adExpr | clausuraExpr | praefixumExpr | scriptumExpr | legeExpr
+         | '(' expression ')'
+adExpr    := 'ad' ASCII_STRING adOpener?
+adOpener  := '(' expression ')'
+arrayLiteral := '[' argumentList? ']'
+iunctaExpr := 'iuncta' typeArguments '[' argumentList? ']'
+# Bare `{ ... }` is a JSON document literal. Keys are quoted JSON strings separated
+# by `:`; values are JSON constants. Anonymous Faber objects (`{ key = expr }`)
+# are retired (literal-family Stage 6). Genus construction uses `typedConstructor`.
+jsonLiteral := '{' (jsonMember (',' jsonMember)*)? '}'
+jsonMember  := STRING ':' jsonValue
+typedConstructor := typeAnnotation '{' fieldList? '}'
+fieldList := fieldInit (',' fieldInit)*
+fieldInit := ('sparge' expression) | (fieldKey '=' expression) | IDENTIFIER
+fieldKey := IDENTIFIER | STRING | '[' expression ']'
+# JSON values: constants only (no Faber expressions, no variable references).
+jsonValue := jsonObject | jsonArray | jsonString | jsonNumber | 'true' | 'false' | 'null'
+jsonObject := '{' (jsonMember (',' jsonMember)*)? '}'
+jsonArray  := '[' (jsonValue (',' jsonValue)*)? ']'
+jsonString := STRING
+# Numerus when no decimal point or exponent is present; otherwise Fractus.
+jsonNumber := NUMBER
+
+fingeExpr     := 'finge' qualifiedIdent ('{' fieldList '}')? ('∷' typeAnnotation)?
+qualifiedIdent := IDENTIFIER ('.' IDENTIFIER)*
+praefixumExpr := 'praefixum' (blockStmt | '(' expression ')')
+scriptumExpr  := 'scriptum' '(' STRING (',' expression)* ')'
+legeExpr      := 'lege' 'lineam'?
+
+objectPattern  := '{' patternProperty (',' patternProperty)* '}'
+patternProperty := 'ceteri'? IDENTIFIER ('ut' IDENTIFIER)?
+arrayPattern   := '[' arrayPatternElement (',' arrayPatternElement)* ']'
+arrayPatternElement := '_' | 'ceteri'? IDENTIFIER
+
+outputStmt := ('nota' | 'vide' | 'mone' | 'scribe') expression (',' expression)*
+
+entryHeader  := ('argumenta' IDENTIFIER)? ('exitus' expression)?
+incipitStmt  := 'incipit' entryHeader blockStmt
+incipietStmt := 'incipiet' entryHeader blockStmt
+
+probandumDecl := 'probandum' STRING probaModifier* '{' probandumBody '}'
+probandumBody := (praeparaBlock | probandumDecl | probaStmt)*
+probaStmt     := 'proba' STRING probaModifier* blockStmt
+probaModifier := 'omitte' STRING | 'futurum' STRING | 'solum' | 'tag' STRING
+              | 'temporis' NUMBER | 'metior' | 'repete' NUMBER | 'fragilis' NUMBER
+              | 'solum_in' STRING
+praeparaBlock := ('praepara' | 'praeparabit' | 'postpara' | 'postparabit') 'omnia'? blockStmt
+
+facBlockStmt := 'fac' blockStmt catchClause? ('dum' expression)?
