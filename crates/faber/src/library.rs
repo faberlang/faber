@@ -5,8 +5,7 @@
 //! reads the ambient environment. This module keeps the faber-owned ambient
 //! discovery seam — `FABER_LIBRARY_HOME` env reading and the
 //! workspace-ancestor probe (CTO memo) — and constructs the explicit
-//! resolver inputs the compiler crate requires. The resolver types are supplied
-//! by `radix-program`; this module adds the Faber-only ambient discovery seam.
+//! resolver inputs the compiler crate requires.
 
 #[cfg(test)]
 #[path = "library_test.rs"]
@@ -17,10 +16,6 @@ use std::path::{Path, PathBuf};
 use radix_program::library::LibraryResolver;
 
 pub(crate) const FABER_LIBRARY_HOME_ENV: &str = "FABER_LIBRARY_HOME";
-/// Env flag exercised by library probe tests; production probe path is not wired yet.
-#[cfg(test)]
-pub(crate) const FABER_ENABLE_WORKSPACE_LIBRARY_PROBE_ENV: &str =
-    "FABER_ENABLE_WORKSPACE_LIBRARY_PROBE";
 
 /// Build a resolver from the ambient library home: an explicit
 /// `FABER_LIBRARY_HOME`, or the sibling workspace dev layout when present.
@@ -33,8 +28,7 @@ fn default_library_home() -> Option<PathBuf> {
         return Some(PathBuf::from(value));
     }
 
-    // Public faber repo is a sibling of norma under faberlang/. Probe
-    // workspace automatically in development — no opt-in env var required.
+    // Walk ancestors from the crate parent for a sibling `norma/src` layout.
     let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap_or_else(|| Path::new("."));
