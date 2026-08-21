@@ -41,7 +41,7 @@ union Condicio {
 }
 
 union Nuntius {
-    Pulsus { int x, int y },
+    Pulsus { int x int y },
     Clavis { string clavis },
     Finis
 }

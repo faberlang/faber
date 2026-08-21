@@ -393,13 +393,21 @@ impl Parser {
                 }
                 let name = self.parse_ident()?;
                 rest = Some(name);
-                if self.eat(&TokenKind::Comma) && self.check_keyword_ident(TokenKind::Ceteri) {
-                    return Err(ParseError::structured(
-                        ParseErrorKind::Expected,
-                        self.current_span(),
-                    )
-                    .with_arg("issue", "duplicate_rest_pattern")
-                    .with_arg("keyword", "ceteri"));
+                if self.check(&TokenKind::Comma) {
+                    let comma_span = self.current_span();
+                    self.advance();
+                    if self.check_keyword_ident(TokenKind::Ceteri) {
+                        return Err(ParseError::structured(
+                            ParseErrorKind::Expected,
+                            self.current_span(),
+                        )
+                        .with_arg("issue", "duplicate_rest_pattern")
+                        .with_arg("keyword", "ceteri"));
+                    }
+                    return Err(ParseError::structured(ParseErrorKind::Expected, comma_span)
+                        .with_arg("issue", "item_list_trailing_comma")
+                        .with_arg("family", "item_list")
+                        .with_arg("position", "array_binding_pattern"));
                 }
                 break;
             }
@@ -416,7 +424,7 @@ impl Parser {
 
             elements.push(element);
 
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::RBracket, "array_binding_pattern")? {
                 break;
             }
         }
@@ -448,13 +456,21 @@ impl Parser {
                     .with_arg("keyword", "ceteri"));
                 }
                 rest = Some(self.parse_ident()?);
-                if self.eat(&TokenKind::Comma) && self.check_keyword_ident(TokenKind::Ceteri) {
-                    return Err(ParseError::structured(
-                        ParseErrorKind::Expected,
-                        self.current_span(),
-                    )
-                    .with_arg("issue", "duplicate_rest_pattern")
-                    .with_arg("keyword", "ceteri"));
+                if self.check(&TokenKind::Comma) {
+                    let comma_span = self.current_span();
+                    self.advance();
+                    if self.check_keyword_ident(TokenKind::Ceteri) {
+                        return Err(ParseError::structured(
+                            ParseErrorKind::Expected,
+                            self.current_span(),
+                        )
+                        .with_arg("issue", "duplicate_rest_pattern")
+                        .with_arg("keyword", "ceteri"));
+                    }
+                    return Err(ParseError::structured(ParseErrorKind::Expected, comma_span)
+                        .with_arg("issue", "item_list_trailing_comma")
+                        .with_arg("family", "item_list")
+                        .with_arg("position", "object_binding_pattern"));
                 }
                 break;
             }
@@ -467,7 +483,7 @@ impl Parser {
             };
             fields.push(ExField { name, alias });
 
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::RBrace, "object_binding_pattern")? {
                 break;
             }
         }
@@ -600,7 +616,7 @@ impl Parser {
                 span,
             });
 
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::RParen, "function_parameters")? {
                 break;
             }
         }
@@ -704,7 +720,7 @@ impl Parser {
         if self.eat_keyword_ident(TokenKind::Implet) {
             loop {
                 implements.push(self.parse_decl_name()?);
-                if !self.eat(&TokenKind::Comma) {
+                if !self.consume_item_separator(&TokenKind::LBrace, "class_implements")? {
                     break;
                 }
             }
@@ -1086,7 +1102,9 @@ impl Parser {
                 span,
             });
 
-            self.eat(&TokenKind::Comma);
+            if !self.consume_item_separator(&TokenKind::RBrace, "enum_members")? {
+                break;
+            }
         }
 
         self.expect(&TokenKind::RBrace, "expected '}'")?;
@@ -1125,7 +1143,7 @@ impl Parser {
                         name: field_name,
                         span: field_span,
                     });
-                    self.eat(&TokenKind::Comma);
+                    self.reject_declaration_block_comma("discretio_payload")?;
                 }
                 self.expect(&TokenKind::RBrace, "expected '}'")?;
                 fields
@@ -1141,7 +1159,9 @@ impl Parser {
                 span,
             });
 
-            self.eat(&TokenKind::Comma);
+            if !self.consume_item_separator(&TokenKind::RBrace, "discretio_variants")? {
+                break;
+            }
         }
 
         self.expect(&TokenKind::RBrace, "expected '}'")?;
@@ -1277,7 +1297,7 @@ impl Parser {
                 }
             }
 
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::RBrace, "import_fields")? {
                 break;
             }
         }
@@ -1707,7 +1727,7 @@ impl Parser {
                 span,
             });
 
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::RBrace, "annotation_fields")? {
                 break;
             }
         }
@@ -1909,7 +1929,7 @@ impl Parser {
             saw_fragment_field = true;
             fragment = self.parse_nucleum_fragment_flag()?;
 
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::RBrace, "nucleum_fields")? {
                 break;
             }
         }
@@ -2306,7 +2326,7 @@ impl Parser {
             let span = start.merge(name.span);
             params.push(TypeParam { kind, name, span });
 
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::GtAscii, "generic_parameters")? {
                 break;
             }
         }

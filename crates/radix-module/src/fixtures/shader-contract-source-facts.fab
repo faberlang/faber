@@ -45,7 +45,7 @@ locale = "la"
 functio vertex_layout_matches(
     numerus geo, numerus index, textus source_name,
     numerus location, numerus format_code, numerus offset_bytes,
-    numerus stride_bytes, numerus step_mode_code, numerus role_code,
+    numerus stride_bytes, numerus step_mode_code, numerus role_code
 ) → bivalens {
     redde verum
 }

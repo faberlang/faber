@@ -35,7 +35,7 @@ locale = "en"
 #   none — deterministic variant strings; no .expected sidecar.
 
 union Mandatum {
-    Moveo { string locus, int passus },
+    Moveo { string locus int passus },
     Loquere { string verba },
     Tace
 }

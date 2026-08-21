@@ -522,6 +522,25 @@ impl Parser {
         self.parse_leading_trivia()
     }
 
+    fn starts_item_list_entry(&self) -> bool {
+        matches!(
+            self.peek().kind,
+            TokenKind::Ident(_)
+                | TokenKind::Underscore(_)
+                | TokenKind::Integer(_)
+                | TokenKind::Float(_)
+                | TokenKind::String(_)
+                | TokenKind::AsciiString(_)
+                | TokenKind::BacktickString(_)
+                | TokenKind::OctetiString(_)
+                | TokenKind::LParen
+                | TokenKind::LBrace
+                | TokenKind::LBracket
+                | TokenKind::Minus
+                | TokenKind::At
+        )
+    }
+
     fn eat(&mut self, kind: &TokenKind) -> bool {
         if self.check(kind) {
             self.advance();
@@ -661,6 +680,132 @@ impl Parser {
         let expected = message.strip_prefix("expected ").unwrap_or(message);
         ParseError::structured(ParseErrorKind::Expected, self.current_span())
             .with_arg("expected", expected)
+    }
+
+    /// Consume the separator after an item-list entry.
+    ///
+    /// Item lists are strict: a comma is required before another entry and is
+    /// forbidden immediately before the closing delimiter. The caller keeps
+    /// ownership of the loop so lists with contextual boundaries can use the
+    /// same diagnostic contract.
+    fn consume_item_separator(
+        &mut self,
+        end: &TokenKind,
+        position: &'static str,
+    ) -> Result<bool, ParseError> {
+        self.consume_item_separator_before(std::slice::from_ref(end), position)
+    }
+
+    /// Variant of [`Self::consume_item_separator`] for contextual lists with
+    /// more than one legal closing token.
+    fn consume_item_separator_before(
+        &mut self,
+        ends: &[TokenKind],
+        position: &'static str,
+    ) -> Result<bool, ParseError> {
+        if self.eat(&TokenKind::Comma) {
+            let comma_span = self.previous_span();
+            if ends.iter().any(|end| self.check(end)) {
+                let error = ParseError::structured(ParseErrorKind::Expected, comma_span)
+                    .with_arg("issue", "item_list_trailing_comma")
+                    .with_arg("family", "item_list")
+                    .with_arg("position", position);
+                let error = if position.starts_with("json_") {
+                    error.with_arg(
+                        "migration_help",
+                        "remove the trailing comma; JSON follows RFC 8259",
+                    )
+                } else {
+                    error
+                };
+                return Err(error);
+            }
+            return Ok(true);
+        }
+
+        if !ends.iter().any(|end| self.check(end))
+            && !self.is_at_end()
+            && self.starts_item_list_entry()
+        {
+            return Err(
+                ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                    .with_arg("issue", "item_list_missing_separator")
+                    .with_arg("family", "item_list")
+                    .with_arg("position", position)
+                    .with_arg("expected", "comma between items"),
+            );
+        }
+
+        Ok(false)
+    }
+
+    /// Reject a separator after a list's final rest item.
+    fn reject_item_list_comma_after_last(
+        &mut self,
+        position: &'static str,
+    ) -> Result<(), ParseError> {
+        if self.eat(&TokenKind::Comma) {
+            let comma_span = self.previous_span();
+            return Err(ParseError::structured(ParseErrorKind::Expected, comma_span)
+                .with_arg("issue", "item_list_trailing_comma")
+                .with_arg("family", "item_list")
+                .with_arg("position", position));
+        }
+        Ok(())
+    }
+
+    /// Consume a separator for an expression list terminated by a statement
+    /// boundary rather than a punctuation delimiter.
+    fn consume_item_separator_to_boundary(
+        &mut self,
+        position: &'static str,
+    ) -> Result<bool, ParseError> {
+        if self.eat(&TokenKind::Comma) {
+            let comma_span = self.previous_span();
+            if self.is_at_end()
+                || self.check(&TokenKind::RBrace)
+                || self.raw_newline_before_next_word()
+                || self.check_keyword_ident(TokenKind::Cape)
+                || self.is_recovery_boundary(&self.peek().kind)
+            {
+                return Err(ParseError::structured(ParseErrorKind::Expected, comma_span)
+                    .with_arg("issue", "item_list_trailing_comma")
+                    .with_arg("family", "item_list")
+                    .with_arg("position", position));
+            }
+            return Ok(true);
+        }
+
+        if self.is_at_end()
+            || self.check(&TokenKind::RBrace)
+            || self.raw_newline_before_next_word()
+            || self.check_keyword_ident(TokenKind::Cape)
+            || self.is_recovery_boundary(&self.peek().kind)
+        {
+            return Ok(false);
+        }
+
+        Err(
+            ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                .with_arg("issue", "item_list_missing_separator")
+                .with_arg("family", "item_list")
+                .with_arg("position", position)
+                .with_arg("expected", "comma between items"),
+        )
+    }
+
+    /// Reject commas in a declaration-block field position.
+    fn reject_declaration_block_comma(&mut self, position: &'static str) -> Result<(), ParseError> {
+        if self.eat(&TokenKind::Comma) {
+            let comma_span = self.previous_span();
+            return Err(
+                ParseError::structured(ParseErrorKind::Unexpected, comma_span)
+                    .with_arg("issue", "declaration_block_comma")
+                    .with_arg("family", "declaration_block")
+                    .with_arg("position", position),
+            );
+        }
+        Ok(())
     }
 
     fn invalid_expression_error(&self, issue: &'static str) -> ParseError {
@@ -913,6 +1058,10 @@ mod schema_test;
 #[cfg(test)]
 #[path = "nucleum_annotation_test.rs"]
 mod nucleum_annotation_test;
+
+#[cfg(test)]
+#[path = "comma_law_test.rs"]
+mod comma_law_test;
 
 #[cfg(test)]
 mod non_trivia_index_tests {

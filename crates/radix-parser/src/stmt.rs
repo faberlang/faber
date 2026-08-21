@@ -261,11 +261,7 @@ impl Parser {
         let mut subjects = Vec::new();
         loop {
             subjects.push(self.parse_expression()?);
-            if !self.eat(&TokenKind::Comma) {
-                break;
-            }
-            // A trailing comma before `{` is not another subject.
-            if self.check(&TokenKind::LBrace) {
+            if !self.consume_item_separator(&TokenKind::LBrace, "discerne_subjects")? {
                 break;
             }
         }
@@ -611,7 +607,7 @@ impl Parser {
         let mut args = Vec::new();
         loop {
             args.push(self.parse_expression()?);
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator_to_boundary("scribe_arguments")? {
                 break;
             }
         }
@@ -746,6 +742,7 @@ impl Parser {
                     return Err(self.expected_statement_error("duplicate_rest_pattern"));
                 }
                 rest = Some(self.parse_ident()?);
+                self.reject_item_list_comma_after_last("extract_fields")?;
                 break;
             }
 
@@ -757,7 +754,7 @@ impl Parser {
             };
             fields.push(ExField { name, alias });
 
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator_to_boundary("extract_fields")? {
                 break;
             }
         }

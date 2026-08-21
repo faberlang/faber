@@ -47,7 +47,7 @@ functio scaled_dot_product<magnitudo B, magnitudo D>(
 
 fixum lista<f32> ones16 ← [
     1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-    1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
 ]
 fixum lista<f32> ones4 ← [1.0, 1.0, 1.0, 1.0]
 fixum tensor<f32, [2, 8]> qb ← ones16 ↦ tensor<f32, [2, 8]>
