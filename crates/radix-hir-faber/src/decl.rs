@@ -384,6 +384,18 @@ impl super::FaberCodegen {
 
         writer.writeln(" {");
         writer.indented(|writer| {
+            if !e.commune_fields.is_empty() {
+                writer.write("@ ");
+                writer.write(surface.contextual_keyword("commune"));
+                writer.newline();
+                for field in &e.commune_fields {
+                    writer.write(&self.type_to_faber(field.ty, types, names, interner, surface));
+                    writer.write(" ");
+                    writer.write(&self.symbol_to_string(field.name, interner));
+                    writer.newline();
+                }
+                writer.newline();
+            }
             for (idx, variant) in e.variants.iter().enumerate() {
                 self.write_member_trivia(variant.def_id, false, interner, writer);
                 writer.write(&self.symbol_to_string(variant.name, interner));

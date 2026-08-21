@@ -1063,6 +1063,10 @@ pub(crate) fn validate_referential_integrity(
                         }
                     }
                 }
+                for field in &e.commune_fields {
+                    check_symbol(field.name)?;
+                    check_type(field.ty)?;
+                }
                 for variant in &e.variants {
                     check_def(variant.def_id)?;
                     check_symbol(variant.name)?;
