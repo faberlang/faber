@@ -35,7 +35,7 @@ impl TensorShape {
     /// Construct a shape, rejecting empty or zero axes.
     pub fn new(dims: impl Into<Vec<u64>>) -> Result<Self, GraphError> {
         let dims = dims.into();
-        if dims.is_empty() || dims.iter().any(|dim| *dim == 0) {
+        if dims.is_empty() || dims.contains(&0) {
             return Err(GraphError::InvalidShape { dims });
         }
         Ok(Self { dims })
