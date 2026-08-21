@@ -80,9 +80,14 @@ pub fn cmd_build(command: radix_module::services::BuildCommand, format: bool, li
         std::process::exit(1);
     }
 
-    let input_path = PathBuf::from(&command.input);
-    let target = resolve_build_target(&command, &input_path);
-    let is_package = use_package_compiler(target, &input_path, command.package);
+    let raw_input_path = PathBuf::from(&command.input);
+    let target = resolve_build_target(&command, &raw_input_path);
+    let is_package = use_package_compiler(target, &raw_input_path, command.package);
+    let input_path = if is_package {
+        super::absolutize_path(&raw_input_path)
+    } else {
+        raw_input_path
+    };
     let warn_policy = radix_module::driver::WarnPolicy {
         deny_all_warnings: command.deny_warnings,
         deny_codes: command.deny_codes,
@@ -656,8 +661,8 @@ pub fn use_package_compiler_from_args(
     if input.is_empty() || input[0] == "-" {
         return false;
     }
-    let path = std::path::Path::new(&input[0]);
-    use_package_compiler(target, path, force_package)
+    let path = super::absolutize_path(std::path::Path::new(&input[0]));
+    use_package_compiler(target, &path, force_package)
 }
 
 /// CLI-argument variant of package-mode detection for commands without a target
@@ -670,8 +675,8 @@ pub fn should_treat_as_package_from_args(input: &[String]) -> bool {
     if input.is_empty() || input[0] == "-" {
         return false;
     }
-    let path = std::path::Path::new(&input[0]);
-    should_treat_as_package(path)
+    let path = super::absolutize_path(std::path::Path::new(&input[0]));
+    should_treat_as_package(&path)
 }
 
 /// Execute the package-aware `faber check` command.
@@ -685,7 +690,7 @@ pub fn cmd_check_package(command: radix_module::services::CheckCommand) {
         std::process::exit(1);
     }
 
-    let input_path = std::path::PathBuf::from(&command.input[0]);
+    let input_path = super::absolutize_path(std::path::Path::new(&command.input[0]));
 
     // Resolve target from faber.toml so AIR-lane exempla with MIR-backed
     // targets (e.g. fmir-text) do not trigger TARGETLANE001.
@@ -834,7 +839,7 @@ fn compile_package_input(
         std::process::exit(1);
     }
 
-    let path = std::path::PathBuf::from(&input[0]);
+    let path = super::absolutize_path(std::path::Path::new(&input[0]));
     let package = use_package_compiler_from_args(target, input, force_package);
     if !package {
         eprintln!("error: expected a package directory, manifest, or entry file");

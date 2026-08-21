@@ -4,6 +4,9 @@
 //! handlers live in [`init`], [`explain`], [`run`], and [`test`].
 
 mod archive;
+#[cfg(test)]
+#[path = "check_test.rs"]
+mod check_test;
 mod convert;
 mod emit;
 mod explain;

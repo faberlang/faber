@@ -26,7 +26,9 @@ use std::process::ExitCode;
 
 pub(super) fn cmd_run(args: RunArgs) {
     crate::commands::validate_deny_codes(&args.deny);
-    let input_path = PathBuf::from(&args.path);
+    // Package discovery and execution require absolute inputs; resolve the
+    // caller-relative path before any route selection or package handoff.
+    let input_path = package::absolutize_path(&args.path);
     if let Some(message) = locale_without_package_error(
         args.locale.as_deref(),
         &[args.path.display().to_string()],
