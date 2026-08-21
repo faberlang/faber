@@ -499,7 +499,23 @@ impl PlanCompiler {
                 .source_nodes
                 .iter()
                 .find_map(|id| graph.node(*id).and_then(|node| node.attention));
-            selections.push(self.selection_for_candidate(candidate, index, bind, attention_facts));
+            let seq_extent = attention_facts
+                .map(|facts| facts.seq)
+                .or_else(|| {
+                    candidate.source_nodes.first().and_then(|id| {
+                        graph
+                            .node(*id)
+                            .and_then(|node| node.shape.dims.first().copied())
+                    })
+                })
+                .unwrap_or(0);
+            selections.push(self.selection_for_candidate(
+                candidate,
+                index,
+                bind,
+                attention_facts,
+                seq_extent,
+            ));
             schedule.push(ScheduledCall {
                 index,
                 layer: candidate.layer,
@@ -850,6 +866,7 @@ impl PlanCompiler {
         index: usize,
         bind: BindDescriptor,
         attention_facts: Option<AttentionFacts>,
+        seq_extent: u64,
     ) -> LibrarySelection {
         let operation = candidate.operation;
         let logical_signature = operation.signature();
@@ -923,26 +940,36 @@ impl PlanCompiler {
                 });
             }
         }
-        let (uniforms, workspace, requirements) = if operation == LibraryOperation::CausalAttention
-        {
-            (
-                vec![UniformBinding {
-                    name: "scale_bits".to_owned(),
-                    ty: crate::device_program_plans::UniformType::U32,
-                    bits: attention_facts.expect("attention facts").scale_bits,
-                }],
-                Some(WorkspaceBinding {
-                    bytes: 0,
-                    alignment: 16,
-                }),
-                vec![BackendRequirement {
-                    backend: "metal".to_owned(),
-                    feature: "CausalAttention".to_owned(),
-                }],
-            )
-        } else {
-            (Vec::new(), None, Vec::new())
-        };
+        let (mut uniforms, workspace, requirements) =
+            if operation == LibraryOperation::CausalAttention {
+                (
+                    vec![UniformBinding {
+                        name: "scale_bits".to_owned(),
+                        ty: crate::device_program_plans::UniformType::U32,
+                        bits: attention_facts.expect("attention facts").scale_bits,
+                    }],
+                    Some(WorkspaceBinding {
+                        bytes: 0,
+                        alignment: 16,
+                    }),
+                    vec![BackendRequirement {
+                        backend: "metal".to_owned(),
+                        feature: "CausalAttention".to_owned(),
+                    }],
+                )
+            } else {
+                (Vec::new(), None, Vec::new())
+            };
+        if matches!(
+            operation,
+            LibraryOperation::QkvProjection | LibraryOperation::SwiGlu
+        ) {
+            uniforms.push(UniformBinding {
+                name: crate::DECODE_GEMV_UNIFORM.to_owned(),
+                ty: crate::device_program_plans::UniformType::U32,
+                bits: u32::from(seq_extent == 1),
+            });
+        }
         LibrarySelection {
             kernel_index: index,
             library_entry,
@@ -1005,9 +1032,10 @@ mod tests {
     }
 
     fn layer_graph(facts: AttentionFacts) -> TypedModelGraph {
-        let mut nodes = vec![node(0, 0, TypedOp::Input, &[8, facts.hidden], &[], None)];
+        let seq = facts.seq;
+        let mut nodes = vec![node(0, 0, TypedOp::Input, &[seq, facts.hidden], &[], None)];
         nodes.extend([
-            node(1, 0, TypedOp::RmsNorm, &[8, facts.hidden], &[0], None),
+            node(1, 0, TypedOp::RmsNorm, &[seq, facts.hidden], &[0], None),
             node(
                 2,
                 0,
@@ -1068,7 +1096,7 @@ mod tests {
                 9,
                 0,
                 TypedOp::Other("output-projection".to_owned()),
-                &[8, facts.hidden],
+                &[seq, facts.hidden],
                 &[8],
                 None,
             ),
@@ -1076,20 +1104,20 @@ mod tests {
                 10,
                 0,
                 TypedOp::ResidualAdd,
-                &[8, facts.hidden],
+                &[seq, facts.hidden],
                 &[1, 9],
                 None,
             ),
-            node(11, 0, TypedOp::RmsNorm, &[8, facts.hidden], &[10], None),
-            node(12, 0, TypedOp::SwiGluGate, &[8, 16], &[11], None),
-            node(13, 0, TypedOp::SwiGluUp, &[8, 16], &[11], None),
-            node(14, 0, TypedOp::SwiGluActivation, &[8, 16], &[12], None),
-            node(15, 0, TypedOp::SwiGluMul, &[8, 16], &[14, 13], None),
+            node(11, 0, TypedOp::RmsNorm, &[seq, facts.hidden], &[10], None),
+            node(12, 0, TypedOp::SwiGluGate, &[seq, 16], &[11], None),
+            node(13, 0, TypedOp::SwiGluUp, &[seq, 16], &[11], None),
+            node(14, 0, TypedOp::SwiGluActivation, &[seq, 16], &[12], None),
+            node(15, 0, TypedOp::SwiGluMul, &[seq, 16], &[14, 13], None),
             node(
                 16,
                 0,
                 TypedOp::Other("down-projection".to_owned()),
-                &[8, facts.hidden],
+                &[seq, facts.hidden],
                 &[15],
                 None,
             ),
@@ -1097,7 +1125,7 @@ mod tests {
                 17,
                 0,
                 TypedOp::ResidualAdd,
-                &[8, facts.hidden],
+                &[seq, facts.hidden],
                 &[10, 16],
                 None,
             ),
@@ -1105,7 +1133,7 @@ mod tests {
                 18,
                 0,
                 TypedOp::Other("output".to_owned()),
-                &[8, facts.hidden],
+                &[seq, facts.hidden],
                 &[17],
                 None,
             ),
@@ -1113,7 +1141,7 @@ mod tests {
                 19,
                 0,
                 TypedOp::Other("observation".to_owned()),
-                &[8, facts.hidden],
+                &[seq, facts.hidden],
                 &[18],
                 None,
             ),
@@ -1171,6 +1199,45 @@ mod tests {
             .compile(&graph)
             .expect_err("missing facts must reject");
         assert!(error.to_string().contains("missing typed GQA facts"));
+    }
+
+    #[test]
+    fn decode_seq_one_exposes_gemv_uniform_on_qkv_and_swiglu() {
+        let facts = AttentionFacts {
+            kv_heads: 5,
+            q_per_kv: 3,
+            seq: 1,
+            head_dim: 4,
+            hidden: 60,
+            scale_bits: (0.5f32).to_bits(),
+        };
+        let plan = PlanCompiler
+            .compile(&layer_graph(facts))
+            .expect("compile decode graph");
+        let qkv = plan
+            .executor_plan
+            .selections
+            .iter()
+            .find(|selection| selection.library_entry.as_deref() == Some("QkvProjection"))
+            .expect("qkv selection");
+        let decode = qkv
+            .uniforms
+            .iter()
+            .find(|uniform| uniform.name == crate::DECODE_GEMV_UNIFORM)
+            .expect("decode_gemv uniform");
+        assert_eq!(decode.bits, 1);
+        let swiglu = plan
+            .executor_plan
+            .selections
+            .iter()
+            .find(|selection| selection.library_entry.as_deref() == Some("SwiGlu"))
+            .expect("swiglu selection");
+        let decode = swiglu
+            .uniforms
+            .iter()
+            .find(|uniform| uniform.name == crate::DECODE_GEMV_UNIFORM)
+            .expect("decode_gemv uniform");
+        assert_eq!(decode.bits, 1);
     }
 
     #[test]

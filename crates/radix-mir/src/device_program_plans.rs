@@ -14,7 +14,7 @@
 use crate::abi::{
     collection_op_contract, CollectionOpContract, MirAbiError, MirKernelResource,
     MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
-    MAX_STORAGE_BUFFERS_PER_KERNEL,
+    PackedStorageLayout, MAX_STORAGE_BUFFERS_PER_KERNEL,
 };
 use crate::device_program::{
     Binding, BufferRole, DeviceProgram, DeviceProgramError, DeviceResource, KernelLaunchPlan,
@@ -398,6 +398,21 @@ impl RecipeKind {
 /// kernel entry and its existing resource/launch facts.
 pub const EXECUTOR_PLAN_BIND_ABI_VERSION: u16 = 1;
 
+/// Uniform name for the packed GGML type id (M5-U2 / M6-U1 seam).
+pub const PACKED_LAYOUT_GGML_TYPE_ID_UNIFORM: &str = "packed_layout_ggml_type_id";
+/// Uniform name for packed block bytes.
+pub const PACKED_BLOCK_BYTES_UNIFORM: &str = "packed_block_bytes";
+/// Uniform name for packed block element count.
+pub const PACKED_BLOCK_ELEMENTS_UNIFORM: &str = "packed_block_elements";
+/// Uniform name for the native packed-region byte length.
+pub const PACKED_BYTES_UNIFORM: &str = "packed_bytes";
+/// Uniform name for decode GEMV selection (`1` when M/seq is 1).
+pub const DECODE_GEMV_UNIFORM: &str = "decode_gemv";
+/// Library entry for a packed GEMM body (M ≠ 1).
+pub const QUANTIZED_GEMM_ENTRY: &str = "quantized_gemm";
+/// Library entry for a packed GEMV body (M = 1 decode).
+pub const QUANTIZED_GEMV_ENTRY: &str = "quantized_gemv";
+
 /// Target-neutral layout family for a library body bind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BindLayout {
@@ -761,10 +776,10 @@ pub fn executor_plan_extension(program: &DeviceProgram) -> ExecutorPlanExtension
                     library_entry: library_entry_for_kernel(kernel, recipe),
                     logical_signature: logical_signature_for_kernel(kernel, recipe),
                     binds: library_binds_for_kernel(kernel, &bind),
-                    uniforms: Vec::new(),
+                    uniforms: packed_decode_uniforms_for_kernel(kernel),
                     offsets: offsets_for_kernel(kernel, &bind),
                     workspace: None,
-                    backend_requirements: Vec::new(),
+                    backend_requirements: packed_backend_requirements_for_kernel(kernel),
                     provenance: PlanProvenance {
                         pass: "device-program-plan".to_owned(),
                         revision: EXECUTOR_PLAN_BIND_ABI_VERSION as u32,
@@ -874,16 +889,28 @@ fn logical_signature_for_kernel(kernel: &KernelUnit, recipe: RecipeKind) -> Logi
 }
 
 fn library_binds_for_kernel(kernel: &KernelUnit, bind: &BindDescriptor) -> Vec<LibraryBind> {
+    let packed = packed_region_for_plan(&kernel.plan);
     kernel
         .resources
         .iter()
         .enumerate()
-        .map(|(index, resource)| LibraryBind {
-            name: format!("buffer{index}"),
-            binding: resource.binding,
-            dims: bind.dims.clone(),
-            strides: bind.strides.clone(),
-            offset_elements: 0,
+        .map(|(index, resource)| {
+            let (dims, strides) = if is_packed_weight_slot(kernel, resource) {
+                if let Some(packed) = packed.as_ref() {
+                    (vec![packed.packed_bytes], vec![1])
+                } else {
+                    (bind.dims.clone(), bind.strides.clone())
+                }
+            } else {
+                (bind.dims.clone(), bind.strides.clone())
+            };
+            LibraryBind {
+                name: format!("buffer{index}"),
+                binding: resource.binding,
+                dims,
+                strides,
+                offset_elements: 0,
+            }
         })
         .collect()
 }
@@ -893,15 +920,22 @@ fn offsets_for_kernel(kernel: &KernelUnit, bind: &BindDescriptor) -> Vec<OffsetB
         .resources
         .iter()
         .enumerate()
-        .map(|(index, _)| OffsetBinding {
+        .map(|(index, resource)| OffsetBinding {
             name: format!("buffer{index}"),
             offset_elements: 0,
-            strides: bind.strides.clone(),
+            strides: if is_packed_weight_slot(kernel, resource) {
+                vec![1]
+            } else {
+                bind.strides.clone()
+            },
         })
         .collect()
 }
 
 fn library_entry_for_kernel(kernel: &KernelUnit, recipe: RecipeKind) -> Option<String> {
+    if let Some(packed) = packed_region_for_plan(&kernel.plan) {
+        return Some(quantized_compute_entry(packed.decode_extent).to_owned());
+    }
     let entry = match recipe {
         RecipeKind::RmsNormalization => Some("rms"),
         RecipeKind::Rope => Some("rope"),
@@ -915,6 +949,96 @@ fn library_entry_for_kernel(kernel: &KernelUnit, recipe: RecipeKind) -> Option<S
         _ => None,
     }?;
     Some(entry.to_owned())
+}
+
+fn quantized_compute_entry(decode_extent: u64) -> &'static str {
+    if decode_extent == 1 {
+        QUANTIZED_GEMV_ENTRY
+    } else {
+        QUANTIZED_GEMM_ENTRY
+    }
+}
+
+struct PackedRegionFacts {
+    layout: PackedStorageLayout,
+    packed_bytes: u64,
+    decode_extent: u64,
+}
+
+fn packed_region_for_plan(plan: &CollectionKernelPlan) -> Option<PackedRegionFacts> {
+    match plan {
+        CollectionKernelPlan::QuantizedMatMul(plan) => Some(PackedRegionFacts {
+            layout: plan.layout,
+            packed_bytes: plan
+                .layout
+                .packed_bytes_for_elements(plan.k.saturating_mul(plan.n))?,
+            decode_extent: plan.m,
+        }),
+        CollectionKernelPlan::BatchedAttention(plan) => {
+            let layout = plan.layout?;
+            let n = match plan.kind {
+                BatchedAttentionKind::ProjectionQ => plan.hidden,
+                BatchedAttentionKind::ProjectionK | BatchedAttentionKind::ProjectionV => {
+                    plan.kv_heads.saturating_mul(plan.head_dim)
+                }
+                _ => return None,
+            };
+            Some(PackedRegionFacts {
+                layout,
+                packed_bytes: layout.packed_bytes_for_elements(plan.hidden.saturating_mul(n))?,
+                decode_extent: plan.seq,
+            })
+        }
+        _ => None,
+    }
+}
+
+fn is_packed_weight_slot(kernel: &KernelUnit, resource: &DeviceResource) -> bool {
+    packed_region_for_plan(&kernel.plan).is_some() && resource.binding.binding == 1
+}
+
+fn packed_decode_uniforms_for_kernel(kernel: &KernelUnit) -> Vec<UniformBinding> {
+    let Some(packed) = packed_region_for_plan(&kernel.plan) else {
+        return Vec::new();
+    };
+    let packed_bytes = u32::try_from(packed.packed_bytes).unwrap_or(u32::MAX);
+    vec![
+        UniformBinding {
+            name: PACKED_LAYOUT_GGML_TYPE_ID_UNIFORM.to_owned(),
+            ty: UniformType::U32,
+            bits: packed.layout.ggml_type_id(),
+        },
+        UniformBinding {
+            name: PACKED_BLOCK_BYTES_UNIFORM.to_owned(),
+            ty: UniformType::U32,
+            bits: packed.layout.block_bytes(),
+        },
+        UniformBinding {
+            name: PACKED_BLOCK_ELEMENTS_UNIFORM.to_owned(),
+            ty: UniformType::U32,
+            bits: packed.layout.block_elements(),
+        },
+        UniformBinding {
+            name: PACKED_BYTES_UNIFORM.to_owned(),
+            ty: UniformType::U32,
+            bits: packed_bytes,
+        },
+        UniformBinding {
+            name: DECODE_GEMV_UNIFORM.to_owned(),
+            ty: UniformType::U32,
+            bits: u32::from(packed.decode_extent == 1),
+        },
+    ]
+}
+
+fn packed_backend_requirements_for_kernel(kernel: &KernelUnit) -> Vec<BackendRequirement> {
+    let Some(packed) = packed_region_for_plan(&kernel.plan) else {
+        return Vec::new();
+    };
+    vec![BackendRequirement {
+        backend: "metal".to_owned(),
+        feature: quantized_compute_entry(packed.decode_extent).to_owned(),
+    }]
 }
 
 fn launch_buffer_slot(resource: &DeviceResource) -> LaunchBufferSlot {
