@@ -1250,7 +1250,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 
 
 - Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
-- Applied `NATURAL` arguments are `维度` capacity facts, not width markers. Proposed (not shipped) bounded forms use that slot: `lista<T, N>`, `textus<N>`, `ascii<N>`, `octeti<N>`. Width-marker families such as `numerus<i32>` stay the separate `widthTypeSugar` production below.
+- Applied `NATURAL` arguments are `维度` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, N>`, `textus<N>`, `ascii<N>`, `octeti<N>`. Width-marker families such as `numerus<i32>` stay the separate `widthTypeSugar` production below.
 - A second applied argument on a `↦` target (`numerus<W, Hex>`, `numerus<W, Be>`) is a convert-slot hint, not a type identity, not a width marker, and not a keyword. Live text-parse hints are `Hex` / `Bin` / `Oct`. `Be` / `Le` occupy that same Hex slot for endian unpack. `typeArguments` is unchanged: these are ordinary `IDENTIFIER` arguments interpreted by conversio, not new `baseType` productions.
 - Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
 - Explicit generic call-site lists use the same `typeArguments` production: `id<_>(x)` is a type hole (equivalent to omitted `id(x)` for a one-param callee), and mixed lists such as `both<_, textus>(a, b)` are legal. Arity stays exact (`both<_>` is still one argument). `∪` in that list is rejected (`explicit_union_type_arg_unsupported`): a callee type param is a monomorphic witness slot.
@@ -1261,7 +1261,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 - Member-by-label (`i.gx`) requires that label to be present on the receiver's `元组` annotation.
 - `元组` element slots admit `_` (monomorphic hole, solved element-wise from the single position witness) and reject `∪`. A wanted union element is declared with binary cup (`元组<f32, textus ∪ 空>`). `lista<∪>` / `tabula<K, ∪>` keep heterogeneous-union behavior. Labels compose with holes (`元组<loss: _, T>`).
 - `ratio` type arguments require a label for every element, labels are unique, `_` is admitted as a monomorphic element hole, and `∪` is rejected in an element slot. A `ratio` has no positional or bracket access, and it has no structural equivalence with another ratio or a genus; fields are accessed by label only.
-- Arrays are written `lista<T>` (unbounded, shipped). Postfix `T[]` is not accepted. `lista<T, N>` is a proposed (not shipped) bounded form; see Generic Collections.
+- Arrays are written `lista<T>` (unbounded, shipped). Postfix `T[]` is not accepted. `lista<T, N>` is the shipped bounded form; see Generic Collections.
 - `借自`/`传入` mark ownership (borrow/mut-borrow) on the immediately following union member. Parenthesize when grouping must be explicit.
 - Two hole kinds share the `holeType` production. `_` is the monomorphic hole ("infer exactly one inhabitant type"); the standalone `∪` is the union hole ("infer a finite multi-member union"). Both are legal wherever a base type is: bindings, returns, params, fields, and type arguments (`lista<∪>`, `tabula<K, ∪>`, `→ ∪`).
 - **Lone-`∪` rule:** a `∪` hole consumes the whole type expression — any following `∪` is a parse error (`A ∪ ∪`, `∪ B` rejected, issue `unexpected_cup_after_union_hole`). `_` keeps today's behavior and may still appear as a binary-cup member (`_ ∪ B`).
@@ -1286,9 +1286,9 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | Faber      | Meaning |
 | ---------- | ------- |
 | `textus`   | Unicode string |
-| `textus<N>` | proposed — not shipped; bounded Unicode string; `N` is a `维度` / `NATURAL` capacity, not a width marker. `textus<_>` is the capacity hole (infer `N`). |
+| `textus<N>` | shipped; bounded Unicode string; `N` is a `维度` / `NATURAL` capacity, not a width marker. `textus<_>` is the capacity hole (infer `N`). |
 | `ascii`    | ASCII-only string |
-| `ascii<N>` | proposed — not shipped; bounded ASCII string; `N` is a `维度` / `NATURAL` capacity, not a width marker. `ascii<_>` is the capacity hole (infer `N`). |
+| `ascii<N>` | shipped; bounded ASCII string; `N` is a `维度` / `NATURAL` capacity, not a width marker. `ascii<_>` is the capacity hole (infer `N`). |
 | `forma`    | captured template + params |
 | `numerus`  | integer (default `i64`) |
 | `modulus<W>` | unsigned modular word; arithmetic wraps modulo 2^W |
@@ -1299,10 +1299,10 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `numquam`  | never |
 | `ignotum`  | unknown |
 | `octeti`   | bytes |
-| `octeti<N>` | proposed — not shipped; bounded byte buffer; `N` is a `维度` / `NATURAL` capacity, not a width marker. `octeti<_>` is the capacity hole (infer `N`). |
+| `octeti<N>` | shipped; bounded byte buffer; `N` is a `维度` / `NATURAL` capacity, not a width marker. `octeti<_>` is the capacity hole (infer `N`). |
 
 Bare `textus` / `ascii` / `octeti` remain the unbounded productions. The
-proposed (not shipped) forms `textus<N>`, `ascii<N>`, and `octeti<N>` take
+shipped forms `textus<N>`, `ascii<N>`, and `octeti<N>` take
 one `维度` / `NATURAL` applied argument. That `N` is capacity, not a
 width marker and not a language-wide default. `_` in that slot (`ascii<_>`,
 `textus<_>`, `octeti<_>`, `lista<T, _>`) is a capacity hole: the form stays
@@ -1335,7 +1335,7 @@ full wrap. Cross-width modular arithmetic is rejected.
 | Faber          | Meaning  |
 | -------------- | -------- |
 | `lista<T>`     | array    |
-| `lista<T, N>`  | proposed — not shipped; bounded array; `N` is a `维度` / `NATURAL` capacity, not a width marker. `lista<T, _>` is the capacity hole (infer `N`). |
+| `lista<T, N>`  | shipped; bounded array; `N` is a `维度` / `NATURAL` capacity, not a width marker. `lista<T, _>` is the capacity hole (infer `N`). |
 | `tabula<K,V>`  | map      |
 | `copia<T>`     | set      |
 | `promissum<T>` | promise  |
