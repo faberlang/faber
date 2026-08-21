@@ -1,39 +1,1036 @@
-# Faber 語言規格
+# Faber Language Specification
 
-> **Reader-locale EBNF (Traditional Chinese).** Latin/source-of-truth grammar remains [`EBNF.md`](EBNF.md).
-> This file is the Traditional Chinese reader surface of that grammar (keywords, commentary, examples).
-> Pack keyword/type spellings are extracted from the glossary appendix at the end.
-> Glyphs (`← → ∴ ≡ ∪ ⇥` …) never localize; `ergo` localizes, `∴` is clausura-only.
+This file is generated from `docs/grammar/source.fg` and `docs/grammar/glossary.zh-Hant.toml`;
+hand edits fail the locale-render gate. Production IDs are the grammar's stable
+snake_case spine and their anchors are derived from those IDs.
 
+## Grammar {#grammar}
 
-Faber 原始碼是由驅動程式在詞法分析前處理的純文字。選用的 TOML 前置資料不是 token grammar 的一部分。本文是 Faber 語言的正式文法與規格說明；可執行的參考程式位於公開的 `../examples/corpus/`，工具可從磁碟載入參考套件。
+The grammar below is the identity rendering of the validated source. Normative detail is kept in this English sidecar and rendered as documentation; the source remains the syntax authority.
+
+```ebnf
+# formerly: fabFile
+# [001] fab_file
+fab_file ::= frontmatter? program
+# [002] frontmatter
+frontmatter ::= FRONTMATTER_DELIMITER NEWLINE TOML_LINES FRONTMATTER_DELIMITER NEWLINE?
+# [003] program
+program ::= statement*
+# [004] statement
+statement ::= annotation* statement_core
+# formerly: statementCore
+# [005] statement_core
+statement_core ::= importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl | typus_decl | ordo_decl | discretio_decl | si_stmt | dum_stmt | itera_stmt | elige_stmt | discerne_stmt | custodi_stmt | cura_stmt | fac_stmt | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt | rumpe_stmt | perge_stmt | tacet_stmt | iace_stmt | adfirma_stmt | requirit_stmt | nota_stmt | incipit_stmt | incipiet_stmt | ex_stmt | probandum_decl | proba_stmt | block_stmt | inc_dec_stmt | expr_stmt
+# formerly: bindingDecl
+# [006] binding_decl
+binding_decl ::= fixum_decl | sit_decl | array_destruct | object_destruct | figendum_decl
+# formerly: exprStmt
+# [007] expr_stmt
+expr_stmt ::= expression
+# formerly: blockStmt
+# [008] block_stmt
+block_stmt ::= '{' statement* '}'
+# formerly: varDecl
+# [009] fixum_decl
+fixum_decl ::= ('定值' | '變值') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?))?
+# formerly: awaitVarDecl
+# [010] figendum_decl
+figendum_decl ::= ('等定' | '等變') type_annotation IDENTIFIER '←' expression
+# formerly: sitDecl
+# [011] sit_decl
+sit_decl ::= '設為' IDENTIFIER ('←' expression)?
+# formerly: arrayDestruct
+# [012] array_destruct
+array_destruct ::= ('定值' | '變值') array_pattern '←' expression
+# formerly: objectDestruct
+# [013] object_destruct
+object_destruct ::= ('定值' | '變值') object_pattern '←' expression
+# formerly: funcDecl
+# [014] functio_decl
+functio_decl ::= '函式' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
+# formerly: paramList
+# [015] param_list
+param_list ::= (parameter (',' parameter)*)?
+# formerly: genericParams
+# [016] generic_params
+generic_params ::= '<' generic_param (',' generic_param)* '>'
+# formerly: genericParam
+# [017] generic_param
+generic_param ::= IDENTIFIER | '尺寸' IDENTIFIER
+# formerly: callTypeArgs
+# [018] call_type_args
+call_type_args ::= '<' type_annotation (',' type_annotation)* '>'
+# [019] parameter
+parameter ::= '其餘'? type_annotation IDENTIFIER '可選'? ('作為' IDENTIFIER)? ('或取' expression)?
+# formerly: funcModifier
+# [020] func_modifier
+func_modifier ::= '引數' IDENTIFIER | '管理' IDENTIFIER ('作為' IDENTIFIER)? | '錯誤' IDENTIFIER | '出口' (IDENTIFIER | NUMBER) | '不變' | '可拋' | '可選項' IDENTIFIER
+# formerly: callablePosture
+# [021] callable_posture
+callable_posture ::= '異步' | '流' | '異流'
+# formerly: returnClause
+# [022] return_clause
+return_clause ::= '→' type_annotation
+# formerly: alternateExitClause
+# [023] alternate_exit_clause
+alternate_exit_clause ::= '⇥' type_annotation
+# formerly: stmtBodyJoint
+# [024] ergo_joint
+ergo_joint ::= '則'
+# formerly: clausuraJoint
+# [025] clausura_joint
+clausura_joint ::= '∴'
+# formerly: clausuraExpr
+# [026] clausura_expr
+clausura_expr ::= compact_clausura_expr | clausura_legacy_expr
+# formerly: compactClausuraExpr
+# [027] compact_clausura_expr
+compact_clausura_expr ::= clausura_signature clausura_joint (expression | fac_block)
+# formerly: clausuraSignature
+# [028] clausura_signature
+clausura_signature ::= (clausura_param | '(' clausura_params? ')') return_clause? alternate_exit_clause?
+# formerly: closureFacBlock
+# [029] fac_block
+fac_block ::= '執行' block_stmt cape_clause?
+# formerly: legacyClausuraExpr
+# [030] clausura_legacy_expr
+clausura_legacy_expr ::= '閉包' clausura_params? ('→' type_annotation)? (':' expression | block_stmt)
+# formerly: clausuraParams
+# [031] clausura_params
+clausura_params ::= clausura_param (',' clausura_param)*
+# formerly: clausuraParam
+# [032] clausura_param
+clausura_param ::= type_annotation IDENTIFIER
+# formerly: genusDecl
+# [033] genus_decl
+genus_decl ::= '抽象'? '類型' IDENTIFIER generic_params? ('子' IDENTIFIER)? ('實作' IDENTIFIER (',' IDENTIFIER)*)? '{' genus_member* '}'
+# formerly: genusMember
+# [034] genus_member
+genus_member ::= annotation* (field_decl | functio_method_decl)
+# formerly: fieldDecl
+# [035] field_decl
+field_decl ::= '靜態'? '綁定'? type_annotation IDENTIFIER '可選'? ('=' expression)?
+# formerly: methodDecl
+# [036] functio_method_decl
+functio_method_decl ::= '函式' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
+# [037] annotation
+annotation ::= nucleum_annotation | braced_annotation | annotation_sugar
+# formerly: annotationName
+# [038] annotation_name
+annotation_name ::= ANNOTATION_NAME
+# formerly: bracedAnnotation
+# [039] braced_annotation
+braced_annotation ::= '@' annotation_name '{' annotation_field_list? '}'
+# formerly: annotationFieldList
+# [040] annotation_field_list
+annotation_field_list ::= annotation_field (',' annotation_field)*
+# formerly: annotationField
+# [041] annotation_field
+annotation_field ::= ANNOTATION_FIELD_NAME '=' (expression | type_annotation)
+# formerly: annotationSugar
+# [042] annotation_sugar
+annotation_sugar ::= '@' annotation_name NON_NEWLINE_TOKEN* NEWLINE
+# formerly: nucleumAnnotation
+# [043] nucleum_annotation
+nucleum_annotation ::= nucleum_sugar | nucleum_braced
+# formerly: nucleumSugar
+# [044] nucleum_sugar
+nucleum_sugar ::= '@' '內核' nucleum_modifier? NEWLINE
+# formerly: nucleumBraced
+# [045] nucleum_braced
+nucleum_braced ::= '@' '內核' '{' nucleum_field_list? '}'
+# formerly: nucleumModifier
+# [046] nucleum_modifier
+nucleum_modifier ::= '片段'
+# formerly: nucleumFieldList
+# [047] nucleum_field_list
+nucleum_field_list ::= nucleum_field (',' nucleum_field)*
+# formerly: nucleumField
+# [048] nucleum_field
+nucleum_field ::= '片段' '=' ('真' | '假')
+# formerly: implendumDecl
+# [049] implendum_decl
+implendum_decl ::= '待實作介面' IDENTIFIER generic_params? '{' implendum_method_decl* '}'
+# formerly: implendumMethod
+# [050] implendum_method_decl
+implendum_method_decl ::= annotation* '函式' IDENTIFIER '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
+# formerly: typeAliasDecl
+# [051] typus_decl
+typus_decl ::= '型別' IDENTIFIER generic_params? '=' type_annotation
+# formerly: enumDecl
+# [052] ordo_decl
+ordo_decl ::= '列舉' IDENTIFIER '{' enum_member (',' enum_member)* '}'
+# formerly: enumMember
+# [053] enum_member
+enum_member ::= IDENTIFIER ('=' ('-'? NUMBER | STRING))?
+# formerly: discretioDecl
+# [054] discretio_decl
+discretio_decl ::= '分支聯集' IDENTIFIER generic_params? '{' variant (',' variant)* '}'
+# [055] variant
+variant ::= IDENTIFIER ('{' variant_fields '}')?
+# formerly: variantFields
+# [056] variant_fields
+variant_fields ::= (type_annotation IDENTIFIER)*
+# formerly: importDecl
+# [057] importa_decl
+importa_decl ::= importa_record | importa_sugar
+# formerly: importRecord
+# [058] importa_record
+importa_record ::= '匯入' '{' import_field_list? '}'
+# formerly: importFieldList
+# [059] import_field_list
+import_field_list ::= import_field (',' import_field)*
+# formerly: importField
+# [060] import_field
+import_field ::= ex_field | visibilitas_field | nomen_field | ut_field | omnia_field
+# formerly: importSourceField
+# [061] ex_field
+ex_field ::= '取自' '=' STRING
+# formerly: importVisibilityField
+# [062] visibilitas_field
+visibilitas_field ::= 'visibilitas' '=' publica
+# formerly: importNameField
+# [063] nomen_field
+nomen_field ::= '名稱' '=' IDENTIFIER
+# formerly: importAliasField
+# [064] ut_field
+ut_field ::= '作為' '=' IDENTIFIER
+# formerly: importWildcardField
+# [065] omnia_field
+omnia_field ::= '全部' '=' IDENTIFIER
+# formerly: importSugar
+# [066] importa_sugar
+importa_sugar ::= '匯入' '取自' STRING publica? (named_import | wildcard_import)?
+# formerly: visibility
+# [067] publica
+publica ::= '公開'
+# formerly: namedImport
+# [068] named_import
+named_import ::= IDENTIFIER ('作為' IDENTIFIER)?
+# formerly: wildcardImport
+# [069] wildcard_import
+wildcard_import ::= '*' '作為' IDENTIFIER
+# formerly: typeAnnotation
+# [070] type_annotation
+type_annotation ::= owned_type ('∪' owned_type)*
+# formerly: ownedType
+# [071] owned_type
+owned_type ::= ('從' | '傳入' | '擁有' | '拷貝')? base_type
+# formerly: baseType
+# [072] base_type
+base_type ::= hole_type | function_type | width_type_sugar | qualified_type type_arguments? | '(' type_annotation ')'
+# formerly: holeType
+# [073] hole_type
+hole_type ::= '_' | '∪'
+# formerly: qualifiedType
+# [074] qualified_type
+qualified_type ::= IDENTIFIER ('.' IDENTIFIER)*
+# formerly: typeArguments
+# [075] type_arguments
+type_arguments ::= '<' type_argument (',' type_argument)* '>'
+# formerly: typeArgument
+# [076] type_argument
+type_argument ::= labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
+# formerly: labeledTypeArgument
+# [077] labeled_type_argument
+labeled_type_argument ::= IDENTIFIER ':' type_annotation
+# formerly: widthTypeSugar
+# [078] width_type_sugar
+width_type_sugar ::= WIDTH_MARKER | LISTA_WIDTH_SUGAR | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix? | MATRIX_WIDTH_SUGAR shape_suffix
+# formerly: shapeSuffix
+# [079] shape_suffix
+shape_suffix ::= '[' figura_list? ']'
+# [080] figura
+figura ::= '_' | NATURAL | IDENTIFIER | '[' figura_list? ']'
+# formerly: figuraList
+# [081] figura_list
+figura_list ::= figura (',' figura)*
+# formerly: functionType
+# [082] function_type
+function_type ::= '(' type_list? ')' '→' type_annotation alternate_exit_clause?
+# formerly: typeList
+# [083] type_list
+type_list ::= type_annotation (',' type_annotation)*
+# formerly: ifStmt
+# [084] si_stmt
+si_stmt ::= '若' expression arm ('否則若' si_stmt | secus_clause)?
+# formerly: elseClause
+# [085] secus_clause
+secus_clause ::= '否則' else_arm
+# [086] arm
+arm ::= (block_stmt | ergo_joint statement) cape_clause?
+# formerly: elseArm
+# [087] else_arm
+else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
+# formerly: whileStmt
+# [088] dum_stmt
+dum_stmt ::= '當' expression (block_stmt | ergo_joint statement) cape_clause?
+# formerly: iteraStmt
+# [089] itera_stmt
+itera_stmt ::= '遍歷' (('取自' | '從') expression | '範圍' expression) ('定值' | '變值') IDENTIFIER (block_stmt | ergo_joint statement) cape_clause?
+# formerly: eligeStmt
+# [090] elige_stmt
+elige_stmt ::= '選擇' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
+# formerly: eligeCase
+# [091] casu_elige_clause
+casu_elige_clause ::= '分支' expression (block_stmt | ergo_joint statement)
+# formerly: defaultCase
+# [092] ceterum_clause
+ceterum_clause ::= '預設' (block_stmt | ergo_joint statement)
+# formerly: discerneStmt
+# [093] discerne_stmt
+discerne_stmt ::= '比對' '全部'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
+# [094] discriminants
+discriminants ::= expression (',' expression)*
+# formerly: variantCase
+# [095] casu_variant_clause
+casu_variant_clause ::= '分支' patterns (block_stmt | ergo_joint statement)
+# [096] patterns
+patterns ::= pattern ((',' | '且') pattern)*
+# [097] pattern
+pattern ::= '_' | literal | (IDENTIFIER ut_pattern?)
+# formerly: patternBind
+# [098] ut_pattern
+ut_pattern ::= ('作為' IDENTIFIER) | (('定值' | '變值') pattern_binding (',' pattern_binding)*)
+# formerly: patternBinding
+# [099] pattern_binding
+pattern_binding ::= IDENTIFIER ('作為' IDENTIFIER)?
+# formerly: guardStmt
+# [100] custodi_stmt
+custodi_stmt ::= '守衛' '{' si_guard_clause+ '}'
+# formerly: guardClause
+# [101] si_guard_clause
+si_guard_clause ::= '若' expression (block_stmt | ergo_joint statement)
+# formerly: curaStmt
+# [102] cura_stmt
+cura_stmt ::= '資源' STRING ('定值' | '變值') type_annotation IDENTIFIER block_stmt cape_clause?
+# formerly: extractStmt
+# [103] ex_stmt
+ex_stmt ::= '取自' expression ('定值' | '變值') extract_fields
+# formerly: extractFields
+# [104] extract_fields
+extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
+# formerly: extractField
+# [105] extract_field
+extract_field ::= IDENTIFIER ('作為' IDENTIFIER)?
+# formerly: restField
+# [106] ceteri_field
+ceteri_field ::= '其餘' IDENTIFIER
+# formerly: returnStmt
+# [107] redde_stmt
+redde_stmt ::= '傳回' expression?
+# formerly: returnAwaitStmt
+# [108] reddet_stmt
+reddet_stmt ::= '等返' expression
+# formerly: awaitDiscardStmt
+# [109] tacebit_stmt
+tacebit_stmt ::= '等棄' expression
+# formerly: yieldStmt
+# [110] cede_stmt
+cede_stmt ::= '讓出' expression
+# formerly: breakStmt
+# [111] rumpe_stmt
+rumpe_stmt ::= '中斷'
+# formerly: continueStmt
+# [112] perge_stmt
+perge_stmt ::= '繼續'
+# formerly: noopStmt
+# [113] tacet_stmt
+tacet_stmt ::= '靜默'
+# formerly: throwStmt
+# [114] iace_stmt
+iace_stmt ::= iace_expr | iace_guarded_expr
+# formerly: bareThrow
+# [115] iace_expr
+iace_expr ::= ('拋出' | '崩潰') expression
+# formerly: guardedThrowSugar
+# [116] iace_guarded_expr
+iace_guarded_expr ::= ('拋出' | '崩潰') expression NO_NEWLINE '若' expression
+# formerly: catchClause
+# [117] cape_clause
+cape_clause ::= '捕捉' IDENTIFIER block_stmt
+# formerly: assertStmt
+# [118] adfirma_stmt
+adfirma_stmt ::= '斷言' expression ('崩潰' expression)?
+# formerly: requiritStmt
+# [119] requirit_stmt
+requirit_stmt ::= '需要' expression '拋出' expression
+# [120] expression
+expression ::= assignment
+# [121] assignment
+assignment ::= ternary ('←' assignment | '↤' assignment inline_recovery?)?
+# formerly: incDecStmt
+# [122] inc_dec_stmt
+inc_dec_stmt ::= place ('↑' | '↓')
+# [123] place
+place ::= call_expr
+# [124] ternary
+ternary ::= aut_expr (('?' expression ':' | '如此' expression '否則') ternary)?
+# formerly: or
+# [125] aut_expr
+aut_expr ::= et_expr (('或') et_expr)*
+# formerly: and
+# [126] et_expr
+et_expr ::= equality (('且') equality)*
+# [127] equality
+equality ::= comparison equality_tail*
+# formerly: equalityTail
+# [128] equality_tail
+equality_tail ::= ('≡' | '≠' | '≈' | '≉' | '是' | '非' '是') comparison
+# [129] comparison
+comparison ::= bitwise_or_expr (('≺' | '≻' | '≤' | '≥' | '內含' | '之間') bitwise_or_expr)*
+# formerly: bitwiseOr
+# [130] bitwise_or_expr
+bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
+# formerly: bitwiseXor
+# [131] bitwise_xor_expr
+bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
+# formerly: bitwiseAnd
+# [132] bitwise_and_expr
+bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
+# formerly: shift
+# [133] shift_expr
+shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
+# formerly: range
+# [134] range_expr
+range_expr ::= additive_expr range_tail?
+# formerly: rangeTail
+# [135] range_tail
+range_tail ::= ('‥' | '…' | '之前' | '直到') additive_expr ('每' additive_expr)?
+# formerly: additive
+# [136] additive_expr
+additive_expr ::= multiplicative_expr (('+' | '-') multiplicative_expr)*
+# formerly: multiplicative
+# [137] multiplicative_expr
+multiplicative_expr ::= vel_expr (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙') vel_expr)*
+# formerly: coalesce
+# [138] vel_expr
+vel_expr ::= unary_expr ('或取' vel_rhs)*
+# formerly: velRhs
+# [139] vel_rhs
+vel_rhs ::= unary_expr vel_range_tail?
+# formerly: velRangeTail
+# [140] vel_range_tail
+vel_range_tail ::= ('‥' | '…' | '之前' | '直到') unary_expr ('每' unary_expr)?
+# formerly: unary
+# [141] unary_expr
+unary_expr ::= ('-' | '¬' | '非') unary_expr | finge_expr | cast_expr
+# formerly: gradientExpr
+# [142] gradient_expr
+gradient_expr ::= call_expr ('∇' gradient_selection?)?
+# formerly: gradientSelection
+# [143] gradient_selection
+gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
+# formerly: gradientPlace
+# [144] gradient_place
+gradient_place ::= expression
+# formerly: cast
+# [145] cast_expr
+cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)*
+# formerly: conversio
+# [146] conversio_expr
+conversio_expr ::= '↦' type_annotation inline_recovery?
+# formerly: inlineRecovery
+# [147] inline_recovery
+inline_recovery ::= '⇥' unary_expr
+# formerly: call
+# [148] call_expr
+call_expr ::= primary (call_suffix | member_suffix | optional_suffix | non_null_suffix)*
+# formerly: callSuffix
+# [149] call_suffix
+call_suffix ::= call_type_args? '(' argument_list ')'
+# formerly: memberSuffix
+# [150] member_suffix
+member_suffix ::= '.' IDENTIFIER | '[' expression ']'
+# formerly: optionalSuffix
+# [151] optional_suffix
+optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
+# formerly: nonNullSuffix
+# [152] non_null_suffix
+non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
+# formerly: argumentList
+# [153] argument_list
+argument_list ::= (argument (',' argument)*)?
+# [154] argument
+argument ::= template_argument | '展開'? expression
+# formerly: templateArgument
+# [155] template_argument
+template_argument ::= '展開'? IDENTIFIER ':' expression
+# [156] literal
+literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '真' | '假' | '空'
+# [157] primary
+primary ::= IDENTIFIER | literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | '(' expression ')'
+# formerly: adExpr
+# [158] ad_expr
+ad_expr ::= '端點' ASCII_STRING ad_opener?
+# formerly: adOpener
+# [159] ad_opener
+ad_opener ::= '(' expression ')'
+# formerly: arrayLiteral
+# [160] array_literal
+array_literal ::= '[' argument_list? ']'
+# formerly: iunctaExpr
+# [161] iuncta_expr
+iuncta_expr ::= '元組' type_arguments '[' argument_list? ']'
+# formerly: jsonLiteral
+# [162] json_literal
+json_literal ::= '{' (json_member (',' json_member)*)? '}'
+# formerly: jsonMember
+# [163] json_member
+json_member ::= STRING ':' json_value
+# formerly: typedConstructor
+# [164] typed_constructor
+typed_constructor ::= type_annotation '{' field_list? '}'
+# formerly: fieldList
+# [165] field_list
+field_list ::= field_init (',' field_init)*
+# formerly: fieldInit
+# [166] field_init
+field_init ::= ('展開' expression) | (field_key '=' expression) | IDENTIFIER
+# formerly: fieldKey
+# [167] field_key
+field_key ::= IDENTIFIER | STRING | '[' expression ']'
+# formerly: jsonValue
+# [168] json_value
+json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
+# formerly: jsonObject
+# [169] json_object
+json_object ::= '{' (json_member (',' json_member)*)? '}'
+# formerly: jsonArray
+# [170] json_array
+json_array ::= '[' (json_value (',' json_value)*)? ']'
+# formerly: jsonString
+# [171] json_string
+json_string ::= STRING
+# formerly: jsonNumber
+# [172] json_number
+json_number ::= NUMBER
+# formerly: fingeExpr
+# [173] finge_expr
+finge_expr ::= '虛構' qualified_ident ('{' field_list '}')? ('∷' type_annotation)?
+# formerly: qualifiedIdent
+# [174] qualified_ident
+qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
+# formerly: praefixumExpr
+# [175] praefixum_expr
+praefixum_expr ::= '前綴' (block_stmt | '(' expression ')')
+# formerly: scriptumExpr
+# [176] scriptum_expr
+scriptum_expr ::= '格式文字' '(' STRING (',' expression)* ')'
+# formerly: legeExpr
+# [177] lege_expr
+lege_expr ::= '讀取' '行'?
+# formerly: objectPattern
+# [178] object_pattern
+object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
+# formerly: patternProperty
+# [179] pattern_property
+pattern_property ::= '其餘'? IDENTIFIER ('作為' IDENTIFIER)?
+# formerly: arrayPattern
+# [180] array_pattern
+array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
+# formerly: arrayPatternElement
+# [181] array_pattern_element
+array_pattern_element ::= '_' | '其餘'? IDENTIFIER
+# formerly: outputStmt
+# [182] nota_stmt
+nota_stmt ::= ('註記' | '檢視' | '警告' | '寫出') expression (',' expression)*
+# formerly: entryHeader
+# [183] entry_header
+entry_header ::= ('引數' IDENTIFIER)? ('出口' expression)?
+# formerly: incipitStmt
+# [184] incipit_stmt
+incipit_stmt ::= '入口' entry_header block_stmt
+# formerly: incipietStmt
+# [185] incipiet_stmt
+incipiet_stmt ::= '非同步入口' entry_header block_stmt
+# formerly: probandumDecl
+# [186] probandum_decl
+probandum_decl ::= '測試規格' STRING proba_modifier* '{' probandum_body '}'
+# formerly: probandumBody
+# [187] probandum_body
+probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
+# formerly: probaStmt
+# [188] proba_stmt
+proba_stmt ::= '測試' STRING proba_modifier* block_stmt
+# formerly: probaModifier
+# [189] proba_modifier
+proba_modifier ::= '略過' STRING | '預期' STRING | '僅限' | '標籤' STRING | '時限' NUMBER | '測量' | '重複' NUMBER | '脆弱' NUMBER | '僅限於' STRING
+# formerly: praeparaBlock
+# [190] praepara_block
+praepara_block ::= ('準備' | '準備非同步' | '後置準備' | '後置準備非同步') '全部'? block_stmt
+# formerly: facBlockStmt
+# [191] fac_stmt
+fac_stmt ::= '執行' block_stmt cape_clause? ('當' expression)?
+# [192] IDENTIFIER
+IDENTIFIER ::=
+# [193] NUMBER
+NUMBER ::=
+# [194] NATURAL
+NATURAL ::=
+# [195] STRING
+STRING ::=
+# [196] ASCII_STRING
+ASCII_STRING ::=
+# [197] BACKTICK_STRING
+BACKTICK_STRING ::=
+# [198] OCTETI_STRING
+OCTETI_STRING ::=
+# [199] NEWLINE
+NEWLINE ::=
+# [200] WIDTH_MARKER
+WIDTH_MARKER ::=
+# [201] LISTA_WIDTH_SUGAR
+LISTA_WIDTH_SUGAR ::=
+# [202] TENSOR_WIDTH_SUGAR
+TENSOR_WIDTH_SUGAR ::=
+# [203] SPARSA_WIDTH_SUGAR
+SPARSA_WIDTH_SUGAR ::=
+# [204] VECTOR_WIDTH_SUGAR
+VECTOR_WIDTH_SUGAR ::=
+# [205] MATRIX_WIDTH_SUGAR
+MATRIX_WIDTH_SUGAR ::=
+# [206] FRONTMATTER_DELIMITER
+FRONTMATTER_DELIMITER ::=
+# [207] TOML_LINES
+TOML_LINES ::=
+# [208] ANNOTATION_NAME
+ANNOTATION_NAME ::=
+# [209] ANNOTATION_FIELD_NAME
+ANNOTATION_FIELD_NAME ::=
+# [210] NON_NEWLINE_TOKEN
+NON_NEWLINE_TOKEN ::=
+# [211] NO_NEWLINE
+NO_NEWLINE ::=
+```
+
+## Production Index {#production-index}
+
+| ID | Anchor | Status | Former names |
+|---|---|---|---|
+| [`IDENTIFIER`](#identifier) | `#identifier` | capture-pending | — |
+| [`NUMBER`](#number) | `#number` | capture-pending | — |
+| [`NATURAL`](#natural) | `#natural` | capture-pending | — |
+| [`STRING`](#string) | `#string` | capture-pending | — |
+| [`ASCII_STRING`](#ascii-string) | `#ascii-string` | capture-pending | — |
+| [`BACKTICK_STRING`](#backtick-string) | `#backtick-string` | capture-pending | — |
+| [`OCTETI_STRING`](#octeti-string) | `#octeti-string` | capture-pending | — |
+| [`NEWLINE`](#newline) | `#newline` | capture-pending | — |
+| [`WIDTH_MARKER`](#width-marker) | `#width-marker` | capture-pending | — |
+| [`LISTA_WIDTH_SUGAR`](#lista-width-sugar) | `#lista-width-sugar` | capture-pending | — |
+| [`TENSOR_WIDTH_SUGAR`](#tensor-width-sugar) | `#tensor-width-sugar` | capture-pending | — |
+| [`SPARSA_WIDTH_SUGAR`](#sparsa-width-sugar) | `#sparsa-width-sugar` | capture-pending | — |
+| [`VECTOR_WIDTH_SUGAR`](#vector-width-sugar) | `#vector-width-sugar` | capture-pending | — |
+| [`MATRIX_WIDTH_SUGAR`](#matrix-width-sugar) | `#matrix-width-sugar` | capture-pending | — |
+| [`FRONTMATTER_DELIMITER`](#frontmatter-delimiter) | `#frontmatter-delimiter` | capture-pending | — |
+| [`TOML_LINES`](#toml-lines) | `#toml-lines` | capture-pending | — |
+| [`ANNOTATION_NAME`](#annotation-name) | `#annotation-name` | capture-pending | — |
+| [`ANNOTATION_FIELD_NAME`](#annotation-field-name) | `#annotation-field-name` | capture-pending | — |
+| [`NON_NEWLINE_TOKEN`](#non-newline-token) | `#非-newline-token` | capture-pending | — |
+| [`NO_NEWLINE`](#no-newline) | `#no-newline` | capture-pending | — |
+| [`fab_file`](#fab-file) | `#fab-file` | live | fabFile |
+| [`frontmatter`](#frontmatter) | `#frontmatter` | live | — |
+| [`program`](#program) | `#program` | live | — |
+| [`statement`](#statement) | `#statement` | live | — |
+| [`statement_core`](#statement-core) | `#statement-core` | live | statementCore |
+| [`binding_decl`](#binding-decl) | `#binding-decl` | live | bindingDecl |
+| [`expr_stmt`](#expr-stmt) | `#expr-stmt` | live | exprStmt |
+| [`block_stmt`](#block-stmt) | `#block-stmt` | live | blockStmt |
+| [`fixum_decl`](#fixum-decl) | `#定值-decl` | live | varDecl |
+| [`figendum_decl`](#figendum-decl) | `#等定-decl` | live | awaitVarDecl |
+| [`sit_decl`](#sit-decl) | `#設為-decl` | live | sitDecl |
+| [`array_destruct`](#array-destruct) | `#array-destruct` | live | arrayDestruct |
+| [`object_destruct`](#object-destruct) | `#object-destruct` | live | objectDestruct |
+| [`functio_decl`](#functio-decl) | `#函式-decl` | live | funcDecl |
+| [`param_list`](#param-list) | `#param-list` | live | paramList |
+| [`generic_params`](#generic-params) | `#generic-params` | live | genericParams |
+| [`generic_param`](#generic-param) | `#generic-param` | live | genericParam |
+| [`call_type_args`](#call-type-args) | `#call-type-args` | live | callTypeArgs |
+| [`parameter`](#parameter) | `#parameter` | live | — |
+| [`func_modifier`](#func-modifier) | `#func-modifier` | live | funcModifier |
+| [`callable_posture`](#callable-posture) | `#callable-posture` | live | callablePosture |
+| [`return_clause`](#return-clause) | `#return-clause` | live | returnClause |
+| [`alternate_exit_clause`](#alternate-exit-clause) | `#alternate-exit-clause` | live | alternateExitClause |
+| [`ergo_joint`](#ergo-joint) | `#則-joint` | live | stmtBodyJoint |
+| [`clausura_joint`](#clausura-joint) | `#閉包-joint` | live | clausuraJoint |
+| [`clausura_expr`](#clausura-expr) | `#閉包-expr` | live | clausuraExpr |
+| [`compact_clausura_expr`](#compact-clausura-expr) | `#compact-閉包-expr` | live | compactClausuraExpr |
+| [`clausura_signature`](#clausura-signature) | `#閉包-signature` | live | clausuraSignature |
+| [`fac_block`](#fac-block) | `#執行-block` | live | closureFacBlock |
+| [`clausura_legacy_expr`](#clausura-legacy-expr) | `#閉包-legacy-expr` | live | legacyClausuraExpr |
+| [`clausura_params`](#clausura-params) | `#閉包-params` | live | clausuraParams |
+| [`clausura_param`](#clausura-param) | `#閉包-param` | live | clausuraParam |
+| [`genus_decl`](#genus-decl) | `#類型-decl` | live | genusDecl |
+| [`genus_member`](#genus-member) | `#類型-member` | live | genusMember |
+| [`field_decl`](#field-decl) | `#field-decl` | live | fieldDecl |
+| [`functio_method_decl`](#functio-method-decl) | `#函式-method-decl` | live | methodDecl |
+| [`annotation`](#annotation) | `#annotation` | live | — |
+| [`annotation_name`](#annotation-name) | `#annotation-name` | live | annotationName |
+| [`braced_annotation`](#braced-annotation) | `#braced-annotation` | live | bracedAnnotation |
+| [`annotation_field_list`](#annotation-field-list) | `#annotation-field-list` | live | annotationFieldList |
+| [`annotation_field`](#annotation-field) | `#annotation-field` | live | annotationField |
+| [`annotation_sugar`](#annotation-sugar) | `#annotation-sugar` | live | annotationSugar |
+| [`nucleum_annotation`](#nucleum-annotation) | `#內核-annotation` | live | nucleumAnnotation |
+| [`nucleum_sugar`](#nucleum-sugar) | `#內核-sugar` | live | nucleumSugar |
+| [`nucleum_braced`](#nucleum-braced) | `#內核-braced` | live | nucleumBraced |
+| [`nucleum_modifier`](#nucleum-modifier) | `#內核-modifier` | live | nucleumModifier |
+| [`nucleum_field_list`](#nucleum-field-list) | `#內核-field-list` | live | nucleumFieldList |
+| [`nucleum_field`](#nucleum-field) | `#內核-field` | live | nucleumField |
+| [`implendum_decl`](#implendum-decl) | `#待實作介面-decl` | live | implendumDecl |
+| [`implendum_method_decl`](#implendum-method-decl) | `#待實作介面-method-decl` | live | implendumMethod |
+| [`typus_decl`](#typus-decl) | `#型別-decl` | live | typeAliasDecl |
+| [`ordo_decl`](#ordo-decl) | `#列舉-decl` | live | enumDecl |
+| [`enum_member`](#enum-member) | `#enum-member` | live | enumMember |
+| [`discretio_decl`](#discretio-decl) | `#分支聯集-decl` | live | discretioDecl |
+| [`variant`](#variant) | `#variant` | live | — |
+| [`variant_fields`](#variant-fields) | `#variant-fields` | live | variantFields |
+| [`importa_decl`](#importa-decl) | `#匯入-decl` | live | importDecl |
+| [`importa_record`](#importa-record) | `#匯入-record` | live | importRecord |
+| [`import_field_list`](#import-field-list) | `#import-field-list` | live | importFieldList |
+| [`import_field`](#import-field) | `#import-field` | live | importField |
+| [`ex_field`](#ex-field) | `#取自-field` | live | importSourceField |
+| [`visibilitas_field`](#visibilitas-field) | `#visibilitas-field` | live | importVisibilityField |
+| [`nomen_field`](#nomen-field) | `#名稱-field` | live | importNameField |
+| [`ut_field`](#ut-field) | `#作為-field` | live | importAliasField |
+| [`omnia_field`](#omnia-field) | `#全部-field` | live | importWildcardField |
+| [`importa_sugar`](#importa-sugar) | `#匯入-sugar` | live | importSugar |
+| [`公開`](#publica) | `#公開` | live | visibility |
+| [`named_import`](#named-import) | `#named-import` | live | namedImport |
+| [`wildcard_import`](#wildcard-import) | `#wildcard-import` | live | wildcardImport |
+| [`type_annotation`](#type-annotation) | `#type-annotation` | live | typeAnnotation |
+| [`owned_type`](#owned-type) | `#owned-type` | live | ownedType |
+| [`base_type`](#base-type) | `#base-type` | live | baseType |
+| [`hole_type`](#hole-type) | `#hole-type` | live | holeType |
+| [`qualified_type`](#qualified-type) | `#qualified-type` | live | qualifiedType |
+| [`type_arguments`](#type-arguments) | `#type-arguments` | live | typeArguments |
+| [`type_argument`](#type-argument) | `#type-argument` | live | typeArgument |
+| [`labeled_type_argument`](#labeled-type-argument) | `#labeled-type-argument` | live | labeledTypeArgument |
+| [`width_type_sugar`](#width-type-sugar) | `#width-type-sugar` | live | widthTypeSugar |
+| [`shape_suffix`](#shape-suffix) | `#shape-suffix` | live | shapeSuffix |
+| [`figura`](#figura) | `#figura` | live | — |
+| [`figura_list`](#figura-list) | `#figura-list` | live | figuraList |
+| [`function_type`](#function-type) | `#function-type` | live | functionType |
+| [`type_list`](#type-list) | `#type-list` | live | typeList |
+| [`si_stmt`](#si-stmt) | `#若-stmt` | live | ifStmt |
+| [`secus_clause`](#secus-clause) | `#否則-clause` | live | elseClause |
+| [`arm`](#arm) | `#arm` | live | — |
+| [`else_arm`](#else-arm) | `#else-arm` | live | elseArm |
+| [`dum_stmt`](#dum-stmt) | `#當-stmt` | live | whileStmt |
+| [`itera_stmt`](#itera-stmt) | `#遍歷-stmt` | live | iteraStmt |
+| [`elige_stmt`](#elige-stmt) | `#選擇-stmt` | live | eligeStmt |
+| [`casu_elige_clause`](#casu-elige-clause) | `#分支-選擇-clause` | live | eligeCase |
+| [`ceterum_clause`](#ceterum-clause) | `#預設-clause` | live | defaultCase |
+| [`discerne_stmt`](#discerne-stmt) | `#比對-stmt` | live | discerneStmt |
+| [`discriminants`](#discriminants) | `#discriminants` | live | — |
+| [`casu_variant_clause`](#casu-variant-clause) | `#分支-variant-clause` | live | variantCase |
+| [`patterns`](#patterns) | `#patterns` | live | — |
+| [`pattern`](#pattern) | `#pattern` | live | — |
+| [`ut_pattern`](#ut-pattern) | `#作為-pattern` | live | patternBind |
+| [`pattern_binding`](#pattern-binding) | `#pattern-binding` | live | patternBinding |
+| [`custodi_stmt`](#custodi-stmt) | `#守衛-stmt` | live | guardStmt |
+| [`si_guard_clause`](#si-guard-clause) | `#若-guard-clause` | live | guardClause |
+| [`cura_stmt`](#cura-stmt) | `#資源-stmt` | live | curaStmt |
+| [`ex_stmt`](#ex-stmt) | `#取自-stmt` | live | extractStmt |
+| [`extract_fields`](#extract-fields) | `#extract-fields` | live | extractFields |
+| [`extract_field`](#extract-field) | `#extract-field` | live | extractField |
+| [`ceteri_field`](#ceteri-field) | `#其餘-field` | live | restField |
+| [`redde_stmt`](#redde-stmt) | `#傳回-stmt` | live | returnStmt |
+| [`reddet_stmt`](#reddet-stmt) | `#等返-stmt` | live | returnAwaitStmt |
+| [`tacebit_stmt`](#tacebit-stmt) | `#等棄-stmt` | live | awaitDiscardStmt |
+| [`cede_stmt`](#cede-stmt) | `#讓出-stmt` | live | yieldStmt |
+| [`rumpe_stmt`](#rumpe-stmt) | `#中斷-stmt` | live | breakStmt |
+| [`perge_stmt`](#perge-stmt) | `#繼續-stmt` | live | continueStmt |
+| [`tacet_stmt`](#tacet-stmt) | `#靜默-stmt` | live | noopStmt |
+| [`iace_stmt`](#iace-stmt) | `#拋出-stmt` | live | throwStmt |
+| [`iace_expr`](#iace-expr) | `#拋出-expr` | live | bareThrow |
+| [`iace_guarded_expr`](#iace-guarded-expr) | `#拋出-guarded-expr` | live | guardedThrowSugar |
+| [`cape_clause`](#cape-clause) | `#捕捉-clause` | live | catchClause |
+| [`adfirma_stmt`](#adfirma-stmt) | `#斷言-stmt` | live | assertStmt |
+| [`requirit_stmt`](#requirit-stmt) | `#需要-stmt` | live | requiritStmt |
+| [`expression`](#expression) | `#expression` | live | — |
+| [`assignment`](#assignment) | `#assignment` | live | — |
+| [`inc_dec_stmt`](#inc-dec-stmt) | `#inc-dec-stmt` | live | incDecStmt |
+| [`place`](#place) | `#place` | live | — |
+| [`ternary`](#ternary) | `#ternary` | live | — |
+| [`aut_expr`](#aut-expr) | `#或-expr` | live | or |
+| [`et_expr`](#et-expr) | `#且-expr` | live | and |
+| [`equality`](#equality) | `#equality` | live | — |
+| [`equality_tail`](#equality-tail) | `#equality-tail` | live | equalityTail |
+| [`comparison`](#comparison) | `#comparison` | live | — |
+| [`bitwise_or_expr`](#bitwise-or-expr) | `#bitwise-or-expr` | live | bitwiseOr |
+| [`bitwise_xor_expr`](#bitwise-xor-expr) | `#bitwise-xor-expr` | live | bitwiseXor |
+| [`bitwise_and_expr`](#bitwise-and-expr) | `#bitwise-and-expr` | live | bitwiseAnd |
+| [`shift_expr`](#shift-expr) | `#shift-expr` | live | shift |
+| [`range_expr`](#range-expr) | `#range-expr` | live | range |
+| [`range_tail`](#range-tail) | `#range-tail` | live | rangeTail |
+| [`additive_expr`](#additive-expr) | `#additive-expr` | live | additive |
+| [`multiplicative_expr`](#multiplicative-expr) | `#multiplicative-expr` | live | multiplicative |
+| [`vel_expr`](#vel-expr) | `#或取-expr` | live | coalesce |
+| [`vel_rhs`](#vel-rhs) | `#或取-rhs` | live | velRhs |
+| [`vel_range_tail`](#vel-range-tail) | `#或取-range-tail` | live | velRangeTail |
+| [`unary_expr`](#unary-expr) | `#unary-expr` | live | unary |
+| [`gradient_expr`](#gradient-expr) | `#gradient-expr` | live | gradientExpr |
+| [`gradient_selection`](#gradient-selection) | `#gradient-selection` | live | gradientSelection |
+| [`gradient_place`](#gradient-place) | `#gradient-place` | live | gradientPlace |
+| [`cast_expr`](#cast-expr) | `#cast-expr` | live | cast |
+| [`conversio_expr`](#conversio-expr) | `#conversio-expr` | live | conversio |
+| [`inline_recovery`](#inline-recovery) | `#inline-recovery` | live | inlineRecovery |
+| [`call_expr`](#call-expr) | `#call-expr` | live | call |
+| [`call_suffix`](#call-suffix) | `#call-suffix` | live | callSuffix |
+| [`member_suffix`](#member-suffix) | `#member-suffix` | live | memberSuffix |
+| [`optional_suffix`](#optional-suffix) | `#optional-suffix` | live | optionalSuffix |
+| [`non_null_suffix`](#non-null-suffix) | `#非-null-suffix` | live | nonNullSuffix |
+| [`argument_list`](#argument-list) | `#argument-list` | live | argumentList |
+| [`argument`](#argument) | `#argument` | live | — |
+| [`template_argument`](#template-argument) | `#template-argument` | live | templateArgument |
+| [`literal`](#literal) | `#literal` | live | — |
+| [`primary`](#primary) | `#primary` | live | — |
+| [`ad_expr`](#ad-expr) | `#端點-expr` | live | adExpr |
+| [`ad_opener`](#ad-opener) | `#端點-opener` | live | adOpener |
+| [`array_literal`](#array-literal) | `#array-literal` | live | arrayLiteral |
+| [`iuncta_expr`](#iuncta-expr) | `#元組-expr` | live | iunctaExpr |
+| [`json_literal`](#json-literal) | `#json-literal` | live | jsonLiteral |
+| [`json_member`](#json-member) | `#json-member` | live | jsonMember |
+| [`typed_constructor`](#typed-constructor) | `#typed-constructor` | live | typedConstructor |
+| [`field_list`](#field-list) | `#field-list` | live | fieldList |
+| [`field_init`](#field-init) | `#field-init` | live | fieldInit |
+| [`field_key`](#field-key) | `#field-key` | live | fieldKey |
+| [`json_value`](#json-value) | `#json-value` | live | jsonValue |
+| [`json_object`](#json-object) | `#json-object` | live | jsonObject |
+| [`json_array`](#json-array) | `#json-array` | live | jsonArray |
+| [`json_string`](#json-string) | `#json-string` | live | jsonString |
+| [`json_number`](#json-number) | `#json-number` | live | jsonNumber |
+| [`finge_expr`](#finge-expr) | `#虛構-expr` | live | fingeExpr |
+| [`qualified_ident`](#qualified-ident) | `#qualified-ident` | live | qualifiedIdent |
+| [`praefixum_expr`](#praefixum-expr) | `#前綴-expr` | live | praefixumExpr |
+| [`scriptum_expr`](#scriptum-expr) | `#格式文字-expr` | live | scriptumExpr |
+| [`lege_expr`](#lege-expr) | `#讀取-expr` | live | legeExpr |
+| [`object_pattern`](#object-pattern) | `#object-pattern` | live | objectPattern |
+| [`pattern_property`](#pattern-property) | `#pattern-property` | live | patternProperty |
+| [`array_pattern`](#array-pattern) | `#array-pattern` | live | arrayPattern |
+| [`array_pattern_element`](#array-pattern-element) | `#array-pattern-element` | live | arrayPatternElement |
+| [`nota_stmt`](#nota-stmt) | `#註記-stmt` | live | outputStmt |
+| [`entry_header`](#entry-header) | `#entry-header` | live | entryHeader |
+| [`incipit_stmt`](#incipit-stmt) | `#入口-stmt` | live | incipitStmt |
+| [`incipiet_stmt`](#incipiet-stmt) | `#非同步入口-stmt` | live | incipietStmt |
+| [`probandum_decl`](#probandum-decl) | `#測試規格-decl` | live | probandumDecl |
+| [`probandum_body`](#probandum-body) | `#測試規格-body` | live | probandumBody |
+| [`proba_stmt`](#proba-stmt) | `#測試-stmt` | live | probaStmt |
+| [`proba_modifier`](#proba-modifier) | `#測試-modifier` | live | probaModifier |
+| [`praepara_block`](#praepara-block) | `#準備-block` | live | praeparaBlock |
+| [`fac_stmt`](#fac-stmt) | `#執行-stmt` | live | facBlockStmt |
+
+## Lexicon Appendix {#lexicon}
+
+The lexical tier is descriptive and remains owned by the live lexer and
+driver. `capture-pending` rows intentionally carry no invented token shape.
+
+| Terminal | Status | Capture notes |
+|---|---|---|
+| `IDENTIFIER` | `capture-pending` | Lexical tier. Empty RHS; status is capture-pending. radix-lexer / driver / parser is the authority (crates/radix-lexer/src/). Not a second lexer spec. scan.rs scan_identifier; Unicode XID_Start or '_' then XID_Continue or '_'; NFKC intern; TokenKind::Ident (keywords also lex as identifiers) |
+| `NUMBER` | `capture-pending` | scan.rs scan_number; decimal/hex/bin/oct integers and floats with '_' separators; TokenKind::Integer(u64) or Float(f64) |
+| `NATURAL` | `capture-pending` | not a distinct lexer token; type-position TokenKind::Integer used as magnitudo capacity (no fraction/exponent) |
+| `STRING` | `capture-pending` | scan.rs scan_string / scan_guillemet_block_string; double-quoted or guillemet block; TokenKind::String |
+| `ASCII_STRING` | `capture-pending` | scan.rs scan_ascii_string; single-quoted; TokenKind::AsciiString |
+| `BACKTICK_STRING` | `capture-pending` | scan.rs scan_backtick_string; backtick forma template; TokenKind::BacktickString |
+| `OCTETI_STRING` | `capture-pending` | scan.rs scan_octeti_string; pipe-delimited hex; TokenKind::OctetiString |
+| `NEWLINE` | `capture-pending` | scan.rs scan_line_break; LF or CRLF; TokenKind::Newline |
+| `WIDTH_MARKER` | `capture-pending` | parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64/f16/f32/f64; not a lexer token |
+| `LISTA_WIDTH_SUGAR` | `capture-pending` | parser type-position l + WIDTH_MARKER; not a lexer token |
+| `TENSOR_WIDTH_SUGAR` | `capture-pending` | parser type-position t + WIDTH_MARKER; not a lexer token |
+| `SPARSA_WIDTH_SUGAR` | `capture-pending` | parser type-position s + WIDTH_MARKER; not a lexer token |
+| `VECTOR_WIDTH_SUGAR` | `capture-pending` | parser type-position v + WIDTH_MARKER; not a lexer token |
+| `MATRIX_WIDTH_SUGAR` | `capture-pending` | parser type-position m + WIDTH_MARKER; not a lexer token |
+| `FRONTMATTER_DELIMITER` | `capture-pending` | driver peels a line whose trimmed content is exactly +++ before lexing |
+| `TOML_LINES` | `capture-pending` | driver; TOML body between FRONTMATTER_DELIMITER lines |
+| `ANNOTATION_NAME` | `capture-pending` | parser; identifier spelling after @, including keyword spellings |
+| `ANNOTATION_FIELD_NAME` | `capture-pending` | parser; identifier spelling in annotation field position |
+| `NON_NEWLINE_TOKEN` | `capture-pending` | parser; one ordinary token other than TokenKind::Newline |
+| `NO_NEWLINE` | `capture-pending` | parser zero-width constraint: adjacent parts stay on the same logical line |
+
+## Keyword Reference {#keyword-reference}
+
+This table is derived from the quoted Latin literals in the source
+productions. It is not a second keyword authority.
+
+| Category | Faber | Meaning |
+|---|---|---|
+| Iteration | `範圍` | range iteration |
+| Declarations | `抽象` | abstract genus modifier |
+| Endpoints | `端點` | capability call |
+| Error | `斷言` | assert |
+| Iteration | `之前` | range until exclusive |
+| Params | `引數` | CLI arguments modifier |
+| Boolean | `或` | or |
+| Error | `捕捉` | local handler |
+| Control | `分支` | case |
+| Async | `讓出` | yield |
+| Params | `其餘` | rest |
+| Control | `預設` | default case |
+| Objects | `閉包` | legacy closure |
+| Type | `拷貝` | copy ownership |
+| Objects | `資源` | with-resource |
+| Params | `管理` | curated options |
+| Control | `守衛` | guard |
+| Type | `從` | borrow / for-in keys |
+| Control | `比對` | pattern match |
+| Declarations | `分支聯集` | tagged union |
+| Control | `當` | while / postfix until |
+| Objects | `自身` | self |
+| Control | `選擇` | switch |
+| Control | `則` | compact statement-body joint |
+| Params | `錯誤` | error channel |
+| Boolean | `是` | is / equality |
+| Boolean | `且` | and |
+| Iteration | `取自` | for-of / import from |
+| Params | `出口` | exit code |
+| Control | `執行` | do block / post-test loop |
+| JSON | `false` | JSON false |
+| Boolean | `假` | false |
+| Async | `異流` | async stream posture |
+| Async | `異步` | async finite posture |
+| Async | `等定` | await-bind immutable |
+| Objects | `虛構` | construct variant |
+| Async | `流` | sync stream posture |
+| Declarations | `定值` | immutable binding |
+| Testing | `脆弱` | flaky |
+| Annotation | `片段` | nucleum fragment |
+| Declarations | `函式` | function |
+| Testing | `預期` | future |
+| Genus | `靜態` | static member |
+| Declarations | `類型` | class |
+| Error | `拋出` | throw |
+| Error | `可拋` | throws marker |
+| Params | `不變` | immutable modifier |
+| Declarations | `待實作介面` | interface contract |
+| Genus | `實作` | implements |
+| Declarations | `匯入` | import |
+| Type | `傳入` | ownership in |
+| Declarations | `非同步入口` | async entrypoint |
+| Declarations | `入口` | entrypoint |
+| Iteration | `之間` | between |
+| Iteration | `內含` | membership |
+| Control | `遍歷` | for |
+| Objects | `元組` | tuple type/constructor |
+| Builtin | `讀取` | read |
+| Builtin | `行` | line |
+| Declarations | `尺寸` | size/index generic parameter |
+| Testing | `測量` | benchmark |
+| Diagnostics | `警告` | warn |
+| Error | `崩潰` | panic |
+| Genus | `綁定` | link field |
+| Literals | `空` | none |
+| Declarations | `名稱` | import binding name |
+| Boolean | `非` | not |
+| Diagnostics | `註記` | note |
+| Annotation | `內核` | kernel annotation |
+| JSON | `null` | JSON null |
+| Testing | `略過` | skip |
+| Params | `全部` | all / glob |
+| Params | `可選項` | options modifier |
+| Declarations | `列舉` | enum |
+| Type | `擁有` | owned |
+| Iteration | `每` | range step |
+| Control | `繼續` | continue |
+| Testing | `後置準備` | teardown |
+| Testing | `後置準備非同步` | async teardown |
+| Objects | `前綴` | prefix expression |
+| Testing | `準備` | setup |
+| Testing | `準備非同步` | async setup |
+| Testing | `測試` | test |
+| Testing | `測試規格` | test suite |
+| Declarations | `公開` | public visibility |
+| Control | `傳回` | return |
+| Async | `等返` | await-return |
+| Testing | `重複` | repeat |
+| Error | `需要` | require |
+| Control | `中斷` | break |
+| Diagnostics | `寫出` | diagnostic channel |
+| Builtin | `格式文字` | write |
+| Control | `否則` | else |
+| Control | `若` | if |
+| Control | `如此` | then (ternary) |
+| Control | `否則若` | else-if |
+| Declarations | `設為` | inferred immutable local |
+| Testing | `僅限` | only |
+| Testing | `僅限於` | only-in |
+| Params | `展開` | spread |
+| Declarations | `可選` | optional declaration slot |
+| Genus | `子` | extends |
+| Async | `等棄` | await-discard |
+| Control | `靜默` | no-op |
+| Testing | `標籤` | tag |
+| Testing | `時限` | timeout |
+| JSON | `true` | JSON true |
+| Declarations | `型別` | type alias |
+| Iteration | `直到` | range until inclusive |
+| Params | `作為` | as / alias |
+| Declarations | `變值` | mutable binding |
+| Async | `等變` | await-bind mutable |
+| Boolean | `或取` | nullable default |
+| Boolean | `真` | true |
+| Diagnostics | `檢視` | debug |
+| Declarations | `visibilitas` | visibility field |
+
+## Comma Separator Table {#comma-separator-law}
+
+Optional commas are forbidden. The source currently has no `','?`
+positions; every comma-bearing production is either required or absent.
+
+| Production | Source row |
+|---|---|
+| — | no optional comma positions |
+
+## Normative Language Notes {#normative-language-notes}
+
+Formal grammar for the Faber programming language. This file is the canonical
+grammar and spec-commentary surface for the public language; the compiler
+(Radix) implements it. The rendered, localized grammar is published on
+[the documentation site](https://faberlang.dev/en-US/reference/grammar.html).
+
+Documentation contract: runnable language reference programs live in the public
+sibling [`examples/corpus/`](../../examples/corpus/) with optional `+++`
+frontmatter (`term`, `syntax`, `related`, …); the generated manifest is
+[`examples/corpus/index.toml`](../../examples/corpus/index.toml). `faber
+explain` loads the exempla reference pack from disk. Prefer the language corpus
++ EBNF for new reference work.
 
 ---
 
-## 程式結構
+## Program Structure
 
-Faber 檔案可選擇以 `+++` TOML 前置資料開始，之後接著程式本體。前置資料只由編譯器驅動程式解析，不會被當作 Faber 陳述式解析。
+Faber source files are raw text peeled by the driver before lexing. Optional TOML
+frontmatter is not part of the token grammar. Within Faber syntax, spaces,
+tabs, and newlines are trivia unless a production explicitly names `NEWLINE`.
+Canonical forms are safe to compress onto one line. Any line-sensitive syntax is
+explicitly sugar; a compressor must expand it when a lossless canonical mapping
+exists, and otherwise preserve its boundary or reject compression. Line comments
+remain line-oriented trivia and must be removed or relocated safely by a compressor.
 
-```ebnf
-fabFile       := frontmatter? program
-frontmatter   := '+++' NEWLINE tomlBody NEWLINE '+++' NEWLINE?
-program       := statement*
-statement     := importDecl | varDecl | funcDecl | genusDecl | implendumDecl
-               | typeAliasDecl | enumDecl | discretioDecl
-               | ifStmt | whileStmt | iteraStmt
-               | eligeStmt | discerneStmt | guardStmt | curaStmt | facBlockStmt
-               | returnStmt | breakStmt | continueStmt | noopStmt | throwStmt
-               | assertStmt | requiritStmt | outputStmt | adStmt | incipitStmt
-               | incipietStmt | extractStmt
-               | probandumDecl | probaStmt | blockStmt | incDecStmt | exprStmt
-blockStmt     := '{' statement* '}'
-```
 
-### 檔案前置資料（`+++`）
+Uppercase names are lexical terminals. `FRONTMATTER_DELIMITER` is a line whose
+trimmed content is exactly `+++`; `TOML_LINES` is the possibly empty sequence of
+complete TOML lines before the closing delimiter. `NON_NEWLINE_TOKEN` means one
+ordinary source token other than a newline. `ANNOTATION_NAME` and
+`ANNOTATION_FIELD_NAME` are identifier spellings in annotation-owned contexts;
+they include spellings that are keywords in other contexts. `NO_NEWLINE` is a
+zero-width constraint requiring adjacent grammar parts to remain on the same
+logical line.
 
-前置資料若存在，必須在第 1 行以完全相同的 `+++` 開始。後續去除前後空白後仍完全等於 `+++` 的行會結束區塊。結束分隔符後的位元組就是 Faber `program`。空白主體是合法的空程式。
+### File frontmatter (`+++`)
 
-前置資料是通用 TOML 文件。作者可附加任意 metadata key；工具會透過 accessor 讀取 `group`、`sectio` 和 `[probanda]` 等已知 key。套件模式仍以 `faber.toml` 的 `[package]`、`[paths]` 和 `[build]` 為準；衝突值會被拒絕。
+When present, frontmatter must open on **line 1** with exactly `+++`. A later line
+that trims to exactly `+++` ends the block. Bytes after the closing delimiter are
+the Faber `program`. An empty body (whitespace only) is a valid empty program.
+
+Frontmatter is parsed as a generic TOML document in the compiler driver — not
+parsed as Faber statements. Authors may attach arbitrary metadata keys; tooling
+reads known keys such as `group`, `sectio`, and `[probanda]` via accessors.
+`faber` package tooling consumes those package keys. Package authority for
+`[package]`, `[paths]`, and `[build]` remains `faber.toml`; conflicting
+frontmatter values are rejected in package mode.
+
+Example:
 
 ```fab
 +++
@@ -41,742 +1038,824 @@ group = "exempla.directiva"
 sectio = "smoke"
 +++
 
-入口 {}
+incipit {}
 ```
 
-行首 `§` 檔案指令已移除。檔案 metadata 請放在 `+++` 前置資料中。引號字串內的 `§` 仍是字串範本洞（見「呼叫與成員存取」）。
+Line-start `§` file directives were removed. Put file metadata in `+++`
+frontmatter instead. Inside quoted strings, `§` remains the string-template hole
+(see **Call and Member Access** below).
+
+### Comma separator law
+
+Every comma position is either required or forbidden. Optional commas do not
+exist.
+
+**Item lists** — homogeneous entries inside a bounded header (`lista` literals,
+call arguments, parameters, type argument lists, figura lists, field-init
+lists, `列舉` members, `分支聯集` variant lists, JSON members and array
+elements, annotation / import / nucleum fields, output statement lists) —
+require a comma between adjacent items and forbid one after the last.
+
+**Declaration blocks** — self-annotating declarations (statements, `類型`
+members, `待實作介面` methods, `分支聯集` payload fields) — contain no commas.
+Entries are trivia-delimited.
 
 ---
 
-## 宣告
+## Declarations
 
-### 變數
+### Variables
 
-```ebnf
-varDecl      := ('定值' | '變值') typeAnnotation IDENTIFIER (('←' expression) | ('↤' assignment inlineRecovery?))?
-sitDecl      := '設為' IDENTIFIER ('←' expression)?
-arrayDestruct := ('定值' | '變值') arrayPattern '←' expression
-objectDestruct := ('定值' | '變值') objectPattern '←' expression
-```
 
-- `定值` 建立不可變 binding（只能寫入一次）：可以不帶初始值宣告，之後恰好指定一次，指定後即凍結。`變值` 建立可重新指定的 binding，類似 `let`。
-- 初始化值能決定型別時，型別標註可使用 `_`：`定值 _ name ← value`。
-- `設為 name ← value` 是 `定值 _ name ← value` 的語法糖（推導型別的不可變區域量）。
-- `設為 name`（沒有初始值）是 `定值 _ name` 的語法糖，表示延後初始化的推導型別不可變量；任何讀取前都必須恰好指定一次。
-- 延後初始化：`定值 整數 x` 或 `設為 x` 宣告未初始化的不可變槽位。任何讀取前都必須恰好指定一次；第二次指定會被拒絕。確定性指定分析（語意階段 3a）會強制執行這項規則。
+- `定值` = immutable binding (write-once): it may be declared without an
+  initializer and assigned exactly once later, then frozen. `變值` = mutable
+  binding (reassignable), like `let`.
+- `等定` / `等變` await a `promissum<T>` or `promissum<T ⇥ E>`, bind
+  the resolved `T`, and propagate a compatible alternate `E`.
+- Use `_` as the type annotation when the initializer determines the type: `定值 _ name ← value`
+- `設為 name ← value` is sugar for `定值 _ name ← value` (inferred immutable local)
+- `設為 name` (no initializer) is sugar for `定值 _ name` — the inferred deferred
+  immutable. Assign exactly once before any read.
+- Typed `定值`/`變值` initializers accept `↤` (`定值 numerus x ↤ "42"`):
+  the written type is the conversion destination, then the binding is
+  initialized. `等定`/`等變` keep `←`; `定值 _`, `設為`, and untyped
+  destructuring reject `↤` (no concrete destination type).
+- Deferred init: `定值 numerus x` or `設為 x` declares an uninitialized immutable
+  slot that must be assigned exactly once before any read; a second assignment is
+  rejected. The definite-assignment pass (semantic Phase 3a) enforces this.
 
-### 函式
+### Functions
 
-```ebnf
-funcDecl     := '函式' IDENTIFIER genericParams? '(' paramList ')' funcModifier* returnClause? alternateExitClause? blockStmt?
-paramList    := (parameter (',' parameter)*)?
-genericParams := '<' genericParam (',' genericParam)* '>'
-genericParam  := IDENTIFIER | '尺寸' IDENTIFIER
-typeArgs      := '<' typeAnnotation (',' typeAnnotation)* '>'
-parameter    := ('從' | '傳入' | '取自')? '其餘'? typeAnnotation IDENTIFIER '可選'? ('作為' IDENTIFIER)? ('或取' expression)?
-funcModifier := '引數' IDENTIFIER | '管理' IDENTIFIER ('作為' IDENTIFIER)? | '錯誤' IDENTIFIER | '出口' (IDENTIFIER | NUMBER) | '不變' | '拋出' | '選項' IDENTIFIER
-returnClause := '→' typeAnnotation
-alternateExitClause := '⇥' typeAnnotation
-stmtBodyJoint  := '則'
-clausuraJoint  := '∴'
-clausuraExpr   := compactClausuraExpr | legacyClausuraExpr
-compactClausuraExpr := clausuraSignature clausuraJoint (expression | closureFacBlock)
-clausuraSignature := (clausuraParam | '(' clausuraParams? ')') returnClause? alternateExitClause?
-closureFacBlock := '執行' blockStmt catchClause?
-legacyClausuraExpr := '閉包' clausuraParams? ('→' typeAnnotation)? (':' expression | blockStmt)
-clausuraParams := clausuraParam (',' clausuraParam)*
-clausuraParam  := typeAnnotation IDENTIFIER
-```
 
-- `→` 宣告正常成功型別。具有函式主體但沒有 `→` 的函式是效果限定（`空值`），且不得包含 `傳回`。語句主體閉包（`執行 { ... }` 或舊式區塊主體）若要使用 `傳回`，也必須明確寫出 `→ T`；運算式主體閉包可由運算式推導結果。
-- `⇥` 宣告可復原的替代出口型別。它可出現在 `→ T` 後，也可單獨出現在效果限定的可失敗函式或閉包上。使用逃逸 `拋出` 的閉包必須宣告自己的 `⇥ E`，不能繼承外層函式的錯誤通道。
-- 在宣告 `⇥` 的函式內，可失敗呼叫（`→ T ⇥ E`）會直接傳播到函式的替代出口，不需要 `執行`/`捕捉` 包裹；它會降級為 Rust `?`。閉包仍必須宣告自己的 `⇥`，因為外層函式的錯誤通道不會跨越閉包邊界。
-- `執行 { ... } 捕捉 err { ... }` 是標準的一次性區域可復原錯誤邊界。
-- 參數前綴：`從`（讀取）、`傳入`（變更）、`取自`（消費）。
-- 名稱後標記：`可選`（自願／可選提供）。`其餘` 標記剩餘參數。`管理 NAME ('作為' LOCAL)` 宣告配置器需求；`LOCAL` 是函式主體內的別名。
+- Return syntax: `→` declares the normal success type. A bodyful function with no `→` is effect-only (`vacuum`) and must not contain `傳回`. A statement-bodied closure (`執行 { ... }` or legacy block body) must also spell `→ T` before it can use `傳回`; expression-bodied closures may infer their result from the expression.
+- Recoverable alternate-exit syntax: `⇥` declares the error-channel type. It can appear after `→ T` or alone on an effect-only failable function or closure. A closure body that uses an escaping `拋出` must declare its own `⇥ E`; it cannot inherit the enclosing function's error channel. A local `執行 { ... } 捕捉 err { ... }` may catch `拋出` without an enclosing `⇥`. A failable function call (`→ T ⇥ E`) inside a `⇥`-declaring function propagates to the function's alternate exit without a `執行`/`捕捉` wrapper, mirroring how bare `↦` conversio and `拋出` throws already behave; the call lowers to Rust `?`. A closure must still declare its own `⇥` to propagate a failable call — the enclosing function's error channel does not cross the closure boundary.
+- Parameter access markers live in the type position: `從`/`ref` (read), `傳入`/`mut` (mutate), `擁有` (consume), and `拷貝` (duplicate then own). The retired parameter-prefix slot is not part of the grammar; `取自`/`from` remains the import/iteration/extraction token identity.
+- Post-name marker: `可選` (voluntary/optional provision)
+- `其餘` marks rest parameter
+- `管理 NAME ('作為' LOCAL)?` declares an allocator requirement; `LOCAL` is the function-body alias.
+- Ordinary `函式` declarations and genus methods require bodies. Signature-only methods belong in `待實作介面`.
+- `錯誤 NAME` is a legacy runtime-injected `ignotum` local, and `可拋` is a legacy marker with no current semantic effect. Neither declares the typed alternate-exit contract. New failable APIs should use `⇥ E`; whether either legacy modifier should survive is unresolved.
+- `則` is the compact **statement-body** joint only (one-statement `若`/`當`/`分支`/… arms).
+- `∴` is the compact **clausura** joint only. The two are not aliases.
+- Compact closure block bodies must use `執行 { ... }`; a closure-local `執行` body may attach `捕捉`, but cannot use postfix `當`.
 
-`⇥` 宣告錯誤通道型別。它可出現在 `→ T` 之後，也可獨立出現在 effect-only 的可失敗函式或閉包上。使用逃逸 `拋出` 的閉包必須宣告自己的 `⇥ E`，不能繼承外層函式的錯誤通道。`執行 { ... } 捕捉 err { ... }` 是單次區域復原錯誤邊界。`則` 只用於單一語句主體；`∴` 只用於 compact clausura，兩者不是別名。
+### Classes
 
-### 類別
 
-```ebnf
-genusDecl    := '抽象'?'類型' IDENTIFIER typeParams? ('子' IDENTIFIER)? ('實作' IDENTIFIER (',' IDENTIFIER)*)? '{' genusMember* '}'
-genusMember  := annotation* (fieldDecl | methodDecl)
-fieldDecl    := '靜態'? '綁定'? typeAnnotation IDENTIFIER '可選'? ('=' expression)?
-methodDecl   := '函式' IDENTIFIER '(' paramList ')' funcModifier* returnClause? alternateExitClause? blockStmt?
-```
+### Annotations
 
-### 註解
 
-```ebnf
-annotation            := '@' annotationName annotationBody?
-annotationName        := IDENTIFIER | '公開' | '保護' | '私有' | '未來' | '游標'
-                        | '標籤' | '僅限' | '略過' | '測量'
-annotationBody        := bracedAnnotation | annotationArgs
-bracedAnnotation      := '{' annotationFieldList? '}'
-annotationFieldList   := annotationField (',' annotationField)* ','?
-annotationField       := IDENTIFIER '=' (expression | typeAnnotation)
-cliProgramAnnotation := '@' 'cli' STRING
-imperiumAnnotation := '@' 'imperium' STRING
-optioAnnotation    := '@' 'optio' IDENTIFIER optioModifier*
-optioModifier      := '短' STRING | '長' STRING | '型別' typeAnnotation
-                    | '說明' STRING | '全域' | '或取' expression
-operandusAnnotation := '@' '位置引數' ('其餘')? typeAnnotation IDENTIFIER operandusModifier*
-operandusModifier  := '說明' STRING | '全域' | '或取' expression
-annotationArgs     := (STRING | IDENTIFIER | expression)+
-annotatioMarker    := '@' 'annotatio' ( '{' annotatioFieldList? '}' )?
-annotatioFieldList := annotatioField (',' annotatioField)* ','?
-annotatioField     := 'target' '=' annotatioTarget
-annotatioTarget    := '函式' | STRING | IDENTIFIER
-contractApplication := '@' IDENTIFIER ( '{' annotationFieldList? '}' )?
-jsonGenusAnnotation := '@' 'json'
-jsonFieldAnnotation := '@' 'json' '{' '名稱' '=' STRING '}'
-```
+`@ 內核 片段` is a modifier on the `內核` annotation (sugar or
+braced `片段 = 真` / `假`), not a fused annotation name and not the
+graphics `@ 片段` stage. Standalone `@ 片段` is unchanged.
 
-`@ annotatio` 將頂層 `genus` 標記為編譯期註解契約。普通 `genus` 不是註解 schema。應用程式使用 `@ ContractName { field = constant }`，並透過本地宣告或匯入的檔案介面匯出解析。解析後的應用會降級為 `HirAnnotation`，其中含有 `contract_id: Some(DefId)` 與常數欄位值。v1 的附加目標僅限 `functio`；載荷純量型別為 `textus`、`numerus`、`fractus` 和 `bivalens`，可透過 `sponte` 或 `T ∪ nihil` 表示可選。編譯器不提供自有的 `@ web`、controller 或 route 族。
+Braced annotation records (`@ futura { }`, `@ optio { binding = verbose, ... }`)
+are canonical and compression-safe. Unbraced annotations are line-sensitive,
+non-compression-safe sugar that consumes through `NEWLINE`; the newline is part
+of this sugar grammar, not a general Faber statement separator. A compressor may
+rewrite promoted families only when their named-field mapping is known. It must
+otherwise preserve the line break or reject compression. Promoted sugar and
+braced forms lower to the same `HirAnnotation` records. Unpromoted positional
+families preserve raw arguments and do not yet have a lossless braced expansion.
 
-**JSON genus：**`@ json` 套用於 `genus` 時，是編譯器擁有的資料模型契約，不是通用註解 schema。欄位必須是 JSON 安全型別：`textus`、`ascii`、`numerus`、`fractus`、`bivalens`、`instans`、`nihil`、`lista<T>`、`tabula<textus, T>`、可空的 `T ∪ nihil`，或另一個 `@ json genus`。欄位中 `@ json { nomen = "wire_name" }` 會變更 `value ↦ valor`、`value ↦ json` 與 `json ↦ Genus` 輸出的物件鍵。JSON 文字仍是 Norma 的線上操作，例如 `json.pange(value ↦ json)`。
+The current Radix parser still accepts only a fixed token subset in unbraced
+payloads and ends them with declaration-boundary heuristics rather than `NEWLINE`.
+Those are implementation mismatches with this specification, not alternate
+language rules.
 
-- `@ radix` 保留給編譯器擁有的 metadata。歷史上的詞幹意義已退役；形態學仍是來源命名規範，不是編譯器產生的變位。接受的形式是套用在頂層函式上的 `@ radix lane "air"`、`"mir"` 或 `"hir-direct"`，用於明確的編譯器 lane 路由；不支援的 lane/target 組合會以診斷拒絕，不會靜默忽略。
-- `@ verte` 定義程式碼生成轉換（方法名稱或範本）。
-- `@ nondum [TARGET] ["REASON"]` 表示宣告存在於介面中，但目前目標不可用。
-- `@ cli "NAME"` 將 `incipit` 入口標記為 CLI 程式。
-- `@ imperium "NAME"` 將函式標記為 CLI 命令入口。
-- `@ optio NAME ...` 定義 CLI 選項；布林旗標使用 `型別 布林`。
-- `@ operandus [ceteri] TYPE NAME ...` 定義 CLI 位置引數。
-- `@ futura` 標記非同步函式；`@ cursor` 標記產生器。
-- `@ publica` 標記匯出、`@ interna` 標記套件內部、`@ privata` 為明確的模組私有標記；未標記的頂層宣告預設為模組私有，混用不同可見性層級會觸發 `SEM019`。
-- `@ protecta` 保留並會以語意診斷拒絕；它不代表套件、子類別或同檔案可見性。
+**Annotation contracts:** `@ annotatio` (optionally `@ annotatio { target = 函式 }`)
+marks a top-level `類型` as a compile-time annotation contract. Ordinary genera
+are not annotation schemas. Applications use `@ ContractName { field = constant }`
+and resolve through local declarations or imported file-interface exports.
+Resolved applications lower to `HirAnnotation` with `contract_id: Some(DefId)`
+and constant field values. v1 attachment target is `函式` only; payload
+scalars are `textus`, `numerus`, `fractus`, and `bivalens` (optional via
+`可選` or `T ∪ 空`). No compiler-owned `@ web` / controller / route families.
 
-- `sub` = 延伸；`implet` = 實作。
-- `generis` = 靜態；`nexum` = 綁定或屬性。
+**JSON genera:** `@ json` on a `類型` is a compiler-owned data-model contract,
+not a generic annotation schema. Fields must be JSON-safe (`textus`, `ascii`,
+`numerus`, `fractus`, `bivalens`, `instans`, `空`, `lista<T>`,
+`tabula<textus, T>`, nullable `T ∪ 空`, or another `@ json 類型`). Field
+metadata `@ json { 名稱 = "wire_name" }` changes the emitted object key used by
+`value ↦ valor`, `value ↦ json`, and `json ↦ Genus`; JSON text remains a Norma
+wire operation such as `json.pange(value ↦ json)`.
 
-### 介面
+- `@ radix` is reserved for compiler-owned metadata. The historical
+  morphology-stem meaning is retired; morphology remains a source naming
+  discipline, not compiler-generated conjugation. Accepted directive forms are
+  `@ radix lane "air"` / `"mir"` / `"hir-direct"` on top-level functions for
+  explicit compiler-lane routing; unsupported lane/target combinations reject
+  with diagnostics instead of being ignored.
+- `@ verte` defines codegen transformation (method name or template)
+- `@ nondum [TARGET] ["REASON"]` marks a declaration as present in an interface but unavailable for the target
+- `@ cli "NAME"` marks an `入口` entry as a CLI program
+- `@ imperium "NAME"` marks a function as a CLI command entry point
+- `@ optio NAME ...` defines a CLI option; use `型別 bivalens` for boolean flags
+- `@ operandus [其餘] TYPE NAME ...` defines a CLI positional argument
+- `@ futura` marks a function as async (legacy — prefer `異步` posture word)
+- `@ cursor` marks a function as generator (legacy — prefer `流` posture word)
+- Callable posture words (`異步`/`流`/`異流`) are recognized in the signature
+  slot after modifiers and before `→`/`⇥`/body; bare means synchronous finite
+- `@ 公開` marks a declaration for the file's importable (export) surface; `@ interna` marks it package-internal (same-package importable only); `@ privata` is an explicit module-private marker. Unmarked top-level declarations are module-private by default; a declaration mixing distinct visibility tiers is rejected with `SEM019` (`conflicting_visibility`)
+- `@ protecta` is reserved and rejected with a semantic diagnostic; it has no package, subclass, or sibling-file visibility meaning
 
-```ebnf
-implendumDecl   := '待實作介面' IDENTIFIER typeParams? '{' implendumMethod* '}'
-implendumMethod := annotation* '函式' IDENTIFIER '(' paramList ')' funcModifier* returnClause? alternateExitClause?
-```
+- `子` = extends, `實作` = implements
+- `靜態` = static, `綁定` = bound/property
 
-`待實作介面` 是只含簽章的方法契約，供 `實作` 使用。匯入 namespace 以 `.fab` 檔案為邊界；匯出的宣告位於檔案頂層。
+### Interfaces
 
-### 型別別名
 
-```ebnf
-typeAliasDecl := '型別' IDENTIFIER genericParams? '=' typeAnnotation
-```
+`待實作介面` is the **contract** construct: signature-only methods for `實作`
+(gerundive of *implere* — that which must be fulfilled). Import namespaces are
+`.fab` file boundaries; exported declarations live at file top level.
 
-### 列舉與標籤聯集
+### Type Aliases
 
-```ebnf
-enumDecl   := '列舉' IDENTIFIER '{' enumMember (',' enumMember)* ','? '}'
-enumMember := IDENTIFIER ('=' ('-'? NUMBER | STRING))?
-discretioDecl := '分支聯集' IDENTIFIER typeParams? '{' variant (',' variant)* ','? '}'
-variant       := IDENTIFIER ('{' variantFields '}')?
-variantFields := (typeAnnotation IDENTIFIER (',' typeAnnotation IDENTIFIER)*)?
-```
 
-### 識別符命名
+### Enums
 
-混合大小寫且首字母小寫的名稱在語法上接受，但不是 Faber 語言、標準函式庫、主機路由或編譯器 intrinsic API 的偏好。優先使用單一字詞；單一字詞不足以承載語意時，才在少數情況使用 snake_case。若兩種形式都不合適，除非方法不可或缺，否則它可能不屬於核心表面。標準函式庫的編解碼在各模組使用機械動詞三件組 `pange` / `solve` / `tempta`；公開文字函式庫是 `norma:chorda`。
 
-### 匯入
+### Tagged Unions
 
-```ebnf
-importDecl     := importRecord | importSugar
-importRecord   := '匯入' '{' importFieldList? '}'
-importFieldList := importField (',' importField)* ','?
-importField    := importSourceField | importVisibilityField | importNameField
-                | importAliasField | importWildcardField
-importSourceField := '取自' '=' STRING
-importVisibilityField := '可見性' '=' visibility
-importNameField := '名稱' '=' IDENTIFIER
-importAliasField := '作為' '=' IDENTIFIER
-importWildcardField := '全部' '=' IDENTIFIER
-importSugar    := '匯入' '取自' STRING visibility? (namedImport | wildcardImport)?
-visibility    := '公開'
-namedImport   := IDENTIFIER ('作為' IDENTIFIER)?
-wildcardImport := '*' '作為' IDENTIFIER
-```
+
+Variant lists are an item list: comma required between variants, forbidden
+after the last. Payload fields inside a variant are a declaration block
+(genus-style, no commas).
+
+### Identifier Naming
+
+Faber has no globally reserved words. Keyword ownership is contextual per
+spelling: a keyword claims only its owning grammar slot. Every user-chosen
+name slot accepts every keyword spelling — declaration names, parameters,
+members, binding targets (`定值`/`變值`/`設為` patterns and captures),
+import aliases, and loop/iteration bindings. Type-name slots stay out.
+
+Outside a spelling's owning contexts, that spelling may be an `IDENTIFIER`.
+An owning context may itself be effectively global when its production
+applies everywhere a statement or expression may begin. Builtin claims
+(`讀取`/`行`/`格式文字`/`vacua`, and the scribe family in
+statement-initial position) are defaults, not reservations: a user binding
+of the same surface spelling wins.
+
+Radix still emits globally reserved tokens for some spellings and selectively
+reinterprets them as identifiers. That is transitional implementation behavior;
+it does not replace the contextual language rule above.
+
+Mixed-case lower-initial names are syntactically accepted but not
+Faber-preferred for language, stdlib, host routes, or compiler-owned intrinsic APIs.
+Prefer one word. If one word cannot carry the meaning, use snake_case only in
+rare cases. If neither shape works, the method probably does not belong in the
+core surface unless it is critical. Stdlib encode/decode uses the
+mechanical verb trio `pange` / `solve` / `tempta` across modules — see
+`docs/stdlib/stdlib-mechanical-verbs.md`. The public text library is
+`norma:chorda` — see `docs/stdlib/chorda-methods.md`.
+
+### Imports
+
+
+Example:
 
 ```fab
-匯入取自 "hono" Hono
-匯入取自 "norma:chorda"
-匯入 { 取自 = "norma:json/solve", 作為 = solve_mod }
-匯入取自 "./types" 公開 User
+importa ex "hono" Hono
+importa ex "hono" Context
+# No marker: no re-export.
+importa ex "norma:chorda"
+importa { ex = "norma:json/solve", ut = solve_mod }
+importa ex "norma:consolum" consolum
+# Kernel manifest glob.
+importa ex "faber:*" faber
+importa ex "lodash" * ut _
+# Re-export.
+importa ex "./types" publica User
 ```
 
-匯入的 `私有` 標記已移除（VM-U3）：無標記的匯入預設不 re-export，`公開` 是 re-export 標記。未指定 binding 時，若最後一段路徑是合法且不衝突的識別符，就使用該名稱。
+The `privata` import marker was removed (VM-U3); an import without a marker
+does not re-export, and `公開` is the re-export marker. Missing named binding
+defaults to the
+last import path segment when it is a valid, non-conflicting identifier. If the
+inferred name is invalid or collides with an existing top-level binding, spell an
+explicit `名稱` or `作為` binding.
+
+`匯入 取自 "faber:*" faber` is kernel-specific sugar: the glob lives
+inside the import path string and expands the released binary's kernel manifest
+into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not create a runtime aggregate value.
 
 ---
 
-## 型別
+## Types
 
-```ebnf
-typeAnnotation := ('從' | '傳入')? baseType ( '∪' typeAnnotation )*
-baseType       := holeType | functionType | qualifiedType typeParams? | '(' typeAnnotation ')'
-holeType       := '_' | '∪'
-qualifiedType  := IDENTIFIER ('.' IDENTIFIER)*
-functionType   := '(' typeList? ')' '→' typeAnnotation alternateExitClause?
-typeList       := typeAnnotation (',' typeAnnotation)*
-typeParams     := genericParams
-```
 
-陣列寫成 `列表<T>`；不接受 postfix `T[]`。`從` 與 `傳入` 是型別前綴的所有權標記。`T ∪ 無` 是標準 nullable 型別形式。`可選` 是宣告標記，不是型別前綴。限定型別路徑必須透過匯入 namespace 解析。
+- Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
+- Applied `NATURAL` arguments are `尺寸` capacity facts, not width markers. Proposed (not shipped) bounded forms use that slot: `lista<T, N>`, `textus<N>`, `ascii<N>`, `octeti<N>`. Width-marker families such as `numerus<i32>` stay the separate `widthTypeSugar` production below.
+- A second applied argument on a `↦` target (`numerus<W, Hex>`, `numerus<W, Be>`) is a convert-slot hint, not a type identity, not a width marker, and not a keyword. Live text-parse hints are `Hex` / `Bin` / `Oct`. `Be` / `Le` occupy that same Hex slot for endian unpack. `typeArguments` is unchanged: these are ordinary `IDENTIFIER` arguments interpreted by conversio, not new `baseType` productions.
+- Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
+- Explicit generic call-site lists use the same `typeArguments` production: `id<_>(x)` is a type hole (equivalent to omitted `id(x)` for a one-param callee), and mixed lists such as `both<_, textus>(a, b)` are legal. Arity stays exact (`both<_>` is still one argument). `∪` in that list is rejected (`explicit_union_type_arg_unsupported`): a callee type param is a monomorphic witness slot.
+- `labeledTypeArgument` is the optional label prefix on `元組` type arguments only (`元組<gx: f32, T>`; mixed labeled/unlabeled legal). A label in a non-`元組` list (`f<gx: T>(x)`, `lista<gx: T>`) is a parse error. Absence is the only unlabeled form; there is no `_: T` spelling. Keyword spellings are legal labels under the contextual law (`元組<定值: A>`).
+- Labels are unique within one tuple type.
+- Labels are erased from type identity: `元組<gx: A, B> ≡ 元組<A, B>` for assignment, `≡`/`↦`, unify, and every emitter.
+- Bracket index on a tuple requires a literal integer (`i[0]`); every element is reachable by position, labeled or not. Non-literal index expressions stay rejected. Positions are brackets only — no `.0`.
+- Member-by-label (`i.gx`) requires that label to be present on the receiver's `元組` annotation.
+- `元組` element slots admit `_` (monomorphic hole, solved element-wise from the single position witness) and reject `∪`. A wanted union element is declared with binary cup (`元組<f32, textus ∪ 空>`). `lista<∪>` / `tabula<K, ∪>` keep heterogeneous-union behavior. Labels compose with holes (`元組<loss: _, T>`).
+- Arrays are written `lista<T>` (unbounded, shipped). Postfix `T[]` is not accepted. `lista<T, N>` is a proposed (not shipped) bounded form; see Generic Collections.
+- `從`/`傳入` mark ownership (borrow/mut-borrow) on the immediately following union member. Parenthesize when grouping must be explicit.
+- Two hole kinds share the `holeType` production. `_` is the monomorphic hole ("infer exactly one inhabitant type"); the standalone `∪` is the union hole ("infer a finite multi-member union"). Both are legal wherever a base type is: bindings, returns, params, fields, and type arguments (`lista<∪>`, `tabula<K, ∪>`, `→ ∪`).
+- **Lone-`∪` rule:** a `∪` hole consumes the whole type expression — any following `∪` is a parse error (`A ∪ ∪`, `∪ B` rejected, issue `unexpected_cup_after_union_hole`). `_` keeps today's behavior and may still appear as a binary-cup member (`_ ∪ B`).
+- **Binary-cup disambiguation:** `∪` between two non-hole types remains the inline value-union operator (`A ∪ B`, nullable `T ∪ 空`); the hole reading applies only when `∪` stands alone in a base-type position.
+- Inline union `T ∪ U` (cup) for ad-hoc value unions; `T ∪ 空` is the canonical nullable type form (lowers to Option<T>).
+- Unions are parsed as a flat member list; duplicates and `空`-only cases are diagnosed in semantic lowering.
+- `可選` is a declaration marker (post-name on params/fields), never a prefix on types.
+- Qualified type paths such as `terminus.Terminus` name a type through an
+  imported namespace binding. The prefix must resolve to a namespace; the final
+  segment must resolve to a type-bearing declaration.
+
+Function types enable higher-order function signatures:
 
 ```fab
-函式 篩選((T) → 布林 預測) → 列表<T>
-函式 組合((A) → B f, (B) → C g) → (A) → C
-函式 套用((整數) → 整數 ⇥ 文字 op, 整數 n) → 整數 ⇥ 文字
+functio filtrata((T) → bivalens pred) → lista<T>
+functio compose((A) → B f, (B) → C g) → (A) → C
+functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ textus
 ```
 
-### 原始型別
+### Primitive Types
 
-| Faber | 意義 |
-|---|---|
-| `文字` | Unicode 字串 |
-| `ascii` | 僅 ASCII 的字串 |
-| `forma` | 擷取的範本與參數 |
-| `整數` | 整數，預設 `i64` |
-| `模數<W>` | 無號模數字，算術以 `2^W` 取模 |
-| `小數` | 浮點數，預設 `f64` |
-| `布林` | 布林值 |
-| `無` | null |
-| `空值` | void |
-| `永不` | never |
-| `未知` | unknown |
-| `位元組` | bytes |
+| Faber      | Meaning |
+| ---------- | ------- |
+| `textus`   | Unicode string |
+| `textus<N>` | proposed — not shipped; bounded Unicode string; `N` is a `尺寸` / `NATURAL` capacity, not a width marker. `textus<_>` is the capacity hole (infer `N`). |
+| `ascii`    | ASCII-only string |
+| `ascii<N>` | proposed — not shipped; bounded ASCII string; `N` is a `尺寸` / `NATURAL` capacity, not a width marker. `ascii<_>` is the capacity hole (infer `N`). |
+| `forma`    | captured template + params |
+| `numerus`  | integer (default `i64`) |
+| `modulus<W>` | unsigned modular word; arithmetic wraps modulo 2^W |
+| `fractus`  | float (default `f64`) |
+| `bivalens` | boolean |
+| `空`    | null |
+| `vacuum`   | void |
+| `numquam`  | never |
+| `ignotum`  | unknown |
+| `octeti`   | bytes |
+| `octeti<N>` | proposed — not shipped; bounded byte buffer; `N` is a `尺寸` / `NATURAL` capacity, not a width marker. `octeti<_>` is the capacity hole (infer `N`). |
 
-大小型別使用寬度標記。`整數` / `小數` 可省略寬度而分別代表 `i64` / `f64`。`模數<W>` 是獨立語意家族，不會與 `整數<W>` 隱式混用。
+Bare `textus` / `ascii` / `octeti` remain the unbounded productions. The
+proposed (not shipped) forms `textus<N>`, `ascii<N>`, and `octeti<N>` take
+one `尺寸` / `NATURAL` applied argument. That `N` is capacity, not a
+width marker and not a language-wide default. `_` in that slot (`ascii<_>`,
+`textus<_>`, `octeti<_>`, `lista<T, _>`) is a capacity hole: the form stays
+bounded, and `N` is inferred from a same-family bounded witness. Bare
+`ascii` is not a hole.
 
-### 泛型集合
+Sized primitives accept one optional **width marker** (not a user type parameter):
 
-| Faber | 意義 |
-|---|---|
-| `列表<T>` | 陣列 |
-| `表格<K,V>` | map |
-| `副本<T>` | set |
-| `承諾<T>` | promise |
-| `游標<T>` | iterator |
-| `tensor<T, Figura>` | 具有靜態形狀的密集同質緩衝區 |
-| `vector<T, N>` | 固定寬度的數值向量 |
-| `matrix<T, [R, C]>` | 恰有兩個靜態維度的數值矩陣 |
-| `atomic<T>` | 儲存敏感的 atomic cell |
-| `sparsa<T, Figura>` | 具有靜態形狀的稀疏同質緩衝區 |
+| Family | Markers | Invalid example |
+| ------ | ------- | --------------- |
+| `numerus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64` | `numerus<f32>` → use `fractus<f32>` |
+| `fractus<W>` | `f16`, `f32`, `f64` | `fractus<i32>` → use `numerus<i32>`; `bf16` is deferred |
+| `modulus<W>` | `u8`, `u16`, `u32`, `u64` | `modulus<i32>` → signed widths are not modular words |
 
-`Figura` := `_`、自然數、識別符或 `[` 形狀列表 `]`；空 `[]` 表示 rank-0。裸 `tensor<T>` 不完整：rank-0 使用 `tensor<T, []>`，推導形狀使用 `tensor<T, _>`。
+Bare `numerus` / `fractus` remain shorthand for `numerus<i64>` / `fractus<f64>`.
+`numerus<_>`, `fractus<_>`, `modulus<_>`, and `instans<_>` are marker holes:
+the family stays identity and only the width/precision is inferred from a
+same-family witness (exact marker, no lattice widening). Unsolved `_` is an
+error, never the bare default. Convert-hint holes (`numerus<u32, _>`) are
+not this form.
 
-`空值` 用於 `tensor<T, []>` 會產生 rank-0 tensor（含一個預設初始化的元素槽）。`空值` 用於任意形狀的 `sparsa<T, Figura>` 會產生沒有儲存項目的全零稀疏 tensor。`matrix<T, Figura>` 必須恰好有兩個維度；裸 `matrix<T>` 以及一維或三維形狀都會被拒絕。
+`modulus<W>` is a distinct semantic family: arithmetic does not mix implicitly
+with `numerus<W>`, while explicit same-width conversion remains available.
+Literals must be in `0..=2^W-1` (for `modulus<u64>` up to
+`18446744073709551615`). Shift counts are themselves modular: `x ⇐ W` is a
+full wrap. Cross-width modular arithmetic is rejected.
 
-`atomic<T>` 在 v1 只接受 `i32` 或 `u32`；atomic cell 不可與元素型別互換，必須使用 `load`、`store`、`exchange` 和 `compare_exchange` 接收者方法。多維 tensor 使用 `crea`、`structa` 或 `↦` 建構。`Type(...)` 不是建構形式：`vector<f32, 4>(...)`、`matrix<f32, [2, 2]>(...)`、`tensor<f32, [2, 2]>(...)` 以及 `numerus("42")` 等純量形式都會被拒絕。請使用 `value ↦ Type`、具名函式庫建構子或 `Genus { field = value }` 記錄。
+### Generic Collections
 
-Tensor 的索引／形狀 intrinsic 槽（`accipe`、`ponde`、`forma`、`crea`、`structa`）在呼叫點接受符合 `lista<numerus>`／`&[i64]` 執行期邊界的整數列表，例如 GPU thread id 可使用 `lista<u32>`，但不可使用 `lista<u64>`。這是限定於這些槽位的結構性例外，不會放寬有號與無號數值格。
+| Faber          | Meaning  |
+| -------------- | -------- |
+| `lista<T>`     | array    |
+| `lista<T, N>`  | proposed — not shipped; bounded array; `N` is a `尺寸` / `NATURAL` capacity, not a width marker. `lista<T, _>` is the capacity hole (infer `N`). |
+| `tabula<K,V>`  | map      |
+| `copia<T>`     | set      |
+| `promissum<T>` | promise  |
+| `cursor<T>`    | iterator |
+| `tensor<T, Figura>` | dense homogeneous buffer with static shape `Figura`; numeric methods require numeric element types |
+| `vector<T, N>` | register-class numeric vector with static width `N` (single dimension, not buffer-backed) |
+| `matrix<T, [R, C]>` | register-class numeric matrix with exactly two static dimensions (not buffer-backed and not a tensor alias) |
+| `atomic<T>` | storage-sensitive atomic cell; v1 accepts `i32` / `u32` elements only and access must go through atomic methods |
+| `sparsa<T, Figura>` | sparse homogeneous buffer with static shape `Figura`; omitted coordinates equal zero; numeric methods require numeric element types |
 
-值聯集使用 inline `T ∪ U`（可空形式：`T ∪ 無`）；標籤聯集使用 `分支聯集`。`副本.unio()` 是集合方法，不是型別建構子。`vacua` 是上下文相關的空集合標記，必須搭配明確集合型別。
+A `figura` is `_`, a natural number, a size identifier, or a bracketed list of nested figura values; empty `[]` is rank-0. Bare `tensor<T>` is incomplete — use `tensor<T, []>` for rank-0 or `tensor<T, _>` to infer shape.
 
-### 型別糖
+`vacua` for `tensor<T, []>` produces a rank-0 tensor (one default-initialized element slot).
+`vacua` for `sparsa<T, Figura>` (any shape) produces an all-zero sparse tensor with no stored entries.
+`matrix<T, Figura>` requires exactly two dimensions; bare `matrix<T>` and one- or three-axis matrix shapes are rejected.
+`atomic<T>` requires `T` to be `i32` or `u32` in v1. Atomic cells are not interchangeable with their element type; use `load`, `store`, `exchange`, and `compare_exchange` receiver methods.
+Construct multi-dimensional tensors via `crea` / `structa` / `↦`.
+`Type(...)` is not a construction form: `vector<f32, 4>(...)`, `matrix<f32, [2, 2]>(...)`, `tensor<f32, [2, 2]>(...)`, and scalar forms such as `numerus("42")` are rejected. Use `value ↦ Type`, named library constructors, or `Genus { field = value }` records.
 
-型別糖只在型別位置有效，與長格式語意相同。寬度標記為 `i8`、`i16`、`i32`、`i64`、`u8`、`u16`、`u32`、`u64`、`f16`、`f32`、`f64`。`lf32` 等表示列表，`tf32[2, 3]` 表示 tensor，`sf32[2, 3]` 表示 sparsa，`vf32[4]` 表示 vector，`mf32[4, 4]` 表示 matrix。matrix 必須指定兩個維度。`模數<W>` 沒有糖，請使用完整形式。
+Tensor index/shape intrinsic slots (`accipe`, `ponde`, `forma`, `crea`, `structa`) accept integer lists that fit the canonical `lista<numerus>` / `&[i64]` runtime boundary at call sites (e.g. `lista<u32>` for GPU thread ids; not `lista<u64>`). This is a structural exception scoped to those slots — it does not widen the signed↔unsigned numeric lattice (see Index vector parameter policy in `tensor-intrinsics.md`).
+
+Value unions use inline `T ∪ U` (nullable: `T ∪ 空`). The standalone `∪` hole infers a multi-member union; `_` infers a single inhabitant (see `docs/design/type-hole-union.md`). Tagged unions use `分支聯集`.
+`copia.unio()` is a set method, not a type constructor.
+
+### Type Sugar
+
+Explicit long forms such as `numerus<u32>` and `lista<numerus<u32>>` are the
+canonical spellings. Type sugar is an ergonomic alternate spelling for numeric
+and collection types. It is **type-position only** and **semantically identical**
+to the long form — the compiler treats both the same. This is the single
+canonical reference for sugar; the rest of the specification uses long form.
+
+Sugar combines a width marker with an optional one-letter family prefix. Width
+markers are `i8`/`i16`/`i32`/`i64` (signed), `u8`/`u16`/`u32`/`u64` (unsigned),
+and `f16`/`f32`/`f64` (float). A bare width marker (no prefix) sugars the scalar
+numeric type; a family prefix sugars a collection of that width. In the grammar,
+`WIDTH_MARKER` is a bare marker; `LISTA_WIDTH_SUGAR`, `TENSOR_WIDTH_SUGAR`,
+`SPARSA_WIDTH_SUGAR`, `VECTOR_WIDTH_SUGAR`, and `MATRIX_WIDTH_SUGAR` are that
+marker prefixed with `l`, `t`, `s`, `v`, and `m`, respectively.
+
+| Sugar | Long form | Bracket rule |
+| ----- | --------- | ------------ |
+| `i8` … `u64`, `f16`/`f32`/`f64` | `numerus<W>`, `fractus<W>` | none (bare marker) |
+| `lf32`, `lu32`, `li64`, … | `lista<f32>`, `lista<u32>`, `lista<i64>`, … | none |
+| `tf32`, `tf32[2, 3]`, `ti64[N]` | `tensor<f32, _>`, `tensor<f32, [2, 3]>`, `tensor<i64, [N]>` | optional `Figura` |
+| `sf32`, `sf32[2, 3]`, `si64[N]` | `sparsa<f32, _>`, `sparsa<f32, [2, 3]>`, `sparsa<i64, [N]>` | optional `Figura` |
+| `vf32`, `vf32[4]`, `vu32[3]` | `vector<f32, _>`, `vector<f32, 4>`, `vector<u32, 3>` | optional single width |
+| `mf32[4, 4]`, `mf16[2, 2]`, `mu32[3, 3]` | `matrix<f32, [4, 4]>`, `matrix<f16, [2, 2]>`, `matrix<u32, [3, 3]>` | **required**, two dimensions |
+
+Bracket shapes: `[]` is rank-0, `[2, 3]` is a fixed shape, and no bracket infers
+the shape (`_`). Matrix requires exactly two dimensions. Sugar never uses `<>`.
+For non-width element types (e.g. `tensor<textus, [3]>`), use the full form.
+
+Sugar is reserved in type syntax only — value identifiers named `tf32`, `lf32`,
+etc. are unchanged.
+
+`modulus<W>` has no sugar; write `modulus<u32>` in full.
+
+**Spelling preference (author convention, not grammar):** general Faber code
+tends toward long form for readability; numeric/tensor-primary modules may
+prefer sugar. Choose per module or file.
 
 ---
 
-## 控制流程
+## Control Flow
 
-### 條件式
+### Conditionals
 
-```ebnf
-ifStmt     := '若' expression arm ('否則若' ifStmt | elseClause)?
-elseClause := '否則' elseArm
-arm        := (blockStmt | stmtBodyJoint statement) catchClause?
-elseArm    := (blockStmt | stmtBodyJoint statement) catchClause?
-```
 
-`則` 用於單一語句主體，例如 `則 傳回`、`則 拋出`、`則 崩潰`、`則 靜默`。`靜默` 是明確 no-op。
+- `若` = if, `否則若` = else-if, `否則` = else
+- `則` for one-statement bodies, including `則 傳回`, `則 拋出`, `則 崩潰`, and `則 靜默` (`∴` is not accepted here)
+- `靜默` for explicit no-op (from musical notation: "it is silent")
 
-### 迴圈
+### Loops
 
-```ebnf
-whileStmt  := '當' expression (blockStmt | stmtBodyJoint statement) catchClause?
-iteraStmt  := '遍歷' (('取自' | '從') expression | '自' expression) ('定值' | '變值') IDENTIFIER (blockStmt | stmtBodyJoint statement) catchClause?
-```
 
-`遍歷 取自 ... 定值` 是 for-of；`遍歷 從 ... 定值` 是 for-in；`遍歷 自 range 定值 i` 是範圍迭代。`每` 屬於範圍運算式。
+- `當` = while
+- `遍歷 取自...定值`/`遍歷 取自...變值` = for-of (values)
+- `遍歷 從...定值`/`遍歷 從...變值` = for-in (keys)
+- `遍歷 範圍 range 定值/變值 i` = range iteration (e.g. `遍歷 範圍 0‥10 每 2 定值 i { 註記 i }`; `每` belongs to the range expression)
 
-### Switch / Match
+### Switch/Match
 
-```ebnf
-eligeStmt    := '選擇' expression '{' eligeCase* defaultCase? '}' catchClause?
-eligeCase    := '分支' expression (blockStmt | stmtBodyJoint statement)
-defaultCase  := '預設' (blockStmt | stmtBodyJoint statement)
-discerneStmt := '比對' '全部'? discriminants '{' variantCase* defaultCase? '}'
-discriminants := expression (',' expression)*
-variantCase  := '分支' patterns (blockStmt | stmtBodyJoint statement)
-patterns     := pattern ((',' | '且') pattern)*
-pattern      := '_' | literal | (IDENTIFIER patternBind?)
-patternBind  := ('作為' IDENTIFIER) | (('定值' | '變值') patternBinding (',' patternBinding)*)
-patternBinding := IDENTIFIER ('作為' IDENTIFIER)?
-```
 
-### 守衛與資源
+### Pattern Matching
 
-```ebnf
-guardStmt   := '守衛' '{' guardClause+ '}'
-guardClause := '若' expression (blockStmt | stmtBodyJoint statement)
-curaStmt    := '資源' STRING ('定值' | '變值') typeAnnotation IDENTIFIER blockStmt catchClause?
-```
 
-### 解構擷取與控制轉移
+### Guards
 
-```ebnf
-extractStmt   := '取自' expression ('定值' | '變值') extractFields
-extractFields := extractField (',' extractField)* (',' restField)? | restField
-extractField  := IDENTIFIER ('作為' IDENTIFIER)?
-restField     := '其餘' IDENTIFIER
-returnStmt   := '傳回' expression?
-breakStmt    := '中斷'
-continueStmt := '繼續'
-noopStmt     := '靜默'
-```
+
+### Resource Management
+
+
+### Destructuring Extraction
+
+
+### Control Transfer
+
+
+- `等返` awaits a compatible promise and returns its success value from a
+  `異步` function.
+- `等棄` awaits a compatible promise to completion and discards any success
+  value.
+- `讓出` is statement-initial yield from `流` / `異流`; it is not an
+  expression-form await.
 
 ---
 
-## 錯誤處理
+## Error Handling
 
-```ebnf
-throwStmt   := ('拋出' | '崩潰') expression ['若' expression]
-catchClause := '捕捉' IDENTIFIER blockStmt
-assertStmt  := '斷言' expression ('崩潰' expression)?
-requiritStmt := '需要' expression '拋出' expression
-```
 
-`捕捉` 可附加於結構化語句與條件分支，不可附加於任意裸區塊。`執行 { ... } 捕捉 err { ... }` 是標準的區域復原錯誤邊界。`嘗試` 與 `最後` 是舊語法並會被遷移診斷拒絕。`拋出` 可復原；`崩潰` 是致命錯誤。`拋出 value 若 condition` 會在解析時展開為條件式。
+- `捕捉` attaches to the structured forms whose productions name `catchClause`: conditional arms, `當`, `遍歷`, `選擇`, `資源`, and `執行`. It does not attach to arbitrary bare blocks.
+- Use the explicit do block when a standalone block needs a handler: `執行 { ... } 捕捉 err { ... }`.
+- `拋出` = throw (recoverable), `崩潰` = panic (fatal).
+- A same-line `若 <expr>` guard on `拋出` and `崩潰` is line-sensitive parser sugar: `拋出 val 若 cond` desugars to `若 cond { 拋出 val }` at parse time. Its canonical, compression-safe spelling is the expanded `若` block. A source compressor must expand this sugar before removing line breaks; the guarded shorthand remains under language review.
+- `斷言` is a runtime invariant check. It desugars conceptually to `崩潰 "msg" 若 !cond`, with the positive condition kept in source form and the inversion applied during lowering. The optional particle is `崩潰` (en `panic`): `斷言 cond 崩潰 msg` / `assert cond panic msg`. Bare `斷言 cond` stays legal. An `斷言` failure is fatal and uncatchable by `捕捉` (it lowers to a panic, not a `Result`-channel error); in test context the harness isolates each `測試` so a failed assertion ends that test without ending the suite.
+- `需要` is the recoverable require statement (en surface `require … throw …`), the typed-error-channel twin of `斷言`. `需要 cond 拋出 err` desugars to `若 非 (cond) { 拋出 err }` at lowering; the thrown value enters the function's `⇥ E` channel and is catchable by `捕捉`/`執行`, unlike `斷言` (fatal). A `需要` statement in a `⇥`-less function is a compile error, same as `拋出`. The particle is `拋出` (en `throw`) and is required.
 
 ---
 
-## 運算式
+## Expressions
 
-### 運算子（由低至高）
+### Operators (by precedence, lowest to highest)
 
-```ebnf
-expression := assignment
-assignment := ternary ('←' assignment | '↤' assignment inlineRecovery?)?
-incDecStmt := place ('↑' | '↓')
-ternary    := or (('?' expression ':' | '如此' expression '否則') ternary)?
-or         := and (('或') and)*
-and        := equality (('且') equality)*
-equality   := comparison (('≡' | '≠' | '≈' | '≉' | '是' | '非' '是') comparison)*
-comparison := bitwiseOr (('<' | '>' | '≤' | '≥' | '內含' | '之間') bitwiseOr)*
-bitwiseOr  := bitwiseXor ('∨' bitwiseXor)*
-bitwiseXor := bitwiseAnd ('⊻' bitwiseAnd)*
-bitwiseAnd := shift ('∧' shift)*
-shift      := range (('⇐' | '⇒') range)*
-range      := additive (('‥' | '…' | '之前' | '直到') additive ('每' additive)?)?
-additive   := multiplicative (('+' | '-') multiplicative)*
-multiplicative := coalesce (('*' | '/' | '%') coalesce)*
-coalesce   := unary ('或取' velRhs)*
-velRhs     := unary (('‥' | '…' | '之前' | '直到') unary ('每' unary)?)?
-unary      := ('-' | '¬' | '非' | '讓出' | '虛構') unary | cast
-cast       := call ('∷' typeAnnotation | conversio)*
-conversio  := '↦' typeAnnotation typeParams? inlineRecovery?
-inlineRecovery := '⇥' unary
-```
 
-`↤` 是定向轉換賦值：先求右側值，透過 `↦` 路徑轉換為左側位置的靜態型別，再賦值。`⇥` 內聯恢復僅在 `↤` 上合法，不允許接在 `←` 之後。
+**Conversion-directed assignment (`↤` / conversio-assign):** `place ↤ value`
+evaluates the right side, converts it to the statically known type of the left
+place through the existing `↦` route, then assigns. It binds at the same
+precedence as `←` and is right-associative; `⇥ inlineRecovery` is **legal only
+on `↤`** — a `⇥` recovery after ordinary `←` is rejected, and in a
+right-associated `↤` chain the recovery attaches to the nearest `↤`. The
+operator is preserved verbatim through syntax and emission; it is never
+rewritten to `←` or `↦`. Typed `定值`/`變值` initializers accept `↤`
+(convert to the written type, then initialize); `定值 _`, `設為`, and untyped
+destructuring have no concrete destination and are rejected.
 
-`∴` 不在上述運算子文法中，永遠只表示 clausura joint。`∷` 是編譯期靜態型別標註；`↦` 是會執行實際解析或轉換的執行期運算子。`⇥` 可在轉換目標後提供同型別的復原值。`或取` 是 nullable elimination，不是邏輯 OR。
+`是` and `非 是` inspect an existing value; they never convert it. Core type
+spellings on the right perform runtime variant/type tests, while `空`,
+`真`, `假`, and ordinary value expressions use the value-test path. Radix
+currently recognizes type targets through a fixed core-type vocabulary. Extending
+that recognition to arbitrary declared types is a separate language decision.
+Use `≡` / `≠` for structural value equality and `↦` for runtime conversion.
 
-### 呼叫與成員存取
+Retired predicate keywords are not prefix unary syntax. Use `expr 是 真`,
+`expr 是 假`, `expr 是 空`, `expr 非 是 空`, `expr ≺ 0`, or
+`expr ≻ 0`.
 
-```ebnf
-call          := primary (callSuffix | memberSuffix | optionalSuffix | nonNullSuffix)*
-callSuffix    := typeArgs? '(' argumentList ')'
-memberSuffix  := '.' IDENTIFIER | '[' expression ']'
-optionalSuffix := '?.' IDENTIFIER | '?[' expression ']' | '?(' argumentList ')'
-nonNullSuffix := '!.' IDENTIFIER | '![' expression ']' | '!(' argumentList ')'
-argumentList  := (argument (',' argument)*)?
-argument      := '展開'? expression
-```
+**Static type ascription (`∷` / verte):**
 
-### 字串與範本字面值
+The `∷` glyph (U+2237, "proportion") explicitly ascribes a target type to an expression. Use it when the source expression already exists and the compiler needs a static target shape:
 
-Faber 使用分隔符語意；每種引號形式都代表不同的來源形狀。
+- Primitive/alias → cast (no runtime effect): `data ∷ textus` → TypeScript: `(data as string)`
+- Built-in collection → target-shaped collection value: `[1, 2, 3] ∷ lista<numerus>`
+- Variant expression → enum/interface target ascription: `虛構 Click { x = 10 } ∷ Event`
 
-| 形式 | 型別 | 用途 |
-|---|---|---|
-| `'...'` | `ascii` | 固定機器 token |
-| `"..."` | `文字` | 短 Unicode 行字串 |
-| `«...»` | `文字` | 區塊或多行 Unicode 字串 |
-| `` `...` `` | `forma` | 擷取範本 |
-| `{ ... }` | `json` | 編譯期 JSON 文件 |
-| `\|...\|` | `位元組` | 編譯期十六進位位元組 |
-| `"..." ↦ regex` | `regex` | 從文字轉換為編譯後模式 |
-| `[ ... ]` | `列表<T>` | Faber 列表 |
-
-Unicode 字串範本中的 `§` 是洞。`文字` 的格式範本呼叫會產生 `scriptum`；`forma` 會擷取文字與參數，不會立即渲染。
+Prefer typed construction for ordinary `類型` values and `vacua` for ordinary empty collection values:
 
 ```fab
-定值 _ 標籤 ← «inline»
-定值 _ 查詢 ← `select * from accounts where id = §`(accountId)
-定值 _ 簽章 ← |de ad be ef|
+fixum _ point ← Point { x = 10 }
+fixum lista<numerus> xs ← vacua
+```
+
+Only the `∷` glyph is accepted as the postfix static type-ascription operator. The Latin forms `qua`, `innatum`, and `novum` were aliases and have been removed (see verte-alias-clean-break).
+
+**Runtime conversion (`↦` / conversio):**
+
+The `↦` glyph (U+21A6, "rightwards arrow from bar") is the runtime value conversion operator. Unlike `∷` (compile-time cast), this performs actual parsing/conversion that can fail:
+
+- `"22" ↦ numerus` → Rust: `"22".parse::<i64>().unwrap()`
+- `"bad" ↦ numerus ⇥ 0` → Rust: `"bad".parse::<i64>().unwrap_or(0)`
+- `42 ↦ textus` → Rust: `42.to_string()`
+
+The second type argument of a `↦` target is the convert-hint slot. `Hex` / `Bin` / `Oct` / `Be` / `Le` are convert hints in that slot, not keywords and not new `baseType` productions. Target support is not a grammar production (see Target Support).
+
+- `"ff" ↦ numerus<i32, Hex>` — shipped; text parse at radix 16 (`Bin` = 2, `Oct` = 8). Hex/Bin/Oct text parse is unchanged by endian hints.
+- `octeti[lo‥hi] ↦ numerus<W, Be>` / `… ↦ numerus<W, Le>` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust, the MIR runner, Go, and TypeScript. TypeScript `i64`/`u64` stay fail-closed (JS number is not exact). English `int<W, Be>` is the same form. `octeti` itself has no endian; `bytes ↦ numerus<u32>` without `Be`/`Le` stays rejected. A short window fails (no pad).
+- `n ↦ octeti<N, Be>` / `… ↦ octeti<N, Le>` — proposed (not shipped); write convert after `octeti<N>` (`N` ∈ {2, 4, 8}). `Be`/`Le` stay Hex-slot hints, not a second capacity.
+
+Inline failure recovery uses `⇥` immediately after the conversio target (`↦ T ⇥ recovery-expr`). The unparenthesized recovery operand is a unary-precedence expression; parenthesize arithmetic, coalescing, ternary, or assignment recovery expressions. The recovery value must have type `T`.
+
+Using `或取` as conversio recovery is rejected with a migration diagnostic. `或取` is local nullable elimination only (`x 或取 y`, parameter defaults) — not logical `或`. A parenthesized conversio result may still combine with `或取` as ordinary defaulting.
+
+### Call and Member Access
+
+
+### String And Template Literals
+
+Faber uses **delimiter semantics**: each quote form means a different source shape.
+They are not interchangeable synonyms.
+
+| Form | Type | Role |
+| --- | --- | --- |
+| `'...'` | `ascii` | fixed machine tokens; no `§`; no `(...)` |
+| `"..."` | `textus` | short Unicode line strings; `(...)` renders |
+| `«...»` | `textus` | block/multiline Unicode; `(...)` renders |
+| `` `...` `` | `forma` | captured templates; `(...)` captures |
+| `{ ... }` | `json` | compile-time object-rooted JSON document (`:` inside) |
+| `\|...\|` | `octeti` | compile-time hex bytes |
+| `"..." ↦ regex` | `regex` | compiled pattern from text conversion |
+| `[ ... ]` | `lista<T>` | Faber list (not JSON array, not bytes) |
+
+`§` (U+00A7) is a template hole in Unicode forms (`"`, `«`, `` ` ``).
+§{label} names a hole with an identifier label; the label is unique within
+its template and may use a keyword spelling under the contextual law. Named
+holes are not available in `ascii` literals, where `§` remains forbidden.
+
+**Rendered templates** (`textus`): `"..."(...)` and `«...»(...)` lower to
+`格式文字("...", args...)`.
+
+**Captured templates** (`forma`): `` `...`(args) `` captures template text and
+parameters without rendering. Safe for bound SQL/URL payloads; do not use
+`«...»(...)` for that job.
+
+Block `textus` uses guillemets `«...»`. The heavy quotation-mark
+pair is retired (too visually close to `"` in many fonts).
+
+Implementation status (2026-06-30):
+
+- Shipped: `"..."`, `«...»` block `textus`, `'...'` → `ascii`, `` `...` `` → `forma`, `|...|` → `octeti`, `{ ... }` → `json`, and text/ascii `↦ regex`.
+- Pending factory delivery: slash-delimited `/.../` regex literals.
+
+Inline block example:
+
+```fab
+fixum _ tag ← «inline»
+```
+
+Multiline block example (newline after opening `«`):
+
+```fab
+fixum _ blob ← «
+    select id, email
+    from accounts
+»
+```
+
+Captured template example:
+
+```fab
+fixum _ q ← `select * from accounts where id = §`(accountId)
+```
+
+Octeti hex literal example:
+
+```fab
+fixum _ sig ← |de ad be ef|
+fixum _ hello ← |48 65 6c 6c 6f|
+```
+
+### Format-Template Application
+
+String literal call syntax is the canonical source form for format-template application:
+
+```fab
+"§{greet} world"(greet: "salve")
 "status: § (§)"(sample_status(), "ok")
-"hello world"[0‥5]
+"status: §1 (§0)"("ok", sample_status())
 ```
 
-對 `文字` 而言，方括號索引以 Unicode scalar 為單位。文字切片接受完整 range 形式，包括 `每`。
+The position law counts named and anonymous holes together in order of
+appearance: "§{greet} §" = `[greet: 0, anonymous: 1]`. Named labels are
+erased at lowering, so "§{greet} world"(greet: "salve") lowers identically
+to the positional form `"§ world"("salve")` and its canonical
+`格式文字("§ world", "salve")` form.
 
-對 `列表<T>` 而言，方括號索引是單一元素存取；索引必須是單一整數，不接受 range slice（要複製範圍請使用 `sectio(start, end)`）。列表方括號存取是**一般存取**，不是 nullable：回傳裸元素 `T`，越界時觸發陷阱。若需要 nullable 列表存取，使用 `xs.accipe(i) → T ∪ 無` 搭配 `或取`。
+This lowers to the compiler's `格式文字("...", args...)` form. Use the string-template form in ordinary source; reserve `格式文字(...)` for explicit desugaring examples and compiler-facing documentation.
 
-對 `tensor<T, Figura>` 而言，方括號索引是 tensor intrinsic 表面的語法糖：
+For `textus`, bracket indexing is Unicode-scalar based:
 
 ```fab
-vector[id]        # vector.accipe([id])
-vector[id] ← v    # vector.ponde([id], v)
-grid[[r, c]]      # grid.accipe([r, c])
-grid[[r, c]] ← v  # grid.ponde([r, c], v)
+# Produces "§".
+"Salve, §!"[7]
+# Produces "hello".
+"hello world"[0‥5]
+# Produces "hello world".
+"hello world"[0 usque 10]
+# Produces "ace".
+"abcdef"[0‥6 per 2]
 ```
 
-讀取回傳 `T ∪ 無`，與 `accipe` 一致；參與算術前請先使用 `或取` 或其他一般選項處理。rank-1 tensor 接受符合 tensor `i64` 執行期邊界的純量整數索引（拒絕 `u64`）。rank-N tensor 使用列表形狀的索引，例如 `[[r, c]]` 或繫結的 `lista<integer>` 值。`grid[r, c]` 不是語法；`memberSuffix` 的方括號內仍只有一個 `expression`。
+Text slices accept the full range form, including `每`.
 
-`位元組` 是位元組緩衝原語，不是陣列，因此不接受方括號索引（讀取或寫入）。位元組存取使用 `accipe`、`appende` 與 `longitudo` 方法；`accipe` 越界時回傳 nullable 值。對高密度位元組索引，內部可使用 `lista<numerus<u8>>`，並在邊界保留 `位元組`。
+For `lista<T>`, bracket indexing is a single-element access. The index must be
+one integer; range slices are not accepted (use `sectio(start, end)` for a
+copied range):
 
-### 基本運算式
-
-```ebnf
-primary := IDENTIFIER | NUMBER | STRING | ASCII_STRING | BACKTICK_STRING
-         | '自身' | '真' | '假' | '無'
-         | 'vacua' | arrayLiteral | jsonLiteral | typedConstructor
-         | adExpr
-         | '(' expression ')'
-adExpr    := '對' asciiLiteral adOpener?
-arrayLiteral := '[' argumentList? ']'
-jsonLiteral := '{' (jsonMember (',' jsonMember)* ','?)? '}'
-jsonMember  := STRING ':' jsonValue
-typedConstructor := typeAnnotation '{' fieldList? '}'
-fieldList := fieldInit (',' fieldInit)*
-fieldInit := ('展開' expression) | (fieldKey '=' expression) | IDENTIFIER
-fieldKey := IDENTIFIER | STRING | '[' expression ']'
-jsonValue := jsonObject | jsonArray | jsonString | jsonNumber | 'true' | 'false' | 'null'
-jsonObject := '{' (jsonMember (',' jsonMember)* ','?)? '}'
-jsonArray  := '[' (jsonValue (',' jsonValue)* ','?)? ']'
-jsonString := STRING
-jsonNumber := NUMBER
+```fab
+# Element at position i.
+xs[i]
+# Write element at position i.
+xs[i] ← v
 ```
 
-裸 `{ ... }` 是 JSON 文件。key 必須是帶引號的 JSON 字串，值只能是 JSON 常數。重複 key 會報錯。類型或變體建構使用 `Type { field = value }`，`=` 的 Faber grammar 保持不變。
+Lista bracket access is **plain**, not nullable: it returns the bare element
+`T` and traps on out-of-bounds. This differs from `tensor`, whose bracket read
+is `accipe` sugar and returns `T ∪ 空`. For nullable list access, use
+`xs.accipe(i) → T ∪ 空` with `或取`.
 
-### 特殊運算式
+For `tensor<T, Figura>`, bracket indexing is sugar over the tensor intrinsic
+surface:
 
-```ebnf
-fingeExpr     := '虛構' IDENTIFIER ('{' fieldList '}')? ('∷' IDENTIFIER)?
-praefixumExpr := '前綴' (blockStmt | '(' expression ')')
-formatStringExpr := STRING '(' argumentList ')'
-formaTemplateExpr := BACKTICK_STRING '(' argumentList ')'
-scriptumExpr  := '格式文字' '(' STRING (',' expression)* ')'
-legeExpr      := '讀取' '行'?
-regexFromText := (STRING | ASCII_STRING) '↦' 'regex'
+```fab
+# vector.accipe([id])
+vector[id]
+# vector.ponde([id], v)
+vector[id] ← v
+# grid.accipe([r, c])
+grid[[r, c]]
+# grid.ponde([r, c], v)
+grid[[r, c]] ← v
 ```
+
+Reads return `T ∪ 空`, matching `accipe`; use `或取` or another ordinary
+option-handling form before arithmetic. Rank-1 tensors accept scalar integer
+indices that fit the tensor `i64` runtime boundary (`u64` is rejected).
+Rank-N tensors use a list-shaped index expression such as `[[r, c]]` or a
+bound `lista<integer>` value. `grid[r, c]` is not syntax; `memberSuffix` still
+contains exactly one `expression` between brackets.
+
+For `octeti`, bracket indexing is a byte or an exclusive window:
+
+```fab
+# One byte → numerus<u8>. O(1). Traps on out-of-bounds.
+buf[i]
+# Exclusive window → octeti. Fully in bounds or fail (no short slice, no pad).
+buf[lo‥hi]
+```
+
+The index must be an integer or a range. A compile-time-provable out-of-range
+index on an octeti literal (`|從 端點 be ef|[0‥5]`) is a structured reject.
+Runtime out-of-bounds traps — the same trapping model as lista bracket access,
+not textus short-slice. Lista `[lo‥hi]` stays rejected.
+
+`octeti` is the endian host. Parse byte windows on the buffer
+(`buf[lo‥hi] ↦ numerus<W, Be|Le>`). Cross to a list once, for element work,
+via `octeti ↦ lista<numerus<u8>>` (representation change only; other element
+types fail closed). The reverse `lista<numerus<u8>> ↦ octeti` is live. Do not
+detour through `valor`. Lists stay for element work, not endian windows.
+
+### Primary Expressions
+
+`vacua` is a contextual empty-collection marker (identifier form, not a reserved keyword).
+Use it with an explicit collection type: `定值 lista<numerus> xs ← vacua` or `定值 tensor<fractus<f32>, []> t ← vacua`.
+
+
+`STRING` includes short strings delimited by `"` and block strings delimited by
+`«` and `»`. `'...'` (`ascii`) and backtick
+`` `...` `` (`forma`) are separate literal forms (see String And Template
+Literals above).
+
+A bare `{ ... }` now produces an object-rooted JSON document of type `json`:
+`{ "name": "Alice", "age": 30, "active": true }`. Keys are quoted JSON strings
+separated by `:`; values are JSON constants only. Duplicate keys are an error
+(second occurrence). Ascribing to `tabula<K,V>` lowers a real constant map.
+Use `↦ valor` for explicit widening to the broad dynamic carrier. Genus/variant
+construction `Type { field = expr }` uses the Faber `=` grammar unchanged.
+
+### Special Expressions
+
+
+`格式文字` and `讀取`/`行` are builtin claims that resolve to a user binding
+when the surface spelling is bound in scope (parameter, local, function, or any
+in-scope definition); otherwise they are the builtin. The same binding-wins rule
+applies to `格式文字`'s paren-claimed form and to the `vacua` empty-collection
+marker: builtin claims are defaults, not reservations.
+
+`虛構` variant construction accepts a qualified variant path
+(`虛構 pkg.Bonum { … }`), so an imported union's variants construct through
+the import alias, and the `∷` cast is a full type annotation
+(`∷ pkg.Exitus`) exactly as the general postfix ascription (uvf-u3).
+
+`∷` remains the general postfix ascription in `cast`. Rendered text templates
+(`STRING '(' argumentList ')'`) and captured `forma` templates
+(`BACKTICK_STRING '(' argumentList ')'`) use the ordinary call suffix. Regex
+construction uses the ordinary conversio grammar: `(STRING | ASCII_STRING) '↦'
+'regex'`.
+
+Slash-delimited regex literals are not active grammar yet. `/` lexes as the
+division operator, while `//` and `/* ... */` are rejected as invalid comments.
+Use `"..." ↦ regex` for compiled regex values.
 
 ---
 
-## 模式
+## Patterns
 
-```ebnf
-objectPattern  := '{' patternProperty (',' patternProperty)* '}'
-patternProperty := '其餘'? IDENTIFIER ('作為' IDENTIFIER)?
-arrayPattern   := '[' arrayPatternElement (',' arrayPatternElement)* ']'
-arrayPatternElement := '_' | '其餘'? IDENTIFIER
-```
 
 ---
 
-## 診斷
+## Diagnostics
 
-```ebnf
-outputStmt := ('註記' | '檢視' | '警告' | '寫出') expression (',' expression)*
-```
 
-`註記` 是中性的診斷 note，`檢視` 用於 debug 或 inspect，`警告` 用於 warn，`寫出` 是診斷通道拼寫。真正的輸出請使用目前標準函式庫方法。
+The scribe family (`註記`/`檢視`/`警告`/`寫出` — en `print`/`debug`/`warn`/`write`)
+claims the statement-initial position only when **not** immediately followed by
+`(`. `註記 expr` is the output statement; a statement-initial `註記(...)` is an
+expression statement whose callee is the identifier `註記` — a user function
+call, never the intrinsic.
 
-### 註解
+- `註記` = neutral diagnostic note, `檢視` = debug/inspect, `警告` = warn
+- `寫出` is a diagnostic channel spelling; use current stdlib methods for real output
 
-Faber 只接受**行註解**：`#` 延伸至行尾。`#` 必須是邏輯行上的第一個非空白 token；只略過前導 ASCII 空格與 tab，其他 Unicode 空白分隔符不會由 lexer 略過。同一行若在其他 token 後出現 `#`，會產生詞法錯誤：`# comments must start a line; move this comment above the code`。
+### Comments
 
-合法的行首註解會以前置 trivia 附加到下一個陳述式或宣告（見 comment-preservation）。字串、`ascii` 字面值、`forma` 範本與其他分隔字面值內的 `#` 都不是註解。
+Faber accepts **line comments only**: `#` through end of line. The `#` must be the
+first non-whitespace token on the logical line (optional leading ASCII spaces or
+tabs only — other Unicode space separators are not skipped by the lexer).
+A `#` that follows any other token on the same line is a **lex error** with the
+message `# comments must start a line; move this comment above the code`.
 
----
-
-## 入口點
-
-```ebnf
-incipitStmt  := '入口' blockStmt
-incipietStmt := '非同步入口' blockStmt
-```
-
-`入口` 是同步入口；`非同步入口` 是非同步入口。
-
----
-
-## 測試
-
-```ebnf
-probandumDecl := '測試規格' STRING probaModifier* '{' probandumBody '}'
-probandumBody := (praeparaBlock | probandumDecl | probaStmt)*
-probaStmt     := '測試' STRING probaModifier* blockStmt
-probaModifier := '略過' STRING | '未來' STRING | '僅限' | '標籤' STRING
-              | '時限' NUMBER | '測量' | '重複' NUMBER | '脆弱' NUMBER
-              | '需要' STRING | '僅限於' STRING
-praeparaBlock := ('準備' | '準備非同步' | '後置準備' | '後置準備非同步') '全部'? blockStmt
-```
+Valid line-start comments attach forward as `leading_trivia` on the following
+statement or declaration (see comment-preservation). `#` inside string literals,
+`ascii` literals, `forma` templates, and other delimited literals is **not** a
+comment.
 
 ---
 
-## CLI 框架
+## Entry Points
 
-```ebnf
-cliDecl       := annotation* (incipitStmt | funcDecl)
-cliAnnotation := cliProgramAnnotation | imperiumAnnotation | optioAnnotation | operandusAnnotation
-```
 
-Faber 支援建立 CLI 應用程式，並自動解析引數與產生 help。
+- `入口` = sync entry, `非同步入口` = async entry.
+- `引數` binds parsed command-line arguments; `出口` supplies the process exit expression. Their order is fixed by `entryHeader`.
+
+---
+
+## Testing
+
+
+---
+
+## CLI Framework
+
+CLI metadata uses the ordinary reachable `annotation* statementCore` grammar.
+The promoted `cli`, `imperium`, `optio`, and `operandus` families validate their
+own named-field schemas after parsing.
+
+Faber supports building CLI applications with automatic argument parsing and help generation.
+
+### CLI Entry Point
 
 ```fab
 @ cli "faber"
-@ optio verbose 長 "verbose" 型別 bivalens
-入口 引數 args {
-    # CLI 框架會自動解析引數
+@ optio verbose longum "verbose" typus bivalens
+incipit argumenta args {
+    # CLI framework automatically parses arguments
 }
 ```
+
+### CLI Options and Arguments
 
 ```fab
 @ imperium "deploy"
-@ optio target 短 "t" 長 "target" 型別 文字 說明 "部署目標"
-@ optio verbose 短 "v" 長 "verbose" 型別 布林 說明 "啟用詳細輸出"
-@ 位置引數 文字 file 說明 "要部署的檔案"
-函式 deploy() 引數 args {
-    # 引數會自動解析並傳入
+@ optio target brevis "t" longum "target" typus textus descriptio "Deployment target"
+@ optio verbose brevis "v" longum "verbose" typus bivalens descriptio "Enable verbose output"
+@ operandus textus file descriptio "File to deploy"
+functio deploy() argumenta args {
+    # Arguments automatically parsed and passed
 }
 ```
 
 ---
 
-## 能力呼叫
+## Capability Calls
 
-expression-form `對` 是唯一支援的 `ad` 表面。舊式具型別 `ad` 和區塊串流形式已在解析時拒絕。
+Expression-form `端點` is the only supported `端點` surface. Legacy typed
+`端點 "route" (args) → T { }` and statement-level stream blocks
+`端點 'route' { meus/tuus … }` are rejected at parse time.
 
-```ebnf
-adExpr        := '對' asciiLiteral adOpener?
-adOpener      := '(' expression ')'
-conversioExpr := expr '↦' typeAnnotation
-```
+The active `adExpr` production is defined under **Primary Expressions**. Its
+ordinary postfix `conversio` materializes the resulting conversation handle.
 
-- route 必須是 `asciiLiteral`，例如 `'solum:lege'`，不能使用雙引號 `STRING`。
-- opener 是可選的單一 `expression`，會作為 Request `data` 的 `valor`。
-- **運算式形式的 `對`** 不帶區塊；求值結果是 `sermo` 對話 handle。可使用 postfix `↦ T` 物化、指定給 `sermo`，或開啟即時方向 view：`s.meus<T>()`（輸出 `da`／`fini`）與 `s.tuus<T>()`（輸入 `accipe`／`cursor`／`exhauri`／`fini`）。輸入內容 frame 請使用 `s.tuus<T>().cursor()` 迭代，不要直接寫 `遍歷 取自 s.tuus<T>()`。
-- 已移除且會產生解析錯誤的表面：舊式具型別 `對 "route"`、區塊 `meus`／`tuus` 分支，以及陳述式層級的 `發出`。
-- 型別包括編譯器擁有的 `scrinium`、`status`，以及不透明的 `sermo` 對話 handle。
-- `sermo ↦ T` 會使用針對 `T` 的型別導向 collector，把輸入 frame 物化為單一 `T` 值。
+- Route: `ASCII_STRING` (`'僅限:讀取'`), not double-quoted `STRING`.
+- Opener: optional single `expression` → Request `data` as `valor`.
+- **Expression `端點`**: blockless; evaluates to a `sermo` conversation handle.
+  Use postfix `↦ T` (materialization), assign to `sermo`, or open live directional
+  views: `s.meus<T>()` (outbound `da` / `fini`) and `s.tuus<T>()` (inbound
+  `accipe` / `cursor` / `exhauri` / `fini`). Iterate inbound content frames with
+  `s.tuus<T>().cursor()`, not direct `遍歷 取自 s.tuus<T>()`.
+- **Removed (parse error):** legacy typed `端點 "route"` and block `meus`/`tuus` arms.
+- Types: compiler-owned `scrinium`, `status`; opaque `sermo` conversation handle.
+- `sermo ↦ T` materializes inbound frames into one value of type `T` using
+  the type-directed collector for `T`.
 
-詳見 [`docs/design/frame-stream-types.md`](docs/design/frame-stream-types.md)。
-
----
-
-## 集合操作
-
-舊的 `ab` 集合 pipeline DSL 已淘汰。篩選、切片與聚合應使用 `文字`、`列表`、`表格`、`副本` 方法與閉包。`prima`、`ultima` 是普通方法名稱；`ubi` 不是有效集合語法。`取自` 用於迭代與匯入。
+See [`docs/design/frame-stream-types.md`](docs/design/frame-stream-types.md).
 
 ---
 
-## Fac 區塊
+## Collection Operations
 
-```ebnf
-facBlockStmt := '執行' blockStmt catchClause? ('當' expression)?
-```
+The former `範圍` collection pipeline DSL is retired. Collection filtering,
+slicing, and aggregation are expressed through ordinary
+`textus`/`lista`/`tabula`/`copia` methods and closures instead of a
+grammar-level query expression. `textus`, `numerus`, `fractus`, `lista<T>`,
+`tabula<K,V>`, and `copia<T>` are compiler-owned core types; their method
+surfaces are not Norma declarations.
 
-`執行 { ... }` 執行一次作用域區塊。`執行 { ... } 捕捉 err { ... }` 是區域復原錯誤邊界。`執行 { ... } 當 condition` 是 post-test loop；postfix `當` 只附加到 `執行`。
+`prima` and `ultima` are ordinary method names, not transform keywords. `ubi` is
+not active collection syntax.
 
----
-
-## 目標支援
-
-目標支援不是文法的一部分。本文只定義語言；各編譯目標可降低的文法與 runtime policy 請參考 `EBNF_MATRIX.md` 與 target capability 文件。
-
----
-
-## 關鍵字參考
-
-文法中的關鍵字按宣告、控制流程、錯誤處理、非同步、端點、布林、物件、型別形狀、型別轉換、位元運算與診斷分類。`∴`、`∷`、`↦`、`⇥` 等 glyph 永遠不翻譯，也不應在 reader pack 中建立 glyph 別名。
-
-| 分類 | 讀者表面 | 說明 |
-|---|---|---|
-| 宣告 | `分支聯集`、`定值`、`函式`、`類型`、`介面`、`型別` | 宣告資料、函式、型別與契約 |
-| 控制流程 | `若` / `否則若` / `否則`、`當`、`遍歷`、`選擇` / `分支`、`比對` | 條件、迴圈、分派與模式比對 |
-| 錯誤處理 | `捕捉`、`斷言`、`需要`、`拋出`、`崩潰`、`執行` | 區域錯誤邊界與控制轉移 |
-| 非同步 | `@ 未來`、`@ 游標`、`讓出` | 非同步函式、產生器與上下文等待／讓出 |
-| 端點 | `對`、`發出` | `對` 是能力呼叫運算式；`發出` 已退役 |
-| 布林 | `真`、`假`、`或`、`且`、`非`、`是`、`或取` | 布林、比較與區域 nullable 消除 |
-| 物件 | `自身`、`虛構` | self 與 variant 建構 |
-| 形狀／轉換 | `∷`、`↦`、`⇥` | 靜態標註、執行期轉換與復原值 |
-| 位元 | `∧`、`∨`、`⊻`、`¬`、`⇐`、`⇒` | 位元 AND、OR、XOR、NOT 與移位 |
-| 診斷 | `註記`、`檢視`、`警告`、`寫出` | 診斷通道，不等同於一般輸出 |
+`取自` is used for iteration (`遍歷 取自 items 定值 x`) and imports (`匯入 取自 "path"`).
 
 ---
 
-## 關鍵語法規則
+## Fac Block
 
-1. 參數採型別優先：`函式 f(整數 n)`，不是名稱後置型別。
-2. 宣告採型別優先：`定值 文字 name`，不是 `name: 文字`。
-3. 迭代語句使用 `遍歷 取自/從 collection 定值/變值 item { }` 或 `遍歷 自 range 定值/變值 item { }`。
-4. 條件可加括號，但慣用形式是不加括號。
-5. 診斷關鍵字是語句，不是可呼叫值。
 
-## Reader pack glossary (machine extract)
+- `執行 { ... }` is the explicit `do` block and executes its body once.
+- `執行 { ... } 當 condition` is the post-test loop form; postfix `當` attaches only to `執行`, not arbitrary preceding blocks.
+- `捕捉` is an attachment shared by several structured forms, not a semantic mode owned by `執行`. A plain `執行` is often used when an otherwise unattached block needs a local handler: `執行 { ... } 捕捉 err { ... }`.
 
-### Keywords
-| Latin | Localized |
-|---|---|
-| discretio | 分支聯集 |
-| fixum | 定值 |
-| functio | 函式 |
-| genus | 類型 |
-| implendum | 待實作介面 |
-| importa | 匯入 |
-| modulus | 模數 |
-| ordo | 列舉 |
-| sit | 設為 |
-| typus | 型別 |
-| varia | 變值 |
-| abstractus | 抽象 |
-| ceteri | 其餘 |
-| curata | 管理 |
-| errata | 錯誤 |
-| exitus | 出口 |
-| generis | 靜態 |
-| iacit | 可拋|
-| immutata | 不變 |
-| interna | 內部 |
-| magnitudo | 尺寸 |
-| nexum | 綁定 |
-| optiones | 選項 |
-| prae | 前置 |
-| privata | 私有 |
-| protecta | 保護 |
-| publica | 公開 |
-| sponte | 可選 |
-| casu | 分支 |
-| ceterum | 預設 |
-| custodi | 守衛 |
-| discerne | 比對 |
-| dum | 當 |
-| elige | 選擇 |
-| ergo | 則 |
-| fac | 執行 |
-| itera | 遍歷 |
-| secus | 否則 |
-| si | 若 |
-| sic | 如此 |
-| sin | 否則若 |
-| perge | 繼續 |
-| redde | 傳回 |
-| rumpe | 中斷 |
-| tacet | 靜默 |
-| adfirma | 斷言 |
-| cape | 捕捉 |
-| cede | 讓出 |
-| iace | 拋出|
-| mori | 崩潰 |
-| clausura | 閉包 |
-| falsum | 假 |
-| nihil | 空|
-| verum | 真 |
-| aut | 或 |
-| est | 是 |
-| et | 且 |
-| non | 非 |
-| vel | 或取 |
-| ego | 自身 |
-| finge | 虛構 |
-| implet | 實作 |
-| sub | 子 |
-| mone | 警告 |
-| nota | 註記 |
-| scribe | 寫出 |
-| vide | 檢視 |
-| argumenta | 引數 |
-| cura | 資源 |
-| incipiet | 非同步入口 |
-| incipit | 入口 |
-| ad | 端點|
-| de | 從 |
-| ex | 取自 |
-| in | 傳入 |
-| lege | 讀取 |
-| lineam | 行 |
-| omnia | 全部 |
-| praefixum | 前綴 |
-| scriptum | 格式文字 |
-| sparge | 展開 |
-| ut | 作為 |
-| ante | 之前 |
-| inter | 之間 |
-| intra | 內含 |
-| per | 每 |
-| usque | 直到 |
-| fragilis | 脆弱 |
-| futurum | 未來 |
-| metior | 測量 |
-| omitte | 略過 |
-| postpara | 後置準備 |
-| postparabit | 後置準備非同步 |
-| praepara | 準備 |
-| praeparabit | 準備非同步 |
-| proba | 測試 |
-| probandum | 測試規格 |
-| repete | 重複 |
-| requirit | 需要 |
-| solum | 僅限 |
-| solum_in | 僅限於 |
-| tag | 標籤 |
-| temporis | 時限 |
-| negativum | 負 |
-| nonnihil | 非空 |
-| nonnulla | 若干 |
-| nulla | 可空|
-| positivum | 正 |
+---
 
-### Types
-| Latin | Localized |
-|---|---|
-| ascii | ascii |
-| textus | 文字 |
-| numerus | 整數 |
-| modulus | 模數 |
-| fractus | 小數 |
-| bivalens | 布林 |
-| nihil | 無 |
-| vacuum | 空值 |
-| numquam | 永不 |
-| ignotum | 未知 |
-| octeti | 位元組 |
-| regex | 正規表示式 |
-| json | JSON |
-| valor | 值 |
-| instans | 執行個體 |
-| objectum | 物件 |
-| quidlibet | 任意值 |
-| lista | 列表 |
-| tabula | 表格 |
-| copia | 副本 |
-| promissum | 承諾 |
-| cursor | 游標 |
+## Target Support
 
-### Glossary changes vs existing pack
-| Latin | Old pack | New (this EBNF) | Why |
-|---|---|---|---|
-| functio | 函式 | 函式 | 保留既有繁體用語。 |
-| fixum | 常數 | 定值 | 與不可變 binding 的語意一致，避免與數學常數混淆。 |
-| sin | 否則如果 | 否則若 | 臺灣技術文件較自然，且保持單一 token。 |
-| secus | 否則 | 否則 | 保留既有用語。 |
-| redde | 傳回 | 傳回 | 保留既有用語。 |
-| nota | 顯示 | 註記 | 與診斷 note 的語意一致，不與一般輸出混淆。 |
-| textus | 文字 | 文字 | 保留既有用語。 |
-| numerus | 整數 | 整數 | 保留既有用語。 |
+Target support is **not** part of the grammar — this file defines only the
+language. For which grammar each compilation target lowers, and the runtime
+policy around it, see:
+
+- [`EBNF_MATRIX.md`](EBNF_MATRIX.md) — generated grammar×target lowerability matrix (the official rows).
+- [`docs/design/target-capability-matrix.md`](docs/design/target-capability-matrix.md) — runtime/contract policy (erase/warn/defer), pipeline routing, per-target contracts.
+
+---
+
+## Critical Syntax Rules
+
+1. **Type-first parameters**: `函式 f(numerus x)` NOT `函式 f(x: numerus)`
+2. **Type-first declarations**: `定值 textus name` NOT `定值 name: textus`
+3. **Iteration loops**: `遍歷 取自/從 collection 定值/變值 item { }` or `遍歷 範圍 range 定值/變值 item { }` (verb-first, source, then binding)
+4. **Parentheses around conditions are valid but not idiomatic**: prefer `若 x ≻ 0 { }` or `若 flag 是 真 { }` over `若 (x ≻ 0) { }`
+5. **Scribe-family keywords claim statement-initial position only when not followed by `(`** — `註記 x` is the output statement; a statement-initial `註記(x)` is a call to the identifier `註記`

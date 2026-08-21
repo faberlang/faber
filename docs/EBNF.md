@@ -1533,7 +1533,7 @@ They are not interchangeable synonyms.
 | `[ ... ]` | `lista<T>` | Faber list (not JSON array, not bytes) |
 
 `§` (U+00A7) is a template hole in Unicode forms (`"`, `«`, `` ` ``).
-`§{label}` names a hole with an identifier label; the label is unique within
+§{label} names a hole with an identifier label; the label is unique within
 its template and may use a keyword spelling under the contextual law. Named
 holes are not available in `ascii` literals, where `§` remains forbidden.
 
@@ -1591,8 +1591,8 @@ String literal call syntax is the canonical source form for format-template appl
 ```
 
 The position law counts named and anonymous holes together in order of
-appearance: `"§{greet} §"` = `[greet: 0, anonymous: 1]`. Named labels are
-erased at lowering, so `"§{greet} world"(greet: "salve")` lowers identically
+appearance: "§{greet} §" = `[greet: 0, anonymous: 1]`. Named labels are
+erased at lowering, so "§{greet} world"(greet: "salve") lowers identically
 to the positional form `"§ world"("salve")` and its canonical
 `scriptum("§ world", "salve")` form.
 
