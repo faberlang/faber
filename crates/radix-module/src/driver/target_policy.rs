@@ -467,12 +467,6 @@ fn scan_rust_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             scan_rust_expr(&if_stmt.cond, file, diagnostics);
             scan_rust_if_body(&if_stmt.then, file, diagnostics);
             if let Some(catch) = &if_stmt.catch {
-                diagnostics.push(rust_target_exception_diagnostic(
-                    file,
-                    catch.span,
-                    "cape is not supported for Rust targets",
-                    "rust_target_cape_unsupported",
-                ));
                 scan_rust_block(&catch.body, file, diagnostics);
             }
             if let Some(else_) = &if_stmt.else_ {
@@ -483,12 +477,6 @@ fn scan_rust_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             scan_rust_expr(&while_stmt.cond, file, diagnostics);
             scan_rust_if_body(&while_stmt.body, file, diagnostics);
             if let Some(catch) = &while_stmt.catch {
-                diagnostics.push(rust_target_exception_diagnostic(
-                    file,
-                    catch.span,
-                    "cape is not supported for Rust targets",
-                    "rust_target_cape_unsupported",
-                ));
                 scan_rust_block(&catch.body, file, diagnostics);
             }
         }
@@ -496,12 +484,6 @@ fn scan_rust_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             scan_rust_expr(&iter_stmt.iterable, file, diagnostics);
             scan_rust_if_body(&iter_stmt.body, file, diagnostics);
             if let Some(catch) = &iter_stmt.catch {
-                diagnostics.push(rust_target_exception_diagnostic(
-                    file,
-                    catch.span,
-                    "cape is not supported for Rust targets",
-                    "rust_target_cape_unsupported",
-                ));
                 scan_rust_block(&catch.body, file, diagnostics);
             }
         }
@@ -644,12 +626,6 @@ fn scan_rust_else(clause: &SecusClause, file: &str, diagnostics: &mut Vec<Diagno
             scan_rust_expr(&stmt.cond, file, diagnostics);
             scan_rust_if_body(&stmt.then, file, diagnostics);
             if let Some(catch) = &stmt.catch {
-                diagnostics.push(rust_target_exception_diagnostic(
-                    file,
-                    catch.span,
-                    "cape is not supported for Rust targets",
-                    "rust_target_cape_unsupported",
-                ));
                 scan_rust_block(&catch.body, file, diagnostics);
             }
             if let Some(else_) = &stmt.else_ {
@@ -659,24 +635,12 @@ fn scan_rust_else(clause: &SecusClause, file: &str, diagnostics: &mut Vec<Diagno
         SecusClause::Block { body, catch, .. } => {
             scan_rust_block(body, file, diagnostics);
             if let Some(catch) = catch {
-                diagnostics.push(rust_target_exception_diagnostic(
-                    file,
-                    catch.span,
-                    "cape is not supported for Rust targets",
-                    "rust_target_cape_unsupported",
-                ));
                 scan_rust_block(&catch.body, file, diagnostics);
             }
         }
         SecusClause::Stmt { stmt, catch, .. } => {
             scan_rust_stmt(stmt, file, diagnostics);
             if let Some(catch) = catch {
-                diagnostics.push(rust_target_exception_diagnostic(
-                    file,
-                    catch.span,
-                    "cape is not supported for Rust targets",
-                    "rust_target_cape_unsupported",
-                ));
                 scan_rust_block(&catch.body, file, diagnostics);
             }
         }

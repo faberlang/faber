@@ -51,26 +51,38 @@ fn rust_fac_cape_does_not_emit_unsupported_error() {
 }
 
 #[test]
-fn rust_si_with_cape_emits_unsupported_error() {
+fn rust_si_with_cape_has_no_unsupported_error() {
     let (program, _) = parse_program("functio f() → vacuum { si verum { } cape err { tacet } }\n");
     let errors = collect_rust_unsupported_errors(&program, "test.fab");
     assert!(
         errors
             .iter()
-            .any(|e| e.issue() == Some("rust_target_cape_unsupported")),
-        "expected rust_target_cape_unsupported error, got: {errors:?}"
+            .all(|e| e.issue() != Some("rust_target_cape_unsupported")),
+        "si cape should emit; got: {errors:?}"
     );
 }
 
 #[test]
-fn rust_dum_with_cape_emits_unsupported_error() {
+fn rust_dum_with_cape_has_no_unsupported_error() {
     let (program, _) = parse_program("functio f() → vacuum { dum verum { perge } cape err { tacet } }\n");
     let errors = collect_rust_unsupported_errors(&program, "test.fab");
     assert!(
         errors
             .iter()
-            .any(|e| e.issue() == Some("rust_target_cape_unsupported")),
-        "expected rust_target_cape_unsupported error, got: {errors:?}"
+            .all(|e| e.issue() != Some("rust_target_cape_unsupported")),
+        "dum cape should emit; got: {errors:?}"
+    );
+}
+
+#[test]
+fn rust_itera_with_cape_has_no_unsupported_error() {
+    let (program, _) = parse_program("functio f() → vacuum { itera ex items fixum n { tacet } cape err { tacet } }\n");
+    let errors = collect_rust_unsupported_errors(&program, "test.fab");
+    assert!(
+        errors
+            .iter()
+            .all(|e| e.issue() != Some("rust_target_cape_unsupported")),
+        "itera cape should emit; got: {errors:?}"
     );
 }
 
@@ -88,13 +100,14 @@ fn rust_elige_with_cape_emits_unsupported_error() {
 
 #[test]
 fn rust_mixed_supported_and_unsupported_constructs() {
-    let (program, _) = parse_program("functio f() → vacuum { si verum { tacet } si verum { } cape err { tacet } }\n");
+    let (program, _) =
+        parse_program("functio f() → vacuum { si verum { tacet } elige 1 { casu 1 { tacet } } cape err { tacet } }\n");
     let errors = collect_rust_unsupported_errors(&program, "test.fab");
     assert!(
         errors
             .iter()
             .any(|e| e.issue() == Some("rust_target_cape_unsupported")),
-        "expected at least one unsupported error in mixed code, got: {errors:?}"
+        "expected remaining elige cape unsupported error, got: {errors:?}"
     );
 }
 
@@ -209,9 +222,9 @@ fn rust_unsupported_errors_are_empty_on_empty_entry_program() {
 
 #[test]
 fn rust_multiple_cape_constructs_each_reported() {
-    // Two separate cape constructs: one in si, one in dum — both should be reported.
+    // Remaining RC-3 sites: elige and cura still reject until those units land.
     let (program, _) = parse_program(
-        "functio f() → vacuum { si verum { } cape err { tacet } dum verum { perge } cape err { tacet } }\n",
+        "functio f() → vacuum { elige 1 { casu 1 { tacet } } cape err { tacet } cura \"arena\" fixum _ alloc { tacet } cape err { tacet } }\n",
     );
     let errors = collect_rust_unsupported_errors(&program, "test.fab");
     let cape_count = errors
@@ -220,6 +233,6 @@ fn rust_multiple_cape_constructs_each_reported() {
         .count();
     assert_eq!(
         cape_count, 2,
-        "expected two cape unsupported errors, got {cape_count}: {errors:?}"
+        "expected elige+cura cape unsupported errors, got {cape_count}: {errors:?}"
     );
 }
