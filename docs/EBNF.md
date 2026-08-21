@@ -79,6 +79,21 @@ Line-start `§` file directives were removed. Put file metadata in `+++`
 frontmatter instead. Inside quoted strings, `§` remains the string-template hole
 (see **Call and Member Access** below).
 
+### Comma separator law
+
+Every comma position is either required or forbidden. Optional commas do not
+exist.
+
+**Item lists** — homogeneous entries inside a bounded header (`lista` literals,
+call arguments, parameters, type argument lists, figura lists, field-init
+lists, `ordo` members, `discretio` variant lists, JSON members and array
+elements, annotation / import / nucleum fields, output statement lists) —
+require a comma between adjacent items and forbid one after the last.
+
+**Declaration blocks** — self-annotating declarations (statements, `genus`
+members, `implendum` methods, `discretio` payload fields) — contain no commas.
+Entries are trivia-delimited.
+
 ---
 
 ## Declarations
@@ -161,14 +176,14 @@ methodDecl   := 'functio' IDENTIFIER genericParams? '(' paramList ')' funcModifi
 annotation            := nucleumAnnotation | bracedAnnotation | annotationSugar
 annotationName        := ANNOTATION_NAME
 bracedAnnotation      := '@' annotationName '{' annotationFieldList? '}'
-annotationFieldList   := annotationField (',' annotationField)* ','?
+annotationFieldList   := annotationField (',' annotationField)*
 annotationField       := ANNOTATION_FIELD_NAME '=' (expression | typeAnnotation)
 annotationSugar       := '@' annotationName NON_NEWLINE_TOKEN* NEWLINE
 nucleumAnnotation     := nucleumSugar | nucleumBraced
 nucleumSugar          := '@' 'nucleum' nucleumModifier? NEWLINE
 nucleumBraced         := '@' 'nucleum' '{' nucleumFieldList? '}'
 nucleumModifier       := 'fragment'
-nucleumFieldList      := nucleumField (',' nucleumField)* ','?
+nucleumFieldList      := nucleumField (',' nucleumField)*
 nucleumField          := 'fragment' '=' ('verum' | 'falsum')
 ```
 
@@ -249,17 +264,21 @@ typeAliasDecl := 'typus' IDENTIFIER genericParams? '=' typeAnnotation
 ### Enums
 
 ```ebnf
-enumDecl   := 'ordo' IDENTIFIER '{' enumMember (',' enumMember)* ','? '}'
+enumDecl   := 'ordo' IDENTIFIER '{' enumMember (',' enumMember)* '}'
 enumMember := IDENTIFIER ('=' ('-'? NUMBER | STRING))?
 ```
 
 ### Tagged Unions
 
 ```ebnf
-discretioDecl := 'discretio' IDENTIFIER genericParams? '{' variant (',' variant)* ','? '}'
+discretioDecl := 'discretio' IDENTIFIER genericParams? '{' variant (',' variant)* '}'
 variant       := IDENTIFIER ('{' variantFields '}')?
-variantFields := (typeAnnotation IDENTIFIER (',' typeAnnotation IDENTIFIER)*)?
+variantFields := (typeAnnotation IDENTIFIER)*
 ```
+
+Variant lists are an item list: comma required between variants, forbidden
+after the last. Payload fields inside a variant are a declaration block
+(genus-style, no commas).
 
 ### Identifier Naming
 
@@ -294,7 +313,7 @@ mechanical verb trio `pange` / `solve` / `tempta` across modules — see
 ```ebnf
 importDecl     := importRecord | importSugar
 importRecord   := 'importa' '{' importFieldList? '}'
-importFieldList := importField (',' importField)* ','?
+importFieldList := importField (',' importField)*
 importField    := importSourceField | importVisibilityField | importNameField
                 | importAliasField | importWildcardField
 importSourceField := 'ex' '=' STRING
@@ -894,7 +913,7 @@ iunctaExpr := 'iuncta' typeArguments '[' argumentList? ']'
 # Bare `{ ... }` is a JSON document literal. Keys are quoted JSON strings separated
 # by `:`; values are JSON constants. Anonymous Faber objects (`{ key = expr }`)
 # are retired (literal-family Stage 6). Genus construction uses `typedConstructor`.
-jsonLiteral := '{' (jsonMember (',' jsonMember)* ','?)? '}'
+jsonLiteral := '{' (jsonMember (',' jsonMember)*)? '}'
 jsonMember  := STRING ':' jsonValue
 typedConstructor := typeAnnotation '{' fieldList? '}'
 fieldList := fieldInit (',' fieldInit)*
@@ -902,8 +921,8 @@ fieldInit := ('sparge' expression) | (fieldKey '=' expression) | IDENTIFIER
 fieldKey := IDENTIFIER | STRING | '[' expression ']'
 # JSON values: constants only (no Faber expressions, no variable references).
 jsonValue := jsonObject | jsonArray | jsonString | jsonNumber | 'true' | 'false' | 'null'
-jsonObject := '{' (jsonMember (',' jsonMember)* ','?)? '}'
-jsonArray  := '[' (jsonValue (',' jsonValue)* ','?)? ']'
+jsonObject := '{' (jsonMember (',' jsonMember)*)? '}'
+jsonArray  := '[' (jsonValue (',' jsonValue)*)? ']'
 jsonString := STRING
 # Numerus when no decimal point or exponent is present; otherwise Fractus.
 jsonNumber := NUMBER
