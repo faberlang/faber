@@ -643,7 +643,6 @@ fn batched_attention_contract(
     // and projections carry their packed layout immediately before the kind.
     let axes_base = args.len() - 5;
     let kind_index = axes_base - 1;
-    let base = axes_base;
     let kind_value = const_nonnegative_u64(args, kind_index, "attention kind")?;
     let (kind, rotate_half) = match kind_value {
         0 => (crate::kernel_plan::BatchedAttentionKind::ProjectionQ, false),
@@ -665,11 +664,11 @@ fn batched_attention_contract(
             )))
         }
     };
-    let kv_heads = const_u64(args, base, "kv_heads")?;
-    let q_per_kv = const_u64(args, base + 1, "q_per_kv")?;
-    let seq = const_u64(args, base + 2, "sequence")?;
-    let head_dim = const_u64(args, base + 3, "head_dim")?;
-    let hidden = const_u64(args, base + 4, "hidden")?;
+    let kv_heads = const_u64(args, axes_base, "kv_heads")?;
+    let q_per_kv = const_u64(args, axes_base + 1, "q_per_kv")?;
+    let seq = const_u64(args, axes_base + 2, "sequence")?;
+    let head_dim = const_u64(args, axes_base + 3, "head_dim")?;
+    let hidden = const_u64(args, axes_base + 4, "hidden")?;
     if kv_heads == 0 || q_per_kv == 0 || seq == 0 || head_dim == 0 || hidden == 0 {
         return Err(MirAbiError::new("batched attention axes must be non-zero"));
     }
