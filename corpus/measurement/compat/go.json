@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 271,
-    "analyzable": 294
+    "capable": 275,
+    "analyzable": 298
   },
   "terms": [
     {
@@ -168,8 +168,8 @@
     {
       "term": "cape",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "⊻",
@@ -576,8 +576,8 @@
     {
       "term": "lista",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "manifest",
@@ -732,8 +732,8 @@
     {
       "term": "octeti",
       "rule": "keyword",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "implendum",
@@ -1068,8 +1068,8 @@
     {
       "term": "textus",
       "rule": "keyword",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "¬",

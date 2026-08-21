@@ -5,7 +5,7 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 245,
+    "capable": 246,
     "analyzable": 288
   },
   "terms": [
@@ -168,8 +168,8 @@
     {
       "term": "cape",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "⊻",
@@ -541,7 +541,7 @@
       "term": "instans",
       "rule": "keyword",
       "capable": 2,
-      "analyzable": 3
+      "analyzable": 2
     },
     {
       "term": "itera",

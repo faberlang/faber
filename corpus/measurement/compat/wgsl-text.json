@@ -169,7 +169,7 @@
       "term": "cape",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 2
     },
     {
       "term": "⊻",
@@ -541,7 +541,7 @@
       "term": "instans",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 3
+      "analyzable": 2
     },
     {
       "term": "itera",
