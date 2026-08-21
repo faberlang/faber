@@ -20,6 +20,7 @@ pub mod regex;
 pub mod sparsa;
 pub mod tensor;
 pub mod textus;
+pub mod textus_bounded;
 pub mod valor;
 
 pub use arena::{Arena, ArenaHandle};
@@ -48,6 +49,7 @@ pub use regex::Regex;
 pub use sparsa::Sparsa;
 pub use tensor::Tensor;
 pub use textus::unicode_scalar_value;
+pub use textus_bounded::{TextusN, TextusNOverflow};
 pub use valor::{FromValor, Valor};
 
 #[cfg(test)]
