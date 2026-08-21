@@ -1,10 +1,15 @@
 use serde::{Deserialize, Serialize};
 
 use super::distributed::FmirDistributedExecutionSection;
+use super::executor_plan::WireExecutorPlan;
 use super::wire::{
     WireDeviceProgram, WireInvocationMode, WireKvCacheLayout, WireSessionInput,
     WireSessionObservationCadence,
 };
+
+/// Version of the additive executor-plan section. WIRE v8 remains unchanged;
+/// this sibling section ratchets independently and fails closed on skew.
+pub const EXECUTOR_PLAN_SECTION_VERSION: u32 = 1;
 
 // ---------------------------------------------------------------------------
 // Device payload (N1.7 / architecture record §7)
@@ -26,6 +31,10 @@ pub struct FmirDeviceSection {
     /// Canonical backend-neutral device-program wire (N3.3): the typed
     /// COMPLETE device program, identical in both image formats (A10).
     pub device_program: FmirDeviceProgramSection,
+    /// Optional separately versioned executor-plan section. It is absent for
+    /// legacy/generated-only programs and old WIRE v8 payloads remain valid.
+    #[serde(default)]
+    pub executor_plan: Option<FmirExecutorPlanSection>,
     /// Backend selection request (from `--backend` / manifest / `auto`).
     pub selection: FmirDeviceSelection,
     /// Declared backend artifacts (Metal MSL, CUDA PTX) — each a versioned
@@ -77,6 +86,33 @@ pub struct FmirDeviceProgramSection {
     pub v: u32,
     /// The complete device program: kernels, launches, lifetime, results.
     pub program: WireDeviceProgram,
+}
+
+/// The separately versioned executor-plan section carried beside WIRE v8.
+/// It contains library entry, logical signature, binds, uniforms,
+/// offsets/strides, workspace, backend requirements, and provenance.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FmirExecutorPlanSection {
+    /// Executor-plan section version, admitted before field interpretation.
+    pub v: u32,
+    /// One selection for each kernel/schedule entry, in program order.
+    pub plans: Vec<WireExecutorPlan>,
+}
+
+impl FmirExecutorPlanSection {
+    /// Project the target-neutral MIR executor section onto its wire mirror.
+    #[must_use]
+    pub fn from_executor_plan(plan: &radix_mir::ExecutorPlanExtension) -> Self {
+        Self {
+            v: EXECUTOR_PLAN_SECTION_VERSION,
+            plans: plan
+                .selections
+                .iter()
+                .map(WireExecutorPlan::from_mir)
+                .collect(),
+        }
+    }
 }
 
 /// One declared host input for an input buffer (run data, not program

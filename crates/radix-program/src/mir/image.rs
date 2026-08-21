@@ -759,6 +759,20 @@ pub(super) fn fmir_image_decode_error(
             "fmir_image_device_program_invalid",
             format!("invalid device program in image: {detail}"),
         )],
+        FmirImageError::UnsupportedExecutorPlanSectionVersion { actual, expected } => vec![
+            mir_issue_diag(
+                path,
+                "fmir_image_executor_plan_section_version_unsupported",
+                format!("unsupported executor-plan section version {actual}; expected {expected}"),
+            )
+            .with_arg("actual", actual.to_string())
+            .with_arg("expected", expected.to_string()),
+        ],
+        FmirImageError::ExecutorPlanSectionInvalid { detail } => vec![mir_issue_diag(
+            path,
+            "fmir_image_executor_plan_section_invalid",
+            format!("invalid executor-plan section in image: {detail}"),
+        )],
         // MD2-W1: the distributed execution section is admitted fail-closed
         // at load; each failure class maps to a focused diagnostic.
         FmirImageError::UnsupportedDistributedSectionVersion { actual, expected } => vec![

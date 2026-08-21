@@ -18,9 +18,9 @@ use crate::schema::{
     packet_sha256_canonical, DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId,
     FmirArtifactReflection, FmirBinaryImageFile, FmirDeviceArtifact, FmirDeviceArtifactsSection,
     FmirDeviceBackend, FmirDeviceInput, FmirDeviceProgramSection, FmirDeviceSection,
-    FmirDeviceSelection, FmirDeviceSymbol, FmirReflectedKernel, FmirReflectedResource,
-    FmirTextCliRootSection, FmirTextCliSection, FmirTextImageFile, FmirTextProgramSection,
-    FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
+    FmirDeviceSelection, FmirDeviceSymbol, FmirExecutorPlanSection, FmirReflectedKernel,
+    FmirReflectedResource, FmirTextCliRootSection, FmirTextCliSection, FmirTextImageFile,
+    FmirTextProgramSection, FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
     FmirTextToolchainSection, FmirTextTypesSection, MaterializationStage, WireAxisReductionPlan,
     WireBinding, WireBroadcastDeclaration, WireBroadcastFact, WireBufferIdentity,
     WireBufferLifetime, WireBufferRole, WireBufferVersion, WireCausalMaskedSoftmaxPlan,
@@ -212,6 +212,7 @@ fn sample_device_section() -> FmirDeviceSection {
             v: WIRE_VERSION,
             program: sample_wire_program(),
         },
+        executor_plan: None,
         selection: FmirDeviceSelection::Auto,
         artifacts: FmirDeviceArtifactsSection {
             artifact: vec![
@@ -231,6 +232,27 @@ fn sample_device_section() -> FmirDeviceSection {
         // precedent).
         session: None,
     }
+}
+
+#[test]
+fn executor_plan_section_version_skew_fails_closed_before_field_admission() {
+    let mut section = sample_device_section();
+    section.executor_plan = Some(FmirExecutorPlanSection {
+        v: 2,
+        plans: Vec::new(),
+    });
+    let error = crate::schema::admit_device_section_with_compat(
+        &section,
+        &crate::schema::default_compatibility_table(),
+    )
+    .expect_err("executor-plan version skew must fail closed");
+    assert!(matches!(
+        error,
+        FmirImageError::UnsupportedExecutorPlanSectionVersion {
+            actual: 2,
+            expected: 1
+        }
+    ));
 }
 
 fn text_image_with_device(device: Option<FmirDeviceSection>) -> FmirTextImageFile {

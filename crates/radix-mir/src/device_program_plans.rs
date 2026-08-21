@@ -457,25 +457,175 @@ impl BindDescriptor {
     }
 }
 
+/// Versioned scalar types accepted by library-call uniforms.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UniformType {
+    /// IEEE-754 single precision value.
+    F32,
+    /// IEEE-754 half precision value, carried as its bit pattern.
+    F16,
+    /// Unsigned 32-bit integer.
+    U32,
+    /// Signed 32-bit integer.
+    I32,
+}
+
+/// One constant or runtime uniform supplied to a library body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UniformBinding {
+    /// Stable logical uniform name.
+    pub name: String,
+    /// Uniform scalar type.
+    pub ty: UniformType,
+    /// Raw little-endian bits (4 bytes for all current uniform types).
+    pub bits: u32,
+}
+
+/// One offset/stride fact for a bound view.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OffsetBinding {
+    /// Logical view name (for example `q`, `k`, `v`, or `output`).
+    pub name: String,
+    /// Element offset from the base allocation.
+    pub offset_elements: u64,
+    /// Physical element strides in logical axis order.
+    pub strides: Vec<u64>,
+}
+
+/// One typed buffer bind supplied to a library body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LibraryBind {
+    /// Stable logical view name.
+    pub name: String,
+    /// Device-program binding slot.
+    pub binding: Binding,
+    /// Logical dimensions of the view.
+    pub dims: Vec<u64>,
+    /// Physical element strides of the view.
+    pub strides: Vec<u64>,
+    /// Base element offset in the allocation.
+    pub offset_elements: u64,
+}
+
+/// Optional scratch/workspace allocation required by a library body.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WorkspaceBinding {
+    /// Required byte size.
+    pub bytes: u64,
+    /// Required byte alignment.
+    pub alignment: u32,
+}
+
+/// A backend capability required by a selected library body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BackendRequirement {
+    /// Backend identity, such as `metal`.
+    pub backend: String,
+    /// Capability or feature name.
+    pub feature: String,
+}
+
+/// Provenance for a plan compiler selection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlanProvenance {
+    /// Name of the pass that made the selection.
+    pub pass: String,
+    /// Revision of that pass's typed recognition rules.
+    pub revision: u32,
+    /// Canonical graph node identities consumed by the selection.
+    pub source_nodes: Vec<u32>,
+}
+
+/// The logical signature selected independently of emitted kernel syntax.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogicalSignature {
+    /// Stable library operation name.
+    pub operation: String,
+    /// Logical input view names.
+    pub inputs: Vec<String>,
+    /// Logical output view names.
+    pub outputs: Vec<String>,
+}
+
 /// One optional library selection and its launch bind facts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LibrarySelection {
-    /// Index into [`DeviceProgram`]`::kernels`.
+    /// Index into [`DeviceProgram`]`::kernels` or the compiled schedule.
     pub kernel_index: usize,
     /// The logical body selected by the executor. `None` retains the
     /// generated-kernel fallback for a recipe not yet owned by library v0.
     pub library_entry: Option<String>,
-    /// Shape/layout/grid facts supplied to the selected body.
+    /// The logical signature of the selected body.
+    pub logical_signature: LogicalSignature,
+    /// Primary shape/layout/grid facts supplied to the selected body.
     pub bind: BindDescriptor,
+    /// All named view binds. `bind` is retained as the primary launch view.
+    pub binds: Vec<LibraryBind>,
+    /// Constant/runtime scalar uniforms.
+    pub uniforms: Vec<UniformBinding>,
+    /// Explicit base offsets and physical strides.
+    pub offsets: Vec<OffsetBinding>,
+    /// Optional scratch allocation.
+    pub workspace: Option<WorkspaceBinding>,
+    /// Backend requirements that must be admitted before dispatch.
+    pub backend_requirements: Vec<BackendRequirement>,
+    /// Compiler provenance for audit and cache identity.
+    pub provenance: PlanProvenance,
 }
 
-/// M0-frozen additive executor-plan extension for library calls.
+/// M0-frozen additive executor-plan section for library calls. This section is
+/// versioned independently of WIRE v8; an unknown version fails closed before
+/// any selection field is interpreted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecutorPlanExtension {
-    /// Extension schema version.
+    /// Section schema version.
     pub abi_version: u16,
     /// Ordered selection/bind records, one per declared kernel.
     pub selections: Vec<LibrarySelection>,
+}
+
+impl ExecutorPlanExtension {
+    /// Validate the section against the program kernel count before a consumer
+    /// interprets any library selection.
+    pub fn validate_for_kernel_count(&self, kernel_count: usize) -> Result<(), String> {
+        if self.abi_version != EXECUTOR_PLAN_BIND_ABI_VERSION {
+            return Err(format!(
+                "executor-plan section version {} is not supported (expected {})",
+                self.abi_version, EXECUTOR_PLAN_BIND_ABI_VERSION
+            ));
+        }
+        if self.selections.len() != kernel_count {
+            return Err(format!(
+                "executor-plan selection count {} does not match kernel count {}",
+                self.selections.len(),
+                kernel_count
+            ));
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        for (position, selection) in self.selections.iter().enumerate() {
+            if selection.kernel_index != position || !seen.insert(selection.kernel_index) {
+                return Err(format!(
+                    "executor-plan kernel indices are not the ordered unique range at position {}",
+                    position
+                ));
+            }
+            if !selection.bind.is_well_formed() {
+                return Err(format!(
+                    "executor-plan selection {} has an invalid bind descriptor",
+                    position
+                ));
+            }
+            if selection.logical_signature.operation.is_empty()
+                || selection.provenance.pass.is_empty()
+            {
+                return Err(format!(
+                    "executor-plan selection {} has incomplete signature/provenance",
+                    position
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
 /// One typed buffer slot in a launch descriptor.
@@ -605,10 +755,22 @@ pub fn executor_plan_extension(program: &DeviceProgram) -> ExecutorPlanExtension
             .enumerate()
             .map(|(kernel_index, kernel)| {
                 let recipe = RecipeKind::from_plan(&kernel.plan);
+                let bind = bind_descriptor_for_kernel(kernel);
                 LibrarySelection {
                     kernel_index,
                     library_entry: library_entry_for_kernel(kernel, recipe),
-                    bind: bind_descriptor_for_kernel(kernel),
+                    logical_signature: logical_signature_for_kernel(kernel, recipe),
+                    binds: library_binds_for_kernel(kernel, &bind),
+                    uniforms: Vec::new(),
+                    offsets: offsets_for_kernel(kernel, &bind),
+                    workspace: None,
+                    backend_requirements: Vec::new(),
+                    provenance: PlanProvenance {
+                        pass: "device-program-plan".to_owned(),
+                        revision: EXECUTOR_PLAN_BIND_ABI_VERSION as u32,
+                        source_nodes: vec![kernel.function.0],
+                    },
+                    bind,
                 }
             })
             .collect(),
@@ -677,6 +839,66 @@ fn bind_dimensions(plan: &CollectionKernelPlan, output_extent: u64) -> (Vec<u64>
         | CollectionKernelPlan::SsmConv1d(_)
         | CollectionKernelPlan::SsmScan(_) => (vec![output_extent.max(1)], BindLayout::Flat),
     }
+}
+
+fn logical_signature_for_kernel(kernel: &KernelUnit, recipe: RecipeKind) -> LogicalSignature {
+    let inputs = kernel
+        .resources
+        .iter()
+        .filter(|resource| {
+            matches!(
+                resource.access,
+                MirKernelResourceAccess::Read | MirKernelResourceAccess::ReadWrite
+            )
+        })
+        .enumerate()
+        .map(|(index, _)| format!("input{index}"))
+        .collect();
+    let outputs = kernel
+        .resources
+        .iter()
+        .filter(|resource| {
+            matches!(
+                resource.access,
+                MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+            )
+        })
+        .enumerate()
+        .map(|(index, _)| format!("output{index}"))
+        .collect();
+    LogicalSignature {
+        operation: format!("{:?}", recipe),
+        inputs,
+        outputs,
+    }
+}
+
+fn library_binds_for_kernel(kernel: &KernelUnit, bind: &BindDescriptor) -> Vec<LibraryBind> {
+    kernel
+        .resources
+        .iter()
+        .enumerate()
+        .map(|(index, resource)| LibraryBind {
+            name: format!("buffer{index}"),
+            binding: resource.binding,
+            dims: bind.dims.clone(),
+            strides: bind.strides.clone(),
+            offset_elements: 0,
+        })
+        .collect()
+}
+
+fn offsets_for_kernel(kernel: &KernelUnit, bind: &BindDescriptor) -> Vec<OffsetBinding> {
+    kernel
+        .resources
+        .iter()
+        .enumerate()
+        .map(|(index, _)| OffsetBinding {
+            name: format!("buffer{index}"),
+            offset_elements: 0,
+            strides: bind.strides.clone(),
+        })
+        .collect()
 }
 
 fn library_entry_for_kernel(kernel: &KernelUnit, recipe: RecipeKind) -> Option<String> {
