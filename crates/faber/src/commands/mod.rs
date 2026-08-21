@@ -59,6 +59,9 @@ use targets::cmd_targets;
 #[cfg(feature = "runner")]
 use test::cmd_test;
 
+pub(crate) const PACKAGE_CHECK_MESSAGE: &str =
+    "error: package checking is owned by the `faber` tool; rerun with `faber check --package`";
+
 fn diagnostic_mode(enabled: bool) -> DiagnosticMode {
     if enabled {
         DiagnosticMode::Diagnostics
@@ -370,7 +373,9 @@ fn cmd_inspect_cli_ir(input: &[String]) {
 
 fn cmd_check_file(command: CheckCommand) {
     if command.package {
-        eprintln!("error: package checking is owned by the `faber` tool; rerun with `faber check --package`");
+        // Cross-reference: must stay verbatim with
+        // crates/radix-cli/src/commands/check.rs `PACKAGE_CHECK_MESSAGE`.
+        eprintln!("{PACKAGE_CHECK_MESSAGE}");
         std::process::exit(1);
     }
     let (name, source) = read_source(&command.input);

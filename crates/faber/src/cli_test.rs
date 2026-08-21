@@ -1053,6 +1053,37 @@ fn check_long_help_discloses_library_resolution() {
 }
 
 #[test]
+fn check_long_help_states_check_ownership_split() {
+    let mut command = Cli::command();
+    let check = command
+        .find_subcommand_mut("check")
+        .expect("check subcommand");
+    let help = check.render_long_help().to_string();
+    let help_line = help
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase();
+
+    assert!(
+        help_line.contains("single-file compiler-dev checks"),
+        "faber check --help must state radix owns single-file compiler-dev checks:\n{help}"
+    );
+    assert!(
+        help_line.contains("package checking, including auto-detected packages"),
+        "faber check --help must state faber owns package checking, including auto-detected packages:\n{help}"
+    );
+}
+
+#[test]
+fn check_file_package_refusal_matches_radix_rerun_instruction() {
+    assert_eq!(
+        crate::commands::PACKAGE_CHECK_MESSAGE,
+        "error: package checking is owned by the `faber` tool; rerun with `faber check --package`"
+    );
+}
+
+#[test]
 fn check_library_long_help_states_v1_library_home_rule() {
     let mut command = Cli::command();
     let check_library = command

@@ -12,6 +12,9 @@ const FABER_AFTER_HELP: &str = include_str!("../../docs/help/faber-after-help.md
 const CHECK_LONG_ABOUT: &str = "\
 Run semantic analysis on a file or package.
 
+`faber check` owns package checking, including auto-detected packages.
+`radix check` is single-file compiler-dev checks.
+
 Package directories and faber.toml inputs use package mode. A directory
 without a faber.toml manifest is treated as a legacy package whose entry is
 <main.fab>; named libraries without that manifest use `faber check-library`
