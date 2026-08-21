@@ -158,7 +158,7 @@ fn prove_same_unit_method() {
             "same-unit receiver methods must lower on the test-link lane: {:?}",
             diagnostics
                 .iter()
-                .map(|diag| (diag.code, diag.issue(), diag.message.as_str()))
+                .map(|diag| (diag.code, diag.issue()))
                 .collect::<Vec<_>>()
         )
     });
