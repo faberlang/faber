@@ -17,9 +17,10 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
-use crate::AccessMarker;
+use crate::{AccessMarker, WarningKind};
 
 const ISSUE_TEXTUS_INDEX_MUST_BE_NUMERUS_OR_RANGE: &str = "textus_index_must_be_numerus_or_range";
+const ISSUE_UNBOUNDED_TEXTUS_INDEX: &str = "unbounded_textus_index";
 const ISSUE_OCTETI_INDEX_MUST_BE_NUMERUS_OR_RANGE: &str = "octeti_index_must_be_numerus_or_range";
 const ISSUE_OCTETI_INDEX_OUT_OF_BOUNDS: &str = "octeti_index_out_of_bounds";
 const ISSUE_ARRAY_INDEX_MUST_BE_NUMERUS: &str = "array_index_must_be_numerus";
@@ -114,11 +115,23 @@ impl TypeChecker<'_> {
                 | Type::BoundedTextus { .. }
                 | Type::BoundedAscii { .. }
         ) {
-            if !self.is_textus_index_type(idx_ty) {
+            let valid_index = self.is_textus_index_type(idx_ty);
+            if !valid_index {
                 self.invalid_operand_types(ISSUE_TEXTUS_INDEX_MUST_BE_NUMERUS_OR_RANGE, index_span);
             }
             if self.is_range_index(idx_ty) {
                 return self.types.primitive(Primitive::Textus);
+            }
+            if valid_index && matches!(&resolved_kind, Type::Primitive(Primitive::Textus)) {
+                // WHY: unbounded textus remains UTF-8 and `.chars().nth` is a
+                // scalar walk; bounded textus has the O(1) carrier path.
+                self.errors.push(
+                    SemanticError::structured(
+                        SemanticErrorKind::Warning(WarningKind::UnboundedTextusIndex),
+                        index_span,
+                    )
+                    .with_arg("issue", ISSUE_UNBOUNDED_TEXTUS_INDEX),
+                );
             }
             return self.ascii_one_type();
         }

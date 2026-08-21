@@ -74,6 +74,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::PreferStringTemplate,
     WarningKind::DiscouragedMutLocal,
     WarningKind::EmptyMarkerShadowing,
+    WarningKind::UnboundedTextusIndex,
 ];
 
 // STABLE CODES
@@ -338,6 +339,9 @@ pub fn semantic_message(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Opti
         SemanticErrorKind::Warning(WarningKind::EmptyMarkerShadowing) => {
             semantic_empty_marker_shadowing_message(args)
         }
+        SemanticErrorKind::Warning(WarningKind::UnboundedTextusIndex) => {
+            semantic_unbounded_textus_index_message(args)
+        }
     }
 }
 
@@ -365,6 +369,9 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
         }
         SemanticErrorKind::Warning(WarningKind::EmptyMarkerShadowing) => Some(
             "choose a different binding name when the empty-collection marker is needed".to_owned(),
+        ),
+        SemanticErrorKind::Warning(WarningKind::UnboundedTextusIndex) => Some(
+            "convert to textus<N> for O(1) indexing or iterate scalars".to_owned(),
         ),
         _ => None,
     }
@@ -2536,6 +2543,12 @@ fn semantic_wildcard_absorbs_null_message(args: &[DiagnosticArg]) -> Option<Stri
     ))
 }
 
+fn semantic_unbounded_textus_index_message(args: &[DiagnosticArg]) -> Option<String> {
+    (arg_value(args, "issue")? == "unbounded_textus_index").then(|| {
+        "unbounded textus scalar index walks UTF-8 and traps on non-ASCII scalars".to_owned()
+    })
+}
+
 // WARNING SPECS
 
 fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
@@ -2617,6 +2630,10 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
             help: Some(
                 "choose a different binding name when the empty-collection marker is needed",
             ),
+        },
+        WarningKind::UnboundedTextusIndex => DiagnosticSpec {
+            code: "WARN022",
+            help: Some("convert to textus<N> for O(1) indexing or iterate scalars"),
         },
     }
 }

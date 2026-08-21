@@ -232,6 +232,9 @@ pub enum WarningKind {
     /// A value binding uses the active locale's empty-collection marker
     /// spelling, making bare marker expressions visually ambiguous.
     EmptyMarkerShadowing,
+    /// Scalar indexing on unbounded UTF-8 `textus` walks from the start and
+    /// traps when the selected scalar is not representable as one ASCII byte.
+    UnboundedTextusIndex,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.
