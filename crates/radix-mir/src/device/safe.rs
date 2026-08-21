@@ -302,11 +302,13 @@ impl<'a> DeviceSafeClassifier<'a> {
                     self.record_layout(SHAPE_KERNEL_AGGREGATE_LAYOUT);
                 }
                 MirLayoutKind::DeviceView(view) => {
-                    if self.allow_host_owned_tensor_entry
+                    let host_owned_entry = self.allow_host_owned_tensor_entry
                         && view.storage == MirTensorStorageLayout::HostOwned
-                        && view.locus == MirTensorLocusLayout::Host
-                    {
-                    } else if view.storage != MirTensorStorageLayout::DeviceHandle
+                        && view.locus == MirTensorLocusLayout::Host;
+                    if host_owned_entry {
+                        return;
+                    }
+                    if view.storage != MirTensorStorageLayout::DeviceHandle
                         || view.locus != MirTensorLocusLayout::Device
                     {
                         self.record_policy(SHAPE_KERNEL_HOST_TENSOR_STORAGE);
