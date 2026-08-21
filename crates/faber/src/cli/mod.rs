@@ -505,6 +505,10 @@ pub struct TestArgs {
     /// Interpret a single `.fab` / `.proba` file without package analysis
     #[arg(long = "no-package")]
     pub no_package: bool,
+
+    /// Exit 0 when no cases are discovered or matched after filtering
+    #[arg(long = "allow-no-tests")]
+    pub allow_no_tests: bool,
 }
 
 /// Arguments for `faber model`.

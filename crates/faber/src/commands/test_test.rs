@@ -201,3 +201,81 @@ fn cmd_test_routes_through_package_discovery() {
         "cmd_test must honor --no-package as the bare-file escape"
     );
 }
+
+#[test]
+fn empty_run_is_nonzero_without_allow_no_tests() {
+    assert_eq!(super::empty_run_exit_code(false), 1);
+    assert_eq!(super::empty_run_exit_code(true), 0);
+}
+
+#[test]
+fn empty_run_messages_name_the_filter_vs_discovery_case() {
+    assert_eq!(
+        super::empty_run_detail(true),
+        "--include matched no *.proba sources"
+    );
+    assert_eq!(super::empty_run_detail(false), "no proba cases discovered");
+}
+
+#[test]
+fn unmatched_include_is_error_when_only_inline_fab_units_are_present() {
+    let units = [PathBuf::from("src/main.fab")];
+    assert!(super::unmatched_include_filter(
+        &["zzz-no-such-file".to_owned()],
+        &units
+    ));
+}
+
+#[test]
+fn include_that_loaded_a_proba_unit_is_not_unmatched() {
+    let units = [
+        PathBuf::from("src/main.fab"),
+        PathBuf::from("src/math.proba"),
+    ];
+    assert!(!super::unmatched_include_filter(
+        &["math".to_owned()],
+        &units
+    ));
+}
+
+#[test]
+fn empty_include_is_never_an_unmatched_include() {
+    let units = [PathBuf::from("src/main.fab")];
+    assert!(!super::unmatched_include_filter(&[], &units));
+}
+
+#[test]
+fn cli_parses_allow_no_tests() {
+    use clap::Parser;
+    let cli = crate::cli::Cli::try_parse_from(["faber", "test", ".", "--allow-no-tests"])
+        .expect("parse --allow-no-tests");
+    let Some(crate::cli::Command::Test(args)) = cli.command else {
+        panic!("expected test subcommand");
+    };
+    assert!(args.allow_no_tests);
+}
+
+#[test]
+fn cmd_test_applies_empty_run_law_and_does_not_widen_unmatched_include() {
+    let source = include_str!("test.rs");
+    let production = source
+        .split("#[cfg(test)]")
+        .next()
+        .expect("production source");
+    assert!(
+        production.contains("allow_no_tests"),
+        "cmd_test must honor --allow-no-tests"
+    );
+    assert!(
+        production.contains("unmatched_include_filter"),
+        "cmd_test must detect a no-match --include before running leftover .fab cases"
+    );
+    assert!(
+        production.contains("empty_run_detail"),
+        "cmd_test must emit a distinct empty-run message"
+    );
+    assert!(
+        production.contains("report.results.is_empty()"),
+        "cmd_test must fail closed on zero selected cases"
+    );
+}

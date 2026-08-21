@@ -95,14 +95,18 @@ pub(super) fn cmd_test(args: &TestArgs) {
         }
     };
 
-    let report = match package::test_input_route(&input_path, args.no_package) {
-        package::TestInputRoute::SingleFile => run_single_file(
-            &config,
-            &input_path,
-            &selection,
-            harness_filter,
-            args.exact,
-            args.include_ignored,
+    let (report, unmatched_include) = match package::test_input_route(&input_path, args.no_package)
+    {
+        package::TestInputRoute::SingleFile => (
+            run_single_file(
+                &config,
+                &input_path,
+                &selection,
+                harness_filter,
+                args.exact,
+                args.include_ignored,
+            ),
+            false,
         ),
         package::TestInputRoute::Package => run_package(
             &config,
@@ -119,11 +123,58 @@ pub(super) fn cmd_test(args: &TestArgs) {
         }
     };
 
+    if report.results.is_empty() {
+        let detail = empty_run_detail(unmatched_include);
+        let code = empty_run_exit_code(args.allow_no_tests);
+        if code == 0 {
+            eprintln!("warning: {detail}");
+            print_report(&report, args.nocapture);
+        } else {
+            eprintln!("error: {detail}");
+        }
+        std::process::exit(code);
+    }
+
     print_report(&report, args.nocapture);
     if report.success() {
         std::process::exit(0);
     }
     std::process::exit(1);
+}
+
+/// Zero selected cases after discovery/filtering. `--include` that matched no
+/// `*.proba` sources is a distinct error so inline `.fab` tests cannot silently
+/// widen the run (E7).
+fn empty_run_detail(unmatched_include: bool) -> &'static str {
+    if unmatched_include {
+        "--include matched no *.proba sources"
+    } else {
+        "no proba cases discovered"
+    }
+}
+
+/// Exit code for an empty report: nonzero unless `--allow-no-tests`.
+fn empty_run_exit_code(allow_no_tests: bool) -> i32 {
+    if allow_no_tests {
+        0
+    } else {
+        1
+    }
+}
+
+/// True when `--include` was given and no analyzed unit is a `*.proba` file.
+///
+/// Include filters only `*.proba` at load; product `.fab` units stay in the
+/// graph. A no-match include must not run those leftover inline tests.
+fn unmatched_include_filter<I, P>(include: &[String], unit_paths: I) -> bool
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    !include.is_empty()
+        && !unit_paths
+            .into_iter()
+            .any(|path| radix_program::source_files::is_proba_source_path(path.as_ref()))
 }
 
 fn run_single_file(
@@ -168,7 +219,7 @@ fn run_package(
     harness_filter: Option<&str>,
     exact: bool,
     include_ignored: bool,
-) -> ProbaReport {
+) -> (ProbaReport, bool) {
     let package = match radix_program::analyze::analyze_package_for_tests(
         config,
         input,
@@ -185,6 +236,16 @@ fn run_package(
         .any(radix_module::diagnostics::Diagnostic::is_error)
     {
         fail_package_analysis(&package.diagnostics);
+    }
+
+    let unmatched_include = proba_filter.is_some_and(|filter| {
+        unmatched_include_filter(
+            &filter.include,
+            package.nodes.values().map(|unit| &unit.path),
+        )
+    });
+    if unmatched_include {
+        return (ProbaReport::default(), true);
     }
 
     let mut test_units = Vec::new();
@@ -252,11 +313,7 @@ fn run_package(
         }
     };
 
-    if combined.results.is_empty() {
-        eprintln!("warning: no proba cases discovered");
-    }
-
-    combined
+    (combined, false)
 }
 
 fn print_report(report: &ProbaReport, nocapture: bool) {
