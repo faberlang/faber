@@ -1,0 +1,55 @@
++++
+term = "cape"
+kind = "keyword"
+category = "errors"
+canonical = false
+summary = "Arm-attached catch on an if/else chain (need repro)."
+syntax = "if <condition> <block> catch <name> <block> else <block>"
+related = ["cape", "si", "secus", "iace", "fac"]
+locale = "en"
++++
+
+# =============================================================================
+# cape — arm-attached catch on an if/else chain
+# =============================================================================
+#
+# What this teaches:
+#   • Per-arm recovery — `catch` attaches to the `if` arm that throws, not
+#     a whole-function `do/catch` wrapper
+#   • Else-arm isolation — the `else` branch is not captured by the then-arm
+#     handler
+#
+# Common mistakes:
+#   • wrapping the whole function in `do { … } catch` when each branch has its
+#     own recovery — that collapses distinct failures into one handler
+#
+# See also: cape, si, secus, iace, fac
+# =============================================================================
+#
+# Repro from need: an `si` arm with `catch e { return … }` plus
+# `else` typechecks and must emit clean on the Rust package target.
+#
+# GRAMMAR:
+#   arm :← block cape_clause?
+#   else_arm :← 'else' block cape_clause?
+#
+# EXPECTED OUTPUT:
+#   none — emit-clean fixture (print so the entry uses both arms)
+#
+
+fn classify(int x) → string {
+    if x > 0 {
+        throw "positive"
+    }
+    catch e {
+        return "err: §"(e)
+    }
+    else {
+        return "zero"
+    }
+}
+
+main {
+    print classify(1)
+    print classify(0)
+}
