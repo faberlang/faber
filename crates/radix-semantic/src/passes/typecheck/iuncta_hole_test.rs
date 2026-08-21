@@ -20,10 +20,16 @@ incipit {
         .next()
         .expect("pair local");
     let Type::Tuple(elements) = result.types.get(local_ty) else {
-        panic!("expected tuple local type, got {:?}", result.types.get(local_ty));
+        panic!(
+            "expected tuple local type, got {:?}",
+            result.types.get(local_ty)
+        );
     };
     assert_eq!(elements.len(), 2);
-    assert!(matches!(result.types.get(elements[1]), Type::Primitive(Primitive::Numerus)));
+    assert!(matches!(
+        result.types.get(elements[1]),
+        Type::Primitive(Primitive::Numerus)
+    ));
 }
 
 #[test]

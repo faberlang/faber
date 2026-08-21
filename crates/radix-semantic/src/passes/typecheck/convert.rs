@@ -77,6 +77,11 @@ const ISSUE_REGEX_OPERAND_UNSUPPORTED: &str = "regex_operand_unsupported";
 const ISSUE_REGEX_RECOVERY_UNSUPPORTED: &str = "regex_recovery_unsupported";
 const ISSUE_REGEX_PATTERN_TOO_LONG: &str = "regex_pattern_too_long";
 const ISSUE_UNSUPPORTED_CONVERSIO: &str = "unsupported_conversio";
+const ISSUE_RECORD_CONVERSION_REQUIRES_RECONSTRUCTION: &str =
+    "record_conversion_requires_reconstruction";
+const ISSUE_RATIO_FIELD_MISSING: &str = "ratio_field_missing";
+const ISSUE_UNKNOWN_RECORD_FIELD: &str = "unknown_record_field";
+const ISSUE_FIELD_INITIALIZER_TYPE_MISMATCH: &str = "field_initializer_type_mismatch";
 const ISSUE_VALOR_VERTE_UNSUPPORTED: &str = "valor_verte_unsupported";
 const ISSUE_INVALID_CAST: &str = "invalid_cast";
 const ISSUE_ARRAY_ELEMENT_TYPE_MISMATCH: &str = "array_element_type_mismatch";
@@ -355,6 +360,11 @@ impl TypeChecker<'_> {
 
         if let Some(error_ty) = self.check_tensor_conversio(source_ty, target_resolved, span) {
             return error_ty;
+        }
+
+        if self.record_conversion_requires_reconstruction(source_ty, target_resolved) {
+            self.invalid_conversion(ISSUE_RECORD_CONVERSION_REQUIRES_RECONSTRUCTION, span);
+            return self.error_type;
         }
 
         // All specialized checks above handle known conversion paths; anything
@@ -1241,6 +1251,10 @@ impl TypeChecker<'_> {
             return true;
         }
 
+        if self.is_record_type(source) || self.is_record_type(target) {
+            return false;
+        }
+
         for ty in [source, target] {
             match self.types.get(ty) {
                 Type::Primitive(Primitive::Valor | Primitive::Ignotum)
@@ -1295,10 +1309,32 @@ impl TypeChecker<'_> {
                 | Type::Intervallum(_)
                 | Type::Alias(_, _)
                 | Type::Union(_)
-                | Type::Record(_)
                 | Type::Tuple(_)
                 | Type::ModularWord(_)
         )
+    }
+
+    fn is_record_type(&self, ty: TypeId) -> bool {
+        matches!(
+            self.types.get(self.resolve_inferred_type(ty)),
+            Type::Record(_)
+        )
+    }
+
+    /// Non-identity conversio involving `Type::Record` must reconstruct.
+    ///
+    /// Identical Record↔Record `↦` stays (equals). Ratio↔genus, genus↔ratio,
+    /// and mismatched Record↔Record have no structural conversion path.
+    fn record_conversion_requires_reconstruction(
+        &self,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+    ) -> bool {
+        let source = self.resolve_inferred_type(source_ty);
+        if self.types.equals(source, target_resolved) {
+            return false;
+        }
+        self.is_record_type(source) || self.is_record_type(target_resolved)
     }
 
     /// Bare failable `↦` propagates through the active alternate-exit channel.
@@ -1444,7 +1480,64 @@ impl TypeChecker<'_> {
                 self.check_verte_map_target(entries, key_ty, value_ty, span)
                     .unwrap_or(target_resolved),
             ),
+            Type::Record(fields) => {
+                self.check_record_fields(&fields, entries, span);
+                Some(target_resolved)
+            }
             _ => None,
+        }
+    }
+
+    /// Exact field-set construction for `Type::Record` (ratio and CLI records).
+    ///
+    /// Unknown init fields reuse `unknown_record_field`; missing labels raise
+    /// `ratio_field_missing`; each initializer typechecks against its slot.
+    fn check_record_fields(
+        &mut self,
+        fields: &FxHashMap<Symbol, TypeId>,
+        entries: &mut [HirObjectField],
+        span: radix_lexer::Span,
+    ) {
+        let mut supplied = FxHashSet::default();
+        for field in entries.iter_mut() {
+            match &mut field.key {
+                HirObjectKey::Ident(name) | HirObjectKey::String(name) => {
+                    let Some(field_ty) = fields.get(name).copied() else {
+                        let error_span = field.value.as_ref().map_or(span, |expr| expr.span);
+                        self.error_issue(
+                            SemanticErrorKind::UndefinedVariable,
+                            ISSUE_UNKNOWN_RECORD_FIELD,
+                            error_span,
+                        );
+                        continue;
+                    };
+                    supplied.insert(*name);
+                    let Some(value) = &mut field.value else {
+                        self.invalid_operand_types(ISSUE_OBJECT_FIELD_REQUIRES_VALUE, span);
+                        continue;
+                    };
+                    let value_ty = self.check_expr_with_expected(value, Some(field_ty));
+                    self.unify_carrier_assign(
+                        value_ty,
+                        field_ty,
+                        value.span,
+                        ISSUE_FIELD_INITIALIZER_TYPE_MISMATCH,
+                    );
+                }
+                HirObjectKey::Computed(expr) | HirObjectKey::Spread(expr) => {
+                    self.check_expr(expr);
+                    self.error_issue(
+                        SemanticErrorKind::UndefinedVariable,
+                        ISSUE_UNKNOWN_RECORD_FIELD,
+                        expr.span,
+                    );
+                }
+            }
+        }
+        for name in fields.keys() {
+            if !supplied.contains(name) {
+                self.undefined_member(ISSUE_RATIO_FIELD_MISSING, span);
+            }
         }
     }
 

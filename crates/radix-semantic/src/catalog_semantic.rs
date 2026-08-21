@@ -731,6 +731,9 @@ fn semantic_invalid_conversion_message(args: &[DiagnosticArg]) -> Option<String>
             let max = arg_value(args, "max")?;
             Some(format!("regex literal pattern is {length} bytes, exceeding the {max}-byte cap"))
         }
+        "record_conversion_requires_reconstruction" => Some(
+            "record conversion requires reconstruction; write `Type { field = value, … }` instead of converting with `↦`".to_owned(),
+        ),
         "regex_recovery_unsupported" => Some(
             "regex conversion does not support `⇥` recovery; regex has no literal form, so there is no target-typed value to substitute".to_owned(),
         ),
@@ -814,6 +817,9 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         }
         "regex_operand_unsupported" => Some("convert textus or ascii values to regex".to_owned()),
         "regex_pattern_too_long" => Some("shorten the literal pattern or build it dynamically".to_owned()),
+        "record_conversion_requires_reconstruction" => {
+            Some("reconstruct by writing `Type { field = value, … }` instead of converting with `↦`".to_owned())
+        }
         "regex_recovery_unsupported" => Some("remove the recovery arm from this regex conversion".to_owned()),
         "matrix_materialize_unsupported" => {
             Some("keep matrix values as typed parameters until matrix construction lowering is implemented".to_owned())
@@ -1524,6 +1530,7 @@ fn semantic_undefined_member_message(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
         "duplicate_variant_field" => Some("duplicate variant field".to_owned()),
         "missing_required_struct_field" => Some("missing required struct field".to_owned()),
+        "ratio_field_missing" => Some("missing required ratio field".to_owned()),
         "missing_variant_field_name" => Some("missing variant field name".to_owned()),
         "namespace_missing_export" => {
             let member = arg_value(args, "member")?;
@@ -1553,6 +1560,7 @@ fn semantic_undefined_member_help(args: &[DiagnosticArg]) -> Option<String> {
         "missing_required_struct_field" => {
             Some("initialize every required struct field".to_owned())
         }
+        "ratio_field_missing" => Some("initialize every required ratio field".to_owned()),
         "missing_variant_field_name" => {
             Some("name every variant argument when using named variant construction".to_owned())
         }
