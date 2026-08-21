@@ -23,18 +23,22 @@
 
 use super::{
     admit_device_section, admit_session_section, FmirBinaryImageFile, FmirDeviceArtifactsSection,
-    FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirSessionSection,
-    FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
-    FmirTextToolchainSection, FmirTextTypesSection, WireBinding, WireBufferIdentity,
-    WireBufferLifetime, WireBufferRole, WireBufferVersion, WireCollectionKernelPlan,
-    WireDeviceProgram, WireDeviceResource, WireDispatchSize, WireInitializationPolicy,
-    WireInputUpdateCadence, WireInvocationMode, WireKernelLaunchPlan, WireKernelUnit,
-    WireKvCacheDtype, WireKvCacheLayout, WireKvReservePolicy, WireLaunchUnit,
-    WireObservationCadence, WireObservationFact, WireProgramLifetime, WireResourceAccess,
-    WireResultBuffer, WireSemanticValue, WireSemanticValueOrigin, WireSessionInput,
-    WireSessionObservationCadence, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
-    FMIR_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
-    WIRE_DISTRIBUTED_SECTION_VERSION, WIRE_SESSION_SECTION_VERSION,
+    FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirExecutorPlanSection,
+    FmirExecutorPlanSectionV2, FmirSessionSection, FmirSessionSectionV2, FmirTextRuntimeSection,
+    FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection,
+    WireBinding, WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
+    WireCollectionKernelPlan, WireDeviceProgram, WireDeviceResource, WireDispatchSize,
+    WireExecutorPlanV2, WireInitializationPolicy, WireInputUpdateCadence, WireInvocationMode,
+    WireKernelLaunchPlan, WireKernelUnit, WireKvCacheAttentionFamily, WireKvCacheCapacityPolicy,
+    WireKvCacheDtype, WireKvCacheLayout, WireKvCacheRopePairing, WireKvCacheSemanticV2,
+    WireKvCacheVLayout, WireKvReservePolicy, WireLaunchUnit, WireObservationCadence,
+    WireObservationFact, WireProgramLifetime, WireResourceAccess, WireResultBuffer,
+    WireSemanticValue, WireSemanticValueOrigin, WireSessionInput, WireSessionObservationCadence,
+    WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize, EXECUTOR_PLAN_SECTION_VERSION,
+    EXECUTOR_PLAN_V2_VERSION, FMIR_TARGET_NAME, LEGACY_EXECUTOR_PLAN_SECTION_VERSION,
+    LEGACY_SESSION_SECTION_VERSION, PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
+    WIRE_DISTRIBUTED_SECTION_VERSION, WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION,
+    WIRE_SESSION_SECTION_VERSION,
 };
 use crate::error::FmirImageError;
 use crate::{decode_binary_image, encode_binary_image};
@@ -406,10 +410,10 @@ fn mutated_byte_in_the_serialized_session_section_fails_admission() {
     // gate inspects the delivered facts, never a self-declared hash.
     let section = honest_session_section();
     let bytes = postcard::to_allocvec(&section).expect("section serializes");
-    // Layout: [v=1][inputs len][slot 1][cadence 0][slot 2][cadence 1]…
+    // Layout: [v=2][inputs len][slot 1][cadence 0][slot 2][cadence 1]…
     assert_eq!(
         &bytes[..6],
-        &[0x01, 0x02, 0x01, 0x00, 0x02, 0x01],
+        &[0x02, 0x02, 0x01, 0x00, 0x02, 0x01],
         "the honest section's version/input prefix is the expected encoding"
     );
     let mut mutated = bytes.clone();
@@ -423,20 +427,132 @@ fn mutated_byte_in_the_serialized_session_section_fails_admission() {
 
 #[test]
 fn mutated_byte_in_the_serialized_version_fails_closed() {
-    // Change the section's version byte (1 → 2): the versioned ratchet fails
+    // Change the section's version byte (2 → 1): the versioned ratchet fails
     // closed BEFORE any field interpretation.
     let section = honest_session_section();
     let bytes = postcard::to_allocvec(&section).expect("section serializes");
     let mut mutated = bytes.clone();
-    assert_eq!(mutated[0], 0x01, "the version varint is 1");
-    mutated[0] = 0x02;
+    assert_eq!(mutated[0], 0x02, "the version varint is 2");
+    mutated[0] = 0x01;
     let decoded: FmirSessionSection =
         postcard::from_bytes(&mutated).expect("mutated section still decodes");
     assert!(matches!(
         admit_session_section(&decoded, &wire_program_fixture()),
         Err(FmirImageError::UnsupportedSessionSectionVersion { actual, expected })
-            if actual == 2 && expected == WIRE_SESSION_SECTION_VERSION
+            if actual == 1 && expected == WIRE_SESSION_SECTION_VERSION
     ));
+}
+
+// ---------------------------------------------------------------------------
+// A4V: explicit v2 carriers and legacy v1 isolation
+// ---------------------------------------------------------------------------
+
+fn semantic_v2_fixture() -> WireKvCacheSemanticV2 {
+    WireKvCacheSemanticV2 {
+        semantic_contract_version: WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION,
+        kv_dtype_k: WireKvCacheDtype::F32,
+        kv_dtype_v: WireKvCacheDtype::F32,
+        v_layout: WireKvCacheVLayout::Straight,
+        attention_family: WireKvCacheAttentionFamily::Flash,
+        query_head_count: 16,
+        kv_head_count: 4,
+        head_dim: 64,
+        layer_count: 32,
+        context_capacity: 8192,
+        capacity_policy: WireKvCacheCapacityPolicy::Fixed,
+        rope_dimension: 64,
+        rope_frequency_base: 100_000.0,
+        rope_frequency_scale: 1.0,
+        rope_pairing: WireKvCacheRopePairing::RotateHalf,
+        k_stored_post_rope: true,
+    }
+}
+
+fn runtime_bindings_v2_fixture() -> WireExecutorPlanV2 {
+    WireExecutorPlanV2 {
+        abi_version: EXECUTOR_PLAN_V2_VERSION,
+        selections: Vec::new(),
+        allocations: Vec::new(),
+        views: Vec::new(),
+        launch_bindings: Vec::new(),
+    }
+}
+
+#[test]
+fn v2_semantic_and_runtime_payloads_round_trip_through_explicit_carriers() {
+    let semantic = FmirSessionSectionV2::from_semantic(
+        vec![
+            WireSessionInput {
+                slot: 1,
+                cadence: WireInputUpdateCadence::Resident,
+            },
+            WireSessionInput {
+                slot: 2,
+                cadence: WireInputUpdateCadence::PerInvocation,
+            },
+        ],
+        vec![
+            WireInvocationMode::Prefill,
+            WireInvocationMode::ScalarDecode,
+        ],
+        WireSessionObservationCadence::PerInvocation,
+        semantic_v2_fixture(),
+    );
+    let semantic_bytes = postcard::to_allocvec(&semantic).expect("semantic carrier serializes");
+    let decoded_semantic: FmirSessionSectionV2 =
+        postcard::from_bytes(&semantic_bytes).expect("semantic carrier decodes");
+    assert_eq!(decoded_semantic, semantic);
+    assert!(decoded_semantic.has_supported_version());
+    assert_eq!(
+        decoded_semantic.semantic.semantic_contract_version,
+        WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION
+    );
+
+    let runtime = FmirExecutorPlanSectionV2::from_runtime_bindings(runtime_bindings_v2_fixture());
+    let runtime_bytes = postcard::to_allocvec(&runtime).expect("runtime carrier serializes");
+    let decoded_runtime: FmirExecutorPlanSectionV2 =
+        postcard::from_bytes(&runtime_bytes).expect("runtime carrier decodes");
+    assert_eq!(decoded_runtime, runtime);
+    assert!(decoded_runtime.has_supported_version());
+    assert_eq!(
+        decoded_runtime.runtime_bindings.abi_version,
+        EXECUTOR_PLAN_V2_VERSION
+    );
+}
+
+#[test]
+fn v1_static_executor_plan_remains_a_v1_carrier_only() {
+    let legacy = FmirExecutorPlanSection {
+        v: LEGACY_EXECUTOR_PLAN_SECTION_VERSION,
+        plans: Vec::new(),
+    };
+    let bytes = postcard::to_allocvec(&legacy).expect("legacy static plan serializes");
+    let decoded: FmirExecutorPlanSection =
+        postcard::from_bytes(&bytes).expect("legacy static plan decodes");
+    assert_eq!(decoded, legacy);
+    assert_eq!(decoded.v, 1);
+    assert_ne!(decoded.v, EXECUTOR_PLAN_SECTION_VERSION);
+}
+
+#[test]
+fn v1_v2_carrier_skew_is_not_default_filled() {
+    let mut semantic = FmirSessionSectionV2::from_semantic(
+        Vec::new(),
+        vec![WireInvocationMode::Prefill],
+        WireSessionObservationCadence::PerSession,
+        semantic_v2_fixture(),
+    );
+    semantic.v = LEGACY_SESSION_SECTION_VERSION;
+    assert!(!semantic.has_supported_version());
+
+    let mut runtime =
+        FmirExecutorPlanSectionV2::from_runtime_bindings(runtime_bindings_v2_fixture());
+    runtime.v = LEGACY_EXECUTOR_PLAN_SECTION_VERSION;
+    assert!(!runtime.has_supported_version());
+    assert_eq!(
+        runtime.runtime_bindings.abi_version,
+        EXECUTOR_PLAN_V2_VERSION
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -475,9 +591,13 @@ fn stale_session_section_version_fails_closed() {
 #[test]
 fn session_section_version_ratchet_is_declared() {
     // The session surface carries its OWN version ratchet (the MD2-W1
-    // sibling-field precedent): the first session-section shape is v1 and
+    // sibling-field precedent): the v2 semantic carrier is explicit and
     // the accepted wire versions are untouched.
-    assert_eq!(WIRE_SESSION_SECTION_VERSION, 1);
+    assert_eq!(WIRE_SESSION_SECTION_VERSION, 2);
+    assert_eq!(WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION, 2);
+    assert_eq!(EXECUTOR_PLAN_SECTION_VERSION, 2);
+    assert_eq!(EXECUTOR_PLAN_V2_VERSION, 2);
+    assert_eq!(LEGACY_EXECUTOR_PLAN_SECTION_VERSION, 1);
     assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 8);
     assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 7);
     assert_eq!(WIRE_DISTRIBUTED_SECTION_VERSION, 1);

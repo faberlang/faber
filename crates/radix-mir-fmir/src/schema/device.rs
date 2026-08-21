@@ -1,15 +1,26 @@
 use serde::{Deserialize, Serialize};
 
 use super::distributed::FmirDistributedExecutionSection;
-use super::executor_plan::WireExecutorPlan;
+use super::executor_plan::{WireExecutorPlan, WireExecutorPlanV2};
 use super::wire::{
-    WireDeviceProgram, WireInvocationMode, WireKvCacheLayout, WireSessionInput,
-    WireSessionObservationCadence,
+    WireDeviceProgram, WireInvocationMode, WireKvCacheLayout, WireKvCacheSemanticV2,
+    WireSessionInput, WireSessionObservationCadence,
 };
 
-/// Version of the additive executor-plan section. WIRE v8 remains unchanged;
-/// this sibling section ratchets independently and fails closed on skew.
-pub const EXECUTOR_PLAN_SECTION_VERSION: u32 = 1;
+/// Legacy static executor-plan sections carry only the v1 selection records.
+/// They remain a separate carrier: their constants are never reinterpreted as
+/// runtime cursor facts.
+pub const LEGACY_EXECUTOR_PLAN_SECTION_VERSION: u32 = 1;
+
+/// Version of the executor-plan carrier that carries KV-B runtime bindings.
+/// WIRE v8 remains unchanged; this sibling section ratchets independently and
+/// fails closed on skew.
+pub const EXECUTOR_PLAN_SECTION_VERSION: u32 = 2;
+
+/// Version of the legacy cadence/session carrier. It remains named here so a
+/// reader can distinguish an old static layout from the v2 semantic record
+/// without filling missing fields with guessed facts.
+pub const LEGACY_SESSION_SECTION_VERSION: u32 = 1;
 
 // ---------------------------------------------------------------------------
 // Device payload (N1.7 / architecture record §7)
@@ -101,17 +112,58 @@ pub struct FmirExecutorPlanSection {
 }
 
 impl FmirExecutorPlanSection {
-    /// Project the target-neutral MIR executor section onto its wire mirror.
+    /// Project the legacy target-neutral MIR executor section onto its v1
+    /// static wire mirror. This constructor intentionally does not upgrade a
+    /// static plan: v1 constants are never treated as runtime bindings.
     #[must_use]
     pub fn from_executor_plan(plan: &radix_mir::ExecutorPlanExtension) -> Self {
         Self {
-            v: EXECUTOR_PLAN_SECTION_VERSION,
+            v: LEGACY_EXECUTOR_PLAN_SECTION_VERSION,
             plans: plan
                 .selections
                 .iter()
                 .map(WireExecutorPlan::from_mir)
                 .collect(),
         }
+    }
+}
+
+/// The v2 executor-plan section carrier. Its payload is deliberately a
+/// different field and type from [`FmirExecutorPlanSection::plans`], so a
+/// legacy v1 static plan cannot be default-filled or reinterpreted as a
+/// runtime-binding payload.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FmirExecutorPlanSectionV2 {
+    /// The executor-plan section's own v2 ratchet.
+    pub v: u32,
+    /// KV-B's tagged runtime-binding payload.
+    pub runtime_bindings: WireExecutorPlanV2,
+}
+
+impl FmirExecutorPlanSectionV2 {
+    /// Wrap a delivered v2 runtime-binding payload without changing it.
+    #[must_use]
+    pub fn from_runtime_bindings(runtime_bindings: WireExecutorPlanV2) -> Self {
+        Self {
+            v: EXECUTOR_PLAN_SECTION_VERSION,
+            runtime_bindings,
+        }
+    }
+
+    /// Project the B2 producer payload onto the v2 section carrier.
+    #[must_use]
+    pub fn from_executor_plan(
+        plan: &radix_mir::device_program_plans::ExecutorPlanExtensionV2,
+    ) -> Self {
+        Self::from_runtime_bindings(WireExecutorPlanV2::from_mir(plan))
+    }
+
+    /// Return whether this carrier has the exact v2 section version. A
+    /// mismatch is rejected rather than decoded through the v1 static shape.
+    #[must_use]
+    pub const fn has_supported_version(&self) -> bool {
+        self.v == EXECUTOR_PLAN_SECTION_VERSION
     }
 }
 
@@ -694,11 +746,10 @@ pub fn canonical_unpadded_base64(bytes: &[u8]) -> String {
 /// S12). The section carries its OWN nested version, admitted fail-closed
 /// **before field interpretation** (the `admit_device_section` pattern, FC4)
 /// — independently of the nested device-program wire version and the outer
-/// image version. The first session-section shape is v1; the nested
-/// `WIRE_DEVICE_PROGRAM_VERSION` and the outer
-/// `PACKAGE_MIR_ARTIFACT_VERSION = 7` stay untouched (the MD2-W1
-/// sibling-field precedent — no `WIRE_DEVICE_PROGRAM_VERSION` bump).
-pub const WIRE_SESSION_SECTION_VERSION: u32 = 1;
+/// image version. Version 2 carries the A4S semantic record; the old v1
+/// layout is retained only as a legacy carrier and is never default-filled
+/// into the v2 record.
+pub const WIRE_SESSION_SECTION_VERSION: u32 = 2;
 
 /// The optional cadence/session section of an FMIR device image (GI4-2).
 ///
@@ -728,6 +779,54 @@ pub struct FmirSessionSection {
     pub invocation_modes: Vec<WireInvocationMode>,
     /// The declared observation cadence of the session's observation.
     pub observation_cadence: WireSessionObservationCadence,
-    /// The typed KV-cache layout carriage (GI4-1 §3).
+    /// The legacy v1 typed KV-cache layout carriage. A v2 semantic record is
+    /// carried by [`FmirSessionSectionV2`] instead of being synthesized from
+    /// this smaller layout.
     pub kv_layout: WireKvCacheLayout,
+}
+
+/// The v2 session-section carrier for the static A4S semantic record.
+///
+/// This is intentionally a separate shape from [`FmirSessionSection`]. The
+/// v1 layout cannot be deserialized into this carrier by defaulting absent
+/// semantic facts, and no v1 field is treated as a v2 runtime fact.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FmirSessionSectionV2 {
+    /// The session section's own v2 ratchet.
+    pub v: u32,
+    /// Declared session/host-input slots with their per-invocation cadence.
+    pub inputs: Vec<WireSessionInput>,
+    /// The workload modes this session executes.
+    pub invocation_modes: Vec<WireInvocationMode>,
+    /// The declared observation cadence of the session's observation.
+    pub observation_cadence: WireSessionObservationCadence,
+    /// The complete static KV-cache semantic record from A4S.
+    pub semantic: WireKvCacheSemanticV2,
+}
+
+impl FmirSessionSectionV2 {
+    /// Wrap the v2 static semantic record without filling or deriving fields.
+    #[must_use]
+    pub fn from_semantic(
+        inputs: Vec<WireSessionInput>,
+        invocation_modes: Vec<WireInvocationMode>,
+        observation_cadence: WireSessionObservationCadence,
+        semantic: WireKvCacheSemanticV2,
+    ) -> Self {
+        Self {
+            v: WIRE_SESSION_SECTION_VERSION,
+            inputs,
+            invocation_modes,
+            observation_cadence,
+            semantic,
+        }
+    }
+
+    /// Return whether this carrier has the exact v2 section version. A
+    /// mismatch is rejected rather than decoded through the legacy layout.
+    #[must_use]
+    pub const fn has_supported_version(&self) -> bool {
+        self.v == WIRE_SESSION_SECTION_VERSION
+    }
 }
