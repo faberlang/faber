@@ -236,7 +236,7 @@ fn missing_root_reports_actionable_error() {
 fn build_registry_loads_canonical_and_legacy_entries() {
     let pack = ReferencePack::load_from(repo_exempla_root()).expect("load pack");
     let registry = pack.build_registry().expect("build registry");
-    assert_eq!(registry.entries().len(), 205);
+    assert_eq!(registry.entries().len(), 207);
     assert!(registry.reference_root().is_some());
     assert!(registry.lookup("functio").is_some());
     assert!(matches!(registry.lookup("=="), Some(Lookup::Legacy { .. })));
@@ -249,7 +249,7 @@ fn load_from_disk_builds_explain_registry() {
     std::env::remove_var(REFERENCE_ROOT_ENV);
 
     let registry = Registry::load_from_disk().expect("disk registry");
-    assert_eq!(registry.entries().len(), 205);
+    assert_eq!(registry.entries().len(), 207);
     let list = render_list(&registry);
     assert!(list.contains("reference:"));
 
