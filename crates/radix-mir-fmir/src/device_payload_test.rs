@@ -14,27 +14,27 @@ use crate::codec::{
 };
 use crate::error::FmirImageError;
 use crate::schema::{
-    canonical_program_bytes, canonical_unpadded_base64, content_sha256, device_identity_hash,
-    packet_sha256_canonical, DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId,
-    FmirArtifactReflection, FmirBinaryImageFile, FmirDeviceArtifact, FmirDeviceArtifactsSection,
-    FmirDeviceBackend, FmirDeviceInput, FmirDeviceProgramSection, FmirDeviceSection,
-    FmirDeviceSelection, FmirDeviceSymbol, FmirExecutorPlanSection, FmirReflectedKernel,
-    FmirReflectedResource, FmirTextCliRootSection, FmirTextCliSection, FmirTextImageFile,
-    FmirTextProgramSection, FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
-    FmirTextToolchainSection, FmirTextTypesSection, MaterializationStage, WireAxisReductionPlan,
-    WireBinding, WireBroadcastDeclaration, WireBroadcastFact, WireBufferIdentity,
-    WireBufferLifetime, WireBufferRole, WireBufferVersion, WireCausalMaskedSoftmaxPlan,
-    WireCollectionKernelPlan, WireCompanionDerivativeKind, WireCompanionRelation,
-    WireCompanionSelectedInput, WireCompanionSelectedOutput, WireDependencyEdge, WireDeviceProgram,
-    WireDeviceResource, WireDispatchSize, WireGatherPlan, WireGroupedMatMulPlan,
-    WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit,
-    WireLayerNormalizationPlan, WireObservationCadence, WireObservationFact,
+    ARTIFACT_ABI_VERSION, DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId,
+    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, FmirArtifactReflection, FmirBinaryImageFile,
+    FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceInput,
+    FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol,
+    FmirExecutorPlanSection, FmirReflectedKernel, FmirReflectedResource, FmirTextCliRootSection,
+    FmirTextCliSection, FmirTextImageFile, FmirTextProgramSection, FmirTextRuntimeSection,
+    FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection,
+    MaterializationStage, PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
+    WireAxisReductionPlan, WireBinding, WireBroadcastDeclaration, WireBroadcastFact,
+    WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
+    WireCausalMaskedSoftmaxPlan, WireCollectionKernelPlan, WireCompanionDerivativeKind,
+    WireCompanionRelation, WireCompanionSelectedInput, WireCompanionSelectedOutput,
+    WireDependencyEdge, WireDeviceProgram, WireDeviceResource, WireDispatchSize, WireGatherPlan,
+    WireGroupedMatMulPlan, WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit,
+    WireLaunchUnit, WireLayerNormalizationPlan, WireObservationCadence, WireObservationFact,
     WirePackedStorageLayout, WireProgramLifetime, WireQuantizedMatMulPlan, WireReduceOp,
     WireReducedProjection, WireResourceAccess, WireResultBuffer, WireRmsNormalizationPlan,
     WireRopePlan, WireRowSoftmaxPlan, WireSemanticValue, WireSemanticValueOrigin,
     WireSsmConv1dPlan, WireSsmScanPlan, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
-    ARTIFACT_ABI_VERSION, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
-    WIRE_DEVICE_PROGRAM_VERSION,
+    canonical_program_bytes, canonical_unpadded_base64, content_sha256, device_identity_hash,
+    packet_sha256_canonical,
 };
 use radix_mir::MirProgram;
 use radix_types::TypeTable;
@@ -248,7 +248,10 @@ fn executor_plan_section_version_skew_fails_closed_before_field_admission() {
     .expect_err("executor-plan version skew must fail closed");
     assert!(matches!(
         error,
-        FmirImageError::UnsupportedExecutorPlanSectionVersion { actual: 3, expected: 2 }
+        FmirImageError::UnsupportedExecutorPlanSectionVersion {
+            actual: 3,
+            expected: 2
+        }
     ));
 }
 
