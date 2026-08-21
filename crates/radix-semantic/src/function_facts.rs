@@ -402,6 +402,25 @@ impl HirVisitor for BodyVisitor<'_> {
                 self.with_suppressed(true, |visitor| visitor.visit_block(body));
                 self.visit_block(&catch.body);
             }
+            HirExpressionKind::Si {
+                cond,
+                then_block,
+                then_catch,
+                else_block,
+            } => {
+                self.visit_expr(cond);
+                if let Some(catch) = then_catch {
+                    // Same containment as `fac`/`cape`: a then-arm throw is
+                    // the catch's local channel, not the enclosing function.
+                    self.with_suppressed(true, |visitor| visitor.visit_block(then_block));
+                    self.visit_block(&catch.body);
+                } else {
+                    self.visit_block(then_block);
+                }
+                if let Some(else_block) = else_block {
+                    self.visit_block(else_block);
+                }
+            }
             HirExpressionKind::Clausura(params, _, _, body) => {
                 let mut nested_bound = self.bound_locals.clone();
                 for param in params {
