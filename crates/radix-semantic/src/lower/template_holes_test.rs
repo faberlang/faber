@@ -1,7 +1,10 @@
 //! NTH-3: erasure, labeled-actual checking, and template arity at application.
+//! NTH-4: semantic HIR and forma parity pins for named template holes.
 
 use crate::test_support;
-use radix_hir::{HirExpression, HirExpressionKind, HirLiteral, HirObjectKey, HirStatementKind};
+use radix_hir::{
+    HirArrayElement, HirExpression, HirExpressionKind, HirLiteral, HirObjectKey, HirStatementKind,
+};
 
 fn entry_init(unit: &test_support::AnalyzedFixture) -> &HirExpression {
     let hir = unit.hir.as_ref().expect("hir");
@@ -72,6 +75,57 @@ fn forma_template_text(source: &str) -> String {
         }
     }
     panic!("forma capture missing template string, entries={entries:?}");
+}
+
+fn forma_capture(source: &str) -> (String, Vec<String>) {
+    let unit = test_support::analyze_ok(source);
+    let init = entry_init(&unit);
+    let HirExpressionKind::Verte {
+        entries: Some(entries),
+        ..
+    } = &init.kind
+    else {
+        panic!("expected forma Verte, got {:?}", init.kind);
+    };
+    let mut template = None;
+    let mut params = None;
+    for field in entries {
+        let HirObjectKey::Ident(key) = &field.key else {
+            continue;
+        };
+        let Some(value) = &field.value else {
+            continue;
+        };
+        match unit.interner.resolve(*key) {
+            "template" => {
+                let HirExpressionKind::Literal(HirLiteral::String(symbol)) = &value.kind else {
+                    panic!("forma template field is not a string: {value:?}");
+                };
+                template = Some(unit.interner.resolve(*symbol).to_owned());
+            }
+            "params" => {
+                let HirExpressionKind::Array(elements) = &value.kind else {
+                    panic!("forma params field is not an array: {value:?}");
+                };
+                params = Some(
+                    elements
+                        .iter()
+                        .map(|element| match element {
+                            HirArrayElement::Expr(expr) => describe_arg(&unit, &expr.kind),
+                            HirArrayElement::Spread(expr) => {
+                                format!("spread:{:?}", expr.kind)
+                            }
+                        })
+                        .collect(),
+                );
+            }
+            _ => {}
+        }
+    }
+    (
+        template.expect("forma template field"),
+        params.expect("forma params field"),
+    )
 }
 
 #[test]
@@ -288,6 +342,34 @@ incipit {
 }
 
 #[test]
+fn labeled_forma_capture_parity_preserves_template_and_positional_params() {
+    let labeled = forma_capture(
+        r#"
+incipit {
+    fixum _ captured ← `hello §{first} §{second}`(second: 2, first: 1)
+    nota captured
+}
+"#,
+    );
+    let positional = forma_capture(
+        r#"
+incipit {
+    fixum _ captured ← `hello § §`(1, 2)
+    nota captured
+}
+"#,
+    );
+    assert_eq!(
+        labeled,
+        (
+            "hello § §".to_owned(),
+            vec!["int:1".to_owned(), "int:2".to_owned()]
+        )
+    );
+    assert_eq!(labeled, positional);
+}
+
+#[test]
 fn bare_forma_literal_keeps_named_hole_text() {
     let text = forma_template_text(
         r#"
@@ -298,4 +380,144 @@ incipit {
 "#,
     );
     assert_eq!(text, "hello §{id}");
+}
+
+/// Produce the semantic equivalent of a `radix hir` dump for parity cases.
+///
+/// `test_support` analyzes every source as the same `test.fab` file. Each parity
+/// fixture also pads the shorter call spelling so corresponding HIR spans have
+/// equal offsets; only interner-assigned Symbol ids need canonicalization.
+fn canonical_hir_dump(source: &str) -> String {
+    let unit = test_support::analyze_ok(source);
+    let hir = unit.hir.as_ref().expect("hir");
+    canonicalize_symbol_ids(&format!("{hir:#?}"), &unit)
+}
+
+fn assert_hir_dump_eq(label: &str, left: &str, right: &str) {
+    let left_dump = canonical_hir_dump(left);
+    let right_dump = canonical_hir_dump(right);
+    assert_eq!(left_dump, right_dump, "{label} HIR differs");
+}
+
+fn canonicalize_symbol_ids(dump: &str, unit: &test_support::AnalyzedFixture) -> String {
+    let mut canonical = String::with_capacity(dump.len());
+    let mut rest = dump;
+    while let Some(start) = rest.find("Symbol(") {
+        canonical.push_str(&rest[..start]);
+        let after_prefix = &rest[start + "Symbol(".len()..];
+        let digit_start = after_prefix
+            .find(|character: char| character.is_ascii_digit())
+            .expect("Symbol debug output has an integer id");
+        let digits = &after_prefix[digit_start..];
+        let digit_end = digits
+            .find(|character: char| !character.is_ascii_digit())
+            .unwrap_or(digits.len());
+        let id = digits[..digit_end]
+            .parse::<u32>()
+            .expect("Symbol debug output has a valid integer id");
+        let close = digits[digit_end..]
+            .find(')')
+            .expect("Symbol debug output closes");
+        let end = digit_start + digit_end + close + 1;
+        let symbol = radix_lexer::Symbol(id);
+        canonical.push_str("Symbol(");
+        canonical.push_str(&format!("{:?}", unit.interner.resolve(symbol)));
+        canonical.push(')');
+        rest = &after_prefix[end..];
+    }
+    canonical.push_str(rest);
+    canonical
+}
+
+#[test]
+fn labeled_positional_scriptum_hir_parity_dumps_are_byte_identical() {
+    let labeled = canonical_hir_dump(
+        r#"
+incipit {
+    fixum textus out ← "§{greet} world"(greet: "salve")
+    nota out
+}
+"#,
+    );
+    let positional = canonical_hir_dump(
+        r#"
+incipit {
+    fixum textus out ← "§ world"              ("salve")
+    nota out
+}
+"#,
+    );
+    let scriptum = canonical_hir_dump(
+        r#"
+incipit {
+    fixum textus out ← scriptum(    "§ world", "salve")
+    nota out
+}
+"#,
+    );
+    assert_eq!(
+        labeled, positional,
+        "labeled HIR differs from positional HIR"
+    );
+    assert_eq!(
+        positional, scriptum,
+        "positional HIR differs from scriptum HIR"
+    );
+}
+
+#[test]
+fn mixed_named_and_anonymous_template_hir_parity_is_positional() {
+    assert_hir_dump_eq(
+        "§{a} § ≡ § §",
+        r#"
+incipit {
+    fixum textus out ← "§{a} §"("one", "two")
+    nota out
+}
+"#,
+        r#"
+incipit {
+    fixum textus out ← "§ §"   ("one", "two")
+    nota out
+}
+"#,
+    );
+}
+
+#[test]
+fn explicit_index_before_named_hole_has_positional_hir_parity() {
+    assert_hir_dump_eq(
+        "§1 §{greet} ≡ §1 §",
+        r#"
+incipit {
+    fixum textus out ← "§1 §{greet}"("one", "two")
+    nota out
+}
+"#,
+        r#"
+incipit {
+    fixum textus out ← "§1 §"       ("one", "two")
+    nota out
+}
+"#,
+    );
+}
+
+#[test]
+fn named_hole_before_repeated_explicit_index_has_positional_hir_parity() {
+    assert_hir_dump_eq(
+        "§{greet} §0 ≡ § §0",
+        r#"
+incipit {
+    fixum textus out ← "§{greet} §0"("one", "two")
+    nota out
+}
+"#,
+        r#"
+incipit {
+    fixum textus out ← "§ §0"       ("one", "two")
+    nota out
+}
+"#,
+    );
 }
