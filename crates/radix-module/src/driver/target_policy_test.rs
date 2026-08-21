@@ -87,27 +87,40 @@ fn rust_itera_with_cape_has_no_unsupported_error() {
 }
 
 #[test]
-fn rust_elige_with_cape_emits_unsupported_error() {
+fn rust_elige_with_cape_has_no_unsupported_error() {
     let (program, _) = parse_program("functio f() → vacuum { elige 1 { casu 1 { tacet } } cape err { tacet } }\n");
     let errors = collect_rust_unsupported_errors(&program, "test.fab");
     assert!(
         errors
             .iter()
-            .any(|e| e.issue() == Some("rust_target_cape_unsupported")),
-        "expected rust_target_cape_unsupported error, got: {errors:?}"
+            .all(|e| e.issue() != Some("rust_target_cape_unsupported")),
+        "elige cape should emit; got: {errors:?}"
     );
 }
 
 #[test]
-fn rust_mixed_supported_and_unsupported_constructs() {
+fn rust_cura_with_cape_has_no_unsupported_error() {
+    let (program, _) =
+        parse_program("functio f() → vacuum { cura \"arena\" fixum _ alloc { tacet } cape err { tacet } }\n");
+    let errors = collect_rust_unsupported_errors(&program, "test.fab");
+    assert!(
+        errors
+            .iter()
+            .all(|e| e.issue() != Some("rust_target_cape_unsupported")),
+        "cura cape should emit; got: {errors:?}"
+    );
+}
+
+#[test]
+fn rust_mixed_cape_forms_have_no_unsupported_error() {
     let (program, _) =
         parse_program("functio f() → vacuum { si verum { tacet } elige 1 { casu 1 { tacet } } cape err { tacet } }\n");
     let errors = collect_rust_unsupported_errors(&program, "test.fab");
     assert!(
         errors
             .iter()
-            .any(|e| e.issue() == Some("rust_target_cape_unsupported")),
-        "expected remaining elige cape unsupported error, got: {errors:?}"
+            .all(|e| e.issue() != Some("rust_target_cape_unsupported")),
+        "si+elige cape should emit; got: {errors:?}"
     );
 }
 
@@ -221,8 +234,7 @@ fn rust_unsupported_errors_are_empty_on_empty_entry_program() {
 }
 
 #[test]
-fn rust_multiple_cape_constructs_each_reported() {
-    // Remaining RC-3 sites: elige and cura still reject until those units land.
+fn rust_multiple_cape_constructs_are_not_reported() {
     let (program, _) = parse_program(
         "functio f() → vacuum { elige 1 { casu 1 { tacet } } cape err { tacet } cura \"arena\" fixum _ alloc { tacet } cape err { tacet } }\n",
     );
@@ -231,8 +243,15 @@ fn rust_multiple_cape_constructs_each_reported() {
         .iter()
         .filter(|e| e.issue() == Some("rust_target_cape_unsupported"))
         .count();
+    assert_eq!(cape_count, 0, "elige+cura cape should emit; got {cape_count}: {errors:?}");
+}
+
+#[test]
+fn rust_target_cape_unsupported_has_no_remaining_sites() {
+    let source = include_str!("target_policy.rs");
+    let count = source.matches("rust_target_cape_unsupported").count();
     assert_eq!(
-        cape_count, 2,
-        "expected elige+cura cape unsupported errors, got {cape_count}: {errors:?}"
+        count, 0,
+        "TARGET001 rust_target_cape_unsupported must be fully retired; {count} site(s) remain"
     );
 }

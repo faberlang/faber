@@ -1076,7 +1076,7 @@ incipit {
 }
 
 #[test]
-fn rust_target_still_rejects_non_fac_cape_attachments() {
+fn rust_target_accepts_si_cape_attachments() {
     let session = test_session(Target::HirRust);
     let source = r#"functio probe(bivalens ok) → vacuum {
   si ok {
@@ -1084,16 +1084,61 @@ fn rust_target_still_rejects_non_fac_cape_attachments() {
   } cape err {
     nota err
   }
+}
+
+incipit {
+  probe(verum)
 }"#;
     let result = compile(&session, "test.fab", source);
 
-    assert!(result.output.is_none());
-    assert!(!result.success());
-    result
-        .diagnostics
-        .iter()
-        .find(|d| d.is_error() && d.code == Some("TARGET001") && d.issue() == Some("rust_target_cape_unsupported"))
-        .expect("Rust target cape diagnostic");
+    assert!(result.success(), "{:?}", result.diagnostics);
+    assert!(matches!(result.output, Some(crate::Output::Rust(_))));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("rust_target_cape_unsupported")),
+        "si cape should emit; got: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn rust_target_accepts_elige_cape_attachments() {
+    let session = test_session(Target::HirRust);
+    let source = r#"functio probe(numerus x) → vacuum {
+  elige x {
+    casu 1 {
+      tacet
+    }
+  } cape err {
+    nota err
+  }
+}
+
+incipit {
+  probe(1)
+}"#;
+    let result = compile(&session, "test.fab", source);
+
+    assert!(result.success(), "{:?}", result.diagnostics);
+    assert!(matches!(result.output, Some(crate::Output::Rust(_))));
+}
+
+#[test]
+fn rust_target_accepts_cura_cape_attachments() {
+    let session = test_session(Target::HirRust);
+    let source = r#"incipit {
+  cura "arena" fixum _ mem {
+    tacet
+  } cape err {
+    tacet
+  }
+}"#;
+    let result = compile(&session, "test.fab", source);
+
+    assert!(result.success(), "{:?}", result.diagnostics);
+    assert!(matches!(result.output, Some(crate::Output::Rust(_))));
 }
 
 #[test]

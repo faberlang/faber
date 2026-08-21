@@ -497,12 +497,6 @@ fn scan_rust_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
                 scan_rust_if_body(&default.body, file, diagnostics);
             }
             if let Some(catch) = &switch_stmt.catch {
-                diagnostics.push(rust_target_exception_diagnostic(
-                    file,
-                    catch.span,
-                    "cape is not supported for Rust targets",
-                    "rust_target_cape_unsupported",
-                ));
                 scan_rust_block(&catch.body, file, diagnostics);
             }
         }
@@ -565,12 +559,6 @@ fn scan_rust_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         StmtKind::Cura(resource) => {
             scan_rust_block(&resource.body, file, diagnostics);
             if let Some(catch) = &resource.catch {
-                diagnostics.push(rust_target_exception_diagnostic(
-                    file,
-                    catch.span,
-                    "cape is not supported for Rust targets",
-                    "rust_target_cape_unsupported",
-                ));
                 scan_rust_block(&catch.body, file, diagnostics);
             }
         }
@@ -793,10 +781,6 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         | ExprKind::Ego(_)
         | ExprKind::Ad(_) => {}
     }
-}
-
-fn rust_target_exception_diagnostic(file: &str, span: crate::lexer::Span, message: &str, issue: &str) -> Diagnostic {
-    target_exception_diagnostic(file, span, message, issue)
 }
 
 fn target_exception_diagnostic(file: &str, span: crate::lexer::Span, message: &str, issue: &str) -> Diagnostic {

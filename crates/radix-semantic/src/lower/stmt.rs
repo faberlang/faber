@@ -749,13 +749,21 @@ impl Lowerer<'_> {
         // recorded by `block_end_for`; carry it onto the wrapping scope block
         // so the end-count parity with `presentation.block_ends` holds.
         let body_block = self.lower_block(&stmt.body);
-        let body_end = body_block.end;
-        stmts.extend(body_block.statements);
-        self.pop_scope();
-
+        let body_end = body_block.end.clone();
         if let Some(catch) = &stmt.catch {
-            self.lower_cape_clause_stmts(catch, &mut stmts);
+            // Catch stays inside the resource scope so the handler can name
+            // the open binding; cleanup is the outer block end after Handled.
+            let cape = self.lower_cape_clause(catch);
+            let handled = self.handled_block_expr(body_block, cape, self.current_span);
+            stmts.push(HirStatement {
+                id: self.next_hir_id(),
+                kind: HirStatementKind::Expr(handled),
+                span: self.current_span,
+            });
+        } else {
+            stmts.extend(body_block.statements);
         }
+        self.pop_scope();
 
         let mut block = HirBlock::simple(stmts, None, self.current_span);
         block.end = body_end;
@@ -1078,15 +1086,6 @@ impl Lowerer<'_> {
         HirBlock::simple(Vec::new(), Some(Box::new(expr)), self.current_span)
     }
 
-    fn lower_cape_clause_stmts(
-        &mut self,
-        catch: &radix_syntax::CapeClause,
-        out: &mut Vec<HirStatement>,
-    ) {
-        let block = self.lower_cape_clause_block(catch);
-        out.extend(block.statements);
-    }
-
     fn lower_cape_clause(&mut self, catch: &radix_syntax::CapeClause) -> radix_hir::HirCape {
         self.push_scope();
         let catch_def_id = self.next_def_id();
@@ -1100,36 +1099,6 @@ impl Lowerer<'_> {
             body,
             span: catch.span,
         }
-    }
-
-    fn lower_cape_clause_block(&mut self, catch: &radix_syntax::CapeClause) -> HirBlock {
-        let cape = self.lower_cape_clause(catch);
-        self.cape_clause_block(cape)
-    }
-
-    fn cape_clause_block(&mut self, cape: radix_hir::HirCape) -> HirBlock {
-        let mut body = cape.body;
-        // Block-shaped handlers need an explicit first local so downstream
-        // passes see the caught value through normal local-binding machinery.
-        body.statements.insert(
-            0,
-            HirStatement {
-                id: self.next_hir_id(),
-                kind: HirStatementKind::Local(radix_hir::HirLocal {
-                    def_id: cape.binding_def_id,
-                    name: cape.binding_name,
-                    ty: cape
-                        .binding_ty
-                        .or_else(|| Some(self.types.primitive(crate::Primitive::Ignotum))),
-                    init: None,
-                    mutable: false,
-                    is_await: false,
-                    runtime_provided: true,
-                }),
-                span: cape.span,
-            },
-        );
-        body
     }
 
     // wraps body into handled expression
