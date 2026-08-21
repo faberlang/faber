@@ -15,6 +15,7 @@ pub mod frame;
 pub mod instans;
 pub mod intervallum;
 pub mod json;
+pub mod lista_bounded;
 pub mod octeti_bounded;
 pub mod or_recovery;
 pub mod regex;
@@ -41,6 +42,7 @@ pub use frame::{
 pub use instans::{Instans, InstansPraecisio};
 pub use intervallum::{Intervallum, IntervallumKind, IntervallumNumeric, IntervallumWalk};
 pub use json::{Json, JsonError, JsonErrorKind};
+pub use lista_bounded::{ListaN, ListaNOverflow};
 pub use octeti_bounded::{OctetiN, OctetiNOverflow};
 pub use or_recovery::{
     instans_from_text_or, instans_from_valor_or, octeti_get_ascii_or, octeti_get_text_or,
