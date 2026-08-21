@@ -56,14 +56,14 @@ pub struct DeviceExecuteRequest {
     pub weight_map_json: Option<Vec<u8>>,
 }
 
-/// One GGUF byte range the child copies into a host f32 buffer.
+/// One GGUF byte range the child copies into a native packed device region.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WeightFileRange {
     /// Byte offset into the GGUF file.
     pub offset: u64,
     /// Packed-byte length to copy.
     pub len: u64,
-    /// Logical f32 element count of the host buffer.
+    /// Admitted packed-region width in f32 words (`ceil(len / 4)`).
     pub elems: u64,
 }
 
@@ -225,7 +225,7 @@ pub fn request_from_section(
     weights_path: Option<&Path>,
     weight_map: Option<&BTreeMap<u32, WeightFileRange>>,
 ) -> Result<DeviceExecuteRequest, HostSpawnError> {
-    let descriptor_json = descriptor_json_from_section(section, backend)?;
+    let descriptor_json = descriptor_json_from_section(section, backend, weight_map)?;
     let inputs_json = encode_device_inputs(inputs)?;
     let weight_map_json = match weight_map {
         Some(map) if !map.is_empty() => Some(encode_weight_map(map)?),
@@ -704,9 +704,17 @@ struct WireEndOfRun {
 }
 
 #[cfg(feature = "device-runtime")]
+fn packed_region_elems(
+    weight_map: Option<&BTreeMap<u32, WeightFileRange>>,
+    buffer_id: u32,
+) -> Option<u64> {
+    weight_map.and_then(|map| map.get(&buffer_id).map(|range| range.elems))
+}
+
 fn descriptor_json_from_section(
     section: &FmirDeviceSection,
     backend: &str,
+    weight_map: Option<&BTreeMap<u32, WeightFileRange>>,
 ) -> Result<Vec<u8>, HostSpawnError> {
     let wire = &section.device_program.program;
     let mut kernels = Vec::with_capacity(wire.kernels.len());
@@ -715,12 +723,14 @@ fn descriptor_json_from_section(
         let entry = kernel_entry(section, backend, &kernel.entry);
         let mut buffers = Vec::with_capacity(kernel.resources.len());
         for resource in &kernel.resources {
+            let element_count = packed_region_elems(weight_map, resource.buffer.id)
+                .unwrap_or(resource.version.element_count);
             add_buffer_version(
                 &mut buffer_versions,
                 resource.buffer.id,
                 resource.version.version,
                 &resource.version.element_ty,
-                resource.version.element_count,
+                element_count,
             )?;
             buffers.push(WireBuffer {
                 buffer_id: resource.buffer.id,
@@ -731,7 +741,7 @@ fn descriptor_json_from_section(
                 initialization: resource.initialization.spelling().to_owned(),
                 binding: resource.binding.binding,
                 element_ty: resource.version.element_ty.clone(),
-                element_count: resource.version.element_count,
+                element_count,
                 version: resource.version.version,
             });
         }
