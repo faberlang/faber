@@ -462,7 +462,12 @@ impl CliBuilder<'_> {
         self.validate_surface("top-level", &globals.options, &globals.operands);
         self.validate_surface("single-command", &single.options, &single.operands);
         if mode == CliMode::SingleCommand {
-            self.validate_global_surface_collisions("single-command", single, globals);
+            self.validate_global_surface_collisions(
+                "single-command",
+                &single.options,
+                &single.operands,
+                globals,
+            );
         }
         self.validate_commands(commands, globals, false);
     }
@@ -1131,12 +1136,12 @@ impl CliBuilder<'_> {
         self.validate_surface(&command_label(command), &command.options, &command.operands);
         self.validate_global_option_collisions(
             &command_label(command),
-            command.options(),
+            &command.options,
             global_bindings,
         );
         self.validate_global_operand_collisions(
             &command_label(command),
-            command.operands(),
+            &command.operands,
             global_bindings,
         );
     }
@@ -1161,7 +1166,7 @@ impl CliBuilder<'_> {
         aliases: &mut FxHashSet<String>,
         allow_alias_paths: bool,
     ) {
-        if alias_path(alias).is_empty() || (!allow_alias_paths && alias.contains('/')) {
+        if path_segments(alias).is_empty() || (!allow_alias_paths && alias.contains('/')) {
             self.error_with(
                 command.span,
                 ISSUE_INVALID_COMMAND_ALIAS,
@@ -1187,12 +1192,13 @@ impl CliBuilder<'_> {
     fn validate_global_surface_collisions(
         &mut self,
         label: &str,
-        local: &impl CliSurfaceView,
+        local_options: &[CliOption],
+        local_operands: &[CliOperand],
         globals: &CliSurface,
     ) {
         let global_bindings = self.global_bindings(globals);
-        self.validate_global_option_collisions(label, local.options(), &global_bindings);
-        self.validate_global_operand_collisions(label, local.operands(), &global_bindings);
+        self.validate_global_option_collisions(label, local_options, &global_bindings);
+        self.validate_global_operand_collisions(label, local_operands, &global_bindings);
     }
 
     fn global_bindings<'a>(&self, globals: &'a CliSurface) -> FxHashSet<&'a str> {
@@ -1338,17 +1344,13 @@ fn prefix_mounted_alias(mount_prefix: &[String], alias: &str) -> String {
     mount_prefix
         .iter()
         .cloned()
-        .chain(alias_path(alias))
+        .chain(path_segments(alias))
         .collect::<Vec<_>>()
         .join("/")
 }
 
 fn command_label(command: &CliCommand) -> String {
     format!("command '{}'", command.path.join("/"))
-}
-
-fn alias_path(alias: &str) -> Vec<String> {
-    path_segments(alias)
 }
 
 fn path_segments(path: &str) -> Vec<String> {
@@ -1368,31 +1370,6 @@ enum SurfacePlacement {
 struct CliSurface {
     options: Vec<CliOption>,
     operands: Vec<CliOperand>,
-}
-
-trait CliSurfaceView {
-    fn options(&self) -> &[CliOption];
-    fn operands(&self) -> &[CliOperand];
-}
-
-impl CliSurfaceView for CliSurface {
-    fn options(&self) -> &[CliOption] {
-        &self.options
-    }
-
-    fn operands(&self) -> &[CliOperand] {
-        &self.operands
-    }
-}
-
-impl CliSurfaceView for CliCommand {
-    fn options(&self) -> &[CliOption] {
-        &self.options
-    }
-
-    fn operands(&self) -> &[CliOperand] {
-        &self.operands
-    }
 }
 
 fn has_cli_annotation(annotations: &[Annotation], interner: &Interner) -> bool {
