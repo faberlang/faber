@@ -1804,7 +1804,11 @@ incipit {
 }
 
 #[test]
-fn bound_vacua_still_lowers_to_vacua() {
+fn bound_vacua_lowers_to_name_load() {
+    // Binding-wins (operator ruling af36ba9a; landed 11acc3ed6): the parser
+    // Vacua claim is only a fallback. A live same-named value binding wins
+    // in bare expression position, matching the semantic pin
+    // bound_vacua_is_the_value_beside_a_same_named_binding.
     let (lowered, _, _) = lower_source(
         r#"
 incipit {
@@ -1814,6 +1818,9 @@ incipit {
 "#,
     );
     let stmts = entry_statements(&lowered);
+    let HirStatementKind::Local(local) = &stmts[0].kind else {
+        panic!("expected local");
+    };
     let HirStatementKind::Expr(scribe) = &stmts[1].kind else {
         panic!("expected scribe expr, got {:?}", stmts[1].kind);
     };
@@ -1821,8 +1828,8 @@ incipit {
         panic!("expected scribe, got {:?}", scribe.kind);
     };
     assert!(
-        matches!(args[0].kind, HirExpressionKind::Vacua),
-        "bare vacua must stay Vacua beside a same-named binding, got {:?}",
+        matches!(args[0].kind, HirExpressionKind::Path(def_id) if def_id == local.def_id),
+        "bound vacua must lower to a name load of the binding, got {:?}",
         args[0].kind
     );
 }
