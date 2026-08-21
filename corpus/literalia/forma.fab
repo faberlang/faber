@@ -5,7 +5,7 @@ category = "template"
 canonical = true
 summary = "Captured backtick templates for bound payloads."
 syntax = "`template`(args)"
-related = ["scriptum", "textus", "valor"]
+related = ["scriptum", "textus"]
 locale = "en"
 +++
 
@@ -21,7 +21,7 @@ locale = "en"
 # Common mistakes:
 #   • Expecting template application to render the string inline — \`...\`(args) captures into a forma genus, it does not interpolate into a textus.
 #
-# See also: scriptum, textus, valor
+# See also: scriptum, textus
 # =============================================================================
 
 # Captured `forma` templates
