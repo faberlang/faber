@@ -1064,6 +1064,10 @@ mod nucleum_annotation_test;
 mod comma_law_test;
 
 #[cfg(test)]
+#[path = "comma_law_matrix_test.rs"]
+mod comma_law_matrix_test;
+
+#[cfg(test)]
 mod non_trivia_index_tests {
     use super::*;
     use radix_lexer::lex;
