@@ -73,6 +73,29 @@ fn run_faber(args: &[&str]) -> (String, String, bool) {
     (stdout, stderr, status.success())
 }
 
+/// Pin the U1 command-boundary ENOENT renderer: abs path + base + artifact.
+fn assert_structured_missing_path(stderr: &str, relative: &str, artifact: &str) {
+    let cwd = std::env::current_dir().expect("cwd");
+    let path = cwd.join(relative);
+    // ALLOW_DIAGNOSTIC_RENDER_TEXT: CLI stderr is the renderer contract for this integration test.
+    assert!(
+        stderr.contains(&path.display().to_string()),
+        "structured missing path must name the absolutized path {}, got:\n{stderr}",
+        path.display()
+    );
+    assert!(
+        stderr.contains(&format!(
+            "cannot read {artifact} resolved against '{}'",
+            cwd.display()
+        )),
+        "structured missing path must name artifact `{artifact}` and resolution base, got:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains(&format!("cannot read '{relative}'")),
+        "must not hand-roll the relative input token, got:\n{stderr}"
+    );
+}
+
 #[test]
 fn targets_reports_faber_package_capability_for_fmir_targets() {
     let (stdout, stderr, ok) = run_faber(&["targets"]);
@@ -638,21 +661,7 @@ fn run_reader_locale_missing_package_path_surfaces_missing_path_error() {
         !stderr.contains("--locale th-TH requires a package path or .fab entry file"),
         "missing package path should reach the underlying filesystem error, got:\n{stderr}"
     );
-    // R1 absolutizes `faber run` inputs before the read-error emitter.
-    let missing_path = std::env::current_dir()
-        .expect("cwd")
-        .join("missing-package");
-    assert!(
-        !stderr.contains("cannot read 'missing-package':"),
-        "run must not print the raw relative token after input absolutization, got:\n{stderr}"
-    );
-    assert!(
-        stderr.contains(&format!(
-            "cannot read '{}': No such file or directory",
-            missing_path.display()
-        )),
-        "expected missing path error, got:\n{stderr}"
-    );
+    assert_structured_missing_path(&stderr, "missing-package", "file");
 }
 
 #[test]
@@ -905,19 +914,43 @@ fn check_reader_locale_missing_package_path_surfaces_missing_path_error() {
         !stderr.contains("--locale th-TH requires a package path or .fab entry file"),
         "missing package path should reach the underlying filesystem error, got:\n{stderr}"
     );
-    // `faber check` still routes a missing non-package path through file-mode
-    // `read_source`, which prints the raw relative token.
-    let absolutized = std::env::current_dir()
-        .expect("cwd")
-        .join("missing-package");
+    assert_structured_missing_path(&stderr, "missing-package", "file");
+}
+
+#[test]
+fn check_missing_directory_surfaces_structured_missing_path() {
+    let (stdout, stderr, ok) = run_faber(&["check", "./no-such-dir"]);
+
+    assert!(!ok, "missing directory should fail");
     assert!(
-        !stderr.contains(&format!("cannot read '{}'", absolutized.display())),
-        "check file-mode must not print the absolutized path, got:\n{stderr}"
+        stdout.is_empty(),
+        "missing directory check should not write stdout: {stdout}"
     );
+    assert_structured_missing_path(&stderr, "no-such-dir", "file");
+}
+
+#[test]
+fn run_missing_source_file_surfaces_structured_missing_path() {
+    let (stdout, stderr, ok) = run_faber(&["run", "no-such-file.fab"]);
+
+    assert!(!ok, "missing source file should fail");
     assert!(
-        stderr.contains("cannot read 'missing-package': No such file or directory"),
-        "expected missing path error, got:\n{stderr}"
+        stdout.is_empty(),
+        "missing source run should not write stdout: {stdout}"
     );
+    assert_structured_missing_path(&stderr, "no-such-file.fab", "source file");
+}
+
+#[test]
+fn model_inspect_missing_file_surfaces_structured_missing_path() {
+    let (stdout, stderr, ok) = run_faber(&["model", "inspect", "no-such-model.safetensors"]);
+
+    assert!(!ok, "missing model file should fail");
+    assert!(
+        stdout.is_empty(),
+        "missing model inspect should not write stdout: {stdout}"
+    );
+    assert_structured_missing_path(&stderr, "no-such-model.safetensors", "file");
 }
 
 #[test]

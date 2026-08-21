@@ -72,8 +72,13 @@ fn cmd_model_inspect(args: ModelInspectArgs) {
     let path = &args.path;
 
     if !path.is_file() {
-        eprintln!("error: no such file: {}", path.display());
-        std::process::exit(1);
+        match fs::metadata(path) {
+            Err(err) => super::eprint_io_error(path, &err),
+            Ok(_) => {
+                eprintln!("error: no such file: {}", path.display());
+                std::process::exit(1);
+            }
+        }
     }
     if !path
         .extension()
@@ -89,10 +94,7 @@ fn cmd_model_inspect(args: ModelInspectArgs) {
 
     let data = match fs::read(path) {
         Ok(d) => d,
-        Err(e) => {
-            eprintln!("error: cannot read {}: {}", path.display(), e);
-            std::process::exit(1);
-        }
+        Err(e) => super::eprint_io_error(path, &e),
     };
 
     let header = match parse_safetensors_metadata(&data) {

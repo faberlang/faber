@@ -137,10 +137,7 @@ pub(super) fn interpret_path(
 
     let source = match fs::read_to_string(path) {
         Ok(source) => source,
-        Err(err) => {
-            eprintln!("error: cannot read '{}': {}", path.display(), err);
-            std::process::exit(1);
-        }
+        Err(err) => super::eprint_io_error(path, &err),
     };
 
     let config = match script_package_config(path, locale, diagnostics_locale) {

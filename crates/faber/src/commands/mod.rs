@@ -92,6 +92,17 @@ pub(super) fn eprint_compile_diagnostics(diagnostics: &[radix_module::diagnostic
     }
 }
 
+/// Exit with a structured missing-path diagnostic (U1 command-boundary contract).
+///
+/// `Diagnostic::io_error` keeps the absolutized path out of the message so the
+/// renderer names it once, and carries `path` / `base` / `artifact` as facts.
+pub(super) fn eprint_io_error(path: &std::path::Path, err: &std::io::Error) -> ! {
+    let path = package::absolutize_path(path);
+    let diagnostic = radix_module::diagnostics::Diagnostic::io_error(&path, err);
+    eprintln!("{}", radix_module::diagnostics::render_plain(&diagnostic));
+    std::process::exit(1);
+}
+
 /// Parse argv and dispatch to the selected command handler.
 pub fn run() {
     let cli = crate::cli::Cli::parse();
@@ -317,10 +328,7 @@ fn read_source(args: &[String]) -> (String, String) {
         ("<stdin>".to_owned(), source)
     } else {
         let path = std::path::PathBuf::from(&args[0]);
-        let source = std::fs::read_to_string(&path).unwrap_or_else(|e| {
-            eprintln!("error: cannot read '{}': {}", path.display(), e);
-            std::process::exit(1);
-        });
+        let source = std::fs::read_to_string(&path).unwrap_or_else(|e| eprint_io_error(&path, &e));
         (args[0].clone(), source)
     }
 }
