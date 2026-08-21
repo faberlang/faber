@@ -59,6 +59,7 @@ fn ty() -> TypeExpr {
         mode: None,
         kind: TypeExprKind::Infer,
         span: Span::new(5, 10),
+        iuncta_label: None,
     }
 }
 

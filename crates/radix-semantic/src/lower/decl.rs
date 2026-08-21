@@ -137,6 +137,7 @@ impl Lowerer<'_> {
 
     fn lower_param(&mut self, param: &Param, use_alias: bool) -> HirParam {
         let def_id = self.next_def_id();
+        crate::tuple_labels::record_from_type_expr(self.resolver, self.interner, def_id, &param.ty);
         let binding_name = if use_alias {
             param.alias.as_ref().unwrap_or(&param.name)
         } else {

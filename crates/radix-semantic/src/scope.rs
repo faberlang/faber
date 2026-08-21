@@ -31,9 +31,10 @@
 
 use super::types::{FuncSig, Type, TypeId, TypeTable};
 use crate::file_interface::{
-    import_interface_callable_with_resolver, import_interface_type_with_resolver, FileExportKind,
-    FileInterface, FileInterfaceError, InterfaceLibraryIdentity, InterfaceMemberKind,
-    InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind, InterfaceStructExport,
+    FileExportKind, FileInterface, FileInterfaceError, InterfaceLibraryIdentity,
+    InterfaceMemberKind, InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind,
+    InterfaceStructExport, import_interface_callable_with_resolver,
+    import_interface_type_with_resolver,
 };
 use crate::locale::LocalePack;
 use crate::passes::visibility_annotation::VisibilityTier;
@@ -669,6 +670,10 @@ pub struct Resolver {
     /// and the active pack's aliases). Empty means registry-direct Latin.
     /// Runtime-only hint state for SEM001.scribe_callee; excluded from snapshots.
     scribe_family_surfaces: FxHashSet<String>,
+    /// Checker-side `iuncta` element labels keyed by binding `DefId`.
+    ///
+    /// Labels never enter `Type::Tuple`. Runtime-only; excluded from snapshots.
+    tuple_element_labels: FxHashMap<DefId, Vec<Option<LexSymbol>>>,
 }
 
 impl Resolver {
@@ -711,6 +716,7 @@ impl Resolver {
             locale_pack_type_aliases: FxHashMap::default(),
             shadowed_builtins: FxHashMap::default(),
             scribe_family_surfaces: FxHashSet::default(),
+            tuple_element_labels: FxHashMap::default(),
         }
     }
 
@@ -2809,6 +2815,17 @@ impl Resolver {
         self.shadowed_builtins.get(&node).copied()
     }
 
+    /// Record per-position `iuncta` labels for a binding.
+    pub fn record_tuple_element_labels(&mut self, def_id: DefId, labels: Vec<Option<LexSymbol>>) {
+        self.tuple_element_labels.insert(def_id, labels);
+    }
+
+    /// Per-position `iuncta` labels for a binding, if an annotation was recorded.
+    #[must_use]
+    pub fn tuple_element_labels(&self, def_id: DefId) -> Option<&[Option<LexSymbol>]> {
+        self.tuple_element_labels.get(&def_id).map(Vec::as_slice)
+    }
+
     /// Return visible value-namespace names from the current lexical scope.
     ///
     /// Served from the nearest-name shadow: one entry per visible spelling,
@@ -3090,6 +3107,7 @@ impl Resolver {
             locale_pack_type_aliases: FxHashMap::default(),
             shadowed_builtins: FxHashMap::default(),
             scribe_family_surfaces: FxHashSet::default(),
+            tuple_element_labels: FxHashMap::default(),
         }
     }
 

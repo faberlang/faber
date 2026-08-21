@@ -59,7 +59,7 @@ use radix_syntax::{
     ExprKind, FiguraExpr, IfBody, Pattern, PatternBind, ProbandumDecl, Program, SiStmt, Stmt,
     StmtKind, TypeExpr, TypeExprKind, TypeParam,
 };
-use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
+use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
 
 const ISSUE_DUPLICATE_DEFINITION: &str = "duplicate_definition";
 const ISSUE_EMPTY_QUALIFIED_TYPE_PATH: &str = "empty_qualified_type_path";
@@ -206,6 +206,7 @@ fn resolve_stmt(
                     decl.mutability == radix_syntax::AstMutability::Mutable,
                     errors,
                 );
+                record_iuncta_labels_for_var(resolver, interner, decl);
             }
             if let Some(init) = &decl.init {
                 resolve_expr(resolver, interner, init, errors);
@@ -217,6 +218,7 @@ fn resolve_stmt(
                     decl.mutability == radix_syntax::AstMutability::Mutable,
                     errors,
                 );
+                record_iuncta_labels_for_var(resolver, interner, decl);
             }
         }
         StmtKind::Func(decl) => {
@@ -236,6 +238,11 @@ fn resolve_stmt(
                         || param.ty.mode == Some(radix_syntax::TypeMode::In),
                     errors,
                 );
+                if let Some(def_id) = resolver.lookup(binding_name.name) {
+                    crate::tuple_labels::record_from_type_expr(
+                        resolver, interner, def_id, &param.ty,
+                    );
+                }
                 if let Some(default) = &param.default {
                     resolve_expr(resolver, interner, default, errors);
                 }
@@ -302,6 +309,12 @@ fn resolve_stmt(
                                     || param.ty.mode == Some(radix_syntax::TypeMode::In),
                                 errors,
                             );
+                            record_iuncta_labels_for_name(
+                                resolver,
+                                interner,
+                                binding_name.name,
+                                &param.ty,
+                            );
                             if let Some(default) = &param.default {
                                 resolve_expr(resolver, interner, default, errors);
                             }
@@ -347,6 +360,7 @@ fn resolve_stmt(
                             || param.ty.mode == Some(radix_syntax::TypeMode::In),
                         errors,
                     );
+                    record_iuncta_labels_for_name(resolver, interner, param.name.name, &param.ty);
                 }
                 if let Some(ret) = &method.ret {
                     resolve_type_expr(resolver, interner, ret, errors);
@@ -1187,6 +1201,7 @@ fn resolve_expr(
                     false,
                     errors,
                 );
+                record_iuncta_labels_for_name(resolver, interner, param.name.name, &param.ty);
             }
             if let Some(ret) = &expr.ret {
                 resolve_type_expr(resolver, interner, ret, errors);
@@ -2320,6 +2335,31 @@ fn define_shader_stage_locals_for_resolution(
     }
 }
 
+fn record_iuncta_labels_for_name(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    name: radix_lexer::Symbol,
+    ty: &TypeExpr,
+) {
+    if let Some(def_id) = resolver.lookup(name) {
+        crate::tuple_labels::record_from_type_expr(resolver, interner, def_id, ty);
+    }
+}
+
+fn record_iuncta_labels_for_var(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    decl: &radix_syntax::VarDecl,
+) {
+    let Some(ty) = &decl.ty else {
+        return;
+    };
+    let BindingPattern::Ident(ident) = &decl.binding else {
+        return;
+    };
+    record_iuncta_labels_for_name(resolver, interner, ident.name, ty);
+}
+
 fn define_symbol(
     resolver: &mut Resolver,
     name: radix_lexer::Symbol,
@@ -2693,11 +2733,7 @@ fn lower_type_expr_with_context(
             } else {
                 types.intern(Type::Union(cleaned))
             };
-            if had_nihil {
-                types.option(base)
-            } else {
-                base
-            }
+            if had_nihil { types.option(base) } else { base }
         }
     };
 
@@ -2737,7 +2773,9 @@ fn type_lower_error_from_message(message: &str) -> TypeLowerError {
         "fractus accepts only f16, f32, or f64" => "invalid_fractus_width_marker",
         "integer width markers are numerus widths; use numerus<…>" => "integer_width_on_fractus",
         "instans accepts at most one precision marker" => "instans_precision_params",
-        "instans accepts only ms, us, or ns as a precision marker" => ISSUE_INVALID_PRECISION_MARKER,
+        "instans accepts only ms, us, or ns as a precision marker" => {
+            ISSUE_INVALID_PRECISION_MARKER
+        }
         "numerus accepts at most one width marker" => "numerus_width_params",
         "precision marker must be a bare spelling such as ms or us" => ISSUE_PRECISION_MARKER_SHAPE,
         "primitive accepts at most one width marker" => "primitive_width_params",
@@ -2748,9 +2786,15 @@ fn type_lower_error_from_message(message: &str) -> TypeLowerError {
         "modulus requires exactly one unsigned width marker; use modulus<u8>, modulus<u16>, modulus<u32>, or modulus<u64>" => {
             "modular_word_width_required"
         }
-        "modulus width marker must be a bare unsigned spelling such as u32" => "modular_word_width_shape",
-        "modulus accepts only unsigned width markers u8, u16, u32, or u64" => "unsupported_modular_word_width",
-        "modulus requires an unsigned integer width marker" => "modular_word_unsigned_width_required",
+        "modulus width marker must be a bare unsigned spelling such as u32" => {
+            "modular_word_width_shape"
+        }
+        "modulus accepts only unsigned width markers u8, u16, u32, or u64" => {
+            "unsupported_modular_word_width"
+        }
+        "modulus requires an unsigned integer width marker" => {
+            "modular_word_unsigned_width_required"
+        }
         _ => ISSUE_UNKNOWN_TYPE_LOWERING,
     };
     TypeLowerError::Issue(issue)

@@ -313,6 +313,13 @@ impl TypeChecker<'_> {
             );
             return self.error_type;
         }
+        if matches!(
+            self.types.get(self.resolve_inferred_type(object_ty)),
+            Type::Tuple(_)
+        ) {
+            self.undefined_member("unknown_tuple_element_label", span);
+            return self.error_type;
+        }
         self.error_type
     }
 

@@ -4,7 +4,7 @@
 
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::{parse_ok, parse_program};
-use crate::{parse, ParseErrorKind};
+use crate::{ParseErrorKind, parse};
 use radix_lexer::lex;
 use radix_syntax::{ClassMemberKind, ExprKind, FiguraExpr, StmtKind, TypeExprKind};
 
@@ -777,6 +777,11 @@ fn parses_labeled_and_unlabeled_iuncta_type_arguments() {
     assert!(matches!(params[0].kind, TypeExprKind::Named(_, _)));
     assert!(matches!(params[1].kind, TypeExprKind::Named(_, _)));
     assert!(matches!(params[2].kind, TypeExprKind::Named(_, _)));
+    let gx = params[0].iuncta_label.as_ref().expect("gx label");
+    assert_eq!(result.interner.resolve(gx.name), "gx");
+    assert!(params[1].iuncta_label.is_none());
+    let fixum = params[2].iuncta_label.as_ref().expect("fixum label");
+    assert_eq!(result.interner.resolve(fixum.name), "fixum");
 }
 
 #[test]
@@ -832,10 +837,12 @@ fn rejects_iuncta_label_spelling_on_call_site_type_arguments() {
 fn unlabeled_iuncta_elements_are_not_spelled_with_an_underscore_label() {
     let result = parse_program("functio f(iuncta<_: f32> pair) → vacuum {}");
     assert!(!result.success());
-    assert!(result
-        .errors
-        .iter()
-        .any(|error| error.kind == ParseErrorKind::Expected));
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|error| error.kind == ParseErrorKind::Expected)
+    );
 }
 
 #[test]

@@ -26,7 +26,7 @@
 //! records the operation and source structure; typecheck decides whether the
 //! operation is valid, and codegen decides how a valid operation is emitted.
 
-use super::{retired_bare_object_literal_args, Lowerer};
+use super::{Lowerer, retired_bare_object_literal_args};
 use crate::builtins::forma::{self as builtin_forma};
 use crate::{Primitive, TypeId};
 use radix_hir::{
@@ -422,8 +422,43 @@ impl Lowerer<'_> {
 
         let object = lower_expr(self, &member.object);
         let field = self.canonicalize_namespace_member(&object, member.member.name);
+        if let Some(kind) = self.lower_tuple_label_member(&object, field, member.member.span) {
+            return kind;
+        }
 
         HirExpressionKind::Field(Box::new(object), field)
+    }
+
+    /// Rewrite `p.gx` on a labeled `iuncta` binding to the same constant-index
+    /// node as `p[0]`. Unknown labels emit `unknown_tuple_element_label`.
+    fn lower_tuple_label_member(
+        &mut self,
+        object: &radix_hir::HirExpression,
+        label: radix_lexer::Symbol,
+        member_span: radix_lexer::Span,
+    ) -> Option<HirExpressionKind> {
+        let radix_hir::HirExpressionKind::Path(def_id) = &object.kind else {
+            return None;
+        };
+        let pos = {
+            let labels = self.resolver.tuple_element_labels(*def_id)?;
+            crate::tuple_labels::position_of(labels, label)
+        };
+        if let Some(pos) = pos {
+            let index = radix_hir::HirExpression {
+                id: self.next_hir_id(),
+                kind: HirExpressionKind::Literal(HirLiteral::Int(pos as u64)),
+                ty: None,
+                span: member_span,
+            };
+            return Some(HirExpressionKind::Index(
+                Box::new(object.clone()),
+                Box::new(index),
+            ));
+        }
+        self.current_span = member_span;
+        self.error("unknown_tuple_element_label");
+        Some(HirExpressionKind::Error)
     }
 
     /// HIR stores canonical library export names. Locale surfaces exist only
@@ -1127,6 +1162,7 @@ fn lower_conversio_target_type(
                     Vec::new(),
                 ),
                 span: ty.span,
+                iuncta_label: None,
             };
             lowerer.lower_type(&bare)
         }

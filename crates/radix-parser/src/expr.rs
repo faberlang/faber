@@ -22,7 +22,7 @@
 //!   colon aliases.
 
 use super::{ParseError, ParseErrorKind, Parser};
-use radix_lexer::{lookup_keyword_spec, KeywordOwner, KeywordScope, Span, Symbol, TokenKind};
+use radix_lexer::{KeywordOwner, KeywordScope, Span, Symbol, TokenKind, lookup_keyword_spec};
 #[allow(clippy::wildcard_imports)]
 use radix_syntax::*;
 
@@ -1330,6 +1330,7 @@ impl Parser {
                         mode: None,
                         kind: TypeExprKind::Named(ident, Vec::new()),
                         span: type_span,
+                        iuncta_label: None,
                     };
                     ExprKind::Verte(VerteExpr {
                         expr: Box::new(object),
@@ -1414,6 +1415,7 @@ impl Parser {
             mode: None,
             kind: TypeExprKind::Qualified(path, Vec::new()),
             span: type_span,
+            iuncta_label: None,
         };
         Ok(Some(ExprKind::Verte(VerteExpr {
             expr: Box::new(object),

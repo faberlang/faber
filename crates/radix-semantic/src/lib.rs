@@ -60,6 +60,7 @@ pub mod target_qualification;
 pub mod tensor_bracket;
 pub mod tensor_element_lattice;
 pub mod tensor_type_directed;
+pub mod tuple_labels;
 pub mod types;
 pub mod vector_width;
 
@@ -74,8 +75,8 @@ pub mod lower;
 #[cfg(test)]
 #[path = "test_support.rs"]
 pub mod test_support;
-pub use lower::annotation::try_parse_nondum_annotation;
 pub use lower::LoweredProgram;
+pub use lower::annotation::try_parse_nondum_annotation;
 pub use numeric_width::is_tensor_element_type;
 pub use numeric_width::tensor_element_conversio_allowed;
 pub use radix_hir::{DefId, HirAnnotation, HirAnnotationField, HirAnnotationValue};
@@ -129,38 +130,38 @@ pub fn all_diagnostic_specs() -> Vec<DiagnosticSpec> {
 use crate::file_interface::{FileExportKind, FileInterface};
 use crate::locale::{LocalePack, TypeBindingKind};
 pub use access_facts::{
-    analyze_access_facts, analyze_access_facts_with_types, AccessFact, AccessFactTable,
-    DeadSourceFact, DeadSourceReason,
+    AccessFact, AccessFactTable, DeadSourceFact, DeadSourceReason, analyze_access_facts,
+    analyze_access_facts_with_types,
 };
 pub use analyzed_application::{
-    qualify_for_target, AnalysisStamp, AnalyzedApplication, AnalyzedApplicationDriverFields,
-    AnalyzedApplicationError, AnalyzedApplicationParts, QualificationStatus, TargetQualification,
+    AnalysisStamp, AnalyzedApplication, AnalyzedApplicationDriverFields, AnalyzedApplicationError,
+    AnalyzedApplicationParts, QualificationStatus, TargetQualification, qualify_for_target,
 };
 pub use annotation_contract::{
+    AnnotationAttachmentTarget, AnnotationContract, AnnotationContractField,
+    AnnotationContractMetadata, AnnotationContractRegistry, ContractFieldType,
+    ContractPayloadValue, ResolvedContractApplication, ResolvedContractField,
     analyze as analyze_annotation_contracts, collect_local_contracts, register_imported_contract,
-    validate_applications as validate_annotation_contract_applications, AnnotationAttachmentTarget,
-    AnnotationContract, AnnotationContractField, AnnotationContractMetadata,
-    AnnotationContractRegistry, ContractFieldType, ContractPayloadValue,
-    ResolvedContractApplication, ResolvedContractField,
+    validate_applications as validate_annotation_contract_applications,
 };
 pub use broadcast_reduction::compute_cotangent_reduction_axes;
 pub use def_id_closure::{
-    check_def_id_closure, def_id_closure_gaps, emit_def_table_name, missing_emit_def_diagnostic,
-    resolved_reference_defs, DEF_ID_CLOSURE_CODE, DEF_ID_CLOSURE_ISSUE,
+    DEF_ID_CLOSURE_CODE, DEF_ID_CLOSURE_ISSUE, check_def_id_closure, def_id_closure_gaps,
+    emit_def_table_name, missing_emit_def_diagnostic, resolved_reference_defs,
 };
 pub use error::{SemanticError, SemanticErrorKind, WarningKind};
 pub use figura::{
-    format_figura, literal_index_i64s, lower_figura_expr, FIGURA_NOT_INDEX_PARAM_MSG,
-    FIGURA_TYPE_PARAM_IN_INDEX_MSG, FIGURA_UNKNOWN_INDEX_MSG, SPARSA_INCOMPLETE_MSG,
-    SPARSA_MISSING_FIGURA_MSG, TENSOR_INCOMPLETE_MSG, TENSOR_MISSING_FIGURA_MSG,
+    FIGURA_NOT_INDEX_PARAM_MSG, FIGURA_TYPE_PARAM_IN_INDEX_MSG, FIGURA_UNKNOWN_INDEX_MSG,
+    SPARSA_INCOMPLETE_MSG, SPARSA_MISSING_FIGURA_MSG, TENSOR_INCOMPLETE_MSG,
+    TENSOR_MISSING_FIGURA_MSG, format_figura, literal_index_i64s, lower_figura_expr,
 };
 pub use format_type::format_faber_type;
 pub use function_facts::{
-    analyze_function_facts, CaptureFact, CaptureMode, FunctionFact, FunctionFactTable,
+    CaptureFact, CaptureMode, FunctionFact, FunctionFactTable, analyze_function_facts,
 };
 pub use index::{IndexExpr, IndexId, IndexVar};
 pub use index_infer::{
-    IndexConstraint, IndexInferError, IndexInferState, INCOMPATIBLE_INDEX_MSG,
+    INCOMPATIBLE_INDEX_MSG, IndexConstraint, IndexInferError, IndexInferState,
     MISSING_TENSOR_SHAPE_MSG, SCALAR_TO_TENSOR_CONVERSIO_MSG, TENSOR_ELEMENT_CONVERSIO_MSG,
     TENSOR_SHAPE_CONVERSIO_MSG, TENSOR_TO_SCALAR_CONVERSIO_MSG,
 };
@@ -168,13 +169,13 @@ pub use index_unify::{IndexUnifier, IndexUnifyError};
 pub use init_state::InitState;
 pub use instans_precision::InstansPrecision;
 pub use matrix_shape::{
-    literal_matrix_shape, lower_matrix_shape_expr, MATRIX_INCOMPLETE_MSG,
-    MATRIX_MISSING_FIGURA_MSG, MATRIX_SHAPE_TWO_DIM_MSG,
+    MATRIX_INCOMPLETE_MSG, MATRIX_MISSING_FIGURA_MSG, MATRIX_SHAPE_TWO_DIM_MSG,
+    literal_matrix_shape, lower_matrix_shape_expr,
 };
 pub use numeric_width::{NumericWidth, TENSOR_ELEMENT_NUMERIC_MSG, TENSOR_INDEX_VECTOR_MSG};
 use passes::companion_predeclare::CompanionPredeclarations;
 pub use qualified_identity::{
-    build_qualified_identities, QualifiedDeclKind, QualifiedIdentity, QualifiedIdentityTable,
+    QualifiedDeclKind, QualifiedIdentity, QualifiedIdentityTable, build_qualified_identities,
 };
 use radix_hir::{HirModule, HirPresentation};
 pub use radix_lane::{RadixBackward, RadixLane, RadixLaneMetadata};
@@ -182,7 +183,7 @@ use radix_lexer::Interner;
 use radix_syntax::Program;
 use radix_target::Target;
 pub use resolved_use::{
-    analyze_resolved_uses, ResolvedUse, ResolvedUseIndex, ResolvedUseKey, ResolvedUseKind,
+    ResolvedUse, ResolvedUseIndex, ResolvedUseKey, ResolvedUseKind, analyze_resolved_uses,
 };
 pub use scope::{
     BareVariantLookup, QualifiedVariantPathLookup, Resolver, Scope, ScopeId, ScopeKind, Symbol,
@@ -190,22 +191,22 @@ pub use scope::{
 };
 use std::collections::BTreeMap;
 pub use types::{
-    access_marker_from_type_mode, collection_type_specs, is_atomic_element_type,
-    is_intervallum_bound_type, lookup_collection_type_spec, lookup_primitive_type_spec,
-    lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs, AccessMarker,
-    CollectionKind, CollectionTypeSpec, FuncSig, InferVar, MarkerFamily, ParamType, Primitive,
-    PrimitiveTypeSpec, SchemaColumnDef, SchemaDef, SemanticMutability, SemanticParamMode,
-    TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId, TypeParamConstraint, TypeTable,
-    TypeTableSnapshot, ATOMIC_ELEMENT_MSG, INTERVALLUM_BOUND_MSG, ISSUE_ASSIGN_THROUGH_REF,
-    ISSUE_DEREF_INTO_OWN, ISSUE_FIELD_INTO_OWN, ISSUE_INDEX_INTO_OWN,
-    ISSUE_MUTATING_RECEIVER_THROUGH_REF, ISSUE_MUT_INTO_OWN, ISSUE_MUT_LOCAL,
+    ATOMIC_ELEMENT_MSG, AccessMarker, CollectionKind, CollectionTypeSpec, FuncSig,
+    INTERVALLUM_BOUND_MSG, ISSUE_ASSIGN_THROUGH_REF, ISSUE_DEREF_INTO_OWN, ISSUE_FIELD_INTO_OWN,
+    ISSUE_INDEX_INTO_OWN, ISSUE_MUT_INTO_OWN, ISSUE_MUT_LOCAL, ISSUE_MUTATING_RECEIVER_THROUGH_REF,
     ISSUE_PROJECTION_INTO_OWN, ISSUE_REF_INTO_OWN, ISSUE_REF_TO_MUT_OR_OWN_POSITION,
-    ISSUE_SCALAR_ACCESS_MARKER, ISSUE_SHARED_INTO_OWN, ISSUE_UNMARKED_INTO_OWN, SUGGESTION_COPY,
+    ISSUE_SCALAR_ACCESS_MARKER, ISSUE_SHARED_INTO_OWN, ISSUE_UNMARKED_INTO_OWN, InferVar,
+    MarkerFamily, ParamType, Primitive, PrimitiveTypeSpec, SUGGESTION_COPY, SchemaColumnDef,
+    SchemaDef, SemanticMutability, SemanticParamMode, TensorFamilyKind, TensorFamilyTypeSpec, Type,
+    TypeId, TypeParamConstraint, TypeTable, TypeTableSnapshot, access_marker_from_type_mode,
+    collection_type_specs, is_atomic_element_type, is_intervallum_bound_type,
+    lookup_collection_type_spec, lookup_primitive_type_spec, lookup_tensor_family_type_spec,
+    primitive_type_specs, tensor_family_type_specs,
 };
 pub use vector_width::{
-    is_vector_width_shape, literal_vector_width, lower_vector_width_expr, VectorWidthError,
     VECTOR_INCOMPLETE_MSG, VECTOR_MISSING_WIDTH_MSG, VECTOR_WIDTH_SINGLE_DIM_ISSUE,
-    VECTOR_WIDTH_SINGLE_DIM_MSG,
+    VECTOR_WIDTH_SINGLE_DIM_MSG, VectorWidthError, is_vector_width_shape, literal_vector_width,
+    lower_vector_width_expr,
 };
 
 /// Final semantic product for a parsed program.
