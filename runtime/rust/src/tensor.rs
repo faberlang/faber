@@ -10,7 +10,6 @@ pub struct Tensor<T> {
     shape: Vec<usize>,
     strides: Vec<usize>,
     offset: usize,
-    view: bool,
 }
 
 // ── Error messages ─────────────────────────────────────────────────────────
@@ -283,7 +282,6 @@ impl<T: Clone + Default> Tensor<T> {
             shape,
             strides: self.strides.clone(),
             offset: self.offset + start * self.strides[0],
-            view: true,
         })
     }
 
@@ -336,17 +334,12 @@ impl<T: Clone + Default> Tensor<T> {
         Ok(Self::from_contiguous(data, shape))
     }
 
-    pub(crate) fn is_view(&self) -> bool {
-        self.view
-    }
-
     fn from_contiguous(data: Vec<T>, shape: Vec<usize>) -> Self {
         Self {
             data: Arc::new(Mutex::new(data)),
             strides: row_major_strides(&shape),
             shape,
             offset: 0,
-            view: false,
         }
     }
 
