@@ -14,10 +14,10 @@ fn config() -> ScanConfig {
 
 const BUDGETS: Budgets = Budgets {
     unwrap: 0,
-    // WHY: four documented static invariants — lockfile duplicate-diagnostic
-    // pop (lockfile.rs), device slot-buffer registration (program.rs), and the
-    // two prefill registered-input/query-head invariants (prefill_run.rs).
-    // cargo.rs / path_deps.rs carry zero expects (fail-closed paths).
+    // WHY: three documented static invariants — device slot-buffer
+    // registration (program.rs), and the two prefill registered-input/query-head
+    // invariants (prefill_run.rs). cargo.rs / path_deps.rs carry zero expects
+    // (fail-closed paths); dense_full_model_run.rs reports missing inputs.
     expect: 4,
     // WHY: one guard in the package build error path.
     panic: 1,
