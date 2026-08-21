@@ -5,7 +5,10 @@
 #![cfg(feature = "runner")]
 
 use super::test_support::test_temp_dir;
-use super::{discover_package, library_resolver_from_config};
+use super::{
+    discover_package, library_resolver_from_config, test_input_route, TestInputRoute,
+    MANIFEST_LESS_TEST_MESSAGE,
+};
 use radix_module::driver::{Config, Session};
 use radix_module::locale::LocalePack;
 use radix_program::analyze::{
@@ -536,4 +539,186 @@ test "core ok" {
         names
     };
     assert_eq!(unit_names(&pkg_relative), unit_names(&pkg_absolute));
+}
+
+fn write_in_package_import_fixture(dir: &Path) -> PathBuf {
+    write_minimal_lib_package(dir);
+    fs::write(
+        dir.join("src/mathesis.fab"),
+        r#"@ public
+fn PI() → float {
+    return 3.14159
+}
+"#,
+    )
+    .expect("mathesis.fab");
+    let proba = dir.join("src/mathesis.proba");
+    fs::write(
+        &proba,
+        r#"import from "./mathesis" mathesis
+
+test "PI is positive" {
+    assert mathesis.PI() > 0.0
+}
+"#,
+    )
+    .expect("mathesis.proba");
+    proba
+}
+
+fn linked_package_report(package: radix_program::analyze::AnalyzedProgram) -> proba::ProbaReport {
+    let mut functions = Vec::new();
+    let mut test_units = Vec::new();
+    for unit in package.nodes.values() {
+        let cases = proba::inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
+        if cases.is_empty() {
+            continue;
+        }
+        functions.extend(cases.iter().map(|case| (unit.path.clone(), case.def_id)));
+        test_units.push((unit.path.clone(), cases));
+    }
+    let scope = radix_program::mir::TestPackageScope::for_program(&package, functions);
+    crate::package::mir::with_linked_test_package_mir(
+        package,
+        &scope,
+        &Config::default(),
+        |validated, function_ids| {
+            let mut report = proba::ProbaReport::default();
+            for (path, cases) in &test_units {
+                report.results.extend(
+                    run_proba_on_validated_with_function_ids(
+                        validated,
+                        path,
+                        cases,
+                        function_ids,
+                        &TestSelection::default(),
+                        None,
+                        false,
+                        false,
+                    )
+                    .results,
+                );
+            }
+            report
+        },
+    )
+    .expect("link package test roots")
+}
+
+#[test]
+fn test_route_sends_in_package_source_file_through_package_analysis() {
+    let dir = test_temp_dir("route-pkg-file");
+    let proba = write_in_package_import_fixture(dir.path());
+    assert_eq!(
+        test_input_route(&proba, false),
+        TestInputRoute::Package,
+        "a .proba under faber.toml must use package analysis"
+    );
+    assert_eq!(
+        test_input_route(&dir.join("src/mathesis.fab"), false),
+        TestInputRoute::Package,
+        "a .fab under faber.toml must use package analysis"
+    );
+    assert_eq!(
+        test_input_route(dir.path(), false),
+        TestInputRoute::Package,
+        "the package root itself stays on the package route"
+    );
+}
+
+#[test]
+fn test_route_no_package_keeps_bare_single_file_route() {
+    let dir = test_temp_dir("route-no-pkg");
+    let proba = write_in_package_import_fixture(dir.path());
+    assert_eq!(
+        test_input_route(&proba, true),
+        TestInputRoute::SingleFile,
+        "--no-package must preserve the bare single-file route"
+    );
+}
+
+#[test]
+fn test_route_bare_file_outside_package_stays_single_file() {
+    let dir = test_temp_dir("route-bare-file");
+    let path = dir.join("alone.proba");
+    fs::write(&path, r#"test "ok" { assert 1 ≡ 1 }"#).expect("write");
+    assert_eq!(test_input_route(&path, false), TestInputRoute::SingleFile);
+    assert_eq!(test_input_route(&path, true), TestInputRoute::SingleFile);
+}
+
+#[test]
+fn test_route_manifest_less_directory_is_guiding_diagnostic() {
+    let dir = test_temp_dir("route-no-toml");
+    fs::write(dir.join("src.fab"), "fn n() → int { return 1 }\n").expect("src");
+    assert_eq!(
+        test_input_route(dir.path(), false),
+        TestInputRoute::ManifestLessDirectory
+    );
+    assert_eq!(
+        MANIFEST_LESS_TEST_MESSAGE,
+        "no faber.toml found; testing a library requires a package root"
+    );
+}
+
+#[test]
+fn single_proba_file_under_package_root_analyzes_and_links_local_import() {
+    let dir = test_temp_dir("route-file-link");
+    let proba = write_in_package_import_fixture(dir.path());
+
+    assert_eq!(test_input_route(&proba, false), TestInputRoute::Package);
+
+    let package = analyze_tests_with_faber_seams(&Config::default(), &proba, None)
+        .expect("analyze single .proba through package discovery");
+    assert!(
+        package.spec.manifest_backed,
+        "file input must resolve the enclosing package"
+    );
+    assert!(
+        package.diagnostics.iter().all(|d| !d.is_error()),
+        "{:?}",
+        package.diagnostics
+    );
+
+    let report = linked_package_report(package);
+    assert_eq!(report.passed(), 1, "{report:?}");
+    assert_eq!(report.failed(), 0, "{report:?}");
+    for result in &report.results {
+        let message = match &result.outcome {
+            CaseOutcome::Failed { message } => message.as_str(),
+            _ => continue,
+        };
+        assert!(
+            !message.contains("provider package:"),
+            "in-package import must not stay a provider identity: {message}"
+        );
+    }
+}
+
+#[test]
+fn no_package_single_file_route_cannot_resolve_in_package_import() {
+    let dir = test_temp_dir("route-bare-import");
+    let proba = write_in_package_import_fixture(dir.path());
+    assert_eq!(test_input_route(&proba, true), TestInputRoute::SingleFile);
+
+    let source = fs::read_to_string(&proba).expect("read");
+    let result = run_proba_source(
+        &english_session(),
+        proba.to_str().unwrap(),
+        &source,
+        &TestSelection::default(),
+        None,
+        false,
+        false,
+    );
+    match result {
+        Ok(report) => {
+            assert!(
+                !report.success(),
+                "bare --no-package route must not resolve in-package imports: {report:?}"
+            );
+        }
+        Err(_) => {
+            // Frontend/MIR error on the import is also the bare-route failure.
+        }
+    }
 }

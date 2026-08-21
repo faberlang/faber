@@ -501,6 +501,10 @@ pub struct TestArgs {
     /// Include selection-filtered cases as skips in the report
     #[arg(long, conflicts_with = "ignored")]
     pub include_ignored: bool,
+
+    /// Interpret a single `.fab` / `.proba` file without package analysis
+    #[arg(long = "no-package")]
+    pub no_package: bool,
 }
 
 /// Arguments for `faber model`.

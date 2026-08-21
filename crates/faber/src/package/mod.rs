@@ -252,6 +252,55 @@ pub(crate) fn discover_package(input: &Path) -> Result<PackageSpec, Box<Diagnost
     Ok(spec)
 }
 
+/// `faber test` execution route selected from the input path.
+///
+/// Used by the `faber` binary `cmd_test` (a separate crate graph from this
+/// lib) and by package-route tests.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+pub(crate) enum TestInputRoute {
+    /// Bare single-file MIR runner (no package graph).
+    SingleFile,
+    /// Package analysis + linking, including a single file under a package root.
+    Package,
+    /// Directory with no `faber.toml` — guiding diagnostic, not `main.fab` fallback.
+    ManifestLessDirectory,
+}
+
+/// Guiding diagnostic for E1: `faber test .` in a library tree without a manifest.
+#[allow(dead_code)]
+pub(crate) const MANIFEST_LESS_TEST_MESSAGE: &str =
+    "no faber.toml found; testing a library requires a package root";
+
+#[allow(dead_code)]
+fn is_test_source_file(path: &Path) -> bool {
+    path.is_file()
+        && path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| ext == "fab" || ext == "proba")
+}
+
+/// Select the `faber test` route for `path`.
+///
+/// A single `.fab`/`.proba` under a discoverable package root uses package
+/// analysis so in-package imports resolve. `--no-package` keeps the bare
+/// single-file route. A directory without `faber.toml` is rejected with
+/// [`MANIFEST_LESS_TEST_MESSAGE`] instead of the legacy `main.fab` fallback.
+#[allow(dead_code)]
+pub(crate) fn test_input_route(path: &Path, no_package: bool) -> TestInputRoute {
+    let path = absolutize_path(path);
+    if is_test_source_file(&path) && no_package {
+        return TestInputRoute::SingleFile;
+    }
+    match discover_package(&path) {
+        Ok(spec) if spec.manifest_backed => TestInputRoute::Package,
+        Ok(_) if path.is_dir() => TestInputRoute::ManifestLessDirectory,
+        _ if is_test_source_file(&path) => TestInputRoute::SingleFile,
+        _ => TestInputRoute::Package,
+    }
+}
+
 pub(crate) fn discover_build_layout(
     input: &Path,
 ) -> Result<radix_program::discovery::BuildLayout, Box<Diagnostic>> {

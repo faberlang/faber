@@ -95,17 +95,16 @@ pub(super) fn cmd_test(args: &TestArgs) {
         }
     };
 
-    let report = if input_is_single_source_file(&input_path) {
-        run_single_file(
+    let report = match package::test_input_route(&input_path, args.no_package) {
+        package::TestInputRoute::SingleFile => run_single_file(
             &config,
             &input_path,
             &selection,
             harness_filter,
             args.exact,
             args.include_ignored,
-        )
-    } else {
-        run_package(
+        ),
+        package::TestInputRoute::Package => run_package(
             &config,
             &input_path,
             &selection,
@@ -113,7 +112,11 @@ pub(super) fn cmd_test(args: &TestArgs) {
             harness_filter,
             args.exact,
             args.include_ignored,
-        )
+        ),
+        package::TestInputRoute::ManifestLessDirectory => {
+            eprintln!("error: {}", package::MANIFEST_LESS_TEST_MESSAGE);
+            std::process::exit(1);
+        }
     };
 
     print_report(&report, args.nocapture);
@@ -121,14 +124,6 @@ pub(super) fn cmd_test(args: &TestArgs) {
         std::process::exit(0);
     }
     std::process::exit(1);
-}
-
-fn input_is_single_source_file(path: &Path) -> bool {
-    path.is_file()
-        && path
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .is_some_and(|ext| ext == "fab" || ext == "proba")
 }
 
 fn run_single_file(
@@ -238,6 +233,7 @@ fn run_package(
                 for (unit_path, cases) in failed_units {
                     for case in cases {
                         blocked.results.push(CaseResult {
+                            unit_path: unit_path.clone(),
                             name: case.name,
                             suite_path: case.suite_path,
                             outcome: CaseOutcome::Blocked {
