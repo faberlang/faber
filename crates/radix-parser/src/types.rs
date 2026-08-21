@@ -471,7 +471,7 @@ impl Parser {
         let mut labels = HashSet::new();
         loop {
             args.push(self.parse_iuncta_type_argument(&mut labels)?);
-            if !self.eat(&TokenKind::Comma) {
+            if !self.consume_item_separator(&TokenKind::GtAscii, "type_arguments")? {
                 break;
             }
         }
