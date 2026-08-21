@@ -14,12 +14,12 @@
 //! the GGUF-M6/M6 capstone package manifest (EXEC-01 challenge C2).
 
 use super::composite_plan::{
-    assemble_composite_plan, verify_identity_preservation, BackendLeaf, BackendSelection,
-    CompositePlanFacts, ContentIdentity, EffectCapabilityRequirements, ExpectedBuffer,
-    ExpectedSource, HostCallFact, IdentitySource, KernelIdentity, ModelIdentity, SourceRevisions,
-    SubmissionRegionFact,
+    BackendLeaf, BackendSelection, CompositePlanFacts, ContentIdentity,
+    EffectCapabilityRequirements, ExpectedBuffer, ExpectedSource, HostCallFact, IdentitySource,
+    KernelIdentity, ModelIdentity, SourceRevisions, SubmissionRegionFact, assemble_composite_plan,
+    verify_identity_preservation,
 };
-use super::test_support::{test_temp_dir, TestDir};
+use super::test_support::{TestDir, test_temp_dir};
 use radix_mir::abi::{
     MirKernelDispatchSize, MirKernelResourceAccess, MirKernelWorkgroupCount, MirWorkgroupSize,
 };
@@ -79,13 +79,27 @@ fn copy_package_dir_skipping_target(src: &Path, dest: &Path) {
     }
 }
 
+/// The imported Gradus HIR is walked recursively by the def-id closure check.
+/// A default Rust test thread's stack is too small for this finite fixture
+/// graph, so keep the synthetic proof on an explicit bounded stack.
+const SYNTHETIC_ANALYSIS_STACK_SIZE: usize = 4 * 1024 * 1024;
+
 /// Analyze a fresh copy of the synthetic fixture package.
+
 fn analyze_fixture() -> (TestDir, AnalyzedProgram) {
-    let dir = copy_fixture();
-    let config = Config::default();
-    let package =
-        analyze_with_faber_seams(&config, dir.path()).expect("synthetic fixture package analyzes");
-    (dir, package)
+    std::thread::Builder::new()
+        .name("composite-plan-synthetic".to_owned())
+        .stack_size(SYNTHETIC_ANALYSIS_STACK_SIZE)
+        .spawn(|| {
+            let dir = copy_fixture();
+            let config = Config::default();
+            let package = analyze_with_faber_seams(&config, dir.path())
+                .expect("synthetic fixture package analyzes");
+            (dir, package)
+        })
+        .expect("spawn synthetic analysis thread")
+        .join()
+        .expect("synthetic analysis thread must not panic")
 }
 
 fn weights_identity() -> BufferIdentity {
