@@ -322,9 +322,9 @@ fn admit_executor_plan_section(
         }
         if plan.primary_bind.dims.is_empty()
             || plan.primary_bind.dims.len() != plan.primary_bind.strides.len()
-            || plan.primary_bind.dims.iter().any(|dim| *dim == 0)
-            || plan.primary_bind.strides.iter().any(|stride| *stride == 0)
-            || plan.primary_bind.grid.iter().any(|axis| *axis == 0)
+            || plan.primary_bind.dims.contains(&0)
+            || plan.primary_bind.strides.contains(&0)
+            || plan.primary_bind.grid.contains(&0)
             || plan.primary_bind.layout.is_empty()
         {
             return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {
@@ -347,8 +347,8 @@ fn admit_executor_plan_section(
             if bind.name.is_empty()
                 || bind.dims.is_empty()
                 || bind.dims.len() != bind.strides.len()
-                || bind.dims.iter().any(|dim| *dim == 0)
-                || bind.strides.iter().any(|stride| *stride == 0)
+                || bind.dims.contains(&0)
+                || bind.strides.contains(&0)
             {
                 return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {
                     detail: format!("selection {position} has an invalid bind for {}", bind.name),
@@ -372,10 +372,7 @@ fn admit_executor_plan_section(
             }
         }
         for offset in &plan.offsets {
-            if offset.name.is_empty()
-                || offset.strides.is_empty()
-                || offset.strides.iter().any(|stride| *stride == 0)
-            {
+            if offset.name.is_empty() || offset.strides.is_empty() || offset.strides.contains(&0) {
                 return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {
                     detail: format!(
                         "selection {position} has an invalid offset/stride row for {}",
