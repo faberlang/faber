@@ -9,6 +9,7 @@ use proba::{
 };
 use radix_module::driver::{Config, Session};
 use radix_program::test_source_filter::TestSourceFilter;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 /// Discover, select, and run proba cases exclusively on the MIR runner.
@@ -180,11 +181,7 @@ fn run_package(
         &package::faber_analysis_seams(),
     ) {
         Ok(package) => package,
-        Err(diagnostics) => {
-            super::eprint_compile_diagnostics(&diagnostics);
-            eprintln!("error: package analysis failed");
-            std::process::exit(1);
-        }
+        Err(diagnostics) => fail_package_analysis(&diagnostics),
     };
 
     if package
@@ -192,9 +189,7 @@ fn run_package(
         .iter()
         .any(radix_module::diagnostics::Diagnostic::is_error)
     {
-        super::eprint_compile_diagnostics(&package.diagnostics);
-        eprintln!("error: package analysis failed");
-        std::process::exit(1);
+        fail_package_analysis(&package.diagnostics);
     }
 
     let mut test_units = Vec::new();
@@ -286,6 +281,48 @@ fn print_report(report: &ProbaReport, _nocapture: bool) {
     println!("{}", format_summary(report));
 }
 
+fn fail_package_analysis(diagnostics: &[radix_module::diagnostics::Diagnostic]) -> ! {
+    let rendered = render_package_analysis_diagnostics(diagnostics);
+    if !rendered.is_empty() {
+        eprintln!("{rendered}");
+    }
+    eprintln!("error: package analysis failed");
+    std::process::exit(1);
+}
+
+/// Package-route analysis diagnostics: errors use the same plain renderer as
+/// `faber check`; repeated warning codes collapse to one counted line (E4).
+fn render_package_analysis_diagnostics(
+    diagnostics: &[radix_module::diagnostics::Diagnostic],
+) -> String {
+    let mut warning_counts = HashMap::<&str, usize>::new();
+    for diag in diagnostics {
+        if diag.severity == radix_module::diagnostics::Severity::Warning {
+            if let Some(code) = diag.code {
+                *warning_counts.entry(code).or_insert(0) += 1;
+            }
+        }
+    }
+
+    let mut emitted_warning_codes = HashSet::<&str>::new();
+    let mut lines = Vec::new();
+    for diag in diagnostics {
+        if diag.severity == radix_module::diagnostics::Severity::Warning {
+            if let Some(code) = diag.code {
+                if warning_counts.get(code).copied().unwrap_or(0) > 1 {
+                    if emitted_warning_codes.insert(code) {
+                        let count = warning_counts[code];
+                        lines.push(format!("warning[{code}]: {count} occurrences"));
+                    }
+                    continue;
+                }
+            }
+        }
+        lines.push(radix_module::diagnostics::render_plain(diag));
+    }
+    lines.join("\n")
+}
+
 fn print_run_error(error: &radix_module::mir::RunSourceError) {
     match error {
         radix_module::mir::RunSourceError::Frontend(diagnostics) => {
@@ -309,3 +346,7 @@ fn print_run_error(error: &radix_module::mir::RunSourceError) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "test_test.rs"]
+mod tests;
