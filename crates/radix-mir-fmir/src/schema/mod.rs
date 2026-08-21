@@ -64,6 +64,10 @@ mod distributed_identity_test;
 mod distributed_test;
 
 #[cfg(test)]
+#[path = "md3h_distributed_test.rs"]
+mod md3h_distributed_test;
+
+#[cfg(test)]
 #[path = "session_test.rs"]
 mod session_test;
 

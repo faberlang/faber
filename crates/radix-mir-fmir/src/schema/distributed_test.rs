@@ -17,6 +17,10 @@
 //!   inspects the delivered bytes, never a self-declared hash;
 //! - a stale `WIRE_DISTRIBUTED_SECTION_VERSION` fails closed;
 //! - the equivalence gate passes for the unmutated fixture.
+//!
+//! MD3H-F1 8-rank / 1-partition execution fixtures live in
+//! `md3h_distributed_test.rs` (this module stays the MD2-W1 two-partition
+//! admission surface).
 
 use super::{
     admit_device_section, admit_distributed_section, canonical_program_bytes, device_identity_hash,
