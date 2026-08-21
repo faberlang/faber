@@ -158,5 +158,9 @@ mod schema_resolve_test;
 mod typecheck_test;
 
 #[cfg(test)]
+#[path = "typecheck/iuncta_label_test.rs"]
+mod iuncta_label_test;
+
+#[cfg(test)]
 #[path = "visibility_annotation_test.rs"]
 mod visibility_annotation_test;

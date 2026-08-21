@@ -6,7 +6,7 @@
 
 #![allow(dead_code)]
 
-use super::catalog::{arg_value, quote_arg, DiagnosticSpec};
+use super::catalog::{DiagnosticSpec, arg_value, quote_arg};
 use crate::{SemanticErrorKind, WarningKind};
 use radix_diagnostics::DiagnosticArg;
 
@@ -1246,13 +1246,17 @@ fn nucleum_fragment_type_message(args: &[DiagnosticArg]) -> Option<String> {
             "@ nucleum fragment call has unsolved generic or magnitudo bindings".to_owned()
         }
         ("shape", Some(expected), Some(actual)) => {
-            format!("@ nucleum fragment call shape {actual} does not match specialized shape {expected}")
+            format!(
+                "@ nucleum fragment call shape {actual} does not match specialized shape {expected}"
+            )
         }
         ("shape", _, _) => {
             "@ nucleum fragment call does not satisfy the specialized shape constraints".to_owned()
         }
         ("layout", Some(expected), Some(actual)) => {
-            format!("@ nucleum fragment call layout {actual} does not match specialized layout {expected}")
+            format!(
+                "@ nucleum fragment call layout {actual} does not match specialized layout {expected}"
+            )
         }
         ("layout", _, _) => {
             "@ nucleum fragment call does not satisfy the specialized layout constraints".to_owned()
@@ -1344,7 +1348,9 @@ fn nucleum_fragment_expansion_message(args: &[DiagnosticArg]) -> Option<String> 
             "nucleum fragment call cannot use a failable terminator".to_owned()
         }
         (Some(kind), Some(observed), Some(limit), Some(chain)) => {
-            format!("nucleum fragment expansion exceeds {kind} limit {limit} (observed {observed}) along {chain}")
+            format!(
+                "nucleum fragment expansion exceeds {kind} limit {limit} (observed {observed}) along {chain}"
+            )
         }
         (Some(kind), Some(observed), Some(limit), _) => {
             format!("nucleum fragment expansion exceeds {kind} limit {limit} (observed {observed})")
@@ -1530,6 +1536,7 @@ fn semantic_undefined_member_message(args: &[DiagnosticArg]) -> Option<String> {
         "unknown_field" => Some("unknown field".to_owned()),
         "unknown_method" => Some("unknown method".to_owned()),
         "unknown_struct_field" => Some("unknown struct field".to_owned()),
+        "unknown_tuple_element_label" => Some("unknown tuple element label".to_owned()),
         "unknown_variant_field" => Some("unknown variant field".to_owned()),
         _ => None,
     }
@@ -1555,6 +1562,9 @@ fn semantic_undefined_member_help(args: &[DiagnosticArg]) -> Option<String> {
         "struct_field_requires_value" => Some("provide a value for the struct field".to_owned()),
         "unknown_field" | "unknown_struct_field" => Some("check the struct field name".to_owned()),
         "unknown_method" => Some("check the receiver type and method name".to_owned()),
+        "unknown_tuple_element_label" => {
+            Some("use a label declared on the iuncta annotation, or index by position".to_owned())
+        }
         "unknown_variant_field" => Some("check the variant field name".to_owned()),
         _ => None,
     }
@@ -1815,6 +1825,7 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
         "unknown_interface" => Some("unknown interface in gens declaration".to_owned()),
         "unknown_lowering_error" => Some("HIR lowering failed".to_owned()),
         "unknown_namespace" => Some("unknown namespace".to_owned()),
+        "unknown_tuple_element_label" => Some("unknown tuple element label".to_owned()),
         "unknown_type_lowering_error" => Some("type lowering failed".to_owned()),
         "unknown_type_name" => Some("unknown type name".to_owned()),
         "vector_width_single_dim" => Some("vector width must be a single dimension".to_owned()),
@@ -2486,24 +2497,38 @@ fn semantic_wildcard_absorbs_null_message(args: &[DiagnosticArg]) -> Option<Stri
 
 fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
     match kind {
-        WarningKind::UnusedVariable => {
-            DiagnosticSpec { code: "WARN001", help: Some("remove the variable or prefix it with '_'") }
-        }
-        WarningKind::UnusedImport => DiagnosticSpec { code: "WARN002", help: Some("remove the unused import") },
-        WarningKind::UnusedFunction => {
-            DiagnosticSpec { code: "WARN003", help: Some("remove the function or mark it as used") }
-        }
-        WarningKind::UnreachableCode => DiagnosticSpec { code: "WARN004", help: Some("remove unreachable code") },
-        WarningKind::UnnecessaryCast => DiagnosticSpec { code: "WARN005", help: Some("remove the redundant cast") },
-        WarningKind::TargetNoop => {
-            DiagnosticSpec { code: "WARN007", help: Some("remove the construct or gate it by target") }
-        }
-        WarningKind::UnusedMutRefParam => {
-            DiagnosticSpec { code: "WARN008", help: Some("change `mut` to `ref` if mutation is unnecessary") }
-        }
-        WarningKind::UnusedMoveParam => {
-            DiagnosticSpec { code: "WARN009", help: Some("change `own` to `ref` if ownership transfer is unnecessary") }
-        }
+        WarningKind::UnusedVariable => DiagnosticSpec {
+            code: "WARN001",
+            help: Some("remove the variable or prefix it with '_'"),
+        },
+        WarningKind::UnusedImport => DiagnosticSpec {
+            code: "WARN002",
+            help: Some("remove the unused import"),
+        },
+        WarningKind::UnusedFunction => DiagnosticSpec {
+            code: "WARN003",
+            help: Some("remove the function or mark it as used"),
+        },
+        WarningKind::UnreachableCode => DiagnosticSpec {
+            code: "WARN004",
+            help: Some("remove unreachable code"),
+        },
+        WarningKind::UnnecessaryCast => DiagnosticSpec {
+            code: "WARN005",
+            help: Some("remove the redundant cast"),
+        },
+        WarningKind::TargetNoop => DiagnosticSpec {
+            code: "WARN007",
+            help: Some("remove the construct or gate it by target"),
+        },
+        WarningKind::UnusedMutRefParam => DiagnosticSpec {
+            code: "WARN008",
+            help: Some("change `mut` to `ref` if mutation is unnecessary"),
+        },
+        WarningKind::UnusedMoveParam => DiagnosticSpec {
+            code: "WARN009",
+            help: Some("change `own` to `ref` if ownership transfer is unnecessary"),
+        },
         WarningKind::ExplicitIgnotumAnnotation => DiagnosticSpec {
             code: "WARN010",
             help: Some("prefer a concrete type annotation to keep type-checking precise"),
@@ -2524,15 +2549,18 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         },
         WarningKind::UnrecognizedCurataAllocator => DiagnosticSpec {
             code: "WARN015",
-            help: Some("use a recognized allocator name (\"arena\", \"page\", \"alloc\", or \"allocator\")"),
+            help: Some(
+                "use a recognized allocator name (\"arena\", \"page\", \"alloc\", or \"allocator\")",
+            ),
         },
         WarningKind::MonomorphicHoleSolvedToUnion => DiagnosticSpec {
             code: "WARN016",
             help: Some("use an explicit union type or a `∪` hole if a sum was intended"),
         },
-        WarningKind::UnionHoleSolvedMonomorphically => {
-            DiagnosticSpec { code: "WARN017", help: Some("use `_` if only one type is intended") }
-        }
+        WarningKind::UnionHoleSolvedMonomorphically => DiagnosticSpec {
+            code: "WARN017",
+            help: Some("use `_` if only one type is intended"),
+        },
         WarningKind::PreferStringTemplate => DiagnosticSpec {
             code: "WARN018",
             help: Some("use a string template (`\"…§…\"(args)`) for long concatenation chains"),
@@ -2543,7 +2571,9 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         },
         WarningKind::EmptyMarkerShadowing => DiagnosticSpec {
             code: "WARN021",
-            help: Some("choose a different binding name when the empty-collection marker is needed"),
+            help: Some(
+                "choose a different binding name when the empty-collection marker is needed",
+            ),
         },
     }
 }

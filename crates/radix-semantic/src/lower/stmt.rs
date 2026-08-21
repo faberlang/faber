@@ -30,7 +30,7 @@
 //! be literals or enum variants. Type compatibility, exhaustiveness, loop
 //! placement legality, and target-specific lowering remain downstream.
 
-use super::{pattern, HirBlock, HirExpression, HirStatement, HirStatementKind, Lowerer};
+use super::{HirBlock, HirExpression, HirStatement, HirStatementKind, Lowerer, pattern};
 use radix_hir::{HirCasuArm, HirExpressionKind, HirLiteral, HirPattern, HirScribeKind};
 use radix_lexer::Span;
 use radix_syntax::{Stmt, StmtKind};
@@ -374,6 +374,14 @@ impl Lowerer<'_> {
         match &decl.binding {
             radix_syntax::BindingPattern::Ident(ident) => {
                 let def_id = self.next_def_id();
+                if let Some(ty) = &decl.ty {
+                    crate::tuple_labels::record_from_type_expr(
+                        self.resolver,
+                        self.interner,
+                        def_id,
+                        ty,
+                    );
+                }
                 self.bind_local(ident.name, def_id);
                 let ty = decl.ty.as_ref().map(|ty| self.lower_type(ty));
                 let init = decl.init.as_ref().map(|expr| self.lower_expr(expr));

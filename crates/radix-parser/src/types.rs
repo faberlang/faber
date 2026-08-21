@@ -87,6 +87,7 @@ impl Parser {
                 mode,
                 kind: TypeExprKind::Func(func),
                 span,
+                iuncta_label: None,
             };
             return self.parse_union_tail(core, start);
         }
@@ -276,6 +277,7 @@ impl Parser {
             mode,
             kind,
             span,
+            iuncta_label: None,
         };
         self.parse_union_tail(core, start)
     }
@@ -317,6 +319,7 @@ impl Parser {
             mode: None, // modes belong on members or parenthesized forms (future)
             kind: TypeExprKind::Union(members),
             span,
+            iuncta_label: None,
         })
     }
 
@@ -453,22 +456,23 @@ impl Parser {
             mode: None,
             kind: TypeExprKind::Named(self.keyword_ident(width, span), Vec::new()),
             span,
+            iuncta_label: None,
         }
     }
 
     /// Parse one `iuncta` element, optionally preceded by its contextual label.
     ///
-    /// Labels are parser-local aliases at this stage. They are consumed here so
-    /// the existing `TypeExprKind::Named("iuncta", params)` carrier keeps its
-    /// identity-erased shape for later phases. `_` is deliberately excluded from
-    /// the label lookahead: an unlabeled element is represented by absence.
+    /// The label rides `TypeExpr::iuncta_label` so later phases can build a
+    /// checker-side table without changing `TypeExprKind` identity. `_` is
+    /// deliberately excluded from the label lookahead: an unlabeled element is
+    /// represented by absence.
     fn parse_iuncta_type_argument(
         &mut self,
         labels: &mut HashSet<Symbol>,
     ) -> Result<TypeExpr, ParseError> {
         let is_label = matches!(self.peek().kind, TokenKind::Ident(_) | TokenKind::Tag)
             && matches!(self.peek_at(1).kind, TokenKind::Colon);
-        if is_label {
+        let iuncta_label = if is_label {
             let label = self.parse_contextual_ident(KeywordOwner::DeclarationName)?;
             if !labels.insert(label.name) {
                 return Err(ParseError::structured(ParseErrorKind::Expected, label.span)
@@ -476,8 +480,13 @@ impl Parser {
                     .with_arg("label", self.interner.resolve(label.name).to_owned()));
             }
             self.expect(&TokenKind::Colon, "expected ':' after tuple element label")?;
-        }
-        self.parse_type_argument()
+            Some(label)
+        } else {
+            None
+        };
+        let mut ty = self.parse_type_argument()?;
+        ty.iuncta_label = iuncta_label;
+        Ok(ty)
     }
 
     /// Parse one applied type argument: a type, or a NATURAL capacity.
@@ -494,6 +503,7 @@ impl Parser {
                 mode: None,
                 kind: TypeExprKind::Named(self.keyword_ident(&value.to_string(), span), Vec::new()),
                 span,
+                iuncta_label: None,
             });
         }
         self.parse_type()
@@ -542,6 +552,7 @@ fn flatten_union_member(member: TypeExpr, members: &mut Vec<TypeExpr>) {
         mode,
         kind,
         span,
+        iuncta_label,
     } = member;
     match kind {
         TypeExprKind::Union(nested) => {
@@ -554,6 +565,7 @@ fn flatten_union_member(member: TypeExpr, members: &mut Vec<TypeExpr>) {
             mode,
             kind,
             span,
+            iuncta_label,
         }),
     }
 }

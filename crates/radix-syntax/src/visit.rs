@@ -761,7 +761,7 @@ fn walk_pattern_bind<V: Visitor>(visitor: &mut V, bind: &PatternBind) {
 
 #[cfg(test)]
 mod tests {
-    use super::{walk_expr, walk_stmt, walk_type_expr, Visitor, MAX_VISIT_DEPTH};
+    use super::{MAX_VISIT_DEPTH, Visitor, walk_expr, walk_stmt, walk_type_expr};
     use crate::{AstMutability, ExField, PathPattern};
     use crate::{
         BinOp, BinaryExpr, BlockStmt, CasuArm, DiscerneStmt, Expr, ExprKind, FuncDecl, Ident,
@@ -844,6 +844,7 @@ mod tests {
             mode: None,
             kind: TypeExprKind::Infer,
             span: Span::new(0, 1),
+            iuncta_label: None,
         }
     }
 
@@ -856,6 +857,7 @@ mod tests {
                 mode: None,
                 kind: TypeExprKind::Atomic(Box::new(ty)),
                 span: Span::new(0, 1),
+                iuncta_label: None,
             };
         }
         ty

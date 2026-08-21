@@ -23,8 +23,8 @@
 
 use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::{
-    keyword_allowed_as_ident, keyword_spelling_for_token, lookup_keyword_spec, KeywordOwner,
-    KeywordScope, TokenKind,
+    KeywordOwner, KeywordScope, TokenKind, keyword_allowed_as_ident, keyword_spelling_for_token,
+    lookup_keyword_spec,
 };
 #[allow(clippy::wildcard_imports)]
 use radix_syntax::*;
@@ -343,6 +343,7 @@ impl Parser {
             mode: None,
             kind: TypeExprKind::Infer,
             span: start,
+            iuncta_label: None,
         });
 
         Ok(StmtKind::Var(VarDecl {
@@ -636,7 +637,7 @@ impl Parser {
                                 ParseErrorKind::Unexpected,
                                 self.previous_span(),
                             )
-                            .with_arg("issue", "exitus_value_out_of_range"))
+                            .with_arg("issue", "exitus_value_out_of_range"));
                         }
                     }
                 } else {
@@ -1028,7 +1029,7 @@ impl Parser {
                                     ParseErrorKind::Unexpected,
                                     self.previous_span(),
                                 )
-                                .with_arg("issue", "enum_value_out_of_range"))
+                                .with_arg("issue", "enum_value_out_of_range"));
                             }
                         }
                     }
@@ -1050,7 +1051,7 @@ impl Parser {
                                         ParseErrorKind::Unexpected,
                                         self.previous_span(),
                                     )
-                                    .with_arg("issue", "enum_value_out_of_range"))
+                                    .with_arg("issue", "enum_value_out_of_range"));
                                 }
                             }
                         } else {
@@ -1758,6 +1759,7 @@ impl Parser {
             mode: None,
             kind: TypeExprKind::Named(name, Vec::new()),
             span,
+            iuncta_label: None,
         })
     }
 

@@ -3,9 +3,9 @@
 //! These tests prove that the first AST pass registers top-level declarations
 //! in the resolver and rejects duplicate definitions.
 
-use super::{collect, Resolver, SemanticErrorKind, SymbolKind, TypeTable};
-use crate::test_support::args_have_no_legacy_message;
+use super::{Resolver, SemanticErrorKind, SymbolKind, TypeTable, collect};
 use crate::SemanticError;
+use crate::test_support::args_have_no_legacy_message;
 use radix_lexer::lex;
 use radix_lexer::{Interner, Span, Symbol};
 use radix_parser::parse;
@@ -362,6 +362,7 @@ fn collects_function_definitions() {
             mode: None,
             kind: TypeExprKind::Named(ident(&mut interner, "vacuum"), Vec::new()),
             span: Span::default(),
+            iuncta_label: None,
         }),
         err: None,
         body: Some(BlockStmt {
