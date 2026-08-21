@@ -45,8 +45,8 @@ pub(crate) fn faber_mir_seams() -> radix_program::mir::MirSeams {
         library_resolver_for_config: super::library_resolver_from_config,
         library_cache_for_config: super::library_cache_with_config,
         device_config_for_input: manifest::manifest_device_config,
-        device_section_builder: device_section_builder,
-        host_route: host_route,
+        device_section_builder,
+        host_route,
         bin_runner_writer: write_fmir_bin_runner,
         toolchain_version: env!("CARGO_PKG_VERSION"),
     }
