@@ -298,15 +298,11 @@ pub fn run_function_with_step_budget<H: Host + ?Sized>(
             format!("no MIR function with id {}", function_id.0),
         )]);
     }
-    if let Some(function) = program
-        .functions
-        .iter()
-        .find(|function| function_contains_bounded_textus(function, context.types))
-    {
-        return Err(vec![RunnerError::unsupported(
-            function.span,
-            "bounded textus runner carrier",
-        )]);
+    if let Some((function, reason)) = program.functions.iter().find_map(|function| {
+        function_unsupported_bounded_carrier(function, context.types)
+            .map(|reason| (function, reason))
+    }) {
+        return Err(vec![RunnerError::unsupported(function.span, reason)]);
     }
     let mut runner = Runner::new(program, context, context.types, interner, host);
     runner.step_limit = step_budget;
@@ -319,23 +315,34 @@ pub fn run_function_with_step_budget<H: Host + ?Sized>(
     }
 }
 
-fn function_contains_bounded_textus(function: &MirFunction, types: &TypeTable) -> bool {
-    let has_type =
-        |ty: radix_mir::MirType| matches!(types.get(ty.semantic_id()), Type::BoundedTextus { .. });
-    function.params.iter().any(|param| has_type(param.ty))
-        || has_type(function.return_ty)
-        || function.error_ty.is_some_and(has_type)
-        || function.locals.iter().any(|local| has_type(local.ty))
-        || function.temps.iter().any(|temp| has_type(temp.ty))
-        || function.blocks.iter().any(|block| {
-            block
-                .statements
-                .iter()
-                .any(|statement| match &statement.kind {
-                    MirStatementKind::Assign { value, .. } => has_type(value.ty),
-                    MirStatementKind::RuntimeCall { call, .. } => has_type(call.return_ty),
-                    MirStatementKind::Call { .. } | MirStatementKind::Construct { .. } => false,
-                })
+fn function_unsupported_bounded_carrier(
+    function: &MirFunction,
+    types: &TypeTable,
+) -> Option<&'static str> {
+    let label = |ty: radix_mir::MirType| match types.get(ty.semantic_id()) {
+        Type::BoundedTextus { .. } => Some("bounded textus runner carrier"),
+        Type::BoundedOcteti { .. } => Some("bounded octeti runner carrier"),
+        _ => None,
+    };
+    function
+        .params
+        .iter()
+        .find_map(|param| label(param.ty))
+        .or_else(|| label(function.return_ty))
+        .or_else(|| function.error_ty.and_then(label))
+        .or_else(|| function.locals.iter().find_map(|local| label(local.ty)))
+        .or_else(|| function.temps.iter().find_map(|temp| label(temp.ty)))
+        .or_else(|| {
+            function.blocks.iter().find_map(|block| {
+                block
+                    .statements
+                    .iter()
+                    .find_map(|statement| match &statement.kind {
+                        MirStatementKind::Assign { value, .. } => label(value.ty),
+                        MirStatementKind::RuntimeCall { call, .. } => label(call.return_ty),
+                        MirStatementKind::Call { .. } | MirStatementKind::Construct { .. } => None,
+                    })
+            })
         })
 }
 

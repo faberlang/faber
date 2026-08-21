@@ -124,8 +124,12 @@ impl TypeChecker<'_> {
         }
         // WHY: octeti[i] is one byte (`numerus<u8>`), O(1). octeti[lo‥hi] is a
         // half-open window that stays `octeti`. Do not reuse the textus return
-        // (`ascii` / substring). BoundedOcteti index is a later unit.
-        if matches!(resolved_kind, Type::Primitive(Primitive::Octeti)) {
+        // (`ascii` / substring). Bounded `octeti<N>` keeps the same live-byte
+        // scalar return; spare `len..N` is not a readable index.
+        if matches!(
+            resolved_kind,
+            Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. }
+        ) {
             if !self.is_textus_index_type(idx_ty) {
                 self.invalid_operand_types(ISSUE_OCTETI_INDEX_MUST_BE_NUMERUS_OR_RANGE, index_span);
             }

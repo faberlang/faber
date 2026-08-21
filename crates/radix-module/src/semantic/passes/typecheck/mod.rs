@@ -28,5 +28,9 @@ mod intervallum_test;
 mod bounded_textus_test;
 
 #[cfg(test)]
+#[path = "bounded_octeti_test.rs"]
+mod bounded_octeti_test;
+
+#[cfg(test)]
 #[path = "modular_word_width_test.rs"]
 mod modular_word_width_test;
