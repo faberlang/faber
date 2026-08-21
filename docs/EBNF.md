@@ -366,7 +366,8 @@ baseType       := holeType | functionType | widthTypeSugar | qualifiedType typeA
 holeType       := '_' | '∪'
 qualifiedType  := IDENTIFIER ('.' IDENTIFIER)*
 typeArguments  := '<' typeArgument (',' typeArgument)* '>'
-typeArgument   := typeAnnotation | NATURAL | '[' figuraList? ']'
+typeArgument   := labeledTypeArgument | typeAnnotation | NATURAL | '[' figuraList? ']'
+labeledTypeArgument := IDENTIFIER ':' typeAnnotation
 widthTypeSugar := WIDTH_MARKER | LISTA_WIDTH_SUGAR
                 | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shapeSuffix?
                 | MATRIX_WIDTH_SUGAR shapeSuffix
@@ -382,6 +383,12 @@ typeList       := typeAnnotation (',' typeAnnotation)*
 - A second applied argument on a `↦` target (`numerus<W, Hex>`, `numerus<W, Be>`) is a convert-slot hint, not a type identity, not a width marker, and not a keyword. Live text-parse hints are `Hex` / `Bin` / `Oct`. `Be` / `Le` occupy that same Hex slot for endian unpack. `typeArguments` is unchanged: these are ordinary `IDENTIFIER` arguments interpreted by conversio, not new `baseType` productions.
 - Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
 - Explicit generic call-site lists use the same `typeArguments` production: `id<_>(x)` is a type hole (equivalent to omitted `id(x)` for a one-param callee), and mixed lists such as `both<_, textus>(a, b)` are legal. Arity stays exact (`both<_>` is still one argument). `∪` in that list is rejected (`explicit_union_type_arg_unsupported`): a callee type param is a monomorphic witness slot.
+- `labeledTypeArgument` is the optional label prefix on `iuncta` type arguments only (`iuncta<gx: f32, T>`; mixed labeled/unlabeled legal). A label in a non-`iuncta` list (`f<gx: T>(x)`, `lista<gx: T>`) is a parse error. Absence is the only unlabeled form; there is no `_: T` spelling. Keyword spellings are legal labels under the contextual law (`iuncta<fixum: A>`).
+- Labels are unique within one tuple type.
+- Labels are erased from type identity: `iuncta<gx: A, B> ≡ iuncta<A, B>` for assignment, `≡`/`↦`, unify, and every emitter.
+- Bracket index on a tuple requires a literal integer (`i[0]`); every element is reachable by position, labeled or not. Non-literal index expressions stay rejected. Positions are brackets only — no `.0`.
+- Member-by-label (`i.gx`) requires that label to be present on the receiver's `iuncta` annotation.
+- `iuncta` element slots admit `_` (monomorphic hole, solved element-wise from the single position witness) and reject `∪`. A wanted union element is declared with binary cup (`iuncta<f32, textus ∪ nihil>`). `lista<∪>` / `tabula<K, ∪>` keep heterogeneous-union behavior. Labels compose with holes (`iuncta<loss: _, T>`).
 - Arrays are written `lista<T>` (unbounded, shipped). Postfix `T[]` is not accepted. `lista<T, N>` is a proposed (not shipped) bounded form; see Generic Collections.
 - `de`/`in` mark ownership (borrow/mut-borrow) on the immediately following union member. Parenthesize when grouping must be explicit.
 - Two hole kinds share the `holeType` production. `_` is the monomorphic hole ("infer exactly one inhabitant type"); the standalone `∪` is the union hole ("infer a finite multi-member union"). Both are legal wherever a base type is: bindings, returns, params, fields, and type arguments (`lista<∪>`, `tabula<K, ∪>`, `→ ∪`).
