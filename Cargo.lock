@@ -288,6 +288,7 @@ name = "faber"
 version = "1.8.0"
 dependencies = [
  "clap",
+ "flate2",
  "handroll",
  "hygiene-ratchet",
  "postcard",

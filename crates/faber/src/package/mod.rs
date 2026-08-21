@@ -39,6 +39,7 @@ mod dense_full_model_device;
 #[cfg(feature = "device-runtime")]
 mod device;
 mod dispatch;
+mod embedded_locale;
 #[cfg(feature = "hir-fhir")]
 mod fhir;
 #[cfg(feature = "hir-go")]
@@ -193,6 +194,10 @@ fn is_mir_backed_target(target: Target) -> bool {
     )
 }
 
+#[allow(unused_imports)]
+pub(crate) use embedded_locale::{
+    load_embedded_locale_pack, EmbeddedLocaleError, EMBEDDED_LOCALE_IDS,
+};
 #[allow(unused_imports)]
 pub use locale::available_locales;
 /// Installed reader-pack path resolution shared by lib surfaces
