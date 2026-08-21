@@ -711,6 +711,7 @@ fn packed_region_elems(
     weight_map.and_then(|map| map.get(&buffer_id).map(|range| range.elems))
 }
 
+#[cfg(feature = "device-runtime")]
 fn descriptor_json_from_section(
     section: &FmirDeviceSection,
     backend: &str,
