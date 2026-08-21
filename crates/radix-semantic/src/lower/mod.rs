@@ -1059,3 +1059,7 @@ fn retired_bare_object_literal_args() -> Vec<DiagnosticArg> {
         DiagnosticArg::new("object_literal_forms", "JSON { ... } or Type { ... }"),
     ]
 }
+
+#[cfg(test)]
+#[path = "template_holes_test.rs"]
+mod template_holes_test;

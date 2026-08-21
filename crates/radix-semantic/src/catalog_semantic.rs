@@ -6,7 +6,7 @@
 
 #![allow(dead_code)]
 
-use super::catalog::{DiagnosticSpec, arg_value, quote_arg};
+use super::catalog::{arg_value, quote_arg, DiagnosticSpec};
 use crate::{SemanticErrorKind, WarningKind};
 use radix_diagnostics::DiagnosticArg;
 
@@ -1646,6 +1646,10 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
         "duplicate_module_method_binding" => {
             Some("duplicate module method binding during lowering".to_owned())
         }
+        "duplicate_template_hole_label" => {
+            let label = arg_value(args, "label")?;
+            Some(format!("duplicate template hole label '{label}'"))
+        }
         "ego_outside_method" => Some("ego used outside method context".to_owned()),
         "elige_case_value_shape" => {
             Some("elige case value must be a literal or enum variant".to_owned())
@@ -1717,6 +1721,15 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
                 "unknown faber kernel module '{module}'; see faber host manifest"
             ))
         }
+        "labeled_actual_non_template_call" => {
+            let label = arg_value(args, "label")?;
+            Some(format!(
+                "labeled actual '{label}' is only legal at a template-call site"
+            ))
+        }
+        "mixed_template_actuals_unsupported" => Some(
+            "template application cannot mix labeled and positional actuals".to_owned(),
+        ),
         "matrix_incomplete" => {
             Some("matrix requires element type and shape; use matrix<T, [R, C]>".to_owned())
         }
@@ -1806,6 +1819,13 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
         "tensor_missing_figura" => {
             Some("tensor requires a Figura shape; use tensor<T, []> for rank-0".to_owned())
         }
+        "template_application_arity_mismatch" => {
+            let actual = arg_value(args, "actual")?;
+            let expected = arg_value(args, "expected")?;
+            Some(format!(
+                "template application has {actual} arguments but template has {expected} holes"
+            ))
+        }
         "template_type_args" => {
             Some("template application does not accept type arguments".to_owned())
         }
@@ -1818,6 +1838,10 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
         "type_name_not_type" => Some("type name does not refer to a type".to_owned()),
         "union_only_nihil" => Some("union type cannot consist only of 'nihil'".to_owned()),
         "undefined_name" => Some("undefined name in lowering".to_owned()),
+        "unfillable_template_hole" => {
+            let label = arg_value(args, "label")?;
+            Some(format!("named template hole '{label}' is not filled"))
+        }
         "unhandled_statement_kind" => Some("unhandled statement kind in lowering".to_owned()),
         "unknown_base_class" => Some("unknown base class in gens declaration".to_owned()),
         "unknown_finge_cast_type" => Some("unknown cast type in finge expression".to_owned()),
@@ -1825,6 +1849,10 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
         "unknown_interface" => Some("unknown interface in gens declaration".to_owned()),
         "unknown_lowering_error" => Some("HIR lowering failed".to_owned()),
         "unknown_namespace" => Some("unknown namespace".to_owned()),
+        "unknown_template_hole_label" => {
+            let label = arg_value(args, "label")?;
+            Some(format!("unknown template hole label '{label}'"))
+        }
         "unknown_tuple_element_label" => Some("unknown tuple element label".to_owned()),
         "unknown_type_lowering_error" => Some("type lowering failed".to_owned()),
         "iuncta_union_type_arg_unsupported" => {

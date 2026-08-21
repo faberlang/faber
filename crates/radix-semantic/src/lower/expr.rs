@@ -26,9 +26,11 @@
 //! records the operation and source structure; typecheck decides whether the
 //! operation is valid, and codegen decides how a valid operation is emitted.
 
-use super::{Lowerer, retired_bare_object_literal_args};
+use super::{retired_bare_object_literal_args, Lowerer};
 use crate::builtins::forma::{self as builtin_forma};
+use crate::template_holes::{analyze_template, TemplateHoleAnalysis};
 use crate::{Primitive, TypeId};
+use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
     HirArrayElement, HirBinOp, HirCallArg, HirConversioTarget, HirExpression, HirExpressionKind,
     HirLiteral, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind, HirUnOp,
@@ -234,24 +236,19 @@ impl Lowerer<'_> {
                 if self.reject_template_call_type_args(&type_args) {
                     return HirExpressionKind::Error;
                 }
-                HirExpressionKind::Scriptum(
-                    *template,
-                    call.args
-                        .iter()
-                        .map(|arg| lower_expr(self, &arg.value))
-                        .collect(),
-                )
+                match self.lower_template_application(*template, &call.args) {
+                    Some((erased, args)) => HirExpressionKind::Scriptum(erased, args),
+                    None => HirExpressionKind::Error,
+                }
             }
             ExprKind::Literal(Literal::Forma(template)) => {
                 if self.reject_template_call_type_args(&type_args) {
                     return HirExpressionKind::Error;
                 }
-                let args = call
-                    .args
-                    .iter()
-                    .map(|arg| lower_expr(self, &arg.value))
-                    .collect();
-                self.lower_forma_capture(*template, args)
+                match self.lower_template_application(*template, &call.args) {
+                    Some((erased, args)) => self.lower_forma_capture(erased, args),
+                    None => HirExpressionKind::Error,
+                }
             }
             ExprKind::Member(member) => {
                 let (recv, name) = self.flatten_dotted_method_callee(member);
@@ -269,12 +266,152 @@ impl Lowerer<'_> {
 
     fn lower_call_args(&mut self, args: &[radix_syntax::Argument]) -> Vec<HirCallArg> {
         args.iter()
-            .map(|arg| HirCallArg {
-                name: None,
-                spread: arg.spread,
-                expr: lower_expr(self, &arg.value),
-                span: arg.span,
+            .map(|arg| {
+                if let Some(label) = arg.label {
+                    let name = self.interner.resolve(label).to_owned();
+                    self.error_with_args_at(
+                        vec![
+                            DiagnosticArg::new("issue", "labeled_actual_non_template_call"),
+                            DiagnosticArg::new("label", name),
+                        ],
+                        arg.span,
+                    );
+                }
+                HirCallArg {
+                    name: None,
+                    spread: arg.spread,
+                    expr: lower_expr(self, &arg.value),
+                    span: arg.span,
+                }
             })
+            .collect()
+    }
+
+    /// Erase named holes and check labeled actuals at a template-call site.
+    ///
+    /// Bare (unapplied) literals keep their raw text; only application rewrites
+    /// the template to its positional `§`-form and reorders labeled actuals.
+    fn lower_template_application(
+        &mut self,
+        template: radix_lexer::Symbol,
+        args: &[radix_syntax::Argument],
+    ) -> Option<(radix_lexer::Symbol, Vec<HirExpression>)> {
+        let call_span = self.current_span;
+        let text = self.interner.resolve(template).to_owned();
+        let analysis = analyze_template(&text);
+        let lowered: Vec<(Option<radix_lexer::Symbol>, HirExpression)> = args
+            .iter()
+            .map(|arg| (arg.label, lower_expr(self, &arg.value)))
+            .collect();
+
+        let mut ok = true;
+        for label in &analysis.duplicate_labels {
+            self.error_with_args_at(
+                vec![
+                    DiagnosticArg::new("issue", "duplicate_template_hole_label"),
+                    DiagnosticArg::new("label", label.clone()),
+                ],
+                call_span,
+            );
+            ok = false;
+        }
+
+        let has_labeled = lowered.iter().any(|(label, _)| label.is_some());
+        let has_unlabeled = lowered.iter().any(|(label, _)| label.is_none());
+        if has_labeled && has_unlabeled {
+            self.error_with_args_at(
+                vec![DiagnosticArg::new(
+                    "issue",
+                    "mixed_template_actuals_unsupported",
+                )],
+                call_span,
+            );
+            ok = false;
+        }
+
+        if has_labeled && !has_unlabeled {
+            for (label, _) in &lowered {
+                let Some(label) = *label else {
+                    continue;
+                };
+                let name = self.interner.resolve(label).to_owned();
+                if analysis.label_position(&name).is_none() {
+                    self.error_with_args_at(
+                        vec![
+                            DiagnosticArg::new("issue", "unknown_template_hole_label"),
+                            DiagnosticArg::new("label", name),
+                        ],
+                        call_span,
+                    );
+                    ok = false;
+                }
+            }
+            for name in analysis.label_positions.keys() {
+                let filled = lowered.iter().any(|(label, _)| {
+                    label.is_some_and(|symbol| self.interner.resolve(symbol) == name)
+                });
+                if !filled {
+                    self.error_with_args_at(
+                        vec![
+                            DiagnosticArg::new("issue", "unfillable_template_hole"),
+                            DiagnosticArg::new("label", name.clone()),
+                        ],
+                        call_span,
+                    );
+                    ok = false;
+                }
+            }
+        }
+
+        if lowered.len() != analysis.holes.len() {
+            self.error_with_args_at(
+                vec![
+                    DiagnosticArg::new("issue", "template_application_arity_mismatch"),
+                    DiagnosticArg::new("actual", lowered.len().to_string()),
+                    DiagnosticArg::new("expected", analysis.holes.len().to_string()),
+                ],
+                call_span,
+            );
+            ok = false;
+        }
+
+        if !ok {
+            return None;
+        }
+
+        let erased = self.interner.intern(&analysis.erased);
+        let positional = if has_labeled {
+            self.reorder_labeled_actuals(&analysis, lowered)
+        } else {
+            lowered.into_iter().map(|(_, expr)| expr).collect()
+        };
+        Some((erased, positional))
+    }
+
+    /// Place labeled actuals into the positional vector the backends already consume.
+    fn reorder_labeled_actuals(
+        &self,
+        analysis: &TemplateHoleAnalysis,
+        lowered: Vec<(Option<radix_lexer::Symbol>, HirExpression)>,
+    ) -> Vec<HirExpression> {
+        let slot_count = analysis
+            .holes
+            .iter()
+            .map(|hole| hole.position)
+            .max()
+            .map_or(0, |position| position.saturating_add(1));
+        let mut slots: Vec<Option<HirExpression>> = (0..slot_count).map(|_| None).collect();
+        for (label, expr) in lowered {
+            let label = label.expect("labeled template actuals are present");
+            let name = self.interner.resolve(label);
+            let position = analysis
+                .label_position(name)
+                .expect("unknown labels already rejected");
+            slots[position] = Some(expr);
+        }
+        slots
+            .into_iter()
+            .map(|slot| slot.expect("labeled actuals fill every position"))
             .collect()
     }
 
