@@ -254,6 +254,25 @@ fn promissum_failable_instantiation_finds_interned() {
 }
 
 #[test]
+fn bounded_ascii_instantiation_finds_interned() {
+    // Same latent gap as PromissumFailable: BoundedAscii was missing from
+    // type_matches_candidate, so Convert-to-ascii<N> failed MIR instantiate
+    // with "missing semantic metadata" even though ascii<N> was interned.
+    let mut types = TypeTable::new();
+    let n2 = types.intern_index(radix_types::IndexExpr::Literal(2));
+    let interned = types.bounded_ascii(n2);
+
+    let resolved = instantiate_existing_generic_type(
+        &types,
+        MirType::semantic(interned),
+        &MirGenericBindings::default(),
+        Span::default(),
+    )
+    .expect("BoundedAscii instantiation must find the interned type");
+    assert_eq!(resolved.semantic_id(), interned);
+}
+
+#[test]
 fn matrix_instantiation_finds_interned() {
     let mut types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);

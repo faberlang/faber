@@ -1738,6 +1738,10 @@ mod octeti_index_test;
 mod octeti_endian_test;
 
 #[cfg(test)]
+#[path = "ascii_format_pack_test.rs"]
+mod ascii_format_pack_test;
+
+#[cfg(test)]
 #[path = "octeti_lista_test.rs"]
 mod octeti_lista_test;
 

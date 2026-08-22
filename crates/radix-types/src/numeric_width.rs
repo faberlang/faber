@@ -207,6 +207,15 @@ pub fn is_conversio_radix_hint(marker: &str) -> bool {
     matches!(marker, "Hex" | "Bin" | "Oct" | "Be" | "Le")
 }
 
+/// Ascii format-pack slot-2 hints: `n ↦ ascii<N, Hex|Bin|Oct>`.
+///
+/// Distinct from [`is_conversio_radix_hint`]: `Be` / `Le` are endian unpack
+/// rules, never ascii digit bases. Slot 1 of a bounded family stays capacity.
+#[must_use]
+pub fn is_ascii_format_hint(marker: &str) -> bool {
+    matches!(marker, "Hex" | "Bin" | "Oct")
+}
+
 /// Standalone width-marker type sugar (`f32` → `fractus<f32>`, `i64` → `numerus<i64>`).
 #[must_use]
 pub fn standalone_width_type(name: &str) -> Option<(Primitive, NumericWidth)> {

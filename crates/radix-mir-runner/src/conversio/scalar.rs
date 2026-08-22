@@ -21,6 +21,7 @@
 )]
 
 use super::*;
+use radix_types::IndexExpr;
 
 #[derive(Copy, Clone)]
 enum EndianHint {
@@ -32,6 +33,19 @@ fn octeti_array<const N: usize>(bytes: &[u8]) -> [u8; N] {
     let mut arr = [0_u8; N];
     arr.copy_from_slice(bytes);
     arr
+}
+
+fn pack_ascii_digits(value: u128, width: usize, radix: u32) -> Option<String> {
+    let unpadded = match radix {
+        16 => format!("{value:x}"),
+        2 => format!("{value:b}"),
+        8 => format!("{value:o}"),
+        _ => return None,
+    };
+    if unpadded.len() > width {
+        return None;
+    }
+    Some(format!("{unpadded:0>width$}"))
 }
 
 impl<H: super::super::Host + ?Sized> Runner<'_, H> {
@@ -317,7 +331,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    fn numerus_radix(&self, params: &[Symbol]) -> Option<u32> {
+    pub(super) fn numerus_radix(&self, params: &[Symbol]) -> Option<u32> {
         params
             .iter()
             .find_map(|param| match self.interner.resolve(*param) {
@@ -721,6 +735,53 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         match materialize_sermo_value(sermo, span)? {
             Value::Str(text) => Ok(Value::Str(text)),
             _ => self.recover_or_fail(recovery, span, "sermo to textus conversion failed"),
+        }
+    }
+
+    pub(crate) fn convert_to_ascii_format_pack(
+        &mut self,
+        value: Value,
+        capacity: radix_types::IndexId,
+        params: &[Symbol],
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let Some(radix) = self.numerus_radix(params) else {
+            return Err(RunnerError::internal(
+                span,
+                "ascii format pack requires Hex, Bin, or Oct",
+            ));
+        };
+        let IndexExpr::Literal(width) = self.types.get_index(capacity) else {
+            return Err(RunnerError::internal(
+                span,
+                "ascii format pack requires a literal capacity",
+            ));
+        };
+        let Ok(width) = usize::try_from(*width) else {
+            return self.recover_or_fail(recovery, span, "ascii_pack_width_overflow");
+        };
+        let magnitude = match value {
+            Value::Int(v) if v < 0 => {
+                return self.recover_or_fail(recovery, span, "ascii_pack_negative_source");
+            }
+            Value::Int(v) => u128::try_from(v)
+                .map_err(|_| RunnerError::internal(span, "ascii_pack_negative_source"))?,
+            Value::UInt(v) => u128::from(v),
+            other => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("ascii format pack requires a numerus source, got {other:?}"),
+                ));
+            }
+        };
+        match pack_ascii_digits(magnitude, width, radix) {
+            Some(digits) if width == 1 => {
+                let byte = digits.as_bytes()[0];
+                Ok(Value::Ascii(byte))
+            }
+            Some(digits) => Ok(Value::Str(digits)),
+            None => self.recover_or_fail(recovery, span, "ascii_pack_width_overflow"),
         }
     }
 

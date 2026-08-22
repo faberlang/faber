@@ -1,0 +1,55 @@
++++
+term = "↦"
+kind = "operator-group"
+category = "conversion"
+canonical = false
+summary = "Fixed-width hex/bin/oct pack from numerus into ascii<N>."
+syntax = "<numerus> ↦ ascii<N, Hex|Bin|Oct>"
+related = ["↦", "ascii", "numerus"]
+locale = "en"
++++
+
+# =============================================================================
+# ↦ — Fixed-width ascii format pack from numerus.
+# =============================================================================
+#
+# What this teaches:
+#   • Slot 1 is capacity — `ascii<N, Hex>` zero-pads to N digits.
+#   • Slot 2 is the format hint — Hex/Bin/Oct; lowercase emission.
+#   • Overflow, negatives, and floats fail closed (not shown here).
+#
+# Common mistakes:
+#   • `n ↦ ascii<Hex>` — slot 1 is never a hint; write `ascii<N, Hex>`.
+#   • Expecting `-ff` or two's-complement blowout from a negative source.
+#
+# See also: ↦, ascii, numerus
+# =============================================================================
+
+
+# conversio — n ↦ ascii<N, Hex|Bin|Oct>
+#
+# <numerus> ↦ ascii<N, Hex|Bin|Oct>
+#
+# GRAMMAR:
+#   convertExpr :← expr '↦' 'ascii' '<' N ',' radix '>'
+#
+# EXPECTED OUTPUT:
+#   ff
+#   00000025
+#   11111111
+#   377
+#
+# BACKEND:
+#   HIR-direct Rust and MIR-stepper routes must agree for ascii format pack.
+
+main {
+    const _ hex ← 255 ↦ ascii<2, Hex>
+    const _ padded ← 37 ↦ ascii<8, Hex>
+    const _ bin ← 255 ↦ ascii<8, Bin>
+    const _ oct ← 255 ↦ ascii<3, Oct>
+
+    print hex
+    print padded
+    print bin
+    print oct
+}

@@ -1250,6 +1250,18 @@ fn lower_conversio_target_type(
         radix_syntax::TypeExprKind::Named(ident, target_params)
             if matches!(
                 Primitive::from_name(lowerer.interner.resolve(ident.name)),
+                Some(Primitive::Ascii)
+            ) && target_params.len() == 2
+                && !ascii_format_hints(&target_params[1..], lowerer.interner).is_empty() =>
+        {
+            // Slot 2 Hex/Bin/Oct is a conversio format hint, not type identity.
+            params.extend(ascii_format_hints(&target_params[1..], lowerer.interner));
+            let ty_id = lowerer.lower_bounded_ascii_capacity(&target_params[0]);
+            apply_type_target_wrappers(lowerer, ty, ty_id)
+        }
+        radix_syntax::TypeExprKind::Named(ident, target_params)
+            if matches!(
+                Primitive::from_name(lowerer.interner.resolve(ident.name)),
                 Some(Primitive::Ascii | Primitive::Octeti | Primitive::Textus)
             ) && !target_params.is_empty() =>
         {
@@ -1352,6 +1364,17 @@ fn conversio_radix_hints(
         .iter()
         .filter_map(conversio_hint_symbol)
         .filter(|symbol| crate::numeric_width::is_conversio_radix_hint(interner.resolve(*symbol)))
+        .collect()
+}
+
+fn ascii_format_hints(
+    target_params: &[radix_syntax::TypeExpr],
+    interner: &radix_lexer::Interner,
+) -> Vec<radix_lexer::Symbol> {
+    target_params
+        .iter()
+        .filter_map(conversio_hint_symbol)
+        .filter(|symbol| crate::numeric_width::is_ascii_format_hint(interner.resolve(*symbol)))
         .collect()
 }
 

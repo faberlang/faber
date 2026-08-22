@@ -98,6 +98,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             Type::Primitive(Primitive::Bivalens) => self.convert_to_bivalens(value, recovery, span),
             Type::Primitive(Primitive::Octeti) => self.convert_to_octeti(value, span),
             Type::Primitive(Primitive::Ascii) => self.convert_to_ascii(value, recovery, span),
+            Type::BoundedAscii { capacity } => {
+                if self.numerus_radix(params).is_some() {
+                    self.convert_to_ascii_format_pack(value, *capacity, params, recovery, span)
+                } else {
+                    Err(RunnerError::unsupported(
+                        span,
+                        &format!("runtime conversio to {target:?}"),
+                    ))
+                }
+            }
             Type::Primitive(Primitive::Regex) => self.convert_to_regex(value, span),
             Type::Primitive(Primitive::Json) => self.convert_to_json(value, recovery, span),
             Type::Primitive(Primitive::Valor) => self.convert_to_valor(value, source_ty, span),

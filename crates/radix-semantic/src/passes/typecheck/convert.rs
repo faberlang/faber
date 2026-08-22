@@ -53,6 +53,9 @@ const ISSUE_CURSOR_TO_VALOR_BOUNDARY: &str = "cursor_to_valor_boundary";
 const ISSUE_NUMERIC_TO_OCTETI_UNSPECIFIED: &str = "numeric_to_octeti_unspecified";
 const ISSUE_OCTETI_TO_NUMERUS_UNSPECIFIED: &str = "octeti_to_numerus_unspecified";
 const ISSUE_OCTETI_ENDIAN_WIDTH_MISMATCH: &str = "octeti_endian_width_mismatch";
+const ISSUE_ASCII_FORMAT_HINT_NOT_CAPACITY: &str = "ascii_format_hint_not_capacity";
+const ISSUE_ASCII_PACK_WIDTH_OVERFLOW: &str = "ascii_pack_width_overflow";
+const ISSUE_ASCII_PACK_NEGATIVE_SOURCE: &str = "ascii_pack_negative_source";
 const ISSUE_OCTETI_TO_FRACTUS_UNSPECIFIED: &str = "octeti_to_fractus_unspecified";
 const ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED: &str = "octeti_to_bivalens_unsupported";
 const ISSUE_PROMISSUM_TARGET_BOUNDARY: &str = "promissum_target_boundary";
@@ -174,6 +177,32 @@ fn endian_read_width_bytes(ty: &Type) -> Option<usize> {
     }
 }
 
+fn static_integer_magnitude(source: &HirExpression) -> Option<i128> {
+    match &source.kind {
+        HirExpressionKind::Literal(HirLiteral::Int(value)) => i128::try_from(*value).ok(),
+        HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => match &inner.kind {
+            HirExpressionKind::Literal(HirLiteral::Int(value)) => {
+                i128::try_from(*value).ok().map(|value| -value)
+            }
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn ascii_pack_digit_count(value: u128, radix: u32) -> u128 {
+    if value == 0 {
+        return 1;
+    }
+    let mut remaining = value;
+    let mut digits = 0;
+    while remaining > 0 {
+        remaining /= u128::from(radix);
+        digits += 1;
+    }
+    digits
+}
+
 fn static_exclusive_range_len(index: &HirExpression) -> Option<usize> {
     let HirExpressionKind::Intervallum {
         start, end, kind, ..
@@ -279,6 +308,24 @@ impl TypeChecker<'_> {
 
         if let Some(error_ty) = self.check_valor_conversio(source_ty, target_resolved, span) {
             return error_ty;
+        }
+
+        if let Some(result_ty) = self.check_ascii_format_pack_conversio(
+            source,
+            source_ty,
+            target_resolved,
+            params,
+            recovery.is_some(),
+            span,
+        ) {
+            if !self.types.equals(result_ty, self.error_type) {
+                if let Some(recovery) = recovery {
+                    self.note_conversio_recovery_checked(recovery, target_resolved);
+                } else {
+                    self.check_conversio_propagation_channel(source_ty, target_resolved, span);
+                }
+            }
+            return result_ty;
         }
 
         if self.is_bounded_ascii_conversio(source_ty, target_resolved) {
@@ -803,6 +850,95 @@ impl TypeChecker<'_> {
         params
             .iter()
             .any(|param| matches!(interner.resolve(*param), "Be" | "Le"))
+    }
+
+    /// `n ↦ ascii<N, Hex|Bin|Oct>`: N is digit width; Hex/Bin/Oct are slot-2
+    /// format hints peeled into conversio params. Float sources reject; a
+    /// const-foldable negative or overflowing source fail-closes at typecheck
+    /// unless `⇥` recovery is present (runtime still fail-closes).
+    fn check_ascii_format_pack_conversio(
+        &mut self,
+        source: &HirExpression,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        params: &[Symbol],
+        has_recovery: bool,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        if !self.conversio_has_ascii_format_hint(params) {
+            return None;
+        }
+        match self.types.get(target_resolved) {
+            Type::BoundedAscii { capacity } => {
+                if matches!(self.types.get_index(*capacity), IndexExpr::Infer(_)) {
+                    return None;
+                }
+                match self.primitive_conversio_family(source_ty) {
+                    PrimitiveConversioFamily::Numerus => {}
+                    _ => {
+                        self.invalid_conversion(ISSUE_UNSUPPORTED_CONVERSIO, span);
+                        return Some(self.error_type);
+                    }
+                }
+                if !has_recovery {
+                    if let Some(issue) =
+                        self.ascii_format_pack_const_issue(source, *capacity, params)
+                    {
+                        self.invalid_conversion(issue, span);
+                        return Some(self.error_type);
+                    }
+                }
+                Some(target_resolved)
+            }
+            Type::Primitive(Primitive::Ascii) => {
+                self.invalid_conversion(ISSUE_ASCII_FORMAT_HINT_NOT_CAPACITY, span);
+                Some(self.error_type)
+            }
+            _ => None,
+        }
+    }
+
+    fn conversio_has_ascii_format_hint(&self, params: &[Symbol]) -> bool {
+        let Some(interner) = self.interner else {
+            return false;
+        };
+        params
+            .iter()
+            .any(|param| crate::numeric_width::is_ascii_format_hint(interner.resolve(*param)))
+    }
+
+    fn ascii_format_radix(&self, params: &[Symbol]) -> Option<u32> {
+        let interner = self.interner?;
+        params
+            .iter()
+            .find_map(|param| match interner.resolve(*param) {
+                "Hex" => Some(16),
+                "Bin" => Some(2),
+                "Oct" => Some(8),
+                _ => None,
+            })
+    }
+
+    fn ascii_format_pack_const_issue(
+        &self,
+        source: &HirExpression,
+        capacity: radix_types::IndexId,
+        params: &[Symbol],
+    ) -> Option<&'static str> {
+        let value = static_integer_magnitude(source)?;
+        if value < 0 {
+            return Some(ISSUE_ASCII_PACK_NEGATIVE_SOURCE);
+        }
+        let IndexExpr::Literal(width) = self.types.get_index(capacity) else {
+            return None;
+        };
+        let radix = self.ascii_format_radix(params)?;
+        let digits = ascii_pack_digit_count(u128::try_from(value).ok()?, radix);
+        if digits > u128::from(*width) {
+            Some(ISSUE_ASCII_PACK_WIDTH_OVERFLOW)
+        } else {
+            None
+        }
     }
 
     /// Compile-time window length: a whole octeti literal, or a constant

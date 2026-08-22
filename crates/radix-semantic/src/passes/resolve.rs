@@ -86,6 +86,7 @@ const ISSUE_OCTET_PARAMS: &str = "octet_params";
 const ISSUE_PRECISION_MARKER_PARAMS: &str = "precision_marker_params";
 const ISSUE_PRECISION_MARKER_SHAPE: &str = "precision_marker_shape";
 const ISSUE_PRIMITIVE_PARAMS: &str = "primitive_params";
+const ISSUE_ASCII_FORMAT_HINT_NOT_CAPACITY: &str = "ascii_format_hint_not_capacity";
 const ISSUE_BOUNDED_CAPACITY_NOT_NATURAL: &str = "bounded_capacity_not_natural";
 const ISSUE_QUALIFIED_TYPE_NOT_EXPORTED: &str = "qualified_type_not_exported";
 const ISSUE_QUALIFIED_TYPE_MIDDLE_NOT_NAMESPACE: &str = "qualified_type_middle_not_namespace";
@@ -1405,8 +1406,27 @@ fn resolve_type_expr(
                 ) {
                     match params.as_slice() {
                         [] => {}
+                        [capacity]
+                            if prim == Primitive::Ascii
+                                && named_type_is_ascii_format_hint(capacity, interner) =>
+                        {
+                            errors.push(lowering_error(
+                                ISSUE_ASCII_FORMAT_HINT_NOT_CAPACITY,
+                                capacity.span,
+                            ));
+                        }
                         [capacity] => {
                             validate_capacity_index_param(resolver, interner, capacity, errors)
+                        }
+                        [capacity, hint]
+                            if prim == Primitive::Ascii
+                                && named_type_is_ascii_format_hint(hint, interner) =>
+                        {
+                            // Slot 2 Hex/Bin/Oct is a conversio format hint.
+                            // Type identity stays ascii<N>; peel happens in
+                            // conversio lowering. Type-position 2-arg ascii
+                            // still fails at lower_bounded_primitive.
+                            validate_capacity_index_param(resolver, interner, capacity, errors);
                         }
                         _ => errors.push(lowering_error(ISSUE_PRIMITIVE_PARAMS, name.span)),
                     }
@@ -1571,6 +1591,13 @@ fn validate_instans_precision_param(
     if let Err(err) = crate::InstansPrecision::from_marker(marker) {
         errors.push(instans_precision_marker_error(err, ident.span));
     }
+}
+
+fn named_type_is_ascii_format_hint(param: &TypeExpr, interner: &Interner) -> bool {
+    let TypeExprKind::Named(ident, nested) = &param.kind else {
+        return false;
+    };
+    nested.is_empty() && crate::numeric_width::is_ascii_format_hint(interner.resolve(ident.name))
 }
 
 fn validate_capacity_index_param(
@@ -2882,6 +2909,11 @@ fn lower_bounded_primitive(
 ) -> Result<TypeId, TypeLowerError> {
     match params {
         [] => Ok(types.primitive(prim)),
+        [capacity]
+            if prim == Primitive::Ascii && named_type_is_ascii_format_hint(capacity, interner) =>
+        {
+            Err(TypeLowerError::Issue(ISSUE_ASCII_FORMAT_HINT_NOT_CAPACITY))
+        }
         [capacity] => {
             let capacity = lower_capacity_index(capacity, resolver, interner, types)?;
             Ok(match prim {

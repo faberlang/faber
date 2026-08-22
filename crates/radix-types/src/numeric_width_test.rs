@@ -2,8 +2,9 @@
 //! lattice, tensor element policy, and bare-numerus identity with i64.
 
 use crate::{
-    is_numeric_width_type_sugar, lista_sugar_width_marker, sparsa_sugar_width_marker,
-    standalone_width_type, tensor_sugar_width_marker, NumericWidth, WidthError,
+    is_ascii_format_hint, is_conversio_radix_hint, is_numeric_width_type_sugar,
+    lista_sugar_width_marker, sparsa_sugar_width_marker, standalone_width_type,
+    tensor_sugar_width_marker, NumericWidth, WidthError,
 };
 use crate::{Primitive, TypeTable};
 
@@ -206,4 +207,25 @@ fn default_for_non_numeric_returns_none() {
 fn is_default_for_returns_false_for_non_numeric() {
     assert!(!NumericWidth::I64.is_default_for(Primitive::Textus));
     assert!(!NumericWidth::F64.is_default_for(Primitive::Bivalens));
+}
+
+#[test]
+fn ascii_format_hints_are_hex_bin_oct_only() {
+    for marker in ["Hex", "Bin", "Oct"] {
+        assert!(
+            is_ascii_format_hint(marker),
+            "{marker} is an ascii pack hint"
+        );
+        assert!(
+            is_conversio_radix_hint(marker),
+            "{marker} stays in the shared conversio hint set"
+        );
+    }
+    for marker in ["Be", "Le"] {
+        assert!(
+            !is_ascii_format_hint(marker),
+            "{marker} is endian, not an ascii digit base"
+        );
+        assert!(is_conversio_radix_hint(marker));
+    }
 }

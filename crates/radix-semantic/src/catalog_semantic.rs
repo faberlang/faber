@@ -695,6 +695,15 @@ fn semantic_invalid_conversion_message(args: &[DiagnosticArg]) -> Option<String>
         "octeti_endian_width_mismatch" => Some(
             "octeti endian conversion requires a window whose length matches the target width (2, 4, or 8 bytes)".to_owned(),
         ),
+        "ascii_format_hint_not_capacity" => Some(
+            "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<N, Hex|Bin|Oct>".to_owned(),
+        ),
+        "ascii_pack_width_overflow" => Some(
+            "ascii format pack needs more digits than the declared capacity N; widen N or narrow the source first".to_owned(),
+        ),
+        "ascii_pack_negative_source" => Some(
+            "ascii format pack rejects negative sources; narrow to an unsigned width first".to_owned(),
+        ),
         "octeti_to_fractus_unspecified" => Some(
             "conversion from octeti to fractus is unspecified (IEEE width and endianness); use `chorda` or explicit byte verbs instead".to_owned(),
         ),
@@ -806,6 +815,15 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         | "octeti_to_bivalens_unsupported" => Some("use chorda or explicit byte conversion helpers".to_owned()),
         "octeti_endian_width_mismatch" => {
             Some("use a window of 2, 4, or 8 bytes matching i16/u16, i32/u32, or i64/u64".to_owned())
+        }
+        "ascii_format_hint_not_capacity" => {
+            Some("write ascii<N, Hex>, ascii<N, Bin>, or ascii<N, Oct> with N as digit width".to_owned())
+        }
+        "ascii_pack_width_overflow" => {
+            Some("increase N or convert the source to a width whose digit count fits".to_owned())
+        }
+        "ascii_pack_negative_source" => {
+            Some("convert to an unsigned numerus width before packing".to_owned())
         }
         "sparsa_collection_unsupported" => Some("densify or use an explicit sparse helper".to_owned()),
         "sparsa_tensor_element_mismatch" | "tensor_element_mismatch" => {
@@ -1661,6 +1679,9 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
         "bounded_capacity_not_natural" => Some(
             "bounded capacity N must be a NATURAL literal or a bound magnitudo parameter"
                 .to_owned(),
+        ),
+        "ascii_format_hint_not_capacity" => Some(
+            "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<N, Hex|Bin|Oct>".to_owned(),
         ),
         "tabula_arity" => Some("tabula requires two type parameters".to_owned()),
         "copia_arity" => Some("copia requires one type parameter".to_owned()),

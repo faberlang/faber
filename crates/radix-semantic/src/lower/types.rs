@@ -512,9 +512,22 @@ impl Lowerer<'_> {
         self.types.primitive(prim)
     }
 
+    /// Conversio `n ↦ ascii<N, Hex|Bin|Oct>` peels the format hint first, then
+    /// lowers capacity-only `ascii<N>` through this helper.
+    pub(crate) fn lower_bounded_ascii_capacity(&mut self, capacity: &TypeExpr) -> TypeId {
+        self.lower_bounded_primitive(Primitive::Ascii, std::slice::from_ref(capacity))
+    }
+
     fn lower_bounded_primitive(&mut self, prim: Primitive, params: &[TypeExpr]) -> TypeId {
         match params {
             [] => self.types.primitive(prim),
+            [capacity]
+                if prim == Primitive::Ascii
+                    && type_expr_is_ascii_format_hint(capacity, self.interner) =>
+            {
+                self.error("ascii_format_hint_not_capacity");
+                self.types.intern(Type::Error)
+            }
             [capacity] => {
                 let Some(capacity) = self.lower_capacity_index(capacity) else {
                     return self.types.intern(Type::Error);
@@ -532,7 +545,16 @@ impl Lowerer<'_> {
             }
         }
     }
+}
 
+fn type_expr_is_ascii_format_hint(param: &TypeExpr, interner: &radix_lexer::Interner) -> bool {
+    let TypeExprKind::Named(ident, nested) = &param.kind else {
+        return false;
+    };
+    nested.is_empty() && crate::numeric_width::is_ascii_format_hint(interner.resolve(ident.name))
+}
+
+impl Lowerer<'_> {
     fn lower_capacity_index(&mut self, param: &TypeExpr) -> Option<crate::IndexId> {
         if matches!(param.kind, TypeExprKind::Infer) {
             let var = self.types.fresh_index_infer_var();

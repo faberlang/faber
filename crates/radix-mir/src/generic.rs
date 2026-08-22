@@ -1396,6 +1396,21 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
         | (Type::Sparsa(a_ty, a_shape), Type::Sparsa(b_ty, b_shape)) => {
             types.equals(*a_ty, *b_ty) && types.index_equals(*a_shape, *b_shape)
         }
+        (
+            Type::BoundedArray {
+                element: a_elem,
+                capacity: a_cap,
+            },
+            Type::BoundedArray {
+                element: b_elem,
+                capacity: b_cap,
+            },
+        ) => types.equals(*a_elem, *b_elem) && types.index_equals(*a_cap, *b_cap),
+        (Type::BoundedTextus { capacity: a }, Type::BoundedTextus { capacity: b })
+        | (Type::BoundedAscii { capacity: a }, Type::BoundedAscii { capacity: b })
+        | (Type::BoundedOcteti { capacity: a }, Type::BoundedOcteti { capacity: b }) => {
+            types.index_equals(*a, *b)
+        }
         (Type::Ref(a_mode, a_ty), Type::Ref(b_mode, b_ty)) => {
             a_mode == b_mode && types.equals(*a_ty, *b_ty)
         }

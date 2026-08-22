@@ -569,6 +569,10 @@ mod ascii_cursor_test;
 mod ascii_index_test;
 
 #[cfg(test)]
+#[path = "ascii_format_pack_conversio_test.rs"]
+mod ascii_format_pack_conversio_test;
+
+#[cfg(test)]
 #[path = "atomic_intrinsic_test.rs"]
 mod atomic_intrinsic_test;
 
