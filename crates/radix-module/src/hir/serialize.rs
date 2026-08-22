@@ -66,7 +66,7 @@ fn capture_fact_to_wire(fact: &crate::semantic::CaptureFact) -> CaptureFactWire 
 
 fn function_fact_to_wire(fact: &crate::semantic::FunctionFact) -> FunctionFactWire {
     FunctionFactWire {
-        direct_failure: fact.direct_failure,
+        has_direct_failure: fact.direct_failure,
         may_fail: fact.may_fail,
         is_async: fact.is_async,
         is_generator: fact.is_generator,
@@ -171,7 +171,7 @@ fn cli_option_wire(o: &crate::cli::CliOption) -> CliOptionWire {
         description: o.description.clone(),
         global: o.global,
         default: o.default.as_ref().map(cli_default_wire),
-        flag: o.flag,
+        is_flag: o.flag,
     }
 }
 
@@ -179,7 +179,7 @@ fn cli_operand_wire(o: &crate::cli::CliOperand) -> CliOperandWire {
     CliOperandWire {
         binding: o.binding.clone(),
         ty: cli_type_wire(&o.ty),
-        rest: o.rest,
+        is_rest: o.rest,
         description: o.description.clone(),
         global: o.global,
         default: o.default.as_ref().map(cli_default_wire),

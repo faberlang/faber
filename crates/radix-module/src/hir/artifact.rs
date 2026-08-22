@@ -91,7 +91,7 @@ fn map_capture_fact(wire: CaptureFactWire) -> CaptureFact {
 /// Map a wire function fact to the live type (F20).
 fn map_function_fact(wire: FunctionFactWire) -> FunctionFact {
     FunctionFact {
-        direct_failure: wire.direct_failure,
+        direct_failure: wire.has_direct_failure,
         may_fail: wire.may_fail,
         is_async: wire.is_async,
         is_generator: wire.is_generator,
@@ -171,7 +171,7 @@ fn map_cli_program(wire: CliProgramWire) -> crate::cli::CliProgram {
             description: w.description,
             global: w.global,
             default: w.default.map(map_cli_default),
-            flag: w.flag,
+            flag: w.is_flag,
             span: radix_lexer::Span::default(),
         }
     }
@@ -181,7 +181,7 @@ fn map_cli_program(wire: CliProgramWire) -> crate::cli::CliProgram {
             binding: w.binding,
             binding_symbol: radix_lexer::Symbol(0),
             ty: map_cli_type(w.ty),
-            rest: w.rest,
+            rest: w.is_rest,
             description: w.description,
             global: w.global,
             default: w.default.map(map_cli_default),
