@@ -1,0 +1,2 @@
+# Stable diagnostic identity; paths and rendered prose are not an oracle.
+error[SEM050:use_after_move]

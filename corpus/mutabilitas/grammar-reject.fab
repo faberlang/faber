@@ -1,0 +1,21 @@
++++
+term = "mutabilitas"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix"]
+category = "type"
+summary = "GSD-9 reject harness: use after own transfer is rejected."
+syntax = "const own list<int> ys ← xs; print xs.length()"
+related = ["own"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — grammar reject harness (MU-3)
+# =============================================================================
+# This exemplum intentionally fails to compile. The sibling .expected file
+# pins only the stable diagnostic identity, not paths or rendered prose.
+
+main {
+    const own list<int> xs ← [1]
+    const own list<int> ys ← xs
+    print xs.length()
+}
