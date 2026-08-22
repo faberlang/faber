@@ -1191,6 +1191,84 @@ fn carried_resources_agree_rejects_inout_on_incoherent_abi() {
 }
 
 #[test]
+fn library_dispatch_agreement_admits_extras_on_fresh_bindings() {
+    // A fused library dispatch carries host-dispatch resources (the K/V
+    // weights and outputs of a QkvProjection launch) on bindings outside
+    // the carrier signature.
+    let signature = reduction_signature(4, 1, 1);
+    let mut carried = vec![
+        resource(
+            identity(1, "x", BufferRole::Input),
+            version(1, signature.input.element_ty, 4),
+            0,
+            MirKernelResourceAccess::Read,
+        ),
+        resource(
+            identity(2, "y", BufferRole::Output),
+            version(1, signature.output.element_ty, 1),
+            1,
+            MirKernelResourceAccess::Write,
+        ),
+    ];
+    let dispatch_extras = vec![
+        resource(
+            identity(3, "k_weight", BufferRole::Input),
+            version(1, signature.input.element_ty, 8),
+            2,
+            MirKernelResourceAccess::Read,
+        ),
+        resource(
+            identity(4, "k_out", BufferRole::Output),
+            version(1, signature.output.element_ty, 2),
+            3,
+            MirKernelResourceAccess::ReadWrite,
+        ),
+    ];
+    carried.extend(dispatch_extras);
+    assert!(carried_resources_agree_for_library_dispatch(
+        &carried, &signature
+    ));
+    // The exact predicate still fails the same carried list — the superset
+    // tolerance is scoped to library dispatches, never the default law.
+    assert!(!carried_resources_agree(&carried, &signature));
+}
+
+#[test]
+fn library_dispatch_agreement_keeps_exact_law_on_signature_slots() {
+    // The fused admission is not a weakening: a signature slot with wrong
+    // typed facts, or a missing signature slot, still fails closed.
+    let signature = reduction_signature(4, 1, 1);
+    let wrong_count = vec![
+        resource(
+            identity(1, "x", BufferRole::Input),
+            version(1, signature.input.element_ty, 5),
+            0,
+            MirKernelResourceAccess::Read,
+        ),
+        resource(
+            identity(2, "y", BufferRole::Output),
+            version(1, signature.output.element_ty, 1),
+            1,
+            MirKernelResourceAccess::Write,
+        ),
+    ];
+    assert!(!carried_resources_agree_for_library_dispatch(
+        &wrong_count,
+        &signature
+    ));
+    let missing_output = vec![resource(
+        identity(1, "x", BufferRole::Input),
+        version(1, signature.input.element_ty, 4),
+        0,
+        MirKernelResourceAccess::Read,
+    )];
+    assert!(!carried_resources_agree_for_library_dispatch(
+        &missing_output,
+        &signature
+    ));
+}
+
+#[test]
 fn carried_plan_agrees_rejects_recipe_mismatch() {
     let mut types = TypeTable::new();
     let function = reduction_function(&mut types, 1024);
