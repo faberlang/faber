@@ -39,7 +39,17 @@ use value::{
     width_checked_rem, width_checked_sub, GradientStorage, TensorValue,
 };
 
-const RUNNER_UNSUPPORTED_PREFIX: &str = "FaberScript unsupported";
+pub(crate) const RUNNER_UNSUPPORTED_PREFIX: &str = "faberscript unsupported";
+
+/// Stable diagnostic code for unsupported runner operations (D-02-07).
+pub(crate) const RUNNER_CODE_UNSUPPORTED: &str = "runner_unsupported";
+
+/// Stable diagnostic code for internal runner failures (D-02-07).
+pub(crate) const RUNNER_CODE_INTERNAL: &str = "runner_internal";
+
+/// Issue stem for the unsupported family; identity comes from the structured
+/// code + feature arg, never from parsing the prose message.
+const RUNNER_ISSUE_UNSUPPORTED_STEM: &str = "runner_faberscript_unsupported";
 
 /// Runner diagnostic surfaced to callers.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,30 +57,46 @@ pub struct RunnerError {
     pub message: String,
     pub issue: String,
     pub span: Span,
+    /// Structured diagnostic code (`runner_unsupported`, `runner_internal`).
+    pub code: &'static str,
+    /// Named identity facts (e.g. `feature`, `identity`, `detail`).
+    pub args: Vec<(String, String)>,
+}
+
+/// Lowercase identifier fragment for a structured fact value.
+fn runner_slug(value: &str) -> String {
+    runner_issue(value)
+        .trim_start_matches("runner_")
+        .to_owned()
 }
 
 impl RunnerError {
     #[must_use]
     pub fn unsupported(span: Span, feature: &str) -> Self {
-        // WHY: the issue derives from the message so the structured fact
-        // carries the rejected feature (runner_unsupported_host_kernel_call),
-        // matching `internal`; non-renderer tests assert `issue`, not prose.
+        // WHY: identity derives from the structured code + `feature` arg, not
+        // from the prose message; non-renderer tests assert `issue`, not prose.
         let message = format!("{RUNNER_UNSUPPORTED_PREFIX}: {feature}");
-        let issue = runner_issue(&message);
+        let issue = format!("{RUNNER_ISSUE_UNSUPPORTED_STEM}_{}", runner_slug(feature));
         Self {
             message,
             issue,
             span,
+            code: RUNNER_CODE_UNSUPPORTED,
+            args: vec![("feature".to_owned(), feature.to_owned())],
         }
     }
 
     pub fn internal(span: Span, message: impl Into<String>) -> Self {
+        // WHY: identity derives from the structured `detail` arg, not from
+        // parsing the rendered prose message field.
         let message = message.into();
-        let issue = runner_issue(&message);
+        let issue = format!("runner_{}", runner_slug(&message));
         Self {
-            message,
             issue,
             span,
+            code: RUNNER_CODE_INTERNAL,
+            args: vec![("detail".to_owned(), message.clone())],
+            message,
         }
     }
 
@@ -83,6 +109,8 @@ impl RunnerError {
             message: message.into(),
             issue: issue.to_owned(),
             span,
+            code: RUNNER_CODE_INTERNAL,
+            args: Vec::new(),
         }
     }
 

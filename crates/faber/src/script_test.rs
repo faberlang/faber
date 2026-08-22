@@ -25,6 +25,8 @@ fn print_run_source_error_accepts_runner_failures() {
         message: "FaberScript unsupported: async".to_owned(),
         issue: "runner_unsupported".to_owned(),
         span: radix::module::lexer::Span::default(),
+        code: "runner_unsupported",
+        args: Vec::new(),
     }]);
     print_run_source_error(&error);
 }

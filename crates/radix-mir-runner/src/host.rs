@@ -32,11 +32,18 @@ pub(crate) fn provider_identity(provider: &MirProvider, interner: &Interner) -> 
 impl RunnerError {
     /// Replace the legacy numeric provider diagnostic with its stable route.
     pub(crate) fn with_provider_identity(mut self, identity: &str) -> Self {
-        if self.message == "FaberScript unsupported: provider"
+        if (self.code == super::RUNNER_CODE_UNSUPPORTED
+            && self
+                .args
+                .iter()
+                .any(|(key, value)| key == "feature" && value == "provider"))
             || self.message.contains("provider sym#")
         {
-            self.message = format!("FaberScript unsupported: provider {identity}");
-            self.issue = super::runner_issue(&self.message);
+            // WHY: identity derives from the structured code + args, not from
+            // matching prose; the route lands in both the issue and the args.
+            self.message = format!("{}: provider {identity}", super::RUNNER_UNSUPPORTED_PREFIX);
+            self.issue = format!("{}_{}", self.issue, super::runner_slug(identity));
+            self.args.push(("identity".to_owned(), identity.to_owned()));
         }
         self
     }
