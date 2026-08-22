@@ -75,21 +75,14 @@ pub(super) fn cmd_test(args: &TestArgs) {
         fail_fast: args.fail_fast,
     };
 
-    let mut include = args.include.clone();
-    if let Some(name) = explicit_proba_include(&input_path) {
-        // A named `.proba` argument is the source selection. `--include` on
-        // the package root still selects by pattern; a file path does not
-        // pull the rest of the package.
-        include = vec![name];
-    }
-    let proba_filter = if include.is_empty() && args.exclude.is_empty() {
-        None
-    } else {
-        Some(TestSourceFilter {
-            include,
-            exclude: args.exclude.clone(),
-        })
-    };
+    // A named `.proba` argument is the source selection. `--include` on
+    // the package root still selects by pattern; a file path does not
+    // pull the rest of the package.
+    let proba_filter = package::test_source_filter_for_input(
+        &input_path,
+        args.include.clone(),
+        args.exclude.clone(),
+    );
 
     // `--ignored` alone means “only source-skipped (omitte/futurum) cases” —
     // not yet supported as a positive suite; document via fail-closed message.
@@ -171,16 +164,6 @@ pub(super) fn cmd_test(args: &TestArgs) {
         std::process::exit(0);
     }
     std::process::exit(1);
-}
-
-/// File-name include for a package-route `.proba` argument.
-fn explicit_proba_include(path: &Path) -> Option<String> {
-    if path.extension().and_then(|ext| ext.to_str()) != Some("proba") || !path.is_file() {
-        return None;
-    }
-    path.file_name()
-        .and_then(|name| name.to_str())
-        .map(str::to_owned)
 }
 
 /// Zero selected cases after discovery/filtering. `--include` that matched no
@@ -459,12 +442,7 @@ fn run_package_with_options(
     include_ignored: bool,
     focused: bool,
 ) -> (ProbaReport, bool, RunMetadata) {
-    let package = match radix::program::analyze::analyze_package_for_tests(
-        config,
-        input,
-        proba_filter,
-        &package::faber_analysis_seams(),
-    ) {
+    let package = match package::analyze_package_for_tests(config, input, proba_filter) {
         Ok(package) => package,
         Err(diagnostics) => fail_package_analysis(&diagnostics),
     };
@@ -569,12 +547,7 @@ fn run_package(
     include_ignored: bool,
     focused: bool,
 ) -> (ProbaReport, bool) {
-    let package = match radix::program::analyze::analyze_package_for_tests(
-        config,
-        input,
-        proba_filter,
-        &package::faber_analysis_seams(),
-    ) {
+    let package = match package::analyze_package_for_tests(config, input, proba_filter) {
         Ok(package) => package,
         Err(diagnostics) => fail_package_analysis(&diagnostics),
     };
@@ -675,12 +648,7 @@ fn run_package_test_unit_with_options(
     focused: bool,
     metadata: &mut RunMetadata,
 ) -> Result<ProbaReport, Vec<radix::module::diagnostics::Diagnostic>> {
-    let mut package = radix::program::analyze::analyze_package_for_tests(
-        config,
-        input,
-        proba_filter,
-        &package::faber_analysis_seams(),
-    )?;
+    let mut package = package::analyze_package_for_tests(config, input, proba_filter)?;
     if package
         .diagnostics
         .iter()
@@ -690,10 +658,12 @@ fn run_package_test_unit_with_options(
     }
 
     let Some((root_id, _)) = package.node_by_path(unit_path) else {
-        return Err(vec![radix::module::diagnostics::Diagnostic::error(format!(
-            "test unit disappeared during package re-analysis: {}",
-            unit_path.display()
-        ))
+        return Err(vec![radix::module::diagnostics::Diagnostic::error(
+            format!(
+                "test unit disappeared during package re-analysis: {}",
+                unit_path.display()
+            ),
+        )
         .with_file(unit_path.display().to_string())]);
     };
     let root_id = root_id.clone();
@@ -703,10 +673,12 @@ fn run_package_test_unit_with_options(
     package.roots = vec![root_id.clone()];
 
     let Some(unit) = package.nodes.get(&root_id) else {
-        return Err(vec![radix::module::diagnostics::Diagnostic::error(format!(
-            "test unit was not retained in its local package closure: {}",
-            unit_path.display()
-        ))
+        return Err(vec![radix::module::diagnostics::Diagnostic::error(
+            format!(
+                "test unit was not retained in its local package closure: {}",
+                unit_path.display()
+            ),
+        )
         .with_file(unit_path.display().to_string())]);
     };
     let all_cases = inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
@@ -775,12 +747,7 @@ fn run_package_test_unit(
     include_ignored: bool,
     focused: bool,
 ) -> Result<ProbaReport, Vec<radix::module::diagnostics::Diagnostic>> {
-    let mut package = radix::program::analyze::analyze_package_for_tests(
-        config,
-        input,
-        proba_filter,
-        &package::faber_analysis_seams(),
-    )?;
+    let mut package = package::analyze_package_for_tests(config, input, proba_filter)?;
     if package
         .diagnostics
         .iter()
@@ -790,10 +757,12 @@ fn run_package_test_unit(
     }
 
     let Some((root_id, _)) = package.node_by_path(unit_path) else {
-        return Err(vec![radix::module::diagnostics::Diagnostic::error(format!(
-            "test unit disappeared during package re-analysis: {}",
-            unit_path.display()
-        ))
+        return Err(vec![radix::module::diagnostics::Diagnostic::error(
+            format!(
+                "test unit disappeared during package re-analysis: {}",
+                unit_path.display()
+            ),
+        )
         .with_file(unit_path.display().to_string())]);
     };
     let root_id = root_id.clone();
@@ -803,10 +772,12 @@ fn run_package_test_unit(
     package.roots = vec![root_id.clone()];
 
     let Some(unit) = package.nodes.get(&root_id) else {
-        return Err(vec![radix::module::diagnostics::Diagnostic::error(format!(
-            "test unit was not retained in its local package closure: {}",
-            unit_path.display()
-        ))
+        return Err(vec![radix::module::diagnostics::Diagnostic::error(
+            format!(
+                "test unit was not retained in its local package closure: {}",
+                unit_path.display()
+            ),
+        )
         .with_file(unit_path.display().to_string())]);
     };
     let all_cases = inventory_cases(&unit.analysis.hir, &unit.analysis.interner);

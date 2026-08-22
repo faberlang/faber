@@ -60,6 +60,7 @@ mod runtime_dependency;
 mod runtime_sources;
 #[cfg(feature = "hir-rust")]
 mod rust_runtime_dependency;
+mod test_route;
 
 #[cfg(feature = "hir-rust")]
 #[allow(unused_imports)]
@@ -138,6 +139,8 @@ use radix::module::driver::Config;
 use radix::program::discovery::PackageSpec;
 use radix::program::library::{LibraryInterfaceCache, LibraryResolver, LockedLibraryPackage};
 use std::path::{Path, PathBuf};
+#[allow(dead_code, unused_imports)]
+pub(crate) use test_route::{analyze_package_for_tests, test_source_filter_for_input};
 
 /// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 executed-lane
 /// routing; authoritative decision record
@@ -389,7 +392,9 @@ pub(crate) fn discover_build_layout(
 
 #[allow(dead_code)]
 pub(crate) fn is_manifest_backed_or_directory_package_input(input: &Path) -> bool {
-    radix::program::discovery::is_manifest_backed_or_directory_package_input(&absolutize_path(input))
+    radix::program::discovery::is_manifest_backed_or_directory_package_input(&absolutize_path(
+        input,
+    ))
 }
 
 /// Build the explicit library cache seam used by product MIR route plumbing.
