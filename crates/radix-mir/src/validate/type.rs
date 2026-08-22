@@ -2,9 +2,9 @@
 
 use super::{FunctionScope, MirValidationError, Validator};
 use crate::{
-    MirAggregateCarrier, MirAggregateFamily, MirBlockId, MirClosureEnvironmentId, MirConstant,
-    MirGenericBindings, MirKernelBuiltin, MirLayoutKind, MirLocalId, MirOperand, MirProjection,
-    MirScalarLayout, MirType, instantiate_existing_generic_type,
+    instantiate_existing_generic_type, MirAggregateCarrier, MirAggregateFamily, MirBlockId,
+    MirClosureEnvironmentId, MirConstant, MirGenericBindings, MirKernelBuiltin, MirLayoutKind,
+    MirLocalId, MirOperand, MirProjection, MirScalarLayout, MirType,
 };
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};

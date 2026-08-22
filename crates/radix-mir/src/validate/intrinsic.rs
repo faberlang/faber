@@ -549,7 +549,10 @@ impl Validator<'_, '_> {
         } else if matches!(op, MirCollectionOp::TensorFromFlat) {
             // Padded form carries a trailing fill operand (AEU-5 Route C).
             if !(3..=4).contains(&call.args.len()) {
-                self.error(span, "collection TensorFromFlat expects 3 or 4 MIR arguments");
+                self.error(
+                    span,
+                    "collection TensorFromFlat expects 3 or 4 MIR arguments",
+                );
             }
         } else if matches!(op, MirCollectionOp::TensorGather) {
             // Dense gather is [table, ids]. Packed gather (R-PACK-02N) adds

@@ -4313,7 +4313,9 @@ fn conversio_padded_tensor_from_flat_fills_dead_slots() {
     // A flat longer than the literal shape keeps the exact-count failure.
     runner.frames.last_mut().unwrap().values.insert(
         MirValueId(2),
-        crate::Value::Array(Rc::new(RefCell::new((0..9).map(|_| crate::Value::Float(0.0)).collect()))),
+        crate::Value::Array(Rc::new(RefCell::new(
+            (0..9).map(|_| crate::Value::Float(0.0)).collect(),
+        ))),
     );
     let overlong = MirRuntimeCall {
         intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorFromFlat),

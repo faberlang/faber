@@ -1420,9 +1420,7 @@ impl FunctionBuilder<'_> {
                 // tensor place (every lane is defined by construction).
                 (collection, MirType::semantic(*elem), false)
             }
-            CollectionIteraKind::BoundedArray(elem, _) => {
-                (collection, MirType::semantic(*elem), false)
-            }
+            CollectionIteraKind::BoundedArray(elem, _) => (collection, MirType::semantic(*elem), false),
             CollectionIteraKind::Shaped { .. } => {
                 unreachable!("shaped collection itera returns through nested lowering above")
             }
@@ -1820,7 +1818,8 @@ impl FunctionBuilder<'_> {
             mutable: true,
             span: iter.span,
         });
-        self.bindings.insert(iter.binding, LocalBinding { local: binding, ty: binding_ty });
+        self.bindings
+            .insert(iter.binding, LocalBinding { local: binding, ty: binding_ty });
 
         let after_id = self.fresh_block(iter.span);
         let mut cases = Vec::new();
@@ -1855,8 +1854,7 @@ impl FunctionBuilder<'_> {
                 self.terminate_open_current(MirTerminatorKind::Goto(lane_end), iter.span);
                 self.switch_to(lane_end);
             }
-            reaches_after |=
-                self.terminate_open_current(MirTerminatorKind::Goto(after_id), iter.span);
+            reaches_after |= self.terminate_open_current(MirTerminatorKind::Goto(after_id), iter.span);
         }
         if reaches_after {
             self.switch_to(after_id);
