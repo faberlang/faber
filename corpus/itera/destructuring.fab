@@ -65,6 +65,14 @@ main {
         print x + y
     }
 
+    # --- Labeled tuples: object_pattern binds by label ---
+
+    const list<tuple<gx: int, int>> paria ← [tuple<int, int> [50, 60], tuple<int, int> [70, 80]]
+
+    for from paria const {gx} {
+        print gx
+    }
+
     # --- Positional tuples: array_pattern over fixed-width rows ---
 
     const list<tuple<int, int>> ordines ← [tuple<int, int> [10, 20], tuple<int, int> [30, 40]]
