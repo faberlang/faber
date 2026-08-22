@@ -333,6 +333,152 @@ functio ce_loss(tf32[2, 2] logits, tf32[2, 2] targets) → fractus {
     );
 }
 
+// ---------------------------------------------------------------------------
+// ARC-1 (air-reducta-cumulata): red drivers pinning today's declines.
+// Tensor-receiver `reducta`/`cumulata` are outside the AIR allow-list today;
+// closure combines additionally hit the closure reject.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn air_lane_reducta_on_tensor_receiver_declines_via_allowlist_miss() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio comb(fractus a, fractus b) → fractus {
+    redde a + b
+}
+
+@ radix lane "air"
+functio loss(tf32[2, 2] x) → fractus {
+    redde x.reducta(comb, 0.0)
+}
+"#,
+    );
+
+    let err = expect_air_issue(&errors, "method_call");
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "method" && arg.value == "reducta"));
+}
+
+#[test]
+fn air_lane_cumulata_on_tensor_receiver_declines_as_unknown() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio comb(fractus a, fractus b) → fractus {
+    redde a + b
+}
+
+@ radix lane "air"
+functio loss(tf32[2, 2] x) → tf32[2, 2] {
+    redde x.cumulata(comb, 0.0)
+}
+"#,
+    );
+
+    let err = expect_air_issue(&errors, "method_call");
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "method" && arg.value == "cumulata"));
+}
+
+#[test]
+fn air_lane_closure_combine_declines_as_closure() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio loss(tf32[2, 2] x) → fractus {
+    redde x.reducta((fractus a, fractus b) ∴ a + b, 0.0)
+}
+"#,
+    );
+
+    expect_air_issue(&errors, "closure");
+}
+
+#[test]
+fn base_lane_cumulata_is_unknown_everywhere() {
+    // Base lane (registry-direct): `cumulata` has no intrinsic row on any
+    // receiver family — lista or tensor — so the spelling cannot resolve on
+    // any lane today. The semantic miss itself is silent (registry-direct
+    // misses fall through to member lookup); the registry pin is the
+    // observable fact.
+    for receiver in [
+        radix_intrinsics::IntrinsicReceiver::Lista,
+        radix_intrinsics::IntrinsicReceiver::Tensor,
+    ] {
+        assert!(
+            radix_intrinsics::lookup_method(receiver, "cumulata", 2).is_none(),
+            "cumulata must be unregistered today; ARC-2 registers the lista row"
+        );
+    }
+
+    let errors = analyze(
+        r#"
+functio probe(lista<fractus> xs) → fractus {
+    redde xs.cumulata((fractus a, fractus b) ∴ a + b, 0.0)
+}
+"#,
+    );
+
+    assert!(
+        !errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::AirPurityViolation),
+        "base-lane cumulata must not reach any AIR admit path: {errors:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// ARC-1 admit fixtures — the post-goal state ARC-3 delivers. Ignored until
+// ARC-3 (AIR eligibility for higher-order intrinsics + Tier A) un-ignores
+// them: named-combine `reducta`/`cumulata` on typed tensor receivers become
+// AIR-eligible, while closure combines keep the `closure` decline.
+// ---------------------------------------------------------------------------
+
+#[test]
+#[ignore = "ARC-3 un-ignores: named-combine reducta on a tensor receiver becomes AIR-eligible"]
+fn air_lane_admits_named_combine_reducta_on_tensor_receiver() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio comb(fractus a, fractus b) → fractus {
+    redde a + b
+}
+
+@ radix lane "air"
+functio loss(tf32[2, 2] x) → fractus {
+    redde x.reducta(comb, 0.0)
+}
+"#,
+    );
+
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
+}
+
+#[test]
+#[ignore = "ARC-3 un-ignores: named-combine cumulata on a tensor receiver becomes AIR-eligible"]
+fn air_lane_admits_named_combine_cumulata_on_tensor_receiver() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio comb(fractus a, fractus b) → fractus {
+    redde a + b
+}
+
+@ radix lane "air"
+functio loss(tf32[2, 2] x) → tf32[2, 2] {
+    redde x.cumulata(comb, 0.0)
+}
+"#,
+    );
+
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
+}
+
 #[test]
 fn rejects_opaque_non_air_calls() {
     let errors = air_errors(
