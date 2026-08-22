@@ -886,3 +886,111 @@ fn lean_checker_missing_toolchain_is_never_proven_for_recognized_records() {
         results[0].status
     );
 }
+
+// ---------------------------------------------------------------------------
+// APA-2 pins: registered AIR kinds carry deterministic labels and cannot fall
+// through the generic `True := trivial` generator as if proven.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lean_checker_theorem_labels_do_not_collide_across_registered_kinds() {
+    let span = HirAspectSpan::Source(Span::new(0, 10));
+
+    let kinds = [
+        HirAspectKind::DiscerneOmnia,
+        HirAspectKind::UnrollEquivalence,
+        HirAspectKind::MaskNeutrality,
+        HirAspectKind::GatePurity,
+    ];
+
+    // Same node id and index: the label must still separate the kinds.
+    let mut labels: Vec<String> = kinds
+        .iter()
+        .map(|&kind| {
+            let record = HirAspectRecord::recognized(kind, span, Some(crate::hir::HirId(7)));
+            super::theorem_label(&record, 0)
+        })
+        .collect();
+    labels.sort_unstable();
+    labels.dedup();
+    assert_eq!(labels.len(), kinds.len(), "labels must be pairwise distinct: {labels:?}");
+
+    // Node-less records fall back to the record index; kind still separates.
+    let mut labels: Vec<String> = kinds
+        .iter()
+        .map(|&kind| {
+            let record = HirAspectRecord::recognized(kind, span, None);
+            super::theorem_label(&record, 3)
+        })
+        .collect();
+    labels.sort_unstable();
+    labels.dedup();
+    assert_eq!(labels.len(), kinds.len(), "index labels must be pairwise distinct: {labels:?}");
+}
+
+#[test]
+fn lean_checker_air_kind_records_never_become_proven_via_placeholder_generator() {
+    let temp_dir = crate::test_support::test_temp_dir("lean-verifier-apa2-no-fallthrough");
+    let temp = temp_dir.path().to_path_buf();
+    let config = LeanAspectCheckerConfig {
+        lake_bin: temp.join("nonexistent-lake"),
+        lean_bin: temp.join("nonexistent-lean"),
+        timeout: Duration::from_secs(5),
+    };
+    let checker = LeanAspectChecker::new(config, temp);
+
+    let span = HirAspectSpan::Source(Span::new(0, 10));
+    let air_kinds = [
+        HirAspectKind::UnrollEquivalence,
+        HirAspectKind::MaskNeutrality,
+        HirAspectKind::GatePurity,
+    ];
+    let records: Vec<HirAspectRecord> =
+        air_kinds.iter().map(|&kind| HirAspectRecord::recognized(kind, span, Some(crate::hir::HirId(1)))).collect();
+    let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, records);
+
+    let results = checker.verify(&report);
+    assert_eq!(results.len(), air_kinds.len());
+    for result in &results {
+        assert_ne!(result.status, HirAspectCheckStatus::Proven, "AIR kind must not be Proven pre-line-proof");
+        assert_eq!(result.status, HirAspectCheckStatus::Failed, "expected refused result, got {:?}", result.status);
+        assert_eq!(result.backend, HirAspectBackendKind::Lean);
+        assert!(result.evidence.0.contains("registered without proof content"));
+        assert!(result.evidence.0.contains("refusing placeholder proof"));
+    }
+}
+
+#[test]
+fn lean_checker_air_refusal_preserves_per_record_order_alongside_checkable_kinds() {
+    let temp_dir = crate::test_support::test_temp_dir("lean-verifier-apa2-order");
+    let temp = temp_dir.path().to_path_buf();
+    let config = LeanAspectCheckerConfig {
+        lake_bin: temp.join("nonexistent-lake"),
+        lean_bin: temp.join("nonexistent-lean"),
+        timeout: Duration::from_secs(5),
+    };
+    let checker = LeanAspectChecker::new(config, temp);
+
+    let span = HirAspectSpan::Source(Span::new(0, 10));
+    let records = vec![
+        HirAspectRecord::recognized(HirAspectKind::UnrollEquivalence, span, Some(crate::hir::HirId(1))),
+        HirAspectRecord::recognized(HirAspectKind::DiscerneOmnia, span, Some(crate::hir::HirId(2))),
+        HirAspectRecord::recognized(HirAspectKind::GatePurity, span, Some(crate::hir::HirId(3))),
+    ];
+    let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, records);
+
+    let results = checker.verify(&report);
+    assert_eq!(results.len(), 3);
+    // The report sorts same-span records by kind, so the deterministic order
+    // is DiscerneOmnia, UnrollEquivalence, GatePurity. DiscerneOmnia with a
+    // missing toolchain is ToolchainMissing/Error, never Proven; the AIR
+    // kinds keep their deterministic refusals, in order.
+    assert!(
+        results[0].status == HirAspectCheckStatus::ToolchainMissing
+            || results[0].status == HirAspectCheckStatus::Error
+    );
+    assert_eq!(results[1].status, HirAspectCheckStatus::Failed);
+    assert!(results[1].evidence.0.contains("unroll_equivalence"));
+    assert_eq!(results[2].status, HirAspectCheckStatus::Failed);
+    assert!(results[2].evidence.0.contains("gate_purity"));
+}

@@ -338,12 +338,16 @@ fn air_shaped_program() -> HirModule {
     ])
 }
 
-/// Exhaustive-dispatch pin: this function stops compiling the moment a second
-/// `HirAspectKind` variant is added, forcing APA-2 to carry the registration
-/// pins for the new kinds instead of silently widening this test.
+/// Exhaustive-dispatch pin: this function stops compiling whenever a
+/// `HirAspectKind` variant changes, forcing registration units (APA-2 and
+/// later lines) to carry the label pins for their kinds instead of silently
+/// widening this test.
 fn only_registered_aspect_kind_label(kind: HirAspectKind) -> &'static str {
     match kind {
         HirAspectKind::DiscerneOmnia => "discerne_omnia",
+        HirAspectKind::UnrollEquivalence => "unroll_equivalence",
+        HirAspectKind::MaskNeutrality => "mask_neutrality",
+        HirAspectKind::GatePurity => "gate_purity",
     }
 }
 
@@ -352,9 +356,76 @@ fn air_aspect_kinds_are_absent_from_the_current_kind_set() {
     let report = report_hir_aspects(&air_shaped_program(), &TypeTable::new());
 
     for record in report.records() {
-        // Exhaustive match: pre-APA-2, every record is DiscerneOmnia.
+        // No AIR recognizer exists yet: any record from an AIR-shaped
+        // program can only be a pre-existing DiscerneOmnia record.
         assert_eq!(only_registered_aspect_kind_label(record.aspect), "discerne_omnia");
     }
+}
+
+// ---------------------------------------------------------------------------
+// APA-2 registration: the three AIR kinds are representable, distinguishable,
+// and carry deterministic obligation identity. No recognizer yet (APA-L1/2/3).
+// ---------------------------------------------------------------------------
+
+#[test]
+fn air_aspect_kinds_are_representable_and_distinguishable_in_records() {
+    let span = HirAspectSpan::Source(test_span_between(8, 20));
+    let kinds = [
+        HirAspectKind::DiscerneOmnia,
+        HirAspectKind::UnrollEquivalence,
+        HirAspectKind::MaskNeutrality,
+        HirAspectKind::GatePurity,
+    ];
+
+    let records: Vec<_> = kinds.iter().map(|&kind| HirAspectRecord::recognized(kind, span, Some(HirId(7)))).collect();
+
+    for (record, &kind) in records.iter().zip(kinds.iter()) {
+        assert_eq!(record.aspect, kind);
+    }
+    // Pairwise distinguishable: no two kinds collapse in the record model.
+    for i in 0..records.len() {
+        for j in (i + 1)..records.len() {
+            assert_ne!(records[i], records[j]);
+        }
+    }
+    // Deterministic labels are pairwise distinct.
+    let mut labels: Vec<_> = kinds.iter().map(|&k| only_registered_aspect_kind_label(k)).collect();
+    labels.sort_unstable();
+    labels.dedup();
+    assert_eq!(labels.len(), kinds.len());
+}
+
+#[test]
+fn air_aspect_kinds_carry_deterministic_distinct_obligation_identity() {
+    use crate::aspect::HirAspectObligationId;
+
+    let kinds = [
+        HirAspectKind::DiscerneOmnia,
+        HirAspectKind::UnrollEquivalence,
+        HirAspectKind::MaskNeutrality,
+        HirAspectKind::GatePurity,
+    ];
+
+    // Same node and ordinal: identity differs only through the kind.
+    let ids: Vec<_> = kinds
+        .iter()
+        .map(|&aspect| HirAspectObligationId { aspect, node_id: Some(HirId(7)), ordinal: 0 })
+        .collect();
+    for i in 0..ids.len() {
+        for j in (i + 1)..ids.len() {
+            assert_ne!(ids[i], ids[j]);
+        }
+    }
+
+    // Same kind: node and ordinal keep multiple obligations distinguishable.
+    assert_ne!(
+        HirAspectObligationId { aspect: HirAspectKind::UnrollEquivalence, node_id: Some(HirId(7)), ordinal: 0 },
+        HirAspectObligationId { aspect: HirAspectKind::UnrollEquivalence, node_id: Some(HirId(7)), ordinal: 1 }
+    );
+    assert_ne!(
+        HirAspectObligationId { aspect: HirAspectKind::MaskNeutrality, node_id: Some(HirId(7)), ordinal: 0 },
+        HirAspectObligationId { aspect: HirAspectKind::MaskNeutrality, node_id: Some(HirId(8)), ordinal: 0 }
+    );
 }
 
 #[test]
@@ -368,7 +439,7 @@ fn air_shaped_program_produces_no_aspect_records_before_registration() {
     assert_eq!(first, second);
     assert!(
         first.records().is_empty(),
-        "AIR-shaped HIR must produce no aspect records before APA-2 registers the AIR kinds"
+        "AIR-shaped HIR must produce no aspect records until APA-L1/L2/L3 land recognizers (APA-2 registers kinds only)"
     );
 }
 
