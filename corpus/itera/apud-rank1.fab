@@ -1,0 +1,48 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "vel_expr", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "itera_stmt", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "Coordinate iteration over a rank-1 tensor binds the axis index and the element together."
+syntax = "for from tensor at [i] const cell { }"
+related = ["apud", "itera", "ex", "tensor"]
+locale = "en"
++++
+
+# =============================================================================
+# apud rank-1 — `at [i]` binds the single axis coordinate next to the element.
+# =============================================================================
+#
+# What this teaches:
+#   • `at [i]` on a rank-1 tensor binds the lane index as a `numerus`
+#     alongside the element — one statement, no nested `from range` loop
+#   • the coordinate is outer-first by construction: rank 1 has exactly one
+#     axis, so the flattening order is the axis itself
+#
+# Common mistakes:
+#   • expecting `at [i, j]` on a rank-1 tensor to bind two coordinates —
+#     coordinate count must equal the iterable rank (arity mismatch)
+#
+# See also: apud, itera, ex, tensor
+# =============================================================================
+
+# Rank-1 `apud [i]` over a literal-shaped tensor
+#
+# for from t at [i] const cell { <body> }
+#
+# GRAMMAR:
+#   iteraStmt :← 'for' 'from' expr ('at' '[' ident (',' ident)* ']')? …
+#
+# EXPECTED OUTPUT:
+#   lane index and element, one line per lane (0‥3).
+
+main {
+    const list<f32> flat ← [1.0, 2.0, 3.0]
+    const tf32[] seed ← empty
+    var tf32[3] line ← seed.from_flat(flat, [3])
+
+    for from line at [i] const cell {
+        print i, cell
+    }
+}

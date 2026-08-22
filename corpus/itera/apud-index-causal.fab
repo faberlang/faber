@@ -1,0 +1,50 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "vel_expr", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "itera_stmt", "si_stmt", "comparison", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "Coordinates bound by `at` are ordinary numerus values — the body can branch on the indices."
+syntax = "for from m at [r, c] const cell { if r ≤ c { } }"
+related = ["apud", "itera", "ex", "matrix", "si"]
+locale = "en"
++++
+
+# =============================================================================
+# apud causal — an index-dependent body over the upper triangle.
+# =============================================================================
+#
+# What this teaches:
+#   • coordinates are plain immutable `numerus` locals: `if r ≤ c` is an
+#     ordinary pure condition, no new index-space operators
+#   • index-dependent bodies keep the single statement — the causal filter
+#     lives inside the loop body, not in a hand-built index walk
+#
+# Common mistakes:
+#   • building the triangle with a nested `for range` pair and manual bounds —
+#     the condition belongs in the body; the loop walks the full grid
+#
+# See also: apud, itera, ex, si
+# =============================================================================
+
+# Index-dependent causal body — keep only r ≤ c (upper triangle)
+#
+# for from m at [r, c] const cell { if r ≤ c { print r, c, cell } }
+#
+# GRAMMAR:
+#   iteraStmt :← 'for' 'from' expr ('at' '[' ident (',' ident)* ']')? …
+#
+# EXPECTED OUTPUT:
+#   six upper-triangle cells of the 3×3 outer product, row-major.
+
+main {
+    const vf32[3] a ← [2.0, 3.0, 4.0] ↦ vf32[3]
+    const vf32[3] b ← [5.0, 7.0, 11.0] ↦ vf32[3]
+    const matrix<f32, [3, 3]> m ← a ⊗ b
+
+    for from m at [r, c] const cell {
+        if r ≤ c {
+            print r, c, cell
+        }
+    }
+}

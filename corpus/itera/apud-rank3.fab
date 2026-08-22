@@ -1,0 +1,47 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "vel_expr", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "itera_stmt", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "Coordinate iteration over a rank-3 tensor binds three coordinates — outermost axis first."
+syntax = "for from tensor at [i, j, k] const cell { }"
+related = ["apud", "itera", "ex", "tensor"]
+locale = "en"
++++
+
+# =============================================================================
+# apud rank-3 — `at [i, j, k]` walks a cube with three nested coordinates.
+# =============================================================================
+#
+# What this teaches:
+#   • any rank ≥ 1 works — arity is the only rank gate; rank 3 binds three
+#     `numerus` coordinates in one statement
+#   • first-bound coordinate is the outer axis: i outer, then j, then k inner
+#
+# Common mistakes:
+#   • expecting silent flattening without coordinates — the statement declares
+#     the flattening order; every axis must be named
+#
+# See also: apud, itera, ex, tensor
+# =============================================================================
+
+# Rank-3 `apud [i, j, k]` over a literal-shaped 2×2×2 tensor
+#
+# for from cube at [i, j, k] const cell { <body> }
+#
+# GRAMMAR:
+#   iteraStmt :← 'for' 'from' expr ('at' '[' ident (',' ident)* ']')? …
+#
+# EXPECTED OUTPUT:
+#   i, j, k, cell per line — eight lanes in i-outer, k-inner order.
+
+main {
+    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    const tf32[] seed ← empty
+    var tf32[2, 2, 2] cube ← seed.from_flat(flat, [2, 2, 2])
+
+    for from cube at [i, j, k] const cell {
+        print i, j, k, cell
+    }
+}

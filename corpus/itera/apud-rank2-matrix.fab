@@ -1,0 +1,48 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "vel_expr", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "itera_stmt", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "Coordinate iteration over a matrix binds row and column in one statement — the database-metadata origin."
+syntax = "for from matrix at [r, c] const cell { }"
+related = ["apud", "itera", "ex", "matrix", "tensor"]
+locale = "en"
++++
+
+# =============================================================================
+# apud rank-2 — `at [r, c]` walks a matrix row-major with one statement.
+# =============================================================================
+#
+# What this teaches:
+#   • `at [r, c]` over `matrix<T, [R, C]>` binds row then column — the
+#     first-bound coordinate is the outer axis, so the walk is row-major
+#   • the operator's database-metadata origin: one statement replaces the
+#     nested `for range` pair `nidificatus.fab` needs for the same grid
+#
+# Common mistakes:
+#   • reading the coordinates as (column, row) — the statement declares the
+#     flattening order; nothing is silently chosen
+#
+# See also: apud, itera, ex, matrix
+# =============================================================================
+
+# Rank-2 `apud [r, c]` over a matrix built by vector outer product
+#
+# for from m at [r, c] const cell { <body> }
+#
+# GRAMMAR:
+#   iteraStmt :← 'for' 'from' expr ('at' '[' ident (',' ident)* ']')? …
+#
+# EXPECTED OUTPUT:
+#   r, c, cell per line — rows outer (0‥2), columns inner (0‥3).
+
+main {
+    const vf32[2] a ← [1.0, 2.0] ↦ vf32[2]
+    const vf32[3] b ← [10.0, 20.0, 30.0] ↦ vf32[3]
+    const matrix<f32, [2, 3]> m ← a ⊗ b
+
+    for from m at [r, c] const cell {
+        print r, c, cell
+    }
+}
