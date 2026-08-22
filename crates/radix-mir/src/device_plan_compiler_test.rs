@@ -19,6 +19,7 @@ fn node(
         shape: shape(dims),
         inputs: inputs.iter().copied().map(GraphNodeId).collect(),
         attention,
+        moe: None,
     }
 }
 
@@ -313,5 +314,252 @@ fn library_operation_spellings_have_one_owner_per_match_site() {
                 "{spelling} must have exactly one owner at {site}; found {count} occurrences of {owner:?}"
             );
         }
+    }
+}
+
+fn moe_node(
+    id: u32,
+    layer: u32,
+    op: TypedOp,
+    dims: &[u64],
+    inputs: &[u32],
+    moe: Option<MoEFacts>,
+) -> TypedOpNode {
+    TypedOpNode {
+        id: GraphNodeId(id),
+        layer,
+        op,
+        shape: shape(dims),
+        inputs: inputs.iter().copied().map(GraphNodeId).collect(),
+        attention: None,
+        moe,
+    }
+}
+
+fn moe_facts() -> MoEFacts {
+    MoEFacts {
+        experts: 128,
+        active: 8,
+        rows: 8,
+        hidden: 1024,
+        intermediate: 512,
+    }
+}
+
+/// moe-probe exemplar class: a routed FFN block (router logits + top-k
+/// selection feeding grouped expert SwiGLU execution).
+fn moe_nodes(facts: MoEFacts) -> Vec<TypedOpNode> {
+    let mut nodes = vec![node(
+        0,
+        0,
+        TypedOp::Input,
+        &[facts.rows, facts.hidden],
+        &[],
+        None,
+    )];
+    nodes.push(node(
+        1,
+        0,
+        TypedOp::RmsNorm,
+        &[facts.rows, facts.hidden],
+        &[0],
+        None,
+    ));
+    nodes.push(moe_node(
+        2,
+        0,
+        TypedOp::RouterProjection,
+        &[facts.rows, facts.experts],
+        &[1],
+        Some(facts),
+    ));
+    nodes.push(moe_node(
+        3,
+        0,
+        TypedOp::RouterTopK,
+        &[facts.rows, facts.active],
+        &[2],
+        Some(facts),
+    ));
+    nodes.push(moe_node(
+        4,
+        0,
+        TypedOp::ExpertGate,
+        &[facts.rows, facts.intermediate],
+        &[1],
+        Some(facts),
+    ));
+    nodes.push(moe_node(
+        5,
+        0,
+        TypedOp::ExpertUp,
+        &[facts.rows, facts.intermediate],
+        &[1],
+        Some(facts),
+    ));
+    nodes.push(moe_node(
+        6,
+        0,
+        TypedOp::ExpertActivation,
+        &[facts.rows, facts.intermediate],
+        &[4],
+        Some(facts),
+    ));
+    nodes.push(moe_node(
+        7,
+        0,
+        TypedOp::ExpertMul,
+        &[facts.rows, facts.intermediate],
+        &[6, 5],
+        Some(facts),
+    ));
+    nodes.push(node(
+        8,
+        0,
+        TypedOp::Other("down-projection".to_owned()),
+        &[facts.rows, facts.hidden],
+        &[7],
+        None,
+    ));
+    nodes.push(node(
+        9,
+        0,
+        TypedOp::ResidualAdd,
+        &[facts.rows, facts.hidden],
+        &[1, 8],
+        None,
+    ));
+    nodes.push(node(
+        10,
+        0,
+        TypedOp::Other("output".to_owned()),
+        &[facts.rows, facts.hidden],
+        &[9],
+        None,
+    ));
+    nodes
+}
+
+fn moe_graph(facts: MoEFacts) -> TypedModelGraph {
+    TypedModelGraph::new(moe_nodes(facts)).expect("canonical moe graph")
+}
+
+#[test]
+fn moe_program_lowers_to_router_and_grouped_expert_selection_rows() {
+    let facts = moe_facts();
+    let plan = PlanCompiler
+        .compile(&moe_graph(facts))
+        .expect("compile moe graph");
+    assert!(plan
+        .schedule
+        .iter()
+        .any(|call| call.operation == LibraryOperation::RouterSelection));
+    assert!(plan
+        .schedule
+        .iter()
+        .any(|call| call.operation == LibraryOperation::GroupedExpertGemm));
+    assert_eq!(plan.executor_plan.selections.len(), plan.schedule.len());
+
+    let router = plan
+        .executor_plan
+        .selections
+        .iter()
+        .find(|selection| selection.library_entry.as_deref() == Some("RouterSelection"))
+        .expect("router selection row");
+    assert_eq!(
+        router
+            .uniforms
+            .iter()
+            .find(|uniform| uniform.name == "expert_count")
+            .expect("expert_count uniform")
+            .bits,
+        128
+    );
+    assert_eq!(
+        router
+            .uniforms
+            .iter()
+            .find(|uniform| uniform.name == "active_experts")
+            .expect("active_experts uniform")
+            .bits,
+        8
+    );
+    assert!(router
+        .backend_requirements
+        .iter()
+        .any(|requirement| requirement.backend == "metal"
+            && requirement.feature == "RouterSelection"));
+    assert!(router
+        .logical_signature
+        .outputs
+        .iter()
+        .all(|name| name == "expert_ids" || name == "expert_weights"));
+
+    let grouped = plan
+        .executor_plan
+        .selections
+        .iter()
+        .find(|selection| selection.library_entry.as_deref() == Some("GroupedExpertGemm"))
+        .expect("grouped expert selection row");
+    assert!(grouped
+        .backend_requirements
+        .iter()
+        .any(|requirement| requirement.backend == "metal"
+            && requirement.feature == "GroupedExpertGemm"));
+    // The router row precedes the grouped row so dispatch reads resident ids.
+    assert!(router.kernel_index < grouped.kernel_index);
+    assert!(plan.decomposition_table().contains("GroupedExpertGemm"));
+}
+
+#[test]
+fn moe_undeclared_expert_policy_fails_closed() {
+    let facts = moe_facts();
+    let mut graph = moe_graph(facts);
+    graph.nodes[3].moe = None;
+    let error = PlanCompiler
+        .compile(&graph)
+        .expect_err("undeclared policy must reject");
+    assert!(error.to_string().contains("no declared expert policy"));
+}
+
+#[test]
+fn moe_invalid_expert_policy_fails_closed() {
+    let mut facts = moe_facts();
+    facts.active = facts.experts + 1;
+    let graph = TypedModelGraph {
+        nodes: moe_nodes(facts),
+    };
+    let error = PlanCompiler
+        .compile(&graph)
+        .expect_err("invalid policy must reject");
+    assert!(error.to_string().contains("MoE facts"), "{error}");
+}
+
+#[test]
+fn dense_plans_stay_byte_identical_on_both_rungs() {
+    for (kv_heads, q_per_kv, golden) in [
+        (
+            5u64,
+            3u64,
+            include_str!("../testdata/m8u1a_dense_plan_rung_5_3.txt"),
+        ),
+        (
+            2,
+            7,
+            include_str!("../testdata/m8u1a_dense_plan_rung_2_7.txt"),
+        ),
+    ] {
+        let facts = AttentionFacts {
+            kv_heads,
+            q_per_kv,
+            seq: 8,
+            head_dim: 4,
+            hidden: kv_heads * q_per_kv * 4,
+            scale_bits: (0.5f32).to_bits(),
+        };
+        let plan = PlanCompiler
+            .compile(&layer_graph(facts))
+            .expect("compile rung graph");
+        assert_eq!(format!("{plan:?}"), golden.trim_end());
     }
 }

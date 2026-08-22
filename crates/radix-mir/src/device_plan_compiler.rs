@@ -109,6 +109,33 @@ impl AttentionFacts {
     }
 }
 
+/// MoE expert-routing facts required for router and grouped-expert
+/// selections (PM3 `RouterPolicy` semantics carried as graph facts).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MoEFacts {
+    /// Declared expert count; also the router logit width.
+    pub experts: u64,
+    /// Declared active experts per token (top-k).
+    pub active: u64,
+    /// Token rows in this step.
+    pub rows: u64,
+    /// Model hidden width.
+    pub hidden: u64,
+    /// Per-expert FFN intermediate width.
+    pub intermediate: u64,
+}
+
+impl MoEFacts {
+    fn valid(self) -> bool {
+        self.experts > 0
+            && self.active > 0
+            && self.active <= self.experts
+            && self.rows > 0
+            && self.hidden > 0
+            && self.intermediate > 0
+    }
+}
+
 /// Typed operation vocabulary.  These are semantic graph operations, not
 /// plan variants.  In particular, the four attention operations below remain
 /// ordinary graph nodes and compile to a `CausalAttention` library call.
@@ -142,6 +169,18 @@ pub enum TypedOp {
     SwiGluActivation,
     /// SwiGLU gate/up product.
     SwiGluMul,
+    /// Router logits projection (one logit per declared expert).
+    RouterProjection,
+    /// Deterministic top-k + softmax router selection (device router body).
+    RouterTopK,
+    /// Grouped-expert SwiGLU gate projection.
+    ExpertGate,
+    /// Grouped-expert SwiGLU up projection.
+    ExpertUp,
+    /// Grouped-expert SwiGLU activation.
+    ExpertActivation,
+    /// Grouped-expert gate/up product.
+    ExpertMul,
     /// An ordinary operation with no admitted fusion pattern.
     Other(String),
 }
@@ -161,6 +200,8 @@ pub struct TypedOpNode {
     pub inputs: Vec<GraphNodeId>,
     /// Attention facts when this node belongs to an attention subgraph.
     pub attention: Option<AttentionFacts>,
+    /// MoE facts when this node belongs to a routed expert subgraph.
+    pub moe: Option<MoEFacts>,
 }
 
 /// A canonical typed model/op graph.
@@ -189,6 +230,9 @@ impl TypedModelGraph {
             }
             if node.attention.is_some_and(|facts| !facts.valid()) {
                 return Err(GraphError::InvalidAttentionFacts(node.id));
+            }
+            if node.moe.is_some_and(|facts| !facts.valid()) {
+                return Err(GraphError::InvalidMoeFacts(node.id));
             }
             for input in &node.inputs {
                 let Some(input_position) = positions.get(input) else {
@@ -225,6 +269,11 @@ pub enum LibraryOperation {
     ResidualRmsNorm,
     /// SwiGLU gate/up/activation/product chain.
     SwiGlu,
+    /// Router GEMV + deterministic top-k/softmax selection feeding the
+    /// grouped-dispatch ids/weights buffers (device-side router body).
+    RouterSelection,
+    /// Grouped expert gate/up/activation/product packed execution.
+    GroupedExpertGemm,
     /// No library body admitted; retain the ordinary generated kernel.
     Generated,
 }
@@ -238,6 +287,8 @@ impl LibraryOperation {
             Self::QkvProjection => Some("QkvProjection"),
             Self::ResidualRmsNorm => Some("ResidualRmsNorm"),
             Self::SwiGlu => Some("SwiGlu"),
+            Self::RouterSelection => Some("RouterSelection"),
+            Self::GroupedExpertGemm => Some("GroupedExpertGemm"),
             Self::Generated => None,
         }
     }
@@ -256,6 +307,16 @@ impl LibraryOperation {
                 vec!["output"],
             ),
             Self::SwiGlu => ("SwiGlu", vec!["gate", "up"], vec!["output"]),
+            Self::RouterSelection => (
+                "RouterSelection",
+                vec!["input", "router_weight"],
+                vec!["expert_ids", "expert_weights"],
+            ),
+            Self::GroupedExpertGemm => (
+                "GroupedExpertGemm",
+                vec!["expert_ids", "expert_weights", "gate_weight", "up_weight"],
+                vec!["output"],
+            ),
             Self::Generated => ("Generated", vec!["input"], vec!["output"]),
         };
         LogicalSignature {
@@ -390,6 +451,8 @@ pub enum GraphError {
     InvalidShape { dims: Vec<u64> },
     /// Attention facts are incomplete or inconsistent.
     InvalidAttentionFacts(GraphNodeId),
+    /// MoE expert-routing facts are incomplete or inconsistent.
+    InvalidMoeFacts(GraphNodeId),
     /// A recognized pattern has a conflicting shape or fact set.
     PatternMismatch { layer: u32, detail: String },
 }
@@ -417,6 +480,9 @@ impl fmt::Display for GraphError {
                     "typed graph attention facts for node {} are invalid",
                     id.0
                 )
+            }
+            Self::InvalidMoeFacts(id) => {
+                write!(f, "typed graph MoE facts for node {} are invalid", id.0)
             }
             Self::PatternMismatch { layer, detail } => {
                 write!(f, "typed graph fusion miss in layer {layer}: {detail}")
@@ -499,12 +565,17 @@ impl PlanCompiler {
                 .source_nodes
                 .iter()
                 .find_map(|id| graph.node(*id).and_then(|node| node.attention));
+            let moe_facts = candidate
+                .source_nodes
+                .iter()
+                .find_map(|id| graph.node(*id).and_then(|node| node.moe));
             let seq_extent = Self::projection_step_rows(graph, candidate, attention_facts);
             selections.push(self.selection_for_candidate(
                 candidate,
                 index,
                 bind,
                 attention_facts,
+                moe_facts,
                 seq_extent,
             ));
             schedule.push(ScheduledCall {
@@ -565,6 +636,8 @@ impl PlanCompiler {
         candidates.extend(self.find_attention(graph)?);
         candidates.extend(self.find_residual_rms(graph));
         candidates.extend(self.find_swiglu(graph));
+        candidates.extend(self.find_moe_router(graph)?);
+        candidates.extend(self.find_grouped_experts(graph)?);
         candidates.sort_by_key(|candidate| candidate.source_nodes[0]);
         Ok(candidates)
     }
@@ -805,6 +878,133 @@ impl PlanCompiler {
         candidates
     }
 
+    /// Recognize the MoE router chain (logits projection + deterministic
+    /// top-k/softmax) and lower it to one device router body row.  Fail
+    /// closed on an undeclared or inconsistent expert policy (PM3
+    /// `RouterPolicy` semantics): a routed layer without a declared policy
+    /// is a typed rejection, never a guessed selection.
+    fn find_moe_router(&self, graph: &TypedModelGraph) -> Result<Vec<Candidate>, GraphError> {
+        let mut candidates = Vec::new();
+        for topk in graph
+            .nodes
+            .iter()
+            .filter(|node| node.op == TypedOp::RouterTopK)
+        {
+            let Some(facts) = topk.moe else {
+                return Err(GraphError::PatternMismatch {
+                    layer: topk.layer,
+                    detail: "router selection has no declared expert policy".to_owned(),
+                });
+            };
+            if topk.inputs.len() != 1 {
+                return Err(GraphError::PatternMismatch {
+                    layer: topk.layer,
+                    detail: "router top-k must have exactly one logits input".to_owned(),
+                });
+            }
+            let Some(logits) = graph
+                .node(topk.inputs[0])
+                .filter(|node| node.op == TypedOp::RouterProjection)
+            else {
+                return Err(GraphError::PatternMismatch {
+                    layer: topk.layer,
+                    detail: "router top-k is not directly fed by router logits".to_owned(),
+                });
+            };
+            if logits.layer != topk.layer || logits.moe != Some(facts) {
+                return Err(GraphError::PatternMismatch {
+                    layer: topk.layer,
+                    detail: "router chain has inconsistent expert policy facts".to_owned(),
+                });
+            }
+            if logits.shape.dims != vec![facts.rows, facts.experts]
+                || topk.shape.dims != vec![facts.rows, facts.active]
+            {
+                return Err(GraphError::PatternMismatch {
+                    layer: topk.layer,
+                    detail: "router chain shapes do not match its expert policy".to_owned(),
+                });
+            }
+            candidates.push(Candidate {
+                layer: topk.layer,
+                operation: LibraryOperation::RouterSelection,
+                source_nodes: vec![logits.id, topk.id],
+            });
+        }
+        Ok(candidates)
+    }
+
+    /// Recognize the grouped-expert SwiGLU chain and lower it to one
+    /// packed grouped-expert row reading the router's device ids/weights.
+    fn find_grouped_experts(&self, graph: &TypedModelGraph) -> Result<Vec<Candidate>, GraphError> {
+        let mut candidates = Vec::new();
+        for mul in graph
+            .nodes
+            .iter()
+            .filter(|node| node.op == TypedOp::ExpertMul)
+        {
+            if mul.inputs.len() != 2 {
+                continue;
+            }
+            let Some(activation) = mul.inputs.iter().find_map(|id| {
+                graph
+                    .node(*id)
+                    .filter(|node| node.op == TypedOp::ExpertActivation)
+            }) else {
+                continue;
+            };
+            let Some(up) = mul
+                .inputs
+                .iter()
+                .find_map(|id| graph.node(*id).filter(|node| node.op == TypedOp::ExpertUp))
+            else {
+                continue;
+            };
+            if activation.inputs.len() != 1 {
+                continue;
+            }
+            let Some(gate) = graph
+                .node(activation.inputs[0])
+                .filter(|node| node.op == TypedOp::ExpertGate && node.layer == mul.layer)
+            else {
+                continue;
+            };
+            if up.layer != mul.layer || activation.layer != mul.layer || gate.inputs != up.inputs {
+                continue;
+            }
+            let facts = [gate, up, activation, mul]
+                .into_iter()
+                .map(|node| node.moe)
+                .collect::<Option<Vec<_>>>()
+                .ok_or(GraphError::PatternMismatch {
+                    layer: mul.layer,
+                    detail: "grouped expert chain is missing expert policy facts".to_owned(),
+                })?;
+            if facts.iter().any(|fact| *fact != facts[0]) {
+                return Err(GraphError::PatternMismatch {
+                    layer: mul.layer,
+                    detail: "grouped expert chain has inconsistent expert policy facts".to_owned(),
+                });
+            }
+            let facts = facts[0];
+            if [gate, up, activation, mul]
+                .into_iter()
+                .any(|node| node.shape.dims != vec![facts.rows, facts.intermediate])
+            {
+                return Err(GraphError::PatternMismatch {
+                    layer: mul.layer,
+                    detail: "grouped expert chain shapes do not match its expert policy".to_owned(),
+                });
+            }
+            candidates.push(Candidate {
+                layer: mul.layer,
+                operation: LibraryOperation::GroupedExpertGemm,
+                source_nodes: vec![gate.id, up.id, activation.id, mul.id],
+            });
+        }
+        Ok(candidates)
+    }
+
     fn bind_for_candidate(
         &self,
         graph: &TypedModelGraph,
@@ -866,7 +1066,10 @@ impl PlanCompiler {
         });
         if matches!(
             candidate.operation,
-            LibraryOperation::QkvProjection | LibraryOperation::SwiGlu
+            LibraryOperation::QkvProjection
+                | LibraryOperation::SwiGlu
+                | LibraryOperation::RouterSelection
+                | LibraryOperation::GroupedExpertGemm
         ) {
             return from_shape
                 .or_else(|| attention_facts.map(|facts| facts.seq))
@@ -884,6 +1087,7 @@ impl PlanCompiler {
         index: usize,
         bind: BindDescriptor,
         attention_facts: Option<AttentionFacts>,
+        moe_facts: Option<MoEFacts>,
         seq_extent: u64,
     ) -> LibrarySelection {
         let operation = candidate.operation;
@@ -978,6 +1182,41 @@ impl PlanCompiler {
             } else {
                 (Vec::new(), None, Vec::new())
             };
+        // MoE selections carry their declared expert policy and a
+        // metal-scoped body admission requirement; dispatch lands in M8-U1b.
+        let mut requirements = requirements;
+        match operation {
+            LibraryOperation::RouterSelection => {
+                let facts = moe_facts.expect("router candidates carry typed facts");
+                uniforms.push(UniformBinding {
+                    name: "expert_count".to_owned(),
+                    ty: crate::device_program_plans::UniformType::U32,
+                    bits: u32::try_from(facts.experts).unwrap_or(u32::MAX),
+                });
+                uniforms.push(UniformBinding {
+                    name: "active_experts".to_owned(),
+                    ty: crate::device_program_plans::UniformType::U32,
+                    bits: u32::try_from(facts.active).unwrap_or(u32::MAX),
+                });
+                requirements.push(BackendRequirement {
+                    backend: "metal".to_owned(),
+                    feature: "RouterSelection".to_owned(),
+                });
+            }
+            LibraryOperation::GroupedExpertGemm => {
+                let facts = moe_facts.expect("expert candidates carry typed facts");
+                uniforms.push(UniformBinding {
+                    name: "expert_count".to_owned(),
+                    ty: crate::device_program_plans::UniformType::U32,
+                    bits: u32::try_from(facts.experts).unwrap_or(u32::MAX),
+                });
+                requirements.push(BackendRequirement {
+                    backend: "metal".to_owned(),
+                    feature: "GroupedExpertGemm".to_owned(),
+                });
+            }
+            _ => {}
+        }
         if matches!(
             operation,
             LibraryOperation::QkvProjection | LibraryOperation::SwiGlu

@@ -513,6 +513,7 @@ fn node(
         shape: TensorShape::new(dims.to_vec())?,
         inputs: inputs.to_vec(),
         attention,
+        moe: None,
     })
 }
 
