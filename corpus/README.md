@@ -35,8 +35,8 @@ corpus/
 ## Check / test
 
 ```bash
-cargo run -p radix --bin radix -- check corpus/incipit/incipit.fab
-cargo run -p radix --bin radix -- test corpus/incipit/incipit.fab
+cargo run -p radix-cli --bin radix -- check corpus/incipit/incipit.fab
+cargo run -p radix-cli --bin radix -- test corpus/incipit/incipit.fab
 ```
 
 ## Regenerate index
