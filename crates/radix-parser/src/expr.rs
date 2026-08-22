@@ -1581,12 +1581,16 @@ impl Parser {
             if self.check(&TokenKind::Arrow)
                 || self.check(&TokenKind::Colon)
                 || self.check(&TokenKind::LBrace)
+                || self.check_libera_marker()
             {
                 break;
             }
 
             params.push(self.parse_clausura_param()?);
 
+            if self.check_libera_marker() {
+                break;
+            }
             if !self.consume_item_separator_before(
                 &[TokenKind::Arrow, TokenKind::Colon, TokenKind::LBrace],
                 "closure_parameters",
@@ -1595,6 +1599,7 @@ impl Parser {
             }
         }
 
+        let libera = self.eat_libera_marker();
         let (ret, err) = self.parse_optional_clausura_signature()?;
 
         let body = if self.eat(&TokenKind::Colon) {
@@ -1609,12 +1614,13 @@ impl Parser {
         let id = self.next_id();
         Ok(Expr {
             id,
-            kind: ExprKind::Clausura(ClausuraExpr {
+            kind: ExprKind::Clausura(Box::new(ClausuraExpr {
                 params,
+                libera,
                 ret,
                 err,
                 body,
-            }),
+            })),
             span,
         })
     }
@@ -1719,6 +1725,7 @@ impl Parser {
             vec![self.parse_clausura_param()?]
         };
 
+        let libera = self.eat_libera_marker();
         let (ret, err) = self.parse_optional_clausura_signature()?;
         if self.check_keyword_ident(TokenKind::Ergo) {
             return Err(ParseError::structured(
@@ -1736,12 +1743,13 @@ impl Parser {
         let id = self.next_id();
         Ok(Expr {
             id,
-            kind: ExprKind::Clausura(ClausuraExpr {
+            kind: ExprKind::Clausura(Box::new(ClausuraExpr {
                 params,
+                libera,
                 ret,
                 err,
                 body,
-            }),
+            })),
             span,
         })
     }

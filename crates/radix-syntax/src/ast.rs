@@ -952,8 +952,9 @@ pub enum ExprKind {
     Verte(VerteExpr),
     /// `finge` variant construction.
     Finge(FingeExpr),
-    /// `clausura` closure.
-    Clausura(ClausuraExpr),
+    /// `clausura` closure. Boxed: the variant dominates `ExprKind`'s size
+    /// (`clippy::large_enum_variant`); closures are allocated once at parse.
+    Clausura(Box<ClausuraExpr>),
     /// `cede` yield carrier.
     Cede(CedeExpr),
     Array(ArrayExpr),
