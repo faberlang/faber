@@ -4,7 +4,7 @@ use crate::cli::{TestArgs, TestOutputFormat};
 use crate::input_shape::locale_without_package_error;
 use crate::package;
 use proba::{
-    format_summary, is_harness_filter_match, has_solum_cases, inventory_cases,
+    format_summary, has_solum_cases, inventory_cases, is_harness_filter_match,
     run_proba_on_validated, run_proba_on_validated_with_function_ids, run_proba_source,
     selection_skip_reason, source_skip_reason, CaseOutcome, CaseResult, ProbaCase, ProbaReport,
     TestSelection,
@@ -1098,7 +1098,7 @@ fn blocking_gap_from_diagnostics(
 
 fn is_named_mir_gap(message: &str) -> bool {
     message.contains("unsupported MIR lowering")
-        || message.contains("FaberScript unsupported:")
+        || message.contains("faberscript unsupported:")
         || message.contains("missing type information for MIR lowering")
         || message.contains("invalid MIR:")
 }
@@ -1128,7 +1128,7 @@ fn classify_blocking_gap(reason: &str) -> String {
     if let Some(rest) = reason.strip_prefix("invalid MIR: ") {
         return rest.trim().to_owned();
     }
-    if reason.starts_with("FaberScript unsupported:") {
+    if reason.starts_with("faberscript unsupported:") {
         return reason.trim().to_owned();
     }
     if reason.contains("missing type information for MIR lowering") {

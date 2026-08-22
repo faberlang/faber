@@ -185,8 +185,8 @@ fn blocking_gap_strips_prefixes_and_unit_path_suffix() {
         "itera ex over tabula before map value iteration MIR lowering"
     );
     assert_eq!(
-        blocking_gap("FaberScript unsupported: provider package:./mathesis::mathesis::PI"),
-        "FaberScript unsupported: provider package:./mathesis::mathesis::PI"
+        blocking_gap("faberscript unsupported: provider package:./mathesis::mathesis::PI"),
+        "faberscript unsupported: provider package:./mathesis::mathesis::PI"
     );
     assert_eq!(
         blocking_gap("missing type information for MIR lowering"),
