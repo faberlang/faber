@@ -8,15 +8,16 @@
 
 use radix::module::hir::visit::{walk_expr, walk_stmt, HirVisitor};
 use radix::module::hir::{
-    HirBlock, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirIteraMode,
+    DefId, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirIteraMode,
     HirStatement,
 };
 use radix::module::lexer::Span;
 use radix::module::semantic::passes::{air_purity, air_unroll};
 use radix::module::semantic::tensor_type_directed::is_tensor_type;
 use radix::module::semantic::{
-    PassConfig, Primitive, RadixLane, SemanticError, Type, TypeTable, TypeId,
+    PassConfig, Primitive, RadixLane, SemanticError, Type, TypeId, TypeTable,
 };
+use std::collections::{HashMap, HashSet};
 
 /// Verdict for one top-level function under a synthetic AIR-lane mapping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,6 +54,29 @@ pub struct AirRow {
     pub note: Option<String>,
 }
 
+/// The unit-local facts needed to attribute AIR blockers without crossing a
+/// module boundary. Calls are already resolved in HIR as definition identities;
+/// an identity absent from this table is deliberately not treated as a callee
+/// with an inferred blocker.
+#[derive(Debug, Clone)]
+struct FunctionRecord {
+    def_id: DefId,
+    name: String,
+    numeric: bool,
+    annotated: bool,
+    has_itera_ab: bool,
+    own_reasons: Vec<AirReason>,
+    unresolved_reasons: Vec<AirReason>,
+    calls: Vec<DefId>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RootBlocker {
+    name: String,
+    rule: String,
+    line: usize,
+}
+
 /// Advisory AIR report is single-file only for now (pattern of the package
 /// check message).
 pub const PACKAGE_AIR_MESSAGE: &str =
@@ -86,8 +110,7 @@ pub fn advisory_rows(_name: &str, source: &str) -> Option<Vec<AirRow>> {
     if !cli_analysis.errors.is_empty() {
         return None;
     }
-    let mut config =
-        PassConfig::for_target(radix::module::codegen::Target::HirRust);
+    let config = PassConfig::for_target(radix::module::codegen::Target::HirRust);
     let result = radix::module::semantic::analyze_with_cli(
         &program,
         &config,
@@ -114,49 +137,218 @@ pub fn advisory_rows(_name: &str, source: &str) -> Option<Vec<AirRow>> {
     // must never see the real pipeline's `hir`/`interner`.
     let mut hir_clone = hir.clone();
     let mut interner_clone = interner.clone();
-    let unroll_errors = air_unroll::unroll(&mut hir_clone, &lanes, &mut interner_clone, &result.types)
-        .err()
-        .unwrap_or_default();
+    let unroll_errors =
+        air_unroll::unroll(&mut hir_clone, &lanes, &mut interner_clone, &result.types)
+            .err()
+            .unwrap_or_default();
     let purity_errors = air_purity::check(&hir_clone, &lanes, &interner_clone, &result.types)
         .err()
         .unwrap_or_default();
     let mut gate_errors = unroll_errors;
     gate_errors.extend(purity_errors);
 
-    let mut rows = Vec::new();
+    let mut records = Vec::new();
     for (def_id, span, function) in functions {
         let annotated = result.radix_lanes.lane_for(def_id).is_some();
         let name = interner.resolve(function.name).to_owned();
         let numeric = signature_is_numeric_or_tensor(function, &result.types);
-        let own_errors: Vec<&SemanticError> = gate_errors
+        let mut calls = CallFinder::default();
+        if let Some(body) = function.body.as_ref() {
+            calls.visit_block(body);
+        }
+
+        let mut own_reasons = Vec::new();
+        let mut unresolved_reasons = Vec::new();
+        for err in gate_errors
             .iter()
             .filter(|err| span_contains(span, err.span))
-            .collect();
-        let reasons: Vec<AirReason> = own_errors
-            .iter()
-            .map(|err| AirReason {
+        {
+            let reason = AirReason {
                 rule: error_rule(err),
                 line: line_of(source, err.span),
-            })
-            .collect();
-        let (verdict, note) = if !numeric {
-            (AirVerdict::NotATarget, Some("no numeric/tensor input or output — nothing to differentiate".to_owned()))
+            };
+            if reason.rule == "non_air_call" {
+                // A non-AIR call is a boundary fact, not evidence about the
+                // callee's body. Keep it as an unresolved note rather than
+                // inventing a blocker from an unavailable module.
+                unresolved_reasons.push(AirReason {
+                    rule: "callee-unresolved".to_owned(),
+                    line: reason.line,
+                });
+            } else {
+                own_reasons.push(reason);
+            }
+        }
+        rank_reasons(&mut own_reasons);
+        records.push(FunctionRecord {
+            def_id,
+            name,
+            numeric,
+            annotated,
+            has_itera_ab: contains_itera_ab(function.body.as_ref()),
+            own_reasons,
+            unresolved_reasons,
+            calls: calls.0,
+        });
+    }
+
+    let records_by_def: HashMap<DefId, FunctionRecord> = records
+        .iter()
+        .cloned()
+        .map(|record| (record.def_id, record))
+        .collect();
+    let mut rows = Vec::new();
+    for record in records {
+        let mut reasons = record.own_reasons.clone();
+        let mut closure_reasons = Vec::new();
+        for callee in &record.calls {
+            let mut visiting = HashSet::default();
+            if let Some(blocker) = first_blocker_for(*callee, &records_by_def, &mut visiting) {
+                closure_reasons.push(AirReason {
+                    rule: format!("blocked by callee `{}`: {}", blocker.name, blocker.rule),
+                    line: blocker.line,
+                });
+            }
+        }
+        dedupe_reasons(&mut closure_reasons);
+        rank_reasons(&mut closure_reasons);
+        reasons.extend(closure_reasons);
+        // Boundary notes are intentionally last: they carry no claim about a
+        // callee's body and must not outrank an actionable local blocker.
+        reasons.extend(record.unresolved_reasons.clone());
+
+        let (verdict, note) = if !record.numeric {
+            (
+                AirVerdict::NotATarget,
+                Some("no numeric/tensor input or output — nothing to differentiate".to_owned()),
+            )
         } else if !reasons.is_empty() {
             (AirVerdict::WouldReject, None)
         } else {
-            let note = contains_itera_ab(function.body.as_ref())
+            let note = record
+                .has_itera_ab
                 .then(|| format!("itera ab unrolls (budget {})", air_unroll::UNROLL_BUDGET));
             (AirVerdict::Admissible, note)
         };
         rows.push(AirRow {
-            name,
+            name: record.name,
             verdict,
-            annotated,
+            annotated: record.annotated,
             reasons,
             note,
         });
     }
     Some(rows)
+}
+
+#[derive(Default)]
+struct CallFinder(Vec<DefId>);
+
+impl HirVisitor for CallFinder {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if let HirExpressionKind::Call(callee, _, _) = &expr.kind {
+            if let HirExpressionKind::Path(def_id) = &callee.kind {
+                self.0.push(*def_id);
+            }
+        }
+        walk_expr(self, expr);
+    }
+}
+
+fn first_blocker_for(
+    def_id: DefId,
+    records: &HashMap<DefId, FunctionRecord>,
+    visiting: &mut HashSet<DefId>,
+) -> Option<RootBlocker> {
+    let record = records.get(&def_id)?;
+    // A non-target callee is not evidence that its caller is blocked. The
+    // report only closes over functions that themselves claim an AIR-relevant
+    // numeric/tensor signature.
+    if !record.numeric || !visiting.insert(def_id) {
+        return None;
+    }
+
+    let mut candidates = record
+        .own_reasons
+        .iter()
+        .filter(|reason| reason.rule != "callee-unresolved")
+        .map(|reason| RootBlocker {
+            name: record.name.clone(),
+            rule: reason.rule.clone(),
+            line: reason.line,
+        })
+        .collect::<Vec<_>>();
+    for callee in &record.calls {
+        if let Some(blocker) = first_blocker_for(*callee, records, visiting) {
+            candidates.push(blocker);
+        }
+    }
+    visiting.remove(&def_id);
+
+    candidates.sort_by_key(|candidate| reason_bucket(&candidate.rule));
+    candidates.into_iter().next()
+}
+
+fn dedupe_reasons(reasons: &mut Vec<AirReason>) {
+    let mut unique = Vec::with_capacity(reasons.len());
+    for reason in reasons.drain(..) {
+        if !unique.contains(&reason) {
+            unique.push(reason);
+        }
+    }
+    *reasons = unique;
+}
+
+/// Order the live gate's reasons by the settled ruling tiers. The final
+/// fallback is deliberate: a newly named reason must remain visible, but it
+/// must not outrank a reason whose bucket is known.
+pub(crate) fn rank_reasons(reasons: &mut [AirReason]) {
+    reasons.sort_by_key(|reason| reason_bucket(&reason.rule));
+}
+
+fn reason_bucket(rule: &str) -> u8 {
+    let base = rule.split(':').next().unwrap_or(rule);
+    match base {
+        // Effects: these cannot become AIR dataflow by a local spelling tweak.
+        "mori" | "diagnostic_output" | "input_read" | "runtime_assertion" => 0,
+        // Structural: the AIR companion or representational boundary is
+        // missing, including unknown-trip-count control flow.
+        "async_function"
+        | "generator_function"
+        | "cede/await/yield"
+        | "cli_mounted_function"
+        | "runtime_provided_binding"
+        | "missing_body"
+        | "non_air_call"
+        | "method_call"
+        | "tensor_method_receiver"
+        | "kernel_device_function"
+        | "loop"
+        | "dum_loop"
+        | "itera_loop"
+        | "breakable_block"
+        | "recoverable_handler"
+        | "iace"
+        | "expression_ad" => 1,
+        // Syntax/transform tier: the source form can be made explicit or
+        // moved to one of the admitted dataflow surfaces.
+        "defaulted_parameter"
+        | "expression_statement"
+        | "named_call_arg"
+        | "spread_call_arg"
+        | "runtime_conversion"
+        | "reference_place_op"
+        | "runtime_variant_check"
+        | "mutable_varia"
+        | "assignment_mutation"
+        | "inc_dec_mutation"
+        | "optional_null_chain"
+        | "closure"
+        | "gradient_expression_unsupported"
+        | "tacet"
+        | "deferred_local_init" => 2,
+        _ => 3,
+    }
 }
 
 /// Render the report table to `out` (one line per row, `name VERDICT [annotated] reasons/note`).

@@ -33,6 +33,27 @@ functio gradus_passus(numerus x) → numerus {
 }
 "#;
 
+const CALLEE_BLOCKED: &str = r#"functio impura(numerus x) → numerus {
+    varia numerus total ← x
+    redde total
+}
+
+functio caller(numerus x) → numerus {
+    redde impura(x)
+}
+"#;
+
+const OWN_AND_CALLEE_BLOCKED: &str = r#"functio impura(numerus x) → numerus {
+    varia numerus total ← x
+    redde total
+}
+
+functio caller(numerus x) → numerus {
+    adfirma x > 0
+    redde impura(x)
+}
+"#;
+
 fn faber_binary() -> std::path::PathBuf {
     super::format_test::faber_binary()
 }
@@ -70,7 +91,9 @@ fn run_faber_stdin(source: &str, air: bool) -> std::process::Output {
     {
         let mut stdin = child.stdin.take().expect("stdin pipe");
         use std::io::Write;
-        stdin.write_all(source.as_bytes()).expect("write stdin source");
+        stdin
+            .write_all(source.as_bytes())
+            .expect("write stdin source");
     }
     child.wait_with_output().expect("run faber")
 }
@@ -195,6 +218,97 @@ fn default_check_output_unchanged_without_flag() {
             && !stderr.contains(super::check_air::AIR_REPORT_HEADER),
         "plain check must not print advisory rows:\n{stdout}\n{stderr}"
     );
+}
+
+#[test]
+fn air_report_attributes_intra_unit_callee_blocker() {
+    let rows = super::check_air::advisory_rows("callee.fab", CALLEE_BLOCKED)
+        .expect("callee fixture should analyze");
+    let caller = rows
+        .iter()
+        .find(|row| row.name == "caller")
+        .expect("caller row");
+
+    assert_eq!(caller.verdict, super::check_air::AirVerdict::WouldReject);
+    assert_eq!(caller.reasons.len(), 1);
+    assert_eq!(
+        caller.reasons[0].rule,
+        "blocked by callee `impura`: mutable_varia"
+    );
+}
+
+#[test]
+fn air_report_ranks_own_blockers_before_callee_blockers() {
+    let rows = super::check_air::advisory_rows("ranking.fab", OWN_AND_CALLEE_BLOCKED)
+        .expect("ranking fixture should analyze");
+    let caller = rows
+        .iter()
+        .find(|row| row.name == "caller")
+        .expect("caller row");
+
+    assert!(caller.reasons.len() >= 2);
+    assert_eq!(caller.reasons[0].rule, "runtime_assertion");
+    let closure_index = caller
+        .reasons
+        .iter()
+        .position(|reason| reason.rule.starts_with("blocked by callee"))
+        .expect("callee blocker");
+    assert!(closure_index > 0, "own blockers must precede callee blockers");
+    assert_eq!(
+        caller.reasons[closure_index].rule,
+        "blocked by callee `impura`: mutable_varia"
+    );
+}
+
+#[test]
+fn air_report_unknown_reason_trails_known_buckets() {
+    let mut reasons = vec![
+        super::check_air::AirReason {
+            rule: "new_future_reason".to_owned(),
+            line: 1,
+        },
+        super::check_air::AirReason {
+            rule: "mutable_varia".to_owned(),
+            line: 2,
+        },
+        super::check_air::AirReason {
+            rule: "mori".to_owned(),
+            line: 3,
+        },
+    ];
+
+    super::check_air::rank_reasons(&mut reasons);
+    assert_eq!(reasons[0].rule, "mori");
+    assert_eq!(reasons[1].rule, "mutable_varia");
+    assert_eq!(reasons[2].rule, "new_future_reason");
+}
+
+/// A provider call is outside the single analyzed unit. It may remain a
+/// report note, but it must not be presented as a blocker borrowed from an
+/// unavailable callee body.
+#[test]
+fn air_report_does_not_invent_cross_unit_callee_blocker() {
+    let source = r#"importa ex "norma:chorda" retorta
+
+functio caller(numerus x) → numerus {
+    redde retorta(x)
+}
+"#;
+    let rows = super::check_air::advisory_rows("cross-unit.fab", source)
+        .expect("cross-unit fixture should analyze");
+    let caller = rows
+        .iter()
+        .find(|row| row.name == "caller")
+        .expect("caller row");
+
+    assert!(caller
+        .reasons
+        .iter()
+        .any(|reason| reason.rule == "callee-unresolved"));
+    assert!(caller
+        .reasons
+        .iter()
+        .all(|reason| !reason.rule.starts_with("blocked by callee")));
 }
 
 /// Package-shaped input (directory or manifest) with `--air` prints an
