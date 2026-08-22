@@ -1096,3 +1096,156 @@ fn check_library_long_help_states_v1_library_home_rule() {
     assert!(help.contains("cista.toml"));
     assert!(help.contains("scripta/check-source"));
 }
+
+/// ALA-3 fixture: one function per row kind — ADMISSIBLE (unroll note),
+/// WOULD-REJECT own-body, WOULD-REJECT via callee closure, NOT-A-TARGET.
+/// Latin surface: file mode uses the canonical Latin reader.
+const ALL_FOUR_VERDICTS: &str = r#"functio computus_gyrum() → fractus {
+    fixum fractus total ← 0.0
+    itera ab 0‥10 per 2 fixum i {
+        total ← total + 1.0
+    }
+    redde total
+}
+
+functio impura(numerus x) → numerus {
+    varia numerus total ← x
+    total ← total + 1
+    redde total
+}
+
+functio caller(numerus x) → numerus {
+    redde impura(x)
+}
+
+functio salve(textus nomen) → textus {
+    redde nomen
+}
+"#;
+
+fn run_faber_stdin(args: &[&str], source: &str) -> std::process::Output {
+    let mut command = std::process::Command::new(crate::commands::format_test::faber_binary());
+    command
+        .args(args)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    let mut child = command.spawn().expect("spawn faber");
+    {
+        use std::io::Write;
+        let mut stdin = child.stdin.take().expect("stdin pipe");
+        stdin
+            .write_all(source.as_bytes())
+            .expect("write stdin source");
+    }
+    child.wait_with_output().expect("run faber")
+}
+
+fn json_row<'a>(rows: &'a [serde_json::Value], name: &str) -> &'a serde_json::Value {
+    rows.iter()
+        .find(|row| row["name"] == name)
+        .unwrap_or_else(|| panic!("missing JSON row for {name}: {rows:#?}"))
+}
+
+/// ALA-3 pin: `check --air --json` emits one machine-readable object per row
+/// (schema_version 1, all four row kinds, byte spans, via-callee attribution,
+/// annotated flag, note), and keeps plain-check exit parity.
+#[test]
+fn check_air_json_machine_rows_are_versioned_and_complete() {
+    let output = run_faber_stdin(&["check", "--air", "--json", "-"], ALL_FOUR_VERDICTS);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let rows = stdout
+        .lines()
+        .map(serde_json::from_str::<serde_json::Value>)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_else(|err| panic!("each stdout line must be one JSON object:\n{stdout}\n{err}"));
+    assert_eq!(rows.len(), 4, "one row per top-level function:\n{stdout}");
+
+    for row in &rows {
+        assert_eq!(
+            row["schema_version"], 1,
+            "rows are versioned from day one:\n{row}"
+        );
+        assert!(
+            row.get("name").is_some()
+                && row.get("verdict").is_some()
+                && row.get("annotated").is_some()
+                && row.get("reasons").is_some(),
+            "every row carries the full key set:\n{row}"
+        );
+    }
+
+    let admissible = json_row(&rows, "computus_gyrum");
+    assert_eq!(admissible["verdict"], "ADMISSIBLE");
+    assert_eq!(admissible["annotated"], false);
+    assert_eq!(admissible["reasons"], serde_json::json!([]));
+    assert_eq!(
+        admissible["note"],
+        format!(
+            "itera ab unrolls (budget {})",
+            radix::module::semantic::passes::air_unroll::UNROLL_BUDGET
+        )
+    );
+
+    let reject = json_row(&rows, "impura");
+    assert_eq!(reject["verdict"], "WOULD-REJECT");
+    assert_eq!(reject["annotated"], false);
+    assert_eq!(reject["note"], serde_json::Value::Null);
+    let reasons = reject["reasons"].as_array().expect("reasons array");
+    assert!(reasons
+        .iter()
+        .any(|reason| { reason["rule"] == "mutable_varia" && reason["via_callee"] == false }));
+    assert!(reasons
+        .iter()
+        .any(|reason| reason["rule"] == "assignment_mutation"));
+    for reason in reasons {
+        assert!(
+            reason["span"]["start"].is_u64() && reason["span"]["end"].is_u64(),
+            "reasons carry byte spans:\n{reason}"
+        );
+        assert!(reason.get("via_callee").is_some());
+    }
+
+    let caller = json_row(&rows, "caller");
+    assert_eq!(caller["verdict"], "WOULD-REJECT");
+    let closure = caller["reasons"]
+        .as_array()
+        .expect("caller reasons")
+        .iter()
+        .find(|reason| reason["via_callee"] == true)
+        .expect("callee-closure blocker reason");
+    assert_eq!(closure["rule"], "blocked by callee `impura`: mutable_varia");
+
+    let not_target = json_row(&rows, "salve");
+    assert_eq!(not_target["verdict"], "NOT-A-TARGET");
+    assert_eq!(not_target["reasons"], serde_json::json!([]));
+    assert_eq!(
+        not_target["note"],
+        "no numeric/tensor input or output — nothing to differentiate"
+    );
+
+    assert!(
+        !stdout.contains("air lane advisory report"),
+        "machine rows must not carry the human header:\n{stdout}"
+    );
+
+    let plain = run_faber_stdin(&["check", "-"], ALL_FOUR_VERDICTS);
+    assert_eq!(
+        plain.status.code(),
+        output.status.code(),
+        "--json rows keep plain-check exit parity"
+    );
+}
+
+/// ALA-3 pin: `--json` without `--air` is rejected at parse time.
+#[test]
+fn cli_rejects_check_json_without_air() {
+    let error =
+        Cli::try_parse_from(["faber", "check", "--json"]).expect_err("--json requires --air");
+    let rendered = error.to_string();
+    assert!(
+        rendered.contains("--air"),
+        "the rejection must name the required --air flag:\n{rendered}"
+    );
+}

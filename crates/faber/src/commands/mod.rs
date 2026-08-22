@@ -69,6 +69,75 @@ use test::cmd_test;
 pub(crate) const PACKAGE_CHECK_MESSAGE: &str =
     "error: package checking is owned by the `faber` tool; rerun with `faber check --package`";
 
+/// `faber check --air --json` machine rows (schema version 1).
+///
+/// One JSON object per report row, one row per line. The contract is
+/// versioned from day one (`schema_version`): the near-miss contract is meant
+/// for LLM/tooling consumption and must not churn silently. The whole report
+/// is computed first; rows are emitted as complete lines, not streamed.
+mod air_json {
+    use super::check_air::AirRow;
+    use serde::Serialize;
+
+    /// Schema version of the advisory AIR `--json` rows.
+    pub(super) const AIR_SCHEMA_VERSION: u32 = 1;
+
+    #[derive(Serialize)]
+    pub(super) struct AirRowJson {
+        schema_version: u32,
+        name: String,
+        verdict: String,
+        annotated: bool,
+        reasons: Vec<AirReasonJson>,
+        note: Option<String>,
+    }
+
+    #[derive(Serialize)]
+    pub(super) struct AirReasonJson {
+        rule: String,
+        span: AirSpanJson,
+        via_callee: bool,
+    }
+
+    /// Half-open byte span of the offending construct.
+    #[derive(Serialize)]
+    pub(super) struct AirSpanJson {
+        start: u32,
+        end: u32,
+    }
+
+    pub(super) fn render_json_rows(
+        out: &mut dyn std::io::Write,
+        rows: &[AirRow],
+    ) -> std::io::Result<()> {
+        for row in rows {
+            let view = AirRowJson {
+                schema_version: AIR_SCHEMA_VERSION,
+                name: row.name.clone(),
+                verdict: row.verdict.label().to_owned(),
+                annotated: row.annotated,
+                reasons: row
+                    .reasons
+                    .iter()
+                    .map(|reason| AirReasonJson {
+                        rule: reason.rule.clone(),
+                        span: AirSpanJson {
+                            start: reason.start,
+                            end: reason.end,
+                        },
+                        via_callee: reason.via_callee,
+                    })
+                    .collect(),
+                note: row.note.clone(),
+            };
+            let json = serde_json::to_string(&view)
+                .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
+            writeln!(out, "{json}")?;
+        }
+        Ok(())
+    }
+}
+
 fn diagnostic_mode(enabled: bool) -> DiagnosticMode {
     if enabled {
         DiagnosticMode::Diagnostics
@@ -175,8 +244,7 @@ fn dispatch(command: Command) {
                 let input_is_plain_file = if args.package {
                     false
                 } else if package_shaped {
-                    !args.input.is_empty()
-                        && std::path::Path::new(&args.input[0]).is_file()
+                    !args.input.is_empty() && std::path::Path::new(&args.input[0]).is_file()
                 } else {
                     true
                 };
@@ -185,17 +253,21 @@ fn dispatch(command: Command) {
                     eprintln!("{message}");
                     std::process::exit(1);
                 }
-                cmd_check_file(CheckCommand {
-                    input: args.input,
-                    package: args.package,
-                    permissive: args.permissive,
-                    deny_warnings: args.deny_warnings,
-                    deny_codes: args.deny,
-                    diagnostic_mode: diagnostic_mode(args.diagnostics),
-                    diagnostics_locale_pack: None,
-                    locale: None,
-                    diagnostics_locale: args.diagnostics_locale,
-                }, true);
+                cmd_check_file(
+                    CheckCommand {
+                        input: args.input,
+                        package: args.package,
+                        permissive: args.permissive,
+                        deny_warnings: args.deny_warnings,
+                        deny_codes: args.deny,
+                        diagnostic_mode: diagnostic_mode(args.diagnostics),
+                        diagnostics_locale_pack: None,
+                        locale: None,
+                        diagnostics_locale: args.diagnostics_locale,
+                    },
+                    true,
+                    args.json,
+                );
             } else if package_shaped {
                 package::cmd_check_package(CheckCommand {
                     input: args.input,
@@ -209,17 +281,21 @@ fn dispatch(command: Command) {
                     diagnostics_locale: args.diagnostics_locale,
                 });
             } else {
-                cmd_check_file(CheckCommand {
-                    input: args.input,
-                    package: args.package,
-                    permissive: args.permissive,
-                    deny_warnings: args.deny_warnings,
-                    deny_codes: args.deny,
-                    diagnostic_mode: diagnostic_mode(args.diagnostics),
-                    diagnostics_locale_pack: None,
-                    locale: None,
-                    diagnostics_locale: args.diagnostics_locale,
-                }, false);
+                cmd_check_file(
+                    CheckCommand {
+                        input: args.input,
+                        package: args.package,
+                        permissive: args.permissive,
+                        deny_warnings: args.deny_warnings,
+                        deny_codes: args.deny,
+                        diagnostic_mode: diagnostic_mode(args.diagnostics),
+                        diagnostics_locale_pack: None,
+                        locale: None,
+                        diagnostics_locale: args.diagnostics_locale,
+                    },
+                    false,
+                    false,
+                );
             }
         }
         Command::Verify(args) => {
@@ -416,7 +492,7 @@ fn cmd_inspect_cli_ir(input: &[String]) {
     ));
 }
 
-fn cmd_check_file(command: CheckCommand, air: bool) {
+fn cmd_check_file(command: CheckCommand, air: bool, json: bool) {
     if command.package {
         // Cross-reference: must stay verbatim with
         // crates/radix-cli/src/commands/check.rs `PACKAGE_CHECK_MESSAGE`.
@@ -435,7 +511,11 @@ fn cmd_check_file(command: CheckCommand, air: bool) {
     if air {
         if let Some(rows) = check_air::advisory_rows(&name, &source) {
             let mut out = std::io::stdout().lock();
-            let _ = check_air::render_report(&mut out, &rows);
+            if json {
+                let _ = air_json::render_json_rows(&mut out, &rows);
+            } else {
+                let _ = check_air::render_report(&mut out, &rows);
+            }
         }
     }
     let success = result.success

@@ -28,7 +28,7 @@ pub enum AirVerdict {
 }
 
 impl AirVerdict {
-    fn label(self) -> &'static str {
+    pub(crate) fn label(self) -> &'static str {
         match self {
             Self::Admissible => "ADMISSIBLE",
             Self::WouldReject => "WOULD-REJECT",
@@ -37,11 +37,19 @@ impl AirVerdict {
     }
 }
 
-/// One rejection reason with its rule id and 1-based source line.
+/// One rejection reason with its rule id, source location, and attribution.
+///
+/// `line` is the 1-based human-table location; `start`/`end` are the exact
+/// byte span of the offending construct for machine rows. `via_callee`
+/// marks reasons attributed through a callee closure rather than the row's
+/// own body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AirReason {
     pub rule: String,
     pub line: usize,
+    pub start: u32,
+    pub end: u32,
+    pub via_callee: bool,
 }
 
 /// One report row.
@@ -75,6 +83,8 @@ struct RootBlocker {
     name: String,
     rule: String,
     line: usize,
+    start: u32,
+    end: u32,
 }
 
 /// Advisory AIR report is single-file only for now (pattern of the package
@@ -166,6 +176,9 @@ pub fn advisory_rows(_name: &str, source: &str) -> Option<Vec<AirRow>> {
             let reason = AirReason {
                 rule: error_rule(err),
                 line: line_of(source, err.span),
+                start: err.span.start,
+                end: err.span.end,
+                via_callee: false,
             };
             if reason.rule == "non_air_call" {
                 // A non-AIR call is a boundary fact, not evidence about the
@@ -174,6 +187,9 @@ pub fn advisory_rows(_name: &str, source: &str) -> Option<Vec<AirRow>> {
                 unresolved_reasons.push(AirReason {
                     rule: "callee-unresolved".to_owned(),
                     line: reason.line,
+                    start: reason.start,
+                    end: reason.end,
+                    via_callee: false,
                 });
             } else {
                 own_reasons.push(reason);
@@ -207,6 +223,9 @@ pub fn advisory_rows(_name: &str, source: &str) -> Option<Vec<AirRow>> {
                 closure_reasons.push(AirReason {
                     rule: format!("blocked by callee `{}`: {}", blocker.name, blocker.rule),
                     line: blocker.line,
+                    start: blocker.start,
+                    end: blocker.end,
+                    via_callee: true,
                 });
             }
         }
@@ -276,6 +295,8 @@ fn first_blocker_for(
             name: record.name.clone(),
             rule: reason.rule.clone(),
             line: reason.line,
+            start: reason.start,
+            end: reason.end,
         })
         .collect::<Vec<_>>();
     for callee in &record.calls {

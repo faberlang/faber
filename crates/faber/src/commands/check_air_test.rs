@@ -253,7 +253,10 @@ fn air_report_ranks_own_blockers_before_callee_blockers() {
         .iter()
         .position(|reason| reason.rule.starts_with("blocked by callee"))
         .expect("callee blocker");
-    assert!(closure_index > 0, "own blockers must precede callee blockers");
+    assert!(
+        closure_index > 0,
+        "own blockers must precede callee blockers"
+    );
     assert_eq!(
         caller.reasons[closure_index].rule,
         "blocked by callee `impura`: mutable_varia"
@@ -266,14 +269,23 @@ fn air_report_unknown_reason_trails_known_buckets() {
         super::check_air::AirReason {
             rule: "new_future_reason".to_owned(),
             line: 1,
+            start: 0,
+            end: 1,
+            via_callee: false,
         },
         super::check_air::AirReason {
             rule: "mutable_varia".to_owned(),
             line: 2,
+            start: 1,
+            end: 2,
+            via_callee: false,
         },
         super::check_air::AirReason {
             rule: "mori".to_owned(),
             line: 3,
+            start: 2,
+            end: 3,
+            via_callee: false,
         },
     ];
 

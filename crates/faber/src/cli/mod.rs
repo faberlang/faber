@@ -383,6 +383,10 @@ pub struct CheckArgs {
     #[arg(long)]
     pub air: bool,
 
+    /// Emit the advisory AIR report as versioned machine rows (requires --air)
+    #[arg(long, requires = "air")]
+    pub json: bool,
+
     /// Force package checking mode
     #[arg(long)]
     pub package: bool,
