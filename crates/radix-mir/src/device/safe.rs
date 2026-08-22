@@ -789,7 +789,12 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                         intrinsic:
                             MirIntrinsic::Collection(
                                 MirCollectionOp::TensorMatMul
-                                | MirCollectionOp::TensorQuantizedMatMul,
+                                | MirCollectionOp::TensorQuantizedMatMul
+                                // EXEC02-PS3: `TensorSsmConv1d` is a recipe
+                                // op (`CollectionKernelPlan::SsmConv1d`) with
+                                // an NVVM body emitter; other targets keep
+                                // their own per-op fail-closed emit gates.
+                                | MirCollectionOp::TensorSsmConv1d,
                             ),
                         ..
                     },
