@@ -207,14 +207,94 @@ pub struct MirKernelSignature {
     pub dispatch_size: MirKernelDispatchSize,
 }
 
-/// The maximum number of storage-buffer bindings ONE kernel may declare —
-/// the Metal `[[buffer(N)]]` attribute maximum (bindings `0..=30`,
-/// inclusive). A device-resident body whose whole-function storage-buffer
-/// signature would exceed this cannot be emitted as one kernel: the ABI
-/// signature synthesis refuses it (fail-closed, so the callers fall through
-/// to the decomposition split) and the plan pass reports the same typed
-/// diagnostic for pre-built signatures.
-pub const MAX_STORAGE_BUFFERS_PER_KERNEL: usize = 31;
+/// Backend-neutral storage-buffer binding capacity for one kernel.
+///
+/// The shared ABI consumes this record rather than teaching every lane one
+/// limit. The default is the conservative minimum across admitted lanes;
+/// lane-owned records may carry a higher capacity when that lane admits it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StorageBufferLimitRecord {
+    /// Human-readable lane identity for typed diagnostics.
+    pub lane: &'static str,
+    /// Maximum number of storage-buffer bindings in one kernel.
+    pub max_storage_buffers: usize,
+}
+
+impl StorageBufferLimitRecord {
+    /// Construct a lane-owned storage-buffer limit record.
+    #[must_use]
+    pub const fn new(lane: &'static str, max_storage_buffers: usize) -> Self {
+        Self {
+            lane,
+            max_storage_buffers,
+        }
+    }
+
+    /// Whether a signature with `buffer_count` storage buffers fits this lane.
+    #[must_use]
+    pub const fn admits(self, buffer_count: usize) -> bool {
+        buffer_count <= self.max_storage_buffers
+    }
+
+    /// Phrase used by diagnostics while preserving the established default
+    /// Metal/conservative-minimum wording byte-for-byte.
+    #[must_use]
+    pub fn binding_limit_phrase(self) -> String {
+        if self == DEFAULT_STORAGE_BUFFER_LIMIT || self == METAL_STORAGE_BUFFER_LIMIT {
+            format!("{}-buffer binding maximum", self.max_storage_buffers)
+        } else {
+            format!(
+                "{}-buffer binding maximum for {} lane",
+                self.max_storage_buffers, self.lane
+            )
+        }
+    }
+}
+
+/// Metal's `[[buffer(N)]]` attribute maximum (bindings `0..=30`, inclusive).
+/// This record is lane-owned; it is not the shared default by itself.
+pub const METAL_STORAGE_BUFFER_LIMIT: StorageBufferLimitRecord =
+    StorageBufferLimitRecord::new("Metal", 31);
+
+/// Conservative shared default: split at the minimum capacity across admitted
+/// lanes until a caller selects a lane-owned record.
+pub const DEFAULT_STORAGE_BUFFER_LIMIT: StorageBufferLimitRecord =
+    StorageBufferLimitRecord::new("conservative minimum across admitted lanes", 31);
+
+/// Compatibility name for the former ceiling. Shared consumers use the
+/// record's `max_storage_buffers` field or pass a lane-owned record instead.
+pub const MAX_STORAGE_BUFFERS_PER_KERNEL: StorageBufferLimitRecord = DEFAULT_STORAGE_BUFFER_LIMIT;
+
+/// Build the storage-buffer limit diagnostic. The default Metal behavior keeps
+/// its established message; a lane-owned record with another capacity names
+/// the active lane and limit in the message and detail.
+pub(crate) fn storage_buffer_limit_error(
+    buffer_count: usize,
+    limit: StorageBufferLimitRecord,
+) -> crate::abi::MirAbiError {
+    let message = format!(
+        "kernel storage-buffer count {buffer_count} exceeds the {}-buffer binding maximum; \
+         the decomposition must split the body",
+        limit.max_storage_buffers
+    );
+    if limit == DEFAULT_STORAGE_BUFFER_LIMIT || limit == METAL_STORAGE_BUFFER_LIMIT {
+        crate::abi::MirAbiError::new(message)
+    } else {
+        let message = format!(
+            "kernel storage-buffer count {buffer_count} exceeds the {}; \
+             the decomposition must split the body",
+            limit.binding_limit_phrase()
+        );
+        crate::abi::MirAbiError::with_detail(
+            message,
+            "mir_kernel_storage_buffer_limit",
+            format!(
+                "lane={} max_storage_buffers={}",
+                limit.lane, limit.max_storage_buffers
+            ),
+        )
+    }
+}
 
 /// Classified builtin usage for a kernel signature — which invocation-header
 /// parameters each backend must declare. This is shared classification data

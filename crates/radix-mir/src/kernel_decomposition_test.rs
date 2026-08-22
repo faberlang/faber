@@ -1155,9 +1155,33 @@ fn oversized_elementwise_train_step(types: &mut TypeTable) -> MirFunction {
 }
 
 /// The per-kernel storage-buffer budget: an elementwise-only body whose
-/// whole-function binding count exceeds [`MAX_STORAGE_BUFFERS_PER_KERNEL`]
+/// whole-function binding count exceeds the selected storage-buffer limit
 /// splits into consecutive elementwise sub-slices, each at or under the
-/// budget, with the return assembly kept in the LAST sub-slice.
+/// default 31-buffer budget, with the return assembly kept in the LAST
+/// sub-slice.
+#[test]
+fn wider_lane_keeps_oversized_elementwise_body_whole() {
+    let mut types = TypeTable::new();
+    let function = oversized_elementwise_train_step(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function_with_limit(
+        &function,
+        &validation,
+        crate::abi::StorageBufferLimitRecord::new("wide-test", 64),
+    )
+    .expect("the 64-buffer lane admits the whole elementwise body");
+
+    assert_eq!(
+        decomposition.subchains.len(),
+        1,
+        "a 37-buffer body stays whole under the 64-buffer lane"
+    );
+    assert_eq!(
+        decomposition.subchains[0].statements,
+        (0..function.blocks[0].statements.len()).collect::<Vec<_>>()
+    );
+}
+
 #[test]
 fn oversized_elementwise_body_splits_within_the_buffer_budget() {
     let mut types = TypeTable::new();
@@ -1196,9 +1220,10 @@ fn oversized_elementwise_body_splits_within_the_buffer_budget() {
         };
         let buffer_count = synthetic.params.len() + outputs;
         assert!(
-            buffer_count <= MAX_STORAGE_BUFFERS_PER_KERNEL,
-            "subchain {position} must fit the {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer budget, \
+            buffer_count <= crate::abi::DEFAULT_STORAGE_BUFFER_LIMIT.max_storage_buffers,
+            "subchain {position} must fit the {}-buffer budget, \
              got {buffer_count} ({} params + {outputs} outputs)",
+            crate::abi::DEFAULT_STORAGE_BUFFER_LIMIT.max_storage_buffers,
             synthetic.params.len()
         );
     }

@@ -49,7 +49,7 @@
 //! and re-labels existing MIR statements; it never introduces a GPU-specific
 //! AIR node or relowers semantics.
 
-use crate::abi::MAX_STORAGE_BUFFERS_PER_KERNEL;
+use crate::abi::{StorageBufferLimitRecord, DEFAULT_STORAGE_BUFFER_LIMIT};
 use crate::device_program_plans::{
     data_flow_element_ty_and_count, is_elementwise_collection_op, is_recipe_op,
     resolve_subchain_plan, PlanMappingError,
@@ -150,6 +150,20 @@ pub fn decompose_kernel_function(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
 ) -> Result<KernelDecomposition, PlanMappingError> {
+    decompose_kernel_function_with_limit(function, validation, DEFAULT_STORAGE_BUFFER_LIMIT)
+}
+
+/// Decompose a device-resident function body against an explicit lane-owned
+/// storage-buffer capacity. The default wrapper keeps the shared conservative
+/// minimum across admitted lanes.
+///
+/// # Errors
+/// Returns [`PlanMappingError`] on any fail-closed decomposition condition.
+pub fn decompose_kernel_function_with_limit(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    limit: StorageBufferLimitRecord,
+) -> Result<KernelDecomposition, PlanMappingError> {
     if function.blocks.len() != 1 {
         return Err(PlanMappingError::mapping(
             "device function body has control flow and cannot decompose into subchain kernels \
@@ -205,7 +219,7 @@ pub fn decompose_kernel_function(
     // body splits into consecutive elementwise sub-slices so every subchain
     // kernel fits the budget, preserving the plan semantics (the carried
     // data-flow edges between the subchains carry the same values).
-    let slices = split_oversized_elementwise_body(function, block, slices, validation)?;
+    let slices = split_oversized_elementwise_body(function, block, slices, validation, limit)?;
 
     // Build the subchains. `written` records each subchain's produced
     // locals so the data-flow edges can be derived. The subchains preserve
@@ -343,7 +357,7 @@ pub fn decompose_kernel_function(
 }
 
 /// Split an elementwise-only body whose whole-function storage-buffer count
-/// exceeds [`MAX_STORAGE_BUFFERS_PER_KERNEL`] into consecutive elementwise
+/// exceeds the selected lane's storage-buffer capacity into consecutive elementwise
 /// sub-slices, each with an emission signature at or under the budget.
 ///
 /// Only the single-slice elementwise-only shape splits (the whole-function
@@ -383,6 +397,7 @@ fn split_oversized_elementwise_body(
     block: &MirBlock,
     slices: Vec<Vec<usize>>,
     validation: &MirValidationContext<'_>,
+    limit: StorageBufferLimitRecord,
 ) -> Result<Vec<Vec<usize>>, PlanMappingError> {
     // Only the single-slice elementwise-only shape splits: a recipe-bearing
     // slice resolves contract-shaped signatures (smaller counts) and the
@@ -417,7 +432,8 @@ fn split_oversized_elementwise_body(
         _ => 1,
     };
     let whole_count = input_count + output_count;
-    if whole_count <= MAX_STORAGE_BUFFERS_PER_KERNEL {
+    let limit_phrase = limit.binding_limit_phrase();
+    if limit.admits(whole_count) {
         return Ok(slices);
     }
 
@@ -428,7 +444,7 @@ fn split_oversized_elementwise_body(
     let Some(fields) = return_tuple_field_locals(function) else {
         return Err(PlanMappingError::mapping(format!(
             "elementwise body storage-buffer count {whole_count} exceeds the \
-             {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer binding maximum and the body \
+             {limit_phrase} and the body \
              does not return an ordered plain-local tuple the split can preserve"
         )));
     };
@@ -479,7 +495,7 @@ fn split_oversized_elementwise_body(
     }) else {
         return Err(PlanMappingError::mapping(format!(
             "elementwise body storage-buffer count {whole_count} exceeds the \
-             {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer binding maximum and the body \
+             {limit_phrase} and the body \
              writes none of its return-tuple fields (the split cannot preserve \
              the result-tuple output semantics)"
         )));
@@ -524,7 +540,7 @@ fn split_oversized_elementwise_body(
         if !is_return_assembly {
             return Err(PlanMappingError::mapping(format!(
                 "elementwise body storage-buffer count {whole_count} exceeds the \
-                 {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer binding maximum and a \
+                 {limit_phrase} and a \
                  statement after the first return-tuple field writer writes a \
                  non-field local outside the return assembly (the split cannot \
                  group the result-tuple output slots)"
@@ -554,7 +570,7 @@ fn split_oversized_elementwise_body(
         if fields.len() > 1 && consumed_count < 2 {
             return false;
         }
-        if params.len() + consumed_count > MAX_STORAGE_BUFFERS_PER_KERNEL {
+        if params.len() + consumed_count > limit.max_storage_buffers {
             return false;
         }
         // Every consumed local must bind as a kernel buffer (a shape list
@@ -573,7 +589,7 @@ fn split_oversized_elementwise_body(
     let last_field_valid = |start: usize| -> bool {
         let (params, written) = range_params_and_written(&written_at, &reads_at, start, n);
         let fields_written = written.intersection(&field_set).count();
-        fields_written >= 1 && params.len() + fields.len() <= MAX_STORAGE_BUFFERS_PER_KERNEL
+        fields_written >= 1 && params.len() + fields.len() <= limit.max_storage_buffers
     };
 
     // Split the statement stream: the pre range (before the first field
@@ -591,7 +607,7 @@ fn split_oversized_elementwise_body(
     let Some(&last_field_position) = field_positions.last() else {
         return Err(PlanMappingError::mapping(format!(
             "elementwise body storage-buffer count {whole_count} exceeds the \
-             {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer binding maximum and the body \
+             {limit_phrase} and the body \
              writes none of its return-tuple fields (the split cannot preserve \
              the result-tuple output semantics)"
         )));
@@ -626,7 +642,7 @@ fn split_oversized_elementwise_body(
         let Some(end) = best else {
             return Err(PlanMappingError::mapping(format!(
                 "elementwise body storage-buffer count {whole_count} exceeds the \
-                 {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer binding maximum and the \
+                 {limit_phrase} and the \
                  statement stream cannot be split within the budget"
             )));
         };

@@ -12,14 +12,15 @@ use super::{
     collection_op_contract, combined_builtin_dependencies, device_view_element_count,
     device_view_element_type, dispatch_size_for_1d_elements, is_vacuum, kernel_has_collection_op,
     named_builtin_for_param, param_source_name, reject_kernel_matrix_abi,
-    require_same_element_type, require_u32_index, result_tuple_count, CollectionOpContract,
-    MirAbiError, MirKernelBuiltin, MirKernelBuiltinInput, MirKernelBuiltinUsage,
-    MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind,
-    MirKernelResourceRole, MirKernelSignature, MirWorkgroupSize, DEFAULT_KERNEL_RESOURCE_GROUP,
+    require_same_element_type, require_u32_index, result_tuple_count, storage_buffer_limit_error,
+    CollectionOpContract, MirAbiError, MirKernelBuiltin, MirKernelBuiltinInput,
+    MirKernelBuiltinUsage, MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess,
+    MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature, MirWorkgroupSize,
+    StorageBufferLimitRecord, DEFAULT_KERNEL_RESOURCE_GROUP, DEFAULT_STORAGE_BUFFER_LIMIT,
     ERR_INDEXED_VIEW_REQUIRES_INPUT, ERR_INDEXED_VIEW_RETURNS_VACUUM,
     ERR_KERNEL_IO_ELEMENT_MISMATCH, ERR_KERNEL_PARAM_RETURN_MISMATCH,
     ERR_KERNEL_RESOURCE_BINDING_OVERFLOW, ERR_KERNEL_RESULT_TUPLE_REQUIRED,
-    ERR_KERNEL_RESULT_TUPLE_REQUIRES_INPUT, MAX_STORAGE_BUFFERS_PER_KERNEL,
+    ERR_KERNEL_RESULT_TUPLE_REQUIRES_INPUT,
 };
 
 struct IndexedViewKernelContext<'a> {
@@ -149,7 +150,24 @@ impl MirKernelSignature {
         function: &MirFunction,
         validation: &MirValidationContext<'_>,
     ) -> Result<Self, MirAbiError> {
-        Self::storage_buffer_kernel_with_names(function, validation, None, false)
+        Self::storage_buffer_kernel_with_limit(function, validation, DEFAULT_STORAGE_BUFFER_LIMIT)
+    }
+
+    /// Synthesize a storage-buffer kernel ABI against an explicit lane limit.
+    ///
+    /// The shared default remains the conservative minimum across admitted
+    /// lanes. A backend lane that admits a different binding capacity passes
+    /// its own [`StorageBufferLimitRecord`] here.
+    ///
+    /// # Errors
+    /// Returns an error when validation, type resolution, or the selected
+    /// lane's storage-buffer capacity fails. See [`MirAbiError`].
+    pub fn storage_buffer_kernel_with_limit(
+        function: &MirFunction,
+        validation: &MirValidationContext<'_>,
+        limit: StorageBufferLimitRecord,
+    ) -> Result<Self, MirAbiError> {
+        Self::storage_buffer_kernel_with_names(function, validation, None, false, limit)
     }
 
     /// # Errors
@@ -159,7 +177,27 @@ impl MirKernelSignature {
         validation: &MirValidationContext<'_>,
         interner: &Interner,
     ) -> Result<Self, MirAbiError> {
-        Self::storage_buffer_kernel_with_names(function, validation, Some(interner), false)
+        Self::storage_buffer_kernel_with_interner_and_limit(
+            function,
+            validation,
+            interner,
+            DEFAULT_STORAGE_BUFFER_LIMIT,
+        )
+    }
+
+    /// Synthesize a named storage-buffer kernel ABI against an explicit lane
+    /// limit.
+    ///
+    /// # Errors
+    /// Returns an error when validation, type resolution, or the selected
+    /// lane's storage-buffer capacity fails. See [`MirAbiError`].
+    pub fn storage_buffer_kernel_with_interner_and_limit(
+        function: &MirFunction,
+        validation: &MirValidationContext<'_>,
+        interner: &Interner,
+        limit: StorageBufferLimitRecord,
+    ) -> Result<Self, MirAbiError> {
+        Self::storage_buffer_kernel_with_names(function, validation, Some(interner), false, limit)
     }
 
     /// # Errors
@@ -169,7 +207,27 @@ impl MirKernelSignature {
         validation: &MirValidationContext<'_>,
         interner: &Interner,
     ) -> Result<Self, MirAbiError> {
-        Self::storage_buffer_kernel_with_names(function, validation, Some(interner), true)
+        Self::storage_buffer_kernel_with_interner_for_target_entry_and_limit(
+            function,
+            validation,
+            interner,
+            DEFAULT_STORAGE_BUFFER_LIMIT,
+        )
+    }
+
+    /// Synthesize a target-entry storage-buffer ABI against an explicit lane
+    /// limit.
+    ///
+    /// # Errors
+    /// Returns an error when validation, type resolution, or the selected
+    /// lane's storage-buffer capacity fails. See [`MirAbiError`].
+    pub fn storage_buffer_kernel_with_interner_for_target_entry_and_limit(
+        function: &MirFunction,
+        validation: &MirValidationContext<'_>,
+        interner: &Interner,
+        limit: StorageBufferLimitRecord,
+    ) -> Result<Self, MirAbiError> {
+        Self::storage_buffer_kernel_with_names(function, validation, Some(interner), true, limit)
     }
 
     fn storage_buffer_kernel_with_names(
@@ -177,6 +235,7 @@ impl MirKernelSignature {
         validation: &MirValidationContext<'_>,
         interner: Option<&Interner>,
         allow_host_owned_tensor_entry: bool,
+        limit: StorageBufferLimitRecord,
     ) -> Result<Self, MirAbiError> {
         // Unit B: stable shape before arity matching so matrix kernel IO does not
         // fall through to the generic "one buffer parameter" message.
@@ -229,12 +288,8 @@ impl MirKernelSignature {
             .resources()
             .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
             .count();
-        if buffer_count > MAX_STORAGE_BUFFERS_PER_KERNEL {
-            return Err(MirAbiError::new(format!(
-                "kernel storage-buffer count {buffer_count} exceeds the \
-                 {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer binding maximum; \
-                 the decomposition must split the body"
-            )));
+        if !limit.admits(buffer_count) {
+            return Err(storage_buffer_limit_error(buffer_count, limit));
         }
         Ok(signature)
     }

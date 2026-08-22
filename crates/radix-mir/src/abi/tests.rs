@@ -1181,6 +1181,67 @@ fn kernel_abi_keeps_f64_scalar_fail_closed_over_f32_tensor_graph() {
 }
 
 #[test]
+fn storage_buffer_limit_record_allows_wider_lane_and_keeps_metal_oracle() {
+    let mut types = TypeTable::new();
+    let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let shape = types.intern_index(IndexExpr::Literal(4));
+    let tensor_ty = MirType::semantic(types.tensor_with_shape(f32, shape));
+    let span = Span::default();
+    let params = (0..39)
+        .map(|local| MirParam {
+            local: MirLocalId(local),
+            name: None,
+            ty: tensor_ty,
+            mode: MirParamMode::Owned,
+            span,
+        })
+        .collect();
+    let function = MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params,
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span,
+            },
+            span,
+        }],
+        return_ty: tensor_ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    };
+    let validation = validation_with_device_tensor_layouts(&types);
+
+    let metal_error = MirKernelSignature::storage_buffer_kernel(&function, &validation)
+        .expect_err("the shared 31-buffer default must keep the fail-closed boundary");
+    assert_eq!(
+        metal_error.message,
+        "kernel storage-buffer count 40 exceeds the 31-buffer binding maximum; the decomposition must split the body"
+    );
+
+    let wide_lane = StorageBufferLimitRecord::new("wide-test", 64);
+    let signature =
+        MirKernelSignature::storage_buffer_kernel_with_limit(&function, &validation, wide_lane)
+            .expect("a 64-buffer lane admits the whole 40-buffer signature");
+    assert_eq!(
+        signature
+            .resources()
+            .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
+            .count(),
+        40
+    );
+}
+
+#[test]
 fn kernel_abi_keeps_f64_scalar_fail_closed_for_pure_scalar_kernel() {
     // S5A-U2: the whole-function scalar surface rejects a PURE-scalar f64
     // kernel (no tensor graph at all) with the same typed diagnostic —

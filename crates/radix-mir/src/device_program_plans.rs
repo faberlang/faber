@@ -12,9 +12,10 @@
 //! [`crate::kernel_decomposition::decompose_kernel_function`].
 
 use crate::abi::{
-    collection_op_contract, CollectionOpContract, MirAbiError, MirKernelResource,
-    MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
-    PackedStorageLayout, MAX_STORAGE_BUFFERS_PER_KERNEL,
+    collection_op_contract, storage_buffer_limit_error, CollectionOpContract, MirAbiError,
+    MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole,
+    MirKernelSignature, PackedStorageLayout, StorageBufferLimitRecord,
+    DEFAULT_STORAGE_BUFFER_LIMIT,
 };
 use crate::device_program::{
     Binding, BufferRole, DeviceProgram, DeviceProgramError, DeviceResource, KernelLaunchPlan,
@@ -144,6 +145,26 @@ pub fn kernel_plan_for_function(
     signature: &MirKernelSignature,
     validation: &MirValidationContext<'_>,
 ) -> Result<Option<CollectionKernelPlan>, PlanMappingError> {
+    kernel_plan_for_function_with_limit(
+        function,
+        signature,
+        validation,
+        DEFAULT_STORAGE_BUFFER_LIMIT,
+    )
+}
+
+/// Re-derive a kernel plan against an explicit lane-owned storage-buffer
+/// capacity. The default wrapper keeps the conservative shared minimum.
+///
+/// # Errors
+/// Returns [`PlanMappingError`] when the signature exceeds the selected lane
+/// limit or its typed recipe facts do not resolve.
+pub fn kernel_plan_for_function_with_limit(
+    function: &MirFunction,
+    signature: &MirKernelSignature,
+    validation: &MirValidationContext<'_>,
+    limit: StorageBufferLimitRecord,
+) -> Result<Option<CollectionKernelPlan>, PlanMappingError> {
     // A kernel whose storage-buffer binding count exceeds the per-kernel
     // maximum cannot be emitted as ONE kernel (Metal's `[[buffer(N)]]`
     // attribute allows bindings 0..=30). The whole-function plan is refused
@@ -154,12 +175,10 @@ pub fn kernel_plan_for_function(
         .resources()
         .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
         .count();
-    if buffer_count > MAX_STORAGE_BUFFERS_PER_KERNEL {
-        return Err(PlanMappingError::mapping(format!(
-            "kernel storage-buffer count {buffer_count} exceeds the \
-             {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer binding maximum; \
-             the decomposition must split the body"
-        )));
+    if !limit.admits(buffer_count) {
+        return Err(PlanMappingError::mapping(
+            storage_buffer_limit_error(buffer_count, limit).message,
+        ));
     }
     // Scan ALL statements: the kernel body's plan is decided by its complete
     // collection-op set, never by the first matching statement (N3.2).
@@ -2249,19 +2268,30 @@ pub fn contract_shape_signature(
             let (element_ty, _) =
                 data_flow_element_ty_and_count(function_local_ty(function, *first)?, validation)?;
             for (binding, local) in operands.iter().copied().enumerate() {
-                let (operand_ty, extent) = data_flow_element_ty_and_count(
-                    function_local_ty(function, local)?,
-                    validation,
-                )?;
+                let ty = function_local_ty(function, local)?;
+                let (operand_ty, extent) = data_flow_element_ty_and_count(ty, validation)?;
                 if binding == 0 {
                     signature.input = storage_input_with_local(0, operand_ty, extent, local);
                 } else {
-                    signature.extra_inputs.push(storage_input_with_local(
+                    let mut extra = storage_input_with_local(
                         u32::try_from(binding).unwrap_or(u32::MAX),
                         operand_ty,
                         extent,
                         local,
-                    ));
+                    );
+                    // Persistent K/V views are written in-shader at
+                    // write_position. Mark them ReadWrite so Metal binds
+                    // `device` rather than `device const`.
+                    if let Ok(dims) = crate::tensor_type::tensor_literal_dims(ty, validation) {
+                        if dims.len() == 3
+                            && dims[0] == kv_heads
+                            && dims[2] == head_dim
+                            && dims[1] != seq
+                        {
+                            extra.access = MirKernelResourceAccess::ReadWrite;
+                        }
+                    }
+                    signature.extra_inputs.push(extra);
                 }
             }
             signature.output = storage_output(

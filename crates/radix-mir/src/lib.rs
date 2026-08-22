@@ -142,7 +142,10 @@ pub use inference_blocker_matrix::{
     inference_blocker_rows, inference_non_claims, InferenceBlockerCategory, InferenceBlockerRow,
     InferenceBlockerStatus, InferenceNonClaim, InferenceNonClaimKind,
 };
-pub use kernel_decomposition::{decompose_kernel_function, KernelDecomposition, KernelSubchain};
+pub use kernel_decomposition::{
+    decompose_kernel_function, decompose_kernel_function_with_limit, KernelDecomposition,
+    KernelSubchain,
+};
 pub use kernel_plan::{
     admit_quantized_gather, admit_quantized_matmul, BarrierPhase, BarrierPoint,
     CollectionKernelPlan, GroupedMatMulPlan, MatMulPlan, OobPaddingPolicy, PackedAdmissionError,
