@@ -471,7 +471,16 @@ pub fn resolve_import(
 fn is_self_package_interface(spec: &PackageSpec, interface: &Path) -> bool {
     let source_root = normalize_path(&spec.source_root);
     let interface = normalize_path(interface);
-    !source_root.as_os_str().is_empty() && interface.starts_with(&source_root)
+    if source_root.as_os_str().is_empty() || !interface.starts_with(&source_root) {
+        return false;
+    }
+    // Prefix match is not package identity: a stdlib/library checkout nested
+    // under the consumer directory has its own `faber.toml` and must stay a
+    // library (Latin identity fallback), not a consumer-locale local unit.
+    match crate::find_package_root(&interface) {
+        Some(root) => normalize_path(&root) == normalize_path(&spec.package_root),
+        None => true,
+    }
 }
 
 fn proba_import_forbidden_diagnostic(from_file: &Path, import_path: &str) -> Diagnostic {

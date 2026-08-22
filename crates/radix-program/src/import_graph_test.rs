@@ -143,6 +143,56 @@ fn resolve_import_external_provider_stays_library() {
 }
 
 #[test]
+fn resolve_import_nested_library_under_consumer_dir_stays_library() {
+    // Manifestless consumer at `<root>/main.fab` with `with_stdlib(<root>/lib)`
+    // used to prefix-match `testlib` as a self-import because source_root is
+    // `<root>`. The library has its own faber.toml and must stay Library.
+    let root = temp_root("nested-lib-under-consumer");
+    fs::create_dir_all(root.join("lib/testlib/src")).unwrap();
+    fs::write(
+        root.join("lib/testlib/faber.toml"),
+        r#"[package]
+name = "testlib"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "testlib"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+target = "fmir"
+targets = ["fmir"]
+"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("lib/testlib/src/outer.fab"),
+        "functio computa(numerus value) → numerus {\n    redde value + 1\n}\n",
+    )
+    .unwrap();
+    let from_file = root.join("main.fab");
+    let package = spec(root.clone(), from_file.clone());
+    let resolver = LibraryResolver::new(root.join("lib"));
+
+    match resolve_import(&package, &resolver, &from_file, "testlib:outer") {
+        ImportResolution::Library(module) => {
+            assert_eq!(module.package, "testlib");
+            assert!(
+                module.interface_path.ends_with("lib/testlib/src/outer.fab"),
+                "interface: {:?}",
+                module.interface_path
+            );
+        }
+        other => panic!("expected external nested library, got {other:?}"),
+    }
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
 fn resolve_import_library_provider() {
     let root = temp_root("library-provider");
     fs::create_dir_all(root.join("prov/src")).unwrap();
