@@ -119,7 +119,7 @@ pub struct BoundaryCall {
 
 /// The typed diagnostic class of one invalid cross-boundary value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BoundaryAbiClass {
+pub enum BoundaryAbiKind {
     /// A crossing value's element type does not equal the declared boundary
     /// element type.
     Type,
@@ -141,7 +141,7 @@ pub enum BoundaryAbiClass {
     CallsiteShape,
 }
 
-impl BoundaryAbiClass {
+impl BoundaryAbiKind {
     /// The stable diagnostic spelling.
     #[must_use]
     pub fn spelling(self) -> &'static str {
@@ -253,14 +253,14 @@ pub enum BoundaryAbiError {
 impl BoundaryAbiError {
     /// The typed class of this diagnostic.
     #[must_use]
-    pub fn class(&self) -> BoundaryAbiClass {
+    pub fn class(&self) -> BoundaryAbiKind {
         match self {
-            Self::Arity { .. } | Self::Shape { .. } => BoundaryAbiClass::Shape,
-            Self::Type { .. } => BoundaryAbiClass::Type,
-            Self::Lifetime { .. } => BoundaryAbiClass::Lifetime,
-            Self::Mutation { .. } => BoundaryAbiClass::Mutation,
-            Self::Observation { .. } => BoundaryAbiClass::Observation,
-            Self::UnsupportedCallsiteShape { .. } => BoundaryAbiClass::CallsiteShape,
+            Self::Arity { .. } | Self::Shape { .. } => BoundaryAbiKind::Shape,
+            Self::Type { .. } => BoundaryAbiKind::Type,
+            Self::Lifetime { .. } => BoundaryAbiKind::Lifetime,
+            Self::Mutation { .. } => BoundaryAbiKind::Mutation,
+            Self::Observation { .. } => BoundaryAbiKind::Observation,
+            Self::UnsupportedCallsiteShape { .. } => BoundaryAbiKind::CallsiteShape,
         }
     }
 }

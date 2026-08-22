@@ -96,7 +96,7 @@ pub use ai_workbench_stage5::{
     AiWorkbenchStage5Row, AiWorkbenchStage5Status,
 };
 pub use boundary_abi::{
-    validate_boundary_abi, BoundaryAbiClass, BoundaryAbiError, BoundaryCall, PreparedRegion,
+    validate_boundary_abi, BoundaryAbiKind, BoundaryAbiError, BoundaryCall, PreparedRegion,
     HOST_CALL_ABI_VERSION,
 };
 pub use cost_analysis::{

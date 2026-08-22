@@ -70,7 +70,7 @@ pub use metal_text::{
     MirMetalTextProbeError, MirMetalTextProbeOutput,
 };
 pub use radix_mir::boundary_abi::{
-    validate_boundary_abi, BoundaryAbiClass, BoundaryAbiError, BoundaryCall, PreparedRegion, HOST_CALL_ABI_VERSION,
+    validate_boundary_abi, BoundaryAbiKind, BoundaryAbiError, BoundaryCall, PreparedRegion, HOST_CALL_ABI_VERSION,
 };
 // DDCP3-U4/U5: the typed `§ArtifactPacket` `HostDeviceCall` surface (typed
 // bindings, bounded numeric argument layout, the execution-descriptor
