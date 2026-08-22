@@ -1360,13 +1360,6 @@ def check_locales(
         )
         if actual != expected:
             mismatches.append(display_path(output_path))
-        site_path = default_site_locale_ebnf_path(locale)
-        if site_path is not None:
-            site_actual = (
-                site_path.read_text(encoding="utf-8") if site_path.is_file() else ""
-            )
-            if site_actual != expected:
-                mismatches.append(display_path(site_path))
     payload = {
         "schema": TRIPLE_SCHEMA,
         "ok": not mismatches and not errors,
@@ -1609,10 +1602,6 @@ def run_render_locales(args: argparse.Namespace) -> list[Path]:
             continue
         rendered, dest = render_locale_file(source_path, sidecar_path, locale)
         written.append(dest)
-        site = default_site_locale_ebnf_path(locale)
-        if site is not None:
-            site.write_text(rendered, encoding="utf-8")
-            written.append(site)
     return written
 
 
