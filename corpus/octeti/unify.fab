@@ -1,6 +1,7 @@
 +++
 term = "octeti"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "fixum_decl", "expr_stmt", "redde_stmt", "cast_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "nota_stmt", "expression", "literal"]
 category = "type"
 canonical = false
 summary = "octeti unifies with lista<numerus<u8>> — every lista method works on octeti."

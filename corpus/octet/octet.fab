@@ -1,6 +1,7 @@
 +++
 term = "octet"
 kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "fixum_decl", "vel_expr", "vel_rhs", "cast_expr", "redde_stmt", "expr_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "nota_stmt", "expression", "literal"]
 category = "type"
 canonical = false
 summary = "octet is the byte scalar, a builtin spelling for numerus<u8>, the element type of octeti."
