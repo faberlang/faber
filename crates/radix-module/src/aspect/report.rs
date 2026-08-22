@@ -152,6 +152,21 @@ pub enum HirAspectDetail {
 pub enum HirAspectKind {
     /// `discerne omnia` finite coverage over an enum-like scrutinee.
     DiscerneOmnia,
+
+    /// AIR line 1: the emitted straight-line unroll preserves the source
+    /// loop's lane sequence, source order, and failure behavior. Proof
+    /// content is owned by APA-L1; registration here is identity only.
+    UnrollEquivalence,
+
+    /// AIR line 2: caller-built masks are neutral — zero-fill combines keep
+    /// the live prefix and dead suffix unchanged. Proof content is owned by
+    /// APA-L2; registration here is identity only.
+    MaskNeutrality,
+
+    /// AIR line 3: the admitted gate form inhabits the pure type fragment
+    /// with no IO/monadic effects. Proof content is owned by APA-L3;
+    /// registration here is identity only.
+    GatePurity,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

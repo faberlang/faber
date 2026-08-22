@@ -296,6 +296,9 @@ pub fn render_hir_aspect_coverage(report: &HirAspectCoverageReport) -> String {
 fn aspect_label(aspect: HirAspectKind) -> &'static str {
     match aspect {
         HirAspectKind::DiscerneOmnia => "discerne_omnia",
+        HirAspectKind::UnrollEquivalence => "unroll_equivalence",
+        HirAspectKind::MaskNeutrality => "mask_neutrality",
+        HirAspectKind::GatePurity => "gate_purity",
     }
 }
 

@@ -320,8 +320,35 @@ impl HirAspectVerifier for LeanAspectChecker {
             return vec![];
         }
 
+        // No-fall-through gate: registered kinds without landed proof content
+        // never reach the generic `True := trivial` generator. They get a
+        // deterministic Failed result naming the unproven kind instead of a
+        // fabricated verdict.
+        let refused: Vec<HirAspectCheckResult> = recognized
+            .iter()
+            .filter(|r| !has_registered_proof_generator(r.aspect))
+            .map(|r| HirAspectCheckResult {
+                status: HirAspectCheckStatus::Failed,
+                evidence: HirAspectEvidence(format!(
+                    "aspect kind `{}` is registered without proof content; refusing placeholder proof",
+                    aspect_label(r)
+                )),
+                backend: HirAspectBackendKind::Lean,
+            })
+            .collect();
+
+        let checkable: Vec<&HirAspectRecord> = recognized
+            .iter()
+            .copied()
+            .filter(|r| has_registered_proof_generator(r.aspect))
+            .collect();
+
+        if checkable.is_empty() {
+            return refused;
+        }
+
         // Generate Lean source and a lakefile.toml for the temp project.
-        let lean_source = generate_lean_source(&recognized);
+        let lean_source = generate_lean_source(&checkable);
         let lakefile_toml = generate_lakefile_toml();
 
         // Create a unique temp directory under the system temp root.
@@ -333,7 +360,7 @@ impl HirAspectVerifier for LeanAspectChecker {
                     evidence: HirAspectEvidence(error),
                     backend: HirAspectBackendKind::Lean,
                 };
-                return recognized.iter().map(|_| err_result.clone()).collect();
+                return merge_results(&recognized, checkable.iter().map(|_| err_result.clone()).collect(), refused);
             }
         };
 
@@ -346,7 +373,7 @@ impl HirAspectVerifier for LeanAspectChecker {
                 backend: HirAspectBackendKind::Lean,
             };
             ignore_result(std::fs::remove_dir_all(&temp_dir));
-            return recognized.iter().map(|_| err_result.clone()).collect();
+            return merge_results(&recognized, checkable.iter().map(|_| err_result.clone()).collect(), refused);
         }
         if let Err(error) = std::fs::write(temp_dir.join("lakefile.toml"), &lakefile_toml) {
             let err_result = HirAspectCheckResult {
@@ -355,7 +382,7 @@ impl HirAspectVerifier for LeanAspectChecker {
                 backend: HirAspectBackendKind::Lean,
             };
             ignore_result(std::fs::remove_dir_all(&temp_dir));
-            return recognized.iter().map(|_| err_result.clone()).collect();
+            return merge_results(&recognized, checkable.iter().map(|_| err_result.clone()).collect(), refused);
         }
 
         // Run lake build via the U1 runner.
@@ -365,7 +392,7 @@ impl HirAspectVerifier for LeanAspectChecker {
         // If lake build did not succeed, all records share the failure.
         if build_result.status != HirAspectCheckStatus::Proven {
             ignore_result(std::fs::remove_dir_all(&temp_dir));
-            return recognized.iter().map(|_| build_result.clone()).collect();
+            return merge_results(&recognized, checkable.iter().map(|_| build_result.clone()).collect(), refused);
         }
 
         // Run trust checks via the U2 mechanism.
@@ -377,8 +404,30 @@ impl HirAspectVerifier for LeanAspectChecker {
         // Clean up the temp project directory.
         ignore_result(std::fs::remove_dir_all(&temp_dir));
 
-        recognized.iter().map(|_| final_result.clone()).collect()
+        merge_results(&recognized, checkable.iter().map(|_| final_result.clone()).collect(), refused)
     }
+}
+
+/// Re-assemble per-record results in the original report order: checkable
+/// records take their checker result, refused kinds take their deterministic
+/// no-fall-through result.
+fn merge_results(
+    records: &[&HirAspectRecord],
+    checked: Vec<HirAspectCheckResult>,
+    refused: Vec<HirAspectCheckResult>,
+) -> Vec<HirAspectCheckResult> {
+    let mut next_checked = checked.into_iter();
+    let mut next_refused = refused.into_iter();
+    records
+        .iter()
+        .map(|record| {
+            if has_registered_proof_generator(record.aspect) {
+                next_checked.next().expect("one checked result per checkable record")
+            } else {
+                next_refused.next().expect("one refused result per refused record")
+            }
+        })
+        .collect()
 }
 
 /// Lake project name used for generated temp projects.
@@ -428,7 +477,20 @@ fn theorem_label(record: &HirAspectRecord, index: usize) -> String {
 fn aspect_label(record: &HirAspectRecord) -> &'static str {
     match record.aspect {
         HirAspectKind::DiscerneOmnia => "discerne_omnia",
+        HirAspectKind::UnrollEquivalence => "unroll_equivalence",
+        HirAspectKind::MaskNeutrality => "mask_neutrality",
+        HirAspectKind::GatePurity => "gate_purity",
     }
+}
+
+/// Whether a checker-ready proof generator is registered for the kind.
+///
+/// Only kinds with landed line-proof content may reach `generate_lean_source`.
+/// The AIR kinds are registered (APA-2) but carry no proof generator until
+/// their owning lines land; they must never fall through the generic
+/// `True := trivial` placeholder as if they were proven obligations.
+fn has_registered_proof_generator(aspect: HirAspectKind) -> bool {
+    matches!(aspect, HirAspectKind::DiscerneOmnia)
 }
 
 /// Create a unique temporary project directory.
