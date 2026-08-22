@@ -408,20 +408,20 @@ impl TypeChecker<'_> {
         // side (T or nihil) can be lifted into it, the join must produce
         // Option<T>, not unwrap to T.
         if let Type::Option(_) = self.types.get(left) {
-            if self.types.assignable(right, left) {
+            if self.types.is_assignable(right, left) {
                 return left;
             }
         }
         if let Type::Option(_) = self.types.get(right) {
-            if self.types.assignable(left, right) {
+            if self.types.is_assignable(left, right) {
                 return right;
             }
         }
 
-        if self.types.assignable(left, right) {
+        if self.types.is_assignable(left, right) {
             return right;
         }
-        if self.types.assignable(right, left) {
+        if self.types.is_assignable(right, left) {
             return left;
         }
         if self.is_numeric(left) && self.is_numeric(right) {

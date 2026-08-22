@@ -159,7 +159,7 @@ impl NumericWidth {
 
     /// Whether `from` may flow into `to` along the v1 widening lattice.
     #[must_use]
-    pub fn widening_assignable(from: Self, to: Self) -> bool {
+    pub fn is_widening_assignable(from: Self, to: Self) -> bool {
         if from == to {
             return true;
         }
@@ -490,7 +490,7 @@ pub fn tensor_method_requires_numeric_element(method_name: &str) -> bool {
 
 /// Whether two numeric types are assignable via equality or widening.
 #[must_use]
-pub fn numeric_assignable(types: &TypeTable, from: TypeId, to: TypeId) -> bool {
+pub fn is_numeric_assignable(types: &TypeTable, from: TypeId, to: TypeId) -> bool {
     // WHY: modular words share an integer carrier with `numerus`, but their
     // arithmetic policy is part of the type family. Only explicit `↦`
     // conversion can cross that boundary.
@@ -500,7 +500,7 @@ pub fn numeric_assignable(types: &TypeTable, from: TypeId, to: TypeId) -> bool {
     let from_w = effective_width(types, from);
     let to_w = effective_width(types, to);
     match (from_w, to_w) {
-        (Some(a), Some(b)) => NumericWidth::widening_assignable(a, b),
+        (Some(a), Some(b)) => NumericWidth::is_widening_assignable(a, b),
         _ => false,
     }
 }
@@ -522,7 +522,7 @@ pub fn tensor_element_conversio_allowed(types: &TypeTable, from: TypeId, to: Typ
     if !is_tensor_element_type(types, from) || !is_tensor_element_type(types, to) {
         return false;
     }
-    if numeric_assignable(types, from, to) {
+    if is_numeric_assignable(types, from, to) {
         return true;
     }
     if let (
@@ -536,15 +536,15 @@ pub fn tensor_element_conversio_allowed(types: &TypeTable, from: TypeId, to: Typ
         else {
             return false;
         };
-        NumericWidth::explicit_narrowing_conversio(from_w, to_w)
+        NumericWidth::is_explicit_narrowing_conversio(from_w, to_w)
     }
 }
 
 impl NumericWidth {
     /// Lossy width narrowing allowed only through explicit `↦` (not bare `←`).
     #[must_use]
-    pub fn explicit_narrowing_conversio(from: Self, to: Self) -> bool {
-        if from == to || Self::widening_assignable(from, to) {
+    pub fn is_explicit_narrowing_conversio(from: Self, to: Self) -> bool {
+        if from == to || Self::is_widening_assignable(from, to) {
             return false;
         }
         if let (Some(a), Some(b)) = (from.signed_rank(), to.signed_rank()) {

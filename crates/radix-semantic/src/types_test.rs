@@ -20,7 +20,7 @@ fn allows_assigning_concrete_type_to_ignotum() {
     let textus = types.primitive(Primitive::Textus);
     let ignotum = types.primitive(Primitive::Ignotum);
 
-    assert!(types.assignable(textus, ignotum));
+    assert!(types.is_assignable(textus, ignotum));
 }
 
 #[test]
@@ -29,7 +29,7 @@ fn rejects_assigning_ignotum_to_concrete_type() {
     let ignotum = types.primitive(Primitive::Ignotum);
     let textus = types.primitive(Primitive::Textus);
 
-    assert!(!types.assignable(ignotum, textus));
+    assert!(!types.is_assignable(ignotum, textus));
 }
 
 #[test]
@@ -37,7 +37,7 @@ fn still_assigns_same_type_id() {
     let types = TypeTable::new();
     let ignotum = types.primitive(Primitive::Ignotum);
 
-    assert!(types.assignable(ignotum, ignotum));
+    assert!(types.is_assignable(ignotum, ignotum));
 }
 
 #[test]
@@ -137,10 +137,10 @@ fn instans_coarse_to_fine_widening_assignable() {
     let millis = types.sized_instans(crate::InstansPrecision::Millis);
     let nanos = types.sized_instans(crate::InstansPrecision::Nanos);
 
-    assert!(types.assignable(bare, millis));
-    assert!(types.assignable(millis, nanos));
-    assert!(!types.assignable(nanos, millis));
-    assert!(!types.assignable(millis, bare));
+    assert!(types.is_assignable(bare, millis));
+    assert!(types.is_assignable(millis, nanos));
+    assert!(!types.is_assignable(nanos, millis));
+    assert!(!types.is_assignable(millis, bare));
 }
 
 #[test]
@@ -269,11 +269,11 @@ fn matrix_with_shape_is_distinct_from_tensor() {
         "matrix must not equal tensor"
     );
     assert!(
-        !types.assignable(matrix_a, tensor),
+        !types.is_assignable(matrix_a, tensor),
         "matrix must not assign to tensor implicitly"
     );
     assert!(
-        !types.assignable(tensor, matrix_a),
+        !types.is_assignable(tensor, matrix_a),
         "tensor must not assign to matrix implicitly"
     );
 }
@@ -291,8 +291,8 @@ fn atomic_is_distinct_from_its_element_type() {
     assert!(types.equals(atomic_i32_a, atomic_i32_b));
     assert!(!types.equals(atomic_i32_a, atomic_u32));
     assert!(!types.equals(atomic_i32_a, i32));
-    assert!(!types.assignable(i32, atomic_i32_a));
-    assert!(!types.assignable(atomic_i32_a, i32));
+    assert!(!types.is_assignable(i32, atomic_i32_a));
+    assert!(!types.is_assignable(atomic_i32_a, i32));
 }
 
 #[test]
@@ -340,8 +340,8 @@ fn sized_numeric_widening_assignable_in_type_table() {
     let mut types = TypeTable::new();
     let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
     let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
-    assert!(types.assignable(i32, i64));
-    assert!(!types.assignable(i64, i32));
+    assert!(types.is_assignable(i32, i64));
+    assert!(!types.is_assignable(i64, i32));
 }
 
 #[test]
@@ -384,11 +384,11 @@ fn octeti_unifies_bidirectionally_with_lista_numerus_u8() {
     let lista_u8 = types.array(u8);
 
     assert!(
-        types.assignable(octeti, lista_u8),
+        types.is_assignable(octeti, lista_u8),
         "octeti should widen to lista<numerus<u8>>"
     );
     assert!(
-        types.assignable(lista_u8, octeti),
+        types.is_assignable(lista_u8, octeti),
         "lista<numerus<u8>> should narrow to octeti"
     );
 }
@@ -406,10 +406,10 @@ fn octeti_does_not_unify_with_non_u8_lista() {
     let textus = types.primitive(Primitive::Textus);
     let lista_textus = types.array(textus);
 
-    assert!(!types.assignable(octeti, lista_u16));
-    assert!(!types.assignable(lista_u16, octeti));
-    assert!(!types.assignable(octeti, lista_numerus));
-    assert!(!types.assignable(octeti, lista_textus));
+    assert!(!types.is_assignable(octeti, lista_u16));
+    assert!(!types.is_assignable(lista_u16, octeti));
+    assert!(!types.is_assignable(octeti, lista_numerus));
+    assert!(!types.is_assignable(octeti, lista_textus));
 }
 
 #[test]
@@ -461,13 +461,13 @@ fn nihil_is_not_assignable_to_non_nullable() {
     let numerus = types.primitive(Primitive::Numerus);
 
     // nihil should not assign to a non-nullable type...
-    assert!(!types.assignable(nihil, textus));
-    assert!(!types.assignable(nihil, numerus));
+    assert!(!types.is_assignable(nihil, textus));
+    assert!(!types.is_assignable(nihil, numerus));
     // ...but a non-nullable type should not assign to nihil either.
-    assert!(!types.assignable(textus, nihil));
-    assert!(!types.assignable(numerus, nihil));
+    assert!(!types.is_assignable(textus, nihil));
+    assert!(!types.is_assignable(numerus, nihil));
     // nihil does assign to itself.
-    assert!(types.assignable(nihil, nihil));
+    assert!(types.is_assignable(nihil, nihil));
 }
 
 #[test]
@@ -490,15 +490,15 @@ fn nihil_in_union_makes_assignable_to_nullable_union() {
     let textus_opt = types.intern(Type::Union(vec![textus, nihil]));
 
     assert!(
-        types.assignable(textus, textus_opt),
+        types.is_assignable(textus, textus_opt),
         "textus should assign to textus ∪ nihil"
     );
     assert!(
-        types.assignable(nihil, textus_opt),
+        types.is_assignable(nihil, textus_opt),
         "nihil should assign to textus ∪ nihil"
     );
     assert!(
-        !types.assignable(numerus, textus_opt),
+        !types.is_assignable(numerus, textus_opt),
         "numerus should not assign to textus ∪ nihil"
     );
 }

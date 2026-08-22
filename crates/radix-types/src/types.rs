@@ -34,8 +34,8 @@
 //! sites; MIR and backends treat that boundary as an upstream invariant.
 
 use crate::index::{IndexExpr, IndexId};
-use crate::instans_precision::{instans_assignable, InstansPrecision};
-use crate::numeric_width::{numeric_assignable, NumericWidth};
+use crate::instans_precision::{is_instans_assignable, InstansPrecision};
+use crate::numeric_width::{is_numeric_assignable, NumericWidth};
 use crate::DefId;
 use radix_lexer::Symbol as LexSymbol;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -55,7 +55,7 @@ pub struct TypeId(pub u32);
 /// The table preloads primitives so passes can cheaply request well-known
 /// built-ins, then appends compound and inferred types as semantic information
 /// becomes available. It deliberately exposes structural [`Self::equals`] and
-/// [`Self::assignable`] helpers so callers do not need to know whether two
+/// [`Self::is_assignable`] helpers so callers do not need to know whether two
 /// equivalent shapes were allocated at the same index.
 pub struct TypeTable {
     types: Vec<Type>,
@@ -70,13 +70,13 @@ pub struct TypeTable {
     /// Memo for [`Self::equals`] results by ordered `(TypeId, TypeId)` pair.
     /// Interior-mutable: `equals` takes `&self` and is pure over existing entries.
     equals_memo: RefCell<FxHashMap<(TypeId, TypeId), bool>>,
-    /// Memo for [`Self::assignable`] results by directional `(from, to)` pair.
+    /// Memo for [`Self::is_assignable`] results by directional `(from, to)` pair.
     ///
     /// The key is NOT canonicalized to a `(min, max)` order like
-    /// [`Self::equals_memo`]: `assignable` is directional (widening, optional,
-    /// and `ignotum`-sink rules are one-way), so `assignable(a, b)` and
-    /// `assignable(b, a)` are distinct queries and must not share a memo entry.
-    /// Interior-mutable: `assignable` takes `&self` and is pure over existing
+    /// [`Self::equals_memo`]: `is_assignable` is directional (widening, optional,
+    /// and `ignotum`-sink rules are one-way), so `is_assignable(a, b)` and
+    /// `is_assignable(b, a)` are distinct queries and must not share a memo entry.
+    /// Interior-mutable: `is_assignable` takes `&self` and is pure over existing
     /// entries (the arena is append-only, so results cannot go stale).
     assignable_memo: RefCell<FxHashMap<(TypeId, TypeId), bool>>,
     /// Memo for [`Self::find_equal`] results by candidate [`Type`].
@@ -1043,11 +1043,11 @@ impl TypeTable {
     /// values do not silently become concrete.
     #[must_use]
     #[allow(clippy::match_same_arms)]
-    pub fn assignable(&self, from: TypeId, to: TypeId) -> bool {
+    pub fn is_assignable(&self, from: TypeId, to: TypeId) -> bool {
         if self.equals(from, to) {
             return true;
         }
-        // Directional key: `assignable(a, b)` and `assignable(b, a)` are
+        // Directional key: `is_assignable(a, b)` and `is_assignable(b, a)` are
         // distinct queries (widening / optional / `ignotum`-sink rules are
         // one-way), so unlike `equals_memo` the pair is NOT min/max ordered.
         let key = (from, to);
@@ -1055,27 +1055,27 @@ impl TypeTable {
             return cached;
         }
 
-        let result = self.assignable_inner(from, to);
+        let result = self.is_assignable_inner(from, to);
         self.assignable_memo.borrow_mut().insert(key, result);
         result
     }
 
-    /// Unmemoized recursion core of [`Self::assignable`].
+    /// Unmemoized recursion core of [`Self::is_assignable`].
     ///
     /// Holds the structural match body; recursive calls re-enter the memoized
-    /// [`Self::assignable`], so every subquery is cached too. Split out so the
+    /// [`Self::is_assignable`], so every subquery is cached too. Split out so the
     /// memo plumbing does not count toward the pedantic `too_many_lines` gate
     /// on the public entry point.
     #[allow(clippy::match_same_arms, clippy::too_many_lines)]
-    fn assignable_inner(&self, from: TypeId, to: TypeId) -> bool {
+    fn is_assignable_inner(&self, from: TypeId, to: TypeId) -> bool {
         let from_ty = self.get(from);
         let to_ty = self.get(to);
 
         match (from_ty, to_ty) {
             // Peel alias wrappers so numeric/instans carrier rules fire on
             // the underlying type.
-            (Type::Alias(_, a_inner), _) => self.assignable(*a_inner, to),
-            (_, Type::Alias(_, b_inner)) => self.assignable(from, *b_inner),
+            (Type::Alias(_, a_inner), _) => self.is_assignable(*a_inner, to),
+            (_, Type::Alias(_, b_inner)) => self.is_assignable(from, *b_inner),
 
             // `ignotum` is an unknown sink: values can flow into it, but not out without cast/narrowing.
             (Type::Primitive(Primitive::Ignotum), _) => false,
@@ -1083,18 +1083,18 @@ impl TypeTable {
             (_, Type::Primitive(Primitive::Ignotum)) => true,
 
             (Type::Union(from_types), _) => {
-                from_types.iter().all(|member| self.assignable(*member, to))
+                from_types.iter().all(|member| self.is_assignable(*member, to))
             }
 
             (_, Type::Union(to_types)) => {
-                to_types.iter().any(|member| self.assignable(from, *member))
+                to_types.iter().any(|member| self.is_assignable(from, *member))
             }
 
             // `nihil` can satisfy optional destinations without inventing a concrete inner value.
             (Type::Primitive(Primitive::Nihil), Type::Option(_)) => true,
 
             (Type::Option(from_inner), Type::Option(to_inner)) => {
-                self.assignable(*from_inner, *to_inner)
+                self.is_assignable(*from_inner, *to_inner)
             }
 
             // WHY: bare `←` may assign `Option<T>` into `T`; Rust codegen unwraps.
@@ -1102,19 +1102,19 @@ impl TypeTable {
             (Type::Option(from_inner), _) if matches!(self.get(*from_inner), Type::Tuple(_)) => {
                 false
             }
-            (Type::Option(from_inner), _) => self.assignable(*from_inner, to),
+            (Type::Option(from_inner), _) => self.is_assignable(*from_inner, to),
 
-            (_, Type::Option(inner)) => self.assignable(from, *inner),
+            (_, Type::Option(inner)) => self.is_assignable(from, *inner),
 
             // Numeric widening is implicit; narrowing remains an explicit operation.
             (Type::Primitive(Primitive::Numerus), Type::Primitive(Primitive::Fractus)) => true,
             (from_ty, to_ty) if is_numeric_carrier(from_ty) && is_numeric_carrier(to_ty) => {
-                numeric_assignable(self, from, to)
+                is_numeric_assignable(self, from, to)
             }
 
             // WHY: coarse→fine instans widening is lossless; fine→coarse requires `↦`.
             (from_ty, to_ty) if is_instans_carrier(from_ty) && is_instans_carrier(to_ty) => {
-                instans_assignable(self, from, to)
+                is_instans_assignable(self, from, to)
             }
 
             // ASCII machine text widens to Unicode `textus`. After D17, `'x'`
@@ -1171,34 +1171,34 @@ impl TypeTable {
                     && from_elems
                         .iter()
                         .zip(to_elems.iter())
-                        .all(|(f, t)| self.assignable(*f, *t))
+                        .all(|(f, t)| self.is_assignable(*f, *t))
             }
 
             (Type::Intervallum(from_bound), Type::Intervallum(to_bound)) => {
-                self.assignable(*from_bound, *to_bound)
+                self.is_assignable(*from_bound, *to_bound)
             }
 
             (Type::Array(from_elem), Type::Array(to_elem))
             | (Type::Set(from_elem), Type::Set(to_elem))
             | (Type::Promissum(from_elem), Type::Promissum(to_elem))
             | (Type::Cursor(from_elem), Type::Cursor(to_elem)) => {
-                self.assignable(*from_elem, *to_elem)
+                self.is_assignable(*from_elem, *to_elem)
             }
 
             // Infallible promissum<T> widens to promissum<T ⇥ E> (numquam bottom).
             (Type::PromissumFailable(ft, fe), Type::PromissumFailable(tt, te)) => {
-                self.assignable(*ft, *tt) && self.assignable(*fe, *te)
+                self.is_assignable(*ft, *tt) && self.is_assignable(*fe, *te)
             }
-            (Type::Promissum(ft), Type::PromissumFailable(tt, _te)) => self.assignable(*ft, *tt),
+            (Type::Promissum(ft), Type::PromissumFailable(tt, _te)) => self.is_assignable(*ft, *tt),
             // Failable promises do not narrow to infallible (erases the alternate channel).
             (Type::PromissumFailable(_, _), Type::Promissum(_)) => false,
 
             (Type::AsyncCursor(fi, fe), Type::AsyncCursor(ti, te)) => {
-                self.assignable(*fi, *ti) && self.assignable(*fe, *te)
+                self.is_assignable(*fi, *ti) && self.is_assignable(*fe, *te)
             }
 
             (Type::Map(from_key, from_val), Type::Map(to_key, to_val)) => {
-                self.assignable(*from_key, *to_key) && self.assignable(*from_val, *to_val)
+                self.is_assignable(*from_key, *to_key) && self.is_assignable(*from_val, *to_val)
             }
 
             // Indexed containers: element-covariant, shape/width invariant.
@@ -1206,7 +1206,7 @@ impl TypeTable {
             | (Type::Vector(from_elem, from_shape), Type::Vector(to_elem, to_shape))
             | (Type::Matrix(from_elem, from_shape), Type::Matrix(to_elem, to_shape))
             | (Type::Sparsa(from_elem, from_shape), Type::Sparsa(to_elem, to_shape)) => {
-                self.assignable(*from_elem, *to_elem) && self.index_equals(*from_shape, *to_shape)
+                self.is_assignable(*from_elem, *to_elem) && self.index_equals(*from_shape, *to_shape)
             }
 
             // Bounded buffers: element-covariant, capacity invariant except
@@ -1222,7 +1222,7 @@ impl TypeTable {
                     element: to_elem,
                     capacity: to_cap,
                 },
-            ) => self.assignable(*from_elem, *to_elem) && self.index_equals(*from_cap, *to_cap),
+            ) => self.is_assignable(*from_elem, *to_elem) && self.index_equals(*from_cap, *to_cap),
             (
                 Type::BoundedTextus { capacity: from_cap },
                 Type::BoundedTextus { capacity: to_cap },
@@ -1234,7 +1234,7 @@ impl TypeTable {
             (
                 Type::BoundedAscii { capacity: from_cap },
                 Type::BoundedAscii { capacity: to_cap },
-            ) => self.bounded_ascii_capacity_assignable(*from_cap, *to_cap),
+            ) => self.is_bounded_ascii_capacity_assignable(*from_cap, *to_cap),
             (Type::BoundedAscii { capacity }, Type::Primitive(Primitive::Ascii)) => {
                 self.bounded_ascii_capacity_is_one(*capacity)
             }
@@ -1243,7 +1243,7 @@ impl TypeTable {
         }
     }
 
-    fn bounded_ascii_capacity_assignable(&self, from: IndexId, to: IndexId) -> bool {
+    fn is_bounded_ascii_capacity_assignable(&self, from: IndexId, to: IndexId) -> bool {
         match (self.get_index(from), self.get_index(to)) {
             (IndexExpr::Literal(from), IndexExpr::Literal(to)) => from <= to,
             _ => false,

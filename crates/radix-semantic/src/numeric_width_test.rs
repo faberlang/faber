@@ -81,11 +81,11 @@ fn rejects_float_markers_on_numerus() {
 
 #[test]
 fn widening_lattice_allows_i32_to_i64() {
-    assert!(NumericWidth::widening_assignable(
+    assert!(NumericWidth::is_widening_assignable(
         NumericWidth::I32,
         NumericWidth::I64
     ));
-    assert!(!NumericWidth::widening_assignable(
+    assert!(!NumericWidth::is_widening_assignable(
         NumericWidth::U8,
         NumericWidth::I8
     ));

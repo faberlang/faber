@@ -22,11 +22,11 @@
 //!   plays no role in the subset relation (matching is a name-based set
 //!   membership, design §2.3 "Membership in `I` and `O` is a per-schema
 //!   property").
-//! - **Type-compatibility direction**: `assignable(I.ty, O.ty)` — a value of
+//! - **Type-compatibility direction**: `is_assignable(I.ty, O.ty)` — a value of
 //!   `I`'s column type must be usable where `O` expects one, because
 //!   projection data flows `I → O` (design §4.5 "checked by name and
 //!   compatible type"). The language's own semantic-compatibility relation
-//!   ([`TypeTable::assignable`]) encodes the implicit widening rules
+//!   ([`TypeTable::is_assignable`]) encodes the implicit widening rules
 //!   (`numerus → fractus`, `ascii → textus`, coarse → fine instans), so an
 //!   `O` that *widens* a column type is compatible and an `O` that *narrows*
 //!   one is not.
@@ -132,7 +132,7 @@ fn schema_column_compatible(
         });
     }
     // Projection direction: the value of I's column flows into O's column.
-    if !types.assignable(i_col.ty, o_col.ty) {
+    if !types.is_assignable(i_col.ty, o_col.ty) {
         return Err(SchemaSubsetFailure::IncompatibleType {
             column: o_col.name,
             expected: o_col.ty,

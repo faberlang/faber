@@ -84,7 +84,7 @@ fn allows_assigning_concrete_type_to_ignotum() {
     let textus = types.primitive(Primitive::Textus);
     let ignotum = types.primitive(Primitive::Ignotum);
 
-    assert!(types.assignable(textus, ignotum));
+    assert!(types.is_assignable(textus, ignotum));
 }
 
 // F2 regression: Option<iuncta> must be assignable to ignotum.
@@ -98,9 +98,9 @@ fn option_iuncta_assignable_to_ignotum() {
     let option_pair = types.option(pair);
     let ignotum = types.primitive(Primitive::Ignotum);
 
-    assert!(types.assignable(option_pair, ignotum));
+    assert!(types.is_assignable(option_pair, ignotum));
     // Sanity: Option→Tuple unwrap is still rejected for concrete destinations.
-    assert!(!types.assignable(option_pair, f32));
+    assert!(!types.is_assignable(option_pair, f32));
 }
 
 #[test]
@@ -109,7 +109,7 @@ fn rejects_assigning_ignotum_to_concrete_type() {
     let ignotum = types.primitive(Primitive::Ignotum);
     let textus = types.primitive(Primitive::Textus);
 
-    assert!(!types.assignable(ignotum, textus));
+    assert!(!types.is_assignable(ignotum, textus));
 }
 
 #[test]
@@ -117,7 +117,7 @@ fn still_assigns_same_type_id() {
     let types = TypeTable::new();
     let ignotum = types.primitive(Primitive::Ignotum);
 
-    assert!(types.assignable(ignotum, ignotum));
+    assert!(types.is_assignable(ignotum, ignotum));
 }
 
 #[test]
@@ -270,12 +270,12 @@ fn instans_coarse_to_fine_widening_assignable() {
     let nanos = types.sized_instans(InstansPrecision::Nanos);
 
     // Coarse → fine: assignable.
-    assert!(types.assignable(bare, millis));
-    assert!(types.assignable(bare, micros));
-    assert!(types.assignable(bare, nanos));
-    assert!(types.assignable(millis, micros));
-    assert!(types.assignable(millis, nanos));
-    assert!(types.assignable(micros, nanos));
+    assert!(types.is_assignable(bare, millis));
+    assert!(types.is_assignable(bare, micros));
+    assert!(types.is_assignable(bare, nanos));
+    assert!(types.is_assignable(millis, micros));
+    assert!(types.is_assignable(millis, nanos));
+    assert!(types.is_assignable(micros, nanos));
 }
 
 #[test]
@@ -287,16 +287,16 @@ fn instans_fine_to_coarse_not_assignable() {
     let nanos = types.sized_instans(InstansPrecision::Nanos);
 
     // Fine → coarse: not assignable.
-    assert!(!types.assignable(nanos, micros));
-    assert!(!types.assignable(nanos, millis));
-    assert!(!types.assignable(nanos, bare));
-    assert!(!types.assignable(micros, millis));
-    assert!(!types.assignable(micros, bare));
-    assert!(!types.assignable(millis, bare));
+    assert!(!types.is_assignable(nanos, micros));
+    assert!(!types.is_assignable(nanos, millis));
+    assert!(!types.is_assignable(nanos, bare));
+    assert!(!types.is_assignable(micros, millis));
+    assert!(!types.is_assignable(micros, bare));
+    assert!(!types.is_assignable(millis, bare));
 
     // Same precision is still assignable.
-    assert!(types.assignable(millis, millis));
-    assert!(types.assignable(bare, bare));
+    assert!(types.is_assignable(millis, millis));
+    assert!(types.is_assignable(bare, bare));
 }
 
 #[test]
@@ -427,11 +427,11 @@ fn matrix_with_shape_is_distinct_from_tensor() {
         "matrix must not equal tensor"
     );
     assert!(
-        !types.assignable(matrix_a, tensor),
+        !types.is_assignable(matrix_a, tensor),
         "matrix must not assign to tensor implicitly"
     );
     assert!(
-        !types.assignable(tensor, matrix_a),
+        !types.is_assignable(tensor, matrix_a),
         "tensor must not assign to matrix implicitly"
     );
 }
@@ -449,8 +449,8 @@ fn atomic_is_distinct_from_its_element_type() {
     assert!(types.equals(atomic_i32_a, atomic_i32_b));
     assert!(!types.equals(atomic_i32_a, atomic_u32));
     assert!(!types.equals(atomic_i32_a, i32));
-    assert!(!types.assignable(i32, atomic_i32_a));
-    assert!(!types.assignable(atomic_i32_a, i32));
+    assert!(!types.is_assignable(i32, atomic_i32_a));
+    assert!(!types.is_assignable(atomic_i32_a, i32));
 }
 
 #[test]
@@ -458,8 +458,8 @@ fn sized_numeric_widening_assignable_in_type_table() {
     let mut types = TypeTable::new();
     let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
     let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
-    assert!(types.assignable(i32, i64));
-    assert!(!types.assignable(i64, i32));
+    assert!(types.is_assignable(i32, i64));
+    assert!(!types.is_assignable(i64, i32));
 }
 
 #[test]
@@ -574,11 +574,11 @@ fn octeti_unifies_bidirectionally_with_lista_numerus_u8() {
     let lista_u8 = types.array(u8);
 
     assert!(
-        types.assignable(octeti, lista_u8),
+        types.is_assignable(octeti, lista_u8),
         "octeti should widen to lista<numerus<u8>>"
     );
     assert!(
-        types.assignable(lista_u8, octeti),
+        types.is_assignable(lista_u8, octeti),
         "lista<numerus<u8>> should narrow to octeti"
     );
 }
@@ -596,10 +596,10 @@ fn octeti_does_not_unify_with_non_u8_lista() {
     let textus = types.primitive(Primitive::Textus);
     let lista_textus = types.array(textus);
 
-    assert!(!types.assignable(octeti, lista_u16));
-    assert!(!types.assignable(lista_u16, octeti));
-    assert!(!types.assignable(octeti, lista_numerus));
-    assert!(!types.assignable(octeti, lista_textus));
+    assert!(!types.is_assignable(octeti, lista_u16));
+    assert!(!types.is_assignable(lista_u16, octeti));
+    assert!(!types.is_assignable(octeti, lista_numerus));
+    assert!(!types.is_assignable(octeti, lista_textus));
 }
 
 #[test]
@@ -715,27 +715,27 @@ fn assignable_memo_keeps_directional_answers_stable() {
     let option_numerus = types.option(numerus);
 
     // Repeated same-direction queries agree (memo hit must not flip answers).
-    assert!(types.assignable(nihil, option_numerus));
+    assert!(types.is_assignable(nihil, option_numerus));
     assert!(
-        types.assignable(nihil, option_numerus),
+        types.is_assignable(nihil, option_numerus),
         "memoized assignable must remain true"
     );
 
     // Directional: `option<T>` does NOT flow into `nihil` even though the
     // reverse (`nihil` → `option<T>`) is accepted. A min/max-ordered memo key
     // (the `equals` shape) would conflate the reversed pair and return the
-    // cached wrong answer, so `assignable` keys the memo by (from, to) order.
-    assert!(!types.assignable(option_numerus, nihil));
+    // cached wrong answer, so `is_assignable` keys the memo by (from, to) order.
+    assert!(!types.is_assignable(option_numerus, nihil));
     assert!(
-        !types.assignable(option_numerus, nihil),
+        !types.is_assignable(option_numerus, nihil),
         "memoized assignable must remain false"
     );
 
     // One-way `ignotum` sink: concrete flows in, unknown does not flow out.
-    assert!(types.assignable(numerus, ignotum));
-    assert!(!types.assignable(ignotum, numerus));
+    assert!(types.is_assignable(numerus, ignotum));
+    assert!(!types.is_assignable(ignotum, numerus));
     assert!(
-        !types.assignable(ignotum, numerus),
+        !types.is_assignable(ignotum, numerus),
         "directional memo key must not conflate (ignotum, numerus) with (numerus, ignotum)"
     );
 }
@@ -757,8 +757,8 @@ fn assignable_memo_is_rebuilt_fresh_by_snapshot_restore() {
     let option_numerus = types.option(numerus);
 
     // Populate the memo with directional answers.
-    assert!(types.assignable(nihil, option_numerus));
-    assert!(!types.assignable(option_numerus, nihil));
+    assert!(types.is_assignable(nihil, option_numerus));
+    assert!(!types.is_assignable(option_numerus, nihil));
     assert!(
         !types.assignable_memo.borrow().is_empty(),
         "directional queries must populate the memo"
@@ -774,14 +774,14 @@ fn assignable_memo_is_rebuilt_fresh_by_snapshot_restore() {
     );
 
     // Re-query recomputes and agrees with the pre-restore answers.
-    assert!(restored.assignable(nihil, option_numerus));
-    assert!(!restored.assignable(option_numerus, nihil));
+    assert!(restored.is_assignable(nihil, option_numerus));
+    assert!(!restored.is_assignable(option_numerus, nihil));
 
     // Append-only arena: interning more types after restore must not flip any
     // answer computed against the restored arena.
     let _extra = restored.array(ignotum);
-    assert!(restored.assignable(nihil, option_numerus));
-    assert!(!restored.assignable(option_numerus, nihil));
+    assert!(restored.is_assignable(nihil, option_numerus));
+    assert!(!restored.is_assignable(option_numerus, nihil));
 }
 
 // --- PRP-017 F2 regression: find_equal uses equals, not raw TypeId == ---
@@ -927,9 +927,9 @@ fn assignable_rejects_cross_primitives() {
     let textus = types.primitive(Primitive::Textus);
     let numerus = types.primitive(Primitive::Numerus);
 
-    assert!(!types.assignable(textus, numerus));
-    assert!(!types.assignable(numerus, textus));
-    assert!(!types.assignable(textus, types.primitive(Primitive::Fractus)));
+    assert!(!types.is_assignable(textus, numerus));
+    assert!(!types.is_assignable(numerus, textus));
+    assert!(!types.is_assignable(textus, types.primitive(Primitive::Fractus)));
 }
 
 #[test]
@@ -938,7 +938,7 @@ fn assignable_accepts_same_primitive() {
     let a = types.primitive(Primitive::Textus);
     let b = types.primitive(Primitive::Textus);
 
-    assert!(types.assignable(a, b));
+    assert!(types.is_assignable(a, b));
 }
 
 #[test]
@@ -966,8 +966,8 @@ fn sized_numeric_mixed_sign_not_assignable() {
     let i8 = types.sized_numeric(Primitive::Numerus, NumericWidth::I8);
     let u8 = types.sized_numeric(Primitive::Numerus, NumericWidth::U8);
 
-    assert!(!types.assignable(i8, u8));
-    assert!(!types.assignable(u8, i8));
+    assert!(!types.is_assignable(i8, u8));
+    assert!(!types.is_assignable(u8, i8));
 }
 
 #[test]
@@ -1012,12 +1012,12 @@ fn f003_alias_wrapped_sized_numeric_widening_assignable() {
     let alias_i64 = types.intern(Type::Alias(DefId(2), i64_id));
 
     assert!(
-        types.assignable(alias_i32, alias_i64),
+        types.is_assignable(alias_i32, alias_i64),
         "F-003: alias-wrapped SizedNumeric I32 must be assignable to alias-wrapped I64"
     );
     // Reverse: narrowing is still rejected.
     assert!(
-        !types.assignable(alias_i64, alias_i32),
+        !types.is_assignable(alias_i64, alias_i32),
         "F-003: alias-wrapped SizedNumeric I64 must NOT be assignable to I32"
     );
 }
@@ -1032,7 +1032,7 @@ fn f003_alias_wrapped_numerus_to_fractus_assignable() {
     let alias_fractus = types.intern(Type::Alias(DefId(4), fractus));
 
     assert!(
-        types.assignable(alias_numerus, alias_fractus),
+        types.is_assignable(alias_numerus, alias_fractus),
         "F-003: alias-wrapped numerus must be assignable to alias-wrapped fractus"
     );
 }
@@ -1048,11 +1048,11 @@ fn f003_alias_wrapped_octeti_lista_unify_still_works() {
     let alias_lista_u8 = types.intern(Type::Alias(DefId(6), lista_u8));
 
     assert!(
-        types.assignable(alias_octeti, alias_lista_u8),
+        types.is_assignable(alias_octeti, alias_lista_u8),
         "F-003: alias-wrapped octeti must widen to alias-wrapped lista<numerus<u8>>"
     );
     assert!(
-        types.assignable(alias_lista_u8, alias_octeti),
+        types.is_assignable(alias_lista_u8, alias_octeti),
         "F-003: alias-wrapped lista<numerus<u8>> must narrow to alias-wrapped octeti"
     );
 }
@@ -1067,12 +1067,12 @@ fn f003_alias_wrapped_instans_carrier_assignable() {
     let alias_millis = types.intern(Type::Alias(DefId(8), millis));
 
     assert!(
-        types.assignable(alias_bare, alias_millis),
+        types.is_assignable(alias_bare, alias_millis),
         "F-003: alias-wrapped bare instans must be assignable to alias-wrapped instans<ms>"
     );
     // Fine→coarse through alias is still rejected.
     assert!(
-        !types.assignable(alias_millis, alias_bare),
+        !types.is_assignable(alias_millis, alias_bare),
         "F-003: alias-wrapped instans<ms> must NOT be assignable to alias-wrapped bare instans"
     );
 }
@@ -1312,12 +1312,12 @@ fn f066_tuple_covariant_assignable() {
     let tuple_i64_i64 = types.tuple(vec![i64, i64]);
 
     assert!(
-        types.assignable(tuple_i32_i64, tuple_i64_i64),
+        types.is_assignable(tuple_i32_i64, tuple_i64_i64),
         "F-066: Tuple<i32,i64> must be assignable to Tuple<i64,i64> (element-covariant)"
     );
     // Narrowing element → not assignable.
     assert!(
-        !types.assignable(tuple_i64_i64, tuple_i32_i64),
+        !types.is_assignable(tuple_i64_i64, tuple_i32_i64),
         "F-066: Tuple<i64,i64> must NOT be assignable to Tuple<i32,i64> (narrowing element)"
     );
 }
@@ -1330,7 +1330,7 @@ fn f066_tuple_different_length_not_assignable() {
     let triple = types.tuple(vec![i32, i32, i32]);
 
     assert!(
-        !types.assignable(pair, triple),
+        !types.is_assignable(pair, triple),
         "F-066: different-length tuples must not be assignable"
     );
 }
@@ -1351,11 +1351,11 @@ fn f066_applied_invariant_assignable() {
         "Applied<numerus> equals Applied<i64> because numerus == i64"
     );
     assert!(
-        types.assignable(applied_numerus, applied_i64),
+        types.is_assignable(applied_numerus, applied_i64),
         "F-066: Applied<numerus> assignable to Applied<i64> via invariant equals"
     );
     assert!(
-        types.assignable(applied_numerus, applied_numerus),
+        types.is_assignable(applied_numerus, applied_numerus),
         "F-066: same Applied must be self-assignable"
     );
 }
@@ -1370,11 +1370,11 @@ fn f066_intervallum_covariant_assignable() {
     let inter_i64 = types.intervallum(i64);
 
     assert!(
-        types.assignable(inter_i32, inter_i64),
+        types.is_assignable(inter_i32, inter_i64),
         "F-066: Intervallum<i32> must be assignable to Intervallum<i64> (covariant)"
     );
     assert!(
-        !types.assignable(inter_i64, inter_i32),
+        !types.is_assignable(inter_i64, inter_i32),
         "F-066: Intervallum<i64> must NOT be assignable to Intervallum<i32> (narrowing bound)"
     );
 }
@@ -1389,29 +1389,29 @@ fn f066_collection_covariant_assignable() {
     let lista_i64 = types.array(i64);
 
     assert!(
-        types.assignable(lista_i32, lista_i64),
+        types.is_assignable(lista_i32, lista_i64),
         "F-066: lista<numerus<i32>> must be assignable to lista<numerus<i64>> (covariant)"
     );
     assert!(
-        !types.assignable(lista_i64, lista_i32),
+        !types.is_assignable(lista_i64, lista_i32),
         "F-066: lista<numerus<i64>> must NOT be assignable to lista<numerus<i32>> (narrowing)"
     );
 
     // Set, Promissum, Cursor also covariant.
     let set_i32 = types.set(i32);
     let set_i64 = types.set(i64);
-    assert!(types.assignable(set_i32, set_i64));
-    assert!(!types.assignable(set_i64, set_i32));
+    assert!(types.is_assignable(set_i32, set_i64));
+    assert!(!types.is_assignable(set_i64, set_i32));
 
     let prom_i32 = types.promissum(i32);
     let prom_i64 = types.promissum(i64);
-    assert!(types.assignable(prom_i32, prom_i64));
-    assert!(!types.assignable(prom_i64, prom_i32));
+    assert!(types.is_assignable(prom_i32, prom_i64));
+    assert!(!types.is_assignable(prom_i64, prom_i32));
 
     let cur_i32 = types.cursor(i32);
     let cur_i64 = types.cursor(i64);
-    assert!(types.assignable(cur_i32, cur_i64));
-    assert!(!types.assignable(cur_i64, cur_i32));
+    assert!(types.is_assignable(cur_i32, cur_i64));
+    assert!(!types.is_assignable(cur_i64, cur_i32));
 }
 
 #[test]
@@ -1424,18 +1424,18 @@ fn f066_map_covariant_assignable() {
     let map_i64_i64 = types.map(i64, i64);
 
     assert!(
-        types.assignable(map_i32_i32, map_i64_i64),
+        types.is_assignable(map_i32_i32, map_i64_i64),
         "F-066: tabula<i32,i32> must be assignable to tabula<i64,i64> (covariant)"
     );
     assert!(
-        !types.assignable(map_i64_i64, map_i32_i32),
+        !types.is_assignable(map_i64_i64, map_i32_i32),
         "F-066: tabula<i64,i64> must NOT be assignable to tabula<i32,i32> (narrowing)"
     );
 
     // Mixed: key widens, value narrows → not assignable.
     let map_i64_i32 = types.map(i64, i32);
     assert!(
-        !types.assignable(map_i64_i64, map_i64_i32),
+        !types.is_assignable(map_i64_i64, map_i64_i32),
         "F-066: value narrowing alone blocks map assignability"
     );
 }
@@ -1458,11 +1458,11 @@ fn f066_tensor_vector_matrix_sparsa_element_covariant_shape_invariant() {
     let t_f32_2x4 = types.tensor_with_shape(f32, shape_2x4);
 
     assert!(
-        types.assignable(t_f32_2x3, t_f64_2x3),
+        types.is_assignable(t_f32_2x3, t_f64_2x3),
         "F-066: tensor<F32,[2,3]> must be assignable to tensor<F64,[2,3]> (element covariant)"
     );
     assert!(
-        !types.assignable(t_f32_2x3, t_f32_2x4),
+        !types.is_assignable(t_f32_2x3, t_f32_2x4),
         "F-066: tensor<F32,[2,3]> must NOT be assignable to tensor<F32,[2,4]> (shape invariant)"
     );
 
@@ -1470,22 +1470,22 @@ fn f066_tensor_vector_matrix_sparsa_element_covariant_shape_invariant() {
     let v_f32_w2 = types.vector_with_width(f32, dim2);
     let v_f64_w2 = types.vector_with_width(f64, dim2);
     let v_f32_w3 = types.vector_with_width(f32, dim3);
-    assert!(types.assignable(v_f32_w2, v_f64_w2));
-    assert!(!types.assignable(v_f32_w2, v_f32_w3));
+    assert!(types.is_assignable(v_f32_w2, v_f64_w2));
+    assert!(!types.is_assignable(v_f32_w2, v_f32_w3));
 
     // Matrix: element covariant, shape invariant.
     let m_f32_2x3 = types.matrix_with_shape(f32, shape_2x3);
     let m_f64_2x3 = types.matrix_with_shape(f64, shape_2x3);
     let m_f32_2x4 = types.matrix_with_shape(f32, shape_2x4);
-    assert!(types.assignable(m_f32_2x3, m_f64_2x3));
-    assert!(!types.assignable(m_f32_2x3, m_f32_2x4));
+    assert!(types.is_assignable(m_f32_2x3, m_f64_2x3));
+    assert!(!types.is_assignable(m_f32_2x3, m_f32_2x4));
 
     // Sparsa: element covariant, shape invariant.
     let s_f32_2x3 = types.sparsa_with_shape(f32, shape_2x3);
     let s_f64_2x3 = types.sparsa_with_shape(f64, shape_2x3);
     let s_f32_2x4 = types.sparsa_with_shape(f32, shape_2x4);
-    assert!(types.assignable(s_f32_2x3, s_f64_2x3));
-    assert!(!types.assignable(s_f32_2x3, s_f32_2x4));
+    assert!(types.is_assignable(s_f32_2x3, s_f64_2x3));
+    assert!(!types.is_assignable(s_f32_2x3, s_f32_2x4));
 }
 
 #[test]
@@ -1493,7 +1493,7 @@ fn f066_atomic_not_assignable_across_elements() {
     // Atomic wrappers are storage-sensitive: atomic<i32> must not be assignable
     // to atomic<i64> even though i32→i64 is widening for bare numerus (F-066
     // intentional exclusion). Same-TypeId atomic is trivially assignable via
-    // the top-level `equals` fast-path in `assignable`.
+    // the top-level `equals` fast-path in `is_assignable`.
     let mut types = TypeTable::new();
     let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
     let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
@@ -1501,15 +1501,15 @@ fn f066_atomic_not_assignable_across_elements() {
     let atomic_i64 = types.atomic(i64);
 
     assert!(
-        !types.assignable(atomic_i32, atomic_i64),
+        !types.is_assignable(atomic_i32, atomic_i64),
         "F-066: atomic<i32> must NOT be assignable to atomic<i64> (storage-sensitive)"
     );
     // Same element → same TypeId is trivially assignable (top-level equals).
-    assert!(types.assignable(atomic_i32, atomic_i32));
+    assert!(types.is_assignable(atomic_i32, atomic_i32));
 
     // Element type not assignable to atomic wrapper.
-    assert!(!types.assignable(i32, atomic_i32));
-    assert!(!types.assignable(atomic_i32, i32));
+    assert!(!types.is_assignable(i32, atomic_i32));
+    assert!(!types.is_assignable(atomic_i32, i32));
 }
 
 #[test]
@@ -1522,7 +1522,7 @@ fn infallible_promissum_widens_to_failable() {
 
     // promissum<T> widens to promissum<T ⇥ E> (numquam bottom channel).
     assert!(
-        types.assignable(infallible, failable),
+        types.is_assignable(infallible, failable),
         "infallible promissum<T> must widen to promissum<T ⇥ E>"
     );
 }
@@ -1537,7 +1537,7 @@ fn failable_promissum_does_not_narrow_to_infallible() {
 
     // Failable promises must NOT narrow to infallible (erases alternate channel).
     assert!(
-        !types.assignable(failable, infallible),
+        !types.is_assignable(failable, infallible),
         "failable promissum<T ⇥ E> must NOT narrow to promissum<T>"
     );
 }
@@ -1553,12 +1553,12 @@ fn failable_promissum_assignable_checks_both_channels() {
 
     // Alternate channel mismatch: textus not assignable to numerus.
     assert!(
-        !types.assignable(a, b),
+        !types.is_assignable(a, b),
         "failable promissum assignability must check both channels"
     );
 
     // Same channels: assignable.
-    assert!(types.assignable(a, a));
+    assert!(types.is_assignable(a, a));
 }
 
 // --- BB-2: bounded buffer type identity ---
@@ -1593,14 +1593,14 @@ fn bounded_forms_are_distinct_from_bare_primitives_and_each_other() {
     );
     assert!(!types.equals(octeti8, octeti), "octeti<8> ≠ octeti");
 
-    assert!(!types.assignable(ascii8, ascii));
-    assert!(!types.assignable(ascii, ascii8));
-    assert!(types.assignable(ascii8, ascii9));
-    assert!(!types.assignable(ascii9, ascii8));
-    assert!(!types.assignable(lista8, lista));
-    assert!(!types.assignable(lista, lista8));
-    assert!(types.assignable(ascii8, ascii8));
-    assert!(types.assignable(lista8, lista8));
+    assert!(!types.is_assignable(ascii8, ascii));
+    assert!(!types.is_assignable(ascii, ascii8));
+    assert!(types.is_assignable(ascii8, ascii9));
+    assert!(!types.is_assignable(ascii9, ascii8));
+    assert!(!types.is_assignable(lista8, lista));
+    assert!(!types.is_assignable(lista, lista8));
+    assert!(types.is_assignable(ascii8, ascii8));
+    assert!(types.is_assignable(lista8, lista8));
 
     assert!(matches!(types.get(lista), Type::Array(_)));
     assert!(matches!(
@@ -1647,17 +1647,17 @@ fn bounded_ascii_one_assigns_to_textus_like_bare_ascii() {
     let ascii1 = types.bounded_ascii(n1);
     let ascii8 = types.bounded_ascii(n8);
 
-    assert!(types.assignable(ascii, textus), "bare ascii → textus");
+    assert!(types.is_assignable(ascii, textus), "bare ascii → textus");
     assert!(
-        types.assignable(ascii1, textus),
+        types.is_assignable(ascii1, textus),
         "ascii<1> → textus (D17 payload widening)"
     );
     assert!(
-        !types.assignable(ascii8, textus),
+        !types.is_assignable(ascii8, textus),
         "ascii<8> ↛ textus until BB-4"
     );
-    assert!(!types.assignable(textus, ascii1), "textus ↛ ascii<1>");
-    assert!(types.assignable(ascii1, ascii), "ascii<1> → ascii (D17)");
+    assert!(!types.is_assignable(textus, ascii1), "textus ↛ ascii<1>");
+    assert!(types.is_assignable(ascii1, ascii), "ascii<1> → ascii (D17)");
 }
 
 #[test]

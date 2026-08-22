@@ -28,9 +28,9 @@ use super::*;
 /// Whether unification is a symmetric inference join or a directional assignment.
 #[derive(Copy, Clone)]
 enum UnifyPolicy {
-    /// Accept widening in either direction (`assignable(a, b) || assignable(b, a)`).
+    /// Accept widening in either direction (`is_assignable(a, b) || is_assignable(b, a)`).
     Join,
-    /// Enforce source-to-destination flow (`assignable(left, right)` only).
+    /// Enforce source-to-destination flow (`is_assignable(left, right)` only).
     Assign,
 }
 
@@ -290,7 +290,7 @@ impl TypeChecker<'_> {
     /// a larger one. Unknown/index-parameter capacities fail closed here;
     /// equality is handled by the `TypeTable` index relation before this
     /// helper is needed.
-    fn bounded_ascii_capacity_assignable(
+    fn is_bounded_ascii_capacity_assignable(
         &mut self,
         from: crate::IndexId,
         to: crate::IndexId,
@@ -476,7 +476,7 @@ impl TypeChecker<'_> {
                 // Capacity widening is directional assignment only. Joins and
                 // equality-shaped inference remain invariant in `N`.
                 if matches!(policy, UnifyPolicy::Assign)
-                    && self.bounded_ascii_capacity_assignable(ca, cb)
+                    && self.is_bounded_ascii_capacity_assignable(ca, cb)
                 {
                     return right;
                 }
@@ -534,15 +534,15 @@ impl TypeChecker<'_> {
             }
             _ => match policy {
                 UnifyPolicy::Join => {
-                    if self.types.assignable(left, right) {
+                    if self.types.is_assignable(left, right) {
                         return right;
                     }
-                    if self.types.assignable(right, left) {
+                    if self.types.is_assignable(right, left) {
                         return left;
                     }
                 }
                 UnifyPolicy::Assign => {
-                    if self.types.assignable(left, right) {
+                    if self.types.is_assignable(left, right) {
                         return right;
                     }
                 }

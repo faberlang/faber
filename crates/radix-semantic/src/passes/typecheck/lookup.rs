@@ -430,7 +430,7 @@ impl TypeChecker<'_> {
     /// per-element casts.
     ///
     /// `nihil` stays the primitive nil type here; optional/nullability acceptance
-    /// is decided later by unification, coalescing, and `TypeTable::assignable`.
+    /// is decided later by unification, coalescing, and `TypeTable::is_assignable`.
     pub fn literal_type(
         &mut self,
         lit: &HirLiteral,
@@ -635,7 +635,7 @@ impl TypeChecker<'_> {
         };
 
         let textus = self.textus_type();
-        if !self.types.assignable(textus, key_ty) {
+        if !self.types.is_assignable(textus, key_ty) {
             let key_span = members.first().map_or(span, |member| member.key_span);
             self.error_issue(
                 SemanticErrorKind::TypeMismatch,
@@ -663,7 +663,7 @@ impl TypeChecker<'_> {
             }
 
             let inferred = self.json_scalar_value_type(&member.value);
-            if !(self.types.assignable(inferred, value_ty) || nested && accepts_nested) {
+            if !(self.types.is_assignable(inferred, value_ty) || nested && accepts_nested) {
                 self.error_issue(
                     SemanticErrorKind::TypeMismatch,
                     ISSUE_JSON_VALUE_TYPE_MISMATCH,

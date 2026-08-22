@@ -5,7 +5,7 @@
 //! between ranks behave as expected.
 
 use super::instans_precision::{
-    instans_assignable, InstansPrecision, InstansPrecisionError, InstansPrecisionRank,
+    is_instans_assignable, InstansPrecision, InstansPrecisionError, InstansPrecisionRank,
 };
 use crate::{Primitive, TypeTable};
 
@@ -43,15 +43,15 @@ fn faber_marker_roundtrips_parsed_precisions() {
 
 #[test]
 fn instans_precision_widening_lattice() {
-    assert!(InstansPrecisionRank::widening_assignable(
+    assert!(InstansPrecisionRank::is_widening_assignable(
         InstansPrecisionRank::Seconds,
         InstansPrecisionRank::Millis
     ));
-    assert!(InstansPrecisionRank::widening_assignable(
+    assert!(InstansPrecisionRank::is_widening_assignable(
         InstansPrecisionRank::Millis,
         InstansPrecisionRank::Nanos
     ));
-    assert!(!InstansPrecisionRank::widening_assignable(
+    assert!(!InstansPrecisionRank::is_widening_assignable(
         InstansPrecisionRank::Nanos,
         InstansPrecisionRank::Millis
     ));
@@ -64,8 +64,8 @@ fn instans_assignable_in_type_table() {
     let millis = types.sized_instans(InstansPrecision::Millis);
     let nanos = types.sized_instans(InstansPrecision::Nanos);
 
-    assert!(instans_assignable(&types, bare, millis));
-    assert!(instans_assignable(&types, millis, nanos));
-    assert!(!instans_assignable(&types, nanos, millis));
-    assert!(!instans_assignable(&types, millis, bare));
+    assert!(is_instans_assignable(&types, bare, millis));
+    assert!(is_instans_assignable(&types, millis, nanos));
+    assert!(!is_instans_assignable(&types, nanos, millis));
+    assert!(!is_instans_assignable(&types, millis, bare));
 }

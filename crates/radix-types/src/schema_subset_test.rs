@@ -328,7 +328,7 @@ fn nullability_tightening_is_rejected_with_column_identity() {
 fn widening_o_column_type_is_compatible() {
     // Projection-direction consequence: an O that *widens* a column type is a
     // compatible subset (numerus -> fractus is the language's implicit
-    // widening; TypeTable::assignable).
+    // widening; TypeTable::is_assignable).
     let mut interner = Interner::new();
     let types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);

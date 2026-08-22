@@ -3,7 +3,7 @@
 //! The assignment-path probe is recorded here first, fixture before claim:
 //! `const T y ← x` compiles **outside** any null-check block because the
 //! source spelling `T ∪ null` lowers to `Type::Option(T)` (hir/lower/types.rs
-//! `lower_union_type`) and `TypeTable::assignable` permits `Option(T) → T`
+//! `lower_union_type`) and `TypeTable::is_assignable` permits `Option(T) → T`
 //! assignment generally (implicit unwrap; Rust codegen unwraps). The null
 //! check is therefore NOT the assignment mechanism — assignment is not
 //! block-sensitive.
@@ -33,8 +33,8 @@ use crate::test_support;
 fn probe_assignment_unwraps_option_outside_null_check() {
     // `fixum textus y ← x` compiles with `x : textus ∪ nihil` and NO null
     // check anywhere: assignment is not a null-check-block typechecker
-    // behavior. The mechanism is `TypeTable::assignable`'s
-    // `(Type::Option(inner), _) => assignable(inner, to)` implicit unwrap.
+    // behavior. The mechanism is `TypeTable::is_assignable`'s
+    // `(Type::Option(inner), _) => is_assignable(inner, to)` implicit unwrap.
     test_support::assert_accepts(
         "functio f(textus ∪ nihil x) → textus {\n    fixum textus y ← x\n    redde y\n}",
     );

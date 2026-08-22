@@ -588,7 +588,7 @@ impl Validator<'_, '_> {
         if !self
             .context
             .types
-            .assignable(from.semantic_id(), to.semantic_id())
+            .is_assignable(from.semantic_id(), to.semantic_id())
         {
             self.error(span, message);
         }
@@ -611,7 +611,7 @@ impl Validator<'_, '_> {
         if self
             .context
             .types
-            .assignable(found.semantic_id(), expected.semantic_id())
+            .is_assignable(found.semantic_id(), expected.semantic_id())
         {
             return;
         }

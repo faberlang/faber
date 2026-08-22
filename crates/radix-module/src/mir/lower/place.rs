@@ -357,7 +357,7 @@ impl FunctionBuilder<'_> {
         if self.types.nullable_inner(use_ty.semantic_id()).is_some()
             || !self
                 .types
-                .assignable(inner_ty.semantic_id(), use_ty.semantic_id())
+                .is_assignable(inner_ty.semantic_id(), use_ty.semantic_id())
         {
             return Some(place);
         }

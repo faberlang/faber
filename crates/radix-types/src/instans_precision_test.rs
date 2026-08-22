@@ -2,7 +2,7 @@
 //! lattice (coarse→fine assignable, fine→coarse not), and assignment in
 //! [`TypeTable`].
 
-use crate::{instans_assignable, InstansPrecision, InstansPrecisionError, InstansPrecisionRank};
+use crate::{is_instans_assignable, InstansPrecision, InstansPrecisionError, InstansPrecisionRank};
 use crate::{Primitive, TypeTable};
 
 #[test]
@@ -39,11 +39,11 @@ fn faber_marker_roundtrips_parsed_precisions() {
 
 #[test]
 fn widening_assignable_coarse_to_fine_seconds() {
-    assert!(InstansPrecisionRank::widening_assignable(
+    assert!(InstansPrecisionRank::is_widening_assignable(
         InstansPrecisionRank::Seconds,
         InstansPrecisionRank::Millis
     ));
-    assert!(InstansPrecisionRank::widening_assignable(
+    assert!(InstansPrecisionRank::is_widening_assignable(
         InstansPrecisionRank::Seconds,
         InstansPrecisionRank::Micros
     ));
@@ -51,11 +51,11 @@ fn widening_assignable_coarse_to_fine_seconds() {
 
 #[test]
 fn widening_assignable_coarse_to_fine_millis() {
-    assert!(InstansPrecisionRank::widening_assignable(
+    assert!(InstansPrecisionRank::is_widening_assignable(
         InstansPrecisionRank::Millis,
         InstansPrecisionRank::Micros
     ));
-    assert!(InstansPrecisionRank::widening_assignable(
+    assert!(InstansPrecisionRank::is_widening_assignable(
         InstansPrecisionRank::Millis,
         InstansPrecisionRank::Nanos
     ));
@@ -63,7 +63,7 @@ fn widening_assignable_coarse_to_fine_millis() {
 
 #[test]
 fn widening_assignable_coarse_to_fine_micros() {
-    assert!(InstansPrecisionRank::widening_assignable(
+    assert!(InstansPrecisionRank::is_widening_assignable(
         InstansPrecisionRank::Micros,
         InstansPrecisionRank::Nanos
     ));
@@ -71,11 +71,11 @@ fn widening_assignable_coarse_to_fine_micros() {
 
 #[test]
 fn widening_assignable_fine_to_coarse_not_nanos() {
-    assert!(!InstansPrecisionRank::widening_assignable(
+    assert!(!InstansPrecisionRank::is_widening_assignable(
         InstansPrecisionRank::Nanos,
         InstansPrecisionRank::Micros
     ));
-    assert!(!InstansPrecisionRank::widening_assignable(
+    assert!(!InstansPrecisionRank::is_widening_assignable(
         InstansPrecisionRank::Nanos,
         InstansPrecisionRank::Millis
     ));
@@ -83,11 +83,11 @@ fn widening_assignable_fine_to_coarse_not_nanos() {
 
 #[test]
 fn widening_assignable_fine_to_coarse_not_micros() {
-    assert!(!InstansPrecisionRank::widening_assignable(
+    assert!(!InstansPrecisionRank::is_widening_assignable(
         InstansPrecisionRank::Micros,
         InstansPrecisionRank::Millis
     ));
-    assert!(!InstansPrecisionRank::widening_assignable(
+    assert!(!InstansPrecisionRank::is_widening_assignable(
         InstansPrecisionRank::Micros,
         InstansPrecisionRank::Seconds
     ));
@@ -100,9 +100,9 @@ fn instans_assignable_bare_to_sized() {
     let millis = types.sized_instans(InstansPrecision::Millis);
     let micros = types.sized_instans(InstansPrecision::Micros);
     let nanos = types.sized_instans(InstansPrecision::Nanos);
-    assert!(instans_assignable(&types, bare, millis));
-    assert!(instans_assignable(&types, bare, micros));
-    assert!(instans_assignable(&types, bare, nanos));
+    assert!(is_instans_assignable(&types, bare, millis));
+    assert!(is_instans_assignable(&types, bare, micros));
+    assert!(is_instans_assignable(&types, bare, nanos));
 }
 
 #[test]
@@ -111,9 +111,9 @@ fn instans_assignable_sized_to_finer() {
     let millis = types.sized_instans(InstansPrecision::Millis);
     let micros = types.sized_instans(InstansPrecision::Micros);
     let nanos = types.sized_instans(InstansPrecision::Nanos);
-    assert!(instans_assignable(&types, millis, micros));
-    assert!(instans_assignable(&types, millis, nanos));
-    assert!(instans_assignable(&types, micros, nanos));
+    assert!(is_instans_assignable(&types, millis, micros));
+    assert!(is_instans_assignable(&types, millis, nanos));
+    assert!(is_instans_assignable(&types, micros, nanos));
 }
 
 #[test]
@@ -123,9 +123,9 @@ fn instans_assignable_nanos_to_coarser_not() {
     let millis = types.sized_instans(InstansPrecision::Millis);
     let micros = types.sized_instans(InstansPrecision::Micros);
     let nanos = types.sized_instans(InstansPrecision::Nanos);
-    assert!(!instans_assignable(&types, nanos, micros));
-    assert!(!instans_assignable(&types, nanos, millis));
-    assert!(!instans_assignable(&types, nanos, bare));
+    assert!(!is_instans_assignable(&types, nanos, micros));
+    assert!(!is_instans_assignable(&types, nanos, millis));
+    assert!(!is_instans_assignable(&types, nanos, bare));
 }
 
 #[test]
@@ -134,7 +134,7 @@ fn instans_assignable_micros_or_millis_to_coarser_not() {
     let bare = types.primitive(Primitive::Instans);
     let millis = types.sized_instans(InstansPrecision::Millis);
     let micros = types.sized_instans(InstansPrecision::Micros);
-    assert!(!instans_assignable(&types, micros, millis));
-    assert!(!instans_assignable(&types, micros, bare));
-    assert!(!instans_assignable(&types, millis, bare));
+    assert!(!is_instans_assignable(&types, micros, millis));
+    assert!(!is_instans_assignable(&types, micros, bare));
+    assert!(!is_instans_assignable(&types, millis, bare));
 }

@@ -35,14 +35,14 @@ pub use index::{
     IndexId, IndexVar,
 };
 pub use instans_precision::{
-    effective_instans_precision, instans_assignable, lower_sized_instans, InstansPrecision,
+    effective_instans_precision, is_instans_assignable, lower_sized_instans, InstansPrecision,
     InstansPrecisionError, InstansPrecisionRank,
 };
 pub use numeric_width::{
     effective_width, is_ascii_format_hint, is_conversio_radix_hint, is_integer_index_scalar,
     is_integer_index_vector, is_numeric_width_type_sugar, is_tensor_element_type,
     is_tensor_numeric_element, lista_sugar_width_marker, lower_modular_word, lower_sized_primitive,
-    lower_standalone_width_type, matrix_sugar_width_marker, numeric_assignable,
+    lower_standalone_width_type, matrix_sugar_width_marker, is_numeric_assignable,
     sparsa_sugar_width_marker, standalone_width_type, tensor_element_conversio_allowed,
     tensor_media_width, tensor_method_requires_numeric_element, tensor_sugar_width_marker,
     vector_sugar_width_marker, NumericWidth, WidthError, TENSOR_ELEMENT_NUMERIC_MSG,

@@ -2,10 +2,10 @@
 //!
 //! Verifies two core lattice invariants across the type space:
 //!
-//! **Reflexivity** – every type `A` satisfies `assignable(A, A)`.
+//! **Reflexivity** – every type `A` satisfies `is_assignable(A, A)`.
 //!
-//! **Transitivity** – for any types `A, B, C` where `assignable(A, B)` and
-//! `assignable(B, C)`, the relation `assignable(A, C)` also holds.
+//! **Transitivity** – for any types `A, B, C` where `is_assignable(A, B)` and
+//! `is_assignable(B, C)`, the relation `is_assignable(A, C)` also holds.
 
 use crate::index::IndexExpr;
 use crate::instans_precision::InstansPrecision;
@@ -170,7 +170,7 @@ fn reflexivity_holds_for_all_types() {
         .iter()
         .copied()
         .enumerate()
-        .filter(|(_, id)| !table.assignable(*id, *id))
+        .filter(|(_, id)| !table.is_assignable(*id, *id))
         .collect();
 
     assert!(
@@ -198,8 +198,8 @@ fn transitivity_holds_for_random_triples() {
         let b = ids.choose(&mut rng).copied().unwrap();
         let c = ids.choose(&mut rng).copied().unwrap();
 
-        let a_assign_b = table.assignable(a, b);
-        let b_assign_c = table.assignable(b, c);
+        let a_assign_b = table.is_assignable(a, b);
+        let b_assign_c = table.is_assignable(b, c);
 
         if !a_assign_b || !b_assign_c {
             continue;
@@ -214,7 +214,7 @@ fn transitivity_holds_for_random_triples() {
             continue;
         }
 
-        if !table.assignable(a, c) {
+        if !table.is_assignable(a, c) {
             violations.push((a, b, c));
         }
     }
@@ -250,13 +250,13 @@ fn option_unboxing_does_not_leak_nihil_into_concrete() {
     let textus = table.primitive(Primitive::Textus);
     let opt_textus = table.option(textus);
 
-    assert!(table.assignable(nihil, opt_textus), "Nihil <: Option(T)");
+    assert!(table.is_assignable(nihil, opt_textus), "Nihil <: Option(T)");
     assert!(
-        table.assignable(opt_textus, textus),
+        table.is_assignable(opt_textus, textus),
         "Option(T) <: T via unboxing",
     );
     assert!(
-        !table.assignable(nihil, textus),
+        !table.is_assignable(nihil, textus),
         "Nihil must NOT be assignable to non-optional T",
     );
 }
@@ -270,7 +270,7 @@ fn option_to_non_option_via_unboxing_is_not_reflexive() {
     let opt = table.option(textus);
 
     assert!(!table.equals(opt, textus), "Option(T) != T structurally");
-    assert!(table.assignable(opt, textus), "Option(T) <: T via coercion");
+    assert!(table.is_assignable(opt, textus), "Option(T) <: T via coercion");
 }
 
 // ── Transitivity (exhaustive, small lattice) ────────────────────────────────
@@ -302,7 +302,7 @@ fn transitivity_holds_for_primitive_lattice() {
     for a in &prims {
         for b in &prims {
             for c in &prims {
-                if table.assignable(*a, *b) && table.assignable(*b, *c) && !table.assignable(*a, *c)
+                if table.is_assignable(*a, *b) && table.is_assignable(*b, *c) && !table.is_assignable(*a, *c)
                 {
                     violations.push((*a, *b, *c));
                 }
@@ -338,9 +338,9 @@ fn numeric_widening_chain_is_transitive() {
         for b in &numerics {
             for c in &numerics {
                 assert!(
-                    !(table.assignable(*a, *b)
-                        && table.assignable(*b, *c)
-                        && !table.assignable(*a, *c)),
+                    !(table.is_assignable(*a, *b)
+                        && table.is_assignable(*b, *c)
+                        && !table.is_assignable(*a, *c)),
                     "numeric widening chain transitivity violated for {:?} <: {:?} <: {:?}",
                     widths[numerics.iter().position(|x| x == a).unwrap()],
                     widths[numerics.iter().position(|x| x == b).unwrap()],
@@ -353,10 +353,10 @@ fn numeric_widening_chain_is_transitive() {
     // Same for fractus (F32, F64)
     let f32 = table.sized_numeric(Primitive::Fractus, NumericWidth::F32);
     let f64 = table.sized_numeric(Primitive::Fractus, NumericWidth::F64);
-    assert!(table.assignable(f32, f64));
-    assert!(!table.assignable(f64, f32));
-    assert!(table.assignable(f32, f32));
-    assert!(table.assignable(f64, f64));
+    assert!(table.is_assignable(f32, f64));
+    assert!(!table.is_assignable(f64, f32));
+    assert!(table.is_assignable(f32, f32));
+    assert!(table.is_assignable(f64, f64));
 }
 
 // ── Instans precision chain transitivity ────────────────────────────────────
@@ -374,7 +374,7 @@ fn instans_widening_chain_is_transitive() {
     for i in 0..chain.len() {
         for j in i..chain.len() {
             assert!(
-                table.assignable(chain[i], chain[j]),
+                table.is_assignable(chain[i], chain[j]),
                 "expected {:?} <: {:?} in instans chain",
                 chain[i],
                 chain[j],
@@ -390,11 +390,11 @@ fn instans_widening_chain_is_transitive() {
                 let b = chain[b_idx];
                 let c = chain[c_idx];
                 assert!(
-                    table.assignable(a, b) && table.assignable(b, c),
+                    table.is_assignable(a, b) && table.is_assignable(b, c),
                     "precondition: chain[{a_idx}] <: chain[{b_idx}] <: chain[{c_idx}]"
                 );
                 assert!(
-                    table.assignable(a, c),
+                    table.is_assignable(a, c),
                     "instans chain transitivity: chain[{a_idx}] <: chain[{c_idx}] should hold (via chain[{b_idx}])",
                 );
             }
@@ -406,9 +406,9 @@ fn instans_widening_chain_is_transitive() {
 
 #[test]
 fn compound_reflexivity_holds_exhaustively() {
-    // Build types and verify EVERY stored type satisfies assignable(self, self).
+    // Build types and verify EVERY stored type satisfies is_assignable(self, self).
     // This catches issues with structural-recursive type containers whose
-    // equals/assignable may fail on self-comparison for certain shapes.
+    // equals/is_assignable may fail on self-comparison for certain shapes.
     let mut table = TypeTable::new();
     let textus = table.primitive(Primitive::Textus);
     let numerus = table.primitive(Primitive::Numerus);
@@ -463,7 +463,7 @@ fn compound_reflexivity_holds_exhaustively() {
 
     for id in &type_ids {
         assert!(
-            table.assignable(*id, *id),
+            table.is_assignable(*id, *id),
             "reflexivity failed for {:?}",
             table.get(*id),
         );

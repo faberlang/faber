@@ -35,7 +35,7 @@
 //! =======================
 //! `nihil` participates in optional and coalescing rules; it is not the same as
 //! an unknown type. `ignotum` remains the explicit escape hatch for interop or
-//! intentionally unchecked values. The checker follows [`TypeTable::assignable`]
+//! intentionally unchecked values. The checker follows [`TypeTable::is_assignable`]
 //! for widening, optional acceptance, union membership, and the one-way
 //! `ignotum` policy, then uses targeted operator/call/access checks for syntax
 //! whose rules are stricter than general assignment.

@@ -195,19 +195,19 @@ fn function_type_join_uses_contravariant_params() {
     let f32_resolved = checker.resolve_inferred_type(f32_id);
     let fractus_resolved = checker.resolve_inferred_type(fractus);
     assert!(
-        !checker.types.assignable(fractus_resolved, f32_resolved),
+        !checker.types.is_assignable(fractus_resolved, f32_resolved),
         "F-012 precondition: fractus must not be assignable to f32 (narrowing)"
     );
     assert!(
-        checker.types.assignable(f32_resolved, fractus_resolved),
+        checker.types.is_assignable(f32_resolved, fractus_resolved),
         "F-012 precondition: f32 must be assignable to fractus (widening)"
     );
 
     // Under the old covariant Join, (f32)→void and (fractus)→void would
     // unsoundly join to (fractus)→void (wider param). Under the fixed
     // contravariant Join using Assign for params, incompatible param types
-    // cause the join to fail because Assign checks assignable(param_b, param_a)
-    // = assignable(fractus, f32) = false.
+    // cause the join to fail because Assign checks is_assignable(param_b, param_a)
+    // = is_assignable(fractus, f32) = false.
     // unsoundly join to (fractus)→void. Under the fixed contravariant Join,
     // incompatible param types cause the join to fail (error type), because
     // there is no single param type safe for both functions.

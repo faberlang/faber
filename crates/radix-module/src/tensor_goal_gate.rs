@@ -14,8 +14,8 @@ pub fn run_types_gate() {
     let mut types = TypeTable::new();
     let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
     let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
-    assert!(types.assignable(i32, i64));
-    assert!(!types.assignable(i64, i32));
+    assert!(types.is_assignable(i32, i64));
+    assert!(!types.is_assignable(i64, i32));
     assert_eq!(NumericWidth::I32.rust_type(), "i32");
 
     let elem = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);

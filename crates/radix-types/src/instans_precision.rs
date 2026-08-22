@@ -54,7 +54,7 @@ impl InstansPrecisionRank {
 
     /// Coarse → fine (gain precision) is lossless and assignable.
     #[must_use]
-    pub fn widening_assignable(from: Self, to: Self) -> bool {
+    pub fn is_widening_assignable(from: Self, to: Self) -> bool {
         from.rank() <= to.rank()
     }
 }
@@ -154,11 +154,11 @@ pub fn effective_instans_precision(types: &TypeTable, ty: TypeId) -> Option<Inst
 
 /// Whether two `instans` carriers are assignable via equality or coarse→fine widening.
 #[must_use]
-pub fn instans_assignable(types: &TypeTable, from: TypeId, to: TypeId) -> bool {
+pub fn is_instans_assignable(types: &TypeTable, from: TypeId, to: TypeId) -> bool {
     let from_rank = effective_instans_precision(types, from);
     let to_rank = effective_instans_precision(types, to);
     match (from_rank, to_rank) {
-        (Some(a), Some(b)) => InstansPrecisionRank::widening_assignable(a, b),
+        (Some(a), Some(b)) => InstansPrecisionRank::is_widening_assignable(a, b),
         _ => false,
     }
 }

@@ -429,7 +429,7 @@ impl Validator<'_, '_> {
                     self.error(span, "sermo cursor drain result is not lista");
                     return;
                 };
-                if !self.context.types.assignable(element, *result_element) {
+                if !self.context.types.is_assignable(element, *result_element) {
                     self.error(span, "sermo cursor drain element type mismatch");
                 }
             }
@@ -1298,11 +1298,11 @@ impl Validator<'_, '_> {
                 let elements_match = self
                     .context
                     .types
-                    .assignable(*source_element, *target_element)
+                    .is_assignable(*source_element, *target_element)
                     && self
                         .context
                         .types
-                        .assignable(*target_element, *source_element);
+                        .is_assignable(*target_element, *source_element);
                 let shapes_match = self.context.types.get_index(*source_shape)
                     == self.context.types.get_index(*target_shape);
                 if !elements_match || !shapes_match {

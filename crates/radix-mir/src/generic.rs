@@ -287,7 +287,7 @@ fn try_bind_generic_type_witness(
             shape_bindings,
             seen,
         ),
-        _ => types.assignable(actual, expected),
+        _ => types.is_assignable(actual, expected),
     }
 }
 
