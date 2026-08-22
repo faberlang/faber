@@ -496,7 +496,7 @@ incipit argumenta args {}
         symbol_name(&result, optio.description.expect("description")),
         "Target language"
     );
-    assert!(!optio.flag);
+    assert!(!optio.is_flag);
     assert!(optio.global);
     assert!(optio.default.is_some());
 
@@ -528,7 +528,7 @@ incipit argumenta args {}
     };
 
     assert_eq!(symbol_name(&result, optio.binding.name), "verbose");
-    assert!(optio.flag, "typus bivalens marks a boolean flag");
+    assert!(optio.is_flag, "typus bivalens marks a boolean flag");
     assert!(
         optio.default.is_none(),
         "absent boolean flag defaults are applied by CLI validation/lowering"
@@ -568,7 +568,7 @@ incipit argumenta args {}
     let Some(default) = &strict.default else {
         panic!("expected boolean default");
     };
-    assert!(strict.flag);
+    assert!(strict.is_flag);
     assert!(matches!(
         default.kind,
         ExprKind::Literal(Literal::Bool(true))
@@ -610,7 +610,7 @@ incipit argumenta args {}
         panic!("expected structured @ operandus");
     };
 
-    assert!(operandus.rest);
+    assert!(operandus.is_rest);
     assert_eq!(symbol_name(&result, operandus.binding.name), "files");
     assert_eq!(
         symbol_name(&result, operandus.description.expect("description")),
@@ -1296,7 +1296,7 @@ fn parses_varia_destructuring() {
     let StmtKind::Var(array_var) = &program.statements[0].kind else {
         panic!("expected destructuring variable declaration");
     };
-    let BindingPattern::Array { elements, rest, .. } = &array_var.binding else {
+    let BindingPattern::Array { elements, is_rest: rest, .. } = &array_var.binding else {
         panic!("expected array binding pattern");
     };
     assert_eq!(elements.len(), 1);
@@ -1318,7 +1318,7 @@ fn parses_object_destructuring() {
     let StmtKind::Var(object_var) = &program.statements[0].kind else {
         panic!("expected object destructuring variable declaration");
     };
-    let BindingPattern::Object { fields, rest, .. } = &object_var.binding else {
+    let BindingPattern::Object { fields, is_rest: rest, .. } = &object_var.binding else {
         panic!("expected object binding pattern");
     };
     assert_eq!(fields.len(), 2);
@@ -1360,7 +1360,7 @@ fn parses_functio_with_all_modifiers() {
     assert!(func.params[0].default.is_some());
     assert!(matches!(func.params[1].mode, AstParamMode::Owned));
     assert_eq!(func.params[1].ty.mode, Some(radix_syntax::TypeMode::Own));
-    assert!(func.params[2].rest);
+    assert!(func.params[2].is_rest);
     assert_eq!(func.modifiers.len(), 6);
 }
 
@@ -3270,7 +3270,7 @@ ex source varia nomen ut name, ceteri reliqua
         "name"
     );
     assert_eq!(
-        symbol_name(&result, extract.rest.as_ref().expect("rest binding").name),
+        symbol_name(&result, extract.is_rest.as_ref().expect("rest binding").name),
         "reliqua"
     );
 }

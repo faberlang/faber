@@ -1914,7 +1914,7 @@ impl Parser {
             let span = start.merge(self.previous_span());
             args.push(Argument {
                 label,
-                spread,
+                is_spread: spread,
                 value,
                 span,
             });
@@ -2291,7 +2291,7 @@ impl Parser {
         let id = self.next_id();
         Ok(Expr {
             id,
-            kind: ExprKind::Lege(LegeExpr { symbol, line, span }),
+            kind: ExprKind::Lege(LegeExpr { symbol, is_line: line, span }),
             span,
         })
     }

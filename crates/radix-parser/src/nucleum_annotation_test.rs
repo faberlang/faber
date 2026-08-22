@@ -18,7 +18,7 @@ fn first_annotation_kind(source: &str) -> AnnotationKindSnapshot {
     );
     match &program.statements[0].annotations[0].kind {
         AnnotationKind::Nucleum(nucleum) => AnnotationKindSnapshot::Nucleum {
-            fragment: nucleum.fragment,
+            fragment: nucleum.is_fragment,
         },
         AnnotationKind::Statement(stmt) => AnnotationKindSnapshot::Statement {
             name: symbol_name(&result, stmt.name.name).to_owned(),
@@ -60,7 +60,7 @@ fn nucleum_fragment_sugar_is_not_untyped_argument() {
     let result = parse_ok("@ nucleum fragment\nfunctio h() → vacuum { }\n");
     let program = result.program.as_ref().expect("program");
     match &program.statements[0].annotations[0].kind {
-        AnnotationKind::Nucleum(nucleum) => assert!(nucleum.fragment),
+        AnnotationKind::Nucleum(nucleum) => assert!(nucleum.is_fragment),
         AnnotationKind::Statement(stmt) => panic!(
             "@ nucleum fragment must not be an untyped statement annotation (name={}, args={})",
             symbol_name(&result, stmt.name.name),

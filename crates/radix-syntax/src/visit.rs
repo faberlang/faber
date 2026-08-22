@@ -232,7 +232,7 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
                     visitor.visit_ident(alias);
                 }
             }
-            if let Some(rest) = &extract_stmt.rest {
+            if let Some(rest) = &extract_stmt.is_rest {
                 visitor.visit_ident(rest);
             }
         }
@@ -587,19 +587,19 @@ fn walk_binding_pattern<V: Visitor>(visitor: &mut V, pattern: &BindingPattern) {
     match pattern {
         BindingPattern::Ident(ident) => visitor.visit_ident(ident),
         BindingPattern::Wildcard(_) => {}
-        BindingPattern::Array { elements, rest, .. } => {
+        BindingPattern::Array { elements, is_rest, .. } => {
             for element in elements {
                 walk_binding_pattern(visitor, element);
             }
-            if let Some(rest) = rest {
+            if let Some(rest) = is_rest {
                 visitor.visit_ident(rest);
             }
         }
-        BindingPattern::Object { fields, rest, .. } => {
+        BindingPattern::Object { fields, is_rest, .. } => {
             for field in fields {
                 visitor.visit_ident(field.alias.as_ref().unwrap_or(&field.name));
             }
-            if let Some(rest) = rest {
+            if let Some(rest) = is_rest {
                 visitor.visit_ident(rest);
             }
         }

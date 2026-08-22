@@ -1406,7 +1406,7 @@ fn template_call_carries_labeled_actual_on_string_literal_callee() {
     assert_eq!(call.args.len(), 1);
     let label = call.args[0].label.expect("labeled actual");
     assert_eq!(result.interner.resolve(label), "greet");
-    assert!(!call.args[0].spread);
+    assert!(!call.args[0].is_spread);
 }
 
 #[test]

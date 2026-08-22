@@ -626,7 +626,7 @@ fn resolve_stmt(
                     );
                 }
             }
-            if let Some(rest) = &stmt.rest {
+            if let Some(rest) = &stmt.is_rest {
                 define_symbol(
                     resolver,
                     rest.name,
@@ -2277,7 +2277,7 @@ fn define_binding_pattern(
             );
         }
         BindingPattern::Wildcard(_) => {}
-        BindingPattern::Array { elements, rest, .. } => {
+        BindingPattern::Array { elements, is_rest: rest, .. } => {
             for element in elements {
                 define_binding_pattern(resolver, element, mutable, errors);
             }
@@ -2292,7 +2292,7 @@ fn define_binding_pattern(
                 );
             }
         }
-        BindingPattern::Object { fields, rest, .. } => {
+        BindingPattern::Object { fields, is_rest: rest, .. } => {
             for field in fields {
                 let binding = field.alias.as_ref().unwrap_or(&field.name);
                 define_symbol(

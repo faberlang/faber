@@ -126,7 +126,7 @@ fn func_with_param_type(interner: &mut Interner, ty: TypeExpr) -> Program {
     let param = Param {
         sponte: false,
         mode: radix_syntax::AstParamMode::Owned,
-        rest: false,
+        is_rest: false,
         ty,
         name: ident(interner, "value"),
         alias: None,

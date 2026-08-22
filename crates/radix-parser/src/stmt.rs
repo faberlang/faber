@@ -764,7 +764,7 @@ impl Parser {
             source,
             mutability,
             fields,
-            rest,
+            is_rest: rest,
             span,
         }))
     }

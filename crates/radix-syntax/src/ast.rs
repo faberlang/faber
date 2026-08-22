@@ -176,12 +176,12 @@ pub enum BindingPattern {
     Wildcard(Span),
     Array {
         elements: Vec<BindingPattern>,
-        rest: Option<Ident>,
+        is_rest: Option<Ident>,
         span: Span,
     },
     Object {
         fields: Vec<ExField>,
-        rest: Option<Ident>,
+        is_rest: Option<Ident>,
         span: Span,
     },
 }
@@ -273,7 +273,7 @@ pub struct Param {
     pub mode: AstParamMode,
 
     /// `ceteri` rest parameter marker.
-    pub rest: bool,
+    pub is_rest: bool,
 
     pub ty: TypeExpr,
     pub name: Ident,
@@ -883,7 +883,7 @@ pub struct ExStmt {
     pub source: Box<Expr>,
     pub mutability: AstMutability,
     pub fields: Vec<ExField>,
-    pub rest: Option<Ident>,
+    pub is_rest: Option<Ident>,
     pub span: Span,
 }
 
@@ -1129,7 +1129,7 @@ pub struct Argument {
     ///
     /// Labels are parser-surface metadata and are erased before HIR lowering.
     pub label: Option<Symbol>,
-    pub spread: bool, // sparge
+    pub is_spread: bool, // sparge
     pub value: Box<Expr>,
     pub span: Span,
 }
@@ -1336,7 +1336,7 @@ pub struct LegeExpr {
     /// Surface spelling that claimed the builtin (`lege`/`lineam` or a pack alias).
     pub symbol: Symbol,
     /// `lineam` marker for line-oriented input.
-    pub line: bool,
+    pub is_line: bool,
 
     pub span: Span,
 }
@@ -1547,7 +1547,7 @@ pub struct RadixLaneAnnotation {
 pub struct NucleumAnnotation {
     /// True when the `fragment` modifier is present (`@ nucleum fragment` or
     /// `@ nucleum { fragment = verum }`).
-    pub fragment: bool,
+    pub is_fragment: bool,
 }
 
 #[derive(Debug)]
@@ -1568,7 +1568,7 @@ pub struct OptioAnnotation {
     pub ty: Option<TypeExpr>,
     pub short: Option<Symbol>,
     pub long: Option<Symbol>,
-    pub flag: bool,
+    pub is_flag: bool,
     pub description: Option<Symbol>,
 
     /// Whether the option applies outside one command scope.
@@ -1579,7 +1579,7 @@ pub struct OptioAnnotation {
 #[derive(Debug)]
 pub struct OperandusAnnotation {
     /// Whether this positional operand captures the remaining arguments.
-    pub rest: bool,
+    pub is_rest: bool,
     pub ty: TypeExpr,
     pub binding: Ident,
     pub description: Option<Symbol>,

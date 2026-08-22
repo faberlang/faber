@@ -84,7 +84,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Scriptum(scriptum) => lowerer.lower_scriptum_or_binding(expr.id, scriptum),
         ExprKind::Lege(lege) => lowerer
             .lower_shadowed_builtin(expr.id, lege.symbol)
-            .unwrap_or(HirExpressionKind::ReadLine(lege.line)),
+            .unwrap_or(HirExpressionKind::ReadLine(lege.is_line)),
 
         ExprKind::Praefixum(praefixum) => lowerer.lower_praefixum(praefixum),
         ExprKind::Ego(span) => lowerer.lower_ego(*span),
@@ -279,7 +279,7 @@ impl Lowerer<'_> {
                 }
                 HirCallArg {
                     name: None,
-                    spread: arg.spread,
+                    spread: arg.is_spread,
                     expr: lower_expr(self, &arg.value),
                     span: arg.span,
                 }

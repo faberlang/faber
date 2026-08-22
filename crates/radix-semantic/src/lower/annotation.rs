@@ -296,7 +296,7 @@ impl Lowerer<'_> {
         span: Span,
     ) -> HirAnnotation {
         let mut fields = Vec::new();
-        if view.rest {
+        if view.is_rest {
             fields.push(HirAnnotationField {
                 name: self.intern_field_name("ceteri"),
                 value: HirAnnotationValue::Bool(true),
@@ -496,7 +496,7 @@ impl Lowerer<'_> {
         span: Span,
     ) -> HirAnnotation {
         let family = self.intern_field_name("nucleum");
-        if nucleum.fragment {
+        if nucleum.is_fragment {
             return HirAnnotation::with_fields(
                 family,
                 vec![HirAnnotationField {
@@ -601,7 +601,7 @@ impl Lowerer<'_> {
         span: Span,
     ) -> HirAnnotation {
         let mut fields = Vec::new();
-        if operandus.rest {
+        if operandus.is_rest {
             fields.push(HirAnnotationField {
                 name: self.intern_field_name("ceteri"),
                 value: HirAnnotationValue::Bool(true),

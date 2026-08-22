@@ -433,7 +433,7 @@ impl Parser {
         let span = start.merge(self.previous_span());
         Ok(BindingPattern::Array {
             elements,
-            rest,
+            is_rest: rest,
             span,
         })
     }
@@ -490,7 +490,7 @@ impl Parser {
 
         self.expect(&TokenKind::RBrace, "expected '}' after pattern")?;
         let span = start.merge(self.previous_span());
-        Ok(BindingPattern::Object { fields, rest, span })
+        Ok(BindingPattern::Object { fields, is_rest: rest, span })
     }
 
     // FUNCTION DECLARATIONS
@@ -608,7 +608,7 @@ impl Parser {
             params.push(Param {
                 sponte,
                 mode: AstParamMode::Owned,
-                rest,
+                is_rest: rest,
                 ty,
                 name,
                 alias,
@@ -1910,7 +1910,7 @@ impl Parser {
             ty,
             short,
             long,
-            flag,
+            is_flag: flag,
             description,
             global,
             default,
@@ -1940,7 +1940,7 @@ impl Parser {
         }
 
         Ok(AnnotationKind::Operandus(OperandusAnnotation {
-            rest,
+            is_rest: rest,
             ty,
             binding,
             description,
@@ -1982,7 +1982,7 @@ impl Parser {
 
         let fragment = self.eat_annotation_ident(TokenKind::Fragment);
         self.expect_annotation_end("unexpected token after @ nucleum")?;
-        Ok(AnnotationKind::Nucleum(NucleumAnnotation { fragment }))
+        Ok(AnnotationKind::Nucleum(NucleumAnnotation { is_fragment: fragment }))
     }
 
     fn parse_braced_nucleum_annotation(&mut self) -> Result<AnnotationKind, ParseError> {
@@ -2012,7 +2012,7 @@ impl Parser {
         }
 
         self.expect(&TokenKind::RBrace, "expected '}' after annotation fields")?;
-        Ok(AnnotationKind::Nucleum(NucleumAnnotation { fragment }))
+        Ok(AnnotationKind::Nucleum(NucleumAnnotation { is_fragment: fragment }))
     }
 
     fn parse_nucleum_fragment_flag(&mut self) -> Result<bool, ParseError> {
@@ -2043,7 +2043,7 @@ impl Parser {
                     .with_arg("issue", "duplicate_nucleum"));
                 }
                 nucleum_span = Some(annotation.span);
-                nucleum_fragment = nucleum.fragment;
+                nucleum_fragment = nucleum.is_fragment;
             }
         }
 

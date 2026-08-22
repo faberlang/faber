@@ -172,7 +172,7 @@ impl Lowerer<'_> {
         let (elements, rest, span) = match &decl.binding {
             radix_syntax::BindingPattern::Array {
                 elements,
-                rest,
+                is_rest: rest,
                 span,
             } => (elements, rest, *span),
             _ => return Vec::new(),
@@ -257,7 +257,7 @@ impl Lowerer<'_> {
             return Vec::new();
         };
 
-        let radix_syntax::BindingPattern::Object { fields, rest, .. } = &decl.binding else {
+        let radix_syntax::BindingPattern::Object { fields, is_rest: rest, .. } = &decl.binding else {
             return Vec::new();
         };
 
@@ -434,7 +434,7 @@ impl Lowerer<'_> {
             });
         }
 
-        if let Some(rest) = &stmt.rest {
+        if let Some(rest) = &stmt.is_rest {
             let def_id = self.next_def_id();
             self.bind_local(rest.name, def_id);
             let local = radix_hir::HirLocal {

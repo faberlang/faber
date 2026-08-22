@@ -157,7 +157,7 @@ pub fn braced_optio_view_strict<'a>(
 
 /// Borrowed `@ operandus` field view.
 pub struct BracedOperandusView<'a> {
-    pub rest: bool,
+    pub is_rest: bool,
     pub ty: &'a TypeExpr,
     pub binding: &'a Ident,
     pub description: Option<radix_lexer::Symbol>,
@@ -178,7 +178,7 @@ pub fn braced_operandus_view<'a>(
     let binding = ident_from_field(binding_field)?;
 
     Some(BracedOperandusView {
-        rest: find_field(braced, "ceteri", interner)
+        is_rest: find_field(braced, "ceteri", interner)
             .is_some_and(|field| bool_from_field(field).unwrap_or(true)),
         ty,
         binding,
@@ -218,7 +218,7 @@ pub fn braced_operandus_view_strict<'a>(
         Ok(description) => description,
         Err(error) => return BracedView::Malformed(error),
     };
-    let rest = match optional_bool_field(braced, interner, "@ operandus", "ceteri") {
+    let is_rest = match optional_bool_field(braced, interner, "@ operandus", "ceteri") {
         Ok(rest) => rest.unwrap_or(false),
         Err(error) => return BracedView::Malformed(error),
     };
@@ -228,7 +228,7 @@ pub fn braced_operandus_view_strict<'a>(
     };
 
     BracedView::Valid(BracedOperandusView {
-        rest,
+        is_rest,
         ty,
         binding,
         description,
