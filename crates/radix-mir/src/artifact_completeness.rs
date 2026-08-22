@@ -151,22 +151,22 @@ pub struct ReflectedResourceFact {
 pub enum CompletenessError {
     /// The partition record has no region row for a derived boundary call
     /// (or the derivation index is out of range).
-    MissingRegionRecord { region: u32 },
+    AbsentRegionRecord { region: u32 },
     /// The record's region row disagrees with the derived partition.
     RegionRecordMismatch { region: u32 },
     /// The record has no callsite mapping for a derived region.
-    MissingCallsite { region: u32 },
+    AbsentCallsite { region: u32 },
     /// No typed `HostDeviceCall` row exists for a derived region.
-    MissingHostDeviceCall { region: u32 },
+    AbsentHostDeviceCall { region: u32 },
     /// A typed `HostDeviceCall` row disagrees with the derived partition.
     HostDeviceCallMismatch { region: u32, detail: String },
     /// The region has no derivable dispatch extent (missing dimension fact).
-    MissingDispatchExtent { region: u32 },
+    AbsentDispatchExtent { region: u32 },
     /// A member kernel has no typed logical entrypoint identity.
-    MissingMemberEntry { region: u32, kernel: MirFunctionId },
+    AbsentMemberEntry { region: u32, kernel: MirFunctionId },
     /// The packet's entrypoint symbol map lacks a member entry (or carries
     /// an empty emitted symbol).
-    MissingPacketEntrypointSymbol {
+    AbsentPacketEntrypointSymbol {
         /// The region whose member entry is missing.
         region: u32,
         /// The member kernel.
@@ -175,7 +175,7 @@ pub enum CompletenessError {
         entry: String,
     },
     /// The packet's reflection lacks a row for a member kernel.
-    MissingPacketReflectionRow {
+    AbsentPacketReflectionRow {
         /// The region whose member reflection is missing.
         region: u32,
         /// The member kernel.
@@ -198,28 +198,28 @@ pub enum CompletenessError {
 impl fmt::Display for CompletenessError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::MissingRegionRecord { region } => {
+            Self::AbsentRegionRecord { region } => {
                 write!(f, "region {region} has no partition-record region row")
             }
             Self::RegionRecordMismatch { region } => {
                 write!(f, "region {region}: the record's region members disagree with the derived partition")
             }
-            Self::MissingCallsite { region } => {
+            Self::AbsentCallsite { region } => {
                 write!(f, "region {region} has no recorded callsite mapping")
             }
-            Self::MissingHostDeviceCall { region } => {
+            Self::AbsentHostDeviceCall { region } => {
                 write!(f, "region {region} has no typed HostDeviceCall row")
             }
             Self::HostDeviceCallMismatch { region, detail } => {
                 write!(f, "region {region}: the typed HostDeviceCall disagrees with the derived partition ({detail})")
             }
-            Self::MissingDispatchExtent { region } => {
+            Self::AbsentDispatchExtent { region } => {
                 write!(f, "region {region} has no derivable dispatch extent (missing dimension fact)")
             }
-            Self::MissingMemberEntry { region, kernel } => {
+            Self::AbsentMemberEntry { region, kernel } => {
                 write!(f, "region {region} kernel f{} has no typed logical entrypoint identity", kernel.0)
             }
-            Self::MissingPacketEntrypointSymbol {
+            Self::AbsentPacketEntrypointSymbol {
                 region,
                 kernel,
                 entry,
@@ -228,7 +228,7 @@ impl fmt::Display for CompletenessError {
                 "region {region} kernel f{} entry `{entry}` has no packet entrypoint-symbol row (or an empty emitted symbol)",
                 kernel.0
             ),
-            Self::MissingPacketReflectionRow {
+            Self::AbsentPacketReflectionRow {
                 region,
                 kernel,
                 entry,
@@ -266,9 +266,9 @@ impl std::error::Error for CompletenessError {}
 ///
 /// # Errors
 ///
-/// Returns [`CompletenessError::MissingDispatchExtent`] when the region has
+/// Returns [`CompletenessError::AbsentDispatchExtent`] when the region has
 /// no derivable dispatch extent, or
-/// [`CompletenessError::MissingMemberEntry`] when a member kernel lacks a
+/// [`CompletenessError::AbsentMemberEntry`] when a member kernel lacks a
 /// typed logical entrypoint identity.
 pub fn derive_region_preparation_facts(
     partition: &HostPartition,
@@ -278,7 +278,7 @@ pub fn derive_region_preparation_facts(
     let call = partition
         .boundary_calls
         .get(index)
-        .ok_or(CompletenessError::MissingRegionRecord { region })?;
+        .ok_or(CompletenessError::AbsentRegionRecord { region })?;
     let mut members = Vec::with_capacity(call.region.kernels.len());
     let mut resources = Vec::new();
     let mut dimensions = Vec::new();
@@ -289,7 +289,7 @@ pub fn derive_region_preparation_facts(
             .kernels
             .iter()
             .find(|unit| unit.function == kernel)
-            .ok_or(CompletenessError::MissingMemberEntry { region, kernel })?;
+            .ok_or(CompletenessError::AbsentMemberEntry { region, kernel })?;
         members.push(MemberKernel {
             kernel,
             entry: unit.entry.clone(),
@@ -375,12 +375,12 @@ pub fn check_preparation_completeness(
             .regions
             .iter()
             .find(|row| row.region == region)
-            .ok_or(CompletenessError::MissingRegionRecord { region })?;
+            .ok_or(CompletenessError::AbsentRegionRecord { region })?;
         if record_region.member_kernels != call.region.kernels {
             return Err(CompletenessError::RegionRecordMismatch { region });
         }
         if !record.callsites.iter().any(|row| row.region == region) {
-            return Err(CompletenessError::MissingCallsite { region });
+            return Err(CompletenessError::AbsentCallsite { region });
         }
 
         // The typed HostDeviceCall bindings: a row for the region whose
@@ -388,7 +388,7 @@ pub fn check_preparation_completeness(
         let call_row = calls
             .iter()
             .find(|row| row.region == region)
-            .ok_or(CompletenessError::MissingHostDeviceCall { region })?;
+            .ok_or(CompletenessError::AbsentHostDeviceCall { region })?;
         if call_row.members != bundle.members {
             return Err(CompletenessError::HostDeviceCallMismatch {
                 region,
@@ -411,13 +411,13 @@ pub fn check_preparation_completeness(
                 .entrypoint_symbols
                 .iter()
                 .find(|row| row.entry == member.entry)
-                .ok_or_else(|| CompletenessError::MissingPacketEntrypointSymbol {
+                .ok_or_else(|| CompletenessError::AbsentPacketEntrypointSymbol {
                     region,
                     kernel: member.kernel,
                     entry: member.entry.clone(),
                 })?;
             if symbol.symbol.is_empty() {
-                return Err(CompletenessError::MissingPacketEntrypointSymbol {
+                return Err(CompletenessError::AbsentPacketEntrypointSymbol {
                     region,
                     kernel: member.kernel,
                     entry: member.entry.clone(),
@@ -427,7 +427,7 @@ pub fn check_preparation_completeness(
                 .reflected_kernels
                 .iter()
                 .find(|row| row.entry == member.entry)
-                .ok_or_else(|| CompletenessError::MissingPacketReflectionRow {
+                .ok_or_else(|| CompletenessError::AbsentPacketReflectionRow {
                     region,
                     kernel: member.kernel,
                     entry: member.entry.clone(),

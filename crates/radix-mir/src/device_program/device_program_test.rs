@@ -980,7 +980,7 @@ fn duplicate_binding_rejected() {
         kernel_index: 0,
     });
     match program.validate() {
-        Err(DeviceProgramError::DuplicateBinding {
+        Err(DeviceProgramError::RepeatedBinding {
             kernel,
             group,
             binding,
@@ -1092,7 +1092,7 @@ fn duplicate_launch_id_rejected() {
     });
     assert!(matches!(
         program.validate(),
-        Err(DeviceProgramError::DuplicateLaunchId {
+        Err(DeviceProgramError::RepeatedLaunchId {
             launch: LaunchId(0)
         })
     ));
@@ -1177,7 +1177,7 @@ fn unknown_producing_launch_rejected() {
     });
     assert!(matches!(
         program.validate(),
-        Err(DeviceProgramError::UnknownProducingLaunch {
+        Err(DeviceProgramError::AbsentProducingLaunch {
             result: 0,
             produced_by: LaunchId(9)
         })
@@ -1840,7 +1840,7 @@ fn consumer_edge_missing_producer_fails_closed() {
     semantics.dependencies[0].version = 2;
     assert!(matches!(
         program.validate_with_semantics(&semantics),
-        Err(DeviceProgramError::MissingProducer {
+        Err(DeviceProgramError::AbsentProducer {
             producer: LaunchId(0),
             value: SemanticValueId(1),
         })

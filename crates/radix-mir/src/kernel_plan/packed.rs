@@ -361,7 +361,7 @@ pub enum PackedDequantError {
     /// Packed block length is not the layout's `block_bytes`.
     BlockBytesMismatch { expected: u32, actual: usize },
     /// This unit has no in-kernel dequant formula for `layout`.
-    UnsupportedLayout { layout: PackedStorageLayout },
+    UnrepresentableLayout { layout: PackedStorageLayout },
 }
 
 impl fmt::Display for PackedDequantError {
@@ -371,7 +371,7 @@ impl fmt::Display for PackedDequantError {
                 f,
                 "packed dequant block is {actual} bytes; expected {expected}"
             ),
-            Self::UnsupportedLayout { layout } => write!(
+            Self::UnrepresentableLayout { layout } => write!(
                 f,
                 "packed dequant has no body for {layout:?} (admitted layouts land per R-PACK-02 unit)"
             ),
@@ -486,7 +486,7 @@ pub fn dequant_packed_block(
         PackedStorageLayout::Q4_K => Ok(dequant_q4_k_block(block)?.to_vec()),
         PackedStorageLayout::Q5_K => Ok(super::packed_dequant::dequant_q5_k(block)?.to_vec()),
         PackedStorageLayout::Q6_K => Ok(super::packed_dequant::dequant_q6_k(block)?.to_vec()),
-        other => Err(PackedDequantError::UnsupportedLayout { layout: other }),
+        other => Err(PackedDequantError::UnrepresentableLayout { layout: other }),
     }
 }
 

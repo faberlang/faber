@@ -304,7 +304,7 @@ impl DeviceLegalityFacts {
     /// diagnostics ([`DeviceProgramError::DeviceFunctionHostileEffect`]) —
     /// deterministic, named rejection, never an ad-hoc error. A fact
     /// naming a launch outside the device program is a malformed record
-    /// and fails closed ([`DeviceProgramError::UnknownDeviceEffectLaunch`]).
+    /// and fails closed ([`DeviceProgramError::AbsentDeviceEffectLaunch`]).
     ///
     /// Ordinary CPU host `ad` through Sermo is untouched: a CPU function is
     /// outside the device launch universe and records no device effect
@@ -320,7 +320,7 @@ impl DeviceLegalityFacts {
     pub fn validate(&self, launches: &[LaunchId]) -> Result<(), DeviceProgramError> {
         if let Some(fact) = self.device_effects.first() {
             if !launches.contains(&fact.launch) {
-                return Err(DeviceProgramError::UnknownDeviceEffectLaunch {
+                return Err(DeviceProgramError::AbsentDeviceEffectLaunch {
                     launch: fact.launch,
                 });
             }
@@ -538,7 +538,7 @@ impl DeviceSemantics {
     fn validate_bindings(&self) -> Result<(), DeviceProgramError> {
         for binding in &self.bindings {
             if !self.values.iter().any(|value| value.id == binding.value) {
-                return Err(DeviceProgramError::UnknownSemanticValue {
+                return Err(DeviceProgramError::AbsentSemanticValue {
                     value: binding.value,
                 });
             }
@@ -546,7 +546,7 @@ impl DeviceSemantics {
         for left in &self.bindings {
             for right in &self.bindings {
                 if left.value == right.value && left.buffer != right.buffer {
-                    return Err(DeviceProgramError::DuplicateValueBinding {
+                    return Err(DeviceProgramError::RepeatedValueBinding {
                         value: left.value,
                         buffer: left.buffer,
                     });
@@ -587,7 +587,7 @@ impl DeviceSemantics {
                 });
             }
             if !self.values.iter().any(|value| value.id == generation.value) {
-                return Err(DeviceProgramError::UnknownSemanticValue {
+                return Err(DeviceProgramError::AbsentSemanticValue {
                     value: generation.value,
                 });
             }
@@ -599,7 +599,7 @@ impl DeviceSemantics {
                 if self.generations[left].value == self.generations[right].value
                     && self.generations[left].generation == self.generations[right].generation
                 {
-                    return Err(DeviceProgramError::DuplicateGenerationProducer {
+                    return Err(DeviceProgramError::RepeatedGenerationProducer {
                         value: self.generations[left].value,
                         generation: self.generations[left].generation,
                     });
@@ -623,7 +623,7 @@ impl DeviceSemantics {
         }
         for left in &self.roots {
             if self.roots.iter().filter(|root| *root == left).count() > 1 {
-                return Err(DeviceProgramError::DuplicateRoot { root: *left });
+                return Err(DeviceProgramError::RepeatedRoot { root: *left });
             }
         }
         for dependency in &self.dependencies {
@@ -633,12 +633,12 @@ impl DeviceSemantics {
                 });
             }
             if !launches.contains(&dependency.producer) {
-                return Err(DeviceProgramError::UnknownDependencyEndpoint {
+                return Err(DeviceProgramError::AbsentDependencyEndpoint {
                     launch: dependency.producer,
                 });
             }
             if !launches.contains(&dependency.consumer) {
-                return Err(DeviceProgramError::UnknownDependencyEndpoint {
+                return Err(DeviceProgramError::AbsentDependencyEndpoint {
                     launch: dependency.consumer,
                 });
             }
@@ -654,7 +654,7 @@ impl DeviceSemantics {
                 .count()
                 > 1
             {
-                return Err(DeviceProgramError::DuplicateDependencyEdge {
+                return Err(DeviceProgramError::RepeatedDependencyEdge {
                     producer: dependency.producer,
                     consumer: dependency.consumer,
                 });
@@ -678,7 +678,7 @@ impl DeviceSemantics {
             if !self.generations.iter().any(|generation| {
                 generation.value == binding.value && generation.produced_by == edge.producer
             }) {
-                return Err(DeviceProgramError::MissingProducer {
+                return Err(DeviceProgramError::AbsentProducer {
                     producer: edge.producer,
                     value: binding.value,
                 });
@@ -689,7 +689,7 @@ impl DeviceSemantics {
         // produces a value but hangs off the graph is a missing dependency.
         for generation in &self.generations {
             if !self.reachable_from_root(generation.produced_by) {
-                return Err(DeviceProgramError::MissingDependency {
+                return Err(DeviceProgramError::AbsentDependency {
                     launch: generation.produced_by,
                     value: generation.value,
                 });
@@ -834,7 +834,7 @@ impl DeviceSemantics {
             // consuming a companion output with no declared relation) are
             // proven by the independent oracle (G6 KernelSequence).
             if relation.selected_inputs.is_empty() && relation.selected_outputs.is_empty() {
-                return Err(DeviceProgramError::MissingCompanionFact {
+                return Err(DeviceProgramError::AbsentCompanionFact {
                     primal: relation.primal,
                     reason: "the relation declares no selected inputs and no selected outputs",
                 });
@@ -861,7 +861,7 @@ impl DeviceSemantics {
                         second,
                     });
                 }
-                return Err(DeviceProgramError::DuplicateRelationRow {
+                return Err(DeviceProgramError::RepeatedRelationRow {
                     primal: relation.primal,
                 });
             }
@@ -894,7 +894,7 @@ impl DeviceSemantics {
                 .iter()
                 .any(|binding| binding.buffer == observation.buffer)
             {
-                return Err(DeviceProgramError::UnknownObservationBuffer {
+                return Err(DeviceProgramError::AbsentObservationBuffer {
                     buffer: observation.buffer,
                 });
             }
@@ -1042,7 +1042,7 @@ impl DeviceSemantics {
     /// a hostile effect on a member launch
     /// ([`DeviceFunctionHostileEffect`](DeviceProgramError::DeviceFunctionHostileEffect)),
     /// or a malformed legality record naming a launch outside the program
-    /// ([`UnknownDeviceEffectLaunch`](DeviceProgramError::UnknownDeviceEffectLaunch)).
+    /// ([`UnknownDeviceEffectLaunch`](DeviceProgramError::AbsentDeviceEffectLaunch)).
     pub fn derive_prepared_regions_with_effect_boundaries(
         &self,
         launches: &[LaunchId],

@@ -358,7 +358,7 @@ fn boundary_abi_rejects_definition_callee_callsite_shape() {
     // one call through it — and the gate rejects the unsupported shape.
     assert_eq!(calls.len(), 1);
     match validate_boundary_abi(&program, &calls, &context) {
-        Err(BoundaryAbiError::UnsupportedCallsiteShape { kernel, .. }) => {
+        Err(BoundaryAbiError::UnlowerableCallsiteShape { kernel, .. }) => {
             assert_eq!(kernel, MirFunctionId(1));
         }
         other => panic!("expected a CallsiteShape violation, got {other:?}"),

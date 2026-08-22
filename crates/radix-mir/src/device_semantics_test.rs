@@ -133,7 +133,7 @@ fn one_value_bound_to_two_buffers_fails_closed() {
     };
     assert!(matches!(
         semantics.validate(&[]),
-        Err(DeviceProgramError::DuplicateValueBinding {
+        Err(DeviceProgramError::RepeatedValueBinding {
             value: SemanticValueId(1),
             buffer: BufferId(1),
         })
@@ -284,7 +284,7 @@ fn second_producer_of_one_generation_is_rejected() {
     };
     assert!(matches!(
         semantics.validate(&launch),
-        Err(DeviceProgramError::DuplicateGenerationProducer {
+        Err(DeviceProgramError::RepeatedGenerationProducer {
             value: SemanticValueId(1),
             generation: 1
         })
@@ -416,7 +416,7 @@ fn missing_dependency_is_rejected() {
     };
     assert!(matches!(
         semantics.validate(&[LaunchId(1), LaunchId(2)]),
-        Err(DeviceProgramError::MissingDependency {
+        Err(DeviceProgramError::AbsentDependency {
             launch: LaunchId(2),
             value: SemanticValueId(1),
         })
@@ -448,7 +448,7 @@ fn unknown_dependency_endpoint_is_rejected() {
     };
     assert!(matches!(
         semantics.validate(&[LaunchId(1)]),
-        Err(DeviceProgramError::UnknownDependencyEndpoint {
+        Err(DeviceProgramError::AbsentDependencyEndpoint {
             launch: LaunchId(9)
         })
     ));
@@ -550,7 +550,7 @@ fn same_producer_duplicate_generation_row_fails_closed() {
     };
     assert!(matches!(
         semantics.validate(&[LaunchId(1)]),
-        Err(DeviceProgramError::DuplicateGenerationProducer {
+        Err(DeviceProgramError::RepeatedGenerationProducer {
             value: SemanticValueId(1),
             generation: 1
         })
@@ -612,7 +612,7 @@ fn consumed_value_without_producer_generation_fails_closed() {
     };
     assert!(matches!(
         semantics.validate(&[LaunchId(1), LaunchId(2)]),
-        Err(DeviceProgramError::MissingProducer {
+        Err(DeviceProgramError::AbsentProducer {
             producer: LaunchId(1),
             value: SemanticValueId(1),
         })
@@ -776,7 +776,7 @@ fn duplicate_companion_facts_fail_closed_on_identity_key() {
     };
     assert!(matches!(
         semantics.validate(&[]),
-        Err(DeviceProgramError::DuplicateRelationRow { primal })
+        Err(DeviceProgramError::RepeatedRelationRow { primal })
             if primal == DefId(1)
     ));
 }
@@ -831,7 +831,7 @@ fn relation_with_no_companion_facts_fails_closed_as_missing() {
     };
     assert!(matches!(
         semantics.validate(&[]),
-        Err(DeviceProgramError::MissingCompanionFact { primal, .. })
+        Err(DeviceProgramError::AbsentCompanionFact { primal, .. })
             if primal == DefId(1)
     ));
 }
@@ -1109,7 +1109,7 @@ fn device_effect_fact_on_unknown_launch_fails_closed() {
     });
     assert!(matches!(
         facts.validate(&launches),
-        Err(DeviceProgramError::UnknownDeviceEffectLaunch {
+        Err(DeviceProgramError::AbsentDeviceEffectLaunch {
             launch: LaunchId(9)
         })
     ));
@@ -1236,7 +1236,7 @@ fn region_formation_with_unknown_effect_launch_fails_closed() {
     });
     assert!(matches!(
         semantics.derive_prepared_regions_with_effect_boundaries(&launches, &legality),
-        Err(DeviceProgramError::UnknownDeviceEffectLaunch {
+        Err(DeviceProgramError::AbsentDeviceEffectLaunch {
             launch: LaunchId(9)
         })
     ));

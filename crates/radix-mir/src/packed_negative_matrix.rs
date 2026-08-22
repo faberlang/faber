@@ -129,7 +129,7 @@ fn wrong_layout_on_packed_block_fails_closed() {
         dequant_packed_block(PackedStorageLayout::F16, &q8).expect_err("no silent F16 reinterpret");
     assert_eq!(
         error,
-        PackedDequantError::UnsupportedLayout {
+        PackedDequantError::UnrepresentableLayout {
             layout: PackedStorageLayout::F16
         }
     );
@@ -137,7 +137,7 @@ fn wrong_layout_on_packed_block_fails_closed() {
         .expect_err("no silent BF16 reinterpret");
     assert_eq!(
         error,
-        PackedDequantError::UnsupportedLayout {
+        PackedDequantError::UnrepresentableLayout {
             layout: PackedStorageLayout::Bf16
         }
     );
@@ -145,7 +145,7 @@ fn wrong_layout_on_packed_block_fails_closed() {
         .expect_err("no silent F32 expansion path");
     assert_eq!(
         error,
-        PackedDequantError::UnsupportedLayout {
+        PackedDequantError::UnrepresentableLayout {
             layout: PackedStorageLayout::F32
         }
     );
@@ -153,7 +153,7 @@ fn wrong_layout_on_packed_block_fails_closed() {
         .expect_err("no silent MXFP4 reinterpret");
     assert_eq!(
         error,
-        PackedDequantError::UnsupportedLayout {
+        PackedDequantError::UnrepresentableLayout {
             layout: PackedStorageLayout::MXFP4
         }
     );

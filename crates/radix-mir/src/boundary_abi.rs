@@ -242,7 +242,7 @@ pub enum BoundaryAbiError {
     /// each mapping to the kernel id) lower to that form, so any other
     /// callee is rejected before emission (DDCP3-U5 / gate 6) — never a
     /// malformed module with a call to a never-emitted kernel body.
-    UnsupportedCallsiteShape {
+    UnlowerableCallsiteShape {
         /// The calling host-side function.
         host: MirFunctionId,
         /// The invoked device kernel.
@@ -260,7 +260,7 @@ impl BoundaryAbiError {
             Self::Lifetime { .. } => BoundaryAbiKind::Lifetime,
             Self::Mutation { .. } => BoundaryAbiKind::Mutation,
             Self::Observation { .. } => BoundaryAbiKind::Observation,
-            Self::UnsupportedCallsiteShape { .. } => BoundaryAbiKind::CallsiteShape,
+            Self::UnlowerableCallsiteShape { .. } => BoundaryAbiKind::CallsiteShape,
         }
     }
 }
@@ -324,7 +324,7 @@ impl fmt::Display for BoundaryAbiError {
                 "boundary call f{} → kernel f{} passes the kernel's own output (from _{} ) back in as an input; the region result is observed before the producing launch ran (observation of unlaunched work)",
                 host.0, kernel.0, local.0
             ),
-            Self::UnsupportedCallsiteShape { host, kernel } => write!(
+            Self::UnlowerableCallsiteShape { host, kernel } => write!(
                 f,
                 "boundary call f{} → kernel f{} goes through a callee the direct region-call ABI cannot lower (a Definition or non-function Value callee) — the prepared-region direct call is the only emitted boundary form (unsupported callsite shape)",
                 host.0, kernel.0
@@ -810,7 +810,7 @@ fn validate_host_calls(
                             | MirCallee::Value(MirOperand::Constant(MirConstant::Function(_)))
                             | MirCallee::Closure(_)
                     ) {
-                        return Err(BoundaryAbiError::UnsupportedCallsiteShape {
+                        return Err(BoundaryAbiError::UnlowerableCallsiteShape {
                             host: host.id,
                             kernel: kernel.id,
                         });

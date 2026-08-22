@@ -20,7 +20,7 @@ pub enum DeviceProgramError {
         error: PlanValidationError,
     },
     /// A kernel binds the same (group, binding) slot twice.
-    DuplicateBinding {
+    RepeatedBinding {
         kernel: usize,
         group: u32,
         binding: u32,
@@ -40,9 +40,9 @@ pub enum DeviceProgramError {
         kernel_count: usize,
     },
     /// A launch id appears more than once in the ordered sequence.
-    DuplicateLaunchId { launch: LaunchId },
+    RepeatedLaunchId { launch: LaunchId },
     /// A result names a producing launch that does not exist.
-    UnknownProducingLaunch {
+    AbsentProducingLaunch {
         result: usize,
         produced_by: LaunchId,
     },
@@ -102,9 +102,9 @@ pub enum DeviceProgramError {
     },
     /// A value id is referenced that no [`SemanticValue`](crate::device_semantics::SemanticValue)
     /// declares (F1).
-    UnknownSemanticValue { value: SemanticValueId },
+    AbsentSemanticValue { value: SemanticValueId },
     /// A semantic value is bound to more than one buffer (F1).
-    DuplicateValueBinding {
+    RepeatedValueBinding {
         value: SemanticValueId,
         buffer: BufferId,
     },
@@ -117,20 +117,20 @@ pub enum DeviceProgramError {
     /// A write carries generation 0 — the reserved unset sentinel (F2).
     UnsetValueGeneration { value: SemanticValueId },
     /// A second producer claims an existing (value, generation) (F2).
-    DuplicateGenerationProducer {
+    RepeatedGenerationProducer {
         value: SemanticValueId,
         generation: u32,
     },
     /// A root names a launch that does not exist (F3).
     IllegalRoot { root: LaunchId },
     /// A root appears more than once (F3).
-    DuplicateRoot { root: LaunchId },
+    RepeatedRoot { root: LaunchId },
     /// A dependency edge runs from a launch to itself (F3).
     SelfDependency { launch: LaunchId },
     /// A dependency edge names a launch that does not exist (F3).
-    UnknownDependencyEndpoint { launch: LaunchId },
+    AbsentDependencyEndpoint { launch: LaunchId },
     /// The same dependency edge is declared twice (F3).
-    DuplicateDependencyEdge {
+    RepeatedDependencyEdge {
         producer: LaunchId,
         consumer: LaunchId,
     },
@@ -138,7 +138,7 @@ pub enum DeviceProgramError {
     DependencyCycle { edge: DependencyEdge },
     /// A generation producer is not reachable from any root — a missing
     /// dependency (F3).
-    MissingDependency {
+    AbsentDependency {
         launch: LaunchId,
         value: SemanticValueId,
     },
@@ -146,7 +146,7 @@ pub enum DeviceProgramError {
     /// selected positions, …) (F4).
     IllegalRelationRow { primal: DefId, reason: &'static str },
     /// Two relation rows name the same primal with identical facts (F4).
-    DuplicateRelationRow { primal: DefId },
+    RepeatedRelationRow { primal: DefId },
     /// Two relation rows for the same primal disagree on a fact (F4).
     ContradictoryRelationRow {
         primal: DefId,
@@ -163,7 +163,7 @@ pub enum DeviceProgramError {
     /// An observation names a launch that does not exist (F5/F6).
     ObservationOutOfRange { launch: LaunchId },
     /// An observation names a buffer no value is bound to (F6).
-    UnknownObservationBuffer { buffer: BufferId },
+    AbsentObservationBuffer { buffer: BufferId },
     /// A result row has no explicit observation fact in the carried
     /// semantics — a writable intermediate exposed as a result without being
     /// declared observed (F6).
@@ -188,7 +188,7 @@ pub enum DeviceProgramError {
     UnboundEdgeBuffer { buffer: BufferId },
     /// A consumer edge references a value its producer launch never writes —
     /// a missing producer (F3 / contract scheduling rule 3).
-    MissingProducer {
+    AbsentProducer {
         producer: LaunchId,
         value: SemanticValueId,
     },
@@ -251,7 +251,7 @@ pub enum DeviceProgramError {
     /// rule 6/7). Graph-direction references (a launch consuming a companion
     /// output with no relation) are proven by the independent oracle
     /// (G6 `KernelSequence`).
-    MissingCompanionFact { primal: DefId, reason: &'static str },
+    AbsentCompanionFact { primal: DefId, reason: &'static str },
     // ── DDCP1-U5: prepared submission regions ────────────────────────────
     /// A prepared submission region contains a declared observation point in
     /// its interior — the host would have to read back between members, a
@@ -268,7 +268,7 @@ pub enum DeviceProgramError {
     // ── DDCP1-U6: device/AIR legality ────────────────────────────────────
     /// A device effect-boundary fact names a launch outside the device
     /// program — a malformed legality record (DDCP1-U6).
-    UnknownDeviceEffectLaunch { launch: LaunchId },
+    AbsentDeviceEffectLaunch { launch: LaunchId },
     /// A device function (launch) carries a device-hostile effect — `ad`,
     /// Sermo, cancellation, or an unresolved host (CPU) effect. Stable
     /// structured rejection with the named effect (DDCP1-U6 / contract
@@ -288,7 +288,7 @@ impl fmt::Display for DeviceProgramError {
                 write!(f, "kernel {kernel} has an empty entry name")
             }
             Self::Plan { error } => write!(f, "kernel plan validation failed: {error}"),
-            Self::DuplicateBinding {
+            Self::RepeatedBinding {
                 kernel,
                 group,
                 binding,
@@ -317,10 +317,10 @@ impl fmt::Display for DeviceProgramError {
                 f,
                 "launch {launch} references kernel {kernel_index} but the program has {kernel_count} kernels"
             ),
-            Self::DuplicateLaunchId { launch } => {
+            Self::RepeatedLaunchId { launch } => {
                 write!(f, "launch id {launch} appears more than once in the launch sequence")
             }
-            Self::UnknownProducingLaunch { result, produced_by } => write!(
+            Self::AbsentProducingLaunch { result, produced_by } => write!(
                 f,
                 "result {result} names producing launch {produced_by}, which does not exist"
             ),
@@ -394,10 +394,10 @@ impl fmt::Display for DeviceProgramError {
                 f,
                 "semantic values {first} and {second} both derive from origin {origin}; distinct values must derive from distinct carried facts"
             ),
-            Self::UnknownSemanticValue { value } => {
+            Self::AbsentSemanticValue { value } => {
                 write!(f, "semantic value {value} is referenced but never declared")
             }
-            Self::DuplicateValueBinding { value, buffer } => write!(
+            Self::RepeatedValueBinding { value, buffer } => write!(
                 f,
                 "semantic value {value} is bound to more than one buffer (including {buffer})"
             ),
@@ -413,25 +413,25 @@ impl fmt::Display for DeviceProgramError {
                 f,
                 "a write of semantic value {value} carries generation 0 (the reserved unset sentinel)"
             ),
-            Self::DuplicateGenerationProducer { value, generation } => write!(
+            Self::RepeatedGenerationProducer { value, generation } => write!(
                 f,
                 "semantic value {value} generation {generation} has a second producer; a later write is a new generation"
             ),
             Self::IllegalRoot { root } => {
                 write!(f, "root {root} is not a declared launch")
             }
-            Self::DuplicateRoot { root } => {
+            Self::RepeatedRoot { root } => {
                 write!(f, "root {root} is declared more than once")
             }
             Self::SelfDependency { launch } => write!(
                 f,
                 "dependency edge runs from launch {launch} to itself"
             ),
-            Self::UnknownDependencyEndpoint { launch } => write!(
+            Self::AbsentDependencyEndpoint { launch } => write!(
                 f,
                 "dependency edge names launch {launch}, which does not exist"
             ),
-            Self::DuplicateDependencyEdge {
+            Self::RepeatedDependencyEdge {
                 producer,
                 consumer,
             } => write!(
@@ -444,7 +444,7 @@ impl fmt::Display for DeviceProgramError {
                 producer = edge.producer,
                 consumer = edge.consumer,
             ),
-            Self::MissingDependency { launch, value } => write!(
+            Self::AbsentDependency { launch, value } => write!(
                 f,
                 "launch {launch} produces semantic value {value} but is not reachable from any root (missing dependency)"
             ),
@@ -453,7 +453,7 @@ impl fmt::Display for DeviceProgramError {
                 "relation row for primal DefId({}) is illegal: {reason}",
                 primal.0
             ),
-            Self::DuplicateRelationRow { primal } => write!(
+            Self::RepeatedRelationRow { primal } => write!(
                 f,
                 "duplicate relation rows for primal DefId({}); duplicate or contradictory rows fail closed",
                 primal.0
@@ -480,7 +480,7 @@ impl fmt::Display for DeviceProgramError {
                 f,
                 "observation names launch {launch}, which does not exist"
             ),
-            Self::UnknownObservationBuffer { buffer } => write!(
+            Self::AbsentObservationBuffer { buffer } => write!(
                 f,
                 "observation names buffer {buffer}, which no semantic value is bound to"
             ),
@@ -508,7 +508,7 @@ impl fmt::Display for DeviceProgramError {
                 f,
                 "dependency edge flows buffer {buffer}, which no semantic value is bound to (F3)"
             ),
-            Self::MissingProducer { producer, value } => write!(
+            Self::AbsentProducer { producer, value } => write!(
                 f,
                 "a consumer edge references semantic value {value} but its producer launch {producer} never writes it (missing producer) (F3)"
             ),
@@ -564,7 +564,7 @@ impl fmt::Display for DeviceProgramError {
                 f,
                 "a consumer binds generation {bound_generation} of semantic value {value} while the producer carries the newer generation {latest_generation} — stale companion consumption of superseded primal state fails closed (companion identity rule 5)"
             ),
-            Self::MissingCompanionFact { primal, reason } => write!(
+            Self::AbsentCompanionFact { primal, reason } => write!(
                 f,
                 "the companion declared for primal DefId({}) is a missing companion fact: {reason} (companion identity rule 6; a forward-only program declares no companions and needs none)",
                 primal.0
@@ -581,7 +581,7 @@ impl fmt::Display for DeviceProgramError {
                 f,
                 "launch {launch} is not assigned to exactly one prepared submission region — an incomplete or overlapping region partition fails closed (prepared submission regions rules 1/4)"
             ),
-            Self::UnknownDeviceEffectLaunch { launch } => write!(
+            Self::AbsentDeviceEffectLaunch { launch } => write!(
                 f,
                 "device effect-boundary fact names launch {launch}, which is not in the device program (device/AIR legality)"
             ),

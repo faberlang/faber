@@ -446,7 +446,7 @@ fn duplicate_partition_id_fails_topology() {
     assert_eq!(error.class(), ValidateKind::TopologyMismatch);
     assert_eq!(
         error,
-        ValidateError::DuplicatePartition {
+        ValidateError::RepeatedPartition {
             partition: PartitionId(0)
         }
     );
@@ -510,7 +510,7 @@ fn transfer_of_undeclared_value_fails_missing_owner() {
     assert_eq!(error.class(), ValidateKind::MissingOwner);
     assert!(matches!(
         error,
-        ValidateError::MissingOwner {
+        ValidateError::AbsentOwner {
             value: SemanticValueId(99),
             reference: OpRef::Transfer(TransferId(0)),
         }
@@ -591,7 +591,7 @@ fn duplicate_replica_in_set_fails_conflicting() {
     assert_eq!(error.class(), ValidateKind::ConflictingReplicas);
     assert_eq!(
         error,
-        ValidateError::DuplicateReplica {
+        ValidateError::RepeatedReplica {
             value: SemanticValueId(6),
             partition: PartitionId(0),
         }
@@ -689,7 +689,7 @@ fn duplicate_move_fails_conflicting() {
     assert_eq!(error.class(), ValidateKind::ConflictingReplicas);
     assert_eq!(
         error,
-        ValidateError::DuplicateMove {
+        ValidateError::RepeatedMove {
             value: SemanticValueId(7),
             original: TransferId(1),
             duplicate: TransferId(2),
@@ -711,7 +711,7 @@ fn missing_generation_fails() {
     assert_eq!(error.class(), ValidateKind::Completeness);
     assert!(matches!(
         error,
-        ValidateError::MissingGeneration {
+        ValidateError::AbsentGeneration {
             value: SemanticValueId(3),
             reference: OpRef::Transfer(TransferId(0)),
             producer_generation: 0,
@@ -749,7 +749,7 @@ fn missing_byte_contract_fails() {
     assert_eq!(error.class(), ValidateKind::Completeness);
     assert!(matches!(
         error,
-        ValidateError::MissingByteContract {
+        ValidateError::AbsentByteContract {
             value: SemanticValueId(3),
             reference: OpRef::Transfer(TransferId(0)),
             byte_count: 0,
@@ -770,7 +770,7 @@ fn missing_producer_fails() {
     assert_eq!(error.class(), ValidateKind::Completeness);
     assert!(matches!(
         error,
-        ValidateError::MissingProducer {
+        ValidateError::AbsentProducer {
             value: SemanticValueId(7),
             reference: OpRef::Transfer(TransferId(1)),
         }
@@ -789,7 +789,7 @@ fn missing_completion_boundary_fails() {
     assert_eq!(error.class(), ValidateKind::Completeness);
     assert!(matches!(
         error,
-        ValidateError::MissingCompletionBoundary {
+        ValidateError::AbsentCompletionBoundary {
             value: SemanticValueId(3),
             reference: OpRef::Transfer(TransferId(0)),
         }
@@ -830,7 +830,7 @@ fn missing_consumer_fails() {
     assert_eq!(error.class(), ValidateKind::Completeness);
     assert!(matches!(
         error,
-        ValidateError::MissingConsumer {
+        ValidateError::AbsentConsumer {
             value: SemanticValueId(1),
             reference: OpRef::Transfer(TransferId(1)),
             source: PartitionId(0),
@@ -941,7 +941,7 @@ fn collective_source_not_participant_fails_unsupported() {
     assert_eq!(error.class(), ValidateKind::UnsupportedCollective);
     assert_eq!(
         error,
-        ValidateError::UnsupportedCollective {
+        ValidateError::UnadmittedCollective {
             value: SemanticValueId(6),
             collective: CollectiveId(0),
             violation: CollectiveViolation::SourceNotParticipant {
@@ -961,7 +961,7 @@ fn collective_not_owner_originated_fails_unsupported() {
     assert_eq!(error.class(), ValidateKind::UnsupportedCollective);
     assert_eq!(
         error,
-        ValidateError::UnsupportedCollective {
+        ValidateError::UnadmittedCollective {
             value: SemanticValueId(6),
             collective: CollectiveId(0),
             violation: CollectiveViolation::NotOwnerOriginated {
@@ -988,7 +988,7 @@ fn diagnostic_display_names_class_and_failing_fact() {
 
     // The failed-class mapping covers every class (each exit-gate bullet).
     assert_eq!(
-        ValidateError::MissingOwner {
+        ValidateError::AbsentOwner {
             value: SemanticValueId(1),
             reference: OpRef::Transfer(TransferId(0)),
         }
@@ -996,7 +996,7 @@ fn diagnostic_display_names_class_and_failing_fact() {
         ValidateKind::MissingOwner
     );
     assert_eq!(
-        ValidateError::DuplicateMove {
+        ValidateError::RepeatedMove {
             value: SemanticValueId(1),
             original: TransferId(0),
             duplicate: TransferId(1),
@@ -1014,7 +1014,7 @@ fn diagnostic_display_names_class_and_failing_fact() {
         ValidateKind::Cycle
     );
     assert_eq!(
-        ValidateError::UnsupportedCollective {
+        ValidateError::UnadmittedCollective {
             value: SemanticValueId(1),
             collective: CollectiveId(0),
             violation: CollectiveViolation::TooFewParticipants { count: 1 },
@@ -1039,7 +1039,7 @@ fn diagnostic_display_names_class_and_failing_fact() {
         ValidateKind::StaleVersion
     );
     assert_eq!(
-        ValidateError::MissingByteContract {
+        ValidateError::AbsentByteContract {
             value: SemanticValueId(1),
             reference: OpRef::Transfer(TransferId(0)),
             byte_count: 0,

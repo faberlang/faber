@@ -278,7 +278,7 @@ fn completeness_gate_fails_closed_on_missing_packet_entrypoint_symbol() {
     packet.entrypoint_symbols.clear();
     assert!(matches!(
         check_preparation_completeness(&partition, &record, &calls, &packet),
-        Err(CompletenessError::MissingPacketEntrypointSymbol {
+        Err(CompletenessError::AbsentPacketEntrypointSymbol {
             region: 1,
             kernel: MirFunctionId(1),
             entry,
@@ -292,7 +292,7 @@ fn completeness_gate_fails_closed_on_missing_packet_entrypoint_symbol() {
     });
     assert!(matches!(
         check_preparation_completeness(&partition, &record, &calls, &packet),
-        Err(CompletenessError::MissingPacketEntrypointSymbol { .. })
+        Err(CompletenessError::AbsentPacketEntrypointSymbol { .. })
     ));
 }
 
@@ -307,7 +307,7 @@ fn completeness_gate_fails_closed_on_missing_packet_reflection() {
     packet.reflected_kernels.clear();
     assert!(matches!(
         check_preparation_completeness(&partition, &record, &calls, &packet),
-        Err(CompletenessError::MissingPacketReflectionRow {
+        Err(CompletenessError::AbsentPacketReflectionRow {
             region: 1,
             kernel: MirFunctionId(1),
             entry,
@@ -335,7 +335,7 @@ fn completeness_gate_fails_closed_on_missing_or_inconsistent_typed_calls() {
     let packet = packet_facts_for(&partition);
     assert!(matches!(
         check_preparation_completeness(&partition, &record, &[], &packet),
-        Err(CompletenessError::MissingHostDeviceCall { region: 1 })
+        Err(CompletenessError::AbsentHostDeviceCall { region: 1 })
     ));
 
     // A HostDeviceCall whose argument layout disagrees with the derived
@@ -359,7 +359,7 @@ fn completeness_gate_fails_closed_on_missing_or_inconsistent_record() {
     record.regions.clear();
     assert!(matches!(
         check_preparation_completeness(&partition, &record, &calls, &packet),
-        Err(CompletenessError::MissingRegionRecord { region: 1 })
+        Err(CompletenessError::AbsentRegionRecord { region: 1 })
     ));
 
     // A record region row that disagrees with the derived partition fails
@@ -378,7 +378,7 @@ fn completeness_gate_fails_closed_on_missing_or_inconsistent_record() {
     record.callsites.clear();
     assert!(matches!(
         check_preparation_completeness(&partition, &record, &calls, &packet),
-        Err(CompletenessError::MissingCallsite { region: 1 })
+        Err(CompletenessError::AbsentCallsite { region: 1 })
     ));
 }
 

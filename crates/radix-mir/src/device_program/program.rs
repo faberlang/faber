@@ -111,7 +111,7 @@ impl DeviceProgram {
                     });
                 }
                 if seen_bindings.contains(&resource.binding) {
-                    return Err(DeviceProgramError::DuplicateBinding {
+                    return Err(DeviceProgramError::RepeatedBinding {
                         kernel: kernel_index,
                         group: resource.binding.group,
                         binding: resource.binding.binding,
@@ -138,7 +138,7 @@ impl DeviceProgram {
                 });
             }
             if seen_launches.contains(&launch.id) {
-                return Err(DeviceProgramError::DuplicateLaunchId { launch: launch.id });
+                return Err(DeviceProgramError::RepeatedLaunchId { launch: launch.id });
             }
             seen_launches.push(launch.id);
         }
@@ -204,7 +204,7 @@ impl DeviceProgram {
                 .iter()
                 .any(|launch| launch.id == result.produced_by)
             {
-                return Err(DeviceProgramError::UnknownProducingLaunch {
+                return Err(DeviceProgramError::AbsentProducingLaunch {
                     result: result_index,
                     produced_by: result.produced_by,
                 });
@@ -415,7 +415,7 @@ impl DeviceProgram {
             let value = binding.value;
 
             let Some(entry) = registry.buffer(edge.buffer) else {
-                return Err(DeviceProgramError::MissingProducer {
+                return Err(DeviceProgramError::AbsentProducer {
                     producer: edge.producer,
                     value,
                 });
@@ -425,13 +425,13 @@ impl DeviceProgram {
                 .iter()
                 .find(|version| version.version.version == edge.version)
             else {
-                return Err(DeviceProgramError::MissingProducer {
+                return Err(DeviceProgramError::AbsentProducer {
                     producer: edge.producer,
                     value,
                 });
             };
             if !version.produced_by.contains(&edge.producer) {
-                return Err(DeviceProgramError::MissingProducer {
+                return Err(DeviceProgramError::AbsentProducer {
                     producer: edge.producer,
                     value,
                 });
@@ -460,7 +460,7 @@ impl DeviceProgram {
                             version: edge.version,
                         });
                     }
-                    return Err(DeviceProgramError::MissingProducer {
+                    return Err(DeviceProgramError::AbsentProducer {
                         producer: edge.producer,
                         value,
                     });

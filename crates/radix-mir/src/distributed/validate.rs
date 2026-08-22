@@ -163,7 +163,7 @@ pub enum ValidateError {
     },
 
     /// The partition set contains a duplicate partition id.
-    DuplicatePartition {
+    RepeatedPartition {
         /// The duplicated partition.
         partition: PartitionId,
     },
@@ -190,14 +190,14 @@ pub enum ValidateError {
     },
 
     /// A cross-partition value has no declared placement.
-    MissingOwner {
+    AbsentOwner {
         /// The value moved without a placement.
         value: SemanticValueId,
         /// The operation moving it.
         reference: OpRef,
     },
     /// A replicated contract has an empty replica set.
-    MissingReplicaSet {
+    AbsentReplicaSet {
         /// The value with the empty contract.
         value: SemanticValueId,
         /// The declared primary.
@@ -221,7 +221,7 @@ pub enum ValidateError {
         second: ContractFingerprint,
     },
     /// A replica set repeats a partition id.
-    DuplicateReplica {
+    RepeatedReplica {
         /// The replicated value.
         value: SemanticValueId,
         /// The repeated partition.
@@ -255,7 +255,7 @@ pub enum ValidateError {
         second: OpRef,
     },
     /// Two transfers declare the identical move of one value.
-    DuplicateMove {
+    RepeatedMove {
         /// The value moved twice.
         value: SemanticValueId,
         /// The original move.
@@ -265,7 +265,7 @@ pub enum ValidateError {
     },
 
     /// A transfer lacks a generation (zero or absent).
-    MissingGeneration {
+    AbsentGeneration {
         /// The moved value.
         value: SemanticValueId,
         /// The operation.
@@ -287,7 +287,7 @@ pub enum ValidateError {
         consumer_generation: u32,
     },
     /// A transfer/collective lacks a byte/shape contract.
-    MissingByteContract {
+    AbsentByteContract {
         /// The moved value.
         value: SemanticValueId,
         /// The operation.
@@ -296,14 +296,14 @@ pub enum ValidateError {
         byte_count: u64,
     },
     /// A transfer names no producing launch.
-    MissingProducer {
+    AbsentProducer {
         /// The moved value.
         value: SemanticValueId,
         /// The operation.
         reference: OpRef,
     },
     /// A transfer's destination neither holds a copy nor runs a launch.
-    MissingConsumer {
+    AbsentConsumer {
         /// The moved value.
         value: SemanticValueId,
         /// The operation.
@@ -314,7 +314,7 @@ pub enum ValidateError {
         destination: PartitionId,
     },
     /// A transfer has no completion boundary at all.
-    MissingCompletionBoundary {
+    AbsentCompletionBoundary {
         /// The moved value.
         value: SemanticValueId,
         /// The operation.
@@ -346,7 +346,7 @@ pub enum ValidateError {
     },
 
     /// A collective is outside the v1 admissible set / form.
-    UnsupportedCollective {
+    UnadmittedCollective {
         /// The moved value.
         value: SemanticValueId,
         /// The collective operation.
@@ -362,28 +362,28 @@ impl ValidateError {
     pub fn class(&self) -> ValidateKind {
         match self {
             Self::StaleVersion { .. } => ValidateKind::StaleVersion,
-            Self::DuplicatePartition { .. }
+            Self::RepeatedPartition { .. }
             | Self::TopologyMismatch { .. }
             | Self::ZeroPartitionBudget { .. }
             | Self::RequireOwnerMismatch { .. } => ValidateKind::TopologyMismatch,
-            Self::MissingOwner { .. }
-            | Self::MissingReplicaSet { .. }
+            Self::AbsentOwner { .. }
+            | Self::AbsentReplicaSet { .. }
             | Self::PrimaryOutsideReplicaSet { .. } => ValidateKind::MissingOwner,
             Self::ConflictingContracts { .. }
-            | Self::DuplicateReplica { .. }
+            | Self::RepeatedReplica { .. }
             | Self::PartitionContractMismatch { .. }
             | Self::SharedLaunch { .. }
             | Self::ConflictingByteContract { .. }
-            | Self::DuplicateMove { .. } => ValidateKind::ConflictingReplicas,
-            Self::MissingGeneration { .. }
+            | Self::RepeatedMove { .. } => ValidateKind::ConflictingReplicas,
+            Self::AbsentGeneration { .. }
             | Self::GenerationOrder { .. }
-            | Self::MissingByteContract { .. }
-            | Self::MissingProducer { .. }
-            | Self::MissingConsumer { .. }
-            | Self::MissingCompletionBoundary { .. }
+            | Self::AbsentByteContract { .. }
+            | Self::AbsentProducer { .. }
+            | Self::AbsentConsumer { .. }
+            | Self::AbsentCompletionBoundary { .. }
             | Self::DanglingBoundaryReference { .. } => ValidateKind::Completeness,
             Self::SelfMove { .. } | Self::ValueMoveCycle { .. } => ValidateKind::Cycle,
-            Self::UnsupportedCollective { .. } => ValidateKind::UnsupportedCollective,
+            Self::UnadmittedCollective { .. } => ValidateKind::UnsupportedCollective,
         }
     }
 }
@@ -399,7 +399,7 @@ impl fmt::Display for ValidateError {
                 "{}: plan version {plan_version} != supported logical plan version {supported_version}",
                 self.class()
             ),
-            Self::DuplicatePartition { partition } => {
+            Self::RepeatedPartition { partition } => {
                 write!(f, "{}: partition set contains {partition} twice", self.class())
             }
             Self::TopologyMismatch {
@@ -431,12 +431,12 @@ impl fmt::Display for ValidateError {
                     self.class()
                 ),
             },
-            Self::MissingOwner { value, reference } => write!(
+            Self::AbsentOwner { value, reference } => write!(
                 f,
                 "{}: {value} moved by {reference} has no declared owner or replication contract",
                 self.class()
             ),
-            Self::MissingReplicaSet { value, primary } => write!(
+            Self::AbsentReplicaSet { value, primary } => write!(
                 f,
                 "{}: {value} declares primary {primary} with an empty replica set",
                 self.class()
@@ -451,7 +451,7 @@ impl fmt::Display for ValidateError {
                 "{}: {value} declared twice — {first:?} vs {second:?}",
                 self.class()
             ),
-            Self::DuplicateReplica { value, partition } => write!(
+            Self::RepeatedReplica { value, partition } => write!(
                 f,
                 "{}: replica set of {value} repeats {partition}",
                 self.class()
@@ -480,7 +480,7 @@ impl fmt::Display for ValidateError {
                 "{}: {value} byte contract {first_byte_count} vs {second_byte_count} on {second}",
                 self.class()
             ),
-            Self::DuplicateMove {
+            Self::RepeatedMove {
                 value,
                 original,
                 duplicate,
@@ -489,7 +489,7 @@ impl fmt::Display for ValidateError {
                 "{}: {duplicate} repeats the move of {value} already declared by {original}",
                 self.class()
             ),
-            Self::MissingGeneration {
+            Self::AbsentGeneration {
                 value,
                 reference,
                 producer_generation,
@@ -509,7 +509,7 @@ impl fmt::Display for ValidateError {
                 "{}: {reference} consumes {value} at generation {consumer_generation} before it is produced at {producer_generation}",
                 self.class()
             ),
-            Self::MissingByteContract {
+            Self::AbsentByteContract {
                 value,
                 reference,
                 byte_count,
@@ -518,12 +518,12 @@ impl fmt::Display for ValidateError {
                 "{}: {reference} moves {value} with byte count {byte_count} — no byte/shape contract",
                 self.class()
             ),
-            Self::MissingProducer { value, reference } => write!(
+            Self::AbsentProducer { value, reference } => write!(
                 f,
                 "{}: {reference} moves {value} without a producing launch",
                 self.class()
             ),
-            Self::MissingConsumer {
+            Self::AbsentConsumer {
                 value,
                 reference,
                 source,
@@ -533,7 +533,7 @@ impl fmt::Display for ValidateError {
                 "{}: {reference} moves {value} {source} → {destination} but {destination} neither holds a copy nor runs a launch",
                 self.class()
             ),
-            Self::MissingCompletionBoundary { value, reference } => write!(
+            Self::AbsentCompletionBoundary { value, reference } => write!(
                 f,
                 "{}: {reference} moves {value} with no completion boundary",
                 self.class()
@@ -560,7 +560,7 @@ impl fmt::Display for ValidateError {
                 "{}: {value} moves cycle through {first} and {second}",
                 self.class()
             ),
-            Self::UnsupportedCollective {
+            Self::UnadmittedCollective {
                 value,
                 collective,
                 violation,
@@ -710,7 +710,7 @@ fn check_duplicate_partitions(plan: &DistributedExecutionPlan) -> Result<(), Val
             .iter()
             .any(|later| later.id == partition.id)
         {
-            return Err(ValidateError::DuplicatePartition {
+            return Err(ValidateError::RepeatedPartition {
                 partition: partition.id,
             });
         }
@@ -869,7 +869,7 @@ fn check_declared_placements(plan: &DistributedExecutionPlan) -> Result<(), Vali
         }
         if let PlacementContract::Replicated { primary, replicas } = &placement.contract {
             if replicas.is_empty() {
-                return Err(ValidateError::MissingReplicaSet {
+                return Err(ValidateError::AbsentReplicaSet {
                     value: placement.value,
                     primary: *primary,
                 });
@@ -885,7 +885,7 @@ fn check_declared_placements(plan: &DistributedExecutionPlan) -> Result<(), Vali
                     .iter()
                     .any(|later| later == replica)
                 {
-                    return Err(ValidateError::DuplicateReplica {
+                    return Err(ValidateError::RepeatedReplica {
                         value: placement.value,
                         partition: *replica,
                     });
@@ -972,13 +972,13 @@ fn check_collective_completeness(
 ) -> Result<(), ValidateError> {
     let reference = OpRef::Collective(collective.id);
     if placement_for(plan, collective.value).is_none() {
-        return Err(ValidateError::MissingOwner {
+        return Err(ValidateError::AbsentOwner {
             value: collective.value,
             reference,
         });
     }
     if collective.byte_count == 0 {
-        return Err(ValidateError::MissingByteContract {
+        return Err(ValidateError::AbsentByteContract {
             value: collective.value,
             reference,
             byte_count: 0,
@@ -996,14 +996,14 @@ fn check_transfer_completeness(
     let reference = OpRef::Transfer(transfer.id);
 
     let Some(placement) = placement_for(plan, transfer.value) else {
-        return Err(ValidateError::MissingOwner {
+        return Err(ValidateError::AbsentOwner {
             value: transfer.value,
             reference,
         });
     };
 
     if transfer.producer_generation == 0 || transfer.consumer_generation == 0 {
-        return Err(ValidateError::MissingGeneration {
+        return Err(ValidateError::AbsentGeneration {
             value: transfer.value,
             reference,
             producer_generation: transfer.producer_generation,
@@ -1020,7 +1020,7 @@ fn check_transfer_completeness(
     }
 
     if transfer.byte_count == 0 {
-        return Err(ValidateError::MissingByteContract {
+        return Err(ValidateError::AbsentByteContract {
             value: transfer.value,
             reference,
             byte_count: transfer.byte_count,
@@ -1030,14 +1030,14 @@ fn check_transfer_completeness(
     if transfer.completion_boundary.barriers.is_empty()
         && transfer.completion_boundary.launches.is_empty()
     {
-        return Err(ValidateError::MissingCompletionBoundary {
+        return Err(ValidateError::AbsentCompletionBoundary {
             value: transfer.value,
             reference,
         });
     }
 
     if transfer.completion_boundary.launches.is_empty() {
-        return Err(ValidateError::MissingProducer {
+        return Err(ValidateError::AbsentProducer {
             value: transfer.value,
             reference,
         });
@@ -1048,7 +1048,7 @@ fn check_transfer_completeness(
         .iter()
         .any(|partition| partition.id == transfer.destination && !partition.launches.is_empty());
     if !copy_holder(&placement.contract, transfer.destination) && !destination_runs_launches {
-        return Err(ValidateError::MissingConsumer {
+        return Err(ValidateError::AbsentConsumer {
             value: transfer.value,
             reference,
             source: transfer.source,
@@ -1101,7 +1101,7 @@ fn check_mover_agreement(plan: &DistributedExecutionPlan) -> Result<(), Validate
             if let (OpRef::Transfer(first), OpRef::Transfer(second)) = (reference, later_reference)
             {
                 if identical_move(plan, first, second) {
-                    return Err(ValidateError::DuplicateMove {
+                    return Err(ValidateError::RepeatedMove {
                         value,
                         original: first,
                         duplicate: second,
@@ -1258,7 +1258,7 @@ fn check_collectives(plan: &DistributedExecutionPlan) -> Result<(), ValidateErro
         match collective.kind {
             CollectiveKind::Broadcast => {
                 if !collective.participants.contains(&collective.source) {
-                    return Err(ValidateError::UnsupportedCollective {
+                    return Err(ValidateError::UnadmittedCollective {
                         value: collective.value,
                         collective: collective.id,
                         violation: CollectiveViolation::SourceNotParticipant {
@@ -1267,7 +1267,7 @@ fn check_collectives(plan: &DistributedExecutionPlan) -> Result<(), ValidateErro
                     });
                 }
                 if collective.participants.len() < 2 {
-                    return Err(ValidateError::UnsupportedCollective {
+                    return Err(ValidateError::UnadmittedCollective {
                         value: collective.value,
                         collective: collective.id,
                         violation: CollectiveViolation::TooFewParticipants {
@@ -1278,7 +1278,7 @@ fn check_collectives(plan: &DistributedExecutionPlan) -> Result<(), ValidateErro
                 if let Some(owner) = declared_owner(plan, collective.value)
                     .filter(|owner| *owner != collective.source)
                 {
-                    return Err(ValidateError::UnsupportedCollective {
+                    return Err(ValidateError::UnadmittedCollective {
                         value: collective.value,
                         collective: collective.id,
                         violation: CollectiveViolation::NotOwnerOriginated {
