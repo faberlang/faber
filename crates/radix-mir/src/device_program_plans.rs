@@ -486,6 +486,12 @@ pub const QUANTIZED_GEMM_ENTRY: &str = "quantized_gemm";
 /// Library entry for a packed GEMV body (M = 1 decode).
 pub const QUANTIZED_GEMV_ENTRY: &str = "quantized_gemv";
 
+/// CTO ruling `f083c057`: batched is the numeric baseline for decode
+/// projections; M=1 GEMV selection stays off until PB-3 root-causes the
+/// numeric divergence and proves identity. The GEMV bodies remain in the
+/// tree; re-enabling is this one flag.
+pub const DECODE_GEMV_SELECTION_ENABLED: bool = false;
+
 /// Target-neutral layout family for a library body bind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BindLayout {
@@ -2015,7 +2021,7 @@ fn library_entry_for_kernel(kernel: &KernelUnit, recipe: RecipeKind) -> Option<S
 }
 
 fn quantized_compute_entry(decode_extent: u64) -> &'static str {
-    if decode_extent == 1 {
+    if DECODE_GEMV_SELECTION_ENABLED && decode_extent == 1 {
         QUANTIZED_GEMV_ENTRY
     } else {
         QUANTIZED_GEMM_ENTRY
@@ -2089,7 +2095,7 @@ fn packed_decode_uniforms_for_kernel(kernel: &KernelUnit) -> Vec<UniformBinding>
         UniformBinding {
             name: DECODE_GEMV_UNIFORM.to_owned(),
             ty: UniformType::U32,
-            bits: u32::from(packed.decode_extent == 1),
+            bits: u32::from(DECODE_GEMV_SELECTION_ENABLED && packed.decode_extent == 1),
         },
     ]
 }

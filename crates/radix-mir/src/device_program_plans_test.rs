@@ -3582,9 +3582,12 @@ fn executor_plan_exposes_packed_region_and_decode_gemv_facts() {
         .validate_for_kernel_count(1)
         .expect("packed executor-plan section is well-formed");
     let selection = &extension.selections[0];
+    // CTO f083c057: batched is the decode numeric baseline, so the M=1
+    // kernel selects the GEMM entry and reports decode_gemv=0 until PB-3
+    // re-enables selection with a numeric-identity proof.
     assert_eq!(
         selection.library_entry.as_deref(),
-        Some(QUANTIZED_GEMV_ENTRY)
+        Some(QUANTIZED_GEMM_ENTRY)
     );
     let packed_bytes = crate::abi::PackedStorageLayout::Q8_0
         .packed_bytes_for_elements(32 * 32)
@@ -3596,7 +3599,7 @@ fn executor_plan_exposes_packed_region_and_decode_gemv_facts() {
             .iter()
             .find(|uniform| uniform.name == DECODE_GEMV_UNIFORM)
             .map(|uniform| uniform.bits),
-        Some(1)
+        Some(0)
     );
     assert_eq!(
         selection
@@ -3616,7 +3619,7 @@ fn executor_plan_exposes_packed_region_and_decode_gemv_facts() {
     );
     assert_eq!(
         selection.backend_requirements[0].feature,
-        QUANTIZED_GEMV_ENTRY
+        QUANTIZED_GEMM_ENTRY
     );
 }
 

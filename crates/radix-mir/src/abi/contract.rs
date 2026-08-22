@@ -661,7 +661,7 @@ fn batched_attention_contract(
         other => {
             return Err(MirAbiError::new(format!(
                 "batched attention kind {other} is not admitted"
-            )))
+            )));
         }
     };
     let kv_heads = const_u64(args, axes_base, "kv_heads")?;
@@ -746,7 +746,12 @@ fn batched_attention_contract(
     // Single-row Q/K/V projections are lowered as one simdgroup per four
     // output columns (`NR0=4`).  The logical output shape stays unchanged;
     // the flat launch is `N × 8` so 32 lanes reduce four packed columns.
-    let output_elements = if is_projection && step_rows == 1 {
+    // GEMV selection off (CTO `f083c057`) keeps the logical, unpadded
+    // output: the batched body needs no padded dispatch domain.
+    let output_elements = if is_projection
+        && step_rows == 1
+        && crate::device_program_plans::DECODE_GEMV_SELECTION_ENABLED
+    {
         output_elements
             .checked_mul(DECODE_GEMV_LANES)
             .ok_or_else(|| MirAbiError::new("decode GEMV dispatch size overflow"))?

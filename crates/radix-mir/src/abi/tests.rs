@@ -1673,8 +1673,8 @@ fn projection_gemv_dispatch_uses_step_rows_not_seq_const() {
         "plan seq is THIS step's row count, not the seq const"
     );
     assert_eq!(
-        output_elements, 64,
-        "logical 2*1*4=8 columns × 8 GEMV lanes"
+        output_elements, 8,
+        "logical 2*1*4=8 columns; the GEMV lane expansion stays off (CTO f083c057)"
     );
 }
 
