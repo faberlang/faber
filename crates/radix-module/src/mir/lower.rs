@@ -1596,7 +1596,20 @@ impl<'a> FunctionBuilder<'a> {
         let id = self.next_local_id();
         self.locals
             .push(MirLocalDecl { id, name: Some(konst.name), ty: mir_ty, mutable: false, span });
-        self.lower_expr_to_destination(&konst.value, MirPlace::local(id), mir_ty)?;
+        if let HirExpressionKind::ConversioAssign { source, recovery, .. } = &konst.value.kind {
+            // Typed `↤` initializer: the destination is the const binding just
+            // declared, so convert the source to its declared type and store once.
+            self.lower_conversio_assign_to_destination(
+                source,
+                recovery.as_deref(),
+                MirPlace::local(id),
+                mir_ty,
+                span,
+                &konst.value,
+            )?;
+        } else {
+            self.lower_expr_to_destination(&konst.value, MirPlace::local(id), mir_ty)?;
+        }
         self.bindings
             .insert(item_def_id, LocalBinding { local: id, ty: mir_ty });
         Some(())

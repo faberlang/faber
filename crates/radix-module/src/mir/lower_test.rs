@@ -140,6 +140,31 @@ functio readAnswer() → numerus {
 }
 
 #[test]
+fn lowers_top_level_const_conversio_init_through_shared_conversion_owner() {
+    let dump = dump_source(
+        r#"
+fixum numerus answer ↤ "42"
+
+incipit {
+    nota answer
+}
+"#,
+    );
+
+    assert_eq!(
+        count_occurrences(&dump, "runtime convert runtime"),
+        1,
+        "item-scope ↤ init must convert exactly once:\n{dump}"
+    );
+    assert_eq!(
+        count_occurrences(&dump, " = %"),
+        1,
+        "item-scope ↤ init must store into the const exactly once:\n{dump}"
+    );
+    assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
+}
+
+#[test]
 fn lowers_atomic_methods_to_dedicated_mir_intrinsics() {
     let dump = dump_source(
         r"
