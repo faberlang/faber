@@ -104,7 +104,7 @@ fn o_column_absent_from_i_fails_with_column_identity() {
 
     assert_eq!(
         schema_subset(&types, &o, &i),
-        Err(SchemaSubsetError::MissingFromInput {
+        Err(SchemaSubsetError::AbsentFromInput {
             column: interner.intern("titulus"),
         })
     );
@@ -236,7 +236,7 @@ fn subset_is_directional() {
 
     assert_eq!(
         schema_subset(&types, &o, &i),
-        Err(SchemaSubsetError::MissingFromInput {
+        Err(SchemaSubsetError::AbsentFromInput {
             column: interner.intern("activa"),
         })
     );
@@ -402,7 +402,7 @@ fn empty_output_schema_is_trivially_a_subset() {
     };
     assert_eq!(
         schema_subset(&types, &o2, &i2),
-        Err(SchemaSubsetError::MissingFromInput {
+        Err(SchemaSubsetError::AbsentFromInput {
             column: interner.intern("id"),
         })
     );

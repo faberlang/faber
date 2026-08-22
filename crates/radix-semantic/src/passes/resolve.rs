@@ -1684,7 +1684,7 @@ fn instans_precision_marker_error(
 
 fn width_marker_error(err: WidthError, prim: Primitive, span: radix_lexer::Span) -> SemanticError {
     let issue = match err {
-        WidthError::UnknownMarker => match prim {
+        WidthError::UnrecognizedMarker => match prim {
             Primitive::Numerus => ISSUE_INVALID_NUMERUS_WIDTH_MARKER,
             Primitive::Fractus => ISSUE_INVALID_FRACTUS_WIDTH_MARKER,
             _ => ISSUE_INVALID_WIDTH_MARKER,
@@ -2275,7 +2275,11 @@ fn define_binding_pattern(
             );
         }
         BindingPattern::Wildcard(_) => {}
-        BindingPattern::Array { elements, is_rest: rest, .. } => {
+        BindingPattern::Array {
+            elements,
+            is_rest: rest,
+            ..
+        } => {
             for element in elements {
                 define_binding_pattern(resolver, element, mutable, errors);
             }
@@ -2290,7 +2294,11 @@ fn define_binding_pattern(
                 );
             }
         }
-        BindingPattern::Object { fields, is_rest: rest, .. } => {
+        BindingPattern::Object {
+            fields,
+            is_rest: rest,
+            ..
+        } => {
             for field in fields {
                 let binding = field.alias.as_ref().unwrap_or(&field.name);
                 define_symbol(

@@ -58,7 +58,7 @@ pub enum SchemaSubsetError {
     /// An `O` column is absent from `I` by public name after alias
     /// resolution — the schema-side analog of MISSING-1 (design §2.4.2).
     /// Metadata-level: no row identity exists.
-    MissingFromInput { column: LexSymbol },
+    AbsentFromInput { column: LexSymbol },
 
     /// A matched column's Faber type is incompatible in the projection
     /// direction: a value of `I`'s type cannot be used where `O`'s type is
@@ -94,7 +94,7 @@ pub enum SchemaSubsetError {
 ///
 /// # Errors
 ///
-/// Returns [`SchemaSubsetError::MissingFromInput`] when an `O` column is
+/// Returns [`SchemaSubsetError::AbsentFromInput`] when an `O` column is
 /// absent from `I`, [`SchemaSubsetError::IncompatibleType`] when the
 /// matched column types are incompatible in the projection direction, and
 /// [`SchemaSubsetError::NullabilityTightened`] when `O` requires a column
@@ -106,7 +106,7 @@ pub fn schema_subset(
 ) -> Result<(), SchemaSubsetError> {
     for o_col in &o.columns {
         let Some(i_col) = i.columns.iter().find(|c| c.name == o_col.name) else {
-            return Err(SchemaSubsetError::MissingFromInput { column: o_col.name });
+            return Err(SchemaSubsetError::AbsentFromInput { column: o_col.name });
         };
         schema_column_compatible(types, i_col, o_col)?;
     }

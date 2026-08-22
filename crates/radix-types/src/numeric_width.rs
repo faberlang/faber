@@ -27,7 +27,7 @@ pub enum NumericWidth {
 /// Family mismatch or unknown width marker for a primitive family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WidthError {
-    UnknownMarker,
+    UnrecognizedMarker,
     FloatOnNumerus,
     IntOnFractus,
     TooManyParams,
@@ -73,7 +73,7 @@ impl NumericWidth {
             ("i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64", Primitive::Fractus) => {
                 Err(WidthError::IntOnFractus)
             }
-            _ => Err(WidthError::UnknownMarker),
+            _ => Err(WidthError::UnrecognizedMarker),
         }
     }
 
@@ -191,9 +191,9 @@ impl WidthError {
             (WidthError::TooManyParams, Primitive::Numerus) => "numerus accepts at most one width marker",
             (WidthError::TooManyParams, Primitive::Fractus) => "fractus accepts at most one width marker",
             (WidthError::TooManyParams, _) => "primitive accepts at most one width marker",
-            (WidthError::UnknownMarker, Primitive::Numerus) => "unknown width marker for numerus",
-            (WidthError::UnknownMarker, Primitive::Fractus) => "fractus accepts only f16, f32, or f64",
-            (WidthError::UnknownMarker, _) => "unknown width marker for this family",
+            (WidthError::UnrecognizedMarker, Primitive::Numerus) => "unknown width marker for numerus",
+            (WidthError::UnrecognizedMarker, Primitive::Fractus) => "fractus accepts only f16, f32, or f64",
+            (WidthError::UnrecognizedMarker, _) => "unknown width marker for this family",
         }
     }
 }
