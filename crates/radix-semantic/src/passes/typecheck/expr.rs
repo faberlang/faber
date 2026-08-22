@@ -34,6 +34,9 @@ const ISSUE_STREAM_AD_OPENER_TYPE_MISMATCH: &str = "stream_ad_opener_type_mismat
 const ISSUE_EXPRESSION_TYPE_MISMATCH: &str = "expression_type_mismatch";
 const ISSUE_ITERA_AB_SOURCE_REQUIRES_RANGE: &str = "itera_ab_source_requires_range";
 const ISSUE_CURSOR_ITERATION_REQUIRES_EX: &str = "cursor_iteration_requires_ex";
+const ISSUE_ITERA_APUD_REQUIRES_EX: &str = "itera_apud_requires_ex";
+const ISSUE_ITERA_APUD_ARITY_MISMATCH: &str = "itera_apud_arity_mismatch";
+const ISSUE_ITERA_APUD_REQUIRES_SHAPED_ITERABLE: &str = "itera_apud_requires_shaped_iterable";
 const ISSUE_CEDE_REQUIRES_PROMISSUM: &str = "cede_requires_promissum";
 const ISSUE_CEDE_REQUIRES_GENERATOR: &str = "cede_requires_generator";
 const ISSUE_REDDET_REQUIRES_ASYNC_FUNCTION: &str = "reddet_requires_async_function";
@@ -43,6 +46,20 @@ const ISSUE_INVALID_LOWERED_EXPRESSION: &str = "invalid_lowered_expression";
 /// operand-eligibility and selector rules land with tensor-glyphs 2B. No `∇`
 /// expression may pass typecheck untyped or silently.
 const ISSUE_GRADIENT_EXPRESSION_UNSUPPORTED: &str = "gradient_expression_unsupported";
+
+/// Rank (shape length) of a tensor shape when statically known.
+///
+/// `Literal` and `Param` shapes are rank-1 (`[N]` parses as a one-element
+/// `Tuple`); compound shapes contribute their dimension count. Inference
+/// holes and the pre-grammar unspecified bridge carry no static rank.
+fn tensor_shape_rank(types: &TypeTable, shape: crate::IndexId) -> Option<u64> {
+    match types.get_index(shape) {
+        IndexExpr::Literal(_) => Some(1),
+        IndexExpr::Tuple(dims) => Some(dims.len() as u64),
+        IndexExpr::Param(_) => Some(1),
+        IndexExpr::Infer(_) | IndexExpr::Unspecified => None,
+    }
+}
 
 impl TypeChecker<'_> {
     /// Synthesizes an expression type, optionally using an expected type as
@@ -114,12 +131,63 @@ impl TypeChecker<'_> {
                 self.check_block(block, None);
                 self.vacuum_type()
             }
-            HirExpressionKind::Itera(mode, _, binding, _, iter, block) => {
+            HirExpressionKind::Itera(mode, coordinate_bindings, binding, _, iter, block) => {
                 let iter_ty = if matches!(mode, radix_hir::HirIteraMode::Ab) {
                     self.check_expr_allowing_direct_intervallum_step(iter)
                 } else {
                     self.check_expr(iter)
                 };
+                // A collection field read through an immutable `ref` root
+                // is a read-only view of the carrier collection. Use that
+                // carrier for iterable-shape dispatch; field projections
+                // retain their `Ref` type for access and borrow checks.
+                let dispatch_ty = if matches!(mode, radix_hir::HirIteraMode::Ab) {
+                    iter_ty
+                } else {
+                    self.types
+                        .peel_access_marker(self.resolve_inferred_type(iter_ty))
+                        .1
+                };
+                let has_coordinates = !coordinate_bindings.is_empty();
+
+                // Mode rule: `apud` coordinates require `ex` iteration in v1.
+                if has_coordinates && !matches!(mode, radix_hir::HirIteraMode::Ex) {
+                    self.error_issue(
+                        SemanticErrorKind::TypeMismatch,
+                        ISSUE_ITERA_APUD_REQUIRES_EX,
+                        iter.span,
+                    );
+                }
+
+                // Arity rule: the coordinate count must equal the iterable's
+                // rank (tensor shape length; matrix = 2) — never partial
+                // binding. A rank >= 2 iterable without an `apud` clause is
+                // arity 0 != rank, hence also a type error. Non-shaped
+                // iterables reject `apud` fail-closed.
+                if matches!(mode, radix_hir::HirIteraMode::Ex) {
+                    let rank = match self.types.get(dispatch_ty) {
+                        Type::Tensor(_, shape) => tensor_shape_rank(self.types, *shape),
+                        Type::Matrix(_, _) => Some(2),
+                        _ => None,
+                    };
+                    match rank {
+                        Some(rank) if !has_coordinates && rank == 1 => {}
+                        Some(rank) if rank == coordinate_bindings.len() as u64 => {}
+                        Some(rank) => self.errors.push(
+                            SemanticError::structured(SemanticErrorKind::TypeMismatch, iter.span)
+                                .with_arg("issue", ISSUE_ITERA_APUD_ARITY_MISMATCH)
+                                .with_arg("expected", rank.to_string())
+                                .with_arg("actual", coordinate_bindings.len().to_string()),
+                        ),
+                        None if has_coordinates => self.error_issue(
+                            SemanticErrorKind::TypeMismatch,
+                            ISSUE_ITERA_APUD_REQUIRES_SHAPED_ITERABLE,
+                            iter.span,
+                        ),
+                        None => {}
+                    }
+                }
+
                 let elem_ty = if matches!(mode, radix_hir::HirIteraMode::Ab) {
                     if let Some(bound) = self.intervallum_bound_type(iter_ty) {
                         bound
@@ -132,15 +200,7 @@ impl TypeChecker<'_> {
                         self.numerus_type()
                     }
                 } else {
-                    // A collection field read through an immutable `ref` root
-                    // is a read-only view of the carrier collection. Use that
-                    // carrier for iterable-shape dispatch; field projections
-                    // retain their `Ref` type for access and borrow checks.
-                    let iter_ty = self
-                        .types
-                        .peel_access_marker(self.resolve_inferred_type(iter_ty))
-                        .1;
-                    match self.types.get(iter_ty) {
+                    match self.types.get(dispatch_ty) {
                         Type::Array(inner) => match mode {
                             radix_hir::HirIteraMode::De => self.numerus_type(),
                             radix_hir::HirIteraMode::Ex => *inner,
@@ -187,24 +247,41 @@ impl TypeChecker<'_> {
                                 self.error_type
                             }
                         },
-                        // Rank-1 literal-shaped tensors bind the element type
-                        // (mir/lower/control.rs owns the matching MIR arm);
-                        // rank > 1 and symbolic shapes keep the numerus
-                        // fallback so MIR's Unsupported diagnostic stays the
-                        // decline site. `[N]` parses as a one-element Tuple.
+                        // `apud` coordinates with arity == rank bind the
+                        // element type; coordinate-free rank-1 literal tensors
+                        // (Route T) keep their existing element binding. Rank
+                        // > 1 coordinate-free and symbolic shapes keep the
+                        // numerus fallback so MIR's Unsupported diagnostic
+                        // stays the decline site. `[N]` parses as a
+                        // one-element Tuple.
                         Type::Tensor(elem, shape)
-                            if matches!(mode, radix_hir::HirIteraMode::Ex)
+                            if matches!(mode, radix_hir::HirIteraMode::Ex) =>
+                        {
+                            let rank = tensor_shape_rank(self.types, *shape);
+                            let route_t = !has_coordinates
                                 && match self.types.get_index(*shape) {
-                                    radix_types::IndexExpr::Literal(_) => true,
-                                    radix_types::IndexExpr::Tuple(dims) => {
+                                    IndexExpr::Literal(_) => true,
+                                    IndexExpr::Tuple(dims) => {
                                         dims.len() == 1
                                             && matches!(
                                                 self.types.get_index(dims[0]),
-                                                radix_types::IndexExpr::Literal(_)
+                                                IndexExpr::Literal(_)
                                             )
                                     }
                                     _ => false,
-                                } =>
+                                };
+                            if rank == Some(coordinate_bindings.len() as u64) || route_t {
+                                *elem
+                            } else {
+                                self.numerus_type()
+                            }
+                        }
+                        // Matrix is rank-2 by the width-sugar rule; the arity
+                        // gate rejects coordinate counts other than 2 (and no
+                        // clause on a matrix, arity 0 != 2).
+                        Type::Matrix(elem, _)
+                            if matches!(mode, radix_hir::HirIteraMode::Ex)
+                                && coordinate_bindings.len() == 2 =>
                         {
                             *elem
                         }
@@ -220,6 +297,10 @@ impl TypeChecker<'_> {
                     }
                 };
                 self.push_scope();
+                let numerus = self.numerus_type();
+                for (def_id, _name) in coordinate_bindings {
+                    self.insert_binding(*def_id, numerus);
+                }
                 self.insert_binding(*binding, elem_ty);
                 self.check_block(block, None);
                 self.pop_scope();

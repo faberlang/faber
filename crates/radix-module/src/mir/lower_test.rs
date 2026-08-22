@@ -1373,11 +1373,13 @@ fn edge_empty_range_itera_ab_skips_loop_body() {
 fn lower_itera_expr_rejects_shaped_tensor_and_matrix_collections() {
     // Post-delivery admit shapes: tensor rank 1/2/3 with [i]/[i, j]/[i, j, k]
     // and matrix rank 2 with [i, j]. Arity-error shapes remain [i] on rank 2,
-    // [i, j] on rank 3, and [i, j, k] on matrix rank 2.
+    // [i, j] on rank 3, and [i, j, k] on matrix rank 2. Coordinate-free rank-2
+    // `itera ex` is an arity type error (AC-5), so the pins ride the explicit
+    // `apud [i, j]` form until AC-6 lowers it.
     let cases = [
         (
             "tensor-rank-2",
-            "functio iterate(tensor<f32, [2, 3]> m) → vacuum { itera ex m fixum cell { } }",
+            "functio iterate(tensor<f32, [2, 3]> m) → vacuum { itera ex m apud [i, j] fixum cell { } }",
             // AEU-1: rank > 1 tensor itera declines ride the generic
             // Unsupported family (rank > 1 belongs to itera-apud-coordinates).
             "unsupported MIR lowering: itera collection before iterator MIR lowering",
@@ -1385,9 +1387,9 @@ fn lower_itera_expr_rejects_shaped_tensor_and_matrix_collections() {
         ),
         (
             "matrix-rank-2",
-            "functio iterate(matrix<f32, [2, 3]> m) → vacuum { itera ex m fixum cell { } }",
-            "unsupported MIR lowering: itera ex over tabula before map value iteration MIR lowering",
-            "unsupported_mir_lowering_itera_ex_over_tabula_before_map_value_iteration_mir_lowering",
+            "functio iterate(matrix<f32, [2, 3]> m) → vacuum { itera ex m apud [i, j] fixum cell { } }",
+            "unsupported MIR lowering: itera collection before iterator MIR lowering",
+            "unsupported_mir_lowering_itera_collection_before_iterator_mir_lowering",
         ),
     ];
 
@@ -1464,9 +1466,12 @@ fn tensor_itera_ex_rank1_lowers_to_literal_bound_index_loop() {
 
 #[test]
 fn tensor_itera_ex_rank2_stays_unsupported() {
+    // Coordinate-free rank-2 `itera ex` is an arity type error (AC-5); the
+    // explicit `apud [i, j]` form still reaches MIR and stays unsupported
+    // until AC-6 lowers the shaped arm.
     let mut unit = analyze(
         r"functio sumGrid(tensor<fractus<f32>, [2, 2]> t) → fractus<f32> {
-  itera ex t fixum x {
+  itera ex t apud [i, j] fixum x {
     nota x
   }
   redde 0.0

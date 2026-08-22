@@ -2095,6 +2095,11 @@ fn semantic_type_mismatch_message(args: &[DiagnosticArg]) -> Option<String> {
         "incompatible_tensor_index" => Some(crate::INCOMPATIBLE_INDEX_MSG.to_owned()),
         "invalid_cast" => Some("invalid cast".to_owned()),
         "itera_ab_source_requires_range" => Some("itera ab source must be a range expression".to_owned()),
+        "itera_apud_arity_mismatch" => Some("apud coordinate count must equal the iterable rank".to_owned()),
+        "itera_apud_requires_ex" => Some("apud coordinate iteration requires ex".to_owned()),
+        "itera_apud_requires_shaped_iterable" => {
+            Some("apud requires a tensor or matrix iterable with a static rank".to_owned())
+        }
         "json_map_key_must_be_textus" => Some("JSON map key must be textus".to_owned()),
         "json_annotation_unsupported_site" => {
             Some("@ json is only supported on genus declarations and fields inside @ json genera".to_owned())

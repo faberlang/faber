@@ -625,6 +625,10 @@ mod gradient_test;
 mod infer_test;
 
 #[cfg(test)]
+#[path = "itera_apud_test.rs"]
+mod itera_apud_test;
+
+#[cfg(test)]
 #[path = "literal_inference_test.rs"]
 mod literal_inference_test;
 

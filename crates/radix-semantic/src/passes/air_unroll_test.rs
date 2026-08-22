@@ -186,11 +186,13 @@ fn tensor_ex_rank1_admits_guard_free_element_lets() {
 
 #[test]
 fn tensor_ex_rank2_defers_to_coordinates_with_distinct_causa() {
+    // Coordinate-free rank-2 `itera ex` is an arity type error (AC-5); the
+    // explicit `apud [i, j]` form typechecks and defers to AC-7's unroll.
     let errors = air_errors(
         r#"
 @ radix lane "air"
 functio grid_sum(tensor<f32, [2, 2]> x) → f32 {
-    itera ex x fixum value { }
+    itera ex x apud [i, j] fixum value { }
     redde 0.0
 }
 "#,
