@@ -32,9 +32,9 @@ use radix_hir::visit::{
     HirVisitor, HirVisitorMut,
 };
 use radix_hir::{
-    DefId, HirBinOp, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirId, HirItemKind,
-    HirIteraMode, HirLiteral, HirLocal, HirModule, HirParam, HirRangeKind, HirStatement,
-    HirStatementKind, HirUnOp,
+    DefId, HirArrayElement, HirBinOp, HirBlock, HirConversioTarget, HirExpression,
+    HirExpressionKind, HirFunction, HirId, HirItemKind, HirIteraMode, HirLiteral, HirLocal,
+    HirModule, HirParam, HirRangeKind, HirStatement, HirStatementKind, HirUnOp,
 };
 use radix_lexer::{Interner, Span, Symbol};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -96,6 +96,7 @@ fn unroll_function(
         return;
     };
     let mask = MaskAnalysis::analyze(&function.params, body, types, interner);
+    let fullness = FullnessFacts::from_block(body, types);
     let mut emitted_lanes = 0;
     rewrite_block(
         body,
@@ -105,6 +106,7 @@ fn unroll_function(
         errors,
         &mask,
         types,
+        &fullness,
         &mut emitted_lanes,
     );
 }
@@ -117,6 +119,7 @@ fn rewrite_block(
     errors: &mut Vec<SemanticError>,
     mask: &MaskAnalysis,
     types: &TypeTable,
+    fullness: &FxHashMap<DefId, usize>,
     emitted_lanes: &mut usize,
 ) {
     let mut index = 0;
@@ -130,6 +133,7 @@ fn rewrite_block(
             interner,
             mask,
             types,
+            fullness,
             emitted_lanes,
         );
         if plan.is_none() {
@@ -141,6 +145,7 @@ fn rewrite_block(
                 errors,
                 mask,
                 types,
+                fullness,
                 emitted_lanes,
             );
         }
@@ -179,9 +184,10 @@ fn rewrite_block(
             errors,
             mask,
             types,
+            fullness,
             emitted_lanes,
         );
-        match classify_itera_expr(&expr, block, lanes, interner, mask, types, emitted_lanes) {
+        match classify_itera_expr(&expr, block, lanes, interner, mask, types, fullness, emitted_lanes) {
             Some(UnrollPlan::Decline { span, causa }) => {
                 errors.push(decline(span, causa));
                 block.expr = Some(expr);
@@ -212,6 +218,7 @@ fn rewrite_nested_stmt(
     errors: &mut Vec<SemanticError>,
     mask: &MaskAnalysis,
     types: &TypeTable,
+    fullness: &FxHashMap<DefId, usize>,
     emitted_lanes: &mut usize,
 ) {
     match &mut stmt.kind {
@@ -225,6 +232,7 @@ fn rewrite_nested_stmt(
                     errors,
                     mask,
                     types,
+                    fullness,
                     emitted_lanes,
                 );
             }
@@ -238,6 +246,7 @@ fn rewrite_nested_stmt(
                 errors,
                 mask,
                 types,
+                fullness,
                 emitted_lanes,
             );
         }
@@ -251,6 +260,7 @@ fn rewrite_nested_stmt(
                     errors,
                     mask,
                     types,
+                    fullness,
                     emitted_lanes,
                 );
                 rewrite_block(
@@ -261,6 +271,7 @@ fn rewrite_nested_stmt(
                     errors,
                     mask,
                     types,
+                    fullness,
                     emitted_lanes,
                 );
             }
@@ -281,6 +292,7 @@ fn rewrite_nested_expr(
     errors: &mut Vec<SemanticError>,
     mask: &MaskAnalysis,
     types: &TypeTable,
+    fullness: &FxHashMap<DefId, usize>,
     emitted_lanes: &mut usize,
 ) {
     match &mut expr.kind {
@@ -292,6 +304,7 @@ fn rewrite_nested_expr(
             errors,
             mask,
             types,
+            fullness,
             emitted_lanes,
         ),
         HirExpressionKind::Si {
@@ -308,6 +321,7 @@ fn rewrite_nested_expr(
                 errors,
                 mask,
                 types,
+                fullness,
                 emitted_lanes,
             );
             rewrite_block(
@@ -318,6 +332,7 @@ fn rewrite_nested_expr(
                 errors,
                 mask,
                 types,
+                fullness,
                 emitted_lanes,
             );
             if let Some(catch) = then_catch {
@@ -329,6 +344,7 @@ fn rewrite_nested_expr(
                     errors,
                     mask,
                     types,
+                    fullness,
                     emitted_lanes,
                 );
             }
@@ -341,6 +357,7 @@ fn rewrite_nested_expr(
                     errors,
                     mask,
                     types,
+                    fullness,
                     emitted_lanes,
                 );
             }
@@ -357,6 +374,7 @@ fn rewrite_nested_expr(
                     errors,
                     mask,
                     types,
+                    fullness,
                     emitted_lanes,
                 );
             }
@@ -370,6 +388,7 @@ fn rewrite_nested_expr(
                         errors,
                         mask,
                         types,
+                        fullness,
                         emitted_lanes,
                     );
                 }
@@ -381,6 +400,7 @@ fn rewrite_nested_expr(
                     errors,
                     mask,
                     types,
+                    fullness,
                     emitted_lanes,
                 );
             }
@@ -394,6 +414,7 @@ fn rewrite_nested_expr(
                 errors,
                 mask,
                 types,
+                fullness,
                 emitted_lanes,
             );
         }
@@ -406,6 +427,7 @@ fn rewrite_nested_expr(
                 errors,
                 mask,
                 types,
+                fullness,
                 emitted_lanes,
             );
             rewrite_block(
@@ -416,6 +438,7 @@ fn rewrite_nested_expr(
                 errors,
                 mask,
                 types,
+                fullness,
                 emitted_lanes,
             );
         }
@@ -428,6 +451,7 @@ fn rewrite_nested_expr(
                 errors,
                 mask,
                 types,
+                fullness,
                 emitted_lanes,
             );
             rewrite_nested_expr(
@@ -438,6 +462,7 @@ fn rewrite_nested_expr(
                 errors,
                 mask,
                 types,
+                fullness,
                 emitted_lanes,
             );
         }
@@ -459,6 +484,7 @@ fn rewrite_nested_expr(
                 errors,
                 mask,
                 types,
+                fullness,
                 emitted_lanes,
             );
         }
@@ -471,6 +497,7 @@ fn rewrite_nested_expr(
                 errors,
                 mask,
                 types,
+                fullness,
                 emitted_lanes,
             );
             rewrite_nested_expr(
@@ -481,6 +508,7 @@ fn rewrite_nested_expr(
                 errors,
                 mask,
                 types,
+                fullness,
                 emitted_lanes,
             );
         }
@@ -493,6 +521,7 @@ fn rewrite_nested_expr(
                 errors,
                 mask,
                 types,
+                fullness,
                 emitted_lanes,
             );
             for arg in args {
@@ -504,6 +533,7 @@ fn rewrite_nested_expr(
                     errors,
                     mask,
                     types,
+                    fullness,
                     emitted_lanes,
                 );
             }
@@ -517,6 +547,7 @@ fn rewrite_nested_expr(
                 errors,
                 mask,
                 types,
+                fullness,
                 emitted_lanes,
             );
             for arg in args {
@@ -528,12 +559,92 @@ fn rewrite_nested_expr(
                     errors,
                     mask,
                     types,
+                    fullness,
                     emitted_lanes,
                 );
             }
         }
         _ => {}
     }
+}
+
+/// Static collection lengths proven from immutable construction sites.
+///
+/// A bounded carrier stores only its live prefix, so its capacity is not an
+/// iteration count. This fact table records an exact length only for an
+/// immutable literal/conversion chain; parameters and mutable values stay
+/// unknown and therefore cannot admit Route A.
+struct FullnessFacts;
+
+impl FullnessFacts {
+    fn from_block(block: &HirBlock, types: &TypeTable) -> FxHashMap<DefId, usize> {
+        let mut facts = FxHashMap::default();
+        let mut collector = Collector { facts: &mut facts, types };
+        collector.visit_block(block);
+        facts
+    }
+}
+
+struct Collector<'a> {
+    facts: &'a mut FxHashMap<DefId, usize>,
+    types: &'a TypeTable,
+}
+
+impl HirVisitor for Collector<'_> {
+    fn visit_local(&mut self, local: &HirLocal) {
+        if !local.mutable {
+            if let Some(init) = &local.init {
+                if let Some(length) = static_length(init, self.facts, self.types) {
+                    self.facts.insert(local.def_id, length);
+                }
+            }
+        } else {
+            self.facts.remove(&local.def_id);
+        }
+        radix_hir::visit::walk_local(self, local);
+    }
+}
+
+fn static_length(
+    expr: &HirExpression,
+    facts: &FxHashMap<DefId, usize>,
+    types: &TypeTable,
+) -> Option<usize> {
+    match &expr.kind {
+        HirExpressionKind::Array(elements)
+            if elements
+                .iter()
+                .all(|element| matches!(element, HirArrayElement::Expr(_))) =>
+        {
+            Some(elements.len())
+        }
+        HirExpressionKind::Path(def_id) => facts.get(def_id).copied(),
+        HirExpressionKind::Conversio {
+            source,
+            target: HirConversioTarget::Type(target),
+            ..
+        } => {
+            let length = static_length(source, facts, types)?;
+            if let Some(capacity) = bounded_capacity(*target, types) {
+                (capacity == length).then_some(length)
+            } else {
+                Some(length)
+            }
+        }
+        HirExpressionKind::Verte { source, .. } => static_length(source, facts, types),
+        _ => None,
+    }
+}
+
+fn bounded_capacity(ty: TypeId, types: &TypeTable) -> Option<usize> {
+    let (_, ty) = types.peel_access_marker(ty);
+    let Type::BoundedArray { capacity, .. } = types.get(ty) else {
+        return None;
+    };
+    let IndexExpr::Literal(value) = types.get_index(*capacity) else {
+        return None;
+    };
+    usize::try_from(*value).ok()
 }
 
 enum UnrollPlan {
@@ -562,12 +673,13 @@ fn classify_itera_stmt(
     interner: &Interner,
     mask: &MaskAnalysis,
     types: &TypeTable,
+    fullness: &FxHashMap<DefId, usize>,
     emitted_lanes: &mut usize,
 ) -> Option<UnrollPlan> {
     let HirStatementKind::Expr(expr) = &stmt.kind else {
         return None;
     };
-    classify_itera_expr(expr, block, lanes, interner, mask, types, emitted_lanes)
+    classify_itera_expr(expr, block, lanes, interner, mask, types, fullness, emitted_lanes)
 }
 
 fn classify_itera_expr(
@@ -577,6 +689,7 @@ fn classify_itera_expr(
     interner: &Interner,
     mask: &MaskAnalysis,
     types: &TypeTable,
+    fullness: &FxHashMap<DefId, usize>,
     emitted_lanes: &mut usize,
 ) -> Option<UnrollPlan> {
     let HirExpressionKind::Itera(mode, index_def, _, source, body) = &expr.kind else {
@@ -604,6 +717,7 @@ fn classify_itera_expr(
             interner,
             mask,
             types,
+            fullness,
             emitted_lanes,
         )),
         HirIteraMode::De => Some(UnrollPlan::Decline {
@@ -670,6 +784,7 @@ fn classify_ex_loop(
     interner: &Interner,
     mask: &MaskAnalysis,
     types: &TypeTable,
+    fullness: &FxHashMap<DefId, usize>,
     emitted_lanes: &mut usize,
 ) -> UnrollPlan {
     let Some(source_ty) = source.ty else {
@@ -679,6 +794,45 @@ fn classify_ex_loop(
         };
     };
     let (_, source_ty) = types.peel_access_marker(source_ty);
+    if let Type::BoundedArray { element, .. } = types.get(source_ty) {
+        let Some(lane_count) = bounded_capacity(source_ty, types) else {
+            return UnrollPlan::Decline {
+                span,
+                causa: CAUSA_NOT_CONCRETE,
+            };
+        };
+        if static_length(source, fullness, types) != Some(lane_count) {
+            return UnrollPlan::Decline {
+                span,
+                causa: CAUSA_NOT_CONCRETE,
+            };
+        }
+        if lane_count > UNROLL_BUDGET.saturating_sub(*emitted_lanes) {
+            return UnrollPlan::Decline {
+                span,
+                causa: CAUSA_BUDGET,
+            };
+        }
+        if let Some(causa) = mask.decline() {
+            return UnrollPlan::Decline { span, causa };
+        }
+        if let Some(causa) = body_decline(body, block, index_def, lanes, interner) {
+            return UnrollPlan::Decline { span, causa };
+        }
+
+        let accumulators = block_accumulators(block, body);
+        *emitted_lanes += lane_count;
+        #[allow(clippy::cast_possible_wrap)]
+        let values = (0..lane_count).map(|lane| lane as i64).collect();
+        return UnrollPlan::Ready(ReadyUnroll {
+            index_def,
+            lanes: values,
+            body: body.clone(),
+            accumulators,
+            tensor_source: Some(source.clone()),
+            tensor_binding_ty: Some(*element),
+        });
+    }
     let Type::Tensor(element_ty, shape) = types.get(source_ty) else {
         return UnrollPlan::Decline {
             span,
@@ -999,7 +1153,7 @@ impl BodyDecline<'_> {
             HirExpressionKind::Scribe(_, _)
             | HirExpressionKind::ReadLine(_)
             | HirExpressionKind::Adfirma(_, _)
-            | HirExpressionKind::Clausura(_, _, _, _)
+            | HirExpressionKind::Clausura(_, _, _, _, _)
             | HirExpressionKind::Conversio { .. }
             | HirExpressionKind::ConversioAssign { .. }
             | HirExpressionKind::Ref(_, _)

@@ -593,3 +593,72 @@ functio unmasked_exit(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
     );
     expect_decline_causa(&errors, "unmasked_exit");
 }
+
+#[test]
+fn bounded_lista_ex_full_literal_admits_guard_free_lanes() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio bounded_sum() → vacuum {
+    fixum lista<f32, 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ lista<f32, 4>
+    itera ex xs fixum value { }
+}
+"#,
+    );
+    assert!(
+        air_errors_from(&result).iter().all(|error| {
+            !error.args.iter().any(|arg| {
+                arg.name == "issue" && arg.value == "itera_loop"
+            })
+        }),
+        "full bounded lista must not decline its itera loop: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "full bounded lista iteration must be erased");
+    assert!(!has_si(hir), "full bounded lista iteration is guard-free");
+    let mut gathers = CountIndexes(0);
+    walk_program(&mut gathers, hir);
+    assert_eq!(gathers.0, 4, "one gather must be emitted per full slot");
+}
+
+#[test]
+fn bounded_lista_ex_inference_chain_preserves_fullness_fact() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio bounded_chain() → vacuum {
+    fixum lista<f32> raw ← [1.0, 2.0, 3.0, 4.0]
+    fixum lista<f32, 4> full ← raw ↦ lista<f32, 4>
+    fixum lista<f32, 4> alias ← full
+    itera ex alias fixum value { }
+}
+"#,
+    );
+    assert!(
+        air_errors_from(&result).iter().all(|error| {
+            !error.args.iter().any(|arg| {
+                arg.name == "issue" && arg.value == "itera_loop"
+            })
+        }),
+        "inference-chained full bounded lista must not decline its itera loop: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "fullness chain must still erase iteration");
+}
+
+#[test]
+fn bounded_lista_ex_non_full_value_declines_not_concrete() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio bounded_partial() → vacuum {
+    fixum lista<f32> raw ← [1.0, 2.0, 3.0]
+    fixum lista<f32, 4> xs ← raw ↦ lista<f32, 4>
+    itera ex xs fixum value { }
+}
+"#,
+    );
+    expect_decline_causa(&errors, "not_concrete");
+}

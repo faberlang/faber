@@ -1,0 +1,38 @@
++++
+term = "itera-ex-air-bounded-lista"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "expression", "assignment", "itera_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "AIR-lane itera ex over a proven-full bounded lista unrolls guard-free; runtime-length values decline not_concrete."
+syntax = "@ radix lane \"air\"; itera ex lista<T, N>"
+related = ["lista", "ex", "itera", "radix"]
+locale = "en"
++++
+
+# =============================================================================
+# itera-ex-air-bounded-lista — AIR-lane bounded lista iteration.
+# =============================================================================
+#
+# What this teaches:
+#   • a full literal lista<T, N> proves len == N for Route A
+#   • inference-chained immutable values preserve that fullness fact
+#   • runtime-length bounded listas decline SEM059.itera_loop with
+#     causa=not_concrete; spare slots are never read
+#
+# The semantic unit tests pin the emitted lanes and decline identity. This is
+# a declaration-only driver, so it does not route an AIR function through main.
+# =============================================================================
+
+@ radix lane "air"
+fn bounded_full() → vacuum {
+    const lista<f32, 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ lista<f32, 4>
+    for from xs const value { }
+}
+
+@ radix lane "air"
+fn bounded_partial() → vacuum {
+    const lista<f32> raw ← [1.0, 2.0, 3.0]
+    const lista<f32, 4> xs ← raw ↦ lista<f32, 4>
+    for from xs const value { }
+}
