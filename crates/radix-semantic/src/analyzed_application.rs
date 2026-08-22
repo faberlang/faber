@@ -4,7 +4,7 @@
 //! consumer may rely on. Consumers must not mix HIR, types, resolver, effects,
 //! or identity tables from different analysis runs.
 
-use crate::access_facts::{analyze_access_facts_with_types, AccessFactTable};
+use crate::access_facts::AccessFactTable;
 use crate::function_facts::{analyze_function_facts, FunctionFactTable};
 use crate::qualified_identity::{build_qualified_identities, QualifiedIdentityTable};
 use crate::resolved_use::{analyze_resolved_uses, ResolvedUseIndex};
@@ -78,7 +78,8 @@ impl std::fmt::Display for AnalyzedApplicationError {
 
 impl std::error::Error for AnalyzedApplicationError {}
 
-/// Inputs produced by the semantic pipeline before fact-table construction.
+/// Inputs produced by the semantic pipeline, including its one fact-table
+/// handoff.
 pub struct AnalyzedApplicationParts {
     pub hir: HirModule,
     pub types: TypeTable,
@@ -87,6 +88,7 @@ pub struct AnalyzedApplicationParts {
     pub libraries: LibraryRegistry,
     pub radix_lanes: RadixLaneMetadata,
     pub gpu_builtins: Vec<(radix_hir::DefId, radix_types::MirKernelBuiltin)>,
+    pub access_facts: AccessFactTable,
     pub semantic_diagnostics: Vec<SemanticError>,
 }
 
@@ -123,7 +125,7 @@ impl AnalyzedApplication {
         parts: AnalyzedApplicationParts,
         interner: &radix_lexer::Interner,
     ) -> Result<Self, AnalyzedApplicationError> {
-        let access_facts = analyze_access_facts_with_types(&parts.hir, &parts.types);
+        let access_facts = parts.access_facts;
         let function_facts = analyze_function_facts(&parts.hir, &parts.types);
         let qualified_identities = build_qualified_identities(&parts.libraries, interner);
         let resolved_uses = analyze_resolved_uses(&parts.hir, &parts.types, &qualified_identities);

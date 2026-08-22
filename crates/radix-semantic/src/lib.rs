@@ -219,6 +219,11 @@ pub use vector_width::{
 pub struct SemanticResult {
     pub hir: Option<HirModule>,
 
+    /// The one typed-HIR access-fact table constructed after AIR passes.  A
+    /// failed pre-HIR result carries `None`; every successful result carries
+    /// the table consumed by the region handoff.
+    pub access_facts: Option<AccessFactTable>,
+
     /// Presentation sidecar produced by the same lowering pass that produced
     /// `hir`. Travels with the HIR value into the driver's `AnalyzedModule`; the
     /// semantic passes themselves stay trivia-blind.
@@ -237,7 +242,9 @@ impl SemanticResult {
     /// Warnings are intentionally non-fatal here; callers that want stricter
     /// policy must inspect `diagnostics` themselves.
     pub fn success(&self) -> bool {
-        self.hir.is_some() && !self.diagnostics.iter().any(SemanticError::is_error)
+        self.hir.is_some()
+            && self.access_facts.is_some()
+            && !self.diagnostics.iter().any(SemanticError::is_error)
     }
 
     /// Result-shaped alias of [`Self::success`] for in-crate tests.
@@ -588,6 +595,13 @@ pub fn analyze_with_cli(
         diagnostics.extend(e);
     }
 
+    // BRI-2: construct the sole typed-HIR fact table only after both AIR
+    // passes, hand the same borrowed table to region inference, then carry it
+    // forward for the analyzed-application snapshot. Unsupported HIR shapes
+    // leave region facts unavailable rather than receiving an approximation.
+    let access_facts = analyze_access_facts_with_types(&hir, &types);
+    let _region_facts = passes::borrow_region::analyze(&hir, &types, &access_facts);
+
     diagnostics
         .extend(passes::fragment_definition::check(&hir, &resolver, &types, interner).errors);
 
@@ -638,6 +652,7 @@ pub fn analyze_with_cli(
 
     SemanticResult {
         hir: Some(hir),
+        access_facts: Some(access_facts),
         presentation: lowered.presentation,
         types,
         radix_lanes,
@@ -658,6 +673,7 @@ pub(crate) fn early_semantic_result(
 ) -> SemanticResult {
     SemanticResult {
         hir: None,
+        access_facts: None,
         presentation: empty_presentation(),
         types,
         radix_lanes,

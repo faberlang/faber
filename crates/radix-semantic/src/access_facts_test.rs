@@ -283,6 +283,10 @@ fn analyzed_application_carries_access_facts() {
         "semantic errors: {:?}",
         result.diagnostics
     );
+    let access_facts = result
+        .access_facts
+        .expect("successful analysis should produce access facts");
+    let expected_access_facts = access_facts.clone();
     let hir = result.hir.expect("successful analysis should produce HIR");
     let local = hir
         .entry
@@ -304,10 +308,12 @@ fn analyzed_application_carries_access_facts() {
         libraries: radix_hir::LibraryRegistry::default(),
         radix_lanes: result.radix_lanes,
         gpu_builtins: result.gpu_builtins,
+        access_facts,
         semantic_diagnostics: result.diagnostics,
     };
     let app = AnalyzedApplication::build(parts, &parsed.interner).expect("application");
 
+    assert_eq!(app.access_facts(), &expected_access_facts);
     assert_eq!(app.access_facts().binding(def_id), AccessFact::Fresh);
 }
 

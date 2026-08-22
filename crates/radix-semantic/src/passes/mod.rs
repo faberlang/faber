@@ -20,16 +20,18 @@
 //! 5. [`air_unroll`] rewrites eligible AIR-lane concrete-`N` `itera ab` range
 //!    loops into straight-line bindings before purity admission.
 //! 6. [`air_purity`] is the fail-closed AIR-lane subset gate.
-//! 7. [`borrow`] runs target-gated ownership checks where required, currently
+//! 7. [`borrow_region`] builds the HIR CFG and computes conservative
+//!    flow-sensitive region facts from the shared access-fact table.
+//! 8. [`borrow`] runs target-gated ownership checks where required, currently
 //!    for Rust output.
-//! 8. [`definite_assignment`] rejects reads of uninitialized non-`sponte`
+//! 9. [`definite_assignment`] rejects reads of uninitialized non-`sponte`
 //!    bindings with conservative branch precision.
-//! 9. [`exhaustive`] reports pattern coverage issues.
-//! 10. [`return_path`] rejects value-returning functions whose bodies can fall
+//! 10. [`exhaustive`] reports pattern coverage issues.
+//! 11. [`return_path`] rejects value-returning functions whose bodies can fall
 //!     through without returning.
-//! 11. [`fragment_definition`] checks `@ nucleum fragment` bodies against the
+//! 12. [`fragment_definition`] checks `@ nucleum fragment` bodies against the
 //!     device-safe effect subset and records a per-definition effect summary.
-//! 12. [`lint`] reports quality diagnostics that may be warnings rather than
+//! 13. [`lint`] reports quality diagnostics that may be warnings rather than
 //!     hard semantic errors.
 //!
 //! ERROR POLICY
@@ -43,6 +45,8 @@
 pub mod air_purity;
 pub mod air_unroll;
 pub mod borrow;
+pub mod borrow_region;
+pub mod borrow_region_cfg;
 pub mod collect;
 pub mod companion_predeclare;
 pub mod companion_signature;

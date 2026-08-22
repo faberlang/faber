@@ -35,6 +35,7 @@ fn analyze_parts(source: &str) -> (AnalyzedApplicationParts, Interner) {
         libraries: radix_hir::LibraryRegistry::default(),
         radix_lanes: result.radix_lanes,
         gpu_builtins: result.gpu_builtins,
+        access_facts: result.access_facts.expect("access facts"),
         semantic_diagnostics: result.diagnostics,
     };
     (parts, parsed.interner)
