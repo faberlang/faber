@@ -1,9 +1,10 @@
 use super::{
     decode_device_inputs, encode_device_execute_invocation, encode_device_inputs,
     encode_weight_map, execute_device_at, open_device_session_at, resolve_host_cli_at,
-    start_device_session_at, validate_protocol_invocation, DeviceExecuteInvocation,
-    DeviceExecuteInvocationMode, DeviceExecuteProgram, DeviceExecuteProtocol, DeviceExecuteReceipt,
-    DeviceExecuteRequest, DeviceExecuteV2Request, HostSpawnError, WeightFileRange,
+    resolve_host_cli_at_root, start_device_session_at, validate_protocol_invocation,
+    DeviceExecuteInvocation, DeviceExecuteInvocationMode, DeviceExecuteProgram,
+    DeviceExecuteProtocol, DeviceExecuteReceipt, DeviceExecuteRequest, DeviceExecuteV2Request,
+    HostSpawnError, WeightFileRange,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -287,11 +288,63 @@ fn v2_receipt_json_preserves_identities_and_lifecycle_counts() {
 #[test]
 fn missing_explicit_host_binary_is_a_spawn_error() {
     let err = resolve_host_cli_at(
+        "metal",
         Some(PathBuf::from("/no/such/faber-host-macos-arm64")),
         false,
     )
     .expect_err("missing binary");
     assert_eq!(err.code, "E_HOST_SPAWN");
+}
+
+#[test]
+fn cuda_without_override_fails_closed_with_backend_named_error() {
+    let hosts = tempfile::tempdir().expect("tempdir");
+    let err = resolve_host_cli_at_root("cuda", None, false, hosts.path())
+        .expect_err("cuda has no product binary without an override");
+    assert_eq!(err.code, "E_HOST_SPAWN");
+    assert!(err.message.contains("cuda"), "{}", err.message);
+    assert!(err.message.contains("FABER_HOST_CUDA"), "{}", err.message);
+    assert!(!err.message.contains("Metal"), "{}", err.message);
+}
+
+#[test]
+fn cuda_override_resolves_the_given_host_path() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let host = dir.path().join("cuda-host");
+    std::fs::write(&host, b"stub").expect("write host stub");
+    let resolved = resolve_host_cli_at("cuda", Some(host.clone()), false).expect("cuda host");
+    assert_eq!(resolved, host);
+}
+
+#[test]
+fn backend_host_rows_do_not_cross_binary_names() {
+    let cuda_only = tempfile::tempdir().expect("cuda tempdir");
+    std::fs::create_dir_all(cuda_only.path().join("target/debug")).expect("target dir");
+    std::fs::write(
+        cuda_only.path().join("target/debug/faber-host-cuda"),
+        b"stub",
+    )
+    .expect("write cuda row");
+    let err = resolve_host_cli_at_root("metal", None, false, cuda_only.path())
+        .expect_err("metal must not use the cuda row");
+    assert!(
+        err.message.contains("FABER_HOST_MACOS_ARM64"),
+        "{}",
+        err.message
+    );
+
+    let metal_only = tempfile::tempdir().expect("metal tempdir");
+    std::fs::create_dir_all(metal_only.path().join("target/debug")).expect("target dir");
+    std::fs::write(
+        metal_only
+            .path()
+            .join("target/debug/faber-host-macos-arm64"),
+        b"stub",
+    )
+    .expect("write metal row");
+    let err = resolve_host_cli_at_root("cuda", None, false, metal_only.path())
+        .expect_err("cuda must not use the metal row");
+    assert!(err.message.contains("FABER_HOST_CUDA"), "{}", err.message);
 }
 
 #[test]

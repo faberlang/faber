@@ -534,13 +534,16 @@ pub fn request_from_section(
     })
 }
 
-/// Invoke `faber-host-macos-arm64 device-execute` as a child process.
+/// Invoke the backend-selected hosts `device-execute` CLI as a child process.
 #[allow(dead_code)] // live entry for device-runtime; lib tests use `execute_device_at`
 pub fn execute_device(
     request: &DeviceExecuteRequest,
     build_if_missing: bool,
 ) -> Result<DeviceExecuteReceipt, HostSpawnError> {
-    execute_device_at(&resolve_host_cli(build_if_missing)?, request)
+    execute_device_at(
+        &resolve_host_cli(&request.backend, build_if_missing)?,
+        request,
+    )
 }
 
 /// Start one long-lived hosts control owner and perform its explicit `load`.
@@ -549,7 +552,10 @@ pub fn open_device_session(
     request: &DeviceExecuteRequest,
     build_if_missing: bool,
 ) -> Result<(DeviceExecuteSession, DeviceExecuteControlReceipt), HostSpawnError> {
-    open_device_session_at(&resolve_host_cli(build_if_missing)?, request)
+    open_device_session_at(
+        &resolve_host_cli(&request.backend, build_if_missing)?,
+        request,
+    )
 }
 
 /// Start a protocol-v2 owner. One load carries both prefill and scalar-decode
@@ -560,7 +566,10 @@ pub fn open_device_session_v2(
     build_if_missing: bool,
 ) -> Result<(DeviceExecuteSession, DeviceExecuteControlReceipt), HostSpawnError> {
     request.validate()?;
-    open_device_session_v2_at(&resolve_host_cli(build_if_missing)?, request)
+    open_device_session_v2_at(
+        &resolve_host_cli(&request.backend, build_if_missing)?,
+        request,
+    )
 }
 
 fn open_device_session_at(
@@ -1036,71 +1045,126 @@ fn decode_device_execute_output(
     })
 }
 
-/// Locate the hosts CLI. Never a Cargo dependency — the binary is a child.
-#[allow(dead_code)] // called by `execute_device`
-pub fn resolve_host_cli(build_if_missing: bool) -> Result<PathBuf, HostSpawnError> {
-    resolve_host_cli_at(
-        std::env::var_os("FABER_HOST_MACOS_ARM64").map(PathBuf::from),
-        build_if_missing,
-    )
+#[derive(Clone, Copy)]
+struct HostRoute {
+    backend: &'static str,
+    override_env: &'static str,
+    binary: &'static str,
+    cargo_package: Option<&'static str>,
 }
 
-/// Resolve with an explicit override (tests + `FABER_HOST_MACOS_ARM64`).
+fn host_route(backend: &str) -> Result<HostRoute, HostSpawnError> {
+    match backend {
+        "metal" => Ok(HostRoute {
+            backend: "metal",
+            override_env: "FABER_HOST_MACOS_ARM64",
+            binary: "faber-host-macos-arm64",
+            cargo_package: Some("faber-host-macos-arm64"),
+        }),
+        "cuda" => Ok(HostRoute {
+            backend: "cuda",
+            override_env: "FABER_HOST_CUDA",
+            binary: "faber-host-cuda",
+            // `hosts/crates/host-cuda` is currently a library-only extraction;
+            // do not pretend that building it produces a spawnable product.
+            cargo_package: None,
+        }),
+        other => Err(HostSpawnError {
+            code: "E_HOST_SPAWN".to_owned(),
+            message: format!("no host spawn route for backend `{other}`"),
+        }),
+    }
+}
+
+fn host_override(backend: &str) -> Result<Option<PathBuf>, HostSpawnError> {
+    let route = host_route(backend)?;
+    Ok(std::env::var_os(route.override_env).map(PathBuf::from))
+}
+
+/// Locate the backend-selected hosts CLI. Never a Cargo dependency — the
+/// binary is a child.
+#[allow(dead_code)] // called by `execute_device`
+pub fn resolve_host_cli(backend: &str, build_if_missing: bool) -> Result<PathBuf, HostSpawnError> {
+    resolve_host_cli_at(backend, host_override(backend)?, build_if_missing)
+}
+
+/// Resolve a backend-selected host with an explicit override (tests and the
+/// matching `FABER_HOST_*` environment variable).
 pub fn resolve_host_cli_at(
+    backend: &str,
     explicit: Option<PathBuf>,
     build_if_missing: bool,
 ) -> Result<PathBuf, HostSpawnError> {
+    let hosts = sibling_hosts_dir()?;
+    resolve_host_cli_at_root(backend, explicit, build_if_missing, &hosts)
+}
+
+fn resolve_host_cli_at_root(
+    backend: &str,
+    explicit: Option<PathBuf>,
+    build_if_missing: bool,
+    hosts: &Path,
+) -> Result<PathBuf, HostSpawnError> {
+    let route = host_route(backend)?;
     if let Some(path) = explicit {
         if path.is_file() {
             return Ok(path);
         }
         return Err(HostSpawnError {
             code: "E_HOST_SPAWN".to_owned(),
-            message: format!("FABER_HOST_MACOS_ARM64 is not a file: {}", path.display()),
+            message: format!("{} is not a file: {}", route.override_env, path.display()),
         });
     }
-    let hosts = sibling_hosts_dir()?;
     for candidate in [
-        hosts.join("target/release/faber-host-macos-arm64"),
-        hosts.join("target/debug/faber-host-macos-arm64"),
+        hosts.join("target/release").join(route.binary),
+        hosts.join("target/debug").join(route.binary),
     ] {
         if candidate.is_file() {
             return Ok(candidate);
         }
     }
     if build_if_missing {
-        let status = Command::new("cargo")
-            .args([
-                "build",
-                "--release",
-                "-p",
-                "faber-host-macos-arm64",
-                "--manifest-path",
-            ])
-            .arg(hosts.join("Cargo.toml"))
-            .status()
-            .map_err(|error| HostSpawnError {
+        if let Some(package) = route.cargo_package {
+            let status = Command::new("cargo")
+                .args(["build", "--release", "-p", package, "--manifest-path"])
+                .arg(hosts.join("Cargo.toml"))
+                .status()
+                .map_err(|error| HostSpawnError {
+                    code: "E_HOST_SPAWN".to_owned(),
+                    message: format!("failed to build {package}: {error}"),
+                })?;
+            let built = hosts.join("target/release").join(route.binary);
+            if status.success() && built.is_file() {
+                return Ok(built);
+            }
+            return Err(HostSpawnError {
                 code: "E_HOST_SPAWN".to_owned(),
-                message: format!("failed to build faber-host-macos-arm64: {error}"),
-            })?;
-        let built = hosts.join("target/release/faber-host-macos-arm64");
-        if status.success() && built.is_file() {
-            return Ok(built);
+                message: format!(
+                    "cargo build -p {package} failed ({status}); missing {}",
+                    built.display()
+                ),
+            });
         }
-        return Err(HostSpawnError {
-            code: "E_HOST_SPAWN".to_owned(),
-            message: format!(
-                "cargo build -p faber-host-macos-arm64 failed ({status}); missing {}",
-                built.display()
-            ),
-        });
     }
+    let message = if route.backend == "metal" {
+        format!(
+            "{} not found under {}; set {} or build the hosts crate",
+            route.binary,
+            hosts.display(),
+            route.override_env
+        )
+    } else {
+        format!(
+            "{} host binary {} not found under {}; set {} to an executable path",
+            route.backend,
+            route.binary,
+            hosts.display(),
+            route.override_env
+        )
+    };
     Err(HostSpawnError {
         code: "E_HOST_SPAWN".to_owned(),
-        message: format!(
-            "faber-host-macos-arm64 not found under {}; set FABER_HOST_MACOS_ARM64 or build the hosts crate",
-            hosts.display()
-        ),
+        message,
     })
 }
 
