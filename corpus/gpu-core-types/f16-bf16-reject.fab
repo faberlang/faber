@@ -1,6 +1,7 @@
 +++
 term = "f16"
 kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "redde_stmt", "expression"]
 category = "numeric"
 summary = "bf16 remains deferred; f16 is the only half-width marker today."
 syntax = "f16"

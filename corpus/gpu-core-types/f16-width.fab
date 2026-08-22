@@ -1,6 +1,7 @@
 +++
 term = "f16"
 kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "redde_stmt", "expression"]
 category = "numeric"
 summary = "f16 and fractus<f16> type-position width markers."
 syntax = "f16 | fractus<f16>"
