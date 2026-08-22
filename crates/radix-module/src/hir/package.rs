@@ -230,7 +230,7 @@ pub enum NucleumPackageError {
     /// Concrete fragment call graph contains a cycle after import resolution.
     CyclicCallGraph { cycle: String },
     /// A fragment is importable but has no canonical MIR body bytes.
-    MissingMirBody { name: String, module: String },
+    MirBodyMissing { name: String, module: String },
 }
 
 impl NucleumPackageError {
@@ -244,7 +244,7 @@ impl NucleumPackageError {
                 module: String::new(),
                 detail: format!("nucleum fragment call cycle: {cycle}"),
             },
-            Self::MissingMirBody { name, module } => FhirPackageError::MalformedUnit {
+            Self::MirBodyMissing { name, module } => FhirPackageError::MalformedUnit {
                 module,
                 detail: format!("nucleum fragment `{name}` is missing a canonical MIR body artifact"),
             },
@@ -255,7 +255,7 @@ impl NucleumPackageError {
     #[must_use]
     pub fn issue(&self) -> &'static str {
         match self {
-            Self::SignatureOnlyImport { .. } | Self::MissingMirBody { .. } => "NUCLEUM_FRAGMENT_EFFECT",
+            Self::SignatureOnlyImport { .. } | Self::MirBodyMissing { .. } => "NUCLEUM_FRAGMENT_EFFECT",
             Self::CyclicCallGraph { .. } => "NUCLEUM_FRAGMENT_CYCLE",
         }
     }
@@ -264,7 +264,7 @@ impl NucleumPackageError {
     #[must_use]
     pub fn reason(&self) -> &'static str {
         match self {
-            Self::SignatureOnlyImport { .. } | Self::MissingMirBody { .. } => "missing_body",
+            Self::SignatureOnlyImport { .. } | Self::MirBodyMissing { .. } => "missing_body",
             Self::CyclicCallGraph { .. } => "cycle",
         }
     }
@@ -277,7 +277,7 @@ impl std::fmt::Display for NucleumPackageError {
                 write!(f, "signature-only nucleum fragment `{name}` in `{module}` cannot be imported")
             }
             Self::CyclicCallGraph { cycle } => write!(f, "nucleum fragment call cycle: {cycle}"),
-            Self::MissingMirBody { name, module } => {
+            Self::MirBodyMissing { name, module } => {
                 write!(f, "nucleum fragment `{name}` in `{module}` is missing a canonical MIR body")
             }
         }
@@ -400,7 +400,7 @@ impl NucleumProgramMetadata {
     ///
     /// # Errors
     ///
-    /// Returns [`NucleumPackageError::MissingMirBody`] when a fragment artifact
+    /// Returns [`NucleumPackageError::MirBodyMissing`] when a fragment artifact
     /// is missing postcard MIR.
     pub fn require_canonical_mir(&self) -> Result<(), NucleumPackageError> {
         for item in &self.items {
@@ -410,7 +410,7 @@ impl NucleumProgramMetadata {
             if item.body.as_ref().is_some_and(|body| !body.mir.is_empty()) {
                 continue;
             }
-            return Err(NucleumPackageError::MissingMirBody {
+            return Err(NucleumPackageError::MirBodyMissing {
                 name: item.name.clone(),
                 module: item.relative_path.clone(),
             });
