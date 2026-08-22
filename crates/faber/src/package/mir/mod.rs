@@ -209,25 +209,26 @@ fn host_route(
     image: &radix::program::mir::FmirPackageImage,
     selection: DeviceSelection,
 ) -> Result<Option<()>, Vec<Diagnostic>> {
-    let requires_device = image.device.is_some();
     // DDPP1-U2 (C2 feature isolation): the device route is compiled only under
     // `device-runtime`; without it an explicit backend request or a
     // device-bearing image fails closed (never silently runs CPU).
     #[cfg(feature = "device-runtime")]
     {
-        // In-process `host_factory` is parked (no hosts crate). Packed Metal
-        // closeout uses `host_spawn`. An explicit backend or a device-bearing
-        // image still fails closed — never a silent CPU fallback.
-        if selection != DeviceSelection::Auto || requires_device {
+        if let Some(device) = &image.device {
+            super::execute_device_route(device, selection, &image.source_hashes)?;
+            return Ok(Some(()));
+        }
+        if selection != DeviceSelection::Auto {
             return Err(vec![mir_diag(
                 &image.diagnostic_path,
-                "device section or explicit backend selection present, but this faber build parks the in-process host; packed closeout uses the spawn client",
+                "explicit backend selection requires a device image; CPU-only images never silently fall back",
             )]);
         }
         Ok(None)
     }
     #[cfg(not(feature = "device-runtime"))]
     {
+        let requires_device = image.device.is_some();
         if selection != DeviceSelection::Auto || requires_device {
             return Err(vec![mir_diag(
                 &image.diagnostic_path,

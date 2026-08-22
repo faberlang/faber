@@ -80,7 +80,7 @@ pub use cmd::{
     cmd_build, cmd_check_package, cmd_emit_package, should_treat_as_package_from_args,
     use_package_compiler_from_args,
 };
-#[cfg(all(feature = "device-runtime", feature = "host-macos-arm64"))]
+#[cfg(feature = "device-runtime")]
 #[allow(unused_imports)]
 pub(crate) use device::execute_device_route;
 #[cfg(feature = "device-runtime")]
