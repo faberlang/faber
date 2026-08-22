@@ -91,6 +91,14 @@ mod borrow_test;
 mod borrow_region_test;
 
 #[cfg(test)]
+#[path = "borrow_region_stress_test.rs"]
+mod borrow_region_stress_test;
+
+#[cfg(test)]
+#[path = "borrow_region_parity_test.rs"]
+mod borrow_region_parity_test;
+
+#[cfg(test)]
 #[path = "collect_test.rs"]
 mod collect_test;
 

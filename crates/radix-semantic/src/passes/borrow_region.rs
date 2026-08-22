@@ -13,7 +13,7 @@ use radix_hir::{
 };
 use radix_lexer::Span;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::VecDeque;
 
 /// Borrow flavor tracked by a region.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -128,10 +128,10 @@ impl From<CfgError> for RegionError {
 
 /// Infer marked borrow regions over typed HIR and the supplied access facts.
 ///
-/// The dataflow is a finite may-live fixpoint.  A borrow starts at its binding,
-/// stays live through reachable CFG nodes, and is killed after a use of the
-/// borrower or a dead-source event supplied by `access_facts`.  Unsupported
-/// HIR control-flow shapes return an error instead of receiving an unsound
+/// The dataflow is a backward may-live fixpoint from the borrower's uses: a
+/// borrow region covers every CFG node from which a use is reachable without
+/// re-entering the binding or passing a dead-source kill.  Unsupported HIR
+/// control-flow shapes return an error instead of receiving an unsound
 /// approximation.
 pub fn analyze(
     hir: &HirModule,
@@ -321,37 +321,42 @@ impl HirVisitor for EventCollector<'_> {
     }
 }
 
+/// Backward may-live fixpoint from the borrower's uses.
+///
+/// A node is live when a use is reachable from it without re-entering the
+/// binding statement (each re-entry re-establishes the borrow, killing the
+/// previous region) and without passing a dead-source kill. Loop back-edges
+/// therefore keep a condition-resident borrow live around the cycle while a
+/// body-local borrow released before a back-edge stays dead at later writes.
 fn solve_live_nodes(
     cfg: &HirCfg,
     start: CfgNodeId,
     uses: &[CfgNodeId],
     source_kills: &[CfgNodeId],
 ) -> Vec<CfgNodeId> {
-    let mut use_nodes: FxHashSet<CfgNodeId> = uses.iter().copied().collect();
-    let kill_nodes: FxHashSet<CfgNodeId> = source_kills.iter().copied().collect();
-    let mut incoming = vec![false; cfg.nodes().len()];
-    let mut active = BTreeSet::new();
-    let mut queue = VecDeque::from([start]);
+    let kills: FxHashSet<CfgNodeId> = source_kills.iter().copied().collect();
+    let mut live: FxHashSet<CfgNodeId> = uses.iter().copied().collect();
+    let mut queue: VecDeque<_> = uses.iter().copied().collect();
 
     while let Some(node) = queue.pop_front() {
-        let live_here = incoming[node.0] || node == start;
-        if !live_here {
-            continue;
-        }
-        active.insert(node);
-        let killed_here = use_nodes.remove(&node) || kill_nodes.contains(&node);
-        if killed_here {
-            continue;
-        }
-        for edge in cfg.successors(node) {
-            if !incoming[edge.to.0] {
-                incoming[edge.to.0] = true;
-                queue.push_back(edge.to);
+        for edge in cfg.predecessors(node) {
+            let predecessor = edge.from;
+            if predecessor == start {
+                // The binding re-establishes the borrow: live at the binding,
+                // but its predecessors (the previous iteration) are not.
+                live.insert(start);
+                continue;
             }
+            if kills.contains(&predecessor) || !live.insert(predecessor) {
+                continue;
+            }
+            queue.push_back(predecessor);
         }
     }
 
-    active.into_iter().collect()
+    let mut nodes: Vec<_> = live.into_iter().collect();
+    nodes.sort_unstable();
+    nodes
 }
 
 fn region_kind(marker: AccessMarker) -> Option<RegionBorrowKind> {
