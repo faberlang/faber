@@ -614,12 +614,9 @@ pub fn analyze_with_cli(
         {
             diagnostics.extend(e);
         }
-    } else if let Err(e) = passes::borrow::analyze_modes_with_regions(
-        &hir,
-        &resolver,
-        &types,
-        region_facts.as_ref(),
-    ) {
+    } else if let Err(e) =
+        passes::borrow::analyze_modes_with_regions(&hir, &resolver, &types, region_facts.as_ref())
+    {
         diagnostics.extend(e);
     }
 

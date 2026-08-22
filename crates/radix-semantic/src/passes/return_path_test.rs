@@ -10,8 +10,7 @@ use crate::SemanticError;
 use crate::SemanticErrorKind;
 
 fn is_return_path_error(diag: &SemanticError) -> bool {
-    diag.kind == SemanticErrorKind::ReturnAbsent
-        && diag.issue() == Some("control_flow_fallthrough")
+    diag.kind == SemanticErrorKind::ReturnAbsent && diag.issue() == Some("control_flow_fallthrough")
 }
 
 fn diagnostic_facts(diagnostics: &[SemanticError]) -> Vec<(SemanticErrorKind, Option<&str>)> {

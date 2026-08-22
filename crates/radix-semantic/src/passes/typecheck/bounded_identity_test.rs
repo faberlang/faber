@@ -40,7 +40,10 @@ fn bounded_identity_distinct_from_bare_and_across_n() {
         "lista<numerus, 8> ≠ lista<numerus>"
     );
     assert!(types.is_assignable(ascii8, ascii64), "ascii<8> → ascii<64>");
-    assert!(!types.is_assignable(ascii64, ascii8), "ascii<64> ↛ ascii<8>");
+    assert!(
+        !types.is_assignable(ascii64, ascii8),
+        "ascii<64> ↛ ascii<8>"
+    );
     assert!(types.is_assignable(ascii8, ascii9), "ascii<8> → ascii<9>");
     assert!(!types.is_assignable(ascii8, ascii));
     let n1 = intern_cap(&mut types, 1);

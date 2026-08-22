@@ -190,7 +190,10 @@ fn nested_int_literal(
 
 fn bounded_lista(types: &mut TypeTable, elem: TypeId, n: u64) -> TypeId {
     let capacity = types.intern_index(IndexExpr::Literal(n));
-    types.intern(Type::BoundedArray { element: elem, capacity })
+    types.intern(Type::BoundedArray {
+        element: elem,
+        capacity,
+    })
 }
 
 #[test]
@@ -223,7 +226,10 @@ fn lista_tensor_conversio_rejects_bounded_non_numeric_source() {
         validate_lista_to_tensor_source(lista, tensor, &types),
         Err(ListaToTensorError::NonNumericElement)
     );
-    assert_eq!(resolve_bounded_lista_padded_shape(lista, tensor, &types), None);
+    assert_eq!(
+        resolve_bounded_lista_padded_shape(lista, tensor, &types),
+        None
+    );
 }
 
 #[test]
@@ -238,7 +244,10 @@ fn lista_tensor_conversio_rejects_capacity_dim_mismatch() {
         validate_lista_to_tensor_source(lista, tensor, &types),
         Err(ListaToTensorError::CapacityMismatch)
     );
-    assert_eq!(resolve_bounded_lista_padded_shape(lista, tensor, &types), None);
+    assert_eq!(
+        resolve_bounded_lista_padded_shape(lista, tensor, &types),
+        None
+    );
 }
 
 #[test]
@@ -253,5 +262,8 @@ fn lista_tensor_conversio_keeps_unbounded_source_on_flat_path() {
         validate_lista_to_tensor_source(lista, tensor, &types),
         Ok(())
     );
-    assert_eq!(resolve_bounded_lista_padded_shape(lista, tensor, &types), None);
+    assert_eq!(
+        resolve_bounded_lista_padded_shape(lista, tensor, &types),
+        None
+    );
 }

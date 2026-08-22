@@ -30,13 +30,10 @@ fn assert_region_accepted(source: &str, label: &str) {
         result.diagnostics
     );
     assert!(
-        !result
-            .diagnostics
-            .iter()
-            .any(|diagnostic| {
-                diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
-                    && issue(diagnostic) == Some("write_while_borrowed")
-            }),
+        !result.diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
+                && issue(diagnostic) == Some("write_while_borrowed")
+        }),
         "{label} must not report write_while_borrowed; diagnostics: {:?}",
         result.diagnostics
     );
@@ -142,13 +139,10 @@ incipit {
 "#,
     );
     assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|diagnostic| {
-                diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
-                    && issue(diagnostic) == Some("write_while_borrowed")
-            }),
+        result.diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
+                && issue(diagnostic) == Some("write_while_borrowed")
+        }),
         "live region must keep write_while_borrowed; diagnostics: {:?}",
         result.diagnostics
     );

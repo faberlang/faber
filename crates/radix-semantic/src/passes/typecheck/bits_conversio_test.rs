@@ -63,7 +63,5 @@ fn without_bits_value_conversion_stays() {
 
 #[test]
 fn radix_hint_accept_row_stays_green() {
-    test_support::assert_accepts(
-        "incipit { fixum _ n ← \"ff\" ↦ numerus<u32, Hex> }",
-    );
+    test_support::assert_accepts("incipit { fixum _ n ← \"ff\" ↦ numerus<u32, Hex> }");
 }

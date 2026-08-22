@@ -35,9 +35,17 @@ fn assert_code_and_arg(err: &crate::SemanticError, code: &str, name: &str, value
 
 fn assert_rejects_arity(source: &str, expected: &str, actual: &str) {
     let result = test_support::analyze_source(source);
-    assert!(!result.is_ok(), "expected arity rejection, got: {:?}", result.diagnostics);
-    let err = find_error(&result, "itera_apud_arity_mismatch")
-        .unwrap_or_else(|| panic!("missing itera_apud_arity_mismatch in {:?}", result.diagnostics));
+    assert!(
+        !result.is_ok(),
+        "expected arity rejection, got: {:?}",
+        result.diagnostics
+    );
+    let err = find_error(&result, "itera_apud_arity_mismatch").unwrap_or_else(|| {
+        panic!(
+            "missing itera_apud_arity_mismatch in {:?}",
+            result.diagnostics
+        )
+    });
     assert_code_and_arg(&err, "SEM010", "expected", expected);
     assert_code_and_arg(&err, "SEM010", "actual", actual);
 }
@@ -197,7 +205,11 @@ functio count() → vacuum {
     }
 }",
     );
-    assert!(!result.is_ok(), "expected mode rejection, got: {:?}", result.diagnostics);
+    assert!(
+        !result.is_ok(),
+        "expected mode rejection, got: {:?}",
+        result.diagnostics
+    );
     let err = find_error(&result, "itera_apud_requires_ex")
         .unwrap_or_else(|| panic!("missing itera_apud_requires_ex in {:?}", result.diagnostics));
     assert_eq!(crate::semantic_spec(err.kind).code, "SEM010");
@@ -213,7 +225,11 @@ functio indices(lista<numerus> xs) → vacuum {
     }
 }",
     );
-    assert!(!result.is_ok(), "expected mode rejection, got: {:?}", result.diagnostics);
+    assert!(
+        !result.is_ok(),
+        "expected mode rejection, got: {:?}",
+        result.diagnostics
+    );
     let err = find_error(&result, "itera_apud_requires_ex")
         .unwrap_or_else(|| panic!("missing itera_apud_requires_ex in {:?}", result.diagnostics));
     assert_eq!(crate::semantic_spec(err.kind).code, "SEM010");
@@ -229,9 +245,16 @@ functio ragged(lista<lista<numerus>> pairs) → vacuum {
     }
 }",
     );
-    assert!(!result.is_ok(), "expected fail-closed rejection, got: {:?}", result.diagnostics);
+    assert!(
+        !result.is_ok(),
+        "expected fail-closed rejection, got: {:?}",
+        result.diagnostics
+    );
     let err = find_error(&result, "itera_apud_requires_shaped_iterable").unwrap_or_else(|| {
-        panic!("missing itera_apud_requires_shaped_iterable in {:?}", result.diagnostics)
+        panic!(
+            "missing itera_apud_requires_shaped_iterable in {:?}",
+            result.diagnostics
+        )
     });
     assert_eq!(crate::semantic_spec(err.kind).code, "SEM010");
 }
@@ -246,9 +269,16 @@ functio flat(lista<numerus> xs) → vacuum {
     }
 }",
     );
-    assert!(!result.is_ok(), "expected fail-closed rejection, got: {:?}", result.diagnostics);
+    assert!(
+        !result.is_ok(),
+        "expected fail-closed rejection, got: {:?}",
+        result.diagnostics
+    );
     let err = find_error(&result, "itera_apud_requires_shaped_iterable").unwrap_or_else(|| {
-        panic!("missing itera_apud_requires_shaped_iterable in {:?}", result.diagnostics)
+        panic!(
+            "missing itera_apud_requires_shaped_iterable in {:?}",
+            result.diagnostics
+        )
     });
     assert_eq!(crate::semantic_spec(err.kind).code, "SEM010");
 }
@@ -263,9 +293,16 @@ functio sparse(sparsa<f32, [2, 3]> s) → vacuum {
     }
 }",
     );
-    assert!(!result.is_ok(), "expected fail-closed rejection, got: {:?}", result.diagnostics);
+    assert!(
+        !result.is_ok(),
+        "expected fail-closed rejection, got: {:?}",
+        result.diagnostics
+    );
     let err = find_error(&result, "itera_apud_requires_shaped_iterable").unwrap_or_else(|| {
-        panic!("missing itera_apud_requires_shaped_iterable in {:?}", result.diagnostics)
+        panic!(
+            "missing itera_apud_requires_shaped_iterable in {:?}",
+            result.diagnostics
+        )
     });
     assert_eq!(crate::semantic_spec(err.kind).code, "SEM010");
 }

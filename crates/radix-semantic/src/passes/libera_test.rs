@@ -4,12 +4,10 @@
 //! structured issue naming/spanning the capture; a marked closure referencing
 //! module-level items passes; an unmarked capturing closure is unchanged.
 
-use crate::test_support::{analyze_source, issue};
 use crate::passes::libera::ISSUE_LIBERA_CAPTURE;
+use crate::test_support::{analyze_source, issue};
 
-fn find_capture_error(
-    diagnostics: &[crate::SemanticError],
-) -> Option<&crate::SemanticError> {
+fn find_capture_error(diagnostics: &[crate::SemanticError]) -> Option<&crate::SemanticError> {
     diagnostics
         .iter()
         .filter(|error| error.is_error())
