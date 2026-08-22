@@ -20,8 +20,9 @@
 
 use super::*;
 use crate::boundary_abi::HOST_CALL_ABI_VERSION;
-use crate::device_program::Binding;
+use crate::device_program::{Binding, BufferLifetime, BufferRole, ObservationCadence};
 use crate::device_semantics::DeviceEffectFact;
+use crate::layout::MirTensorStorageLayout;
 use crate::{
     MirBlock, MirBlockId, MirCallee, MirFunction, MirFunctionId, MirKernelShaderStage, MirLocal,
     MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirProgram, MirStatement,

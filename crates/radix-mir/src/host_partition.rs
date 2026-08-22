@@ -67,11 +67,10 @@ use crate::boundary_abi::{
 };
 use crate::device_program::LaunchId;
 use crate::device_program::{
-    build_device_program, BufferLifetime, BufferRole, DeviceProgram, DeviceProgramBuildError,
-    DeviceProgramError, DeviceProgramLifetime, ObservationCadence,
+    build_device_program, DeviceProgram, DeviceProgramBuildError, DeviceProgramError,
+    DeviceProgramLifetime,
 };
 use crate::device_semantics::{DeviceEffectBoundaryKind, DeviceLegalityFacts};
-use crate::layout::MirTensorStorageLayout;
 use crate::{
     MirBlockId, MirCallee, MirConstant, MirFunction, MirFunctionId, MirOperand, MirProgram,
     MirStatementKind, ValidatedMir,
