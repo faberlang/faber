@@ -400,25 +400,27 @@ functio loss(tf32[2, 2] x) → fractus {
 }
 
 #[test]
-fn base_lane_cumulata_is_unknown_everywhere() {
-    // Base lane (registry-direct): `cumulata` has no intrinsic row on any
-    // receiver family — lista or tensor — so the spelling cannot resolve on
-    // any lane today. The semantic miss itself is silent (registry-direct
-    // misses fall through to member lookup); the registry pin is the
-    // observable fact.
-    for receiver in [
-        radix_intrinsics::IntrinsicReceiver::Lista,
-        radix_intrinsics::IntrinsicReceiver::Tensor,
-    ] {
-        assert!(
-            radix_intrinsics::lookup_method(receiver, "cumulata", 2).is_none(),
-            "cumulata must be unregistered today; ARC-2 registers the lista row"
-        );
-    }
+fn base_lane_cumulata_is_registered_on_lista_only() {
+    // ARC-2: the base lane now owns the lista scan row, while tensor
+    // admission remains reserved for ARC-3+.
+    assert!(
+        radix_intrinsics::lookup_method(radix_intrinsics::IntrinsicReceiver::Lista, "cumulata", 2,)
+            .is_some(),
+        "lista cumulata must be registered on the base lane"
+    );
+    assert!(
+        radix_intrinsics::lookup_method(
+            radix_intrinsics::IntrinsicReceiver::Tensor,
+            "cumulata",
+            2,
+        )
+        .is_none(),
+        "tensor cumulata remains outside the base-lane registry"
+    );
 
     let errors = analyze(
         r#"
-functio probe(lista<fractus> xs) → fractus {
+functio probe(lista<fractus> xs) → lista<fractus> {
     redde xs.cumulata((fractus a, fractus b) ∴ a + b, 0.0)
 }
 "#,

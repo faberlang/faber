@@ -8,7 +8,8 @@
 use super::{
     is_atomic_operator_method, is_mutating_receiver, lookup_method, lookup_method_for_type,
     lookup_method_for_type_id, mir_atomic_op, mir_collection_op, mir_is_higher_order_lista,
-    receivers_for_type, receivers_for_type_id, IntrinsicReceiver, INTRINSICS,
+    receivers_for_type, receivers_for_type_id, IntrinsicMirKind, IntrinsicParamKind,
+    IntrinsicReceiver, IntrinsicReturnKind, INTRINSICS,
 };
 use radix_types::{IndexExpr, MirAtomicOp, MirCollectionOp, Primitive, SemanticMutability, Type};
 
@@ -30,6 +31,26 @@ fn lookup_resolves_registered_rows() {
         "arity must be exact"
     );
     assert!(lookup_method(IntrinsicReceiver::Lista, "nonexistent", 0).is_none());
+}
+
+#[test]
+fn cumulata_is_a_lista_scan_row() {
+    let entry =
+        lookup_method(IntrinsicReceiver::Lista, "cumulata", 2).expect("lista cumulata scan row");
+    assert_eq!(
+        entry.params,
+        &[IntrinsicParamKind::Reducer, IntrinsicParamKind::Accumulator]
+    );
+    assert_eq!(entry.return_kind, IntrinsicReturnKind::ReducerArray);
+    assert_eq!(entry.mir_kind, IntrinsicMirKind::HigherOrderCumulata);
+    let mut types = radix_types::TypeTable::new();
+    let element = types.intern(Type::Primitive(Primitive::Numerus));
+    let lista = Type::Array(element);
+    assert_eq!(
+        lookup_method_for_type(&lista, "cumulata", 2).map(|row| row.faber_name),
+        Some("cumulata")
+    );
+    assert!(lookup_method(IntrinsicReceiver::Tensor, "cumulata", 2).is_none());
 }
 
 #[test]

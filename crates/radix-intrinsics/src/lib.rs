@@ -212,6 +212,7 @@ pub fn mir_collection_op(entry: &MethodIntrinsic) -> Option<MirCollectionOp> {
         IntrinsicMirKind::HigherOrderFiltrata
         | IntrinsicMirKind::HigherOrderMap
         | IntrinsicMirKind::HigherOrderReduce
+        | IntrinsicMirKind::HigherOrderCumulata
         | IntrinsicMirKind::CodegenOnly => None,
     }
 }
@@ -225,6 +226,7 @@ pub fn mir_atomic_op(entry: &MethodIntrinsic) -> Option<MirAtomicOp> {
         | IntrinsicMirKind::HigherOrderFiltrata
         | IntrinsicMirKind::HigherOrderMap
         | IntrinsicMirKind::HigherOrderReduce
+        | IntrinsicMirKind::HigherOrderCumulata
         | IntrinsicMirKind::CodegenOnly => None,
     }
 }

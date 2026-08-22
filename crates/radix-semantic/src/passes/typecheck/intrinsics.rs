@@ -335,7 +335,7 @@ pub(super) fn check_intrinsic_method_call(
             let ret = checker.resolve_inferred_type(mapped);
             Some(checker.types.array(ret))
         }
-        IntrinsicReturnKind::ReducerInfer => {
+        IntrinsicReturnKind::ReducerInfer | IntrinsicReturnKind::ReducerArray => {
             let Some(inner) = ctx.inner else {
                 return Some(checker.error_type);
             };
@@ -381,7 +381,12 @@ pub(super) fn check_intrinsic_method_call(
                 is_generator: false,
             };
             checker.check_call_args(&sig, args, span);
-            Some(checker.resolve_inferred_type(acc))
+            let resolved = checker.resolve_inferred_type(acc);
+            if matches!(entry.return_kind, IntrinsicReturnKind::ReducerArray) {
+                Some(checker.types.array(resolved))
+            } else {
+                Some(resolved)
+            }
         }
         _ => {
             let params = resolve_param_types(checker, entry, &ctx);
@@ -730,7 +735,9 @@ fn resolve_return_type(
             };
             super::tensor_index::tensor_with_fresh_shape(checker, inner)
         }
-        IntrinsicReturnKind::MapperArray | IntrinsicReturnKind::ReducerInfer => checker.error_type,
+        IntrinsicReturnKind::MapperArray
+        | IntrinsicReturnKind::ReducerInfer
+        | IntrinsicReturnKind::ReducerArray => checker.error_type,
     }
 }
 

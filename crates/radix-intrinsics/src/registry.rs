@@ -100,6 +100,8 @@ pub enum IntrinsicReturnKind {
     GatherShape,
     MapperArray,
     ReducerInfer,
+    /// `lista` of prefix results for a serial higher-order scan.
+    ReducerArray,
     TextusArray,
     /// `cursor<ascii<1>>` — the `ascii.cursor()` / later `textus.cursor()` walk.
     CursorAsciiOne,
@@ -113,6 +115,8 @@ pub enum IntrinsicMirKind {
     HigherOrderFiltrata,
     HigherOrderMap,
     HigherOrderReduce,
+    /// Base-lane target-codegen scan; MIR has no lista scan op yet.
+    HigherOrderCumulata,
     /// Lowered directly in target codegen without a MIR collection op.
     CodegenOnly,
 }
@@ -180,6 +184,14 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Lista, "addita", 1, &[IntrinsicParamKind::Inner], ArrayInner, collection AppendImmutable),
     intrinsic!(Lista, "appende", 1, &[IntrinsicParamKind::Inner], Vacuum, collection Append),
     intrinsic!(Lista, "continet", 1, &[IntrinsicParamKind::Inner], Bool, collection Contains),
+    intrinsic!(
+        Lista,
+        "cumulata",
+        2,
+        &[IntrinsicParamKind::Reducer, IntrinsicParamKind::Accumulator],
+        ReducerArray,
+        HigherOrderCumulata
+    ),
     intrinsic!(Lista, "decapita", 0, &[], OptionInner, collection RemoveFirst),
     intrinsic!(
         Lista,
