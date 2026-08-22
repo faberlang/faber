@@ -121,13 +121,16 @@ fn hir_fhir_requires_emit_workflow() -> CodegenError {
     CodegenError {
         message: "Target::HirFhir is a serialization dispatch, not a codegen backend. Use the emit workflow."
             .to_owned(),
-        args: Vec::new(),
+        args: vec![DiagnosticArg::new("issue", "hir_fhir_requires_emit_workflow")],
     }
 }
 
 /// Rejection error for `MIR`-backed targets: routing belongs to the driver.
 fn mir_backed_requires_driver() -> CodegenError {
-    CodegenError { message: "target is MIR-backed and must be routed through the driver".to_owned(), args: Vec::new() }
+    CodegenError {
+        message: "target is MIR-backed and must be routed through the driver".to_owned(),
+        args: vec![DiagnosticArg::new("issue", "mir_backed_requires_driver")],
+    }
 }
 
 /// Build the failable-def set and per-definition error-type overrides shared by
@@ -487,11 +490,17 @@ fn emit_provider_modules(analysis: &crate::driver::AnalyzedModule) -> Result<Vec
             }
             let provider_path = resolve_namespace_import(from_file, import_path, None).map_err(|err| CodegenError {
                 message: format!("cannot resolve provider import `{import_path}` for Rust module emission: {err}"),
-                args: Vec::new(),
+                args: vec![
+                    DiagnosticArg::new("issue", "provider_import_resolution_failed"),
+                    DiagnosticArg::new("import_path", import_path),
+                ],
             })?;
             let source = std::fs::read_to_string(&provider_path).map_err(|err| CodegenError {
                 message: format!("cannot read provider source {}: {err}", provider_path.display()),
-                args: Vec::new(),
+                args: vec![
+                    DiagnosticArg::new("issue", "provider_source_read_failed"),
+                    DiagnosticArg::new("path", provider_path.display().to_string()),
+                ],
             })?;
             // Re-analysis is a program-layer entry: discover contracts from
             // the provider path, then fail-closed module analysis. Nested
@@ -512,7 +521,10 @@ fn emit_provider_modules(analysis: &crate::driver::AnalyzedModule) -> Result<Vec
                 crate::program::compile::prepare_program_module(&provider_path, &source, &session).map_err(|diag| {
                     CodegenError {
                         message: format!("cannot prepare provider module `{module_name}`: {}", diag.message),
-                        args: Vec::new(),
+                        args: vec![
+                            DiagnosticArg::new("issue", "provider_module_prepare_failed"),
+                            DiagnosticArg::new("module", module_name.clone()),
+                        ],
                     }
                 })?;
             let unit = crate::driver::analyze_source(
@@ -531,7 +543,10 @@ fn emit_provider_modules(analysis: &crate::driver::AnalyzedModule) -> Result<Vec
                         .collect::<Vec<_>>()
                         .join("; ")
                 ),
-                args: Vec::new(),
+                args: vec![
+                    DiagnosticArg::new("issue", "provider_module_analysis_failed"),
+                    DiagnosticArg::new("module", module_name.clone()),
+                ],
             })?;
             if unit
                 .diagnostics
@@ -540,7 +555,10 @@ fn emit_provider_modules(analysis: &crate::driver::AnalyzedModule) -> Result<Vec
             {
                 return Err(CodegenError {
                     message: format!("provider module `{module_name}` has analysis errors"),
-                    args: Vec::new(),
+                    args: vec![
+                        DiagnosticArg::new("issue", "provider_module_analysis_errors"),
+                        DiagnosticArg::new("module", module_name.clone()),
+                    ],
                 });
             }
             let module_out = rust::generate_module(&unit.hir, &unit.types, &unit.interner)?;
