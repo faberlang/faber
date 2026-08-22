@@ -618,7 +618,8 @@ mod tests;
 
 /// The target-neutral logical entry name of a kernel function: the function's
 /// source name when it carries one, else the kernel index-based fallback.
-fn kernel_entry_name(function: &MirFunction, interner: &Interner) -> String {
+#[must_use]
+pub fn kernel_entry_name(function: &MirFunction, interner: &Interner) -> String {
     function.name.map_or_else(
         || format!("kernel{}", function.id.0),
         |symbol| interner.resolve(symbol).to_owned(),

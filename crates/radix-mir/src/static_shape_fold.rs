@@ -41,12 +41,12 @@ use crate::figura::i64s_from_literal_index;
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirCollectionOp,
-    MirConstant, MirFunction, MirIntrinsic, MirLocalId, MirOperand, MirPlace, MirPlaceBase,
-    MirRuntimeCall, MirStatement, MirStatementKind, MirTempId, MirType, MirValidationContext,
-    MirValueKind,
+    MirConstant, MirFunction, MirFunctionId, MirIntrinsic, MirLocalId, MirOperand, MirPlace,
+    MirPlaceBase, MirRuntimeCall, MirStatement, MirStatementKind, MirTempId, MirType,
+    MirValidationContext, MirValueKind, ValidatedMir,
 };
 use radix_types::Type;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 /// Stable category of a shape-fold failure (S5-U4).
@@ -309,6 +309,49 @@ pub fn fold_static_shapes(
     Ok(ShapeFoldOutcome {
         function: folded,
         report: ShapeFoldReport { facts },
+    })
+}
+
+/// Fold every selected device-resident function in one validated MIR program.
+///
+/// The caller supplies the complete device-kernel identity set because some
+/// device kernels are ordinary compute functions while others are generated
+/// companions or training-step functions. Every selected function is visited
+/// exactly once; functions without shape-construction operations pass through
+/// unchanged. The returned token is revalidated whenever a body changes.
+///
+/// # Errors
+/// Returns the first fail-closed [`ShapeFoldError`] from a selected function,
+/// or when the resulting folded program no longer validates.
+pub fn fold_validated_device_program<'a>(
+    validated: &ValidatedMir<'a>,
+    device_function_ids: &BTreeSet<MirFunctionId>,
+) -> Result<ValidatedMir<'a>, ShapeFoldError> {
+    let mut program = validated.program().clone();
+    let mut changed = false;
+    for function in &mut program.functions {
+        if !device_function_ids.contains(&function.id) {
+            continue;
+        }
+        let outcome = fold_static_shapes(function, validated.validation())?;
+        changed |= outcome.function != *function;
+        *function = outcome.function;
+    }
+    if !changed {
+        return Ok(validated.clone());
+    }
+    ValidatedMir::new(program, validated.validation().clone()).map_err(|errors| {
+        ShapeFoldError::new(
+            ShapeFoldKind::NotDeviceMaterializable,
+            format!(
+                "device shape fold produced invalid MIR: {}",
+                errors
+                    .iter()
+                    .map(|error| error.message.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" | ")
+            ),
+        )
     })
 }
 

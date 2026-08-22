@@ -83,7 +83,7 @@ pub use abi::{
     MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceReflection,
     MirKernelResourceRole, MirKernelShaderAccess, MirKernelShaderStage, MirKernelSignature,
     MirKernelWorkgroupCount, MirPrimitiveTopology, MirRankExtensionBroadcast, MirRuntimeAbi,
-    MirRuntimeAbiKind, MirRuntimeAbiFamily, MirStencilFaceState, MirStencilOp,
+    MirRuntimeAbiFamily, MirRuntimeAbiKind, MirStencilFaceState, MirStencilOp,
     MirVaryingInterpolation, MirVaryingReflection, MirVertexInputFormat, MirVertexInputReflection,
     MirWebGpuBindGroupDescriptor, MirWebGpuBindGroupEntryDescriptor,
     MirWebGpuBindGroupLayoutDescriptor, MirWebGpuBindGroupLayoutEntryDescriptor,
@@ -96,7 +96,7 @@ pub use ai_workbench_stage5::{
     AiWorkbenchStage5Row, AiWorkbenchStage5Status,
 };
 pub use boundary_abi::{
-    validate_boundary_abi, BoundaryAbiKind, BoundaryAbiError, BoundaryCall, PreparedRegion,
+    validate_boundary_abi, BoundaryAbiError, BoundaryAbiKind, BoundaryCall, PreparedRegion,
     HOST_CALL_ABI_VERSION,
 };
 pub use cost_analysis::{
@@ -128,16 +128,18 @@ pub use device_program_plans::{
 };
 pub use dump::dump_program;
 pub use elementwise_plan::{
-    plan_elementwise, ConcreteTensorShape, ElementwiseBarrierError, ElementwiseExpr, ElementwiseInput,
-    ElementwiseOp, ElementwiseOutput, ElementwisePlan, IndexMapping, NumericalPolicy,
-    ReassociationPolicy, SourceSpanFact,
+    plan_elementwise, ConcreteTensorShape, ElementwiseBarrierError, ElementwiseExpr,
+    ElementwiseInput, ElementwiseOp, ElementwiseOutput, ElementwisePlan, IndexMapping,
+    NumericalPolicy, ReassociationPolicy, SourceSpanFact,
 };
 pub use generic::{
     bind_generic_type_witness, fold_shape_size_constant, function_contains_shape_size,
     instantiate_existing_generic_type, rewrite_function_constants, substitute_shape_size_constants,
     type_contains_param, MirGenericBindings,
 };
-pub use host_partition::{derive_host_partition, HostPartition, HostPartitionError};
+pub use host_partition::{
+    derive_host_partition, kernel_entry_name, HostPartition, HostPartitionError,
+};
 pub use inference_blocker_matrix::{
     inference_blocker_rows, inference_non_claims, InferenceBlockerKind, InferenceBlockerRow,
     InferenceBlockerStatus, InferenceNonClaim, InferenceNonClaimKind,
@@ -149,7 +151,7 @@ pub use kernel_decomposition::{
 pub use kernel_plan::{
     admit_quantized_gather, admit_quantized_matmul, BarrierPhase, BarrierPoint,
     CollectionKernelPlan, GroupedMatMulPlan, MatMulPlan, OobPaddingPolicy, PackedAdmissionError,
-    PackedDequantKind, PackedDequantError, PackedDequantResolution, PlanValidationError,
+    PackedDequantError, PackedDequantKind, PackedDequantResolution, PlanValidationError,
     QuantizedGatherPlan, QuantizedMatMulPlan, ReduceOp, ReductionPlan, SharedMemoryLayout,
     SsmConv1dPlan, SsmScanPlan, TransposePlan, TRANSPOSE_WORKGROUP_X,
 };
@@ -188,8 +190,9 @@ pub use shader_contract::{
     ShaderVarying, ShaderVertexAttribute,
 };
 pub use static_shape_fold::{
-    admit_device_shape_materialization, fold_static_shapes, FoldedShapeFact, ShapeFactSource,
-    ShapeFoldError, ShapeFoldKind, ShapeFoldOutcome, ShapeFoldReport, ShapeFoldedAdmission,
+    admit_device_shape_materialization, fold_static_shapes, fold_validated_device_program,
+    FoldedShapeFact, ShapeFactSource, ShapeFoldError, ShapeFoldKind, ShapeFoldOutcome,
+    ShapeFoldReport, ShapeFoldedAdmission,
 };
 pub use tensor_operation_floor::{
     required_tensor_operation_floor_families, tensor_operation_floor_rows,
