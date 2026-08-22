@@ -253,3 +253,62 @@ fn output_bind_preserves_sequence_major_context_stride() {
     assert_eq!(selection.bind.strides, vec![4, 4, 60, 1]);
     assert_eq!(selection.bind.layout, BindLayout::Strided);
 }
+
+#[test]
+fn library_operation_spellings_have_one_owner_per_match_site() {
+    let compiler = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/device_plan_compiler.rs"));
+    let section = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../faber/src/package/device/section.rs"
+    ));
+    let hosts = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../hosts/macos-arm64/src/kernel/library.rs"
+    ));
+
+    let operations = [
+        (
+            LibraryOperation::CausalAttention,
+            "CausalAttention",
+            "Self::CausalAttention => Some(\"CausalAttention\")",
+            "\"CausalAttention\" | \"SwiGlu\" => continue,",
+            "LibraryKernel::CausalAttention => causal_attention(bind, q, k, v, output),",
+        ),
+        (
+            LibraryOperation::QkvProjection,
+            "QkvProjection",
+            "Self::QkvProjection => Some(\"QkvProjection\")",
+            "\"QkvProjection\" => (",
+            "(Some(\"QkvProjection\"), 0 | 1) => Ok(Some(LibraryKernel::QkvProjection)),",
+        ),
+        (
+            LibraryOperation::ResidualRmsNorm,
+            "ResidualRmsNorm",
+            "Self::ResidualRmsNorm => Some(\"ResidualRmsNorm\")",
+            "\"ResidualRmsNorm\" => (vec![\"residual\", \"skip\", \"gamma\"], vec![\"output\"]),",
+            "Some(\"ResidualRmsNorm\") => Ok(Some(LibraryKernel::ResidualRmsNorm)),",
+        ),
+        (
+            LibraryOperation::SwiGlu,
+            "SwiGlu",
+            "Self::SwiGlu => Some(\"SwiGlu\")",
+            "\"CausalAttention\" | \"SwiGlu\" => continue,",
+            "Some(\"QkvProjection\" | \"OutputProjection\" | \"SwiGlu\")",
+        ),
+    ];
+
+    for (operation, spelling, compiler_owner, section_owner, hosts_owner) in operations {
+        assert_eq!(operation.entry(), Some(spelling));
+        for (site, source, owner) in [
+            ("compiler matches", compiler, compiler_owner),
+            ("section producer", section, section_owner),
+            ("hosts dispatch", hosts, hosts_owner),
+        ] {
+            let count = source.matches(owner).count();
+            assert_eq!(
+                count, 1,
+                "{spelling} must have exactly one owner at {site}; found {count} occurrences of {owner:?}"
+            );
+        }
+    }
+}
