@@ -184,21 +184,6 @@ pub struct LowerError {
 }
 
 impl<'a> Lowerer<'a> {
-    /// Create a lowerer for one program.
-    ///
-    /// `cli_program` is optional because ordinary file compilation and package
-    /// CLI compilation share the same lowering pipeline. When present, it is
-    /// used only to type synthetic entrypoint/command argument records.
-    pub fn new(
-        resolver: &'a mut Resolver,
-        types: &'a mut TypeTable,
-        interner: &'a mut Interner,
-        cli_program: Option<&'a CliProgram>,
-        locale_pack: Option<&'a LocalePack>,
-    ) -> Self {
-        Self::new_with_contracts(resolver, types, interner, cli_program, locale_pack, None)
-    }
-
     /// Create a lowerer that attaches resolved annotation-contract applications to HIR.
     pub fn new_with_contracts(
         resolver: &'a mut Resolver,
@@ -940,63 +925,34 @@ impl<'a> Lowerer<'a> {
     }
 }
 
-/// Lower resolved AST to HIR without package CLI metadata.
+/// HIR lowering request: the resolved program plus the optional metadata that
+/// feeds binding shapes and library bindings.
 ///
-/// This is the ordinary compiler entrypoint for sources whose entry arguments
-/// are the default `lista<textus>` shape rather than a validated CLI contract.
-pub fn lower(
-    program: &Program,
-    resolver: &mut Resolver,
-    types: &mut TypeTable,
-    interner: &mut Interner,
-) -> (LoweredProgram, Vec<LowerError>) {
-    lower_with_cli(program, resolver, types, interner, None)
+/// `cli_program` carries an already validated CLI contract (record-shaped
+/// entry arguments); `locale_pack` carries reader-pack type surface bindings;
+/// `annotation_contracts` carries annotation-contract metadata. All three are
+/// optional — plain sources lower with `None` for each.
+pub struct LowerRequest<'a> {
+    pub program: &'a Program,
+    pub resolver: &'a mut Resolver,
+    pub types: &'a mut TypeTable,
+    pub interner: &'a mut Interner,
+    pub cli_program: Option<&'a CliProgram>,
+    pub locale_pack: Option<&'a LocalePack>,
+    pub annotation_contracts: Option<&'a AnnotationContractMetadata>,
 }
 
-/// Lower resolved AST to HIR with an optional validated CLI contract.
-///
-/// Package CLI analysis runs before lowering and can provide record-shaped
-/// argument metadata for `incipit` and command functions. The HIR still carries
-/// ordinary locals and type ids; no CLI-specific semantic checks are performed
-/// here beyond translating the already validated contract into HIR-friendly
-/// binding types.
-pub fn lower_with_cli(
-    program: &Program,
-    resolver: &mut Resolver,
-    types: &mut TypeTable,
-    interner: &mut Interner,
-    cli_program: Option<&CliProgram>,
-) -> (LoweredProgram, Vec<LowerError>) {
-    lower_with_cli_and_locale_pack(program, resolver, types, interner, cli_program, None)
-}
-
-/// Lower resolved AST to HIR with optional CLI metadata and reader-pack type
-/// surface bindings.
-pub fn lower_with_cli_and_locale_pack(
-    program: &Program,
-    resolver: &mut Resolver,
-    types: &mut TypeTable,
-    interner: &mut Interner,
-    cli_program: Option<&CliProgram>,
-    locale_pack: Option<&LocalePack>,
-) -> (LoweredProgram, Vec<LowerError>) {
-    let mut lowerer = Lowerer::new(resolver, types, interner, cli_program, locale_pack);
-    let hir = lowerer.lower_program(program);
-    let errors = lowerer.take_errors();
-    let presentation = lowerer.presentation;
-    (LoweredProgram { hir, presentation }, errors)
-}
-
-/// Lower resolved AST to HIR with optional CLI, reader-pack, and annotation-contract metadata.
-pub fn lower_with_cli_locale_pack_and_contracts(
-    program: &Program,
-    resolver: &mut Resolver,
-    types: &mut TypeTable,
-    interner: &mut Interner,
-    cli_program: Option<&CliProgram>,
-    locale_pack: Option<&LocalePack>,
-    annotation_contracts: Option<&AnnotationContractMetadata>,
-) -> (LoweredProgram, Vec<LowerError>) {
+/// Lower resolved AST to HIR.
+pub fn lower(request: LowerRequest<'_>) -> (LoweredProgram, Vec<LowerError>) {
+    let LowerRequest {
+        program,
+        resolver,
+        types,
+        interner,
+        cli_program,
+        locale_pack,
+        annotation_contracts,
+    } = request;
     let mut lowerer = Lowerer::new_with_contracts(
         resolver,
         types,

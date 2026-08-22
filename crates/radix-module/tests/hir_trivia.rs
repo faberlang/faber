@@ -43,7 +43,7 @@ fn lower_source(source: &str) -> (LoweredProgram, Vec<LowerError>, Interner) {
     if let Err(errors) = passes::resolve::resolve(&program, &mut resolver, &interner, &mut types) {
         panic!("resolve failed: {errors:?}");
     }
-    let (lowered, errors) = radix_module::hir::lower(&program, &mut resolver, &mut types, &mut interner);
+    let (lowered, errors) = radix_module::hir::lower(radix_module::hir::LowerRequest { program: &program, resolver: &mut resolver, types: &mut types, interner: &mut interner, cli_program: None, locale_pack: None, annotation_contracts: None });
     (lowered, errors, interner)
 }
 

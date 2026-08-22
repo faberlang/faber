@@ -2,7 +2,7 @@
 //!
 //! Contract: each `instans<...>` syntax maps to the correct `Type::SizedInstans` variant.
 
-use super::lower;
+use super::{lower, LowerRequest};
 use crate::hir::{HirFunction, HirItemKind};
 use crate::lexer::Interner;
 use crate::semantic::{passes, InstansPrecision, Primitive, Resolver, Type, TypeTable};
@@ -21,7 +21,7 @@ fn lower_source(source: &str) -> (crate::hir::LoweredProgram, Interner, TypeTabl
     passes::collect::collect(&program, &mut resolver, &mut types).expect("collect");
     passes::resolve::resolve(&program, &mut resolver, &interner, &mut types).expect("resolve");
 
-    let (lowered, errors) = lower(&program, &mut resolver, &mut types, &mut interner);
+    let (lowered, errors) = lower(LowerRequest { program: &program, resolver: &mut resolver, types: &mut types, interner: &mut interner, cli_program: None, locale_pack: None, annotation_contracts: None });
     assert!(errors.is_empty(), "lower failed: {errors:?}");
     (lowered, interner, types)
 }

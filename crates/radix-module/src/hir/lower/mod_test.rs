@@ -6,7 +6,7 @@
 #[path = "error_masking_test.rs"]
 mod error_masking_test;
 
-use super::lower;
+use super::{lower, LowerRequest};
 use crate::hir::{
     HirAnnotationValue, HirAvailability, HirExpressionKind, HirFunction, HirInterface, HirItemKind, HirStatementKind,
     HirStruct, HirTestMetadata, HirTestModifier, HirTypeParamConstraint,
@@ -42,7 +42,7 @@ fn lower_source_result(source: &str) -> (crate::hir::LoweredProgram, Vec<crate::
         panic!("resolve failed: {errors:?}");
     }
 
-    let (lowered, errors) = lower(&program, &mut resolver, &mut types, &mut interner);
+    let (lowered, errors) = lower(LowerRequest { program: &program, resolver: &mut resolver, types: &mut types, interner: &mut interner, cli_program: None, locale_pack: None, annotation_contracts: None });
     (lowered, errors, interner, types)
 }
 
@@ -83,7 +83,7 @@ fn lower_source_with_locale_pack(
         panic!("resolve failed: {errors:?}");
     }
 
-    let (lowered, errors) = lower(&program, &mut resolver, &mut types, &mut interner);
+    let (lowered, errors) = lower(LowerRequest { program: &program, resolver: &mut resolver, types: &mut types, interner: &mut interner, cli_program: None, locale_pack: None, annotation_contracts: None });
     assert!(errors.is_empty(), "lower failed: {errors:?}");
     (lowered, interner, types)
 }

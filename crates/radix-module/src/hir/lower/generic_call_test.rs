@@ -1,6 +1,6 @@
 //! HIR lowering preserves explicit call-site type arguments.
 
-use super::lower;
+use super::{lower, LowerRequest};
 use crate::hir::{HirExpressionKind, HirStatementKind};
 use crate::semantic::{passes, Resolver, TypeTable};
 
@@ -27,7 +27,7 @@ fn prepare_lower_pipeline(source: &str) -> (crate::syntax::Program, Resolver, Ty
 
 fn lower_source(source: &str) -> crate::hir::LoweredProgram {
     let (program, mut resolver, mut types, mut interner) = prepare_lower_pipeline(source);
-    let (lowered, errors) = lower(&program, &mut resolver, &mut types, &mut interner);
+    let (lowered, errors) = lower(LowerRequest { program: &program, resolver: &mut resolver, types: &mut types, interner: &mut interner, cli_program: None, locale_pack: None, annotation_contracts: None });
     assert!(errors.is_empty(), "lower failed: {errors:?}");
     lowered
 }
@@ -74,7 +74,7 @@ fn rejects_template_call_with_explicit_type_args_at_lowering() {
     fixum _ s ← "§"<textus>("x")
 }"#,
     );
-    let (lowered, errors) = lower(&program, &mut resolver, &mut types, &mut interner);
+    let (lowered, errors) = lower(LowerRequest { program: &program, resolver: &mut resolver, types: &mut types, interner: &mut interner, cli_program: None, locale_pack: None, annotation_contracts: None });
     assert!(
         errors.iter().any(|err| err
             .args

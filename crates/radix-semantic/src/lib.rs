@@ -519,15 +519,15 @@ pub fn analyze_with_cli(
         );
     }
 
-    let (lowered, lower_errors) = crate::lower::lower_with_cli_locale_pack_and_contracts(
+    let (lowered, lower_errors) = crate::lower::lower(crate::lower::LowerRequest {
         program,
-        &mut resolver,
-        &mut types,
+        resolver: &mut resolver,
+        types: &mut types,
         interner,
         cli_program,
-        config.locale_pack.as_ref(),
-        Some(&annotation_contracts),
-    );
+        locale_pack: config.locale_pack.as_ref(),
+        annotation_contracts: Some(&annotation_contracts),
+    });
     let mut hir = lowered.hir;
 
     for err in lower_errors {

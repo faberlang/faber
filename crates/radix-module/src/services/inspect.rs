@@ -207,7 +207,7 @@ pub fn hir_inspection_for_source(name: &str, source: &str) -> SourceInspection {
         Ok(ready) => ready,
         Err(errors) => return SourceInspection { text: String::new(), success: false, errors },
     };
-    let (lowered, errors) = crate::hir::lower(&program, &mut resolver, &mut types, &mut interner);
+    let (lowered, errors) = crate::hir::lower(crate::hir::LowerRequest { program: &program, resolver: &mut resolver, types: &mut types, interner: &mut interner, cli_program: None, locale_pack: None, annotation_contracts: None });
     SourceInspection {
         text: hir_inspection_json(&source_file, &lowered.hir, Some(&lowered.presentation), &interner, &errors),
         success: errors.is_empty(),

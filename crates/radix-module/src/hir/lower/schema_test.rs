@@ -8,7 +8,7 @@
 //! deterministically. Schema decls are never lowered to MIR or any backend
 //! leaf.
 
-use super::lower;
+use super::{lower, LowerRequest};
 use crate::hir::{HirItemKind, HirModule};
 use crate::semantic::{passes, Primitive, Resolver, Type, TypeTable};
 
@@ -35,7 +35,7 @@ fn prepare_lower_pipeline(source: &str) -> (crate::syntax::Program, Resolver, Ty
 
 fn lower_schema_source(source: &str) -> (crate::hir::LoweredProgram, crate::lexer::Interner, TypeTable) {
     let (program, mut resolver, mut types, mut interner) = prepare_lower_pipeline(source);
-    let (lowered, errors) = lower(&program, &mut resolver, &mut types, &mut interner);
+    let (lowered, errors) = lower(LowerRequest { program: &program, resolver: &mut resolver, types: &mut types, interner: &mut interner, cli_program: None, locale_pack: None, annotation_contracts: None });
     assert!(errors.is_empty(), "lower failed: {errors:?}");
     (lowered, interner, types)
 }
