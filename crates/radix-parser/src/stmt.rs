@@ -128,7 +128,7 @@ impl Parser {
     }
 
     fn missing_block_error(&self) -> ParseError {
-        ParseError::structured(ParseErrorKind::MissingBlock, self.current_span())
+        ParseError::structured(ParseErrorKind::BlockAbsent, self.current_span())
             .with_arg("block", "{ ... }")
             .with_arg("ergo", "ergo")
     }
@@ -179,7 +179,14 @@ impl Parser {
         let iterable = Box::new(self.parse_expression()?);
 
         let mutability = self.parse_mutability()?;
-        let binding = self.parse_binding_pattern()?;
+        // A top-level `_` in an itera binder is the legacy unused loop
+        // variable, not a destructuring wildcard. Keep it as an identifier;
+        // wildcard patterns remain available inside array/object binders.
+        let binding = if matches!(self.peek().kind, TokenKind::Underscore(_)) {
+            BindingPattern::Ident(self.parse_ident()?)
+        } else {
+            self.parse_binding_pattern()?
+        };
         let body = self.parse_ergo_body()?;
         let catch = self.try_parse_cape_stmt()?;
 
@@ -304,7 +311,7 @@ impl Parser {
     }
 
     fn invalid_casu_arm_error(&self) -> ParseError {
-        ParseError::structured(ParseErrorKind::InvalidCasuArm, self.current_span())
+        ParseError::structured(ParseErrorKind::CasuArmInvalid, self.current_span())
             .with_arg("casu", "casu")
             .with_arg("ceterum", "ceterum")
     }
@@ -714,7 +721,7 @@ impl Parser {
         statement: &'static str,
         replacement: &'static str,
     ) -> ParseError {
-        ParseError::structured(ParseErrorKind::InvalidStatement, span)
+        ParseError::structured(ParseErrorKind::StatementInvalid, span)
             .with_arg("issue", "ad_expression_only")
             .with_arg("statement", statement)
             .with_arg("replacement", replacement)

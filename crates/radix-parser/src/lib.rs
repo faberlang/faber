@@ -809,7 +809,7 @@ impl Parser {
     }
 
     fn invalid_expression_error(&self, issue: &'static str) -> ParseError {
-        ParseError::structured(ParseErrorKind::InvalidExpression, self.current_span())
+        ParseError::structured(ParseErrorKind::ExpressionInvalid, self.current_span())
             .with_arg("issue", issue)
     }
 
@@ -930,7 +930,7 @@ impl Parser {
     /// Parse the required name after `functio`.
     fn parse_function_name(&mut self) -> Result<Ident, ParseError> {
         self.parse_decl_name_after_keyword(
-            ParseErrorKind::MissingFunctionName,
+            ParseErrorKind::FunctionNameAbsent,
             "functio",
             "functio",
         )
@@ -938,7 +938,7 @@ impl Parser {
 
     /// Parse the required name after `genus`.
     fn parse_class_name(&mut self) -> Result<Ident, ParseError> {
-        self.parse_decl_name_after_keyword(ParseErrorKind::MissingClassName, "genus", "genus")
+        self.parse_decl_name_after_keyword(ParseErrorKind::ClassNameAbsent, "genus", "genus")
     }
 
     fn parse_decl_name_after_keyword(
@@ -1050,6 +1050,10 @@ mod slot_helpers_test;
 #[cfg(test)]
 #[path = "mod_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "itera_binder_regression_test.rs"]
+mod itera_binder_regression_test;
 
 #[cfg(test)]
 #[path = "schema_test.rs"]
