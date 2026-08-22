@@ -1,0 +1,29 @@
++++
+term = "libera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "base_type", "compact_clausura_expr", "clausura_signature", "clausura_param", "clausura_params", "clausura_joint", "expression", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "literal", "nota_stmt"]
+category = "function"
+summary = "A free-marked closure may reference module-level items; they are statically resolved, not captures."
+syntax = "fn <name>(…) → <type> { … }; main { const _ f ← … free ∴ <name>(…) }"
+related = ["clausura", "functio", "∴"]
+locale = "en"
++++
+# =============================================================================
+# libera — module-level reference stays legal (CL-5)
+# =============================================================================
+#
+# What this teaches:
+#   • Module-level functions (and other statically resolved identities) are
+#     not captures, so a free-marked closure may call them
+#
+# See also: libera.fab, libera-reject.fab
+# =============================================================================
+
+fn duplica(int n) → int {
+    return n * 2
+}
+
+main {
+    const _ double ← int x free → int ∴ duplica(x)
+    print double(21)
+}

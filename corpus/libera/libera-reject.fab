@@ -1,0 +1,21 @@
++++
+term = "libera"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "compact_clausura_expr", "clausura_signature", "clausura_param", "clausura_params", "clausura_joint", "expression", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "literal", "expr_stmt"]
+category = "function"
+summary = "CL-5 reject harness: a free-marked closure may not capture an enclosing local or parameter."
+syntax = "const int seed ← 2; const _ add ← int x free ∴ x + seed"
+related = ["clausura"]
+locale = "en"
++++
+# =============================================================================
+# libera — capture reject (CL-5)
+# =============================================================================
+# This exemplum intentionally fails to compile. The sibling .expected file
+# pins only the stable diagnostic identity, not paths or rendered prose.
+
+main {
+    const int seed ← 2
+    const _ add ← int x free ∴ x + seed
+    print add(40)
+}
