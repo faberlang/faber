@@ -32,6 +32,10 @@ pub mod test_support;
 #[path = "itera_destructure_test.rs"]
 mod itera_destructure_tests;
 
+#[cfg(test)]
+#[path = "bounded_itera_test.rs"]
+mod bounded_itera_test;
+
 // --- Core from radix-mir (module paths for residual code) ---
 pub use radix_mir::{
     abi, ai_workbench_stage5, artifact_completeness, boundary_abi, capability, control, device, device_semantics, dump,
@@ -52,8 +56,8 @@ pub use coverage::{classify_mir_coverage, MirCoverageTarget, MIR_COVERAGE_TARGET
 // `llvm-text`/`llvm-host` through the lane when roles are present — no route
 // silently emits device bodies into a CPU module.
 pub use llvm_text::{
-    classify_lowerability, emit_llvm_text_probe, fmir_artifact_packet_facts, CliAdapterField,
-    CliAdapterPlan, CliRecordFunction, LlvmEmitRequest, MirLlvmTextProbeError,
+    classify_lowerability, emit_llvm_text_probe, fmir_artifact_packet_facts, CliAdapterField, CliAdapterPlan,
+    CliRecordFunction, LlvmEmitRequest, MirLlvmTextProbeError,
 };
 pub use lower::prepare_mir_lowering_interner;
 pub use lower::{
@@ -66,7 +70,7 @@ pub use metal_text::{
     MirMetalTextProbeError, MirMetalTextProbeOutput,
 };
 pub use radix_mir::boundary_abi::{
-    validate_boundary_abi, BoundaryAbiKind, BoundaryAbiError, BoundaryCall, PreparedRegion, HOST_CALL_ABI_VERSION,
+    validate_boundary_abi, BoundaryAbiError, BoundaryAbiKind, BoundaryCall, PreparedRegion, HOST_CALL_ABI_VERSION,
 };
 // DDCP3-U4/U5: the typed `§ArtifactPacket` `HostDeviceCall` surface (typed
 // bindings, bounded numeric argument layout, the execution-descriptor
@@ -106,8 +110,8 @@ pub use radix_mir::{
     indexed_access_parity, TensorOperationFamily, TensorOperationParityRow, TensorParityStatus, TensorParityTarget,
 };
 pub use radix_mir::{
-    inference_blocker_rows, inference_non_claims, InferenceBlockerKind, InferenceBlockerRow,
-    InferenceBlockerStatus, InferenceNonClaim, InferenceNonClaimKind,
+    inference_blocker_rows, inference_non_claims, InferenceBlockerKind, InferenceBlockerRow, InferenceBlockerStatus,
+    InferenceNonClaim, InferenceNonClaimKind,
 };
 pub(crate) use radix_mir::{instantiate_existing_generic_type, type_contains_param, MirGenericBindings};
 pub use radix_mir::{
@@ -122,7 +126,7 @@ pub use radix_mir::{
     MirKernelLaunchPipelineLayout, MirKernelLaunchPlan, MirKernelOffsetMode, MirKernelProvenance, MirKernelReflection,
     MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceReflection,
     MirKernelResourceRole, MirKernelShaderAccess, MirKernelShaderStage, MirKernelSignature, MirKernelWorkgroupCount,
-    MirRuntimeAbi, MirRuntimeAbiKind, MirRuntimeAbiFamily, MirVaryingInterpolation, MirVaryingReflection,
+    MirRuntimeAbi, MirRuntimeAbiFamily, MirRuntimeAbiKind, MirVaryingInterpolation, MirVaryingReflection,
     MirVertexInputFormat, MirVertexInputReflection, MirWebGpuBindGroupDescriptor, MirWebGpuBindGroupEntryDescriptor,
     MirWebGpuBindGroupLayoutDescriptor, MirWebGpuBindGroupLayoutEntryDescriptor, MirWebGpuDispatchWorkgroups,
     MirWebGpuLaunchAdapter, MirWebGpuPipelineLayoutDescriptor, MirWebGpuVertexAttributeDescriptor,

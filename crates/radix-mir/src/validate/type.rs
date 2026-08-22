@@ -2,9 +2,9 @@
 
 use super::{FunctionScope, MirValidationError, Validator};
 use crate::{
-    instantiate_existing_generic_type, MirAggregateCarrier, MirAggregateFamily, MirBlockId,
-    MirClosureEnvironmentId, MirConstant, MirGenericBindings, MirKernelBuiltin, MirLayoutKind,
-    MirLocalId, MirOperand, MirProjection, MirScalarLayout, MirType,
+    MirAggregateCarrier, MirAggregateFamily, MirBlockId, MirClosureEnvironmentId, MirConstant,
+    MirGenericBindings, MirKernelBuiltin, MirLayoutKind, MirLocalId, MirOperand, MirProjection,
+    MirScalarLayout, MirType, instantiate_existing_generic_type,
 };
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
@@ -285,6 +285,19 @@ impl Validator<'_, '_> {
                     );
                 }
                 Some(MirType::semantic(inner))
+            }
+            // Route B (AEU-4): bounded lista element gathers index the live
+            // prefix lanes only (the lowerer emits constants below len).
+            Type::BoundedArray { element, .. } => {
+                if let Some((_, index_ty)) = index {
+                    self.require_assignable(
+                        index_ty,
+                        self.primitive(Primitive::Numerus),
+                        span,
+                        "bounded array index is not numerus",
+                    );
+                }
+                Some(MirType::semantic(element))
             }
             Type::Tensor(inner, _) => {
                 if let Some((_, index_ty)) = index {

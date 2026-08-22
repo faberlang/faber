@@ -47,6 +47,10 @@ enum CollectionIteraKind {
     Cursor(TypeId),
     AsyncCursor(TypeId),
     Tensor(TypeId),
+    // Route B (AEU-4): runtime-len `lista<T, N>` splits on the carrier `len`
+    // into N+1 guard-free unrolled arms; the literal capacity is carried so
+    // the split stays base-lane MIR (never AIR).
+    BoundedArray(TypeId, i64),
     Unsupported,
 }
 
@@ -1268,6 +1272,24 @@ impl FunctionBuilder<'_> {
                         CollectionIteraKind::Unsupported
                     }
                 }
+                // Route B (AEU-4): runtime-len `lista<T, N>` lowers in the base
+                // lane to a static split on the carrier `len` with N+1
+                // guard-free arms (total N(N+1)/2 lanes). The N <= 10
+                // code-size cap keeps the split bounded; non-literal capacities
+                // (shape-generics) and N > 10 fall through to Unsupported.
+                Type::BoundedArray { element, capacity } => {
+                    let literal_n = if matches!(iter.mode, HirIteraMode::Ex) {
+                        i64s_from_literal_index(*capacity, self.types)
+                            .and_then(|dims| dims.first().copied())
+                            .filter(|n| (0..=10).contains(n))
+                    } else {
+                        None
+                    };
+                    match literal_n {
+                        Some(n) => CollectionIteraKind::BoundedArray(*element, n),
+                        None => CollectionIteraKind::Unsupported,
+                    }
+                }
                 Type::Array(item) => CollectionIteraKind::Array(*item),
                 Type::Map(key, _) if matches!(iter.mode, HirIteraMode::De) => CollectionIteraKind::MapKeys(*key),
                 Type::Map(_, value) if matches!(iter.mode, HirIteraMode::Ex) => CollectionIteraKind::MapValues(*value),
@@ -1292,10 +1314,12 @@ impl FunctionBuilder<'_> {
             (kind, lanes)
         };
         if matches!(collection_kind, CollectionIteraKind::Unsupported) {
-            let is_tensor = matches!(self.normalized_type(iter_ty), Type::Tensor(_, _));
+            // Only map-value iteration carries the tabula decline; tensor and
+            // bounded-lista declines keep the generic iterator diagnostic.
+            let is_map = matches!(self.normalized_type(iter_ty), Type::Map(_, _));
             self.errors.push(MirError::unsupported(
                 iter.iter.span,
-                if matches!(iter.mode, HirIteraMode::Ex) && !is_tensor {
+                if matches!(iter.mode, HirIteraMode::Ex) && is_map {
                     "itera ex over tabula before map value iteration MIR lowering"
                 } else {
                     "itera collection before iterator MIR lowering"
@@ -1351,10 +1375,17 @@ impl FunctionBuilder<'_> {
                 // tensor place (every lane is defined by construction).
                 (collection, MirType::semantic(elem), false)
             }
+            CollectionIteraKind::BoundedArray(elem, _) => {
+                (collection, MirType::semantic(elem), false)
+            }
             CollectionIteraKind::Unsupported => {
                 unreachable!("unsupported collection itera kinds fail closed above")
             }
         };
+
+        if let CollectionIteraKind::BoundedArray(_, capacity) = collection_kind {
+            return self.lower_bounded_array_itera_split(&iter, iteration_place, binding_ty, capacity);
+        }
 
         let index = self.next_local_id();
         self.locals
@@ -1442,6 +1473,87 @@ impl FunctionBuilder<'_> {
         self.terminate_current(MirTerminatorKind::Goto(cond_id), iter.span);
 
         self.switch_to(after_id);
+        Some(())
+    }
+
+    /// Route B (AEU-4): lower `itera ex` over a runtime-len `lista<T, N>` to
+    /// a base-lane static split — a switch on the carrier `len` with N+1
+    /// literal arms, arm k being a guard-free unroll of k lanes over 0..k.
+    ///
+    /// Each arm touches only `0..k ⊆ 0..len`, so no dead slot (i ≥ len) is
+    /// ever read. The branch is base-lane MIR; the AIR lane never admits the
+    /// loop (`air_unroll` declines runtime-len values `not_concrete`), so
+    /// reverse AD never sees a non-literal scrutinee.
+    fn lower_bounded_array_itera_split(
+        &mut self,
+        iter: &ArrayIteraLowering<'_>,
+        collection: MirPlace,
+        binding_ty: MirType,
+        capacity: i64,
+    ) -> Option<()> {
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        // Runtime `len` read from the ListaN carrier — the split scrutinee.
+        let length = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Length),
+            vec![MirOperand::Place(collection.clone())],
+            numerus,
+            iter.iter.span,
+        );
+        if !self.current_is_open() {
+            return None;
+        }
+
+        let binding = self.next_local_id();
+        self.locals.push(MirLocalDecl {
+            id: binding,
+            name: Some(iter.name),
+            ty: binding_ty,
+            mutable: true,
+            span: iter.span,
+        });
+        self.bindings.insert(iter.binding, LocalBinding { local: binding, ty: binding_ty });
+
+        let after_id = self.fresh_block(iter.span);
+        let mut cases = Vec::new();
+        for k in 0..=capacity {
+            cases.push(MirSwitchCase { value: MirConstant::Int(k), target: self.fresh_block(iter.span) });
+        }
+        let arm_blocks = cases.iter().map(|case| case.target).collect::<Vec<_>>();
+        self.terminate_current(
+            MirTerminatorKind::Switch { value: length, cases, default: after_id },
+            iter.iter.span,
+        );
+
+        let mut reaches_after = false;
+        for (k, arm_id) in arm_blocks.into_iter().enumerate() {
+            self.switch_to(arm_id);
+            for lane in 0..k as i64 {
+                // Arm k reads only lanes 0..k ⊆ 0..len — never a dead slot.
+                let mut indexed = collection.clone();
+                indexed
+                    .projections
+                    .push(MirProjection::Index(MirOperand::Constant(MirConstant::Int(lane))));
+                self.assign(MirPlace::local(binding), MirOperand::Place(indexed), binding_ty, iter.span);
+                let lane_end = self.fresh_block(iter.span);
+                self.breakables.push(BreakableContext {
+                    perge_target: Some(lane_end),
+                    rumpe_target: after_id,
+                    rumpe_used: false,
+                });
+                self.visit_block(iter.body);
+                let ctx = self.breakables.pop().expect("breakable context balances");
+                reaches_after |= ctx.rumpe_used;
+                self.terminate_open_current(MirTerminatorKind::Goto(lane_end), iter.span);
+                self.switch_to(lane_end);
+            }
+            reaches_after |=
+                self.terminate_open_current(MirTerminatorKind::Goto(after_id), iter.span);
+        }
+        if reaches_after {
+            self.switch_to(after_id);
+        } else {
+            self.seal_unreachable(after_id, iter.span);
+        }
         Some(())
     }
 
