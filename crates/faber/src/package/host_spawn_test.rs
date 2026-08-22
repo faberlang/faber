@@ -50,6 +50,28 @@ esac
     (dir, path)
 }
 
+fn n1_distributed_stub_cli() -> (tempfile::TempDir, PathBuf) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("faber-host-macos-arm64");
+    let script = r##"#!/bin/sh
+case "$*" in
+  *"device-execute --backend metal --distributed-image "*" --bind-count 1")
+    printf '%s\n' '{"physical_device_count":1,"physical_device_ids":["metal:test"],"virtual_partition_count":1,"virtual_partition_ids":["implicit-local"],"fixture_identity_class":"virtual","transport_class":"none","hardware_isolation_claimed":false,"bind_shape":"1:1","communication_graph_edge_count":0,"snapshot_id":"snapshot:n1","logical_distributed_plan_hash":"sha256:logical-n1","bound_distributed_plan_hash":"sha256:bound-n1","transaction_state":"prepared"}'
+    exit 0
+    ;;
+  *) exit 64 ;;
+esac
+"##;
+    std::fs::write(&path, script).expect("write N=1 distributed stub");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod N=1 distributed stub");
+    }
+    (dir, path)
+}
+
 fn resident_stub_cli() -> (tempfile::TempDir, PathBuf) {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("faber-host-macos-arm64");
@@ -383,6 +405,24 @@ fn distributed_spawn_passes_image_and_bind_count_and_decodes_receipt() {
     assert_eq!(receipt.bind_shape, "8:1");
     assert_eq!(receipt.transaction_state, "prepared");
     assert!(!receipt.hardware_isolation_claimed);
+}
+
+#[test]
+fn n1_distributed_spawn_preserves_zero_communication_edge_receipt() {
+    let (_dir, host) = n1_distributed_stub_cli();
+    let request = DistributedExecuteRequest {
+        backend: "metal".to_owned(),
+        image: b"fmir-one-partition".to_vec(),
+        bind_count: 1,
+    };
+    let receipt: DistributedPrepareReceipt =
+        execute_distributed_at(&host, &request).expect("N=1 CLI receipt");
+    assert_eq!(receipt.physical_device_count, 1);
+    assert_eq!(receipt.virtual_partition_count, 1);
+    assert_eq!(receipt.bind_shape, "1:1");
+    assert_eq!(receipt.communication_graph_edge_count, 0);
+    assert!(!receipt.hardware_isolation_claimed);
+    assert_eq!(receipt.transaction_state, "prepared");
 }
 
 #[test]
