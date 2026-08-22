@@ -301,3 +301,112 @@ fn hir_aspect_report_model_represents_recognized_and_no_span_records() {
     assert_eq!(record.reason, HirAspectReason::Recognized);
     assert_eq!(record.span, HirAspectSpan::NoSpan(HirAspectNoSpanReason::ProgramSummary));
 }
+
+// ---------------------------------------------------------------------------
+// APA-1 pins: AIR aspects are unregistered pre-delivery.
+// Goal: docs/factory/air-proof-aspect. Registration is APA-2; the three proof
+// lines are APA-L1/L2/L3. These pins hold only until those units land.
+// ---------------------------------------------------------------------------
+
+/// AIR-shaped HIR sample: plain calls whose shapes evoke the unroll route,
+/// the `summa` zero-fill mask combine, and the purity gate. The report
+/// builder has no AIR recognizer, so none of these may produce records.
+fn air_call_expr(id: u32, span: Span, callee: DefId) -> HirExpression {
+    HirExpression {
+        id: HirId(id),
+        kind: HirExpressionKind::Call(
+            Box::new(HirExpression {
+                id: HirId(id + 1),
+                kind: HirExpressionKind::Path(callee),
+                ty: None,
+                span,
+            }),
+            Vec::new(),
+            Vec::new(),
+        ),
+        ty: None,
+        span,
+    }
+}
+
+fn air_shaped_program() -> HirModule {
+    let span = test_span_between(10, 20);
+    expr_program(vec![
+        air_call_expr(1, span, DefId(300)),
+        air_call_expr(10, span, DefId(301)),
+        air_call_expr(20, span, DefId(302)),
+    ])
+}
+
+/// Exhaustive-dispatch pin: this function stops compiling the moment a second
+/// `HirAspectKind` variant is added, forcing APA-2 to carry the registration
+/// pins for the new kinds instead of silently widening this test.
+fn only_registered_aspect_kind_label(kind: HirAspectKind) -> &'static str {
+    match kind {
+        HirAspectKind::DiscerneOmnia => "discerne_omnia",
+    }
+}
+
+#[test]
+fn air_aspect_kinds_are_absent_from_the_current_kind_set() {
+    let report = report_hir_aspects(&air_shaped_program(), &TypeTable::new());
+
+    for record in report.records() {
+        // Exhaustive match: pre-APA-2, every record is DiscerneOmnia.
+        assert_eq!(only_registered_aspect_kind_label(record.aspect), "discerne_omnia");
+    }
+}
+
+#[test]
+fn air_shaped_program_produces_no_aspect_records_before_registration() {
+    let types = TypeTable::new();
+    let program = air_shaped_program();
+
+    let first = report_hir_aspects(&program, &types);
+    let second = report_hir_aspects(&program, &types);
+
+    assert_eq!(first, second);
+    assert!(
+        first.records().is_empty(),
+        "AIR-shaped HIR must produce no aspect records before APA-2 registers the AIR kinds"
+    );
+}
+
+#[test]
+#[ignore = "APA-1 future fixture: UnrollEquivalence (evidence class machine-checked-structural) is unregistered until APA-2 lands registration and APA-L1 lands the real obligation after AEU-2; un-ignored only by its owner"]
+fn future_fixture_air_unroll_equivalence_record_and_verdict_shape() {
+    // Owning line APA-L1 (after AEU-2): the unroll-route fixture must become a
+    // Recognized UnrollEquivalence record whose Lean checker verdict is Proven
+    // only through real `lake build` + sorry scan + allowlisted transitive
+    // axiom audit (machine-checked-structural, never semantic preservation).
+    // No float theorem, no sorry, no unallowlisted axiom, no execution claim.
+    // Pre-registration absence pin (holds today):
+    let report = report_hir_aspects(&air_shaped_program(), &TypeTable::new());
+    assert!(report.records().is_empty());
+}
+
+#[test]
+#[ignore = "APA-1 future fixture: MaskNeutrality (evidence class machine-checked-structural) is unregistered until APA-2 lands registration and APA-L2 lands the real obligation after ARC-3 and ARC-4; un-ignored only by its owner"]
+fn future_fixture_air_mask_neutrality_record_and_verdict_shape() {
+    // Owning line APA-L2 (after ARC-3/ARC-4): the caller-built-mask zero-fill
+    // fixture must become a Recognized MaskNeutrality record with a live-prefix
+    // / dead-suffix structural theorem — machine-checked-structural only, with
+    // the caller-built-mask boundary retained. No float algebra, no identity
+    // inference, no in-region mask admission.
+    // Pre-registration absence pin (holds today):
+    let report = report_hir_aspects(&air_shaped_program(), &TypeTable::new());
+    assert!(report.records().is_empty());
+}
+
+#[test]
+#[ignore = "APA-1 future fixture: GatePurity (evidence class machine-checked-structural) is unregistered until APA-2 lands registration and APA-L3 lands the real obligation; un-ignored only by its owner"]
+fn future_fixture_air_gate_purity_record_and_verdict_shape() {
+    // Owning line APA-L3: the scalar/let/call admitted fixture must become a
+    // Recognized GatePurity record proving inhabitation in the pure type
+    // fragment with no IO/monadic effects; a gate-admitted-but-impure form
+    // surfaces as a named gate-hole finding, never a suppressed failure.
+    // Machine-checked-structural, not semantic preservation.
+    // Pre-registration absence pin (holds today):
+    let report = report_hir_aspects(&air_shaped_program(), &TypeTable::new());
+    assert!(report.records().is_empty());
+}

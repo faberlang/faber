@@ -9,7 +9,8 @@ use super::{
 };
 use crate::aspect::verifier::{HirAspectCheckResult, HirAspectCheckStatus, HirAspectEvidence, HirAspectVerifier};
 use crate::aspect::{
-    HirAspectBackendKind, HirAspectKind, HirAspectPrecondition, HirAspectRecord, HirAspectReport, HirAspectSpan,
+    HirAspectBackendKind, HirAspectKind, HirAspectPrecondition, HirAspectReason, HirAspectRecord, HirAspectReport,
+    HirAspectSpan,
 };
 use crate::lexer::Span;
 use std::path::PathBuf;
@@ -795,4 +796,93 @@ fn lean_checker_verifier_integration_full_verify() {
     // (If lake is not on PATH, the test is #[ignore] anyway.)
     assert_eq!(results[0].status, HirAspectCheckStatus::Proven);
     assert_eq!(results[0].backend, HirAspectBackendKind::Lean);
+}
+
+// ---------------------------------------------------------------------------
+// APA-1 pins: no AIR proof obligation flows through the Lean checker today.
+// Goal: docs/factory/air-proof-aspect. The three AIR proof lines are owned by
+// APA-L1/L2/L3; the placeholder below is never AIR evidence.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lean_checker_generated_source_is_true_trivial_placeholder_not_air_proof() {
+    let record = HirAspectRecord::recognized(
+        HirAspectKind::DiscerneOmnia,
+        HirAspectSpan::Source(Span::new(0, 10)),
+        Some(crate::hir::HirId(1)),
+    );
+
+    let source = super::generate_lean_source(&[&record]);
+
+    // Current posture: the generated theorem body is the True/trivial
+    // placeholder. It carries no AIR obligation and must never be cited as
+    // AIR proof evidence (that is APA-L1/L2/L3 work).
+    assert!(source.contains(": True := trivial"));
+    assert!(!source.to_lowercase().contains("unroll"));
+    assert!(!source.to_lowercase().contains("mask"));
+    assert!(!source.to_lowercase().contains("purity"));
+}
+
+#[test]
+fn lean_checker_verifier_fabricates_no_results_for_unproven_records() {
+    // No false Proven: records the recognizer could not prove (NotProven,
+    // SkippedCandidate) never reach the checker at all, so no verdict —
+    // Proven or otherwise — is fabricated for them.
+    let temp_dir = crate::test_support::test_temp_dir("lean-verifier-apa1-no-false-proven");
+    let temp = temp_dir.path().to_path_buf();
+    let config = LeanAspectCheckerConfig {
+        lake_bin: temp.join("nonexistent-lake"),
+        lean_bin: temp.join("nonexistent-lean"),
+        timeout: Duration::from_secs(5),
+    };
+    let checker = LeanAspectChecker::new(config, temp);
+
+    let span = HirAspectSpan::Source(Span::new(0, 10));
+    let records = vec![
+        HirAspectRecord::not_proven(
+            HirAspectKind::DiscerneOmnia,
+            span,
+            None,
+            HirAspectReason::MissingExplicitVariants,
+        ),
+        HirAspectRecord::skipped_candidate(
+            HirAspectKind::DiscerneOmnia,
+            span,
+            None,
+            HirAspectReason::NonOmniaDiscerne,
+        ),
+    ];
+    let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, records);
+
+    let results = checker.verify(&report);
+    assert!(results.is_empty(), "unproven records must yield no checker results");
+}
+
+#[test]
+fn lean_checker_missing_toolchain_is_never_proven_for_recognized_records() {
+    // Pin (no false Proven): a recognized record with no Lean toolchain must
+    // normalize to ToolchainMissing/Error — never a proof. Missing tooling is
+    // an explicit unavailable/error result, never a pass.
+    let temp_dir = crate::test_support::test_temp_dir("lean-verifier-apa1-missing-tc");
+    let temp = temp_dir.path().to_path_buf();
+    let config = LeanAspectCheckerConfig {
+        lake_bin: temp.join("nonexistent-lake"),
+        lean_bin: temp.join("nonexistent-lean"),
+        timeout: Duration::from_secs(5),
+    };
+    let checker = LeanAspectChecker::new(config, temp);
+
+    let record =
+        HirAspectRecord::recognized(HirAspectKind::DiscerneOmnia, HirAspectSpan::Source(Span::new(0, 10)), None);
+    let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, vec![record]);
+
+    let results = checker.verify(&report);
+    assert_eq!(results.len(), 1);
+    assert_ne!(results[0].status, HirAspectCheckStatus::Proven);
+    assert!(
+        results[0].status == HirAspectCheckStatus::ToolchainMissing
+            || results[0].status == HirAspectCheckStatus::Error,
+        "expected ToolchainMissing or Error, got {:?}",
+        results[0].status
+    );
 }
