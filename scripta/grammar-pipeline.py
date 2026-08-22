@@ -466,7 +466,8 @@ def locale_drift_rows(text: str, *, path: str) -> list[dict[str, object]]:
                     "message": "statement still lists retired adStmt",
                 }
             )
-        pre_layer = "statementCore" not in refs or "annotation" not in refs
+        has_core = "statementCore" in refs or "statement_core" in refs
+        pre_layer = not has_core or "annotation" not in refs
         if pre_layer:
             rows.append(
                 {
@@ -1155,6 +1156,13 @@ def default_locale_ebnf_path(locale: str) -> Path:
     return default_ebnf_path().with_name(f"EBNF.{locale}.md")
 
 
+def default_site_locale_ebnf_path(locale: str) -> Path | None:
+    directory = default_locale_dir()
+    if directory is None:
+        return None
+    return directory / f"EBNF.{locale}.md"
+
+
 def dumps_glossary(locale: str, mapping: dict[str, str]) -> str:
     lines = [
         f"# Grammar locale glossary ({locale}).",
@@ -1352,6 +1360,13 @@ def check_locales(
         )
         if actual != expected:
             mismatches.append(display_path(output_path))
+        site_path = default_site_locale_ebnf_path(locale)
+        if site_path is not None:
+            site_actual = (
+                site_path.read_text(encoding="utf-8") if site_path.is_file() else ""
+            )
+            if site_actual != expected:
+                mismatches.append(display_path(site_path))
     payload = {
         "schema": TRIPLE_SCHEMA,
         "ok": not mismatches and not errors,
@@ -1592,8 +1607,12 @@ def run_render_locales(args: argparse.Namespace) -> list[Path]:
         glossary = default_glossary_path(locale)
         if args.locales is None and not glossary.is_file():
             continue
-        _, dest = render_locale_file(source_path, sidecar_path, locale)
+        rendered, dest = render_locale_file(source_path, sidecar_path, locale)
         written.append(dest)
+        site = default_site_locale_ebnf_path(locale)
+        if site is not None:
+            site.write_text(rendered, encoding="utf-8")
+            written.append(site)
     return written
 
 
