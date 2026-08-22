@@ -679,6 +679,7 @@ name = "radix-mir"
 version = "0.83.0"
 dependencies = [
  "handroll",
+ "hygiene-ratchet",
  "radix-codegen-shared",
  "radix-diagnostics",
  "radix-hir",
@@ -695,6 +696,7 @@ name = "radix-mir-fmir"
 version = "0.83.0"
 dependencies = [
  "handroll",
+ "hygiene-ratchet",
  "postcard",
  "radix-hir",
  "radix-lexer",
