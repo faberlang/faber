@@ -44,6 +44,16 @@ fn error_expr(lowerer: &mut Lowerer, span: Span) -> HirExpression {
     }
 }
 
+/// Source span of a binding pattern for diagnostics.
+fn binding_pattern_span(pattern: &radix_syntax::BindingPattern) -> Span {
+    match pattern {
+        radix_syntax::BindingPattern::Ident(ident) => ident.span,
+        radix_syntax::BindingPattern::Wildcard(span) => *span,
+        radix_syntax::BindingPattern::Array { span, .. }
+        | radix_syntax::BindingPattern::Object { span, .. } => *span,
+    }
+}
+
 /// Lower one source statement into one HIR statement.
 ///
 /// This function assumes expansion-only forms have already gone through
@@ -550,8 +560,25 @@ impl Lowerer<'_> {
 
         let binding = self.next_def_id();
         let iter = self.lower_expr(&iter_stmt.iterable);
+        let binder = match &iter_stmt.binding {
+            radix_syntax::BindingPattern::Ident(ident) => ident,
+            // Pattern binders lower per-element in U3; reject at lowering
+            // until then rather than mis-binding the whole pattern as one
+            // loop variable.
+            pattern => {
+                let span = binding_pattern_span(pattern);
+                self.error_with_args_at(
+                    vec![radix_diagnostics::DiagnosticArg::new(
+                        "issue",
+                        "itera_binder_pattern_unsupported",
+                    )],
+                    span,
+                );
+                return HirStatementKind::Expr(error_expr(self, span));
+            }
+        };
         self.push_scope();
-        self.bind_local(iter_stmt.binding.name, binding);
+        self.bind_local(binder.name, binding);
         let body = self.lower_ergo_body(&iter_stmt.body);
         self.pop_scope();
         let expr = HirExpression {
@@ -559,7 +586,7 @@ impl Lowerer<'_> {
             kind: HirExpressionKind::Itera(
                 mode,
                 binding,
-                iter_stmt.binding.name,
+                binder.name,
                 Box::new(iter),
                 body,
             ),

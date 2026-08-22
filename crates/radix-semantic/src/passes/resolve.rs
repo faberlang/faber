@@ -423,14 +423,19 @@ fn resolve_stmt(
         StmtKind::Itera(stmt) => {
             resolve_expr(resolver, interner, &stmt.iterable, errors);
             resolver.enter_scope(ScopeKind::Loop);
-            define_symbol(
-                resolver,
-                stmt.binding.name,
-                stmt.binding.span,
-                SymbolKind::Local,
-                stmt.mutability == radix_syntax::AstMutability::Mutable,
-                errors,
-            );
+            // Pattern binders gain per-element definitions in U3; only the
+            // plain identifier binder resolves today, so pattern element names
+            // surface as unresolved.
+            if let BindingPattern::Ident(ident) = &stmt.binding {
+                define_symbol(
+                    resolver,
+                    ident.name,
+                    ident.span,
+                    SymbolKind::Local,
+                    stmt.mutability == radix_syntax::AstMutability::Mutable,
+                    errors,
+                );
+            }
             resolve_if_body(resolver, interner, &stmt.body, errors);
             resolver.exit_scope();
             if let Some(catch) = &stmt.catch {

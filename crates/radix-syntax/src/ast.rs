@@ -679,7 +679,7 @@ pub struct IteraStmt {
     pub mode: IteraMode,
     pub iterable: Box<Expr>,
     pub mutability: AstMutability,
-    pub binding: Ident,
+    pub binding: BindingPattern,
     pub body: IfBody,
     pub catch: Option<CapeClause>,
 }

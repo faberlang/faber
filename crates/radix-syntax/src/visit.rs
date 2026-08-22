@@ -217,7 +217,7 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
         }
         StmtKind::Itera(iter_stmt) => {
             visitor.visit_expr(&iter_stmt.iterable);
-            visitor.visit_ident(&iter_stmt.binding);
+            walk_binding_pattern(visitor, &iter_stmt.binding);
             walk_if_body(visitor, &iter_stmt.body);
             if let Some(catch) = &iter_stmt.catch {
                 visitor.visit_ident(&catch.binding);

@@ -355,7 +355,7 @@ impl Parser {
         }))
     }
 
-    fn parse_binding_pattern(&mut self) -> Result<BindingPattern, ParseError> {
+    pub(super) fn parse_binding_pattern(&mut self) -> Result<BindingPattern, ParseError> {
         if let TokenKind::LBracket = self.peek().kind {
             return self.parse_array_binding_pattern();
         }

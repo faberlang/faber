@@ -156,7 +156,7 @@ impl Parser {
     /// Parse an `itera` loop and its ownership mode.
     ///
     /// GRAMMAR:
-    ///   itera-stmt := `itera` mode expr (`fixum`|`varia`) ident if-body [`cape` ident block]
+    ///   itera-stmt := `itera` mode expr (`fixum`|`varia`) binding-pattern if-body [`cape` ident block]
     ///   mode := `ex` | `de` | `ab`
     ///
     /// The parser records the source preposition mode; later phases validate
@@ -179,7 +179,7 @@ impl Parser {
         let iterable = Box::new(self.parse_expression()?);
 
         let mutability = self.parse_mutability()?;
-        let binding = self.parse_ident()?;
+        let binding = self.parse_binding_pattern()?;
         let body = self.parse_ergo_body()?;
         let catch = self.try_parse_cape_stmt()?;
 

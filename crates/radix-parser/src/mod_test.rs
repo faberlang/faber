@@ -2144,6 +2144,105 @@ fn parses_itera_loop() {
 }
 
 #[test]
+fn parses_itera_array_pattern_binder() {
+    let result = parse_ok("itera ex xs fixum [a, b] { nota a }");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
+        panic!("expected itera statement");
+    };
+    assert!(matches!(iter_stmt.mode, IteraMode::Ex));
+    let BindingPattern::Array { elements, is_rest, .. } = &iter_stmt.binding else {
+        panic!("expected array binding pattern binder");
+    };
+    assert_eq!(elements.len(), 2);
+    assert!(elements
+        .iter()
+        .all(|e| matches!(e, BindingPattern::Ident(_))));
+    assert!(is_rest.is_none());
+}
+
+#[test]
+fn parses_itera_object_pattern_binder() {
+    let result = parse_ok("itera ex xs fixum {gx} { nota gx }");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
+        panic!("expected itera statement");
+    };
+    let BindingPattern::Object { fields, is_rest, .. } = &iter_stmt.binding else {
+        panic!("expected object binding pattern binder");
+    };
+    assert_eq!(fields.len(), 1);
+    assert!(is_rest.is_none());
+}
+
+#[test]
+fn parses_itera_pattern_binder_all_modes() {
+    for (source, mode) in [
+        ("itera ex xs fixum [a] { nota a }", IteraMode::Ex),
+        ("itera de xs fixum [a] { nota a }", IteraMode::De),
+        ("itera ab items fixum [a] { nota a }", IteraMode::Ab),
+    ] {
+        let result = parse_ok(source);
+        let program = result
+            .program
+            .as_ref()
+            .expect("parser should produce a program");
+        let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
+            panic!("expected itera statement for {source}");
+        };
+        assert!(matches!(iter_stmt.mode, mode), "mode mismatch for {source}");
+        assert!(
+            matches!(iter_stmt.binding, BindingPattern::Array { .. }),
+            "expected array binder for {source}"
+        );
+    }
+}
+
+#[test]
+fn parses_itera_pattern_binder_element_forms() {
+    let result = parse_ok("itera ex xs varia [_, secundus, ceteri cauda] { nota secundum }");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
+        panic!("expected itera statement");
+    };
+    assert!(matches!(iter_stmt.mutability, AstMutability::Mutable));
+    let BindingPattern::Array { elements, is_rest, .. } = &iter_stmt.binding else {
+        panic!("expected array binding pattern binder");
+    };
+    assert_eq!(elements.len(), 2);
+    assert!(matches!(elements[0], BindingPattern::Wildcard(_)));
+    assert!(matches!(elements[1], BindingPattern::Ident(_)));
+    assert!(is_rest.is_some());
+}
+
+#[test]
+fn parses_itera_object_pattern_alias() {
+    let result = parse_ok("itera ex xs fixum {gx ut caput} ergo redde caput cape err {}");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
+        panic!("expected itera statement");
+    };
+    let BindingPattern::Object { fields, .. } = &iter_stmt.binding else {
+        panic!("expected object binding pattern binder");
+    };
+    assert_eq!(fields.len(), 1);
+    assert!(fields[0].alias.is_some());
+    assert!(iter_stmt.catch.is_some());
+}
+
+#[test]
 fn parses_elige_switch() {
     let result = parse_ok("elige value { casu 1 ergo redde 1 ceterum ergo tacet } cape err {}");
     let program = result
