@@ -163,6 +163,7 @@ impl ProgramBuffer {
 /// Returns a typed error when folding, ABI/plan derivation, companion lookup,
 /// buffer identity construction, or the shared program-plus-semantics schema
 /// rejects the result.
+#[must_use]
 pub fn build_device_program(
     validated: &ValidatedMir<'_>,
     interner: &Interner,
