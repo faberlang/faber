@@ -67,9 +67,9 @@ fn gate_classification_is_conservative() {
     // shape / context kind keeps the gate firing. Classification must be
     // conservative: when in doubt, the gate stops before lowering.
     for kind in [
-        SemanticErrorKind::UndefinedVariable,
-        SemanticErrorKind::UndefinedFunction,
-        SemanticErrorKind::UndefinedMember,
+        SemanticErrorKind::VariableUndefined,
+        SemanticErrorKind::FunctionUndefined,
+        SemanticErrorKind::MemberUndefined,
     ] {
         assert!(
             is_use_site_only_error(&SemanticError::structured(
@@ -82,12 +82,12 @@ fn gate_classification_is_conservative() {
     for kind in [
         // Definition-identity / coherence class: breaks the table lowering
         // assumes, so the gate must keep firing.
-        SemanticErrorKind::DuplicateDefinition,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::DefinitionDuplicate,
+        SemanticErrorKind::ImportAbsent,
         SemanticErrorKind::CircularDependency,
-        SemanticErrorKind::UndefinedType,
+        SemanticErrorKind::TypeUndefined,
         SemanticErrorKind::LoweringError,
-        SemanticErrorKind::InvalidAnnotation,
+        SemanticErrorKind::AnnotationInvalid,
         SemanticErrorKind::CliValidation,
         // Pre-lowering shape / context / type kinds are also not use-site-only.
         SemanticErrorKind::TypeMismatch,
@@ -96,7 +96,7 @@ fn gate_classification_is_conservative() {
         SemanticErrorKind::ContinueOutsideLoop,
         SemanticErrorKind::UseBeforeInit,
         SemanticErrorKind::NonExhaustiveMatch,
-        SemanticErrorKind::MissingReturn,
+        SemanticErrorKind::ReturnAbsent,
         SemanticErrorKind::Warning(WarningKind::FileInterfaceExportSkipped),
     ] {
         assert!(
@@ -133,7 +133,7 @@ fn use_site_only_errors_reach_lowering() {
         result
             .diagnostics
             .iter()
-            .any(|err| err.kind == SemanticErrorKind::UndefinedVariable),
+            .any(|err| err.kind == SemanticErrorKind::VariableUndefined),
         "resolve must report the use-site miss, got: {:?}",
         result.diagnostics
     );
@@ -171,7 +171,7 @@ fn coherence_class_errors_stop_before_lowering() {
         result
             .diagnostics
             .iter()
-            .any(|err| err.kind == SemanticErrorKind::DuplicateDefinition),
+            .any(|err| err.kind == SemanticErrorKind::DefinitionDuplicate),
         "duplicate definitions must be reported, got: {:?}",
         result.diagnostics
     );

@@ -200,7 +200,7 @@ fn define_import_symbol(
         // type-kind entry). Any other collision still fails closed.
         if !existing_kind.is_some_and(SymbolKind::is_type) && inferred {
             errors.push(
-                SemanticError::structured(SemanticErrorKind::DuplicateDefinition, span)
+                SemanticError::structured(SemanticErrorKind::DefinitionDuplicate, span)
                     .with_arg("issue", "inferred_import_name_collision"),
             );
             return;
@@ -229,7 +229,7 @@ fn define_symbol(
 
     if resolver.define(symbol).is_err() {
         errors.push(
-            SemanticError::structured(SemanticErrorKind::DuplicateDefinition, span)
+            SemanticError::structured(SemanticErrorKind::DefinitionDuplicate, span)
                 .with_arg("issue", "duplicate_definition"),
         );
         None
@@ -241,7 +241,7 @@ fn define_symbol(
 /// Raise SEM005 for a duplicate variant name within one union.
 fn duplicate_variant_error(errors: &mut Vec<SemanticError>, span: radix_lexer::Span) {
     errors.push(
-        SemanticError::structured(SemanticErrorKind::DuplicateDefinition, span)
+        SemanticError::structured(SemanticErrorKind::DefinitionDuplicate, span)
             .with_arg("issue", "duplicate_definition"),
     );
 }

@@ -385,7 +385,7 @@ functio simple_loss(tf32[2, 2] x, tf32[2, 2] w) → tf32[2, 2] {
     assert!(
         !errors
             .iter()
-            .any(|err| err.kind == SemanticErrorKind::InvalidAnnotation),
+            .any(|err| err.kind == SemanticErrorKind::AnnotationInvalid),
         "air-lane + backward must still pass SEM018: {errors:?}"
     );
 }

@@ -376,7 +376,7 @@ fn cross_package_privata_errors() {
 #[test]
 fn diagnostic_kind_is_import_not_found() {
     assert_eq!(
-        crate::diagnostics::semantic_spec(SemanticErrorKind::ImportNotFound).code,
+        crate::diagnostics::semantic_spec(SemanticErrorKind::ImportAbsent).code,
         "SEM006"
     );
 }

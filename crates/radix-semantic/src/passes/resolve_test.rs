@@ -197,7 +197,7 @@ incipit {
         .expect_err("resolve should fail");
     let err = expect_structured_error(
         &errors,
-        SemanticErrorKind::UndefinedVariable,
+        SemanticErrorKind::VariableUndefined,
         "unknown_identifier",
     );
 
@@ -233,7 +233,7 @@ incipit {
         .expect_err("resolve should fail");
     let err = expect_structured_error(
         &errors,
-        SemanticErrorKind::UndefinedVariable,
+        SemanticErrorKind::VariableUndefined,
         "unknown_identifier",
     );
 
@@ -267,7 +267,7 @@ incipit {
         .expect_err("resolve should fail");
     let mut suggestions: Vec<(String, String)> = errors
         .iter()
-        .filter(|err| err.kind == SemanticErrorKind::UndefinedVariable)
+        .filter(|err| err.kind == SemanticErrorKind::VariableUndefined)
         .map(|err| {
             let spelling = err
                 .args
@@ -318,7 +318,7 @@ incipit {
         .expect_err("resolve should fail");
     let err = expect_structured_error(
         &errors,
-        SemanticErrorKind::UndefinedVariable,
+        SemanticErrorKind::VariableUndefined,
         "unknown_identifier",
     );
 
@@ -355,7 +355,7 @@ incipit {
 
     expect_structured_error(
         &errors,
-        SemanticErrorKind::DuplicateDefinition,
+        SemanticErrorKind::DefinitionDuplicate,
         "duplicate_definition",
     );
 }
@@ -569,7 +569,7 @@ fn reports_unknown_type_with_structured_event() {
     let errors = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types)
         .expect_err("resolve should fail");
 
-    expect_structured_error(&errors, SemanticErrorKind::UndefinedType, "unknown_type");
+    expect_structured_error(&errors, SemanticErrorKind::TypeUndefined, "unknown_type");
 }
 
 #[test]
@@ -601,7 +601,7 @@ fn reports_invalid_width_marker_with_structured_event() {
 
         let errors = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types)
             .expect_err("resolve should fail");
-        let err = expect_structured_error(&errors, SemanticErrorKind::UndefinedType, issue);
+        let err = expect_structured_error(&errors, SemanticErrorKind::TypeUndefined, issue);
 
         assert!(err
             .args
@@ -1323,7 +1323,7 @@ functio f(terminus.Terminus value) → vacuum {}
 
     expect_structured_error(
         &errors,
-        SemanticErrorKind::UndefinedType,
+        SemanticErrorKind::TypeUndefined,
         "qualified_type_prefix_not_namespace",
     );
 }

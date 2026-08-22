@@ -556,7 +556,7 @@ fn catalog_identities_stay_stable() {
         DiagnosticArg::new("site", "definition"),
     ];
     assert_eq!(
-        semantic_message(SemanticErrorKind::InvalidOperandTypes, &definition).as_deref(),
+        semantic_message(SemanticErrorKind::OperandTypesInvalid, &definition).as_deref(),
         Some("@ nucleum fragment cannot call a host function or other non-device-safe callable")
     );
     let instantiation = vec![
@@ -566,7 +566,7 @@ fn catalog_identities_stay_stable() {
         DiagnosticArg::new("site", "call"),
     ];
     assert_eq!(
-        semantic_message(SemanticErrorKind::InvalidOperandTypes, &instantiation).as_deref(),
+        semantic_message(SemanticErrorKind::OperandTypesInvalid, &instantiation).as_deref(),
         Some("host code cannot call an @ nucleum fragment")
     );
 }

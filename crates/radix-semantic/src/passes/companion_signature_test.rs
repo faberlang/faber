@@ -126,7 +126,7 @@ incipit {
     let errors = analyze_errors(source);
 
     let has_wrong_arity = errors.iter().any(|e| {
-        e.kind == SemanticErrorKind::WrongArity
+        e.kind == SemanticErrorKind::ArityMismatch
             && e.args
                 .iter()
                 .any(|a| a.name == "issue" && a.value == "wrong_number_of_arguments")
@@ -160,7 +160,7 @@ incipit {
 
     // Companion name must resolve — no SEM001 for mean_backward.
     let has_sem001 = errors.iter().any(|e| {
-        e.kind == SemanticErrorKind::UndefinedVariable
+        e.kind == SemanticErrorKind::VariableUndefined
             && e.args
                 .iter()
                 .any(|a| a.name == "issue" && a.value == "unknown_identifier")
@@ -176,7 +176,7 @@ incipit {
     // Correct arity: 4 args supplied, 4 params expected.
     let has_wrong_arity = errors
         .iter()
-        .any(|e| e.kind == SemanticErrorKind::WrongArity);
+        .any(|e| e.kind == SemanticErrorKind::ArityMismatch);
     assert!(
         !has_wrong_arity,
         "companion call with correct arity (4 args) should not produce WrongArity; errors: {errors:?}"
@@ -185,7 +185,7 @@ incipit {
     // Companion has a Func type → callable.
     let has_not_callable = errors
         .iter()
-        .any(|e| e.kind == SemanticErrorKind::NotCallable);
+        .any(|e| e.kind == SemanticErrorKind::NonCallable);
     assert!(
         !has_not_callable,
         "companion with Func type should not produce NotCallable; errors: {errors:?}"
@@ -241,7 +241,7 @@ incipit {
     let errors = analyze_errors(source);
 
     let has_sem001 = errors.iter().any(|e| {
-        e.kind == SemanticErrorKind::UndefinedVariable
+        e.kind == SemanticErrorKind::VariableUndefined
             && e.args
                 .iter()
                 .any(|a| a.name == "issue" && a.value == "unknown_identifier")

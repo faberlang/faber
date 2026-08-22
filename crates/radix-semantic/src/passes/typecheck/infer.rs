@@ -562,7 +562,7 @@ impl TypeChecker<'_> {
         policy: UnifyPolicy,
     ) -> TypeId {
         if sig_a.params.len() != sig_b.params.len() {
-            self.error_issue(SemanticErrorKind::WrongArity, issue, span);
+            self.error_issue(SemanticErrorKind::ArityMismatch, issue, span);
             return self.error_type;
         }
         if sig_a.is_async != sig_b.is_async || sig_a.is_generator != sig_b.is_generator {

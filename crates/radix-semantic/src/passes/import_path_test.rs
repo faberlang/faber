@@ -93,7 +93,7 @@ fn reject_starting_dot_dot() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_parent_traversal")],
     );
 }
@@ -104,7 +104,7 @@ fn reject_mid_dot_dot() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_parent_traversal")],
     );
 }
@@ -115,7 +115,7 @@ fn reject_ending_dot_dot() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_parent_traversal")],
     );
 }
@@ -126,7 +126,7 @@ fn reject_bare_dot_dot() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_parent_traversal")],
     );
 }
@@ -139,7 +139,7 @@ fn reject_unix_absolute_path() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_absolute_path")],
     );
 }
@@ -150,7 +150,7 @@ fn reject_windows_absolute_path() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_absolute_path")],
     );
 }
@@ -163,7 +163,7 @@ fn reject_https_scheme() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_unknown_scheme")],
     );
 }
@@ -174,7 +174,7 @@ fn reject_unknown_scheme() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_unknown_scheme")],
     );
 }
@@ -185,7 +185,7 @@ fn reject_bare_name_without_prefix() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_unknown_scheme")],
     );
 }
@@ -199,7 +199,7 @@ fn reject_ssrc_in_script_mode() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_unknown_template")],
     );
 }
@@ -211,7 +211,7 @@ fn reject_section_in_script_mode() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_unknown_template")],
     );
 }
@@ -225,7 +225,7 @@ fn reject_unknown_template_name() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_unknown_template")],
     );
 }
@@ -237,7 +237,7 @@ fn reject_bare_glyph() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_bare_glyph")],
     );
 }
@@ -249,7 +249,7 @@ fn reject_bare_glyph_no_slash() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_bare_glyph")],
     );
 }
@@ -261,7 +261,7 @@ fn reject_multiple_holes() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_multiple_holes")],
     );
 }
@@ -273,7 +273,7 @@ fn reject_positional_hole() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_positional_hole")],
     );
 }
@@ -285,7 +285,7 @@ fn reject_positional_hole_1() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_positional_hole")],
     );
 }
@@ -304,17 +304,17 @@ importa ex "https://evil.com/pkg" c
     assert_eq!(errors.len(), 3);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_parent_traversal")],
     );
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_absolute_path")],
     );
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "import_unknown_scheme")],
     );
 }
@@ -342,7 +342,7 @@ fn reject_empty_import_path() {
         parse
             .errors
             .iter()
-            .any(|error| error.kind == ParseErrorKind::InvalidImport
+            .any(|error| error.kind == ParseErrorKind::ImportInvalid
                 && error
                     .args
                     .iter()

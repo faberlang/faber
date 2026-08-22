@@ -29,7 +29,7 @@ fn missing_function_name_emits_structured_parse_error() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::MissingFunctionName)
+        .find(|err| err.kind == ParseErrorKind::FunctionNameAbsent)
         .expect("missing function name diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
@@ -44,7 +44,7 @@ fn missing_class_name_emits_structured_parse_error() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::MissingClassName)
+        .find(|err| err.kind == ParseErrorKind::ClassNameAbsent)
         .expect("missing class name diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
@@ -59,7 +59,7 @@ fn missing_class_body_emits_structured_parse_error() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::MissingClassBody)
+        .find(|err| err.kind == ParseErrorKind::ClassBodyAbsent)
         .expect("missing class body diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
@@ -1225,7 +1225,7 @@ fn parses_import_with_public_alias() {
 fn import_with_empty_path_rejected() {
     assert_parse_error_matches(
         r#"importa ex "" Value"#,
-        ParseExpectation::Kind(ParseErrorKind::InvalidImport),
+        ParseExpectation::Kind(ParseErrorKind::ImportInvalid),
     );
 }
 
@@ -1263,7 +1263,7 @@ fn import_after_expression_start_infers_binding() {
 fn import_privata_marker_rejected() {
     assert_parse_error_matches(
         r#"importa ex "norma:solum" privata solum"#,
-        ParseExpectation::Kind(ParseErrorKind::InvalidImport),
+        ParseExpectation::Kind(ParseErrorKind::ImportInvalid),
     );
     assert_parse_error_matches(
         r#"importa ex "norma:solum" privata solum"#,
@@ -1275,7 +1275,7 @@ fn import_privata_marker_rejected() {
 fn import_record_privata_visibility_rejected() {
     assert_parse_error_matches(
         r#"importa { ex = "norma:solum", visibilitas = privata, nomen = solum }"#,
-        ParseExpectation::Kind(ParseErrorKind::InvalidImport),
+        ParseExpectation::Kind(ParseErrorKind::ImportInvalid),
     );
     assert_parse_error_matches(
         r#"importa { ex = "norma:solum", visibilitas = privata, nomen = solum }"#,
@@ -1392,7 +1392,7 @@ fn parses_functio_with_all_modifiers() {
 fn rejects_functio_without_body() {
     assert_parse_error_matches(
         "functio greet(textus name) → textus",
-        ParseExpectation::Kind(ParseErrorKind::MissingFunctionBody),
+        ParseExpectation::Kind(ParseErrorKind::FunctionBodyAbsent),
     );
 }
 
@@ -1583,7 +1583,7 @@ fn minimal_import_requires_inferrable_name() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::InvalidImport)
+        .find(|err| err.kind == ParseErrorKind::ImportInvalid)
         .expect("invalid import diagnostic");
     assert!(err
         .args
@@ -1629,7 +1629,7 @@ fn import_name_inference_failed_rejected() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::InvalidImport)
+        .find(|err| err.kind == ParseErrorKind::ImportInvalid)
         .expect("invalid import diagnostic");
     assert!(err
         .args
@@ -2701,7 +2701,7 @@ fn invalid_discerne_pattern_emits_structured_parse_error() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::InvalidPattern)
+        .find(|err| err.kind == ParseErrorKind::PatternInvalid)
         .expect("invalid pattern diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
@@ -2718,7 +2718,7 @@ fn elige_missing_casu_rejected() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::InvalidCasuArm)
+        .find(|err| err.kind == ParseErrorKind::CasuArmInvalid)
         .expect("invalid casu arm diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
@@ -2735,7 +2735,7 @@ fn discerne_missing_casu_rejected() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::InvalidCasuArm)
+        .find(|err| err.kind == ParseErrorKind::CasuArmInvalid)
         .expect("invalid casu arm diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
@@ -2928,7 +2928,7 @@ fn closure_block_body_rejected_with_structured_error() {
         .errors
         .iter()
         .find(|err| {
-            err.kind == ParseErrorKind::InvalidExpression
+            err.kind == ParseErrorKind::ExpressionInvalid
                 && err
                     .args
                     .iter()
@@ -3249,7 +3249,7 @@ fn statement_level_ad_rejected_with_structured_error() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::InvalidStatement)
+        .find(|err| err.kind == ParseErrorKind::StatementInvalid)
         .expect("invalid statement diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
@@ -3273,7 +3273,7 @@ fn legacy_ad_route_expression_rejected_with_structured_error() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::InvalidStatement)
+        .find(|err| err.kind == ParseErrorKind::StatementInvalid)
         .expect("invalid statement diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
@@ -3293,7 +3293,7 @@ fn si_without_block_or_ergo_rejected() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::MissingBlock)
+        .find(|err| err.kind == ParseErrorKind::BlockAbsent)
         .expect("missing block diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
@@ -3310,7 +3310,7 @@ fn si_secus_without_block_or_ergo_rejected() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::MissingBlock)
+        .find(|err| err.kind == ParseErrorKind::BlockAbsent)
         .expect("missing block diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
@@ -3327,7 +3327,7 @@ fn elige_without_block_rejected() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::MissingBlock)
+        .find(|err| err.kind == ParseErrorKind::BlockAbsent)
         .expect("missing block diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
@@ -3344,7 +3344,7 @@ fn dum_without_block_rejected() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::MissingBlock)
+        .find(|err| err.kind == ParseErrorKind::BlockAbsent)
         .expect("missing block diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
@@ -3635,7 +3635,7 @@ fn legacy_question_mark_in_fixum_rejected() {
 fn legacy_question_mark_in_function_return_rejected() {
     assert_parse_error_matches(
         r"functio find() → textus? { redde nihil }",
-        ParseExpectation::Kind(ParseErrorKind::MissingFunctionBody),
+        ParseExpectation::Kind(ParseErrorKind::FunctionBodyAbsent),
     );
 }
 
@@ -3658,7 +3658,7 @@ fn removed_fixus_in_param_rejected() {
         .errors
         .iter()
         .find(|err| {
-            err.kind == ParseErrorKind::InvalidParameter
+            err.kind == ParseErrorKind::ParameterInvalid
                 && err
                     .args
                     .iter()
@@ -3681,7 +3681,7 @@ fn removed_fixus_in_genus_field_rejected() {
         .errors
         .iter()
         .find(|err| {
-            err.kind == ParseErrorKind::InvalidParameter
+            err.kind == ParseErrorKind::ParameterInvalid
                 && err
                     .args
                     .iter()
@@ -3890,7 +3890,7 @@ fn rejects_removed_prae_typus_in_param_lists() {
         .errors
         .iter()
         .find(|err| {
-            err.kind == ParseErrorKind::InvalidTypeParameter
+            err.kind == ParseErrorKind::TypeParameterInvalid
                 && err
                     .args
                     .iter()
@@ -3939,7 +3939,7 @@ fn rejects_type_params_after_magnitudo_params() {
         .errors
         .iter()
         .find(|err| {
-            err.kind == ParseErrorKind::InvalidTypeParameter
+            err.kind == ParseErrorKind::TypeParameterInvalid
                 && err
                     .args
                     .iter()

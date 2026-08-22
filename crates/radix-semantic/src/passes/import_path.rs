@@ -45,7 +45,7 @@ pub fn validate_import_paths(
         // Check 1: `..` segment anywhere in the path.
         if contains_parent_traversal(path) {
             errors.push(
-                SemanticError::structured(SemanticErrorKind::ImportNotFound, decl.span)
+                SemanticError::structured(SemanticErrorKind::ImportAbsent, decl.span)
                     .with_arg("issue", "import_parent_traversal")
                     .with_arg("path", path),
             );
@@ -55,7 +55,7 @@ pub fn validate_import_paths(
         // Check 2: Absolute path (Unix `/` or Windows drive letter).
         if is_absolute_path(path) {
             errors.push(
-                SemanticError::structured(SemanticErrorKind::ImportNotFound, decl.span)
+                SemanticError::structured(SemanticErrorKind::ImportAbsent, decl.span)
                     .with_arg("issue", "import_absolute_path")
                     .with_arg("path", path),
             );
@@ -69,7 +69,7 @@ pub fn validate_import_paths(
                 // In no-template modes (script/bare), reject all `§` forms
                 // including default templates like §src.
                 errors.push(
-                    SemanticError::structured(SemanticErrorKind::ImportNotFound, decl.span)
+                    SemanticError::structured(SemanticErrorKind::ImportAbsent, decl.span)
                         .with_arg("issue", "import_unknown_template")
                         .with_arg("name", path),
                 );
@@ -92,7 +92,7 @@ pub fn validate_import_paths(
         } else {
             // Not a known form: reject as unknown scheme.
             errors.push(
-                SemanticError::structured(SemanticErrorKind::ImportNotFound, decl.span)
+                SemanticError::structured(SemanticErrorKind::ImportAbsent, decl.span)
                     .with_arg("issue", "import_unknown_scheme")
                     .with_arg("path", path),
             );
@@ -120,7 +120,7 @@ fn validate_template_specifier(
     // Bare `§/…` — no template name after the glyph.
     if after_glyph.is_empty() || after_glyph.starts_with('/') {
         errors.push(
-            SemanticError::structured(SemanticErrorKind::ImportNotFound, span)
+            SemanticError::structured(SemanticErrorKind::ImportAbsent, span)
                 .with_arg("issue", "import_bare_glyph"),
         );
         return;
@@ -129,7 +129,7 @@ fn validate_template_specifier(
     // Check for `§N` / `§0` positional holes.
     if after_glyph.starts_with(|c: char| c.is_ascii_digit()) {
         errors.push(
-            SemanticError::structured(SemanticErrorKind::ImportNotFound, span)
+            SemanticError::structured(SemanticErrorKind::ImportAbsent, span)
                 .with_arg("issue", "import_positional_hole"),
         );
         return;
@@ -139,7 +139,7 @@ fn validate_template_specifier(
     let hole_count = path.matches('§').count();
     if hole_count > 1 {
         errors.push(
-            SemanticError::structured(SemanticErrorKind::ImportNotFound, span)
+            SemanticError::structured(SemanticErrorKind::ImportAbsent, span)
                 .with_arg("issue", "import_multiple_holes")
                 .with_arg("path", path),
         );
@@ -150,7 +150,7 @@ fn validate_template_specifier(
     let name = strip_template_name(path);
     if name.is_empty() {
         errors.push(
-            SemanticError::structured(SemanticErrorKind::ImportNotFound, span)
+            SemanticError::structured(SemanticErrorKind::ImportAbsent, span)
                 .with_arg("issue", "import_bare_glyph"),
         );
         return;
@@ -159,7 +159,7 @@ fn validate_template_specifier(
     let is_known = templates.contains_key(name) || default_names.contains(&name);
     if !is_known {
         errors.push(
-            SemanticError::structured(SemanticErrorKind::ImportNotFound, span)
+            SemanticError::structured(SemanticErrorKind::ImportAbsent, span)
                 .with_arg("issue", "import_unknown_template")
                 .with_arg("name", name),
         );

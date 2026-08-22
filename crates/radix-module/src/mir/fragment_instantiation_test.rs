@@ -629,7 +629,7 @@ fn catalog_emits_type_and_call_site_context() {
         DiagnosticArg::new("actual", "u32"),
     ];
     assert_eq!(
-        semantic_message(SemanticErrorKind::InvalidOperandTypes, &type_args).as_deref(),
+        semantic_message(SemanticErrorKind::OperandTypesInvalid, &type_args).as_deref(),
         Some("@ nucleum fragment argument has type u32, expected f32")
     );
 
@@ -640,7 +640,7 @@ fn catalog_emits_type_and_call_site_context() {
         DiagnosticArg::new("site", "call"),
     ];
     assert_eq!(
-        semantic_message(SemanticErrorKind::InvalidOperandTypes, &context_args).as_deref(),
+        semantic_message(SemanticErrorKind::OperandTypesInvalid, &context_args).as_deref(),
         Some("@ nucleum cannot call another @ nucleum entry")
     );
 }

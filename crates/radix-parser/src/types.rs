@@ -102,7 +102,7 @@ impl Parser {
             self.advance();
             if self.check(&TokenKind::Cup) {
                 return Err(
-                    ParseError::structured(ParseErrorKind::InvalidType, cup_span)
+                    ParseError::structured(ParseErrorKind::TypeInvalid, cup_span)
                         .with_arg("issue", "unexpected_cup_after_union_hole"),
                 );
             }
@@ -187,7 +187,7 @@ impl Parser {
                     } else {
                         if self.eat(&TokenKind::Comma) {
                             return Err(ParseError::structured(
-                                ParseErrorKind::InvalidType,
+                                ParseErrorKind::TypeInvalid,
                                 self.current_span(),
                             )
                             .with_arg("issue", "promissum_alternate_uses_exit_arrow"));
@@ -248,7 +248,7 @@ impl Parser {
                     self.expect(&TokenKind::GtAscii, "expected '>'")?;
                     if name_str == "iuncta" && params.len() > 16 {
                         return Err(
-                            ParseError::structured(ParseErrorKind::InvalidType, name.span)
+                            ParseError::structured(ParseErrorKind::TypeInvalid, name.span)
                                 .with_arg("issue", "iuncta_arity_exceeded")
                                 .with_arg("arity", params.len().to_string()),
                         );
@@ -297,7 +297,7 @@ impl Parser {
         // binary-cup member. The hole arm rejects a directly-following cup;
         // this guards the `first` slot defensively against future callers.
         if matches!(first.kind, TypeExprKind::UnionHole) {
-            return Err(ParseError::structured(ParseErrorKind::InvalidType, start)
+            return Err(ParseError::structured(ParseErrorKind::TypeInvalid, start)
                 .with_arg("issue", "unexpected_cup_after_union_hole"));
         }
         let mut members = Vec::new();
@@ -306,7 +306,7 @@ impl Parser {
             let member = self.parse_type()?;
             if matches!(member.kind, TypeExprKind::UnionHole) {
                 return Err(
-                    ParseError::structured(ParseErrorKind::InvalidType, member.span)
+                    ParseError::structured(ParseErrorKind::TypeInvalid, member.span)
                         .with_arg("issue", "unexpected_cup_after_union_hole"),
                 );
             }
@@ -448,7 +448,7 @@ impl Parser {
     }
 
     fn invalid_type_error(&self, issue: &'static str) -> ParseError {
-        ParseError::structured(ParseErrorKind::InvalidType, self.current_span())
+        ParseError::structured(ParseErrorKind::TypeInvalid, self.current_span())
             .with_arg("issue", issue)
     }
 

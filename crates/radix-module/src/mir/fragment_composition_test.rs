@@ -549,7 +549,7 @@ fn catalog_emits_cycle_and_expansion() {
         DiagnosticArg::new("cycle", "ping → pong → ping"),
     ];
     assert_eq!(
-        semantic_message(SemanticErrorKind::InvalidOperandTypes, &cycle_args).as_deref(),
+        semantic_message(SemanticErrorKind::OperandTypesInvalid, &cycle_args).as_deref(),
         Some("nucleum fragment call cycle: ping → pong → ping")
     );
     let expansion_args = vec![
@@ -561,7 +561,7 @@ fn catalog_emits_cycle_and_expansion() {
         DiagnosticArg::new("chain", "k → a → b"),
     ];
     assert_eq!(
-        semantic_message(SemanticErrorKind::InvalidOperandTypes, &expansion_args).as_deref(),
+        semantic_message(SemanticErrorKind::OperandTypesInvalid, &expansion_args).as_deref(),
         Some("nucleum fragment expansion exceeds depth limit 16 (observed 17) along k → a → b")
     );
 }

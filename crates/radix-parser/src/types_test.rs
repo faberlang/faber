@@ -51,7 +51,7 @@ fn expect_expected_issue(source: &str, issue: &str) -> crate::ParseError {
 fn rejects_postfix_array_param_type() {
     parse_errors_include_issue(
         "functio sum(numerus[] items) → numerus { redde 0 }",
-        ParseErrorKind::InvalidType,
+        ParseErrorKind::TypeInvalid,
         "postfix_array_syntax",
     );
 }
@@ -60,7 +60,7 @@ fn rejects_postfix_array_param_type() {
 fn rejects_postfix_array_variable_type() {
     parse_errors_include_issue(
         "fixum textus[] words ← vacua",
-        ParseErrorKind::InvalidType,
+        ParseErrorKind::TypeInvalid,
         "postfix_array_syntax",
     );
 }
@@ -72,7 +72,7 @@ fn invalid_type_emits_vector_sugar_angle_bracket_form() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::InvalidType)
+        .find(|err| err.kind == ParseErrorKind::TypeInvalid)
         .expect("invalid type diagnostic");
 
     assert!(
@@ -100,7 +100,7 @@ fn invalid_type_tensor_sugar_angle_form_carries_sugar_discriminator() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == ParseErrorKind::InvalidType)
+        .find(|err| err.kind == ParseErrorKind::TypeInvalid)
         .expect("invalid type diagnostic");
 
     assert!(
@@ -517,7 +517,7 @@ fn parses_matrix_sugar_bracket_form() {
 fn matrix_sugar_requires_bracket_shape() {
     parse_errors_include_issue(
         "functio f(mf32 value) → vacuum {}",
-        ParseErrorKind::InvalidType,
+        ParseErrorKind::TypeInvalid,
         "matrix_sugar_missing_shape",
     );
 }
@@ -615,7 +615,7 @@ fn parses_sparsa_sugar_unsigned_width() {
 fn rejects_sparsa_sugar_angle_bracket_form() {
     parse_errors_include_issue(
         "functio f(sf32<f32> value) → vacuum {}",
-        ParseErrorKind::InvalidType,
+        ParseErrorKind::TypeInvalid,
         "type_sugar_angle_bracket_form",
     );
 }
@@ -638,7 +638,7 @@ fn parses_standalone_width_marker_type() {
 fn rejects_tensor_sugar_angle_bracket_form() {
     parse_errors_include_issue(
         "functio f(tf32<f32> value) → vacuum {}",
-        ParseErrorKind::InvalidType,
+        ParseErrorKind::TypeInvalid,
         "type_sugar_angle_bracket_form",
     );
 }
@@ -682,7 +682,7 @@ fn parses_lista_sugar_float_width() {
 fn rejects_lista_sugar_angle_bracket_form() {
     parse_errors_include_issue(
         "functio f(lu32<u32> rows) → vacuum {}",
-        ParseErrorKind::InvalidType,
+        ParseErrorKind::TypeInvalid,
         "lista_sugar_angle_bracket_form",
     );
 }
@@ -691,7 +691,7 @@ fn rejects_lista_sugar_angle_bracket_form() {
 fn rejects_lista_sugar_bracket_suffix() {
     parse_errors_include_issue(
         "functio f(lu32[] rows) → vacuum {}",
-        ParseErrorKind::InvalidType,
+        ParseErrorKind::TypeInvalid,
         "lista_sugar_bracket_form",
     );
 }
@@ -826,7 +826,7 @@ fn rejects_iuncta_label_spelling_on_call_site_type_arguments() {
         .errors
         .first()
         .expect("call-site label must produce a parse error");
-    assert_eq!(error.kind, ParseErrorKind::InvalidExpression);
+    assert_eq!(error.kind, ParseErrorKind::ExpressionInvalid);
     assert_eq!(
         error.span.start,
         source.find(':').expect("label colon") as u32
@@ -865,7 +865,7 @@ fn labeled_iuncta_arity_cap_counts_labeled_elements() {
         .join(", ");
     let rejected = parse_program(&format!("functio f(iuncta<{args}> many) → vacuum {{}}"));
     assert!(rejected.errors.iter().any(|error| {
-        error.kind == ParseErrorKind::InvalidType
+        error.kind == ParseErrorKind::TypeInvalid
             && error
                 .args
                 .iter()
@@ -897,7 +897,7 @@ fn parses_promissum_failable_type_with_exit_arrow_channel() {
 fn rejects_promissum_comma_alternate_type() {
     parse_errors_include_issue(
         "functio f(promissum<numerus, textus> future) → vacuum {}",
-        ParseErrorKind::InvalidType,
+        ParseErrorKind::TypeInvalid,
         "promissum_alternate_uses_exit_arrow",
     );
 }
@@ -922,7 +922,7 @@ fn parses_iuncta_tuple_type_with_sixteen_elements() {
 fn rejects_iuncta_with_seventeen_elements() {
     parse_errors_include_issue(
         "incipit { fixum iuncta<u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8> big ← vacua }",
-        ParseErrorKind::InvalidType,
+        ParseErrorKind::TypeInvalid,
         "iuncta_arity_exceeded",
     );
 }
@@ -1138,19 +1138,19 @@ fn rejects_cup_after_union_hole() {
     // `A ∪ ∪`: the right-hand member slot is itself a union hole.
     parse_errors_include_issue(
         "functio f(A ∪ ∪ value) → vacuum {}",
-        ParseErrorKind::InvalidType,
+        ParseErrorKind::TypeInvalid,
         "unexpected_cup_after_union_hole",
     );
     // `A ∪ ∪ B`: same, with a member following the stray cup.
     parse_errors_include_issue(
         "functio f(A ∪ ∪ B value) → vacuum {}",
-        ParseErrorKind::InvalidType,
+        ParseErrorKind::TypeInvalid,
         "unexpected_cup_after_union_hole",
     );
     // `∪ ∪`: a hole directly followed by a cup.
     parse_errors_include_issue(
         "functio f(∪ ∪ value) → vacuum {}",
-        ParseErrorKind::InvalidType,
+        ParseErrorKind::TypeInvalid,
         "unexpected_cup_after_union_hole",
     );
 }

@@ -583,7 +583,7 @@ impl FragmentDefinitionChecker<'_> {
 
     fn effect(&mut self, span: Span, reason: &'static str) {
         self.errors.push(
-            SemanticError::structured(SemanticErrorKind::InvalidOperandTypes, span)
+            SemanticError::structured(SemanticErrorKind::OperandTypesInvalid, span)
                 .with_arg("issue", ISSUE_EFFECT)
                 .with_arg("reason", reason),
         );
@@ -591,7 +591,7 @@ impl FragmentDefinitionChecker<'_> {
 
     fn context(&mut self, span: Span, reason: &'static str) {
         self.errors.push(
-            SemanticError::structured(SemanticErrorKind::InvalidOperandTypes, span)
+            SemanticError::structured(SemanticErrorKind::OperandTypesInvalid, span)
                 .with_arg("issue", ISSUE_CONTEXT)
                 .with_arg("reason", reason)
                 .with_arg("site", "definition"),

@@ -34,7 +34,7 @@ impl TypeChecker<'_> {
             if self.annotation_is_json(annotation) {
                 self.errors.push(
                     SemanticError::structured(
-                        SemanticErrorKind::InvalidAnnotation,
+                        SemanticErrorKind::AnnotationInvalid,
                         annotation.span,
                     )
                     .with_arg("issue", ISSUE_JSON_ANNOTATION_UNSUPPORTED_SITE)
@@ -52,7 +52,7 @@ impl TypeChecker<'_> {
             let json_field = self.json_field_nomen(field);
             if !is_json && json_field.is_some() {
                 self.error_issue(
-                    SemanticErrorKind::InvalidAnnotation,
+                    SemanticErrorKind::AnnotationInvalid,
                     ISSUE_JSON_FIELD_ANNOTATION_OUTSIDE_JSON_GENUS,
                     field.span,
                 );
@@ -65,7 +65,7 @@ impl TypeChecker<'_> {
 
             if field.is_static {
                 self.error_issue(
-                    SemanticErrorKind::InvalidAnnotation,
+                    SemanticErrorKind::AnnotationInvalid,
                     ISSUE_JSON_GENUS_FIELD_TYPE_UNSUPPORTED,
                     field.span,
                 );
@@ -80,7 +80,7 @@ impl TypeChecker<'_> {
             if let Some(previous) = output_names.insert(output_name, field.span) {
                 let name = self.resolve_symbol_for_diag(output_name);
                 self.errors.push(
-                    SemanticError::structured(SemanticErrorKind::InvalidAnnotation, field.span)
+                    SemanticError::structured(SemanticErrorKind::AnnotationInvalid, field.span)
                         .with_arg("issue", ISSUE_JSON_GENUS_DUPLICATE_FIELD_NAME)
                         .with_arg("name", name)
                         .with_arg("previous_span", format!("{previous:?}")),
@@ -112,7 +112,7 @@ impl TypeChecker<'_> {
                     Type::Primitive(Primitive::Textus)
                 ) {
                     self.error_issue(
-                        SemanticErrorKind::InvalidAnnotation,
+                        SemanticErrorKind::AnnotationInvalid,
                         ISSUE_JSON_GENUS_MAP_KEY_NOT_TEXTUS,
                         span,
                     );
@@ -123,7 +123,7 @@ impl TypeChecker<'_> {
             Type::Struct(nested) if self.json_structs.contains(&nested) => {}
             Type::Struct(_) => {
                 self.error_issue(
-                    SemanticErrorKind::InvalidAnnotation,
+                    SemanticErrorKind::AnnotationInvalid,
                     ISSUE_JSON_GENUS_NESTED_REQUIRES_JSON,
                     span,
                 );
@@ -131,7 +131,7 @@ impl TypeChecker<'_> {
             Type::Error | Type::Infer(_) => {}
             _ => {
                 self.error_issue(
-                    SemanticErrorKind::InvalidAnnotation,
+                    SemanticErrorKind::AnnotationInvalid,
                     ISSUE_JSON_GENUS_FIELD_TYPE_UNSUPPORTED,
                     span,
                 );
@@ -152,7 +152,7 @@ impl TypeChecker<'_> {
         }
         if non_nil.len() != 1 {
             self.error_issue(
-                SemanticErrorKind::InvalidAnnotation,
+                SemanticErrorKind::AnnotationInvalid,
                 ISSUE_JSON_GENUS_FIELD_TYPE_UNSUPPORTED,
                 span,
             );
@@ -168,7 +168,7 @@ impl TypeChecker<'_> {
             .find(|annotation| self.annotation_is_json(annotation))?;
         if annotation.fields.len() != 1 {
             self.error_issue(
-                SemanticErrorKind::InvalidAnnotation,
+                SemanticErrorKind::AnnotationInvalid,
                 ISSUE_JSON_FIELD_ANNOTATION_OPTION,
                 annotation.span,
             );
@@ -177,7 +177,7 @@ impl TypeChecker<'_> {
         let option = &annotation.fields[0];
         if self.resolve_symbol_for_diag(option.name) != "nomen" {
             self.error_issue(
-                SemanticErrorKind::InvalidAnnotation,
+                SemanticErrorKind::AnnotationInvalid,
                 ISSUE_JSON_FIELD_ANNOTATION_OPTION,
                 option.span,
             );
@@ -185,7 +185,7 @@ impl TypeChecker<'_> {
         }
         let Some(name) = self.annotation_string_value(&option.value) else {
             self.error_issue(
-                SemanticErrorKind::InvalidAnnotation,
+                SemanticErrorKind::AnnotationInvalid,
                 ISSUE_JSON_FIELD_ANNOTATION_OPTION,
                 option.span,
             );
@@ -193,7 +193,7 @@ impl TypeChecker<'_> {
         };
         if self.resolve_symbol_for_diag(name).is_empty() {
             self.error_issue(
-                SemanticErrorKind::InvalidAnnotation,
+                SemanticErrorKind::AnnotationInvalid,
                 ISSUE_JSON_FIELD_NOMEN_EMPTY,
                 option.span,
             );

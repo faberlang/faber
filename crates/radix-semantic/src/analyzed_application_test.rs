@@ -285,7 +285,7 @@ incipit {
 
     // Inject a hard error into semantic_diagnostics.
     parts.semantic_diagnostics.push(SemanticError::structured(
-        SemanticErrorKind::UndefinedVariable,
+        SemanticErrorKind::VariableUndefined,
         radix_lexer::Span::default(),
     ));
 

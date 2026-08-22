@@ -30,7 +30,7 @@ fn expect_issue(source: &str, issue: &str) {
         .diagnostics
         .iter()
         .find(|err| {
-            err.kind == SemanticErrorKind::InvalidAnnotation
+            err.kind == SemanticErrorKind::AnnotationInvalid
                 && err
                     .args
                     .iter()

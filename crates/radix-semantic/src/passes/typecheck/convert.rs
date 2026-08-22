@@ -1852,7 +1852,7 @@ impl TypeChecker<'_> {
                     let Some(field_ty) = fields.get(name).copied() else {
                         let error_span = field.value.as_ref().map_or(span, |expr| expr.span);
                         self.error_issue(
-                            SemanticErrorKind::UndefinedVariable,
+                            SemanticErrorKind::VariableUndefined,
                             ISSUE_UNKNOWN_RECORD_FIELD,
                             error_span,
                         );
@@ -1874,7 +1874,7 @@ impl TypeChecker<'_> {
                 HirObjectKey::Computed(expr) | HirObjectKey::Spread(expr) => {
                     self.check_expr(expr);
                     self.error_issue(
-                        SemanticErrorKind::UndefinedVariable,
+                        SemanticErrorKind::VariableUndefined,
                         ISSUE_UNKNOWN_RECORD_FIELD,
                         expr.span,
                     );
@@ -1955,7 +1955,7 @@ impl TypeChecker<'_> {
         let length = payload.len();
         if length > REGEX_PATTERN_MAX_BYTES {
             self.errors.push(
-                SemanticError::structured(SemanticErrorKind::InvalidConversion, span)
+                SemanticError::structured(SemanticErrorKind::ConversionInvalid, span)
                     .with_arg("issue", ISSUE_REGEX_PATTERN_TOO_LONG)
                     .with_arg("length", length.to_string())
                     .with_arg("max", REGEX_PATTERN_MAX_BYTES.to_string()),

@@ -597,7 +597,7 @@ impl TypeChecker<'_> {
                 || "shape".to_owned(),
                 |interner| interner.resolve(*sym).to_owned(),
             );
-            let error = SemanticError::structured(SemanticErrorKind::MissingTypeAnnotation, span)
+            let error = SemanticError::structured(SemanticErrorKind::TypeAnnotationAbsent, span)
                 .with_arg("issue", ISSUE_CANNOT_INFER_TENSOR_SHAPE)
                 .with_arg("param", param_name);
             self.errors.push(error);

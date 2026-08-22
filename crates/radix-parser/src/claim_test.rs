@@ -14,7 +14,7 @@ fn invalid_placement_count(result: &crate::ParseResult) -> usize {
     result
         .errors
         .iter()
-        .filter(|e| e.kind == ParseErrorKind::InvalidCommentPlacement)
+        .filter(|e| e.kind == ParseErrorKind::CommentPlacementInvalid)
         .count()
 }
 
@@ -26,7 +26,7 @@ fn assert_invalid_comment_placement(result: &crate::ParseResult, comment_text: &
     let err: &ParseError = &result.errors[0];
     assert_eq!(
         err.kind,
-        ParseErrorKind::InvalidCommentPlacement,
+        ParseErrorKind::CommentPlacementInvalid,
         "{:?}",
         result.errors
     );
@@ -155,7 +155,7 @@ functio f() → vacuum {
     for err in &result.errors {
         assert_eq!(
             err.kind,
-            ParseErrorKind::InvalidCommentPlacement,
+            ParseErrorKind::CommentPlacementInvalid,
             "only structured invalid placement is allowed: {:?}",
             result.errors
         );

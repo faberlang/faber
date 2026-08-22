@@ -536,7 +536,7 @@ impl Parser {
             None
         } else {
             return Err(ParseError::structured(
-                ParseErrorKind::MissingFunctionBody,
+                ParseErrorKind::FunctionBodyAbsent,
                 self.current_span(),
             )
             .with_arg("functio", "functio"));
@@ -732,7 +732,7 @@ impl Parser {
 
         if !self.check(&TokenKind::LBrace) {
             return Err(ParseError::structured(
-                ParseErrorKind::MissingClassBody,
+                ParseErrorKind::ClassBodyAbsent,
                 self.current_span(),
             )
             .with_arg("genus", "genus"));
@@ -924,7 +924,7 @@ impl Parser {
         // schema is not a header surface (schemas have no inheritance).
         if self.check_keyword_ident(TokenKind::Sub) || self.check_keyword_ident(TokenKind::Implet) {
             return Err(ParseError::structured(
-                ParseErrorKind::InvalidDeclaration,
+                ParseErrorKind::DeclarationInvalid,
                 self.current_span(),
             )
             .with_arg("issue", "schema_inheritance"));
@@ -942,7 +942,7 @@ impl Parser {
             // generic "expected 'columna'".
             if self.check_keyword_ident(TokenKind::Functio) {
                 return Err(ParseError::structured(
-                    ParseErrorKind::InvalidDeclaration,
+                    ParseErrorKind::DeclarationInvalid,
                     self.current_span(),
                 )
                 .with_arg("issue", "schema_method"));
@@ -951,7 +951,7 @@ impl Parser {
                 || self.check_keyword_ident(TokenKind::Implet)
             {
                 return Err(ParseError::structured(
-                    ParseErrorKind::InvalidDeclaration,
+                    ParseErrorKind::DeclarationInvalid,
                     self.current_span(),
                 )
                 .with_arg("issue", "schema_inheritance"));
@@ -963,7 +963,7 @@ impl Parser {
             // (`columna columna …`) means a column nested inside a column.
             if self.check_keyword_ident(TokenKind::Columna) {
                 return Err(ParseError::structured(
-                    ParseErrorKind::InvalidDeclaration,
+                    ParseErrorKind::DeclarationInvalid,
                     self.current_span(),
                 )
                 .with_arg("issue", "schema_nested_column"));
@@ -983,7 +983,7 @@ impl Parser {
             if self.check_keyword_ident(TokenKind::Columna) && !self.raw_newline_before_next_word()
             {
                 return Err(ParseError::structured(
-                    ParseErrorKind::InvalidDeclaration,
+                    ParseErrorKind::DeclarationInvalid,
                     self.current_span(),
                 )
                 .with_arg("issue", "schema_nested_column"));
@@ -1509,7 +1509,7 @@ impl Parser {
     }
 
     fn invalid_import_error_at(issue: &'static str, span: radix_lexer::Span) -> ParseError {
-        ParseError::structured(ParseErrorKind::InvalidImport, span).with_arg("issue", issue)
+        ParseError::structured(ParseErrorKind::ImportInvalid, span).with_arg("issue", issue)
     }
 
     fn removed_import_visibility_error(span: radix_lexer::Span) -> ParseError {
@@ -2045,7 +2045,7 @@ impl Parser {
             if let AnnotationKind::Nucleum(nucleum) = &annotation.kind {
                 if nucleum_span.is_some() {
                     return Err(ParseError::structured(
-                        ParseErrorKind::InvalidAnnotation,
+                        ParseErrorKind::AnnotationInvalid,
                         annotation.span,
                     )
                     .with_arg("issue", "duplicate_nucleum"));
@@ -2059,7 +2059,7 @@ impl Parser {
             for annotation in annotations {
                 if self.is_graphics_fragment_annotation(&annotation.kind) {
                     return Err(ParseError::structured(
-                        ParseErrorKind::InvalidAnnotation,
+                        ParseErrorKind::AnnotationInvalid,
                         annotation.span,
                     )
                     .with_arg("issue", "nucleum_fragment_conflicts_with_fragment"));
@@ -2228,7 +2228,7 @@ impl Parser {
     }
 
     fn invalid_annotation_error(&self, issue: &'static str) -> ParseError {
-        ParseError::structured(ParseErrorKind::InvalidAnnotation, self.current_span())
+        ParseError::structured(ParseErrorKind::AnnotationInvalid, self.current_span())
             .with_arg("issue", issue)
     }
 
@@ -2430,14 +2430,14 @@ impl Parser {
     }
 
     fn removed_prae_typus_error(&self) -> ParseError {
-        ParseError::structured(ParseErrorKind::InvalidTypeParameter, self.current_span())
+        ParseError::structured(ParseErrorKind::TypeParameterInvalid, self.current_span())
             .with_arg("issue", "removed_prae_typus")
             .with_arg("keyword", "prae typus")
             .with_arg("replacement", "functio name<T>(...)")
     }
 
     fn removed_fixus_error(&self) -> ParseError {
-        ParseError::structured(ParseErrorKind::InvalidParameter, self.current_span())
+        ParseError::structured(ParseErrorKind::ParameterInvalid, self.current_span())
             .with_arg("issue", "removed_fixus")
             .with_arg("keyword", "fixus")
             .with_arg("optional_marker", "sponte")
@@ -2445,7 +2445,7 @@ impl Parser {
     }
 
     fn type_param_after_magnitudo_error(&self) -> ParseError {
-        ParseError::structured(ParseErrorKind::InvalidTypeParameter, self.current_span())
+        ParseError::structured(ParseErrorKind::TypeParameterInvalid, self.current_span())
             .with_arg("issue", "type_param_after_magnitudo")
             .with_arg("size_param", "magnitudo")
     }

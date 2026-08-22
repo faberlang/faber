@@ -99,7 +99,7 @@ impl ContractFieldType {
 }
 
 fn invalid_annotation(span: Span, issue: &'static str) -> SemanticError {
-    SemanticError::structured(SemanticErrorKind::InvalidAnnotation, span).with_arg("issue", issue)
+    SemanticError::structured(SemanticErrorKind::AnnotationInvalid, span).with_arg("issue", issue)
 }
 
 fn application_key(span: Span) -> (u32, u32) {
@@ -620,7 +620,7 @@ fn reject_commune_field_uniqueness(stmt: &Stmt, errors: &mut Vec<SemanticError>)
         if seen.contains(&field.field.name.name) {
             errors.push(
                 SemanticError::structured(
-                    SemanticErrorKind::DuplicateDefinition,
+                    SemanticErrorKind::DefinitionDuplicate,
                     field.field.name.span,
                 )
                 .with_arg("issue", ISSUE_DUPLICATE_COMMUNE_FIELD),
@@ -634,7 +634,7 @@ fn reject_commune_field_uniqueness(stmt: &Stmt, errors: &mut Vec<SemanticError>)
             if seen.contains(&field.name.name) {
                 errors.push(
                     SemanticError::structured(
-                        SemanticErrorKind::DuplicateDefinition,
+                        SemanticErrorKind::DefinitionDuplicate,
                         field.name.span,
                     )
                     .with_arg("issue", ISSUE_VARIANT_REDECLARES_COMMUNE),

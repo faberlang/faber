@@ -71,7 +71,7 @@ impl FragmentCompositionError {
     #[must_use]
     pub fn message(&self) -> String {
         crate::diagnostics::semantic_message(
-            crate::semantic::SemanticErrorKind::InvalidOperandTypes,
+            crate::semantic::SemanticErrorKind::OperandTypesInvalid,
             &self.catalog_args(),
         )
         .unwrap_or_else(|| format!("{}: {}", self.issue, self.reason))

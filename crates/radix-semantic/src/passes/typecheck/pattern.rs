@@ -52,7 +52,7 @@ impl TypeChecker<'_> {
                         // without recursing into an empty destructuring shape.
                         let Some(parent) = self.variant_parent.get(variant_def).copied() else {
                             self.error_issue(
-                                SemanticErrorKind::UndefinedVariable,
+                                SemanticErrorKind::VariableUndefined,
                                 "unknown_variant",
                                 span,
                             );
@@ -79,7 +79,7 @@ impl TypeChecker<'_> {
             HirPattern::Variant(variant_def, patterns) => {
                 let Some(parent) = self.variant_parent.get(variant_def).copied() else {
                     self.error_issue(
-                        SemanticErrorKind::UndefinedVariable,
+                        SemanticErrorKind::VariableUndefined,
                         "unknown_variant",
                         span,
                     );
@@ -98,7 +98,7 @@ impl TypeChecker<'_> {
 
                 let Some(fields) = self.variant_fields.get(variant_def).cloned() else {
                     self.error_issue(
-                        SemanticErrorKind::UndefinedVariable,
+                        SemanticErrorKind::VariableUndefined,
                         "unknown_variant_fields",
                         span,
                     );

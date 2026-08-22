@@ -42,7 +42,7 @@ pub(super) fn check(parser: &mut Parser, program: &Program) {
         .collect();
     for (span, text) in unclaimed {
         parser.errors.push(
-            ParseError::structured(ParseErrorKind::InvalidCommentPlacement, span)
+            ParseError::structured(ParseErrorKind::CommentPlacementInvalid, span)
                 .with_arg("issue", INVALID_COMMENT_PLACEMENT_ISSUE)
                 .with_arg("comment", text),
         );

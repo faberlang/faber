@@ -48,7 +48,7 @@ impl TypeChecker<'_> {
     }
 
     pub fn invalid_operand_types(&mut self, issue: &'static str, span: radix_lexer::Span) {
-        self.error_issue(SemanticErrorKind::InvalidOperandTypes, issue, span);
+        self.error_issue(SemanticErrorKind::OperandTypesInvalid, issue, span);
     }
 
     pub fn invalid_operand_types_with_args(
@@ -57,7 +57,7 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
         args: &[(&'static str, String)],
     ) {
-        let mut error = SemanticError::structured(SemanticErrorKind::InvalidOperandTypes, span)
+        let mut error = SemanticError::structured(SemanticErrorKind::OperandTypesInvalid, span)
             .with_arg("issue", issue);
         for (name, value) in args {
             error = error.with_arg(name, value);
@@ -66,7 +66,7 @@ impl TypeChecker<'_> {
     }
 
     pub fn undefined_member(&mut self, issue: &'static str, span: radix_lexer::Span) {
-        self.error_issue(SemanticErrorKind::UndefinedMember, issue, span);
+        self.error_issue(SemanticErrorKind::MemberUndefined, issue, span);
     }
 
     pub fn undefined_member_with_args(
@@ -75,7 +75,7 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
         args: &[(&'static str, String)],
     ) {
-        let mut error = SemanticError::structured(SemanticErrorKind::UndefinedMember, span)
+        let mut error = SemanticError::structured(SemanticErrorKind::MemberUndefined, span)
             .with_arg("issue", issue);
         for (name, value) in args {
             error = error.with_arg(name, value);
@@ -104,11 +104,11 @@ impl TypeChecker<'_> {
     }
 
     pub fn missing_type_annotation(&mut self, issue: &'static str, span: radix_lexer::Span) {
-        self.error_issue(SemanticErrorKind::MissingTypeAnnotation, issue, span);
+        self.error_issue(SemanticErrorKind::TypeAnnotationAbsent, issue, span);
     }
 
     pub fn invalid_conversion(&mut self, issue: &'static str, span: radix_lexer::Span) {
-        self.error_issue(SemanticErrorKind::InvalidConversion, issue, span);
+        self.error_issue(SemanticErrorKind::ConversionInvalid, issue, span);
     }
 
     pub fn invalid_conversion_with_args(
@@ -117,7 +117,7 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
         args: &[(&'static str, &'static str)],
     ) {
-        let mut error = SemanticError::structured(SemanticErrorKind::InvalidConversion, span)
+        let mut error = SemanticError::structured(SemanticErrorKind::ConversionInvalid, span)
             .with_arg("issue", issue);
         for (name, value) in args {
             error = error.with_arg(name, *value);
@@ -126,11 +126,11 @@ impl TypeChecker<'_> {
     }
 
     pub fn not_callable(&mut self, issue: &'static str, span: radix_lexer::Span) {
-        self.error_issue(SemanticErrorKind::NotCallable, issue, span);
+        self.error_issue(SemanticErrorKind::NonCallable, issue, span);
     }
 
     pub fn wrong_arity(&mut self, issue: &'static str, span: radix_lexer::Span) {
-        self.error_issue(SemanticErrorKind::WrongArity, issue, span);
+        self.error_issue(SemanticErrorKind::ArityMismatch, issue, span);
     }
 
     pub fn wrong_arity_with_arg(
@@ -141,7 +141,7 @@ impl TypeChecker<'_> {
         value: impl Into<String>,
     ) {
         self.errors.push(
-            SemanticError::structured(SemanticErrorKind::WrongArity, span)
+            SemanticError::structured(SemanticErrorKind::ArityMismatch, span)
                 .with_arg("issue", issue)
                 .with_arg(name, value),
         );

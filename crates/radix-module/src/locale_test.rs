@@ -741,14 +741,14 @@ fn normalized_diagnostics_render_against_installed_pack_rows_without_prose_asser
 
         let diagnostics = [
             lex_diagnostic(
-                LexErrorKind::UnexpectedCharacter,
+                LexErrorKind::CharacterUnexpected,
                 vec![
                     diagnostic_arg("issue", "unexpected_character"),
                     diagnostic_arg("char", "１"),
                 ],
             ),
             semantic_diagnostic(
-                SemanticErrorKind::UndefinedVariable,
+                SemanticErrorKind::VariableUndefined,
                 vec![
                     diagnostic_arg("issue", "unknown_identifier"),
                     diagnostic_arg("spelling", "nomen"),
@@ -780,9 +780,9 @@ fn normalized_diagnostics_render_against_installed_pack_rows_without_prose_asser
 fn installed_latin_pack_has_structural_templates_for_catalog_codes() {
     let pack = latin_locale_pack();
     for diagnostic in [
-        parse_diagnostic(ParseErrorKind::MissingFunctionName, vec![diagnostic_arg("functio", "functio")]),
+        parse_diagnostic(ParseErrorKind::FunctionNameAbsent, vec![diagnostic_arg("functio", "functio")]),
         parse_diagnostic(
-            ParseErrorKind::InvalidExpression,
+            ParseErrorKind::ExpressionInvalid,
             vec![diagnostic_arg("issue", "type_call_constructor")],
         ),
         semantic_diagnostic(

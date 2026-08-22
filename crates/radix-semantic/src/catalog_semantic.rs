@@ -13,37 +13,37 @@ use radix_diagnostics::DiagnosticArg;
 // ANALYSIS KINDS
 
 pub(crate) const SEMANTIC_ERROR_KINDS: &[SemanticErrorKind] = &[
-    SemanticErrorKind::UndefinedVariable,
-    SemanticErrorKind::UndefinedType,
-    SemanticErrorKind::UndefinedFunction,
-    SemanticErrorKind::UndefinedMember,
-    SemanticErrorKind::DuplicateDefinition,
-    SemanticErrorKind::ImportNotFound,
+    SemanticErrorKind::VariableUndefined,
+    SemanticErrorKind::TypeUndefined,
+    SemanticErrorKind::FunctionUndefined,
+    SemanticErrorKind::MemberUndefined,
+    SemanticErrorKind::DefinitionDuplicate,
+    SemanticErrorKind::ImportAbsent,
     SemanticErrorKind::CircularDependency,
     SemanticErrorKind::LoweringError,
     SemanticErrorKind::CliValidation,
-    SemanticErrorKind::InvalidAnnotation,
+    SemanticErrorKind::AnnotationInvalid,
     SemanticErrorKind::ConflictingVisibility,
     SemanticErrorKind::ShadowedVariable,
     SemanticErrorKind::TypeMismatch,
-    SemanticErrorKind::InvalidOperandTypes,
-    SemanticErrorKind::NotCallable,
-    SemanticErrorKind::WrongArity,
-    SemanticErrorKind::MissingTypeAnnotation,
-    SemanticErrorKind::InvalidCast,
-    SemanticErrorKind::InvalidConversion,
+    SemanticErrorKind::OperandTypesInvalid,
+    SemanticErrorKind::NonCallable,
+    SemanticErrorKind::ArityMismatch,
+    SemanticErrorKind::TypeAnnotationAbsent,
+    SemanticErrorKind::CastInvalid,
+    SemanticErrorKind::ConversionInvalid,
     SemanticErrorKind::UnavailableDeclaration,
     SemanticErrorKind::AirPurityViolation,
     SemanticErrorKind::ImmutableAssignment,
-    SemanticErrorKind::InvalidAssignmentTarget,
+    SemanticErrorKind::AssignmentTargetInvalid,
     SemanticErrorKind::UseBeforeInit,
     SemanticErrorKind::BreakOutsideBreakable,
     SemanticErrorKind::ContinueOutsideLoop,
     SemanticErrorKind::ReturnOutsideFunction,
-    SemanticErrorKind::MissingReturn,
+    SemanticErrorKind::ReturnAbsent,
     SemanticErrorKind::NonExhaustiveMatch,
     SemanticErrorKind::UnreachablePattern,
-    SemanticErrorKind::DuplicatePattern,
+    SemanticErrorKind::PatternDuplicate,
     SemanticErrorKind::OmniaRequiresEnum,
     SemanticErrorKind::OmniaForbidsCatchall,
     SemanticErrorKind::UseAfterMove,
@@ -89,27 +89,27 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
 #[must_use]
 pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
     match kind {
-        SemanticErrorKind::UndefinedVariable => DiagnosticSpec {
+        SemanticErrorKind::VariableUndefined => DiagnosticSpec {
             code: "SEM001",
             help: Some("declare the variable before use"),
         },
-        SemanticErrorKind::UndefinedType => DiagnosticSpec {
+        SemanticErrorKind::TypeUndefined => DiagnosticSpec {
             code: "SEM002",
             help: Some("declare the type or import it"),
         },
-        SemanticErrorKind::UndefinedFunction => DiagnosticSpec {
+        SemanticErrorKind::FunctionUndefined => DiagnosticSpec {
             code: "SEM003",
             help: Some("declare the function or import it"),
         },
-        SemanticErrorKind::UndefinedMember => DiagnosticSpec {
+        SemanticErrorKind::MemberUndefined => DiagnosticSpec {
             code: "SEM004",
             help: Some("check the member name and type"),
         },
-        SemanticErrorKind::DuplicateDefinition => DiagnosticSpec {
+        SemanticErrorKind::DefinitionDuplicate => DiagnosticSpec {
             code: "SEM005",
             help: Some("rename one of the definitions"),
         },
-        SemanticErrorKind::ImportNotFound => DiagnosticSpec {
+        SemanticErrorKind::ImportAbsent => DiagnosticSpec {
             code: "SEM006",
             help: Some("check the import path"),
         },
@@ -125,7 +125,7 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
             code: "SEM009",
             help: Some("fix the CLI annotation contract before emitting runnable CLI code"),
         },
-        SemanticErrorKind::InvalidAnnotation => DiagnosticSpec {
+        SemanticErrorKind::AnnotationInvalid => DiagnosticSpec {
             code: "SEM018",
             help: Some("fix the annotation contract before semantic lowering"),
         },
@@ -141,27 +141,27 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
             code: "SEM010",
             help: Some("make the expression type match the expected type"),
         },
-        SemanticErrorKind::InvalidOperandTypes => DiagnosticSpec {
+        SemanticErrorKind::OperandTypesInvalid => DiagnosticSpec {
             code: "SEM011",
             help: Some("use compatible operand types"),
         },
-        SemanticErrorKind::NotCallable => DiagnosticSpec {
+        SemanticErrorKind::NonCallable => DiagnosticSpec {
             code: "SEM012",
             help: Some("call a function or closure"),
         },
-        SemanticErrorKind::WrongArity => DiagnosticSpec {
+        SemanticErrorKind::ArityMismatch => DiagnosticSpec {
             code: "SEM013",
             help: Some("adjust the number of arguments"),
         },
-        SemanticErrorKind::MissingTypeAnnotation => DiagnosticSpec {
+        SemanticErrorKind::TypeAnnotationAbsent => DiagnosticSpec {
             code: "SEM014",
             help: Some("add a type annotation"),
         },
-        SemanticErrorKind::InvalidCast => DiagnosticSpec {
+        SemanticErrorKind::CastInvalid => DiagnosticSpec {
             code: "SEM015",
             help: Some("cast to a compatible type"),
         },
-        SemanticErrorKind::InvalidConversion => DiagnosticSpec {
+        SemanticErrorKind::ConversionInvalid => DiagnosticSpec {
             code: "SEM016",
             help: Some("use a valid conversion or provide inline recovery with `⇥`"),
         },
@@ -179,7 +179,7 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
                 "use a `varia` binding to allow reassignment, or remove the extra assignment",
             ),
         },
-        SemanticErrorKind::InvalidAssignmentTarget => DiagnosticSpec {
+        SemanticErrorKind::AssignmentTargetInvalid => DiagnosticSpec {
             code: "SEM021",
             help: Some("assign to a valid lvalue"),
         },
@@ -199,7 +199,7 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
             code: "SEM032",
             help: Some("use 'redde' inside a function"),
         },
-        SemanticErrorKind::MissingReturn => DiagnosticSpec {
+        SemanticErrorKind::ReturnAbsent => DiagnosticSpec {
             code: "SEM033",
             help: Some("add a return statement or make the return type 'vacuum'"),
         },
@@ -211,7 +211,7 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
             code: "SEM041",
             help: Some("remove or reorder the unreachable pattern"),
         },
-        SemanticErrorKind::DuplicatePattern => DiagnosticSpec {
+        SemanticErrorKind::PatternDuplicate => DiagnosticSpec {
             code: "SEM042",
             help: Some("remove the duplicate pattern"),
         },
@@ -273,36 +273,36 @@ pub fn semantic_message(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Opti
         SemanticErrorKind::CliValidation => semantic_cli_validation_message(args),
         SemanticErrorKind::CircularDependency => semantic_circular_dependency_message(args),
         SemanticErrorKind::ConflictingVisibility => semantic_conflicting_visibility_message(args),
-        SemanticErrorKind::DuplicateDefinition => semantic_duplicate_definition_message(args),
-        SemanticErrorKind::UndefinedFunction => Some("undefined function".to_owned()),
-        SemanticErrorKind::InvalidCast => Some("invalid cast".to_owned()),
+        SemanticErrorKind::DefinitionDuplicate => semantic_duplicate_definition_message(args),
+        SemanticErrorKind::FunctionUndefined => Some("undefined function".to_owned()),
+        SemanticErrorKind::CastInvalid => Some("invalid cast".to_owned()),
         SemanticErrorKind::LifetimeMismatch => Some("lifetime mismatch".to_owned()),
         SemanticErrorKind::ImmutableAssignment | SemanticErrorKind::UseBeforeInit => {
             semantic_definite_assignment_message(args)
         }
-        SemanticErrorKind::ImportNotFound => semantic_import_not_found_message(args),
-        SemanticErrorKind::InvalidAssignmentTarget => {
+        SemanticErrorKind::ImportAbsent => semantic_import_not_found_message(args),
+        SemanticErrorKind::AssignmentTargetInvalid => {
             semantic_invalid_assignment_target_message(args)
         }
-        SemanticErrorKind::InvalidAnnotation => semantic_invalid_annotation_message(args),
-        SemanticErrorKind::InvalidOperandTypes => semantic_invalid_operand_types_message(args),
+        SemanticErrorKind::AnnotationInvalid => semantic_invalid_annotation_message(args),
+        SemanticErrorKind::OperandTypesInvalid => semantic_invalid_operand_types_message(args),
         SemanticErrorKind::LoweringError => semantic_lowering_error_message(args),
         SemanticErrorKind::ShadowedVariable => semantic_lint_message(args),
-        SemanticErrorKind::DuplicatePattern
+        SemanticErrorKind::PatternDuplicate
         | SemanticErrorKind::NonExhaustiveMatch
         | SemanticErrorKind::OmniaForbidsCatchall
         | SemanticErrorKind::OmniaRequiresEnum
         | SemanticErrorKind::UnreachablePattern => semantic_exhaustiveness_message(kind, args),
-        SemanticErrorKind::MissingReturn => semantic_missing_return_message(args),
-        SemanticErrorKind::MissingTypeAnnotation => semantic_missing_type_annotation_message(args),
-        SemanticErrorKind::InvalidConversion => semantic_invalid_conversion_message(args),
-        SemanticErrorKind::NotCallable => semantic_not_callable_message(args),
+        SemanticErrorKind::ReturnAbsent => semantic_missing_return_message(args),
+        SemanticErrorKind::TypeAnnotationAbsent => semantic_missing_type_annotation_message(args),
+        SemanticErrorKind::ConversionInvalid => semantic_invalid_conversion_message(args),
+        SemanticErrorKind::NonCallable => semantic_not_callable_message(args),
         SemanticErrorKind::TypeMismatch => semantic_type_mismatch_message(args),
         SemanticErrorKind::UnavailableDeclaration => semantic_unavailable_declaration_message(args),
-        SemanticErrorKind::UndefinedMember => semantic_undefined_member_message(args),
-        SemanticErrorKind::UndefinedType => semantic_undefined_type_message(args),
-        SemanticErrorKind::UndefinedVariable => semantic_undefined_variable_message(args),
-        SemanticErrorKind::WrongArity => semantic_wrong_arity_message(args),
+        SemanticErrorKind::MemberUndefined => semantic_undefined_member_message(args),
+        SemanticErrorKind::TypeUndefined => semantic_undefined_type_message(args),
+        SemanticErrorKind::VariableUndefined => semantic_undefined_variable_message(args),
+        SemanticErrorKind::ArityMismatch => semantic_wrong_arity_message(args),
         SemanticErrorKind::Warning(WarningKind::TargetNoop) => Some("target no-op".to_owned()),
         SemanticErrorKind::Warning(
             WarningKind::ExplicitIgnotumAnnotation
@@ -350,17 +350,17 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
     match kind {
         SemanticErrorKind::AirPurityViolation => semantic_air_purity_help(args),
         SemanticErrorKind::ConflictingVisibility => semantic_conflicting_visibility_help(args),
-        SemanticErrorKind::InvalidConversion => semantic_invalid_conversion_help(args),
-        SemanticErrorKind::InvalidAnnotation => semantic_invalid_annotation_help(args),
-        SemanticErrorKind::InvalidOperandTypes => semantic_invalid_operand_types_help(args),
-        SemanticErrorKind::MissingTypeAnnotation => semantic_missing_type_annotation_help(args),
-        SemanticErrorKind::NotCallable => semantic_not_callable_help(args),
-        SemanticErrorKind::DuplicateDefinition => semantic_duplicate_definition_help(args),
+        SemanticErrorKind::ConversionInvalid => semantic_invalid_conversion_help(args),
+        SemanticErrorKind::AnnotationInvalid => semantic_invalid_annotation_help(args),
+        SemanticErrorKind::OperandTypesInvalid => semantic_invalid_operand_types_help(args),
+        SemanticErrorKind::TypeAnnotationAbsent => semantic_missing_type_annotation_help(args),
+        SemanticErrorKind::NonCallable => semantic_not_callable_help(args),
+        SemanticErrorKind::DefinitionDuplicate => semantic_duplicate_definition_help(args),
         SemanticErrorKind::UnavailableDeclaration => semantic_unavailable_declaration_help(args),
-        SemanticErrorKind::UndefinedMember => semantic_undefined_member_help(args),
-        SemanticErrorKind::ImportNotFound => semantic_import_not_found_help(args),
-        SemanticErrorKind::UndefinedVariable => semantic_undefined_variable_help(args),
-        SemanticErrorKind::WrongArity => semantic_wrong_arity_help(args),
+        SemanticErrorKind::MemberUndefined => semantic_undefined_member_help(args),
+        SemanticErrorKind::ImportAbsent => semantic_import_not_found_help(args),
+        SemanticErrorKind::VariableUndefined => semantic_undefined_variable_help(args),
+        SemanticErrorKind::ArityMismatch => semantic_wrong_arity_help(args),
         SemanticErrorKind::Warning(WarningKind::MonomorphicHoleSolvedToUnion) => {
             semantic_monomorphic_hole_solved_to_union_help(args)
         }
@@ -2554,7 +2554,7 @@ fn semantic_exhaustiveness_message(
     args: &[DiagnosticArg],
 ) -> Option<String> {
     match (kind, arg_value(args, "issue")?) {
-        (SemanticErrorKind::DuplicatePattern, "duplicate_variant") => {
+        (SemanticErrorKind::PatternDuplicate, "duplicate_variant") => {
             Some("duplicate pattern".to_owned())
         }
         (SemanticErrorKind::NonExhaustiveMatch, "missing_variants") => {

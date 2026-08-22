@@ -235,7 +235,7 @@ functio secretum() → vacuum {
     let errors = check(&program, interner).expect_err("protecta annotation should be rejected");
     expect_structured_error(
         &errors,
-        SemanticErrorKind::InvalidAnnotation,
+        SemanticErrorKind::AnnotationInvalid,
         &[
             ("issue", "protecta_reserved"),
             ("annotation", "@ protecta"),

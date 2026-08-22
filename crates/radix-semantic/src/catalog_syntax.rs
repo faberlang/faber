@@ -15,11 +15,11 @@ use radix_parser::ParseErrorKind;
 
 pub(crate) const LEX_ERROR_KINDS: &[LexErrorKind] = &[
     LexErrorKind::UnterminatedString,
-    LexErrorKind::InvalidNumber,
-    LexErrorKind::InvalidEscape,
-    LexErrorKind::UnexpectedCharacter,
+    LexErrorKind::NumberInvalid,
+    LexErrorKind::EscapeInvalid,
+    LexErrorKind::CharacterUnexpected,
     LexErrorKind::RemovedSectionDirective,
-    LexErrorKind::InvalidCommentSyntax,
+    LexErrorKind::CommentSyntaxInvalid,
     LexErrorKind::InlineComment,
 ];
 
@@ -27,36 +27,36 @@ pub(crate) const PARSE_ERROR_KINDS: &[ParseErrorKind] = &[
     ParseErrorKind::LexError,
     ParseErrorKind::Expected,
     ParseErrorKind::Unexpected,
-    ParseErrorKind::DuplicateModifier,
-    ParseErrorKind::InvalidAnnotation,
-    ParseErrorKind::InvalidDeclaration,
-    ParseErrorKind::InvalidModifier,
-    ParseErrorKind::InvalidParameter,
-    ParseErrorKind::InvalidTypeParameter,
-    ParseErrorKind::MissingClassBody,
-    ParseErrorKind::MissingClassName,
-    ParseErrorKind::MissingFunctionBody,
-    ParseErrorKind::MissingFunctionName,
-    ParseErrorKind::InvalidCasuArm,
-    ParseErrorKind::InvalidCasuValue,
-    ParseErrorKind::InvalidPattern,
-    ParseErrorKind::InvalidStatement,
-    ParseErrorKind::MissingBlock,
+    ParseErrorKind::ModifierDuplicate,
+    ParseErrorKind::AnnotationInvalid,
+    ParseErrorKind::DeclarationInvalid,
+    ParseErrorKind::ModifierInvalid,
+    ParseErrorKind::ParameterInvalid,
+    ParseErrorKind::TypeParameterInvalid,
+    ParseErrorKind::ClassBodyAbsent,
+    ParseErrorKind::ClassNameAbsent,
+    ParseErrorKind::FunctionBodyAbsent,
+    ParseErrorKind::FunctionNameAbsent,
+    ParseErrorKind::CasuArmInvalid,
+    ParseErrorKind::CasuValueInvalid,
+    ParseErrorKind::PatternInvalid,
+    ParseErrorKind::StatementInvalid,
+    ParseErrorKind::BlockAbsent,
     ParseErrorKind::ThereforeWrongContext,
     ParseErrorKind::ErgoWrongContext,
-    ParseErrorKind::MissingCondition,
-    ParseErrorKind::InvalidAssignmentTarget,
-    ParseErrorKind::InvalidCallArgument,
-    ParseErrorKind::InvalidExpression,
-    ParseErrorKind::InvalidLiteral,
-    ParseErrorKind::InvalidMemberAccess,
-    ParseErrorKind::InvalidOperator,
+    ParseErrorKind::ConditionAbsent,
+    ParseErrorKind::AssignmentTargetInvalid,
+    ParseErrorKind::CallArgumentInvalid,
+    ParseErrorKind::ExpressionInvalid,
+    ParseErrorKind::LiteralInvalid,
+    ParseErrorKind::MemberAccessInvalid,
+    ParseErrorKind::OperatorInvalid,
     ParseErrorKind::UnterminatedGroup,
-    ParseErrorKind::InvalidType,
-    ParseErrorKind::InvalidTypeAnnotation,
+    ParseErrorKind::TypeInvalid,
+    ParseErrorKind::TypeAnnotationInvalid,
     ParseErrorKind::UnterminatedTypeParams,
-    ParseErrorKind::InvalidImport,
-    ParseErrorKind::InvalidCommentPlacement,
+    ParseErrorKind::ImportInvalid,
+    ParseErrorKind::CommentPlacementInvalid,
 ];
 
 // STABLE CODES
@@ -72,20 +72,20 @@ pub fn lex_spec(kind: LexErrorKind) -> DiagnosticSpec {
         LexErrorKind::UnterminatedString => {
             DiagnosticSpec { code: "LEX001", help: Some("close the string literal before the end of the line or file") }
         }
-        LexErrorKind::InvalidNumber => {
+        LexErrorKind::NumberInvalid => {
             DiagnosticSpec { code: "LEX002", help: Some("check numeric separators and base prefixes") }
         }
-        LexErrorKind::InvalidEscape => {
+        LexErrorKind::EscapeInvalid => {
             DiagnosticSpec { code: "LEX003", help: Some("use a supported escape sequence or escape the backslash") }
         }
-        LexErrorKind::UnexpectedCharacter => {
+        LexErrorKind::CharacterUnexpected => {
             DiagnosticSpec { code: "LEX004", help: Some("remove the character or escape it if it should be literal") }
         }
         LexErrorKind::RemovedSectionDirective => DiagnosticSpec {
             code: "LEX005",
             help: Some("put file metadata in +++ TOML frontmatter on line 1 instead of line-start § directives"),
         },
-        LexErrorKind::InvalidCommentSyntax => {
+        LexErrorKind::CommentSyntaxInvalid => {
             DiagnosticSpec { code: "LEX006", help: Some("prefix comments with # instead of // or /* */") }
         }
         LexErrorKind::InlineComment => DiagnosticSpec {
@@ -114,33 +114,33 @@ pub fn parse_spec(kind: ParseErrorKind) -> DiagnosticSpec {
         ParseErrorKind::Unexpected => {
             DiagnosticSpec { code: "PARSE002", help: Some("remove or reposition the unexpected token") }
         }
-        ParseErrorKind::InvalidDeclaration => {
+        ParseErrorKind::DeclarationInvalid => {
             DiagnosticSpec { code: "PARSE010", help: Some("check declaration keywords and required parts") }
         }
-        ParseErrorKind::MissingFunctionName => DiagnosticSpec { code: "PARSE011", help: None },
-        ParseErrorKind::MissingFunctionBody => DiagnosticSpec { code: "PARSE012", help: None },
-        ParseErrorKind::MissingClassName => DiagnosticSpec { code: "PARSE013", help: None },
-        ParseErrorKind::MissingClassBody => DiagnosticSpec { code: "PARSE014", help: None },
-        ParseErrorKind::InvalidParameter => {
+        ParseErrorKind::FunctionNameAbsent => DiagnosticSpec { code: "PARSE011", help: None },
+        ParseErrorKind::FunctionBodyAbsent => DiagnosticSpec { code: "PARSE012", help: None },
+        ParseErrorKind::ClassNameAbsent => DiagnosticSpec { code: "PARSE013", help: None },
+        ParseErrorKind::ClassBodyAbsent => DiagnosticSpec { code: "PARSE014", help: None },
+        ParseErrorKind::ParameterInvalid => {
             DiagnosticSpec { code: "PARSE015", help: Some("check parameter syntax and order") }
         }
-        ParseErrorKind::InvalidTypeParameter => {
+        ParseErrorKind::TypeParameterInvalid => {
             DiagnosticSpec { code: "PARSE016", help: Some("check type parameter list for commas and identifiers") }
         }
-        ParseErrorKind::InvalidModifier => {
+        ParseErrorKind::ModifierInvalid => {
             DiagnosticSpec { code: "PARSE017", help: Some("move or remove the modifier") }
         }
-        ParseErrorKind::InvalidAnnotation => {
+        ParseErrorKind::AnnotationInvalid => {
             DiagnosticSpec { code: "PARSE018", help: Some("add an annotation name after '@'") }
         }
-        ParseErrorKind::DuplicateModifier => {
+        ParseErrorKind::ModifierDuplicate => {
             DiagnosticSpec { code: "PARSE019", help: Some("remove the duplicate modifier") }
         }
-        ParseErrorKind::InvalidStatement => DiagnosticSpec { code: "PARSE020", help: None },
-        ParseErrorKind::MissingCondition => {
+        ParseErrorKind::StatementInvalid => DiagnosticSpec { code: "PARSE020", help: None },
+        ParseErrorKind::ConditionAbsent => {
             DiagnosticSpec { code: "PARSE021", help: Some("add a condition expression") }
         }
-        ParseErrorKind::MissingBlock => DiagnosticSpec { code: "PARSE022", help: None },
+        ParseErrorKind::BlockAbsent => DiagnosticSpec { code: "PARSE022", help: None },
         ParseErrorKind::ThereforeWrongContext => DiagnosticSpec {
             code: "PARSE026",
             help: Some("use 'ergo' for a single-statement body, or wrap the body in braces"),
@@ -148,37 +148,37 @@ pub fn parse_spec(kind: ParseErrorKind) -> DiagnosticSpec {
         ParseErrorKind::ErgoWrongContext => {
             DiagnosticSpec { code: "PARSE027", help: Some("use '∴' between a closure signature and its body") }
         }
-        ParseErrorKind::InvalidPattern => DiagnosticSpec { code: "PARSE023", help: None },
-        ParseErrorKind::InvalidCasuArm => DiagnosticSpec { code: "PARSE024", help: None },
-        ParseErrorKind::InvalidCasuValue => {
+        ParseErrorKind::PatternInvalid => DiagnosticSpec { code: "PARSE023", help: None },
+        ParseErrorKind::CasuArmInvalid => DiagnosticSpec { code: "PARSE024", help: None },
+        ParseErrorKind::CasuValueInvalid => {
             DiagnosticSpec { code: "PARSE025", help: Some("use a valid case expression") }
         }
-        ParseErrorKind::InvalidExpression => DiagnosticSpec { code: "PARSE030", help: Some("check expression syntax") },
-        ParseErrorKind::InvalidLiteral => DiagnosticSpec { code: "PARSE031", help: Some("check the literal form") },
-        ParseErrorKind::InvalidOperator => {
+        ParseErrorKind::ExpressionInvalid => DiagnosticSpec { code: "PARSE030", help: Some("check expression syntax") },
+        ParseErrorKind::LiteralInvalid => DiagnosticSpec { code: "PARSE031", help: Some("check the literal form") },
+        ParseErrorKind::OperatorInvalid => {
             DiagnosticSpec { code: "PARSE032", help: Some("check operator placement and operands") }
         }
         ParseErrorKind::UnterminatedGroup => {
             DiagnosticSpec { code: "PARSE033", help: Some("close the grouping delimiter") }
         }
-        ParseErrorKind::InvalidCallArgument => {
+        ParseErrorKind::CallArgumentInvalid => {
             DiagnosticSpec { code: "PARSE034", help: Some("check call argument syntax") }
         }
-        ParseErrorKind::InvalidMemberAccess => {
+        ParseErrorKind::MemberAccessInvalid => {
             DiagnosticSpec { code: "PARSE035", help: Some("check member access syntax") }
         }
-        ParseErrorKind::InvalidAssignmentTarget => {
+        ParseErrorKind::AssignmentTargetInvalid => {
             DiagnosticSpec { code: "PARSE036", help: Some("assign only to valid lvalues") }
         }
-        ParseErrorKind::InvalidType => DiagnosticSpec { code: "PARSE040", help: Some("check type syntax") },
-        ParseErrorKind::InvalidTypeAnnotation => {
+        ParseErrorKind::TypeInvalid => DiagnosticSpec { code: "PARSE040", help: Some("check type syntax") },
+        ParseErrorKind::TypeAnnotationInvalid => {
             DiagnosticSpec { code: "PARSE041", help: Some("check type annotation form") }
         }
         ParseErrorKind::UnterminatedTypeParams => {
             DiagnosticSpec { code: "PARSE042", help: Some("close the type parameter list with '>'") }
         }
-        ParseErrorKind::InvalidImport => DiagnosticSpec { code: "PARSE050", help: Some("check import syntax") },
-        ParseErrorKind::InvalidCommentPlacement => DiagnosticSpec {
+        ParseErrorKind::ImportInvalid => DiagnosticSpec { code: "PARSE050", help: Some("check import syntax") },
+        ParseErrorKind::CommentPlacementInvalid => DiagnosticSpec {
             code: "PARSE060",
             help: Some(
                 "place comments before a statement, declaration, or member; or immediately before a block's closing '}' or end of file",
@@ -211,7 +211,7 @@ pub fn lex_message(kind: LexErrorKind, args: &[DiagnosticArg]) -> Option<String>
             }
             _ => None,
         },
-        LexErrorKind::InvalidNumber => match issue? {
+        LexErrorKind::NumberInvalid => match issue? {
             "invalid_hexadecimal_number" => Some("invalid hexadecimal number".to_owned()),
             "invalid_binary_number" => Some("invalid binary number".to_owned()),
             "invalid_octal_number" => Some("invalid octal number".to_owned()),
@@ -219,8 +219,8 @@ pub fn lex_message(kind: LexErrorKind, args: &[DiagnosticArg]) -> Option<String>
             "invalid_integer" => Some("invalid integer".to_owned()),
             _ => None,
         },
-        LexErrorKind::InvalidEscape => Some("invalid escape sequence".to_owned()),
-        LexErrorKind::UnexpectedCharacter => match issue? {
+        LexErrorKind::EscapeInvalid => Some("invalid escape sequence".to_owned()),
+        LexErrorKind::CharacterUnexpected => match issue? {
             "unexpected_character" => {
                 let ch = arg_value(args, "char")?;
                 Some(format!("unexpected character: {ch}"))
@@ -230,7 +230,7 @@ pub fn lex_message(kind: LexErrorKind, args: &[DiagnosticArg]) -> Option<String>
         LexErrorKind::RemovedSectionDirective => {
             Some("file-scope § directives were removed; use +++ frontmatter".to_owned())
         }
-        LexErrorKind::InvalidCommentSyntax => match issue? {
+        LexErrorKind::CommentSyntaxInvalid => match issue? {
             "c_style_line_comment" => Some(
                 "C-style // comments are not valid in Faber; use # for line comments".to_owned(),
             ),
@@ -257,22 +257,22 @@ pub fn parse_message(kind: ParseErrorKind, args: &[DiagnosticArg]) -> Option<Str
         ParseErrorKind::LexError => None,
         ParseErrorKind::Expected => expected_message(args),
         ParseErrorKind::Unexpected => unexpected_message(args),
-        ParseErrorKind::InvalidDeclaration => Some("invalid declaration".to_owned()),
-        ParseErrorKind::InvalidModifier => Some("invalid modifier".to_owned()),
-        ParseErrorKind::DuplicateModifier => Some("duplicate modifier".to_owned()),
-        ParseErrorKind::InvalidAnnotation => invalid_annotation_message(args),
-        ParseErrorKind::MissingFunctionName => quote_arg(args, "functio")
+        ParseErrorKind::DeclarationInvalid => Some("invalid declaration".to_owned()),
+        ParseErrorKind::ModifierInvalid => Some("invalid modifier".to_owned()),
+        ParseErrorKind::ModifierDuplicate => Some("duplicate modifier".to_owned()),
+        ParseErrorKind::AnnotationInvalid => invalid_annotation_message(args),
+        ParseErrorKind::FunctionNameAbsent => quote_arg(args, "functio")
             .map(|functio| format!("expected function name after {functio}")),
-        ParseErrorKind::MissingFunctionBody => quote_arg(args, "functio")
+        ParseErrorKind::FunctionBodyAbsent => quote_arg(args, "functio")
             .map(|functio| format!("expected function body for {functio} declaration")),
-        ParseErrorKind::MissingClassName => {
+        ParseErrorKind::ClassNameAbsent => {
             quote_arg(args, "genus").map(|genus| format!("expected class name after {genus}"))
         }
-        ParseErrorKind::MissingClassBody => quote_arg(args, "genus")
+        ParseErrorKind::ClassBodyAbsent => quote_arg(args, "genus")
             .map(|genus| format!("expected class body after {genus} declaration")),
-        ParseErrorKind::InvalidParameter => invalid_parameter_message(args),
-        ParseErrorKind::InvalidTypeParameter => invalid_type_parameter_message(args),
-        ParseErrorKind::MissingBlock => quote_arg(args, "block").and_then(|block| {
+        ParseErrorKind::ParameterInvalid => invalid_parameter_message(args),
+        ParseErrorKind::TypeParameterInvalid => invalid_type_parameter_message(args),
+        ParseErrorKind::BlockAbsent => quote_arg(args, "block").and_then(|block| {
             quote_arg(args, "ergo").map(|ergo| format!("expected {block} block or {ergo} body"))
         }),
         ParseErrorKind::ThereforeWrongContext => {
@@ -281,29 +281,29 @@ pub fn parse_message(kind: ParseErrorKind, args: &[DiagnosticArg]) -> Option<Str
         ParseErrorKind::ErgoWrongContext => Some(
             "ergo is only for single-statement bodies; use ∴ for a compact clausura".to_owned(),
         ),
-        ParseErrorKind::InvalidPattern => quote_arg(args, "wildcard").and_then(|wildcard| {
+        ParseErrorKind::PatternInvalid => quote_arg(args, "wildcard").and_then(|wildcard| {
             arg_value(args, "identifier")
                 .map(|identifier| format!("expected pattern such as {wildcard} or {identifier}"))
         }),
-        ParseErrorKind::InvalidCasuArm => quote_arg(args, "casu").and_then(|casu| {
+        ParseErrorKind::CasuArmInvalid => quote_arg(args, "casu").and_then(|casu| {
             quote_arg(args, "ceterum")
                 .map(|ceterum| format!("expected {casu} arm or {ceterum} default"))
         }),
-        ParseErrorKind::InvalidCasuValue => Some("invalid case value".to_owned()),
-        ParseErrorKind::InvalidStatement => invalid_statement_message(args),
-        ParseErrorKind::MissingCondition => Some("missing condition".to_owned()),
-        ParseErrorKind::InvalidAssignmentTarget => Some("invalid assignment target".to_owned()),
-        ParseErrorKind::InvalidCallArgument => Some("invalid call argument".to_owned()),
-        ParseErrorKind::InvalidExpression => invalid_expression_message(args),
-        ParseErrorKind::InvalidLiteral => Some("invalid literal".to_owned()),
-        ParseErrorKind::InvalidMemberAccess => Some("invalid member access".to_owned()),
-        ParseErrorKind::InvalidOperator => Some("invalid operator".to_owned()),
+        ParseErrorKind::CasuValueInvalid => Some("invalid case value".to_owned()),
+        ParseErrorKind::StatementInvalid => invalid_statement_message(args),
+        ParseErrorKind::ConditionAbsent => Some("missing condition".to_owned()),
+        ParseErrorKind::AssignmentTargetInvalid => Some("invalid assignment target".to_owned()),
+        ParseErrorKind::CallArgumentInvalid => Some("invalid call argument".to_owned()),
+        ParseErrorKind::ExpressionInvalid => invalid_expression_message(args),
+        ParseErrorKind::LiteralInvalid => Some("invalid literal".to_owned()),
+        ParseErrorKind::MemberAccessInvalid => Some("invalid member access".to_owned()),
+        ParseErrorKind::OperatorInvalid => Some("invalid operator".to_owned()),
         ParseErrorKind::UnterminatedGroup => Some("unterminated group".to_owned()),
-        ParseErrorKind::InvalidType => invalid_type_message(args),
-        ParseErrorKind::InvalidTypeAnnotation => Some("invalid type annotation".to_owned()),
+        ParseErrorKind::TypeInvalid => invalid_type_message(args),
+        ParseErrorKind::TypeAnnotationInvalid => Some("invalid type annotation".to_owned()),
         ParseErrorKind::UnterminatedTypeParams => Some("unterminated type parameters".to_owned()),
-        ParseErrorKind::InvalidImport => invalid_import_message(args),
-        ParseErrorKind::InvalidCommentPlacement => {
+        ParseErrorKind::ImportInvalid => invalid_import_message(args),
+        ParseErrorKind::CommentPlacementInvalid => {
             Some("comment is not in a legal attachment position".to_owned())
         }
     }
@@ -314,26 +314,26 @@ pub fn parse_help(kind: ParseErrorKind, args: &[DiagnosticArg]) -> Option<String
     match kind {
         ParseErrorKind::Expected => expected_help(args),
         ParseErrorKind::Unexpected => unexpected_help(args),
-        ParseErrorKind::InvalidAnnotation => invalid_annotation_help(args),
-        ParseErrorKind::MissingFunctionName => {
+        ParseErrorKind::AnnotationInvalid => invalid_annotation_help(args),
+        ParseErrorKind::FunctionNameAbsent => {
             let functio = quote_arg(args, "functio")?;
             Some(format!("add a function name after {functio}"))
         }
-        ParseErrorKind::MissingFunctionBody => {
+        ParseErrorKind::FunctionBodyAbsent => {
             let block = quote_arg(args, "block")?;
             Some(format!("add a {block} to the function declaration"))
         }
-        ParseErrorKind::MissingClassName => {
+        ParseErrorKind::ClassNameAbsent => {
             let genus = quote_arg(args, "genus")?;
             Some(format!("add a class name after {genus}"))
         }
-        ParseErrorKind::MissingClassBody => {
+        ParseErrorKind::ClassBodyAbsent => {
             let genus = quote_arg(args, "genus")?;
             Some(format!("add a block after the {genus} declaration header"))
         }
-        ParseErrorKind::InvalidParameter => invalid_parameter_help(args),
-        ParseErrorKind::InvalidTypeParameter => invalid_type_parameter_help(args),
-        ParseErrorKind::MissingBlock => {
+        ParseErrorKind::ParameterInvalid => invalid_parameter_help(args),
+        ParseErrorKind::TypeParameterInvalid => invalid_type_parameter_help(args),
+        ParseErrorKind::BlockAbsent => {
             let block = quote_arg(args, "block")?;
             let ergo = quote_arg(args, "ergo")?;
             Some(format!(
@@ -346,27 +346,27 @@ pub fn parse_help(kind: ParseErrorKind, args: &[DiagnosticArg]) -> Option<String
         ParseErrorKind::ErgoWrongContext => {
             Some("use '∴' between a closure signature and its body".to_owned())
         }
-        ParseErrorKind::InvalidPattern => {
+        ParseErrorKind::PatternInvalid => {
             let wildcard = quote_arg(args, "wildcard")?;
             let identifier = arg_value(args, "identifier")?;
             Some(format!(
                 "use {wildcard}, a literal, or an {identifier} pattern"
             ))
         }
-        ParseErrorKind::InvalidCasuArm => {
+        ParseErrorKind::CasuArmInvalid => {
             let casu = quote_arg(args, "casu")?;
             let ceterum = quote_arg(args, "ceterum")?;
             Some(format!(
                 "start the dispatch arm with {casu} or close with {ceterum}"
             ))
         }
-        ParseErrorKind::InvalidStatement => {
+        ParseErrorKind::StatementInvalid => {
             let replacement = arg_value(args, "replacement")?;
             Some(format!("use {replacement}"))
         }
-        ParseErrorKind::InvalidExpression => invalid_expression_help(args),
-        ParseErrorKind::InvalidType => invalid_type_help(args),
-        ParseErrorKind::InvalidImport => invalid_import_help(args),
+        ParseErrorKind::ExpressionInvalid => invalid_expression_help(args),
+        ParseErrorKind::TypeInvalid => invalid_type_help(args),
+        ParseErrorKind::ImportInvalid => invalid_import_help(args),
         _ => None,
     }
 }

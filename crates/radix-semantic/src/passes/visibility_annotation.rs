@@ -94,7 +94,7 @@ fn push_protecta_diagnostics(
     for annotation in annotations {
         if is_protecta(annotation, interner) {
             errors.push(
-                SemanticError::structured(SemanticErrorKind::InvalidAnnotation, annotation.span)
+                SemanticError::structured(SemanticErrorKind::AnnotationInvalid, annotation.span)
                     .with_arg("issue", "protecta_reserved")
                     .with_arg("annotation", "@ protecta")
                     .with_arg("publica", "@ publica")

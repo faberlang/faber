@@ -34,14 +34,14 @@ pub fn validate_kernel_imports(
         if is_kernel_glob_import_path(path) {
             if matches!(decl.visibility, Visibility::Publica) {
                 errors.push(
-                    SemanticError::structured(SemanticErrorKind::ImportNotFound, decl.span)
+                    SemanticError::structured(SemanticErrorKind::ImportAbsent, decl.span)
                         .with_arg("issue", "kernel_glob_reexport")
                         .with_arg("path", "faber:*"),
                 );
             }
             if !matches!(decl.kind, ImportKind::Named { .. }) {
                 errors.push(
-                    SemanticError::structured(SemanticErrorKind::ImportNotFound, decl.span)
+                    SemanticError::structured(SemanticErrorKind::ImportAbsent, decl.span)
                         .with_arg("issue", "kernel_glob_named_alias")
                         .with_arg("path", "faber:*"),
                 );
@@ -53,13 +53,13 @@ pub fn validate_kernel_imports(
             let diagnostic = match err {
                 KernelResolveError::NotKernelPath => continue,
                 KernelResolveError::InvalidPath { reason, .. } => {
-                    SemanticError::structured(SemanticErrorKind::ImportNotFound, decl.span)
+                    SemanticError::structured(SemanticErrorKind::ImportAbsent, decl.span)
                         .with_arg("issue", "kernel_invalid_path")
                         .with_arg("path", path)
                         .with_arg("reason", reason)
                 }
                 KernelResolveError::UnknownModule { name } => {
-                    SemanticError::structured(SemanticErrorKind::ImportNotFound, decl.span)
+                    SemanticError::structured(SemanticErrorKind::ImportAbsent, decl.span)
                         .with_arg("issue", "kernel_unknown_module")
                         .with_arg("module", name)
                 }
@@ -93,7 +93,7 @@ pub fn validate_script_kernel_library_imports(
         let path = interner.resolve(decl.path);
         if path == "norma:json" {
             errors.push(
-                SemanticError::structured(SemanticErrorKind::ImportNotFound, decl.span)
+                SemanticError::structured(SemanticErrorKind::ImportAbsent, decl.span)
                     .with_arg("issue", "kernel_norma_json_in_script")
                     .with_arg("script_path", "faber:json")
                     .with_arg("library_path", "norma:json"),

@@ -89,7 +89,7 @@ incipit {
     // The predeclare pass registers mul_backward before resolve, so
     // no UndefinedVariable error should mention mul_backward.
     let has_unknown_companion = errors.iter().any(|e| {
-        e.kind == SemanticErrorKind::UndefinedVariable
+        e.kind == SemanticErrorKind::VariableUndefined
             && e.args
                 .iter()
                 .any(|a| a.name == "issue" && a.value == "unknown_identifier")
@@ -116,7 +116,7 @@ incipit {
     );
 
     let has_sem001 = errors.iter().any(|e| {
-        e.kind == SemanticErrorKind::UndefinedVariable
+        e.kind == SemanticErrorKind::VariableUndefined
             && e.args
                 .iter()
                 .any(|a| a.name == "issue" && a.value == "unknown_identifier")

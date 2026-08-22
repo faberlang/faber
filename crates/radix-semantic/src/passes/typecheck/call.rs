@@ -900,7 +900,7 @@ impl TypeChecker<'_> {
                     self.variant_field_names.get(def_id).cloned(),
                 ) else {
                     self.error_issue(
-                        SemanticErrorKind::UndefinedVariable,
+                        SemanticErrorKind::VariableUndefined,
                         "unknown_variant_fields",
                         callee.span,
                     );

@@ -79,7 +79,7 @@ fn kernel_glob_import_rejects_re_export() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "kernel_glob_reexport"), ("path", "faber:*")],
     );
 }
@@ -90,7 +90,7 @@ fn unknown_kernel_import_emits_kernel_diagnostic() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[("issue", "kernel_unknown_module"), ("module", "nihil")],
     );
 }
@@ -101,7 +101,7 @@ fn nested_faber_path_is_invalid() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[
             ("issue", "kernel_invalid_path"),
             ("path", "faber:hal/solum"),
@@ -119,7 +119,7 @@ fn script_mode_rejects_norma_json_with_kernel_replacement() {
     assert_eq!(errors.len(), 1);
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImportNotFound,
+        SemanticErrorKind::ImportAbsent,
         &[
             ("issue", "kernel_norma_json_in_script"),
             ("script_path", "faber:json"),

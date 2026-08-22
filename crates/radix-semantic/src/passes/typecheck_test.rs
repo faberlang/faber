@@ -696,7 +696,7 @@ fn object_field_without_value_uses_structured_issue_arg() {
 
     let errors = typecheck(&mut program, &Resolver::new(), &mut types).unwrap_err();
     assert!(errors.iter().any(|err| {
-        err.kind == SemanticErrorKind::InvalidOperandTypes
+        err.kind == SemanticErrorKind::OperandTypesInvalid
             && err.span == expr_span
             && args_have_no_legacy_message(&err.args)
             && err
@@ -787,7 +787,7 @@ fn struct_computed_key_uses_structured_issue_arg() {
 
     let errors = typecheck(&mut program, &Resolver::new(), &mut types).unwrap_err();
     assert!(errors.iter().any(|err| {
-        err.kind == SemanticErrorKind::InvalidOperandTypes
+        err.kind == SemanticErrorKind::OperandTypesInvalid
             && err.span == key_span
             && test_support::semantic_error_has_issue(err, "struct_computed_key_forbidden")
     }));
@@ -864,7 +864,7 @@ fn struct_spread_field_uses_structured_issue_arg() {
 
     let errors = typecheck(&mut program, &Resolver::new(), &mut types).unwrap_err();
     assert!(errors.iter().any(|err| {
-        err.kind == SemanticErrorKind::InvalidOperandTypes
+        err.kind == SemanticErrorKind::OperandTypesInvalid
             && err.span == spread_span
             && test_support::semantic_error_has_issue(err, "struct_spread_forbidden")
     }));
@@ -983,7 +983,7 @@ fn unresolved_local_type_uses_declaration_span() {
 
     let errors = typecheck(&mut program, &Resolver::new(), &mut types).unwrap_err();
     assert!(errors.iter().any(|err| {
-        err.kind == SemanticErrorKind::MissingTypeAnnotation
+        err.kind == SemanticErrorKind::TypeAnnotationAbsent
             && err.span == decl_span
             && args_have_no_legacy_message(&err.args)
             && err
@@ -1299,7 +1299,7 @@ functio probe(train.Seed seed) → tensor<f32, [2]> {
         .diagnostics
         .iter()
         .find(|diagnostic| {
-            diagnostic.kind == SemanticErrorKind::UndefinedMember
+            diagnostic.kind == SemanticErrorKind::MemberUndefined
                 && diagnostic
                     .args
                     .iter()
@@ -1376,7 +1376,7 @@ fn variant_call_reports_missing_field_metadata() {
 
     assert_eq!(result, checker.error_type);
     assert!(checker.errors.iter().any(|err| {
-        err.kind == SemanticErrorKind::UndefinedVariable
+        err.kind == SemanticErrorKind::VariableUndefined
             && err
                 .args
                 .iter()
@@ -1398,7 +1398,7 @@ fn reports_unknown_variant_pattern_with_structured_event() {
     checker.check_pattern(&pattern, expected, test_span());
 
     assert!(checker.errors.iter().any(|err| {
-        err.kind == SemanticErrorKind::UndefinedVariable
+        err.kind == SemanticErrorKind::VariableUndefined
             && err
                 .args
                 .iter()

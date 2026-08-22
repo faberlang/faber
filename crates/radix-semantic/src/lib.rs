@@ -354,9 +354,9 @@ pub fn qualify_rust_borrow(
 pub fn is_use_site_only_error(diag: &SemanticError) -> bool {
     matches!(
         diag.kind,
-        SemanticErrorKind::UndefinedVariable
-            | SemanticErrorKind::UndefinedFunction
-            | SemanticErrorKind::UndefinedMember
+        SemanticErrorKind::VariableUndefined
+            | SemanticErrorKind::FunctionUndefined
+            | SemanticErrorKind::MemberUndefined
     )
 }
 
@@ -451,7 +451,7 @@ pub fn analyze_with_cli(
                 .collect::<String>();
             diagnostics.push(
                 SemanticError::structured(
-                    SemanticErrorKind::UndefinedType,
+                    SemanticErrorKind::TypeUndefined,
                     radix_lexer::Span::default(),
                 )
                 .with_arg("issue", format!("file_interface_import_failed_{detail}"))

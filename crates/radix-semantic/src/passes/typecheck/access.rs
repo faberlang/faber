@@ -57,7 +57,7 @@ impl TypeChecker<'_> {
                         ty
                     } else {
                         self.error_issue(
-                            SemanticErrorKind::InvalidAssignmentTarget,
+                            SemanticErrorKind::AssignmentTargetInvalid,
                             ISSUE_INVALID_ASSIGNMENT_TARGET,
                             target.span,
                         );
@@ -65,7 +65,7 @@ impl TypeChecker<'_> {
                     }
                 } else {
                     self.error_issue(
-                        SemanticErrorKind::InvalidAssignmentTarget,
+                        SemanticErrorKind::AssignmentTargetInvalid,
                         ISSUE_INVALID_ASSIGNMENT_TARGET,
                         target.span,
                     );
@@ -86,7 +86,7 @@ impl TypeChecker<'_> {
             HirExpressionKind::Index(object, index) => self.check_index_lvalue(object, index),
             _ => {
                 self.error_issue(
-                    SemanticErrorKind::InvalidAssignmentTarget,
+                    SemanticErrorKind::AssignmentTargetInvalid,
                     ISSUE_INVALID_ASSIGNMENT_TARGET,
                     target.span,
                 );
@@ -347,7 +347,7 @@ impl TypeChecker<'_> {
                 return field_ty;
             }
             self.error_issue(
-                SemanticErrorKind::UndefinedVariable,
+                SemanticErrorKind::VariableUndefined,
                 "unknown_record_field",
                 span,
             );
@@ -781,7 +781,7 @@ impl TypeChecker<'_> {
         }
 
         self.error_issue(
-            SemanticErrorKind::UndefinedVariable,
+            SemanticErrorKind::VariableUndefined,
             "unknown_identifier",
             span,
         );

@@ -205,7 +205,7 @@ fn check_match(
                 }
                 if !covered.insert(def_id) {
                     errors.push(
-                        SemanticError::structured(SemanticErrorKind::DuplicatePattern, arm.span)
+                        SemanticError::structured(SemanticErrorKind::PatternDuplicate, arm.span)
                             .with_arg("issue", "duplicate_variant"),
                     );
                 }

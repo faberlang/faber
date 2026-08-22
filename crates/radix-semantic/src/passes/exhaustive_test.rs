@@ -196,7 +196,7 @@ fn reports_duplicate_variant_pattern() {
     let errors = result.unwrap_err();
     expect_structured_error(
         &errors,
-        SemanticErrorKind::DuplicatePattern,
+        SemanticErrorKind::PatternDuplicate,
         &[("issue", "duplicate_variant")],
     );
 }
@@ -840,7 +840,7 @@ fn omnia_accepts_all_unguarded_variants_even_with_extra_guarded_arms() {
     // (guarded arms are never counted for coverage or duplicate checks).
     let has_duplicate = errors
         .iter()
-        .any(|e| matches!(e.kind, SemanticErrorKind::DuplicatePattern));
+        .any(|e| matches!(e.kind, SemanticErrorKind::PatternDuplicate));
     assert!(
         !has_duplicate,
         "F-022: guarded duplicate must not trigger DuplicatePattern: {errors:?}"

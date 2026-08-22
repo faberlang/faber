@@ -102,25 +102,27 @@ impl fmt::Display for DiagnosticPhase {
 /// such as "unexpected token" or "missing expression" are intentionally not
 /// modeled here. Owned by the diagnostics foundation so [`Diagnostic`] can
 /// carry the typed kind without a dependency cycle on phase crates.
+///
+/// Variants use a fact-noun grammar, naming the failed fact or state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LexErrorKind {
     /// String literal reached newline or EOF before its closing delimiter.
     UnterminatedString,
 
     /// Numeric literal text could not be parsed under its declared radix/form.
-    InvalidNumber,
+    NumberInvalid,
 
     /// Escape processing rejected a string escape sequence.
-    InvalidEscape,
+    EscapeInvalid,
 
     /// Character had no token meaning in the current lexer mode.
-    UnexpectedCharacter,
+    CharacterUnexpected,
 
     /// Line-start `§` file directives were removed in favor of `+++` frontmatter.
     RemovedSectionDirective,
 
     /// C-style `//` or `/* */` comments are not part of the Faber lexical contract.
-    InvalidCommentSyntax,
+    CommentSyntaxInvalid,
 
     /// `#` appeared after other tokens on the same logical line.
     InlineComment,
@@ -131,6 +133,8 @@ pub enum LexErrorKind {
 /// Variants are intentionally grouped by the part of the grammar that failed.
 /// Add new variants when a category unlocks clearer recovery, tests, or user
 /// messaging; otherwise prefer an existing bucket with a precise message.
+///
+/// Variants use a fact-noun grammar, naming the failed fact or state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ParseErrorKind {
     // Lexer passthrough - allows treating lex/parse errors uniformly
@@ -141,50 +145,50 @@ pub enum ParseErrorKind {
     Unexpected,
 
     // Declaration errors - structural issues in top-level constructs
-    DuplicateModifier,
-    InvalidAnnotation,
-    InvalidDeclaration,
-    InvalidModifier,
-    InvalidParameter,
-    InvalidTypeParameter,
-    MissingClassBody,
-    MissingClassName,
-    MissingFunctionBody,
-    MissingFunctionName,
+    ModifierDuplicate,
+    AnnotationInvalid,
+    DeclarationInvalid,
+    ModifierInvalid,
+    ParameterInvalid,
+    TypeParameterInvalid,
+    ClassBodyAbsent,
+    ClassNameAbsent,
+    FunctionBodyAbsent,
+    FunctionNameAbsent,
 
     // Statement errors - control flow and block structure issues
-    InvalidCasuArm,
-    InvalidCasuValue,
-    InvalidPattern,
-    InvalidStatement,
-    MissingBlock,
+    CasuArmInvalid,
+    CasuValueInvalid,
+    PatternInvalid,
+    StatementInvalid,
+    BlockAbsent,
     /// `∴` used where a compact statement body requires `ergo`.
     ThereforeWrongContext,
     /// `ergo` used where a compact clausura requires `∴`.
     ErgoWrongContext,
-    MissingCondition,
+    ConditionAbsent,
 
     // Expression errors - malformed expressions and operators
-    InvalidAssignmentTarget,
-    InvalidCallArgument,
-    InvalidExpression,
-    InvalidLiteral,
-    InvalidMemberAccess,
-    InvalidOperator,
+    AssignmentTargetInvalid,
+    CallArgumentInvalid,
+    ExpressionInvalid,
+    LiteralInvalid,
+    MemberAccessInvalid,
+    OperatorInvalid,
     UnterminatedGroup,
 
     // Type annotation errors
-    InvalidType,
-    InvalidTypeAnnotation,
+    TypeInvalid,
+    TypeAnnotationInvalid,
     UnterminatedTypeParams,
 
     // Import errors
-    InvalidImport,
+    ImportInvalid,
 
     // Comment/trivia errors
     /// A `LineComment` token was not claimed by a legal attachment boundary
     /// (forward statement/member trivia, block end, or program end).
-    InvalidCommentPlacement,
+    CommentPlacementInvalid,
 }
 
 /// Non-fatal semantic findings that share the normal diagnostic transport.
@@ -243,49 +247,51 @@ pub enum WarningKind {
 /// renderers should use the message/help text for display, while compiler
 /// policy can match the kind when it needs to distinguish unresolved names,
 /// type failures, ownership failures, or warnings.
+///
+/// Variants use a fact-noun grammar, naming the failed fact or state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SemanticErrorKind {
     // Name resolution
-    UndefinedVariable,
-    UndefinedType,
-    UndefinedFunction,
-    UndefinedMember,
-    DuplicateDefinition,
-    ImportNotFound,
+    VariableUndefined,
+    TypeUndefined,
+    FunctionUndefined,
+    MemberUndefined,
+    DefinitionDuplicate,
+    ImportAbsent,
     CircularDependency,
     LoweringError,
     CliValidation,
-    InvalidAnnotation,
+    AnnotationInvalid,
     /// A declaration mixes distinct visibility tiers (`@ publica @ privata`).
     ConflictingVisibility,
     ShadowedVariable,
 
     // Type errors
     TypeMismatch,
-    InvalidOperandTypes,
-    NotCallable,
-    WrongArity,
-    MissingTypeAnnotation,
-    InvalidCast,
-    InvalidConversion,
+    OperandTypesInvalid,
+    NonCallable,
+    ArityMismatch,
+    TypeAnnotationAbsent,
+    CastInvalid,
+    ConversionInvalid,
     UnavailableDeclaration,
     AirPurityViolation,
 
     // Assignment
     ImmutableAssignment,
-    InvalidAssignmentTarget,
+    AssignmentTargetInvalid,
     UseBeforeInit,
 
     // Control flow
     BreakOutsideBreakable,
     ContinueOutsideLoop,
     ReturnOutsideFunction,
-    MissingReturn,
+    ReturnAbsent,
 
     // Pattern matching
     NonExhaustiveMatch,
     UnreachablePattern,
-    DuplicatePattern,
+    PatternDuplicate,
     OmniaRequiresEnum,
     OmniaForbidsCatchall,
 
@@ -313,11 +319,11 @@ impl SemanticErrorKind {
     pub fn is_permissive_check_downgrade(self) -> bool {
         matches!(
             self,
-            SemanticErrorKind::UndefinedVariable
-                | SemanticErrorKind::UndefinedType
-                | SemanticErrorKind::UndefinedFunction
-                | SemanticErrorKind::UndefinedMember
-                | SemanticErrorKind::ImportNotFound
+            SemanticErrorKind::VariableUndefined
+                | SemanticErrorKind::TypeUndefined
+                | SemanticErrorKind::FunctionUndefined
+                | SemanticErrorKind::MemberUndefined
+                | SemanticErrorKind::ImportAbsent
         )
     }
 }

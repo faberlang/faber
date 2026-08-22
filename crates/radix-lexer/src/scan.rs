@@ -403,7 +403,7 @@ impl<'a> Lexer<'a> {
         {
             self.cursor
                 .eat_while(|c| c.is_ascii_alphanumeric() || c == '_');
-            self.emit_issue_error(LexErrorKind::InvalidNumber, start, issue);
+            self.emit_issue_error(LexErrorKind::NumberInvalid, start, issue);
             self.emit_token(TokenKind::Error, start);
             return;
         }
@@ -414,7 +414,7 @@ impl<'a> Lexer<'a> {
         if let Ok(n) = u64::from_str_radix(&clean, radix) {
             self.emit_token(TokenKind::Integer(n), start);
         } else {
-            self.emit_issue_error(LexErrorKind::InvalidNumber, start, issue);
+            self.emit_issue_error(LexErrorKind::NumberInvalid, start, issue);
             self.emit_token(TokenKind::Error, start);
         }
     }
@@ -494,7 +494,7 @@ impl<'a> Lexer<'a> {
                     kind
                 } else {
                     self.emit_error(
-                        LexErrorKind::UnexpectedCharacter,
+                        LexErrorKind::CharacterUnexpected,
                         start,
                         vec![
                             DiagnosticArg::new("issue", "unexpected_character"),
@@ -549,7 +549,7 @@ impl<'a> Lexer<'a> {
                 self.cursor.advance();
                 self.cursor.eat_while(|c| !matches!(c, '\n' | '\r'));
                 self.emit_issue_error(
-                    LexErrorKind::InvalidCommentSyntax,
+                    LexErrorKind::CommentSyntaxInvalid,
                     start,
                     "c_style_line_comment",
                 );
@@ -569,7 +569,7 @@ impl<'a> Lexer<'a> {
                 } else {
                     "unterminated_c_style_block_comment"
                 };
-                self.emit_issue_error(LexErrorKind::InvalidCommentSyntax, start, issue);
+                self.emit_issue_error(LexErrorKind::CommentSyntaxInvalid, start, issue);
                 self.emit_token(TokenKind::Error, start);
             }
             _ => self.emit_token(TokenKind::Slash, start),
@@ -855,17 +855,17 @@ impl<'a> Lexer<'a> {
         if is_float || has_exp {
             match clean.parse::<f64>() {
                 Ok(n) if n.is_infinite() => {
-                    self.emit_issue_error(LexErrorKind::InvalidNumber, start, "float_overflow");
+                    self.emit_issue_error(LexErrorKind::NumberInvalid, start, "float_overflow");
                     self.emit_token(TokenKind::Error, start);
                 }
                 Ok(n) if n == 0.0 && Self::has_non_zero_significand(&clean) => {
-                    self.emit_issue_error(LexErrorKind::InvalidNumber, start, "float_underflow");
+                    self.emit_issue_error(LexErrorKind::NumberInvalid, start, "float_underflow");
                     self.emit_token(TokenKind::Error, start);
                 }
                 Ok(n) => self.emit_token(TokenKind::Float(n), start),
                 Err(_) => {
                     self.emit_issue_error(
-                        LexErrorKind::InvalidNumber,
+                        LexErrorKind::NumberInvalid,
                         start,
                         "invalid_floating_point_number",
                     );
@@ -875,7 +875,7 @@ impl<'a> Lexer<'a> {
         } else if let Ok(n) = clean.parse::<u64>() {
             self.emit_token(TokenKind::Integer(n), start);
         } else {
-            self.emit_issue_error(LexErrorKind::InvalidNumber, start, "invalid_integer");
+            self.emit_issue_error(LexErrorKind::NumberInvalid, start, "invalid_integer");
             self.emit_token(TokenKind::Error, start);
         }
     }

@@ -786,7 +786,7 @@ fn resolve_elige_case_value(
                     | QualifiedVariantPathLookup::NotQualified => {
                         errors.push(
                             SemanticError::structured(
-                                SemanticErrorKind::UndefinedVariable,
+                                SemanticErrorKind::VariableUndefined,
                                 last_span,
                             )
                             .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
@@ -868,7 +868,7 @@ fn resolve_pattern(
                 BareVariantLookup::Ambiguous { .. }
             ) {
                 errors.push(
-                    SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+                    SemanticError::structured(SemanticErrorKind::VariableUndefined, ident.span)
                         .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
                 );
             }
@@ -900,7 +900,7 @@ fn resolve_pattern(
                             | QualifiedVariantPathLookup::NotQualified => {
                                 errors.push(
                                     SemanticError::structured(
-                                        SemanticErrorKind::UndefinedVariable,
+                                        SemanticErrorKind::VariableUndefined,
                                         last.span,
                                     )
                                     .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
@@ -929,7 +929,7 @@ fn resolve_pattern(
                                     Some(_) => {
                                         errors.push(
                                             SemanticError::structured(
-                                                SemanticErrorKind::UndefinedVariable,
+                                                SemanticErrorKind::VariableUndefined,
                                                 last.span,
                                             )
                                             .with_arg("issue", ISSUE_NAME_NOT_VARIANT),
@@ -939,7 +939,7 @@ fn resolve_pattern(
                                         BareVariantLookup::Ambiguous { .. } => {
                                             errors.push(
                                                 SemanticError::structured(
-                                                    SemanticErrorKind::UndefinedVariable,
+                                                    SemanticErrorKind::VariableUndefined,
                                                     last.span,
                                                 )
                                                 .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
@@ -948,7 +948,7 @@ fn resolve_pattern(
                                         BareVariantLookup::Single(_) | BareVariantLookup::None => {
                                             errors.push(
                                                 SemanticError::structured(
-                                                    SemanticErrorKind::UndefinedVariable,
+                                                    SemanticErrorKind::VariableUndefined,
                                                     last.span,
                                                 )
                                                 .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
@@ -993,7 +993,7 @@ fn resolve_variant_path_without_enum_parent(
         QualifiedVariantPathLookup::Variant(_) => {}
         QualifiedVariantPathLookup::UnknownVariant => {
             errors.push(
-                SemanticError::structured(SemanticErrorKind::UndefinedVariable, last.span)
+                SemanticError::structured(SemanticErrorKind::VariableUndefined, last.span)
                     .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
             );
         }
@@ -1055,7 +1055,7 @@ fn resolve_expr(
                     BareVariantLookup::Ambiguous { .. } => {
                         errors.push(
                             SemanticError::structured(
-                                SemanticErrorKind::UndefinedVariable,
+                                SemanticErrorKind::VariableUndefined,
                                 ident.span,
                             )
                             .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
@@ -1072,7 +1072,7 @@ fn resolve_expr(
             if let Some(symbol) = resolver.get_symbol(def_id) {
                 if !symbol.kind.is_value_name() {
                     errors.push(
-                        SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+                        SemanticError::structured(SemanticErrorKind::VariableUndefined, ident.span)
                             .with_arg("issue", ISSUE_NAME_NOT_VALUE),
                     );
                 }
@@ -1122,7 +1122,7 @@ fn resolve_expr(
                         {
                             errors.push(
                                 SemanticError::structured(
-                                    SemanticErrorKind::UndefinedMember,
+                                    SemanticErrorKind::MemberUndefined,
                                     expr.member.span,
                                 )
                                 .with_arg("issue", ISSUE_NAMESPACE_MISSING_EXPORT)
@@ -1668,7 +1668,7 @@ fn validate_width_marker_param(
 }
 
 fn undefined_type_error(issue: &'static str, span: radix_lexer::Span) -> SemanticError {
-    SemanticError::structured(SemanticErrorKind::UndefinedType, span).with_arg("issue", issue)
+    SemanticError::structured(SemanticErrorKind::TypeUndefined, span).with_arg("issue", issue)
 }
 
 fn instans_precision_marker_error(
@@ -1901,7 +1901,7 @@ fn resolve_enum_variant_member(
         BareVariantLookup::Ambiguous { .. }
     ) {
         errors.push(
-            SemanticError::structured(SemanticErrorKind::UndefinedVariable, variant_ident.span)
+            SemanticError::structured(SemanticErrorKind::VariableUndefined, variant_ident.span)
                 .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
         );
         return true;
@@ -1909,27 +1909,27 @@ fn resolve_enum_variant_member(
 
     let Some(variant_def) = resolver.lookup(variant_ident.name) else {
         errors.push(
-            SemanticError::structured(SemanticErrorKind::UndefinedVariable, variant_ident.span)
+            SemanticError::structured(SemanticErrorKind::VariableUndefined, variant_ident.span)
                 .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
         );
         return true;
     };
     let Some(variant_symbol) = resolver.get_symbol(variant_def) else {
         errors.push(
-            SemanticError::structured(SemanticErrorKind::UndefinedVariable, variant_ident.span)
+            SemanticError::structured(SemanticErrorKind::VariableUndefined, variant_ident.span)
                 .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
         );
         return true;
     };
     if variant_symbol.kind != SymbolKind::Variant {
         errors.push(
-            SemanticError::structured(SemanticErrorKind::UndefinedVariable, variant_ident.span)
+            SemanticError::structured(SemanticErrorKind::VariableUndefined, variant_ident.span)
                 .with_arg("issue", ISSUE_NAME_NOT_VARIANT),
         );
         return true;
     }
     errors.push(
-        SemanticError::structured(SemanticErrorKind::UndefinedVariable, variant_ident.span)
+        SemanticError::structured(SemanticErrorKind::VariableUndefined, variant_ident.span)
             .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
     );
     true
@@ -1967,7 +1967,7 @@ fn resolve_variant_path(
             QualifiedVariantPathLookup::UnknownVariant
             | QualifiedVariantPathLookup::NotQualified => {
                 errors.push(
-                    SemanticError::structured(SemanticErrorKind::UndefinedVariable, last.span)
+                    SemanticError::structured(SemanticErrorKind::VariableUndefined, last.span)
                         .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
                 );
                 return;
@@ -1992,7 +1992,7 @@ fn resolve_variant_path(
             match resolver.lookup(last.name) {
                 Some(_) => {
                     errors.push(
-                        SemanticError::structured(SemanticErrorKind::UndefinedVariable, last.span)
+                        SemanticError::structured(SemanticErrorKind::VariableUndefined, last.span)
                             .with_arg("issue", ISSUE_NAME_NOT_VARIANT),
                     );
                 }
@@ -2000,7 +2000,7 @@ fn resolve_variant_path(
                     BareVariantLookup::Ambiguous { .. } => {
                         errors.push(
                             SemanticError::structured(
-                                SemanticErrorKind::UndefinedVariable,
+                                SemanticErrorKind::VariableUndefined,
                                 last.span,
                             )
                             .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
@@ -2009,7 +2009,7 @@ fn resolve_variant_path(
                     BareVariantLookup::Single(_) | BareVariantLookup::None => {
                         errors.push(
                             SemanticError::structured(
-                                SemanticErrorKind::UndefinedVariable,
+                                SemanticErrorKind::VariableUndefined,
                                 last.span,
                             )
                             .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
@@ -2040,7 +2040,7 @@ fn resolve_variant_ident(
             BareVariantLookup::Single(_) => return,
             BareVariantLookup::Ambiguous { .. } => {
                 errors.push(
-                    SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+                    SemanticError::structured(SemanticErrorKind::VariableUndefined, ident.span)
                         .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
                 );
                 return;
@@ -2048,7 +2048,7 @@ fn resolve_variant_ident(
             BareVariantLookup::None => {}
         }
         errors.push(
-            SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+            SemanticError::structured(SemanticErrorKind::VariableUndefined, ident.span)
                 .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
         );
         return;
@@ -2056,7 +2056,7 @@ fn resolve_variant_ident(
 
     let Some(symbol) = resolver.get_symbol(def_id) else {
         errors.push(
-            SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+            SemanticError::structured(SemanticErrorKind::VariableUndefined, ident.span)
                 .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
         );
         return;
@@ -2064,7 +2064,7 @@ fn resolve_variant_ident(
 
     if symbol.kind != SymbolKind::Variant {
         errors.push(
-            SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+            SemanticError::structured(SemanticErrorKind::VariableUndefined, ident.span)
                 .with_arg("issue", ISSUE_NAME_NOT_VARIANT),
         );
     }
@@ -2077,12 +2077,12 @@ fn undefined_identifier_error(
 ) -> SemanticError {
     let spelling = interner.resolve(ident.name);
     if resolver.is_scribe_family_surface(spelling) {
-        return SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+        return SemanticError::structured(SemanticErrorKind::VariableUndefined, ident.span)
             .with_arg("issue", ISSUE_SCRIBE_CALLEE)
             .with_arg("spelling", spelling.to_owned());
     }
 
-    let mut error = SemanticError::structured(SemanticErrorKind::UndefinedVariable, ident.span)
+    let mut error = SemanticError::structured(SemanticErrorKind::VariableUndefined, ident.span)
         .with_arg("issue", ISSUE_UNKNOWN_IDENTIFIER);
 
     if let Some(suggestion) = semantic_name_suggestion(resolver, interner, spelling) {
@@ -2414,7 +2414,7 @@ fn define_symbol(
 
     if resolver.define(symbol).is_err() {
         errors.push(
-            SemanticError::structured(SemanticErrorKind::DuplicateDefinition, span)
+            SemanticError::structured(SemanticErrorKind::DefinitionDuplicate, span)
                 .with_arg("issue", ISSUE_DUPLICATE_DEFINITION),
         );
     }
@@ -2557,7 +2557,7 @@ fn resolve_schema_decls(
         for (order, column) in decl.columns.iter().enumerate() {
             if !seen_visible.insert(column.name.name) {
                 errors.push(
-                    SemanticError::structured(SemanticErrorKind::DuplicateDefinition, column.span)
+                    SemanticError::structured(SemanticErrorKind::DefinitionDuplicate, column.span)
                         .with_arg("issue", ISSUE_SCHEMA_DUPLICATE_VISIBLE)
                         .with_arg("column", interner.resolve(column.name.name)),
                 );
@@ -2571,7 +2571,7 @@ fn resolve_schema_decls(
                 .map_or(column.name.name, |alias| alias.name);
             if !seen_source.insert(source) {
                 errors.push(
-                    SemanticError::structured(SemanticErrorKind::DuplicateDefinition, column.span)
+                    SemanticError::structured(SemanticErrorKind::DefinitionDuplicate, column.span)
                         .with_arg("issue", ISSUE_SCHEMA_DUPLICATE_SOURCE)
                         .with_arg("column", interner.resolve(column.name.name))
                         .with_arg("source", interner.resolve(source)),
@@ -2591,7 +2591,7 @@ fn resolve_schema_decls(
                     | TypeLowerError::CollectionArity(_),
                 ) => {
                     errors.push(
-                        SemanticError::structured(SemanticErrorKind::UndefinedType, column.ty.span)
+                        SemanticError::structured(SemanticErrorKind::TypeUndefined, column.ty.span)
                             .with_arg("issue", ISSUE_SCHEMA_UNKNOWN_TYPE)
                             .with_arg("column", interner.resolve(column.name.name)),
                     );

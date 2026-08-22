@@ -361,7 +361,7 @@ fn comment_before_genus_close_attaches_as_class_end_trivia() {
         !parse_result
             .errors
             .iter()
-            .any(|err| err.kind == radix_module::parser::ParseErrorKind::InvalidCommentPlacement),
+            .any(|err| err.kind == radix_module::parser::ParseErrorKind::CommentPlacementInvalid),
         "genus-close comment is a legal ClassDecl.end_trivia attachment"
     );
 

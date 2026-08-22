@@ -146,7 +146,7 @@ impl HirVisitor for ClosureReturnPathVisitor<'_> {
 
 fn push_missing_return(errors: &mut Vec<SemanticError>, span: radix_lexer::Span) {
     errors.push(
-        SemanticError::structured(SemanticErrorKind::MissingReturn, span)
+        SemanticError::structured(SemanticErrorKind::ReturnAbsent, span)
             .with_arg("issue", "control_flow_fallthrough"),
     );
 }

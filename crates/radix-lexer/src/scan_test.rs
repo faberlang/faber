@@ -233,7 +233,7 @@ fn rejects_c_style_line_comment() {
     let result = lex("incipit {\n    // not a Faber comment\n}\n");
     assert!(!result.success());
     assert!(result.errors.iter().any(|err| {
-        err.kind == LexErrorKind::InvalidCommentSyntax
+        err.kind == LexErrorKind::CommentSyntaxInvalid
             && has_arg(err, "issue", "c_style_line_comment")
     }));
     assert!(!result
@@ -247,7 +247,7 @@ fn rejects_c_style_block_comment() {
     let result = lex("incipit { /* block */ }\n");
     assert!(!result.success());
     assert!(result.errors.iter().any(|err| {
-        err.kind == LexErrorKind::InvalidCommentSyntax
+        err.kind == LexErrorKind::CommentSyntaxInvalid
             && has_arg(err, "issue", "c_style_block_comment")
     }));
 }
@@ -257,7 +257,7 @@ fn rejects_unterminated_c_style_block_comment() {
     let result = lex("incipit { /* open\n}\n");
     assert!(!result.success());
     assert!(result.errors.iter().any(|err| {
-        err.kind == LexErrorKind::InvalidCommentSyntax
+        err.kind == LexErrorKind::CommentSyntaxInvalid
             && has_arg(err, "issue", "unterminated_c_style_block_comment")
     }));
 }
@@ -269,7 +269,7 @@ fn hash_after_c_block_comment_with_newline_is_line_comment() {
     let result = lex("/*\n*/\n# good\n");
     assert!(!result.success());
     assert!(result.errors.iter().any(|err| {
-        err.kind == LexErrorKind::InvalidCommentSyntax
+        err.kind == LexErrorKind::CommentSyntaxInvalid
             && has_arg(err, "issue", "c_style_block_comment")
     }));
     assert!(
@@ -329,7 +329,7 @@ fn rejects_non_xid_identifier_start() {
     assert!(result
         .errors
         .iter()
-        .any(|err| err.kind == LexErrorKind::UnexpectedCharacter));
+        .any(|err| err.kind == LexErrorKind::CharacterUnexpected));
 }
 
 #[test]
@@ -357,7 +357,7 @@ fn rejects_null_byte_in_source() {
     assert!(result
         .errors
         .iter()
-        .any(|err| err.kind == LexErrorKind::UnexpectedCharacter));
+        .any(|err| err.kind == LexErrorKind::CharacterUnexpected));
 }
 
 #[test]
@@ -374,7 +374,7 @@ fn unexpected_bidi_control_diagnostic_uses_codepoint_not_raw_control() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == LexErrorKind::UnexpectedCharacter)
+        .find(|err| err.kind == LexErrorKind::CharacterUnexpected)
         .expect("unexpected bidi control diagnostic");
 
     assert!(has_arg(err, "char", "U+202E"), "{:?}", err.args);
@@ -486,7 +486,7 @@ fn nfkc_does_not_reject_ideographic_punctuation() {
         result
             .errors
             .iter()
-            .any(|e| matches!(e.kind, LexErrorKind::UnexpectedCharacter)),
+            .any(|e| matches!(e.kind, LexErrorKind::CharacterUnexpected)),
         "expected UnexpectedCharacter error, got {:?}",
         result.errors
     );
@@ -784,7 +784,7 @@ fn rejects_float_underflow() {
     let result = lex("1e-400");
     assert!(!result.success());
     assert!(result.errors.iter().any(|err| {
-        err.kind == LexErrorKind::InvalidNumber && has_arg(err, "issue", "float_underflow")
+        err.kind == LexErrorKind::NumberInvalid && has_arg(err, "issue", "float_underflow")
     }));
     assert!(
         result.tokens.iter().any(|t| t.kind == TokenKind::Error),
@@ -827,7 +827,7 @@ fn rejects_float_overflow_to_infinity() {
     );
     assert!(
         result.errors.iter().any(|err| {
-            err.kind == LexErrorKind::InvalidNumber && has_arg(err, "issue", "float_overflow")
+            err.kind == LexErrorKind::NumberInvalid && has_arg(err, "issue", "float_overflow")
         }),
         "expected float_overflow diagnostic, got {:?}",
         result.errors
@@ -854,7 +854,7 @@ fn rejects_invalid_hexadecimal_literal() {
     let result = lex("0x");
     assert!(!result.success());
     assert!(result.errors.iter().any(|err| {
-        err.kind == LexErrorKind::InvalidNumber
+        err.kind == LexErrorKind::NumberInvalid
             && has_arg(err, "issue", "invalid_hexadecimal_number")
     }));
     assert!(
@@ -868,7 +868,7 @@ fn rejects_invalid_binary_literal() {
     let result = lex("0b");
     assert!(!result.success());
     assert!(result.errors.iter().any(|err| {
-        err.kind == LexErrorKind::InvalidNumber && has_arg(err, "issue", "invalid_binary_number")
+        err.kind == LexErrorKind::NumberInvalid && has_arg(err, "issue", "invalid_binary_number")
     }));
 }
 
@@ -877,7 +877,7 @@ fn rejects_invalid_octal_literal() {
     let result = lex("0o");
     assert!(!result.success());
     assert!(result.errors.iter().any(|err| {
-        err.kind == LexErrorKind::InvalidNumber && has_arg(err, "issue", "invalid_octal_number")
+        err.kind == LexErrorKind::NumberInvalid && has_arg(err, "issue", "invalid_octal_number")
     }));
 }
 
@@ -891,7 +891,7 @@ fn rejects_invalid_trailing_digit_in_octal() {
     let result = lex("0o18");
     assert!(!result.success());
     assert!(result.errors.iter().any(|err| {
-        err.kind == LexErrorKind::InvalidNumber && has_arg(err, "issue", "invalid_octal_number")
+        err.kind == LexErrorKind::NumberInvalid && has_arg(err, "issue", "invalid_octal_number")
     }));
     // The whole span from 0 to after the bad digit is consumed as Error.
     assert!(
@@ -916,7 +916,7 @@ fn rejects_invalid_trailing_digit_in_binary() {
     let result = lex("0b12");
     assert!(!result.success());
     assert!(result.errors.iter().any(|err| {
-        err.kind == LexErrorKind::InvalidNumber && has_arg(err, "issue", "invalid_binary_number")
+        err.kind == LexErrorKind::NumberInvalid && has_arg(err, "issue", "invalid_binary_number")
     }));
     let ints: Vec<&u64> = result
         .tokens
@@ -935,7 +935,7 @@ fn rejects_invalid_trailing_digit_in_hexadecimal() {
     let result = lex("0x1G");
     assert!(!result.success());
     assert!(result.errors.iter().any(|err| {
-        err.kind == LexErrorKind::InvalidNumber
+        err.kind == LexErrorKind::NumberInvalid
             && has_arg(err, "issue", "invalid_hexadecimal_number")
     }));
 }
@@ -1122,7 +1122,7 @@ fn leftwards_pair_arrow_never_scans_as_conversio_assign() {
     let err = result
         .errors
         .iter()
-        .find(|err| err.kind == LexErrorKind::UnexpectedCharacter)
+        .find(|err| err.kind == LexErrorKind::CharacterUnexpected)
         .expect("U+21C7 must be an unknown character");
     assert!(
         has_arg(err, "char", &format!("'{}'", '\u{21C7}'.escape_default())),
@@ -1295,7 +1295,7 @@ fn rejects_retired_shift_glyphs() {
             result
                 .errors
                 .iter()
-                .any(|err| err.kind == LexErrorKind::UnexpectedCharacter),
+                .any(|err| err.kind == LexErrorKind::CharacterUnexpected),
             "retired shift glyph in {src:?} should be a scan error"
         );
     }
@@ -1308,7 +1308,7 @@ fn rejects_retired_verte_arrow() {
         result
             .errors
             .iter()
-            .any(|err| err.kind == LexErrorKind::UnexpectedCharacter),
+            .any(|err| err.kind == LexErrorKind::CharacterUnexpected),
         "retired ⇢ glyph should no longer lex as a type-ascription operator"
     );
 }
@@ -1828,7 +1828,7 @@ fn prp030_error_token_counts_as_line_code_for_same_line_hash() {
     assert!(result
         .errors
         .iter()
-        .any(|err| err.kind == LexErrorKind::UnexpectedCharacter));
+        .any(|err| err.kind == LexErrorKind::CharacterUnexpected));
     assert!(result
         .errors
         .iter()

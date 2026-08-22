@@ -168,7 +168,7 @@ fn comment_between_annotation_lines() {
     assert_eq!(result.errors.len(), 1, "{:?}", result.errors);
     assert_eq!(
         result.errors[0].kind,
-        ParseErrorKind::InvalidCommentPlacement,
+        ParseErrorKind::CommentPlacementInvalid,
         "{:?}",
         result.errors
     );

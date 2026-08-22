@@ -107,7 +107,7 @@ pub fn predeclare(
 
         if let Err(dup) = resolver.define(companion_symbol) {
             errors.push(
-                SemanticError::structured(SemanticErrorKind::DuplicateDefinition, Span::default())
+                SemanticError::structured(SemanticErrorKind::DefinitionDuplicate, Span::default())
                     .with_arg("issue", "companion_name_collision")
                     .with_arg("name", interner.resolve(dup).to_string()),
             );

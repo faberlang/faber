@@ -29,7 +29,7 @@ fn hard_semantic_diagnostics_are_fatal() {
 
 #[test]
 fn structured_semantic_diagnostics_do_not_choose_prose_at_emit_site() {
-    let error = SemanticError::structured(SemanticErrorKind::UndefinedVariable, Span::default())
+    let error = SemanticError::structured(SemanticErrorKind::VariableUndefined, Span::default())
         .with_arg("name", "x");
 
     assert_eq!(error.args, vec![DiagnosticArg::new("name", "x")]);
@@ -37,11 +37,11 @@ fn structured_semantic_diagnostics_do_not_choose_prose_at_emit_site() {
 
 #[test]
 fn permissive_check_downgrades_only_missing_symbol_errors() {
-    assert!(SemanticErrorKind::UndefinedVariable.is_permissive_check_downgrade());
-    assert!(SemanticErrorKind::UndefinedType.is_permissive_check_downgrade());
-    assert!(SemanticErrorKind::UndefinedFunction.is_permissive_check_downgrade());
-    assert!(SemanticErrorKind::UndefinedMember.is_permissive_check_downgrade());
-    assert!(SemanticErrorKind::ImportNotFound.is_permissive_check_downgrade());
+    assert!(SemanticErrorKind::VariableUndefined.is_permissive_check_downgrade());
+    assert!(SemanticErrorKind::TypeUndefined.is_permissive_check_downgrade());
+    assert!(SemanticErrorKind::FunctionUndefined.is_permissive_check_downgrade());
+    assert!(SemanticErrorKind::MemberUndefined.is_permissive_check_downgrade());
+    assert!(SemanticErrorKind::ImportAbsent.is_permissive_check_downgrade());
 
     assert!(!SemanticErrorKind::TypeMismatch.is_permissive_check_downgrade());
     assert!(!SemanticErrorKind::LoweringError.is_permissive_check_downgrade());

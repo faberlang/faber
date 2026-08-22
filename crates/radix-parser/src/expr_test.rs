@@ -1372,7 +1372,7 @@ fn prefix_nabla_fails_parse() {
     );
     assert!(
         result.errors.iter().any(|err| {
-            err.kind == crate::ParseErrorKind::InvalidExpression
+            err.kind == crate::ParseErrorKind::ExpressionInvalid
                 && err
                     .args
                     .iter()

@@ -47,7 +47,7 @@ impl TypeChecker<'_> {
             info.fields.clone()
         } else {
             self.error_issue(
-                SemanticErrorKind::UndefinedType,
+                SemanticErrorKind::TypeUndefined,
                 ISSUE_UNKNOWN_STRUCT,
                 fields
                     .first()
@@ -306,7 +306,7 @@ impl TypeChecker<'_> {
             info.fields.clone()
         } else {
             self.error_issue(
-                SemanticErrorKind::UndefinedType,
+                SemanticErrorKind::TypeUndefined,
                 ISSUE_UNKNOWN_STRUCT,
                 fields
                     .first()

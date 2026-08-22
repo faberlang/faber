@@ -10,7 +10,7 @@ use crate::SemanticError;
 use crate::SemanticErrorKind;
 
 fn is_return_path_error(diag: &SemanticError) -> bool {
-    diag.kind == SemanticErrorKind::MissingReturn
+    diag.kind == SemanticErrorKind::ReturnAbsent
         && diag.issue() == Some("control_flow_fallthrough")
 }
 
@@ -324,7 +324,7 @@ fn diagnostic_uses_missing_return_kind() {
         .any(|arg| arg.name == "issue" && arg.value == "control_flow_fallthrough"));
     // The kind is exercised transitively through the catalog; the code is the
     // stable contract. Keep a direct kind reference for documentation parity.
-    let _ = SemanticErrorKind::MissingReturn;
+    let _ = SemanticErrorKind::ReturnAbsent;
 }
 
 // --- edge/sad path tests ----------------------------------------------------

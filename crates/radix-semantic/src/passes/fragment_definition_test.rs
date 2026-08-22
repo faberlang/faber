@@ -34,7 +34,7 @@ fn expect_issue<'a>(errors: &'a [SemanticError], issue: &str, reason: &str) -> &
     let err = errors
         .iter()
         .find(|err| {
-            err.kind == SemanticErrorKind::InvalidOperandTypes
+            err.kind == SemanticErrorKind::OperandTypesInvalid
                 && err
                     .args
                     .iter()

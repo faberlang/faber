@@ -48,7 +48,7 @@ impl TypeChecker<'_> {
                 self.check_expr(expr);
             }
             self.errors.push(
-                SemanticError::structured(SemanticErrorKind::MissingReturn, span)
+                SemanticError::structured(SemanticErrorKind::ReturnAbsent, span)
                     .with_arg("issue", "redde_requires_return_type")
                     .with_arg("keyword", "redde"),
             );

@@ -96,7 +96,7 @@ fn reports_duplicate_definitions() {
     let errors = result.unwrap_err();
     expect_structured_error(
         &errors,
-        SemanticErrorKind::DuplicateDefinition,
+        SemanticErrorKind::DefinitionDuplicate,
         &[("issue", "duplicate_definition")],
     );
 }
@@ -134,7 +134,7 @@ fn inferred_import_name_collision_requests_explicit_alias() {
     let errors = result.unwrap_err();
     expect_structured_error(
         &errors,
-        SemanticErrorKind::DuplicateDefinition,
+        SemanticErrorKind::DefinitionDuplicate,
         &[("issue", "inferred_import_name_collision")],
     );
 }
@@ -346,7 +346,7 @@ fn same_union_duplicate_variant_still_fails() {
     assert!(result.is_err());
     expect_structured_error(
         &result.unwrap_err(),
-        SemanticErrorKind::DuplicateDefinition,
+        SemanticErrorKind::DefinitionDuplicate,
         &[("issue", "duplicate_definition")],
     );
 }

@@ -120,7 +120,7 @@ functio loss() → numerus {
 
     expect_structured_error(
         &errors,
-        SemanticErrorKind::InvalidAnnotation,
+        SemanticErrorKind::AnnotationInvalid,
         &[
             ("issue", "unknown_lane"),
             ("annotation", "@ radix lane"),
@@ -142,7 +142,7 @@ functio loss() → numerus {
 
     expect_structured_error(
         &errors,
-        SemanticErrorKind::InvalidAnnotation,
+        SemanticErrorKind::AnnotationInvalid,
         &[
             ("issue", "unknown_lane"),
             ("annotation", "@ radix lane"),
@@ -164,7 +164,7 @@ functio loss() → numerus {
 
     expect_structured_error(
         &errors,
-        SemanticErrorKind::InvalidAnnotation,
+        SemanticErrorKind::AnnotationInvalid,
         &[
             ("issue", "non_string_lane_value"),
             ("annotation", "@ radix lane"),
@@ -185,7 +185,7 @@ functio loss() → numerus {
 
     expect_structured_error(
         &errors,
-        SemanticErrorKind::InvalidAnnotation,
+        SemanticErrorKind::AnnotationInvalid,
         &[("issue", "unknown_directive"), ("annotation", "@ radix")],
     );
 }
@@ -203,7 +203,7 @@ functio load<T>(T value) → T {
 
     expect_structured_error(
         &errors,
-        SemanticErrorKind::InvalidAnnotation,
+        SemanticErrorKind::AnnotationInvalid,
         &[
             ("issue", "empty_radix_typus_domain"),
             ("annotation", "@ radix typus"),
@@ -224,7 +224,7 @@ genus Model {
 
     expect_structured_error(
         &errors,
-        SemanticErrorKind::InvalidAnnotation,
+        SemanticErrorKind::AnnotationInvalid,
         &[
             ("issue", "unsupported_placement"),
             ("annotation", "@ radix lane"),
@@ -275,7 +275,7 @@ functio loss(numerus x) → numerus {
 
     expect_structured_error(
         &errors,
-        SemanticErrorKind::InvalidAnnotation,
+        SemanticErrorKind::AnnotationInvalid,
         &[
             ("issue", "conflicting_backward_without_air"),
             ("annotation", "@ radix backward"),
@@ -297,7 +297,7 @@ functio loss(tf32[2] a, tf32[2] b) → tf32[2] {
 
     expect_structured_error(
         &errors,
-        SemanticErrorKind::InvalidAnnotation,
+        SemanticErrorKind::AnnotationInvalid,
         &[
             ("issue", "missing_backward_name"),
             ("annotation", "@ radix backward"),
@@ -318,7 +318,7 @@ fn radix_backward_non_string_value_rejects() {
 
     expect_structured_error(
         &errors,
-        SemanticErrorKind::InvalidAnnotation,
+        SemanticErrorKind::AnnotationInvalid,
         &[
             ("issue", "non_string_backward_name"),
             ("annotation", "@ radix backward"),
@@ -340,7 +340,7 @@ functio loss(tf32[2] a, tf32[2] b) → tf32[2] {
 
     expect_structured_error(
         &errors,
-        SemanticErrorKind::InvalidAnnotation,
+        SemanticErrorKind::AnnotationInvalid,
         &[
             ("issue", "extra_backward_args"),
             ("annotation", "@ radix backward"),
@@ -363,7 +363,7 @@ functio loss(tf32[2] a, tf32[2] b) → tf32[2] {
 
     expect_structured_error(
         &errors,
-        SemanticErrorKind::InvalidAnnotation,
+        SemanticErrorKind::AnnotationInvalid,
         &[
             ("issue", "conflicting_backward"),
             ("annotation", "@ radix backward"),
@@ -384,7 +384,7 @@ genus Model {
 
     expect_structured_error(
         &errors,
-        SemanticErrorKind::InvalidAnnotation,
+        SemanticErrorKind::AnnotationInvalid,
         &[
             ("issue", "unsupported_placement"),
             ("annotation", "@ radix backward"),

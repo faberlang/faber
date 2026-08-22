@@ -346,12 +346,12 @@ fn rejections_raise_semantically_with_structured_issues() {
     );
     expect_structured_error(
         &errors,
-        SemanticErrorKind::DuplicateDefinition,
+        SemanticErrorKind::DefinitionDuplicate,
         "schema_duplicate_source",
     );
     expect_structured_error(
         &errors,
-        SemanticErrorKind::UndefinedType,
+        SemanticErrorKind::TypeUndefined,
         "schema_unknown_type",
     );
 }

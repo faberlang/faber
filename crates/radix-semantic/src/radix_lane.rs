@@ -449,7 +449,7 @@ fn radix_annotation_error(
     issue: &'static str,
     annotation: &'static str,
 ) -> SemanticError {
-    SemanticError::structured(SemanticErrorKind::InvalidAnnotation, span)
+    SemanticError::structured(SemanticErrorKind::AnnotationInvalid, span)
         .with_arg("issue", issue)
         .with_arg("annotation", annotation)
         .with_arg(

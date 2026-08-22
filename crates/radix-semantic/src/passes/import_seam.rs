@@ -72,10 +72,10 @@ pub fn violation_issue(tier: Option<VisibilityTier>, seam: ImportSeam) -> Option
     }
 }
 
-/// Structured import-seam diagnostic (`SEM006` / [`SemanticErrorKind::ImportNotFound`]).
+/// Structured import-seam diagnostic (`SEM006` / [`SemanticErrorKind::ImportAbsent`]).
 #[must_use]
 pub fn diagnostic(span: Span, issue: &'static str, name: &str) -> SemanticError {
-    SemanticError::structured(SemanticErrorKind::ImportNotFound, span)
+    SemanticError::structured(SemanticErrorKind::ImportAbsent, span)
         .with_arg("issue", issue)
         .with_arg("name", name)
 }

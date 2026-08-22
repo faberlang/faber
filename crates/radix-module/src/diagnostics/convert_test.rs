@@ -119,15 +119,15 @@ fn parse_error_normalization_carries_identity_and_named_args_only() {
 fn parse_error_conversion_preserves_typed_kind_round_trip() {
     use radix_diagnostics::PhaseErrorKind;
 
-    let err = ParseError::structured(ParseErrorKind::MissingFunctionName, Span { start: 0, end: 8 })
+    let err = ParseError::structured(ParseErrorKind::FunctionNameAbsent, Span { start: 0, end: 8 })
         .with_arg("functio", "functio");
 
     let diagnostic = Diagnostic::from_parse_error("missing-name.fab", "functio\n", &err);
 
-    assert_eq!(diagnostic.parse_kind(), Some(ParseErrorKind::MissingFunctionName));
+    assert_eq!(diagnostic.parse_kind(), Some(ParseErrorKind::FunctionNameAbsent));
     assert_eq!(
         diagnostic.error_kind,
-        Some(PhaseErrorKind::Parse(ParseErrorKind::MissingFunctionName))
+        Some(PhaseErrorKind::Parse(ParseErrorKind::FunctionNameAbsent))
     );
     assert_eq!(diagnostic.code, Some("PARSE011"));
     assert_eq!(diagnostic.phase, DiagnosticPhase::Parse);
@@ -137,7 +137,7 @@ fn parse_error_conversion_preserves_typed_kind_round_trip() {
 #[test]
 fn semantic_error_normalization_carries_identity_and_named_args_only() {
     let source = "nota greting\n";
-    let err = SemanticError::structured(SemanticErrorKind::UndefinedVariable, Span { start: 5, end: 12 })
+    let err = SemanticError::structured(SemanticErrorKind::VariableUndefined, Span { start: 5, end: 12 })
         .with_arg("issue", "unknown_identifier")
         .with_arg("spelling", "greting")
         .with_arg("suggestion", "greeting");

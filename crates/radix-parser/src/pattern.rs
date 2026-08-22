@@ -106,7 +106,7 @@ impl Parser {
         }
 
         Err(
-            ParseError::structured(ParseErrorKind::InvalidPattern, self.current_span())
+            ParseError::structured(ParseErrorKind::PatternInvalid, self.current_span())
                 .with_arg("wildcard", "_")
                 .with_arg("identifier", "identifier"),
         )
