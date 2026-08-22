@@ -641,6 +641,10 @@ pub fn analyze_with_cli(
         diagnostics.extend(e);
     }
 
+    if let Err(e) = passes::libera::analyze(&hir, &resolver, interner) {
+        diagnostics.extend(e);
+    }
+
     if config.lint {
         if let Err(e) = passes::visibility_annotation::check(program, interner) {
             diagnostics.extend(e);

@@ -2100,6 +2100,12 @@ fn semantic_type_mismatch_message(args: &[DiagnosticArg]) -> Option<String> {
         "itera_apud_requires_shaped_iterable" => {
             Some("apud requires a tensor or matrix iterable with a static rank".to_owned())
         }
+        "libera_capture" => {
+            let capture = arg_value(args, "capture")?;
+            Some(format!(
+                "libera closure captures '{capture}' from an enclosing scope; a libera closure must not capture enclosing locals or parameters"
+            ))
+        }
         "json_map_key_must_be_textus" => Some("JSON map key must be textus".to_owned()),
         "json_annotation_unsupported_site" => {
             Some("@ json is only supported on genus declarations and fields inside @ json genera".to_owned())

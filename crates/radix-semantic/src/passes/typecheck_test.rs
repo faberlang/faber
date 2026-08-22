@@ -2022,12 +2022,12 @@ fn distinct_error_placeholders_each_report_once() {
 // CL-1 — `libera` semantic red drivers
 // =============================================================================
 // Pinned red in CL-1 (422bc28bd, side branch; restored here). The
-// parser-success precondition keeps these red for the absence of the capture
+// parser-success precondition kept these red for the absence of the capture
 // contract rather than a generic parse error. CL-3 landed the marker plumbing;
-// these stay ignored until the CL-4 capture check lands.
+// CL-4 landed the capture contract, so the reject driver now asserts the
+// structured capture diagnostic and the module-level driver asserts legality.
 
 #[test]
-#[ignore = "CL-4 pending: libera capture rejection is not landed"]
 fn rejects_libera_closure_that_captures_an_enclosing_local() {
     let source = r#"
 incipit {
@@ -2048,10 +2048,21 @@ incipit {
         "a libera closure that captures `seed` must be rejected: {:?}",
         unit.diagnostics
     );
+    assert!(
+        unit.diagnostics.iter().any(|error| {
+            error.is_error()
+                && crate::test_support::issue(error) == Some("libera_capture")
+                && error
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "capture" && arg.value == "seed")
+        }),
+        "the rejection must be the structured libera_capture issue naming `seed`: {:?}",
+        unit.diagnostics
+    );
 }
 
 #[test]
-#[ignore = "CL-4 pending: module-level libera legality is not landed"]
 fn accepts_libera_closure_reference_to_module_level_item() {
     let source = r#"
 functio module_value() → numerus {
@@ -2072,6 +2083,22 @@ incipit {
     assert!(
         unit.is_ok(),
         "a libera closure may reference module-level items: {:?}",
+        unit.diagnostics
+    );
+}
+
+#[test]
+fn unmarked_capturing_closure_behavior_is_unchanged() {
+    let source = r#"
+incipit {
+    fixum numerus seed ← 2
+    fixum _ closure ← (numerus value) ∴ value + seed
+}
+"#;
+    let unit = analyze(source);
+    assert!(
+        unit.is_ok(),
+        "an unmarked closure may capture enclosing locals: {:?}",
         unit.diagnostics
     );
 }
