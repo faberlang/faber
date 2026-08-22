@@ -41,6 +41,7 @@ pub mod program {
     pub use radix_module::{CompileResult, Compiler};
     #[cfg(feature = "mir-llvm")]
     pub use radix_program::llvm;
+    #[cfg(any(feature = "mir-fmir", feature = "runner", feature = "device"))]
     pub use radix_program::mir;
     #[cfg(feature = "mir-wasm")]
     pub use radix_program::wasm;

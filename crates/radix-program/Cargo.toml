@@ -9,11 +9,10 @@ license = "MIT"
 # Private compiler workspace (local org layout). Not published with this crate.
 # radix-program sits above the radix facade and composes its existing
 # single-unit analysis/codegen — never a second pipeline (package-api.md §5).
-# `mod mir` is always compiled (llvm/wasm share canonicalize + lowering).
-# It uses `radix-module::mir` (mir-core) and runner types (`Host`, `run_entry`).
-# AIR (`prepare_air_backward_bundle`, reverse-AD tensor tests) stays behind
-# the `device` feature — see `mir/air_backward.rs`.
-radix-module = { path = "../radix-module", default-features = false, features = ["mir-core", "runner"] }
+# Package MIR is admitted only by the package/runner/device features below.
+# Target-only lanes use radix-module directly and must not inherit the package
+# runner or FMIR leaves through this dependency.
+radix-module = { path = "../radix-module", default-features = false }
 # RP2a: the compiler view of faber.toml and faber.lock parses here (toml)
 # with the same serde derive surface faber's product view uses.
 serde = { version = "1.0.228", features = ["derive"] }
@@ -24,7 +23,7 @@ toml = "1.1.2"
 # faber's optional `faber-hir-rust`; pulled only under `hir-rust`.
 # RP5: the moved package-MIR/FMIR subset consumes the FMIR codec and schema
 # types directly (image construction/loading, route decisions, test support).
-radix-mir-fmir = { path = "../radix-mir-fmir" }
+radix-mir-fmir = { path = "../radix-mir-fmir", optional = true }
 # RP5: the moved package-MIR linker works with the shared semantic TypeId
 # surface directly (mirroring faber's own direct radix-types dependency).
 radix-types = { path = "../radix-types" }
@@ -43,10 +42,11 @@ tempfile = "3"
 [features]
 default = ["full-targets"]
 full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "runner"]
+package-mir = ["radix-module/mir-core", "radix-module/runner", "dep:radix-mir-fmir"]
 hir-faber = ["radix-module/hir-faber"]
 hir-fhir = ["radix-module/hir-fhir", "dep:handroll"]
-mir-fmir = ["radix-module/mir-fmir"]
-runner = ["radix-module/runner"]
+mir-fmir = ["package-mir", "radix-module/mir-fmir"]
+runner = ["package-mir", "radix-module/runner"]
 
 [lints]
 workspace = true

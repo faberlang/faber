@@ -2200,41 +2200,7 @@ pub fn canonicalize_direct_definition_callees(
     lowered: &mut LoweredMirUnit<'_>,
     diagnostic_path: &Path,
 ) -> Result<(), Vec<Diagnostic>> {
-    let mut direct_sources = HashMap::new();
-    let mut ambiguous = HashSet::new();
-    for function in &lowered.program.functions {
-        let Some(source) = function.source else {
-            continue;
-        };
-        if ambiguous.contains(&source) {
-            continue;
-        }
-        if direct_sources.insert(source, function.id).is_some() {
-            direct_sources.remove(&source);
-            ambiguous.insert(source);
-        }
-    }
-
-    for function in &mut lowered.program.functions {
-        for block in &mut function.blocks {
-            for statement in &mut block.statements {
-                let MirStatementKind::Call { callee, .. } = &mut statement.kind else {
-                    continue;
-                };
-                let MirCallee::Definition { source, type_args } = callee else {
-                    continue;
-                };
-                if !type_args.is_empty() {
-                    continue;
-                }
-                if let Some(id) = direct_sources.get(source) {
-                    *callee = MirCallee::Function(*id);
-                }
-            }
-        }
-    }
-
-    rebuild_merged_validated(lowered, diagnostic_path, None)
+    crate::mir_canonicalize::canonicalize_direct_definition_callees(lowered, diagnostic_path)
 }
 
 pub(super) fn shift_program_ids(

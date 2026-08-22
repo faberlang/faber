@@ -8,6 +8,9 @@
 
 use std::path::PathBuf;
 
+#[cfg(any(feature = "mir-llvm", feature = "package-mir"))]
+mod mir_canonicalize;
+
 pub mod analyze;
 pub mod artifact_plan;
 #[cfg(feature = "hir-rust")]
@@ -25,6 +28,7 @@ pub mod llvm;
 pub mod lockfile;
 pub mod manifest;
 pub mod member_path;
+#[cfg(feature = "package-mir")]
 pub mod mir;
 pub mod modules;
 #[cfg(feature = "hir-fhir")]
@@ -37,7 +41,7 @@ pub mod test_source_filter;
 #[cfg(feature = "mir-wasm")]
 pub mod wasm;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "package-mir"))]
 pub(crate) mod test_support;
 
 pub use radix_module::program::{
