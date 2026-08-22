@@ -147,7 +147,9 @@ incipit {
 }
 "#;
     let mut unit = analyze_source(&session, "kernel-import.fab", source).expect("analysis");
-    let program = lower_analyzed_unit(&mut unit).expect("lower");
+    let program = lower_analyzed_unit(&mut unit, Default::default())
+        .map(|lowered| lowered.program)
+        .expect("lower");
 
     let mut saw_kernel_processus = false;
     for function in &program.functions {
@@ -179,7 +181,9 @@ incipit {
 }
 "#;
     let mut unit = analyze_source(&session, "kernel-toml-import.fab", source).expect("analysis");
-    let program = lower_analyzed_unit(&mut unit).expect("lower");
+    let program = lower_analyzed_unit(&mut unit, Default::default())
+        .map(|lowered| lowered.program)
+        .expect("lower");
 
     let mut saw_kernel_toml = false;
     for function in &program.functions {
@@ -212,7 +216,9 @@ incipit {
 }
 "#;
     let mut unit = analyze_source(&session, "kernel-glob-import.fab", source).expect("analysis");
-    let program = lower_analyzed_unit(&mut unit).expect("lower");
+    let program = lower_analyzed_unit(&mut unit, Default::default())
+        .map(|lowered| lowered.program)
+        .expect("lower");
 
     let mut saw_json = false;
     let mut saw_aleator = false;

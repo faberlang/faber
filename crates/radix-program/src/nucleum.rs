@@ -93,7 +93,7 @@ pub fn attach_canonical_mir(
             continue;
         }
         let lowered =
-            radix_module::mir::lower_analyzed_unit(&mut node.analysis).map_err(|errors| {
+            radix_module::mir::lower_analyzed_unit(&mut node.analysis, Default::default()).map_err(|errors| {
                 errors
                     .into_iter()
                     .map(|error| {
@@ -104,7 +104,7 @@ pub fn attach_canonical_mir(
                     })
                     .collect::<Vec<_>>()
             })?;
-        metadata.attach_canonical_mir(&lowered, &relative);
+        metadata.attach_canonical_mir(lowered.validated.program(), &relative);
     }
     metadata
         .require_canonical_mir()

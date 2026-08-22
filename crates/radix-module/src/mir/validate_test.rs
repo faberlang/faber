@@ -1501,7 +1501,7 @@ fn octeti_unify_exemplum_mir_validates() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/octeti/unify.fab");
     let source = std::fs::read_to_string(path).expect("read octeti unify exemplum");
     let mut unit = analyze(&source);
-    lower_analyzed_unit(&mut unit).expect("octeti unify exemplum validates in MIR");
+    lower_analyzed_unit(&mut unit, Default::default()).expect("octeti unify exemplum validates in MIR");
 }
 
 #[test]
@@ -1512,7 +1512,7 @@ fn validates_valor_array_carrier_aggregate() {
     );
     let source = std::fs::read_to_string(path).expect("read valor tensor exemplum");
     let mut unit = analyze(&source);
-    lower_analyzed_unit(&mut unit).expect("valor array carrier validates in MIR");
+    lower_analyzed_unit(&mut unit, Default::default()).expect("valor array carrier validates in MIR");
 }
 
 #[ignore = "MIR validation — Stage 6 MIR lowering not yet complete"]
@@ -1530,7 +1530,7 @@ fn representative_lowered_phase_3_to_7_mir_validates() {
         r#"functio log(textus name) → vacuum { nota "salve" vide name mone "cave" }"#,
     ] {
         let mut unit = analyze(source);
-        lower_analyzed_unit(&mut unit).expect("lowered MIR validates");
+        lower_analyzed_unit(&mut unit, Default::default()).expect("lowered MIR validates");
     }
 }
 

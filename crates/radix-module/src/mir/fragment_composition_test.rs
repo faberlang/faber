@@ -581,12 +581,12 @@ functio k(fractus<f32> x) → fractus<f32> {
 ";
     let session = Session::new(Config::default());
     let mut analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis).expect("composition must succeed");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("composition must succeed");
     assert!(
-        surviving_fragment_calls(&lowered.functions, &[], &roles).is_empty(),
+        surviving_fragment_calls(&lowered.program.functions, &[], &roles).is_empty(),
         "no fragment call may survive lowering: {:#?}",
-        lowered.functions
+        lowered.program.functions
     );
 }
 
@@ -610,7 +610,7 @@ functio k(fractus<f32> x) → fractus<f32> {
 ";
     let session = Session::new(Config::default());
     let mut analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
-    let errors = crate::mir::lower_analyzed_unit(&mut analysis).expect_err("cycle must fail closed");
+    let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("cycle must fail closed");
     assert!(
         errors.iter().any(|err| err.issue == ISSUE_CYCLE),
         "expected NUCLEUM_FRAGMENT_CYCLE, got {errors:?}"
@@ -634,7 +634,7 @@ functio k(fractus<f32> x) → fractus<f32> {
     with_budget_override(budget, || {
         let session = Session::new(Config::default());
         let mut analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
-        let errors = crate::mir::lower_analyzed_unit(&mut analysis).expect_err("budget must fail closed");
+        let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("budget must fail closed");
         assert!(
             errors.iter().any(|err| err.issue == ISSUE_EXPANSION),
             "expected NUCLEUM_FRAGMENT_EXPANSION, got {errors:?}"

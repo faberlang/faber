@@ -133,17 +133,21 @@ fn mir_lower_issue(prefix: &str, detail: &str) -> String {
     issue.trim_end_matches('_').to_owned()
 }
 
-/// Lower a semantically analyzed HIR unit into a validated MIR program.
+/// Lower a semantically analyzed HIR unit into a validated MIR unit.
 ///
-/// The returned program has already passed MIR validation. Lowering failures and
+/// The returned unit carries a program that has already passed MIR validation,
+/// along with the validation token and lowering metadata. Lowering failures and
 /// validation failures share the same error type so callers can treat the MIR
 /// pipeline as one fail-closed developer command.
 ///
 /// # Errors
 /// Returns `MirError` values for unsupported HIR surfaces, missing semantic
 /// types, sealed-block misuse, and post-lowering validation failures.
-pub fn lower_analyzed_unit(unit: &mut AnalyzedModule) -> Result<MirProgram, Vec<MirError>> {
-    lower_analyzed_unit_with_context(unit).map(|lowered| lowered.program)
+pub fn lower_analyzed_unit(
+    unit: &mut AnalyzedModule,
+    options: MirLoweringOptions,
+) -> Result<LoweredMirUnit<'_>, Vec<MirError>> {
+    lower_analyzed_unit_with_options(unit, options)
 }
 
 /// MIR output plus the proving validated-MIR token and auxiliary lowering data.
@@ -174,6 +178,20 @@ pub struct LoweredMirUnit<'a> {
     pub companions: radix_mir::device::MirCompanionMap,
 }
 
+impl std::fmt::Debug for LoweredMirUnit<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("LoweredMirUnit")
+            .field("program", &self.program)
+            .field("monomorphizations", &self.monomorphizations)
+            .field("closure_environments", &self.closure_environments)
+            .field("generic_templates", &self.generic_templates)
+            .field("generic_params", &self.generic_params)
+            .field("companions", &self.companions)
+            .finish_non_exhaustive()
+    }
+}
+
 /// One generic parameter in source declaration order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MirGenericParam {
@@ -181,127 +199,17 @@ pub struct MirGenericParam {
     pub is_shape: bool,
 }
 
-/// Lower a semantically analyzed HIR unit and retain validation metadata.
-///
-/// MIR itself stays target-neutral, but some target probes need the same
-/// declaration metadata that validation used to type-check compact MIR
-/// references such as struct fields and enum variant fields.
-///
-/// # Errors
-/// Returns `MirError` values for unsupported HIR surfaces, missing semantic
-/// types, sealed-block misuse, and post-lowering validation failures.
-pub fn lower_analyzed_unit_with_context(unit: &mut AnalyzedModule) -> Result<LoweredMirUnit<'_>, Vec<MirError>> {
-    lower_analyzed_unit_with_options(unit, MirLoweringOptions::default())
-}
-
-/// Lower a CLI-bearing unit after the caller has selected and validated the
-/// supported CLI execution subset.
-///
-/// # Errors
-/// Returns `MirError` values for unsupported CLI program surfaces, missing
-/// semantic types, sealed-block misuse, and post-lowering validation failures.
-pub fn lower_analyzed_unit_allowing_cli_entry_with_context(
-    unit: &mut AnalyzedModule,
-) -> Result<LoweredMirUnit<'_>, Vec<MirError>> {
-    lower_analyzed_unit_with_options(unit, MirLoweringOptions::default())
-}
-
-/// Lower a CLI-bearing unit with parsed package-MIR entry argument record
-/// fields supplied by the package runner.
-///
-/// # Errors
-/// Returns `MirError` values for unsupported CLI program surfaces, missing
-/// semantic types, sealed-block misuse, and post-lowering validation failures.
-pub fn lower_analyzed_unit_allowing_cli_entry_record_with_context(
-    unit: &mut AnalyzedModule,
-    cli_entry_record_fields: Vec<MirNamedOperand>,
-) -> Result<LoweredMirUnit<'_>, Vec<MirError>> {
-    let cli_entry_record_fields = cli_entry_record_fields
-        .into_iter()
-        .map(MirRuntimeRecordField::operand)
-        .collect();
-    let cli_record_fields_by_local = unit
-        .hir
-        .entry_args_name
-        .map(|name| FxHashMap::from_iter([(name, cli_entry_record_fields)]))
-        .unwrap_or_default();
-    lower_analyzed_unit_with_options(
-        unit,
-        MirLoweringOptions {
-            cli_record_fields_by_local: Arc::new(cli_record_fields_by_local),
-            cli_record_fields_by_type: Arc::new(FxHashMap::default()),
-            cli_adapter_active: false,
-        },
-    )
-}
-
-/// Lower a CLI-bearing unit with parsed package-MIR argument record fields
-/// keyed by the `argumenta` local that should receive them.
-///
-/// # Errors
-/// Returns `MirError` values for unsupported CLI program surfaces, missing
-/// semantic types, sealed-block misuse, and post-lowering validation failures.
-pub fn lower_analyzed_unit_allowing_cli_records_with_context(
-    unit: &mut AnalyzedModule,
-    cli_record_fields_by_local: impl IntoIterator<Item = (Symbol, Vec<MirNamedOperand>)>,
-) -> Result<LoweredMirUnit<'_>, Vec<MirError>> {
-    let cli_record_fields_by_local = cli_record_fields_by_local
-        .into_iter()
-        .map(|(name, fields)| {
-            (
-                name,
-                fields
-                    .into_iter()
-                    .map(MirRuntimeRecordField::operand)
-                    .collect(),
-            )
-        })
-        .collect();
-    lower_analyzed_unit_with_options(
-        unit,
-        MirLoweringOptions {
-            cli_record_fields_by_local: Arc::new(cli_record_fields_by_local),
-            cli_record_fields_by_type: Arc::new(FxHashMap::default()),
-            cli_adapter_active: false,
-        },
-    )
-}
-
-/// Lower a CLI-bearing unit with parsed package-MIR runtime record fields.
-///
-/// # Errors
-/// Returns `MirError` values for unsupported CLI program surfaces, missing
-/// semantic types, sealed-block misuse, and post-lowering validation failures.
-pub fn lower_analyzed_unit_allowing_cli_runtime_records_with_context(
-    unit: &mut AnalyzedModule,
-    cli_record_fields_by_local: impl IntoIterator<Item = (Symbol, Vec<MirRuntimeRecordField>)>,
-) -> Result<LoweredMirUnit<'_>, Vec<MirError>> {
-    let cli_record_fields_by_local = cli_record_fields_by_local.into_iter().collect();
-    lower_analyzed_unit_with_options(
-        unit,
-        MirLoweringOptions {
-            cli_record_fields_by_local: Arc::new(cli_record_fields_by_local),
-            cli_record_fields_by_type: Arc::new(FxHashMap::default()),
-            cli_adapter_active: false,
-        },
-    )
-}
-
-/// Lower a CLI-bearing unit for the Stage 8 S8.2 static descriptor + typed
-/// entry adapter: CLI-record entry/command functions build their `argumenta`
-/// records from runtime-filled temps the emitted LLVM adapter seeds from the
-/// runtime's typed value table, instead of compile-time field values.
-///
-/// # Errors
-/// Returns `MirError` values for unsupported CLI program surfaces, missing
-/// semantic types, sealed-block misuse, and post-lowering validation failures.
-pub fn lower_analyzed_unit_with_cli_adapter_with_context(
-    unit: &mut AnalyzedModule,
-) -> Result<LoweredMirUnit<'_>, Vec<MirError>> {
-    lower_analyzed_unit_with_options(
-        unit,
-        MirLoweringOptions { cli_adapter_active: true, ..MirLoweringOptions::default() },
-    )
+#[derive(Default)]
+pub struct MirLoweringOptions {
+    pub cli_record_fields_by_local: Arc<FxHashMap<Symbol, Vec<MirRuntimeRecordField>>>,
+    /// Descriptor-derived CLI record fields keyed by the `argumenta` record
+    /// type (entry + `@ imperium` command surfaces), used by the shared
+    /// default-path lowering when the caller supplied no parsed runtime
+    /// fields for a CLI record local.
+    pub cli_record_fields_by_type: Arc<FxHashMap<TypeId, Vec<MirRuntimeRecordField>>>,
+    /// S8.2: build CLI-record entry/command records from runtime-filled temps
+    /// (see [`FunctionBuilderContext::cli_adapter_active`]).
+    pub cli_adapter_active: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -321,19 +229,6 @@ impl MirRuntimeRecordField {
 pub enum MirRuntimeRecordValue {
     Operand(MirOperand),
     Array { ty: MirType, items: Vec<MirOperand> },
-}
-
-#[derive(Default)]
-struct MirLoweringOptions {
-    cli_record_fields_by_local: Arc<FxHashMap<Symbol, Vec<MirRuntimeRecordField>>>,
-    /// Descriptor-derived CLI record fields keyed by the `argumenta` record
-    /// type (entry + `@ imperium` command surfaces), used by the shared
-    /// default-path lowering when the caller supplied no parsed runtime
-    /// fields for a CLI record local.
-    cli_record_fields_by_type: Arc<FxHashMap<TypeId, Vec<MirRuntimeRecordField>>>,
-    /// S8.2: build CLI-record entry/command records from runtime-filled temps
-    /// (see [`FunctionBuilderContext::cli_adapter_active`]).
-    cli_adapter_active: bool,
 }
 
 fn lower_analyzed_unit_with_options(
@@ -660,7 +555,7 @@ fn cli_type_zero_operand(interner: &mut Interner, ty: &CliType) -> MirOperand {
 /// Returns `MirError` values for unsupported HIR surfaces, missing semantic
 /// types, sealed-block misuse, and post-lowering validation failures.
 pub fn dump_analyzed_unit(unit: &mut AnalyzedModule) -> Result<String, Vec<MirError>> {
-    lower_analyzed_unit(unit).map(|program| dump_program(&program))
+    lower_analyzed_unit(unit, MirLoweringOptions::default()).map(|lowered| dump_program(&lowered.program))
 }
 
 fn ensure_map_iteration_array_types(types: &mut TypeTable) {

@@ -366,8 +366,8 @@ fn fragment_bodies_are_omitted_from_target_symbols_after_composition() {
 fn importable_fragment_carries_canonical_mir_artifact() {
     let mut unit = analyze("device.fab", nucleum_source());
     let mut metadata = collect_nucleum_metadata(&unit, "device.fab").expect("collect");
-    let lowered = crate::mir::lower_analyzed_unit(&mut unit).expect("lower fragment unit");
-    metadata.attach_canonical_mir(&lowered, "device.fab");
+    let lowered = crate::mir::lower_analyzed_unit(&mut unit, Default::default()).expect("lower fragment unit");
+    metadata.attach_canonical_mir(lowered.validated.program(), "device.fab");
     metadata
         .require_canonical_mir()
         .expect("canonical MIR attached");

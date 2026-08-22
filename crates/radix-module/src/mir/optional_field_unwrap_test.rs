@@ -25,7 +25,7 @@ fn analyze(source: &str) -> AnalyzedModule {
 
 fn lower_errors(source: &str) -> Vec<String> {
     let mut unit = analyze(source);
-    match lower_analyzed_unit(&mut unit) {
+    match lower_analyzed_unit(&mut unit, Default::default()) {
         Ok(_) => Vec::new(),
         Err(errors) => errors.into_iter().map(|error| error.message).collect(),
     }

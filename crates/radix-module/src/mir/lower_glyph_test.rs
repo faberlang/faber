@@ -356,7 +356,7 @@ functio vecmat(vector<f32, 2> v, matrix<f32, [2, 2]> m) → vector<f32, 2> {
 }
 ",
     );
-    let errors = lower_analyzed_unit(&mut unit).expect_err("vector·matrix must fail closed on the MIR lane");
+    let errors = lower_analyzed_unit(&mut unit, Default::default()).expect_err("vector·matrix must fail closed on the MIR lane");
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert_eq!(
         errors[0].issue,

@@ -146,8 +146,7 @@ use radix_module::hir::{
 };
 use radix_module::lexer::{Interner, Symbol};
 use radix_module::mir::{
-    lower_analyzed_unit_allowing_cli_runtime_records_with_context,
-    lower_analyzed_unit_with_context, run_entry, validate_program, Host, LoweredMirUnit,
+    lower_analyzed_unit, run_entry, validate_program, Host, LoweredMirUnit,
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirBlockId,
     MirCallee, MirClosureCallee, MirClosureEnvironment, MirClosureEnvironmentId, MirClosureValue,
     MirConstant, MirDiagnosticKind, MirFunction, MirFunctionId, MirIntrinsic, MirNamedOperand,

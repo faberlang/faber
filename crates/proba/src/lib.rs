@@ -13,7 +13,7 @@ mod tests;
 use radix::hir::{DefId, HirItemKind, HirModule, HirTestMetadata, HirTestModifier};
 use radix::lexer::Interner;
 use radix::mir::{
-    lower_analyzed_unit_with_context, run_function_with_step_budget, BufferHost, MirFunctionId,
+    lower_analyzed_unit, run_function_with_step_budget, BufferHost, MirFunctionId,
     RunSourceError, RunnerError, ValidatedMir,
 };
 use radix::module::{AnalyzedModule, Session};
@@ -484,7 +484,7 @@ fn run_proba_on_analyzed_with_unit_path(
     include_ignored: bool,
 ) -> Result<ProbaReport, RunSourceError> {
     let cases = inventory_cases(&unit.hir, &unit.interner);
-    let lowered = lower_analyzed_unit_with_context(unit).map_err(RunSourceError::Mir)?;
+    let lowered = lower_analyzed_unit(unit, Default::default()).map_err(RunSourceError::Mir)?;
     Ok(run_proba_on_validated_with_unit_path(
         &lowered.validated,
         unit_path,

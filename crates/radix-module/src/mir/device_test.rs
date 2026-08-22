@@ -157,7 +157,7 @@ fn classify_source(source: &str) -> radix_types::Lowerability {
     let session = Session::new(Config::default());
     let mut analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
     let roles = device_roles_from_hir(&analysis.hir);
-    let lowered = crate::mir::lower_analyzed_unit_with_context(&mut analysis).expect("lower source to MIR");
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("lower source to MIR");
     let mut validation = lowered.validated.validation().clone();
     attach_device_tensor_layouts(&mut validation);
     let mut context = MirDeviceContext::from_hir_roles(roles);
@@ -2310,10 +2310,10 @@ functio k(fractus<f32> x) → fractus<f32> {
 ";
     let session = Session::new(Config::default());
     let mut analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis).expect("legal fragment call must compose");
     let roles = device_roles_from_hir(&analysis.hir);
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("legal fragment call must compose");
     assert!(
-        crate::mir::fragment_composition::surviving_fragment_calls(&lowered.functions, &[], &roles).is_empty(),
+        crate::mir::fragment_composition::surviving_fragment_calls(&lowered.program.functions, &[], &roles).is_empty(),
         "no fragment call may survive composition"
     );
 }

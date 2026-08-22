@@ -208,7 +208,7 @@ function f0 -> ty#5 {
 #[test]
 fn lowers_function_params_as_mir_locals() {
     let mut unit = analyze("functio saluta(textus nomen, numerus aetas) {}");
-    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
     let function = &program.functions[0];
 
     assert_eq!(function.params.len(), 2);
@@ -235,7 +235,7 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
     let function = &program.functions[0];
 
     assert_eq!(function.params[0].mode, MirParamMode::MutRef);
@@ -961,7 +961,7 @@ fn failed_top_level_const_initializer_does_not_bind_const() {
 fn ignores_top_level_type_metadata_items() {
     let mut unit =
         analyze("genus Persona { textus nomen } discretio Eventus { Bonum { textus nuntius } } functio salve() {}");
-    let program = lower_analyzed_unit(&mut unit).expect("type metadata should not block MIR lowering");
+    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("type metadata should not block MIR lowering");
 
     assert_eq!(program.functions.len(), 1);
 }
@@ -1420,7 +1420,7 @@ fn rejects_deferred_control_flow_constructs_with_explicit_diagnostics() {
     assert!(!iter_ex_dump.contains("itera ex over tabula before map value iteration MIR lowering"));
 
     let mut discerne_unit = analyze("functio handle(numerus n) → vacuum { discerne n { casu x { nota x } } }");
-    let discerne_errors = lower_analyzed_unit(&mut discerne_unit).expect_err("binding discerne is deferred");
+    let discerne_errors = lower_analyzed_unit(&mut discerne_unit, Default::default()).expect_err("binding discerne is deferred");
     assert_eq!(discerne_errors.len(), 1);
     assert_eq!(
         discerne_errors[0].issue,
@@ -1460,7 +1460,7 @@ fn rejects_fabricated_iace_without_alternate_exit_type() {
         ..Default::default()
     });
 
-    let errors = lower_analyzed_unit(&mut unit).expect_err("fabricated iace without ⇥ should fail");
+    let errors = lower_analyzed_unit(&mut unit, Default::default()).expect_err("fabricated iace without ⇥ should fail");
     assert_eq!(errors.len(), 1);
     assert_eq!(
         errors[0].issue,
@@ -1775,8 +1775,8 @@ functio mensura(lista<numerus> f) → numerus ⇥ FormaError {
         &mut unit.hir,
     );
 
-    match lower_analyzed_unit(&mut unit) {
-        Ok(program) => Ok(crate::mir::dump_program(&program)),
+    match lower_analyzed_unit(&mut unit, Default::default()) {
+        Ok(lowered) => Ok(crate::mir::dump_program(&lowered.program)),
         Err(errors) => Err(errors),
     }
 }
@@ -2012,7 +2012,7 @@ functio elige_color() → Color {
     assert!(!dump.contains("path that does not resolve to a local value"));
 
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
     let (enum_def, variants) = lowered
         .validated
         .validation()
@@ -2329,7 +2329,7 @@ incipit {
 #[test]
 fn rejects_unsupported_runtime_method_shapes() {
     let mut unit = analyze(r"functio malum(lista<numerus> xs) → numerus { redde xs.praepone(1) }");
-    let errors = lower_analyzed_unit(&mut unit).expect_err("unsupported method remains fail-closed");
+    let errors = lower_analyzed_unit(&mut unit, Default::default()).expect_err("unsupported method remains fail-closed");
 
     assert!(errors
         .iter()
@@ -2787,7 +2787,7 @@ functio _exponens(f32 x) → f32 {
 }
 ";
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
     validate_program(&lowered.program, lowered.validated.validation())
         .expect("the exponentiation-identity MIR must validate (guard/power/join blocks reachable)");
     let dump = dump_program(&lowered.program);
@@ -3083,7 +3083,7 @@ incipit {
     let name_field = unit.interner.intern("name");
     let email_field = unit.interner.intern("email");
     let ada = unit.interner.intern("Ada");
-    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
 
     let fields = program
         .functions
@@ -3138,7 +3138,7 @@ incipit {
 "#;
     let mut unit = analyze(source);
     let tag_field = unit.interner.intern("tag");
-    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
 
     let fields = program
         .functions
@@ -3250,7 +3250,7 @@ fn validates_captured_closure_callee_environment_function_match() {
   nota adde(5)
 }",
     );
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
     let mut corrupted_context = lowered.validated.validation().clone();
     let environment_id = corrupted_context
         .closure_environments
@@ -3340,7 +3340,7 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
     validate_program(&lowered.program, lowered.validated.validation()).expect("generic call-site MIR validates");
 }
 
@@ -3360,7 +3360,7 @@ functio describe(Resultatus<numerus> r) → textus {
 }
 "#;
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("generic enum payload MIR lowers");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("generic enum payload MIR lowers");
     validate_program(&lowered.program, lowered.validated.validation()).expect("generic enum payload MIR validates");
 }
 
@@ -3406,7 +3406,7 @@ fn sparsa_shape_lowers_to_tensor_shape_and_validates() {
     assert!(dump.contains("runtime collection tensor_shape("), "{dump}");
 
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("sparsa shape MIR lowers");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("sparsa shape MIR lowers");
     validate_program(&lowered.program, lowered.validated.validation()).expect("sparsa shape MIR validates");
 }
 
@@ -3452,7 +3452,7 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
     validate_program(&lowered.program, lowered.validated.validation())
         .expect("composite generic call-site MIR validates");
 }
@@ -3470,7 +3470,7 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
     validate_program(&lowered.program, lowered.validated.validation()).expect("nullable generic return MIR validates");
 }
 
@@ -3483,7 +3483,7 @@ functio count(lista<fractus> values) → numerus ∪ nihil {
 "#;
     let mut unit = analyze(source);
     let numerus = unit.types.primitive(Primitive::Numerus);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("nullable collection length lowers");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("nullable collection length lowers");
     validate_program(&lowered.program, lowered.validated.validation()).expect("nullable collection length validates");
 
     let function = lowered
@@ -3532,7 +3532,7 @@ functio first(lista<numerus> ∪ nihil values) → numerus {
 }
 "#;
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("narrowed collection lowers");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("narrowed collection lowers");
     validate_program(&lowered.program, lowered.validated.validation())
         .expect("narrowed collection projection validates");
 }
@@ -3547,7 +3547,7 @@ incipit {
 }
 ";
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
     validate_program(&lowered.program, lowered.validated.validation()).expect("explicit nil generic call validates");
 }
 
@@ -3569,7 +3569,7 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
     validate_program(&lowered.program, lowered.validated.validation())
         .expect("projected struct field generic call validates");
 }
@@ -3588,7 +3588,7 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
     validate_program(&lowered.program, lowered.validated.validation())
         .expect("indexed list element generic call validates");
 }
@@ -3610,7 +3610,7 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
 
     assert_eq!(lowered.monomorphizations.len(), 2);
     let textus_instance = lowered.monomorphizations[0].function;
@@ -3700,7 +3700,7 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
 
     assert_eq!(lowered.monomorphizations.len(), 1);
     let instance_id = lowered.monomorphizations[0].function;
@@ -3758,7 +3758,7 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("explicit NATURAL size args must lower");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("explicit NATURAL size args must lower");
     assert_eq!(lowered.monomorphizations.len(), 1);
     let shape_args = lowered.monomorphizations[0].key.shape_args.clone();
     assert_eq!(shape_args.len(), 3);
@@ -3792,7 +3792,7 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
 
     assert_eq!(lowered.monomorphizations.len(), 2);
     let first = lowered.monomorphizations[0].function;
@@ -3830,7 +3830,7 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("MIR lowering succeeds");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
     assert_eq!(
         lowered.monomorphizations.len(),
         1,
@@ -3874,7 +3874,7 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("nested generic lowering succeeds");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("nested generic lowering succeeds");
 
     assert_eq!(
         lowered.monomorphizations.len(),
@@ -3915,7 +3915,7 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut unit).expect("nested failable generic lowering succeeds");
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("nested failable generic lowering succeeds");
 
     assert_eq!(lowered.monomorphizations.len(), 2);
     for monomorphization in &lowered.monomorphizations {
@@ -3950,7 +3950,7 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let Err(errors) = lower_analyzed_unit_with_context(&mut unit) else {
+    let Err(errors) = lower_analyzed_unit(&mut unit, Default::default()) else {
         panic!("unbound child shape must fail closed");
     };
     assert!(errors
@@ -3973,7 +3973,7 @@ incipit {
 
 fn lowers_nucleum_annotation_to_compute_shader_stage() {
     let mut unit = analyze("@ nucleum\nfunctio kernel_entry() → vacuum { redde }");
-    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
     let function = &program.functions[0];
     assert_eq!(
         function.shader_stage,
@@ -3985,7 +3985,7 @@ fn lowers_nucleum_annotation_to_compute_shader_stage() {
 #[test]
 fn lowers_vertex_annotation_to_vertex_shader_stage() {
     let mut unit = analyze("@ vertex\nfunctio vertex_entry() → vacuum { redde }");
-    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
     let function = &program.functions[0];
     assert_eq!(
         function.shader_stage,
@@ -3997,7 +3997,7 @@ fn lowers_vertex_annotation_to_vertex_shader_stage() {
 #[test]
 fn lowers_fragment_annotation_to_fragment_shader_stage() {
     let mut unit = analyze("@ fragment\nfunctio fragment_entry() → vacuum { redde }");
-    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
     let function = &program.functions[0];
     assert_eq!(
         function.shader_stage,
@@ -4009,7 +4009,7 @@ fn lowers_fragment_annotation_to_fragment_shader_stage() {
 #[test]
 fn lowers_plain_function_without_shader_stage() {
     let mut unit = analyze("functio plain() → vacuum { redde }");
-    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
     let function = &program.functions[0];
     assert_eq!(function.shader_stage, None, "plain function must have no shader stage");
 }
@@ -4072,7 +4072,7 @@ fn shader_stage_rejects_conflicting_annotations() {
 fn conflicting_shader_annotations_emit_diagnostic() {
     // @vertex + @fragment on a single function must produce a diagnostic.
     let mut unit = analyze("@ vertex\n@ fragment\nfunctio conflict() → vacuum { redde }");
-    let errors = lower_analyzed_unit(&mut unit).unwrap_err();
+    let errors = lower_analyzed_unit(&mut unit, Default::default()).unwrap_err();
     assert_eq!(errors.len(), 1, "expected exactly one error for conflicting annotations");
     assert!(
         errors[0].issue.contains("conflicting"),
@@ -4085,7 +4085,7 @@ fn conflicting_shader_annotations_emit_diagnostic() {
 fn conflicting_shader_annotations_with_nucleum_emit_diagnostic() {
     // @nucleum + @vertex must also produce a diagnostic.
     let mut unit = analyze("@ nucleum\n@ vertex\nfunctio conflict() → vacuum { redde }");
-    let errors = lower_analyzed_unit(&mut unit).unwrap_err();
+    let errors = lower_analyzed_unit(&mut unit, Default::default()).unwrap_err();
     assert_eq!(errors.len(), 1, "expected exactly one error for @nucleum + @vertex");
     assert!(
         errors[0].issue.contains("conflicting"),
@@ -4099,7 +4099,7 @@ fn lowers_vertex_method_inside_genus_to_shader_stage() {
     let mut unit = analyze(
         "genus Renderer {\n  numerus dummy = 0\n  @ vertex\n  functio draw() → vacuum { redde }\n}\n\nincipit {\n  fixum _ r ← Renderer {}\n}",
     );
-    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
     let draw = program
         .functions
         .iter()
@@ -4117,7 +4117,7 @@ fn lowers_fragment_method_inside_genus_to_shader_stage() {
     let mut unit = analyze(
         "genus Renderer {\n  numerus dummy = 0\n  @ fragment\n  functio shade() → vacuum { redde }\n}\n\nincipit {\n  fixum _ r ← Renderer {}\n}",
     );
-    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
     let shade = program
         .functions
         .iter()
@@ -4135,7 +4135,7 @@ fn vertex_function_injects_out_position_local_for_empty_body() {
     // Even a @vertex function with an empty body must have out_position
     // injected as a synthetic local during MIR lowering.
     let mut unit = analyze("@ vertex\nfunctio v() → vacuum { redde }");
-    let program = lower_analyzed_unit(&mut unit).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
     let function = &program.functions[0];
     assert_eq!(
         function.shader_stage,
@@ -4412,7 +4412,7 @@ fn record_field_value<'a>(function: &'a MirFunction, field: &str, interner: &Int
 }
 
 /// All ten `shared-mir` CLI-family rows (promotion packet P1 §2) must lower
-/// through the default `lower_analyzed_unit_with_context` path — the
+/// through the default `lower_analyzed_unit` path — the
 /// `allow_cli_program` gate is lifted and the shared lowering derives the
 /// complete `argumenta` record surface from the CLI descriptor.
 #[test]
@@ -4431,7 +4431,7 @@ fn cli_fixture_family_lowers_through_default_path() {
     ];
     for fixture in fixtures {
         let mut analysis = analyze_exemplum_for_mir(fixture);
-        let lowered = lower_analyzed_unit_with_context(&mut analysis)
+        let lowered = lower_analyzed_unit(&mut analysis, Default::default())
             .unwrap_or_else(|errors| panic!("{fixture} must lower through the default path: {errors:?}"));
         let surfaces = record_aggregate_fields(&lowered.program, &lowered.interner);
         assert!(
@@ -4447,7 +4447,7 @@ fn cli_fixture_family_lowers_through_default_path() {
 #[test]
 fn cli_fab_subcommand_records_carry_option_and_operand_binding() {
     let mut analysis = analyze_exemplum_for_mir("cli/cli.fab");
-    let lowered = lower_analyzed_unit_with_context(&mut analysis).expect("lower cli/cli.fab");
+    let lowered = lower_analyzed_unit(&mut analysis, Default::default()).expect("lower cli/cli.fab");
     let surfaces = record_aggregate_fields(&lowered.program, &lowered.interner);
     assert!(
         surfaces.contains(&vec!["verbose".to_owned()]),
@@ -4487,7 +4487,7 @@ fn cli_fab_subcommand_records_carry_option_and_operand_binding() {
 #[test]
 fn cli_option_and_operand_binding_typed_defaults() {
     let mut optio = analyze_exemplum_for_mir("optio/optio.fab");
-    let lowered = lower_analyzed_unit_with_context(&mut optio).expect("lower optio/optio.fab");
+    let lowered = lower_analyzed_unit(&mut optio, Default::default()).expect("lower optio/optio.fab");
     let surfaces = record_aggregate_fields(&lowered.program, &lowered.interner);
     assert!(
         surfaces.contains(&vec!["verbose".to_owned(), "count".to_owned()]),
@@ -4511,7 +4511,7 @@ fn cli_option_and_operand_binding_typed_defaults() {
     );
 
     let mut operandus = analyze_exemplum_for_mir("operandus/operandus.fab");
-    let lowered = lower_analyzed_unit_with_context(&mut operandus).expect("lower operandus/operandus.fab");
+    let lowered = lower_analyzed_unit(&mut operandus, Default::default()).expect("lower operandus/operandus.fab");
     let entry = lowered
         .program
         .functions
@@ -4579,7 +4579,7 @@ fn async_fixture_family_analyzes_and_lowers_through_shared_path() {
             "{fixture} must not reject await/cede on promissum-returning receivers: {:?}",
             analysis.diagnostics
         );
-        let lowered = lower_analyzed_unit_with_context(&mut analysis)
+        let lowered = lower_analyzed_unit(&mut analysis, Default::default())
             .unwrap_or_else(|errors| panic!("{fixture} must lower: {errors:?}"));
         assert!(
             !lowered.program.functions.is_empty(),
@@ -4593,7 +4593,7 @@ fn async_fixture_family_analyzes_and_lowers_through_shared_path() {
 #[test]
 fn async_tempus_tacebit_lowers_provider_call_and_discards_payload() {
     let mut analysis = analyze_exemplum_for_mir_async("ad/async-tempus-dormiet.fab");
-    let lowered = lower_analyzed_unit_with_context(&mut analysis).expect("lower async tempus");
+    let lowered = lower_analyzed_unit(&mut analysis, Default::default()).expect("lower async tempus");
     let dump = crate::mir::dump_program(&lowered.program);
     let provider_calls = dump.matches("runtime provider").count();
     assert!(
@@ -4611,7 +4611,7 @@ fn async_tempus_tacebit_lowers_provider_call_and_discards_payload() {
 #[test]
 fn async_solum_await_const_binds_payload_carrier() {
     let mut analysis = analyze_exemplum_for_mir_async("ad/async-solum-leget.fab");
-    let lowered = lower_analyzed_unit_with_context(&mut analysis).expect("lower async solum leget");
+    let lowered = lower_analyzed_unit(&mut analysis, Default::default()).expect("lower async solum leget");
     let dump = crate::mir::dump_program(&lowered.program);
     assert!(
         dump.matches("runtime provider").count() >= 2,
@@ -4640,7 +4640,7 @@ incipiet {
 }
 ";
     let mut analysis = analyze(source);
-    let lowered = lower_analyzed_unit_with_context(&mut analysis).expect("lower reddet unit");
+    let lowered = lower_analyzed_unit(&mut analysis, Default::default()).expect("lower reddet unit");
     assert!(
         lowered.program.functions.iter().any(|function| function
             .name

@@ -291,7 +291,7 @@ fn run_source_with_options(
         return Ok((ProbaReport::default(), RunMetadata::default()));
     }
 
-    let lowered = radix::module::mir::lower_analyzed_unit_with_context(&mut analysis)
+    let lowered = radix::module::mir::lower_analyzed_unit(&mut analysis, Default::default())
         .map_err(radix::module::mir::RunSourceError::Mir)?;
     let mut report = ProbaReport::default();
     let mut metadata = RunMetadata::default();
@@ -363,7 +363,7 @@ fn run_source_with_focus(
         );
         return Ok(report);
     }
-    let lowered = radix::module::mir::lower_analyzed_unit_with_context(&mut analysis)
+    let lowered = radix::module::mir::lower_analyzed_unit(&mut analysis, Default::default())
         .map_err(radix::module::mir::RunSourceError::Mir)?;
     let mut report = run_proba_on_validated(
         &lowered.validated,

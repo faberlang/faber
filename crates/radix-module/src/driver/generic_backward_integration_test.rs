@@ -26,7 +26,7 @@ use crate::driver::{
     analyze_source, apply_air_backward_bundle, lower_mir_with_context_for_target, prepare_air_backward_bundle,
     FreshMirFunctionIds, SpannedCodegenError,
 };
-use crate::mir::{lower_analyzed_unit_with_context, MirFunctionId};
+use crate::mir::{lower_analyzed_unit, MirFunctionId};
 use crate::semantic::{IndexExpr, Type};
 use crate::test_support::test_session;
 
@@ -155,7 +155,7 @@ fn unresolved_post_bundle_shape_size_uses_stable_survivor_diagnostic() {
     )
     .expect("backward bundle");
     let concrete_dim = analysis.types.intern_index(IndexExpr::Literal(2));
-    let mut lowered = lower_analyzed_unit_with_context(&mut analysis).expect("initial MIR lowering succeeds");
+    let mut lowered = lower_analyzed_unit(&mut analysis, Default::default()).expect("initial MIR lowering succeeds");
 
     // Force the finalizer down its executable-program path without adding a
     // usable binding for the companion's [R,C] shape.
@@ -224,7 +224,7 @@ fn generic_backward_primal_generates_symbolic_companion_through_driver() {
         }
     }
 
-    let mut lowered = lower_analyzed_unit_with_context(&mut analysis).expect("generic primal should lower to MIR");
+    let mut lowered = lower_analyzed_unit(&mut analysis, Default::default()).expect("generic primal should lower to MIR");
     expect_codegen_ok(
         apply_air_backward_bundle(&mut lowered, bundle, false),
         "generic companion must install without a symbolic-shape error",
@@ -293,7 +293,7 @@ functio gradientes_simple_loss<magnitudo R, magnitudo C>(
     )
     .expect("an AIR lane with backward annotations must produce a bundle");
 
-    let mut lowered = lower_analyzed_unit_with_context(&mut analysis).expect("generic wrapper should lower to MIR");
+    let mut lowered = lower_analyzed_unit(&mut analysis, Default::default()).expect("generic wrapper should lower to MIR");
     expect_codegen_ok(
         apply_air_backward_bundle(&mut lowered, bundle, false),
         "generic companion must install without a symbolic-shape error",
@@ -350,7 +350,7 @@ functio broad_loss<magnitudo R, magnitudo C>(
     );
 
     let mut lowered =
-        lower_analyzed_unit_with_context(&mut analysis).expect("generic broadcast primal should lower to MIR");
+        lower_analyzed_unit(&mut analysis, Default::default()).expect("generic broadcast primal should lower to MIR");
     expect_codegen_ok(
         apply_air_backward_bundle(&mut lowered, bundle, false),
         "broadcast-using generic primal companion must generate without \
@@ -406,7 +406,7 @@ functio lane_sum(tensor<f32, [4]> x) → f32 {
         "full-prefix unroll must reach reverse_ad as a guard-free straight line"
     );
 
-    let mut lowered = lower_analyzed_unit_with_context(&mut analysis).expect("unrolled primal should lower to MIR");
+    let mut lowered = lower_analyzed_unit(&mut analysis, Default::default()).expect("unrolled primal should lower to MIR");
     expect_codegen_ok(
         apply_air_backward_bundle(&mut lowered, bundle, false),
         "unrolled full-prefix body must generate a reverse_ad companion",
@@ -465,7 +465,7 @@ functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
         "mask-mode unroll must reach reverse_ad as a guard-free straight line"
     );
 
-    let mut lowered = lower_analyzed_unit_with_context(&mut analysis).expect("masked primal should lower to MIR");
+    let mut lowered = lower_analyzed_unit(&mut analysis, Default::default()).expect("masked primal should lower to MIR");
     expect_codegen_ok(
         apply_air_backward_bundle(&mut lowered, bundle, false),
         "masked unrolled body must generate a reverse_ad companion",

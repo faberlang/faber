@@ -11,7 +11,7 @@ pub use radix_mir_runner::{
 
 use crate::diagnostics::Diagnostic;
 use crate::driver::{AnalyzedModule, Session};
-use crate::mir::lower_analyzed_unit_with_context;
+use crate::mir::lower_analyzed_unit;
 use crate::program::analyze_prepared_program_name;
 
 /// Failure modes for the analyzed-source run routes.
@@ -48,7 +48,7 @@ pub fn run_source<H: Host + ?Sized>(
 /// Returns [`RunnerError`] values for MIR lowering failures and
 /// interpretation-time failures.
 pub fn run_analyzed<H: Host + ?Sized>(unit: &mut AnalyzedModule, host: &mut H) -> Result<(), Vec<RunnerError>> {
-    let lowered = lower_analyzed_unit_with_context(unit).map_err(|errors| {
+    let lowered = lower_analyzed_unit(unit, Default::default()).map_err(|errors| {
         errors
             .into_iter()
             .map(|error| RunnerError::internal(error.span, error.message))

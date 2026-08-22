@@ -353,7 +353,7 @@ incipit {
 }
 ";
     let mut analysis = analyze_source(&runner_session(), "gather_empty.fab", source).expect("frontend");
-    let lowered = crate::mir::lower_analyzed_unit_with_context(&mut analysis).expect("lowering");
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("lowering");
 
     let mut empty_program = lowered.program.clone();
     let emptied = empty_tensor_gather_ids(&mut empty_program);

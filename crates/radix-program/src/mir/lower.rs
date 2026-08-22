@@ -843,7 +843,7 @@ pub(super) fn lower_package_units<'a>(
                         return Ok(());
                     }
                 };
-                let mut lowered = match lower_analyzed_unit_with_context(analysis) {
+                let mut lowered = match lower_analyzed_unit(analysis, Default::default()) {
                     Ok(lowered) => lowered,
                     Err(errors) => {
                         diagnostics.extend(
@@ -2013,9 +2013,15 @@ pub(super) fn lower_unit<'a>(
             .get(&unit.path)
             .cloned()
             .unwrap_or_default();
-        lower_analyzed_unit_allowing_cli_runtime_records_with_context(&mut unit.analysis, fields)
+        lower_analyzed_unit(
+            &mut unit.analysis,
+            radix_module::mir::MirLoweringOptions {
+                cli_record_fields_by_local: std::sync::Arc::new(fields.into_iter().collect()),
+                ..Default::default()
+            },
+        )
     } else {
-        lower_analyzed_unit_with_context(&mut unit.analysis)
+        lower_analyzed_unit(&mut unit.analysis, Default::default())
     };
     let mut lowered = result.map_err(|errors| {
         errors
