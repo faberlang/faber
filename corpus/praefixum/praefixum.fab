@@ -1,6 +1,7 @@
 +++
 term = "praefixum"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "praefixum_expr", "conversio_expr", "multiplicative_expr", "expression", "literal", "json_literal", "json_member", "json_value", "json_number", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix"]
 category = "comptime"
 canonical = true
 summary = "Forces compile-time evaluation of an expression."

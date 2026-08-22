@@ -1,6 +1,7 @@
 +++
 term = "probandum"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "probandum_decl", "probandum_body", "proba_stmt", "adfirma_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "expression", "literal", "additive_expr", "multiplicative_expr", "equality", "equality_tail", "comparison"]
 category = "testing"
 canonical = true
 summary = "Groups related test cases into a named suite."

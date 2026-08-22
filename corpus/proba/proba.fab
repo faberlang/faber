@@ -1,6 +1,7 @@
 +++
 term = "proba"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "proba_stmt", "proba_modifier", "adfirma_stmt", "expression", "literal", "additive_expr", "equality", "equality_tail"]
 category = "testing"
 canonical = true
 summary = "Defines a single test case."
