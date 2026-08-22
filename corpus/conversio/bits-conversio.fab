@@ -1,0 +1,63 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "labeled_type_argument", "conversio_expr", "expression", "literal", "range_expr", "range_tail"]
+category = "conversion"
+canonical = false
+summary = "Exact-width IEEE bitcast between int and float through the Bits hint."
+syntax = "int<u32|u64> ↦ float<f32|f64, Bits> and float<f32|f64> ↦ int<u32|u64, Bits>"
+related = ["↦", "int", "float", "octeti"]
+locale = "en"
++++
+
+# =============================================================================
+# ↦ — Exact-width bitcast via the Bits hint.
+# =============================================================================
+#
+# What this teaches:
+#   • Both directions — `n ↦ float<f32, Bits>` and `x ↦ int<u32, Bits>` (plus the u64/f64 twins).
+#   • Exact pairs only — u32 pairs with f32, u64 with f64; anything else rejects.
+#   • Bit-identical — NaN payloads pass through unchanged; no canonicalization.
+#   • Composition — `octeti[0‥4] ↦ int<u32, Le> ↦ float<f32, Bits>` equals `octeti[0‥4] ↦ float<f32, Le>`.
+#
+# Common mistakes:
+#   • Wrong pair — `n ↦ float<f64, Bits>` from int<u32> rejects (bits_pair_width_mismatch).
+#   • Missing width — unsized float sources reject; Bits needs both widths exact.
+#
+# See also: ↦, int, float, octeti
+# =============================================================================
+
+
+# EXPECTED OUTPUT:
+#   2143289344
+#   2143289344
+#   4607182418800017408
+#   1
+#
+# BACKEND:
+#   HIR-direct Rust emits to_bits / from_bits. MIR-stepper reinterprets the
+#   same bits. Go uses math.Float{32,64}bits / frombits; TS uses DataView
+#   set/get pairs.
+
+main {
+    # 0x7fc00000 is a quiet NaN payload; it must survive the round trip.
+    const _ nan_bits ← |7f c0 00 00|[0‥4] ↦ int<u32, Le>
+    const _ nan ← nan_bits ↦ float<f32, Bits>
+    const _ back ← nan ↦ int<u32, Bits>
+
+    # Composition algebra: endian read + bitcast ≡ direct float endian read.
+    const _ composed ← |7f c0 00 00|[0‥4] ↦ int<u32, Le> ↦ float<f32, Bits>
+    const _ direct ← |7f c0 00 00|[0‥4] ↦ float<f32, Le>
+    const _ composed_bits ← composed ↦ int<u32, Bits>
+    const _ direct_bits ← direct ↦ int<u32, Bits>
+
+    # u64/f64 twin: 1.0f64 is 0x3ff0000000000000.
+    const _ one_f64 ← 1.0 ↦ float<f64, Bits>
+    const _ one_bits ← one_f64 ↦ int<u64, Bits>
+    const _ one_back ← one_bits ↦ float<f64, Bits>
+
+    print back
+    print direct_bits
+    print one_bits
+    print (one_back ↦ int<u64, Bits> == one_bits ? 1 : 0)
+}

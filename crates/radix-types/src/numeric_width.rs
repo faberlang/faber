@@ -201,10 +201,12 @@ impl WidthError {
 /// Conversio slot-2 hints that follow an optional width marker.
 ///
 /// `Hex` / `Bin` / `Oct` are text-parse radices. `Be` / `Le` are endian
-/// unpack rules for `octeti` windows — same slot, not bases.
+/// unpack rules for `octeti` windows — same slot, not bases. `Bits` is an
+/// exact-width bitcast (`u32↔f32`, `u64↔f64`) — reinterpretation, not a
+/// radix, and never legal in a `from_str_radix` base.
 #[must_use]
 pub fn is_conversio_radix_hint(marker: &str) -> bool {
-    matches!(marker, "Hex" | "Bin" | "Oct" | "Be" | "Le")
+    matches!(marker, "Hex" | "Bin" | "Oct" | "Be" | "Le" | "Bits")
 }
 
 /// Ascii format-pack slot-2 hints: `n ↦ ascii<N, Hex|Bin|Oct>`.

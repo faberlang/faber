@@ -653,6 +653,10 @@ mod numeric_value_equality_test;
 mod octeti_endian_conversio_test;
 
 #[cfg(test)]
+#[path = "bits_conversio_test.rs"]
+mod bits_conversio_test;
+
+#[cfg(test)]
 #[path = "octeti_lista_conversio_test.rs"]
 mod octeti_lista_conversio_test;
 

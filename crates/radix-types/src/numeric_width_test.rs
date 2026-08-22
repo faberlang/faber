@@ -221,10 +221,10 @@ fn ascii_format_hints_are_hex_bin_oct_only() {
             "{marker} stays in the shared conversio hint set"
         );
     }
-    for marker in ["Be", "Le"] {
+    for marker in ["Be", "Le", "Bits"] {
         assert!(
             !is_ascii_format_hint(marker),
-            "{marker} is endian, not an ascii digit base"
+            "{marker} is endian/bitcast, not an ascii digit base"
         );
         assert!(is_conversio_radix_hint(marker));
     }

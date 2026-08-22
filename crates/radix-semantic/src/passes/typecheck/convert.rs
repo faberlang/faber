@@ -57,6 +57,7 @@ const ISSUE_ASCII_FORMAT_HINT_NOT_CAPACITY: &str = "ascii_format_hint_not_capaci
 const ISSUE_ASCII_PACK_WIDTH_OVERFLOW: &str = "ascii_pack_width_overflow";
 const ISSUE_ASCII_PACK_NEGATIVE_SOURCE: &str = "ascii_pack_negative_source";
 const ISSUE_OCTETI_TO_FRACTUS_UNSPECIFIED: &str = "octeti_to_fractus_unspecified";
+const ISSUE_BITS_PAIR_WIDTH_MISMATCH: &str = "bits_pair_width_mismatch";
 const ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED: &str = "octeti_to_bivalens_unsupported";
 const ISSUE_PROMISSUM_TARGET_BOUNDARY: &str = "promissum_target_boundary";
 const ISSUE_PROMISSUM_SOURCE_BOUNDARY: &str = "promissum_source_boundary";
@@ -814,6 +815,14 @@ impl TypeChecker<'_> {
             (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Bivalens) => {
                 Some(ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED)
             }
+            (
+                PrimitiveConversioFamily::Numerus,
+                PrimitiveConversioFamily::Fractus,
+            )
+            | (
+                PrimitiveConversioFamily::Fractus,
+                PrimitiveConversioFamily::Numerus,
+            ) => self.bits_pair_issue(source_ty, target_resolved, params),
             _ => None,
         };
 
@@ -873,6 +882,52 @@ impl TypeChecker<'_> {
         params
             .iter()
             .any(|param| matches!(interner.resolve(*param), "Be" | "Le"))
+    }
+
+    /// `Bits` is an exact-width IEEE bitcast: `u32↔f32` and `u64↔f64` only.
+    /// Any other pair (or unsized primitive) fail-closes; without the hint the
+    /// ordinary value-conversion families stay in charge.
+    fn bits_pair_issue(
+        &self,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        params: &[Symbol],
+    ) -> Option<&'static str> {
+        if !self.conversio_has_bits_hint(params) {
+            return None;
+        }
+        let source = self.types.get(self.resolve_inferred_type(source_ty));
+        let target = self.types.get(target_resolved);
+        let exact_pair = matches!(
+            (source, target),
+            (
+                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32),
+                Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32)
+            ) | (
+                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64),
+                Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64)
+            ) | (
+                Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32),
+                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)
+            ) | (
+                Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64),
+                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64)
+            )
+        );
+        if exact_pair {
+            None
+        } else {
+            Some(ISSUE_BITS_PAIR_WIDTH_MISMATCH)
+        }
+    }
+
+    fn conversio_has_bits_hint(&self, params: &[Symbol]) -> bool {
+        let Some(interner) = self.interner else {
+            return false;
+        };
+        params
+            .iter()
+            .any(|param| matches!(interner.resolve(*param), "Bits"))
     }
 
     /// `n ↦ ascii<N, Hex|Bin|Oct>`: N is digit width; Hex/Bin/Oct are slot-2

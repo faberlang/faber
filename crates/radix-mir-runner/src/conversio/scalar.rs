@@ -135,6 +135,20 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
+        if self.has_bits_hint(params) {
+            // `numerus<u32|u64, Bits>` reinterprets float bits; exact pairs
+            // only, NaN payloads pass through bit-identical.
+            if let Value::Float(value) = value {
+                return match width {
+                    NumericWidth::U32 => Ok(Value::UInt(u64::from(
+                        (value as f32).to_bits(),
+                    ))),
+                    NumericWidth::U64 => Ok(Value::UInt(value.to_bits())),
+                    _ => self.recover_or_fail(recovery, span, "bits pair width mismatch"),
+                };
+            }
+            return self.recover_or_fail(recovery, span, "bits pair width mismatch");
+        }
         match value {
             Value::Str(text) => match self.parse_textus_numerus(&text, params) {
                 // SA-002: range-check against `W` so `textus ↦ numerus<u8>` of
@@ -265,6 +279,12 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             })
     }
 
+    fn has_bits_hint(&self, params: &[Symbol]) -> bool {
+        params
+            .iter()
+            .any(|param| self.interner.resolve(*param) == "Bits")
+    }
+
     pub(crate) fn convert_to_modular_word(
         &self,
         value: Value,
@@ -350,6 +370,25 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
+        if self.has_bits_hint(params) {
+            // `fractus<f32|f64, Bits>` reinterprets integer bits; exact pairs
+            // only, NaN payloads pass through bit-identical.
+            return match (value, width) {
+                (Value::Int(value), NumericWidth::F32) => {
+                    Ok(Value::Float(f64::from(f32::from_bits(value as u32))))
+                }
+                (Value::Int(value), NumericWidth::F64) => {
+                    Ok(Value::Float(f64::from_bits(value as u64)))
+                }
+                (Value::UInt(value), NumericWidth::F32) => {
+                    Ok(Value::Float(f64::from(f32::from_bits(value as u32))))
+                }
+                (Value::UInt(value), NumericWidth::F64) => {
+                    Ok(Value::Float(f64::from_bits(value)))
+                }
+                _ => self.recover_or_fail(recovery, span, "bits pair width mismatch"),
+            };
+        }
         let value = match value {
             Value::Octeti(bytes) => {
                 if self.endian_hint(params).is_some() {
