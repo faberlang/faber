@@ -62,17 +62,29 @@ type ReaderPackRef<'a> = Option<&'a crate::locale::LocalePack>;
 fn read_input_source(input: &[String]) -> Result<(String, String), crate::Diagnostic> {
     if input.is_empty() || input[0] == "-" {
         let mut source = String::new();
-        std::io::Read::read_to_string(&mut std::io::stdin(), &mut source)
-            .map_err(|err| crate::Diagnostic::error(format!("failed to read stdin: {err}")))?;
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut source).map_err(|err| {
+            crate::Diagnostic::error(format!("failed to read stdin: {err}"))
+                .with_phase(crate::diagnostics::DiagnosticPhase::Io)
+                .with_code("IO001")
+                .with_arg("issue", "stdin_read_failed")
+        })?;
         return Ok(("<stdin>".to_owned(), source));
     }
     let path = PathBuf::from(&input[0]);
-    let source = std::fs::read_to_string(&path).map_err(|err| crate::Diagnostic::io_error(&path, &err))?;
+    let source = std::fs::read_to_string(&path).map_err(|err| {
+        crate::Diagnostic::io_error(&path, &err).with_code("IO001").with_arg("issue", "source_read_failed")
+    })?;
     Ok((input[0].clone(), source))
 }
 
-fn package_reject(message: &str) -> crate::CompileResult {
-    crate::CompileResult { output: None, diagnostics: vec![crate::Diagnostic::error(message.to_owned())] }
+fn package_reject(message: &str, issue: &str) -> crate::CompileResult {
+    crate::CompileResult {
+        output: None,
+        diagnostics: vec![crate::Diagnostic::error(message.to_owned())
+            .with_phase(crate::diagnostics::DiagnosticPhase::Tool)
+            .with_code("TOOL002")
+            .with_arg("issue", issue)],
+    }
 }
 
 /// Return whether an input path syntactically names package mode.
@@ -131,7 +143,7 @@ fn compile_cli_input_with_locale_pack_inner(
 ) -> crate::CompileResult {
     if input.is_empty() || input[0] == "-" {
         if package {
-            return package_reject("package compilation requires a path input");
+            return package_reject("package compilation requires a path input", "package_requires_path_input");
         }
 
         let (name, source) = match read_input_source(input) {
@@ -192,13 +204,19 @@ fn compile_cli_path_with_locale_pack_inner(
     if package || should_treat_as_package(path) {
         return package_reject(
             "package compilation is owned by the `faber` tool; rerun with `faber build` or `faber emit`",
+            "package_compilation_owned_by_faber",
         );
     }
 
     let source = match std::fs::read_to_string(path) {
         Ok(source) => source,
         Err(err) => {
-            return crate::CompileResult { output: None, diagnostics: vec![crate::Diagnostic::io_error(path, &err)] };
+            return crate::CompileResult {
+                output: None,
+                diagnostics: vec![
+                    crate::Diagnostic::io_error(path, &err).with_code("IO001").with_arg("issue", "source_read_failed"),
+                ],
+            };
         }
     };
     let name = path.display().to_string();
@@ -357,6 +375,8 @@ pub fn prepare_program_module(
                     crate::locale::format_locale_pack_load_error(&err)
                 ))
                 .with_phase(crate::diagnostics::DiagnosticPhase::Lex)
+                .with_code("LOCALE001")
+                .with_arg("issue", "library_locale_pack_load_failed")
                 .with_file(path.display().to_string()),
             )
         })?;

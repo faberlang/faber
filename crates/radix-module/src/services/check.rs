@@ -104,6 +104,12 @@ pub fn check_diagnostics_for_source_with_locale_pack(
                         "failed to load library locale pack: {}",
                         crate::locale::format_locale_pack_load_error(&err)
                     ))
+                    .with_phase(crate::diagnostics::DiagnosticPhase::Lex)
+                    .with_code("LOCALE001")
+                    .with_args(vec![crate::diagnostics::DiagnosticArg::new(
+                        "issue",
+                        "library_locale_pack_load_failed",
+                    )])
                     .with_file(name.to_owned()),
                 );
                 return CheckDiagnosticsResult { diagnostics, success: false };
