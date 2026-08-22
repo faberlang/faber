@@ -236,39 +236,23 @@ mod unsigned_integer_tests;
 
 #[cfg(test)]
 #[allow(unused_imports)]
-mod names_unit {
-    pub use super::*;
-    pub use radix_mir::names::*;
-    include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/mir/names_test.rs"));
-}
+#[path = "names_test.rs"]
+mod names_unit;
 
 #[cfg(test)]
 #[allow(unused_imports)]
-mod validate_unit {
-    // validate_test uses super::* for both validate helpers and MIR nodes.
-    pub use super::*;
-    pub use radix_mir::validate::*;
-    include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/mir/validate_test.rs"));
-}
+#[path = "validate_test.rs"]
+mod validate_unit;
 
 #[cfg(test)]
 #[allow(unused_imports)]
-mod validate_enum_unit {
-    pub use super::*;
-    pub use radix_mir::validate::*;
-    include!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/src/mir/validate_enum_representation_test.rs"
-    ));
-}
+#[path = "validate_enum_representation_test.rs"]
+mod validate_enum_unit;
 
 #[cfg(test)]
 #[allow(unused_imports)]
-mod visit_unit {
-    pub use super::*;
-    pub use radix_mir::visit::*;
-    include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/mir/visit_test.rs"));
-}
+#[path = "visit_test.rs"]
+mod visit_unit;
 
 #[cfg(test)]
 #[path = "fmir_target_delegation_test.rs"]

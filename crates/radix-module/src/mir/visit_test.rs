@@ -4,10 +4,9 @@
 // storage order without following control-flow edges, and that
 // terminator_successors extracts correct block targets from every
 // terminator kind.
-//
-// NOTE: This file is include!'d into mir::visit_unit, so it cannot
-// carry //! inner doc comments.
 
+use super::*;
+use radix_mir::visit::*;
 use crate::semantic::TypeId;
 use crate::test_support::test_span;
 

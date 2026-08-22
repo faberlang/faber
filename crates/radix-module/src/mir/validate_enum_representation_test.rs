@@ -6,10 +6,9 @@
 // integer-payload, float-payload, tagged-union, tagged-product) has its own
 // test. Edge cases include missing metadata, full-range domains, invalid
 // domains, and wide carrier selection.
-//
-// NOTE: This file is include!'d into a validate_unit sub-module in mod.rs,
-// so it cannot carry //! inner doc comments.
 
+use super::*;
+use radix_mir::validate::*;
 use crate::lexer::Symbol;
 use crate::semantic::{NumericWidth, Primitive, TypeTable};
 

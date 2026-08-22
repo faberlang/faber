@@ -4,11 +4,9 @@
 // literal identities (text, ASCII, octeti, regex), external function
 // import names, and entry-function detection. Names are a stable
 // target-facing contract shared by text backends.
-//
-// NOTE: This file is include!'d into mir::names_unit, so it cannot
-// carry //! inner doc comments.
 
 use super::*;
+use radix_mir::names::*;
 use crate::lexer::{Interner, Span, Symbol};
 use crate::semantic::{Primitive, TypeTable};
 

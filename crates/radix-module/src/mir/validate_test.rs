@@ -4,10 +4,9 @@
 // malformed MIR and accepts well-formed programs. They cover atomic
 // runtime calls, value operands, control flow edges, call signatures,
 // and type consistency. Validation never repairs or interprets.
-//
-// NOTE: This file is include!'d into mir::validate_unit, so it cannot
-// carry //! inner doc comments.
 
+use super::*;
+use radix_mir::validate::*;
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::lexer::Symbol;
