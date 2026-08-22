@@ -61,6 +61,17 @@ const SHAPE_KERNEL_TENSOR_VIEW_OP: &str =
 const SHAPE_TRY_CALL: &str = "try_call";
 const SHAPE_RETURN_ERROR_DEVICE_TERMINATOR: &str = "return_error device terminator";
 
+/// EXEC02-PC1: name the collection op that hit the wildcard runtime-call
+/// reject (e.g. `TensorBatchedAttention`). Non-collection intrinsics keep
+/// the bare shape — their stable diagnostics (e.g. the Scribe reject in
+/// radix-module device_test) already identify the statement.
+fn runtime_call_op_name(intrinsic: &MirIntrinsic) -> String {
+    match intrinsic {
+        MirIntrinsic::Collection(op) => format!("{op:?}"),
+        _ => String::new(),
+    }
+}
+
 #[must_use]
 pub fn classify_device_safe(
     validated: &ValidatedMir<'_>,
@@ -794,7 +805,17 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                                 // op (`CollectionKernelPlan::SsmConv1d`) with
                                 // an NVVM body emitter; other targets keep
                                 // their own per-op fail-closed emit gates.
-                                | MirCollectionOp::TensorSsmConv1d,
+                                | MirCollectionOp::TensorSsmConv1d
+                                // EXEC02-PC1: `TensorSsmScan` and
+                                // `TensorGroupedMatMul` follow the same
+                                // recipe admission (`nvvm/ssm_scan.rs` /
+                                // `nvvm/grouped_matmul.rs` body emitters);
+                                // other targets keep their own per-op
+                                // fail-closed emit gates. Ops with no NVVM
+                                // body (e.g. `TensorBatchedAttention`) stay
+                                // fail-closed at the wildcard below.
+                                | MirCollectionOp::TensorSsmScan
+                                | MirCollectionOp::TensorGroupedMatMul,
                             ),
                         ..
                     },
@@ -881,7 +902,18 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 // The WGSL emitter keeps its per-op fail-closed emit gate.
                 crate::visit::walk_stmt(self, stmt);
             }
-            MirStatementKind::RuntimeCall { .. } => self.record_policy(SHAPE_KERNEL_RUNTIME_CALL),
+            // EXEC02-PC1: the wildcard runtime-call reject names the
+            // offending collection op — the first CUDA dense run died
+            // unnamed; a diagnostic must not be vaguer than the fact.
+            MirStatementKind::RuntimeCall { call, .. } => {
+                let op_name = runtime_call_op_name(&call.intrinsic);
+                let shape = if op_name.is_empty() {
+                    SHAPE_KERNEL_RUNTIME_CALL.to_owned()
+                } else {
+                    format!("{SHAPE_KERNEL_RUNTIME_CALL} {op_name}")
+                };
+                self.record_policy(shape);
+            }
             MirStatementKind::Construct {
                 aggregate,
                 destination,
