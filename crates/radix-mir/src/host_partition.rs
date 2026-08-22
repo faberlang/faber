@@ -62,20 +62,15 @@
 //! revision moves the schema, its wire mirror, the materializer, and the ABI
 //! ratchet in lockstep under their named owners.
 
-use crate::abi::{
-    MirKernelResource, MirKernelResourceKind, MirKernelShaderStage, MirKernelSignature,
-};
 use crate::boundary_abi::{
-    derive_boundary_calls, validate_boundary_abi, BoundaryAbiError, BoundaryCall,
+    BoundaryAbiError, BoundaryCall, derive_boundary_calls, validate_boundary_abi,
 };
+use crate::device_program::LaunchId;
 use crate::device_program::{
-    BufferId, BufferIdentity, BufferLifetime, BufferRole, BufferVersion, DeviceProgram,
-    DeviceProgramError, DeviceProgramLifetime, DeviceResource, KernelLaunchPlan, KernelUnit,
-    LaunchId, LaunchUnit, ObservationCadence, ResultBuffer,
+    BufferLifetime, BufferRole, DeviceProgram, DeviceProgramBuildError, DeviceProgramError,
+    DeviceProgramLifetime, ObservationCadence, build_device_program,
 };
-use crate::device_program_plans::kernel_plan_for_function;
 use crate::device_semantics::{DeviceEffectBoundaryKind, DeviceLegalityFacts};
-use crate::kernel_plan::CollectionKernelPlan;
 use crate::layout::MirTensorStorageLayout;
 use crate::{
     MirBlockId, MirCallee, MirConstant, MirFunction, MirFunctionId, MirOperand, MirProgram,
@@ -117,6 +112,9 @@ pub enum HostPartitionError {
     },
     /// The derived device program violates the shared schema rules.
     Program(DeviceProgramError),
+    /// The shared constructor rejected a selected shape fold or companion
+    /// relation before a host view could be formed.
+    Constructor(DeviceProgramBuildError),
     /// The cross-boundary call surface violates the versioned call ABI
     /// (NGAB1-U2): an invalid cross-boundary value — wrong type, shape,
     /// lifetime, mutation of a read-only resource, or observation of
@@ -144,12 +142,39 @@ impl fmt::Display for HostPartitionError {
                 function.0
             ),
             Self::Program(error) => write!(f, "derived device program failed validation: {error}"),
+            Self::Constructor(error) => write!(f, "device program constructor: {error}"),
             Self::Boundary(error) => write!(f, "boundary call ABI: {error}"),
         }
     }
 }
 
 impl std::error::Error for HostPartitionError {}
+
+impl From<DeviceProgramBuildError> for HostPartitionError {
+    fn from(error: DeviceProgramBuildError) -> Self {
+        match error {
+            DeviceProgramBuildError::KernelAbi { function, detail } => {
+                Self::KernelAbi { function, detail }
+            }
+            DeviceProgramBuildError::KernelPlan { function, detail } => {
+                Self::KernelPlan { function, detail }
+            }
+            DeviceProgramBuildError::BufferRole {
+                function,
+                binding,
+                role,
+                access,
+            } => Self::BufferRole {
+                function,
+                binding,
+                role,
+                access,
+            },
+            DeviceProgramBuildError::Program(error) => Self::Program(error),
+            other => Self::Constructor(other),
+        }
+    }
+}
 
 /// The host/device partition of one analyzed program (NGAB0 §Partition).
 ///
@@ -215,119 +240,20 @@ pub fn derive_host_partition(
     validated: &ValidatedMir<'_>,
     interner: &Interner,
 ) -> Result<HostPartition, HostPartitionError> {
+    let (device_program, _semantics) = build_device_program(
+        validated,
+        interner,
+        &crate::device::MirCompanionMap::default(),
+        None,
+        DeviceProgramLifetime::SingleRun,
+    )
+    .map_err(HostPartitionError::from)?;
     let program = validated.program();
-    let kernel_functions: Vec<&MirFunction> = program
-        .functions
+    let device_kernels: Vec<MirFunctionId> = device_program
+        .kernels
         .iter()
-        .filter(|function| function.shader_stage == Some(MirKernelShaderStage::Compute))
+        .map(|kernel| kernel.function)
         .collect();
-    if kernel_functions.is_empty() {
-        return Ok(HostPartition {
-            device_kernels: Vec::new(),
-            host_functions: program
-                .functions
-                .iter()
-                .map(|function| function.id)
-                .collect(),
-            device_program: DeviceProgram::new(DeviceProgramLifetime::SingleRun),
-            boundary_calls: Vec::new(),
-            call_abi_version: crate::boundary_abi::HOST_CALL_ABI_VERSION,
-        });
-    }
-
-    let mut device_program = DeviceProgram::new(DeviceProgramLifetime::SingleRun);
-    let mut device_kernels = Vec::with_capacity(kernel_functions.len());
-    let mut launches = Vec::with_capacity(kernel_functions.len());
-    let mut results = Vec::new();
-    let mut next_buffer_id = 1u32;
-
-    for (index, function) in kernel_functions.iter().enumerate() {
-        let signature = MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-            function,
-            validated.validation(),
-            interner,
-        )
-        .map_err(|error| HostPartitionError::KernelAbi {
-            function: function.id,
-            detail: error.message.clone(),
-        })?;
-        let plan = kernel_plan_for_function(function, &signature, validated.validation())
-            .map_err(|error| HostPartitionError::KernelPlan {
-                function: function.id,
-                detail: error.message.clone(),
-            })?
-            .unwrap_or(CollectionKernelPlan::Elementwise);
-        let entry = kernel_entry_name(function, interner);
-        let launch = KernelLaunchPlan::from_signature_and_function(&signature, function);
-        let launch_id = LaunchId(u32::try_from(index + 1).unwrap_or(u32::MAX));
-
-        let mut resources = Vec::new();
-        for resource in signature
-            .resources()
-            .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
-        {
-            let role =
-                BufferRole::from_abi_role(resource.role, resource.access).ok_or_else(|| {
-                    HostPartitionError::BufferRole {
-                        function: function.id,
-                        binding: resource.binding,
-                        role: format!("{:?}", resource.role),
-                        access: format!("{:?}", resource.access),
-                    }
-                })?;
-            let identity = BufferIdentity {
-                id: BufferId(next_buffer_id),
-                name: buffer_slot_name(function, interner, resource),
-                role,
-                storage: MirTensorStorageLayout::DeviceHandle,
-                lifetime: BufferLifetime::PerProgram,
-            };
-            next_buffer_id += 1;
-            let version = BufferVersion {
-                version: 1,
-                element_ty: resource.element_ty,
-                element_count: resource.element_count,
-                reduced_projection: resource.reduced_projection,
-            };
-            if let Some(device_resource) =
-                DeviceResource::from_kernel_resource(identity.clone(), version.clone(), resource)
-            {
-                resources.push(device_resource);
-            }
-            // A device-produced output read back once at the end of the run:
-            // the explicit observation row (NGAB0 §Abi observations are
-            // declared, never inferred).
-            if role == BufferRole::Output {
-                results.push(ResultBuffer {
-                    buffer: identity,
-                    version,
-                    role: BufferRole::Output,
-                    produced_by: launch_id,
-                    cadence: ObservationCadence::EndOfRun,
-                });
-            }
-        }
-
-        device_kernels.push(function.id);
-        device_program.kernels.push(KernelUnit {
-            function: function.id,
-            entry,
-            plan,
-            resources,
-            launch,
-        });
-        launches.push(LaunchUnit {
-            id: launch_id,
-            kernel_index: index,
-        });
-    }
-
-    device_program.launches = launches;
-    device_program.results = results;
-    device_program
-        .validate()
-        .map_err(HostPartitionError::Program)?;
-
     let host_functions = program
         .functions
         .iter()
@@ -340,7 +266,8 @@ pub fn derive_host_partition(
     // (wrong type, shape, lifetime, mutation of a read-only resource,
     // observation of unlaunched work) fail here — at compile time, before any
     // composite build/link or launch — with a typed diagnostic (NGAB0 §Abi
-    // cross-boundary validity). No boundary call reaches a consumer unvalidated.
+    // cross-boundary validity). No boundary call reaches a consumer
+    // unvalidated.
     validate_boundary_abi(program, &boundary_calls, validated.validation())
         .map_err(HostPartitionError::Boundary)?;
 
@@ -624,35 +551,6 @@ pub fn kernel_entry_name(function: &MirFunction, interner: &Interner) -> String 
         || format!("kernel{}", function.id.0),
         |symbol| interner.resolve(symbol).to_owned(),
     )
-}
-
-/// The buffer-slot name for one ABI resource: the carried source name when
-/// present, else the param name of the slot's source local, else a
-/// role/binding-based fallback. The name is a diagnostic/wire label — the
-/// identity key is the [`BufferId`], never the name or the emitted text.
-fn buffer_slot_name(
-    function: &MirFunction,
-    interner: &Interner,
-    resource: &MirKernelResource,
-) -> String {
-    if let Some(name) = &resource.source_name {
-        return name.clone();
-    }
-    if let Some(local) = resource.source_local {
-        if let Some(name) = function
-            .params
-            .iter()
-            .find(|param| param.local == local)
-            .and_then(|param| param.name)
-            .map(|symbol| interner.resolve(symbol))
-        {
-            return name.to_owned();
-        }
-    }
-    match resource.role {
-        crate::abi::MirKernelResourceRole::Input => format!("input_{}", resource.binding),
-        crate::abi::MirKernelResourceRole::Output => format!("output_{}", resource.binding),
-    }
 }
 
 /// Resolve a call statement's callee to the MIR function ids it may refer to.

@@ -109,15 +109,21 @@
 //! this reading incompatible with the frozen schema, it stops and routes a
 //! need to the Mind (delivery spec §11); it does not fork silently.
 
+mod constructor;
 mod error;
 mod helpers;
 mod program;
 mod registry;
 mod types;
 
+pub use constructor::*;
 pub use error::*;
 pub use registry::*;
 pub use types::*;
+
+#[cfg(test)]
+#[path = "constructor_test.rs"]
+mod constructor_tests;
 
 #[cfg(test)]
 #[path = "device_program_test.rs"]

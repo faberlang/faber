@@ -678,6 +678,9 @@ pub struct DumStmt {
 pub struct IteraStmt {
     pub mode: IteraMode,
     pub iterable: Box<Expr>,
+    /// Coordinate names from the optional `apud`/`at` clause, in source order.
+    /// Semantic binding is intentionally deferred to the iteration lowering unit.
+    pub apud: Vec<Ident>,
     pub mutability: AstMutability,
     pub binding: BindingPattern,
     pub body: IfBody,

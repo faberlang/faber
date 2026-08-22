@@ -734,17 +734,50 @@ fn itera_pro_mode_rejected() {
 }
 
 #[test]
-fn parses_itera_loop_apud_clause_rejected_before_surface_lands() {
+fn parses_itera_loop_apud_clause_and_preserves_coordinate_order() {
     // Post-delivery admit shapes: tensor rank 1/2/3 with [i]/[i, j]/[i, j, k]
     // and matrix rank 2 with [i, j]. Arity-error shapes remain [i] on rank 2,
     // [i, j] on rank 3, and [i, j, k] on matrix rank 2.
-    assert_parse_error_matches(
-        r"itera ex m apud [i, j] fixum cell { }",
-        ParseExpectation::Args(&[
-            ("issue", "mutability_marker"),
-            ("expected", "'fixum' or 'varia'"),
-        ]),
-    );
+    for (source, expected) in [
+        (r"itera ex m apud [i] fixum cell { }", &["i"][..]),
+        (r"itera ex m apud [i, j] fixum cell { }", &["i", "j"][..]),
+        (
+            r"itera ex m apud [i, j, k] fixum cell { }",
+            &["i", "j", "k"][..],
+        ),
+    ] {
+        let result = parse_ok(source);
+        let program = result.program.as_ref().expect("program");
+        let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
+            panic!("expected itera statement");
+        };
+        let coordinates = iter_stmt
+            .apud
+            .iter()
+            .map(|ident| symbol_name(&result, ident.name))
+            .collect::<Vec<_>>();
+        assert_eq!(coordinates, expected);
+        assert!(matches!(&iter_stmt.binding, BindingPattern::Ident(_)));
+    }
+}
+
+#[test]
+fn rejects_malformed_itera_apud_clauses_with_structured_errors() {
+    for (source, expected) in [
+        (r"itera ex m apud fixum cell { }", "'[' after 'apud'"),
+        (r"itera ex m apud (i, j) fixum cell { }", "'[' after 'apud'"),
+        (r"itera ex m apud [] fixum cell { }", "identifier"),
+        (r"itera ex m apud [i,] fixum cell { }", "identifier"),
+    ] {
+        let result = parse_program(source);
+        assert!(
+            result.errors.iter().any(|error| {
+                error.kind == ParseErrorKind::Expected && has_arg(error, "expected", expected)
+            }),
+            "expected structured apud rejection for {source:?}, got {:?}",
+            result.errors
+        );
+    }
 }
 
 #[test]
@@ -2370,6 +2403,7 @@ impl KeywordPack for EnGuardPack {
             "true" => Some("verum"),
             "for" => Some("itera"),
             "from" => Some("ex"),
+            "at" => Some("apud"),
             "const" => Some("fixum"),
             _ => None,
         }
@@ -2404,20 +2438,18 @@ fn assert_en_parse_error_issue(source: &str, issue: &str) {
 }
 
 #[test]
-fn itera_pro_mode_rejected_en_apud_clause_before_surface_lands() {
-    // `at` is intentionally absent from this pre-AC-2 pack, so the parser
-    // still expects the mutability marker after the iterable expression.
-    let result = parse_en("for from m at [i, j] const cell { }");
-    let errors = result.errors.iter().collect::<Vec<_>>();
-    let error = result
-        .errors
+fn parses_itera_apud_clause_on_en_at_surface() {
+    let result = parse_ok_en("for from m at [i, j] const cell { }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
+        panic!("expected itera statement");
+    };
+    let coordinates = iter_stmt
+        .apud
         .iter()
-        .find(|err| has_arg(err, "issue", "mutability_marker"))
-        .unwrap_or_else(|| panic!("expected mutability-marker rejection, got {errors:?}"));
-    assert!(
-        has_arg(error, "expected", "'fixum' or 'varia'"),
-        "unexpected args: {error:?}"
-    );
+        .map(|ident| symbol_name(&result, ident.name))
+        .collect::<Vec<_>>();
+    assert_eq!(coordinates, ["i", "j"]);
 }
 
 #[test]

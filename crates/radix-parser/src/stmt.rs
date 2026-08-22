@@ -156,8 +156,9 @@ impl Parser {
     /// Parse an `itera` loop and its ownership mode.
     ///
     /// GRAMMAR:
-    ///   itera-stmt := `itera` mode expr (`fixum`|`varia`) binding-pattern if-body [`cape` ident block]
+    ///   itera-stmt := `itera` mode expr [apud-clause] (`fixum`|`varia`) binding-pattern if-body [`cape` ident block]
     ///   mode := `ex` | `de` | `ab`
+    ///   apud-clause := `apud` `[` IDENTIFIER (`,` IDENTIFIER)* `]`
     ///
     /// The parser records the source preposition mode; later phases validate
     /// the semantic source shape for that mode.
@@ -177,6 +178,11 @@ impl Parser {
         };
 
         let iterable = Box::new(self.parse_expression()?);
+        let apud = if self.eat_keyword_ident(TokenKind::Apud) {
+            self.parse_apud_clause()?
+        } else {
+            Vec::new()
+        };
 
         let mutability = self.parse_mutability()?;
         // A top-level `_` in an itera binder is the legacy unused loop
@@ -193,11 +199,27 @@ impl Parser {
         Ok(StmtKind::Itera(IteraStmt {
             mode,
             iterable,
+            apud,
             mutability,
             binding,
             body,
             catch,
         }))
+    }
+
+    /// Parse the bracketed coordinate names claimed by an `apud` clause.
+    fn parse_apud_clause(&mut self) -> Result<Vec<Ident>, ParseError> {
+        self.expect(&TokenKind::LBracket, "expected '[' after 'apud'")?;
+
+        let mut coordinates = vec![self.parse_ident()?];
+        while self.eat(&TokenKind::Comma) {
+            coordinates.push(self.parse_ident()?);
+        }
+        self.expect(
+            &TokenKind::RBracket,
+            "expected ']' after `apud` coordinates",
+        )?;
+        Ok(coordinates)
     }
 
     // PATTERN MATCHING AND DISPATCH
