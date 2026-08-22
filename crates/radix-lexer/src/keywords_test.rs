@@ -6,7 +6,7 @@
 
 use super::{
     keyword_allowed_as_ident, keyword_group_specs, keyword_specs, keyword_spelling_for_token,
-    keyword_token_kind, lookup_keyword_spec, validate_keyword_groups, KeywordCategory,
+    keyword_token_kind, lookup_keyword_spec, validate_keyword_groups, KeywordKind,
     KeywordOwner, KeywordScope,
 };
 use crate::TokenKind;
@@ -225,7 +225,7 @@ fn nonnihil_remains_predicate_and_member_identifier() {
 fn annotation_family_keywords_have_identities() {
     let futura = lookup_keyword_spec("futura").expect("futura metadata should be registered");
     assert_eq!(futura.scope, KeywordScope::Annotation);
-    assert_eq!(futura.category, KeywordCategory::Annotation);
+    assert_eq!(futura.category, KeywordKind::Annotation);
     assert_eq!(futura.token_kind, Some(TokenKind::Futura));
 
     assert!(lookup_keyword_spec("sectio").is_none());
@@ -237,7 +237,7 @@ fn interna_is_visibility_annotation_keyword() {
     // contextual keyword claiming the annotation-name slot.
     let spec = lookup_keyword_spec("interna").expect("interna must be registered");
     assert_eq!(spec.token_kind, Some(TokenKind::Interna));
-    assert_eq!(spec.category, KeywordCategory::Modifier);
+    assert_eq!(spec.category, KeywordKind::Modifier);
     assert_eq!(keyword_token_kind("interna"), Some(TokenKind::Interna));
     assert!(TokenKind::Interna.is_keyword());
     assert_eq!(
@@ -278,7 +278,7 @@ fn census_schema_and_columna_are_declaration_keywords() {
         let spec = lookup_keyword_spec(spelling)
             .unwrap_or_else(|| panic!("{spelling} must be a registered keyword"));
         assert_eq!(spec.token_kind, Some(identity.clone()));
-        assert_eq!(spec.category, KeywordCategory::Declaration);
+        assert_eq!(spec.category, KeywordKind::Declaration);
         assert_eq!(keyword_token_kind(spelling), Some(identity.clone()));
         assert!(
             identity.is_keyword(),

@@ -64,7 +64,7 @@ use std::collections::HashMap;
 pub use cursor::Cursor;
 pub use keywords::{
     keyword_allowed_as_ident, keyword_group_specs, keyword_specs, keyword_spelling_for_token,
-    keyword_token_kind, lookup_keyword_spec, validate_keyword_groups, KeywordCategory,
+    keyword_token_kind, lookup_keyword_spec, validate_keyword_groups, KeywordKind,
     KeywordGroupSpec, KeywordGroupValidationError, KeywordOwner, KeywordScope, KeywordSpec,
 };
 pub use scan::INLINE_COMMENT_ISSUE;

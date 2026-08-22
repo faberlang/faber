@@ -1393,7 +1393,7 @@ fn lexes_requirit_statement_keyword() {
     assert_eq!(spec.token_kind, Some(TokenKind::Requirit));
     assert_eq!(
         spec.category,
-        crate::KeywordCategory::ErrorHandling,
+        crate::KeywordKind::ErrorHandling,
         "requirit belongs to the error-handling category"
     );
 }
