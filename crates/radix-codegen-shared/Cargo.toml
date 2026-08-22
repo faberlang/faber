@@ -13,6 +13,9 @@ radix-lexer = { path = "../radix-lexer" }
 radix-types = { path = "../radix-types" }
 rustc-hash = "2"
 
+[dev-dependencies]
+hygiene-ratchet = { path = "../hygiene-ratchet" }
+
 [lints]
 workspace = true
 
