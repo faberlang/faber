@@ -13,7 +13,7 @@
 //! excluded from the build it runs in: the module cannot reference any of
 //! them because they are not compiled.
 
-use radix_program::mir::DeviceSelection;
+use radix::program::mir::DeviceSelection;
 
 /// C2 small-build proof. Runs only outside `full-targets` (the
 /// `--no-default-features --features hir-rust` build): the GPU emitters and

@@ -2,7 +2,7 @@ use crate::diagnostic_explain::{
     is_diagnostic_query, lookup_diagnostic_in_pack, lookup_embedded_diagnostic, render_json,
     render_plain,
 };
-use radix_module::locale::LocalePack;
+use radix::module::locale::LocalePack;
 
 fn synthetic_pack() -> LocalePack {
     LocalePack::from_toml_str(

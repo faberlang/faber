@@ -1,10 +1,11 @@
 use super::{
     decode_device_inputs, encode_device_execute_invocation, encode_device_inputs,
-    encode_weight_map, execute_device_at, open_device_session_at, resolve_host_cli_at,
-    resolve_host_cli_at_root, start_device_session_at, validate_protocol_invocation,
-    DeviceExecuteInvocation, DeviceExecuteInvocationMode, DeviceExecuteProgram,
-    DeviceExecuteProtocol, DeviceExecuteReceipt, DeviceExecuteRequest, DeviceExecuteV2Request,
-    HostSpawnError, WeightFileRange,
+    encode_weight_map, execute_device_at, execute_distributed_at, open_device_session_at,
+    resolve_host_cli_at, resolve_host_cli_at_root, start_device_session_at,
+    validate_protocol_invocation, DeviceExecuteInvocation, DeviceExecuteInvocationMode,
+    DeviceExecuteProgram, DeviceExecuteProtocol, DeviceExecuteReceipt, DeviceExecuteRequest,
+    DeviceExecuteV2Request, DistributedExecuteRequest, DistributedPrepareReceipt, HostSpawnError,
+    WeightFileRange,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -25,6 +26,28 @@ fn stub_host_cli(stdout: &str) -> (tempfile::TempDir, PathBuf) {
 fn spawn_via_stub_cli(request: DeviceExecuteRequest, stdout: &str) -> HostSpawnError {
     let (_dir, host) = stub_host_cli(stdout);
     execute_device_at(&host, &request).expect_err("cli error")
+}
+
+fn distributed_stub_cli() -> (tempfile::TempDir, PathBuf) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("faber-host-macos-arm64");
+    let script = r##"#!/bin/sh
+case "$*" in
+  *"device-execute --backend cuda --distributed-image "*" --bind-count 1")
+    printf '%s\n' '{"physical_device_count":1,"physical_device_ids":["cuda:test"],"virtual_partition_count":8,"virtual_partition_ids":["partition:0"],"fixture_identity_class":"virtual","transport_class":"host_staged","hardware_isolation_claimed":false,"bind_shape":"8:1","communication_graph_edge_count":3,"snapshot_id":"snapshot:test","logical_distributed_plan_hash":"sha256:logical","bound_distributed_plan_hash":"sha256:bound","transaction_state":"prepared"}'
+    exit 0
+    ;;
+  *) exit 64 ;;
+esac
+"##;
+    std::fs::write(&path, script).expect("write distributed stub");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod distributed stub");
+    }
+    (dir, path)
 }
 
 fn resident_stub_cli() -> (tempfile::TempDir, PathBuf) {
@@ -345,6 +368,21 @@ fn backend_host_rows_do_not_cross_binary_names() {
     let err = resolve_host_cli_at_root("cuda", None, false, metal_only.path())
         .expect_err("cuda must not use the metal row");
     assert!(err.message.contains("FABER_HOST_CUDA"), "{}", err.message);
+}
+
+#[test]
+fn distributed_spawn_passes_image_and_bind_count_and_decodes_receipt() {
+    let (_dir, host) = distributed_stub_cli();
+    let request = DistributedExecuteRequest {
+        backend: "cuda".to_owned(),
+        image: b"fmir-distributed".to_vec(),
+        bind_count: 1,
+    };
+    let receipt: DistributedPrepareReceipt =
+        execute_distributed_at(&host, &request).expect("distributed CLI receipt");
+    assert_eq!(receipt.bind_shape, "8:1");
+    assert_eq!(receipt.transaction_state, "prepared");
+    assert!(!receipt.hardware_isolation_claimed);
 }
 
 #[test]

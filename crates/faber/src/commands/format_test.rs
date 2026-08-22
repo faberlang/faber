@@ -3,12 +3,12 @@
 use super::format::{
     format_session, formatted_source_for_write, normalize_trailing_newline, source_for_compare,
 };
-use radix_module::codegen::faber::compile_canonical;
-use radix_module::codegen::faber::test_gate::{
+use radix::module::codegen::faber::compile_canonical;
+use radix::module::codegen::faber::test_gate::{
     assert_canonical_idempotent_with_session, assert_canonical_reparses_with,
     canonical_format_once_with_session,
 };
-use radix_module::locale::LocalePack;
+use radix::module::locale::LocalePack;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -59,7 +59,7 @@ pub(crate) fn code_only(code: &str) -> String {
 fn format_canonical_output_reparses_without_errors() {
     let path = exempla("incipit/salve-munde.fab");
     let formatted = canonical_cli_pipeline(&path);
-    let body = radix_module::driver::split_frontmatter(&formatted)
+    let body = radix::module::driver::split_frontmatter(&formatted)
         .expect("split")
         .body;
     assert_canonical_reparses_with(body, "salve-munde pipeline", Some(&english_pack()))
@@ -153,7 +153,7 @@ fn format_canonical_pipeline_reparses_cura_fixture() {
         formatted.contains("print \"in arena\"") || formatted.contains("# cura"),
         "cura exempla should keep the arena-scoped body on the en surface:\n{formatted}"
     );
-    let body = radix_module::driver::split_frontmatter(&formatted)
+    let body = radix::module::driver::split_frontmatter(&formatted)
         .expect("split")
         .body;
     assert_canonical_reparses_with(body, "cura pipeline", Some(&english_pack())).expect("reparse");
@@ -171,7 +171,7 @@ fn format_canonical_pipeline_preserves_and_reparses_comment_fixture() {
     let session = format_session(&path, None, source).expect("session");
     let _ = fs::remove_dir_all(&dir);
     assert!(formatted.contains("# lead comment"));
-    let body = radix_module::driver::split_frontmatter(&formatted)
+    let body = radix::module::driver::split_frontmatter(&formatted)
         .expect("split")
         .body;
     assert_canonical_reparses_with(body, "comment pipeline", Some(&english_pack()))
@@ -187,7 +187,7 @@ fn format_test_gate_matches_compile_canonical_pipeline_for_salve() {
     let session = format_session(&path, None, &source).expect("session");
     let via_gate = canonical_format_once_with_session(&session, &name, &source).expect("gate");
     let via_pipeline = canonical_cli_pipeline(&path);
-    let body = radix_module::driver::split_frontmatter(&via_pipeline)
+    let body = radix::module::driver::split_frontmatter(&via_pipeline)
         .expect("split")
         .body;
     assert_eq!(
@@ -270,7 +270,7 @@ fn format_cli_en_source_keeps_english_types() {
     let formatted = run_faber_format_stdout(&fixture);
     let _ = fs::remove_file(&fixture);
 
-    let body = radix_module::driver::split_frontmatter(&formatted)
+    let body = radix::module::driver::split_frontmatter(&formatted)
         .expect("split")
         .body;
     assert!(
@@ -300,7 +300,7 @@ fn format_cli_la_source_stays_latin() {
     let formatted = run_faber_format_stdout(&fixture);
     let _ = fs::remove_file(&fixture);
 
-    let body = radix_module::driver::split_frontmatter(&formatted)
+    let body = radix::module::driver::split_frontmatter(&formatted)
         .expect("split")
         .body;
     assert!(
@@ -347,7 +347,7 @@ fn format_cli_comment_fixture_reparses() {
         formatted.contains("# lead comment"),
         "CLI must preserve leading comment:\n{formatted}"
     );
-    let body = radix_module::driver::split_frontmatter(&formatted)
+    let body = radix::module::driver::split_frontmatter(&formatted)
         .expect("split")
         .body;
     assert_canonical_reparses_with(body, "comment CLI --stdout", Some(&english_pack()))
@@ -388,7 +388,7 @@ fn format_stdin_en_source_keeps_english_surface() {
         success,
         "faber format --stdin must accept en source: {stderr}"
     );
-    let body = radix_module::driver::split_frontmatter(&stdout)
+    let body = radix::module::driver::split_frontmatter(&stdout)
         .expect("split")
         .body;
     assert!(
@@ -551,7 +551,7 @@ fn format_write_reprepends_exact_frontmatter_slice() {
     let path = exempla("incipit/salve-munde.fab");
     let raw = fs::read_to_string(&path).expect("read");
     let formatted = canonical_cli_pipeline(&path);
-    let split = radix_module::driver::split_frontmatter(&raw).expect("split frontmatter");
+    let split = radix::module::driver::split_frontmatter(&raw).expect("split frontmatter");
     let body_start = split.body_byte_offset as usize;
 
     assert_eq!(

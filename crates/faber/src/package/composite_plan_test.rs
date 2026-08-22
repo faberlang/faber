@@ -24,8 +24,8 @@ use radix_mir_fmir::{
     DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId, FmirDeviceArtifact,
     FmirDeviceBackend, MaterializationStage,
 };
-use radix_module::codegen::Target;
-use radix_module::diagnostics::{Diagnostic, DiagnosticArg};
+use radix::module::codegen::Target;
+use radix::module::diagnostics::{Diagnostic, DiagnosticArg};
 use radix_types::TypeId;
 use std::collections::BTreeMap;
 use std::path::PathBuf;

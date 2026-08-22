@@ -6,7 +6,7 @@
 //! compressed.
 
 use flate2::read::GzDecoder;
-use radix_module::locale::{LocalePack, LocalePackLoadError};
+use radix::module::locale::{LocalePack, LocalePackLoadError};
 use std::fmt;
 use std::io::Read;
 

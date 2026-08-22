@@ -13,17 +13,17 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-use radix_module::codegen::Target;
-use radix_module::diagnostics::Diagnostic;
+use radix::module::codegen::Target;
+use radix::module::diagnostics::Diagnostic;
 use serde::Deserialize;
 
 // DDPP1-U2 (C2 feature isolation): the shared route-selection request type.
-use radix_program::library::is_valid_provider_segment;
-use radix_program::manifest::{
+use radix::program::library::is_valid_provider_segment;
+use radix::program::manifest::{
     manifest_build_target, ManifestBuild, ManifestLibrary, ManifestPackage, ManifestPaths,
     ManifestReader, ManifestTarget,
 };
-use radix_program::mir::DeviceSelection;
+use radix::program::mir::DeviceSelection;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -275,12 +275,12 @@ pub fn read_manifest(path: &Path) -> Result<FaberManifest, Box<Diagnostic>> {
 /// must keep its manifest: a later missing or unreadable manifest is a
 /// diagnostic, never a silent `None` default (FBR-P1-001).
 pub(super) fn manifest_for_spec(
-    spec: &radix_program::discovery::PackageSpec,
+    spec: &radix::program::discovery::PackageSpec,
 ) -> Result<Option<FaberManifest>, Box<Diagnostic>> {
     if !spec.manifest_backed {
         return Ok(None);
     }
-    let Some(path) = radix_program::frontmatter::manifest_path_for_spec(spec) else {
+    let Some(path) = radix::program::frontmatter::manifest_path_for_spec(spec) else {
         return Err(Box::new(
             crate::package_diagnostic_error(
                 "package manifest faber.toml is missing after discovery validated it",

@@ -8,10 +8,10 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use radix_module::codegen::Target;
-use radix_module::diagnostics::Diagnostic;
-use radix_program::discovery::PackageSpec;
-use radix_program::library::is_valid_provider_segment;
+use radix::module::codegen::Target;
+use radix::module::diagnostics::Diagnostic;
+use radix::program::discovery::PackageSpec;
+use radix::program::library::is_valid_provider_segment;
 
 use crate::cli::CheckLibraryArgs;
 use crate::library::{
@@ -187,7 +187,7 @@ fn check_target(provider_repo: &Path, root_rule: LibraryRootRule) -> Target {
     let Ok(manifest) = crate::package::read_manifest(&manifest_path) else {
         return Target::HirRust;
     };
-    radix_program::manifest::manifest_build_target(manifest.build.target.as_deref(), &manifest_path)
+    radix::program::manifest::manifest_build_target(manifest.build.target.as_deref(), &manifest_path)
         .unwrap_or(Target::HirRust)
 }
 
@@ -208,7 +208,7 @@ pub(crate) fn check_dev_library(checkout: &DevLibraryCheckout) -> Vec<Diagnostic
             Ok(resolver) => resolver,
             Err(diagnostics) => return diagnostics,
         };
-    match radix_program::analyze::analyze_package_spec(
+    match radix::program::analyze::analyze_package_spec(
         &config,
         clone_spec(&checkout.spec),
         &resolver,
@@ -244,7 +244,7 @@ pub(super) fn cmd_check_library(args: CheckLibraryArgs) {
     let diagnostics = check_dev_library(&checkout);
     let mut fatal = 0usize;
     for diag in &diagnostics {
-        eprintln!("{}", radix_module::diagnostics::render_plain(diag));
+        eprintln!("{}", radix::module::diagnostics::render_plain(diag));
         if diag.is_error() {
             fatal += 1;
         }

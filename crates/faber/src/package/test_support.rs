@@ -3,7 +3,7 @@
 //! Extracted from `package_test.rs` so that sibling test modules (e.g.
 //! `frontmatter_integration_test.rs`) can reuse them without duplication.
 
-use radix_module::diagnostics::{Diagnostic, DiagnosticArg};
+use radix::module::diagnostics::{Diagnostic, DiagnosticArg};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 /// while retaining lexical normalization for paths that do not exist yet.
 pub fn paths_equivalent(left: &Path, right: &Path) -> bool {
     fn comparison_path(path: &Path) -> PathBuf {
-        std::fs::canonicalize(path).unwrap_or_else(|_| radix_program::paths::normalize_path(path))
+        std::fs::canonicalize(path).unwrap_or_else(|_| radix::program::paths::normalize_path(path))
     }
 
     comparison_path(left) == comparison_path(right)

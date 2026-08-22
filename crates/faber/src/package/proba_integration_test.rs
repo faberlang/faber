@@ -5,17 +5,17 @@
 
 use super::library_resolver_from_config;
 use super::test_support::{diagnostic_has_issue, test_temp_dir};
-use radix_module::driver::Config;
-use radix_module::locale::LocalePack;
-use radix_module::Output;
-use radix_program::analyze::AnalysisSeams;
-use radix_program::discovery::PackageSpec;
-use radix_program::emit::{
+use radix::module::driver::Config;
+use radix::module::locale::LocalePack;
+use radix::module::Output;
+use radix::program::analyze::AnalysisSeams;
+use radix::program::discovery::PackageSpec;
+use radix::program::emit::{
     compile_package as compile_package_direct,
     compile_package_with_test_options as compile_package_with_test_options_direct,
 };
-use radix_program::library::LibraryResolver;
-use radix_program::test_source_filter::TestSourceFilter;
+use radix::program::library::LibraryResolver;
+use radix::program::test_source_filter::TestSourceFilter;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -23,16 +23,16 @@ fn seams() -> AnalysisSeams {
     crate::package::faber_analysis_seams()
 }
 
-fn compile_with_faber_seams(config: &Config, input: &Path) -> radix_module::CompileResult {
+fn compile_with_faber_seams(config: &Config, input: &Path) -> radix::module::CompileResult {
     compile_package_direct(config, input, &crate::package::faber_emission_seams())
 }
 
 fn compile_with_test_options(
     config: &Config,
     input: &Path,
-    selection: Option<&radix_program::frontmatter::RustTestSelection>,
+    selection: Option<&radix::program::frontmatter::RustTestSelection>,
     filter: Option<&TestSourceFilter>,
-) -> radix_module::CompileResult {
+) -> radix::module::CompileResult {
     compile_package_with_test_options_direct(
         config,
         input,
@@ -44,7 +44,7 @@ fn compile_with_test_options(
 
 fn discover_package(
     input: &Path,
-) -> Result<PackageSpec, Box<radix_module::diagnostics::Diagnostic>> {
+) -> Result<PackageSpec, Box<radix::module::diagnostics::Diagnostic>> {
     crate::package::discover_package(input)
 }
 
@@ -54,8 +54,8 @@ fn load_with_faber_seams(
     locale_pack: Option<&LocalePack>,
     include_proba: bool,
     filter: Option<&TestSourceFilter>,
-) -> Result<Vec<radix_program::PackageFile>, Vec<radix_module::diagnostics::Diagnostic>> {
-    radix_program::analyze::load_package_with_locale_pack(
+) -> Result<Vec<radix::program::PackageFile>, Vec<radix::module::diagnostics::Diagnostic>> {
+    radix::program::analyze::load_package_with_locale_pack(
         spec,
         resolver,
         locale_pack,
@@ -444,7 +444,7 @@ describe "helpers" {
 
 #[test]
 fn norma_src_proba_is_discovered_beside_product_sources() {
-    let norma_src = radix_module::paths::faberlang_home()
+    let norma_src = radix::module::paths::faberlang_home()
         .expect("faberlang container root")
         .join("norma/src");
     assert!(
@@ -466,12 +466,12 @@ fn norma_src_proba_is_discovered_beside_product_sources() {
     );
 
     let files =
-        radix_program::source_files::package_source_files(&norma_src, true).expect("discover");
+        radix::program::source_files::package_source_files(&norma_src, true).expect("discover");
     assert!(
         files.iter().any(|p| p.ends_with("mathesis.proba")),
         "include_proba=true must find mathesis.proba under norma/src"
     );
-    let prod = radix_program::source_files::package_source_files(&norma_src, false).expect("prod");
+    let prod = radix::program::source_files::package_source_files(&norma_src, false).expect("prod");
     assert!(
         !prod.iter().any(|p| p.ends_with(".proba")),
         "production discovery must skip *.proba under norma/src"

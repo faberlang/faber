@@ -3,15 +3,34 @@
 //! Library-only: no binary, no clap, no process exit. The developer `radix`
 //! binary lives in `radix-cli`.
 
-/// Fail-closed module analysis.
+/// Fail-closed module compiler APIs and supporting module-owned types.
 pub mod module {
+    #[cfg(feature = "device")]
+    pub use radix_module::air;
     pub use radix_module::driver::{
-        analyze_source, analyze_source_with_module_import_contract, AnalyzedModule, Config,
-        ModuleImportContract, Session,
+        analyze_source, analyze_source_with_module_import_contract, AnalyzedModule,
+        ModuleImportContract,
+    };
+    #[cfg(feature = "mir-core")]
+    pub use radix_module::mir;
+    pub use radix_module::{
+        abi, aspect, builtins, cli_descriptor, codegen, diagnostics, driver, file_interface, hir,
+        intrinsics, kernel, lexer, live_tuus_cursor, llvm_host, locale, parser, paths,
+        runtime_contract, semantic, syntax,
+    };
+    pub use radix_module::{
+        apply_warn_policy, is_known_diagnostic_code, CompileResult, Compiler, Config, Diagnostic,
+        FaberOutput, GoOutput, HaskellOutput, Output, PythonOutput, RustOutput, Session,
+        SwiftOutput, Target, TypeScriptOutput, WarnPolicy,
     };
 }
 
-/// Typed program-layer compilation and prepared-module analysis.
+/// Compiler CLI-IR (`@ cli` / `@ imperium`), not developer CLI grammar.
+pub mod cli {
+    pub use radix_module::cli::*;
+}
+
+/// Typed program-layer compilation and whole-program package APIs.
 pub mod program {
     pub use radix_module::program::{
         analyze_prepared_program_name, analyze_prepared_program_path,
@@ -20,6 +39,20 @@ pub mod program {
         PreparedProgramModule, FABER_LIBRARY_HOME_ENV,
     };
     pub use radix_module::{CompileResult, Compiler};
+    #[cfg(feature = "mir-llvm")]
+    pub use radix_program::llvm;
+    pub use radix_program::mir;
+    #[cfg(feature = "mir-wasm")]
+    pub use radix_program::wasm;
+    pub use radix_program::{
+        analyze, artifact_plan, discovery, emit, file_interface, frontmatter, import_graph,
+        library, lockfile, manifest, member_path, modules, paths, source_files, test_source_filter,
+        LibraryImportBinding, PackageFile,
+    };
+    #[cfg(feature = "hir-rust")]
+    pub use radix_program::{codegen, rust_target};
+    #[cfg(feature = "hir-fhir")]
+    pub use radix_program::{fhir, nucleum};
 }
 
 /// Admitted typed services: values + diagnostics, no printing or process exit.

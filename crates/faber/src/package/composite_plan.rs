@@ -18,14 +18,14 @@
 //! makes no execution claim and adds no CLI or FMIR wire surface.
 //!
 //! TARGET: internal product-pipeline typed value mirroring
-//! [`radix_program::artifact_plan`] — debug/test/tooling surface, not a public ABI.
+//! [`radix::program::artifact_plan`] — debug/test/tooling surface, not a public ABI.
 //! WHY: the campaign join is a build-time typed value; there is no new
 //! top-level CLI (EXEC-01 challenge C1).
 //!
 //! # Assembly rule (DDPP0 §ProductShape)
 //!
 //! Assembly composes typed facts only: `AnalyzedProgram` → per-target
-//! [`ArtifactPlan`](radix_program::artifact_plan::ArtifactPlan) (package identity),
+//! [`ArtifactPlan`](radix::program::artifact_plan::ArtifactPlan) (package identity),
 //! the target-neutral `DeviceProgram` plus its carried `DeviceSemantics`
 //! (prepared regions are derived from the carried dependency graph), FMIR
 //! device-section artifacts with their identity digests, Gradus
@@ -63,12 +63,12 @@ use radix_mir::kernel_plan::CollectionKernelPlan;
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::MirType;
 use radix_mir_fmir::{DeviceTargetId, FmirDeviceArtifact, FmirDeviceBackend};
-use radix_module::codegen::Target;
-use radix_module::diagnostics::Diagnostic;
+use radix::module::codegen::Target;
+use radix::module::diagnostics::Diagnostic;
 use serde::Serialize;
 
-use radix_program::analyze::AnalyzedProgram;
-use radix_program::artifact_plan::plan_package;
+use radix::program::analyze::AnalyzedProgram;
+use radix::program::artifact_plan::plan_package;
 
 /// The versioned composite-plan document schema.
 pub const COMPOSITE_PLAN_SCHEMA: &str = "composite-plan v1";
@@ -802,7 +802,7 @@ fn is_canonical_sha256_digestio(digestio: &str) -> bool {
 ///
 /// # Errors
 /// Serialization failure (a serde error is surfaced as a string, matching
-/// [`radix_program::artifact_plan::ArtifactPlan::to_debug_json`]).
+/// [`radix::program::artifact_plan::ArtifactPlan::to_debug_json`]).
 pub(crate) fn render_composite_plan_v1(plan: &CompositePlan) -> Result<String, String> {
     serde_json::to_string_pretty(&CompositePlanDocument::from(plan))
         .map_err(|error| error.to_string())

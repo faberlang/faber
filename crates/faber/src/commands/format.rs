@@ -3,8 +3,8 @@
 //! type vocabulary stay on that surface. Reader-locale conversion lives in
 //! `faber convert` (`commands/convert.rs`).
 
-use radix_module::codegen::Target;
-use radix_module::driver::{peel_raw_source, split_frontmatter, Config, Session};
+use radix::module::codegen::Target;
+use radix::module::driver::{peel_raw_source, split_frontmatter, Config, Session};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -152,7 +152,7 @@ pub(super) fn convert_single_doc(
         }
     };
     let result =
-        radix_module::codegen::faber::compile_canonical(&session, &name, &source_for_compile);
+        radix::module::codegen::faber::compile_canonical(&session, &name, &source_for_compile);
     let mut had_error = false;
     for diag in &result.diagnostics {
         if diag.is_error() {
@@ -208,7 +208,7 @@ fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
             return Err(());
         }
     };
-    let result = radix_module::codegen::faber::compile_canonical(&session, &name, source);
+    let result = radix::module::codegen::faber::compile_canonical(&session, &name, source);
 
     let mut had_error = false;
     for diag in &result.diagnostics {

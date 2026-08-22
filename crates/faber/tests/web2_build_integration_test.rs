@@ -8,7 +8,7 @@
 //!
 //! The tela content root resolves via `FABER_TELA_HOME` (env override),
 //! then the faberlang container root discovered by
-//! `radix_module::paths::faberlang_home()` (`tela` under it). When the content
+//! `radix::module::paths::faberlang_home()` (`tela` under it). When the content
 //! root is absent the test skips with a recorded message, exactly as it
 //! already does when `tsc` is missing from PATH (both preconditions recorded,
 //! never claimed as coverage).
@@ -22,12 +22,12 @@ mod temp;
 use temp::TempDir;
 
 /// tela content root: `FABER_TELA_HOME` override, then the faberlang
-/// container root via `radix_module::paths::faberlang_home()`.
+/// container root via `radix::module::paths::faberlang_home()`.
 fn tela_root() -> PathBuf {
     if let Ok(home) = std::env::var("FABER_TELA_HOME") {
         return PathBuf::from(home);
     }
-    radix_module::paths::faberlang_home()
+    radix::module::paths::faberlang_home()
         .expect("faberlang container root")
         .join("tela")
 }

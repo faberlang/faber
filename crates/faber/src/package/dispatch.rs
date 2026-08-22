@@ -1,5 +1,5 @@
 use super::runtime_sources::{path_override_root, SupportCrateSource};
-use radix_module::diagnostics::Diagnostic;
+use radix::module::diagnostics::Diagnostic;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fs;

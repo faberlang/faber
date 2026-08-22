@@ -1,14 +1,14 @@
-use radix_module::codegen::Target;
-use radix_module::diagnostics::Diagnostic;
-use radix_module::driver::Config;
-use radix_module::locale::LocalePack;
+use radix::module::codegen::Target;
+use radix::module::diagnostics::Diagnostic;
+use radix::module::driver::Config;
+use radix::module::locale::LocalePack;
 use std::path::{Path, PathBuf};
 
 use super::discover_package;
 use super::embedded_locale::{load_embedded_locale_pack, EmbeddedLocaleError, EMBEDDED_LOCALE_IDS};
 use super::manifest::{manifest_for_spec, FaberManifest};
-use radix_program::discovery::PackageSpec;
-use radix_program::paths::normalize_path;
+use radix::program::discovery::PackageSpec;
+use radix::program::paths::normalize_path;
 
 pub(crate) const DEFAULT_CODE_LOCALE: &str = "en";
 

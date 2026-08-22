@@ -6,7 +6,7 @@
 #![cfg(feature = "runner")]
 
 use proba::{run_proba_source, TestSelection};
-use radix_module::driver::{Config, Session};
+use radix::module::driver::{Config, Session};
 use std::fs;
 use std::path::PathBuf;
 
@@ -103,7 +103,7 @@ fn cmd_test_source_has_no_cargo_or_rust_executor() {
 
 #[test]
 fn package_analysis_failures_render_file_line_and_message() {
-    use radix_module::diagnostics::{Diagnostic, Span};
+    use radix::module::diagnostics::{Diagnostic, Span};
 
     let error = Diagnostic::error("unknown identifier")
         .with_code("SEM001")
@@ -111,7 +111,7 @@ fn package_analysis_failures_render_file_line_and_message() {
         .with_file("src/gradus.fab")
         .with_span(Span::new(42, 50))
         .with_source_line("    nomen missing");
-    let check_line = radix_module::diagnostics::render_plain(&error);
+    let check_line = radix::module::diagnostics::render_plain(&error);
     let rendered = super::render_package_analysis_diagnostics(std::slice::from_ref(&error));
 
     assert_eq!(rendered, check_line);
@@ -131,7 +131,7 @@ fn package_analysis_failures_render_file_line_and_message() {
 
 #[test]
 fn package_analysis_repeated_warning_codes_collapse_to_a_count() {
-    use radix_module::diagnostics::{Diagnostic, Span};
+    use radix::module::diagnostics::{Diagnostic, Span};
 
     let error = Diagnostic::error("undefined name")
         .with_code("SEM008")
@@ -159,11 +159,11 @@ fn package_analysis_repeated_warning_codes_collapse_to_a_count() {
     let rendered = super::render_package_analysis_diagnostics(&diagnostics);
 
     assert!(
-        rendered.contains(&radix_module::diagnostics::render_plain(&error)),
+        rendered.contains(&radix::module::diagnostics::render_plain(&error)),
         "errors must keep the faber-check plain renderer:\n{rendered}"
     );
     assert!(
-        rendered.contains(&radix_module::diagnostics::render_plain(&unique)),
+        rendered.contains(&radix::module::diagnostics::render_plain(&unique)),
         "a unique warning still renders in full:\n{rendered}"
     );
     assert!(

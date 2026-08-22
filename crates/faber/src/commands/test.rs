@@ -9,8 +9,8 @@ use proba::{
     selection_skip_reason, source_skip_reason, CaseOutcome, CaseResult, ProbaCase, ProbaReport,
     TestSelection,
 };
-use radix_module::driver::{Config, Session};
-use radix_program::test_source_filter::TestSourceFilter;
+use radix::module::driver::{Config, Session};
+use radix::program::test_source_filter::TestSourceFilter;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 use std::time::Instant;
@@ -56,7 +56,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         && !args.path.exists()
     {
         let diagnostic = package::missing_package_path_diagnostic(&args.path);
-        eprintln!("{}", radix_module::diagnostics::render_plain(&diagnostic));
+        eprintln!("{}", radix::module::diagnostics::render_plain(&diagnostic));
         std::process::exit(1);
     }
 
@@ -100,7 +100,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         std::process::exit(2);
     }
 
-    let warn_policy = radix_module::driver::WarnPolicy {
+    let warn_policy = radix::module::driver::WarnPolicy {
         deny_all_warnings: args.deny_warnings,
         deny_codes: args.deny.clone(),
     };
@@ -215,7 +215,7 @@ where
     !include.is_empty()
         && !unit_paths
             .into_iter()
-            .any(|path| radix_program::source_files::is_proba_source_path(path.as_ref()))
+            .any(|path| radix::program::source_files::is_proba_source_path(path.as_ref()))
 }
 
 fn run_single_file(
@@ -286,9 +286,9 @@ fn run_source_with_options(
     options: &TestRunOptions,
     include_ignored: bool,
     focused: bool,
-) -> Result<(ProbaReport, RunMetadata), radix_module::mir::RunSourceError> {
-    let mut analysis = radix_program::analyze_prepared_program_name(session, name, source)
-        .map_err(radix_module::mir::RunSourceError::Frontend)?;
+) -> Result<(ProbaReport, RunMetadata), radix::module::mir::RunSourceError> {
+    let mut analysis = radix::program::analyze_prepared_program_name(session, name, source)
+        .map_err(radix::module::mir::RunSourceError::Frontend)?;
     let all_cases = inventory_cases(&analysis.hir, &analysis.interner);
     let focused = focused || has_solum_cases(&all_cases);
     let available = if focused {
@@ -308,8 +308,8 @@ fn run_source_with_options(
         return Ok((ProbaReport::default(), RunMetadata::default()));
     }
 
-    let lowered = radix_module::mir::lower_analyzed_unit_with_context(&mut analysis)
-        .map_err(radix_module::mir::RunSourceError::Mir)?;
+    let lowered = radix::module::mir::lower_analyzed_unit_with_context(&mut analysis)
+        .map_err(radix::module::mir::RunSourceError::Mir)?;
     let mut report = ProbaReport::default();
     let mut metadata = RunMetadata::default();
     for case in cases {
@@ -345,7 +345,7 @@ fn run_source_with_focus(
     exact: bool,
     include_ignored: bool,
     focused: bool,
-) -> Result<ProbaReport, radix_module::mir::RunSourceError> {
+) -> Result<ProbaReport, radix::module::mir::RunSourceError> {
     if !focused {
         return run_proba_source(
             session,
@@ -357,8 +357,8 @@ fn run_source_with_focus(
             include_ignored,
         );
     }
-    let mut analysis = radix_program::analyze_prepared_program_name(session, name, source)
-        .map_err(radix_module::mir::RunSourceError::Frontend)?;
+    let mut analysis = radix::program::analyze_prepared_program_name(session, name, source)
+        .map_err(radix::module::mir::RunSourceError::Frontend)?;
     let all_cases = inventory_cases(&analysis.hir, &analysis.interner);
     let focused = focused || has_solum_cases(&all_cases);
     let cases = if focused {
@@ -380,8 +380,8 @@ fn run_source_with_focus(
         );
         return Ok(report);
     }
-    let lowered = radix_module::mir::lower_analyzed_unit_with_context(&mut analysis)
-        .map_err(radix_module::mir::RunSourceError::Mir)?;
+    let lowered = radix::module::mir::lower_analyzed_unit_with_context(&mut analysis)
+        .map_err(radix::module::mir::RunSourceError::Mir)?;
     let mut report = run_proba_on_validated(
         &lowered.validated,
         &cases,
@@ -459,7 +459,7 @@ fn run_package_with_options(
     include_ignored: bool,
     focused: bool,
 ) -> (ProbaReport, bool, RunMetadata) {
-    let package = match radix_program::analyze::analyze_package_for_tests(
+    let package = match radix::program::analyze::analyze_package_for_tests(
         config,
         input,
         proba_filter,
@@ -471,7 +471,7 @@ fn run_package_with_options(
     if package
         .diagnostics
         .iter()
-        .any(radix_module::diagnostics::Diagnostic::is_error)
+        .any(radix::module::diagnostics::Diagnostic::is_error)
     {
         fail_package_analysis(&package.diagnostics);
     }
@@ -569,7 +569,7 @@ fn run_package(
     include_ignored: bool,
     focused: bool,
 ) -> (ProbaReport, bool) {
-    let package = match radix_program::analyze::analyze_package_for_tests(
+    let package = match radix::program::analyze::analyze_package_for_tests(
         config,
         input,
         proba_filter,
@@ -582,7 +582,7 @@ fn run_package(
     if package
         .diagnostics
         .iter()
-        .any(radix_module::diagnostics::Diagnostic::is_error)
+        .any(radix::module::diagnostics::Diagnostic::is_error)
     {
         fail_package_analysis(&package.diagnostics);
     }
@@ -674,8 +674,8 @@ fn run_package_test_unit_with_options(
     include_ignored: bool,
     focused: bool,
     metadata: &mut RunMetadata,
-) -> Result<ProbaReport, Vec<radix_module::diagnostics::Diagnostic>> {
-    let mut package = radix_program::analyze::analyze_package_for_tests(
+) -> Result<ProbaReport, Vec<radix::module::diagnostics::Diagnostic>> {
+    let mut package = radix::program::analyze::analyze_package_for_tests(
         config,
         input,
         proba_filter,
@@ -684,13 +684,13 @@ fn run_package_test_unit_with_options(
     if package
         .diagnostics
         .iter()
-        .any(radix_module::diagnostics::Diagnostic::is_error)
+        .any(radix::module::diagnostics::Diagnostic::is_error)
     {
         return Err(package.diagnostics);
     }
 
     let Some((root_id, _)) = package.node_by_path(unit_path) else {
-        return Err(vec![radix_module::diagnostics::Diagnostic::error(format!(
+        return Err(vec![radix::module::diagnostics::Diagnostic::error(format!(
             "test unit disappeared during package re-analysis: {}",
             unit_path.display()
         ))
@@ -703,7 +703,7 @@ fn run_package_test_unit_with_options(
     package.roots = vec![root_id.clone()];
 
     let Some(unit) = package.nodes.get(&root_id) else {
-        return Err(vec![radix_module::diagnostics::Diagnostic::error(format!(
+        return Err(vec![radix::module::diagnostics::Diagnostic::error(format!(
             "test unit was not retained in its local package closure: {}",
             unit_path.display()
         ))
@@ -728,7 +728,7 @@ fn run_package_test_unit_with_options(
         .iter()
         .map(|case| (unit.path.clone(), case.def_id))
         .collect();
-    let scope = radix_program::mir::TestPackageScope::for_program(&package, functions);
+    let scope = radix::program::mir::TestPackageScope::for_program(&package, functions);
 
     package::mir::with_linked_test_package_mir(
         package,
@@ -774,8 +774,8 @@ fn run_package_test_unit(
     exact: bool,
     include_ignored: bool,
     focused: bool,
-) -> Result<ProbaReport, Vec<radix_module::diagnostics::Diagnostic>> {
-    let mut package = radix_program::analyze::analyze_package_for_tests(
+) -> Result<ProbaReport, Vec<radix::module::diagnostics::Diagnostic>> {
+    let mut package = radix::program::analyze::analyze_package_for_tests(
         config,
         input,
         proba_filter,
@@ -784,13 +784,13 @@ fn run_package_test_unit(
     if package
         .diagnostics
         .iter()
-        .any(radix_module::diagnostics::Diagnostic::is_error)
+        .any(radix::module::diagnostics::Diagnostic::is_error)
     {
         return Err(package.diagnostics);
     }
 
     let Some((root_id, _)) = package.node_by_path(unit_path) else {
-        return Err(vec![radix_module::diagnostics::Diagnostic::error(format!(
+        return Err(vec![radix::module::diagnostics::Diagnostic::error(format!(
             "test unit disappeared during package re-analysis: {}",
             unit_path.display()
         ))
@@ -803,7 +803,7 @@ fn run_package_test_unit(
     package.roots = vec![root_id.clone()];
 
     let Some(unit) = package.nodes.get(&root_id) else {
-        return Err(vec![radix_module::diagnostics::Diagnostic::error(format!(
+        return Err(vec![radix::module::diagnostics::Diagnostic::error(format!(
             "test unit was not retained in its local package closure: {}",
             unit_path.display()
         ))
@@ -836,7 +836,7 @@ fn run_package_test_unit(
         .iter()
         .map(|case| (unit.path.clone(), case.def_id))
         .collect();
-    let scope = radix_program::mir::TestPackageScope::for_program(&package, functions);
+    let scope = radix::program::mir::TestPackageScope::for_program(&package, functions);
 
     package::mir::with_linked_test_package_mir(
         package,
@@ -1109,13 +1109,13 @@ fn print_report(
 
 /// Unit-link failure reason: name the blocking MIR gap from diagnostics when
 /// present, otherwise the generic link/lower fallback.
-fn unit_link_block_reason(diagnostics: &[radix_module::diagnostics::Diagnostic]) -> String {
+fn unit_link_block_reason(diagnostics: &[radix::module::diagnostics::Diagnostic]) -> String {
     blocking_gap_from_diagnostics(diagnostics)
         .unwrap_or_else(|| "unit failed to link/lower for runner proba execution".to_owned())
 }
 
 fn blocking_gap_from_diagnostics(
-    diagnostics: &[radix_module::diagnostics::Diagnostic],
+    diagnostics: &[radix::module::diagnostics::Diagnostic],
 ) -> Option<String> {
     diagnostics
         .iter()
@@ -1283,7 +1283,7 @@ fn replay_output(result: &CaseResult) {
     }
 }
 
-fn fail_package_analysis(diagnostics: &[radix_module::diagnostics::Diagnostic]) -> ! {
+fn fail_package_analysis(diagnostics: &[radix::module::diagnostics::Diagnostic]) -> ! {
     let rendered = render_package_analysis_diagnostics(diagnostics);
     if !rendered.is_empty() {
         eprintln!("{rendered}");
@@ -1295,11 +1295,11 @@ fn fail_package_analysis(diagnostics: &[radix_module::diagnostics::Diagnostic]) 
 /// Package-route analysis diagnostics: errors use the same plain renderer as
 /// `faber check`; repeated warning codes collapse to one counted line (E4).
 fn render_package_analysis_diagnostics(
-    diagnostics: &[radix_module::diagnostics::Diagnostic],
+    diagnostics: &[radix::module::diagnostics::Diagnostic],
 ) -> String {
     let mut warning_counts = HashMap::<&str, usize>::new();
     for diag in diagnostics {
-        if diag.severity == radix_module::diagnostics::Severity::Warning {
+        if diag.severity == radix::module::diagnostics::Severity::Warning {
             if let Some(code) = diag.code {
                 *warning_counts.entry(code).or_insert(0) += 1;
             }
@@ -1309,7 +1309,7 @@ fn render_package_analysis_diagnostics(
     let mut emitted_warning_codes = HashSet::<&str>::new();
     let mut lines = Vec::new();
     for diag in diagnostics {
-        if diag.severity == radix_module::diagnostics::Severity::Warning {
+        if diag.severity == radix::module::diagnostics::Severity::Warning {
             if let Some(code) = diag.code {
                 if warning_counts.get(code).copied().unwrap_or(0) > 1 {
                     if emitted_warning_codes.insert(code) {
@@ -1320,14 +1320,14 @@ fn render_package_analysis_diagnostics(
                 }
             }
         }
-        lines.push(radix_module::diagnostics::render_plain(diag));
+        lines.push(radix::module::diagnostics::render_plain(diag));
     }
     lines.join("\n")
 }
 
-fn print_run_error(error: &radix_module::mir::RunSourceError) {
+fn print_run_error(error: &radix::module::mir::RunSourceError) {
     match error {
-        radix_module::mir::RunSourceError::Frontend(diagnostics) => {
+        radix::module::mir::RunSourceError::Frontend(diagnostics) => {
             for diag in diagnostics {
                 if diag.is_error() {
                     eprintln!("error: {}", diag.message);
@@ -1336,12 +1336,12 @@ fn print_run_error(error: &radix_module::mir::RunSourceError) {
                 }
             }
         }
-        radix_module::mir::RunSourceError::Mir(errors) => {
+        radix::module::mir::RunSourceError::Mir(errors) => {
             for error in errors {
                 eprintln!("error: {}", error.message);
             }
         }
-        radix_module::mir::RunSourceError::Stepper(errors) => {
+        radix::module::mir::RunSourceError::Stepper(errors) => {
             for error in errors {
                 eprintln!("error: {}", error.message);
             }

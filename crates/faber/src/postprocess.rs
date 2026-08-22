@@ -4,9 +4,9 @@
 //! Radix emits target artifacts. Faber may optionally run target-specific
 //! developer tools as part of user-facing build/emit workflows.
 
-use radix_module::codegen::Target;
-use radix_module::services::DiagnosticMode;
-use radix_module::Output;
+use radix::module::codegen::Target;
+use radix::services::DiagnosticMode;
+use radix::module::Output;
 use std::path::Path;
 use std::{fs, io};
 
@@ -46,7 +46,7 @@ pub fn write_output_artifact(
     ensure_artifact_parent(path);
 
     let code = postprocess_code(
-        radix_module::services::output_code(output),
+        radix::services::output_code(output),
         target,
         format,
         linter,
@@ -56,13 +56,13 @@ pub fn write_output_artifact(
 
 /// Print diagnostics using Faber-owned presentation.
 pub fn print_diagnostics(
-    diagnostics: &[radix_module::diagnostics::Diagnostic],
+    diagnostics: &[radix::module::diagnostics::Diagnostic],
     mode: DiagnosticMode,
-    diagnostics_locale_pack: Option<&radix_module::locale::LocalePack>,
+    diagnostics_locale_pack: Option<&radix::module::locale::LocalePack>,
 ) {
     if mode != DiagnosticMode::Diagnostics {
         for diag in diagnostics {
-            eprintln!("{}", radix_module::diagnostics::render_plain(diag));
+            eprintln!("{}", radix::module::diagnostics::render_plain(diag));
         }
         return;
     }
@@ -70,7 +70,7 @@ pub fn print_diagnostics(
         return;
     }
     match diagnostics_locale_pack {
-        Some(pack) => match radix_module::diagnostics::render_expanded_diagnostics_with_pack(
+        Some(pack) => match radix::module::diagnostics::render_expanded_diagnostics_with_pack(
             diagnostics,
             pack,
         ) {
@@ -82,7 +82,7 @@ pub fn print_diagnostics(
         },
         None => eprintln!(
             "{}",
-            radix_module::diagnostics::render_expanded_diagnostics(diagnostics)
+            radix::module::diagnostics::render_expanded_diagnostics(diagnostics)
         ),
     }
 }

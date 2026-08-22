@@ -2,7 +2,7 @@
 //!
 //! Clap shapes live in [`cli`]; handlers live in [`commands`]. Package-aware
 //! compilation routes through [`package`]; single-file compiler inspection
-//! delegates to typed `radix_module::services`.
+//! delegates to typed `radix::module::services`.
 
 mod cli;
 mod commands;
@@ -27,8 +27,8 @@ mod script_test;
 
 const PACKAGE_DIAGNOSTIC_CODE: &str = "PKG001";
 
-fn package_diagnostic_error(message: impl Into<String>) -> radix_module::diagnostics::Diagnostic {
-    radix_module::diagnostics::Diagnostic::error(message).with_code(PACKAGE_DIAGNOSTIC_CODE)
+fn package_diagnostic_error(message: impl Into<String>) -> radix::module::diagnostics::Diagnostic {
+    radix::module::diagnostics::Diagnostic::error(message).with_code(PACKAGE_DIAGNOSTIC_CODE)
 }
 
 fn main() {

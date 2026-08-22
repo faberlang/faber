@@ -39,7 +39,7 @@ use radix_mir::device_program::{
 };
 use radix_mir::kernel_plan::CollectionKernelPlan;
 use radix_mir::layout::MirTensorStorageLayout;
-use radix_module::codegen::Target;
+use radix::module::codegen::Target;
 use std::fs;
 use std::path::PathBuf;
 
@@ -59,12 +59,12 @@ incipit {
     nota run_scale(3.0 ∷ fractus<f32>)
 }"#;
 
-fn llvm_host_config() -> radix_module::Config {
-    radix_module::Config::default().with_target(Target::MirLlvmHost)
+fn llvm_host_config() -> radix::module::Config {
+    radix::module::Config::default().with_target(Target::MirLlvmHost)
 }
 
 fn toolchain_available() -> bool {
-    radix_module::llvm_host::LlvmHostToolchain::discover().is_ok()
+    radix::module::llvm_host::LlvmHostToolchain::discover().is_ok()
 }
 
 /// Write the single-unit fixture under a temp package dir and return the
@@ -208,10 +208,10 @@ fn ngab1_host_partition_executes_boundary_call_via_llvm_host() {
     // CPU module ("no physical execution" is the lane's frozen non-goal), so
     // the build proof here is the emitted host module contract — the same
     // contract the radix-mir-llvm vertical fixture proves.
-    let build = radix_program::llvm::build_package_llvm(
+    let build = radix::program::llvm::build_package_llvm(
         &llvm_host_config(),
         &entry,
-        &radix_program::llvm::PackageLlvmOptions::new(
+        &radix::program::llvm::PackageLlvmOptions::new(
             dir.as_ref().join("target/faber-llvm/debug/modules"),
         ),
         &crate::package::faber_analysis_seams(),

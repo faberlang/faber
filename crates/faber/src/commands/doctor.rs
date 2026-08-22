@@ -57,7 +57,7 @@ pub(crate) fn doctor_report_for(
                 let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
                     continue;
                 };
-                if radix_program::library::is_valid_provider_segment(name)
+                if radix::program::library::is_valid_provider_segment(name)
                     && library_availability(&path) != LibraryAvailability::NotFound
                 {
                     names.insert(name.to_owned());

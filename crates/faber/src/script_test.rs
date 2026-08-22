@@ -21,10 +21,10 @@ main {
 
 #[test]
 fn print_run_source_error_accepts_runner_failures() {
-    let error = RunSourceError::Stepper(vec![radix_module::mir::RunnerError {
+    let error = RunSourceError::Stepper(vec![radix::module::mir::RunnerError {
         message: "FaberScript unsupported: async".to_owned(),
         issue: "runner_unsupported".to_owned(),
-        span: radix_module::lexer::Span::default(),
+        span: radix::module::lexer::Span::default(),
     }]);
     print_run_source_error(&error);
 }

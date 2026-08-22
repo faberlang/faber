@@ -16,9 +16,9 @@ use crate::package;
 use crate::script::{
     interpret_source, interpret_source_or_exit, print_run_source_error, raw_exit_code,
 };
-use radix_module::diagnostics::Diagnostic;
-use radix_module::mir::StdioHost;
-use radix_program::mir::DeviceSelection;
+use radix::module::diagnostics::Diagnostic;
+use radix::module::mir::StdioHost;
+use radix::program::mir::DeviceSelection;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -85,7 +85,7 @@ pub(super) fn interpret_path(
                 }
             };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
-        if let Err(mut diagnostics) = radix_program::mir::run_package_mir_with_selection(
+        if let Err(mut diagnostics) = radix::program::mir::run_package_mir_with_selection(
             &config,
             archive.package_input(),
             selection,
@@ -110,7 +110,7 @@ pub(super) fn interpret_path(
             }
         };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
-        if let Err(diagnostics) = radix_program::mir::run_package_mir_with_selection(
+        if let Err(diagnostics) = radix::program::mir::run_package_mir_with_selection(
             &config,
             path,
             selection,
@@ -147,7 +147,7 @@ pub(super) fn interpret_path(
             std::process::exit(1);
         }
     };
-    let session = radix_module::driver::Session::new(config);
+    let session = radix::module::driver::Session::new(config);
     let mut host = StdioHost::with_argumenta(program_args.to_vec());
     let result =
         crate::script::run_with_session(&session, &path.display().to_string(), &source, &mut host);
@@ -159,7 +159,7 @@ pub(super) fn interpret_path(
 /// Success yields `0`. An explicit `processus.exit_process(code)` yields that
 /// Unix-masked code. Frontend / MIR / runner failures yield `1`.
 pub(super) fn single_file_run_process_code(
-    result: Result<ExitCode, radix_module::mir::RunSourceError>,
+    result: Result<ExitCode, radix::module::mir::RunSourceError>,
 ) -> i32 {
     match result {
         Ok(status) => raw_exit_code(status),
@@ -167,7 +167,7 @@ pub(super) fn single_file_run_process_code(
     }
 }
 
-fn exit_interpreted(result: Result<ExitCode, radix_module::mir::RunSourceError>) {
+fn exit_interpreted(result: Result<ExitCode, radix::module::mir::RunSourceError>) {
     if let Err(error) = &result {
         print_run_source_error(error);
     }
@@ -186,9 +186,9 @@ fn script_package_config(
     input: &Path,
     locale: Option<&str>,
     diagnostics_locale: Option<&str>,
-) -> Result<radix_module::driver::Config, Box<Diagnostic>> {
+) -> Result<radix::module::driver::Config, Box<Diagnostic>> {
     package::config_with_locale(
-        radix_module::Target::HirTypeScript,
+        radix::module::Target::HirTypeScript,
         input,
         locale,
         diagnostics_locale,
@@ -212,25 +212,25 @@ fn manifestless_file_declares_non_kernel_import(path: &Path) -> bool {
         return false;
     };
     let display_name = path.display().to_string();
-    let Ok(peeled) = radix_module::driver::peel_raw_source(&display_name, &raw_source) else {
+    let Ok(peeled) = radix::module::driver::peel_raw_source(&display_name, &raw_source) else {
         return false;
     };
-    let lex = match package::default_config_with_locale(radix_module::Target::HirTypeScript) {
+    let lex = match package::default_config_with_locale(radix::module::Target::HirTypeScript) {
         Ok(config) => match config.locale_pack.as_ref() {
-            Some(pack) => radix_module::lexer::lex_with_locale_pack(peeled.body, pack),
-            None => radix_module::lexer::lex(peeled.body),
+            Some(pack) => radix::module::lexer::lex_with_locale_pack(peeled.body, pack),
+            None => radix::module::lexer::lex(peeled.body),
         },
-        Err(_) => radix_module::lexer::lex(peeled.body),
+        Err(_) => radix::module::lexer::lex(peeled.body),
     };
-    let parse = radix_module::parser::parse(lex);
+    let parse = radix::module::parser::parse(lex);
     let Some(program) = parse.program else {
         return false;
     };
     program.statements.iter().any(|statement| {
-        let radix_module::syntax::StmtKind::Import(import) = &statement.kind else {
+        let radix::module::syntax::StmtKind::Import(import) = &statement.kind else {
             return false;
         };
-        !radix_module::kernel::is_kernel_import_path(parse.interner.resolve(import.path))
+        !radix::module::kernel::is_kernel_import_path(parse.interner.resolve(import.path))
     })
 }
 
@@ -375,7 +375,7 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
     // the image's device section decides whether the route carries a device
     // program, and the selection request is the CLI `--backend` override
     // falling back to the image's recorded selection.
-    let decision = match radix_program::mir::fmir_image_route_decision(
+    let decision = match radix::program::mir::fmir_image_route_decision(
         &args.image,
         &package::mir::faber_mir_seams(),
     ) {
@@ -394,7 +394,7 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
     // The route function applies the one host-construction policy: a
     // device-bearing image runs through the composite host's device route
     // (S1-6 launch seam); anything else runs the CPU/FMIR runner.
-    if let Err(diagnostics) = radix_program::mir::run_fmir_image_path_with_selection(
+    if let Err(diagnostics) = radix::program::mir::run_fmir_image_path_with_selection(
         &args.image,
         Some(selection),
         &package::mir::faber_mir_seams(),

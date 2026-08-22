@@ -36,10 +36,10 @@ use radix_mir_fmir::{
     DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId, FmirDeviceArtifact,
     FmirDeviceBackend, MaterializationStage,
 };
-use radix_module::codegen::Target;
-use radix_module::diagnostics::{Diagnostic, DiagnosticArg};
-use radix_module::driver::Config;
-use radix_program::analyze::AnalyzedProgram;
+use radix::module::codegen::Target;
+use radix::module::diagnostics::{Diagnostic, DiagnosticArg};
+use radix::module::driver::Config;
+use radix::program::analyze::AnalyzedProgram;
 use radix_types::TypeId;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -47,8 +47,8 @@ use std::path::{Path, PathBuf};
 fn analyze_with_faber_seams(
     config: &Config,
     input: &Path,
-) -> Result<radix_program::analyze::AnalyzedProgram, Vec<Diagnostic>> {
-    radix_program::analyze::analyze_package(config, input, &crate::package::faber_analysis_seams())
+) -> Result<radix::program::analyze::AnalyzedProgram, Vec<Diagnostic>> {
+    radix::program::analyze::analyze_package(config, input, &crate::package::faber_analysis_seams())
 }
 
 /// The checked-in synthetic fixture package (analyzed via a tempdir copy so

@@ -5,13 +5,13 @@
 //! `radix-program/src/mir/manifest.rs`. The `[device]` manifest projection
 //! stays faber-side (ownership-freeze §4/§5.2): the product view reads the
 //! `[device]` table through faber's manifest helpers, and the compiler subset
-//! receives the resolved config through [`radix_program::mir::MirSeams`].
+//! receives the resolved config through [`radix::program::mir::MirSeams`].
 
 use std::path::Path;
 
-use radix_module::diagnostics::Diagnostic;
+use radix::module::diagnostics::Diagnostic;
 
-use radix_program::mir::DeviceManifestConfig;
+use radix::program::mir::DeviceManifestConfig;
 
 /// Read the package's `[device]` surface for the S1-6 device payload:
 /// `[device] inputs` (typed f32 host inputs), `[device] backend` (the

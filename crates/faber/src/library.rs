@@ -13,7 +13,7 @@ mod tests;
 
 use std::path::{Path, PathBuf};
 
-use radix_program::library::LibraryResolver;
+use radix::program::library::LibraryResolver;
 
 pub(crate) const FABER_LIBRARY_HOME_ENV: &str = "FABER_LIBRARY_HOME";
 

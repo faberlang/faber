@@ -62,7 +62,7 @@ fn check_library_src_fallback_ignores_garbage_cista_toml() {
     assert!(
         !diagnostics
             .iter()
-            .any(radix_module::diagnostics::Diagnostic::is_error),
+            .any(radix::module::diagnostics::Diagnostic::is_error),
         "src-fallback norma fixture must check clean: {diagnostics:?}"
     );
 }
@@ -89,7 +89,7 @@ fn check_library_uses_faber_toml_source_dot_not_src_fallback() {
     assert!(
         !diagnostics
             .iter()
-            .any(radix_module::diagnostics::Diagnostic::is_error),
+            .any(radix::module::diagnostics::Diagnostic::is_error),
         "faber.toml library fixture must check clean: {diagnostics:?}"
     );
 }

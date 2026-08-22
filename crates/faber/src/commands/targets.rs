@@ -9,7 +9,7 @@
 //! per-row availability; device/host-leaf/device-runtime capability rows are
 //! **compiled-only** — a build without the feature reports no row for it.
 
-use radix_module::services::{
+use radix::services::{
     target_capabilities_for_surface, TargetCapabilities, TargetCommandSurface,
 };
 use std::collections::BTreeSet;
@@ -22,68 +22,68 @@ use std::collections::BTreeSet;
 /// considers always-compiled (e.g. `MirLlvm`), and only faber knows its own
 /// feature gates. When a row's feature is not compiled, build/run/package are
 /// forced off so no row claims a capability the build did not compile.
-const FABER_TARGET_ROWS: &[(radix_module::codegen::Target, &str, &str)] = &[
-    (radix_module::codegen::Target::HirRust, "rust", "hir-rust"),
-    (radix_module::codegen::Target::HirFhir, "fhir", "hir-fhir"),
+const FABER_TARGET_ROWS: &[(radix::module::codegen::Target, &str, &str)] = &[
+    (radix::module::codegen::Target::HirRust, "rust", "hir-rust"),
+    (radix::module::codegen::Target::HirFhir, "fhir", "hir-fhir"),
     (
-        radix_module::codegen::Target::MirFmir,
+        radix::module::codegen::Target::MirFmir,
         "fmir-text",
         "mir-fmir",
     ),
     (
-        radix_module::codegen::Target::MirFmirBinary,
+        radix::module::codegen::Target::MirFmirBinary,
         "fmir",
         "mir-fmir",
     ),
     (
-        radix_module::codegen::Target::MirFmirBundle,
+        radix::module::codegen::Target::MirFmirBundle,
         "fmir-bin",
         "mir-fmir",
     ),
     (
-        radix_module::codegen::Target::HirFaber,
+        radix::module::codegen::Target::HirFaber,
         "faber",
         "hir-faber",
     ),
-    (radix_module::codegen::Target::HirGo, "go", "hir-go"),
+    (radix::module::codegen::Target::HirGo, "go", "hir-go"),
     (
-        radix_module::codegen::Target::HirPython,
+        radix::module::codegen::Target::HirPython,
         "python",
         "hir-python",
     ),
     (
-        radix_module::codegen::Target::HirHaskell,
+        radix::module::codegen::Target::HirHaskell,
         "haskell",
         "hir-haskell",
     ),
-    (radix_module::codegen::Target::MirWasm, "wasm", "mir-wasm"),
+    (radix::module::codegen::Target::MirWasm, "wasm", "mir-wasm"),
     (
-        radix_module::codegen::Target::MirWasm,
+        radix::module::codegen::Target::MirWasm,
         "wasm-text",
         "mir-wasm",
     ),
     (
-        radix_module::codegen::Target::MirLlvm,
+        radix::module::codegen::Target::MirLlvm,
         "llvm-text",
         "mir-llvm",
     ),
     (
-        radix_module::codegen::Target::MirLlvmHost,
+        radix::module::codegen::Target::MirLlvmHost,
         "llvm-host",
         "mir-llvm",
     ),
     (
-        radix_module::codegen::Target::MirMetal,
+        radix::module::codegen::Target::MirMetal,
         "metal-text",
         "mir-metal",
     ),
     (
-        radix_module::codegen::Target::MirWgsl,
+        radix::module::codegen::Target::MirWgsl,
         "wgsl-text",
         "mir-wgsl",
     ),
-    (radix_module::codegen::Target::MirSexp, "sexp", "mir-sexp"),
-    (radix_module::codegen::Target::HirTypeScript, "ts", "hir-ts"),
+    (radix::module::codegen::Target::MirSexp, "sexp", "mir-sexp"),
+    (radix::module::codegen::Target::HirTypeScript, "ts", "hir-ts"),
 ];
 
 /// Compiled-only capability rows for the device/host-leaf/device-runtime
@@ -181,25 +181,25 @@ fn target_rows(compiled: &BTreeSet<&'static str>) -> Vec<TargetRow> {
 /// package surface truth (capability truth T1 — what faber can express, not a
 /// shipping promise).
 fn faber_surface_capabilities(
-    target: radix_module::codegen::Target,
+    target: radix::module::codegen::Target,
     capabilities: TargetCapabilities,
 ) -> TargetCapabilities {
     match target {
-        radix_module::codegen::Target::MirFmir => TargetCapabilities {
+        radix::module::codegen::Target::MirFmir => TargetCapabilities {
             check: true,
             build: true,
             run: true,
             package: true,
             note: "faber package MIR image target: `faber build --target fmir-text`",
         },
-        radix_module::codegen::Target::MirFmirBinary => TargetCapabilities {
+        radix::module::codegen::Target::MirFmirBinary => TargetCapabilities {
             check: true,
             build: true,
             run: true,
             package: true,
             note: "faber package MIR image target: `faber build --target fmir`",
         },
-        radix_module::codegen::Target::MirFmirBundle => TargetCapabilities {
+        radix::module::codegen::Target::MirFmirBundle => TargetCapabilities {
             check: true,
             build: true,
             run: true,

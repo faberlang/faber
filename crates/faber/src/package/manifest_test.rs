@@ -3,7 +3,7 @@
 
 use super::*;
 // S3-U2 cut: resolve through the packaged selection type in every build.
-use radix_program::mir::DeviceSelection;
+use radix::program::mir::DeviceSelection;
 use std::path::Path;
 
 #[test]

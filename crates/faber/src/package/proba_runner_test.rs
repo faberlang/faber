@@ -9,14 +9,14 @@ use super::{
     discover_package, library_resolver_from_config, test_input_route, TestInputRoute,
     MANIFEST_LESS_TEST_MESSAGE,
 };
-use radix_module::driver::{Config, Session};
-use radix_module::locale::LocalePack;
-use radix_program::analyze::{
+use radix::module::driver::{Config, Session};
+use radix::module::locale::LocalePack;
+use radix::program::analyze::{
     analyze_package as analyze_package_direct,
     analyze_package_for_tests as analyze_package_for_tests_direct, AnalysisSeams,
 };
-use radix_program::discovery::PackageSpec;
-use radix_program::library::LibraryResolver;
+use radix::program::discovery::PackageSpec;
+use radix::program::library::LibraryResolver;
 
 fn seams() -> AnalysisSeams {
     crate::package::faber_analysis_seams()
@@ -25,15 +25,15 @@ fn seams() -> AnalysisSeams {
 fn analyze_with_faber_seams(
     config: &Config,
     input: &Path,
-) -> Result<radix_program::analyze::AnalyzedProgram, Vec<radix_module::diagnostics::Diagnostic>> {
+) -> Result<radix::program::analyze::AnalyzedProgram, Vec<radix::module::diagnostics::Diagnostic>> {
     analyze_package_direct(config, input, &seams())
 }
 
 fn analyze_tests_with_faber_seams(
     config: &Config,
     input: &Path,
-    filter: Option<&radix_program::test_source_filter::TestSourceFilter>,
-) -> Result<radix_program::analyze::AnalyzedProgram, Vec<radix_module::diagnostics::Diagnostic>> {
+    filter: Option<&radix::program::test_source_filter::TestSourceFilter>,
+) -> Result<radix::program::analyze::AnalyzedProgram, Vec<radix::module::diagnostics::Diagnostic>> {
     analyze_package_for_tests_direct(config, input, filter, &seams())
 }
 
@@ -42,9 +42,9 @@ fn load_with_faber_seams(
     resolver: &LibraryResolver,
     locale_pack: Option<&LocalePack>,
     include_proba: bool,
-    filter: Option<&radix_program::test_source_filter::TestSourceFilter>,
-) -> Result<Vec<radix_program::PackageFile>, Vec<radix_module::diagnostics::Diagnostic>> {
-    radix_program::analyze::load_package_with_locale_pack(
+    filter: Option<&radix::program::test_source_filter::TestSourceFilter>,
+) -> Result<Vec<radix::program::PackageFile>, Vec<radix::module::diagnostics::Diagnostic>> {
+    radix::program::analyze::load_package_with_locale_pack(
         spec,
         resolver,
         locale_pack,
@@ -328,7 +328,7 @@ test "double" {
         functions.extend(cases.iter().map(|case| (unit.path.clone(), case.def_id)));
         test_units.push((unit.path.clone(), cases));
     }
-    let scope = radix_program::mir::TestPackageScope::for_program(&package, functions);
+    let scope = radix::program::mir::TestPackageScope::for_program(&package, functions);
     let report = crate::package::mir::with_linked_test_package_mir(
         package,
         &scope,
@@ -571,7 +571,7 @@ test "core ok" {
         ),
         "relative and absolute inputs must land on the same package root"
     );
-    let unit_names = |pkg: &radix_program::analyze::AnalyzedProgram| {
+    let unit_names = |pkg: &radix::program::analyze::AnalyzedProgram| {
         let mut names = pkg
             .nodes
             .values()
@@ -608,7 +608,7 @@ test "PI is positive" {
     proba
 }
 
-fn linked_package_report(package: radix_program::analyze::AnalyzedProgram) -> proba::ProbaReport {
+fn linked_package_report(package: radix::program::analyze::AnalyzedProgram) -> proba::ProbaReport {
     let mut functions = Vec::new();
     let mut test_units = Vec::new();
     for unit in package.nodes.values() {
@@ -619,7 +619,7 @@ fn linked_package_report(package: radix_program::analyze::AnalyzedProgram) -> pr
         functions.extend(cases.iter().map(|case| (unit.path.clone(), case.def_id)));
         test_units.push((unit.path.clone(), cases));
     }
-    let scope = radix_program::mir::TestPackageScope::for_program(&package, functions);
+    let scope = radix::program::mir::TestPackageScope::for_program(&package, functions);
     crate::package::mir::with_linked_test_package_mir(
         package,
         &scope,

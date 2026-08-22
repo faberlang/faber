@@ -2,17 +2,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use radix_module::diagnostics::{Diagnostic, DiagnosticPhase};
-use radix_module::driver::Config;
+use radix::module::diagnostics::{Diagnostic, DiagnosticPhase};
+use radix::module::driver::Config;
 use serde::Deserialize;
 
 use super::{faber_analysis_seams, read_manifest, validate_manifest};
-use radix_program::analyze::AnalyzedProgram;
-use radix_program::discovery::resolve_source_root;
-use radix_program::file_interface::extract_callable_contracts;
-use radix_program::member_path::resolve_package_member;
+use radix::program::analyze::AnalyzedProgram;
+use radix::program::discovery::resolve_source_root;
+use radix::program::file_interface::extract_callable_contracts;
+use radix::program::member_path::resolve_package_member;
 #[cfg(feature = "hir-rust")]
-use radix_program::rust_target::render_binding_probe;
+use radix::program::rust_target::render_binding_probe;
 
 #[cfg(feature = "hir-rust")]
 use super::binding_probe::run_rust_binding_probe;
@@ -43,10 +43,10 @@ struct ShimBinding {
 struct BindingContract {
     key: String,
     file: PathBuf,
-    span: radix_module::lexer::Span,
-    callable: radix_module::file_interface::InterfaceCallable,
+    span: radix::module::lexer::Span,
+    callable: radix::module::file_interface::InterfaceCallable,
     has_body: bool,
-    def_id: radix_module::hir::DefId,
+    def_id: radix::module::hir::DefId,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -186,7 +186,7 @@ fn collect_binding_contracts(
     provider: &str,
     package_root: &Path,
 ) -> Result<(AnalyzedProgram, Vec<BindingContract>), Vec<Diagnostic>> {
-    let package = radix_program::analyze::analyze_package(
+    let package = radix::program::analyze::analyze_package(
         &Config::default().with_bodyless_functions(),
         package_root,
         &faber_analysis_seams(),

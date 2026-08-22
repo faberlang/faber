@@ -2,15 +2,16 @@
 
 use super::cost::{
     build_report, parse_min_class, render_human, render_json_compact, test_input_path, test_site,
-    CostReport, COST_LEGEND, COST_REPORT_VERSION,
+    CostReport, COST_LEGEND, COST_REPORT_VERSION, SOURCE_LINE_CAP,
 };
 use crate::cli::{Cli, Command};
 use clap::{CommandFactory, Parser};
 use radix_mir::{CostClass, CostFamily, CostSiteKind, CostTag};
 use serde_json::Value;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 use std::process::Command as ProcessCommand;
+use std::sync::Arc;
 
 const ROOT_KEYS: [&str; 6] = [
     "version",
@@ -439,4 +440,112 @@ fn cli_cost_json_and_min_class_on_fixture() {
             .any(|line| line.contains(" C0 ") || line.starts_with("  C0 ")),
         "filtered human report must drop C0 sites:\n{human}"
     );
+}
+
+fn unique_interned_source_line_bytes(report: &CostReport) -> usize {
+    let mut seen = HashSet::new();
+    let mut bytes = 0usize;
+    for site in &report.sites {
+        if let Some(line) = &site.source_line {
+            let ptr = Arc::as_ptr(line) as *const u8;
+            if seen.insert(ptr) {
+                bytes += line.len();
+            }
+        }
+    }
+    bytes
+}
+
+#[test]
+fn source_lines_are_capped_and_shared_across_sites_on_the_same_line() {
+    const LINE_LEN: usize = 64 * 1024;
+    const SITE_COUNT: usize = 1_000;
+    let line = "a".repeat(LINE_LEN);
+    let sites: Vec<_> = (0..SITE_COUNT)
+        .map(|i| {
+            test_site(
+                1,
+                (i * 10) as u32,
+                CostTag::Class(CostClass::C0),
+                CostFamily::Cast,
+                CostSiteKind::Convert,
+                false,
+            )
+        })
+        .collect();
+    let names = BTreeMap::new();
+    let report = build_report(
+        &test_input_path(),
+        sites,
+        &names,
+        CostClass::C0,
+        Some("main.fab"),
+        Some(&line),
+    );
+    assert_eq!(report.sites.len(), SITE_COUNT);
+    let first = report.sites[0]
+        .source_line
+        .as_ref()
+        .expect("source_line attached");
+    assert!(
+        first.len() <= SOURCE_LINE_CAP,
+        "capped length {}, cap {SOURCE_LINE_CAP}",
+        first.len()
+    );
+    assert_eq!(&line[..SOURCE_LINE_CAP], first.as_ref());
+    for site in &report.sites {
+        let shared = site.source_line.as_ref().expect("source_line attached");
+        assert!(
+            Arc::ptr_eq(first, shared),
+            "sites on one line must share one source_line allocation"
+        );
+        assert!(shared.len() <= SOURCE_LINE_CAP);
+    }
+    let retained = unique_interned_source_line_bytes(&report);
+    assert!(
+        retained <= SOURCE_LINE_CAP,
+        "interned source_line bytes {retained} must stay at the cap, not SITE_COUNT × LINE_LEN = {}",
+        SITE_COUNT * LINE_LEN
+    );
+}
+
+#[test]
+fn human_renderer_strips_control_bytes_json_preserves_them() {
+    let mut names = BTreeMap::new();
+    names.insert(1, "mean\x1b[31msq".to_owned());
+    let source = "x".repeat(200);
+    let file = "src/\x1b[31mmain.fab";
+    let report = build_report(
+        &test_input_path(),
+        vec![test_site(
+            1,
+            100,
+            CostTag::Class(CostClass::C3),
+            CostFamily::ValorJson,
+            CostSiteKind::Convert,
+            true,
+        )],
+        &names,
+        CostClass::C0,
+        Some(file),
+        Some(&source),
+    );
+    let human = render_human(&report);
+    assert!(
+        !human.contains('\u{1b}'),
+        "human output must not carry ESC:\n{human:?}"
+    );
+    assert!(
+        human.contains("meansq"),
+        "stripped name must stay readable:\n{human}"
+    );
+    assert!(
+        human.contains("file=src/main.fab"),
+        "stripped file must stay readable:\n{human}"
+    );
+    let compact = render_json_compact(&report).expect("json");
+    let value: Value = serde_json::from_str(&compact).expect("parse json");
+    assert_eq!(value["sites"][0]["name"], "mean\u{1b}[31msq");
+    assert_eq!(value["sites"][0]["file"], "src/\u{1b}[31mmain.fab");
+    assert_eq!(value["functions"][0]["name"], "mean\u{1b}[31msq");
 }

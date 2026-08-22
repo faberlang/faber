@@ -45,7 +45,7 @@ use crate::cli::Command;
 use crate::input_shape::{locale_without_package_error, verify_input_is_package_shaped};
 use crate::package;
 use clap::Parser;
-use radix_module::services::{
+use radix::services::{
     BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand,
 };
 
@@ -79,7 +79,7 @@ fn diagnostic_mode(enabled: bool) -> DiagnosticMode {
 /// Exits with a clear message on the first unknown code.
 pub(super) fn validate_deny_codes(codes: &[String]) {
     for code in codes {
-        if !radix_module::is_known_diagnostic_code(code) {
+        if !radix::module::is_known_diagnostic_code(code) {
             eprintln!("error: unknown diagnostic code '{code}' passed to --deny");
             std::process::exit(1);
         }
@@ -87,7 +87,7 @@ pub(super) fn validate_deny_codes(codes: &[String]) {
 }
 
 /// Print package compile diagnostics in the normal CLI style.
-pub(super) fn eprint_compile_diagnostics(diagnostics: &[radix_module::diagnostics::Diagnostic]) {
+pub(super) fn eprint_compile_diagnostics(diagnostics: &[radix::module::diagnostics::Diagnostic]) {
     for diag in diagnostics {
         if diag.is_error() {
             eprintln!("error: {}", diag.message);
@@ -103,8 +103,8 @@ pub(super) fn eprint_compile_diagnostics(diagnostics: &[radix_module::diagnostic
 /// renderer names it once, and carries `path` / `base` / `artifact` as facts.
 pub(super) fn eprint_io_error(path: &std::path::Path, err: &std::io::Error) -> ! {
     let path = package::absolutize_path(path);
-    let diagnostic = radix_module::diagnostics::Diagnostic::io_error(&path, err);
-    eprintln!("{}", radix_module::diagnostics::render_plain(&diagnostic));
+    let diagnostic = radix::module::diagnostics::Diagnostic::io_error(&path, err);
+    eprintln!("{}", radix::module::diagnostics::render_plain(&diagnostic));
     std::process::exit(1);
 }
 
@@ -229,7 +229,7 @@ fn dispatch(command: Command) {
                 diagnostics_locale_pack: None,
                 locale: args.locale,
                 diagnostics_locale: args.diagnostics_locale,
-                output_mode: radix_module::codegen::OutputMode::Application,
+                output_mode: radix::module::codegen::OutputMode::Application,
                 module_name: None,
                 #[cfg(feature = "mir-llvm")]
                 cuda_descriptor: None,
@@ -315,7 +315,7 @@ fn reject_reader_locale_without_package(
     }
 }
 
-fn print_inspection(result: radix_module::services::SourceInspection) {
+fn print_inspection(result: radix::services::SourceInspection) {
     if !result.text.is_empty() {
         print!("{}", result.text);
     }
@@ -344,14 +344,14 @@ fn read_source(args: &[String]) -> (String, String) {
 
 fn cmd_inspect_lex(input: &[String]) {
     let (name, source) = read_source(input);
-    print_inspection(radix_module::services::lex_inspection_for_source(
+    print_inspection(radix::services::lex_inspection_for_source(
         &name, &source,
     ));
 }
 
 fn cmd_inspect_parse(input: &[String]) {
     let (name, source) = read_source(input);
-    print_inspection(radix_module::services::parse_inspection_for_source(
+    print_inspection(radix::services::parse_inspection_for_source(
         &name, &source,
     ));
 }
@@ -363,14 +363,14 @@ fn cmd_inspect_hir(input: &[String], load: Option<std::path::PathBuf>) {
         std::process::exit(1);
     }
     let (name, source) = read_source(input);
-    print_inspection(radix_module::services::hir_inspection_for_source(
+    print_inspection(radix::services::hir_inspection_for_source(
         &name, &source,
     ));
 }
 
 fn cmd_inspect_mir(input: &[String]) {
     let (name, source) = read_source(input);
-    match radix_module::services::mir_output_for_source(&name, &source) {
+    match radix::services::mir_output_for_source(&name, &source) {
         Ok(output) => print!("{output}"),
         Err(messages) => {
             for message in messages {
@@ -383,7 +383,7 @@ fn cmd_inspect_mir(input: &[String]) {
 
 fn cmd_inspect_cli_ir(input: &[String]) {
     let (name, source) = read_source(input);
-    print_inspection(radix_module::services::cli_ir_inspection_for_source(
+    print_inspection(radix::services::cli_ir_inspection_for_source(
         &name, &source,
     ));
 }
@@ -397,18 +397,18 @@ fn cmd_check_file(command: CheckCommand) {
     }
     let (name, source) = read_source(&command.input);
     let mut result =
-        radix_module::services::check_diagnostics_for_source(&name, &source, command.permissive);
-    let warn_policy = radix_module::driver::WarnPolicy {
+        radix::services::check_diagnostics_for_source(&name, &source, command.permissive);
+    let warn_policy = radix::module::driver::WarnPolicy {
         deny_all_warnings: command.deny_warnings,
         deny_codes: command.deny_codes.clone(),
     };
-    radix_module::driver::apply_warn_policy(&mut result.diagnostics, &warn_policy);
+    radix::module::driver::apply_warn_policy(&mut result.diagnostics, &warn_policy);
     crate::postprocess::print_diagnostics(&result.diagnostics, command.diagnostic_mode, None);
     let success = result.success
         && !result
             .diagnostics
             .iter()
-            .any(radix_module::diagnostics::Diagnostic::is_error);
+            .any(radix::module::diagnostics::Diagnostic::is_error);
     if success {
         eprintln!("ok: {name}");
     } else {
@@ -418,17 +418,17 @@ fn cmd_check_file(command: CheckCommand) {
 
 fn cmd_verify_file(command: VerifyCommand) {
     let (name, source) = read_source(&command.input);
-    let result = radix_module::services::verify_source(&name, &source, None);
+    let result = radix::services::verify_source(&name, &source, None);
     if !result.diagnostics.is_empty() {
         eprint!(
             "{}",
-            radix_module::diagnostics::render_expanded_diagnostics(&result.diagnostics)
+            radix::module::diagnostics::render_expanded_diagnostics(&result.diagnostics)
         );
     }
     if let Some(coverage) = &result.coverage {
         print!(
             "{}",
-            radix_module::aspect::render_hir_aspect_coverage(coverage)
+            radix::module::aspect::render_hir_aspect_coverage(coverage)
         );
     }
     if !result.success {

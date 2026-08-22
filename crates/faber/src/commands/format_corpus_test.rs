@@ -2,7 +2,7 @@
 //!
 //! Reads every `product-corpus/format/*.fab` fixture and formats it through
 //! the exact CLI path FR-2 will install: [`super::format::format_session`] +
-//! [`radix_module::codegen::faber::compile_canonical`] +
+//! [`radix::module::codegen::faber::compile_canonical`] +
 //! [`super::format::formatted_source_for_write`]. Output must match
 //! `*.format.expected`. Each fixture is idempotent, byte-stable, and
 //! re-parses under its own locale pack.
@@ -12,8 +12,8 @@
 #![cfg(feature = "hir-faber")]
 
 use super::format::{format_session, formatted_source_for_write};
-use radix_module::codegen::faber::compile_canonical;
-use radix_module::codegen::faber::test_gate::{
+use radix::module::codegen::faber::compile_canonical;
+use radix::module::codegen::faber::test_gate::{
     assert_canonical_idempotent_with_session, lex_parse_with_pack,
 };
 use std::fs;
@@ -39,7 +39,7 @@ fn fixture_sources() -> Vec<PathBuf> {
 fn canonical_pipeline(
     path: &Path,
     source: &str,
-) -> Result<(radix_module::driver::Session, String, String), String> {
+) -> Result<(radix::module::driver::Session, String, String), String> {
     let session =
         format_session(path, None, source).map_err(|err| format!("format session: {err}"))?;
     let name = path.display().to_string();

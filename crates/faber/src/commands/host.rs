@@ -1,7 +1,7 @@
 //! `faber host` — script kernel introspection for agents.
 
 use clap::Args;
-use radix_module::kernel::{kernel_manifest_entries, KERNEL_MANIFEST_VERSION};
+use radix::module::kernel::{kernel_manifest_entries, KERNEL_MANIFEST_VERSION};
 use serde::Serialize;
 
 /// Arguments for `faber host`.

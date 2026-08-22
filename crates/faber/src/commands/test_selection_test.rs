@@ -5,8 +5,8 @@
 use super::*;
 use clap::Parser;
 use proba::{CaseOutcome, ProbaCase, ProbaModifierView};
-use radix_module::hir::DefId;
-use radix_module::lexer::Span;
+use radix::module::hir::DefId;
+use radix::module::lexer::Span;
 use std::path::Path;
 
 fn case(name: &str, suite: &str, modifiers: Vec<ProbaModifierView>) -> ProbaCase {

@@ -80,7 +80,7 @@ pub use cmd::{
     cmd_build, cmd_check_package, cmd_emit_package, should_treat_as_package_from_args,
     use_package_compiler_from_args,
 };
-#[cfg(all(feature = "device-runtime", feature = "host-macos-arm64"))]
+#[cfg(feature = "device-runtime")]
 #[allow(unused_imports)]
 pub(crate) use device::execute_device_route;
 #[cfg(feature = "device-runtime")]
@@ -132,11 +132,11 @@ pub use mir::with_lowered_package_mir;
 pub(crate) use product::build_browser_product_with_postprocess;
 #[cfg(test)]
 pub(crate) use product::{build_browser_product, build_browser_product_static_assets};
-use radix_module::codegen::Target;
-use radix_module::diagnostics::Diagnostic;
-use radix_module::driver::Config;
-use radix_program::discovery::PackageSpec;
-use radix_program::library::{LibraryInterfaceCache, LibraryResolver, LockedLibraryPackage};
+use radix::module::codegen::Target;
+use radix::module::diagnostics::Diagnostic;
+use radix::module::driver::Config;
+use radix::program::discovery::PackageSpec;
+use radix::program::library::{LibraryInterfaceCache, LibraryResolver, LockedLibraryPackage};
 use std::path::{Path, PathBuf};
 
 /// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 executed-lane
@@ -211,7 +211,7 @@ pub(crate) use locale::{
 pub(super) const MANIFEST_FILE: &str = "faber.toml";
 
 fn resolution_base() -> std::path::PathBuf {
-    radix_program::paths::normalize_path(
+    radix::program::paths::normalize_path(
         &std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")),
     )
 }
@@ -226,7 +226,7 @@ pub(crate) fn missing_package_path_diagnostic(path: &Path) -> Box<Diagnostic> {
             path.display(),
             base.display()
         ))
-        .with_phase(radix_module::diagnostics::DiagnosticPhase::Io)
+        .with_phase(radix::module::diagnostics::DiagnosticPhase::Io)
         .with_file(path.display().to_string())
         .with_arg("issue", "package_path_missing")
         .with_arg("path", path.display().to_string())
@@ -268,25 +268,25 @@ pub(crate) fn attach_path_diagnostic_context(mut diagnostic: Box<Diagnostic>) ->
     diagnostic.file = pack_path.display().to_string();
     diagnostic
         .args
-        .push(radix_module::diagnostics::DiagnosticArg::new(
+        .push(radix::module::diagnostics::DiagnosticArg::new(
             "issue",
             "locale_pack_missing",
         ));
     diagnostic
         .args
-        .push(radix_module::diagnostics::DiagnosticArg::new(
+        .push(radix::module::diagnostics::DiagnosticArg::new(
             "path",
             pack_path.display().to_string(),
         ));
     diagnostic
         .args
-        .push(radix_module::diagnostics::DiagnosticArg::new(
+        .push(radix::module::diagnostics::DiagnosticArg::new(
             "base",
             base.display().to_string(),
         ));
     diagnostic
         .args
-        .push(radix_module::diagnostics::DiagnosticArg::new(
+        .push(radix::module::diagnostics::DiagnosticArg::new(
             "artifact",
             "locale pack",
         ));
@@ -316,12 +316,12 @@ pub(crate) fn absolutize_path(path: &Path) -> std::path::PathBuf {
     } else {
         resolution_base().join(path)
     };
-    radix_program::paths::normalize_path(&path)
+    radix::program::paths::normalize_path(&path)
 }
 
 pub(crate) fn discover_package(input: &Path) -> Result<PackageSpec, Box<Diagnostic>> {
     let path = absolutize_path(input);
-    let spec = radix_program::discovery::discover_package_with_base(&path, &resolution_base())?;
+    let spec = radix::program::discovery::discover_package_with_base(&path, &resolution_base())?;
     if spec.manifest_backed {
         let manifest_path = spec.package_root.join(MANIFEST_FILE);
         if manifest_path.exists() {
@@ -383,13 +383,13 @@ pub(crate) fn test_input_route(path: &Path, no_package: bool) -> TestInputRoute 
 
 pub(crate) fn discover_build_layout(
     input: &Path,
-) -> Result<radix_program::discovery::BuildLayout, Box<Diagnostic>> {
-    radix_program::discovery::discover_build_layout(&absolutize_path(input))
+) -> Result<radix::program::discovery::BuildLayout, Box<Diagnostic>> {
+    radix::program::discovery::discover_build_layout(&absolutize_path(input))
 }
 
 #[allow(dead_code)]
 pub(crate) fn is_manifest_backed_or_directory_package_input(input: &Path) -> bool {
-    radix_program::discovery::is_manifest_backed_or_directory_package_input(&absolutize_path(input))
+    radix::program::discovery::is_manifest_backed_or_directory_package_input(&absolutize_path(input))
 }
 
 /// Build the explicit library cache seam used by product MIR route plumbing.
@@ -402,7 +402,7 @@ pub(crate) fn library_cache_default() -> LibraryInterfaceCache {
 }
 
 pub(crate) fn library_resolver_from_config(
-    config: &radix_module::driver::Config,
+    config: &radix::module::driver::Config,
 ) -> LibraryResolver {
     // The library home (provider repos such as `norma/` and `triga/`) is
     // independent of the reader-pack stdlib path (`stdlib/locale/<id>/pack.toml`).
@@ -424,7 +424,7 @@ pub(crate) fn library_resolver_from_config(
 /// Build a library resolver for a package root, attaching `faber.toml`
 /// dependencies and `faber.lock` interface roots when present.
 pub(crate) fn library_resolver_for_package(
-    config: &radix_module::driver::Config,
+    config: &radix::module::driver::Config,
     package_root: &std::path::Path,
 ) -> Result<LibraryResolver, Vec<Diagnostic>> {
     let mut resolver = library_resolver_from_config(config);
@@ -436,11 +436,11 @@ pub(crate) fn library_resolver_for_package(
         Ok(manifest) => manifest,
         Err(diag) => return Err(vec![*diag]),
     };
-    let lock = match radix_program::lockfile::read_lock(package_root) {
+    let lock = match radix::program::lockfile::read_lock(package_root) {
         Ok(lock) => lock,
         Err(diag) => return Err(vec![*diag]),
     };
-    let lock_diags = radix_program::lockfile::validate_dependencies_against_lock(
+    let lock_diags = radix::program::lockfile::validate_dependencies_against_lock(
         package_root,
         &manifest.dependencies,
         lock.as_ref(),
@@ -451,8 +451,8 @@ pub(crate) fn library_resolver_for_package(
 
     let mut locked = std::collections::BTreeMap::new();
     if let Some(lock) = lock.as_ref() {
-        let lock_index = radix_program::lockfile::lock_index(
-            &package_root.join(radix_program::lockfile::LOCK_FILE),
+        let lock_index = radix::program::lockfile::lock_index(
+            &package_root.join(radix::program::lockfile::LOCK_FILE),
             lock,
         )?;
         for package in lock_index.values() {
@@ -489,8 +489,8 @@ pub(crate) fn library_resolver_for_package(
 // loading, strict product-view manifest validation (FBR-P1-001), and
 // `FABER_LIBRARY_HOME` / workspace probing — while keeping the faber-internal
 // entry signatures.
-pub fn faber_analysis_seams() -> radix_program::analyze::AnalysisSeams {
-    radix_program::analyze::AnalysisSeams {
+pub fn faber_analysis_seams() -> radix::program::analyze::AnalysisSeams {
+    radix::program::analyze::AnalysisSeams {
         locale_loader: load_locale_pack_for_input,
         manifest_validator: validate_product_manifest_for_spec,
         resolver_for_package: library_resolver_for_package,
@@ -500,8 +500,8 @@ pub fn faber_analysis_seams() -> radix_program::analyze::AnalysisSeams {
 /// Faber-supplied package-emission seams. Go source assembly remains a product
 /// helper because it owns the generated multi-file package shape; the shared
 /// dispatch and Rust assembly live in `radix-program`.
-pub fn faber_emission_seams() -> radix_program::emit::EmissionSeams {
-    radix_program::emit::EmissionSeams {
+pub fn faber_emission_seams() -> radix::program::emit::EmissionSeams {
+    radix::program::emit::EmissionSeams {
         analysis: faber_analysis_seams(),
         #[cfg(feature = "hir-go")]
         emit_go: go_build::generate_package_go_result,

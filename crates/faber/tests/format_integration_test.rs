@@ -1,6 +1,6 @@
 //! Subprocess checks for `faber format --stdout` (requires built `faber` binary).
 
-use radix_module::codegen::faber::test_gate::assert_canonical_reparses_with;
+use radix::module::codegen::faber::test_gate::assert_canonical_reparses_with;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -18,14 +18,14 @@ fn exempla(path: &str) -> PathBuf {
 
 /// English reader pack — the product-default surface the CLI uses for
 /// untagged sources and `locale = "en"` frontmatter files.
-fn english_pack() -> radix_module::locale::LocalePack {
+fn english_pack() -> radix::module::locale::LocalePack {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
-    radix_module::locale::LocalePack::from_toml_path(path).expect("load English locale pack")
+    radix::module::locale::LocalePack::from_toml_path(path).expect("load English locale pack")
 }
 
-fn latin_pack() -> radix_module::locale::LocalePack {
+fn latin_pack() -> radix::module::locale::LocalePack {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/la/pack.toml");
-    radix_module::locale::LocalePack::from_toml_path(path).expect("load Latin locale pack")
+    radix::module::locale::LocalePack::from_toml_path(path).expect("load Latin locale pack")
 }
 
 fn normalize_trailing_newline(text: &str) -> String {
@@ -38,7 +38,7 @@ fn normalize_trailing_newline(text: &str) -> String {
 }
 
 fn body_for_parse(source: &str) -> &str {
-    radix_module::driver::split_frontmatter(source)
+    radix::module::driver::split_frontmatter(source)
         .expect("split formatted source")
         .body
 }

@@ -1,7 +1,7 @@
 //! Exit/abort traps so interpreted Faber can return an [`ExitCode`] without
 //! terminating the embedder process.
 
-use radix_module::mir::{Host, KernelModule, MirDiagnosticKind, MirProvider, RunnerError, Value};
+use radix::module::mir::{Host, KernelModule, MirDiagnosticKind, MirProvider, RunnerError, Value};
 use std::any::Any;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::process::ExitCode;
@@ -41,7 +41,7 @@ impl Host for TrapHost<'_> {
         module: KernelModule,
         verb: &str,
         args: &[Value],
-        span: radix_module::lexer::Span,
+        span: radix::module::lexer::Span,
     ) -> Result<Value, RunnerError> {
         // processus.exit_process must hit TrapHost::exit (HostTrap) rather than the
         // inner BufferHost::exit panic, so embedders can return ExitCode.

@@ -56,6 +56,35 @@ pub struct DeviceExecuteRequest {
     pub weight_map_json: Option<Vec<u8>>,
 }
 
+/// A distributed FMIR image passed to the hosts `device-execute` CLI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DistributedExecuteRequest {
+    /// `--backend` spelling (`metal` / `cuda` / `auto`).
+    pub backend: String,
+    /// Postcard-encoded `FmirDeviceSection`.
+    pub image: Vec<u8>,
+    /// Declared physical bind count (`1` is the MD3H 8:1 path).
+    pub bind_count: u32,
+}
+
+/// Frozen receipt returned by a distributed-image prepare.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DistributedPrepareReceipt {
+    pub physical_device_count: u64,
+    pub physical_device_ids: Vec<String>,
+    pub virtual_partition_count: u64,
+    pub virtual_partition_ids: Vec<String>,
+    pub fixture_identity_class: String,
+    pub transport_class: String,
+    pub hardware_isolation_claimed: bool,
+    pub bind_shape: String,
+    pub communication_graph_edge_count: u64,
+    pub snapshot_id: String,
+    pub logical_distributed_plan_hash: String,
+    pub bound_distributed_plan_hash: String,
+    pub transaction_state: String,
+}
+
 /// Version of the local `device-execute` control protocol.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
@@ -546,6 +575,18 @@ pub fn execute_device(
     )
 }
 
+/// Invoke the hosts distributed-image prepare entry as a child process.
+#[allow(dead_code)] // live from the MD3H run route; lib tests use the `_at` seam
+pub fn execute_distributed(
+    request: &DistributedExecuteRequest,
+    build_if_missing: bool,
+) -> Result<DistributedPrepareReceipt, HostSpawnError> {
+    execute_distributed_at(
+        &resolve_host_cli(&request.backend, build_if_missing)?,
+        request,
+    )
+}
+
 /// Start one long-lived hosts control owner and perform its explicit `load`.
 #[allow(dead_code)] // live from the dense device-runtime route
 pub fn open_device_session(
@@ -1006,6 +1047,55 @@ fn execute_device_at(
         receipt.load_us = receipt.session_create_us;
     }
     Ok(receipt)
+}
+
+/// Invoke a resolved host binary with a distributed FMIR image.
+fn execute_distributed_at(
+    host: &Path,
+    request: &DistributedExecuteRequest,
+) -> Result<DistributedPrepareReceipt, HostSpawnError> {
+    let work = WorkDir::create()?;
+    let image_path = work.path.join("distributed-image.postcard");
+    write_file(&image_path, &request.image)?;
+    let image_path = path_text(&image_path)?;
+    let bind_count = request.bind_count.to_string();
+    let output = Command::new(host)
+        .args([
+            "device-execute",
+            "--backend",
+            &request.backend,
+            "--distributed-image",
+            &image_path,
+            "--bind-count",
+            &bind_count,
+        ])
+        .output()
+        .map_err(|error| HostSpawnError {
+            code: "E_HOST_SPAWN".to_owned(),
+            message: format!("failed to spawn {}: {error}", host.display()),
+        })?;
+    if output.status.code() == Some(0) {
+        return serde_json::from_slice(&output.stdout).map_err(|error| HostSpawnError {
+            code: "E_HOST_SPAWN".to_owned(),
+            message: format!("distributed prepare receipt JSON is invalid: {error}"),
+        });
+    }
+    if let Ok(parsed) = serde_json::from_slice::<WireHostError>(&output.stdout) {
+        if !parsed.code.is_empty() {
+            return Err(HostSpawnError {
+                code: parsed.code,
+                message: parsed.message,
+            });
+        }
+    }
+    Err(HostSpawnError {
+        code: "E_HOST_SPAWN".to_owned(),
+        message: format!(
+            "device-execute distributed prepare exited {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        ),
+    })
 }
 
 fn elapsed_us(start: std::time::Instant) -> u64 {

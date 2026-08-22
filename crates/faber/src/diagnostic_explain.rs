@@ -7,7 +7,7 @@
 use crate::explain::ExplainError;
 use crate::io_buf::writeln_buf;
 use crate::package::{load_embedded_locale_pack, EMBEDDED_LOCALE_IDS};
-use radix_module::locale::{DiagnosticTemplate, LocalePack};
+use radix::module::locale::{DiagnosticTemplate, LocalePack};
 use serde::Serialize;
 
 const DEFAULT_READER_LOCALE: &str = "en";

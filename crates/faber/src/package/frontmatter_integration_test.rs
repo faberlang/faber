@@ -8,18 +8,18 @@
 
 use super::library_resolver_from_config;
 use super::test_support::{diagnostic_has_arg, diagnostic_has_issue, test_temp_dir};
-use radix_module::driver::Config;
-use radix_module::Output;
-use radix_program::analyze::AnalysisSeams;
-use radix_program::discovery::PackageSpec;
-use radix_program::emit::{
+use radix::module::driver::Config;
+use radix::module::Output;
+use radix::program::analyze::AnalysisSeams;
+use radix::program::discovery::PackageSpec;
+use radix::program::emit::{
     compile_package as compile_package_direct,
     compile_package_with_test_options as compile_package_with_test_options_direct,
     compile_package_with_test_selection as compile_package_with_test_selection_direct,
 };
-use radix_program::frontmatter::RustTestSelection as TestSelection;
-use radix_program::library::LibraryResolver;
-use radix_program::test_source_filter::TestSourceFilter;
+use radix::program::frontmatter::RustTestSelection as TestSelection;
+use radix::program::library::LibraryResolver;
+use radix::program::test_source_filter::TestSourceFilter;
 use std::fs;
 use std::path::Path;
 
@@ -27,7 +27,7 @@ fn seams() -> AnalysisSeams {
     crate::package::faber_analysis_seams()
 }
 
-fn compile_with_faber_seams(config: &Config, input: &Path) -> radix_module::CompileResult {
+fn compile_with_faber_seams(config: &Config, input: &Path) -> radix::module::CompileResult {
     compile_package_direct(config, input, &crate::package::faber_emission_seams())
 }
 
@@ -35,7 +35,7 @@ fn compile_with_test_selection(
     config: &Config,
     input: &Path,
     selection: Option<&TestSelection>,
-) -> radix_module::CompileResult {
+) -> radix::module::CompileResult {
     compile_package_with_test_selection_direct(
         config,
         input,
@@ -49,7 +49,7 @@ fn compile_with_test_options(
     input: &Path,
     selection: Option<&TestSelection>,
     filter: Option<&TestSourceFilter>,
-) -> radix_module::CompileResult {
+) -> radix::module::CompileResult {
     compile_package_with_test_options_direct(
         config,
         input,
@@ -61,15 +61,15 @@ fn compile_with_test_options(
 
 fn discover_package(
     input: &Path,
-) -> Result<PackageSpec, Box<radix_module::diagnostics::Diagnostic>> {
+) -> Result<PackageSpec, Box<radix::module::diagnostics::Diagnostic>> {
     crate::package::discover_package(input)
 }
 
 fn load_with_faber_seams(
     spec: &PackageSpec,
     resolver: &LibraryResolver,
-) -> Result<Vec<radix_program::PackageFile>, Vec<radix_module::diagnostics::Diagnostic>> {
-    radix_program::analyze::load_package_with_locale_pack(
+) -> Result<Vec<radix::program::PackageFile>, Vec<radix::module::diagnostics::Diagnostic>> {
+    radix::program::analyze::load_package_with_locale_pack(
         spec,
         resolver,
         None,
