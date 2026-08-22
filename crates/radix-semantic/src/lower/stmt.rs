@@ -54,6 +54,22 @@ fn binding_pattern_span(pattern: &radix_syntax::BindingPattern) -> Span {
     }
 }
 
+fn binding_pattern_has_name(pattern: &radix_syntax::BindingPattern, name: radix_lexer::Symbol) -> bool {
+    match pattern {
+        radix_syntax::BindingPattern::Ident(ident) => ident.name == name,
+        radix_syntax::BindingPattern::Wildcard(_) => false,
+        radix_syntax::BindingPattern::Array { elements, is_rest, .. } => {
+            elements.iter().any(|element| binding_pattern_has_name(element, name))
+                || is_rest.as_ref().is_some_and(|rest| rest.name == name)
+        }
+        radix_syntax::BindingPattern::Object { fields, is_rest, .. } => {
+            fields.iter().any(|field| {
+                field.alias.as_ref().unwrap_or(&field.name).name == name
+            }) || is_rest.as_ref().is_some_and(|rest| rest.name == name)
+        }
+    }
+}
+
 /// Lower one source statement into one HIR statement.
 ///
 /// This function assumes expansion-only forms have already gone through
@@ -176,10 +192,19 @@ impl Lowerer<'_> {
             return Vec::new();
         };
 
+        self.lower_array_destructure_pattern(&decl.binding, init, decl.mutability, decl.is_await)
+    }
+
+    fn lower_array_destructure_pattern(
+        &mut self,
+        pattern: &radix_syntax::BindingPattern,
+        init: &radix_syntax::Expr,
+        mutability: radix_syntax::AstMutability,
+        is_await: bool,
+    ) -> Vec<HirStatement> {
         let mut out = Vec::new();
-        let mutable = decl.mutability == radix_syntax::AstMutability::Mutable;
-        let is_await = decl.is_await;
-        let (elements, rest, span) = match &decl.binding {
+        let mutable = mutability == radix_syntax::AstMutability::Mutable;
+        let (elements, rest, span) = match pattern {
             radix_syntax::BindingPattern::Array {
                 elements,
                 is_rest: rest,
@@ -267,7 +292,17 @@ impl Lowerer<'_> {
             return Vec::new();
         };
 
-        let radix_syntax::BindingPattern::Object { fields, is_rest: rest, .. } = &decl.binding else {
+        self.lower_object_destructure_pattern(&decl.binding, init, decl.mutability, decl.is_await)
+    }
+
+    fn lower_object_destructure_pattern(
+        &mut self,
+        pattern: &radix_syntax::BindingPattern,
+        init: &radix_syntax::Expr,
+        mutability: radix_syntax::AstMutability,
+        is_await: bool,
+    ) -> Vec<HirStatement> {
+        let radix_syntax::BindingPattern::Object { fields, is_rest: rest, .. } = pattern else {
             return Vec::new();
         };
 
@@ -279,8 +314,7 @@ impl Lowerer<'_> {
             .as_ref()
             .map(|labels| vec![false; labels.len()]);
         let mut out = Vec::new();
-        let mutable = decl.mutability == radix_syntax::AstMutability::Mutable;
-        let is_await = decl.is_await;
+        let mutable = mutability == radix_syntax::AstMutability::Mutable;
 
         for field in fields {
             let name = field
@@ -550,6 +584,18 @@ impl Lowerer<'_> {
         HirStatementKind::Expr(expr)
     }
 
+    fn fresh_itera_binding_name(&mut self, pattern: &radix_syntax::BindingPattern) -> radix_lexer::Symbol {
+        let mut suffix = 0_u32;
+        loop {
+            let candidate_text = format!("__itera_element_{suffix}");
+            let candidate = self.interner.intern(&candidate_text);
+            if !binding_pattern_has_name(pattern, candidate) {
+                return candidate;
+            }
+            suffix += 1;
+        }
+    }
+
     /// Lower `itera` with a synthetic binding local for the iteration variable.
     fn lower_itera(&mut self, iter_stmt: &radix_syntax::IteraStmt) -> HirStatementKind {
         let mode = match iter_stmt.mode {
@@ -560,33 +606,62 @@ impl Lowerer<'_> {
 
         let binding = self.next_def_id();
         let iter = self.lower_expr(&iter_stmt.iterable);
-        let binder = match &iter_stmt.binding {
-            radix_syntax::BindingPattern::Ident(ident) => ident,
-            // Pattern binders lower per-element in U3; reject at lowering
-            // until then rather than mis-binding the whole pattern as one
-            // loop variable.
-            pattern => {
-                let span = binding_pattern_span(pattern);
+        let binding_span = binding_pattern_span(&iter_stmt.binding);
+        let binding_name = match &iter_stmt.binding {
+            radix_syntax::BindingPattern::Ident(ident) => ident.name,
+            radix_syntax::BindingPattern::Array { .. }
+            | radix_syntax::BindingPattern::Object { .. } => {
+                self.fresh_itera_binding_name(&iter_stmt.binding)
+            }
+            // The normalized loop grammar has no top-level wildcard binder.
+            // Keep the parser's broader shared-pattern recovery fail-closed.
+            radix_syntax::BindingPattern::Wildcard(_) => {
                 self.error_with_args_at(
                     vec![radix_diagnostics::DiagnosticArg::new(
                         "issue",
                         "itera_binder_pattern_unsupported",
                     )],
-                    span,
+                    binding_span,
                 );
-                return HirStatementKind::Expr(error_expr(self, span));
+                return HirStatementKind::Expr(error_expr(self, binding_span));
             }
         };
+        let binding_expr = radix_syntax::Expr {
+            id: u32::MAX,
+            kind: radix_syntax::ExprKind::Ident(radix_syntax::Ident {
+                name: binding_name,
+                span: binding_span,
+            }),
+            span: binding_span,
+        };
+
         self.push_scope();
-        self.bind_local(binder.name, binding);
-        let body = self.lower_ergo_body(&iter_stmt.body);
+        self.bind_local(binding_name, binding);
+        let pattern_locals = match &iter_stmt.binding {
+            radix_syntax::BindingPattern::Array { .. } => self.lower_array_destructure_pattern(
+                &iter_stmt.binding,
+                &binding_expr,
+                iter_stmt.mutability,
+                false,
+            ),
+            radix_syntax::BindingPattern::Object { .. } => self.lower_object_destructure_pattern(
+                &iter_stmt.binding,
+                &binding_expr,
+                iter_stmt.mutability,
+                false,
+            ),
+            radix_syntax::BindingPattern::Ident(_) => Vec::new(),
+            radix_syntax::BindingPattern::Wildcard(_) => unreachable!("wildcard loop binder rejected above"),
+        };
+        let mut body = self.lower_ergo_body(&iter_stmt.body);
+        body.statements.splice(0..0, pattern_locals);
         self.pop_scope();
         let expr = HirExpression {
             id: self.next_hir_id(),
             kind: HirExpressionKind::Itera(
                 mode,
                 binding,
-                binder.name,
+                binding_name,
                 Box::new(iter),
                 body,
             ),
