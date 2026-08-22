@@ -18,7 +18,7 @@ use radix_mir::{MirCollectionOp, MirDiagnosticKind, MirIntrinsic, MirProvider, M
 use radix_types::TypeId;
 
 /// Canonical test program shape: one empty function with no params, locals, or blocks.
-fn test_function() -> MirFunction {
+fn make_function() -> MirFunction {
     MirFunction {
         id: MirFunctionId(0),
         source: None,
@@ -224,7 +224,7 @@ fn rounding_ops_return_numerus_so_bound_compares_do_not_mismatch() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&types);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
     let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
     let fn0 = program.functions.first().unwrap();
     runner.push_frame(fn0.id, MirBlockId(0));
@@ -301,7 +301,7 @@ fn tensor_layernorm_rank2_no_affine() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -393,7 +393,7 @@ fn tensor_softmax_rank1() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -491,7 +491,7 @@ fn tensor_softmax_rank2() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -585,7 +585,7 @@ fn tensor_gelu_rank1() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -660,7 +660,7 @@ fn tensor_relu_rank1() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -732,7 +732,7 @@ fn mir_unop_gelu_tensor() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -802,7 +802,7 @@ fn mir_unop_tanh_tensor() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -870,7 +870,7 @@ fn mir_unop_exp_tensor() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -939,7 +939,7 @@ fn tensor_elementwise_or_scalar_broadcast() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -1019,7 +1019,7 @@ fn tensor_elementwise_or_scalar_broadcast_div_scalar_tensor() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -1099,7 +1099,7 @@ fn tensor_elementwise_or_scalar_broadcast_sub_scalar_tensor() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -1183,7 +1183,7 @@ fn unop_sqrt_tensor() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -1267,7 +1267,7 @@ fn tensor_fill_prefix_broadcast() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -1360,7 +1360,7 @@ fn tensor_fill_suffix_broadcast() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -1463,7 +1463,7 @@ fn tensor_crux_entropia_rank2() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -1601,7 +1601,7 @@ fn package_provider_routes_fail_closed() {
     let type_table = TypeTable::default();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
     runner.push_frame(MirFunctionId(0), MirBlockId(0));
 
@@ -1711,7 +1711,7 @@ fn tensor_elementwise_shape_mismatch_rejected() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -1782,7 +1782,7 @@ fn tensor_elementwise_backing_length_mismatch_rejected() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -1862,7 +1862,7 @@ fn tensor_elementwise_same_shape_succeeds() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -1931,7 +1931,7 @@ fn tensor_softmax_zero_width_rejected() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -1981,7 +1981,7 @@ fn tensor_softmax_rank2_zero_width_rejected() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -2030,7 +2030,7 @@ fn tensor_crux_entropia_zero_width_rejected() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -2258,7 +2258,7 @@ fn f029_tensor_add_u8_overflow_rejected() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -2326,7 +2326,7 @@ fn f029_uint_tensor_add_succeeds() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -2396,7 +2396,7 @@ fn f029_tensor_div_zero_rejected() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -2463,7 +2463,7 @@ fn f029_float_tensor_div_zero_allowed() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
 
@@ -2527,7 +2527,7 @@ fn f082_reversed_interval_bounds_rejected() {
     let type_table = TypeTable::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut host = BufferHost::default();
     let interner = Interner::new();
@@ -2586,7 +2586,7 @@ fn f082_valid_interval_bounds_accepted() {
     let type_table = TypeTable::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut host = BufferHost::default();
     let interner = Interner::new();
@@ -2648,7 +2648,7 @@ fn f088_interval_clamp_empty_exclusive_interval_no_panic() {
     let type_table = TypeTable::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut host = BufferHost::default();
     let interner = Interner::new();
@@ -2705,7 +2705,7 @@ fn f088_interval_clamp_exclusive_interval_clamps_into_range() {
     let type_table = TypeTable::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut host = BufferHost::default();
     let interner = Interner::new();
@@ -2765,7 +2765,7 @@ fn sum_numeric_u8_overflow_rejects() {
     let u8_ty = type_table.sized_numeric(Primitive::Numerus, NumericWidth::U8);
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut host = BufferHost::default();
     let interner = Interner::new();
@@ -2815,7 +2815,7 @@ fn sum_numeric_width_boundary_succeeds() {
     let u64_ty = type_table.sized_numeric(Primitive::Numerus, NumericWidth::U64);
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut host = BufferHost::default();
     let interner = Interner::new();
@@ -2907,7 +2907,7 @@ fn f083_optional_variant_field_nil_fallback() {
         .insert(variant_def, FxHashSet::from_iter([optional_field]));
 
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut host = BufferHost::default();
     let interner = Interner::new();
@@ -2957,7 +2957,7 @@ fn f083_required_variant_field_errors() {
     let context = MirValidationContext::new(&type_table);
 
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut host = BufferHost::default();
     let interner = Interner::new();
@@ -3102,7 +3102,7 @@ fn f086_octeti_append_non_place_returns_modified() {
     let type_table = TypeTable::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut host = BufferHost::default();
     let interner = Interner::new();
@@ -3163,7 +3163,7 @@ fn f087_inclusive_range_materialize_i64max() {
 
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut host = BufferHost::default();
     let interner = Interner::new();
@@ -3225,7 +3225,7 @@ fn f087_exclusive_range_i64max_empty() {
 
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut host = BufferHost::default();
     let interner = Interner::new();
@@ -3294,7 +3294,7 @@ fn eval_tensor_add_bias(x_data: Vec<f64>, b_data: Vec<f64>) -> Value {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
     let fn0 = program.functions.first().unwrap();
@@ -3374,7 +3374,7 @@ fn tensor_add_invalid_broadcast_pair_fails_closed() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
     let fn0 = program.functions.first().unwrap();
@@ -3418,7 +3418,7 @@ fn evaluate_collection_call(
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
     let fn0 = program.functions.first().unwrap();
     runner.push_frame(fn0.id, MirBlockId(0));
@@ -3715,7 +3715,7 @@ fn runner_gradient_handle_create_accumulate_read_zero_round_trip() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
     let fn0 = program.functions.first().unwrap();
@@ -3875,7 +3875,7 @@ fn runner_gradient_operations_fail_closed_on_unknown_or_foreign_handle() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
     let fn0 = program.functions.first().unwrap();
@@ -3933,7 +3933,7 @@ fn runner_type_check_dispatches_on_runtime_variant_tag() {
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
-    program.functions.push(test_function());
+    program.functions.push(make_function());
 
     let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
     let fn0 = program.functions.first().unwrap();
@@ -4182,7 +4182,7 @@ fn recovery_calls_index_only_orphan_temp_destinations() {
     };
     use radix_types::TypeTable;
 
-    let mut function = test_function();
+    let mut function = make_function();
     function.blocks.push(MirBlock {
         id: MirBlockId(0),
         statements: vec![MirStatement {

@@ -248,7 +248,7 @@ fn wire_facts_fixture() -> Vec<WirePlacementFact> {
 /// Assemble the logical plan the fixture derives: the declared placement
 /// (facts + the CS-1 160 MiB partition budgets + one objective) + the
 /// deterministic derivation.
-fn fixture_plan() -> DistributedExecutionPlan {
+fn sample_plan() -> DistributedExecutionPlan {
     let facts = wire_facts_to_facts(&wire_facts_fixture());
     let program = wire_program_to_program(&wire_program_fixture()).expect("fixture reconstructs");
     let (partitions, graph) = radix_mir::distributed::derive(&program, &facts);
@@ -280,7 +280,7 @@ fn fixture_plan() -> DistributedExecutionPlan {
 /// declared placement facts + the H1 hash over the **wire-reconstructed**
 /// plan (the schema's element-type reconstruction contract).
 fn honest_section() -> FmirDistributedExecutionSection {
-    let plan = fixture_plan();
+    let plan = sample_plan();
     let wire_plan = plan_to_wire_plan(&plan);
     let reconstructed = wire_plan_to_plan(&wire_plan).expect("fixture plan round-trips");
     FmirDistributedExecutionSection {
@@ -708,7 +708,7 @@ fn device_identity_hash_is_identical_with_and_without_the_distributed_section() 
 
 #[test]
 fn wire_plan_mirror_round_trips_the_derived_plan() {
-    let plan = fixture_plan();
+    let plan = sample_plan();
     let wire = plan_to_wire_plan(&plan);
     let reconstructed = wire_plan_to_plan(&wire).expect("plan round-trips");
     assert_eq!(
