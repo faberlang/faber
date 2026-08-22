@@ -125,11 +125,7 @@ pub fn render_plain_with_pack(diag: &Diagnostic, pack: &LocalePack) -> Result<St
 fn render_plain_text(diag: &Diagnostic, pack: Option<&LocalePack>) -> Result<String, DiagnosticTemplateRenderError> {
     let severity = severity_name(diag.severity);
 
-    let location = if let Some(span) = diag.span {
-        format!("{}:{}", diag.file, span.start)
-    } else {
-        diag.file.clone()
-    };
+    let location = diag.display_location();
 
     let text = diagnostic_display_text(diag, pack)?;
     let label = diag.display_label();

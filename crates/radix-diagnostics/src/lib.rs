@@ -16,9 +16,9 @@ mod span;
 mod spec;
 
 pub use diagnostic::{
-    diagnostic_identity, get_line_at_offset, nearest_char_boundary, parse_arg_value, Diagnostic,
-    DiagnosticArg, DiagnosticPhase, LexErrorKind, ParseErrorKind, PhaseErrorKind,
-    SemanticErrorKind, Severity, WarningKind,
+    diagnostic_identity, get_line_at_offset, nearest_char_boundary, offset_to_line,
+    parse_arg_value, Diagnostic, DiagnosticArg, DiagnosticPhase, LexErrorKind, ParseErrorKind,
+    PhaseErrorKind, SemanticErrorKind, Severity, WarningKind,
 };
 pub use span::Span;
 pub use spec::{

@@ -27,6 +27,37 @@ fn plain_render_includes_code_location_source_and_help() {
     );
 }
 
+/// Byte offsets printed as `file:N` leak past physical EOF (`main.fab:1846` in a 93-line file).
+#[test]
+fn plain_render_file_line_stays_within_physical_source_length() {
+    let mut source = String::new();
+    for _ in 0..5 {
+        source.push_str("line\n");
+    }
+    source.push_str("boom token\n");
+    let start = u32::try_from(source.find("boom").expect("boom")).expect("fits u32");
+    let line_count = u32::try_from(source.lines().count()).expect("fits u32");
+    assert!(
+        start > line_count,
+        "reproducer needs a byte offset past the physical line count ({start} > {line_count})"
+    );
+
+    let diagnostic = Diagnostic::error("expected identifier")
+        .with_phase(DiagnosticPhase::Parse)
+        .with_code("PARSE001")
+        .with_source_context("main.fab", &source, Span { start, end: start + 4 });
+    let rendered = render_plain(&diagnostic);
+
+    assert!(
+        rendered.contains(&format!("main.fab:{line_count}")),
+        "plain location must be a physical line ≤ {line_count}: {rendered}"
+    );
+    assert!(
+        !rendered.contains(&format!("main.fab:{start}")),
+        "byte offset must not leak as a line number: {rendered}"
+    );
+}
+
 #[test]
 fn plain_render_uses_issue_in_compact_code_label() {
     let diagnostic = Diagnostic::error("unknown identifier")

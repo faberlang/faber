@@ -362,6 +362,14 @@ pub struct Diagnostic {
     /// Byte span in `file`; absent when the error is not tied to source text.
     pub span: Option<Span>,
 
+    /// One-based physical line in `file` when source context was available.
+    ///
+    /// Plain `file:N` locations must use this, not [`Span::start`]. Byte offsets
+    /// printed as line numbers leak past physical EOF (`main.fab:1846` in a
+    /// 93-line file).
+    #[serde(default)]
+    pub line: Option<u32>,
+
     /// Full source line containing `span`, captured for plain renderers.
     pub source_line: Option<String>,
 
@@ -381,6 +389,7 @@ impl Diagnostic {
             args: Vec::new(),
             file: String::new(),
             span: None,
+            line: None,
             source_line: None,
             help: None,
         }
@@ -493,13 +502,29 @@ impl Diagnostic {
         self
     }
 
-    /// Attach file, span, and containing source line for phase conversions.
+    /// Attach file, span, physical line, and containing source line for phase conversions.
     #[must_use]
     pub fn with_source_context(mut self, file: &str, source: &str, span: Span) -> Self {
         file.clone_into(&mut self.file);
         self.span = Some(span);
+        self.line = Some(offset_to_line(source, span.start as usize));
         self.source_line = Some(get_line_at_offset(source, span.start as usize));
         self
+    }
+
+    /// User-facing `file:line` when source context mapped a physical line.
+    ///
+    /// Span-only diagnostics fall back to `file:byte` so tests that never saw
+    /// source text keep a stable location token.
+    #[must_use]
+    pub fn display_location(&self) -> String {
+        match (self.line, self.span) {
+            (Some(line), _) if self.file.is_empty() => line.to_string(),
+            (Some(line), _) => format!("{}:{line}", self.file),
+            (_, Some(span)) if self.file.is_empty() => span.start.to_string(),
+            (_, Some(span)) => format!("{}:{}", self.file, span.start),
+            _ => self.file.clone(),
+        }
     }
 
     #[must_use]
@@ -618,6 +643,20 @@ pub fn get_line_at_offset(source: &str, offset: usize) -> String {
         .find('\n')
         .map_or(source.len(), |i| offset + i);
     source[start..end].to_owned()
+}
+
+/// One-based physical line for a byte offset, clamped to the real source length.
+///
+/// Newline count before the clamped offset is the line index. Offsets past EOF
+/// or onto a trailing empty line after a final `\n` stay on the last content
+/// line so user-facing `file:N` cannot exceed `wc -l`.
+#[must_use]
+pub fn offset_to_line(source: &str, offset: usize) -> u32 {
+    let offset = nearest_char_boundary(source, offset.min(source.len()));
+    let newlines = source[..offset].bytes().filter(|&b| b == b'\n').count();
+    let line = newlines.saturating_add(1);
+    let physical = source.lines().count().max(1);
+    u32::try_from(line.min(physical)).unwrap_or(u32::MAX)
 }
 
 /// Snap a byte offset down to the nearest UTF-8 char boundary.
