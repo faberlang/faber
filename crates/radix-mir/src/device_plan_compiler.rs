@@ -7,13 +7,14 @@
 //! fallback schedule entries and an incomplete pattern is a typed miss rather
 //! than a guessed fusion.
 
+use crate::MirKernelWorkgroupCount;
+use crate::abi::PackedStorageLayout;
 use crate::device_program::{Binding, DeviceProgram};
 use crate::device_program_plans::{
-    BackendRequirement, BindDescriptor, BindLayout, ExecutorPlanExtension, LibraryBind,
-    LibrarySelection, LogicalSignature, OffsetBinding, PlanProvenance, UniformBinding,
-    WorkspaceBinding, EXECUTOR_PLAN_BIND_ABI_VERSION,
+    BackendRequirement, BindDescriptor, BindLayout, EXECUTOR_PLAN_BIND_ABI_VERSION,
+    ExecutorPlanExtension, LibraryBind, LibrarySelection, LogicalSignature, OffsetBinding,
+    PlanProvenance, UniformBinding, WorkspaceBinding,
 };
-use crate::MirKernelWorkgroupCount;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
@@ -136,6 +137,81 @@ impl MoEFacts {
     }
 }
 
+/// SSM state-operation facts carried by a hybrid model graph.
+///
+/// These are the same typed extents admitted by [`crate::SsmConv1dPlan`] and
+/// [`crate::SsmScanPlan`].  The state bodies currently prove only the plain F32
+/// storage row; other closed packed layouts remain explicit typed misses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SsmFacts {
+    /// Causal convolution over `[length, channels]` state rows.
+    Conv1d {
+        /// Number of time rows.
+        length: u64,
+        /// Number of state channels per row.
+        channels: u64,
+        /// Number of causal kernel taps.
+        kernel_width: u64,
+        /// Stored kernel/state layout.
+        layout: PackedStorageLayout,
+    },
+    /// Linear recurrence over `[length, state_dim]` state rows.
+    Scan {
+        /// Number of time rows.
+        length: u64,
+        /// Number of state values per row.
+        state_dim: u64,
+        /// Stored state/update layout.
+        layout: PackedStorageLayout,
+    },
+}
+
+impl SsmFacts {
+    fn valid(self) -> bool {
+        match self {
+            Self::Conv1d {
+                length,
+                channels,
+                kernel_width,
+                ..
+            } => length > 0 && channels > 0 && kernel_width > 0,
+            Self::Scan {
+                length, state_dim, ..
+            } => length > 0 && state_dim > 0,
+        }
+    }
+
+    fn servable(self) -> bool {
+        match self {
+            Self::Conv1d { layout, .. } | Self::Scan { layout, .. } => {
+                layout == PackedStorageLayout::F32
+            }
+        }
+    }
+
+    fn state_dims(self) -> Vec<u64> {
+        match self {
+            Self::Conv1d {
+                length, channels, ..
+            } => vec![length, channels],
+            Self::Scan {
+                length, state_dim, ..
+            } => vec![length, state_dim],
+        }
+    }
+
+    fn extent(self) -> Option<u64> {
+        match self {
+            Self::Conv1d {
+                length, channels, ..
+            } => length.checked_mul(channels),
+            Self::Scan {
+                length, state_dim, ..
+            } => length.checked_mul(state_dim),
+        }
+    }
+}
+
 /// Typed operation vocabulary.  These are semantic graph operations, not
 /// plan variants.  In particular, the four attention operations below remain
 /// ordinary graph nodes and compile to a `CausalAttention` library call.
@@ -181,6 +257,10 @@ pub enum TypedOp {
     ExpertActivation,
     /// Grouped-expert gate/up product.
     ExpertMul,
+    /// Causal SSM convolution state operation.
+    SsmConv1d,
+    /// SSM linear-recurrence state operation.
+    SsmScan,
     /// An ordinary operation with no admitted fusion pattern.
     Other(String),
 }
@@ -202,6 +282,8 @@ pub struct TypedOpNode {
     pub attention: Option<AttentionFacts>,
     /// MoE facts when this node belongs to a routed expert subgraph.
     pub moe: Option<MoEFacts>,
+    /// SSM state facts when this node is a conv/scan state operation.
+    pub ssm: Option<SsmFacts>,
 }
 
 /// A canonical typed model/op graph.
@@ -233,6 +315,16 @@ impl TypedModelGraph {
             }
             if node.moe.is_some_and(|facts| !facts.valid()) {
                 return Err(GraphError::InvalidMoeFacts(node.id));
+            }
+            if node.ssm.is_some_and(|facts| !facts.valid())
+                || !matches!(
+                    (&node.op, node.ssm),
+                    (TypedOp::SsmConv1d, Some(SsmFacts::Conv1d { .. }))
+                        | (TypedOp::SsmScan, Some(SsmFacts::Scan { .. }))
+                        | (_, None)
+                )
+            {
+                return Err(GraphError::InvalidSsmFacts(node.id));
             }
             for input in &node.inputs {
                 let Some(input_position) = positions.get(input) else {
@@ -274,6 +366,10 @@ pub enum LibraryOperation {
     RouterSelection,
     /// Grouped expert gate/up/activation/product packed execution.
     GroupedExpertGemm,
+    /// Causal SSM convolution body over state channels.
+    SsmConv1d,
+    /// SSM linear-recurrence scan body over state rows.
+    SsmScan,
     /// No library body admitted; retain the ordinary generated kernel.
     Generated,
 }
@@ -289,6 +385,8 @@ impl LibraryOperation {
             Self::SwiGlu => Some("SwiGlu"),
             Self::RouterSelection => Some("RouterSelection"),
             Self::GroupedExpertGemm => Some("GroupedExpertGemm"),
+            Self::SsmConv1d => Some("SsmConv1d"),
+            Self::SsmScan => Some("SsmScan"),
             Self::Generated => None,
         }
     }
@@ -317,6 +415,8 @@ impl LibraryOperation {
                 vec!["expert_ids", "expert_weights", "gate_weight", "up_weight"],
                 vec!["output"],
             ),
+            Self::SsmConv1d => ("SsmConv1d", vec!["input", "kernel"], vec!["output"]),
+            Self::SsmScan => ("SsmScan", vec!["input"], vec!["output"]),
             Self::Generated => ("Generated", vec!["input"], vec!["output"]),
         };
         LogicalSignature {
@@ -453,6 +553,8 @@ pub enum GraphError {
     InvalidAttentionFacts(GraphNodeId),
     /// MoE expert-routing facts are incomplete or inconsistent.
     InvalidMoeFacts(GraphNodeId),
+    /// SSM state-operation facts are incomplete or inconsistent.
+    InvalidSsmFacts(GraphNodeId),
     /// A recognized pattern has a conflicting shape or fact set.
     PatternMismatch { layer: u32, detail: String },
 }
@@ -483,6 +585,9 @@ impl fmt::Display for GraphError {
             }
             Self::InvalidMoeFacts(id) => {
                 write!(f, "typed graph MoE facts for node {} are invalid", id.0)
+            }
+            Self::InvalidSsmFacts(id) => {
+                write!(f, "typed graph SSM facts for node {} are invalid", id.0)
             }
             Self::PatternMismatch { layer, detail } => {
                 write!(f, "typed graph fusion miss in layer {layer}: {detail}")
@@ -569,6 +674,10 @@ impl PlanCompiler {
                 .source_nodes
                 .iter()
                 .find_map(|id| graph.node(*id).and_then(|node| node.moe));
+            let ssm_facts = candidate
+                .source_nodes
+                .iter()
+                .find_map(|id| graph.node(*id).and_then(|node| node.ssm));
             let seq_extent = Self::projection_step_rows(graph, candidate, attention_facts);
             selections.push(self.selection_for_candidate(
                 candidate,
@@ -576,6 +685,7 @@ impl PlanCompiler {
                 bind,
                 attention_facts,
                 moe_facts,
+                ssm_facts,
                 seq_extent,
             ));
             schedule.push(ScheduledCall {
@@ -638,6 +748,7 @@ impl PlanCompiler {
         candidates.extend(self.find_swiglu(graph));
         candidates.extend(self.find_moe_router(graph)?);
         candidates.extend(self.find_grouped_experts(graph)?);
+        candidates.extend(self.find_ssm(graph)?);
         candidates.sort_by_key(|candidate| candidate.source_nodes[0]);
         Ok(candidates)
     }
@@ -1005,6 +1116,111 @@ impl PlanCompiler {
         Ok(candidates)
     }
 
+    /// Recognize the typed SSM state operations used by the PS5 hybrid
+    /// shape.  The bodies currently serve only F32 state storage, so every
+    /// other closed layout is a deliberate typed miss rather than a guessed
+    /// conversion or a fallback to a dense kernel.
+    fn find_ssm(&self, graph: &TypedModelGraph) -> Result<Vec<Candidate>, GraphError> {
+        let mut candidates = Vec::new();
+        for node in graph
+            .nodes
+            .iter()
+            .filter(|node| matches!(node.op, TypedOp::SsmConv1d | TypedOp::SsmScan))
+        {
+            let Some(facts) = node.ssm else {
+                return Err(GraphError::PatternMismatch {
+                    layer: node.layer,
+                    detail: "SSM state operation has no declared state facts".to_owned(),
+                });
+            };
+            if !facts.servable() {
+                return Err(GraphError::PatternMismatch {
+                    layer: node.layer,
+                    detail: format!("SSM state layout {facts:?} is not servable"),
+                });
+            }
+            let Some(extent) = facts.extent() else {
+                return Err(GraphError::PatternMismatch {
+                    layer: node.layer,
+                    detail: "SSM state extent overflows the plan grid".to_owned(),
+                });
+            };
+            if extent == 0 || node.shape.dims != facts.state_dims() {
+                return Err(GraphError::PatternMismatch {
+                    layer: node.layer,
+                    detail: "SSM state shape does not match its typed facts".to_owned(),
+                });
+            }
+            match facts {
+                SsmFacts::Conv1d { kernel_width, .. } => {
+                    if node.inputs.len() != 2 {
+                        return Err(GraphError::PatternMismatch {
+                            layer: node.layer,
+                            detail: "SSM conv1d requires state and kernel inputs".to_owned(),
+                        });
+                    }
+                    let Some(input) = graph.node(node.inputs[0]) else {
+                        return Err(GraphError::UnknownInput {
+                            node: node.id,
+                            input: node.inputs[0],
+                        });
+                    };
+                    let Some(kernel) = graph.node(node.inputs[1]) else {
+                        return Err(GraphError::UnknownInput {
+                            node: node.id,
+                            input: node.inputs[1],
+                        });
+                    };
+                    if input.layer != node.layer || input.shape.dims != node.shape.dims {
+                        return Err(GraphError::PatternMismatch {
+                            layer: node.layer,
+                            detail: "SSM conv1d input shape is not the declared state shape"
+                                .to_owned(),
+                        });
+                    }
+                    if kernel.layer != node.layer || kernel.shape.dims != vec![kernel_width] {
+                        return Err(GraphError::PatternMismatch {
+                            layer: node.layer,
+                            detail: "SSM conv1d kernel shape is not the declared width".to_owned(),
+                        });
+                    }
+                    candidates.push(Candidate {
+                        layer: node.layer,
+                        operation: LibraryOperation::SsmConv1d,
+                        source_nodes: vec![node.id],
+                    });
+                }
+                SsmFacts::Scan { .. } => {
+                    if node.inputs.len() != 1 {
+                        return Err(GraphError::PatternMismatch {
+                            layer: node.layer,
+                            detail: "SSM scan requires exactly one state input".to_owned(),
+                        });
+                    }
+                    let Some(input) = graph.node(node.inputs[0]) else {
+                        return Err(GraphError::UnknownInput {
+                            node: node.id,
+                            input: node.inputs[0],
+                        });
+                    };
+                    if input.layer != node.layer || input.shape.dims != node.shape.dims {
+                        return Err(GraphError::PatternMismatch {
+                            layer: node.layer,
+                            detail: "SSM scan input shape is not the declared state shape"
+                                .to_owned(),
+                        });
+                    }
+                    candidates.push(Candidate {
+                        layer: node.layer,
+                        operation: LibraryOperation::SsmScan,
+                        source_nodes: vec![node.id],
+                    });
+                }
+            }
+        }
+        Ok(candidates)
+    }
+
     fn bind_for_candidate(
         &self,
         graph: &TypedModelGraph,
@@ -1027,6 +1243,38 @@ impl PlanCompiler {
                 grid: MirKernelWorkgroupCount {
                     x: facts.kv_heads,
                     y: facts.q_per_kv,
+                    z: 1,
+                },
+            });
+        }
+        if matches!(
+            candidate.operation,
+            LibraryOperation::SsmConv1d | LibraryOperation::SsmScan
+        ) {
+            let facts = candidate
+                .source_nodes
+                .iter()
+                .find_map(|id| graph.node(*id).and_then(|node| node.ssm))
+                .ok_or_else(|| GraphError::PatternMismatch {
+                    layer: candidate.layer,
+                    detail: "SSM selection has no state facts".to_owned(),
+                })?;
+            let extent = facts.extent().ok_or_else(|| GraphError::PatternMismatch {
+                layer: candidate.layer,
+                detail: "SSM state extent overflows the plan grid".to_owned(),
+            })?;
+            let dims = facts.state_dims();
+            let mut strides = vec![1u64; dims.len()];
+            for axis in (0..dims.len()).rev().skip(1) {
+                strides[axis] = strides[axis + 1].saturating_mul(dims[axis + 1]);
+            }
+            return Ok(BindDescriptor {
+                dims,
+                strides,
+                layout: BindLayout::RowMajor,
+                grid: MirKernelWorkgroupCount {
+                    x: extent,
+                    y: 1,
                     z: 1,
                 },
             });
@@ -1088,6 +1336,7 @@ impl PlanCompiler {
         bind: BindDescriptor,
         attention_facts: Option<AttentionFacts>,
         moe_facts: Option<MoEFacts>,
+        ssm_facts: Option<SsmFacts>,
         seq_extent: u64,
     ) -> LibrarySelection {
         let operation = candidate.operation;
@@ -1130,17 +1379,28 @@ impl PlanCompiler {
                     group: 0,
                     binding: binding as u32,
                 };
+                let (dims, strides) =
+                    if operation == LibraryOperation::SsmConv1d && name == "kernel" {
+                        let SsmFacts::Conv1d { kernel_width, .. } =
+                            ssm_facts.expect("SSM conv selections carry typed facts")
+                        else {
+                            unreachable!("SSM conv selection has scan facts")
+                        };
+                        (vec![kernel_width], vec![1])
+                    } else {
+                        (bind.dims.clone(), bind.strides.clone())
+                    };
                 binds.push(LibraryBind {
                     name: name.clone(),
                     binding,
-                    dims: bind.dims.clone(),
-                    strides: bind.strides.clone(),
+                    dims,
+                    strides: strides.clone(),
                     offset_elements: 0,
                 });
                 offsets.push(OffsetBinding {
                     name: name.clone(),
                     offset_elements: 0,
-                    strides: bind.strides.clone(),
+                    strides,
                 });
             }
             for (offset, name) in logical_signature.outputs.iter().enumerate() {
@@ -1213,6 +1473,38 @@ impl PlanCompiler {
                 requirements.push(BackendRequirement {
                     backend: "metal".to_owned(),
                     feature: "GroupedExpertGemm".to_owned(),
+                });
+            }
+            LibraryOperation::SsmConv1d => {
+                let SsmFacts::Conv1d { kernel_width, .. } =
+                    ssm_facts.expect("SSM conv selections carry typed facts")
+                else {
+                    unreachable!("SSM conv selection has scan facts")
+                };
+                uniforms.push(UniformBinding {
+                    name: "kernel_width".to_owned(),
+                    ty: crate::device_program_plans::UniformType::U32,
+                    bits: u32::try_from(kernel_width).unwrap_or(u32::MAX),
+                });
+                requirements.push(BackendRequirement {
+                    backend: "metal".to_owned(),
+                    feature: "SsmConv1d".to_owned(),
+                });
+            }
+            LibraryOperation::SsmScan => {
+                let SsmFacts::Scan { state_dim, .. } =
+                    ssm_facts.expect("SSM scan selections carry typed facts")
+                else {
+                    unreachable!("SSM scan selection has conv facts")
+                };
+                uniforms.push(UniformBinding {
+                    name: "state_dim".to_owned(),
+                    ty: crate::device_program_plans::UniformType::U32,
+                    bits: u32::try_from(state_dim).unwrap_or(u32::MAX),
+                });
+                requirements.push(BackendRequirement {
+                    backend: "metal".to_owned(),
+                    feature: "SsmScan".to_owned(),
                 });
             }
             _ => {}

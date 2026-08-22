@@ -20,6 +20,7 @@ fn node(
         inputs: inputs.iter().copied().map(GraphNodeId).collect(),
         attention,
         moe: None,
+        ssm: None,
     }
 }
 
@@ -333,6 +334,7 @@ fn moe_node(
         inputs: inputs.iter().copied().map(GraphNodeId).collect(),
         attention: None,
         moe,
+        ssm: None,
     }
 }
 
@@ -562,4 +564,149 @@ fn dense_plans_stay_byte_identical_on_both_rungs() {
             .expect("compile rung graph");
         assert_eq!(format!("{plan:?}"), golden.trim_end());
     }
+}
+
+fn ssm_node(
+    id: u32,
+    layer: u32,
+    op: TypedOp,
+    dims: &[u64],
+    inputs: &[u32],
+    ssm: SsmFacts,
+) -> TypedOpNode {
+    TypedOpNode {
+        id: GraphNodeId(id),
+        layer,
+        op,
+        shape: shape(dims),
+        inputs: inputs.iter().copied().map(GraphNodeId).collect(),
+        attention: None,
+        moe: None,
+        ssm: Some(ssm),
+    }
+}
+
+fn hybrid_ssm_graph() -> TypedModelGraph {
+    let length = 3;
+    let state_dim = 128;
+    TypedModelGraph::new(vec![
+        node(0, 0, TypedOp::Input, &[length, state_dim], &[], None),
+        node(
+            1,
+            0,
+            TypedOp::Other("conv-kernel".to_owned()),
+            &[4],
+            &[],
+            None,
+        ),
+        ssm_node(
+            2,
+            0,
+            TypedOp::SsmConv1d,
+            &[length, state_dim],
+            &[0, 1],
+            SsmFacts::Conv1d {
+                length,
+                channels: state_dim,
+                kernel_width: 4,
+                layout: PackedStorageLayout::F32,
+            },
+        ),
+        ssm_node(
+            3,
+            0,
+            TypedOp::SsmScan,
+            &[length, state_dim],
+            &[2],
+            SsmFacts::Scan {
+                length,
+                state_dim,
+                layout: PackedStorageLayout::F32,
+            },
+        ),
+        node(
+            4,
+            0,
+            TypedOp::Other("hybrid-output".to_owned()),
+            &[length, state_dim],
+            &[3],
+            None,
+        ),
+    ])
+    .expect("canonical PS5-shaped hybrid graph")
+}
+
+#[test]
+fn hybrid_ssm_program_lowers_to_conv_and_scan_selection_rows() {
+    let plan = PlanCompiler
+        .compile(&hybrid_ssm_graph())
+        .expect("compile PS5-shaped hybrid graph");
+
+    let conv = plan
+        .executor_plan
+        .selections
+        .iter()
+        .find(|selection| selection.library_entry.as_deref() == Some("SsmConv1d"))
+        .expect("SSM conv selection row");
+    assert_eq!(conv.bind.dims, vec![3, 128]);
+    assert_eq!(conv.bind.grid.x, 3 * 128);
+    assert_eq!(
+        conv.binds
+            .iter()
+            .find(|bind| bind.name == "kernel")
+            .expect("SSM kernel bind")
+            .dims,
+        vec![4]
+    );
+    assert_eq!(
+        conv.uniforms
+            .iter()
+            .find(|uniform| uniform.name == "kernel_width")
+            .expect("kernel width uniform")
+            .bits,
+        4
+    );
+    assert!(conv
+        .backend_requirements
+        .iter()
+        .any(|requirement| requirement.backend == "metal" && requirement.feature == "SsmConv1d"));
+
+    let scan = plan
+        .executor_plan
+        .selections
+        .iter()
+        .find(|selection| selection.library_entry.as_deref() == Some("SsmScan"))
+        .expect("SSM scan selection row");
+    assert_eq!(scan.bind.dims, vec![3, 128]);
+    assert_eq!(scan.bind.grid.x, 3 * 128);
+    assert_eq!(
+        scan.uniforms
+            .iter()
+            .find(|uniform| uniform.name == "state_dim")
+            .expect("state dimension uniform")
+            .bits,
+        128
+    );
+    assert!(scan
+        .backend_requirements
+        .iter()
+        .any(|requirement| requirement.backend == "metal" && requirement.feature == "SsmScan"));
+    assert!(conv.kernel_index < scan.kernel_index);
+    assert!(plan.decomposition_table().contains("SsmConv1d"));
+    assert!(plan.decomposition_table().contains("SsmScan"));
+}
+
+#[test]
+fn hybrid_ssm_unservable_state_layout_fails_closed() {
+    let mut graph = hybrid_ssm_graph();
+    graph.nodes[2].ssm = Some(SsmFacts::Conv1d {
+        length: 3,
+        channels: 128,
+        kernel_width: 4,
+        layout: PackedStorageLayout::Q4_K,
+    });
+    let error = PlanCompiler
+        .compile(&graph)
+        .expect_err("unservable SSM layout must reject");
+    assert!(error.to_string().contains("not servable"), "{error}");
 }
