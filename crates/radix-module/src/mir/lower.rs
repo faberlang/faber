@@ -1291,16 +1291,14 @@ impl<'a> FunctionBuilder<'a> {
 
     fn add_param(&mut self, def_id: DefId, name: crate::lexer::Symbol, ty: TypeId, mode: HirParamMode, span: Span) {
         let local = self.next_local_id();
-        // MIR carries borrow intent in `MirParamMode`; the local slot carries
-        // the referent value type so MIR arithmetic and places stay scalar.
-        // HIR's `in T` / `de T` type is a `Ref` wrapper for source checking.
-        let storage_ty = if matches!(mode, HirParamMode::De | HirParamMode::In) {
-            match self.normalized_type(ty) {
-                Type::Ref(_, inner) => *inner,
-                _ => ty,
-            }
-        } else {
-            ty
+        // MIR carries access intent in `MirParamMode`; the local slot carries
+        // the payload value type so MIR calls, returns, and places stay in the
+        // storage domain. Every type-position access marker is a source-level
+        // wrapper, including `own`/`copy` even though HIR collapses those to
+        // value-owned mode.
+        let storage_ty = match self.normalized_type(ty) {
+            Type::Ref(_, inner) => *inner,
+            _ => ty,
         };
         let mir_ty = MirType::semantic(storage_ty);
         // Keep the MIR ABI mode and local mutability paired. In particular,
@@ -2562,3 +2560,7 @@ mod glyph_tests;
 #[cfg(test)]
 #[path = "optional_field_unwrap_test.rs"]
 mod optional_field_unwrap_tests;
+
+#[cfg(test)]
+#[path = "own_textus_test.rs"]
+mod own_textus_tests;
