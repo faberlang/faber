@@ -56,6 +56,20 @@ directory or that faber.toml path. A directory without faber.toml fails
 when reading the sought <root>/faber.toml.
 ";
 
+const COST_LONG_ABOUT: &str = "\
+Report static runtime-cost classes over a package's lowered MIR.
+
+`faber cost` classifies conversion sites and uncosted extern calls as
+relative classes (C0 register op, C1 scan/format, C2 allocate+copy, C3
+walk+transform), plus foldable (F) and uncosted (U) buckets. It does not
+measure wall time. Cost units are relative classes, not time.
+
+The same package discovery front half as `faber check` compiles to
+ValidatedMir and stops before emit. Default output includes C0 sites.
+`--min-class C1` hides cheaper C-class sites; F and U buckets stay
+visible. `--json` emits the same records as a versioned machine contract.
+";
+
 /// Root parser for the `faber` binary.
 #[derive(Parser, Debug)]
 #[command(
@@ -99,6 +113,10 @@ pub enum Command {
 
     /// Show resolved library home, probing provenance, and availability
     Doctor,
+
+    /// Report static runtime-cost classes over lowered MIR
+    #[command(long_about = COST_LONG_ABOUT)]
+    Cost(CostArgs),
 
     /// Run aspect verification on a single file
     Verify(VerifyArgs),
@@ -305,6 +323,33 @@ pub struct CheckLibraryArgs {
     /// Provider name resolved from the library home (`norma`, `triga`, …).
     /// v1 does not accept a path; use `faber check` for a package directory.
     pub name: String,
+}
+
+/// Arguments for `faber cost`.
+#[derive(clap::Args, Debug)]
+pub struct CostArgs {
+    /// Emit the versioned JSON contract instead of the human report
+    #[arg(long)]
+    pub json: bool,
+
+    /// Hide C-class sites cheaper than this class (default C0 includes all)
+    #[arg(long = "min-class", value_name = "CLASS", default_value = "C0")]
+    pub min_class: String,
+
+    /// Code locale used to select a package-local locale pack.
+    #[arg(long = "locale", value_name = "LOCALE")]
+    pub locale: Option<String>,
+
+    /// Message language for diagnostics (independent of code locale).
+    #[arg(long = "diagnostics-locale", value_name = "LOCALE")]
+    pub diagnostics_locale: Option<String>,
+
+    /// Force package mode
+    #[arg(long)]
+    pub package: bool,
+
+    /// Input file or package path
+    pub input: Vec<String>,
 }
 
 /// Arguments for `faber check`.

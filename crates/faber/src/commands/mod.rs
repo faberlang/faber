@@ -12,6 +12,10 @@ mod check_library_test;
 #[path = "check_test.rs"]
 mod check_test;
 mod convert;
+mod cost;
+#[cfg(test)]
+#[path = "cost_test.rs"]
+mod cost_test;
 mod doctor;
 #[cfg(test)]
 #[path = "doctor_test.rs"]
@@ -47,6 +51,7 @@ use radix_module::services::{
 
 use check_library::cmd_check_library;
 use convert::cmd_convert;
+use cost::cmd_cost;
 use doctor::cmd_doctor;
 use explain::cmd_explain;
 use format::cmd_format;
@@ -150,6 +155,10 @@ fn dispatch(command: Command) {
         Command::Targets => cmd_targets(),
         Command::CheckLibrary(args) => cmd_check_library(args),
         Command::Doctor => cmd_doctor(),
+        Command::Cost(args) => {
+            reject_reader_locale_without_package(args.locale.as_deref(), &args.input, args.package);
+            cmd_cost(args);
+        }
         Command::Check(args) => {
             reject_reader_locale_without_package(args.locale.as_deref(), &args.input, args.package);
             validate_deny_codes(&args.deny);
