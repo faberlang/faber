@@ -187,7 +187,16 @@ fn rewrite_block(
             fullness,
             emitted_lanes,
         );
-        match classify_itera_expr(&expr, block, lanes, interner, mask, types, fullness, emitted_lanes) {
+        match classify_itera_expr(
+            &expr,
+            block,
+            lanes,
+            interner,
+            mask,
+            types,
+            fullness,
+            emitted_lanes,
+        ) {
             Some(UnrollPlan::Decline { span, causa }) => {
                 errors.push(decline(span, causa));
                 block.expr = Some(expr);
@@ -579,7 +588,10 @@ struct FullnessFacts;
 impl FullnessFacts {
     fn from_block(block: &HirBlock, types: &TypeTable) -> FxHashMap<DefId, usize> {
         let mut facts = FxHashMap::default();
-        let mut collector = Collector { facts: &mut facts, types };
+        let mut collector = Collector {
+            facts: &mut facts,
+            types,
+        };
         collector.visit_block(block);
         facts
     }
@@ -679,7 +691,16 @@ fn classify_itera_stmt(
     let HirStatementKind::Expr(expr) = &stmt.kind else {
         return None;
     };
-    classify_itera_expr(expr, block, lanes, interner, mask, types, fullness, emitted_lanes)
+    classify_itera_expr(
+        expr,
+        block,
+        lanes,
+        interner,
+        mask,
+        types,
+        fullness,
+        emitted_lanes,
+    )
 }
 
 fn classify_itera_expr(

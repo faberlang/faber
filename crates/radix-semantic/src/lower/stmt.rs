@@ -694,7 +694,10 @@ impl Lowerer<'_> {
 
         self.push_scope();
         self.bind_local(binding_name, binding);
-        if matches!(iter_stmt.binding, radix_syntax::BindingPattern::Object { .. }) {
+        if matches!(
+            iter_stmt.binding,
+            radix_syntax::BindingPattern::Object { .. }
+        ) {
             self.record_itera_element_labels(&iter_stmt.iterable, binding);
         }
         let pattern_locals = match &iter_stmt.binding {
