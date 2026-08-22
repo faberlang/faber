@@ -265,6 +265,23 @@ fn keyword_groups_are_static_and_complete_for_latin_surface() {
         .find(|group| group.id == "conditional")
         .expect("conditional group");
     assert_eq!(conditional.members, &["si", "sin", "secus"]);
+
+    let closure = keyword_group_specs()
+        .iter()
+        .find(|group| group.id == "closure")
+        .expect("closure group");
+    assert_eq!(closure.members, &["clausura", "libera"]);
+}
+
+#[test]
+fn libera_is_a_tokenless_closure_modifier_identity() {
+    let spec = lookup_keyword_spec("libera").expect("libera must be registered");
+    assert_eq!(spec.token_kind, None);
+    assert_eq!(spec.category, KeywordKind::Modifier);
+    let KeywordScope::Contextual(owners) = spec.scope else {
+        panic!("libera must be contextual");
+    };
+    assert!(owners.contains(&KeywordOwner::CallablePosture));
 }
 
 #[test]

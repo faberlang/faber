@@ -357,6 +357,7 @@ const CHOICE_GROUP: &[&str] = &["elige", "casu", "ceterum"];
 const PATTERN_CHOICE_GROUP: &[&str] = &["discerne", "casu", "ceterum"];
 const TRY_RECOVERY_GROUP: &[&str] = &["cape"];
 const LOOP_GROUP: &[&str] = &["dum", "fac", "itera", "perge", "rumpe"];
+const CLOSURE_GROUP: &[&str] = &["clausura", "libera"];
 const RELATIONAL_VIEW_GROUP: &[&str] = &["schema", "columna"];
 
 /// Complete keyword-group declarations for static Latin source-surface data.
@@ -380,6 +381,10 @@ pub static KEYWORD_GROUP_SPECS: &[KeywordGroupSpec] = &[
     KeywordGroupSpec {
         id: "loop",
         members: LOOP_GROUP,
+    },
+    KeywordGroupSpec {
+        id: "closure",
+        members: CLOSURE_GROUP,
     },
     KeywordGroupSpec {
         id: "relational_view",
@@ -727,6 +732,14 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         token_kind: Some(TokenKind::Clausura),
         scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
         category: KeywordKind::Async,
+    },
+    // `libera` is a closure-signature modifier. It is tokenless because the
+    // parser claims the locale-independent spelling in that signature slot.
+    KeywordSpec {
+        text: "libera",
+        token_kind: None,
+        scope: KeywordScope::Contextual(CALLABLE_POSTURE),
+        category: KeywordKind::Modifier,
     },
     // === Contextual callable-posture spellings ===
     // WHY: morphology-driven async/stream posture; claimed in signature slots,
