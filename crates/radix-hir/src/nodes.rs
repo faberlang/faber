@@ -1080,12 +1080,15 @@ pub enum HirExpressionKind {
         catch: Box<HirCape>,
     },
 
-    /// Closure with parameters, optional return/error types, and expression body.
+    /// Closure with parameters, optional return/error types, expression body,
+    /// and the `libera` capture-free marker (marker-carry only; semantic
+    /// analysis owns its contract).
     Clausura(
         Vec<HirParam>,
         Option<TypeId>,
         Option<TypeId>,
         Box<HirExpression>,
+        bool,
     ),
 
     /// Legacy serialized/imported context-dependent `cede` carrier. New source

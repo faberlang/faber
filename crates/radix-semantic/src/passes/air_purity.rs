@@ -301,7 +301,7 @@ impl AirPurityChecker<'_> {
                 self.check_block(body);
                 self.check_cape(catch, "recoverable_handler");
             }
-            HirExpressionKind::Clausura(params, _, _, body) => {
+            HirExpressionKind::Clausura(params, _, _, body, _) => {
                 self.reject(expr.span, "closure");
                 for param in params {
                     if let Some(default) = &param.default {

@@ -107,7 +107,7 @@ impl FunctionBuilder<'_> {
         expected_return: MirType,
         expected_params: usize,
     ) -> Option<MirCallee> {
-        let HirExpressionKind::Clausura(params, ret_ty, err_ty, body) = &closure.kind else {
+        let HirExpressionKind::Clausura(params, ret_ty, err_ty, body, _) = &closure.kind else {
             self.errors.push(MirError::unsupported(
                 closure.span,
                 "collection callback must be a closure expression",

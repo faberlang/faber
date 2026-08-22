@@ -1241,6 +1241,10 @@ pub struct FingeFieldInit {
 #[derive(Debug)]
 pub struct ClausuraExpr {
     pub params: Vec<ClausuraParam>,
+    /// `libera` capture-free marker claimed after params, before return/
+    /// alternate-exit clauses. Marker-carry only; borrow semantics live in
+    /// semantic analysis.
+    pub libera: bool,
     pub ret: Option<TypeExpr>,
     pub err: Option<TypeExpr>,
     pub body: ClausuraBody,

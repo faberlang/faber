@@ -88,7 +88,7 @@ pub(super) trait HirExpressionLoweringVisitor {
             HirExpressionKind::Ref(_, inner) => self.visit_ref_expr(inner, expr),
             HirExpressionKind::Deref(inner) => self.visit_deref_expr(inner, expr),
             HirExpressionKind::ReadLine(_) => self.visit_read_line_expr(expr),
-            HirExpressionKind::Clausura(params, ret_ty, err_ty, body) => {
+            HirExpressionKind::Clausura(params, ret_ty, err_ty, body, _) => {
                 self.visit_clausura_expr(params, ret_ty.as_ref(), err_ty.as_ref(), body, expr)
             }
             HirExpressionKind::Yield(inner) => self.visit_cede_expr(inner, expr),

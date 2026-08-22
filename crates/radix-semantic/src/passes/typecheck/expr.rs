@@ -208,6 +208,14 @@ impl TypeChecker<'_> {
                         {
                             *elem
                         }
+                        // Route B (AEU-4): `lista<T, N>` binds the element type;
+                        // mir/lower/control.rs owns the matching static-split
+                        // arm and the N <= 10 / literal-capacity decline site.
+                        Type::BoundedArray { element, .. }
+                            if matches!(mode, radix_hir::HirIteraMode::Ex) =>
+                        {
+                            *element
+                        }
                         _ => self.numerus_type(),
                     }
                 };
@@ -299,7 +307,7 @@ impl TypeChecker<'_> {
             HirExpressionKind::Handled { body, catch } => {
                 self.check_handled_block(body, catch, expected)
             }
-            HirExpressionKind::Clausura(params, ret, err, body) => {
+            HirExpressionKind::Clausura(params, ret, err, body, _) => {
                 self.check_closure(params, ret.as_mut(), err.as_mut(), body, expected)
             }
             HirExpressionKind::Cede(inner) => {

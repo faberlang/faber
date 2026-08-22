@@ -440,7 +440,7 @@ fn collect_expr_defs(
             registry.insert(catch.binding_def_id);
             collect_block_defs(&catch.body, registry);
         }
-        HirExpressionKind::Clausura(params, _, _, body) => {
+        HirExpressionKind::Clausura(params, _, _, body, _) => {
             for param in params {
                 collect_param_defs(param, registry);
             }
@@ -710,7 +710,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                 collect_block(body, registry);
                 collect_block(&catch.body, registry);
             }
-            HirExpressionKind::Clausura(params, _, _, body) => {
+            HirExpressionKind::Clausura(params, _, _, body, _) => {
                 for param in params {
                     if let Some(ref init) = param.default {
                         collect_expr(init, registry);
@@ -1466,7 +1466,7 @@ pub(crate) fn validate_referential_integrity(
                 }
                 validate_block(&catch.body, check_symbol, check_def, check_hir, check_type)?;
             }
-            HirExpressionKind::Clausura(params, ret_ty, err_ty, body) => {
+            HirExpressionKind::Clausura(params, ret_ty, err_ty, body, _) => {
                 for param in params {
                     check_def(param.def_id)?;
                     check_symbol(param.name)?;

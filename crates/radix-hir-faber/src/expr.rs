@@ -549,7 +549,7 @@ impl super::FaberCodegen {
                 writer.write(" ");
                 self.write_expr(value, types, names, interner, surface, writer);
             }
-            HirExpressionKind::Clausura(params, ret, err, body) => {
+            HirExpressionKind::Clausura(params, ret, err, body, _) => {
                 let parenthesized = params.len() != 1;
                 if parenthesized {
                     writer.write("(");

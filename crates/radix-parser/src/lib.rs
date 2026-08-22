@@ -400,6 +400,27 @@ impl Parser {
         )
     }
 
+    /// Check whether the current word is the `libera` capture-free closure
+    /// modifier, by locale-independent keyword identity (tokenless keyword;
+    /// pack spellings resolve to the latin key).
+    fn check_libera_marker(&self) -> bool {
+        let TokenKind::Ident(sym) = self.peek().kind else {
+            return false;
+        };
+        matches!(self.keyword_claim_key(sym), Some("libera"))
+    }
+
+    /// Consume the `libera` modifier when present in the closure signature
+    /// slot. Returns whether the marker was claimed.
+    fn eat_libera_marker(&mut self) -> bool {
+        if self.check_libera_marker() {
+            self.advance();
+            true
+        } else {
+            false
+        }
+    }
+
     /// Same as [`Self::check_keyword_ident`] but on the raw token stream —
     /// no trivia skipping. Used for same-line guards (`iace … si cond`,
     /// `mori … si cond`) where an intervening newline means the word starts a

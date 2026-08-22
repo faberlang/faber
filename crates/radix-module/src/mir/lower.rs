@@ -2513,7 +2513,7 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Panic(_) => "mori fatal flow",
         HirExpressionKind::Throw(_) => "iace error-flow",
         HirExpressionKind::Handled { .. } => "structured cape before local-handler MIR lowering",
-        HirExpressionKind::Clausura(_, _, _, _) => "closure expression",
+        HirExpressionKind::Clausura(_, _, _, _, _) => "closure expression",
         HirExpressionKind::Cede(_) => "legacy context-dependent cede carrier",
         HirExpressionKind::Verte { .. } => "verte before conversion MIR lowering",
         HirExpressionKind::Conversio { .. } => "conversio before runtime conversion MIR lowering",

@@ -70,6 +70,7 @@ fn decode_accepts_def_sites_inside_parameter_default() {
             None,
             None,
             Box::new(lit(2, 0)),
+        false,
         ),
         ty: None,
         span: Span::default(),

@@ -4436,3 +4436,151 @@ fn conversio_assign_awaited_binding_initializer_rejects_with_await_issue() {
         assert_parse_error_issue(source, "conversio_assign_await_unsupported");
     }
 }
+
+// =============================================================================
+// CL-1 — `libera` grammar drivers (green since CL-3)
+// =============================================================================
+// Pinned red in CL-1 (422bc28bd, side branch; restored here) and turned green
+// by the CL-3 marker plumbing. The two semantic drivers in
+// radix-semantic/src/passes/typecheck_test.rs remain ignored until the CL-4
+// capture contract lands.
+
+#[test]
+fn parses_compact_libera_closure() {
+    let result = parse_ok("fixum _ summa ← (numerus a, numerus b) libera ∴ a + b");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let ExprKind::Clausura(closure) = &var.init.as_ref().expect("initializer").kind else {
+        panic!("expected compact closure");
+    };
+    assert_eq!(closure.params.len(), 2);
+    assert!(closure.libera);
+    assert!(matches!(closure.body, ClausuraBody::Expr(_)));
+}
+
+#[test]
+fn parses_legacy_clausura_libera_closure() {
+    let result = parse_ok("fixum _ identity ← clausura numerus value libera: value");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let ExprKind::Clausura(closure) = &var.init.as_ref().expect("initializer").kind else {
+        panic!("expected legacy clausura expression");
+    };
+    assert_eq!(closure.params.len(), 1);
+    assert!(closure.libera);
+    assert!(matches!(closure.body, ClausuraBody::Expr(_)));
+}
+
+#[test]
+fn parses_libera_before_return_clause_in_compact_and_legacy_forms() {
+    for source in [
+        "fixum _ compact ← (numerus value) libera → numerus ∴ value",
+        "fixum _ legacy ← clausura numerus value libera → numerus: value",
+    ] {
+        let result = parse_ok(source);
+        let program = result.program.as_ref().expect("program");
+        let StmtKind::Var(var) = &program.statements[0].kind else {
+            panic!("expected variable declaration");
+        };
+        let ExprKind::Clausura(closure) = &var.init.as_ref().expect("initializer").kind else {
+            panic!("expected closure expression");
+        };
+        assert!(closure.libera);
+        assert!(closure.ret.is_some(), "libera must precede the return clause");
+    }
+}
+
+#[test]
+fn unmarked_closures_carry_absent_marker() {
+    for source in [
+        "fixum _ compact ← (numerus value) ∴ value",
+        "fixum _ legacy ← clausura numerus value: value",
+    ] {
+        let result = parse_ok(source);
+        let program = result.program.as_ref().expect("program");
+        let StmtKind::Var(var) = &program.statements[0].kind else {
+            panic!("expected variable declaration");
+        };
+        let ExprKind::Clausura(closure) = &var.init.as_ref().expect("initializer").kind else {
+            panic!("expected closure expression");
+        };
+        assert!(!closure.libera);
+    }
+}
+
+// =============================================================================
+// EOT-1 — additive parser red drivers and legacy baseline
+// =============================================================================
+
+const EOT_SELECTIVE_IMPORT_ISSUES: &[&str] = &[
+    "selective_import_binding_expected",
+    "selective_import_type_not_value",
+    "selective_import_missing_member",
+    "selective_import_duplicate_alias",
+];
+
+const EOT_TRANSFER_ISSUES: &[&str] = &[
+    "transfer_sink_not_callable",
+    "transfer_sink_must_be_unary",
+    "transfer_sink_must_return_vacuum",
+    "transfer_payload_type_mismatch",
+];
+
+#[test]
+fn eot_selective_import_is_currently_rejected_at_the_expression_boundary() {
+    let source = r#"importa ex "norma:consolum" fixum dic ut output, funde ut output_bytes,"#;
+    let result = parse_program(source);
+    assert!(!result.success(), "selective import must remain absent before EOT-2S");
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|error| has_arg(error, "issue", "expected_expression")),
+        "the current parser must expose the known pre-EOT issue `expected_expression`, got {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn eot_selective_import_acceptance_red_driver() {
+    let source = r#"importa ex "norma:consolum" fixum dic ut output, funde ut output_bytes,"#;
+    let result = parse_program(source);
+    assert!(
+        result.success(),
+        "EOT-2S red driver: selective imports must parse as one declaration; current errors={:?}; later issue names={EOT_SELECTIVE_IMPORT_ISSUES:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn eot_transfer_expression_acceptance_red_driver() {
+    let result = parse_program("incipit { output ⇇ \"salve\\n\" }");
+    assert!(
+        result.success(),
+        "EOT-3S red driver: glyph-only transfer must parse; current errors={:?}; later issue names={EOT_TRANSFER_ISSUES:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn eot_legacy_import_output_and_input_forms_remain_accepted() {
+    for source in [
+        r#"importa ex "norma:consolum" consolum"#,
+        "nota \"legacy text\"",
+        "mone \"legacy warning\"",
+        "vide \"legacy debug\"",
+        "scribe \"legacy compatibility\"",
+        "incipit { fixum _ input ← lege nota input }",
+    ] {
+        let result = parse_program(source);
+        assert!(
+            result.success(),
+            "legacy EOT baseline must remain accepted for {source:?}: {:?}",
+            result.errors
+        );
+    }
+}

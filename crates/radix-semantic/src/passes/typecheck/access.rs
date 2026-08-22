@@ -391,7 +391,7 @@ impl TypeChecker<'_> {
             | HirExpressionKind::Gradient { .. }
             | HirExpressionKind::Binary(_, _, _)
             | HirExpressionKind::Unary(_, _)
-            | HirExpressionKind::Clausura(_, _, _, _)
+            | HirExpressionKind::Clausura(_, _, _, _, _)
             | HirExpressionKind::Intervallum { .. }
             | HirExpressionKind::Scriptum(_, _)
             | HirExpressionKind::Conversio { .. }

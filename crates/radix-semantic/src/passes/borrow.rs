@@ -1041,7 +1041,7 @@ impl HirVisitor for BorrowChecker<'_> {
                     self.visit_expr(recovery);
                 }
             }
-            HirExpressionKind::Clausura(params, _, _, body) => {
+            HirExpressionKind::Clausura(params, _, _, body, _) => {
                 self.push_scope();
                 for param in params {
                     self.ensure_state(param.def_id);

@@ -762,7 +762,7 @@ impl HirVisitor for DeadSourceAnalyzer<'_> {
                     |this| this.visit_block(&catch.body),
                 );
             }
-            HirExpressionKind::Clausura(_, _, _, body) => {
+            HirExpressionKind::Clausura(_, _, _, body, _) => {
                 let baseline_states = self.states.clone();
                 let baseline_bindings = self.bindings.clone();
                 let baseline_used = self.used.clone();

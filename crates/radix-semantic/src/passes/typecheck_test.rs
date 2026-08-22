@@ -2017,3 +2017,144 @@ fn distinct_error_placeholders_each_report_once() {
         checker.errors
     );
 }
+
+// =============================================================================
+// CL-1 — `libera` semantic red drivers
+// =============================================================================
+// Pinned red in CL-1 (422bc28bd, side branch; restored here). The
+// parser-success precondition keeps these red for the absence of the capture
+// contract rather than a generic parse error. CL-3 landed the marker plumbing;
+// these stay ignored until the CL-4 capture check lands.
+
+#[test]
+#[ignore = "CL-4 pending: libera capture rejection is not landed"]
+fn rejects_libera_closure_that_captures_an_enclosing_local() {
+    let source = r#"
+incipit {
+    fixum numerus seed ← 2
+    fixum _ closure ← (numerus value) libera ∴ value + seed
+}
+"#;
+    let parsed = radix_parser::parse(radix_lexer::lex(source));
+    assert!(
+        parsed.success(),
+        "libera capture driver must reach semantic analysis; parser errors: {:?}",
+        parsed.errors
+    );
+
+    let unit = analyze(source);
+    assert!(
+        !unit.is_ok(),
+        "a libera closure that captures `seed` must be rejected: {:?}",
+        unit.diagnostics
+    );
+}
+
+#[test]
+#[ignore = "CL-4 pending: module-level libera legality is not landed"]
+fn accepts_libera_closure_reference_to_module_level_item() {
+    let source = r#"
+functio module_value() → numerus {
+    redde 1
+}
+incipit {
+    fixum _ closure ← (numerus value) libera ∴ value + module_value()
+}
+"#;
+    let parsed = radix_parser::parse(radix_lexer::lex(source));
+    assert!(
+        parsed.success(),
+        "module-level legality driver must reach semantic analysis; parser errors: {:?}",
+        parsed.errors
+    );
+
+    let unit = analyze(source);
+    assert!(
+        unit.is_ok(),
+        "a libera closure may reference module-level items: {:?}",
+        unit.diagnostics
+    );
+}
+
+#[test]
+fn libera_marker_survives_lowering_into_hir() {
+    struct LiberaProbe(usize);
+    impl radix_hir::visit::HirVisitor for LiberaProbe {
+        fn visit_expr(&mut self, expr: &radix_hir::HirExpression) {
+            if let radix_hir::HirExpressionKind::Clausura(_, _, _, _, libera) = &expr.kind {
+                if *libera {
+                    self.0 += 1;
+                }
+            }
+            radix_hir::visit::walk_expr(self, expr);
+        }
+    }
+
+    let marked = analyze("incipit {\n    fixum _ c ← (numerus value) libera ∴ value\n}\n");
+    let mut marked_probe = LiberaProbe(0);
+    radix_hir::visit::walk_program(&mut marked_probe, marked.result.hir.as_ref().expect("hir"));
+    assert_eq!(
+        marked_probe.0, 1,
+        "marked closure must carry the HIR marker"
+    );
+
+    let unmarked = analyze("incipit {\n    fixum _ c ← (numerus value) ∴ value\n}\n");
+    let mut unmarked_probe = LiberaProbe(0);
+    radix_hir::visit::walk_program(
+        &mut unmarked_probe,
+        unmarked.result.hir.as_ref().expect("hir"),
+    );
+    assert_eq!(
+        unmarked_probe.0, 0,
+        "unmarked closure must default the marker to absent"
+    );
+}
+
+// =============================================================================
+// EOT-1 — typecheck red drivers and unchanged legacy forms
+// =============================================================================
+
+#[test]
+fn eot_selective_imported_callable_alias_typechecks_red_driver() {
+    let result = analyze(
+        r#"importa ex "norma:consolum" fixum dic ut output, funde ut output_bytes,
+incipit { output("salve") }"#,
+    );
+    assert!(
+        result.is_ok(),
+        "EOT-2M red driver: imported callable aliases must typecheck as ordinary values; current diagnostics={:?}; expected later issues include `selective_import_missing_member`, `selective_import_type_not_value`, and `selective_import_duplicate_alias`",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn eot_transfer_typecheck_red_driver() {
+    let result = analyze(
+        r#"functio output(textus value) → vacuum { tacet }
+incipit { output ⇇ "salve" }"#,
+    );
+    assert!(
+        result.is_ok(),
+        "EOT-3M red driver: transfer must typecheck as a unary vacuum-returning call; current diagnostics={:?}; expected later issues include `transfer_sink_not_callable`, `transfer_sink_must_be_unary`, `transfer_sink_must_return_vacuum`, and `transfer_payload_type_mismatch`",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn eot_legacy_output_and_input_forms_typecheck_unchanged() {
+    let result = analyze(
+        r#"incipit {
+  nota "legacy text"
+  mone "legacy warning"
+  vide "legacy debug"
+  scribe "legacy compatibility"
+  fixum _ input ← lege
+  nota input
+}"#,
+    );
+    assert!(
+        result.is_ok(),
+        "legacy output/input baseline must remain typecheckable: {:?}",
+        result.diagnostics
+    );
+}

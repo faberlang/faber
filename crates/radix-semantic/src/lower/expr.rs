@@ -983,7 +983,7 @@ impl Lowerer<'_> {
 
         let ret = closure.ret.as_ref().map(|ret| self.lower_type(ret));
         let err = closure.err.as_ref().map(|err| self.lower_type(err));
-        HirExpressionKind::Clausura(params, ret, err, Box::new(body))
+        HirExpressionKind::Clausura(params, ret, err, Box::new(body), closure.libera)
     }
 
     fn lower_intervallum(&mut self, range: &radix_syntax::IntervallumExpr) -> HirExpressionKind {
