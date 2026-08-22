@@ -91,7 +91,7 @@ pub enum OutputMode {
 use crate::diagnostics::DiagnosticArg;
 use crate::hir::HirModule;
 use crate::lexer::Interner;
-#[cfg(all(test, feature = "hir-faber"))]
+#[cfg(feature = "hir-faber")]
 use crate::locale::latin_locale_pack;
 use crate::locale::KeywordSurface;
 use crate::semantic::TypeTable;
@@ -235,67 +235,8 @@ pub fn generate_from_analyzed_with_options(
         return Err(unavailable_target_error(target));
     }
     match target {
-        Target::HirRust => {
-            #[cfg(feature = "hir-rust")]
-            {
-                reject_rust_unsupported_types(&analysis.types)?;
-
-                let namespace_info = rust::build_file_import_namespaces(
-                    &analysis.hir,
-                    &analysis.interner,
-                    &rust::ResolverImportsBridge(&analysis.resolver),
-                );
-                let provider_modules = emit_provider_modules(analysis)?;
-                let gpu_builtins = rust::rust_gpu_builtins(&analysis.gpu_builtins);
-                let function_facts = rust::rust_function_facts(&analysis.function_facts);
-                let used_imports = rust::used_import_defs(&analysis.resolved_uses);
-
-                let mut gen = rust::RustCodegen::new_with_types(&analysis.hir, &analysis.interner, &analysis.types);
-                gen.set_gpu_builtins(&gpu_builtins);
-                gen.set_function_facts(&function_facts);
-                gen.set_used_import_defs(&used_imports);
-                gen.set_imported_namespace_info(namespace_info);
-                let mut output = gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
-
-                if !provider_modules.is_empty() {
-                    let mut assembled = String::new();
-                    for (module_name, module_code) in &provider_modules {
-                        assembled.push_str("pub mod ");
-                        assembled.push_str(module_name);
-                        assembled.push_str(" {\n");
-                        assembled.push_str(module_code);
-                        if !module_code.ends_with('\n') {
-                            assembled.push('\n');
-                        }
-                        assembled.push_str("}\n\n");
-                    }
-                    assembled.push_str(&output.code);
-                    output.code = assembled;
-                }
-
-                Ok(crate::Output::Rust(crate::RustOutput { code: output.code }))
-            }
-            #[cfg(not(feature = "hir-rust"))]
-            {
-                Err(unavailable_target_error(Target::HirRust))
-            }
-        }
-        Target::HirTypeScript => {
-            #[cfg(feature = "hir-ts")]
-            {
-                let mut gen = ts::TsCodegen::new(&analysis.hir, &analysis.interner);
-                gen.set_failable_facts(&ts_failable_facts(&analysis.function_facts));
-                gen.set_library_registry(&analysis.libraries);
-                gen.set_gpu_builtins(&ts_gpu_builtins(&analysis.gpu_builtins));
-                register_cross_file_defids(&mut gen, &analysis.hir, &analysis.resolver);
-                let output = gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
-                Ok(crate::Output::TypeScript(crate::TypeScriptOutput { code: output.code }))
-            }
-            #[cfg(not(feature = "hir-ts"))]
-            {
-                Err(unavailable_target_error(Target::HirTypeScript))
-            }
-        }
+        Target::HirRust => generate_rust_from_analyzed(analysis),
+        Target::HirTypeScript => generate_ts_from_analyzed(analysis),
         Target::HirGo => generate_go_from_analyzed(analysis),
         Target::HirSwift => generate_swift_from_analyzed(analysis, output_mode, module_name),
         Target::HirPython => generate_python_from_analyzed(analysis),
@@ -457,6 +398,92 @@ fn generate_haskell_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> 
     Err(unavailable_target_error(Target::HirHaskell))
 }
 
+/// Generate TypeScript output from a coherent analyzed unit.
+///
+/// TypeScript-specific convenience over the analyzed-unit dispatch that wires
+/// the compiler-owned GPU builtin seam, the library registry, and cross-file
+/// def-id registration the target needs. The TS backend never reads the
+/// keyword surface, so this entry stays surface-free for direct callers
+/// (e.g. the `exempla` e2e harness).
+///
+/// # Errors
+///
+/// Returns [`CodegenError`] if the `HIR` still contains error recovery
+/// expressions or the backend's own emission fails.
+#[cfg(feature = "hir-ts")]
+pub fn generate_ts_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
+    radix_codegen_shared::reject_hir_errors(&analysis.hir)?;
+    let mut gen = ts::TsCodegen::new(&analysis.hir, &analysis.interner);
+    gen.set_failable_facts(&ts_failable_facts(&analysis.function_facts));
+    gen.set_library_registry(&analysis.libraries);
+    gen.set_gpu_builtins(&ts_gpu_builtins(&analysis.gpu_builtins));
+    register_cross_file_defids(&mut gen, &analysis.hir, &analysis.resolver);
+    let output = gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
+    Ok(crate::Output::TypeScript(crate::TypeScriptOutput { code: output.code }))
+}
+
+#[cfg(not(feature = "hir-ts"))]
+pub fn generate_ts_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
+    Err(unavailable_target_error(Target::HirTypeScript))
+}
+
+/// Rust emission from a coherent analyzed unit.
+///
+/// File-namespace provider imports (e.g. ``importa ex "triga:triga"``) emit as
+/// nested `pub mod` crates with typed paths (`crate::triga::Vector3`) rather
+/// than `unresolved_def` / value-style `triga.vector3` calls.
+///
+/// # Errors
+///
+/// Returns [`CodegenError`] if the `HIR` contains error recovery expressions,
+/// the types table contains Rust-unsupported types (e.g., `fractus<f16>`,
+/// atomic), or the `rust` backend's own emission fails.
+#[cfg(feature = "hir-rust")]
+pub fn generate_rust_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
+    radix_codegen_shared::reject_hir_errors(&analysis.hir)?;
+    reject_rust_unsupported_types(&analysis.types)?;
+
+    let namespace_info = rust::build_file_import_namespaces(
+        &analysis.hir,
+        &analysis.interner,
+        &rust::ResolverImportsBridge(&analysis.resolver),
+    );
+    let provider_modules = emit_provider_modules(analysis)?;
+    let gpu_builtins = rust::rust_gpu_builtins(&analysis.gpu_builtins);
+    let function_facts = rust::rust_function_facts(&analysis.function_facts);
+    let used_imports = rust::used_import_defs(&analysis.resolved_uses);
+
+    let mut gen = rust::RustCodegen::new_with_types(&analysis.hir, &analysis.interner, &analysis.types);
+    gen.set_gpu_builtins(&gpu_builtins);
+    gen.set_function_facts(&function_facts);
+    gen.set_used_import_defs(&used_imports);
+    gen.set_imported_namespace_info(namespace_info);
+    let mut output = gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
+
+    if !provider_modules.is_empty() {
+        let mut assembled = String::new();
+        for (module_name, module_code) in &provider_modules {
+            assembled.push_str("pub mod ");
+            assembled.push_str(module_name);
+            assembled.push_str(" {\n");
+            assembled.push_str(module_code);
+            if !module_code.ends_with('\n') {
+                assembled.push('\n');
+            }
+            assembled.push_str("}\n\n");
+        }
+        assembled.push_str(&output.code);
+        output.code = assembled;
+    }
+
+    Ok(crate::Output::Rust(crate::RustOutput { code: output.code }))
+}
+
+#[cfg(not(feature = "hir-rust"))]
+pub fn generate_rust_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
+    Err(unavailable_target_error(Target::HirRust))
+}
+
 /// Analyze and emit each distinct file-namespace provider binding as a module.
 #[cfg(feature = "hir-rust")]
 fn emit_provider_modules(analysis: &crate::driver::AnalyzedModule) -> Result<Vec<(String, String)>, CodegenError> {
@@ -565,7 +592,6 @@ fn emit_provider_modules(analysis: &crate::driver::AnalyzedModule) -> Result<Vec
 ///
 /// Returns [`CodegenError`] if the `HIR` contains error recovery expressions
 /// or if the target is `MIR`-backed and must be routed through the driver.
-#[cfg(test)]
 pub fn generate(
     target: Target,
     hir: &HirModule,
@@ -583,7 +609,6 @@ pub fn generate(
 ///
 /// Returns [`CodegenError`] if the `HIR` contains error recovery expressions
 /// or if the target is `MIR`-backed and must be routed through the driver.
-#[cfg(test)]
 pub fn generate_with_options(
     target: Target,
     hir: &HirModule,
@@ -640,7 +665,7 @@ pub fn generate_with_options(
     }
 }
 
-#[cfg(all(test, feature = "hir-ts"))]
+#[cfg(feature = "hir-ts")]
 fn generate_ts_with_facts(
     hir: &HirModule,
     types: &TypeTable,
@@ -653,7 +678,7 @@ fn generate_ts_with_facts(
     Ok(crate::Output::TypeScript(crate::TypeScriptOutput { code: output.code }))
 }
 
-#[cfg(all(test, not(feature = "hir-ts")))]
+#[cfg(not(feature = "hir-ts"))]
 fn generate_ts_with_facts(
     _hir: &HirModule,
     _types: &TypeTable,
@@ -663,7 +688,7 @@ fn generate_ts_with_facts(
     Err(unavailable_target_error(Target::HirTypeScript))
 }
 
-#[cfg(all(test, feature = "hir-go"))]
+#[cfg(feature = "hir-go")]
 fn generate_go_with_facts(
     hir: &HirModule,
     types: &TypeTable,
@@ -676,7 +701,7 @@ fn generate_go_with_facts(
     Ok(crate::Output::Go(crate::GoOutput { code: output.code }))
 }
 
-#[cfg(all(test, not(feature = "hir-go")))]
+#[cfg(not(feature = "hir-go"))]
 fn generate_go_with_facts(
     _hir: &HirModule,
     _types: &TypeTable,
@@ -686,7 +711,7 @@ fn generate_go_with_facts(
     Err(unavailable_target_error(Target::HirGo))
 }
 
-#[cfg(all(test, feature = "hir-swift"))]
+#[cfg(feature = "hir-swift")]
 fn generate_swift_with_facts(
     hir: &HirModule,
     types: &TypeTable,
@@ -708,7 +733,7 @@ fn generate_swift_with_facts(
     Ok(crate::Output::Swift(crate::SwiftOutput { code: output.code }))
 }
 
-#[cfg(all(test, not(feature = "hir-swift")))]
+#[cfg(not(feature = "hir-swift"))]
 fn generate_swift_with_facts(
     _hir: &HirModule,
     _types: &TypeTable,
@@ -720,7 +745,7 @@ fn generate_swift_with_facts(
     Err(unavailable_target_error(Target::HirSwift))
 }
 
-#[cfg(all(test, feature = "hir-python"))]
+#[cfg(feature = "hir-python")]
 fn generate_python_with_facts(
     hir: &HirModule,
     types: &TypeTable,
@@ -733,7 +758,7 @@ fn generate_python_with_facts(
     Ok(crate::Output::Python(crate::PythonOutput { code: output.code }))
 }
 
-#[cfg(all(test, not(feature = "hir-python")))]
+#[cfg(not(feature = "hir-python"))]
 fn generate_python_with_facts(
     _hir: &HirModule,
     _types: &TypeTable,
@@ -743,7 +768,7 @@ fn generate_python_with_facts(
     Err(unavailable_target_error(Target::HirPython))
 }
 
-#[cfg(all(test, feature = "hir-haskell"))]
+#[cfg(feature = "hir-haskell")]
 fn generate_haskell_with_facts(
     hir: &HirModule,
     types: &TypeTable,
@@ -756,7 +781,7 @@ fn generate_haskell_with_facts(
     Ok(crate::Output::Haskell(crate::HaskellOutput { code: output.code }))
 }
 
-#[cfg(all(test, not(feature = "hir-haskell")))]
+#[cfg(not(feature = "hir-haskell"))]
 fn generate_haskell_with_facts(
     _hir: &HirModule,
     _types: &TypeTable,
@@ -766,7 +791,35 @@ fn generate_haskell_with_facts(
     Err(unavailable_target_error(Target::HirHaskell))
 }
 
-#[cfg(all(test, feature = "hir-rust"))]
+/// Generate Rust source from typed `HIR` without GPU builtins.
+///
+/// # Errors
+///
+/// Returns [`CodegenError`] if the `HIR` contains error recovery expressions,
+/// the types table contains Rust-unsupported types, or the Rust backend's own
+/// emission fails.
+pub fn generate_rust(hir: &HirModule, types: &TypeTable, interner: &Interner) -> Result<crate::Output, CodegenError> {
+    generate_rust_with_gpu_builtins(hir, types, interner, &[])
+}
+
+/// Generate Rust source from typed `HIR` with GPU builtins.
+///
+/// # Errors
+///
+/// Returns [`CodegenError`] if the `HIR` contains error recovery expressions,
+/// the types table contains Rust-unsupported types, or the Rust backend's own
+/// emission fails.
+pub fn generate_rust_with_gpu_builtins(
+    hir: &HirModule,
+    types: &TypeTable,
+    interner: &Interner,
+    gpu_builtins: &[(crate::hir::DefId, radix_types::MirKernelBuiltin)],
+) -> Result<crate::Output, CodegenError> {
+    let facts = crate::semantic::analyze_function_facts(hir, types);
+    generate_rust_with_facts(hir, types, interner, gpu_builtins, &facts)
+}
+
+#[cfg(feature = "hir-rust")]
 fn generate_rust_with_facts(
     hir: &HirModule,
     types: &TypeTable,
@@ -785,7 +838,7 @@ fn generate_rust_with_facts(
     Ok(crate::Output::Rust(crate::RustOutput { code: output.code }))
 }
 
-#[cfg(all(test, not(feature = "hir-rust")))]
+#[cfg(not(feature = "hir-rust"))]
 fn generate_rust_with_facts(
     _hir: &HirModule,
     _types: &TypeTable,
