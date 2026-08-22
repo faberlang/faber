@@ -34,7 +34,7 @@ main {
     var uint<u16> max ← 65535
     const uint<u16> one ← 1
     var uint<u16> zero ← 0
-    const int<u16> converted ← one ↦ int<u16>
+    const int<u16> converted ↤ one
 
     print max + one
     print zero - one

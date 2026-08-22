@@ -34,7 +34,7 @@ main {
     var uint<u64> max ← 18446744073709551615
     const uint<u64> one ← 1
     var uint<u64> zero ← 0
-    const int<u64> converted ← one ↦ int<u64>
+    const int<u64> converted ↤ one
 
     print max + one
     print zero - one
@@ -47,7 +47,7 @@ main {
 
     # Carrier-mix equality: conversions and arithmetic results compare by
     # value against literals (review regression).
-    const uint<u64> uno ← 1 ↦ uint<u64>
+    const uint<u64> uno ↤ 1
     print one ≡ uno
     print one ≡ one + 0
 
