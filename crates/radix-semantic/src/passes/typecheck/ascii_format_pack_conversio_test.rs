@@ -63,6 +63,35 @@ fn hint_in_slot_one_rejects() {
 }
 
 #[test]
+fn const_source_hole_infers_hex_digit_capacity() {
+    test_support::assert_accepts(
+        "incipit { fixum ascii<_> hex ← 255 ↦ ascii<_, Hex> }",
+    );
+}
+
+#[test]
+fn const_source_hole_infers_bin_digit_capacity() {
+    test_support::assert_accepts(
+        "incipit { fixum ascii<_> bits ← 255 ↦ ascii<_, Bin> }",
+    );
+}
+
+#[test]
+fn const_source_hole_infers_oct_digit_capacity() {
+    test_support::assert_accepts(
+        "incipit { fixum ascii<_> oct ← 255 ↦ ascii<_, Oct> }",
+    );
+}
+
+#[test]
+fn runtime_source_hole_reports_unsolved_capacity() {
+    test_support::assert_analysis_rejects_with_issue(
+        "functio pack(numerus n) → ascii<_> { redde n ↦ ascii<_, Hex> }",
+        "bounded_capacity_unsolved",
+    );
+}
+
+#[test]
 fn runtime_source_overflow_is_not_a_type_error() {
     test_support::assert_accepts("functio pack(numerus n) → ascii<2> { redde n ↦ ascii<2, Hex> }");
 }

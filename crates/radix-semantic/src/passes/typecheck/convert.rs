@@ -870,9 +870,7 @@ impl TypeChecker<'_> {
         }
         match self.types.get(target_resolved) {
             Type::BoundedAscii { capacity } => {
-                if matches!(self.types.get_index(*capacity), IndexExpr::Infer(_)) {
-                    return None;
-                }
+                let capacity = *capacity;
                 match self.primitive_conversio_family(source_ty) {
                     PrimitiveConversioFamily::Numerus => {}
                     _ => {
@@ -880,10 +878,43 @@ impl TypeChecker<'_> {
                         return Some(self.error_type);
                     }
                 }
+
+                // AP-2: a hole is a const-folding witness, not a runtime
+                // capacity inference. A literal numerus source supplies the
+                // digit count through the shared index unifier; a runtime
+                // source keeps the hole open so finalization reports the
+                // established bounded_capacity_unsolved diagnostic.
+                let resolved_capacity = self.resolve_index(capacity);
+                if self.is_unresolved_index_hole(resolved_capacity) {
+                    if let Some(value) = static_integer_magnitude(source) {
+                        if value >= 0 {
+                            let radix = self
+                                .ascii_format_radix(params)
+                                .expect("ascii format hint checked above");
+                            let digits = ascii_pack_digit_count(
+                                u128::try_from(value).expect("non-negative i128 fits u128"),
+                                radix,
+                            );
+                            let witness = self
+                                .types
+                                .intern_index(IndexExpr::Literal(
+                                    u64::try_from(digits).expect("digit count fits u64"),
+                                ));
+                            self.constrain_index_equal(capacity, witness, span);
+                        } else if !has_recovery {
+                            self.invalid_conversion(ISSUE_ASCII_PACK_NEGATIVE_SOURCE, span);
+                            return Some(self.error_type);
+                        }
+                    }
+                    return Some(target_resolved);
+                }
+
                 if !has_recovery {
-                    if let Some(issue) =
-                        self.ascii_format_pack_const_issue(source, *capacity, params)
-                    {
+                    if let Some(issue) = self.ascii_format_pack_const_issue(
+                        source,
+                        resolved_capacity,
+                        params,
+                    ) {
                         self.invalid_conversion(issue, span);
                         return Some(self.error_type);
                     }
