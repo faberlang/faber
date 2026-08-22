@@ -217,8 +217,8 @@ pub struct MirKernelWorkgroupCount {
 /// - **everything else** (reduction, elementwise, non-collection):
 ///   `ceil(dispatch_size / effective)` per dimension.
 ///
-/// Semantics lifted from the former WGSL-local `kernel_dispatch_workgroups` /
-/// `apply_effective_workgroup` pair.
+/// Semantics shared with the former target-local
+/// `kernel_dispatch_workgroups` / `apply_effective_workgroup` pair.
 #[must_use]
 pub fn collection_op_workgroup_count(
     function: &MirFunction,
@@ -269,8 +269,8 @@ pub(crate) fn kernel_has_collection_op(
 }
 
 /// `ceil(dispatch / workgroup)` with a defensively nonzero workgroup lane
-/// count (mirrors the WGSL chain-descriptor guard; the effective workgroup is
-/// nonzero for every real consumer).
+/// count (mirrors the target chain-descriptor guard; the effective workgroup
+/// is nonzero for every real consumer).
 fn effective_ceil_dimension(dispatch: u64, workgroup: u32) -> u64 {
     dispatch.div_ceil(u64::from(workgroup.max(1)))
 }
@@ -523,8 +523,8 @@ pub(crate) fn buffer_element_count(
 /// Fail closed with a single stable shape when any kernel param or return is a
 /// register matrix (storage-buffer ABI does not map `DeviceMatrix` IO).
 ///
-/// Unit B ratchet: shared by WGSL/Metal storage-buffer kernels and llvm-text
-/// `@nucleum` emit so matrix kernel IO is never fail-open on a staging target.
+/// Unit B ratchet: shared by all storage-buffer and `@nucleum` emit lanes so
+/// matrix kernel IO is never fail-open on a staging target.
 /// # Errors
 /// Returns an error when validation or type resolution fails. See [`MirAbiError`].
 pub fn reject_kernel_matrix_abi(

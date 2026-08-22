@@ -59,7 +59,7 @@ impl MirKernelReflection {
     /// [`from_signature`] reflects the signature default: `workgroup_count` is
     /// the naive `ceil(dispatch_size / workgroup)`. Fused-grid collection-op
     /// kernels override `@workgroup_size` via the effective workgroup (the
-    /// caller's emitter policy — WGSL's tiled matmul tile, the metal
+    /// caller's emitter policy — a target's tiled matmul tile or its
     /// signature workgroup, …). This is the single shared correction every
     /// reflection-producing consumer applies so the launch plan, chain
     /// descriptor, and reflection JSON report the same dispatch contract:
@@ -77,9 +77,10 @@ impl MirKernelReflection {
     /// the count then equals the naive `from_signature` value, so
     /// non-collection consumers are unchanged (C-A1-N).
     ///
-    /// Semantics lifted from the former WGSL-local `apply_effective_workgroup`
-    /// (decision D-A1, delivery D-W6-A1): this method is the single source of
-    /// truth for the collection-op `workgroup_count` semantics.
+    /// Semantics lifted from the former target-local
+    /// `apply_effective_workgroup` (decision D-A1, delivery D-W6-A1): this
+    /// method is the single source of truth for collection-op
+    /// `workgroup_count` semantics.
     pub fn apply_effective_workgroup(
         &mut self,
         function: &MirFunction,

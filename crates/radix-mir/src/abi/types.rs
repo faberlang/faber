@@ -309,9 +309,9 @@ pub struct MirKernelBuiltinUsage {
     pub uses_workgroup_id: bool,
     /// A local-invocation-id builtin is referenced.
     pub uses_local_invocation_id: bool,
-    /// A workgroup-size builtin is referenced. Metal declares a
-    /// `threads_per_threadgroup` param for it; WGSL emits workgroup-size
-    /// constants inline and ignores this flag.
+    /// A workgroup-size builtin is referenced. Each lane maps this fact to
+    /// its own invocation-header syntax; for example, one lane declares a
+    /// threadgroup-size parameter while another emits a workgroup constant.
     pub uses_workgroup_size: bool,
 }
 

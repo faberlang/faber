@@ -415,9 +415,9 @@ impl MirKernelSignature {
     ///
     /// This is the device ABI for a backward companion's `(grad_x, grad_w)`
     /// tuple: N gradient outputs bind to N distinct output slots, and no
-    /// kernel value carries an aggregate type — the Metal aggregate
-    /// rejection is unreachable through this ABI because tuple outputs are
-    /// separate resources, never an aggregate.
+    /// kernel value carries an aggregate type — backend aggregate rejection
+    /// is unreachable through this ABI because tuple outputs are separate
+    /// resources, never an aggregate.
     fn multi_output_return_kernel(
         function: &MirFunction,
         inputs: &[MirParam],
@@ -745,15 +745,15 @@ impl MirKernelSignature {
         Ok(signature)
     }
 
-    /// Synthesize the storage-buffer ABI for a multi-input return-buffer
-    /// kernel (CUDA C3): every param becomes a read input buffer and the
-    /// tensor return becomes the write output buffer.
+    /// Synthesize the storage-buffer ABI for a multi-input device kernel
+    /// entry (C3): every param becomes a read input buffer and the tensor
+    /// return becomes the write output buffer.
     ///
-    /// Shared ABI law for all compute targets (WGSL/Metal auto-consume, LLVM
-    /// device consumes). Equal element counts across every input and the
-    /// return are enforced with the same equality law the single-input
-    /// return-buffer path uses, so a host can assume one elementwise shape
-    /// across bindings.
+    /// Shared ABI law for every compute lane: each backend consumes this
+    /// resource shape through its own syntax. Equal element counts across
+    /// every input and the return are enforced with the same equality law the
+    /// single-input return-buffer path uses, so a host can assume one
+    /// elementwise shape across bindings.
     fn multi_input_return_buffer_kernel(
         function: &MirFunction,
         validation: &MirValidationContext<'_>,
@@ -1035,9 +1035,10 @@ impl MirKernelSignature {
     /// F-036/F-049: the OOB guard must compare against the correct dispatch
     /// axis instead of always using `dispatch_size.x`.
     ///
-    /// `first_builtin` is an explicit argument (L1) because the WGSL emitter
-    /// augments the header builtins with body-required builtins before
-    /// selecting the first one; Metal passes `header_builtins().first()`.
+    /// `first_builtin` is an explicit argument (L1) because a lane may
+    /// augment the header builtins with body-required builtins before
+    /// selecting the first one; each emitter supplies its selected first
+    /// builtin.
     #[must_use]
     pub fn oob_guard_limit(&self, first_builtin: MirKernelBuiltin) -> u32 {
         match first_builtin {

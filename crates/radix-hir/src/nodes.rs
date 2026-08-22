@@ -330,7 +330,8 @@ pub struct HirFunction {
     /// Generator callable (`fiunt`/`fient` / `cursor`).
     pub is_generator: bool,
 
-    /// CUDA kernel entry (`@ nucleum`). The Entry half of [`NucleumRole`].
+    /// Device kernel entry (`@ nucleum`), shared by every device lane. The
+    /// Entry half of [`NucleumRole`].
     pub is_kernel: bool,
 
     /// `@ nucleum fragment` composition helper. Mutually exclusive with
