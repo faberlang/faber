@@ -1,6 +1,7 @@
 +++
 term = "curata"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "func_modifier", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "expression"]
 category = "function"
 canonical = true
 summary = "Marks a function as requiring an allocator binding."

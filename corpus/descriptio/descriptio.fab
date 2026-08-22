@@ -1,6 +1,7 @@
 +++
 term = "descriptio"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "annotation_sugar", "incipit_stmt", "entry_header"]
 category = "cli"
 canonical = true
 summary = "Attaches a description string to CLI metadata."
