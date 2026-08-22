@@ -97,7 +97,7 @@ where
         .name("faber-test-analyze".to_owned())
         .stack_size(ANALYZE_THREAD_STACK_SIZE)
         .spawn(move || {
-            let _ = tx.send(work());
+            tx.send(work()).ok();
         });
     let handle = match spawn {
         Ok(handle) => handle,
