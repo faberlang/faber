@@ -21,10 +21,18 @@ fn expression_shape(expr: &HirExpression, unit: &AnalyzedFixture) -> String {
         HirExpressionKind::Path(_) => "path".to_owned(),
         HirExpressionKind::Literal(literal) => format!("literal:{literal:?}"),
         HirExpressionKind::Index(object, index) => {
-            format!("index({}, {})", expression_shape(object, unit), expression_shape(index, unit))
+            format!(
+                "index({}, {})",
+                expression_shape(object, unit),
+                expression_shape(index, unit)
+            )
         }
         HirExpressionKind::Field(object, name) => {
-            format!("field({}, {})", expression_shape(object, unit), unit.interner.resolve(*name))
+            format!(
+                "field({}, {})",
+                expression_shape(object, unit),
+                unit.interner.resolve(*name)
+            )
         }
         HirExpressionKind::Tuple(elements, _) => {
             let elements = elements
@@ -133,6 +141,38 @@ functio loopum(lista<Point> points) → vacuum {
         local_shapes(function_body(&binding), &binding),
         local_shapes(loop_body(&looping), &looping),
         "object binder must lower to the same per-element field reads",
+    );
+}
+
+#[test]
+fn labeled_tuple_loop_binder_binds_by_label() {
+    let binding = test_support::analyze_ok(
+        r"
+functio bind(iuncta<gx: numerus, gw: numerus> pair) → vacuum {
+    fixum {gx} ← pair
+    tacet
+}
+",
+    );
+    let looping = test_support::analyze_ok(
+        r"
+functio loopum() → vacuum {
+    fixum lista<iuncta<gx: numerus, gw: numerus>> xs ← [
+        iuncta<numerus, numerus> [1, 2],
+        iuncta<numerus, numerus> [3, 4]
+    ]
+    itera ex xs fixum {gx} {
+        tacet
+    }
+}
+",
+    );
+
+    assert_eq!(
+        local_shapes(function_body(&binding), &binding),
+        local_shapes(loop_body(&looping), &looping),
+        "by-label binder over a labeled-tuple list must lower to the same \
+         per-element index reads as binding position",
     );
 }
 

@@ -167,6 +167,12 @@ pub struct Lowerer<'a> {
 
     /// Resolved annotation-contract applications from the semantic contract pass.
     annotation_contracts: Option<&'a AnnotationContractMetadata>,
+
+    /// Per-position `iuncta` labels extracted from the element type of a
+    /// list-annotated local (`lista<iuncta<gx: A, B>>`), keyed by the local's
+    /// `DefId`. Consumed by `itera` lowering to label the synthetic element
+    /// local so by-label loop patterns resolve like binding-position forms.
+    list_element_labels: FxHashMap<radix_hir::DefId, Vec<Option<Symbol>>>,
 }
 
 /// Recoverable diagnostic emitted while converting resolved AST into HIR.
@@ -220,6 +226,7 @@ impl<'a> Lowerer<'a> {
             cli_program,
             locale_pack,
             annotation_contracts,
+            list_element_labels: FxHashMap::default(),
         }
     }
 

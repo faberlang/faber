@@ -54,6 +54,21 @@ fn binding_pattern_span(pattern: &radix_syntax::BindingPattern) -> Span {
     }
 }
 
+/// Per-position `iuncta` labels of a list annotation's element type
+/// (`lista<iuncta<gx: A, B>>`), or `None` for any other annotation shape.
+fn lista_element_labels(
+    ty: &radix_syntax::TypeExpr,
+    interner: &radix_lexer::Interner,
+) -> Option<Vec<Option<radix_lexer::Symbol>>> {
+    let radix_syntax::TypeExprKind::Named(name, params) = &ty.kind else {
+        return None;
+    };
+    if interner.resolve(name.name) != "lista" || params.len() != 1 {
+        return None;
+    }
+    crate::tuple_labels::from_type_expr(&params[0], interner)
+}
+
 fn binding_pattern_has_name(
     pattern: &radix_syntax::BindingPattern,
     name: radix_lexer::Symbol,
@@ -526,6 +541,9 @@ impl Lowerer<'_> {
                         def_id,
                         ty,
                     );
+                    if let Some(labels) = lista_element_labels(ty, self.interner) {
+                        self.list_element_labels.insert(def_id, labels);
+                    }
                 }
                 self.bind_local(ident.name, def_id);
                 let ty = decl.ty.as_ref().map(|ty| self.lower_type(ty));
@@ -614,6 +632,27 @@ impl Lowerer<'_> {
         }
     }
 
+    /// Propagate the iterable's annotated element labels onto the synthetic
+    /// loop element local so by-label patterns (`{gx}`) lower exactly like
+    /// binding-position destructuring over the element type.
+    fn record_itera_element_labels(
+        &mut self,
+        iterable: &radix_syntax::Expr,
+        binding: radix_hir::DefId,
+    ) {
+        let radix_syntax::ExprKind::Ident(ident) = &iterable.kind else {
+            return;
+        };
+        let Some(def_id) = self.lookup_name(ident.name) else {
+            return;
+        };
+        let Some(labels) = self.list_element_labels.get(&def_id) else {
+            return;
+        };
+        self.resolver
+            .record_tuple_element_labels(binding, labels.clone());
+    }
+
     /// Lower `itera` with a synthetic binding local for the iteration variable.
     fn lower_itera(&mut self, iter_stmt: &radix_syntax::IteraStmt) -> HirStatementKind {
         let mode = match iter_stmt.mode {
@@ -655,6 +694,9 @@ impl Lowerer<'_> {
 
         self.push_scope();
         self.bind_local(binding_name, binding);
+        if matches!(iter_stmt.binding, radix_syntax::BindingPattern::Object { .. }) {
+            self.record_itera_element_labels(&iter_stmt.iterable, binding);
+        }
         let pattern_locals = match &iter_stmt.binding {
             radix_syntax::BindingPattern::Array { .. } => self.lower_array_destructure_pattern(
                 &iter_stmt.binding,
