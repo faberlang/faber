@@ -250,7 +250,10 @@ fn cli_codegen_diagnostic(target: Target, name: &str, analysis: &AnalyzedModule)
                     "CLI exitus code generation supports numeric literals, bindings, and args fields in Phase 03",
                 ));
             }
-            phase03_cli_codegen_gap(cli_program).map(|message| codegen_diagnostic(name, "CODEGEN005", message))
+            phase03_cli_codegen_gap(cli_program).map(|(issue, message)| {
+                codegen_diagnostic(name, "CODEGEN005", message)
+                    .with_args(vec![DiagnosticArg::new("issue", issue)])
+            })
         }
         Target::HirGo => go_cli_codegen_diagnostic(name, cli_program),
         // Wasm text routes CLI programs through the ordinary emit path (the
@@ -460,7 +463,10 @@ fn generate_output(
     match target {
         Target::MirStepper => Err(codegen::CodegenError {
             message: "stepper is the core interpreter target; run through the MIR stepper, not codegen emit".to_owned(),
-            args: Vec::new(),
+            args: vec![
+                DiagnosticArg::new("issue", "stepper_not_codegen_target"),
+                DiagnosticArg::new("target", "mir-stepper"),
+            ],
         }
         .into()),
         #[cfg(feature = "mir-wasm")]
@@ -501,7 +507,10 @@ fn generate_output(
             {
                 Err(codegen::CodegenError {
                     message: "the amdgpu emit lane is not yet wired into the radix driver (the `mir-amd` leaf compiles under the feature; the emit route is a follow-on unit)".to_owned(),
-                    args: Vec::new(),
+                    args: vec![
+                        DiagnosticArg::new("issue", "amdgpu_emit_lane_not_wired"),
+                        DiagnosticArg::new("target", "mir-amd"),
+                    ],
                 }
                 .into())
             }
@@ -529,28 +538,43 @@ fn generate_output(
         Target::MirSexp => Err(unavailable_target_spanned(Target::MirSexp)),
         Target::MirScena => Err(codegen::CodegenError {
             message: "scena package artifacts must be built through `faber build --target scena`".to_owned(),
-            args: Vec::new(),
+            args: vec![
+                DiagnosticArg::new("issue", "package_artifact_route_required"),
+                DiagnosticArg::new("target", "scena"),
+            ],
         }
         .into()),
         Target::MirFmir => Err(codegen::CodegenError {
             message: "fmir-text package images must be built through `faber build --target fmir-text`".to_owned(),
-            args: Vec::new(),
+            args: vec![
+                DiagnosticArg::new("issue", "package_artifact_route_required"),
+                DiagnosticArg::new("target", "fmir-text"),
+            ],
         }
         .into()),
         Target::MirFmirBinary => Err(codegen::CodegenError {
             message: "fmir package images must be built through `faber build --target fmir`".to_owned(),
-            args: Vec::new(),
+            args: vec![
+                DiagnosticArg::new("issue", "package_artifact_route_required"),
+                DiagnosticArg::new("target", "fmir"),
+            ],
         }
         .into()),
         Target::MirFmirBundle => Err(codegen::CodegenError {
             message: "fmir-bin bundles must be built through `faber build --target fmir-bin`".to_owned(),
-            args: Vec::new(),
+            args: vec![
+                DiagnosticArg::new("issue", "package_artifact_route_required"),
+                DiagnosticArg::new("target", "fmir-bin"),
+            ],
         }
         .into()),
         Target::HirFhir => Err(codegen::CodegenError {
             message: "Target::HirFhir is a serialization dispatch, not a codegen backend. Use the emit workflow."
                 .to_owned(),
-            args: Vec::new(),
+            args: vec![
+                DiagnosticArg::new("issue", "fhir_serialization_dispatch_only"),
+                DiagnosticArg::new("target", "fhir"),
+            ],
         }
         .into()),
         Target::HirRust => {
@@ -1337,7 +1361,7 @@ pub fn apply_air_backward_bundle(
         let messages: Vec<String> = errors.iter().map(|e| e.message.clone()).collect();
         SpannedCodegenError {
             message: format!("call-graph companion generation failed: {}", messages.join("; ")),
-            args: vec![],
+            args: vec![DiagnosticArg::new("issue", "air_companion_generation_failed")],
             span: None,
         }
     })?;
@@ -1367,7 +1391,7 @@ pub fn apply_air_backward_bundle(
         let Some(companion) = annotated_by_primal.get(&snapshot.primal_def_id) else {
             return Err(SpannedCodegenError {
                 message: format!("companion not found for annotated primal DefId({})", snapshot.primal_def_id.0),
-                args: vec![],
+                args: vec![DiagnosticArg::new("issue", "air_companion_missing_for_primal")],
                 span: None,
             });
         };
@@ -1384,7 +1408,7 @@ pub fn apply_air_backward_bundle(
             .try_insert(entry)
             .map_err(|error| SpannedCodegenError {
                 message: format!("companion relation carrier rejected: {error}"),
-                args: vec![],
+                args: vec![DiagnosticArg::new("issue", "air_companion_carrier_rejected")],
                 span: None,
             })?;
     }
@@ -1399,7 +1423,7 @@ pub fn apply_air_backward_bundle(
             let messages: Vec<String> = errors.iter().map(|e| format!("{e:?}")).collect();
             SpannedCodegenError {
                 message: format!("unannotated callee companion AIR validation failed: {}", messages.join("; ")),
-                args: vec![],
+                args: vec![DiagnosticArg::new("issue", "air_companion_validation_failed")],
                 span: None,
             }
         })?;
@@ -1414,7 +1438,7 @@ pub fn apply_air_backward_bundle(
             let messages: Vec<String> = errors.iter().map(|e| format!("{e:?}")).collect();
             SpannedCodegenError {
                 message: format!("unannotated callee companion MIR lowering failed: {}", messages.join("; ")),
-                args: vec![],
+                args: vec![DiagnosticArg::new("issue", "air_companion_mir_lowering_failed")],
                 span: None,
             }
         })?;
@@ -1478,7 +1502,7 @@ fn finalize_air_backward_shapes(lowered: &mut crate::mir::LoweredMirUnit<'_>) ->
     let types = lowered.validated.validation().types;
     let types = radix_types::TypeTable::from_snapshot(types.snapshot()).map_err(|message| SpannedCodegenError {
         message: format!("MIR type metadata clone failed: {message}"),
-        args: vec![],
+        args: vec![DiagnosticArg::new("issue", "mir_type_metadata_clone_failed")],
         span: None,
     })?;
     // Generated concrete tuple/index carriers must outlive the returned
@@ -1550,7 +1574,7 @@ fn finalize_air_backward_shapes(lowered: &mut crate::mir::LoweredMirUnit<'_>) ->
                     "MIR validation after backward shape finalization failed: {}",
                     messages.join("; ")
                 ),
-                args: vec![],
+                args: vec![DiagnosticArg::new("issue", "mir_validation_after_shape_finalization_failed")],
                 span: errors.first().map(|error| error.span),
             }
         })?;
@@ -1637,7 +1661,7 @@ fn rewrite_air_backward_calls(
                     ) {
                         return Err(SpannedCodegenError {
                             message: "call argument type mismatch".to_owned(),
-                            args: vec![],
+                            args: vec![DiagnosticArg::new("issue", "air_companion_call_argument_type_mismatch")],
                             span: Some(statement.span),
                         });
                     }
@@ -1656,7 +1680,7 @@ fn rewrite_air_backward_calls(
                 let Some(&target) = instances.get(&key) else {
                     return Err(SpannedCodegenError {
                         message: "generic call signature has unresolved type parameter".to_owned(),
-                        args: vec![],
+                        args: vec![DiagnosticArg::new("issue", "air_companion_unresolved_type_parameter")],
                         span: Some(statement.span),
                     });
                 };
@@ -1664,7 +1688,7 @@ fn rewrite_air_backward_calls(
                     let Some(&concrete_return) = instance_return_types.get(&key) else {
                         return Err(SpannedCodegenError {
                             message: "generic companion instance is missing".to_owned(),
-                            args: vec![],
+                            args: vec![DiagnosticArg::new("issue", "air_companion_instance_missing")],
                             span: Some(statement.span),
                         });
                     };
@@ -1690,7 +1714,7 @@ fn rewrite_air_backward_calls(
                 if templates.contains_key(source) {
                     return Err(SpannedCodegenError {
                         message: "generic call signature has unresolved type parameter".to_owned(),
-                        args: vec![],
+                        args: vec![DiagnosticArg::new("issue", "air_companion_unresolved_type_parameter")],
                         span: Some(block.terminator.span),
                     });
                 }
@@ -1892,7 +1916,7 @@ fn lower_mir_with_context_for_target(
                     "MIR validation after backward companion addition failed: {}",
                     messages.join("; ")
                 ),
-                args: vec![],
+                args: vec![DiagnosticArg::new("issue", "mir_validation_after_companion_addition_failed")],
                 span: None,
             }
         })?;
@@ -2278,7 +2302,7 @@ fn llvm_text_codegen_error(error: crate::mir::MirLlvmTextProbeError) -> codegen:
 // CLI analysis can already describe more surface than the Phase 03 Rust CLI
 // generator accepts. Keep the gap explicit here so unsupported programs fail
 // with CLI-shaped diagnostics instead of leaking backend assumptions.
-fn phase03_cli_codegen_gap(program: &crate::cli::CliProgram) -> Option<String> {
+fn phase03_cli_codegen_gap(program: &crate::cli::CliProgram) -> Option<(&'static str, String)> {
     for option in program
         .global_options
         .iter()
@@ -2291,9 +2315,12 @@ fn phase03_cli_codegen_gap(program: &crate::cli::CliProgram) -> Option<String> {
         )
     {
         if !is_cli_scalar_type(&option.ty) {
-            return Some(format!(
-                "Phase 03 Rust CLI code generation does not support option '{}' with type {:?}",
-                option.binding, option.ty
+            return Some((
+                "cli_phase03_option_type_unsupported",
+                format!(
+                    "Phase 03 Rust CLI code generation does not support option '{}' with type {:?}",
+                    option.binding, option.ty
+                ),
             ));
         }
     }
@@ -2313,9 +2340,12 @@ fn phase03_cli_codegen_gap(program: &crate::cli::CliProgram) -> Option<String> {
         let supported_rest_list =
             operand.rest && matches!(operand.ty, crate::cli::CliType::ListaTextus | crate::cli::CliType::ListaNumerus);
         if !supported_scalar && !supported_rest_list {
-            return Some(format!(
-                "Phase 03 Rust CLI code generation does not support operand '{}' with type {:?}",
-                operand.binding, operand.ty
+            return Some((
+                "cli_phase03_operand_type_unsupported",
+                format!(
+                    "Phase 03 Rust CLI code generation does not support operand '{}' with type {:?}",
+                    operand.binding, operand.ty
+                ),
             ));
         }
     }
@@ -3210,6 +3240,19 @@ fn analyzed_unit_from_semantic(
         );
         return Err(());
     };
+    let Some(access_facts) = semantic_result.access_facts else {
+        diagnostics.push(
+            Diagnostic::error("semantic analysis did not produce access facts")
+                .with_phase(DiagnosticPhase::Analysis)
+                .with_code("INTERNAL001")
+                .with_args(vec![DiagnosticArg::new(
+                    "issue",
+                    "semantic_result_missing_access_facts",
+                )])
+                .with_file(name.to_owned()),
+        );
+        return Err(());
+    };
 
     let libraries = LibraryRegistry::default();
     let parts = semantic::AnalyzedApplicationParts {
@@ -3220,6 +3263,7 @@ fn analyzed_unit_from_semantic(
         libraries,
         radix_lanes: semantic_result.radix_lanes,
         gpu_builtins: semantic_result.gpu_builtins,
+        access_facts,
         semantic_diagnostics: semantic_result.diagnostics,
     };
 
