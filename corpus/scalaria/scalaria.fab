@@ -1,6 +1,7 @@
 +++
 term = "scalaria"
 kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "additive_expr", "multiplicative_expr", "comparison", "unary_expr", "et_expr", "expression", "literal"]
 category = "type"
 canonical = true
 summary = "Scalar operations on numerus, fractus, and bivalens in function signatures."

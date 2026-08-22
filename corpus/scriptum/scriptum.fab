@@ -1,6 +1,7 @@
 +++
 term = "scriptum"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "additive_expr", "expression", "literal", "nota_stmt"]
 category = "format"
 canonical = true
 summary = "Creates a formatted string with `§` placeholders."

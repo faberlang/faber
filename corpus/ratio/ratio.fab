@@ -1,6 +1,7 @@
 +++
 term = "ratio"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "ratio_type", "hole_type", "qualified_type", "type_arguments", "type_argument", "labeled_type_argument", "typed_constructor", "field_list", "field_init", "field_key", "object_destruct", "object_pattern", "pattern_property", "call_expr", "member_suffix", "additive_expr", "expression", "literal", "nota_stmt"]
 category = "type"
 canonical = true
 summary = "Labeled ad-hoc record type: construction, .name access, objectPattern, and holes."
