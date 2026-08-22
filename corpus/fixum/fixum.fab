@@ -1,6 +1,7 @@
 +++
 term = "fixum"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "si_stmt", "arm", "secus_clause", "else_arm", "assignment", "place", "comparison", "equality", "equality_tail", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "proba_stmt", "adfirma_stmt", "expression", "literal", "nota_stmt"]
 category = "binding"
 canonical = true
 summary = "Declares an immutable binding."

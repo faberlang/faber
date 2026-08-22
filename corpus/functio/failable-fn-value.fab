@@ -1,6 +1,7 @@
 +++
 term = "functio"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "discretio_decl", "variant", "variant_fields", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura_list", "figura", "functio_decl", "param_list", "parameter", "function_type", "type_list", "return_clause", "alternate_exit_clause", "iace_stmt", "iace_expr", "finge_expr", "qualified_ident", "field_list", "field_init", "field_key", "redde_stmt", "fac_stmt", "cape_clause", "fixum_decl", "hole_type", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
 category = "function"
 canonical = false
 summary = "Failable function-value callback: (string, int) → Tensor ⇥ LookupError throws through the call site."
