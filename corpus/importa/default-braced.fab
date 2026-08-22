@@ -1,6 +1,7 @@
 +++
 term = "importa"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_record", "import_field_list", "import_field", "ex_field", "nota_stmt", "expression", "literal"]
 category = "package"
 canonical = true
 summary = "Canonical braced import record with private binding inferred from the path."

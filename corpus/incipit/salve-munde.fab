@@ -1,6 +1,7 @@
 +++
 term = "incipit"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "nota_stmt", "expression", "literal"]
 category = "function"
 canonical = false
 summary = "Canonical hello-world smoke with module-scope nota output."

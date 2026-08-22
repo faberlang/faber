@@ -1,6 +1,7 @@
 +++
 term = "integratio"
 kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "callable_posture", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "cede_stmt", "si_stmt", "arm", "multiplicative_expr", "equality", "equality_tail", "itera_stmt", "range_expr", "range_tail", "incipiet_stmt", "figendum_decl", "hole_type", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
 category = "integration"
 canonical = false
 summary = "Async await-bind and stream yield in one program."

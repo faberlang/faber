@@ -1,6 +1,7 @@
 +++
 term = "importa"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
 category = "package"
 canonical = false
 summary = "Minimal import sugar with private binding inferred from the path."

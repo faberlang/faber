@@ -1,6 +1,7 @@
 +++
 term = "intervallum"
 kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "range_expr", "range_tail", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "adfirma_stmt", "equality", "equality_tail", "expression", "literal"]
 category = "range"
 canonical = true
 summary = "Clamp, materialize, and contain via conversio and continet."

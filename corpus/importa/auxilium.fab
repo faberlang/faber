@@ -1,6 +1,7 @@
 +++
 term = "importa"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_sugar", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
 category = "package"
 canonical = false
 summary = "Sibling module consumed by importa ex … ."
