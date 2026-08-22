@@ -101,7 +101,9 @@ fn inline_test_modules_ignore_companion_semicolon_wiring() {
         0
     );
     assert_eq!(
-        count_inline("#[cfg(all(test, feature = \"foo\"))]\n#[path = \"foo_test.rs\"]\nmod tests;\n"),
+        count_inline(
+            "#[cfg(all(test, feature = \"foo\"))]\n#[path = \"foo_test.rs\"]\nmod tests;\n"
+        ),
         0
     );
     assert_eq!(count_inline("#[cfg(test)]\nmod test_support;\n"), 0);

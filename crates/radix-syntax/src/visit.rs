@@ -587,7 +587,9 @@ fn walk_binding_pattern<V: Visitor>(visitor: &mut V, pattern: &BindingPattern) {
     match pattern {
         BindingPattern::Ident(ident) => visitor.visit_ident(ident),
         BindingPattern::Wildcard(_) => {}
-        BindingPattern::Array { elements, is_rest, .. } => {
+        BindingPattern::Array {
+            elements, is_rest, ..
+        } => {
             for element in elements {
                 walk_binding_pattern(visitor, element);
             }
@@ -595,7 +597,9 @@ fn walk_binding_pattern<V: Visitor>(visitor: &mut V, pattern: &BindingPattern) {
                 visitor.visit_ident(rest);
             }
         }
-        BindingPattern::Object { fields, is_rest, .. } => {
+        BindingPattern::Object {
+            fields, is_rest, ..
+        } => {
             for field in fields {
                 visitor.visit_ident(field.alias.as_ref().unwrap_or(&field.name));
             }

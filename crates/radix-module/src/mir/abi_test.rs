@@ -9,8 +9,8 @@ use super::{
     MirColorTargetFormat, MirFragmentOutputReflection, MirFunctionAbi, MirInputStepMode, MirKernelAxis,
     MirKernelBufferBindingKind, MirKernelBuiltin, MirKernelBuiltinInput, MirKernelDispatchSize, MirKernelOffsetMode,
     MirKernelReflection, MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole,
-    MirKernelShaderAccess, MirKernelShaderStage, MirKernelSignature, MirRuntimeAbi, MirRuntimeAbiKind,
-    MirRuntimeAbiFamily, MirVaryingInterpolation, MirVaryingReflection, MirVertexInputFormat, MirVertexInputReflection,
+    MirKernelShaderAccess, MirKernelShaderStage, MirKernelSignature, MirRuntimeAbi, MirRuntimeAbiFamily,
+    MirRuntimeAbiKind, MirVaryingInterpolation, MirVaryingReflection, MirVertexInputFormat, MirVertexInputReflection,
     MirWebGpuVertexStepMode, MirWorkgroupSize,
 };
 use crate::lexer::Interner;

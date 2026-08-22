@@ -3,7 +3,7 @@
 
 use super::compile;
 use crate::codegen::Target;
-use crate::driver::{Config, Session, ModuleCompileRequest};
+use crate::driver::{Config, ModuleCompileRequest, Session};
 use crate::test_support::test_session;
 
 // ── reader-pack integration ──

@@ -1082,13 +1082,13 @@ impl TypeTable {
             // `ignotum` accepts any concrete value; must fire before tighter rejections.
             (_, Type::Primitive(Primitive::Ignotum)) => true,
 
-            (Type::Union(from_types), _) => {
-                from_types.iter().all(|member| self.is_assignable(*member, to))
-            }
+            (Type::Union(from_types), _) => from_types
+                .iter()
+                .all(|member| self.is_assignable(*member, to)),
 
-            (_, Type::Union(to_types)) => {
-                to_types.iter().any(|member| self.is_assignable(from, *member))
-            }
+            (_, Type::Union(to_types)) => to_types
+                .iter()
+                .any(|member| self.is_assignable(from, *member)),
 
             // `nihil` can satisfy optional destinations without inventing a concrete inner value.
             (Type::Primitive(Primitive::Nihil), Type::Option(_)) => true,
@@ -1206,7 +1206,8 @@ impl TypeTable {
             | (Type::Vector(from_elem, from_shape), Type::Vector(to_elem, to_shape))
             | (Type::Matrix(from_elem, from_shape), Type::Matrix(to_elem, to_shape))
             | (Type::Sparsa(from_elem, from_shape), Type::Sparsa(to_elem, to_shape)) => {
-                self.is_assignable(*from_elem, *to_elem) && self.index_equals(*from_shape, *to_shape)
+                self.is_assignable(*from_elem, *to_elem)
+                    && self.index_equals(*from_shape, *to_shape)
             }
 
             // Bounded buffers: element-covariant, capacity invariant except

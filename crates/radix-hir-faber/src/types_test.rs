@@ -291,9 +291,7 @@ impl KeywordSurface for ProbeSurface {
             TypeBindingKind::TensorFamily(TensorFamilyKind::Matrix) => "MATRIX_MARKER",
             TypeBindingKind::TensorFamily(TensorFamilyKind::Sparsa) => "SPARSA_MARKER",
             TypeBindingKind::TensorFamily(TensorFamilyKind::Atomic) => "ATOMIC_MARKER",
-            TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum) => {
-                "INTERVALLUM_MARKER"
-            }
+            TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum) => "INTERVALLUM_MARKER",
             TypeBindingKind::Primitive(Primitive::Numerus) => "numerus",
             _ => "ignotum",
         }
@@ -688,9 +686,7 @@ fn si_with_cape_preserves_cape_keyword() {
                 id: HirId(40),
                 kind: HirStatementKind::Redde(Some(HirExpression {
                     id: HirId(41),
-                    kind: HirExpressionKind::Literal(HirLiteral::String(
-                        interner.intern("caught"),
-                    )),
+                    kind: HirExpressionKind::Literal(HirLiteral::String(interner.intern("caught"))),
                     ty: Some(textus),
                     span: span(),
                 })),

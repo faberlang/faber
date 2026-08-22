@@ -6,7 +6,7 @@ use super::compile;
 #[cfg(feature = "hir-faber")]
 use crate::codegen::faber::compile_canonical_str;
 use crate::codegen::Target;
-use crate::driver::{Config, Session, AnalyzeRequest, ModuleCompileRequest};
+use crate::driver::{AnalyzeRequest, Config, ModuleCompileRequest, Session};
 use crate::test_support::test_session;
 use std::path::PathBuf;
 
@@ -163,7 +163,12 @@ fn statement_level_ad_does_not_roundtrip_through_faber_codegen() {
     nota err
   }
 }"#;
-    let result = compile(&test_session(Target::HirRust), "test.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &test_session(Target::HirRust),
+        "test.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
     assert!(!result.success());
     assert!(result
         .diagnostics
@@ -253,7 +258,12 @@ fn contextual_compact_fac_closure_rejects_redde_without_local_return_type() {
     redde n > 1
   }
 }";
-    let result = compile(&session, "closure-contextual-implicit-return.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &session,
+        "closure-contextual-implicit-return.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
 
     assert!(result.output.is_none());
     assert!(!result.success());
@@ -271,7 +281,12 @@ fn compact_fac_closure_accepts_iace_with_explicit_error_channel() {
     iace "bad"
   }
 }"#;
-    let result = compile(&session, "closure-explicit-error-channel.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &session,
+        "closure-explicit-error-channel.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
 
     assert!(result.success(), "{:?}", result.diagnostics);
 }
@@ -284,7 +299,12 @@ fn compact_fac_closure_rejects_iace_without_local_error_channel() {
     iace "bad"
   }
 }"#;
-    let result = compile(&session, "closure-missing-error-channel.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &session,
+        "closure-missing-error-channel.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
 
     assert!(result.output.is_none());
     assert!(!result.success());
@@ -304,7 +324,8 @@ fn compact_fac_closure_accepts_local_cape_without_error_channel() {
     nota err
   }
 }"#;
-    let result = crate::driver::analyze_source(&session, "closure-local-cape-error.fab", source, AnalyzeRequest::default());
+    let result =
+        crate::driver::analyze_source(&session, "closure-local-cape-error.fab", source, AnalyzeRequest::default());
 
     assert!(result.is_ok(), "{:?}", result.err());
 }
@@ -338,7 +359,12 @@ fn legacy_block_closure_rejects_redde_without_explicit_return_type() {
     redde n > 1
   }
 }";
-    let result = compile(&session, "legacy-closure-implicit-return.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &session,
+        "legacy-closure-implicit-return.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
 
     assert!(result.output.is_none());
     assert!(!result.success());
@@ -1763,7 +1789,12 @@ fn hir_smoke_regression_guard_rust_rejects_mangled_emit() {
         return;
     }
     let session = test_session(Target::HirRust);
-    let result = compile(&session, "guard.fab", "incipit { nota \"salve\" }", ModuleCompileRequest::default());
+    let result = compile(
+        &session,
+        "guard.fab",
+        "incipit { nota \"salve\" }",
+        ModuleCompileRequest::default(),
+    );
     assert!(result.success());
     let emitted = super::rust_output(result).code;
     let mangled = crate::backend_smoke::mangle_emitted_text(&emitted);
@@ -1849,7 +1880,12 @@ incipit {
     }
 }
 ";
-    let result = compile(&test_session(Target::MirLlvm), "loop_call.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &test_session(Target::MirLlvm),
+        "loop_call.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
     assert!(
         result.success(),
         "tensor-returning function call inside itera body should compile; diagnostics: {:?}",
@@ -1877,12 +1913,9 @@ functio uses_undefined() → numerus {
     redde definitely_not_defined
 }
 ";
-    let Err(diagnostics) = crate::driver::analyze_source(
-        &session,
-        "recovered-continuation.fab",
-        source,
-        AnalyzeRequest::default(),
-    ) else {
+    let Err(diagnostics) =
+        crate::driver::analyze_source(&session, "recovered-continuation.fab", source, AnalyzeRequest::default())
+    else {
         panic!("recovered parse must fail analysis");
     };
 

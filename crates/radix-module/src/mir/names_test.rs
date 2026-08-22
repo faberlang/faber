@@ -6,9 +6,9 @@
 // target-facing contract shared by text backends.
 
 use super::*;
-use radix_mir::names::*;
 use crate::lexer::{Interner, Span, Symbol};
 use crate::semantic::{Primitive, TypeTable};
+use radix_mir::names::*;
 
 fn ty(types: &TypeTable, primitive: Primitive) -> MirType {
     MirType::semantic(types.primitive(primitive))

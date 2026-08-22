@@ -1310,7 +1310,12 @@ fn parses_varia_destructuring() {
     let StmtKind::Var(array_var) = &program.statements[0].kind else {
         panic!("expected destructuring variable declaration");
     };
-    let BindingPattern::Array { elements, is_rest: rest, .. } = &array_var.binding else {
+    let BindingPattern::Array {
+        elements,
+        is_rest: rest,
+        ..
+    } = &array_var.binding
+    else {
         panic!("expected array binding pattern");
     };
     assert_eq!(elements.len(), 1);
@@ -1332,7 +1337,12 @@ fn parses_object_destructuring() {
     let StmtKind::Var(object_var) = &program.statements[0].kind else {
         panic!("expected object destructuring variable declaration");
     };
-    let BindingPattern::Object { fields, is_rest: rest, .. } = &object_var.binding else {
+    let BindingPattern::Object {
+        fields,
+        is_rest: rest,
+        ..
+    } = &object_var.binding
+    else {
         panic!("expected object binding pattern");
     };
     assert_eq!(fields.len(), 2);
@@ -2168,7 +2178,10 @@ fn parses_itera_array_pattern_binder() {
         panic!("expected itera statement");
     };
     assert!(matches!(iter_stmt.mode, IteraMode::Ex));
-    let BindingPattern::Array { elements, is_rest, .. } = &iter_stmt.binding else {
+    let BindingPattern::Array {
+        elements, is_rest, ..
+    } = &iter_stmt.binding
+    else {
         panic!("expected array binding pattern binder");
     };
     assert_eq!(elements.len(), 2);
@@ -2188,7 +2201,10 @@ fn parses_itera_object_pattern_binder() {
     let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
         panic!("expected itera statement");
     };
-    let BindingPattern::Object { fields, is_rest, .. } = &iter_stmt.binding else {
+    let BindingPattern::Object {
+        fields, is_rest, ..
+    } = &iter_stmt.binding
+    else {
         panic!("expected object binding pattern binder");
     };
     assert_eq!(fields.len(), 1);
@@ -2229,7 +2245,10 @@ fn parses_itera_pattern_binder_element_forms() {
         panic!("expected itera statement");
     };
     assert!(matches!(iter_stmt.mutability, AstMutability::Mutable));
-    let BindingPattern::Array { elements, is_rest, .. } = &iter_stmt.binding else {
+    let BindingPattern::Array {
+        elements, is_rest, ..
+    } = &iter_stmt.binding
+    else {
         panic!("expected array binding pattern binder");
     };
     assert_eq!(elements.len(), 2);
@@ -2395,7 +2414,10 @@ fn itera_pro_mode_rejected_en_apud_clause_before_surface_lands() {
         .iter()
         .find(|err| has_arg(err, "issue", "mutability_marker"))
         .unwrap_or_else(|| panic!("expected mutability-marker rejection, got {errors:?}"));
-    assert!(has_arg(error, "expected", "'fixum' or 'varia'"), "unexpected args: {error:?}");
+    assert!(
+        has_arg(error, "expected", "'fixum' or 'varia'"),
+        "unexpected args: {error:?}"
+    );
 }
 
 #[test]
@@ -3400,7 +3422,10 @@ ex source varia nomen ut name, ceteri reliqua
         "name"
     );
     assert_eq!(
-        symbol_name(&result, extract.is_rest.as_ref().expect("rest binding").name),
+        symbol_name(
+            &result,
+            extract.is_rest.as_ref().expect("rest binding").name
+        ),
         "reliqua"
     );
 }

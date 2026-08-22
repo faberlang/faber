@@ -42,7 +42,15 @@ fn lower_source_result(source: &str) -> (crate::hir::LoweredProgram, Vec<crate::
         panic!("resolve failed: {errors:?}");
     }
 
-    let (lowered, errors) = lower(LowerRequest { program: &program, resolver: &mut resolver, types: &mut types, interner: &mut interner, cli_program: None, locale_pack: None, annotation_contracts: None });
+    let (lowered, errors) = lower(LowerRequest {
+        program: &program,
+        resolver: &mut resolver,
+        types: &mut types,
+        interner: &mut interner,
+        cli_program: None,
+        locale_pack: None,
+        annotation_contracts: None,
+    });
     (lowered, errors, interner, types)
 }
 
@@ -83,7 +91,15 @@ fn lower_source_with_locale_pack(
         panic!("resolve failed: {errors:?}");
     }
 
-    let (lowered, errors) = lower(LowerRequest { program: &program, resolver: &mut resolver, types: &mut types, interner: &mut interner, cli_program: None, locale_pack: None, annotation_contracts: None });
+    let (lowered, errors) = lower(LowerRequest {
+        program: &program,
+        resolver: &mut resolver,
+        types: &mut types,
+        interner: &mut interner,
+        cli_program: None,
+        locale_pack: None,
+        annotation_contracts: None,
+    });
     assert!(errors.is_empty(), "lower failed: {errors:?}");
     (lowered, interner, types)
 }

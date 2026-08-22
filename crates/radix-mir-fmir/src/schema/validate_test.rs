@@ -2,10 +2,9 @@ use super::super::wire::{
     WireAxisReductionPlan, WireBinding, WireBufferIdentity, WireBufferLifetime, WireBufferRole,
     WireBufferVersion, WireCollectionKernelPlan, WireDeviceProgram, WireDeviceResource,
     WireDispatchSize, WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit,
-    WireLaunchUnit, WireObservationCadence, WireObservationFact, WireProgramLifetime,
-    WireReduceOp, WireReducedProjection, WireResourceAccess, WireResultBuffer,
-    WireSemanticValue, WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount,
-    WireWorkgroupSize,
+    WireLaunchUnit, WireObservationCadence, WireObservationFact, WireProgramLifetime, WireReduceOp,
+    WireReducedProjection, WireResourceAccess, WireResultBuffer, WireSemanticValue,
+    WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
 };
 use super::*;
 

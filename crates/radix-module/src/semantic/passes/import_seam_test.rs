@@ -8,8 +8,8 @@ use super::import_seam::{
     importability, seam_from_flag, violation_issue, ImportSeam, Importability, ISSUE_IMPORT_INTERNA_CROSS_PACKAGE,
     ISSUE_IMPORT_MODULE_PRIVATE,
 };
-use crate::driver::AnalyzeRequest;
 use crate::diagnostics::Diagnostic;
+use crate::driver::AnalyzeRequest;
 use crate::import_resolve::library_home_test_support;
 use crate::semantic::passes::visibility_annotation::VisibilityTier;
 use crate::semantic::SemanticErrorKind;
@@ -215,8 +215,9 @@ fn module_analysis_does_not_derive_contracts_from_path_name() {
         "program/discovery helper still supplies contracts: {:?}",
         prepared.contract.file_interfaces.keys().collect::<Vec<_>>()
     );
-    let mut unit = crate::driver::analyze_source(&session, &consumer.display().to_string(), &source, AnalyzeRequest::default())
-        .expect("empty contracts stay unrestricted; they must not be derived");
+    let mut unit =
+        crate::driver::analyze_source(&session, &consumer.display().to_string(), &source, AnalyzeRequest::default())
+            .expect("empty contracts stay unrestricted; they must not be derived");
     let probe = unit.interner.intern("probe");
     let aperta = unit.interner.intern("aperta");
     assert!(

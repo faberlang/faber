@@ -140,9 +140,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             // only, NaN payloads pass through bit-identical.
             if let Value::Float(value) = value {
                 return match width {
-                    NumericWidth::U32 => Ok(Value::UInt(u64::from(
-                        (value as f32).to_bits(),
-                    ))),
+                    NumericWidth::U32 => Ok(Value::UInt(u64::from((value as f32).to_bits()))),
                     NumericWidth::U64 => Ok(Value::UInt(value.to_bits())),
                     _ => self.recover_or_fail(recovery, span, "bits pair width mismatch"),
                 };
@@ -383,9 +381,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 (Value::UInt(value), NumericWidth::F32) => {
                     Ok(Value::Float(f64::from(f32::from_bits(value as u32))))
                 }
-                (Value::UInt(value), NumericWidth::F64) => {
-                    Ok(Value::Float(f64::from_bits(value)))
-                }
+                (Value::UInt(value), NumericWidth::F64) => Ok(Value::Float(f64::from_bits(value))),
                 _ => self.recover_or_fail(recovery, span, "bits pair width mismatch"),
             };
         }

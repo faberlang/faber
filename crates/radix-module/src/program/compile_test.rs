@@ -1,8 +1,8 @@
 //! Provider-import contract tests (Triga SEM002 residual).
 
-use crate::driver::AnalyzeRequest;
 use super::clear_import_target_cache;
 use super::import_contract_for_file;
+use crate::driver::AnalyzeRequest;
 use crate::import_resolve::library_home_test_support;
 use crate::import_resolve::resolve_namespace_import;
 use std::fs;

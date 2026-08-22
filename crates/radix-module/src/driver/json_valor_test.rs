@@ -1,10 +1,10 @@
 //! JSON valor literal semantic validation and tabula-ascription tests.
 //! See docs/factory/inline-json-valor/contract.md.
 
-use crate::driver::ModuleCompileRequest;
 use super::compile;
 use crate::codegen::Target;
 use crate::diagnostics::DiagnosticArg;
+use crate::driver::ModuleCompileRequest;
 use crate::test_support::{assert_compile_fails_with_args, assert_compile_fails_with_issue, test_session};
 
 // ── JSON valor literal typecheck ──

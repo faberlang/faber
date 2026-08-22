@@ -8,9 +8,9 @@ use super::super::executor_plan::{
     WirePlanProvenance, WireRuntimeSource, WireViewFact,
 };
 use super::super::wire::{
-    WireBinding, WireBufferLifetime, WireBufferRole, WireCollectionKernelPlan,
-    WireDeviceProgram, WireInitializationPolicy, WireInvocationMode, WireKernelLaunchPlan,
-    WireKernelUnit, WireKvCacheAttentionFamily, WireKvCacheCapacityPolicy, WireKvCacheDtype,
+    WireBinding, WireBufferLifetime, WireBufferRole, WireCollectionKernelPlan, WireDeviceProgram,
+    WireInitializationPolicy, WireInvocationMode, WireKernelLaunchPlan, WireKernelUnit,
+    WireKvCacheAttentionFamily, WireKvCacheCapacityPolicy, WireKvCacheDtype,
     WireKvCacheRopePairing, WireKvCacheSemanticV2, WireKvCacheVLayout,
     WireSessionObservationCadence, WireStorageLayout, WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION,
 };
@@ -251,8 +251,7 @@ fn b2_runtime_source_and_overflow_diagnostics_are_preserved() {
         WireExecutorPlanSource::Runtime {
             source: WireRuntimeSource::Unknown("future_cursor".to_owned()),
         };
-    let error =
-        admit(&session(), &unknown_runtime).expect_err("unknown runtime source must fail");
+    let error = admit(&session(), &unknown_runtime).expect_err("unknown runtime source must fail");
     assert!(
         matches!(error, FmirImageError::ExecutorPlanSectionInvalid { detail } if detail.contains("future_cursor"))
     );

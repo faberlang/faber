@@ -54,7 +54,7 @@ fn function_by_id_mut_rewrites_dense_and_sparse() {
 // ── Phase-4 producer fact: instance shape-size substitution ──────────────
 
 use crate::codegen::Target;
-use crate::driver::{Config, Session, AnalyzeRequest};
+use crate::driver::{AnalyzeRequest, Config, Session};
 use crate::semantic::IndexId;
 
 fn analyzed_unit(source: &str) -> AnalyzedModule {

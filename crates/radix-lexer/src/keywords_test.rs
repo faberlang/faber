@@ -6,8 +6,8 @@
 
 use super::{
     keyword_allowed_as_ident, keyword_group_specs, keyword_specs, keyword_spelling_for_token,
-    keyword_token_kind, lookup_keyword_spec, validate_keyword_groups, KeywordKind,
-    KeywordOwner, KeywordScope,
+    keyword_token_kind, lookup_keyword_spec, validate_keyword_groups, KeywordKind, KeywordOwner,
+    KeywordScope,
 };
 use crate::TokenKind;
 

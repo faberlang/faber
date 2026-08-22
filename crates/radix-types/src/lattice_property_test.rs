@@ -270,7 +270,10 @@ fn option_to_non_option_via_unboxing_is_not_reflexive() {
     let opt = table.option(textus);
 
     assert!(!table.equals(opt, textus), "Option(T) != T structurally");
-    assert!(table.is_assignable(opt, textus), "Option(T) <: T via coercion");
+    assert!(
+        table.is_assignable(opt, textus),
+        "Option(T) <: T via coercion"
+    );
 }
 
 // ── Transitivity (exhaustive, small lattice) ────────────────────────────────
@@ -302,7 +305,9 @@ fn transitivity_holds_for_primitive_lattice() {
     for a in &prims {
         for b in &prims {
             for c in &prims {
-                if table.is_assignable(*a, *b) && table.is_assignable(*b, *c) && !table.is_assignable(*a, *c)
+                if table.is_assignable(*a, *b)
+                    && table.is_assignable(*b, *c)
+                    && !table.is_assignable(*a, *c)
                 {
                     violations.push((*a, *b, *c));
                 }

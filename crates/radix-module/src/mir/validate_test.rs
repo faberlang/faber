@@ -6,13 +6,15 @@
 // and type consistency. Validation never repairs or interprets.
 
 use super::*;
-use radix_mir::validate::*;
 use crate::codegen::Target;
-use crate::driver::{Config, Session, AnalyzeRequest};
+use crate::driver::{AnalyzeRequest, Config, Session};
 use crate::lexer::Symbol;
 use crate::mir::lower_analyzed_unit;
-use crate::semantic::{FuncSig, IndexExpr, InferVar, NumericWidth, SemanticParamMode, ParamType, Primitive, Type, TypeTable};
+use crate::semantic::{
+    FuncSig, IndexExpr, InferVar, NumericWidth, ParamType, Primitive, SemanticParamMode, Type, TypeTable,
+};
 use crate::test_support::test_span;
+use radix_mir::validate::*;
 
 fn ty(types: &TypeTable, primitive: Primitive) -> MirType {
     MirType::semantic(types.primitive(primitive))
@@ -230,7 +232,11 @@ fn rejects_atomic_runtime_call_type_mismatch() {
 }
 
 fn analyze(source: &str) -> crate::driver::AnalyzedModule {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript).with_dev_stdlib());
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_dev_stdlib(),
+    );
     crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()).expect("analysis succeeds")
 }
 
@@ -1506,10 +1512,7 @@ fn octeti_unify_exemplum_mir_validates() {
 
 #[test]
 fn validates_valor_array_carrier_aggregate() {
-    let path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../corpus/conversio/valor-tensor.fab"
-    );
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/conversio/valor-tensor.fab");
     let source = std::fs::read_to_string(path).expect("read valor tensor exemplum");
     let mut unit = analyze(&source);
     lower_analyzed_unit(&mut unit, Default::default()).expect("valor array carrier validates in MIR");
@@ -1687,10 +1690,7 @@ fn rejects_block_not_reachable_from_entry() {
                 MirBlock {
                     id: MirBlockId(1),
                     statements: Vec::new(),
-                    terminator: MirTerminator {
-                        kind: MirTerminatorKind::Goto(MirBlockId(2)),
-                        span: test_span(),
-                    },
+                    terminator: MirTerminator { kind: MirTerminatorKind::Goto(MirBlockId(2)), span: test_span() },
                     span: test_span(),
                 },
                 // bb2 is referenced as a successor (by bb1) but not reachable
@@ -1730,20 +1730,14 @@ fn rejects_block_that_does_not_reach_terminator() {
                 MirBlock {
                     id: MirBlockId(0),
                     statements: Vec::new(),
-                    terminator: MirTerminator {
-                        kind: MirTerminatorKind::Goto(MirBlockId(1)),
-                        span: test_span(),
-                    },
+                    terminator: MirTerminator { kind: MirTerminatorKind::Goto(MirBlockId(1)), span: test_span() },
                     span: test_span(),
                 },
                 // bb1 has Goto bb0, creating a loop that never reaches Return/ReturnError/Unreachable.
                 MirBlock {
                     id: MirBlockId(1),
                     statements: Vec::new(),
-                    terminator: MirTerminator {
-                        kind: MirTerminatorKind::Goto(MirBlockId(0)),
-                        span: test_span(),
-                    },
+                    terminator: MirTerminator { kind: MirTerminatorKind::Goto(MirBlockId(0)), span: test_span() },
                     span: test_span(),
                 },
             ],

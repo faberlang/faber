@@ -4,8 +4,7 @@ use crate::schema::executor_plan::{
     WireExecutorPlanV2, WireLogicalSignature, WirePlanProvenance,
 };
 use crate::schema::wire::{
-    WireBinding, WireBufferLifetime, WireBufferRole, WireInitializationPolicy,
-    WireStorageLayout,
+    WireBinding, WireBufferLifetime, WireBufferRole, WireInitializationPolicy, WireStorageLayout,
 };
 
 fn payload() -> WireExecutorPlanV2 {

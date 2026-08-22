@@ -1,9 +1,9 @@
 //! Type-conversion (conversio) codegen tests. Each compiles a small Faber program
 //! to Rust and asserts the emitted conversion pattern.
 
-use crate::driver::ModuleCompileRequest;
 use super::compile;
 use crate::codegen::Target;
+use crate::driver::ModuleCompileRequest;
 use crate::test_support::test_session;
 
 // ── conversio glyph form ──

@@ -1,8 +1,8 @@
 use super::*;
 use crate::schema::{
     FmirTextCliRootSection, FmirTextCliSection, FmirTextProgramSection, FmirTextRuntimeSection,
-    FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection,
-    FmirTextTypesSection, PACKAGE_MIR_ARTIFACT_VERSION,
+    FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection,
+    PACKAGE_MIR_ARTIFACT_VERSION,
 };
 use radix_mir::MirProgram;
 use radix_types::TypeTable;

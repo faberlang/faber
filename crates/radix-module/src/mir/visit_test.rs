@@ -6,9 +6,9 @@
 // terminator kind.
 
 use super::*;
-use radix_mir::visit::*;
 use crate::semantic::TypeId;
 use crate::test_support::test_span;
+use radix_mir::visit::*;
 
 fn ty() -> MirType {
     MirType::semantic(TypeId(0))
@@ -236,9 +236,7 @@ fn terminator_successors_switch_no_cases_returns_default_only() {
 
 #[test]
 fn structural_visitor_walks_empty_program() {
-    let program = MirProgram {
-        functions: vec![],
-    };
+    let program = MirProgram { functions: vec![] };
     let mut visitor = CountingVisitor::default();
     visitor.visit_program(&program);
 

@@ -1,8 +1,8 @@
 //! CLI codegen tests — all spawn external toolchains and are #[ignore] by default.
 
-use crate::driver::ModuleCompileRequest;
 use super::compile;
 use crate::codegen::Target;
+use crate::driver::ModuleCompileRequest;
 use crate::test_support::test_session;
 
 // ── single-command CLI ──

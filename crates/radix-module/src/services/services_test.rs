@@ -3,8 +3,8 @@
 //! Proves: tool dispatch; source compilation through the tool entry point;
 //! reader-pack integration; target discovery and capability reporting.
 
-use crate::driver::AnalyzeRequest;
 use super::*;
+use crate::driver::AnalyzeRequest;
 use crate::services::{
     check_diagnostics_for_source, check_diagnostics_for_source_with_locale_pack, compile_cli_path, compile_cli_source,
     compile_cli_source_with_locale_pack, discoverable_targets, target_capabilities, target_capabilities_for_surface,
@@ -2087,7 +2087,8 @@ fn emit_fhir_serializes_valid_faber_to_fhir_bytes() {
             .with_target(crate::codegen::Target::HirFhir)
             .with_dev_stdlib(),
     );
-    let unit = crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()).expect("analysis should succeed");
+    let unit = crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default())
+        .expect("analysis should succeed");
 
     let artifact = crate::hir::serialize::from_analyzed(&unit, "test_hash", "test.fab");
     let bytes = postcard::to_allocvec(&artifact).expect("postcard serialization should succeed");

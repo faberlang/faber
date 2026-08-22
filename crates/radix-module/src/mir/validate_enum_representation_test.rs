@@ -8,9 +8,9 @@
 // domains, and wide carrier selection.
 
 use super::*;
-use radix_mir::validate::*;
 use crate::lexer::Symbol;
 use crate::semantic::{NumericWidth, Primitive, TypeTable};
+use radix_mir::validate::*;
 
 fn ty(types: &TypeTable, primitive: Primitive) -> MirType {
     MirType::semantic(types.primitive(primitive))

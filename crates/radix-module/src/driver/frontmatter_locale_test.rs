@@ -2,10 +2,10 @@
 //! that `+++\nlocale = "..."\n+++` frontmatter correctly selects reader packs
 //! for keyword lexing and type surface resolution.
 
-use crate::driver::ModuleCompileRequest;
 use super::compile;
 use crate::codegen::Target;
 use crate::driver::Config;
+use crate::driver::ModuleCompileRequest;
 use std::path::PathBuf;
 
 fn stdlib_path() -> PathBuf {

@@ -2291,7 +2291,11 @@ impl Parser {
         let id = self.next_id();
         Ok(Expr {
             id,
-            kind: ExprKind::Lege(LegeExpr { symbol, is_line: line, span }),
+            kind: ExprKind::Lege(LegeExpr {
+                symbol,
+                is_line: line,
+                span,
+            }),
             span,
         })
     }

@@ -1,10 +1,10 @@
 //! Template/scriptum, block strings, ASCII literals, octeti literals, valor
 //! assignment policy, and related literal-emission tests.
 
-use crate::driver::ModuleCompileRequest;
 use super::compile;
 use crate::codegen::Target;
 use crate::diagnostics::DiagnosticArg;
+use crate::driver::ModuleCompileRequest;
 use crate::test_support::{assert_compile_fails_with_args, assert_compile_fails_with_issue, test_session};
 
 // ── template / forma / scriptum ──
