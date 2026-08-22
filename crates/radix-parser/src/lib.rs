@@ -929,11 +929,7 @@ impl Parser {
 
     /// Parse the required name after `functio`.
     fn parse_function_name(&mut self) -> Result<Ident, ParseError> {
-        self.parse_decl_name_after_keyword(
-            ParseErrorKind::FunctionNameAbsent,
-            "functio",
-            "functio",
-        )
+        self.parse_decl_name_after_keyword(ParseErrorKind::FunctionNameAbsent, "functio", "functio")
     }
 
     /// Parse the required name after `genus`.

@@ -136,13 +136,11 @@ pub(crate) fn check_artifact_abi_versions(
 ) -> Result<(), crate::error::FmirImageError> {
     for artifact in &device.artifacts.artifact {
         if artifact.abi_version != ARTIFACT_ABI_VERSION {
-            return Err(
-                crate::error::FmirImageError::ArtifactAbiVersionMismatch {
-                    backend: artifact.backend.spelling(),
-                    actual: artifact.abi_version,
-                    accepted: ARTIFACT_ABI_VERSION,
-                },
-            );
+            return Err(crate::error::FmirImageError::ArtifactAbiVersionMismatch {
+                backend: artifact.backend.spelling(),
+                actual: artifact.abi_version,
+                accepted: ARTIFACT_ABI_VERSION,
+            });
         }
     }
     Ok(())
@@ -403,12 +401,10 @@ pub fn admit_device_section_with_compat(
     // S8: the nested device-program version fails closed independently of the
     // outer FMIR version, with a focused diagnostic.
     if device.device_program.v != WIRE_DEVICE_PROGRAM_VERSION {
-        return Err(
-            crate::error::FmirImageError::DeviceProgramVersionMismatch {
-                actual: device.device_program.v,
-                expected: WIRE_DEVICE_PROGRAM_VERSION,
-            },
-        );
+        return Err(crate::error::FmirImageError::DeviceProgramVersionMismatch {
+            actual: device.device_program.v,
+            expected: WIRE_DEVICE_PROGRAM_VERSION,
+        });
     }
     validate_wire_program(&device.device_program.program)?;
     if let Some(executor_plan) = &device.executor_plan {
