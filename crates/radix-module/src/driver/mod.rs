@@ -614,7 +614,10 @@ fn generate_output(
             args: Vec::new(),
         }
         .into()),
-        Target::HirRust => codegen::generate_rust_from_analyzed(analysis).map_err(std::convert::Into::into),
+        Target::HirRust => {
+            codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
+                .map_err(std::convert::Into::into)
+        },
         Target::HirFaber => {
             codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
                 .map_err(std::convert::Into::into)
