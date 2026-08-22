@@ -41,19 +41,15 @@ pub use radix_mir::{
 #[cfg(feature = "mir-coverage")]
 pub use coverage::{classify_mir_coverage, MirCoverageTarget, MIR_COVERAGE_TARGETS};
 #[cfg(feature = "mir-llvm")]
-// DDCP3-U2 (b) mixed-path disambiguation: the host-partition lane
-// (`emit_llvm_text_probe_host_partition`) is the CPU-module path for a
-// package that carries device roles (direct declarations/calls, no device
-// bodies); `emit_llvm_text_probe_with_device_roles` remains the NVVM
-// device-artifact probe path. The driver routes `llvm-text`/`llvm-host`
-// through the lane when roles are present — no route silently emits device
-// bodies into a CPU module.
+// DDCP3-U2 (b) mixed-path disambiguation: `LlvmEmitRequest` selects the
+// host-partition CPU-module path for a package that carries device roles
+// (direct declarations/calls, no device bodies); the ordinary request with
+// roles remains the NVVM device-artifact probe path. The driver routes
+// `llvm-text`/`llvm-host` through the lane when roles are present — no route
+// silently emits device bodies into a CPU module.
 pub use llvm_text::{
-    classify_lowerability, emit_llvm_text_probe, emit_llvm_text_probe_host_partition,
-    emit_llvm_text_probe_host_partition_with_legality, emit_llvm_text_probe_library_module,
-    emit_llvm_text_probe_with_cli_adapter, emit_llvm_text_probe_with_device_context,
-    emit_llvm_text_probe_with_device_roles, emit_llvm_text_probe_with_device_roles_and_exit,
-    fmir_artifact_packet_facts, CliAdapterField, CliAdapterPlan, CliRecordFunction, MirLlvmTextProbeError,
+    classify_lowerability, emit_llvm_text_probe, fmir_artifact_packet_facts, CliAdapterField,
+    CliAdapterPlan, CliRecordFunction, LlvmEmitRequest, MirLlvmTextProbeError,
 };
 pub use lower::prepare_mir_lowering_interner;
 pub use lower::{

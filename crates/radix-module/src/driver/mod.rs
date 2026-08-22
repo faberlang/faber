@@ -707,13 +707,16 @@ fn generate_llvm_text_output(
         // DDCP3-U2 (b) mixed-path disambiguation: default `llvm-text`/`llvm-host`
         // is the CPU-module path. A package that carries device roles routes
         // through the HOST-PARTITION lane (direct declarations/calls, no device
-        // bodies). `emit_llvm_text_probe_with_device_roles` is the NVVM device-
-        // artifact path: `--cuda-descriptor` selects it so the emitted `.ll`
-        // matches the sidecar. No default route silently emits device bodies
-        // into a CPU module.
+        // bodies). The ordinary `LlvmEmitRequest` with roles is the NVVM
+        // device-artifact path: `--cuda-descriptor` selects it so the emitted
+        // `.ll` matches the sidecar. No default route silently emits device
+        // bodies into a CPU module.
         let code = if emit_nvvm_device_module || device_roles.is_empty() {
-            crate::mir::emit_llvm_text_probe_with_device_roles(&device_roles, &mir.validated, &mir.interner)
-                .map_err(llvm_text_codegen_error)?
+            crate::mir::emit_llvm_text_probe(crate::mir::LlvmEmitRequest {
+                device_roles: Some(device_roles.clone()),
+                ..crate::mir::LlvmEmitRequest::new(&mir.validated, &mir.interner)
+            })
+            .map_err(llvm_text_codegen_error)?
         } else {
             // DDCP3-U5 (gate 6): the host-partition lane runs the pre-emission
             // reject gate BEFORE any output byte — unsupported callsite shapes,
@@ -725,13 +728,12 @@ fn generate_llvm_text_output(
             // the gate + record stay live regardless. The fmir→ArtifactPacketFacts
             // adapter (crate::mir::fmir_artifact_packet_facts, U4 residual) is
             // available to that seam at this route.
-            crate::mir::emit_llvm_text_probe_host_partition_with_legality(
-                &device_roles,
-                &mir.validated,
-                &mir.interner,
-                None,
-                &crate::mir::device_semantics::DeviceLegalityFacts::default(),
-            )
+            crate::mir::emit_llvm_text_probe(crate::mir::LlvmEmitRequest {
+                device_roles: Some(device_roles.clone()),
+                host_partition: true,
+                host_partition_legality: crate::mir::device_semantics::DeviceLegalityFacts::default(),
+                ..crate::mir::LlvmEmitRequest::new(&mir.validated, &mir.interner)
+            })
             .map_err(llvm_text_codegen_error)?
         };
         Ok(crate::Output::LlvmText(crate::LlvmTextOutput { code }))

@@ -2131,7 +2131,9 @@ fn assert_package_corpus_llvm_smoke(relative: &str, label: &str) {
             .validation()
             .interner
             .expect("package MIR carries interner");
-        radix::module::mir::emit_llvm_text_probe(&lowered.validated, interner)
+        radix::module::mir::emit_llvm_text_probe(
+            radix::module::mir::LlvmEmitRequest::new(&lowered.validated, interner),
+        )
     })
     .expect("corpus package lowers to MIR")
     .expect("corpus package emits LLVM");
