@@ -50,10 +50,10 @@ fixum lista<f32> ones16 ← [
     1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
 ]
 fixum lista<f32> ones4 ← [1.0, 1.0, 1.0, 1.0]
-fixum tensor<f32, [2, 8]> qb ↤ ones16
-fixum tensor<f32, [2, 8]> kb ↤ ones16
-fixum tensor<f32, [2, 8]> vb ↤ ones16
-fixum tensor<f32, [2, 2]> scale ↤ ones4
+fixum tensor<f32, [2, 8]> qb ← ones16 ↦ tensor<f32, [2, 8]>
+fixum tensor<f32, [2, 8]> kb ← ones16 ↦ tensor<f32, [2, 8]>
+fixum tensor<f32, [2, 8]> vb ← ones16 ↦ tensor<f32, [2, 8]>
+fixum tensor<f32, [2, 2]> scale ← ones4 ↦ tensor<f32, [2, 2]>
 fixum tensor<f32, [2, 8]> ctx ← scaled_dot_product(qb, kb, vb, scale)
 
 nota "shape-generic scaled_dot_product [2, 8] ligata"
