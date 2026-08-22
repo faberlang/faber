@@ -1,6 +1,7 @@
 +++
 term = "tuus"
 kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "ad_expr", "ad_opener", "itera_stmt", "call_expr", "call_suffix", "call_type_args", "member_suffix", "argument_list", "expression", "literal", "adfirma_stmt", "equality_tail"]
 category = "endpoint"
 canonical = true
 summary = "typed inbound sermo stream view"

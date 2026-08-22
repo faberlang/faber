@@ -1,6 +1,7 @@
 +++
 term = "ad"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "ad_expr", "ad_opener", "conversio_expr", "expression", "literal", "adfirma_stmt", "equality_tail"]
 category = "endpoint"
 canonical = true
 summary = "ad opens a sermo endpoint and materializes the stream with an explicit conversio target."

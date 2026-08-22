@@ -1,6 +1,7 @@
 +++
 term = "adfirma"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "adfirma_stmt", "redde_stmt", "si_stmt", "arm", "fixum_decl", "expr_stmt", "assignment", "unary_expr", "additive_expr", "multiplicative_expr", "comparison", "equality_tail", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal"]
 category = "testing"
 canonical = false
 summary = "Asserts conditions inside function bodies."

@@ -1,6 +1,7 @@
 +++
 term = "optio"
 kind = "annotation"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "entry_header", "annotation", "braced_annotation", "annotation_name", "annotation_field_list", "annotation_field", "expression", "literal", "type_annotation", "owned_type", "base_type", "qualified_type"]
 category = "cli"
 canonical = true
 summary = "Braced canonical @ optio CLI option record."

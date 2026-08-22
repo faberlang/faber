@@ -1,6 +1,7 @@
 +++
 term = "async solum leget"
 kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipiet_stmt", "importa_decl", "importa_sugar", "named_import", "fixum_decl", "figendum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "expr_stmt", "call_expr", "call_suffix", "call_type_args", "member_suffix", "argument_list", "argument", "expression", "literal", "adfirma_stmt", "equality_tail"]
 category = "ad"
 canonical = true
 summary = "Async solum.read_file_async<T> uses the same solum:lege route as sync solum.read_file<T>."

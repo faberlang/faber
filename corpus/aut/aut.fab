@@ -1,6 +1,7 @@
 +++
 term = "aut"
 kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "aut_expr", "expression", "literal", "nota_stmt"]
 category = "logic"
 canonical = false
 summary = "Short-circuit logical or on bivalent operands."

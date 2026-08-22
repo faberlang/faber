@@ -1,6 +1,7 @@
 +++
 term = "adfirma"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "adfirma_stmt", "expression", "literal", "comparison", "equality_tail", "proba_stmt"]
 category = "testing"
 canonical = true
 summary = "Asserts that a condition is true at runtime."

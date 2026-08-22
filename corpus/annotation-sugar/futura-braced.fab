@@ -1,6 +1,7 @@
 +++
 term = "futura"
 kind = "annotation"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "annotation", "braced_annotation", "annotation_name", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "nota_stmt", "expression", "literal"]
 category = "async"
 canonical = true
 summary = "Braced canonical @ futura unit marker."
