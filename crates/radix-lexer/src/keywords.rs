@@ -356,7 +356,7 @@ const CONDITIONAL_GROUP: &[&str] = &["si", "sin", "secus"];
 const CHOICE_GROUP: &[&str] = &["elige", "casu", "ceterum"];
 const PATTERN_CHOICE_GROUP: &[&str] = &["discerne", "casu", "ceterum"];
 const TRY_RECOVERY_GROUP: &[&str] = &["cape"];
-const LOOP_GROUP: &[&str] = &["dum", "fac", "itera", "perge", "rumpe"];
+const LOOP_GROUP: &[&str] = &["dum", "fac", "itera", "apud", "perge", "rumpe"];
 const CLOSURE_GROUP: &[&str] = &["clausura", "libera"];
 const RELATIONAL_VIEW_GROUP: &[&str] = &["schema", "columna"];
 
@@ -585,6 +585,12 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         category: KeywordKind::Modifier,
     },
     // === Keywords: Control flow ===
+    KeywordSpec {
+        text: "apud",
+        token_kind: Some(TokenKind::Apud),
+        scope: KeywordScope::Contextual(CONTROL_FLOW),
+        category: KeywordKind::ControlFlow,
+    },
     KeywordSpec {
         text: "casu",
         token_kind: Some(TokenKind::Casu),

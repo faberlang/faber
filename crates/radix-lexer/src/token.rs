@@ -128,6 +128,7 @@ pub enum TokenKind {
     Protecta,
     Publica,
     // === Keywords: Control flow ===
+    Apud,
     Casu,
     Ceterum,
     Custodi,
@@ -383,6 +384,7 @@ impl TokenKind {
                 | Privata
                 | Protecta
                 | Publica
+                | Apud
                 | Casu
                 | Ceterum
                 | Custodi

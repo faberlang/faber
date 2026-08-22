@@ -266,11 +266,34 @@ fn keyword_groups_are_static_and_complete_for_latin_surface() {
         .expect("conditional group");
     assert_eq!(conditional.members, &["si", "sin", "secus"]);
 
+    let loop_group = keyword_group_specs()
+        .iter()
+        .find(|group| group.id == "loop")
+        .expect("loop group");
+    assert_eq!(
+        loop_group.members,
+        &["dum", "fac", "itera", "apud", "perge", "rumpe"]
+    );
+
     let closure = keyword_group_specs()
         .iter()
         .find(|group| group.id == "closure")
         .expect("closure group");
     assert_eq!(closure.members, &["clausura", "libera"]);
+}
+
+#[test]
+fn apud_is_a_control_flow_keyword_identity() {
+    let spec = lookup_keyword_spec("apud").expect("apud must be registered");
+    assert_eq!(spec.token_kind, Some(TokenKind::Apud));
+    assert_eq!(spec.category, KeywordKind::ControlFlow);
+    assert_eq!(keyword_token_kind("apud"), Some(TokenKind::Apud));
+    assert!(TokenKind::Apud.is_keyword());
+    assert_eq!(keyword_spelling_for_token(&TokenKind::Apud), Some("apud"));
+    let KeywordScope::Contextual(owners) = spec.scope else {
+        panic!("apud must be contextual");
+    };
+    assert!(owners.contains(&KeywordOwner::ControlFlow));
 }
 
 #[test]
