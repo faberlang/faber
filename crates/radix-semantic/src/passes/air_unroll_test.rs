@@ -958,3 +958,184 @@ functio reduce_tensor(tensor<f32, [4]> x) → f32 {
     let hir = result.hir.as_ref().expect("typed HIR");
     assert!(!has_itera(hir), "the pipeline must erase the admitted loop");
 }
+
+
+// AC-8: index-dependent bodies and the decline catalog. Coordinate-reading
+// conditions are ordinary pure per-lane control — they admit through the
+// unroll (constants substituted per lane) — while ragged iterables decline
+// fail-closed at the shaped-iterable rule, and a mixed function keeps exactly
+// the declined diagnostic.
+
+#[test]
+fn apud_causal_body_si_i_le_j_admits_per_lane_conditions() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+@ radix backward "causal_backward"
+functio causal(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> ⇥ textus {
+    varia tensor<f32, [2, 2]> acc ← x
+    itera ex x apud [i, j] fixum cell {
+        si i > j { iace "upper" }
+        acc ← acc.addita(x)
+    }
+    redde acc
+}
+"#,
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|err| !err.args.iter().any(|arg| arg.name == "causa")),
+        "causal index-dependent body must not decline: {:?}",
+        result.diagnostics
+    );
+    expect_issue(&result.diagnostics, "iace");
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(
+        !has_itera(hir),
+        "admitted causal apud iteration must be erased"
+    );
+    assert!(
+        has_si(hir),
+        "per-lane `si` must remain so each lane keeps its own folded condition"
+    );
+    assert_eq!(
+        coordinate_lane_tuples(hir, 2),
+        vec![vec![0, 0], vec![0, 1], vec![1, 0], vec![1, 1]],
+        "causal lanes must splice in source order"
+    );
+    let mut sis = CountSi(0);
+    walk_program(&mut sis, hir);
+    assert_eq!(sis.0, 4, "one per-lane condition must remain per lane");
+}
+
+#[test]
+fn apud_triangular_arithmetic_body_admits_per_lane_conditions() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+@ radix backward "triangular_backward"
+functio triangular(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> ⇥ textus {
+    varia tensor<f32, [2, 2]> acc ← x
+    itera ex x apud [i, j] fixum cell {
+        fixum numerus idx ← i * 2 + j
+        si idx > 2 { iace "upper" }
+        acc ← acc.addita(x)
+    }
+    redde acc
+}
+"#,
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|err| !err.args.iter().any(|arg| arg.name == "causa")),
+        "triangular i * 2 + j body must not decline: {:?}",
+        result.diagnostics
+    );
+    expect_issue(&result.diagnostics, "iace");
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(
+        !has_itera(hir),
+        "admitted triangular apud iteration must be erased"
+    );
+    assert_eq!(
+        coordinate_lane_tuples(hir, 2),
+        vec![vec![0, 0], vec![0, 1], vec![1, 0], vec![1, 1]],
+        "triangular lanes must splice in source order"
+    );
+    let mut sis = CountSi(0);
+    walk_program(&mut sis, hir);
+    assert_eq!(sis.0, 4, "one per-lane condition must remain per lane");
+}
+
+#[test]
+fn apud_ragged_nested_lista_declines_fail_closed() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio ragged(lista<lista<f32>> pairs) → f32 {
+    itera ex pairs apud [i, j] fixum cell { }
+    redde 0.0
+}
+"#,
+    );
+    // Ragged `lista<lista<T>>` fails closed at the shaped-iterable rule;
+    // the loop is never unrolled, so the AIR purity pass reports the whole
+    // `itera` instead of a per-lane decline.
+    expect_issue(&result.diagnostics, "itera_apud_requires_shaped_iterable");
+    expect_issue(&result.diagnostics, "itera_loop");
+    let hir = result.hir.as_ref().expect("typed HIR despite the decline");
+    assert!(
+        has_itera(hir),
+        "ragged apud iteration must remain whole"
+    );
+}
+
+#[test]
+fn apud_mixed_admit_and_decline_reports_only_the_declined_loop() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+@ radix backward "mixed_backward"
+functio mixed(tensor<f32, [40]> x) → f32 {
+    varia tensor<f32, [40]> acc ← x
+    itera ex x apud [i] fixum cell {
+        acc ← acc.addita(x)
+    }
+    itera ex x apud [i] fixum cell {
+        acc ← acc.addita(x)
+    }
+    redde acc.media()
+}
+"#,
+    );
+    let declined: Vec<_> = air_errors_from(&result)
+        .into_iter()
+        .filter(|err| err
+            .args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "itera_loop")
+            && err.args.iter().any(|arg| arg.name == "causa"))
+        .collect();
+    assert_eq!(
+        declined.len(),
+        1,
+        "exactly the over-budget loop declines: {:?}",
+        result.diagnostics
+    );
+    assert!(declined[0]
+        .args
+        .iter()
+        .any(|arg| arg.name == "causa" && arg.value == "budget"));
+    let hir = result.hir.as_ref().expect("typed HIR despite the decline");
+    let mut iteras = CountIteras(0);
+    walk_program(&mut iteras, hir);
+    assert_eq!(
+        iteras.0, 1,
+        "the admitted loop is erased; only the declined loop remains whole"
+    );
+}
+
+struct CountIteras(usize);
+impl HirVisitor for CountIteras {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if matches!(expr.kind, HirExpressionKind::Itera(..)) {
+            self.0 += 1;
+        }
+        walk_expr(self, expr);
+    }
+}
+
+struct CountSi(usize);
+impl HirVisitor for CountSi {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if matches!(expr.kind, HirExpressionKind::Si { .. }) {
+            self.0 += 1;
+        }
+        walk_expr(self, expr);
+    }
+}
+
