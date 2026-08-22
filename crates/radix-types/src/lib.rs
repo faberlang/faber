@@ -50,7 +50,7 @@ pub use numeric_width::{
 };
 pub use schema::{SchemaColumnDef, SchemaDef};
 pub use schema_subset::{
-    extra_input_columns, schema_column_count, schema_subset, SchemaSubsetFailure,
+    extra_input_columns, schema_column_count, schema_subset, SchemaSubsetError,
 };
 pub use types::{
     collection_type_specs, is_atomic_element_type, is_intervallum_bound_type,

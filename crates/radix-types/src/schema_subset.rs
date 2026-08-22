@@ -54,7 +54,7 @@ use radix_lexer::Symbol as LexSymbol;
 /// `O` column (design §2.3; §9 fact vocabulary: column identity plus
 /// expected/observed type where a type is the failure).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SchemaSubsetFailure {
+pub enum SchemaSubsetError {
     /// An `O` column is absent from `I` by public name after alias
     /// resolution — the schema-side analog of MISSING-1 (design §2.4.2).
     /// Metadata-level: no row identity exists.
@@ -94,19 +94,19 @@ pub enum SchemaSubsetFailure {
 ///
 /// # Errors
 ///
-/// Returns [`SchemaSubsetFailure::MissingFromInput`] when an `O` column is
-/// absent from `I`, [`SchemaSubsetFailure::IncompatibleType`] when the
+/// Returns [`SchemaSubsetError::MissingFromInput`] when an `O` column is
+/// absent from `I`, [`SchemaSubsetError::IncompatibleType`] when the
 /// matched column types are incompatible in the projection direction, and
-/// [`SchemaSubsetFailure::NullabilityTightened`] when `O` requires a column
+/// [`SchemaSubsetError::NullabilityTightened`] when `O` requires a column
 /// `I` offers only optionally.
 pub fn schema_subset(
     types: &TypeTable,
     o: &SchemaDef,
     i: &SchemaDef,
-) -> Result<(), SchemaSubsetFailure> {
+) -> Result<(), SchemaSubsetError> {
     for o_col in &o.columns {
         let Some(i_col) = i.columns.iter().find(|c| c.name == o_col.name) else {
-            return Err(SchemaSubsetFailure::MissingFromInput { column: o_col.name });
+            return Err(SchemaSubsetError::MissingFromInput { column: o_col.name });
         };
         schema_column_compatible(types, i_col, o_col)?;
     }
@@ -120,12 +120,12 @@ fn schema_column_compatible(
     types: &TypeTable,
     i_col: &SchemaColumnDef,
     o_col: &SchemaColumnDef,
-) -> Result<(), SchemaSubsetFailure> {
+) -> Result<(), SchemaSubsetError> {
     // Nullability is a distinct state from required (design §2.2); a
     // compatible subset may relax it (I required → O nullable) but never
     // tighten it.
     if o_col.required && !i_col.required {
-        return Err(SchemaSubsetFailure::NullabilityTightened {
+        return Err(SchemaSubsetError::NullabilityTightened {
             column: o_col.name,
             expected: o_col.ty,
             observed: i_col.ty,
@@ -133,7 +133,7 @@ fn schema_column_compatible(
     }
     // Projection direction: the value of I's column flows into O's column.
     if !types.is_assignable(i_col.ty, o_col.ty) {
-        return Err(SchemaSubsetFailure::IncompatibleType {
+        return Err(SchemaSubsetError::IncompatibleType {
             column: o_col.name,
             expected: o_col.ty,
             observed: i_col.ty,

@@ -9,7 +9,7 @@
 
 use crate::schema::{SchemaColumnDef, SchemaDef};
 use crate::schema_subset::{
-    extra_input_columns, schema_column_count, schema_subset, SchemaSubsetFailure,
+    extra_input_columns, schema_column_count, schema_subset, SchemaSubsetError,
 };
 use crate::types::{Primitive, TypeId, TypeTable};
 use radix_lexer::Interner;
@@ -104,7 +104,7 @@ fn o_column_absent_from_i_fails_with_column_identity() {
 
     assert_eq!(
         schema_subset(&types, &o, &i),
-        Err(SchemaSubsetFailure::MissingFromInput {
+        Err(SchemaSubsetError::MissingFromInput {
             column: interner.intern("titulus"),
         })
     );
@@ -131,7 +131,7 @@ fn type_incompatible_column_fails_with_column_identity() {
 
     assert_eq!(
         schema_subset(&types, &o, &i),
-        Err(SchemaSubsetFailure::IncompatibleType {
+        Err(SchemaSubsetError::IncompatibleType {
             column: interner.intern("id"),
             expected: textus,
             observed: numerus,
@@ -167,7 +167,7 @@ fn narrowing_o_column_type_is_incompatible() {
 
     assert_eq!(
         schema_subset(&types, &o, &i),
-        Err(SchemaSubsetFailure::IncompatibleType {
+        Err(SchemaSubsetError::IncompatibleType {
             column: interner.intern("id"),
             expected: numerus,
             observed: fractus,
@@ -236,7 +236,7 @@ fn subset_is_directional() {
 
     assert_eq!(
         schema_subset(&types, &o, &i),
-        Err(SchemaSubsetFailure::MissingFromInput {
+        Err(SchemaSubsetError::MissingFromInput {
             column: interner.intern("activa"),
         })
     );
@@ -316,7 +316,7 @@ fn nullability_tightening_is_rejected_with_column_identity() {
 
     assert_eq!(
         schema_subset(&types, &o, &i),
-        Err(SchemaSubsetFailure::NullabilityTightened {
+        Err(SchemaSubsetError::NullabilityTightened {
             column: interner.intern("email"),
             expected: textus,
             observed: email_optional,
@@ -402,7 +402,7 @@ fn empty_output_schema_is_trivially_a_subset() {
     };
     assert_eq!(
         schema_subset(&types, &o2, &i2),
-        Err(SchemaSubsetFailure::MissingFromInput {
+        Err(SchemaSubsetError::MissingFromInput {
             column: interner.intern("id"),
         })
     );
