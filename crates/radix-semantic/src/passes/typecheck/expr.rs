@@ -187,6 +187,27 @@ impl TypeChecker<'_> {
                                 self.error_type
                             }
                         },
+                        // Rank-1 literal-shaped tensors bind the element type
+                        // (mir/lower/control.rs owns the matching MIR arm);
+                        // rank > 1 and symbolic shapes keep the numerus
+                        // fallback so MIR's Unsupported diagnostic stays the
+                        // decline site. `[N]` parses as a one-element Tuple.
+                        Type::Tensor(elem, shape)
+                            if matches!(mode, radix_hir::HirIteraMode::Ex)
+                                && match self.types.get_index(*shape) {
+                                    radix_types::IndexExpr::Literal(_) => true,
+                                    radix_types::IndexExpr::Tuple(dims) => {
+                                        dims.len() == 1
+                                            && matches!(
+                                                self.types.get_index(dims[0]),
+                                                radix_types::IndexExpr::Literal(_)
+                                            )
+                                    }
+                                    _ => false,
+                                } =>
+                        {
+                            *elem
+                        }
                         _ => self.numerus_type(),
                     }
                 };

@@ -1,0 +1,50 @@
++++
+term = "itera-ex-rank1"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "vel_expr", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "itera_stmt", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Value iteration over rank-1 literal-shaped tensors iterates all N lanes."
+syntax = "itera ex tensor<T, [N]> fixum x { }"
+related = ["tensor", "ex", "itera"]
+locale = "en"
++++
+
+# =============================================================================
+# itera-ex-rank1 — Value iteration over rank-1 literal-shaped tensors.
+# =============================================================================
+#
+# What this teaches:
+#   • `itera ex` over a `tensor<T, [N]>` visits every lane in 0‥N — the bound
+#     is the literal shape, not a runtime length call
+#   • the binding is the element type T, gathered by index projection
+#
+# Common mistakes:
+#   • iterating rank > 1 tensors — higher ranks defer to coordinate iteration
+#   • expecting a runtime `len` — the literal shape is the loop bound
+#
+# See also: tensor, ex, itera
+# =============================================================================
+
+# itera ex over tensor<float, [4]> — element binding is f32
+#
+# EXPECTED stdout:
+#   1.0
+#   2.0
+#   3.0
+#   4.0
+#   10.0
+
+main {
+    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    const tf32[] seed ← empty
+    var tf32[4] t ← seed.from_flat(flat, [4])
+
+    var f32 total ← 0.0
+    for from t const x {
+        print x
+        total ← total + x
+    }
+
+    print total
+}

@@ -698,7 +698,7 @@ fn adversarial_cross_arena_dangle() {
         entries: vec![(
             radix_types::DefId(99999),
             radix_hir_fhir::FunctionFactWire {
-                direct_failure: false,
+                has_direct_failure: false,
                 may_fail: false,
                 is_async: false,
                 is_generator: false,
@@ -921,7 +921,7 @@ fn capture_fact_to_wire(fact: &crate::semantic::CaptureFact) -> radix_hir_fhir::
 
 fn function_fact_to_wire(fact: &crate::semantic::FunctionFact) -> radix_hir_fhir::FunctionFactWire {
     radix_hir_fhir::FunctionFactWire {
-        direct_failure: fact.direct_failure,
+        has_direct_failure: fact.direct_failure,
         may_fail: fact.may_fail,
         is_async: fact.is_async,
         is_generator: fact.is_generator,

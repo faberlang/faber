@@ -1371,26 +1371,27 @@ fn lower_itera_expr_rejects_shaped_tensor_and_matrix_collections() {
         (
             "tensor-rank-2",
             "functio iterate(tensor<f32, [2, 3]> m) → vacuum { itera ex m fixum cell { } }",
+            // AEU-1: rank > 1 tensor itera declines ride the generic
+            // Unsupported family (rank > 1 belongs to itera-apud-coordinates).
+            "unsupported MIR lowering: itera collection before iterator MIR lowering",
+            "unsupported_mir_lowering_itera_collection_before_iterator_mir_lowering",
         ),
         (
             "matrix-rank-2",
             "functio iterate(matrix<f32, [2, 3]> m) → vacuum { itera ex m fixum cell { } }",
+            "unsupported MIR lowering: itera ex over tabula before map value iteration MIR lowering",
+            "unsupported_mir_lowering_itera_ex_over_tabula_before_map_value_iteration_mir_lowering",
         ),
     ];
 
-    for (label, source) in cases {
+    for (label, source, message, issue) in cases {
         let mut unit = analyze(source);
         let errors = lower_analyzed_unit(&mut unit, Default::default())
             .expect_err("shaped itera ex must remain unsupported before AC-6");
         assert_eq!(errors.len(), 1, "{label} should emit one MIR rejection: {errors:?}");
+        assert_eq!(errors[0].message, message, "{label} unsupported string");
         assert_eq!(
-            errors[0].message,
-            "unsupported MIR lowering: itera ex over tabula before map value iteration MIR lowering",
-            "{label} should preserve the live Ex-mode unsupported string"
-        );
-        assert_eq!(
-            errors[0].issue,
-            "unsupported_mir_lowering_itera_ex_over_tabula_before_map_value_iteration_mir_lowering",
+            errors[0].issue, issue,
             "{label} should use the live Ex-mode unsupported identity"
         );
     }
@@ -1426,6 +1427,53 @@ fn lowers_array_itera_ex_and_de_to_index_loops() {
     assert!(de_dump.contains("_2 = _1: ty#1"));
     assert!(de_dump.contains("return _2"));
     assert!(!de_dump.contains("itera collection before iterator MIR lowering"));
+}
+
+#[test]
+fn tensor_itera_ex_rank1_lowers_to_literal_bound_index_loop() {
+    let source = r"functio sumTensor(tensor<numerus, [8]> t) → numerus {
+  varia numerus total ← 0
+  itera ex t fixum x {
+    total ← total + x
+  }
+  redde total
+}";
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
+    validate_program(&lowered.program, lowered.validated.validation())
+        .expect("the tensor itera loop MIR must validate");
+    let dump = dump_program(&lowered.program);
+    assert!(
+        !dump.contains("itera collection before iterator MIR lowering"),
+        "rank-1 tensor itera ex must lower: {dump}"
+    );
+    assert!(
+        !dump.contains("runtime collection length"),
+        "the tensor loop bound is the literal 8, not a runtime length intrinsic: {dump}"
+    );
+    assert!(dump.contains("branch "), "the tensor loop must produce loop CFG: {dump}");
+    assert!(dump.contains("8"), "the literal lane count 8 must appear as the bound: {dump}");
+}
+
+#[test]
+fn tensor_itera_ex_rank2_stays_unsupported() {
+    let mut unit = analyze(
+        r"functio sumGrid(tensor<fractus<f32>, [2, 2]> t) → fractus<f32> {
+  itera ex t fixum x {
+    nota x
+  }
+  redde 0.0
+}",
+    );
+    let errors = lower_analyzed_unit(&mut unit, Default::default()).expect_err("rank-2 tensor itera must fail closed");
+    assert_eq!(errors.len(), 1);
+    assert!(
+        errors[0]
+            .issue
+            .contains("itera_collection_before_iterator_mir_lowering"),
+        "rank-2 decline keeps the Unsupported diagnostic family: {:?}",
+        errors[0].issue
+    );
 }
 
 #[test]
