@@ -10,8 +10,10 @@
 
 use crate::test_support::args_have_no_legacy_message;
 use crate::{PassConfig, SemanticError, SemanticErrorKind};
-use radix_hir::visit::{walk_expr, walk_program, HirVisitor};
-use radix_hir::{HirExpression, HirExpressionKind, HirLiteral, HirModule};
+use radix_hir::visit::{walk_expr, walk_program, walk_stmt, HirVisitor};
+use radix_hir::{
+    HirExpression, HirExpressionKind, HirLiteral, HirModule, HirStatement, HirStatementKind,
+};
 use radix_target::Target;
 
 fn analyze(source: &str) -> crate::SemanticResult {
@@ -184,29 +186,211 @@ fn tensor_ex_rank1_admits_guard_free_element_lets() {
     );
 }
 
+// Coordinate-free rank-2 `itera ex` is an arity type error (AC-5, SEM010),
+// so it never reaches this pass; the pass-side `defer_coordinates` decline
+// stays as fail-closed defense. The explicit `apud [i, j]` form is Route M
+// and admits below.
+
+const APUD_RANK2_GRID: &str = r#"
+@ radix lane "air"
+@ radix backward "grid_backward"
+functio grid_sum(tensor<f32, [2, 3]> x) → f32 {
+    varia tensor<f32, [2, 3]> acc ← x
+    itera ex x apud [i, j] fixum cell {
+        acc ← acc.addita(x)
+    }
+    redde acc.media()
+}
+"#;
+
 #[test]
-fn tensor_ex_rank2_defers_to_coordinates_with_distinct_causa() {
-    // Coordinate-free rank-2 `itera ex` is an arity type error (AC-5); the
-    // explicit `apud [i, j]` form typechecks and defers to AC-7's unroll.
-    let errors = air_errors(
+fn apud_rank2_unrolls_six_guard_free_lanes_first_bound_outer() {
+    let result = analyze(APUD_RANK2_GRID);
+    assert!(
+        result.is_ok(),
+        "rank-2 apud outer product must reach reverse AD: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "admitted apud iteration must be erased");
+    assert!(!has_si(hir), "apud unroll is guard-free");
+    let mut gathers = CountIndexes(0);
+    walk_program(&mut gathers, hir);
+    assert_eq!(
+        gathers.0, 6,
+        "one tensor element gather must be emitted per lane"
+    );
+    assert_eq!(
+        coordinate_lane_tuples(hir, 2),
+        vec![
+            vec![0, 0],
+            vec![0, 1],
+            vec![0, 2],
+            vec![1, 0],
+            vec![1, 1],
+            vec![1, 2]
+        ],
+        "lane tuples for [2, 3] must run first-bound=outer (i slowest, j fastest)"
+    );
+}
+
+#[test]
+fn apud_rank1_driver_reaches_reverse_ad_with_lane_count() {
+    let result = analyze(
         r#"
 @ radix lane "air"
-functio grid_sum(tensor<f32, [2, 2]> x) → f32 {
-    itera ex x apud [i, j] fixum value { }
+@ radix backward "line_backward"
+functio line_sum(tensor<f32, [8]> x) → f32 {
+    varia tensor<f32, [8]> acc ← x
+    itera ex x apud [i] fixum cell {
+        acc ← acc.addita(x)
+    }
+    redde acc.media()
+}
+"#,
+    );
+    assert!(
+        result.is_ok(),
+        "rank-1 apud must reach reverse AD: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "rank-1 apud iteration must be erased");
+    assert!(!has_si(hir), "rank-1 apud unroll is guard-free");
+    let mut gathers = CountIndexes(0);
+    walk_program(&mut gathers, hir);
+    assert_eq!(gathers.0, 8, "lane count must equal the product of dims");
+    assert_eq!(
+        coordinate_lane_tuples(hir, 1),
+        (0..8).map(|lane| vec![lane]).collect::<Vec<_>>(),
+        "rank-1 lane constants must run in source order"
+    );
+}
+
+#[test]
+fn apud_rank3_driver_reaches_reverse_ad_with_lane_count() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+@ radix backward "cube_backward"
+functio cube_sum(tensor<f32, [2, 2, 2]> x) → f32 {
+    varia tensor<f32, [2, 2, 2]> acc ← x
+    itera ex x apud [i, j, k] fixum cell {
+        acc ← acc.addita(x)
+    }
+    redde acc.media()
+}
+"#,
+    );
+    assert!(
+        result.is_ok(),
+        "rank-3 apud must reach reverse AD: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "rank-3 apud iteration must be erased");
+    assert!(!has_si(hir), "rank-3 apud unroll is guard-free");
+    let mut gathers = CountIndexes(0);
+    walk_program(&mut gathers, hir);
+    assert_eq!(gathers.0, 8, "lane count must equal 2 * 2 * 2");
+    assert_eq!(
+        coordinate_lane_tuples(hir, 3),
+        vec![
+            vec![0, 0, 0],
+            vec![0, 0, 1],
+            vec![0, 1, 0],
+            vec![0, 1, 1],
+            vec![1, 0, 0],
+            vec![1, 0, 1],
+            vec![1, 1, 0],
+            vec![1, 1, 1],
+        ],
+        "first bound i must vary slowest, last bound k fastest"
+    );
+}
+
+#[test]
+fn apud_product_over_budget_declines_whole_with_causa() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio too_wide(tensor<f32, [9, 8]> x) → f32 {
+    itera ex x apud [i, j] fixum cell { }
     redde 0.0
 }
 "#,
     );
-    expect_decline_causa(&errors, "defer_coordinates");
+    expect_decline_causa(&air_errors_from(&result), "budget");
+    let hir = result.hir.as_ref().expect("typed HIR despite AIR decline");
     assert!(
-        !errors.iter().any(|error| {
-            error
-                .args
-                .iter()
-                .any(|arg| arg.name == "causa" && arg.value == "not_concrete")
-        }),
-        "rank-2 defer must not collapse into not_concrete: {errors:?}"
+        has_itera(hir),
+        "the over-budget apud loop must remain whole"
     );
+}
+
+#[test]
+fn apud_generic_dims_decline_not_concrete() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio generic_grid<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x) → f32 {
+    itera ex x apud [i, j] fixum cell { }
+    redde 0.0
+}
+"#,
+    );
+    expect_decline_causa(&errors, "not_concrete");
+}
+
+#[test]
+fn apud_on_non_air_lane_loop_is_left_in_place() {
+    let result = analyze(
+        r#"
+functio host_grid(tensor<f32, [2, 3]> x) → vacuum {
+    itera ex x apud [i, j] fixum cell { }
+}
+"#,
+    );
+    assert!(
+        result.is_ok(),
+        "non-AIR apud loop must keep ordinary lowering: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(
+        has_itera(hir),
+        "non-AIR-lane apud itera must remain untouched"
+    );
+}
+
+struct CollectCoordLets(Vec<u64>);
+impl HirVisitor for CollectCoordLets {
+    fn visit_stmt(&mut self, stmt: &HirStatement) {
+        if let HirStatementKind::Local(local) = &stmt.kind {
+            if let Some(init) = &local.init {
+                if let HirExpressionKind::Literal(HirLiteral::Int(value)) = init.kind {
+                    self.0.push(value);
+                }
+            }
+        }
+        walk_stmt(self, stmt);
+    }
+}
+
+/// Per-lane coordinate tuples in emission order, chunked by rank: only the
+/// per-lane `numerus` constant lets bound by Route M qualify.
+fn coordinate_lane_tuples(hir: &HirModule, rank: usize) -> Vec<Vec<u64>> {
+    let mut found = CollectCoordLets(Vec::new());
+    walk_program(&mut found, hir);
+    assert!(
+        found.0.len() % rank == 0,
+        "coordinate constants must chunk evenly by rank"
+    );
+    found
+        .0
+        .chunks(rank)
+        .map(|chunk| chunk.to_vec())
+        .collect()
 }
 
 #[test]

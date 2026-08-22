@@ -10,6 +10,10 @@
 //!
 //! The pass owns:
 //! - the unroll budget (64, the `MAX_MONOMORPHIZATIONS` convention);
+//! - Route M: `itera ex … apud [i, j, …]` over statically shaped tensors —
+//!   one statement is one unroll unit, lanes are the product of dims in
+//!   first-bound=outer order, guard-free, each coordinate bound per lane as
+//!   a `numerus` constant;
 //! - the `len`-guard preservation proof (a proven-exact iteration count emits
 //!   no `If`);
 //! - mask-mode admit conditions (mask-as-operand, dead-lane NaN safety, body
@@ -672,6 +676,11 @@ struct ReadyUnroll {
     accumulators: FxHashMap<DefId, AccInfo>,
     tensor_source: Option<HirExpression>,
     tensor_binding_ty: Option<TypeId>,
+    /// Route M: `apud` coordinate defs bound per lane as `numerus` constants.
+    coordinate_defs: Vec<DefId>,
+    /// Route M: per-lane coordinate tuples, first bound varying slowest.
+    /// Empty lanes tuples for the coordinate-free routes.
+    lane_coordinates: Vec<Vec<i64>>,
 }
 
 #[derive(Clone, Copy)]
@@ -714,7 +723,8 @@ fn classify_itera_expr(
     fullness: &FxHashMap<DefId, usize>,
     emitted_lanes: &mut usize,
 ) -> Option<UnrollPlan> {
-    let HirExpressionKind::Itera(mode, _, index_def, _, source, body) = &expr.kind else {
+    let HirExpressionKind::Itera(mode, coordinates, index_def, _, source, body) = &expr.kind
+    else {
         return None;
     };
     match mode {
@@ -732,6 +742,7 @@ fn classify_itera_expr(
         HirIteraMode::Ex => Some(classify_ex_loop(
             expr.span,
             *index_def,
+            coordinates,
             source,
             body,
             block,
@@ -793,12 +804,15 @@ fn classify_ab_loop(
         accumulators,
         tensor_source: None,
         tensor_binding_ty: None,
+        coordinate_defs: Vec::new(),
+        lane_coordinates: Vec::new(),
     })
 }
 
 fn classify_ex_loop(
     span: Span,
     index_def: DefId,
+    coordinates: &[(DefId, Symbol)],
     source: &HirExpression,
     body: &HirBlock,
     block: &HirBlock,
@@ -853,6 +867,8 @@ fn classify_ex_loop(
             accumulators,
             tensor_source: Some(source.clone()),
             tensor_binding_ty: Some(*element),
+            coordinate_defs: Vec::new(),
+            lane_coordinates: Vec::new(),
         });
     }
     let Type::Tensor(element_ty, shape) = types.get(source_ty) else {
@@ -862,53 +878,183 @@ fn classify_ex_loop(
         };
     };
 
-    let lane_count = match types.get_index(*shape) {
-        IndexExpr::Literal(value) => match usize::try_from(*value) {
-            Ok(count) => count,
-            Err(_) => {
-                return UnrollPlan::Decline {
-                    span,
-                    causa: CAUSA_BUDGET,
-                };
-            }
-        },
-        IndexExpr::Tuple(dims) if dims.len() > 1 => {
+    // Route M (AC-7): `apud` coordinates over a statically shaped tensor
+    // unroll as the product of dims with per-lane coordinate constants.
+    // Coordinate-free iteration still admits only rank-1 (Route T).
+    if coordinates.is_empty() && !matches!(types.get_index(*shape), IndexExpr::Literal(_)) {
+        let IndexExpr::Tuple(dims) = types.get_index(*shape) else {
+            return UnrollPlan::Decline {
+                span,
+                causa: CAUSA_NOT_CONCRETE,
+            };
+        };
+        if dims.len() > 1 {
             return UnrollPlan::Decline {
                 span,
                 causa: CAUSA_DEFER_COORDINATES,
             };
         }
-        IndexExpr::Tuple(dims) if dims.len() == 1 => {
-            if !matches!(types.get_index(dims[0]), IndexExpr::Literal(_)) {
+    }
+
+    let concrete_dims = |types: &TypeTable| -> Option<Vec<usize>> {
+        let dims: Vec<crate::IndexId> = match types.get_index(*shape) {
+            IndexExpr::Literal(_) => vec![*shape],
+            IndexExpr::Tuple(dims) => dims.clone(),
+            _ => return None,
+        };
+        dims.iter()
+            .map(|dim| match types.get_index(*dim) {
+                IndexExpr::Literal(value) => usize::try_from(*value).ok(),
+                _ => None,
+            })
+            .collect()
+    };
+
+    let dims = if coordinates.is_empty() {
+        // Route T: a rank-1 literal shape, exactly as before Route M.
+        let IndexExpr::Tuple(dims) = types.get_index(*shape) else {
+            let IndexExpr::Literal(value) = types.get_index(*shape) else {
                 return UnrollPlan::Decline {
                     span,
                     causa: CAUSA_NOT_CONCRETE,
                 };
-            }
-            match types.get_index(dims[0]) {
-                IndexExpr::Literal(value) => match usize::try_from(*value) {
-                    Ok(count) => count,
-                    Err(_) => {
-                        return UnrollPlan::Decline {
-                            span,
-                            causa: CAUSA_BUDGET,
-                        };
-                    }
+            };
+            return match usize::try_from(*value) {
+                Ok(count) => classify_ex_tensor_ready(
+                    span,
+                    index_def,
+                    source,
+                    body,
+                    block,
+                    lanes,
+                    interner,
+                    mask,
+                    emitted_lanes,
+                    count,
+                    Vec::new(),
+                    Vec::new(),
+                    *element_ty,
+                ),
+                Err(_) => UnrollPlan::Decline {
+                    span,
+                    causa: CAUSA_BUDGET,
                 },
-                _ => unreachable!("literal tensor dimension was checked above"),
-            }
-        }
-        IndexExpr::Tuple(_)
-        | IndexExpr::Param(_)
-        | IndexExpr::Infer(_)
-        | IndexExpr::Unspecified => {
+            };
+        };
+        if dims.len() != 1 || !matches!(types.get_index(dims[0]), IndexExpr::Literal(_)) {
             return UnrollPlan::Decline {
                 span,
                 causa: CAUSA_NOT_CONCRETE,
             };
         }
+        match concrete_dims(types) {
+            Some(dims) => dims,
+            None => {
+                return UnrollPlan::Decline {
+                    span,
+                    causa: CAUSA_BUDGET,
+                };
+            }
+        }
+    } else {
+        // Route M: arity == rank is typechecked (AC-5); fail closed anyway.
+        if coordinates.len() != rank_of(types.get_index(*shape)) {
+            return UnrollPlan::Decline {
+                span,
+                causa: CAUSA_NOT_CONCRETE,
+            };
+        }
+        match concrete_dims(types) {
+            Some(dims) => dims,
+            None => {
+                return UnrollPlan::Decline {
+                    span,
+                    causa: CAUSA_NOT_CONCRETE,
+                };
+            }
+        }
     };
 
+    let Some(lane_count) = dims.iter().try_fold(1usize, |acc, dim| acc.checked_mul(*dim))
+    else {
+        return UnrollPlan::Decline {
+            span,
+            causa: CAUSA_BUDGET,
+        };
+    };
+
+    if coordinates.is_empty() {
+        return classify_ex_tensor_ready(
+            span,
+            index_def,
+            source,
+            body,
+            block,
+            lanes,
+            interner,
+            mask,
+            emitted_lanes,
+            lane_count,
+            Vec::new(),
+            Vec::new(),
+            *element_ty,
+        );
+    }
+
+    // First-bound = outer axis: the first coordinate varies slowest across
+    // lanes (row-major lane order).
+    let coordinate_defs = coordinates.iter().map(|(def, _)| *def).collect();
+    let mut lane_coordinates = Vec::with_capacity(lane_count);
+    for lane in 0..lane_count {
+        let mut rest = lane;
+        let mut tuple = vec![0i64; dims.len()];
+        for (slot, dim) in dims.iter().enumerate().rev() {
+            tuple[slot] = (rest % dim) as i64;
+            rest /= dim;
+        }
+        lane_coordinates.push(tuple);
+    }
+    classify_ex_tensor_ready(
+        span,
+        index_def,
+        source,
+        body,
+        block,
+        lanes,
+        interner,
+        mask,
+        emitted_lanes,
+        lane_count,
+        coordinate_defs,
+        lane_coordinates,
+        *element_ty,
+    )
+}
+
+fn rank_of(shape: &IndexExpr) -> usize {
+    match shape {
+        IndexExpr::Literal(_) => 1,
+        IndexExpr::Tuple(dims) => dims.len(),
+        _ => 0,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn classify_ex_tensor_ready(
+    span: Span,
+    index_def: DefId,
+    source: &HirExpression,
+    body: &HirBlock,
+    block: &HirBlock,
+    lanes: &RadixLaneMetadata,
+    interner: &Interner,
+    mask: &MaskAnalysis,
+    emitted_lanes: &mut usize,
+    lane_count: usize,
+    coordinate_defs: Vec<DefId>,
+    lane_coordinates: Vec<Vec<i64>>,
+    element_ty: TypeId,
+) -> UnrollPlan {
     if lane_count > UNROLL_BUDGET.saturating_sub(*emitted_lanes) {
         return UnrollPlan::Decline {
             span,
@@ -932,7 +1078,9 @@ fn classify_ex_loop(
         body: body.clone(),
         accumulators,
         tensor_source: Some(source.clone()),
-        tensor_binding_ty: Some(*element_ty),
+        tensor_binding_ty: Some(element_ty),
+        coordinate_defs,
+        lane_coordinates,
     })
 }
 
@@ -1234,12 +1382,40 @@ fn emit_unrolled_lanes(
         .map(|def| (def, def))
         .collect();
     let mut out = Vec::new();
-    for value in &ready.lanes {
+    for (lane_index, value) in ready.lanes.iter().enumerate() {
+        let mut coordinate_bindings = FxHashMap::default();
+        if !ready.coordinate_defs.is_empty() {
+            let tuple = &ready.lane_coordinates[lane_index];
+            for (def, coord) in ready.coordinate_defs.iter().zip(tuple) {
+                let binding_def = ids.next_def();
+                let binding = HirLocal {
+                    def_id: binding_def,
+                    name: interner.intern(&format!("__unroll_{}", binding_def.0)),
+                    ty: None,
+                    init: Some(HirExpression {
+                        id: ids.next_hir(),
+                        kind: int_literal(*coord, ids),
+                        ty: None,
+                        span: ready.body.span,
+                    }),
+                    mutable: false,
+                    is_await: false,
+                    runtime_provided: false,
+                };
+                out.push(HirStatement {
+                    id: ids.next_hir(),
+                    kind: HirStatementKind::Local(binding),
+                    span: ready.body.span,
+                });
+                coordinate_bindings.insert(*def, binding_def);
+            }
+        }
         let mut remap = Remap {
             index_def: ready.index_def,
             index_value: *value,
             index_ty: None,
             binding_value: None,
+            coordinate_bindings,
             acc_current: acc_current.clone(),
             local_map: FxHashMap::default(),
         };
@@ -1247,9 +1423,26 @@ fn emit_unrolled_lanes(
             let mut source = source.clone();
             remap_fresh_expr(&mut source, &remap, ids);
             let binding_def = ids.next_def();
+            let index_kind = if ready.coordinate_defs.is_empty() {
+                int_literal(*value, ids)
+            } else {
+                HirExpressionKind::Array(
+                    ready.lane_coordinates[lane_index]
+                        .iter()
+                        .map(|coord| {
+                            HirArrayElement::Expr(HirExpression {
+                                id: ids.next_hir(),
+                                kind: int_literal(*coord, ids),
+                                ty: None,
+                                span: source.span,
+                            })
+                        })
+                        .collect(),
+                )
+            };
             let index = HirExpression {
                 id: ids.next_hir(),
-                kind: int_literal(*value, ids),
+                kind: index_kind,
                 ty: None,
                 span: source.span,
             };
@@ -1385,6 +1578,7 @@ struct Remap {
     index_value: i64,
     index_ty: Option<crate::TypeId>,
     binding_value: Option<DefId>,
+    coordinate_bindings: FxHashMap<DefId, DefId>,
     acc_current: FxHashMap<DefId, DefId>,
     local_map: FxHashMap<DefId, DefId>,
 }
@@ -1423,6 +1617,10 @@ impl HirVisitorMut for FreshRemap<'_> {
     fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
         expr.id = self.ids.next_hir();
         if let HirExpressionKind::Path(def) = expr.kind {
+            if let Some(binding) = self.remap.coordinate_bindings.get(&def) {
+                expr.kind = HirExpressionKind::Path(*binding);
+                return;
+            }
             if def == self.remap.index_def {
                 if let Some(binding) = self.remap.binding_value {
                     expr.kind = HirExpressionKind::Path(binding);
