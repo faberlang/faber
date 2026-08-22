@@ -256,7 +256,12 @@ pub(crate) fn with_interpreted_lowered_package_mir<R>(
     input: &Path,
     run: impl for<'a> FnOnce(&radix::module::mir::LoweredMirUnit<'a>) -> R,
 ) -> Result<R, Vec<Diagnostic>> {
-    radix::program::mir::with_interpreted_lowered_package_mir(config, input, &faber_mir_seams(), run)
+    radix::program::mir::with_interpreted_lowered_package_mir(
+        config,
+        input,
+        &faber_mir_seams(),
+        run,
+    )
 }
 
 /// Link an already-analyzed package test scope once, then lend its validated

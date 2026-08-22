@@ -5,8 +5,8 @@
 //! emit behaviour. Target availability follows compile-time feature gates.
 
 use radix::module::codegen::Target;
-use radix::services::DiagnosticMode;
 use radix::module::{CompileResult, Output};
+use radix::services::DiagnosticMode;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -481,12 +481,8 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
     }
 
     // Legacy single-file path (direct .fab files, other targets, or --out-dir override cases)
-    let output_path = radix::services::build_output_path(
-        &command.out_dir,
-        &input_path,
-        target,
-        is_package,
-    );
+    let output_path =
+        radix::services::build_output_path(&command.out_dir, &input_path, target, is_package);
 
     let code = crate::postprocess::postprocess_code(code, target, format, linter);
     write_output_file(&output_path, code.as_bytes());
@@ -587,10 +583,7 @@ fn single_file_rust_runtime_plan(
 /// Resolve the build target: an explicit CLI target wins, otherwise the
 /// package manifest's `build.target`. Unlike [`resolve_check_target`], a
 /// manifest read failure is fatal here rather than silently falling back.
-fn resolve_build_target(
-    command: &radix::services::BuildCommand,
-    input_path: &Path,
-) -> Target {
+fn resolve_build_target(command: &radix::services::BuildCommand, input_path: &Path) -> Target {
     if command.target_explicit {
         return command.target;
     }
@@ -732,8 +725,11 @@ pub fn cmd_check_package(command: radix::services::CheckCommand) {
             fail_with_diagnostic(&diag)
         }
     };
-    let mut diagnostics =
-        radix::program::analyze::check_package(&config, &input_path, &super::faber_analysis_seams());
+    let mut diagnostics = radix::program::analyze::check_package(
+        &config,
+        &input_path,
+        &super::faber_analysis_seams(),
+    );
     radix::module::apply_warn_policy(&mut diagnostics, &config.warn_policy);
 
     let mut fatal_errors = 0usize;
