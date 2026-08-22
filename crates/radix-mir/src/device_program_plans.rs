@@ -12,10 +12,10 @@
 //! [`crate::kernel_decomposition::decompose_kernel_function`].
 
 use crate::abi::{
-    collection_op_contract, storage_buffer_limit_error, CollectionOpContract, MirAbiError,
-    MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole,
-    MirKernelSignature, PackedStorageLayout, StorageBufferLimitRecord,
-    DEFAULT_STORAGE_BUFFER_LIMIT,
+    CollectionOpContract, DEFAULT_STORAGE_BUFFER_LIMIT, MirAbiError, MirKernelResource,
+    MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
+    PackedStorageLayout, StorageBufferLimitRecord, collection_op_contract,
+    storage_buffer_limit_error,
 };
 use crate::device_program::{
     Binding, BufferRole, DeviceProgram, DeviceProgramError, DeviceResource, KernelLaunchPlan,
@@ -768,7 +768,7 @@ pub struct VerificationPlanShape {
 impl VerificationPlanShape {
     /// Validate the static shape facts before they enter a plan identity.
     pub fn validate(&self) -> Result<(), VerificationAdmissionError> {
-        if self.model_shape.is_empty() || self.model_shape.iter().any(|dimension| *dimension == 0) {
+        if self.model_shape.is_empty() || self.model_shape.contains(&0) {
             return Err(VerificationAdmissionError::InvalidPlanShape {
                 detail: "model shape must have a positive rank and dimensions".to_owned(),
             });
@@ -890,19 +890,32 @@ pub enum VerificationAdmissionError {
 impl fmt::Display for VerificationAdmissionError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidPlanShape { detail } => write!(formatter, "invalid verification plan shape: {detail}"),
-            Self::FreshPrefillMasquerade => write!(formatter, "verification prefix_before must be nonzero"),
-            Self::InvalidQueryRows => write!(formatter, "verification query_rows k must be nonzero"),
+            Self::InvalidPlanShape { detail } => {
+                write!(formatter, "invalid verification plan shape: {detail}")
+            }
+            Self::FreshPrefillMasquerade => {
+                write!(formatter, "verification prefix_before must be nonzero")
+            }
+            Self::InvalidQueryRows => {
+                write!(formatter, "verification query_rows k must be nonzero")
+            }
             Self::CandidateCountMismatch { declared, actual } => write!(
                 formatter,
                 "verification candidate count {actual} does not match explicit k={declared}"
             ),
-            Self::InvalidCandidateId { index, candidate_id } => write!(
+            Self::InvalidCandidateId {
+                index,
+                candidate_id,
+            } => write!(
                 formatter,
                 "verification candidate id {candidate_id} at index {index} is outside the admitted vocabulary"
             ),
-            Self::MissingGeneration => write!(formatter, "verification committed generation is missing"),
-            Self::MissingTransactionIdentity => write!(formatter, "verification transaction identity is missing"),
+            Self::MissingGeneration => {
+                write!(formatter, "verification committed generation is missing")
+            }
+            Self::MissingTransactionIdentity => {
+                write!(formatter, "verification transaction identity is missing")
+            }
             Self::StaleGeneration { expected, actual } => write!(
                 formatter,
                 "verification result generation {actual} is stale; expected {expected}"
