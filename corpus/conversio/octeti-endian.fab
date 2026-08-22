@@ -4,9 +4,9 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "labeled_type_argument", "range_expr", "range_tail", "conversio_expr", "expression", "literal"]
 category = "conversion"
 canonical = false
-summary = "Endian integer unpack from an octeti window."
-syntax = "<octeti>[lo‥hi] ↦ int<W, Be|Le>"
-related = ["↦", "octeti", "int"]
+summary = "Endian integer and float unpack from an octeti window."
+syntax = "<octeti>[lo‥hi] ↦ int|float<W, Be|Le>"
+related = ["↦", "octeti", "int", "float"]
 locale = "en"
 +++
 
@@ -16,11 +16,12 @@ locale = "en"
 #
 # What this teaches:
 #   • Locked read form — `corpus[0‥4] ↦ int<u32, Be>` and `… ↦ int<u32, Le>`.
+#   • Float read form — `corpus[0‥4] ↦ float<f32, Be|Le>` and `corpus[0‥8] ↦ float<f64, Be|Le>`.
 #   • Hex-slot hints — `Be` / `Le` sit in the same second-argument slot as `Hex` / `Bin` / `Oct`.
-#   • Exact width — the window length must match the integer width (2 / 4 / 8).
+#   • Exact width — the window length must match the integer or float width (2 / 4 / 8).
 #
 # Common mistakes:
-#   • Omitting Be/Le — `bytes ↦ int<u32>` stays rejected (endian unspecified).
+#   • Omitting Be/Le — `bytes ↦ int<u32>` or `bytes ↦ float<f32>` stays rejected (endian unspecified).
 #   • Using a short window — a 3-byte source does not pad.
 #
 # See also: ↦, octeti, int
@@ -35,6 +36,10 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   3735928559
 #   4022250974
+#   1
+#   1
+#   1
+#   1
 #
 # BACKEND:
 #   HIR-direct Rust emits from_be_bytes / from_le_bytes. MIR-stepper agrees.
@@ -42,7 +47,15 @@ locale = "en"
 main {
     const _ be ← |de ad be ef|[0‥4] ↦ int<u32, Be>
     const _ le ← |de ad be ef|[0‥4] ↦ int<u32, Le>
+    const _ f32_be ← |3f 80 00 00|[0‥4] ↦ float<f32, Be>
+    const _ f32_le ← |00 00 80 3f|[0‥4] ↦ float<f32, Le>
+    const _ f64_be ← |3f f0 00 00 00 00 00 00|[0‥8] ↦ float<f64, Be>
+    const _ f64_le ← |00 00 00 00 00 00 f0 3f|[0‥8] ↦ float<f64, Le>
 
     print be
     print le
+    print f32_be
+    print f32_le
+    print f64_be
+    print f64_le
 }

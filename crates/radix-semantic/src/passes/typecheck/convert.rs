@@ -173,6 +173,8 @@ fn endian_read_width_bytes(ty: &Type) -> Option<usize> {
         Type::SizedNumeric(Primitive::Numerus, NumericWidth::I16 | NumericWidth::U16) => Some(2),
         Type::SizedNumeric(Primitive::Numerus, NumericWidth::I32 | NumericWidth::U32) => Some(4),
         Type::SizedNumeric(Primitive::Numerus, NumericWidth::I64 | NumericWidth::U64) => Some(8),
+        Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32) => Some(4),
+        Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => Some(8),
         _ => None,
     }
 }
@@ -807,7 +809,7 @@ impl TypeChecker<'_> {
                 self.octeti_to_numerus_issue(source, target_resolved, params)
             }
             (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Fractus) => {
-                Some(ISSUE_OCTETI_TO_FRACTUS_UNSPECIFIED)
+                self.octeti_to_fractus_issue(source, target_resolved, params)
             }
             (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Bivalens) => {
                 Some(ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED)
@@ -836,6 +838,27 @@ impl TypeChecker<'_> {
         }
         let Some(need) = endian_read_width_bytes(self.types.get(target_resolved)) else {
             return Some(ISSUE_OCTETI_TO_NUMERUS_UNSPECIFIED);
+        };
+        match self.static_octeti_window_len(source) {
+            Some(got) if got != need => Some(ISSUE_OCTETI_ENDIAN_WIDTH_MISMATCH),
+            _ => None,
+        }
+    }
+
+    /// `octeti ↦ fractus<W, Be|Le>` is allowed only for the exact IEEE width
+    /// and a static window that matches it. Without Be/Le, or on f16/unsized
+    /// fractus, the family reject stays.
+    fn octeti_to_fractus_issue(
+        &self,
+        source: &HirExpression,
+        target_resolved: TypeId,
+        params: &[Symbol],
+    ) -> Option<&'static str> {
+        if !self.conversio_has_endian_hint(params) {
+            return Some(ISSUE_OCTETI_TO_FRACTUS_UNSPECIFIED);
+        }
+        let Some(need) = endian_read_width_bytes(self.types.get(target_resolved)) else {
+            return Some(ISSUE_OCTETI_TO_FRACTUS_UNSPECIFIED);
         };
         match self.static_octeti_window_len(source) {
             Some(got) if got != need => Some(ISSUE_OCTETI_ENDIAN_WIDTH_MISMATCH),
@@ -895,11 +918,9 @@ impl TypeChecker<'_> {
                                 u128::try_from(value).expect("non-negative i128 fits u128"),
                                 radix,
                             );
-                            let witness = self
-                                .types
-                                .intern_index(IndexExpr::Literal(
-                                    u64::try_from(digits).expect("digit count fits u64"),
-                                ));
+                            let witness = self.types.intern_index(IndexExpr::Literal(
+                                u64::try_from(digits).expect("digit count fits u64"),
+                            ));
                             self.constrain_index_equal(capacity, witness, span);
                         } else if !has_recovery {
                             self.invalid_conversion(ISSUE_ASCII_PACK_NEGATIVE_SOURCE, span);
@@ -910,11 +931,9 @@ impl TypeChecker<'_> {
                 }
 
                 if !has_recovery {
-                    if let Some(issue) = self.ascii_format_pack_const_issue(
-                        source,
-                        resolved_capacity,
-                        params,
-                    ) {
+                    if let Some(issue) =
+                        self.ascii_format_pack_const_issue(source, resolved_capacity, params)
+                    {
                         self.invalid_conversion(issue, span);
                         return Some(self.error_type);
                     }

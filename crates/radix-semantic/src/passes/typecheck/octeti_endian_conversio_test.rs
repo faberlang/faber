@@ -69,9 +69,61 @@ fn four_byte_window_mismatches_u16() {
 }
 
 #[test]
-fn fractus_endian_still_rejected() {
+fn octeti_window_to_f32_be_accepts() {
+    test_support::assert_accepts(
+        "functio win(octeti corpus) → fractus<f32> { redde corpus[0‥4] ↦ fractus<f32, Be> }",
+    );
+}
+
+#[test]
+fn octeti_window_to_f32_le_accepts() {
+    test_support::assert_accepts(
+        "functio win(octeti corpus) → fractus<f32> { redde corpus[0‥4] ↦ fractus<f32, Le> }",
+    );
+}
+
+#[test]
+fn octeti_window_to_f64_be_accepts() {
+    test_support::assert_accepts(
+        "functio win(octeti corpus) → fractus<f64> { redde corpus[0‥8] ↦ fractus<f64, Be> }",
+    );
+}
+
+#[test]
+fn octeti_window_to_f64_le_accepts() {
+    test_support::assert_accepts(
+        "functio win(octeti corpus) → fractus<f64> { redde corpus[0‥8] ↦ fractus<f64, Le> }",
+    );
+}
+
+#[test]
+fn fractus_without_endian_still_unspecified() {
     test_support::assert_rejects_with_issue(
-        "incipit { fixum _ n ← |de ad be ef|[0‥4] ↦ fractus<f32, Le> }",
+        "incipit { fixum _ n ← |de ad be ef|[0‥4] ↦ fractus<f32> }",
+        "octeti_to_fractus_unspecified",
+    );
+}
+
+#[test]
+fn three_byte_window_mismatches_f32() {
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum _ n ← |de ad be|[0‥3] ↦ fractus<f32, Be> }",
+        "octeti_endian_width_mismatch",
+    );
+}
+
+#[test]
+fn four_byte_window_mismatches_f64() {
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum _ n ← |de ad be ef|[0‥4] ↦ fractus<f64, Le> }",
+        "octeti_endian_width_mismatch",
+    );
+}
+
+#[test]
+fn hex_hint_on_fractus_still_rejected() {
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum _ n ← |de ad be ef|[0‥4] ↦ fractus<f32, Hex> }",
         "octeti_to_fractus_unspecified",
     );
 }

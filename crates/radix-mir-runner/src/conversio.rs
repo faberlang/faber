@@ -93,7 +93,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             Type::ModularWord(width) => self.convert_to_modular_word(value, *width, span),
             Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
-                self.convert_to_fractus(value, recovery, span)
+                let width = match &target {
+                    Type::SizedNumeric(_, width) => *width,
+                    _ => NumericWidth::F64,
+                };
+                self.convert_to_fractus(value, params, width, recovery, span)
             }
             Type::Primitive(Primitive::Bivalens) => self.convert_to_bivalens(value, recovery, span),
             Type::Primitive(Primitive::Octeti) => self.convert_to_octeti(value, span),

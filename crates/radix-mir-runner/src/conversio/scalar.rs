@@ -345,9 +345,24 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     pub(crate) fn convert_to_fractus(
         &mut self,
         value: Value,
+        params: &[Symbol],
+        width: NumericWidth,
         recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
+        let value = match value {
+            Value::Octeti(bytes) => {
+                if self.endian_hint(params).is_some() {
+                    return self
+                        .convert_octeti_endian_fractus(bytes, params, width, recovery, span);
+                }
+                return Err(RunnerError::internal(
+                    span,
+                    "unsupported conversio to fractus from Octeti",
+                ));
+            }
+            other => other,
+        };
         match value {
             Value::Str(text) => match text.parse::<f64>() {
                 Ok(v) => Ok(Value::Float(v)),
@@ -363,6 +378,47 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 span,
                 format!("unsupported conversio to fractus from {other:?}"),
             )),
+        }
+    }
+
+    fn convert_octeti_endian_fractus(
+        &mut self,
+        bytes: Vec<u8>,
+        params: &[Symbol],
+        width: NumericWidth,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let Some(endian) = self.endian_hint(params) else {
+            return Err(RunnerError::internal(
+                span,
+                "unsupported conversio to fractus from Octeti",
+            ));
+        };
+        let need = match width {
+            NumericWidth::F32 => 4,
+            NumericWidth::F64 => 8,
+            _ => {
+                return self.recover_or_fail(recovery, span, "octeti endian width unsupported");
+            }
+        };
+        if bytes.len() != need {
+            return self.recover_or_fail(recovery, span, "octeti endian width mismatch");
+        }
+        match (width, endian) {
+            (NumericWidth::F32, EndianHint::Be) => Ok(Value::Float(f64::from(f32::from_be_bytes(
+                octeti_array(&bytes),
+            )))),
+            (NumericWidth::F32, EndianHint::Le) => Ok(Value::Float(f64::from(f32::from_le_bytes(
+                octeti_array(&bytes),
+            )))),
+            (NumericWidth::F64, EndianHint::Be) => {
+                Ok(Value::Float(f64::from_be_bytes(octeti_array(&bytes))))
+            }
+            (NumericWidth::F64, EndianHint::Le) => {
+                Ok(Value::Float(f64::from_le_bytes(octeti_array(&bytes))))
+            }
+            _ => self.recover_or_fail(recovery, span, "octeti endian width unsupported"),
         }
     }
 

@@ -42,6 +42,41 @@ fn eval_bytes(bytes: Vec<u8>, hint: &str, width: NumericWidth) -> Result<Value, 
     )
 }
 
+fn eval_float_bytes(bytes: Vec<u8>, hint: &str, width: NumericWidth) -> Result<Value, RunnerError> {
+    let mut type_table = TypeTable::new();
+    let _target_ty = type_table.sized_numeric(Primitive::Fractus, width);
+    let mut interner = Interner::new();
+    let hint_sym = interner.intern(hint);
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![],
+        locals: vec![],
+        temps: vec![],
+        blocks: vec![],
+        return_ty: MirType::semantic(TypeId(0)),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    });
+    let mut host = crate::host::BufferHost::default();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner.convert_to_fractus(
+        Value::Octeti(bytes),
+        &[hint_sym],
+        width,
+        None,
+        Span::default(),
+    )
+}
+
 #[test]
 fn octeti_endian_be_u32_is_deadbeef() {
     let result = eval_bytes(vec![0xde, 0xad, 0xbe, 0xef], "Be", NumericWidth::U32).expect("be u32");
@@ -62,4 +97,38 @@ fn octeti_endian_short_window_fails() {
         err.issue, "runner_octeti_endian_width_mismatch",
         "expected width mismatch, got: {err:?}"
     );
+}
+
+#[test]
+fn octeti_endian_le_f32_preserves_bits() {
+    let result =
+        eval_float_bytes(vec![0x00, 0x00, 0x80, 0x3f], "Le", NumericWidth::F32).expect("le f32");
+    let Value::Float(value) = result else {
+        panic!("expected float result");
+    };
+    assert_eq!((value as f32).to_bits(), 0x3f80_0000);
+}
+
+#[test]
+fn octeti_endian_le_f32_preserves_noncanonical_bits() {
+    let result =
+        eval_float_bytes(vec![0xde, 0xad, 0xbe, 0xef], "Le", NumericWidth::F32).expect("le f32");
+    let Value::Float(value) = result else {
+        panic!("expected float result");
+    };
+    assert_eq!((value as f32).to_bits(), 0xefbe_adde);
+}
+
+#[test]
+fn octeti_endian_be_f64_decodes() {
+    let result = eval_float_bytes(
+        vec![0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+        "Be",
+        NumericWidth::F64,
+    )
+    .expect("be f64");
+    let Value::Float(value) = result else {
+        panic!("expected float result");
+    };
+    assert_eq!(value.to_bits(), 1.0f64.to_bits());
 }
