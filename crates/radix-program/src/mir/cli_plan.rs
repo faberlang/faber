@@ -924,6 +924,9 @@ pub(super) fn import_semantic_type(
 pub(super) struct NominalImportContext<'a> {
     /// Source nominal `DefId` → unified entry `TypeId`.
     pub nominal_map: &'a HashMap<DefId, TypeId>,
+    /// Source struct/enum/variant `DefId` → merged dest, so interned types
+    /// carry the same DefId as remapped aggregates and projections.
+    pub def_remap: &'a HashMap<DefId, DefId>,
 }
 
 /// Build the canonical nominal remap for one source unit (sibling or linked
@@ -948,6 +951,7 @@ pub(super) fn build_nominal_remap(
     source_identity: Option<&InterfaceLibraryIdentity>,
     source_exports: &BTreeSet<String>,
     entry: &AnalyzedModule,
+    shared_nominals: &HashMap<(InterfaceNominalKind, String), TypeId>,
 ) -> Result<HashMap<DefId, TypeId>, String> {
     let mut map = HashMap::new();
     let mut target_interner = entry.interner.clone();
@@ -975,10 +979,11 @@ pub(super) fn build_nominal_remap(
                 .then(|| source_identity.cloned())
                 .flatten()
         });
-        if let Some(entry_ty) =
-            entry
-                .resolver
-                .imported_nominal_type_by_identity(kind, home_identity.as_ref(), name)
+        if let Some(entry_ty) = entry
+            .resolver
+            .imported_nominal_type_by_identity(kind, home_identity.as_ref(), name)
+            .or_else(|| fallback_entry_nominal_type(entry, kind, name, name_text))
+            .or_else(|| shared_nominals.get(&(kind, name_text.to_owned())).copied())
         {
             map.insert(def_id, entry_ty);
         } else if home_identity
@@ -1018,6 +1023,7 @@ pub(super) fn build_variant_remap(
     source_identity: Option<&InterfaceLibraryIdentity>,
     source_exports: &BTreeSet<String>,
     entry: &AnalyzedModule,
+    shared_nominals: &HashMap<(InterfaceNominalKind, String), TypeId>,
 ) -> Result<HashMap<DefId, DefId>, String> {
     let mut map = HashMap::new();
     let mut target_interner = entry.interner.clone();
@@ -1039,11 +1045,27 @@ pub(super) fn build_variant_remap(
                     .then(|| source_identity.cloned())
                     .flatten()
             });
-        let Some(entry_enum_def) = entry.resolver.imported_nominal_def_id(
-            InterfaceNominalKind::Enum,
-            enum_home.as_ref(),
-            enum_name,
-        ) else {
+        let Some(entry_enum_def) = entry
+            .resolver
+            .imported_nominal_def_id(InterfaceNominalKind::Enum, enum_home.as_ref(), enum_name)
+            .or_else(|| {
+                fallback_entry_nominal_type(
+                    entry,
+                    InterfaceNominalKind::Enum,
+                    enum_name,
+                    enum_name_text,
+                )
+                .or_else(|| {
+                    shared_nominals
+                        .get(&(InterfaceNominalKind::Enum, enum_name_text.to_owned()))
+                        .copied()
+                })
+                .and_then(|ty| match entry.types.get(ty) {
+                    Type::Enum(def) => Some(*def),
+                    _ => None,
+                })
+            })
+        else {
             if enum_home
                 .as_ref()
                 .is_some_and(|identity| entry.resolver.canonical_identity_known(identity))
@@ -1072,6 +1094,105 @@ pub(super) fn build_variant_remap(
         }
     }
     Ok(map)
+}
+
+/// Nested sibling/library nominals (gradus `dtype.DType` on `tensor.Tensor`)
+/// often live on the consumer only as a field/error type, not as a directly
+/// imported module identity. Fall back to the unique name-keyed imported
+/// nominal, then to a unique same-kind type-table entry with that name.
+fn fallback_entry_nominal_type(
+    entry: &AnalyzedModule,
+    kind: InterfaceNominalKind,
+    name: Symbol,
+    name_text: &str,
+) -> Option<TypeId> {
+    if !entry
+        .resolver
+        .imported_nominal_type_is_ambiguous(kind, name)
+    {
+        if let Some(ty) = entry.resolver.imported_nominal_type(kind, name) {
+            return Some(ty);
+        }
+    }
+    let expected = match kind {
+        InterfaceNominalKind::Struct => SymbolKind::Struct,
+        InterfaceNominalKind::Enum => SymbolKind::Enum,
+        InterfaceNominalKind::Interface => SymbolKind::Interface,
+    };
+    let mut found = None;
+    for index in 0..entry.types.type_count() {
+        let ty = TypeId(index as u32);
+        let def_id = match (kind, entry.types.get(ty)) {
+            (InterfaceNominalKind::Struct, Type::Struct(def_id))
+            | (InterfaceNominalKind::Enum, Type::Enum(def_id))
+            | (InterfaceNominalKind::Interface, Type::Interface(def_id)) => *def_id,
+            _ => continue,
+        };
+        let Some(symbol) = entry.resolver.get_symbol(def_id) else {
+            continue;
+        };
+        if symbol.kind != expected {
+            continue;
+        }
+        if entry.interner.resolve(symbol.name) != name_text {
+            continue;
+        }
+        if found.is_some_and(|existing| existing != ty) {
+            return None;
+        }
+        found = Some(ty);
+    }
+    found
+}
+
+/// Remember interned sibling/library nominals by (kind, name) so a later unit
+/// that imports the same nested type (self-provider `dtype.DType` from
+/// `tensor.fab`) unifies onto the first intern instead of minting a second
+/// `Enum(DefId)`.
+pub(super) fn record_shared_nominals(
+    source_names: &HashMap<DefId, (InterfaceNominalKind, String)>,
+    source_types: &TypeTable,
+    type_rewrites: &[(TypeId, TypeId)],
+    shared: &mut HashMap<(InterfaceNominalKind, String), TypeId>,
+) {
+    for index in 0..source_types.type_count() {
+        let source_ty = TypeId(index as u32);
+        let def_id = match source_types.get(source_ty) {
+            Type::Struct(def_id) | Type::Enum(def_id) | Type::Interface(def_id) => *def_id,
+            _ => continue,
+        };
+        let Some((kind, name)) = source_names.get(&def_id) else {
+            continue;
+        };
+        let Some((_, entry_ty)) = type_rewrites.iter().find(|(from, _)| *from == source_ty) else {
+            continue;
+        };
+        shared.entry((*kind, name.clone())).or_insert(*entry_ty);
+    }
+}
+
+pub(super) fn source_nominal_names(
+    source_types: &TypeTable,
+    source_interner: &Interner,
+    source_resolver: &Resolver,
+) -> HashMap<DefId, (InterfaceNominalKind, String)> {
+    let mut names = HashMap::new();
+    for index in 0..source_types.type_count() {
+        let ty = TypeId(index as u32);
+        let (kind, def_id) = match source_types.get(ty) {
+            Type::Struct(def_id) => (InterfaceNominalKind::Struct, *def_id),
+            Type::Enum(def_id) => (InterfaceNominalKind::Enum, *def_id),
+            Type::Interface(def_id) => (InterfaceNominalKind::Interface, *def_id),
+            _ => continue,
+        };
+        let Some(symbol) = source_resolver.get_symbol(def_id) else {
+            continue;
+        };
+        names
+            .entry(def_id)
+            .or_insert_with(|| (kind, source_interner.resolve(symbol.name).to_owned()));
+    }
+    names
 }
 
 pub(super) fn import_semantic_type_with_nominal(
@@ -1239,7 +1360,21 @@ pub(super) fn import_semantic_type_with_nominal(
             target.intern(Type::Tuple(members))
         }
         other @ (Type::Struct(_) | Type::Enum(_) | Type::Interface(_)) => {
-            import_nominal_by_canonical_key(&other, nominal).unwrap_or_else(|| target.intern(other))
+            import_nominal_by_canonical_key(&other, nominal).unwrap_or_else(|| {
+                let def = match &other {
+                    Type::Struct(def) | Type::Enum(def) | Type::Interface(def) => *def,
+                    _ => unreachable!("matched Struct/Enum/Interface"),
+                };
+                let dest = nominal
+                    .and_then(|ctx| ctx.def_remap.get(&def).copied())
+                    .unwrap_or(def);
+                match other {
+                    Type::Struct(_) => target.intern(Type::Struct(dest)),
+                    Type::Enum(_) => target.intern(Type::Enum(dest)),
+                    Type::Interface(_) => target.intern(Type::Interface(dest)),
+                    _ => unreachable!("matched Struct/Enum/Interface"),
+                }
+            })
         }
         other @ (Type::Param(_)
         | Type::Infer(_)

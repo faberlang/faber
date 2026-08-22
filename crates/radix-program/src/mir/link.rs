@@ -2438,7 +2438,13 @@ impl LibraryMethodCallRewriter<'_> {
     }
 
     fn receiver_struct_def_from_ty(&self, ty: radix_types::TypeId) -> Option<DefId> {
-        match self.types.get(ty) {
+        // Typecheck peels access markers and nullability before method lookup.
+        // The package-MIR rewrite must too: `mut t.get()` / `t ∪ nihil` on a
+        // linked library nominal otherwise stays MethodCall and fail-closes as
+        // "method call before runtime/provider MIR lowering".
+        let payload = self.types.peel_access_marker(ty).1;
+        let payload = self.types.nullable_inner(payload).unwrap_or(payload);
+        match self.types.get(payload) {
             Type::Struct(def_id) => Some(*def_id),
             // Namespace-qualified imported nominal types can retain an alias
             // or applied wrapper in converted HIR; peel those wrappers before
@@ -2515,12 +2521,18 @@ impl HirVisitorMut for LibraryMethodCallRewriter<'_> {
                 }
             }
             HirExpressionKind::Call(callee, type_args, args) => {
-                let HirExpressionKind::Field(receiver, method) = &callee.kind else {
-                    walk_expr_mut(self, expr);
-                    return;
+                let (receiver, method) = match &callee.kind {
+                    HirExpressionKind::Field(receiver, method) => (receiver, *method),
+                    HirExpressionKind::NonNull(receiver, HirNonNullKind::Member(method)) => {
+                        (receiver, *method)
+                    }
+                    _ => {
+                        walk_expr_mut(self, expr);
+                        return;
+                    }
                 };
                 if let Some((new_callee, type_args, args)) =
-                    self.synthetic_call_parts(receiver, *method, type_args, args)
+                    self.synthetic_call_parts(receiver, method, type_args, args)
                 {
                     *expr = HirExpression {
                         id: expr.id,

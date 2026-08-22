@@ -2,6 +2,453 @@
 
 use super::*;
 use radix_module::file_interface::FileInterface;
+use radix_module::mir::MirFunctionSignature;
+
+/// Struct/enum/function validation metadata remapped from a sibling or
+/// library unit into the entry's DefId / TypeId / Symbol space.
+///
+/// Self-provider method bodies (gradus `t.get()`, `Tensor { dtype = … }`)
+/// lower against the source unit's metadata. Nested sibling nominals such as
+/// `dtype.DType` are often absent from the entry's imported identity table, so
+/// the merged program would otherwise fail closed on missing field/parent
+/// metadata. Union this onto the entry context before re-validation.
+#[derive(Clone, Default)]
+pub(super) struct RemappedValidation {
+    struct_fields: HashMap<DefId, HashMap<Symbol, MirType>>,
+    optional_struct_fields: HashMap<DefId, HashSet<Symbol>>,
+    nullable_struct_fields: HashMap<DefId, HashSet<Symbol>>,
+    variant_parents: HashMap<DefId, DefId>,
+    enum_variants: HashMap<DefId, Vec<DefId>>,
+    variant_fields: HashMap<DefId, HashMap<Symbol, MirType>>,
+    functions: HashMap<DefId, MirFunctionSignature>,
+}
+
+impl RemappedValidation {
+    fn merge(&mut self, other: &Self) {
+        union_field_maps(&mut self.struct_fields, &other.struct_fields);
+        union_symbol_sets(
+            &mut self.optional_struct_fields,
+            &other.optional_struct_fields,
+        );
+        union_symbol_sets(
+            &mut self.nullable_struct_fields,
+            &other.nullable_struct_fields,
+        );
+        for (variant, parent) in &other.variant_parents {
+            self.variant_parents.entry(*variant).or_insert(*parent);
+        }
+        for (enum_def, variants) in &other.enum_variants {
+            self.enum_variants
+                .entry(*enum_def)
+                .or_insert_with(|| variants.clone());
+        }
+        union_field_maps(&mut self.variant_fields, &other.variant_fields);
+        for (def, sig) in &other.functions {
+            self.functions.entry(*def).or_insert_with(|| sig.clone());
+        }
+    }
+
+    fn apply(&self, context: &mut radix_module::mir::MirValidationContext<'_>) {
+        for (def, fields) in &self.struct_fields {
+            context
+                .struct_fields
+                .insert(*def, fields.iter().map(|(name, ty)| (*name, *ty)).collect());
+        }
+        for (def, fields) in &self.optional_struct_fields {
+            context
+                .optional_struct_fields
+                .entry(*def)
+                .or_default()
+                .extend(fields.iter().copied());
+        }
+        for (def, fields) in &self.nullable_struct_fields {
+            context
+                .nullable_struct_fields
+                .entry(*def)
+                .or_default()
+                .extend(fields.iter().copied());
+        }
+        for (variant, parent) in &self.variant_parents {
+            context.variant_parents.insert(*variant, *parent);
+        }
+        for (enum_def, variants) in &self.enum_variants {
+            context
+                .enum_variants
+                .entry(*enum_def)
+                .or_insert_with(|| variants.clone());
+        }
+        for (def, fields) in &self.variant_fields {
+            let slot = context.variant_fields.entry(*def).or_default();
+            for (name, ty) in fields {
+                slot.entry(*name).or_insert(*ty);
+            }
+        }
+        for (def, sig) in &self.functions {
+            context.functions.entry(*def).or_insert_with(|| sig.clone());
+        }
+    }
+}
+
+fn union_field_maps(
+    dest: &mut HashMap<DefId, HashMap<Symbol, MirType>>,
+    src: &HashMap<DefId, HashMap<Symbol, MirType>>,
+) {
+    for (def, fields) in src {
+        let slot = dest.entry(*def).or_default();
+        for (name, ty) in fields {
+            slot.entry(*name).or_insert(*ty);
+        }
+    }
+}
+
+fn union_symbol_sets(
+    dest: &mut HashMap<DefId, HashSet<Symbol>>,
+    src: &HashMap<DefId, HashSet<Symbol>>,
+) {
+    for (def, fields) in src {
+        dest.entry(*def).or_default().extend(fields.iter().copied());
+    }
+}
+
+fn complete_def_remap(
+    remap: &mut HashMap<DefId, DefId>,
+    source_defs: impl IntoIterator<Item = DefId>,
+    next_synthetic: &mut u32,
+) {
+    for def in source_defs {
+        remap.entry(def).or_insert_with(|| {
+            let id = DefId(*next_synthetic);
+            *next_synthetic += 1;
+            id
+        });
+    }
+}
+
+fn source_struct_defs(source: &radix_module::mir::MirValidationContext<'_>) -> Vec<DefId> {
+    let mut defs: Vec<DefId> = source.struct_fields.keys().copied().collect();
+    defs.extend(program_struct_defs_from_types(source.types));
+    defs.sort_by_key(|def| def.0);
+    defs.dedup();
+    defs
+}
+
+fn program_struct_defs_from_types(types: &TypeTable) -> Vec<DefId> {
+    (0..types.type_count())
+        .filter_map(|index| match types.get(TypeId(index as u32)) {
+            Type::Struct(def_id) => Some(*def_id),
+            _ => None,
+        })
+        .collect()
+}
+
+fn program_aggregate_defs(program: &MirProgram) -> (Vec<DefId>, Vec<DefId>) {
+    let mut structs = Vec::new();
+    let mut variants = Vec::new();
+    for function in &program.functions {
+        collect_function_aggregate_defs(function, &mut structs, &mut variants);
+    }
+    (structs, variants)
+}
+
+fn lowered_aggregate_defs(lowered: &LoweredMirUnit<'_>) -> (Vec<DefId>, Vec<DefId>) {
+    let (mut structs, mut variants) = program_aggregate_defs(&lowered.program);
+    for function in &lowered.generic_templates {
+        collect_function_aggregate_defs(function, &mut structs, &mut variants);
+    }
+    (structs, variants)
+}
+
+fn collect_function_aggregate_defs(
+    function: &MirFunction,
+    structs: &mut Vec<DefId>,
+    variants: &mut Vec<DefId>,
+) {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            collect_statement_aggregate_defs(statement, structs, variants);
+        }
+        collect_terminator_aggregate_defs(&block.terminator, variants);
+    }
+}
+
+fn collect_statement_aggregate_defs(
+    statement: &MirStatement,
+    structs: &mut Vec<DefId>,
+    variants: &mut Vec<DefId>,
+) {
+    match &statement.kind {
+        MirStatementKind::Construct {
+            destination,
+            aggregate,
+        } => {
+            collect_place_variant_defs(destination, variants);
+            match aggregate.kind {
+                MirAggregateKind::Struct(def_id) => structs.push(def_id),
+                MirAggregateKind::EnumVariant(def_id) => variants.push(def_id),
+                _ => {}
+            }
+            collect_aggregate_operand_variant_defs(aggregate, variants);
+        }
+        MirStatementKind::Assign { place, value } => {
+            collect_place_variant_defs(place, variants);
+            collect_value_variant_defs(value, variants);
+        }
+        MirStatementKind::Call {
+            destination, args, ..
+        } => {
+            if let Some(destination) = destination {
+                collect_place_variant_defs(destination, variants);
+            }
+            for arg in args {
+                collect_operand_variant_defs(arg, variants);
+            }
+        }
+        MirStatementKind::RuntimeCall { destination, call } => {
+            if let Some(destination) = destination {
+                collect_place_variant_defs(destination, variants);
+            }
+            for arg in &call.args {
+                collect_operand_variant_defs(arg, variants);
+            }
+        }
+    }
+}
+
+fn collect_terminator_aggregate_defs(terminator: &MirTerminator, variants: &mut Vec<DefId>) {
+    match &terminator.kind {
+        MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
+            collect_operand_variant_defs(operand, variants);
+        }
+        MirTerminatorKind::TryCall {
+            destination,
+            args,
+            error_place,
+            ..
+        } => {
+            if let Some(destination) = destination {
+                collect_place_variant_defs(destination, variants);
+            }
+            for arg in args {
+                collect_operand_variant_defs(arg, variants);
+            }
+            collect_place_variant_defs(error_place, variants);
+        }
+        MirTerminatorKind::Branch { condition, .. } => {
+            collect_operand_variant_defs(condition, variants);
+        }
+        MirTerminatorKind::Switch { value, .. } => collect_operand_variant_defs(value, variants),
+        MirTerminatorKind::Return(None)
+        | MirTerminatorKind::Goto(_)
+        | MirTerminatorKind::Unreachable => {}
+    }
+}
+
+fn collect_value_variant_defs(value: &MirValue, variants: &mut Vec<DefId>) {
+    match &value.kind {
+        MirValueKind::Operand(operand) => collect_operand_variant_defs(operand, variants),
+        MirValueKind::Closure(closure) => {
+            collect_operand_variant_defs(&closure.environment, variants);
+        }
+        MirValueKind::Unary { operand, .. } => collect_operand_variant_defs(operand, variants),
+        MirValueKind::Binary { lhs, rhs, .. } => {
+            collect_operand_variant_defs(lhs, variants);
+            collect_operand_variant_defs(rhs, variants);
+        }
+        MirValueKind::Option(op) => match op {
+            MirOptionOp::None => {}
+            MirOptionOp::Some(operand)
+            | MirOptionOp::IsNil(operand)
+            | MirOptionOp::IsNotNil(operand) => collect_operand_variant_defs(operand, variants),
+            MirOptionOp::Unwrap { value, .. } => collect_operand_variant_defs(value, variants),
+            MirOptionOp::Coalesce { value, fallback } => {
+                collect_operand_variant_defs(value, variants);
+                collect_operand_variant_defs(fallback, variants);
+            }
+            MirOptionOp::Chain { base, link } => {
+                collect_operand_variant_defs(base, variants);
+                match link {
+                    MirOptionChainLink::VariantField { variant, .. } => variants.push(*variant),
+                    MirOptionChainLink::Index(operand) => {
+                        collect_operand_variant_defs(operand, variants);
+                    }
+                    MirOptionChainLink::Call { args, .. } => {
+                        for arg in args {
+                            collect_operand_variant_defs(arg, variants);
+                        }
+                    }
+                    MirOptionChainLink::Field(_) => {}
+                }
+            }
+        },
+    }
+}
+
+fn collect_aggregate_operand_variant_defs(aggregate: &MirAggregate, variants: &mut Vec<DefId>) {
+    match &aggregate.fields {
+        MirAggregateFields::Ordered(items) => {
+            for item in items {
+                match item {
+                    MirAggregateItem::Operand(operand) | MirAggregateItem::Spread(operand) => {
+                        collect_operand_variant_defs(operand, variants);
+                    }
+                }
+            }
+        }
+        MirAggregateFields::Named(items) => {
+            for item in items {
+                collect_operand_variant_defs(&item.value, variants);
+            }
+        }
+        MirAggregateFields::Keyed(items) => {
+            for item in items {
+                collect_operand_variant_defs(&item.key, variants);
+                collect_operand_variant_defs(&item.value, variants);
+            }
+        }
+    }
+}
+
+fn collect_operand_variant_defs(operand: &MirOperand, variants: &mut Vec<DefId>) {
+    if let MirOperand::Place(place) = operand {
+        collect_place_variant_defs(place, variants);
+    }
+}
+
+fn collect_place_variant_defs(place: &MirPlace, variants: &mut Vec<DefId>) {
+    for projection in &place.projections {
+        match projection {
+            MirProjection::VariantField { variant, .. } => variants.push(*variant),
+            MirProjection::Index(operand) => collect_operand_variant_defs(operand, variants),
+            MirProjection::Field(_)
+            | MirProjection::ClosureCapture { .. }
+            | MirProjection::VectorLane(_)
+            | MirProjection::MatrixCell { .. } => {}
+        }
+    }
+}
+
+fn source_variant_defs(source: &radix_module::mir::MirValidationContext<'_>) -> Vec<DefId> {
+    let mut defs: Vec<DefId> = source.variant_parents.keys().copied().collect();
+    defs.extend(source.variant_fields.keys().copied());
+    defs.sort_by_key(|def| def.0);
+    defs.dedup();
+    defs
+}
+
+fn remap_metadata_def(
+    def: DefId,
+    struct_remap: &HashMap<DefId, DefId>,
+    variant_remap: &HashMap<DefId, DefId>,
+    nominal_map: &HashMap<DefId, TypeId>,
+    entry_types: &TypeTable,
+) -> DefId {
+    if let Some(mapped) = struct_remap.get(&def) {
+        return *mapped;
+    }
+    if let Some(mapped) = variant_remap.get(&def) {
+        return *mapped;
+    }
+    if let Some(ty) = nominal_map.get(&def) {
+        match entry_types.get(*ty) {
+            Type::Struct(mapped) | Type::Enum(mapped) | Type::Interface(mapped) => {
+                return *mapped;
+            }
+            _ => {}
+        }
+    }
+    def
+}
+
+fn remap_metadata_symbol(symbol: Symbol, source: &Interner, target: &mut Interner) -> Symbol {
+    target.intern(source.resolve(symbol))
+}
+
+fn remap_metadata_type(ty: MirType, type_rewrites: &[(TypeId, TypeId)]) -> MirType {
+    let mut remapped = ty;
+    rewrite_type_id(&mut remapped, type_rewrites);
+    remapped
+}
+
+fn collect_remapped_validation(
+    source: &radix_module::mir::MirValidationContext<'_>,
+    source_interner: &Interner,
+    entry_interner: &mut Interner,
+    type_rewrites: &[(TypeId, TypeId)],
+    struct_remap: &HashMap<DefId, DefId>,
+    variant_remap: &HashMap<DefId, DefId>,
+    nominal_map: &HashMap<DefId, TypeId>,
+    entry_types: &TypeTable,
+    source_rewrites: &SourceRewrites,
+    unit_path: &Path,
+) -> RemappedValidation {
+    let remap_def =
+        |def: DefId| remap_metadata_def(def, struct_remap, variant_remap, nominal_map, entry_types);
+    let remap_function_def = |def: DefId| {
+        source_rewrites
+            .get(&(unit_path.to_path_buf(), def))
+            .copied()
+            .unwrap_or_else(|| remap_def(def))
+    };
+    let mut out = RemappedValidation::default();
+    for (def, fields) in &source.struct_fields {
+        let dest = remap_def(*def);
+        let slot = out.struct_fields.entry(dest).or_default();
+        for (name, ty) in fields {
+            slot.insert(
+                remap_metadata_symbol(*name, source_interner, entry_interner),
+                remap_metadata_type(*ty, type_rewrites),
+            );
+        }
+    }
+    for (def, fields) in &source.optional_struct_fields {
+        let dest = remap_def(*def);
+        out.optional_struct_fields.entry(dest).or_default().extend(
+            fields
+                .iter()
+                .map(|name| remap_metadata_symbol(*name, source_interner, entry_interner)),
+        );
+    }
+    for (def, fields) in &source.nullable_struct_fields {
+        let dest = remap_def(*def);
+        out.nullable_struct_fields.entry(dest).or_default().extend(
+            fields
+                .iter()
+                .map(|name| remap_metadata_symbol(*name, source_interner, entry_interner)),
+        );
+    }
+    for (variant, parent) in &source.variant_parents {
+        out.variant_parents
+            .entry(remap_def(*variant))
+            .or_insert(remap_def(*parent));
+    }
+    for (enum_def, variants) in &source.enum_variants {
+        out.enum_variants
+            .entry(remap_def(*enum_def))
+            .or_insert_with(|| variants.iter().copied().map(remap_def).collect());
+    }
+    for (def, fields) in &source.variant_fields {
+        let dest = remap_def(*def);
+        let slot = out.variant_fields.entry(dest).or_default();
+        for (name, ty) in fields {
+            slot.insert(
+                remap_metadata_symbol(*name, source_interner, entry_interner),
+                remap_metadata_type(*ty, type_rewrites),
+            );
+        }
+    }
+    for (def, sig) in &source.functions {
+        let mut sig = sig.clone();
+        rewrite_type_id(&mut sig.return_ty, type_rewrites);
+        if let Some(error_ty) = &mut sig.error_ty {
+            rewrite_type_id(error_ty, type_rewrites);
+        }
+        for param in &mut sig.params {
+            rewrite_type_id(&mut param.ty, type_rewrites);
+        }
+        out.functions.entry(remap_function_def(*def)).or_insert(sig);
+    }
+    out
+}
 
 pub(super) fn lower_package_units<'a>(
     package: &'a mut AnalyzedProgram,
@@ -53,6 +500,8 @@ pub(super) fn lower_package_units<'a>(
     )?;
     let entry_path = entry.path.clone();
     let mut pending = Vec::new();
+    let mut extra_validation = RemappedValidation::default();
+    let mut shared_nominals: HashMap<(InterfaceNominalKind, String), TypeId> = HashMap::new();
     // Mutable copy of the link sources: the library-lowering pass extends it
     // with synthetic ids for auto-generated sub-companion sources.
     let mut source_rewrites = links.sources.clone();
@@ -71,6 +520,7 @@ pub(super) fn lower_package_units<'a>(
             unit.file_interface.identity.as_ref(),
             &source_exports,
             &entry.analysis,
+            &shared_nominals,
         ) {
             Ok(map) => map,
             Err(message) => {
@@ -88,6 +538,7 @@ pub(super) fn lower_package_units<'a>(
             unit.file_interface.identity.as_ref(),
             &source_exports,
             &entry.analysis,
+            &shared_nominals,
         ) {
             Ok(remap) => remap,
             Err(message) => {
@@ -98,6 +549,11 @@ pub(super) fn lower_package_units<'a>(
                 )]);
             }
         };
+        let source_names = source_nominal_names(
+            &unit.analysis.types,
+            &unit.analysis.interner,
+            &unit.analysis.resolver,
+        );
         let mut lowered = lower_unit(unit, &cli_plan.entry_records, no_fuse)?;
         remap_program_text_symbols(
             &mut lowered.program,
@@ -105,21 +561,46 @@ pub(super) fn lower_package_units<'a>(
             &mut entry.analysis.interner,
         );
         remap_templates_text_symbols(&mut lowered, &mut entry.analysis.interner);
+        // Sibling struct literals constructed in the source analysis carry
+        // the source struct `DefId` in `MirAggregateKind::Struct`; the merged
+        // program's struct metadata is keyed by the entry's canonical nominal
+        // def, so the aggregate kind rides the same remap.
+        let mut struct_remap = build_struct_def_remap(&nominal_map, &entry.analysis.types);
+        let (program_structs, program_variants) = lowered_aggregate_defs(&lowered);
+        complete_def_remap(
+            &mut struct_remap,
+            source_struct_defs(lowered.validated.validation())
+                .into_iter()
+                .chain(program_structs),
+            &mut next_synthetic,
+        );
+        let mut variant_remap = variant_remap;
+        complete_def_remap(
+            &mut variant_remap,
+            source_variant_defs(lowered.validated.validation())
+                .into_iter()
+                .chain(program_variants),
+            &mut next_synthetic,
+        );
+        let mut def_remap = struct_remap.clone();
+        def_remap.extend(variant_remap.iter().map(|(key, dest)| (*key, *dest)));
         let nominal = NominalImportContext {
             nominal_map: &nominal_map,
+            def_remap: &def_remap,
         };
         let source_to_entry_types = import_lowered_semantic_types(
             lowered.validated.validation().types,
             &mut entry.analysis.types,
             Some(&nominal),
         );
+        record_shared_nominals(
+            &source_names,
+            lowered.validated.validation().types,
+            &source_to_entry_types,
+            &mut shared_nominals,
+        );
         rewrite_lowered_type_ids(&mut lowered, &source_to_entry_types);
         rewrite_lowered_variant_defs(&mut lowered, &variant_remap);
-        // Sibling struct literals constructed in the source analysis carry
-        // the source struct `DefId` in `MirAggregateKind::Struct`; the merged
-        // program's struct metadata is keyed by the entry's canonical nominal
-        // def, so the aggregate kind rides the same remap.
-        let struct_remap = build_struct_def_remap(&nominal_map, &entry.analysis.types);
         rewrite_lowered_struct_defs(&mut lowered, &struct_remap);
         if let Some(rewrite) = cli_plan
             .dispatch
@@ -134,6 +615,19 @@ pub(super) fn lower_package_units<'a>(
         rewrite_program_sources(&mut lowered.program, &unit_path, &source_rewrites);
         rewrite_generic_identity(&mut lowered, &unit_path, &source_rewrites);
         ensure_unique_definition_sources(&lowered.program, &unit_path)?;
+        let validation = collect_remapped_validation(
+            lowered.validated.validation(),
+            &source_interner,
+            &mut entry.analysis.interner,
+            &source_to_entry_types,
+            &struct_remap,
+            &variant_remap,
+            &nominal_map,
+            &entry.analysis.types,
+            &source_rewrites,
+            &unit_path,
+        );
+        extra_validation.merge(&validation);
         let dispatch_function = selected_cli_dispatch_function(
             cli_plan,
             &unit_path,
@@ -191,6 +685,7 @@ pub(super) fn lower_package_units<'a>(
                     source_identity.as_ref(),
                     &source_exports,
                     &entry.analysis,
+                    &shared_nominals,
                 ) {
                     Ok(map) => map,
                     Err(message) => {
@@ -209,6 +704,7 @@ pub(super) fn lower_package_units<'a>(
                     source_identity.as_ref(),
                     &source_exports,
                     &entry.analysis,
+                    &shared_nominals,
                 ) {
                     Ok(remap) => remap,
                     Err(message) => {
@@ -220,6 +716,8 @@ pub(super) fn lower_package_units<'a>(
                         return Ok(());
                     }
                 };
+                let source_names =
+                    source_nominal_names(&analysis.types, &analysis.interner, &analysis.resolver);
                 let bundle = match super::air_backward::prepare(analysis) {
                     Ok(bundle) => bundle,
                     Err(message) => {
@@ -251,22 +749,42 @@ pub(super) fn lower_package_units<'a>(
                     &mut entry.analysis.interner,
                 );
                 remap_templates_text_symbols(&mut lowered, &mut entry.analysis.interner);
+                let mut struct_remap = build_struct_def_remap(&nominal_map, &entry.analysis.types);
+                let (program_structs, program_variants) = lowered_aggregate_defs(&lowered);
+                complete_def_remap(
+                    &mut struct_remap,
+                    source_struct_defs(lowered.validated.validation())
+                        .into_iter()
+                        .chain(program_structs),
+                    &mut next_synthetic,
+                );
+                let mut variant_remap = variant_remap;
+                complete_def_remap(
+                    &mut variant_remap,
+                    source_variant_defs(lowered.validated.validation())
+                        .into_iter()
+                        .chain(program_variants),
+                    &mut next_synthetic,
+                );
+                let mut def_remap = struct_remap.clone();
+                def_remap.extend(variant_remap.iter().map(|(key, dest)| (*key, *dest)));
                 let nominal = NominalImportContext {
                     nominal_map: &nominal_map,
+                    def_remap: &def_remap,
                 };
                 let source_to_entry_types = import_lowered_semantic_types(
                     lowered.validated.validation().types,
                     &mut entry.analysis.types,
                     Some(&nominal),
                 );
+                record_shared_nominals(
+                    &source_names,
+                    lowered.validated.validation().types,
+                    &source_to_entry_types,
+                    &mut shared_nominals,
+                );
                 rewrite_lowered_type_ids(&mut lowered, &source_to_entry_types);
                 rewrite_lowered_variant_defs(&mut lowered, &variant_remap);
-                // Library struct literals (`tensor.Tensor { … }` inside a
-                // gradus module) carry the library struct `DefId` in
-                // `MirAggregateKind::Struct`; the merged program's struct
-                // metadata is keyed by the entry's canonical nominal def, so
-                // the aggregate kind rides the same remap as the variant defs.
-                let struct_remap = build_struct_def_remap(&nominal_map, &entry.analysis.types);
                 rewrite_lowered_struct_defs(&mut lowered, &struct_remap);
                 rewrite_program_sources(&mut lowered.program, &library.path, &source_rewrites);
                 extend_unmapped_library_sources(
@@ -283,6 +801,18 @@ pub(super) fn lower_package_units<'a>(
                     diagnostics.extend(errors);
                     return Ok(());
                 }
+                extra_validation.merge(&collect_remapped_validation(
+                    lowered.validated.validation(),
+                    &lowered.interner,
+                    &mut entry.analysis.interner,
+                    &source_to_entry_types,
+                    &struct_remap,
+                    &variant_remap,
+                    &nominal_map,
+                    &entry.analysis.types,
+                    &source_rewrites,
+                    &library.path,
+                ));
                 library_parts.push(LibraryMirParts {
                     program: lowered.program,
                     environments: lowered.closure_environments,
@@ -344,7 +874,7 @@ pub(super) fn lower_package_units<'a>(
         ensure_unique_definition_sources(&merged.program, &entry_path)?;
     }
     instantiate_package_generics(&mut merged, generic_templates, generic_params, &entry_path)?;
-    rebuild_merged_validated(&mut merged, &entry_path)?;
+    rebuild_merged_validated(&mut merged, &entry_path, Some(&extra_validation))?;
 
     if cli_plan.dispatch.is_some() {
         let Some(function) = dispatch_function else {
@@ -479,9 +1009,12 @@ fn transplant_data_member(
         source_interface.identity.as_ref(),
         &source_exports,
         &entry.analysis,
+        &HashMap::new(),
     )?;
+    let empty_def_remap = HashMap::new();
     let nominal = NominalImportContext {
         nominal_map: &nominal_map,
+        def_remap: &empty_def_remap,
     };
     let konst = HirConst {
         name: remap_symbol(
@@ -1454,6 +1987,7 @@ fn function_id_overflow_diag(path: &Path, message: &str) -> Diagnostic {
 pub(super) fn rebuild_merged_validated(
     merged: &mut LoweredMirUnit<'_>,
     diagnostic_path: &Path,
+    extra: Option<&RemappedValidation>,
 ) -> Result<(), Vec<Diagnostic>> {
     let mut context = merged.validated.validation().clone();
     context.closure_environments.clear();
@@ -1461,6 +1995,9 @@ pub(super) fn rebuild_merged_validated(
         context
             .closure_environments
             .insert(environment.id, environment.clone());
+    }
+    if let Some(extra) = extra {
+        extra.apply(&mut context);
     }
     merged.validated = radix_module::mir::ValidatedMir::new(merged.program.clone(), context)
         .map_err(|errors| {
@@ -1556,7 +2093,7 @@ pub fn canonicalize_direct_definition_callees(
         }
     }
 
-    rebuild_merged_validated(lowered, diagnostic_path)
+    rebuild_merged_validated(lowered, diagnostic_path, None)
 }
 
 pub(super) fn shift_program_ids(
