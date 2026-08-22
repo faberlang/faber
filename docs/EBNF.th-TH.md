@@ -272,7 +272,7 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 dum_stmt ::= 'ขณะ' expression (block_stmt | ergo_joint statement) cape_clause?
 # formerly: iteraStmt
 # [091] itera_stmt
-itera_stmt ::= 'วน' (('ออก' | 'จาก') expression | 'ช่วง' expression) ('คงที่' | 'แปร') IDENTIFIER (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt ::= 'วน' (('ออก' | 'จาก') expression | 'ช่วง' expression) ('คงที่' | 'แปร') (array_pattern | object_pattern | IDENTIFIER) (block_stmt | ergo_joint statement) cape_clause?
 # formerly: eligeStmt
 # [092] elige_stmt
 elige_stmt ::= 'เลือก' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?

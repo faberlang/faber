@@ -952,7 +952,9 @@ else_arm    := (block_stmt | ergo_joint statement) cape_clause?
 @formerly whileStmt
 dum_stmt  := 'dum' expression (block_stmt | ergo_joint statement) cape_clause?
 @formerly iteraStmt
-itera_stmt  := 'itera' (('ex' | 'de') expression | 'ab' expression) ('fixum' | 'varia') IDENTIFIER (block_stmt | ergo_joint statement) cape_clause?
+# A top-level `_` in the itera binder parses as the legacy unused loop-variable
+# identifier, not a destructuring wildcard.
+itera_stmt  := 'itera' (('ex' | 'de') expression | 'ab' expression) ('fixum' | 'varia') (array_pattern | object_pattern | IDENTIFIER) (block_stmt | ergo_joint statement) cape_clause?
 
 @formerly eligeStmt
 elige_stmt    := 'elige' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?

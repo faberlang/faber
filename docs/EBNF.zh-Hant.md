@@ -272,7 +272,7 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 dum_stmt ::= '當' expression (block_stmt | ergo_joint statement) cape_clause?
 # formerly: iteraStmt
 # [091] itera_stmt
-itera_stmt ::= '遍歷' (('取自' | '從') expression | '範圍' expression) ('定值' | '變值') IDENTIFIER (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt ::= '遍歷' (('取自' | '從') expression | '範圍' expression) ('定值' | '變值') (array_pattern | object_pattern | IDENTIFIER) (block_stmt | ergo_joint statement) cape_clause?
 # formerly: eligeStmt
 # [092] elige_stmt
 elige_stmt ::= '選擇' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?

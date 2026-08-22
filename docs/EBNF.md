@@ -272,7 +272,7 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 dum_stmt ::= 'dum' expression (block_stmt | ergo_joint statement) cape_clause?
 # formerly: iteraStmt
 # [091] itera_stmt
-itera_stmt ::= 'itera' (('ex' | 'de') expression | 'ab' expression) ('fixum' | 'varia') IDENTIFIER (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt ::= 'itera' (('ex' | 'de') expression | 'ab' expression) ('fixum' | 'varia') (array_pattern | object_pattern | IDENTIFIER) (block_stmt | ergo_joint statement) cape_clause?
 # formerly: eligeStmt
 # [092] elige_stmt
 elige_stmt ::= 'elige' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?

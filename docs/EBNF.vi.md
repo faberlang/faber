@@ -272,7 +272,7 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 dum_stmt ::= 'trong_khi' expression (block_stmt | ergo_joint statement) cape_clause?
 # formerly: iteraStmt
 # [091] itera_stmt
-itera_stmt ::= 'lặp' (('từ' | 'ra') expression | 'khoảng' expression) ('hằng' | 'biến') IDENTIFIER (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt ::= 'lặp' (('từ' | 'ra') expression | 'khoảng' expression) ('hằng' | 'biến') (array_pattern | object_pattern | IDENTIFIER) (block_stmt | ergo_joint statement) cape_clause?
 # formerly: eligeStmt
 # [092] elige_stmt
 elige_stmt ::= 'chọn' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
