@@ -171,7 +171,8 @@ pub struct CliOptionWire {
     pub description: Option<String>,
     pub global: bool,
     pub default: Option<CliDefaultWire>,
-    pub flag: bool,
+    #[serde(rename = "flag")]
+    pub is_flag: bool,
 }
 
 /// Wire type for CLI operand declarations.
@@ -179,7 +180,8 @@ pub struct CliOptionWire {
 pub struct CliOperandWire {
     pub binding: String,
     pub ty: CliTypeWire,
-    pub rest: bool,
+    #[serde(rename = "rest")]
+    pub is_rest: bool,
     pub description: Option<String>,
     pub global: bool,
     pub default: Option<CliDefaultWire>,
@@ -271,7 +273,8 @@ pub struct CaptureFactWire {
 )]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FunctionFactWire {
-    pub direct_failure: bool,
+    #[serde(rename = "direct_failure")]
+    pub has_direct_failure: bool,
     pub may_fail: bool,
     pub is_async: bool,
     pub is_generator: bool,
