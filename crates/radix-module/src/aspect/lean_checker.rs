@@ -422,9 +422,13 @@ fn merge_results(
         .iter()
         .map(|record| {
             if has_registered_proof_generator(record.aspect) {
-                next_checked.next().expect("one checked result per checkable record")
+                next_checked
+                    .next()
+                    .expect("one checked result per checkable record")
             } else {
-                next_refused.next().expect("one refused result per refused record")
+                next_refused
+                    .next()
+                    .expect("one refused result per refused record")
             }
         })
         .collect()
