@@ -1,13 +1,25 @@
 //! Static runtime-cost classification over MIR conversions.
 //!
 //! This module owns the v1 cost-class vocabulary, the revisable cost-basis
-//! table, and the pure conversion classifier. It does not walk `ValidatedMir`,
-//! apply loop tags, or emit a report — those belong to the site walker and
-//! `faber cost`. Size amplification is a walker-applied hook over the
-//! intrinsic class this classifier returns.
+//! table, the pure conversion classifier, and the site walker over
+//! [`ValidatedMir`]. Size amplification, loop membership, and F/U buckets
+//! are walker-applied. Per-function roll-up *rendering* belongs to `faber
+//! cost`; [`cost_rollups`] produces the data.
 
-use crate::{MirConversion, MirConversionFlavor, MirType};
+use crate::figura::literal_index_i64s;
+use crate::read_analysis::{operand_local, statement_destination, temp_forward_local};
+use crate::visit::terminator_successors;
+use crate::{
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirBlockId, MirCallee, MirConversion,
+    MirConversionFlavor, MirFunction, MirFunctionId, MirIntrinsic, MirLocalId, MirOperand,
+    MirPlace, MirPlaceBase, MirRuntimeCall, MirStatement, MirStatementKind, MirTempId,
+    MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind, ValidatedMir,
+};
+use radix_hir::DefId;
+use radix_lexer::{Span, Symbol};
 use radix_types::{Primitive, Type, TypeTable};
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::collections::BTreeMap;
 
 /// Logarithmic cost class. `C0 = 1`, `C1 = 10`, `C2 = 100`, `C3 = 1000`.
 ///
@@ -321,6 +333,521 @@ fn round_log10(element_count: u64) -> u8 {
     floor.saturating_add(u8::from(rounds_up))
 }
 
+/// Origin of a cost site.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CostSiteKind {
+    /// `MirIntrinsic::Convert` runtime call.
+    Convert,
+    /// Package `Call`/`TryCall` to a `Definition` callee, or a `Provider`
+    /// runtime call — no intrinsic cost data.
+    ExternCall,
+}
+
+/// One cost site in a [`ValidatedMir`] program.
+///
+/// **Span decider (U2):** `Span` is a byte range with no file id. MIR does
+/// not carry a multi-file def→path map; diagnostics attach `file` separately
+/// via `Diagnostic::with_source_context`. v1 records `function` + optional
+/// `source` [`DefId`] + the statement/terminator span. `faber cost` renders the
+/// path through that existing diagnostics context, not a new package-relative
+/// span type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CostSite {
+    pub function: MirFunctionId,
+    pub source: Option<DefId>,
+    pub name: Option<Symbol>,
+    pub block: MirBlockId,
+    pub span: Span,
+    pub kind: CostSiteKind,
+    pub family: CostFamily,
+    pub tag: CostTag,
+    pub hot: bool,
+    pub element_count: Option<u64>,
+}
+
+/// Per-function roll-up: dominant class plus per-class histogram.
+///
+/// Rendering (human/JSON) is U3's concern; this is the data.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CostFunctionRollup {
+    pub function: MirFunctionId,
+    pub dominant: Option<CostClass>,
+    pub class_histogram: Vec<(CostClass, usize)>,
+    pub foldable: usize,
+    pub uncosted: usize,
+    pub hot: usize,
+}
+
+/// Enumerate conversion sites and uncosted extern calls over `validated`.
+///
+/// Convert sites get an intrinsic class from [`classify_conversion`], then
+/// F (constant/literal-fed operand), size amplification, and a loop-member
+/// hot tag. Package `Definition` calls and `Provider` runtime calls are U.
+#[must_use]
+pub fn cost_sites(validated: &ValidatedMir<'_>) -> Vec<CostSite> {
+    let types = validated.validation().types;
+    let mut sites = Vec::new();
+    for function in &validated.program().functions {
+        let hot_blocks = loop_member_blocks(function);
+        let foldable = foldable_bindings(function);
+        for block in &function.blocks {
+            let hot = hot_blocks.contains(&block.id);
+            let loc = SiteLoc {
+                function,
+                block: block.id,
+                hot,
+            };
+            for statement in &block.statements {
+                if let Some(site) = site_from_statement(loc, statement, &foldable, types) {
+                    sites.push(site);
+                }
+            }
+            if let Some(site) =
+                site_from_terminator(loc, &block.terminator.kind, block.terminator.span)
+            {
+                sites.push(site);
+            }
+        }
+    }
+    sites
+}
+
+/// Group [`cost_sites`] by function into dominant class + histogram.
+#[must_use]
+pub fn cost_rollups(sites: &[CostSite]) -> Vec<CostFunctionRollup> {
+    let mut order = Vec::new();
+    let mut grouped: BTreeMap<u32, Vec<&CostSite>> = BTreeMap::new();
+    for site in sites {
+        grouped
+            .entry(site.function.0)
+            .or_insert_with(|| {
+                order.push(site.function);
+                Vec::new()
+            })
+            .push(site);
+    }
+    order
+        .into_iter()
+        .map(|function| {
+            rollup_function(
+                function,
+                grouped.get(&function.0).map_or(&[], Vec::as_slice),
+            )
+        })
+        .collect()
+}
+
+fn rollup_function(function: MirFunctionId, sites: &[&CostSite]) -> CostFunctionRollup {
+    let mut counts: BTreeMap<u8, usize> = BTreeMap::new();
+    let mut foldable = 0;
+    let mut uncosted = 0;
+    let mut hot = 0;
+    let mut dominant = None;
+    for site in sites {
+        hot += usize::from(site.hot);
+        match site.tag {
+            CostTag::F => foldable += 1,
+            CostTag::U => uncosted += 1,
+            CostTag::Class(class) => {
+                *counts.entry(class.log10()).or_insert(0) += 1;
+                dominant = Some(dominant.map_or(class, |best: CostClass| best.max(class)));
+            }
+        }
+    }
+    CostFunctionRollup {
+        function,
+        dominant,
+        class_histogram: counts
+            .into_iter()
+            .map(|(log10, count)| (CostClass::from_log10(log10), count))
+            .collect(),
+        foldable,
+        uncosted,
+        hot,
+    }
+}
+
+#[derive(Clone, Copy)]
+struct SiteLoc<'a> {
+    function: &'a MirFunction,
+    block: MirBlockId,
+    hot: bool,
+}
+
+fn site_from_statement(
+    loc: SiteLoc<'_>,
+    statement: &MirStatement,
+    foldable: &Foldable,
+    types: &TypeTable,
+) -> Option<CostSite> {
+    match &statement.kind {
+        MirStatementKind::RuntimeCall { call, .. } => match &call.intrinsic {
+            MirIntrinsic::Convert(conversion) => Some(convert_site(
+                loc,
+                statement.span,
+                call,
+                conversion,
+                foldable,
+                types,
+            )),
+            MirIntrinsic::Provider(_) => Some(extern_site(loc, statement.span)),
+            _ => None,
+        },
+        MirStatementKind::Call { callee, .. } if is_extern_callee(callee) => {
+            Some(extern_site(loc, statement.span))
+        }
+        MirStatementKind::Assign { .. }
+        | MirStatementKind::Construct { .. }
+        | MirStatementKind::Call { .. } => None,
+    }
+}
+
+fn site_from_terminator(
+    loc: SiteLoc<'_>,
+    terminator: &MirTerminatorKind,
+    span: Span,
+) -> Option<CostSite> {
+    let MirTerminatorKind::TryCall { callee, .. } = terminator else {
+        return None;
+    };
+    is_extern_callee(callee).then(|| extern_site(loc, span))
+}
+
+fn convert_site(
+    loc: SiteLoc<'_>,
+    span: Span,
+    call: &MirRuntimeCall,
+    conversion: &MirConversion,
+    foldable: &Foldable,
+    types: &TypeTable,
+) -> CostSite {
+    let family = conversion_family(conversion, types);
+    let element_count = conversion_element_count(conversion, types);
+    let source_foldable = call
+        .args
+        .first()
+        .is_some_and(|operand| operand_is_foldable(operand, loc.function, foldable));
+    let tag = if source_foldable {
+        foldable_tag()
+    } else {
+        let intrinsic = classify_conversion(conversion, types);
+        element_count.map_or(intrinsic, |count| intrinsic.amplify(count))
+    };
+    CostSite {
+        function: loc.function.id,
+        source: loc.function.source,
+        name: loc.function.name,
+        block: loc.block,
+        span,
+        kind: CostSiteKind::Convert,
+        family,
+        tag,
+        hot: loc.hot,
+        element_count,
+    }
+}
+
+fn extern_site(loc: SiteLoc<'_>, span: Span) -> CostSite {
+    CostSite {
+        function: loc.function.id,
+        source: loc.function.source,
+        name: loc.function.name,
+        block: loc.block,
+        span,
+        kind: CostSiteKind::ExternCall,
+        family: CostFamily::UnknownExtern,
+        tag: uncosted_tag(),
+        hot: loc.hot,
+        element_count: None,
+    }
+}
+
+fn is_extern_callee(callee: &MirCallee) -> bool {
+    matches!(callee, MirCallee::Definition { .. })
+}
+
+fn conversion_element_count(conversion: &MirConversion, types: &TypeTable) -> Option<u64> {
+    static_element_count(conversion.source_ty, types)
+        .or_else(|| static_element_count(conversion.target_ty, types))
+}
+
+/// Literal tensor/list element count — same index facts [`crate::static_shape_fold`]
+/// reads via [`literal_index_i64s`].
+fn static_element_count(ty: MirType, types: &TypeTable) -> Option<u64> {
+    let shape = match type_kind(types, ty) {
+        Type::Tensor(_, shape) => *shape,
+        Type::BoundedArray { capacity, .. } => *capacity,
+        _ => return None,
+    };
+    let dims = literal_index_i64s(shape, types)?;
+    let mut product = 1u64;
+    for dim in dims {
+        product = product.saturating_mul(u64::try_from(dim).ok()?);
+    }
+    Some(product)
+}
+
+struct Foldable {
+    locals: FxHashSet<MirLocalId>,
+    temps: FxHashSet<MirTempId>,
+    values: FxHashSet<MirValueId>,
+}
+
+fn foldable_bindings(function: &MirFunction) -> Foldable {
+    let params: FxHashSet<MirLocalId> = function.params.iter().map(|param| param.local).collect();
+    let mut foldable = Foldable {
+        locals: FxHashSet::default(),
+        temps: FxHashSet::default(),
+        values: FxHashSet::default(),
+    };
+    let mut tainted_locals = params.clone();
+    let mut tainted_temps = FxHashSet::default();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for block in &function.blocks {
+            for statement in &block.statements {
+                changed |= absorb_statement(
+                    function,
+                    statement,
+                    &params,
+                    &mut foldable,
+                    &mut tainted_locals,
+                    &mut tainted_temps,
+                );
+            }
+        }
+    }
+    foldable
+}
+
+fn absorb_statement(
+    function: &MirFunction,
+    statement: &MirStatement,
+    params: &FxHashSet<MirLocalId>,
+    foldable: &mut Foldable,
+    tainted_locals: &mut FxHashSet<MirLocalId>,
+    tainted_temps: &mut FxHashSet<MirTempId>,
+) -> bool {
+    let src_foldable = statement_source_foldable(function, statement, foldable);
+    let mut changed = false;
+    if let MirStatementKind::Assign { value, .. } = &statement.kind {
+        if src_foldable {
+            changed |= foldable.values.insert(value.id);
+        }
+    }
+    if let Some(local) = statement_destination(statement) {
+        changed |= consider_local(local, src_foldable, params, foldable, tainted_locals);
+        return changed;
+    }
+    let Some(place) = statement_dest_place(statement) else {
+        return changed;
+    };
+    changed |= consider_temp_place(place, src_foldable, foldable, tainted_temps);
+    changed
+}
+
+fn statement_source_foldable(
+    function: &MirFunction,
+    statement: &MirStatement,
+    foldable: &Foldable,
+) -> bool {
+    match &statement.kind {
+        MirStatementKind::Assign { value, .. } => value_is_foldable(value, function, foldable),
+        MirStatementKind::Construct { aggregate, .. } => {
+            aggregate_operands_foldable(aggregate, function, foldable)
+        }
+        MirStatementKind::RuntimeCall { call, .. } => match &call.intrinsic {
+            MirIntrinsic::Convert(_) => call
+                .args
+                .first()
+                .is_some_and(|operand| operand_is_foldable(operand, function, foldable)),
+            _ => false,
+        },
+        MirStatementKind::Call { .. } => false,
+    }
+}
+
+fn statement_dest_place(statement: &MirStatement) -> Option<&MirPlace> {
+    match &statement.kind {
+        MirStatementKind::Assign { place, .. }
+        | MirStatementKind::Construct {
+            destination: place, ..
+        } => Some(place),
+        MirStatementKind::RuntimeCall { destination, .. }
+        | MirStatementKind::Call { destination, .. } => destination.as_ref(),
+    }
+}
+
+fn consider_local(
+    id: MirLocalId,
+    src_foldable: bool,
+    params: &FxHashSet<MirLocalId>,
+    foldable: &mut Foldable,
+    tainted_locals: &mut FxHashSet<MirLocalId>,
+) -> bool {
+    if params.contains(&id) || !src_foldable {
+        tainted_locals.insert(id);
+        return foldable.locals.remove(&id);
+    }
+    !tainted_locals.contains(&id) && foldable.locals.insert(id)
+}
+
+fn consider_temp_place(
+    place: &MirPlace,
+    src_foldable: bool,
+    foldable: &mut Foldable,
+    tainted_temps: &mut FxHashSet<MirTempId>,
+) -> bool {
+    if !place.projections.is_empty() {
+        return false;
+    }
+    let MirPlaceBase::Temp(id) = place.base else {
+        return false;
+    };
+    if src_foldable {
+        return !tainted_temps.contains(&id) && foldable.temps.insert(id);
+    }
+    tainted_temps.insert(id);
+    foldable.temps.remove(&id)
+}
+
+fn value_is_foldable(value: &MirValue, function: &MirFunction, foldable: &Foldable) -> bool {
+    match &value.kind {
+        MirValueKind::Operand(operand) => operand_is_foldable(operand, function, foldable),
+        MirValueKind::Closure(_)
+        | MirValueKind::Unary { .. }
+        | MirValueKind::Binary { .. }
+        | MirValueKind::Option(_) => false,
+    }
+}
+
+fn aggregate_operands_foldable(
+    aggregate: &MirAggregate,
+    function: &MirFunction,
+    foldable: &Foldable,
+) -> bool {
+    match &aggregate.fields {
+        MirAggregateFields::Ordered(items) => items.iter().all(|item| {
+            let (MirAggregateItem::Operand(operand) | MirAggregateItem::Spread(operand)) = item;
+            operand_is_foldable(operand, function, foldable)
+        }),
+        MirAggregateFields::Named(fields) => fields
+            .iter()
+            .all(|field| operand_is_foldable(&field.value, function, foldable)),
+        MirAggregateFields::Keyed(fields) => fields.iter().all(|field| {
+            operand_is_foldable(&field.key, function, foldable)
+                && operand_is_foldable(&field.value, function, foldable)
+        }),
+    }
+}
+
+fn operand_is_foldable(operand: &MirOperand, function: &MirFunction, foldable: &Foldable) -> bool {
+    match operand {
+        MirOperand::Constant(_) => true,
+        MirOperand::Place(_) => place_operand_foldable(operand, foldable),
+        MirOperand::Temp(temp) => {
+            foldable.temps.contains(temp)
+                || temp_forward_local(function, *temp)
+                    .is_some_and(|local| foldable.locals.contains(&local))
+        }
+        MirOperand::Value(value) => foldable.values.contains(value),
+    }
+}
+
+fn place_operand_foldable(operand: &MirOperand, foldable: &Foldable) -> bool {
+    if let Some(local) = operand_local(operand) {
+        return foldable.locals.contains(&local);
+    }
+    let MirOperand::Place(place) = operand else {
+        return false;
+    };
+    if !place.projections.is_empty() {
+        return false;
+    }
+    matches!(place.base, MirPlaceBase::Temp(temp) if foldable.temps.contains(&temp))
+}
+
+fn loop_member_blocks(function: &MirFunction) -> FxHashSet<MirBlockId> {
+    if function.blocks.is_empty() {
+        return FxHashSet::default();
+    }
+    let mut successors = FxHashMap::default();
+    let mut predecessors: FxHashMap<MirBlockId, Vec<MirBlockId>> = FxHashMap::default();
+    for block in &function.blocks {
+        let succs = terminator_successors(&block.terminator.kind);
+        for &succ in &succs {
+            predecessors.entry(succ).or_default().push(block.id);
+        }
+        successors.insert(block.id, succs);
+    }
+    let mut members = FxHashSet::default();
+    for (tail, head) in dfs_back_edges(MirBlockId(0), &successors) {
+        collect_natural_loop(tail, head, &predecessors, &mut members);
+    }
+    members
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DfsColor {
+    White,
+    Gray,
+    Black,
+}
+
+fn dfs_back_edges(
+    entry: MirBlockId,
+    successors: &FxHashMap<MirBlockId, Vec<MirBlockId>>,
+) -> Vec<(MirBlockId, MirBlockId)> {
+    let mut color = FxHashMap::default();
+    let mut back_edges = Vec::new();
+    let mut stack = vec![(entry, 0usize)];
+    color.insert(entry, DfsColor::Gray);
+    while let Some((id, idx)) = stack.pop() {
+        let succs = successors.get(&id).map_or(&[][..], Vec::as_slice);
+        if idx < succs.len() {
+            stack.push((id, idx + 1));
+            let succ = succs[idx];
+            match color.get(&succ).copied().unwrap_or(DfsColor::White) {
+                DfsColor::Gray => back_edges.push((id, succ)),
+                DfsColor::White => {
+                    color.insert(succ, DfsColor::Gray);
+                    stack.push((succ, 0));
+                }
+                DfsColor::Black => {}
+            }
+        } else {
+            color.insert(id, DfsColor::Black);
+        }
+    }
+    back_edges
+}
+
+fn collect_natural_loop(
+    tail: MirBlockId,
+    head: MirBlockId,
+    predecessors: &FxHashMap<MirBlockId, Vec<MirBlockId>>,
+    members: &mut FxHashSet<MirBlockId>,
+) {
+    members.insert(head);
+    if tail == head {
+        return;
+    }
+    let mut stack = vec![tail];
+    while let Some(id) = stack.pop() {
+        if !members.insert(id) {
+            continue;
+        }
+        if let Some(preds) = predecessors.get(&id) {
+            stack.extend(preds.iter().copied());
+        }
+    }
+}
+
 #[cfg(test)]
 #[path = "cost_analysis_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "cost_walker_test.rs"]
+mod walker_tests;

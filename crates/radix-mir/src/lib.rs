@@ -100,8 +100,9 @@ pub use boundary_abi::{
     HOST_CALL_ABI_VERSION,
 };
 pub use cost_analysis::{
-    amplify_class, basis_tag, classify_conversion, conversion_family, foldable_tag, uncosted_tag,
-    CostBasisRow, CostClass, CostFamily, CostTag, COST_BASIS,
+    amplify_class, basis_tag, classify_conversion, conversion_family, cost_rollups, cost_sites,
+    foldable_tag, uncosted_tag, CostBasisRow, CostClass, CostFamily, CostFunctionRollup, CostSite,
+    CostSiteKind, CostTag, COST_BASIS,
 };
 // Vocabulary moved down to radix-types (feature-granularity §2); re-exported
 pub use device::{
