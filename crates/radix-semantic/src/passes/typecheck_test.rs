@@ -1750,7 +1750,20 @@ functio sum_pair(iuncta<f32, f32> pair) → f32 {
     redde x + y
 }
 ";
-    let _result = analyze(source);
+    test_support::assert_accepts(source);
+}
+
+#[test]
+fn iuncta_tuple_array_destructuring_width_mismatch_uses_binding_issue() {
+    test_support::assert_rejects_with_issue(
+        r"
+functio bad(iuncta<f32, f32> pair) → f32 {
+    fixum [x, y, z] ← pair
+    redde x
+}
+",
+        "tuple_index_out_of_bounds",
+    );
 }
 
 #[test]
