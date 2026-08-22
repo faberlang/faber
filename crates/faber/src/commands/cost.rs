@@ -6,10 +6,9 @@
 //!
 //! **Span rendering (U2 decider):** v1 has no multi-file def→path map. Site
 //! identity is function id + optional [`DefId`] + statement span. File context
-//! is attached from the package entry source when the span falls inside that
-//! buffer — not a new package-relative span type. Site `source_line` values
-//! are length-capped and interned per unique line so a hostile long line
-//! cannot amplify report memory with site count.
+//! is attached through [`Diagnostic::with_source_context`] on the package
+//! entry source when the span falls inside that buffer — not a new
+//! package-relative span type.
 //!
 //! JSON contract (version 1) — stable key set:
 //! - root: `version`, `legend`, `min_class`, `package`, `functions`, `sites`
@@ -27,20 +26,16 @@ use radix_mir::{
 };
 use radix::module::codegen::Target;
 use radix::module::diagnostics::Diagnostic;
+use serde::ser::Serializer;
 use serde::Serialize;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::path::Path;
-use std::sync::Arc;
 
 /// Legend line present in both human and JSON output.
 pub(crate) const COST_LEGEND: &str = "cost units are relative classes, not time";
 
 /// Version of the `--json` machine contract.
 pub(crate) const COST_REPORT_VERSION: u32 = 1;
-
-/// Maximum retained bytes of a site `source_line`. Truncated at a UTF-8
-/// boundary; sites on the same physical line share one allocation.
-pub(crate) const SOURCE_LINE_CAP: usize = 256;
 
 /// Versioned cost report shared by the human renderer and `--json`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -99,7 +94,7 @@ pub(crate) struct CostSiteJson {
     pub hot: bool,
     pub element_count: Option<u64>,
     pub file: Option<String>,
-    pub source_line: Option<Arc<str>>,
+    pub source_line: Option<String>,
 }
 
 /// Statement span as a half-open byte range — not a path-bearing type.
@@ -212,10 +207,9 @@ pub(crate) fn build_report(
             .then(left.id.cmp(&right.id))
     });
     let package = package_json(input, &rollups, sites.len());
-    let mut intern = SourceLineInterner::new(entry_file, entry_source);
     let site_views = sites
         .iter()
-        .map(|site| site_json(site, names, &mut intern))
+        .map(|site| site_json(site, names, entry_file, entry_source))
         .collect();
     CostReport {
         version: COST_REPORT_VERSION,
@@ -251,8 +245,7 @@ pub(crate) fn render_human(report: &CostReport) -> String {
         for function in &report.functions {
             let label = function
                 .name
-                .as_deref()
-                .map(strip_controls)
+                .clone()
                 .unwrap_or_else(|| format!("fn={}", function.id));
             out.push_str(&format!(
                 "  {label}: {}\n",
@@ -403,9 +396,10 @@ fn histogram_json(histogram: &[(CostClass, usize)]) -> Vec<CostHistogramBin> {
 fn site_json(
     site: &CostSite,
     names: &BTreeMap<u32, String>,
-    intern: &mut SourceLineInterner<'_>,
+    entry_file: Option<&str>,
+    entry_source: Option<&str>,
 ) -> CostSiteJson {
-    let (file, source_line) = intern.context(site);
+    let (file, source_line) = source_context(site, entry_file, entry_source);
     CostSiteJson {
         function: site.function.0,
         name: names.get(&site.function.0).cloned(),
@@ -425,83 +419,21 @@ fn site_json(
     }
 }
 
-/// Interns capped source lines so sites on one physical line share one copy.
-struct SourceLineInterner<'a> {
-    file: Option<&'a str>,
-    source: Option<&'a str>,
-    by_start: HashMap<usize, Arc<str>>,
-    ranges: Vec<(usize, usize)>,
-}
-
-impl<'a> SourceLineInterner<'a> {
-    fn new(file: Option<&'a str>, source: Option<&'a str>) -> Self {
-        Self {
-            file,
-            source,
-            by_start: HashMap::new(),
-            ranges: Vec::new(),
-        }
+fn source_context(
+    site: &CostSite,
+    entry_file: Option<&str>,
+    entry_source: Option<&str>,
+) -> (Option<String>, Option<String>) {
+    let (Some(file), Some(source)) = (entry_file, entry_source) else {
+        return (None, None);
+    };
+    let start = site.span.start as usize;
+    let end = site.span.end as usize;
+    if start > source.len() || end > source.len() {
+        return (None, None);
     }
-
-    fn context(&mut self, site: &CostSite) -> (Option<String>, Option<Arc<str>>) {
-        let (Some(file), Some(source)) = (self.file, self.source) else {
-            return (None, None);
-        };
-        let start = site.span.start as usize;
-        let end = site.span.end as usize;
-        if start > source.len() || end > source.len() {
-            return (None, None);
-        }
-        (Some(file.to_owned()), Some(self.intern_line(source, start)))
-    }
-
-    fn intern_line(&mut self, source: &str, offset: usize) -> Arc<str> {
-        for &(start, end) in &self.ranges {
-            if offset >= start && offset <= end {
-                return self
-                    .by_start
-                    .get(&start)
-                    .expect("cached line range has interned text")
-                    .clone();
-            }
-        }
-        let (start, end) = line_bounds(source, offset);
-        let interned: Arc<str> = Arc::from(capped_source_line(&source[start..end]));
-        self.by_start.insert(start, interned.clone());
-        self.ranges.push((start, end));
-        interned
-    }
-}
-
-fn line_bounds(source: &str, offset: usize) -> (usize, usize) {
-    let offset = snap_char_boundary(source, offset.min(source.len()));
-    let start = source[..offset].rfind('\n').map_or(0, |i| i + 1);
-    let end = source[offset..]
-        .find('\n')
-        .map_or(source.len(), |i| offset + i);
-    (start, end)
-}
-
-fn snap_char_boundary(source: &str, mut offset: usize) -> usize {
-    while offset > 0 && !source.is_char_boundary(offset) {
-        offset -= 1;
-    }
-    offset
-}
-
-fn capped_source_line(line: &str) -> &str {
-    if line.len() <= SOURCE_LINE_CAP {
-        return line;
-    }
-    let mut end = SOURCE_LINE_CAP;
-    while end > 0 && !line.is_char_boundary(end) {
-        end -= 1;
-    }
-    &line[..end]
-}
-
-fn strip_controls(input: &str) -> String {
-    input.chars().filter(|ch| !ch.is_control()).collect()
+    let diagnostic = Diagnostic::error("").with_source_context(file, source, site.span);
+    (Some(diagnostic.file), diagnostic.source_line)
 }
 
 fn entry_source_context(input: &Path) -> (Option<String>, Option<String>) {
@@ -527,7 +459,7 @@ fn render_site_line(site: &CostSiteJson) -> String {
     line.push_str(&site.family);
     if let Some(name) = site.name.as_deref() {
         line.push(' ');
-        line.push_str(&strip_controls(name));
+        line.push_str(name);
     }
     line.push_str(&format!(" fn={}", site.function));
     if let Some(source) = site.source {
@@ -538,7 +470,7 @@ fn render_site_line(site: &CostSiteJson) -> String {
         line.push_str(&format!(" n={count}"));
     }
     if let Some(file) = site.file.as_deref() {
-        line.push_str(&format!(" file={}", strip_controls(file)));
+        line.push_str(&format!(" file={file}"));
     }
     line
 }

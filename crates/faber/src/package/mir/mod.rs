@@ -188,7 +188,7 @@ fn device_section_builder(
             super::device::DeviceSectionBuild {
                 selection,
                 inputs: &device_inputs,
-                ptx_target: super::device::ptx_target_for(None),
+                ptx_target: S1_6_PTX_TARGET,
                 repeating_steps: step_count,
             },
         )?;
@@ -200,6 +200,11 @@ fn device_section_builder(
         Ok(None)
     }
 }
+
+/// The NVPTX target the S1-6 device images compile for (faber-side with the
+/// device-section builder seam).
+#[cfg(feature = "device-runtime")]
+const S1_6_PTX_TARGET: &str = "sm_90";
 
 /// The faber host-construction policy (N1.1/N1.5, S1-6): decide whether a
 /// loaded image runs on the CPU/FMIR runner or a device route, and execute
@@ -215,14 +220,13 @@ fn host_route(
     // device-bearing image fails closed (never silently runs CPU).
     #[cfg(feature = "device-runtime")]
     {
-        if let Some(device) = &image.device {
-            super::execute_device_route(device, selection, &image.source_hashes)?;
-            return Ok(Some(()));
-        }
-        if selection != DeviceSelection::Auto {
+        // In-process `host_factory` is parked (no hosts crate). Packed Metal
+        // closeout uses `host_spawn`. An explicit backend or a device-bearing
+        // image still fails closed — never a silent CPU fallback.
+        if selection != DeviceSelection::Auto || requires_device {
             return Err(vec![mir_diag(
                 &image.diagnostic_path,
-                "explicit backend selection requires a device image; CPU-only images never silently fall back",
+                "device section or explicit backend selection present, but this faber build parks the in-process host; packed closeout uses the spawn client",
             )]);
         }
         Ok(None)
@@ -256,12 +260,7 @@ pub(crate) fn with_interpreted_lowered_package_mir<R>(
     input: &Path,
     run: impl for<'a> FnOnce(&radix::module::mir::LoweredMirUnit<'a>) -> R,
 ) -> Result<R, Vec<Diagnostic>> {
-    radix::program::mir::with_interpreted_lowered_package_mir(
-        config,
-        input,
-        &faber_mir_seams(),
-        run,
-    )
+    radix::program::mir::with_interpreted_lowered_package_mir(config, input, &faber_mir_seams(), run)
 }
 
 /// Link an already-analyzed package test scope once, then lend its validated
