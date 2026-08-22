@@ -151,9 +151,10 @@ pub fn advisory_rows(_name: &str, source: &str) -> Option<Vec<AirRow>> {
         air_unroll::unroll(&mut hir_clone, &lanes, &mut interner_clone, &result.types)
             .err()
             .unwrap_or_default();
-    let purity_errors = air_purity::check(&hir_clone, &lanes, &interner_clone, &result.types)
-        .err()
-        .unwrap_or_default();
+    let purity_errors =
+        air_purity::check(&mut hir_clone, &mut lanes, &mut interner_clone, &result.types)
+            .err()
+            .unwrap_or_default();
     let mut gate_errors = unroll_errors;
     gate_errors.extend(purity_errors);
 
