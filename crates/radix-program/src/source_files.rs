@@ -3,6 +3,13 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Maximum number of Faber source files discovered under one package source
+/// root. This bounds directory volume before parsing or analysis begins.
+pub const MAX_PACKAGE_SOURCE_FILES: usize = 4096;
+/// Maximum aggregate byte length of Faber source files discovered under one
+/// package source root.
+pub const MAX_PACKAGE_SOURCE_BYTES: u64 = 64 * 1024 * 1024;
+
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::{peel_raw_source, source_load_diagnostic, FileFrontmatter};
 use radix_module::lexer::Interner;
@@ -34,6 +41,7 @@ pub fn package_source_files(
         .map_err(|error| vec![Diagnostic::io_error(source_root, &error)])?;
     let mut pending = vec![source_root.to_path_buf()];
     let mut files = Vec::new();
+    let mut total_bytes = 0_u64;
     let mut diagnostics = Vec::new();
     while let Some(directory) = pending.pop() {
         let entries = match fs::read_dir(&directory) {
@@ -73,6 +81,50 @@ pub fn package_source_files(
             if path.is_dir() {
                 pending.push(path);
             } else if is_package_source_path(&path, include_proba) {
+                if files.len() >= MAX_PACKAGE_SOURCE_FILES {
+                    return Err(vec![package_source_limit_diagnostic(
+                        &canonical_root,
+                        "package_source_file_limit",
+                        format!(
+                            "package source file limit exceeded: maximum is {} files",
+                            MAX_PACKAGE_SOURCE_FILES
+                        ),
+                        (files.len() + 1).to_string(),
+                        MAX_PACKAGE_SOURCE_FILES.to_string(),
+                    )]);
+                }
+                let byte_length = match fs::metadata(&path) {
+                    Ok(metadata) => metadata.len(),
+                    Err(error) => {
+                        diagnostics.push(Diagnostic::io_error(&path, &error));
+                        continue;
+                    }
+                };
+                let Some(new_total_bytes) = total_bytes.checked_add(byte_length) else {
+                    return Err(vec![package_source_limit_diagnostic(
+                        &canonical_root,
+                        "package_source_byte_limit",
+                        format!(
+                            "package source byte limit exceeded: maximum is {} bytes",
+                            MAX_PACKAGE_SOURCE_BYTES
+                        ),
+                        u64::MAX.to_string(),
+                        MAX_PACKAGE_SOURCE_BYTES.to_string(),
+                    )]);
+                };
+                if new_total_bytes > MAX_PACKAGE_SOURCE_BYTES {
+                    return Err(vec![package_source_limit_diagnostic(
+                        &canonical_root,
+                        "package_source_byte_limit",
+                        format!(
+                            "package source byte limit exceeded: maximum is {} bytes",
+                            MAX_PACKAGE_SOURCE_BYTES
+                        ),
+                        new_total_bytes.to_string(),
+                        MAX_PACKAGE_SOURCE_BYTES.to_string(),
+                    )]);
+                }
+                total_bytes = new_total_bytes;
                 files.push(path);
             }
         }
@@ -83,6 +135,20 @@ pub fn package_source_files(
     } else {
         Err(diagnostics)
     }
+}
+
+fn package_source_limit_diagnostic(
+    source_root: &Path,
+    issue: &str,
+    message: String,
+    observed: String,
+    limit: String,
+) -> Diagnostic {
+    crate::package_diagnostic_error(message)
+        .with_file(source_root.display().to_string())
+        .with_arg("issue", issue)
+        .with_arg("observed", observed)
+        .with_arg("limit", limit)
 }
 
 pub fn is_package_source_path(path: &Path, include_proba: bool) -> bool {

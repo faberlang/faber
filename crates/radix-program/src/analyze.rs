@@ -15,6 +15,12 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
+
+/// Wall-clock budget for package test analysis. The package test route accepts
+/// untrusted source, so a loader defect must become a diagnostic instead of an
+/// unbounded multi-unit analysis.
+pub const PACKAGE_TEST_ANALYSIS_BUDGET: Duration = Duration::from_secs(30);
 
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::{
@@ -346,6 +352,27 @@ pub fn analyze_package_spec(
     proba_filter: Option<&TestSourceFilter>,
     seams: &AnalysisSeams,
 ) -> Result<AnalyzedProgram, Vec<Diagnostic>> {
+    let deadline = include_proba.then(|| Instant::now() + PACKAGE_TEST_ANALYSIS_BUDGET);
+    analyze_package_spec_with_deadline(
+        config,
+        spec,
+        library_resolver,
+        include_proba,
+        proba_filter,
+        deadline,
+        seams,
+    )
+}
+
+fn analyze_package_spec_with_deadline(
+    config: &Config,
+    spec: PackageSpec,
+    library_resolver: &LibraryResolver,
+    include_proba: bool,
+    proba_filter: Option<&TestSourceFilter>,
+    deadline: Option<Instant>,
+    seams: &AnalysisSeams,
+) -> Result<AnalyzedProgram, Vec<Diagnostic>> {
     let files = match config.locale_pack.as_ref() {
         Some(pack) => load_package_with_locale_pack(
             &spec,
@@ -364,6 +391,9 @@ pub fn analyze_package_spec(
             seams,
         )?,
     };
+    if let Some(diagnostic) = analysis_deadline_diagnostic(&spec, deadline, None, "load") {
+        return Err(vec![diagnostic]);
+    }
     let entry_frontmatter = files
         .iter()
         .find(|file| file.path == spec.entry)
@@ -426,6 +456,12 @@ pub fn analyze_package_spec(
     let imports = build_module_graph(&spec, &files, &path_to_id, library_resolver);
 
     for file in package_analysis_order(&spec, &files, &files_by_path, library_resolver) {
+        if let Some(diagnostic) =
+            analysis_deadline_diagnostic(&spec, deadline, Some(&file.path), "unit")
+        {
+            diagnostics.push(diagnostic);
+            break;
+        }
         let file_cli = mount_plan.module_cli.get(&file.path).cloned();
         let namespace_exports = match namespace_exports_for_file(
             &spec,
@@ -567,6 +603,9 @@ pub fn analyze_package_spec(
         );
     }
 
+    if let Some(diagnostic) = analysis_deadline_diagnostic(&spec, deadline, None, "package") {
+        diagnostics.push(diagnostic);
+    }
     if diagnostics.iter().any(|diag| diag.is_error()) {
         return Err(diagnostics);
     }
@@ -614,6 +653,32 @@ pub fn analyze_package_spec(
     }
 
     Ok(program)
+}
+
+fn analysis_deadline_diagnostic(
+    spec: &PackageSpec,
+    deadline: Option<Instant>,
+    path: Option<&Path>,
+    phase: &str,
+) -> Option<Diagnostic> {
+    let deadline = deadline?;
+    if Instant::now() < deadline {
+        return None;
+    }
+    let path = path.unwrap_or(&spec.package_root);
+    Some(
+        crate::package_diagnostic_error(format!(
+            "package test analysis exceeded the {}ms budget during {phase}",
+            PACKAGE_TEST_ANALYSIS_BUDGET.as_millis()
+        ))
+        .with_file(path.display().to_string())
+        .with_arg("issue", "package_analysis_budget_exceeded")
+        .with_arg(
+            "budget_ms",
+            PACKAGE_TEST_ANALYSIS_BUDGET.as_millis().to_string(),
+        )
+        .with_arg("phase", phase),
+    )
 }
 
 fn program_roots(

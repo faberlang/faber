@@ -6,6 +6,7 @@ use radix_module::semantic::passes::visibility_annotation::VisibilityTier;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 fn temp_root(label: &str) -> PathBuf {
     let path = std::env::temp_dir().join(format!(
@@ -56,6 +57,37 @@ fn test_seams() -> AnalysisSeams {
         manifest_validator: accept_manifest,
         resolver_for_package: empty_resolver_for_package,
     }
+}
+
+#[test]
+fn package_test_analysis_deadline_fails_closed() {
+    let dir = temp_root("analysis-deadline");
+    let entry = dir.join("main.fab");
+    fs::write(&entry, "functio value() → numerus { redde 1 }\n").expect("write source");
+    let spec = discover_package(&entry).expect("discover package");
+    let resolver = LibraryResolver::with_optional_home(None);
+    let expired = Instant::now() - Duration::from_secs(1);
+
+    let diagnostics = analyze_package_spec_with_deadline(
+        &Config::default(),
+        spec,
+        &resolver,
+        true,
+        None,
+        Some(expired),
+        &test_seams(),
+    );
+    let diagnostics = match diagnostics {
+        Ok(_) => panic!("expired package test analysis must fail closed"),
+        Err(diagnostics) => diagnostics,
+    };
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some("package_analysis_budget_exceeded")),
+        "unexpected diagnostics: {diagnostics:?}"
+    );
+    let _ = fs::remove_dir_all(&dir);
 }
 
 /// Moved from `crates/faber/src/package_test.rs`
