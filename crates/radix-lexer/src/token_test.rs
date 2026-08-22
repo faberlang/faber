@@ -100,3 +100,25 @@ fn nabla_lexes_as_dedicated_gradient_operator() {
     // Nabla is never a keyword identity.
     assert!(!TokenKind::Nabla.is_keyword());
 }
+
+// EOT-1 baseline: U+21C7 is not a current TokenKind and must remain distinct
+// from the live arrow family until EOT-3L adds the exact transfer token.
+#[test]
+fn eot_transfer_glyph_is_currently_an_unexpected_character() {
+    let result = crate::lex("\u{21C7}");
+    let error = result
+        .errors
+        .iter()
+        .find(|error| error.kind == crate::LexErrorKind::CharacterUnexpected)
+        .expect("U+21C7 must be absent from the current token set");
+    assert!(error.args.iter().any(|arg| {
+        arg.name == "issue" && arg.value == "unexpected_character"
+    }));
+    assert!(error.args.iter().any(|arg| {
+        arg.name == "char" && arg.value == format!("'{}'", '\u{21C7}'.escape_default())
+    }));
+    assert!(
+        result.tokens.iter().any(|token| token.kind == TokenKind::Error),
+        "an absent glyph must use the lexer Error recovery token"
+    );
+}

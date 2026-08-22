@@ -1105,3 +1105,16 @@ fn conversio_assign_fhir_artifact_round_trip_preserves_operator() {
         faber.code
     );
 }
+
+// EOT-1 baseline: the current artifact loader remains a clean round-trip
+// boundary while selective imports and transfer are still absent from the
+// source/HIR contract. The positive source fixture is owned by the later EOT
+// family; the loader baseline must not change legacy artifact behavior.
+#[test]
+fn eot_artifact_legacy_empty_surface_roundtrips_unchanged() {
+    let artifact = minimal_test_artifact();
+    let bytes = serialize_artifact(&artifact);
+    let loaded = load_fhir(&bytes).expect("legacy artifact baseline must load");
+    assert_eq!(loaded.hir.items.len(), artifact.hir.items.len());
+    assert!(loaded.hir.entry.is_none());
+}

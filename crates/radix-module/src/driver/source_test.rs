@@ -82,3 +82,40 @@ fn line_content_returns_trimmed_lines_and_none_out_of_range() {
     assert_eq!(source.line_content(4), None);
     assert_eq!(source.line_content(0), None);
 }
+
+// =============================================================================
+// EOT-1 — driver red driver and source baseline
+// =============================================================================
+
+#[test]
+fn eot_driver_acceptance_red_driver_for_selective_import_and_transfer() {
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let result = crate::driver::analyze_source(
+        &session,
+        "eot-1.fab",
+        r#"importa ex "norma:consolum" fixum dic ut output
+incipit { output ⇇ "salve\\n" }"#,
+        crate::driver::AnalyzeRequest::default(),
+    );
+    assert!(
+        result.is_ok(),
+        "EOT-1 driver red fixture must reach analyzable HIR; current diagnostics={:?}; later issue names are `selective_import_missing_member`, `selective_import_type_not_value`, `selective_import_duplicate_alias`, and transfer sink/payload issues",
+        result.as_ref().err()
+    );
+}
+
+#[test]
+fn eot_driver_legacy_source_baseline_preserves_output_and_input_forms() {
+    let source = r#"incipit {
+  nota "legacy text"
+  mone "legacy warning"
+  vide "legacy debug"
+  scribe "legacy compatibility"
+  fixum _ input ← lege
+  nota input
+}"#;
+    let file = SourceFile::inline("eot-1-legacy.fab", source.to_owned()).expect("source");
+    assert_eq!(file.content, source);
+    assert_eq!(file.raw_content, source);
+    assert_eq!(file.body_byte_offset, 0);
+}

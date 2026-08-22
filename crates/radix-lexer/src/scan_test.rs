@@ -1979,3 +1979,49 @@ mod line_start_comment {
         assert_rejects_inline_comment("incipit { # inner comment on same line\n  tacet\n}\n");
     }
 }
+
+// =============================================================================
+// EOT-1 — exact-output-transfer red driver and absence receipt
+// =============================================================================
+// U+21C7 (`⇇`) is glyph-only and intentionally absent until EOT-3L. The
+// positive driver below must fail today with the structured
+// `unexpected_character` lexer issue; the absence receipt must stay green and
+// must not permit aliasing to any existing arrow token.
+
+#[test]
+fn eot_transfer_glyph_lexes_as_a_dedicated_token() {
+    let result = lex("output ⇇ \"salve\\n\"");
+    assert!(
+        result.errors.is_empty(),
+        "EOT-3L red driver: U+21C7 must lex without errors; current expected issue is `unexpected_character`, got {:?}",
+        result.errors
+    );
+    assert!(
+        !result.tokens.iter().any(|token| token.kind == TokenKind::Error),
+        "EOT-3L red driver: U+21C7 must not produce an Error token"
+    );
+}
+
+#[test]
+fn eot_transfer_glyph_absence_receipt_is_exact_and_non_aliasing() {
+    let result = lex("\u{21C7}");
+    let error = result
+        .errors
+        .iter()
+        .find(|error| error.kind == LexErrorKind::CharacterUnexpected)
+        .expect("pre-EOT-3L U+21C7 must report CharacterUnexpected");
+    assert!(
+        has_arg(error, "issue", "unexpected_character"),
+        "expected `unexpected_character`, got {:?}",
+        error.args
+    );
+    assert!(
+        has_arg(error, "char", &format!("'{}'", '\u{21C7}'.escape_default())),
+        "expected the exact U+21C7 scalar, got {:?}",
+        error.args
+    );
+    assert!(
+        result.tokens.iter().any(|token| token.kind == TokenKind::Error),
+        "the absent glyph must recover as an Error token"
+    );
+}

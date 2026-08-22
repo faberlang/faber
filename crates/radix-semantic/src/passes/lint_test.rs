@@ -1061,3 +1061,34 @@ fn warns_on_chain_with_ascii_literal_and_folds_text_into_suggestion() {
     // the template body ("ab"), the trailing path becomes the `§` hole.
     assert_eq!(suggestion, Some("\"ab§\"(_)"));
 }
+
+// EOT-1: the lint surface must eventually see each selective item as an
+// ordinary local. Until EOT-2M installs those bindings, the source fixture
+// stops at the known parser/lowering issue `expected_expression`.
+#[test]
+fn eot_selective_import_lint_red_driver_reaches_bound_items() {
+    let result = crate::test_support::analyze_source(
+        r#"importa ex "norma:consolum" fixum dic ut output, funde ut output_bytes,
+incipit { nota output }"#,
+    );
+    assert!(
+        result.is_ok(),
+        "EOT-2M lint red driver must analyze selective bindings; current diagnostics={:?}; expected later issues include `selective_import_missing_member`, `selective_import_type_not_value`, and `selective_import_duplicate_alias`",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn eot_legacy_import_lint_surface_remains_unchanged() {
+    let result = crate::test_support::analyze_source(
+        r#"importa ex "norma:consolum" consolum
+incipit {
+  nota "legacy output"
+}"#,
+    );
+    assert!(
+        result.is_ok(),
+        "legacy namespace import/output baseline must remain analyzable: {:?}",
+        result.diagnostics
+    );
+}

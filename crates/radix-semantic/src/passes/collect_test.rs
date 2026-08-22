@@ -567,3 +567,46 @@ discretio PhaseErrorKind {
         ));
     }
 }
+
+// =============================================================================
+// EOT-1 — import collection baseline and selective red driver
+// =============================================================================
+
+#[test]
+fn eot_namespace_import_collection_baseline_remains_green() {
+    let parsed = parse(lex(r#"importa ex "norma:consolum" consolum"#));
+    assert!(
+        parsed.errors.is_empty(),
+        "legacy namespace import parse errors: {:?}",
+        parsed.errors
+    );
+    let program = parsed.program.expect("legacy namespace import program");
+
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let result = collect::collect(&program, &mut resolver, &mut types);
+    assert!(
+        result.is_ok(),
+        "legacy namespace import must still collect: {result:?}"
+    );
+}
+
+#[test]
+fn eot_selective_import_collection_red_driver() {
+    let parsed = parse(lex(
+        r#"importa ex "norma:consolum" fixum dic ut output, funde ut output_bytes,"#,
+    ));
+    assert!(
+        parsed.errors.is_empty(),
+        "EOT-2M red driver: selective members must reach collection as local bindings; current parser errors={:?}; expected pre-EOT issue is `expected_expression`",
+        parsed.errors
+    );
+    let program = parsed.program.expect("selective import program");
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let result = collect::collect(&program, &mut resolver, &mut types);
+    assert!(
+        result.is_ok(),
+        "selective bindings must collect independently: {result:?}"
+    );
+}
