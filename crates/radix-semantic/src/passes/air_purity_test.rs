@@ -376,7 +376,7 @@ functio loss(tf32[2, 2] x) → tf32[2, 2] {
 }
 
 #[test]
-fn air_lane_closure_combine_declines_as_closure() {
+fn air_lane_capture_free_closure_combine_is_lifted() {
     let errors = air_errors(
         r#"
 @ radix lane "air"
@@ -386,7 +386,7 @@ functio loss(tf32[2, 2] x) → fractus {
 "#,
     );
 
-    expect_air_issue(&errors, "closure");
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
 }
 
 #[test]

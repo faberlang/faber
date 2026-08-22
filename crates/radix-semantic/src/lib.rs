@@ -591,7 +591,7 @@ pub fn analyze_with_cli(
         }
     }
 
-    if let Err(e) = passes::air_purity::check(&hir, &radix_lanes, interner, &types) {
+    if let Err(e) = passes::air_purity::check(&mut hir, &mut radix_lanes, interner, &types) {
         diagnostics.extend(e);
     }
 

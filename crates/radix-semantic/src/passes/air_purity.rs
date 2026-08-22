@@ -19,11 +19,15 @@ use radix_lexer::{Interner, Span, Symbol};
 /// Returns [`SemanticError`]s for `@ radix lane "air"` functions that violate
 /// the accepted v1 pure subset.
 pub fn check(
-    hir: &HirModule,
-    lanes: &RadixLaneMetadata,
-    interner: &Interner,
+    hir: &mut HirModule,
+    lanes: &mut RadixLaneMetadata,
+    interner: &mut Interner,
     types: &TypeTable,
 ) -> Result<(), Vec<SemanticError>> {
+    let mut errors = match super::air_closure_lift::lift(hir, lanes, interner, types) {
+        Ok(()) => Vec::new(),
+        Err(errors) => errors,
+    };
     let mut checker = AirPurityChecker {
         lanes,
         interner,
@@ -31,11 +35,12 @@ pub fn check(
         errors: Vec::new(),
     };
     checker.check_program(hir);
+    errors.extend(checker.errors);
 
-    if checker.errors.is_empty() {
+    if errors.is_empty() {
         Ok(())
     } else {
-        Err(checker.errors)
+        Err(errors)
     }
 }
 
@@ -302,6 +307,9 @@ impl AirPurityChecker<'_> {
                 self.check_cape(catch, "recoverable_handler");
             }
             HirExpressionKind::Clausura(params, _, _, body, _) => {
+                // ARC-4 rewrites higher-order capture-free combines before this
+                // walker. A closure that remains here is outside that callback
+                // surface (or was rejected with a capture-specific diagnostic).
                 self.reject(expr.span, "closure");
                 for param in params {
                     if let Some(default) = &param.default {
@@ -382,7 +390,7 @@ impl AirPurityChecker<'_> {
         } else if !self.is_typed_tensor_receiver(receiver) {
             self.reject_with_arg(span, "tensor_method_receiver", "method", &method);
         }
-        if is_higher_order_tensor_intrinsic(&method) {
+        if super::air_closure_lift::is_higher_order_method(&method) {
             self.check_higher_order_combine(args);
         }
         self.check_expr(receiver);
@@ -499,10 +507,6 @@ fn is_allowed_tensor_intrinsic(method: &str) -> bool {
             | "mappata"
             | "filtrata"
     )
-}
-
-fn is_higher_order_tensor_intrinsic(method: &str) -> bool {
-    matches!(method, "reducta" | "cumulata" | "mappata" | "filtrata")
 }
 
 fn is_control_expr_statement(expr: &HirExpression) -> bool {

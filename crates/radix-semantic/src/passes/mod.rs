@@ -42,6 +42,7 @@
 //! well as errors, and the driver decides success from the final diagnostic
 //! severities rather than from pass execution alone.
 
+pub mod air_closure_lift;
 pub mod air_purity;
 pub mod air_unroll;
 pub mod borrow;
@@ -68,6 +69,10 @@ pub use crate::{
     DefId, Primitive, Resolver, SemanticError, SemanticErrorKind, SymbolKind, Type, TypeId,
     TypeTable, WarningKind,
 };
+
+#[cfg(test)]
+#[path = "air_closure_lift_test.rs"]
+mod air_closure_lift_test;
 
 #[cfg(test)]
 #[path = "air_purity_test.rs"]
