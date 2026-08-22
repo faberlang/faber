@@ -70,11 +70,17 @@ const BUDGETS: Budgets = Budgets {
     // `let _ =` discards; remaining sites are deliberate side-effect binds
     // in lowering/resolver paths.
     let_underscore: 6,
-    // All inline `mod tests { … }` bodies extracted to *_test.rs companions
-    // (2026-08-19: annotation, emit, shader_contract, broadcast_reduction).
-    inline_test_modules: 0,
-    // All #[test] attrs moved out of production sources into companions.
-    test_attr_in_production: 0,
+    // Minted at D03-RATCHET: the widened counter counts every cfg(test)-gated
+    // inline `mod NAME {` (not only literal `mod tests {`). Live 6:
+    // 4 `*_unit` modules in mir/mod.rs (D03-MODULE extracts these),
+    // 1 `mod tests` in mir/lower/package_instantiate.rs (2d25e243e, after
+    // the D-03 census), and 1 `library_home_test_support` helper in
+    // import_resolve.rs.
+    inline_test_modules: 6,
+    // WHY: package_instantiate.rs still hosts one inline `#[test]` inside
+    // the `mod tests` body counted above. Other `#[test]` attrs live in
+    // companions. Frozen at observed; D03-MODULE does not extract this file.
+    test_attr_in_production: 1,
 };
 
 #[test]

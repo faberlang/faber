@@ -113,9 +113,7 @@ pub fn count_budgets(files: &[SourceFile], subtract_self_expect: bool) -> Counts
         counts.todo += count_substring(&file.scrubbed, "todo!(");
         counts.unimplemented += count_substring(&file.scrubbed, "unimplemented!(");
         counts.let_underscore += count_let_underscore(&file.scrubbed);
-        if file.scrubbed.contains("#[cfg(test)]") && file.scrubbed.contains("mod tests {") {
-            counts.inline_test_modules += 1;
-        }
+        counts.inline_test_modules += count_inline_test_modules(&file.scrubbed);
         if file.scrubbed.contains("#[test]") {
             counts.test_attr_in_production += 1;
         }
@@ -136,7 +134,7 @@ pub fn assert_budgets(counts: Counts, budgets: Budgets) {
     );
     assert_budget("let _ =", counts.let_underscore, budgets.let_underscore);
     assert_budget(
-        "inline #[cfg(test)] mod tests {",
+        "inline #[cfg(test)] mod NAME {",
         counts.inline_test_modules,
         budgets.inline_test_modules,
     );
@@ -239,6 +237,160 @@ fn count_let_underscore(haystack: &str) -> usize {
         .lines()
         .filter(|line| line.contains("let _ ="))
         .count()
+}
+
+/// Count each cfg(test)-gated inline `mod NAME { … }` body, including
+/// `#[cfg(all(test, …))]` and stacked attributes. Companion `mod NAME;`
+/// wiring is not counted.
+#[must_use]
+pub fn count_inline_test_modules(scrubbed: &str) -> usize {
+    let chars: Vec<char> = scrubbed.chars().collect();
+    let mut count = 0;
+    let mut i = 0;
+    let mut pending_attrs: Vec<String> = Vec::new();
+
+    while i < chars.len() {
+        if chars[i].is_whitespace() {
+            i += 1;
+            continue;
+        }
+        if chars[i] == '#' && i + 1 < chars.len() && chars[i + 1] == '[' {
+            if let Some((attr, end)) = parse_attribute(&chars, i) {
+                pending_attrs.push(attr);
+                i = end;
+                continue;
+            }
+        }
+        if let Some((end, is_inline)) = parse_mod_item(&chars, i) {
+            if is_inline && pending_attrs.iter().any(|attr| cfg_enables_test(attr)) {
+                count += 1;
+            }
+            pending_attrs.clear();
+            i = end;
+            continue;
+        }
+        pending_attrs.clear();
+        i += 1;
+    }
+    count
+}
+
+fn parse_attribute(chars: &[char], start: usize) -> Option<(String, usize)> {
+    if start + 1 >= chars.len() || chars[start] != '#' || chars[start + 1] != '[' {
+        return None;
+    }
+    let end = skip_balanced(chars, start + 1, '[', ']')?;
+    Some((chars[start..end].iter().collect(), end))
+}
+
+/// Returns `(end_index, is_inline_body)` for `pub(…)? mod NAME {` / `;`.
+fn parse_mod_item(chars: &[char], start: usize) -> Option<(usize, bool)> {
+    let mut i = start;
+    if ident_at(chars, i, "pub") {
+        i += 3;
+        i = skip_ws(chars, i);
+        if i < chars.len() && chars[i] == '(' {
+            i = skip_balanced(chars, i, '(', ')')?;
+            i = skip_ws(chars, i);
+        }
+    }
+    if !ident_at(chars, i, "mod") {
+        return None;
+    }
+    i += 3;
+    i = skip_ws(chars, i);
+    if i >= chars.len() || !is_ident_start(chars[i]) {
+        return None;
+    }
+    i += 1;
+    while i < chars.len() && is_ident_continue(chars[i]) {
+        i += 1;
+    }
+    i = skip_ws(chars, i);
+    match chars.get(i) {
+        Some('{') => Some((i + 1, true)),
+        Some(';') => Some((i + 1, false)),
+        _ => None,
+    }
+}
+
+fn cfg_enables_test(attr: &str) -> bool {
+    let compact: String = attr.chars().filter(|ch| !ch.is_whitespace()).collect();
+    let Some(inner) = compact
+        .strip_prefix("#[cfg(")
+        .and_then(|rest| rest.strip_suffix(")]"))
+    else {
+        return false;
+    };
+    ident_tokens(&strip_not_groups(inner)).any(|token| token == "test")
+}
+
+fn strip_not_groups(pred: &str) -> String {
+    let chars: Vec<char> = pred.chars().collect();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < chars.len() {
+        if ident_at(&chars, i, "not") {
+            let j = skip_ws(&chars, i + 3);
+            if j < chars.len() && chars[j] == '(' {
+                if let Some(end) = skip_balanced(&chars, j, '(', ')') {
+                    i = end;
+                    continue;
+                }
+            }
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out
+}
+
+fn ident_tokens(src: &str) -> impl Iterator<Item = &str> {
+    src.split(|ch: char| !is_ident_continue(ch))
+        .filter(|token| !token.is_empty())
+}
+
+fn ident_at(chars: &[char], i: usize, ident: &str) -> bool {
+    let ident: Vec<char> = ident.chars().collect();
+    if i + ident.len() > chars.len() || chars[i..i + ident.len()] != ident {
+        return false;
+    }
+    let end = i + ident.len();
+    (i == 0 || !is_ident_continue(chars[i - 1]))
+        && (end == chars.len() || !is_ident_continue(chars[end]))
+}
+
+fn skip_ws(chars: &[char], mut i: usize) -> usize {
+    while i < chars.len() && chars[i].is_whitespace() {
+        i += 1;
+    }
+    i
+}
+
+fn skip_balanced(chars: &[char], open_at: usize, open: char, close: char) -> Option<usize> {
+    if chars.get(open_at) != Some(&open) {
+        return None;
+    }
+    let mut depth = 0;
+    for (offset, ch) in chars[open_at..].iter().enumerate() {
+        if *ch == open {
+            depth += 1;
+        } else if *ch == close {
+            depth -= 1;
+            if depth == 0 {
+                return Some(open_at + offset + 1);
+            }
+        }
+    }
+    None
+}
+
+fn is_ident_start(ch: char) -> bool {
+    ch.is_ascii_alphabetic() || ch == '_'
+}
+
+fn is_ident_continue(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || ch == '_'
 }
 
 /// Strip comments and string/char literal bodies so budget scans see code only.

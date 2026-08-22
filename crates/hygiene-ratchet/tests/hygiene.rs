@@ -33,6 +33,82 @@ fn production_hygiene_budgets() {
     assert_budgets(counts, BUDGETS);
 }
 
+fn count_inline(src: &str) -> usize {
+    hygiene_ratchet::count_inline_test_modules(&hygiene_ratchet::scrub_rust_source(src))
+}
+
+#[test]
+fn inline_test_modules_count_any_cfg_test_gated_name() {
+    assert_eq!(count_inline("#[cfg(test)]\nmod tests {\n}\n"), 1);
+    assert_eq!(count_inline("#[cfg(test)]\nmod smoke_tests {\n}\n"), 1);
+    assert_eq!(count_inline("#[cfg(test)]\nmod names_unit {\n}\n"), 1);
+    assert_eq!(
+        count_inline("#[cfg(test)]\npub(crate) mod library_home_test_support {\n}\n"),
+        1
+    );
+}
+
+#[test]
+fn inline_test_modules_count_cfg_all_test() {
+    assert_eq!(
+        count_inline("#[cfg(all(test, feature = \"foo\"))]\nmod tests {\n}\n"),
+        1
+    );
+    assert_eq!(
+        count_inline("#[cfg(all(test, not(feature = \"foo\")))]\nmod smoke_tests {\n}\n"),
+        1
+    );
+    assert_eq!(
+        count_inline(
+            "#[cfg(all(\n    test,\n    any(feature = \"a\", feature = \"b\")\n))]\nmod tests {\n}\n"
+        ),
+        1
+    );
+}
+
+#[test]
+fn inline_test_modules_count_stacked_allow_attrs() {
+    assert_eq!(
+        count_inline("#[cfg(test)]\n#[allow(unused_imports)]\nmod names_unit {\n}\n"),
+        1
+    );
+    assert_eq!(
+        count_inline(
+            "#[cfg(test)]\n#[allow(\n    clippy::float_cmp,\n    clippy::cast_possible_truncation\n)]\nmod tests {\n}\n"
+        ),
+        1
+    );
+}
+
+#[test]
+fn inline_test_modules_count_each_module_not_file() {
+    let src = "#[cfg(test)]\nmod names_unit {\n}\n#[cfg(test)]\nmod validate_unit {\n}\n";
+    assert_eq!(count_inline(src), 2);
+}
+
+#[test]
+fn inline_test_modules_ignore_companion_semicolon_wiring() {
+    assert_eq!(
+        count_inline("#[cfg(test)]\n#[path = \"foo_test.rs\"]\nmod tests;\n"),
+        0
+    );
+    assert_eq!(
+        count_inline("#[cfg(all(test, feature = \"foo\"))]\n#[path = \"foo_test.rs\"]\nmod tests;\n"),
+        0
+    );
+    assert_eq!(count_inline("#[cfg(test)]\nmod test_support;\n"), 0);
+}
+
+#[test]
+fn inline_test_modules_ignore_not_test_and_literals() {
+    assert_eq!(count_inline("#[cfg(not(test))]\nmod tests {\n}\n"), 0);
+    assert_eq!(count_inline("mod tests {\n}\n"), 0);
+    assert_eq!(
+        count_inline(r##"fn probe() { let _ = "#[cfg(test)] mod tests {"; }"##),
+        0
+    );
+}
+
 #[test]
 fn non_renderer_tests_do_not_assert_diagnostic_text() {
     let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
