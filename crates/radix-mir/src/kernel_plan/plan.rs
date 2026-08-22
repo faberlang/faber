@@ -1,3 +1,12 @@
+//! Portable collective floor for backend-neutral kernel recipes.
+//!
+//! Every lane must be able to emit a collective as a tree reduction over
+//! shared memory plus a barrier. Lane-ISA collectives such as simdgroup/warp
+//! shuffle, reduce, or scan are recipe-local optimizations, not portable MIR
+//! semantics: each optimization carries a portable fallback or an explicit
+//! lane admission. No collective MIR op is introduced until a second caller
+//! requires one.
+
 #[allow(unused_imports)] // intra-doc links only; the plan pass lives in build.rs
 use crate::abi::CollectionOpContract;
 
