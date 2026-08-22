@@ -379,6 +379,10 @@ pub struct CheckArgs {
     #[arg(long = "deny", value_name = "CODE")]
     pub deny: Vec<String>,
 
+    /// Print an advisory AIR-lane compatibility report (report-only)
+    #[arg(long)]
+    pub air: bool,
+
     /// Force package checking mode
     #[arg(long)]
     pub package: bool,

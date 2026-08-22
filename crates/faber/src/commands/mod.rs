@@ -4,6 +4,10 @@
 //! handlers live in [`init`], [`explain`], [`run`], and [`test`].
 
 mod archive;
+mod check_air;
+#[cfg(test)]
+#[path = "check_air_test.rs"]
+mod check_air_test;
 mod check_library;
 #[cfg(test)]
 #[path = "check_library_test.rs"]
@@ -45,9 +49,7 @@ use crate::cli::Command;
 use crate::input_shape::{locale_without_package_error, verify_input_is_package_shaped};
 use crate::package;
 use clap::Parser;
-use radix::services::{
-    BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand,
-};
+use radix::services::{BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
 
 use check_library::cmd_check_library;
 use convert::cmd_convert;
@@ -162,7 +164,39 @@ fn dispatch(command: Command) {
         Command::Check(args) => {
             reject_reader_locale_without_package(args.locale.as_deref(), &args.input, args.package);
             validate_deny_codes(&args.deny);
-            if args.package || package::should_treat_as_package_from_args(&args.input) {
+            let package_shaped =
+                args.package || package::should_treat_as_package_from_args(&args.input);
+            if args.air {
+                // ALA-1: the advisory AIR report is single-file only. Plain
+                // `check` routes bare `.fab` files through the package loader;
+                // under `--air` a plain file stays in file mode so the report
+                // rides the single-file pipeline. Directory/manifest-shaped
+                // inputs stay unsupported.
+                let input_is_plain_file = if args.package {
+                    false
+                } else if package_shaped {
+                    !args.input.is_empty()
+                        && std::path::Path::new(&args.input[0]).is_file()
+                } else {
+                    true
+                };
+                if !input_is_plain_file {
+                    let message = check_air::PACKAGE_AIR_MESSAGE;
+                    eprintln!("{message}");
+                    std::process::exit(1);
+                }
+                cmd_check_file(CheckCommand {
+                    input: args.input,
+                    package: args.package,
+                    permissive: args.permissive,
+                    deny_warnings: args.deny_warnings,
+                    deny_codes: args.deny,
+                    diagnostic_mode: diagnostic_mode(args.diagnostics),
+                    diagnostics_locale_pack: None,
+                    locale: None,
+                    diagnostics_locale: args.diagnostics_locale,
+                }, true);
+            } else if package_shaped {
                 package::cmd_check_package(CheckCommand {
                     input: args.input,
                     package: args.package,
@@ -185,7 +219,7 @@ fn dispatch(command: Command) {
                     diagnostics_locale_pack: None,
                     locale: None,
                     diagnostics_locale: args.diagnostics_locale,
-                });
+                }, false);
             }
         }
         Command::Verify(args) => {
@@ -344,16 +378,12 @@ fn read_source(args: &[String]) -> (String, String) {
 
 fn cmd_inspect_lex(input: &[String]) {
     let (name, source) = read_source(input);
-    print_inspection(radix::services::lex_inspection_for_source(
-        &name, &source,
-    ));
+    print_inspection(radix::services::lex_inspection_for_source(&name, &source));
 }
 
 fn cmd_inspect_parse(input: &[String]) {
     let (name, source) = read_source(input);
-    print_inspection(radix::services::parse_inspection_for_source(
-        &name, &source,
-    ));
+    print_inspection(radix::services::parse_inspection_for_source(&name, &source));
 }
 
 fn cmd_inspect_hir(input: &[String], load: Option<std::path::PathBuf>) {
@@ -363,9 +393,7 @@ fn cmd_inspect_hir(input: &[String], load: Option<std::path::PathBuf>) {
         std::process::exit(1);
     }
     let (name, source) = read_source(input);
-    print_inspection(radix::services::hir_inspection_for_source(
-        &name, &source,
-    ));
+    print_inspection(radix::services::hir_inspection_for_source(&name, &source));
 }
 
 fn cmd_inspect_mir(input: &[String]) {
@@ -388,7 +416,7 @@ fn cmd_inspect_cli_ir(input: &[String]) {
     ));
 }
 
-fn cmd_check_file(command: CheckCommand) {
+fn cmd_check_file(command: CheckCommand, air: bool) {
     if command.package {
         // Cross-reference: must stay verbatim with
         // crates/radix-cli/src/commands/check.rs `PACKAGE_CHECK_MESSAGE`.
@@ -404,6 +432,12 @@ fn cmd_check_file(command: CheckCommand) {
     };
     radix::module::driver::apply_warn_policy(&mut result.diagnostics, &warn_policy);
     crate::postprocess::print_diagnostics(&result.diagnostics, command.diagnostic_mode, None);
+    if air {
+        if let Some(rows) = check_air::advisory_rows(&name, &source) {
+            let mut out = std::io::stdout().lock();
+            let _ = check_air::render_report(&mut out, &rows);
+        }
+    }
     let success = result.success
         && !result
             .diagnostics
