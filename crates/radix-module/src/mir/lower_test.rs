@@ -1340,7 +1340,7 @@ fn range_itera_stops_when_bounds_fail_to_lower() {
     let body = HirBlock { statements: Vec::new(), expr: None, span, ..Default::default() };
 
     assert!(builder
-        .lower_itera_expr(crate::hir::HirIteraMode::Ab, DefId(0), Symbol(0), &iter, &body, &expr)
+        .lower_itera_expr(crate::hir::HirIteraMode::Ab, &[], DefId(0), Symbol(0), &iter, &body, &expr)
         .is_none());
     assert_eq!(builder.blocks.len(), 1);
     assert_eq!(builder.errors.len(), 1);
@@ -1370,40 +1370,57 @@ fn edge_empty_range_itera_ab_skips_loop_body() {
 }
 
 #[test]
-fn lower_itera_expr_rejects_shaped_tensor_and_matrix_collections() {
-    // Post-delivery admit shapes: tensor rank 1/2/3 with [i]/[i, j]/[i, j, k]
-    // and matrix rank 2 with [i, j]. Arity-error shapes remain [i] on rank 2,
-    // [i, j] on rank 3, and [i, j, k] on matrix rank 2. Coordinate-free rank-2
-    // `itera ex` is an arity type error (AC-5), so the pins ride the explicit
-    // `apud [i, j]` form until AC-6 lowers it.
-    let cases = [
-        (
-            "tensor-rank-2",
-            "functio iterate(tensor<f32, [2, 3]> m) → vacuum { itera ex m apud [i, j] fixum cell { } }",
-            // AEU-1: rank > 1 tensor itera declines ride the generic
-            // Unsupported family (rank > 1 belongs to itera-apud-coordinates).
-            "unsupported MIR lowering: itera collection before iterator MIR lowering",
-            "unsupported_mir_lowering_itera_collection_before_iterator_mir_lowering",
-        ),
-        (
-            "matrix-rank-2",
-            "functio iterate(matrix<f32, [2, 3]> m) → vacuum { itera ex m apud [i, j] fixum cell { } }",
-            "unsupported MIR lowering: itera collection before iterator MIR lowering",
-            "unsupported_mir_lowering_itera_collection_before_iterator_mir_lowering",
-        ),
-    ];
+fn lowers_shaped_tensor_and_matrix_collections() {
+    // AC-6 admits one unified shaped arm. The matrix source uses the same
+    // rank-2 coordinate spelling as a tensor; its register cells are selected
+    // through static MatrixCell projections behind the coordinate loop.
+    let tensor_dump = dump_source(
+        r"functio iterate(tensor<f32, [2, 3]> m) → vacuum {
+  itera ex m apud [i, j] fixum cell {
+    nota i
+    nota j
+    nota cell
+  }
+}",
+    );
+    assert!(
+        !tensor_dump.contains("itera collection before iterator MIR lowering"),
+        "{tensor_dump}"
+    );
+    assert!(
+        tensor_dump.contains("runtime collection tensor_get"),
+        "tensor element binding must use TensorGet: {tensor_dump}"
+    );
+    assert!(
+        tensor_dump.matches("branch ").count() >= 2,
+        "rank-2 tensor needs two loop branches: {tensor_dump}"
+    );
 
-    for (label, source, message, issue) in cases {
-        let mut unit = analyze(source);
-        let errors = lower_analyzed_unit(&mut unit, Default::default())
-            .expect_err("shaped itera ex must remain unsupported before AC-6");
-        assert_eq!(errors.len(), 1, "{label} should emit one MIR rejection: {errors:?}");
-        assert_eq!(errors[0].message, message, "{label} unsupported string");
-        assert_eq!(
-            errors[0].issue, issue,
-            "{label} should use the live Ex-mode unsupported identity"
-        );
-    }
+    let matrix_dump = dump_source(
+        r"functio iterate(matrix<f32, [2, 3]> m) → vacuum {
+  itera ex m apud [i, j] fixum cell {
+    nota i
+    nota j
+    nota cell
+  }
+}",
+    );
+    assert!(
+        !matrix_dump.contains("itera collection before iterator MIR lowering"),
+        "{matrix_dump}"
+    );
+    assert!(
+        matrix_dump.contains(".cell0_0"),
+        "matrix first cell must be bound: {matrix_dump}"
+    );
+    assert!(
+        matrix_dump.contains(".cell1_2"),
+        "matrix last cell must be bound: {matrix_dump}"
+    );
+    assert!(
+        matrix_dump.matches("branch ").count() >= 2,
+        "rank-2 matrix needs two loop branches: {matrix_dump}"
+    );
 }
 
 #[test]
@@ -1465,26 +1482,52 @@ fn tensor_itera_ex_rank1_lowers_to_literal_bound_index_loop() {
 }
 
 #[test]
-fn tensor_itera_ex_rank2_stays_unsupported() {
-    // Coordinate-free rank-2 `itera ex` is an arity type error (AC-5); the
-    // explicit `apud [i, j]` form still reaches MIR and stays unsupported
-    // until AC-6 lowers the shaped arm.
-    let mut unit = analyze(
+fn tensor_itera_ex_rank2_lowers_to_nested_coordinate_loops() {
+    let dump = dump_source(
         r"functio sumGrid(tensor<fractus<f32>, [2, 2]> t) → fractus<f32> {
   itera ex t apud [i, j] fixum x {
+    nota i
+    nota j
     nota x
   }
   redde 0.0
 }",
     );
-    let errors = lower_analyzed_unit(&mut unit, Default::default()).expect_err("rank-2 tensor itera must fail closed");
-    assert_eq!(errors.len(), 1);
+    assert!(!dump.contains("itera collection before iterator MIR lowering"), "{dump}");
     assert!(
-        errors[0]
-            .issue
-            .contains("itera_collection_before_iterator_mir_lowering"),
-        "rank-2 decline keeps the Unsupported diagnostic family: {:?}",
-        errors[0].issue
+        dump.contains("runtime collection tensor_get"),
+        "rank-2 tensor element binding must use TensorGet: {dump}"
+    );
+    assert!(
+        dump.matches("branch ").count() >= 2,
+        "rank-2 tensor needs outer and inner loops: {dump}"
+    );
+}
+
+#[test]
+fn tensor_itera_ex_rank3_lowers_three_nested_coordinate_loops() {
+    let dump = dump_source(
+        r"functio visitCube(tensor<numerus, [2, 2, 2]> cube) → vacuum {
+  itera ex cube apud [i, j, k] fixum cell {
+    nota i
+    nota j
+    nota k
+    nota cell
+  }
+}",
+    );
+    assert!(!dump.contains("itera collection before iterator MIR lowering"), "{dump}");
+    assert!(
+        dump.contains("runtime collection tensor_get"),
+        "rank-3 tensor element binding must use TensorGet: {dump}"
+    );
+    assert!(
+        dump.matches("branch ").count() >= 3,
+        "rank-3 tensor needs three loop branches: {dump}"
+    );
+    assert!(
+        dump.matches("var _").count() >= 4,
+        "rank-3 loop needs three coordinate locals plus the element local: {dump}"
     );
 }
 

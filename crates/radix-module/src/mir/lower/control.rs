@@ -39,7 +39,7 @@ struct RangeIteraLowering<'a> {
     span: Span,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum CollectionIteraKind {
     Array(TypeId),
     MapKeys(TypeId),
@@ -47,6 +47,14 @@ enum CollectionIteraKind {
     Cursor(TypeId),
     AsyncCursor(TypeId),
     Tensor(TypeId),
+    /// Unified shaped lane: tensors and matrices share rank-N loop lowering.
+    /// The matrix flag selects static cell projections for the register carrier;
+    /// tensors use the runtime indexed-access ABI for rank-N coordinates.
+    Shaped {
+        element: TypeId,
+        dimensions: Vec<i64>,
+        matrix: bool,
+    },
     // Route B (AEU-4): runtime-len `lista<T, N>` splits on the carrier `len`
     // into N+1 guard-free unrolled arms; the literal capacity is carried so
     // the split stays base-lane MIR (never AIR).
@@ -56,6 +64,7 @@ enum CollectionIteraKind {
 
 struct ArrayIteraLowering<'a> {
     mode: HirIteraMode,
+    coordinates: &'a [(DefId, Symbol)],
     binding: DefId,
     name: Symbol,
     iter: &'a HirExpression,
@@ -345,6 +354,7 @@ impl FunctionBuilder<'_> {
     pub(super) fn lower_itera_expr(
         &mut self,
         mode: HirIteraMode,
+        coordinates: &[(DefId, Symbol)],
         binding: DefId,
         name: Symbol,
         iter: &HirExpression,
@@ -377,7 +387,15 @@ impl FunctionBuilder<'_> {
                 })?;
             }
             HirIteraMode::Ex | HirIteraMode::De => {
-                self.lower_array_itera(ArrayIteraLowering { mode, binding, name, iter, body, span: expr.span })?;
+                self.lower_array_itera(ArrayIteraLowering {
+                    mode,
+                    coordinates,
+                    binding,
+                    name,
+                    iter,
+                    body,
+                    span: expr.span,
+                })?;
             }
         }
         Some(MirOperand::Constant(MirConstant::Unit))
@@ -1251,23 +1269,47 @@ impl FunctionBuilder<'_> {
         // before the builder mutates itself below.
         let (collection_kind, tensor_lanes) = {
             let normalized = self.normalized_type(iter_ty);
+            let has_coordinates = !iter.coordinates.is_empty();
             let kind = match normalized {
                 Type::Tensor(elem, shape) => {
-                    // Rank-1 literal shape: `IndexExpr::Literal(N)` or a
-                    // one-element `Tuple` of a literal (the figura-list
-                    // brackets parse `[N]` as a 1-tuple). Rank > 1 and
-                    // symbolic shapes fall through to Unsupported (rank > 1
-                    // belongs to itera-apud-coordinates, symbolic shapes are
-                    // shape-generics).
-                    let rank1_literal = match self.types.get_index(*shape) {
-                        IndexExpr::Literal(_) => true,
-                        IndexExpr::Tuple(dims) => {
-                            dims.len() == 1 && matches!(self.types.get_index(dims[0]), IndexExpr::Literal(_))
+                    let dimensions = i64s_from_literal_index(*shape, self.types);
+                    if matches!(iter.mode, HirIteraMode::Ex)
+                        && has_coordinates
+                        && dimensions
+                            .as_ref()
+                            .is_some_and(|dims| dims.len() == iter.coordinates.len())
+                    {
+                        CollectionIteraKind::Shaped {
+                            element: *elem,
+                            dimensions: dimensions.expect("literal tensor dimensions checked above"),
+                            matrix: false,
                         }
-                        _ => false,
-                    };
-                    if matches!(iter.mode, HirIteraMode::Ex) && rank1_literal {
-                        CollectionIteraKind::Tensor(*elem)
+                    } else {
+                        // The coordinate-free rank-1 route remains unchanged;
+                        // rank-N shaped tensors use the unified shaped arm.
+                        let rank1_literal = dimensions.as_ref().is_some_and(|dims| dims.len() == 1);
+                        if matches!(iter.mode, HirIteraMode::Ex) && !has_coordinates && rank1_literal {
+                            CollectionIteraKind::Tensor(*elem)
+                        } else {
+                            CollectionIteraKind::Unsupported
+                        }
+                    }
+                }
+                Type::Matrix(elem, shape) => {
+                    let dimensions = i64s_from_literal_index(*shape, self.types);
+                    let literal_matrix = dimensions
+                        .as_ref()
+                        .is_some_and(|dims| dims.len() == 2 && dims.iter().all(|dim| u8::try_from(*dim).is_ok()));
+                    if matches!(iter.mode, HirIteraMode::Ex)
+                        && has_coordinates
+                        && iter.coordinates.len() == 2
+                        && literal_matrix
+                    {
+                        CollectionIteraKind::Shaped {
+                            element: *elem,
+                            dimensions: dimensions.expect("literal matrix dimensions checked above"),
+                            matrix: true,
+                        }
                     } else {
                         CollectionIteraKind::Unsupported
                     }
@@ -1299,9 +1341,9 @@ impl FunctionBuilder<'_> {
                 }
                 _ => CollectionIteraKind::Unsupported,
             };
-            // Static bound: the tensor loop runs the literal N lanes — no
-            // runtime length intrinsic on the tensor carrier.
-            let lanes = if let CollectionIteraKind::Tensor(_) = kind {
+            // Static bound: the coordinate-free tensor loop runs the literal N
+            // lanes — no runtime length intrinsic on that tensor carrier.
+            let lanes = if matches!(&kind, CollectionIteraKind::Tensor(_)) {
                 let Type::Tensor(_, shape) = normalized else {
                     unreachable!("tensor itera kind was classified from a tensor type")
                 };
@@ -1313,7 +1355,7 @@ impl FunctionBuilder<'_> {
             };
             (kind, lanes)
         };
-        if matches!(collection_kind, CollectionIteraKind::Unsupported) {
+        if matches!(&collection_kind, CollectionIteraKind::Unsupported) {
             // Only map-value iteration carries the tabula decline; tensor and
             // bounded-lista declines keep the generic iterator diagnostic.
             let is_map = matches!(self.normalized_type(iter_ty), Type::Map(_, _));
@@ -1331,9 +1373,9 @@ impl FunctionBuilder<'_> {
         let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let collection = self.lower_expr_value(iter.iter)?;
-        let (collection, collection_ty) = match collection_kind {
+        let (collection, collection_ty) = match &collection_kind {
             CollectionIteraKind::Cursor(element) | CollectionIteraKind::AsyncCursor(element) => {
-                let array = self.types.find_array(element)?;
+                let array = self.types.find_array(*element)?;
                 let array_ty = MirType::semantic(array);
                 let snapshot = self.runtime_call_value(
                     MirIntrinsic::Sermo(crate::mir::MirSermoOp::DrainCursor),
@@ -1346,10 +1388,13 @@ impl FunctionBuilder<'_> {
             _ => (collection, MirType::semantic(iter_ty)),
         };
         let collection = self.materialize_operand_place(collection, collection_ty, iter.iter.span);
+        if let CollectionIteraKind::Shaped { element, dimensions, matrix } = &collection_kind {
+            return self.lower_shaped_itera(&iter, collection, *element, dimensions, *matrix);
+        }
 
-        let (iteration_place, binding_ty, array_de) = match collection_kind {
+        let (iteration_place, binding_ty, array_de) = match &collection_kind {
             CollectionIteraKind::Array(item) => {
-                let item_ty = MirType::semantic(item);
+                let item_ty = MirType::semantic(*item);
                 let binding_ty = if matches!(iter.mode, HirIteraMode::De) {
                     numerus
                 } else {
@@ -1359,32 +1404,35 @@ impl FunctionBuilder<'_> {
             }
             CollectionIteraKind::MapKeys(key) => {
                 let (snapshot_place, binding_ty) =
-                    self.lower_map_itera_snapshot(collection, key, MirCollectionOp::Keys, iter.iter.span)?;
+                    self.lower_map_itera_snapshot(collection, *key, MirCollectionOp::Keys, iter.iter.span)?;
                 (snapshot_place, binding_ty, false)
             }
             CollectionIteraKind::MapValues(value) => {
                 let (snapshot_place, binding_ty) =
-                    self.lower_map_itera_snapshot(collection, value, MirCollectionOp::Values, iter.iter.span)?;
+                    self.lower_map_itera_snapshot(collection, *value, MirCollectionOp::Values, iter.iter.span)?;
                 (snapshot_place, binding_ty, false)
             }
             CollectionIteraKind::Cursor(value) | CollectionIteraKind::AsyncCursor(value) => {
-                (collection, MirType::semantic(value), false)
+                (collection, MirType::semantic(*value), false)
             }
             CollectionIteraKind::Tensor(elem) => {
                 // Element gather rides the generic Index projection over the
                 // tensor place (every lane is defined by construction).
-                (collection, MirType::semantic(elem), false)
+                (collection, MirType::semantic(*elem), false)
             }
             CollectionIteraKind::BoundedArray(elem, _) => {
-                (collection, MirType::semantic(elem), false)
+                (collection, MirType::semantic(*elem), false)
+            }
+            CollectionIteraKind::Shaped { .. } => {
+                unreachable!("shaped collection itera returns through nested lowering above")
             }
             CollectionIteraKind::Unsupported => {
                 unreachable!("unsupported collection itera kinds fail closed above")
             }
         };
 
-        if let CollectionIteraKind::BoundedArray(_, capacity) = collection_kind {
-            return self.lower_bounded_array_itera_split(&iter, iteration_place, binding_ty, capacity);
+        if let CollectionIteraKind::BoundedArray(_, capacity) = &collection_kind {
+            return self.lower_bounded_array_itera_split(&iter, iteration_place, binding_ty, *capacity);
         }
 
         let index = self.next_local_id();
@@ -1397,7 +1445,7 @@ impl FunctionBuilder<'_> {
             iter.span,
         );
 
-        let length = if let CollectionIteraKind::Tensor(_) = collection_kind {
+        let length = if matches!(&collection_kind, CollectionIteraKind::Tensor(_)) {
             MirOperand::Constant(MirConstant::Int(tensor_lanes))
         } else {
             self.runtime_call_value(
@@ -1473,6 +1521,267 @@ impl FunctionBuilder<'_> {
         self.terminate_current(MirTerminatorKind::Goto(cond_id), iter.span);
 
         self.switch_to(after_id);
+        Some(())
+    }
+
+    /// Lower one shaped `apud` loop as rank-N nested CFG loops.
+    ///
+    /// Tensor element reads use the runtime `TensorGet` ABI with the current
+    /// coordinate locals as its index list. Matrix values are register-class
+    /// aggregates, so their dynamic coordinate pair is switched to the
+    /// corresponding static `MatrixCell` projection before the shared body.
+    fn lower_shaped_itera(
+        &mut self,
+        iter: &ArrayIteraLowering<'_>,
+        collection: MirPlace,
+        element: TypeId,
+        dimensions: &[i64],
+        matrix: bool,
+    ) -> Option<()> {
+        if dimensions.is_empty() || dimensions.len() != iter.coordinates.len() {
+            self.errors.push(MirError::unsupported(
+                iter.iter.span,
+                "itera shaped collection dimensions before nested loop MIR lowering",
+            ));
+            return None;
+        }
+
+        let element_ty = MirType::semantic(element);
+        let binding = self.next_local_id();
+        self.locals.push(MirLocalDecl {
+            id: binding,
+            name: Some(iter.name),
+            ty: element_ty,
+            mutable: true,
+            span: iter.span,
+        });
+        self.bindings
+            .insert(iter.binding, LocalBinding { local: binding, ty: element_ty });
+
+        let after_id = self.fresh_block(iter.span);
+        self.lower_shaped_level(iter, collection, element, binding, dimensions, matrix, 0, after_id)?;
+        self.switch_to(after_id);
+        Some(())
+    }
+
+    fn lower_shaped_level(
+        &mut self,
+        iter: &ArrayIteraLowering<'_>,
+        collection: MirPlace,
+        element: TypeId,
+        binding: MirLocalId,
+        dimensions: &[i64],
+        matrix: bool,
+        level: usize,
+        continuation: MirBlockId,
+    ) -> Option<()> {
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let (coordinate_def, coordinate_name) = iter.coordinates[level];
+        let coordinate = self.next_local_id();
+        self.locals.push(MirLocalDecl {
+            id: coordinate,
+            name: Some(coordinate_name),
+            ty: numerus,
+            mutable: true,
+            span: iter.span,
+        });
+        self.bindings
+            .insert(coordinate_def, LocalBinding { local: coordinate, ty: numerus });
+        self.assign(
+            MirPlace::local(coordinate),
+            MirOperand::Constant(MirConstant::Int(0)),
+            numerus,
+            iter.span,
+        );
+
+        let condition_id = self.fresh_block(iter.span);
+        let body_id = self.fresh_block(iter.body.span);
+        let increment_id = self.fresh_block(iter.span);
+        let loop_after_id = self.fresh_block(iter.span);
+        self.terminate_current(MirTerminatorKind::Goto(condition_id), iter.span);
+
+        self.switch_to(condition_id);
+        let condition = self.binary_temp(
+            MirBinOp::Lt,
+            MirOperand::Place(MirPlace::local(coordinate)),
+            MirOperand::Constant(MirConstant::Int(dimensions[level])),
+            MirType::semantic(self.types.primitive(Primitive::Bivalens)),
+            iter.span,
+        );
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition, then_block: body_id, else_block: loop_after_id },
+            iter.span,
+        );
+
+        self.switch_to(body_id);
+        if level + 1 < dimensions.len() {
+            self.lower_shaped_level(iter, collection, element, binding, dimensions, matrix, level + 1, increment_id)?;
+        } else if matrix {
+            self.lower_shaped_matrix_body(
+                iter,
+                collection,
+                element,
+                binding,
+                coordinate,
+                iter.coordinates[level - 1].0,
+                dimensions,
+                increment_id,
+                loop_after_id,
+            )?;
+        } else {
+            self.lower_shaped_tensor_body(iter, collection, element, binding, increment_id, loop_after_id)?;
+        }
+
+        self.switch_to(increment_id);
+        let next = self.binary_temp(
+            MirBinOp::Add,
+            MirOperand::Place(MirPlace::local(coordinate)),
+            MirOperand::Constant(MirConstant::Int(1)),
+            numerus,
+            iter.span,
+        );
+        self.assign(MirPlace::local(coordinate), next, numerus, iter.span);
+        self.terminate_current(MirTerminatorKind::Goto(condition_id), iter.span);
+
+        self.switch_to(loop_after_id);
+        self.terminate_open_current(MirTerminatorKind::Goto(continuation), iter.span);
+        Some(())
+    }
+
+    fn lower_shaped_tensor_body(
+        &mut self,
+        iter: &ArrayIteraLowering<'_>,
+        collection: MirPlace,
+        element: TypeId,
+        binding: MirLocalId,
+        increment_id: MirBlockId,
+        loop_after_id: MirBlockId,
+    ) -> Option<()> {
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let Some(index_array) = self.types.find_array(numerus.semantic_id()) else {
+            self.errors
+                .push(MirError::missing_type(iter.iter.span, "shaped itera coordinate list"));
+            return None;
+        };
+        let coordinate_operands = iter
+            .coordinates
+            .iter()
+            .map(|(def_id, _)| {
+                let local = self
+                    .bindings
+                    .get(def_id)
+                    .expect("shaped coordinate binding exists")
+                    .local;
+                MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(local)))
+            })
+            .collect();
+        let index_list = self.construct_temp(
+            MirAggregateKind::Array,
+            MirAggregateFields::Ordered(coordinate_operands),
+            MirType::semantic(index_array),
+            iter.span,
+        );
+        let Some(option_ty) = self.types.find_equal(&Type::Option(element)) else {
+            self.errors
+                .push(MirError::missing_type(iter.iter.span, "shaped itera element option"));
+            return None;
+        };
+        let option = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorGet),
+            vec![MirOperand::Place(collection), index_list],
+            MirType::semantic(option_ty),
+            iter.iter.span,
+        );
+        if !self.current_is_open() {
+            return None;
+        }
+        let value = self.assign_temp(
+            MirValueKind::Option(MirOptionOp::Unwrap { value: option, mode: MirOptionUnwrapMode::Assume }),
+            MirType::semantic(element),
+            iter.span,
+        );
+        self.assign(MirPlace::local(binding), value, MirType::semantic(element), iter.span);
+        self.breakables.push(BreakableContext {
+            perge_target: Some(increment_id),
+            rumpe_target: loop_after_id,
+            rumpe_used: false,
+        });
+        self.visit_block(iter.body);
+        self.breakables.pop();
+        self.terminate_open_current(MirTerminatorKind::Goto(increment_id), iter.span);
+        Some(())
+    }
+
+    fn lower_shaped_matrix_body(
+        &mut self,
+        iter: &ArrayIteraLowering<'_>,
+        collection: MirPlace,
+        element: TypeId,
+        binding: MirLocalId,
+        column: MirLocalId,
+        row_def: DefId,
+        dimensions: &[i64],
+        increment_id: MirBlockId,
+        loop_after_id: MirBlockId,
+    ) -> Option<()> {
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let row = self
+            .bindings
+            .get(&row_def)
+            .expect("matrix row coordinate binding exists")
+            .local;
+        let rows = u8::try_from(dimensions[0]).ok()?;
+        let columns = u8::try_from(dimensions[1]).ok()?;
+        let row_stride = self.binary_temp(
+            MirBinOp::Mul,
+            MirOperand::Place(MirPlace::local(row)),
+            MirOperand::Constant(MirConstant::Int(i64::from(columns))),
+            numerus,
+            iter.span,
+        );
+        let linear = self.binary_temp(
+            MirBinOp::Add,
+            row_stride,
+            MirOperand::Place(MirPlace::local(column)),
+            numerus,
+            iter.span,
+        );
+        let body_id = self.fresh_block(iter.body.span);
+        let cases = (0..u16::from(rows) * u16::from(columns))
+            .map(|offset| MirSwitchCase {
+                value: MirConstant::Int(i64::from(offset)),
+                target: self.fresh_block(iter.span),
+            })
+            .collect::<Vec<_>>();
+        let cell_blocks = cases.iter().map(|case| case.target).collect::<Vec<_>>();
+        self.terminate_current(
+            MirTerminatorKind::Switch { value: linear, cases, default: increment_id },
+            iter.span,
+        );
+        for (offset, cell_id) in cell_blocks.into_iter().enumerate() {
+            let matrix_row = u8::try_from(offset / usize::from(columns)).ok()?;
+            let matrix_column = u8::try_from(offset % usize::from(columns)).ok()?;
+            self.switch_to(cell_id);
+            let mut cell = collection.clone();
+            cell.projections
+                .push(MirProjection::MatrixCell { row: matrix_row, column: matrix_column });
+            self.assign(
+                MirPlace::local(binding),
+                MirOperand::Place(cell),
+                MirType::semantic(element),
+                iter.span,
+            );
+            self.terminate_current(MirTerminatorKind::Goto(body_id), iter.span);
+        }
+        self.switch_to(body_id);
+        self.breakables.push(BreakableContext {
+            perge_target: Some(increment_id),
+            rumpe_target: loop_after_id,
+            rumpe_used: false,
+        });
+        self.visit_block(iter.body);
+        self.breakables.pop();
+        self.terminate_open_current(MirTerminatorKind::Goto(increment_id), iter.span);
         Some(())
     }
 

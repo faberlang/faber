@@ -79,8 +79,8 @@ pub(super) trait HirExpressionLoweringVisitor {
             HirExpressionKind::Discerne { scrutinees, arms, .. } => self.visit_discerne_expr(scrutinees, arms, expr),
             HirExpressionKind::Loop(block) => self.visit_loop_expr(block, expr),
             HirExpressionKind::Dum(cond, block) => self.visit_dum_expr(cond, block, expr),
-            HirExpressionKind::Itera(mode, _, binding, name, iter, block) => {
-                self.visit_itera_expr(*mode, *binding, *name, iter, block, expr)
+            HirExpressionKind::Itera(mode, coordinates, binding, name, iter, block) => {
+                self.visit_itera_expr(*mode, coordinates, *binding, *name, iter, block, expr)
             }
             HirExpressionKind::Handled { body, catch } => self.visit_handled_expr(body, catch, expr),
             HirExpressionKind::Assign(_, _) => self.visit_assignment_expr(expr),
@@ -235,6 +235,7 @@ pub(super) trait HirExpressionLoweringVisitor {
     fn visit_itera_expr(
         &mut self,
         mode: HirIteraMode,
+        coordinates: &[(DefId, Symbol)],
         binding: DefId,
         name: Symbol,
         iter: &HirExpression,
@@ -487,13 +488,14 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
     fn visit_itera_expr(
         &mut self,
         mode: HirIteraMode,
+        coordinates: &[(DefId, Symbol)],
         binding: DefId,
         name: Symbol,
         iter: &HirExpression,
         block: &HirBlock,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        self.lower_itera_expr(mode, binding, name, iter, block, expr)
+        self.lower_itera_expr(mode, coordinates, binding, name, iter, block, expr)
     }
 
     fn visit_handled_expr(&mut self, body: &HirBlock, catch: &HirCape, expr: &HirExpression) -> Option<MirOperand> {

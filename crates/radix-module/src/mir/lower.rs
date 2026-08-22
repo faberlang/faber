@@ -236,6 +236,7 @@ fn lower_analyzed_unit_with_options(
     options: MirLoweringOptions,
 ) -> Result<LoweredMirUnit<'_>, Vec<MirError>> {
     ensure_map_iteration_array_types(&mut unit.types);
+    ensure_itera_coordinate_array_types(&unit.hir, &mut unit.types);
     ensure_tensor_bracket_index_array_types(&unit.hir, &mut unit.types);
     // The layout table is rebuilt after monomorphization's shape finalization
     // so it covers the concrete shapes/type graph the instances carry.
@@ -581,6 +582,46 @@ fn ensure_map_iteration_array_types(types: &mut TypeTable) {
     }
     for element in elements {
         types.ensure_array(element);
+    }
+}
+
+fn ensure_itera_coordinate_array_types(hir: &crate::hir::HirModule, types: &mut TypeTable) {
+    struct IteraCoordinateCollector<'a> {
+        types: &'a TypeTable,
+        elements: FxHashSet<TypeId>,
+    }
+
+    impl HirVisitor for IteraCoordinateCollector<'_> {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if let HirExpressionKind::Itera(_, coordinates, _, _, iter, _) = &expr.kind {
+                if !coordinates.is_empty() {
+                    let mut iter_ty = iter.ty;
+                    while let Some(ty) = iter_ty {
+                        match self.types.get(ty) {
+                            Type::Alias(_, inner) => iter_ty = Some(*inner),
+                            Type::Tensor(element, _) | Type::Matrix(element, _) => {
+                                self.elements.insert(*element);
+                                break;
+                            }
+                            _ => break,
+                        }
+                    }
+                }
+            }
+            walk_expr(self, expr);
+        }
+    }
+
+    let mut collector = IteraCoordinateCollector { types, elements: FxHashSet::default() };
+    walk_program(&mut collector, hir);
+    let elements = std::mem::take(&mut collector.elements);
+    drop(collector);
+    if !elements.is_empty() {
+        let numerus = types.primitive(Primitive::Numerus);
+        types.ensure_array(numerus);
+        for element in elements {
+            types.intern(Type::Option(element));
+        }
     }
 }
 
