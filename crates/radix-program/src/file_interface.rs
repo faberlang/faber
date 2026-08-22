@@ -231,6 +231,7 @@ fn snapshot_enum(
     file_label: &str,
     export_identity: Option<&ExportIdentityContext>,
 ) -> Result<InterfaceNominalExport, Diagnostic> {
+    let name = analysis.interner.resolve(enm.name).to_owned();
     let variants = enm
         .variants
         .iter()
@@ -263,11 +264,31 @@ fn snapshot_enum(
             })
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;
+    let shared_fields = enm
+        .commune_fields
+        .iter()
+        .map(|field| {
+            snapshot_interface_type_with_identity(
+                field.ty,
+                &analysis.types,
+                &analysis.interner,
+                &analysis.resolver,
+                export_identity.map(identity_for).as_ref(),
+            )
+            .map(|ty| InterfaceStructField {
+                name: analysis.interner.resolve(field.name).to_owned(),
+                ty,
+                optional: false,
+                required: true,
+            })
+            .map_err(|err| interface_error(file_label, &name, err))
+        })
+        .collect::<Result<Vec<_>, Diagnostic>>()?;
     Ok(InterfaceNominalExport {
-        name: analysis.interner.resolve(enm.name).to_owned(),
+        name,
         methods: Vec::new(),
         variants,
-        shared_fields: Vec::new(),
+        shared_fields,
     })
 }
 

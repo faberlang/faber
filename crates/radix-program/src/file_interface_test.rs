@@ -1,6 +1,7 @@
 use super::*;
 use radix_module::driver::{analyze_source_with_cli_program_and_import_contract, Config, Session};
-use radix_module::file_interface::FileExportKind;
+use radix_module::file_interface::{FileExportKind, InterfaceStructField, InterfaceTypeSnapshot};
+use radix_module::semantic::Primitive;
 use std::collections::BTreeMap;
 
 fn analyze_with(config: Config, source: &str) -> radix_module::driver::AnalyzedModule {
@@ -70,6 +71,62 @@ implendum Loquax {
     ));
     // Private exports never appear even when named.
     assert!(!interface.exports.contains_key("hidden"));
+}
+
+#[test]
+fn extract_file_interface_round_trips_public_commune_fields() {
+    let analysis = analyze(
+        r#"@ publica
+        discretio ShapeError {
+            @ commune
+            textus message
+
+            Incompatible,
+            ElementMismatch { numerus expected numerus actual }
+        }
+        "#,
+    );
+    let interface = extract_file_interface_with_identity(
+        &analysis,
+        &["ShapeError".to_owned()],
+        "test.fab",
+        None,
+    )
+    .expect("extract interface");
+
+    let Some(FileExportKind::Enum(export)) = interface
+        .exports
+        .get("ShapeError")
+        .map(|export| &export.kind)
+    else {
+        panic!("public enum export missing: {interface:?}");
+    };
+    assert_eq!(
+        export.shared_fields,
+        vec![InterfaceStructField {
+            name: "message".to_owned(),
+            ty: InterfaceTypeSnapshot::Primitive(Primitive::Textus),
+            optional: false,
+            required: true,
+        }]
+    );
+    assert_eq!(export.variants.len(), 2);
+    assert_eq!(export.variants[1].fields.len(), 2);
+
+    analyze_source_with_cli_program_and_import_contract(
+        &Session::new(Config::default().with_target(radix_module::codegen::Target::HirRust)),
+        "consumer.fab",
+        r#"importa ex "shape:errors" shape
+
+functio render(shape.ShapeError e) → textus {
+    redde e.message
+}
+"#,
+        None,
+        BTreeMap::new(),
+        BTreeMap::from([("shape".to_owned(), interface.clone())]),
+    )
+    .expect("commune field interface round trip");
 }
 
 #[test]
