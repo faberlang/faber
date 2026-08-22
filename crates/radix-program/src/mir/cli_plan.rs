@@ -927,6 +927,12 @@ pub(super) struct NominalImportContext<'a> {
     /// Source struct/enum/variant `DefId` → merged dest, so interned types
     /// carry the same DefId as remapped aggregates and projections.
     pub def_remap: &'a HashMap<DefId, DefId>,
+    /// Source nominal `DefId` → (kind, export name). Intern falls back to
+    /// `shared_nominals` so leftover unions unify by name instead of minting
+    /// a colliding `Type::Enum(source-local DefId)`.
+    pub source_names: &'a HashMap<DefId, (InterfaceNominalKind, String)>,
+    /// Previously interned sibling/library nominals keyed by (kind, name).
+    pub shared_nominals: &'a HashMap<(InterfaceNominalKind, String), TypeId>,
 }
 
 /// Build the canonical nominal remap for one source unit (sibling or linked
@@ -1390,8 +1396,8 @@ pub(super) fn import_semantic_type_with_nominal(
 /// remap into the entry type table (codex-gap S1 U2).
 ///
 /// Returns `None` when the source def has no canonical entry mapping — the
-/// caller falls back to interning the source-local def as-is (pre-U2
-/// behavior, preserved for genuinely entry-local nominal references).
+/// caller falls back to interning through `def_remap` so leftover unions
+/// and structs do not keep colliding source-local `DefId`s.
 fn import_nominal_by_canonical_key(
     ty: &Type,
     nominal: Option<&NominalImportContext<'_>>,
@@ -1401,7 +1407,11 @@ fn import_nominal_by_canonical_key(
         Type::Struct(def_id) | Type::Enum(def_id) | Type::Interface(def_id) => *def_id,
         _ => return None,
     };
-    ctx.nominal_map.get(&def_id).copied()
+    if let Some(mapped) = ctx.nominal_map.get(&def_id).copied() {
+        return Some(mapped);
+    }
+    let (kind, name) = ctx.source_names.get(&def_id)?;
+    ctx.shared_nominals.get(&(*kind, name.clone())).copied()
 }
 
 pub(super) fn import_index_expr(

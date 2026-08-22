@@ -124,18 +124,20 @@ fn complete_def_remap(
     }
 }
 
-fn source_struct_defs(source: &radix_module::mir::MirValidationContext<'_>) -> Vec<DefId> {
+fn source_nominal_defs(source: &radix_module::mir::MirValidationContext<'_>) -> Vec<DefId> {
     let mut defs: Vec<DefId> = source.struct_fields.keys().copied().collect();
-    defs.extend(program_struct_defs_from_types(source.types));
+    defs.extend(source.enum_variants.keys().copied());
+    defs.extend(source.variant_parents.values().copied());
+    defs.extend(program_nominal_defs_from_types(source.types));
     defs.sort_by_key(|def| def.0);
     defs.dedup();
     defs
 }
 
-fn program_struct_defs_from_types(types: &TypeTable) -> Vec<DefId> {
+fn program_nominal_defs_from_types(types: &TypeTable) -> Vec<DefId> {
     (0..types.type_count())
         .filter_map(|index| match types.get(TypeId(index as u32)) {
-            Type::Struct(def_id) => Some(*def_id),
+            Type::Struct(def_id) | Type::Enum(def_id) | Type::Interface(def_id) => Some(*def_id),
             _ => None,
         })
         .collect()
@@ -561,15 +563,16 @@ pub(super) fn lower_package_units<'a>(
             &mut entry.analysis.interner,
         );
         remap_templates_text_symbols(&mut lowered, &mut entry.analysis.interner);
-        // Sibling struct literals constructed in the source analysis carry
-        // the source struct `DefId` in `MirAggregateKind::Struct`; the merged
-        // program's struct metadata is keyed by the entry's canonical nominal
-        // def, so the aggregate kind rides the same remap.
-        let mut struct_remap = build_struct_def_remap(&nominal_map, &entry.analysis.types);
+        // Sibling struct/union literals constructed in the source analysis
+        // carry the source `DefId` in aggregate kinds and interned types; the
+        // merged program's metadata is keyed by the entry's canonical nominal
+        // def, so leftover unions ride the same (kind, name) remap instead of
+        // intern-colliding on source-local DefIds.
+        let mut nominal_def_remap = build_nominal_def_remap(&nominal_map, &entry.analysis.types);
         let (program_structs, program_variants) = lowered_aggregate_defs(&lowered);
         complete_def_remap(
-            &mut struct_remap,
-            source_struct_defs(lowered.validated.validation())
+            &mut nominal_def_remap,
+            source_nominal_defs(lowered.validated.validation())
                 .into_iter()
                 .chain(program_structs),
             &mut next_synthetic,
@@ -582,17 +585,21 @@ pub(super) fn lower_package_units<'a>(
                 .chain(program_variants),
             &mut next_synthetic,
         );
-        let mut def_remap = struct_remap.clone();
+        let mut def_remap = nominal_def_remap.clone();
         def_remap.extend(variant_remap.iter().map(|(key, dest)| (*key, *dest)));
-        let nominal = NominalImportContext {
-            nominal_map: &nominal_map,
-            def_remap: &def_remap,
+        let source_to_entry_types = {
+            let nominal = NominalImportContext {
+                nominal_map: &nominal_map,
+                def_remap: &def_remap,
+                source_names: &source_names,
+                shared_nominals: &shared_nominals,
+            };
+            import_lowered_semantic_types(
+                lowered.validated.validation().types,
+                &mut entry.analysis.types,
+                Some(&nominal),
+            )
         };
-        let source_to_entry_types = import_lowered_semantic_types(
-            lowered.validated.validation().types,
-            &mut entry.analysis.types,
-            Some(&nominal),
-        );
         record_shared_nominals(
             &source_names,
             lowered.validated.validation().types,
@@ -601,7 +608,7 @@ pub(super) fn lower_package_units<'a>(
         );
         rewrite_lowered_type_ids(&mut lowered, &source_to_entry_types);
         rewrite_lowered_variant_defs(&mut lowered, &variant_remap);
-        rewrite_lowered_struct_defs(&mut lowered, &struct_remap);
+        rewrite_lowered_struct_defs(&mut lowered, &nominal_def_remap);
         if let Some(rewrite) = cli_plan
             .dispatch
             .as_ref()
@@ -620,7 +627,7 @@ pub(super) fn lower_package_units<'a>(
             &source_interner,
             &mut entry.analysis.interner,
             &source_to_entry_types,
-            &struct_remap,
+            &nominal_def_remap,
             &variant_remap,
             &nominal_map,
             &entry.analysis.types,
@@ -749,11 +756,12 @@ pub(super) fn lower_package_units<'a>(
                     &mut entry.analysis.interner,
                 );
                 remap_templates_text_symbols(&mut lowered, &mut entry.analysis.interner);
-                let mut struct_remap = build_struct_def_remap(&nominal_map, &entry.analysis.types);
+                let mut nominal_def_remap =
+                    build_nominal_def_remap(&nominal_map, &entry.analysis.types);
                 let (program_structs, program_variants) = lowered_aggregate_defs(&lowered);
                 complete_def_remap(
-                    &mut struct_remap,
-                    source_struct_defs(lowered.validated.validation())
+                    &mut nominal_def_remap,
+                    source_nominal_defs(lowered.validated.validation())
                         .into_iter()
                         .chain(program_structs),
                     &mut next_synthetic,
@@ -766,17 +774,21 @@ pub(super) fn lower_package_units<'a>(
                         .chain(program_variants),
                     &mut next_synthetic,
                 );
-                let mut def_remap = struct_remap.clone();
+                let mut def_remap = nominal_def_remap.clone();
                 def_remap.extend(variant_remap.iter().map(|(key, dest)| (*key, *dest)));
-                let nominal = NominalImportContext {
-                    nominal_map: &nominal_map,
-                    def_remap: &def_remap,
+                let source_to_entry_types = {
+                    let nominal = NominalImportContext {
+                        nominal_map: &nominal_map,
+                        def_remap: &def_remap,
+                        source_names: &source_names,
+                        shared_nominals: &shared_nominals,
+                    };
+                    import_lowered_semantic_types(
+                        lowered.validated.validation().types,
+                        &mut entry.analysis.types,
+                        Some(&nominal),
+                    )
                 };
-                let source_to_entry_types = import_lowered_semantic_types(
-                    lowered.validated.validation().types,
-                    &mut entry.analysis.types,
-                    Some(&nominal),
-                );
                 record_shared_nominals(
                     &source_names,
                     lowered.validated.validation().types,
@@ -785,7 +797,7 @@ pub(super) fn lower_package_units<'a>(
                 );
                 rewrite_lowered_type_ids(&mut lowered, &source_to_entry_types);
                 rewrite_lowered_variant_defs(&mut lowered, &variant_remap);
-                rewrite_lowered_struct_defs(&mut lowered, &struct_remap);
+                rewrite_lowered_struct_defs(&mut lowered, &nominal_def_remap);
                 rewrite_program_sources(&mut lowered.program, &library.path, &source_rewrites);
                 extend_unmapped_library_sources(
                     &lowered.program,
@@ -806,7 +818,7 @@ pub(super) fn lower_package_units<'a>(
                     &lowered.interner,
                     &mut entry.analysis.interner,
                     &source_to_entry_types,
-                    &struct_remap,
+                    &nominal_def_remap,
                     &variant_remap,
                     &nominal_map,
                     &entry.analysis.types,
@@ -873,7 +885,13 @@ pub(super) fn lower_package_units<'a>(
         generic_params.append(&mut library.generic_params);
         ensure_unique_definition_sources(&merged.program, &entry_path)?;
     }
-    instantiate_package_generics(&mut merged, generic_templates, generic_params, &entry_path)?;
+    instantiate_package_generics(
+        &mut merged,
+        generic_templates,
+        generic_params,
+        &entry_path,
+        Some(&extra_validation),
+    )?;
     rebuild_merged_validated(&mut merged, &entry_path, Some(&extra_validation))?;
 
     if cli_plan.dispatch.is_some() {
@@ -1012,9 +1030,13 @@ fn transplant_data_member(
         &HashMap::new(),
     )?;
     let empty_def_remap = HashMap::new();
+    let empty_source_names = HashMap::new();
+    let empty_shared_nominals = HashMap::new();
     let nominal = NominalImportContext {
         nominal_map: &nominal_map,
         def_remap: &empty_def_remap,
+        source_names: &empty_source_names,
+        shared_nominals: &empty_shared_nominals,
     };
     let konst = HirConst {
         name: remap_symbol(
@@ -1457,6 +1479,7 @@ fn instantiate_package_generics(
     templates: Vec<MirFunction>,
     generic_params: Vec<(DefId, Vec<radix_module::mir::MirGenericParam>)>,
     diagnostic_path: &Path,
+    extra_validation: Option<&RemappedValidation>,
 ) -> Result<(), Vec<Diagnostic>> {
     if templates.is_empty() {
         merged.generic_templates = templates;
@@ -1491,6 +1514,9 @@ fn instantiate_package_generics(
             .insert(environment.id, environment.clone());
     }
     context.layouts = radix_module::mir::MirLayoutTable::from_types(types);
+    if let Some(extra) = extra_validation {
+        extra.apply(&mut context);
+    }
     merged.validated = radix_module::mir::ValidatedMir::new(merged.program.clone(), context)
         .map_err(|errors| {
             errors
@@ -1593,19 +1619,21 @@ fn rewrite_function_variant_defs(
     }
 }
 
-/// Project the source nominal-identity remap onto struct aggregate kinds
-/// (FMIR e2e-hardening CTO-1): every nominal the map sends to an entry-side
-/// `Type::Struct(def)` becomes a `(source struct DefId → entry struct DefId)`
-/// rewrite, so struct literals lowered from a sibling/library analysis
-/// validate against the merged program's entry-keyed struct metadata.
-fn build_struct_def_remap(
+/// Project the source nominal-identity remap onto struct/union/interface
+/// defs: every nominal the map sends to an entry-side `Type::{Struct,Enum,
+/// Interface}(def)` becomes a `(source DefId → entry DefId)` rewrite, so
+/// leftover unions intern under the merged identity instead of colliding on
+/// source-local DefIds (cache.fab `KvDtype` / `VLayout` / `LayerStructure`).
+fn build_nominal_def_remap(
     nominal_map: &HashMap<DefId, TypeId>,
     entry_types: &TypeTable,
 ) -> HashMap<DefId, DefId> {
     nominal_map
         .iter()
         .filter_map(|(source_def, entry_ty)| match entry_types.get(*entry_ty) {
-            Type::Struct(entry_def) => Some((*source_def, *entry_def)),
+            Type::Struct(entry_def) | Type::Enum(entry_def) | Type::Interface(entry_def) => {
+                Some((*source_def, *entry_def))
+            }
             _ => None,
         })
         .collect()
@@ -2003,7 +2031,9 @@ pub(super) fn rebuild_merged_validated(
         .map_err(|errors| {
             errors
                 .into_iter()
-                .map(|error| mir_lowering_diag(diagnostic_path, error.message))
+                .map(|error| {
+                    mir_lowering_diag(diagnostic_path, error.message).with_span(error.span)
+                })
                 .collect::<Vec<_>>()
         })?;
     Ok(())

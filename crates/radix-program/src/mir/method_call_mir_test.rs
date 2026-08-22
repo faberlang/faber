@@ -360,8 +360,189 @@ fn package_test_self_provider_nested_tensor_methods_execute() {
     assert_nested_tensor_output(output);
 }
 
+const COLOR_LIB: &str = r#"+++
+locale = "en"
++++
+@ public { }
+union Color {
+    Red {
+        int shade
+    },
+    Blue { }
+}
+
+@ public { }
+fn red(int shade) → Color {
+    return variant Red { shade = shade }
+}
+
+@ public { }
+fn shade(Color c) → int {
+    match c {
+        case Red const shade {
+            return shade
+        }
+        case Blue {
+            return 0
+        }
+    }
+}
+"#;
+
+const TONE_LIB: &str = r#"+++
+locale = "en"
++++
+@ public { }
+union Tone {
+    Dark {
+        int shade
+    },
+    Light { }
+}
+
+@ public { }
+fn dark(int shade) → Tone {
+    return variant Dark { shade = shade }
+}
+
+@ public { }
+fn shade(Tone t) → int {
+    match t {
+        case Dark const shade {
+            return shade
+        }
+        case Light {
+            return 0
+        }
+    }
+}
+"#;
+
+const UNION_PROBA: &str = r#"+++
+locale = "en"
++++
+import from "unionlib:color" color
+import from "unionlib:tone" tone
+
+fn prove_sibling_union_payloads() {
+    print color.shade(color.red(4))
+    print tone.shade(tone.dark(5))
+}
+"#;
+
+fn write_self_provider_union_package(dir: &std::path::Path) -> std::path::PathBuf {
+    let package_root = dir.join("libhome").join("unionlib");
+    let src = package_root.join("src");
+    fs::create_dir_all(&src).expect("create self-provider union src");
+    fs::write(
+        package_root.join("faber.toml"),
+        r#"
+[package]
+name = "unionlib"
+version = "1.0.0"
+edition = "2026"
+
+[library]
+provider = "unionlib"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["fmir"]
+
+[locale]
+locale = "en"
+"#,
+    )
+    .expect("write self-provider union faber.toml");
+    fs::write(src.join("color.fab"), COLOR_LIB).expect("write color.fab");
+    fs::write(src.join("tone.fab"), TONE_LIB).expect("write tone.fab");
+    fs::write(src.join("union.proba"), UNION_PROBA).expect("write union.proba");
+    src.join("union.proba")
+}
+
 #[test]
-#[ignore = "full gradus cache.proba still has leftover nested-metadata residuals beyond the Tensor.get fixture"]
+fn package_test_sibling_union_payloads_project() {
+    // Two sibling unions with the same source-local DefId layout (Color /
+    // Tone, each with a payload variant + a unit variant). Intern must not
+    // collapse them onto one Type::Enum; variant field projection must
+    // resolve against the remapped union identity.
+    let dir = crate::test_support::test_temp_dir("union-defid-intern");
+    let proba_path = write_self_provider_union_package(dir.as_ref());
+    let package_root = proba_path.parent().unwrap().parent().unwrap();
+    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let mut package = crate::analyze::analyze_package_for_tests(
+        &config,
+        package_root,
+        None,
+        &crate::test_support::test_analysis_seams(),
+    )
+    .expect("analyze self-provider sibling union package tests");
+    let (root_id, _) = package
+        .node_by_path(&proba_path)
+        .expect("union.proba is an analyzed node");
+    let root_id = root_id.clone();
+    let included = package.imports.local_closure(std::iter::once(&root_id));
+    package.nodes.retain(|id, _| included.contains(id));
+    package.entry = Some(root_id.clone());
+    package.roots = vec![root_id];
+    let mut functions = Vec::new();
+    for unit in package.nodes.values() {
+        let is_proba = unit
+            .path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| ext == "proba");
+        if !is_proba {
+            continue;
+        }
+        for item in &unit.analysis.hir.items {
+            if let HirItemKind::Function(function) = &item.kind {
+                if unit.analysis.interner.resolve(function.name) == "prove_sibling_union_payloads" {
+                    functions.push((unit.path.clone(), item.def_id));
+                }
+            }
+        }
+    }
+    assert_eq!(
+        functions.len(),
+        1,
+        "expected one prove_sibling_union_payloads case"
+    );
+    let scope = TestPackageScope::for_program(&package, functions);
+    let output = with_linked_test_package_mir(
+        package,
+        &scope,
+        &config,
+        &crate::test_support::test_mir_seams(),
+        |validated, function_ids| {
+            let mut host = BufferHost::default();
+            for function_id in function_ids.values() {
+                radix_module::mir::run_function(validated, *function_id, &mut host)
+                    .expect("sibling union payload projections must execute");
+            }
+            host.stdout_lines
+        },
+    )
+    .unwrap_or_else(|diagnostics| {
+        panic!(
+            "sibling union payload projections must link: {:?}",
+            diagnostics
+                .iter()
+                .map(|diag| diag.message.clone())
+                .collect::<Vec<_>>()
+        )
+    });
+    assert_eq!(
+        output,
+        vec!["4".to_owned(), "5".to_owned()],
+        "Color.Red.shade and Tone.Dark.shade project independently"
+    );
+}
+
+#[test]
 fn gradus_cache_proba_package_test_links() {
     let Some(home) = radix_module::paths::faberlang_home() else {
         return;
