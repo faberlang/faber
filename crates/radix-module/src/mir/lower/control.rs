@@ -26,7 +26,6 @@
 // parent module provides shared imports for lowering
 use super::*;
 use crate::hir::visit::HirVisitor;
-use radix_types::i64s_from_literal_index;
 
 struct RangeIteraLowering<'a> {
     binding: DefId,
@@ -46,7 +45,6 @@ enum CollectionIteraKind {
     MapValues(TypeId),
     Cursor(TypeId),
     AsyncCursor(TypeId),
-    Tensor(TypeId),
     Unsupported,
 }
 
@@ -1243,59 +1241,20 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(iter.iter.span, "itera collection source"));
             return None;
         };
-        // Classify inside a scope so the `&Type` borrow of the type table ends
-        // before the builder mutates itself below.
-        let (collection_kind, tensor_lanes) = {
-            let normalized = self.normalized_type(iter_ty);
-            let kind = match normalized {
-                Type::Tensor(elem, shape) => {
-                    // Rank-1 literal shape: `IndexExpr::Literal(N)` or a
-                    // one-element `Tuple` of a literal (the figura-list
-                    // brackets parse `[N]` as a 1-tuple). Rank > 1 and
-                    // symbolic shapes fall through to Unsupported (rank > 1
-                    // belongs to itera-apud-coordinates, symbolic shapes are
-                    // shape-generics).
-                    let rank1_literal = match self.types.get_index(*shape) {
-                        IndexExpr::Literal(_) => true,
-                        IndexExpr::Tuple(dims) => {
-                            dims.len() == 1 && matches!(self.types.get_index(dims[0]), IndexExpr::Literal(_))
-                        }
-                        _ => false,
-                    };
-                    if matches!(iter.mode, HirIteraMode::Ex) && rank1_literal {
-                        CollectionIteraKind::Tensor(*elem)
-                    } else {
-                        CollectionIteraKind::Unsupported
-                    }
-                }
-                Type::Array(item) => CollectionIteraKind::Array(*item),
-                Type::Map(key, _) if matches!(iter.mode, HirIteraMode::De) => CollectionIteraKind::MapKeys(*key),
-                Type::Map(_, value) if matches!(iter.mode, HirIteraMode::Ex) => CollectionIteraKind::MapValues(*value),
-                Type::Cursor(value) if matches!(iter.mode, HirIteraMode::Ex) => CollectionIteraKind::Cursor(*value),
-                Type::AsyncCursor(value, _) if matches!(iter.mode, HirIteraMode::Ex) => {
-                    CollectionIteraKind::AsyncCursor(*value)
-                }
-                _ => CollectionIteraKind::Unsupported,
-            };
-            // Static bound: the tensor loop runs the literal N lanes — no
-            // runtime length intrinsic on the tensor carrier.
-            let lanes = if let CollectionIteraKind::Tensor(_) = kind {
-                let Type::Tensor(_, shape) = normalized else {
-                    unreachable!("tensor itera kind was classified from a tensor type")
-                };
-                i64s_from_literal_index(*shape, self.types)
-                    .and_then(|dims| dims.first().copied())
-                    .unwrap_or(0)
-            } else {
-                0
-            };
-            (kind, lanes)
+        let collection_kind = match self.normalized_type(iter_ty) {
+            Type::Array(item) => CollectionIteraKind::Array(*item),
+            Type::Map(key, _) if matches!(iter.mode, HirIteraMode::De) => CollectionIteraKind::MapKeys(*key),
+            Type::Map(_, value) if matches!(iter.mode, HirIteraMode::Ex) => CollectionIteraKind::MapValues(*value),
+            Type::Cursor(value) if matches!(iter.mode, HirIteraMode::Ex) => CollectionIteraKind::Cursor(*value),
+            Type::AsyncCursor(value, _) if matches!(iter.mode, HirIteraMode::Ex) => {
+                CollectionIteraKind::AsyncCursor(*value)
+            }
+            _ => CollectionIteraKind::Unsupported,
         };
         if matches!(collection_kind, CollectionIteraKind::Unsupported) {
-            let is_tensor = matches!(self.normalized_type(iter_ty), Type::Tensor(_, _));
             self.errors.push(MirError::unsupported(
                 iter.iter.span,
-                if matches!(iter.mode, HirIteraMode::Ex) && !is_tensor {
+                if matches!(iter.mode, HirIteraMode::Ex) {
                     "itera ex over tabula before map value iteration MIR lowering"
                 } else {
                     "itera collection before iterator MIR lowering"
@@ -1346,11 +1305,6 @@ impl FunctionBuilder<'_> {
             CollectionIteraKind::Cursor(value) | CollectionIteraKind::AsyncCursor(value) => {
                 (collection, MirType::semantic(value), false)
             }
-            CollectionIteraKind::Tensor(elem) => {
-                // Element gather rides the generic Index projection over the
-                // tensor place (every lane is defined by construction).
-                (collection, MirType::semantic(elem), false)
-            }
             CollectionIteraKind::Unsupported => {
                 unreachable!("unsupported collection itera kinds fail closed above")
             }
@@ -1366,16 +1320,12 @@ impl FunctionBuilder<'_> {
             iter.span,
         );
 
-        let length = if let CollectionIteraKind::Tensor(_) = collection_kind {
-            MirOperand::Constant(MirConstant::Int(tensor_lanes))
-        } else {
-            self.runtime_call_value(
-                MirIntrinsic::Collection(MirCollectionOp::Length),
-                vec![MirOperand::Place(iteration_place.clone())],
-                numerus,
-                iter.span,
-            )
-        };
+        let length = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Length),
+            vec![MirOperand::Place(iteration_place.clone())],
+            numerus,
+            iter.span,
+        );
         if !self.current_is_open() {
             return None;
         }

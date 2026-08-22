@@ -2888,18 +2888,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let key = index.to_key(span)?;
                 Ok(cell.borrow().get(&key).cloned().unwrap_or(Value::Nil))
             }
-            // Scalar flat-lane index over a tensor (itera ex element gather);
-            // tensors define every lane by construction, so bounds are the
-            // only failure mode.
-            Value::Tensor(tensor) => {
-                let idx = index.as_index(span)?;
-                tensor
-                    .borrow()
-                    .data
-                    .get(idx)
-                    .cloned()
-                    .ok_or_else(|| RunnerError::internal(span, "tensor index out of bounds"))
-            }
             _ => Err(RunnerError::internal(span, "index receiver type mismatch")),
         }
     }

@@ -54,28 +54,18 @@ fn binding_pattern_span(pattern: &radix_syntax::BindingPattern) -> Span {
     }
 }
 
-fn binding_pattern_has_name(
-    pattern: &radix_syntax::BindingPattern,
-    name: radix_lexer::Symbol,
-) -> bool {
+fn binding_pattern_has_name(pattern: &radix_syntax::BindingPattern, name: radix_lexer::Symbol) -> bool {
     match pattern {
         radix_syntax::BindingPattern::Ident(ident) => ident.name == name,
         radix_syntax::BindingPattern::Wildcard(_) => false,
-        radix_syntax::BindingPattern::Array {
-            elements, is_rest, ..
-        } => {
-            elements
-                .iter()
-                .any(|element| binding_pattern_has_name(element, name))
+        radix_syntax::BindingPattern::Array { elements, is_rest, .. } => {
+            elements.iter().any(|element| binding_pattern_has_name(element, name))
                 || is_rest.as_ref().is_some_and(|rest| rest.name == name)
         }
-        radix_syntax::BindingPattern::Object {
-            fields, is_rest, ..
-        } => {
-            fields
-                .iter()
-                .any(|field| field.alias.as_ref().unwrap_or(&field.name).name == name)
-                || is_rest.as_ref().is_some_and(|rest| rest.name == name)
+        radix_syntax::BindingPattern::Object { fields, is_rest, .. } => {
+            fields.iter().any(|field| {
+                field.alias.as_ref().unwrap_or(&field.name).name == name
+            }) || is_rest.as_ref().is_some_and(|rest| rest.name == name)
         }
     }
 }
@@ -312,12 +302,7 @@ impl Lowerer<'_> {
         mutability: radix_syntax::AstMutability,
         is_await: bool,
     ) -> Vec<HirStatement> {
-        let radix_syntax::BindingPattern::Object {
-            fields,
-            is_rest: rest,
-            ..
-        } = pattern
-        else {
+        let radix_syntax::BindingPattern::Object { fields, is_rest: rest, .. } = pattern else {
             return Vec::new();
         };
 
@@ -599,10 +584,7 @@ impl Lowerer<'_> {
         HirStatementKind::Expr(expr)
     }
 
-    fn fresh_itera_binding_name(
-        &mut self,
-        pattern: &radix_syntax::BindingPattern,
-    ) -> radix_lexer::Symbol {
+    fn fresh_itera_binding_name(&mut self, pattern: &radix_syntax::BindingPattern) -> radix_lexer::Symbol {
         let mut suffix = 0_u32;
         loop {
             let candidate_text = format!("__itera_element_{suffix}");
@@ -669,16 +651,20 @@ impl Lowerer<'_> {
                 false,
             ),
             radix_syntax::BindingPattern::Ident(_) => Vec::new(),
-            radix_syntax::BindingPattern::Wildcard(_) => {
-                unreachable!("wildcard loop binder rejected above")
-            }
+            radix_syntax::BindingPattern::Wildcard(_) => unreachable!("wildcard loop binder rejected above"),
         };
         let mut body = self.lower_ergo_body(&iter_stmt.body);
         body.statements.splice(0..0, pattern_locals);
         self.pop_scope();
         let expr = HirExpression {
             id: self.next_hir_id(),
-            kind: HirExpressionKind::Itera(mode, binding, binding_name, Box::new(iter), body),
+            kind: HirExpressionKind::Itera(
+                mode,
+                binding,
+                binding_name,
+                Box::new(iter),
+                body,
+            ),
             ty: None,
             span: self.current_span,
         };
