@@ -180,14 +180,20 @@ impl PackageInstantiate<'_> {
             &mut type_bindings,
             &mut shape_bindings,
         );
-        self.key_from_bindings(
-            source,
-            &params,
-            &type_bindings,
-            &shape_bindings,
-            &MirShapeBindings::default(),
-            function.span,
-        )
+        let mut type_args = Vec::new();
+        let mut shape_args = Vec::new();
+        for param in &params {
+            if param.is_shape {
+                let bound = shape_bindings.get(&param.name).copied()?;
+                let concrete =
+                    super::monomorphize::resolve_parent_shape_binding(self.types, bound, &MirShapeBindings::default())?;
+                shape_args.push(canonical_index(self.types, concrete));
+            } else {
+                let bound = type_bindings.get(&param.name).copied()?;
+                type_args.push(bound);
+            }
+        }
+        Some(MirMonomorphizationKey { source, type_args, shape_args })
     }
 
     fn rewrite_program(&mut self, program: &mut MirProgram) {
@@ -237,45 +243,49 @@ impl PackageInstantiate<'_> {
         let mut scope = FunctionTypeScope::from_function(function);
         for (block_index, block) in function.blocks.iter().enumerate() {
             for (statement_index, statement) in block.statements.iter().enumerate() {
-                match &statement.kind {
-                    MirStatementKind::Assign { value, .. } => {
-                        scope.values.insert(value.id, value.ty);
-                    }
-                    MirStatementKind::Call { destination, callee, args } => {
-                        if let MirCallee::Definition { source, type_args } = callee {
-                            if self.templates.contains_key(source) {
-                                calls.push(PendingCall {
-                                    function: function.id,
-                                    block_index,
-                                    statement_index: Some(statement_index),
-                                    destination: destination.clone(),
-                                    source: *source,
-                                    type_args: type_args.clone(),
-                                    args: args.clone(),
-                                    span: statement.span,
-                                    scope: scope.clone(),
-                                });
-                            }
-                        }
-                    }
-                    _ => {}
+                if let MirStatementKind::Assign { value, .. } = &statement.kind {
+                    scope.values.insert(value.id, value.ty);
                 }
-            }
-            if let MirTerminatorKind::TryCall { destination, callee, args, .. } = &block.terminator.kind {
-                if let MirCallee::Definition { source, type_args } = callee {
+                if let MirStatementKind::Call {
+                    destination,
+                    callee: MirCallee::Definition { source, type_args },
+                    args,
+                } = &statement.kind
+                {
                     if self.templates.contains_key(source) {
                         calls.push(PendingCall {
                             function: function.id,
                             block_index,
-                            statement_index: None,
+                            statement_index: Some(statement_index),
                             destination: destination.clone(),
                             source: *source,
                             type_args: type_args.clone(),
                             args: args.clone(),
-                            span: block.terminator.span,
+                            span: statement.span,
                             scope: scope.clone(),
                         });
                     }
+                }
+            }
+            if let MirTerminatorKind::TryCall {
+                destination,
+                callee: MirCallee::Definition { source, type_args },
+                args,
+                ..
+            } = &block.terminator.kind
+            {
+                if self.templates.contains_key(source) {
+                    calls.push(PendingCall {
+                        function: function.id,
+                        block_index,
+                        statement_index: None,
+                        destination: destination.clone(),
+                        source: *source,
+                        type_args: type_args.clone(),
+                        args: args.clone(),
+                        span: block.terminator.span,
+                        scope: scope.clone(),
+                    });
                 }
             }
         }
@@ -578,9 +588,31 @@ impl PackageInstantiate<'_> {
                             None => return false,
                         };
                     }
-                    MirStatementKind::Call { .. } => {}
+                    MirStatementKind::Call { callee, .. } => {
+                        if !self.substitute_callee(callee, bindings, span) {
+                            return false;
+                        }
+                    }
                 }
             }
+            if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind {
+                if !self.substitute_callee(callee, bindings, span) {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    fn substitute_callee(&mut self, callee: &mut MirCallee, bindings: &MirGenericBindings, span: Span) -> bool {
+        let MirCallee::Definition { type_args, .. } = callee else {
+            return true;
+        };
+        for type_arg in type_args {
+            *type_arg = match self.substitute_ty(*type_arg, bindings, span) {
+                Some(ty) => ty,
+                None => return false,
+            };
         }
         true
     }
@@ -777,11 +809,40 @@ fn finalize_function(
                         None => return false,
                     };
                 }
-                MirStatementKind::Call { .. } => {}
+                MirStatementKind::Call { callee, .. } => {
+                    if !finalize_callee(types, callee, type_bindings, shape_bindings, span, errors) {
+                        return false;
+                    }
+                }
+            }
+        }
+        if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind {
+            if !finalize_callee(types, callee, type_bindings, shape_bindings, span, errors) {
+                return false;
             }
         }
     }
     let _ = substitute_shape_size_constants(types, function, shape_bindings);
+    true
+}
+
+fn finalize_callee(
+    types: &mut TypeTable,
+    callee: &mut MirCallee,
+    type_bindings: &MirGenericBindings,
+    shape_bindings: &MirShapeBindings,
+    span: Span,
+    errors: &mut Vec<MirError>,
+) -> bool {
+    let MirCallee::Definition { type_args, .. } = callee else {
+        return true;
+    };
+    for type_arg in type_args {
+        *type_arg = match finalize_ty(types, *type_arg, type_bindings, shape_bindings, span, errors) {
+            Some(ty) => ty,
+            None => return false,
+        };
+    }
     true
 }
 
@@ -799,6 +860,70 @@ fn finalize_ty(
             errors.push(MirError::validation(error.span, error.message));
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mir::{MirBlock, MirStatement, MirTerminator};
+
+    #[test]
+    fn substitute_function_rewrites_generic_call_type_args() {
+        let mut types = TypeTable::new();
+        let mut interner = Interner::new();
+        let symbol = interner.intern("T");
+        let generic = MirType::semantic(types.intern(Type::Param(symbol)));
+        let concrete = MirType::semantic(types.primitive(Primitive::Textus));
+        let mut function = MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: Vec::new(),
+            locals: Vec::new(),
+            temps: Vec::new(),
+            blocks: vec![MirBlock {
+                id: crate::mir::MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Call {
+                        destination: None,
+                        callee: MirCallee::Definition { source: DefId(1), type_args: vec![generic] },
+                        args: Vec::new(),
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: Span::default() },
+                span: Span::default(),
+            }],
+            return_ty: concrete,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        };
+        let mut state = PackageInstantiate {
+            types: &mut types,
+            interner: &interner,
+            templates: FxHashMap::default(),
+            generic_params: FxHashMap::default(),
+            instance_index: FxHashMap::default(),
+            monomorphizations: Vec::new(),
+            next_id: MirFunctionId(1),
+            errors: Vec::new(),
+            created: Vec::new(),
+        };
+        let mut bindings = MirGenericBindings::default();
+        bindings.insert(symbol, concrete);
+
+        assert!(state.substitute_function(&mut function, &bindings, Span::default()));
+        let MirStatementKind::Call { callee, .. } = &function.blocks[0].statements[0].kind else {
+            panic!("expected call statement");
+        };
+        let MirCallee::Definition { type_args, .. } = callee else {
+            panic!("expected definition callee");
+        };
+        assert_eq!(type_args, &[concrete]);
     }
 }
 

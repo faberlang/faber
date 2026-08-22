@@ -594,6 +594,11 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                     return false;
                 }
             }
+            if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind {
+                if !self.substitute_callee(callee, bindings, span) {
+                    return false;
+                }
+            }
         }
         true
     }
@@ -606,10 +611,23 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     ) -> bool {
         match &mut statement.kind {
             MirStatementKind::Assign { value, .. } => self.substitute_value(value, bindings, span),
-            MirStatementKind::Call { .. } => true,
+            MirStatementKind::Call { callee, .. } => self.substitute_callee(callee, bindings, span),
             MirStatementKind::RuntimeCall { call, .. } => self.substitute_runtime_call(call, bindings, span),
             MirStatementKind::Construct { aggregate, .. } => self.substitute_aggregate(aggregate, bindings, span),
         }
+    }
+
+    fn substitute_callee(&mut self, callee: &mut MirCallee, bindings: &MirGenericBindings, span: Span) -> bool {
+        let MirCallee::Definition { type_args, .. } = callee else {
+            return true;
+        };
+        for type_arg in type_args {
+            *type_arg = match self.substitute_ty(*type_arg, bindings, span) {
+                Some(ty) => ty,
+                None => return false,
+            };
+        }
+        true
     }
 
     fn substitute_value(&mut self, value: &mut MirValue, bindings: &MirGenericBindings, span: Span) -> bool {
