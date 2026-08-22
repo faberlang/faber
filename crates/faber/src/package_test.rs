@@ -504,6 +504,79 @@ fn compile_package_accepts_empty_source_as_noop() {
 }
 
 #[test]
+fn package_rust_emit_contains_arm_cape_throw() {
+    let dir = test_temp_dir("package-cape-emit");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+fn classify(int x) → string {
+    if x > 0 {
+        throw "positive"
+    } catch e {
+        return "caught"
+    }
+    return "zero"
+}
+
+main {
+    print classify(1)
+}
+"#,
+    )
+    .expect("write cape source");
+
+    let code = compile_package_rust_code(&entry);
+    let start = code
+        .find("fn classify(x: i64) -> String")
+        .expect("classify signature");
+    let function = code
+        .get(start..code.find("\nfn main").expect("main signature"))
+        .expect("classify function span");
+    assert!(
+        !function.contains("fn classify(x: i64) -> Result") && !function.contains(".expect("),
+        "package emit must contain the arm throw instead of exposing a Result signature/expect:\n{code}"
+    );
+}
+
+#[test]
+fn package_rust_cli_emit_contains_arm_cape_throw() {
+    let dir = test_temp_dir("package-cape-cli-emit");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+fn classify(int x) → string {
+    if x > 0 {
+        throw "positive"
+    } catch e {
+        return "caught"
+    }
+    return "zero"
+}
+
+@ cli "tool"
+main args args {
+    print classify(1)
+}
+"#,
+    )
+    .expect("write CLI cape source");
+
+    let code = compile_package_rust_code(&entry);
+    let start = code
+        .find("fn classify(x: i64) -> String")
+        .expect("CLI classify signature");
+    let function = code
+        .get(start..code.find("\nfn main").expect("CLI main signature"))
+        .expect("CLI classify function span");
+    assert!(
+        !function.contains("fn classify(x: i64) -> Result") && !function.contains(".expect("),
+        "CLI package emit must preserve the contained arm-cape signature:\n{code}"
+    );
+}
+
+#[test]
 fn compile_package_resolves_builtin_norma_library_imports_without_local_modules() {
     let dir = test_temp_dir("norma-json-import");
     fs::create_dir_all(dir.join("src")).expect("create src");
