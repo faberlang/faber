@@ -378,12 +378,30 @@ impl AirPurityChecker<'_> {
     ) {
         let method = self.interner.resolve(method).to_owned();
         if !is_allowed_tensor_intrinsic(&method) {
-            self.reject_with_arg(span, "method_call", "method", method);
+            self.reject_with_arg(span, "method_call", "method", &method);
         } else if !self.is_typed_tensor_receiver(receiver) {
-            self.reject_with_arg(span, "tensor_method_receiver", "method", method);
+            self.reject_with_arg(span, "tensor_method_receiver", "method", &method);
+        }
+        if is_higher_order_tensor_intrinsic(&method) {
+            self.check_higher_order_combine(args);
         }
         self.check_expr(receiver);
         self.check_call_args(args);
+    }
+
+    /// Higher-order AIR methods may receive a named AIR function as their
+    /// combine/mapper. Keep the callback as a DefId path so the existing AIR
+    /// call graph can discover its companion; closure literals are still
+    /// rejected by `check_expr` with the stable `closure` issue.
+    fn check_higher_order_combine(&mut self, args: &[HirCallArg]) {
+        let Some(combine) = args.first() else {
+            return;
+        };
+        if let HirExpressionKind::Path(def_id) = &combine.expr.kind {
+            if self.lanes.lane_for(*def_id) != Some(RadixLane::Air) {
+                self.reject(combine.span, "non_air_call");
+            }
+        }
     }
 
     fn check_call_args(&mut self, args: &[HirCallArg]) {
@@ -474,7 +492,17 @@ fn is_allowed_tensor_intrinsic(method: &str) -> bool {
             | "rms_norm"
             | "rope_norm"
             | "gather"
+            // ARC-3: higher-order tensor methods admit named AIR combines;
+            // closure combines remain rejected by the purity traversal.
+            | "reducta"
+            | "cumulata"
+            | "mappata"
+            | "filtrata"
     )
+}
+
+fn is_higher_order_tensor_intrinsic(method: &str) -> bool {
+    matches!(method, "reducta" | "cumulata" | "mappata" | "filtrata")
 }
 
 fn is_control_expr_statement(expr: &HirExpression) -> bool {

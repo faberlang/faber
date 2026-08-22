@@ -334,16 +334,15 @@ functio ce_loss(tf32[2, 2] logits, tf32[2, 2] targets) → fractus {
 }
 
 // ---------------------------------------------------------------------------
-// ARC-1 (air-reducta-cumulata): red drivers pinning today's declines.
-// Tensor-receiver `reducta`/`cumulata` are outside the AIR allow-list today;
-// closure combines additionally hit the closure reject.
+// ARC-1 (air-reducta-cumulata): red drivers pinning the decline paths.
+// Named combines must themselves target the AIR lane; closure combines
+// additionally hit the stable closure reject.
 // ---------------------------------------------------------------------------
 
 #[test]
-fn air_lane_reducta_on_tensor_receiver_declines_via_allowlist_miss() {
+fn air_lane_reducta_on_tensor_receiver_declines_for_non_air_combine() {
     let errors = air_errors(
         r#"
-@ radix lane "air"
 functio comb(fractus a, fractus b) → fractus {
     redde a + b
 }
@@ -355,18 +354,13 @@ functio loss(tf32[2, 2] x) → fractus {
 "#,
     );
 
-    let err = expect_air_issue(&errors, "method_call");
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "method" && arg.value == "reducta"));
+    expect_air_issue(&errors, "non_air_call");
 }
 
 #[test]
-fn air_lane_cumulata_on_tensor_receiver_declines_as_unknown() {
+fn air_lane_cumulata_on_tensor_receiver_declines_for_non_air_combine() {
     let errors = air_errors(
         r#"
-@ radix lane "air"
 functio comb(fractus a, fractus b) → fractus {
     redde a + b
 }
@@ -378,11 +372,7 @@ functio loss(tf32[2, 2] x) → tf32[2, 2] {
 "#,
     );
 
-    let err = expect_air_issue(&errors, "method_call");
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "method" && arg.value == "cumulata"));
+    expect_air_issue(&errors, "non_air_call");
 }
 
 #[test]
@@ -435,14 +425,12 @@ functio probe(lista<fractus> xs) → lista<fractus> {
 }
 
 // ---------------------------------------------------------------------------
-// ARC-1 admit fixtures — the post-goal state ARC-3 delivers. Ignored until
-// ARC-3 (AIR eligibility for higher-order intrinsics + Tier A) un-ignores
-// them: named-combine `reducta`/`cumulata` on typed tensor receivers become
-// AIR-eligible, while closure combines keep the `closure` decline.
+// ARC-1 admit fixtures — the post-goal state ARC-3 delivers: named-combine
+// `reducta`/`cumulata` on typed tensor receivers are AIR-eligible, while
+// closure combines keep the stable `closure` decline.
 // ---------------------------------------------------------------------------
 
 #[test]
-#[ignore = "ARC-3 un-ignores: named-combine reducta on a tensor receiver becomes AIR-eligible"]
 fn air_lane_admits_named_combine_reducta_on_tensor_receiver() {
     let errors = air_errors(
         r#"
@@ -462,7 +450,6 @@ functio loss(tf32[2, 2] x) → fractus {
 }
 
 #[test]
-#[ignore = "ARC-3 un-ignores: named-combine cumulata on a tensor receiver becomes AIR-eligible"]
 fn air_lane_admits_named_combine_cumulata_on_tensor_receiver() {
     let errors = air_errors(
         r#"
@@ -474,6 +461,44 @@ functio comb(fractus a, fractus b) → fractus {
 @ radix lane "air"
 functio loss(tf32[2, 2] x) → tf32[2, 2] {
     redde x.cumulata(comb, 0.0)
+}
+"#,
+    );
+
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
+}
+
+#[test]
+fn air_lane_admits_named_mapper_mappata_on_tensor_receiver() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio map_one(fractus x) → fractus {
+    redde x
+}
+
+@ radix lane "air"
+functio map_tensor(tf32[2, 2] x) → tf32[2, 2] {
+    redde x.mappata(map_one)
+}
+"#,
+    );
+
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
+}
+
+#[test]
+fn air_lane_admits_named_predicate_filtrata_on_tensor_receiver() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio keep(fractus x) → bivalens {
+    redde x > 0.0
+}
+
+@ radix lane "air"
+functio filter_tensor(tf32[2, 2] x) → tf32[2, 2] {
+    redde x.filtrata(keep)
 }
 "#,
     );
