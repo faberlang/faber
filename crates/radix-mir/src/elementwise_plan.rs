@@ -188,7 +188,7 @@ pub struct ElementwisePlan {
 
 /// Typed reason a function is not a phase-one elementwise plan.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ElementwiseBarrier {
+pub enum ElementwiseBarrierError {
     /// Recipe-bearing collection op (`is_recipe_op`); never elementwise.
     Recipe {
         /// The recipe collection op.
@@ -237,7 +237,7 @@ pub enum ElementwiseBarrier {
     },
 }
 
-impl fmt::Display for ElementwiseBarrier {
+impl fmt::Display for ElementwiseBarrierError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Recipe { op, .. } => {
@@ -274,7 +274,7 @@ impl fmt::Display for ElementwiseBarrier {
     }
 }
 
-impl std::error::Error for ElementwiseBarrier {}
+impl std::error::Error for ElementwiseBarrierError {}
 
 /// Build a typed elementwise plan from a device function's existing facts.
 ///
@@ -286,15 +286,15 @@ impl std::error::Error for ElementwiseBarrier {}
 ///
 /// # Errors
 ///
-/// Returns a typed [`ElementwiseBarrier`] when the body is not a phase-one
+/// Returns a typed [`ElementwiseBarrierError`] when the body is not a phase-one
 /// single-consumer elementwise chain.
 #[must_use = "the plan or barrier must be acted on"]
 pub fn plan_elementwise(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
-) -> Result<ElementwisePlan, ElementwiseBarrier> {
+) -> Result<ElementwisePlan, ElementwiseBarrierError> {
     if function.blocks.len() != 1 {
-        return Err(ElementwiseBarrier::ControlFlow {
+        return Err(ElementwiseBarrierError::ControlFlow {
             span: function.span,
         });
     }
@@ -304,14 +304,14 @@ pub fn plan_elementwise(
     for (index, statement) in block.statements.iter().enumerate() {
         let dest_place = statement_destination_place(statement);
         if dest_place.is_some_and(|place| !place.projections.is_empty()) {
-            return Err(ElementwiseBarrier::ProjectedDestination {
+            return Err(ElementwiseBarrierError::ProjectedDestination {
                 span: statement.span,
             });
         }
         let Some(op) = statement_collection_op(statement) else {
             if let Some(local) = crate::read_analysis::statement_destination(statement) {
                 if consumer_counts.get(&local).copied().unwrap_or(0) > 0 {
-                    return Err(ElementwiseBarrier::Effect {
+                    return Err(ElementwiseBarrierError::Effect {
                         span: statement.span,
                     });
                 }
@@ -326,19 +326,19 @@ pub fn plan_elementwise(
         }
         let classified = classify_collection_op(op, statement.span)?;
         let Some(local) = dest else {
-            return Err(ElementwiseBarrier::UnresolvedShape {
+            return Err(ElementwiseBarrierError::UnresolvedShape {
                 span: statement.span,
             });
         };
         let count = consumer_counts.get(&local).copied().unwrap_or(0);
         if count > 1 {
-            return Err(ElementwiseBarrier::MultiConsumer {
+            return Err(ElementwiseBarrierError::MultiConsumer {
                 local,
                 span: statement.span,
             });
         }
         let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
-            return Err(ElementwiseBarrier::Effect {
+            return Err(ElementwiseBarrierError::Effect {
                 span: statement.span,
             });
         };
@@ -361,11 +361,11 @@ pub fn plan_elementwise(
                 .rev()
                 .find_map(crate::read_analysis::statement_destination)
         })
-        .ok_or(ElementwiseBarrier::NoCandidate {
+        .ok_or(ElementwiseBarrierError::NoCandidate {
             span: function.span,
         })?;
     let Some(output_producer) = producers.get(&output_local) else {
-        return Err(ElementwiseBarrier::NoCandidate {
+        return Err(ElementwiseBarrierError::NoCandidate {
             span: function.span,
         });
     };
@@ -417,14 +417,14 @@ pub fn plan_elementwise(
 fn classify_collection_op(
     op: MirCollectionOp,
     span: Span,
-) -> Result<ElementwiseOp, ElementwiseBarrier> {
+) -> Result<ElementwiseOp, ElementwiseBarrierError> {
     if is_recipe_op(op) {
-        return Err(ElementwiseBarrier::Recipe { op, span });
+        return Err(ElementwiseBarrierError::Recipe { op, span });
     }
     if is_elementwise_collection_op(op) {
-        return named_elementwise_op(op).ok_or(ElementwiseBarrier::UnsupportedOp { op, span });
+        return named_elementwise_op(op).ok_or(ElementwiseBarrierError::UnsupportedOp { op, span });
     }
-    Err(ElementwiseBarrier::UnsupportedOp { op, span })
+    Err(ElementwiseBarrierError::UnsupportedOp { op, span })
 }
 
 /// Name an already-classified elementwise collection op.
@@ -472,7 +472,7 @@ fn concrete_shape(
     ty: MirType,
     validation: &MirValidationContext<'_>,
     span: Span,
-) -> Result<ConcreteTensorShape, ElementwiseBarrier> {
+) -> Result<ConcreteTensorShape, ElementwiseBarrierError> {
     let dims = literal_dims(ty, validation, span)?;
     let element_ty = match validation.types.get(ty.semantic_id()) {
         Type::Tensor(element, _) => MirType::semantic(*element),
@@ -494,10 +494,10 @@ fn literal_dims(
     ty: MirType,
     validation: &MirValidationContext<'_>,
     span: Span,
-) -> Result<Vec<u64>, ElementwiseBarrier> {
+) -> Result<Vec<u64>, ElementwiseBarrierError> {
     match validation.types.get(ty.semantic_id()) {
         Type::Tensor(_, _) => tensor_literal_dims(ty, validation)
-            .map_err(|_| ElementwiseBarrier::UnresolvedShape { span }),
+            .map_err(|_| ElementwiseBarrierError::UnresolvedShape { span }),
         _ => Ok(Vec::new()),
     }
 }
@@ -545,9 +545,9 @@ impl PlanBuilder<'_, '_> {
         &mut self,
         local: MirLocalId,
         span: Span,
-    ) -> Result<ElementwiseExpr, ElementwiseBarrier> {
+    ) -> Result<ElementwiseExpr, ElementwiseBarrierError> {
         if !self.visiting.insert(local) {
-            return Err(ElementwiseBarrier::UnresolvedShape { span });
+            return Err(ElementwiseBarrierError::UnresolvedShape { span });
         }
         let expr = if self.producers.contains_key(&local) {
             self.expr_for_producer(local)?
@@ -561,9 +561,9 @@ impl PlanBuilder<'_, '_> {
     fn expr_for_producer(
         &mut self,
         local: MirLocalId,
-    ) -> Result<ElementwiseExpr, ElementwiseBarrier> {
+    ) -> Result<ElementwiseExpr, ElementwiseBarrierError> {
         let Some(producer) = self.producers.get(&local) else {
-            return Err(ElementwiseBarrier::NoCandidate {
+            return Err(ElementwiseBarrierError::NoCandidate {
                 span: self.function.span,
             });
         };
@@ -579,10 +579,10 @@ impl PlanBuilder<'_, '_> {
         let policy = NumericalPolicy::SOURCE_ORDER;
         match op {
             ElementwiseOp::Add | ElementwiseOp::Sub | ElementwiseOp::Mul | ElementwiseOp::Div => {
-                let lhs = args.first().ok_or(ElementwiseBarrier::UnresolvedShape {
+                let lhs = args.first().ok_or(ElementwiseBarrierError::UnresolvedShape {
                     span: producer_span,
                 })?;
-                let rhs = args.get(1).ok_or(ElementwiseBarrier::UnresolvedShape {
+                let rhs = args.get(1).ok_or(ElementwiseBarrierError::UnresolvedShape {
                     span: producer_span,
                 })?;
                 let lhs = self.expr_for_operand(lhs, producer_span)?;
@@ -604,7 +604,7 @@ impl PlanBuilder<'_, '_> {
                 } else {
                     args.first()
                 }
-                .ok_or(ElementwiseBarrier::UnresolvedShape {
+                .ok_or(ElementwiseBarrierError::UnresolvedShape {
                     span: producer_span,
                 })?;
                 let operand = self.expr_for_operand(operand, producer_span)?;
@@ -622,20 +622,20 @@ impl PlanBuilder<'_, '_> {
         &mut self,
         operand: &MirOperand,
         span: Span,
-    ) -> Result<ElementwiseExpr, ElementwiseBarrier> {
+    ) -> Result<ElementwiseExpr, ElementwiseBarrierError> {
         match operand {
             MirOperand::Constant(constant) => Ok(ElementwiseExpr::Scalar(constant.clone())),
             MirOperand::Place(place) => {
                 if !place.projections.is_empty() {
-                    return Err(ElementwiseBarrier::ProjectedDestination { span });
+                    return Err(ElementwiseBarrierError::ProjectedDestination { span });
                 }
                 let Some(local) = crate::read_analysis::place_local_base(place) else {
-                    return Err(ElementwiseBarrier::UnresolvedShape { span });
+                    return Err(ElementwiseBarrierError::UnresolvedShape { span });
                 };
                 self.expr_for_local(local, span)
             }
             MirOperand::Temp(_) | MirOperand::Value(_) => {
-                Err(ElementwiseBarrier::UnresolvedShape { span })
+                Err(ElementwiseBarrierError::UnresolvedShape { span })
             }
         }
     }
@@ -644,7 +644,7 @@ impl PlanBuilder<'_, '_> {
         &mut self,
         local: MirLocalId,
         span: Span,
-    ) -> Result<ElementwiseExpr, ElementwiseBarrier> {
+    ) -> Result<ElementwiseExpr, ElementwiseBarrierError> {
         if let Some(&slot) = self.input_slots.get(&local) {
             return Ok(ElementwiseExpr::Input {
                 slot,
@@ -652,10 +652,10 @@ impl PlanBuilder<'_, '_> {
             });
         }
         let ty = crate::local_ty::local_ty(self.function, local)
-            .ok_or(ElementwiseBarrier::UnresolvedShape { span })?;
+            .ok_or(ElementwiseBarrierError::UnresolvedShape { span })?;
         let shape = literal_dims(ty, self.validation, span)?;
         let index = index_mapping(&shape, &self.result_shape)
-            .ok_or(ElementwiseBarrier::UnresolvedShape { span })?;
+            .ok_or(ElementwiseBarrierError::UnresolvedShape { span })?;
         let slot = self.inputs.len();
         self.inputs.push(ElementwiseInput {
             local,

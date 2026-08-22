@@ -75,7 +75,7 @@ pub use abi::{
     validate_varying_consistency, MirAbiError, MirBroadcastDeclaration, MirColorTargetFormat,
     MirDepthCompareFunction, MirDepthStencilState, MirFragmentOutputReflection, MirFunctionAbi,
     MirFunctionAbiParam, MirGpuReflection, MirGraphicsPipelineReflection, MirInputStepMode,
-    MirKernelBufferBindingType, MirKernelBuiltinInput, MirKernelBuiltinInputReflection,
+    MirKernelBufferBindingKind, MirKernelBuiltinInput, MirKernelBuiltinInputReflection,
     MirKernelBuiltinUsage, MirKernelDispatchSize, MirKernelLaunchBindGroup,
     MirKernelLaunchBindGroupLayoutEntry, MirKernelLaunchBinding,
     MirKernelLaunchPipelineBindGroupLayout, MirKernelLaunchPipelineLayout, MirKernelLaunchPlan,
@@ -83,7 +83,7 @@ pub use abi::{
     MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceReflection,
     MirKernelResourceRole, MirKernelShaderAccess, MirKernelShaderStage, MirKernelSignature,
     MirKernelWorkgroupCount, MirPrimitiveTopology, MirRankExtensionBroadcast, MirRuntimeAbi,
-    MirRuntimeAbiCategory, MirRuntimeAbiFamily, MirStencilFaceState, MirStencilOp,
+    MirRuntimeAbiKind, MirRuntimeAbiFamily, MirStencilFaceState, MirStencilOp,
     MirVaryingInterpolation, MirVaryingReflection, MirVertexInputFormat, MirVertexInputReflection,
     MirWebGpuBindGroupDescriptor, MirWebGpuBindGroupEntryDescriptor,
     MirWebGpuBindGroupLayoutDescriptor, MirWebGpuBindGroupLayoutEntryDescriptor,
@@ -128,7 +128,7 @@ pub use device_program_plans::{
 };
 pub use dump::dump_program;
 pub use elementwise_plan::{
-    plan_elementwise, ConcreteTensorShape, ElementwiseBarrier, ElementwiseExpr, ElementwiseInput,
+    plan_elementwise, ConcreteTensorShape, ElementwiseBarrierError, ElementwiseExpr, ElementwiseInput,
     ElementwiseOp, ElementwiseOutput, ElementwisePlan, IndexMapping, NumericalPolicy,
     ReassociationPolicy, SourceSpanFact,
 };
@@ -139,7 +139,7 @@ pub use generic::{
 };
 pub use host_partition::{derive_host_partition, HostPartition, HostPartitionError};
 pub use inference_blocker_matrix::{
-    inference_blocker_rows, inference_non_claims, InferenceBlockerCategory, InferenceBlockerRow,
+    inference_blocker_rows, inference_non_claims, InferenceBlockerKind, InferenceBlockerRow,
     InferenceBlockerStatus, InferenceNonClaim, InferenceNonClaimKind,
 };
 pub use kernel_decomposition::{
@@ -149,7 +149,7 @@ pub use kernel_decomposition::{
 pub use kernel_plan::{
     admit_quantized_gather, admit_quantized_matmul, BarrierPhase, BarrierPoint,
     CollectionKernelPlan, GroupedMatMulPlan, MatMulPlan, OobPaddingPolicy, PackedAdmissionError,
-    PackedDequantClass, PackedDequantError, PackedDequantResolution, PlanValidationError,
+    PackedDequantKind, PackedDequantError, PackedDequantResolution, PlanValidationError,
     QuantizedGatherPlan, QuantizedMatMulPlan, ReduceOp, ReductionPlan, SharedMemoryLayout,
     SsmConv1dPlan, SsmScanPlan, TransposePlan, TRANSPOSE_WORKGROUP_X,
 };
@@ -189,7 +189,7 @@ pub use shader_contract::{
 };
 pub use static_shape_fold::{
     admit_device_shape_materialization, fold_static_shapes, FoldedShapeFact, ShapeFactSource,
-    ShapeFoldError, ShapeFoldErrorKind, ShapeFoldOutcome, ShapeFoldReport, ShapeFoldedAdmission,
+    ShapeFoldError, ShapeFoldKind, ShapeFoldOutcome, ShapeFoldReport, ShapeFoldedAdmission,
 };
 pub use tensor_operation_floor::{
     required_tensor_operation_floor_families, tensor_operation_floor_rows,

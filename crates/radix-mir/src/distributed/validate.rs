@@ -20,7 +20,7 @@ use crate::distributed::types::{
 
 /// Fail-closed check class named by [`ValidateError::class`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ValidateClass {
+pub enum ValidateKind {
     /// Cross-device completeness — a field of the value contract is missing.
     Completeness,
     /// The value-move graph contains a cycle.
@@ -37,7 +37,7 @@ pub enum ValidateClass {
     StaleVersion,
 }
 
-impl fmt::Display for ValidateClass {
+impl fmt::Display for ValidateKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Completeness => write!(f, "completeness"),
@@ -359,31 +359,31 @@ pub enum ValidateError {
 impl ValidateError {
     /// The violated check class of this diagnostic.
     #[must_use]
-    pub fn class(&self) -> ValidateClass {
+    pub fn class(&self) -> ValidateKind {
         match self {
-            Self::StaleVersion { .. } => ValidateClass::StaleVersion,
+            Self::StaleVersion { .. } => ValidateKind::StaleVersion,
             Self::DuplicatePartition { .. }
             | Self::TopologyMismatch { .. }
             | Self::ZeroPartitionBudget { .. }
-            | Self::RequireOwnerMismatch { .. } => ValidateClass::TopologyMismatch,
+            | Self::RequireOwnerMismatch { .. } => ValidateKind::TopologyMismatch,
             Self::MissingOwner { .. }
             | Self::MissingReplicaSet { .. }
-            | Self::PrimaryOutsideReplicaSet { .. } => ValidateClass::MissingOwner,
+            | Self::PrimaryOutsideReplicaSet { .. } => ValidateKind::MissingOwner,
             Self::ConflictingContracts { .. }
             | Self::DuplicateReplica { .. }
             | Self::PartitionContractMismatch { .. }
             | Self::SharedLaunch { .. }
             | Self::ConflictingByteContract { .. }
-            | Self::DuplicateMove { .. } => ValidateClass::ConflictingReplicas,
+            | Self::DuplicateMove { .. } => ValidateKind::ConflictingReplicas,
             Self::MissingGeneration { .. }
             | Self::GenerationOrder { .. }
             | Self::MissingByteContract { .. }
             | Self::MissingProducer { .. }
             | Self::MissingConsumer { .. }
             | Self::MissingCompletionBoundary { .. }
-            | Self::DanglingBoundaryReference { .. } => ValidateClass::Completeness,
-            Self::SelfMove { .. } | Self::ValueMoveCycle { .. } => ValidateClass::Cycle,
-            Self::UnsupportedCollective { .. } => ValidateClass::UnsupportedCollective,
+            | Self::DanglingBoundaryReference { .. } => ValidateKind::Completeness,
+            Self::SelfMove { .. } | Self::ValueMoveCycle { .. } => ValidateKind::Cycle,
+            Self::UnsupportedCollective { .. } => ValidateKind::UnsupportedCollective,
         }
     }
 }

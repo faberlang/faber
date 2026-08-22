@@ -51,7 +51,7 @@ use std::fmt;
 
 /// Stable category of a shape-fold failure (S5-U4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ShapeFoldErrorKind {
+pub enum ShapeFoldKind {
     /// `magnitudines()` on a tensor with no literal shape (dynamic shape).
     UnfoldableMagnitudines,
     /// A shape-construction destination with no literal tensor shape.
@@ -60,7 +60,7 @@ pub enum ShapeFoldErrorKind {
     NotDeviceMaterializable,
 }
 
-impl ShapeFoldErrorKind {
+impl ShapeFoldKind {
     /// Short diagnostic spelling.
     #[must_use]
     pub fn spelling(self) -> &'static str {
@@ -77,13 +77,13 @@ impl ShapeFoldErrorKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeFoldError {
     /// Stable failure category.
-    pub kind: ShapeFoldErrorKind,
+    pub kind: ShapeFoldKind,
     /// Human-readable detail.
     pub message: String,
 }
 
 impl ShapeFoldError {
-    fn new(kind: ShapeFoldErrorKind, message: impl Into<String>) -> Self {
+    fn new(kind: ShapeFoldKind, message: impl Into<String>) -> Self {
         Self {
             kind,
             message: message.into(),
@@ -240,7 +240,7 @@ pub fn fold_static_shapes(
                     let dims =
                         tensor_literal_dims(call.return_ty, validation).ok_or_else(|| {
                             ShapeFoldError::new(
-                                ShapeFoldErrorKind::NonStaticShapeDestination,
+                                ShapeFoldKind::NonStaticShapeDestination,
                                 format!(
                                     "shape-construction destination local {} has no literal \
                                  tensor shape (dynamic shape is not device-expressible)",
@@ -333,14 +333,14 @@ pub fn admit_device_shape_materialization(
     let signature = MirKernelSignature::storage_buffer_kernel(&outcome.function, validation)
         .map_err(|error| {
             ShapeFoldError::new(
-                ShapeFoldErrorKind::NotDeviceMaterializable,
+                ShapeFoldKind::NotDeviceMaterializable,
                 format!("kernel signature after shape folding: {}", error.message),
             )
         })?;
     let plan =
         kernel_plan_for_function(&outcome.function, &signature, validation).map_err(|error| {
             ShapeFoldError::new(
-                ShapeFoldErrorKind::NotDeviceMaterializable,
+                ShapeFoldKind::NotDeviceMaterializable,
                 format!("kernel plan after shape folding: {}", error.message),
             )
         })?;
@@ -406,13 +406,13 @@ fn fold_statement(
             let traced_local = destination_local_traced(destination.as_ref(), temp_to_local);
             let Some(local) = traced_local else {
                 return Err(ShapeFoldError::new(
-                    ShapeFoldErrorKind::NonStaticShapeDestination,
+                    ShapeFoldKind::NonStaticShapeDestination,
                     "tensor_create destination is not a local; cannot fold to a fill kernel",
                 ));
             };
             let dims = tensor_literal_dims(call.return_ty, validation).ok_or_else(|| {
                 ShapeFoldError::new(
-                    ShapeFoldErrorKind::NonStaticShapeDestination,
+                    ShapeFoldKind::NonStaticShapeDestination,
                     format!(
                         "crea destination local {} has no literal tensor shape \
                          (dynamic shape is not device-expressible)",
@@ -422,7 +422,7 @@ fn fold_statement(
             })?;
             let fill_value = call.args.get(1).cloned().ok_or_else(|| {
                 ShapeFoldError::new(
-                    ShapeFoldErrorKind::NonStaticShapeDestination,
+                    ShapeFoldKind::NonStaticShapeDestination,
                     format!("crea at local {} has no scalar fill operand", local.0),
                 )
             })?;
@@ -449,13 +449,13 @@ fn fold_statement(
         MirCollectionOp::TensorFromFlat => {
             let Some(local) = destination_local_traced(destination.as_ref(), temp_to_local) else {
                 return Err(ShapeFoldError::new(
-                    ShapeFoldErrorKind::NonStaticShapeDestination,
+                    ShapeFoldKind::NonStaticShapeDestination,
                     "tensor_from_flat destination is not a local; cannot fold its shape",
                 ));
             };
             let dims = tensor_literal_dims(call.return_ty, validation).ok_or_else(|| {
                 ShapeFoldError::new(
-                    ShapeFoldErrorKind::NonStaticShapeDestination,
+                    ShapeFoldKind::NonStaticShapeDestination,
                     format!(
                         "tensor_from_flat destination local {} has no literal tensor shape \
                          (dynamic shape is not device-expressible)",
@@ -484,13 +484,13 @@ fn magnitudines_receiver_ty(
 ) -> Result<MirType, ShapeFoldError> {
     let Some(receiver) = call.args.first() else {
         return Err(ShapeFoldError::new(
-            ShapeFoldErrorKind::UnfoldableMagnitudines,
+            ShapeFoldKind::UnfoldableMagnitudines,
             "magnitudines() has no receiver operand",
         ));
     };
     let Some(ty) = crate::local_ty::operand_local_ty(function, receiver) else {
         return Err(ShapeFoldError::new(
-            ShapeFoldErrorKind::UnfoldableMagnitudines,
+            ShapeFoldKind::UnfoldableMagnitudines,
             "magnitudines() receiver has no resolvable MIR type",
         ));
     };
@@ -507,7 +507,7 @@ fn shape_receiver_dims(
     let ty = magnitudines_receiver_ty(call, function)?;
     let Some(dims) = tensor_literal_dims(ty, validation) else {
         return Err(ShapeFoldError::new(
-            ShapeFoldErrorKind::UnfoldableMagnitudines,
+            ShapeFoldKind::UnfoldableMagnitudines,
             "magnitudines() receiver has no literal tensor shape (dynamic shape; \
              a statically-shaped tensor is required for the device path)",
         ));
@@ -581,7 +581,7 @@ fn tensor_element_ty(
     match validation.types.get(ty.semantic_id()) {
         Type::Tensor(element, _) => Ok(MirType::semantic(*element)),
         _ => Err(ShapeFoldError::new(
-            ShapeFoldErrorKind::NonStaticShapeDestination,
+            ShapeFoldKind::NonStaticShapeDestination,
             "shape destination type is not a tensor",
         )),
     }
@@ -593,7 +593,7 @@ fn element_count_for_dims(dims: &[i64]) -> Result<u64, ShapeFoldError> {
     for &dim in dims {
         let count = u64::try_from(dim).map_err(|_| {
             ShapeFoldError::new(
-                ShapeFoldErrorKind::NonStaticShapeDestination,
+                ShapeFoldKind::NonStaticShapeDestination,
                 format!(
                     "shape dimension {dim} is negative or too large for a device element count"
                 ),

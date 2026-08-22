@@ -1,7 +1,7 @@
 //! Design-doc §10 Unit-1 fixtures: a typed plan or a typed barrier reason.
 
 use super::{
-    plan_elementwise, ElementwiseBarrier, ElementwiseExpr, ElementwiseOp, ElementwisePlan,
+    plan_elementwise, ElementwiseBarrierError, ElementwiseExpr, ElementwiseOp, ElementwisePlan,
     IndexMapping, ReassociationPolicy,
 };
 use crate::{
@@ -178,7 +178,7 @@ fn plan_of(function: &MirFunction, types: &TypeTable) -> ElementwisePlan {
     plan_elementwise(function, &validation).expect("fixture should yield a typed plan")
 }
 
-fn barrier_of(function: &MirFunction, types: &TypeTable) -> ElementwiseBarrier {
+fn barrier_of(function: &MirFunction, types: &TypeTable) -> ElementwiseBarrierError {
     let validation = MirValidationContext::new(types);
     plan_elementwise(function, &validation).expect_err("fixture should yield a typed barrier")
 }
@@ -413,7 +413,7 @@ fn multi_consumer_intermediate_is_barrier() {
         r1,
     );
     match barrier_of(&function, &types) {
-        ElementwiseBarrier::MultiConsumer { local, .. } => {
+        ElementwiseBarrierError::MultiConsumer { local, .. } => {
             assert_eq!(local, MirLocalId(3));
         }
         other => panic!("expected MultiConsumer, got {other:?}"),
@@ -446,7 +446,7 @@ fn projected_destination_is_barrier() {
     assert!(
         matches!(
             barrier_of(&function, &types),
-            ElementwiseBarrier::ProjectedDestination { .. }
+            ElementwiseBarrierError::ProjectedDestination { .. }
         ),
         "projected destination must be a typed barrier"
     );
@@ -474,7 +474,7 @@ fn recipe_op_is_barrier_not_elementwise() {
         "fixture must use the kernel_plan recipe-authority classifier"
     );
     match barrier_of(&function, &types) {
-        ElementwiseBarrier::Recipe { op, .. } => {
+        ElementwiseBarrierError::Recipe { op, .. } => {
             assert_eq!(op, MirCollectionOp::TensorMatMul);
         }
         other => panic!("expected Recipe barrier, got {other:?}"),
@@ -500,7 +500,7 @@ fn unsupported_collection_op_is_barrier() {
         MirCollectionOp::TensorCruxEntropia
     ));
     match barrier_of(&function, &types) {
-        ElementwiseBarrier::UnsupportedOp { op, .. } => {
+        ElementwiseBarrierError::UnsupportedOp { op, .. } => {
             assert_eq!(op, MirCollectionOp::TensorCruxEntropia);
         }
         other => panic!("expected UnsupportedOp barrier, got {other:?}"),
@@ -512,7 +512,7 @@ fn unsupported_collection_op_is_barrier() {
 /// `is_admitted_tensor_unary`).
 ///
 /// `plan_elementwise` classifies only collection runtime calls. A live tensor
-/// unary assign is therefore an [`ElementwiseBarrier::Effect`], even though
+/// unary assign is therefore an [`ElementwiseBarrierError::Effect`], even though
 /// Relu/Gelu are admitted as both a collection op and a tensor unary.
 #[test]
 fn unary_relu_gelu_assign_is_effect_barrier() {
@@ -537,7 +537,7 @@ fn unary_relu_gelu_assign_is_effect_barrier() {
             r1,
         );
         match barrier_of(&function, &types) {
-            ElementwiseBarrier::Effect { .. } => {}
+            ElementwiseBarrierError::Effect { .. } => {}
             other => panic!("expected Effect barrier for unary {unop:?}, got {other:?}"),
         }
     }

@@ -18,11 +18,11 @@ fn matrix_covers_required_inference_blocker_categories() {
     let rows = inference_blocker_rows();
 
     for category in [
-        InferenceBlockerCategory::ModelLoading,
-        InferenceBlockerCategory::TensorOps,
-        InferenceBlockerCategory::Placement,
-        InferenceBlockerCategory::TargetSurface,
-        InferenceBlockerCategory::Session,
+        InferenceBlockerKind::ModelLoading,
+        InferenceBlockerKind::TensorOps,
+        InferenceBlockerKind::Placement,
+        InferenceBlockerKind::TargetSurface,
+        InferenceBlockerKind::Session,
     ] {
         assert!(
             rows.iter().any(|row| row.category == category),
@@ -54,7 +54,7 @@ fn matrix_records_explicit_inference_non_claims() {
 
 #[test]
 fn target_surface_blocker_matches_radix_runtime_capabilities() {
-    let row = row_for(InferenceBlockerCategory::TargetSurface);
+    let row = row_for(InferenceBlockerKind::TargetSurface);
     assert_eq!(row.status, InferenceBlockerStatus::NoRuntimeClaim);
 
     for target in [
@@ -81,7 +81,7 @@ fn target_surface_blocker_matches_radix_runtime_capabilities() {
 
 #[test]
 fn tensor_ops_blocker_matches_systems_target_debt() {
-    let row = row_for(InferenceBlockerCategory::TensorOps);
+    let row = row_for(InferenceBlockerKind::TensorOps);
     assert_eq!(row.status, InferenceBlockerStatus::CheckedDebt);
 
     for family in [
@@ -107,7 +107,7 @@ fn tensor_ops_blocker_matches_systems_target_debt() {
 
 #[test]
 fn placement_blocker_matches_reserved_transfer_policy() {
-    let row = row_for(InferenceBlockerCategory::Placement);
+    let row = row_for(InferenceBlockerKind::Placement);
     assert_eq!(row.status, InferenceBlockerStatus::ReservedExplicitOperation);
 
     for facet in [
@@ -128,17 +128,17 @@ fn placement_blocker_matches_reserved_transfer_policy() {
 
 #[test]
 fn model_loading_and_session_rows_do_not_claim_runtime_support() {
-    let model = row_for(InferenceBlockerCategory::ModelLoading);
+    let model = row_for(InferenceBlockerKind::ModelLoading);
     assert_eq!(model.status, InferenceBlockerStatus::Parked);
     assert!(model.blocker.contains("no production model loader"));
     assert!(model.evidence.contains("safetensors-gguf"));
 
-    let session = row_for(InferenceBlockerCategory::Session);
+    let session = row_for(InferenceBlockerKind::Session);
     assert_eq!(session.status, InferenceBlockerStatus::Delegated);
     assert!(session.blocker.contains("not a loaded-model session"));
 }
 
-fn row_for(category: InferenceBlockerCategory) -> &'static InferenceBlockerRow {
+fn row_for(category: InferenceBlockerKind) -> &'static InferenceBlockerRow {
     inference_blocker_rows()
         .iter()
         .find(|row| row.category == category)

@@ -5,7 +5,7 @@ use crate::{
 use radix_lexer::Interner;
 
 use super::{
-    device_view_element_count, require_u32_index, MirAbiError, MirKernelBufferBindingType,
+    device_view_element_count, require_u32_index, MirAbiError, MirKernelBufferBindingKind,
     MirKernelBuiltin, MirKernelBuiltinInput, MirKernelDispatchSize, MirKernelResourceAccess,
     MirKernelShaderAccess, MirKernelSignature, MirWorkgroupSize, ERR_KERNEL_BUILTIN_DUPLICATE_NAME,
     ERR_KERNEL_BUILTIN_UNKNOWN_NAME,
@@ -1054,10 +1054,10 @@ pub(crate) fn shader_access_for_resource(access: MirKernelResourceAccess) -> Mir
 
 pub(crate) fn buffer_binding_type_for_shader_access(
     shader_access: MirKernelShaderAccess,
-) -> MirKernelBufferBindingType {
+) -> MirKernelBufferBindingKind {
     match shader_access {
-        MirKernelShaderAccess::Read => MirKernelBufferBindingType::ReadOnlyStorage,
-        MirKernelShaderAccess::ReadWrite => MirKernelBufferBindingType::Storage,
+        MirKernelShaderAccess::Read => MirKernelBufferBindingKind::ReadOnlyStorage,
+        MirKernelShaderAccess::ReadWrite => MirKernelBufferBindingKind::Storage,
     }
 }
 

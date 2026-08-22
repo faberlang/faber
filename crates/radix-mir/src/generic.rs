@@ -279,7 +279,7 @@ fn try_bind_generic_type_witness(
             shape_bindings,
             seen,
         ),
-        (Type::Func(expected_sig), Type::Func(actual_sig)) => try_bind_func_signature(
+        (Type::Func(expected_sig), Type::Func(actual_sig)) => try_bind_function_signature(
             types,
             expected_sig,
             actual_sig,
@@ -464,7 +464,7 @@ fn undo_shape_bindings_to(shape_bindings: &mut MirShapeBindings, keys_before: &F
     shape_bindings.retain(|key, _| keys_before.contains(key));
 }
 
-fn try_bind_func_signature(
+fn try_bind_function_signature(
     types: &TypeTable,
     expected_sig: &FuncSig,
     actual_sig: &FuncSig,
@@ -1420,7 +1420,7 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
         (Type::Alias(a_def, a_inner), Type::Alias(b_def, b_inner)) => {
             a_def == b_def && types.equals(*a_inner, *b_inner)
         }
-        (Type::Func(a), Type::Func(b)) => func_signature_matches(types, a, b),
+        (Type::Func(a), Type::Func(b)) => function_signature_matches(types, a, b),
         (Type::Applied(a_base, a_args), Type::Applied(b_base, b_args)) => {
             a_args.len() == b_args.len()
                 && types.equals(*a_base, *b_base)
@@ -1448,7 +1448,7 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
     }
 }
 
-fn func_signature_matches(types: &TypeTable, a: &FuncSig, b: &FuncSig) -> bool {
+fn function_signature_matches(types: &TypeTable, a: &FuncSig, b: &FuncSig) -> bool {
     a.params.len() == b.params.len()
         && a.params
             .iter()

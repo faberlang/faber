@@ -6,7 +6,7 @@
 #![cfg(test)]
 
 use crate::abi::PackedStorageLayout;
-use crate::kernel_plan::{admit_quantized_matmul, PackedDequantClass};
+use crate::kernel_plan::{admit_quantized_matmul, PackedDequantKind};
 
 /// Native BF16 → f32 convert: zero-extend the 16-bit payload into the
 /// high half of an f32 (IEEE-754 bfloat16). Exact; no rounding.
@@ -61,7 +61,7 @@ fn bf16_quantized_matmul_matches_cpu_reference_without_weight_expansion() {
     };
     assert_eq!(
         quantized.dequant_resolution().class,
-        PackedDequantClass::NativeBf16Convert
+        PackedDequantKind::NativeBf16Convert
     );
     assert_eq!((layout.block_elements(), layout.block_bytes()), (1, 2));
 
@@ -150,7 +150,7 @@ fn q5_0_block_dequant_matches_gi2_1_goldens() {
     };
     assert_eq!(
         quantized.dequant_resolution().class,
-        PackedDequantClass::Block
+        PackedDequantKind::Block
     );
     assert_eq!((layout.block_elements(), layout.block_bytes()), (32, 22));
 

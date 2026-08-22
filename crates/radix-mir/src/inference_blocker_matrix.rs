@@ -7,14 +7,14 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InferenceBlockerRow {
-    pub category: InferenceBlockerCategory,
+    pub category: InferenceBlockerKind,
     pub status: InferenceBlockerStatus,
     pub blocker: &'static str,
     pub evidence: &'static str,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InferenceBlockerCategory {
+pub enum InferenceBlockerKind {
     ModelLoading,
     TensorOps,
     Placement,
@@ -22,7 +22,7 @@ pub enum InferenceBlockerCategory {
     Session,
 }
 
-impl InferenceBlockerCategory {
+impl InferenceBlockerKind {
     #[must_use]
     pub fn label(self) -> &'static str {
         match self {
@@ -89,31 +89,31 @@ impl InferenceNonClaimKind {
 
 pub const INFERENCE_BLOCKER_ROWS: &[InferenceBlockerRow] = &[
     InferenceBlockerRow {
-        category: InferenceBlockerCategory::ModelLoading,
+        category: InferenceBlockerKind::ModelLoading,
         status: InferenceBlockerStatus::Parked,
         blocker: "GGUF parsing, tokenizer ownership, quantization, and dynamic-shape handoff remain parked; no production model loader is claimed. F32 safetensors tensor materialization is product-ready (norma/src/model.fab safetensors_tensor_f32). Inference fragment architecture (tiny linear → BERT-shaped) defines the vertical integration path (docs/factory/mir-swarm/fragment-architecture.md).",
         evidence: "docs/factory/mir-swarm/fragment-architecture.md; norma/src/model.fab safetensors_tensor_f32; docs/factory/safetensors-gguf-breakpoint-spike/goal.md",
     },
     InferenceBlockerRow {
-        category: InferenceBlockerCategory::TensorOps,
+        category: InferenceBlockerKind::TensorOps,
         status: InferenceBlockerStatus::CheckedDebt,
         blocker: "Native systems targets prove rank-1 f32 device-view elementwise arithmetic and reductions; rank-2 matmul promoted to NativeSupport on WgslText; batched matmul (rank-3+), non-WGSL targets (Metal, LLVM, Wasm), and f16/bf16 remain checked debt. Activations (ReLU, Sqrt, Gelu, Softmax forward) are available on Rust reference carrier; device-native activations are checked debt. Softmax VJP is deferred. Normalizations (LayerNorm) are available on Rust reference carrier; device-native normalizations are checked debt.",
         evidence: "crates/radix/src/mir/tensor_systems_target.rs::TENSOR_SYSTEMS_TARGET_ROWS",
     },
     InferenceBlockerRow {
-        category: InferenceBlockerCategory::Placement,
+        category: InferenceBlockerKind::Placement,
         status: InferenceBlockerStatus::ReservedExplicitOperation,
         blocker: "Host/device placement descriptors exist, but copy-in, readback, and sync are reserved explicit operations and implicit movement is fail-closed.",
         evidence: "crates/radix/src/mir/tensor_placement.rs::TENSOR_PLACEMENT_POLICY_ROWS",
     },
     InferenceBlockerRow {
-        category: InferenceBlockerCategory::TargetSurface,
+        category: InferenceBlockerKind::TargetSurface,
         status: InferenceBlockerStatus::NoRuntimeClaim,
         blocker: "Metal/WGSL emit shader source only and report run/package=false; Radix FMIR image targets are check-only and delegated to Faber package builds.",
         evidence: "crates/radix/src/tool/commands/targets.rs::target_capabilities_for_surface",
     },
     InferenceBlockerRow {
-        category: InferenceBlockerCategory::Session,
+        category: InferenceBlockerKind::Session,
         status: InferenceBlockerStatus::Delegated,
         blocker: "Radix owns compiler inspection and fail-closed emitters, not a loaded-model session lifecycle or product inference runner.",
         evidence: "crates/radix/src/mir/tensor_runtime_abi.rs::TENSOR_RUNTIME_ABI_ROWS",

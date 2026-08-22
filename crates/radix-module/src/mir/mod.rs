@@ -110,7 +110,7 @@ pub use radix_mir::{
     indexed_access_parity, TensorOperationFamily, TensorOperationParityRow, TensorParityStatus, TensorParityTarget,
 };
 pub use radix_mir::{
-    inference_blocker_rows, inference_non_claims, InferenceBlockerCategory, InferenceBlockerRow,
+    inference_blocker_rows, inference_non_claims, InferenceBlockerKind, InferenceBlockerRow,
     InferenceBlockerStatus, InferenceNonClaim, InferenceNonClaimKind,
 };
 pub(crate) use radix_mir::{instantiate_existing_generic_type, type_contains_param, MirGenericBindings};
@@ -120,13 +120,13 @@ pub use radix_mir::{
 };
 pub use radix_mir::{
     reject_kernel_matrix_abi, validate_varying_consistency, MirAbiError, MirFragmentOutputReflection, MirFunctionAbi,
-    MirFunctionAbiParam, MirGpuReflection, MirKernelAxis, MirKernelBufferBindingType, MirKernelBuiltin,
+    MirFunctionAbiParam, MirGpuReflection, MirKernelAxis, MirKernelBufferBindingKind, MirKernelBuiltin,
     MirKernelBuiltinInput, MirKernelBuiltinInputReflection, MirKernelDispatchSize, MirKernelLaunchBindGroup,
     MirKernelLaunchBindGroupLayoutEntry, MirKernelLaunchBinding, MirKernelLaunchPipelineBindGroupLayout,
     MirKernelLaunchPipelineLayout, MirKernelLaunchPlan, MirKernelOffsetMode, MirKernelProvenance, MirKernelReflection,
     MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceReflection,
     MirKernelResourceRole, MirKernelShaderAccess, MirKernelShaderStage, MirKernelSignature, MirKernelWorkgroupCount,
-    MirRuntimeAbi, MirRuntimeAbiCategory, MirRuntimeAbiFamily, MirVaryingInterpolation, MirVaryingReflection,
+    MirRuntimeAbi, MirRuntimeAbiKind, MirRuntimeAbiFamily, MirVaryingInterpolation, MirVaryingReflection,
     MirVertexInputFormat, MirVertexInputReflection, MirWebGpuBindGroupDescriptor, MirWebGpuBindGroupEntryDescriptor,
     MirWebGpuBindGroupLayoutDescriptor, MirWebGpuBindGroupLayoutEntryDescriptor, MirWebGpuDispatchWorkgroups,
     MirWebGpuLaunchAdapter, MirWebGpuPipelineLayoutDescriptor, MirWebGpuVertexAttributeDescriptor,

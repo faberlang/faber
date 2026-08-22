@@ -26,7 +26,7 @@ use std::fmt;
 /// superblock vs native convert vs E8M0 scaled group). Never inferred
 /// from a filename.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PackedDequantClass {
+pub enum PackedDequantKind {
     /// Plain f32 passthrough — existing `TiledMatMul` / `Gather`.
     PassthroughF32,
     /// Native 2-byte IEEE-754 binary16; in-kernel f32 convert.
@@ -52,7 +52,7 @@ pub struct PackedDequantResolution {
     /// Closed layout this resolution was derived from.
     pub layout: PackedStorageLayout,
     /// Block/superblock/convert class from the §5 table.
-    pub class: PackedDequantClass,
+    pub class: PackedDequantKind,
     /// Logical elements per stored block.
     pub block_elements: u32,
     /// Packed bytes per stored block.
@@ -101,14 +101,14 @@ impl PackedDequantResolution {
     #[must_use]
     pub fn for_layout(layout: PackedStorageLayout) -> Self {
         let class = match layout {
-            PackedStorageLayout::F32 => PackedDequantClass::PassthroughF32,
-            PackedStorageLayout::F16 => PackedDequantClass::NativeF16Convert,
-            PackedStorageLayout::Bf16 => PackedDequantClass::NativeBf16Convert,
-            PackedStorageLayout::Q8_0 | PackedStorageLayout::Q5_0 => PackedDequantClass::Block,
+            PackedStorageLayout::F32 => PackedDequantKind::PassthroughF32,
+            PackedStorageLayout::F16 => PackedDequantKind::NativeF16Convert,
+            PackedStorageLayout::Bf16 => PackedDequantKind::NativeBf16Convert,
+            PackedStorageLayout::Q8_0 | PackedStorageLayout::Q5_0 => PackedDequantKind::Block,
             PackedStorageLayout::Q4_K | PackedStorageLayout::Q5_K | PackedStorageLayout::Q6_K => {
-                PackedDequantClass::Superblock
+                PackedDequantKind::Superblock
             }
-            PackedStorageLayout::MXFP4 => PackedDequantClass::ScaledE8M0Group,
+            PackedStorageLayout::MXFP4 => PackedDequantKind::ScaledE8M0Group,
         };
         Self {
             layout,

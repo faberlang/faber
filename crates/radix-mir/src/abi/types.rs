@@ -46,14 +46,14 @@ impl MirFunctionAbi {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MirRuntimeAbiCategory {
+pub enum MirRuntimeAbiKind {
     CoreSemantics,
     HostIntegration,
     ProbeScaffolding,
     IntentionalOpaqueRuntime,
 }
 
-impl MirRuntimeAbiCategory {
+impl MirRuntimeAbiKind {
     #[must_use]
     pub fn slug(self) -> &'static str {
         match self {
@@ -87,7 +87,7 @@ pub enum MirRuntimeAbiFamily {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MirRuntimeAbi {
     pub family: MirRuntimeAbiFamily,
-    pub category: MirRuntimeAbiCategory,
+    pub category: MirRuntimeAbiKind,
     pub returns_void: bool,
 }
 
@@ -102,77 +102,77 @@ impl MirRuntimeAbi {
         let (family, category, returns_void) = match intrinsic {
             MirIntrinsic::Diagnostic(_) => (
                 MirRuntimeAbiFamily::RuntimeDiagnostic,
-                MirRuntimeAbiCategory::HostIntegration,
+                MirRuntimeAbiKind::HostIntegration,
                 true,
             ),
             MirIntrinsic::Assert => (
                 MirRuntimeAbiFamily::RuntimeAssert,
-                MirRuntimeAbiCategory::CoreSemantics,
+                MirRuntimeAbiKind::CoreSemantics,
                 true,
             ),
             MirIntrinsic::FormatString { .. } => (
                 MirRuntimeAbiFamily::RuntimeFormat,
-                MirRuntimeAbiCategory::CoreSemantics,
+                MirRuntimeAbiKind::CoreSemantics,
                 false,
             ),
             MirIntrinsic::Convert(_) => (
                 MirRuntimeAbiFamily::RuntimeConvert,
-                MirRuntimeAbiCategory::CoreSemantics,
+                MirRuntimeAbiKind::CoreSemantics,
                 false,
             ),
             MirIntrinsic::Collection(_) => (
                 MirRuntimeAbiFamily::RuntimeCollection,
-                MirRuntimeAbiCategory::CoreSemantics,
+                MirRuntimeAbiKind::CoreSemantics,
                 false,
             ),
             MirIntrinsic::Atomic(op) => (
                 MirRuntimeAbiFamily::RuntimeAtomic,
-                MirRuntimeAbiCategory::CoreSemantics,
+                MirRuntimeAbiKind::CoreSemantics,
                 matches!(op, crate::MirAtomicOp::Store),
             ),
             MirIntrinsic::Panic => (
                 MirRuntimeAbiFamily::RuntimePanic,
-                MirRuntimeAbiCategory::CoreSemantics,
+                MirRuntimeAbiKind::CoreSemantics,
                 true,
             ),
             MirIntrinsic::Provider(_) => (
                 MirRuntimeAbiFamily::RuntimeProvider,
-                MirRuntimeAbiCategory::HostIntegration,
+                MirRuntimeAbiKind::HostIntegration,
                 false,
             ),
             MirIntrinsic::SermoOpen | MirIntrinsic::SermoSetOpener | MirIntrinsic::Sermo(_) => (
                 MirRuntimeAbiFamily::RuntimeSermo,
-                MirRuntimeAbiCategory::HostIntegration,
+                MirRuntimeAbiKind::HostIntegration,
                 false,
             ),
             MirIntrinsic::ReadLine => (
                 MirRuntimeAbiFamily::RuntimeReadLine,
-                MirRuntimeAbiCategory::HostIntegration,
+                MirRuntimeAbiKind::HostIntegration,
                 false,
             ),
             MirIntrinsic::Cede => (
                 MirRuntimeAbiFamily::RuntimeCede,
-                MirRuntimeAbiCategory::HostIntegration,
+                MirRuntimeAbiKind::HostIntegration,
                 false,
             ),
             MirIntrinsic::GpuBuiltin(_) => (
                 MirRuntimeAbiFamily::RuntimeGpuBuiltin,
-                MirRuntimeAbiCategory::CoreSemantics,
+                MirRuntimeAbiKind::CoreSemantics,
                 false,
             ),
             MirIntrinsic::CursorStream(_) => (
                 MirRuntimeAbiFamily::RuntimeCursorStream,
-                MirRuntimeAbiCategory::HostIntegration,
+                MirRuntimeAbiKind::HostIntegration,
                 false,
             ),
             MirIntrinsic::Gradient(_) => (
                 MirRuntimeAbiFamily::RuntimeGradient,
-                MirRuntimeAbiCategory::HostIntegration,
+                MirRuntimeAbiKind::HostIntegration,
                 false,
             ),
             MirIntrinsic::TypeCheck(_) => (
                 MirRuntimeAbiFamily::RuntimeTypeCheck,
-                MirRuntimeAbiCategory::CoreSemantics,
+                MirRuntimeAbiKind::CoreSemantics,
                 false,
             ),
         };

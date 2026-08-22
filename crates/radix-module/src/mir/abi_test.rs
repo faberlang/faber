@@ -7,9 +7,9 @@ use super::abi::collection_op_workgroup_count;
 use super::test_support::*;
 use super::{
     MirColorTargetFormat, MirFragmentOutputReflection, MirFunctionAbi, MirInputStepMode, MirKernelAxis,
-    MirKernelBufferBindingType, MirKernelBuiltin, MirKernelBuiltinInput, MirKernelDispatchSize, MirKernelOffsetMode,
+    MirKernelBufferBindingKind, MirKernelBuiltin, MirKernelBuiltinInput, MirKernelDispatchSize, MirKernelOffsetMode,
     MirKernelReflection, MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole,
-    MirKernelShaderAccess, MirKernelShaderStage, MirKernelSignature, MirRuntimeAbi, MirRuntimeAbiCategory,
+    MirKernelShaderAccess, MirKernelShaderStage, MirKernelSignature, MirRuntimeAbi, MirRuntimeAbiKind,
     MirRuntimeAbiFamily, MirVaryingInterpolation, MirVaryingReflection, MirVertexInputFormat, MirVertexInputReflection,
     MirWebGpuVertexStepMode, MirWorkgroupSize,
 };
@@ -237,8 +237,8 @@ fn simple_launch_plan_bind_group_0_shader_accesses_and_buffer_types() {
     assert_eq!(
         launch.bind_groups[0].buffer_binding_types,
         vec![
-            MirKernelBufferBindingType::ReadOnlyStorage,
-            MirKernelBufferBindingType::Storage
+            MirKernelBufferBindingKind::ReadOnlyStorage,
+            MirKernelBufferBindingKind::Storage
         ]
     );
     assert_eq!(launch.bind_groups[0].buffer_binding_type_count, 2);
@@ -338,7 +338,7 @@ fn simple_launch_plan_bind_group_0_layout_entry_0_is_readonly_storage_input() {
     assert_eq!(e.buffer_byte_offset, 0);
     assert_eq!(e.binding_byte_len, 4);
     assert_eq!(e.shader_visibility, MirKernelShaderStage::Compute);
-    assert_eq!(e.buffer_binding_type, MirKernelBufferBindingType::ReadOnlyStorage);
+    assert_eq!(e.buffer_binding_type, MirKernelBufferBindingKind::ReadOnlyStorage);
     assert_eq!(e.min_binding_size, 4);
     assert!(!e.has_dynamic_offset);
     assert_eq!(e.source_local, Some(MirLocalId(3)));
@@ -357,7 +357,7 @@ fn simple_launch_plan_bind_group_0_layout_entry_1_is_storage_output() {
     assert_eq!(e.buffer_byte_offset, 0);
     assert_eq!(e.binding_byte_len, 4);
     assert_eq!(e.shader_visibility, MirKernelShaderStage::Compute);
-    assert_eq!(e.buffer_binding_type, MirKernelBufferBindingType::Storage);
+    assert_eq!(e.buffer_binding_type, MirKernelBufferBindingKind::Storage);
     assert_eq!(e.min_binding_size, 4);
     assert!(!e.has_dynamic_offset);
     assert_eq!(e.source_local, None);
@@ -376,7 +376,7 @@ fn simple_launch_plan_bind_group_0_binding_0_is_readonly_input_resource() {
     assert_eq!(b.access, MirKernelResourceAccess::Read);
     assert_eq!(b.shader_access, MirKernelShaderAccess::Read);
     assert_eq!(b.shader_visibility, MirKernelShaderStage::Compute);
-    assert_eq!(b.buffer_binding_type, MirKernelBufferBindingType::ReadOnlyStorage);
+    assert_eq!(b.buffer_binding_type, MirKernelBufferBindingKind::ReadOnlyStorage);
     assert_eq!(b.element_ty, ty);
     assert_eq!(b.element_layout, MirScalarLayout::F32);
     assert_eq!(b.element_byte_width, 4);
@@ -401,7 +401,7 @@ fn simple_launch_plan_bind_group_0_binding_1_is_readwrite_output_resource() {
     assert_eq!(b.access, MirKernelResourceAccess::Write);
     assert_eq!(b.shader_access, MirKernelShaderAccess::ReadWrite);
     assert_eq!(b.shader_visibility, MirKernelShaderStage::Compute);
-    assert_eq!(b.buffer_binding_type, MirKernelBufferBindingType::Storage);
+    assert_eq!(b.buffer_binding_type, MirKernelBufferBindingKind::Storage);
     assert_eq!(b.element_ty, ty);
     assert_eq!(b.element_layout, MirScalarLayout::F32);
     assert_eq!(b.buffer_byte_len, 4);
@@ -560,12 +560,12 @@ fn sparse_launch_plan_bind_groups_have_expected_buffer_binding_types() {
     let (_types, launch) = setup_sparse_group_launch_plan();
     assert_eq!(
         launch.bind_groups[0].buffer_binding_types,
-        vec![MirKernelBufferBindingType::Storage]
+        vec![MirKernelBufferBindingKind::Storage]
     );
     assert_eq!(launch.bind_groups[0].buffer_binding_type_count, 1);
     assert_eq!(
         launch.bind_groups[1].buffer_binding_types,
-        vec![MirKernelBufferBindingType::ReadOnlyStorage]
+        vec![MirKernelBufferBindingKind::ReadOnlyStorage]
     );
     assert_eq!(launch.bind_groups[1].buffer_binding_type_count, 1);
 }
@@ -1074,7 +1074,7 @@ fn webgpu_adapter_bind_group_0_storage_output_layout() {
     assert_eq!(layout.entries[0].binding_index, 0);
     assert_eq!(layout.entries[0].resource_index, 1);
     assert_eq!(layout.entries[0].visibility, MirKernelShaderStage::Compute);
-    assert_eq!(layout.entries[0].buffer_type, MirKernelBufferBindingType::Storage);
+    assert_eq!(layout.entries[0].buffer_type, MirKernelBufferBindingKind::Storage);
     assert_eq!(layout.entries[0].buffer_byte_len, 4);
     assert_eq!(layout.entries[0].buffer_byte_offset, 0);
     assert_eq!(layout.entries[0].binding_byte_len, 4);
@@ -1099,7 +1099,7 @@ fn webgpu_adapter_bind_group_0_storage_output_layout() {
     assert_eq!(bind_group.entries[0].element_count, 1);
     assert_eq!(bind_group.entries[0].resource_index, 1);
     assert_eq!(bind_group.entries[0].binding_index, 0);
-    assert_eq!(bind_group.entries[0].buffer_type, MirKernelBufferBindingType::Storage);
+    assert_eq!(bind_group.entries[0].buffer_type, MirKernelBufferBindingKind::Storage);
     assert_eq!(bind_group.entries[0].buffer_byte_len, 4);
     assert_eq!(bind_group.entries[0].buffer_byte_offset, 0);
     assert_eq!(bind_group.entries[0].binding_byte_len, 4);
@@ -1122,7 +1122,7 @@ fn webgpu_adapter_bind_group_1_readonly_storage_input_layout() {
     assert_eq!(layout.entries[0].binding_index, 0);
     assert_eq!(layout.entries[0].resource_index, 0);
     assert_eq!(layout.entries[0].visibility, MirKernelShaderStage::Compute);
-    assert_eq!(layout.entries[0].buffer_type, MirKernelBufferBindingType::ReadOnlyStorage);
+    assert_eq!(layout.entries[0].buffer_type, MirKernelBufferBindingKind::ReadOnlyStorage);
     assert_eq!(layout.entries[0].buffer_byte_len, 4);
     assert_eq!(layout.entries[0].buffer_byte_offset, 0);
     assert_eq!(layout.entries[0].binding_byte_len, 4);
@@ -1147,7 +1147,7 @@ fn webgpu_adapter_bind_group_1_readonly_storage_input_layout() {
     assert_eq!(bind_group.entries[0].element_count, 1);
     assert_eq!(bind_group.entries[0].resource_index, 0);
     assert_eq!(bind_group.entries[0].binding_index, 0);
-    assert_eq!(bind_group.entries[0].buffer_type, MirKernelBufferBindingType::ReadOnlyStorage);
+    assert_eq!(bind_group.entries[0].buffer_type, MirKernelBufferBindingKind::ReadOnlyStorage);
     assert_eq!(bind_group.entries[0].buffer_byte_len, 4);
     assert_eq!(bind_group.entries[0].buffer_byte_offset, 0);
     assert_eq!(bind_group.entries[0].binding_byte_len, 4);
@@ -1869,12 +1869,12 @@ fn kernel_abi_runtime_classifies_selected_helper_families() {
 
     let diagnostic_abi = MirRuntimeAbi::from_call(&diagnostic);
     assert_eq!(diagnostic_abi.family, MirRuntimeAbiFamily::RuntimeDiagnostic);
-    assert_eq!(diagnostic_abi.category, MirRuntimeAbiCategory::HostIntegration);
+    assert_eq!(diagnostic_abi.category, MirRuntimeAbiKind::HostIntegration);
     assert!(diagnostic_abi.returns_void);
 
     let format_abi = MirRuntimeAbi::from_call(&format);
     assert_eq!(format_abi.family, MirRuntimeAbiFamily::RuntimeFormat);
-    assert_eq!(format_abi.category, MirRuntimeAbiCategory::CoreSemantics);
+    assert_eq!(format_abi.category, MirRuntimeAbiKind::CoreSemantics);
     assert!(!format_abi.returns_void);
 
     let assert_abi = MirRuntimeAbi::from_call(&assert_call);

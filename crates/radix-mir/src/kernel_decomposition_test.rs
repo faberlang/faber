@@ -2186,7 +2186,7 @@ fn q4k_quantized_matmul_decomposes_to_packed_plan() {
     assert_eq!(plan.layout, crate::abi::PackedStorageLayout::Q4_K);
     assert_eq!(
         plan.dequant_resolution().class,
-        crate::kernel_plan::PackedDequantClass::Superblock
+        crate::kernel_plan::PackedDequantKind::Superblock
     );
 }
 

@@ -1637,7 +1637,7 @@ fn grouped_and_ssm_plans_resolve_typed_variants() {
 
 fn section5_packed_layouts() -> [(
     crate::abi::PackedStorageLayout,
-    PackedDequantClass,
+    PackedDequantKind,
     u32,
     u32,
 ); 8] {
@@ -1645,39 +1645,39 @@ fn section5_packed_layouts() -> [(
     [
         (
             PackedStorageLayout::F16,
-            PackedDequantClass::NativeF16Convert,
+            PackedDequantKind::NativeF16Convert,
             1,
             2,
         ),
         (
             PackedStorageLayout::Bf16,
-            PackedDequantClass::NativeBf16Convert,
+            PackedDequantKind::NativeBf16Convert,
             1,
             2,
         ),
-        (PackedStorageLayout::Q8_0, PackedDequantClass::Block, 32, 34),
+        (PackedStorageLayout::Q8_0, PackedDequantKind::Block, 32, 34),
         (
             PackedStorageLayout::Q4_K,
-            PackedDequantClass::Superblock,
+            PackedDequantKind::Superblock,
             256,
             144,
         ),
         (
             PackedStorageLayout::Q5_K,
-            PackedDequantClass::Superblock,
+            PackedDequantKind::Superblock,
             256,
             176,
         ),
         (
             PackedStorageLayout::Q6_K,
-            PackedDequantClass::Superblock,
+            PackedDequantKind::Superblock,
             256,
             210,
         ),
-        (PackedStorageLayout::Q5_0, PackedDequantClass::Block, 32, 22),
+        (PackedStorageLayout::Q5_0, PackedDequantKind::Block, 32, 22),
         (
             PackedStorageLayout::MXFP4,
-            PackedDequantClass::ScaledE8M0Group,
+            PackedDequantKind::ScaledE8M0Group,
             32,
             17,
         ),
@@ -1688,7 +1688,7 @@ fn section5_packed_layouts() -> [(
 fn packed_dequant_resolution_binds_section5_layout_table() {
     use crate::abi::PackedStorageLayout;
     let f32 = PackedDequantResolution::for_layout(PackedStorageLayout::F32);
-    assert_eq!(f32.class, PackedDequantClass::PassthroughF32);
+    assert_eq!(f32.class, PackedDequantKind::PassthroughF32);
     assert_eq!((f32.block_elements, f32.block_bytes), (1, 4));
     for (layout, class, elements, bytes) in section5_packed_layouts() {
         let resolved = PackedDequantResolution::for_layout(layout);
@@ -1747,7 +1747,7 @@ fn q4k_ggml_id_admits_quantized_matmul_with_superblock_dequant() {
     assert_eq!(quantized.layout, crate::abi::PackedStorageLayout::Q4_K);
     assert_eq!(
         quantized.dequant_resolution().class,
-        PackedDequantClass::Superblock
+        PackedDequantKind::Superblock
     );
 }
 
@@ -1765,7 +1765,7 @@ fn f16_ggml_id_admits_quantized_matmul_with_native_f16_convert() {
     assert_eq!(quantized.layout, crate::abi::PackedStorageLayout::F16);
     assert_eq!(
         quantized.dequant_resolution().class,
-        PackedDequantClass::NativeF16Convert
+        PackedDequantKind::NativeF16Convert
     );
     assert_eq!(
         (
@@ -1792,7 +1792,7 @@ fn mxfp4_ggml_id_admits_quantized_matmul_with_scaled_e8m0_group() {
     assert_eq!(quantized.layout, crate::abi::PackedStorageLayout::MXFP4);
     assert_eq!(
         quantized.dequant_resolution().class,
-        PackedDequantClass::ScaledE8M0Group
+        PackedDequantKind::ScaledE8M0Group
     );
     assert_eq!(
         (

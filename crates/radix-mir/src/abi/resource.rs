@@ -155,7 +155,7 @@ pub enum MirKernelShaderAccess {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MirKernelBufferBindingType {
+pub enum MirKernelBufferBindingKind {
     ReadOnlyStorage,
     Storage,
 }
@@ -170,7 +170,7 @@ impl MirKernelShaderAccess {
     }
 }
 
-impl MirKernelBufferBindingType {
+impl MirKernelBufferBindingKind {
     #[must_use]
     pub fn spelling(self) -> &'static str {
         match self {

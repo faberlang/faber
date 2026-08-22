@@ -83,7 +83,7 @@ pub struct KernelSubchain {
     pub plan: CollectionKernelPlan,
     /// Typed elementwise expression plan for a legal elementwise-only
     /// subchain. `None` when [`Self::plan`] is a recipe or when the slice
-    /// hits a typed [`crate::elementwise_plan::ElementwiseBarrier`]. The
+    /// hits a typed [`crate::elementwise_plan::ElementwiseBarrierError`]. The
     /// collection-plan classification is unchanged: this is additive
     /// payload, not a replacement for [`CollectionKernelPlan::Elementwise`].
     pub elementwise_plan: Option<ElementwisePlan>,
@@ -242,7 +242,7 @@ pub fn decompose_kernel_function_with_limit(
         // Additive payload: a legal elementwise-only subchain carries the
         // OF-1 expression plan. Recipe classification stays
         // `resolve_subchain_plan` / `kernel_plan/` — this never re-derives
-        // it, and a typed `ElementwiseBarrier` leaves the collection plan
+        // it, and a typed `ElementwiseBarrierError` leaves the collection plan
         // as payload-less `Elementwise` (existing gates stay closed).
         let elementwise_plan = match &plan {
             CollectionKernelPlan::Elementwise => plan_elementwise(&synthetic, validation).ok(),

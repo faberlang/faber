@@ -7,7 +7,7 @@
 
 use crate::abi::PackedStorageLayout;
 use crate::kernel_plan::{
-    admit_quantized_gather, dequant_q8_0_block, AdmittedGather, PackedDequantClass,
+    admit_quantized_gather, dequant_q8_0_block, AdmittedGather, PackedDequantKind,
 };
 
 fn parse_hex_bytes(hex: &str) -> Vec<u8> {
@@ -67,7 +67,7 @@ fn q8_0_quantized_gather_matches_gi2_1_goldens_without_table_expansion() {
     let AdmittedGather::Quantized(plan) = admitted else {
         panic!("Q8_0 embedding table must admit QuantizedGather");
     };
-    assert_eq!(plan.dequant.class, PackedDequantClass::Block);
+    assert_eq!(plan.dequant.class, PackedDequantKind::Block);
     assert_eq!((layout.block_elements(), layout.block_bytes()), (32, 34));
 
     let goldens: Gi2Goldens = serde_json::from_str(include_str!(concat!(

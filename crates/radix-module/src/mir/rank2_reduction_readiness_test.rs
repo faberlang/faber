@@ -9,7 +9,7 @@ use super::*;
 use crate::codegen::Target;
 use crate::mir::{
     inference_blocker_rows, tensor_operation_floor_rows, tensor_placement_policy_rows, tensor_systems_target_rows,
-    InferenceBlockerCategory, InferenceBlockerStatus, TensorOperationFloorStatus, TensorOperationFloorTarget,
+    InferenceBlockerKind, InferenceBlockerStatus, TensorOperationFloorStatus, TensorOperationFloorTarget,
     TensorPlacementFacet, TensorPlacementStatus, TensorSystemsTarget, TensorSystemsTargetStatus,
 };
 use crate::services::{target_capabilities_for_surface, TargetCommandSurface};
@@ -110,7 +110,7 @@ fn cuda_directed_rows_match_host_provider_and_placement_blockers() {
 fn readiness_matrix_is_tied_to_inference_tensor_blocker() {
     let tensor_blocker = inference_blocker_rows()
         .iter()
-        .find(|row| row.category == InferenceBlockerCategory::TensorOps)
+        .find(|row| row.category == InferenceBlockerKind::TensorOps)
         .expect("inference tensor blocker row");
     assert_eq!(tensor_blocker.status, InferenceBlockerStatus::CheckedDebt);
     assert!(tensor_blocker.blocker.contains("reductions"));

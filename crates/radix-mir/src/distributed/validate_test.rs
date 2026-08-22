@@ -13,7 +13,7 @@
 //! depend on radix-mir-fmir).
 
 use super::{
-    BoundaryRef, CollectiveViolation, ContractFingerprint, OpRef, TopologyRef, ValidateClass,
+    BoundaryRef, CollectiveViolation, ContractFingerprint, OpRef, TopologyRef, ValidateKind,
     ValidateError,
 };
 use crate::abi::{
@@ -386,7 +386,7 @@ fn stale_plan_version_fails() {
     let mut plan = cs1();
     plan.version = PlanVersion(0);
     let error = plan.validate().expect_err("a stale plan version must fail");
-    assert_eq!(error.class(), ValidateClass::StaleVersion);
+    assert_eq!(error.class(), ValidateKind::StaleVersion);
     assert_eq!(
         error,
         ValidateError::StaleVersion {
@@ -403,7 +403,7 @@ fn unknown_future_plan_version_fails() {
     let error = plan
         .validate()
         .expect_err("an unknown plan version must fail");
-    assert_eq!(error.class(), ValidateClass::StaleVersion);
+    assert_eq!(error.class(), ValidateKind::StaleVersion);
     assert!(matches!(
         error,
         ValidateError::StaleVersion { plan_version, .. } if plan_version == PlanVersion(2)
@@ -426,7 +426,7 @@ fn constraint_on_undeclared_partition_fails_topology() {
     let error = plan
         .validate()
         .expect_err("a constraint on an undeclared partition must fail");
-    assert_eq!(error.class(), ValidateClass::TopologyMismatch);
+    assert_eq!(error.class(), ValidateKind::TopologyMismatch);
     assert!(matches!(
         error,
         ValidateError::TopologyMismatch {
@@ -443,7 +443,7 @@ fn duplicate_partition_id_fails_topology() {
     let error = plan
         .validate()
         .expect_err("a duplicate partition id must fail");
-    assert_eq!(error.class(), ValidateClass::TopologyMismatch);
+    assert_eq!(error.class(), ValidateKind::TopologyMismatch);
     assert_eq!(
         error,
         ValidateError::DuplicatePartition {
@@ -464,7 +464,7 @@ fn zero_partition_budget_fails_topology() {
     let error = plan
         .validate()
         .expect_err("a zero partition budget must fail");
-    assert_eq!(error.class(), ValidateClass::TopologyMismatch);
+    assert_eq!(error.class(), ValidateKind::TopologyMismatch);
     assert_eq!(
         error,
         ValidateError::ZeroPartitionBudget {
@@ -485,7 +485,7 @@ fn require_owner_disagreeing_with_declared_owner_fails_topology() {
     let error = plan
         .validate()
         .expect_err("a disagreeing RequireOwner constraint must fail");
-    assert_eq!(error.class(), ValidateClass::TopologyMismatch);
+    assert_eq!(error.class(), ValidateKind::TopologyMismatch);
     assert_eq!(
         error,
         ValidateError::RequireOwnerMismatch {
@@ -507,7 +507,7 @@ fn transfer_of_undeclared_value_fails_missing_owner() {
     let error = plan
         .validate()
         .expect_err("a transfer of an undeclared value must fail");
-    assert_eq!(error.class(), ValidateClass::MissingOwner);
+    assert_eq!(error.class(), ValidateKind::MissingOwner);
     assert!(matches!(
         error,
         ValidateError::MissingOwner {
@@ -533,7 +533,7 @@ fn replicated_primary_outside_replica_set_fails_missing_owner() {
     let error = plan
         .validate()
         .expect_err("a primary outside its replica set must fail");
-    assert_eq!(error.class(), ValidateClass::MissingOwner);
+    assert_eq!(error.class(), ValidateKind::MissingOwner);
     assert_eq!(
         error,
         ValidateError::PrimaryOutsideReplicaSet {
@@ -559,7 +559,7 @@ fn duplicate_value_contracts_fail_conflicting() {
     let error = plan
         .validate()
         .expect_err("a doubly-declared value must fail");
-    assert_eq!(error.class(), ValidateClass::ConflictingReplicas);
+    assert_eq!(error.class(), ValidateKind::ConflictingReplicas);
     assert_eq!(
         error,
         ValidateError::ConflictingContracts {
@@ -588,7 +588,7 @@ fn duplicate_replica_in_set_fails_conflicting() {
         replicas: vec![PartitionId(0), PartitionId(0), PartitionId(1)],
     };
     let error = plan.validate().expect_err("a repeated replica must fail");
-    assert_eq!(error.class(), ValidateClass::ConflictingReplicas);
+    assert_eq!(error.class(), ValidateKind::ConflictingReplicas);
     assert_eq!(
         error,
         ValidateError::DuplicateReplica {
@@ -610,7 +610,7 @@ fn partition_placement_disagreeing_with_plan_fails_conflicting() {
     let error = plan
         .validate()
         .expect_err("a disagreeing partition placement must fail");
-    assert_eq!(error.class(), ValidateClass::ConflictingReplicas);
+    assert_eq!(error.class(), ValidateKind::ConflictingReplicas);
     assert_eq!(
         error,
         ValidateError::PartitionContractMismatch {
@@ -627,7 +627,7 @@ fn shared_launch_fails_conflicting() {
     let error = plan
         .validate()
         .expect_err("a launch on two partitions must fail");
-    assert_eq!(error.class(), ValidateClass::ConflictingReplicas);
+    assert_eq!(error.class(), ValidateKind::ConflictingReplicas);
     assert_eq!(
         error,
         ValidateError::SharedLaunch {
@@ -657,7 +657,7 @@ fn conflicting_byte_contract_fails_conflicting() {
     let error = plan
         .validate()
         .expect_err("disagreeing byte contracts must fail");
-    assert_eq!(error.class(), ValidateClass::ConflictingReplicas);
+    assert_eq!(error.class(), ValidateKind::ConflictingReplicas);
     assert_eq!(
         error,
         ValidateError::ConflictingByteContract {
@@ -686,7 +686,7 @@ fn duplicate_move_fails_conflicting() {
             f32,
         )));
     let error = plan.validate().expect_err("a duplicate move must fail");
-    assert_eq!(error.class(), ValidateClass::ConflictingReplicas);
+    assert_eq!(error.class(), ValidateKind::ConflictingReplicas);
     assert_eq!(
         error,
         ValidateError::DuplicateMove {
@@ -708,7 +708,7 @@ fn missing_generation_fails() {
     let error = plan
         .validate()
         .expect_err("a transfer without a generation must fail");
-    assert_eq!(error.class(), ValidateClass::Completeness);
+    assert_eq!(error.class(), ValidateKind::Completeness);
     assert!(matches!(
         error,
         ValidateError::MissingGeneration {
@@ -729,7 +729,7 @@ fn consumer_generation_before_producer_fails() {
     let error = plan
         .validate()
         .expect_err("a consumer before its producer must fail");
-    assert_eq!(error.class(), ValidateClass::Completeness);
+    assert_eq!(error.class(), ValidateKind::Completeness);
     assert!(matches!(
         error,
         ValidateError::GenerationOrder {
@@ -746,7 +746,7 @@ fn missing_byte_contract_fails() {
     let mut plan = cs1();
     transfer_mut(&mut plan, 0).byte_count = 0;
     let error = plan.validate().expect_err("a zero byte contract must fail");
-    assert_eq!(error.class(), ValidateClass::Completeness);
+    assert_eq!(error.class(), ValidateKind::Completeness);
     assert!(matches!(
         error,
         ValidateError::MissingByteContract {
@@ -767,7 +767,7 @@ fn missing_producer_fails() {
     let error = plan
         .validate()
         .expect_err("a transfer without a producing launch must fail");
-    assert_eq!(error.class(), ValidateClass::Completeness);
+    assert_eq!(error.class(), ValidateKind::Completeness);
     assert!(matches!(
         error,
         ValidateError::MissingProducer {
@@ -786,7 +786,7 @@ fn missing_completion_boundary_fails() {
     let error = plan
         .validate()
         .expect_err("a transfer without a completion boundary must fail");
-    assert_eq!(error.class(), ValidateClass::Completeness);
+    assert_eq!(error.class(), ValidateKind::Completeness);
     assert!(matches!(
         error,
         ValidateError::MissingCompletionBoundary {
@@ -827,7 +827,7 @@ fn missing_consumer_fails() {
     let error = plan
         .validate()
         .expect_err("a move with no consumer must fail");
-    assert_eq!(error.class(), ValidateClass::Completeness);
+    assert_eq!(error.class(), ValidateKind::Completeness);
     assert!(matches!(
         error,
         ValidateError::MissingConsumer {
@@ -849,7 +849,7 @@ fn dangling_boundary_barrier_fails() {
     let error = plan
         .validate()
         .expect_err("a dangling boundary barrier must fail");
-    assert_eq!(error.class(), ValidateClass::Completeness);
+    assert_eq!(error.class(), ValidateKind::Completeness);
     assert_eq!(
         error,
         ValidateError::DanglingBoundaryReference {
@@ -869,7 +869,7 @@ fn dangling_boundary_launch_fails() {
     let error = plan
         .validate()
         .expect_err("a dangling boundary launch must fail");
-    assert_eq!(error.class(), ValidateClass::Completeness);
+    assert_eq!(error.class(), ValidateKind::Completeness);
     assert_eq!(
         error,
         ValidateError::DanglingBoundaryReference {
@@ -902,7 +902,7 @@ fn bidirectional_value_move_cycle_fails() {
             f32,
         )));
     let error = plan.validate().expect_err("a value-move cycle must fail");
-    assert_eq!(error.class(), ValidateClass::Cycle);
+    assert_eq!(error.class(), ValidateKind::Cycle);
     assert!(matches!(
         error,
         ValidateError::ValueMoveCycle {
@@ -917,7 +917,7 @@ fn self_move_cycle_fails() {
     let mut plan = cs1();
     transfer_mut(&mut plan, 0).destination = PartitionId(0);
     let error = plan.validate().expect_err("a self-move must fail");
-    assert_eq!(error.class(), ValidateClass::Cycle);
+    assert_eq!(error.class(), ValidateKind::Cycle);
     assert!(matches!(
         error,
         ValidateError::SelfMove {
@@ -938,7 +938,7 @@ fn collective_source_not_participant_fails_unsupported() {
     let error = plan
         .validate()
         .expect_err("a broadcast from a non-participant must fail");
-    assert_eq!(error.class(), ValidateClass::UnsupportedCollective);
+    assert_eq!(error.class(), ValidateKind::UnsupportedCollective);
     assert_eq!(
         error,
         ValidateError::UnsupportedCollective {
@@ -958,7 +958,7 @@ fn collective_not_owner_originated_fails_unsupported() {
     let error = plan
         .validate()
         .expect_err("a broadcast not from the owner must fail");
-    assert_eq!(error.class(), ValidateClass::UnsupportedCollective);
+    assert_eq!(error.class(), ValidateKind::UnsupportedCollective);
     assert_eq!(
         error,
         ValidateError::UnsupportedCollective {
@@ -993,7 +993,7 @@ fn diagnostic_display_names_class_and_failing_fact() {
             reference: OpRef::Transfer(TransferId(0)),
         }
         .class(),
-        ValidateClass::MissingOwner
+        ValidateKind::MissingOwner
     );
     assert_eq!(
         ValidateError::DuplicateMove {
@@ -1002,7 +1002,7 @@ fn diagnostic_display_names_class_and_failing_fact() {
             duplicate: TransferId(1),
         }
         .class(),
-        ValidateClass::ConflictingReplicas
+        ValidateKind::ConflictingReplicas
     );
     assert_eq!(
         ValidateError::ValueMoveCycle {
@@ -1011,7 +1011,7 @@ fn diagnostic_display_names_class_and_failing_fact() {
             second: TransferId(1),
         }
         .class(),
-        ValidateClass::Cycle
+        ValidateKind::Cycle
     );
     assert_eq!(
         ValidateError::UnsupportedCollective {
@@ -1020,7 +1020,7 @@ fn diagnostic_display_names_class_and_failing_fact() {
             violation: CollectiveViolation::TooFewParticipants { count: 1 },
         }
         .class(),
-        ValidateClass::UnsupportedCollective
+        ValidateKind::UnsupportedCollective
     );
     assert_eq!(
         ValidateError::TopologyMismatch {
@@ -1028,7 +1028,7 @@ fn diagnostic_display_names_class_and_failing_fact() {
             referenced_by: TopologyRef::Constraint,
         }
         .class(),
-        ValidateClass::TopologyMismatch
+        ValidateKind::TopologyMismatch
     );
     assert_eq!(
         ValidateError::StaleVersion {
@@ -1036,7 +1036,7 @@ fn diagnostic_display_names_class_and_failing_fact() {
             supported_version: LOGICAL_PLAN_VERSION,
         }
         .class(),
-        ValidateClass::StaleVersion
+        ValidateKind::StaleVersion
     );
     assert_eq!(
         ValidateError::MissingByteContract {
@@ -1045,7 +1045,7 @@ fn diagnostic_display_names_class_and_failing_fact() {
             byte_count: 0,
         }
         .class(),
-        ValidateClass::Completeness
+        ValidateKind::Completeness
     );
 }
 
