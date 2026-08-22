@@ -668,6 +668,360 @@ impl ExecutorPlanExtension {
 /// allocation/view/binding facts below.
 pub const EXECUTOR_PLAN_RUNTIME_BIND_ABI_VERSION: u16 = 2;
 
+/// Version of the additive speculative-verification record section.
+///
+/// The runtime-binding v2 payload remains wire-compatible for existing
+/// consumers. Verification records are a new section at the next version so
+/// an older consumer cannot default-fill `L`, `k`, generation, or result
+/// fields and accidentally admit a different invocation.
+pub const EXECUTOR_PLAN_VERIFICATION_ABI_VERSION: u16 = EXECUTOR_PLAN_RUNTIME_BIND_ABI_VERSION + 1;
+
+/// The layout of the ordered candidate-logits result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum VerificationLogitsLayout {
+    /// Consecutive rows, each containing the complete vocabulary in order.
+    RowMajor,
+    /// A layout that is not the ordered row-major result contract.
+    ColumnMajor,
+}
+
+impl VerificationLogitsLayout {
+    /// Stable spelling used by diagnostics and identity canonicalization.
+    #[must_use]
+    pub const fn spelling(self) -> &'static str {
+        match self {
+            Self::RowMajor => "row_major",
+            Self::ColumnMajor => "column_major",
+        }
+    }
+}
+
+/// Static model/output facts for one verification plan.
+///
+/// `prefix_before`, `query_rows`, generation, candidate ids, and transaction
+/// identity deliberately do not appear here. They are invocation facts and
+/// must not change the compiled-plan identity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationPlanShape {
+    /// The model's stable logical dimensions, excluding invocation extents.
+    pub model_shape: Vec<u64>,
+    /// Vocabulary width of each ordered logits row.
+    pub vocab: u64,
+    /// Result layout admitted by the plan.
+    pub logits_layout: VerificationLogitsLayout,
+}
+
+impl VerificationPlanShape {
+    /// Validate the static shape facts before they enter a plan identity.
+    pub fn validate(&self) -> Result<(), VerificationAdmissionError> {
+        if self.model_shape.is_empty() || self.model_shape.iter().any(|dimension| *dimension == 0) {
+            return Err(VerificationAdmissionError::InvalidPlanShape {
+                detail: "model shape must have a positive rank and dimensions".to_owned(),
+            });
+        }
+        if self.vocab == 0 {
+            return Err(VerificationAdmissionError::InvalidPlanShape {
+                detail: "vocabulary width must be positive".to_owned(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Return the stable identity of this static plan shape.
+    #[must_use]
+    pub fn static_identity(&self) -> VerificationPlanIdentity {
+        let mut bytes = Vec::new();
+        push_verification_identity_bytes(&mut bytes, b"radix-mir:verification-plan:v1");
+        push_verification_identity_u64(
+            &mut bytes,
+            u64::from(EXECUTOR_PLAN_VERIFICATION_ABI_VERSION),
+        );
+        push_verification_identity_u64(
+            &mut bytes,
+            u64::try_from(self.model_shape.len()).unwrap_or(u64::MAX),
+        );
+        for dimension in &self.model_shape {
+            push_verification_identity_u64(&mut bytes, *dimension);
+        }
+        push_verification_identity_u64(&mut bytes, self.vocab);
+        push_verification_identity_bytes(&mut bytes, self.logits_layout.spelling().as_bytes());
+        VerificationPlanIdentity(format!("sha256:{}", handroll::sha256_hex(bytes)))
+    }
+}
+
+/// Stable identity for static verification-plan facts.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct VerificationPlanIdentity(String);
+
+impl VerificationPlanIdentity {
+    /// Canonical `sha256:<64-hex>` identity spelling.
+    #[must_use]
+    pub fn digest(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Target-neutral admission record for one speculative verification block.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationBlockAdmission {
+    /// Version of this additive verification record section.
+    pub abi_version: u16,
+    /// Committed prefix length `L` before this invocation.
+    pub prefix_before: u64,
+    /// Explicit candidate/query row count `k`; never inferred from a sequence.
+    pub query_rows: u64,
+    /// Candidate token ids, in the order represented by the result rows.
+    pub candidate_ids: Vec<i64>,
+    /// Generation of the committed cache state being read.
+    pub committed_generation: Option<u64>,
+    /// Identity of the transaction that owns the uncommitted candidate rows.
+    pub transaction_id: Option<u64>,
+    /// Static model and result-shape facts.
+    pub plan: VerificationPlanShape,
+}
+
+/// Target-neutral result record returned for an admitted verification block.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationBlockResult {
+    /// Transaction that produced these candidate rows and logits.
+    pub transaction_id: Option<u64>,
+    /// Generation of the committed cache state used for the forward pass.
+    pub committed_generation: Option<u64>,
+    /// Ordered logits shape, expected to be exactly `[k, vocab]`.
+    pub logits_shape: Vec<u64>,
+    /// Physical/logical layout of the logits rows.
+    pub logits_layout: VerificationLogitsLayout,
+    /// Number of candidate rows accepted by the caller, `0 ≤ r ≤ k`.
+    pub accepted_length: i64,
+}
+
+/// Focused fail-closed errors at the speculative-verification seam.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VerificationAdmissionError {
+    /// A static model/output shape is incomplete or malformed.
+    InvalidPlanShape { detail: String },
+    /// A prefix of zero would masquerade as fresh prefill.
+    FreshPrefillMasquerade,
+    /// The explicit candidate/query row count is zero.
+    InvalidQueryRows,
+    /// Candidate ids do not have the explicitly declared row count.
+    CandidateCountMismatch { declared: u64, actual: usize },
+    /// A candidate id is negative or outside the declared vocabulary.
+    InvalidCandidateId { index: usize, candidate_id: i64 },
+    /// The committed cache generation was omitted.
+    MissingGeneration,
+    /// The transaction identity was omitted.
+    MissingTransactionIdentity,
+    /// A result belongs to a different committed cache generation.
+    StaleGeneration { expected: u64, actual: u64 },
+    /// A result belongs to a different verification transaction.
+    TransactionIdentityMismatch { expected: u64, actual: u64 },
+    /// The result shape is not the ordered `[k, vocab]` shape, including a
+    /// candidate-id/logit-row count mismatch.
+    LogitsShapeSkew {
+        expected: Vec<u64>,
+        actual: Vec<u64>,
+    },
+    /// The result layout does not match the admitted plan layout.
+    LogitsLayoutSkew {
+        expected: VerificationLogitsLayout,
+        actual: VerificationLogitsLayout,
+    },
+    /// The caller supplied an impossible accepted length.
+    InvalidAcceptedLength { accepted: i64, maximum: u64 },
+    /// A section consumer received a stale or unknown record version.
+    UnsupportedVersion { actual: u16, expected: u16 },
+}
+
+impl fmt::Display for VerificationAdmissionError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidPlanShape { detail } => write!(formatter, "invalid verification plan shape: {detail}"),
+            Self::FreshPrefillMasquerade => write!(formatter, "verification prefix_before must be nonzero"),
+            Self::InvalidQueryRows => write!(formatter, "verification query_rows k must be nonzero"),
+            Self::CandidateCountMismatch { declared, actual } => write!(
+                formatter,
+                "verification candidate count {actual} does not match explicit k={declared}"
+            ),
+            Self::InvalidCandidateId { index, candidate_id } => write!(
+                formatter,
+                "verification candidate id {candidate_id} at index {index} is outside the admitted vocabulary"
+            ),
+            Self::MissingGeneration => write!(formatter, "verification committed generation is missing"),
+            Self::MissingTransactionIdentity => write!(formatter, "verification transaction identity is missing"),
+            Self::StaleGeneration { expected, actual } => write!(
+                formatter,
+                "verification result generation {actual} is stale; expected {expected}"
+            ),
+            Self::TransactionIdentityMismatch { expected, actual } => write!(
+                formatter,
+                "verification result transaction {actual} does not match admitted transaction {expected}"
+            ),
+            Self::LogitsShapeSkew { expected, actual } => write!(
+                formatter,
+                "verification logits shape {actual:?} does not match ordered {expected:?}"
+            ),
+            Self::LogitsLayoutSkew { expected, actual } => write!(
+                formatter,
+                "verification logits layout {} does not match {}",
+                actual.spelling(),
+                expected.spelling()
+            ),
+            Self::InvalidAcceptedLength { accepted, maximum } => write!(
+                formatter,
+                "verification accepted length r={accepted} is outside 0..={maximum}"
+            ),
+            Self::UnsupportedVersion { actual, expected } => write!(
+                formatter,
+                "unsupported verification record version {actual}; expected {expected}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for VerificationAdmissionError {}
+
+impl VerificationBlockAdmission {
+    /// Validate and admit the invocation facts without inferring `k` from any
+    /// sequence or candidate vector.
+    pub fn admit(self) -> Result<Self, VerificationAdmissionError> {
+        self.validate()?;
+        Ok(self)
+    }
+
+    /// Validate this invocation record.
+    pub fn validate(&self) -> Result<(), VerificationAdmissionError> {
+        admit_executor_plan_verification_version(self.abi_version)?;
+        self.plan.validate()?;
+        if self.prefix_before == 0 {
+            return Err(VerificationAdmissionError::FreshPrefillMasquerade);
+        }
+        if self.query_rows == 0 {
+            return Err(VerificationAdmissionError::InvalidQueryRows);
+        }
+        if self.candidate_ids.len() != usize::try_from(self.query_rows).unwrap_or(usize::MAX) {
+            return Err(VerificationAdmissionError::CandidateCountMismatch {
+                declared: self.query_rows,
+                actual: self.candidate_ids.len(),
+            });
+        }
+        for (index, candidate_id) in self.candidate_ids.iter().copied().enumerate() {
+            let in_vocab = u64::try_from(candidate_id)
+                .ok()
+                .is_some_and(|candidate_id| candidate_id < self.plan.vocab);
+            if !in_vocab {
+                return Err(VerificationAdmissionError::InvalidCandidateId {
+                    index,
+                    candidate_id,
+                });
+            }
+        }
+        if self.committed_generation.is_none() {
+            return Err(VerificationAdmissionError::MissingGeneration);
+        }
+        if self.transaction_id.is_none() {
+            return Err(VerificationAdmissionError::MissingTransactionIdentity);
+        }
+        Ok(())
+    }
+
+    /// The static identity excludes `L`, `k`, generation, candidates, and the
+    /// transaction so equivalent model shapes share one compiled plan.
+    #[must_use]
+    pub fn static_plan_identity(&self) -> VerificationPlanIdentity {
+        self.plan.static_identity()
+    }
+
+    /// Admit a result against this invocation's generation, transaction, row
+    /// shape, layout, and accepted-length contract.
+    pub fn admit_result(
+        &self,
+        result: VerificationBlockResult,
+    ) -> Result<VerificationBlockResult, VerificationAdmissionError> {
+        self.validate()?;
+        result.validate_against(self)?;
+        Ok(result)
+    }
+}
+
+impl VerificationBlockResult {
+    /// Validate this result against its admitted verification block.
+    pub fn validate_against(
+        &self,
+        admission: &VerificationBlockAdmission,
+    ) -> Result<(), VerificationAdmissionError> {
+        let expected_generation = admission
+            .committed_generation
+            .ok_or(VerificationAdmissionError::MissingGeneration)?;
+        let actual_generation = self
+            .committed_generation
+            .ok_or(VerificationAdmissionError::MissingGeneration)?;
+        if actual_generation != expected_generation {
+            return Err(VerificationAdmissionError::StaleGeneration {
+                expected: expected_generation,
+                actual: actual_generation,
+            });
+        }
+        let expected_transaction = admission
+            .transaction_id
+            .ok_or(VerificationAdmissionError::MissingTransactionIdentity)?;
+        let actual_transaction = self
+            .transaction_id
+            .ok_or(VerificationAdmissionError::MissingTransactionIdentity)?;
+        if actual_transaction != expected_transaction {
+            return Err(VerificationAdmissionError::TransactionIdentityMismatch {
+                expected: expected_transaction,
+                actual: actual_transaction,
+            });
+        }
+        let expected_shape = vec![admission.query_rows, admission.plan.vocab];
+        if self.logits_shape != expected_shape {
+            return Err(VerificationAdmissionError::LogitsShapeSkew {
+                expected: expected_shape,
+                actual: self.logits_shape.clone(),
+            });
+        }
+        if self.logits_layout != admission.plan.logits_layout {
+            return Err(VerificationAdmissionError::LogitsLayoutSkew {
+                expected: admission.plan.logits_layout,
+                actual: self.logits_layout,
+            });
+        }
+        if self.accepted_length < 0
+            || u64::try_from(self.accepted_length)
+                .map_or(true, |accepted| accepted > admission.query_rows)
+        {
+            return Err(VerificationAdmissionError::InvalidAcceptedLength {
+                accepted: self.accepted_length,
+                maximum: admission.query_rows,
+            });
+        }
+        Ok(())
+    }
+}
+
+/// Admit a verification section version before interpreting its records.
+pub fn admit_executor_plan_verification_version(
+    version: u16,
+) -> Result<(), VerificationAdmissionError> {
+    if version != EXECUTOR_PLAN_VERIFICATION_ABI_VERSION {
+        return Err(VerificationAdmissionError::UnsupportedVersion {
+            actual: version,
+            expected: EXECUTOR_PLAN_VERIFICATION_ABI_VERSION,
+        });
+    }
+    Ok(())
+}
+
+fn push_verification_identity_bytes(output: &mut Vec<u8>, bytes: &[u8]) {
+    output.extend_from_slice(&(bytes.len() as u64).to_le_bytes());
+    output.extend_from_slice(bytes);
+}
+
+fn push_verification_identity_u64(output: &mut Vec<u8>, value: u64) {
+    output.extend_from_slice(&value.to_le_bytes());
+}
+
 /// The scalar data type of an allocation or typed source.
 ///
 /// This is an alias of the existing uniform type vocabulary so the producer

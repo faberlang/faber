@@ -3664,3 +3664,162 @@ fn untagged_static_sources_do_not_claim_v2_runtime_bindings() {
         .expect_err("a static-only binding set must stay on the v1 producer");
     assert_eq!(error, ExecutorPlanV2Error::MissingRuntimeSource);
 }
+
+fn speculative_verification_admission() -> VerificationBlockAdmission {
+    VerificationBlockAdmission {
+        abi_version: EXECUTOR_PLAN_VERIFICATION_ABI_VERSION,
+        prefix_before: 12,
+        query_rows: 3,
+        candidate_ids: vec![7, 8, 9],
+        committed_generation: Some(4),
+        transaction_id: Some(19),
+        plan: VerificationPlanShape {
+            model_shape: vec![4096, 32],
+            vocab: 32_000,
+            logits_layout: VerificationLogitsLayout::RowMajor,
+        },
+    }
+}
+
+fn speculative_verification_result() -> VerificationBlockResult {
+    VerificationBlockResult {
+        transaction_id: Some(19),
+        committed_generation: Some(4),
+        logits_shape: vec![3, 32_000],
+        logits_layout: VerificationLogitsLayout::RowMajor,
+        accepted_length: 2,
+    }
+}
+
+#[test]
+fn speculative_verification_admits_explicit_block_and_result() {
+    let admission = speculative_verification_admission()
+        .admit()
+        .expect("nonzero prefix and explicit candidate count admit");
+    let result = admission
+        .admit_result(speculative_verification_result())
+        .expect("matching generation, transaction, shape, and r admit");
+    assert_eq!(result.accepted_length, 2);
+    assert_eq!(admission.static_plan_identity().digest().len(), 71);
+}
+
+#[test]
+fn speculative_verification_rejects_missing_generation() {
+    let mut admission = speculative_verification_admission();
+    admission.committed_generation = None;
+    assert_eq!(
+        admission.admit().expect_err("generation is required"),
+        VerificationAdmissionError::MissingGeneration
+    );
+}
+
+#[test]
+fn speculative_verification_rejects_zero_k_and_fresh_prefill() {
+    let mut admission = speculative_verification_admission();
+    admission.query_rows = 0;
+    assert_eq!(
+        admission.admit().expect_err("k=0 is not a block"),
+        VerificationAdmissionError::InvalidQueryRows
+    );
+
+    let mut fresh = speculative_verification_admission();
+    fresh.prefix_before = 0;
+    assert_eq!(
+        fresh
+            .admit()
+            .expect_err("fresh prefill must not masquerade as verification"),
+        VerificationAdmissionError::FreshPrefillMasquerade
+    );
+}
+
+#[test]
+fn speculative_verification_rejects_k_inferred_from_candidate_sequence() {
+    let mut admission = speculative_verification_admission();
+    admission.query_rows = 2;
+    assert_eq!(
+        admission
+            .admit()
+            .expect_err("the explicit k must match candidate rows"),
+        VerificationAdmissionError::CandidateCountMismatch {
+            declared: 2,
+            actual: 3,
+        }
+    );
+}
+
+#[test]
+fn speculative_verification_rejects_invalid_accepted_lengths() {
+    let admission = speculative_verification_admission();
+    for accepted_length in [-1, 4] {
+        let mut result = speculative_verification_result();
+        result.accepted_length = accepted_length;
+        assert!(matches!(
+            admission.admit_result(result),
+            Err(VerificationAdmissionError::InvalidAcceptedLength { .. })
+        ));
+    }
+}
+
+#[test]
+fn speculative_verification_rejects_shape_and_layout_skew() {
+    let admission = speculative_verification_admission();
+    let mut shape_skew = speculative_verification_result();
+    shape_skew.logits_shape = vec![2, 32_000];
+    assert!(matches!(
+        admission.admit_result(shape_skew),
+        Err(VerificationAdmissionError::LogitsShapeSkew { .. })
+    ));
+
+    let mut layout_skew = speculative_verification_result();
+    layout_skew.logits_layout = VerificationLogitsLayout::ColumnMajor;
+    assert!(matches!(
+        admission.admit_result(layout_skew),
+        Err(VerificationAdmissionError::LogitsLayoutSkew { .. })
+    ));
+}
+
+#[test]
+fn speculative_verification_rejects_stale_generation_and_row_mismatch() {
+    let admission = speculative_verification_admission();
+    let mut stale = speculative_verification_result();
+    stale.committed_generation = Some(3);
+    assert!(matches!(
+        admission.admit_result(stale),
+        Err(VerificationAdmissionError::StaleGeneration { .. })
+    ));
+
+    let mut row_mismatch = speculative_verification_result();
+    row_mismatch.logits_shape = vec![4, 32_000];
+    assert!(matches!(
+        admission.admit_result(row_mismatch),
+        Err(VerificationAdmissionError::LogitsShapeSkew { .. })
+    ));
+}
+
+#[test]
+fn speculative_verification_static_identity_excludes_live_invocation_facts() {
+    let admission = speculative_verification_admission();
+    let base = admission.static_plan_identity();
+    let mut different_invocation = admission.clone();
+    different_invocation.prefix_before = 99;
+    different_invocation.query_rows = 1;
+    different_invocation.candidate_ids = vec![11];
+    different_invocation.committed_generation = Some(88);
+    different_invocation.transaction_id = Some(77);
+    assert_eq!(base, different_invocation.static_plan_identity());
+
+    let mut different_shape = admission;
+    different_shape.plan.vocab += 1;
+    assert_ne!(base, different_shape.static_plan_identity());
+}
+
+#[test]
+fn speculative_verification_version_skew_fails_closed() {
+    assert!(
+        admit_executor_plan_verification_version(EXECUTOR_PLAN_VERIFICATION_ABI_VERSION).is_ok()
+    );
+    assert!(matches!(
+        admit_executor_plan_verification_version(EXECUTOR_PLAN_VERIFICATION_ABI_VERSION - 1),
+        Err(VerificationAdmissionError::UnsupportedVersion { .. })
+    ));
+}
