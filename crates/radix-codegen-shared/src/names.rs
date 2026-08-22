@@ -87,7 +87,7 @@ impl<'a> NameCatalog<'a> {
 
     /// Whether the HIR program contained a source symbol for this definition.
     #[must_use]
-    pub fn contains_def(&self, def_id: DefId) -> bool {
+    pub fn catalog_contains_def(&self, def_id: DefId) -> bool {
         self.names.contains_key(&def_id)
     }
 
@@ -165,7 +165,7 @@ mod tests {
             entry_is_async: false,
         };
         let catalog = NameCatalog::new(&hir, &interner);
-        assert!(!catalog.contains_def(DefId(0)));
+        assert!(!catalog.catalog_contains_def(DefId(0)));
         assert!(catalog.resolve_def(DefId(0)).is_err());
     }
 

@@ -4,7 +4,7 @@ use crate::cli::{TestArgs, TestOutputFormat};
 use crate::input_shape::locale_without_package_error;
 use crate::package;
 use proba::{
-    format_summary, harness_filter_matches, has_solum_cases, inventory_cases,
+    format_summary, is_harness_filter_match, has_solum_cases, inventory_cases,
     run_proba_on_validated, run_proba_on_validated_with_function_ids, run_proba_source,
     selection_skip_reason, source_skip_reason, CaseOutcome, CaseResult, ProbaCase, ProbaReport,
     TestSelection,
@@ -417,7 +417,7 @@ fn append_focus_skips(
         return;
     }
     for case in cases {
-        if is_solum_case(case) || !harness_filter_matches(case, harness_filter, exact) {
+        if is_solum_case(case) || !is_harness_filter_match(case, harness_filter, exact) {
             continue;
         }
         let Some(reason) = selection_skip_reason(case, selection, true) else {
@@ -896,7 +896,7 @@ fn blocked_unit_report(
     let has_solum = focused || has_solum_cases(&cases);
     let mut report = ProbaReport::default();
     for case in cases {
-        if !harness_filter_matches(&case, harness_filter, exact) {
+        if !is_harness_filter_match(&case, harness_filter, exact) {
             continue;
         }
         if let Some(skip_reason) = selection_skip_reason(&case, selection, has_solum) {

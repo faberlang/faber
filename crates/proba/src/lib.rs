@@ -411,7 +411,7 @@ fn solum_in_matches_in(
 
 /// Optional harness-style substring filter on case display path (`suite/name`).
 #[must_use]
-pub fn harness_filter_matches(case: &ProbaCase, filter: Option<&str>, exact: bool) -> bool {
+pub fn is_harness_filter_match(case: &ProbaCase, filter: Option<&str>, exact: bool) -> bool {
     let Some(filter) = filter else {
         return true;
     };
@@ -536,7 +536,7 @@ fn run_proba_on_validated_with_unit_path(
         harness_filter,
         exact,
         include_ignored,
-        |case| mir_function_id_for_def(validated, case.def_id),
+        |case| mir_function_id_from_def(validated, case.def_id),
     )
 }
 
@@ -588,7 +588,7 @@ fn run_proba_cases(
     let mut results = Vec::with_capacity(cases.len());
 
     for case in cases {
-        if !harness_filter_matches(case, harness_filter, exact) {
+        if !is_harness_filter_match(case, harness_filter, exact) {
             continue;
         }
 
@@ -656,7 +656,7 @@ fn run_proba_cases(
     ProbaReport { results }
 }
 
-fn mir_function_id_for_def(validated: &ValidatedMir<'_>, def_id: DefId) -> Option<MirFunctionId> {
+fn mir_function_id_from_def(validated: &ValidatedMir<'_>, def_id: DefId) -> Option<MirFunctionId> {
     validated
         .program()
         .functions
