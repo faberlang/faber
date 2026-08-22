@@ -211,6 +211,68 @@ fn converts_numeric_array_to_octeti_in_one_step() {
 }
 
 #[test]
+fn rounding_ops_return_numerus_so_bound_compares_do_not_mismatch() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::{Primitive, TypeTable};
+
+    let mut host = BufferHost::default();
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let fractus = types.primitive(Primitive::Fractus);
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&types);
+    let mut program = MirProgram::new();
+    program.functions.push(test_function());
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    let round = |value: f64| MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::Round),
+        args: vec![MirOperand::Constant(MirConstant::Float(value))],
+        return_ty: MirType::semantic(numerus),
+    };
+    assert_eq!(
+        runner
+            .eval_runtime_call(&round(1.0), radix_lexer::Span::default())
+            .expect("round 1.0"),
+        Value::Int(1)
+    );
+    assert_eq!(
+        runner
+            .eval_runtime_call(&round(0.5), radix_lexer::Span::default())
+            .expect("round 0.5"),
+        Value::Int(1)
+    );
+    assert_eq!(
+        runner
+            .eval_runtime_call(&round(0.2), radix_lexer::Span::default())
+            .expect("round 0.2"),
+        Value::Int(0)
+    );
+    assert_eq!(
+        runner
+            .eval_runtime_call(&round(-0.5), radix_lexer::Span::default())
+            .expect("round -0.5"),
+        Value::Int(-1)
+    );
+
+    let abs_float = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::Absolute),
+        args: vec![MirOperand::Constant(MirConstant::Float(-3.5))],
+        return_ty: MirType::semantic(fractus),
+    };
+    assert_eq!(
+        runner
+            .eval_runtime_call(&abs_float, radix_lexer::Span::default())
+            .expect("abs keeps fractus"),
+        Value::Float(3.5)
+    );
+}
+
+#[test]
 fn tensor_layernorm_rank2_no_affine() {
     use crate::host::BufferHost;
     use crate::value::TensorValue;

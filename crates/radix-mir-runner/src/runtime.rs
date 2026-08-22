@@ -1249,8 +1249,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 };
                 Ok(Value::Str(text.replace(&from, &to)))
             }
-            MirCollectionOp::Absolute => self.map_numeric(args, span, f64::abs),
-            MirCollectionOp::Signum => self.map_numeric(args, span, f64::signum),
+            MirCollectionOp::Absolute => self.map_numeric(args, span, return_ty, f64::abs),
+            MirCollectionOp::Signum => self.map_numeric(args, span, return_ty, f64::signum),
             MirCollectionOp::Minimum => self.map_numeric_pair(args, span, f64::min),
             MirCollectionOp::Maximum => self.map_numeric_pair(args, span, f64::max),
             MirCollectionOp::Approximate => self.approximate_fractus(args, span),
@@ -1315,10 +1315,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorTranspose => self.tensor_transpose(args, span),
             MirCollectionOp::SparseGet => self.sparse_get(args, span),
             MirCollectionOp::SparseSet => self.sparse_set(args, span),
-            MirCollectionOp::Round => self.map_numeric(args, span, f64::round),
-            MirCollectionOp::Floor => self.map_numeric(args, span, f64::floor),
-            MirCollectionOp::Ceiling => self.map_numeric(args, span, f64::ceil),
-            MirCollectionOp::Truncate => self.map_numeric(args, span, f64::trunc),
+            MirCollectionOp::Round => self.map_numeric(args, span, return_ty, f64::round),
+            MirCollectionOp::Floor => self.map_numeric(args, span, return_ty, f64::floor),
+            MirCollectionOp::Ceiling => self.map_numeric(args, span, return_ty, f64::ceil),
+            MirCollectionOp::Truncate => self.map_numeric(args, span, return_ty, f64::trunc),
             MirCollectionOp::Keys => self.eval_map_snapshot(args, span, false),
             MirCollectionOp::Values => self.eval_map_snapshot(args, span, true),
             MirCollectionOp::Put => {
@@ -3044,22 +3044,40 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         &mut self,
         args: &[MirOperand],
         span: Span,
+        return_ty: MirType,
         f: impl FnOnce(f64) -> f64,
     ) -> Result<Value, RunnerError> {
         let [receiver] = args else {
             return Err(RunnerError::internal(span, "numeric collection arity"));
         };
         let value = self.eval_operand(receiver, span)?;
-        Ok(match value {
-            Value::Int(v) => Value::Int(f(v as f64) as i64),
-            Value::Float(v) => Value::Float(f(v)),
+        let numeric = match value {
+            Value::Int(v) => f(v as f64),
+            Value::UInt(v) => f(v as f64),
+            Value::Float(v) => f(v),
             _ => {
                 return Err(RunnerError::internal(
                     span,
                     "numeric receiver type mismatch",
                 ))
             }
-        })
+        };
+        // Rounding ops (`round`/`floor`/`ceil`/`trunc`) are typed numerus;
+        // abs/signum keep the receiver's carrier. Honor the declared result
+        // so a later comparison (`n ≺ minimum_i32`) sees Int vs Int, not
+        // Float vs Int ("comparison type mismatch").
+        match self.types.get(return_ty.semantic_id()) {
+            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
+                Ok(Value::Int(numeric as i64))
+            }
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
+                Ok(Value::Float(numeric))
+            }
+            _ => Err(RunnerError::internal(
+                span,
+                "numeric collection result type mismatch",
+            )),
+        }
     }
 
     fn map_numeric_pair(
