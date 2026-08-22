@@ -59,7 +59,7 @@ fn resolve_rejects_malformed_provider_specifiers() {
     ] {
         let err = resolver.resolve(specifier).expect_err(specifier);
         assert!(
-            matches!(&err, LibraryResolveError::InvalidProviderSpecifier { specifier: s, reason: r } if s == specifier && r == reason),
+            matches!(&err, LibraryResolveError::ProviderSpecifierInvalid { specifier: s, reason: r } if s == specifier && r == reason),
             "unexpected error for {specifier}: {err:?}"
         );
     }
@@ -73,7 +73,7 @@ fn resolve_missing_library_home_when_no_home() {
     let err = resolver.resolve("prov:mod").expect_err("no home must fail");
     assert!(matches!(
         err,
-        LibraryResolveError::MissingLibraryHome { hint, .. }
+        LibraryResolveError::LibraryHomeMissing { hint, .. }
             if hint.contains("FABER_LIBRARY_HOME")
     ));
 }
@@ -87,7 +87,7 @@ fn resolve_unknown_provider_from_empty_home() {
         .expect_err("empty home must fail");
     assert!(matches!(
         err,
-        LibraryResolveError::UnknownProvider { provider, .. } if provider == "prov"
+        LibraryResolveError::ProviderUnknown { provider, .. } if provider == "prov"
     ));
     let _ = fs::remove_dir_all(&root);
 }
@@ -104,7 +104,7 @@ fn resolve_undeclared_provider_when_declarations_exist() {
         .expect_err("undeclared must fail");
     assert!(matches!(
         err,
-        LibraryResolveError::UndeclaredProvider { provider, .. } if provider == "prov"
+        LibraryResolveError::ProviderUndeclared { provider, .. } if provider == "prov"
     ));
     let _ = fs::remove_dir_all(&root);
 }
@@ -174,7 +174,7 @@ fn resolve_unknown_module_lists_known_modules() {
         .expect_err("missing module must fail");
     assert!(matches!(
         err,
-        LibraryResolveError::UnknownModule { package, known_modules, .. }
+        LibraryResolveError::ModuleUnknown { package, known_modules, .. }
             if package == "prov" && known_modules == vec!["known".to_owned()]
     ));
     let _ = fs::remove_dir_all(&root);
@@ -237,7 +237,7 @@ fn resolve_unknown_module_for_locked_package() {
         .expect_err("missing locked module must fail");
     assert!(matches!(
         err,
-        LibraryResolveError::UnknownModule { package, known_modules, .. }
+        LibraryResolveError::ModuleUnknown { package, known_modules, .. }
             if package == "pkg" && known_modules == vec!["known".to_owned()]
     ));
     let _ = fs::remove_dir_all(&root);
@@ -254,7 +254,7 @@ fn resolve_declared_but_unlocked_package_is_missing_locked_diagnostic() {
         .expect_err("declared without lock must fail");
     assert!(matches!(
         err,
-        LibraryResolveError::MissingLockedPackage { provider, version, .. }
+        LibraryResolveError::LockedPackageMissing { provider, version, .. }
             if provider == "pkg" && version.as_deref() == Some("2.0.0")
     ));
 }

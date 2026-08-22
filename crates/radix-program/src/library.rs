@@ -75,6 +75,8 @@ impl ResolvedLibraryModule {
 }
 
 /// Errors that mean a specifier selected a library provider but not a module.
+///
+/// Variants use a fact-noun grammar, naming the failed library fact or state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LibraryResolveError {
     /// The old built-in slash form was used for a Norma module.
@@ -87,7 +89,7 @@ pub enum LibraryResolveError {
     },
 
     /// The specifier is provider-shaped but malformed.
-    InvalidProviderSpecifier {
+    ProviderSpecifierInvalid {
         /// Original import specifier from source.
         specifier: String,
 
@@ -96,7 +98,7 @@ pub enum LibraryResolveError {
     },
 
     /// The provider separator selected a provider that is not implemented.
-    UnknownProvider {
+    ProviderUnknown {
         /// Original import specifier from source.
         specifier: String,
 
@@ -108,7 +110,7 @@ pub enum LibraryResolveError {
     },
 
     /// A provider repo exists but does not expose a readable top-level manifest.
-    InvalidInstalledManifest {
+    InstalledManifestInvalid {
         /// Original import specifier from source.
         specifier: String,
 
@@ -123,7 +125,7 @@ pub enum LibraryResolveError {
     },
 
     /// A provider manifest points at a source root that does not exist.
-    MissingInstalledSourceRoot {
+    InstalledSourceRootMissing {
         /// Original import specifier from source.
         specifier: String,
 
@@ -135,7 +137,7 @@ pub enum LibraryResolveError {
     },
 
     /// A provider package was named, but no matching interface exists.
-    UnknownModule {
+    ModuleUnknown {
         /// Original import specifier from source.
         specifier: String,
 
@@ -150,7 +152,7 @@ pub enum LibraryResolveError {
     },
 
     /// No public library home could be found.
-    MissingLibraryHome {
+    LibraryHomeMissing {
         /// Original import specifier from source.
         specifier: String,
 
@@ -159,7 +161,7 @@ pub enum LibraryResolveError {
     },
 
     /// Provider is declared in faber.toml but missing from faber.lock.
-    MissingLockedPackage {
+    LockedPackageMissing {
         /// Original import specifier from source.
         specifier: String,
 
@@ -172,7 +174,7 @@ pub enum LibraryResolveError {
 
     /// Provider-qualified import is not declared in faber.toml dependencies
     /// and is not available from the bundled library home.
-    UndeclaredProvider {
+    ProviderUndeclared {
         /// Original import specifier from source.
         specifier: String,
 
@@ -262,28 +264,28 @@ impl LibraryResolver {
         };
 
         if provider.is_empty() {
-            return Err(LibraryResolveError::InvalidProviderSpecifier {
+            return Err(LibraryResolveError::ProviderSpecifierInvalid {
                 specifier: specifier.to_owned(),
                 reason: "provider segment must not be empty".to_owned(),
             });
         }
 
         if !is_valid_provider_segment(provider) {
-            return Err(LibraryResolveError::InvalidProviderSpecifier {
+            return Err(LibraryResolveError::ProviderSpecifierInvalid {
                 specifier: specifier.to_owned(),
                 reason: "provider segment must contain only ASCII letters, numbers, underscore, or hyphen".to_owned(),
             });
         }
 
         if module_path.is_empty() {
-            return Err(LibraryResolveError::InvalidProviderSpecifier {
+            return Err(LibraryResolveError::ProviderSpecifierInvalid {
                 specifier: specifier.to_owned(),
                 reason: "module path segment must not be empty".to_owned(),
             });
         }
 
         if module_path.contains(':') {
-            return Err(LibraryResolveError::InvalidProviderSpecifier {
+            return Err(LibraryResolveError::ProviderSpecifierInvalid {
                 specifier: specifier.to_owned(),
                 reason: "library specifier must contain exactly one provider separator".to_owned(),
             });
@@ -294,7 +296,7 @@ impl LibraryResolver {
             .iter()
             .all(|segment| is_valid_module_segment(segment))
         {
-            return Err(LibraryResolveError::InvalidProviderSpecifier {
+            return Err(LibraryResolveError::ProviderSpecifierInvalid {
                 specifier: specifier.to_owned(),
                 reason: "module path must not contain empty, dot, or dot-dot segments".to_owned(),
             });
@@ -303,7 +305,7 @@ impl LibraryResolver {
         if let Some(locked) = self.locked.get(provider) {
             let interface_path = locked.interface_root.join(format!("{module_path}.fab"));
             if !interface_path.exists() {
-                return Err(LibraryResolveError::UnknownModule {
+                return Err(LibraryResolveError::ModuleUnknown {
                     specifier: specifier.to_owned(),
                     package: provider.to_owned(),
                     expected_path: interface_path,
@@ -321,7 +323,7 @@ impl LibraryResolver {
         }
 
         if self.declared.contains_key(provider) {
-            return Err(LibraryResolveError::MissingLockedPackage {
+            return Err(LibraryResolveError::LockedPackageMissing {
                 specifier: specifier.to_owned(),
                 provider: provider.to_owned(),
                 version: self.declared.get(provider).cloned(),
@@ -336,12 +338,12 @@ impl LibraryResolver {
             // package has a [dependencies] table and this provider is not Norma
             // library-home layout.
             if !self.declared.is_empty() && provider != "norma" {
-                return Err(LibraryResolveError::UndeclaredProvider {
+                return Err(LibraryResolveError::ProviderUndeclared {
                     specifier: specifier.to_owned(),
                     provider: provider.to_owned(),
                 });
             }
-            return Err(LibraryResolveError::UnknownProvider {
+            return Err(LibraryResolveError::ProviderUnknown {
                 specifier: specifier.to_owned(),
                 provider: provider.to_owned(),
                 library_home,
@@ -351,7 +353,7 @@ impl LibraryResolver {
         let provider_root = installed_provider_source_root(specifier, provider, &provider_repo)?;
         let interface_path = provider_root.join(format!("{module_path}.fab"));
         if !interface_path.exists() {
-            return Err(LibraryResolveError::UnknownModule {
+            return Err(LibraryResolveError::ModuleUnknown {
                 specifier: specifier.to_owned(),
                 package: provider.to_owned(),
                 expected_path: interface_path,
@@ -371,7 +373,7 @@ impl LibraryResolver {
 
     fn library_home_for(&self, specifier: &str) -> Result<PathBuf, LibraryResolveError> {
         self.library_home.clone().ok_or_else(|| {
-            LibraryResolveError::MissingLibraryHome {
+            LibraryResolveError::LibraryHomeMissing {
                 specifier: specifier.to_owned(),
                 hint: format!(
                     "set FABER_LIBRARY_HOME to a directory containing provider repos, such as <home>/norma/src"
@@ -392,7 +394,7 @@ fn installed_provider_source_root(
         if fallback.is_dir() {
             return Ok(fallback);
         }
-        return Err(LibraryResolveError::InvalidInstalledManifest {
+        return Err(LibraryResolveError::InstalledManifestInvalid {
             specifier: specifier.to_owned(),
             provider: provider.to_owned(),
             manifest_path,
@@ -401,7 +403,7 @@ fn installed_provider_source_root(
     }
 
     crate::discovery::discover_package(provider_repo).map_err(|diag| {
-        LibraryResolveError::InvalidInstalledManifest {
+        LibraryResolveError::InstalledManifestInvalid {
             specifier: specifier.to_owned(),
             provider: provider.to_owned(),
             manifest_path: manifest_path.clone(),
@@ -409,7 +411,7 @@ fn installed_provider_source_root(
         }
     })?;
     let manifest = crate::manifest::read_manifest(&manifest_path).map_err(|diag| {
-        LibraryResolveError::InvalidInstalledManifest {
+        LibraryResolveError::InstalledManifestInvalid {
             specifier: specifier.to_owned(),
             provider: provider.to_owned(),
             manifest_path: manifest_path.clone(),
@@ -418,7 +420,7 @@ fn installed_provider_source_root(
     })?;
 
     if manifest.build.kind != "lib" {
-        return Err(LibraryResolveError::InvalidInstalledManifest {
+        return Err(LibraryResolveError::InstalledManifestInvalid {
             specifier: specifier.to_owned(),
             provider: provider.to_owned(),
             manifest_path,
@@ -427,7 +429,7 @@ fn installed_provider_source_root(
     }
 
     let Some(library) = manifest.library.as_ref() else {
-        return Err(LibraryResolveError::InvalidInstalledManifest {
+        return Err(LibraryResolveError::InstalledManifestInvalid {
             specifier: specifier.to_owned(),
             provider: provider.to_owned(),
             manifest_path,
@@ -436,7 +438,7 @@ fn installed_provider_source_root(
     };
 
     if library.provider != provider {
-        return Err(LibraryResolveError::InvalidInstalledManifest {
+        return Err(LibraryResolveError::InstalledManifestInvalid {
             specifier: specifier.to_owned(),
             provider: provider.to_owned(),
             manifest_path,
@@ -449,7 +451,7 @@ fn installed_provider_source_root(
 
     let source_root = provider_repo.join(&manifest.paths.source);
     if !source_root.is_dir() {
-        return Err(LibraryResolveError::MissingInstalledSourceRoot {
+        return Err(LibraryResolveError::InstalledSourceRootMissing {
             specifier: specifier.to_owned(),
             provider: provider.to_owned(),
             source_root,

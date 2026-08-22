@@ -638,11 +638,11 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
         .with_file(file.display().to_string())
         .with_arg("issue", "old_builtin_norma_specifier")
         .with_arg("replacement", replacement),
-        LibraryResolveError::InvalidProviderSpecifier { specifier, reason } => crate::package_diagnostic_error(format!(
+        LibraryResolveError::ProviderSpecifierInvalid { specifier, reason } => crate::package_diagnostic_error(format!(
             "invalid library import specifier `{specifier}`: {reason}"
         ))
         .with_file(file.display().to_string()),
-        LibraryResolveError::UnknownProvider {
+        LibraryResolveError::ProviderUnknown {
             specifier,
             provider,
             library_home,
@@ -655,7 +655,7 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
         .with_arg("specifier", specifier)
         .with_arg("provider", provider)
         .with_arg("library_home", library_home.display().to_string()),
-        LibraryResolveError::InvalidInstalledManifest {
+        LibraryResolveError::InstalledManifestInvalid {
             specifier,
             provider,
             manifest_path,
@@ -669,7 +669,7 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
         .with_arg("specifier", specifier)
         .with_arg("provider", provider)
         .with_arg("manifest_path", manifest_path.display().to_string()),
-        LibraryResolveError::MissingInstalledSourceRoot {
+        LibraryResolveError::InstalledSourceRootMissing {
             specifier,
             provider,
             source_root,
@@ -682,7 +682,7 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
         .with_arg("specifier", specifier)
         .with_arg("provider", provider)
         .with_arg("source_root", source_root.display().to_string()),
-        LibraryResolveError::UnknownModule {
+        LibraryResolveError::ModuleUnknown {
             specifier,
             package,
             expected_path,
@@ -698,13 +698,13 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
         .with_arg("provider", package)
         .with_arg("expected_path", expected_path.display().to_string())
         .with_arg("known_modules", known_modules.join(",")),
-        LibraryResolveError::MissingLibraryHome { specifier, hint } => crate::package_diagnostic_error(format!(
+        LibraryResolveError::LibraryHomeMissing { specifier, hint } => crate::package_diagnostic_error(format!(
             "library import `{specifier}` needs a public library home; {hint}"
         ))
         .with_file(file.display().to_string())
         .with_arg("issue", "missing_library_home")
         .with_arg("specifier", specifier),
-        LibraryResolveError::MissingLockedPackage {
+        LibraryResolveError::LockedPackageMissing {
             specifier,
             provider,
             version,
@@ -721,7 +721,7 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
             .with_arg("specifier", specifier)
             .with_arg("provider", provider)
         }
-        LibraryResolveError::UndeclaredProvider {
+        LibraryResolveError::ProviderUndeclared {
             specifier,
             provider,
         } => crate::package_diagnostic_error(format!(

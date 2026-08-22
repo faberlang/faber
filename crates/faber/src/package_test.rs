@@ -5611,7 +5611,7 @@ fn library_resolver_rejects_retired_norma_hal_paths() {
 
     assert!(matches!(
         err,
-        LibraryResolveError::UnknownModule {
+        LibraryResolveError::ModuleUnknown {
             specifier,
             package,
             ..
