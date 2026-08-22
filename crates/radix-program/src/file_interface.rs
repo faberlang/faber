@@ -600,7 +600,7 @@ fn reject_signature_only_fragment(
         ))
         .with_phase(DiagnosticPhase::Analysis)
         .with_file(file_label.to_owned())
-        .with_arg("issue", "NUCLEUM_FRAGMENT_EFFECT")
+        .with_arg("issue", "nucleum_fragment_effect")
         .with_arg("reason", "missing_body")
         .with_arg("site", "import"));
     }

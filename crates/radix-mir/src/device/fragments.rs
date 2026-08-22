@@ -14,7 +14,7 @@ use crate::{
 use radix_lexer::Span;
 
 /// Stable diagnostic identifier for a fragment that survived composition.
-pub const NUCLEUM_FRAGMENT_SURVIVED: &str = "NUCLEUM_FRAGMENT_SURVIVED";
+pub const NUCLEUM_FRAGMENT_SURVIVED: &str = "nucleum_fragment_survived";
 
 /// How a nucleum fragment leaked past composition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
