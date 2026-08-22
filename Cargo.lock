@@ -598,6 +598,7 @@ dependencies = [
 name = "radix-codegen-shared"
 version = "0.83.0"
 dependencies = [
+ "hygiene-ratchet",
  "radix-diagnostics",
  "radix-hir",
  "radix-lexer",
@@ -628,6 +629,7 @@ dependencies = [
 name = "radix-hir-faber"
 version = "0.83.0"
 dependencies = [
+ "hygiene-ratchet",
  "radix-codegen-shared",
  "radix-diagnostics",
  "radix-hir",
@@ -642,6 +644,7 @@ dependencies = [
 name = "radix-hir-fhir"
 version = "0.83.0"
 dependencies = [
+ "hygiene-ratchet",
  "postcard",
  "radix-hir",
  "radix-lexer",
@@ -679,6 +682,7 @@ name = "radix-mir"
 version = "0.83.0"
 dependencies = [
  "handroll",
+ "hygiene-ratchet",
  "radix-codegen-shared",
  "radix-diagnostics",
  "radix-hir",
@@ -695,6 +699,7 @@ name = "radix-mir-fmir"
 version = "0.83.0"
 dependencies = [
  "handroll",
+ "hygiene-ratchet",
  "postcard",
  "radix-hir",
  "radix-lexer",
@@ -710,6 +715,7 @@ name = "radix-mir-runner"
 version = "0.83.0"
 dependencies = [
  "handroll",
+ "hygiene-ratchet",
  "radix-hir",
  "radix-lexer",
  "radix-mir",
