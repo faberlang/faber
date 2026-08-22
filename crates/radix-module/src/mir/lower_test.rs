@@ -20,7 +20,7 @@
 
 use super::*;
 use crate::codegen::Target;
-use crate::driver::{Config, Session, AnalyzeRequest, ModuleImportContract, ModuleCompileRequest};
+use crate::driver::{AnalyzeRequest, Config, ModuleCompileRequest, ModuleImportContract, Session};
 use crate::hir::HirId;
 use crate::mir::type_contains_param;
 use crate::mir::validate_program;
@@ -208,7 +208,9 @@ function f0 -> ty#5 {
 #[test]
 fn lowers_function_params_as_mir_locals() {
     let mut unit = analyze("functio saluta(textus nomen, numerus aetas) {}");
-    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default())
+        .map(|lowered| lowered.program)
+        .expect("MIR lowering succeeds");
     let function = &program.functions[0];
 
     assert_eq!(function.params.len(), 2);
@@ -235,7 +237,9 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default())
+        .map(|lowered| lowered.program)
+        .expect("MIR lowering succeeds");
     let function = &program.functions[0];
 
     assert_eq!(function.params[0].mode, MirParamMode::MutRef);
@@ -961,7 +965,9 @@ fn failed_top_level_const_initializer_does_not_bind_const() {
 fn ignores_top_level_type_metadata_items() {
     let mut unit =
         analyze("genus Persona { textus nomen } discretio Eventus { Bonum { textus nuntius } } functio salve() {}");
-    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("type metadata should not block MIR lowering");
+    let program = lower_analyzed_unit(&mut unit, Default::default())
+        .map(|lowered| lowered.program)
+        .expect("type metadata should not block MIR lowering");
 
     assert_eq!(program.functions.len(), 1);
 }
@@ -1162,7 +1168,8 @@ fn rejects_statement_level_stream_ad_for_mir() {
     let result = crate::driver::compile(
         &crate::Session::new(crate::Config::default()),
         "stream-ad.fab",
-        r"functio f() → vacuum { ad 'noop:ping' { tuus { rumpe } } }", ModuleCompileRequest::default(),
+        r"functio f() → vacuum { ad 'noop:ping' { tuus { rumpe } } }",
+        ModuleCompileRequest::default(),
     );
     assert!(
         !result.success(),
@@ -1363,6 +1370,40 @@ fn edge_empty_range_itera_ab_skips_loop_body() {
 }
 
 #[test]
+fn lower_itera_expr_rejects_shaped_tensor_and_matrix_collections() {
+    // Post-delivery admit shapes: tensor rank 1/2/3 with [i]/[i, j]/[i, j, k]
+    // and matrix rank 2 with [i, j]. Arity-error shapes remain [i] on rank 2,
+    // [i, j] on rank 3, and [i, j, k] on matrix rank 2.
+    let cases = [
+        (
+            "tensor-rank-2",
+            "functio iterate(tensor<f32, [2, 3]> m) → vacuum { itera ex m fixum cell { } }",
+        ),
+        (
+            "matrix-rank-2",
+            "functio iterate(matrix<f32, [2, 3]> m) → vacuum { itera ex m fixum cell { } }",
+        ),
+    ];
+
+    for (label, source) in cases {
+        let mut unit = analyze(source);
+        let errors = lower_analyzed_unit(&mut unit, Default::default())
+            .expect_err("shaped itera ex must remain unsupported before AC-6");
+        assert_eq!(errors.len(), 1, "{label} should emit one MIR rejection: {errors:?}");
+        assert_eq!(
+            errors[0].message,
+            "unsupported MIR lowering: itera ex over tabula before map value iteration MIR lowering",
+            "{label} should preserve the live Ex-mode unsupported string"
+        );
+        assert_eq!(
+            errors[0].issue,
+            "unsupported_mir_lowering_itera_ex_over_tabula_before_map_value_iteration_mir_lowering",
+            "{label} should use the live Ex-mode unsupported identity"
+        );
+    }
+}
+
+#[test]
 fn lowers_array_itera_ex_and_de_to_index_loops() {
     let ex_dump = dump_source(
         r"functio sumArray(lista<numerus> nums) → numerus {
@@ -1395,6 +1436,52 @@ fn lowers_array_itera_ex_and_de_to_index_loops() {
 }
 
 #[test]
+fn tensor_itera_ex_rank1_lowers_to_literal_bound_index_loop() {
+    let source = r"functio sumTensor(tensor<f32, [8]> t) → f32 {
+  varia f32 total ← 0.0
+  itera ex t fixum x {
+    total ← total + x
+  }
+  redde total
+}";
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
+    validate_program(&lowered.program, lowered.validated.validation())
+        .expect("the tensor itera loop MIR must validate");
+    let dump = dump_program(&lowered.program);
+    assert!(
+        !dump.contains("itera collection before iterator MIR lowering"),
+        "rank-1 tensor itera ex must lower: {dump}"
+    );
+    assert!(
+        !dump.contains("runtime collection length"),
+        "the tensor loop bound is the literal 8, not a runtime length intrinsic: {dump}"
+    );
+    assert!(dump.contains("branch "), "the tensor loop must produce loop CFG: {dump}");
+    assert!(dump.contains("8"), "the literal lane count 8 must appear as the bound: {dump}");
+}
+
+#[test]
+fn tensor_itera_ex_rank2_stays_unsupported() {
+    let mut unit = analyze(
+        r"functio sumGrid(tensor<f32, [2, 2]> t) → f32 {
+  itera ex t fixum x {
+    nota x
+  }
+  redde 0.0
+}",
+    );
+    let errors = lower_analyzed_unit(&mut unit, Default::default())
+        .expect_err("rank-2 tensor itera must fail closed");
+    assert_eq!(errors.len(), 1);
+    assert!(
+        errors[0].issue.contains("itera_collection_before_iterator_mir_lowering"),
+        "rank-2 decline keeps the Unsupported diagnostic family: {:?}",
+        errors[0].issue
+    );
+}
+
+#[test]
 fn rejects_deferred_control_flow_constructs_with_explicit_diagnostics() {
     let mut iter_de_unit = analyze(
         r"functio iterare(tabula<textus, numerus> nums) → vacuum {
@@ -1420,7 +1507,8 @@ fn rejects_deferred_control_flow_constructs_with_explicit_diagnostics() {
     assert!(!iter_ex_dump.contains("itera ex over tabula before map value iteration MIR lowering"));
 
     let mut discerne_unit = analyze("functio handle(numerus n) → vacuum { discerne n { casu x { nota x } } }");
-    let discerne_errors = lower_analyzed_unit(&mut discerne_unit, Default::default()).expect_err("binding discerne is deferred");
+    let discerne_errors =
+        lower_analyzed_unit(&mut discerne_unit, Default::default()).expect_err("binding discerne is deferred");
     assert_eq!(discerne_errors.len(), 1);
     assert_eq!(
         discerne_errors[0].issue,
@@ -2347,7 +2435,8 @@ incipit {
 #[test]
 fn rejects_unsupported_runtime_method_shapes() {
     let mut unit = analyze(r"functio malum(lista<numerus> xs) → numerus { redde xs.praepone(1) }");
-    let errors = lower_analyzed_unit(&mut unit, Default::default()).expect_err("unsupported method remains fail-closed");
+    let errors =
+        lower_analyzed_unit(&mut unit, Default::default()).expect_err("unsupported method remains fail-closed");
 
     assert!(errors
         .iter()
@@ -2383,12 +2472,24 @@ fn lowers_imported_nominal_method_to_provider_runtime_call() {
     });
 
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
-    let mut unit = crate::driver::analyze_source(&session, "test.fab", r#"
+    let mut unit = crate::driver::analyze_source(
+        &session,
+        "test.fab",
+        r#"
 importa ex "demo:lib" demo
 functio legebatur(demo.Sample value) → numerus {
     redde value.metire()
 }
-"#, crate::driver::AnalyzeRequest { cli_program: None, contract: ModuleImportContract { namespace_exports: std::collections::BTreeMap::new(), file_interfaces: std::collections::BTreeMap::from([("demo".to_owned(), interface)]), ..ModuleImportContract::default() } })
+"#,
+        crate::driver::AnalyzeRequest {
+            cli_program: None,
+            contract: ModuleImportContract {
+                namespace_exports: std::collections::BTreeMap::new(),
+                file_interfaces: std::collections::BTreeMap::from([("demo".to_owned(), interface)]),
+                ..ModuleImportContract::default()
+            },
+        },
+    )
     .expect("imported nominal method source analyzes");
     let dump = dump_analyzed_unit(&mut unit).expect("imported nominal method lowers");
 
@@ -3094,7 +3195,9 @@ incipit {
     let name_field = unit.interner.intern("name");
     let email_field = unit.interner.intern("email");
     let ada = unit.interner.intern("Ada");
-    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default())
+        .map(|lowered| lowered.program)
+        .expect("MIR lowering succeeds");
 
     let fields = program
         .functions
@@ -3149,7 +3252,9 @@ incipit {
 "#;
     let mut unit = analyze(source);
     let tag_field = unit.interner.intern("tag");
-    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default())
+        .map(|lowered| lowered.program)
+        .expect("MIR lowering succeeds");
 
     let fields = program
         .functions
@@ -3311,7 +3416,8 @@ fn rejects_legacy_typed_ad_statement_for_mir() {
   ad "fasciculus:lege" ("salve.txt") → textus textus ⇥ textus {
     nota textus
   }
-}"#, ModuleCompileRequest::default(),
+}"#,
+        ModuleCompileRequest::default(),
     );
     assert!(
         !result.success(),
@@ -3926,7 +4032,8 @@ incipit {
 }
 "#;
     let mut unit = analyze(source);
-    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("nested failable generic lowering succeeds");
+    let lowered =
+        lower_analyzed_unit(&mut unit, Default::default()).expect("nested failable generic lowering succeeds");
 
     assert_eq!(lowered.monomorphizations.len(), 2);
     for monomorphization in &lowered.monomorphizations {
@@ -3984,7 +4091,9 @@ incipit {
 
 fn lowers_nucleum_annotation_to_compute_shader_stage() {
     let mut unit = analyze("@ nucleum\nfunctio kernel_entry() → vacuum { redde }");
-    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default())
+        .map(|lowered| lowered.program)
+        .expect("MIR lowering succeeds");
     let function = &program.functions[0];
     assert_eq!(
         function.shader_stage,
@@ -3996,7 +4105,9 @@ fn lowers_nucleum_annotation_to_compute_shader_stage() {
 #[test]
 fn lowers_vertex_annotation_to_vertex_shader_stage() {
     let mut unit = analyze("@ vertex\nfunctio vertex_entry() → vacuum { redde }");
-    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default())
+        .map(|lowered| lowered.program)
+        .expect("MIR lowering succeeds");
     let function = &program.functions[0];
     assert_eq!(
         function.shader_stage,
@@ -4008,7 +4119,9 @@ fn lowers_vertex_annotation_to_vertex_shader_stage() {
 #[test]
 fn lowers_fragment_annotation_to_fragment_shader_stage() {
     let mut unit = analyze("@ fragment\nfunctio fragment_entry() → vacuum { redde }");
-    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default())
+        .map(|lowered| lowered.program)
+        .expect("MIR lowering succeeds");
     let function = &program.functions[0];
     assert_eq!(
         function.shader_stage,
@@ -4020,7 +4133,9 @@ fn lowers_fragment_annotation_to_fragment_shader_stage() {
 #[test]
 fn lowers_plain_function_without_shader_stage() {
     let mut unit = analyze("functio plain() → vacuum { redde }");
-    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default())
+        .map(|lowered| lowered.program)
+        .expect("MIR lowering succeeds");
     let function = &program.functions[0];
     assert_eq!(function.shader_stage, None, "plain function must have no shader stage");
 }
@@ -4110,7 +4225,9 @@ fn lowers_vertex_method_inside_genus_to_shader_stage() {
     let mut unit = analyze(
         "genus Renderer {\n  numerus dummy = 0\n  @ vertex\n  functio draw() → vacuum { redde }\n}\n\nincipit {\n  fixum _ r ← Renderer {}\n}",
     );
-    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default())
+        .map(|lowered| lowered.program)
+        .expect("MIR lowering succeeds");
     let draw = program
         .functions
         .iter()
@@ -4128,7 +4245,9 @@ fn lowers_fragment_method_inside_genus_to_shader_stage() {
     let mut unit = analyze(
         "genus Renderer {\n  numerus dummy = 0\n  @ fragment\n  functio shade() → vacuum { redde }\n}\n\nincipit {\n  fixum _ r ← Renderer {}\n}",
     );
-    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default())
+        .map(|lowered| lowered.program)
+        .expect("MIR lowering succeeds");
     let shade = program
         .functions
         .iter()
@@ -4146,7 +4265,9 @@ fn vertex_function_injects_out_position_local_for_empty_body() {
     // Even a @vertex function with an empty body must have out_position
     // injected as a synthetic local during MIR lowering.
     let mut unit = analyze("@ vertex\nfunctio v() → vacuum { redde }");
-    let program = lower_analyzed_unit(&mut unit, Default::default()).map(|lowered| lowered.program).expect("MIR lowering succeeds");
+    let program = lower_analyzed_unit(&mut unit, Default::default())
+        .map(|lowered| lowered.program)
+        .expect("MIR lowering succeeds");
     let function = &program.functions[0];
     assert_eq!(
         function.shader_stage,

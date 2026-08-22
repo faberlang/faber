@@ -734,6 +734,20 @@ fn itera_pro_mode_rejected() {
 }
 
 #[test]
+fn parses_itera_loop_apud_clause_rejected_before_surface_lands() {
+    // Post-delivery admit shapes: tensor rank 1/2/3 with [i]/[i, j]/[i, j, k]
+    // and matrix rank 2 with [i, j]. Arity-error shapes remain [i] on rank 2,
+    // [i, j] on rank 3, and [i, j, k] on matrix rank 2.
+    assert_parse_error_matches(
+        r"itera ex m apud [i, j] fixum cell { }",
+        ParseExpectation::Args(&[
+            ("issue", "mutability_marker"),
+            ("expected", "'fixum' or 'varia'"),
+        ]),
+    );
+}
+
+#[test]
 fn sit_underscore_identifier_rejected() {
     assert_parse_error_matches(
         r"sit _ nomen ← 1",
@@ -2335,6 +2349,9 @@ impl KeywordPack for EnGuardPack {
             "panic" => Some("mori"),
             "else" => Some("secus"),
             "true" => Some("verum"),
+            "for" => Some("itera"),
+            "from" => Some("ex"),
+            "const" => Some("fixum"),
             _ => None,
         }
     }
@@ -2365,6 +2382,20 @@ fn assert_en_parse_error_issue(source: &str, issue: &str) {
         result.errors.iter().any(|err| has_arg(err, "issue", issue)),
         "expected en-surface parse error issue {issue:?}, got {errors:?}"
     );
+}
+
+#[test]
+fn itera_pro_mode_rejected_en_apud_clause_before_surface_lands() {
+    // `at` is intentionally absent from this pre-AC-2 pack, so the parser
+    // still expects the mutability marker after the iterable expression.
+    let result = parse_en("for from m at [i, j] const cell { }");
+    let errors = result.errors.iter().collect::<Vec<_>>();
+    let error = result
+        .errors
+        .iter()
+        .find(|err| has_arg(err, "issue", "mutability_marker"))
+        .unwrap_or_else(|| panic!("expected mutability-marker rejection, got {errors:?}"));
+    assert!(has_arg(error, "expected", "'fixum' or 'varia'"), "unexpected args: {error:?}");
 }
 
 #[test]
