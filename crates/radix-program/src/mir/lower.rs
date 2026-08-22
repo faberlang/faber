@@ -337,25 +337,46 @@ fn source_variant_defs(source: &radix_module::mir::MirValidationContext<'_>) -> 
     defs
 }
 
+#[derive(Clone, Copy)]
+enum MetadataDefKind {
+    /// Structs, enums, and interfaces use the nominal remap.
+    Nominal,
+    /// Enum variants use the variant remap, even when their source `DefId`
+    /// also appears in the nominal remap.
+    Variant,
+}
+
+/// Remap metadata in its consumer's identity domain.
+///
+/// A source analysis can expose one `DefId` for both a nominal and a variant:
+/// variant lowering falls back to the ordinary name lookup when the
+/// parent-qualified variant entry is unavailable, so a variant whose spelling
+/// matches a struct can reuse that struct's id. The remap tables are already
+/// separate `(DefId, kind)` domains; preserve that distinction at each
+/// metadata consumer instead of collapsing them with precedence.
 fn remap_metadata_def(
     def: DefId,
+    kind: MetadataDefKind,
     struct_remap: &HashMap<DefId, DefId>,
     variant_remap: &HashMap<DefId, DefId>,
     nominal_map: &HashMap<DefId, TypeId>,
     entry_types: &TypeTable,
 ) -> DefId {
-    if let Some(mapped) = struct_remap.get(&def) {
+    let remap = match kind {
+        MetadataDefKind::Nominal => struct_remap,
+        MetadataDefKind::Variant => variant_remap,
+    };
+    if let Some(mapped) = remap.get(&def) {
         return *mapped;
     }
-    if let Some(mapped) = variant_remap.get(&def) {
-        return *mapped;
-    }
-    if let Some(ty) = nominal_map.get(&def) {
-        match entry_types.get(*ty) {
-            Type::Struct(mapped) | Type::Enum(mapped) | Type::Interface(mapped) => {
-                return *mapped;
+    if matches!(kind, MetadataDefKind::Nominal) {
+        if let Some(ty) = nominal_map.get(&def) {
+            match entry_types.get(*ty) {
+                Type::Struct(mapped) | Type::Enum(mapped) | Type::Interface(mapped) => {
+                    return *mapped;
+                }
+                _ => {}
             }
-            _ => {}
         }
     }
     def
@@ -383,17 +404,35 @@ fn collect_remapped_validation(
     source_rewrites: &SourceRewrites,
     unit_path: &Path,
 ) -> RemappedValidation {
-    let remap_def =
-        |def: DefId| remap_metadata_def(def, struct_remap, variant_remap, nominal_map, entry_types);
+    let remap_nominal_def = |def: DefId| {
+        remap_metadata_def(
+            def,
+            MetadataDefKind::Nominal,
+            struct_remap,
+            variant_remap,
+            nominal_map,
+            entry_types,
+        )
+    };
+    let remap_variant_def = |def: DefId| {
+        remap_metadata_def(
+            def,
+            MetadataDefKind::Variant,
+            struct_remap,
+            variant_remap,
+            nominal_map,
+            entry_types,
+        )
+    };
     let remap_function_def = |def: DefId| {
         source_rewrites
             .get(&(unit_path.to_path_buf(), def))
             .copied()
-            .unwrap_or_else(|| remap_def(def))
+            .unwrap_or_else(|| remap_nominal_def(def))
     };
     let mut out = RemappedValidation::default();
     for (def, fields) in &source.struct_fields {
-        let dest = remap_def(*def);
+        let dest = remap_nominal_def(*def);
         let slot = out.struct_fields.entry(dest).or_default();
         for (name, ty) in fields {
             slot.insert(
@@ -403,7 +442,7 @@ fn collect_remapped_validation(
         }
     }
     for (def, fields) in &source.optional_struct_fields {
-        let dest = remap_def(*def);
+        let dest = remap_nominal_def(*def);
         out.optional_struct_fields.entry(dest).or_default().extend(
             fields
                 .iter()
@@ -411,7 +450,7 @@ fn collect_remapped_validation(
         );
     }
     for (def, fields) in &source.nullable_struct_fields {
-        let dest = remap_def(*def);
+        let dest = remap_nominal_def(*def);
         out.nullable_struct_fields.entry(dest).or_default().extend(
             fields
                 .iter()
@@ -420,16 +459,16 @@ fn collect_remapped_validation(
     }
     for (variant, parent) in &source.variant_parents {
         out.variant_parents
-            .entry(remap_def(*variant))
-            .or_insert(remap_def(*parent));
+            .entry(remap_variant_def(*variant))
+            .or_insert(remap_nominal_def(*parent));
     }
     for (enum_def, variants) in &source.enum_variants {
         out.enum_variants
-            .entry(remap_def(*enum_def))
-            .or_insert_with(|| variants.iter().copied().map(remap_def).collect());
+            .entry(remap_nominal_def(*enum_def))
+            .or_insert_with(|| variants.iter().copied().map(remap_variant_def).collect());
     }
     for (def, fields) in &source.variant_fields {
-        let dest = remap_def(*def);
+        let dest = remap_variant_def(*def);
         let slot = out.variant_fields.entry(dest).or_default();
         for (name, ty) in fields {
             slot.insert(
@@ -450,6 +489,78 @@ fn collect_remapped_validation(
         out.functions.entry(remap_function_def(*def)).or_insert(sig);
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn remapped_validation_keeps_colliding_struct_and_variant_consumers() {
+        // This is the source shape from parameter.fab: the same source DefId
+        // reaches both metadata domains because variant lowering falls back to
+        // a bare name lookup when its parent-qualified entry is unavailable.
+        let source_def = DefId(4109);
+        let source_enum = DefId(4110);
+        let struct_dest = DefId(2_000_000_301);
+        let enum_dest = DefId(2_000_000_302);
+        let variant_dest = DefId(2_000_000_235);
+
+        let source_types = TypeTable::new();
+        let number = source_types.primitive(Primitive::Numerus);
+        let mut source = radix_module::mir::MirValidationContext::new(&source_types);
+        let mut source_interner = Interner::new();
+        let struct_field = source_interner.intern("struct_field");
+        let variant_field = source_interner.intern("variant_field");
+        source
+            .struct_fields
+            .entry(source_def)
+            .or_default()
+            .insert(struct_field, MirType::semantic(number));
+        source.variant_parents.insert(source_def, source_enum);
+        source.enum_variants.insert(source_enum, vec![source_def]);
+        source
+            .variant_fields
+            .entry(source_def)
+            .or_default()
+            .insert(variant_field, MirType::semantic(number));
+
+        let mut struct_remap = HashMap::new();
+        struct_remap.insert(source_def, struct_dest);
+        struct_remap.insert(source_enum, enum_dest);
+        let mut variant_remap = HashMap::new();
+        variant_remap.insert(source_def, variant_dest);
+        let mut entry_interner = Interner::new();
+        let source_rewrites = SourceRewrites::new();
+        let remapped = collect_remapped_validation(
+            &source,
+            &source_interner,
+            &mut entry_interner,
+            &[],
+            &struct_remap,
+            &variant_remap,
+            &HashMap::new(),
+            &source_types,
+            &source_rewrites,
+            Path::new("parameter.fab"),
+        );
+
+        // Struct consumers must keep the struct slot, while variant consumers
+        // must keep the package-synthetic variant slot. A precedence-based
+        // lookup cannot satisfy both assertions for one source DefId.
+        assert!(remapped.struct_fields.contains_key(&struct_dest));
+        assert!(!remapped.struct_fields.contains_key(&variant_dest));
+        assert_eq!(
+            remapped.variant_parents.get(&variant_dest),
+            Some(&enum_dest)
+        );
+        assert_eq!(
+            remapped.enum_variants.get(&enum_dest),
+            Some(&vec![variant_dest])
+        );
+        assert!(remapped.variant_fields.contains_key(&variant_dest));
+        assert!(!remapped.variant_fields.contains_key(&struct_dest));
+    }
 }
 
 pub(super) fn lower_package_units<'a>(
