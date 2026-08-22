@@ -671,6 +671,73 @@ functio bounded_partial() → vacuum {
 }
 
 #[test]
+fn bounded_lista_ex_full_literal_n8_admits_guard_free_lanes() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio bounded_sum_8() → vacuum {
+    fixum lista<f32, 8> xs ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0] ↦ lista<f32, 8>
+    itera ex xs fixum value { }
+}
+"#,
+    );
+    assert!(
+        air_errors_from(&result).iter().all(|error| {
+            !error
+                .args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "itera_loop")
+        }),
+        "full 8-slot bounded lista must not decline its itera loop: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "full 8-slot iteration must be erased");
+    assert!(!has_si(hir), "full 8-slot iteration is guard-free");
+    let mut gathers = CountIndexes(0);
+    walk_program(&mut gathers, hir);
+    assert_eq!(gathers.0, 8, "one gather must be emitted per full slot");
+}
+
+#[test]
+fn bounded_lista_ex_over_budget_declines_whole_with_causa() {
+    let elements = (0..65)
+        .map(|index| format!("{index}.0"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let source = format!(
+        r#"
+@ radix lane "air"
+functio too_wide() → vacuum {{
+    fixum lista<f32, 65> xs ← [{elements}] ↦ lista<f32, 65>
+    itera ex xs fixum value {{ }}
+}}
+"#
+    );
+    let result = analyze(&source);
+    expect_decline_causa(&air_errors_from(&result), "budget");
+    let hir = result.hir.as_ref().expect("typed HIR despite AIR decline");
+    assert!(
+        has_itera(hir),
+        "the over-budget bounded-lista loop must remain whole"
+    );
+}
+
+#[test]
+fn bounded_lista_ex_unbounded_declines_not_concrete() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio unbounded() → vacuum {
+    fixum lista<f32> xs ← [1.0, 2.0, 3.0]
+    itera ex xs fixum value { }
+}
+"#,
+    );
+    expect_decline_causa(&errors, "not_concrete");
+}
+
+#[test]
 fn pipeline_unroll_admits_arc3_intrinsic_before_purity() {
     let result = analyze(
         r#"
