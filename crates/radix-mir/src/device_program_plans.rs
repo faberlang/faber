@@ -2249,19 +2249,30 @@ pub fn contract_shape_signature(
             let (element_ty, _) =
                 data_flow_element_ty_and_count(function_local_ty(function, *first)?, validation)?;
             for (binding, local) in operands.iter().copied().enumerate() {
-                let (operand_ty, extent) = data_flow_element_ty_and_count(
-                    function_local_ty(function, local)?,
-                    validation,
-                )?;
+                let ty = function_local_ty(function, local)?;
+                let (operand_ty, extent) = data_flow_element_ty_and_count(ty, validation)?;
                 if binding == 0 {
                     signature.input = storage_input_with_local(0, operand_ty, extent, local);
                 } else {
-                    signature.extra_inputs.push(storage_input_with_local(
+                    let mut extra = storage_input_with_local(
                         u32::try_from(binding).unwrap_or(u32::MAX),
                         operand_ty,
                         extent,
                         local,
-                    ));
+                    );
+                    // Persistent K/V views are written in-shader at
+                    // write_position. Mark them ReadWrite so Metal binds
+                    // `device` rather than `device const`.
+                    if let Ok(dims) = crate::tensor_type::tensor_literal_dims(ty, validation) {
+                        if dims.len() == 3
+                            && dims[0] == kv_heads
+                            && dims[2] == head_dim
+                            && dims[1] != seq
+                        {
+                            extra.access = MirKernelResourceAccess::ReadWrite;
+                        }
+                    }
+                    signature.extra_inputs.push(extra);
                 }
             }
             signature.output = storage_output(

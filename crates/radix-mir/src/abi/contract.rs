@@ -633,7 +633,7 @@ fn batched_attention_contract(
     destination: Option<&crate::MirPlace>,
     validation: &MirValidationContext<'_>,
 ) -> Result<CollectionOpContract, MirAbiError> {
-    if !(7..=12).contains(&args.len()) {
+    if !(7..=16).contains(&args.len()) {
         return Err(MirAbiError::new(
             "batched attention has an unsupported operand/const arity",
         ));

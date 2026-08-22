@@ -551,12 +551,13 @@ impl Validator<'_, '_> {
             }
         } else if matches!(op, MirCollectionOp::TensorBatchedAttention) {
             // This compiler-owned primitive has tensor peers followed by
-            // shape/layout constants. Fused projections may carry x/weight,
-            // cos/sin, and bias (up to twelve operands).
-            if !(7..=12).contains(&call.args.len()) {
+            // shape/layout constants. Cache-aware projections may carry
+            // x/weight, cos/sin, bias, a rank-3 cache view, and the B1
+            // cursor (up to sixteen operands).
+            if !(7..=16).contains(&call.args.len()) {
                 self.error(
                     span,
-                    "collection TensorBatchedAttention expects 7-12 MIR arguments",
+                    "collection TensorBatchedAttention expects 7-16 MIR arguments",
                 );
             }
         } else if call.args.len() != expected_args {
