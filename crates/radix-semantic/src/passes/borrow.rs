@@ -447,11 +447,7 @@ impl<'a> BorrowChecker<'a> {
                                         );
                                     }
                                     radix_hir::HirRefKind::Mutable => {
-                                        self.borrow_mut_with(
-                                            source,
-                                            Some(local.def_id),
-                                            init.span,
-                                        );
+                                        self.borrow_mut_with(source, Some(local.def_id), init.span);
                                     }
                                 }
                                 return;
@@ -1003,7 +999,9 @@ impl<'a> BorrowChecker<'a> {
         } else {
             state.shared = state.shared.saturating_add(1);
             if let Some(scope) = self.scopes.last_mut() {
-                scope.borrows.push(ScopeBorrow::Flagged(def_id, BorrowKind::Shared));
+                scope
+                    .borrows
+                    .push(ScopeBorrow::Flagged(def_id, BorrowKind::Shared));
             }
         }
     }
@@ -1012,12 +1010,7 @@ impl<'a> BorrowChecker<'a> {
         self.borrow_mut_with(def_id, None, span);
     }
 
-    fn borrow_mut_with(
-        &mut self,
-        def_id: DefId,
-        borrower: Option<DefId>,
-        span: radix_lexer::Span,
-    ) {
+    fn borrow_mut_with(&mut self, def_id: DefId, borrower: Option<DefId>, span: radix_lexer::Span) {
         let (_, region_any_live) = self.region_liveness(def_id);
         let state = self.states.entry(def_id).or_default();
         if state.moved {
@@ -1058,7 +1051,9 @@ impl<'a> BorrowChecker<'a> {
         } else {
             state.mutable = true;
             if let Some(scope) = self.scopes.last_mut() {
-                scope.borrows.push(ScopeBorrow::Flagged(def_id, BorrowKind::Mutable));
+                scope
+                    .borrows
+                    .push(ScopeBorrow::Flagged(def_id, BorrowKind::Mutable));
             }
         }
     }
@@ -1124,7 +1119,9 @@ impl<'a> BorrowChecker<'a> {
                     // The borrowing block exited; region liveness no longer
                     // decides this borrow, matching the old release point.
                     if let Some(state) = self.states.get_mut(&source) {
-                        state.region_borrows.retain(|tracked| tracked.borrower != borrower);
+                        state
+                            .region_borrows
+                            .retain(|tracked| tracked.borrower != borrower);
                     }
                 }
             }

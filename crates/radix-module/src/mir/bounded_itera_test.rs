@@ -20,13 +20,11 @@ fn bounded_lista_ex_lowers_to_len_static_split() {
   }
   redde total
 }";
-    let mut unit =
-        analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
-            .expect("bounded lista itera source analyzes");
+    let mut unit = analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
+        .expect("bounded lista itera source analyzes");
     let lowered = lower_analyzed_unit(&mut unit, Default::default())
         .expect("runtime-len bounded lista itera ex lowers in the base MIR lane");
-    validate_program(&lowered.program, lowered.validated.validation())
-        .expect("the len static split MIR must validate");
+    validate_program(&lowered.program, lowered.validated.validation()).expect("the len static split MIR must validate");
     let dump = dump_program(&lowered.program);
     assert!(
         !dump.contains("itera collection before iterator MIR lowering"),
@@ -62,12 +60,10 @@ fn bounded_lista_ex_arm_k_unrolls_only_lanes_below_k() {
   }
   redde
 }";
-    let mut unit =
-        analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
-            .expect("bounded lista itera source analyzes");
+    let mut unit = analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
+        .expect("bounded lista itera source analyzes");
     let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("the split lowers");
-    validate_program(&lowered.program, lowered.validated.validation())
-        .expect("the len static split MIR must validate");
+    validate_program(&lowered.program, lowered.validated.validation()).expect("the len static split MIR must validate");
     let dump = dump_program(&lowered.program);
     let index_constants = ["0", "1", "2"]
         .iter()
@@ -81,10 +77,7 @@ fn bounded_lista_ex_arm_k_unrolls_only_lanes_below_k() {
     }
     // Capacity 3: arm k reads only lanes 0..k, so lane 3 (a dead slot when
     // len < 4... here len <= 3) is never projected.
-    assert!(
-        !dump.contains("[const int 3]"),
-        "no arm may read lane >= capacity: {dump}"
-    );
+    assert!(!dump.contains("[const int 3]"), "no arm may read lane >= capacity: {dump}");
 }
 
 #[test]
