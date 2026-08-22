@@ -582,6 +582,10 @@ pub struct LibraryInterfaceCache {
     entries: BTreeMap<LibraryIdentityKey, CachedLibraryInterface>,
     analysis_config: Config,
     locale_loader: Option<LocaleLoader>,
+    /// Modules whose `analyze_cached_library_interface` frame is live.
+    /// Re-entry before `file_interface` is stored would restart analysis of
+    /// the same key and never terminate.
+    analyzing: BTreeSet<LibraryIdentityKey>,
 }
 
 impl Default for LibraryInterfaceCache {
@@ -598,6 +602,7 @@ impl LibraryInterfaceCache {
                 .with_target(config.target)
                 .with_bodyless_functions(),
             locale_loader: None,
+            analyzing: BTreeSet::new(),
         }
     }
 
@@ -1123,6 +1128,31 @@ fn analyze_cached_library_interface(
     library_cache: &mut LibraryInterfaceCache,
 ) -> Result<(), Diagnostic> {
     let key = library_identity_key(&library_identity(&import.module));
+    if !library_cache.analyzing.insert(key.clone()) {
+        return Err(library_analysis_reentry_diagnostic(import));
+    }
+    let result =
+        analyze_cached_library_interface_body(import, library_resolver, library_cache, &key);
+    library_cache.analyzing.remove(&key);
+    result
+}
+
+fn library_analysis_reentry_diagnostic(import: &LibraryImportBinding) -> Diagnostic {
+    let module_label = library_module_label(import);
+    crate::package_diagnostic_error(format!(
+        "library interface analysis re-entered for `{module_label}` before the cached file interface was stored"
+    ))
+    .with_file(import.module.interface_path.display().to_string())
+    .with_arg("issue", "library_analysis_reentry")
+    .with_arg("module", module_label)
+}
+
+fn analyze_cached_library_interface_body(
+    import: &LibraryImportBinding,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+    key: &LibraryIdentityKey,
+) -> Result<(), Diagnostic> {
     let mut diagnostics = Vec::new();
     let expanded = expand_library_imports(
         std::slice::from_ref(import),
@@ -1136,7 +1166,7 @@ fn analyze_cached_library_interface(
 
     for dependency in &expanded {
         let dependency_key = library_identity_key(&library_identity(&dependency.module));
-        if dependency_key != key {
+        if &dependency_key != key {
             library_cached_file_interface(dependency, library_resolver, library_cache)?;
         }
     }
@@ -1263,7 +1293,7 @@ fn analyze_cached_library_interface(
         }
     }
 
-    let cached = library_cache.entries.get_mut(&key).ok_or_else(|| {
+    let cached = library_cache.entries.get_mut(key).ok_or_else(|| {
         crate::package_diagnostic_error("library interface cache missing entry after analysis")
             .with_file(import.module.interface_path.display().to_string())
     })?;

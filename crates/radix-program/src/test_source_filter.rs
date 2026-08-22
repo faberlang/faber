@@ -19,6 +19,21 @@ impl TestSourceFilter {
         self.include.is_empty() && self.exclude.is_empty()
     }
 
+    /// Restrict `*.proba` discovery to one explicit file argument.
+    ///
+    /// `faber test src/cache.proba` is a package route (manifest-backed root)
+    /// and must not load every sibling `*.proba`. Exclude patterns from an
+    /// existing filter are preserved; include is replaced by this file.
+    pub fn restricting_explicit_proba(
+        existing: Option<&Self>,
+        source_root: &Path,
+        path: &Path,
+    ) -> Self {
+        let mut filter = existing.cloned().unwrap_or_default();
+        filter.include = vec![relative_display(source_root, path)];
+        filter
+    }
+
     /// Whether a discovered test source path should be loaded.
     ///
     /// Product `*.fab` files are never filtered here — only callers should pass
@@ -116,3 +131,7 @@ fn glob_match(pattern: &str, text: &str) -> bool {
     }
     rec(pattern.as_bytes(), text.as_bytes())
 }
+
+#[cfg(test)]
+#[path = "test_source_filter_test.rs"]
+mod test_source_filter_test;

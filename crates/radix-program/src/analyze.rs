@@ -293,9 +293,35 @@ pub fn analyze_package_for_tests(
 ) -> Result<AnalyzedProgram, Vec<Diagnostic>> {
     let config = effective_package_config(config, input, seams.locale_loader)?;
     let spec = discover_package(input).map_err(|diag| vec![*diag])?;
+    let owned_filter = explicit_proba_path_filter(&spec, input, proba_filter);
+    let proba_filter = owned_filter.as_ref().or(proba_filter);
     let package_root = package_root_for_input(input);
     let library_resolver = (seams.resolver_for_package)(&config, &package_root)?;
     analyze_package_spec(&config, spec, &library_resolver, true, proba_filter, seams)
+}
+
+/// A named `.proba` file under a package root selects that file only.
+fn explicit_proba_path_filter(
+    spec: &PackageSpec,
+    input: &Path,
+    existing: Option<&TestSourceFilter>,
+) -> Option<TestSourceFilter> {
+    if !is_proba_source_path(input) {
+        return None;
+    }
+    let source_root = if spec.source_root.is_dir() {
+        spec.source_root.clone()
+    } else {
+        spec.entry
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf()
+    };
+    Some(TestSourceFilter::restricting_explicit_proba(
+        existing,
+        &source_root,
+        input,
+    ))
 }
 
 /// Apply the package's reader-locale pack when the config has none yet.

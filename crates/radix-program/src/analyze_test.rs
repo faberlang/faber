@@ -314,3 +314,79 @@ fn beta() → int {
     assert!(program.nodes.values().all(|node| !node.is_entry));
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn analyze_package_for_tests_named_proba_skips_sibling() {
+    let dir = temp_root("named-proba");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "namedproba"
+version = "0.1.0"
+
+[library]
+provider = "namedproba"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["fhir"]
+"#,
+    )
+    .expect("write manifest");
+    fs::create_dir_all(dir.join("src")).expect("mkdir src");
+    fs::write(
+        dir.join("src/lib.fab"),
+        r#"
+@ public
+fn n() → int {
+  return 1
+}
+"#,
+    )
+    .expect("write lib");
+    fs::write(
+        dir.join("src/cache.proba"),
+        r#"
+test "cache" {
+  assert 1 ≡ 1
+}
+"#,
+    )
+    .expect("write cache.proba");
+    fs::write(
+        dir.join("src/decode.proba"),
+        r#"
+test "decode" {
+  assert 1 ≡ 1
+}
+"#,
+    )
+    .expect("write decode.proba");
+
+    let program = analyze_package_for_tests(
+        &Config::default(),
+        &dir.join("src/cache.proba"),
+        None,
+        &test_seams(),
+    )
+    .expect("analyze named proba");
+    let proba_names: Vec<_> = program
+        .nodes
+        .values()
+        .filter_map(|node| {
+            node.path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .filter(|ext| *ext == "proba")
+                .and_then(|_| node.path.file_name())
+                .and_then(|name| name.to_str())
+                .map(str::to_owned)
+        })
+        .collect();
+    assert_eq!(proba_names, vec!["cache.proba".to_owned()]);
+    let _ = fs::remove_dir_all(&dir);
+}

@@ -198,6 +198,48 @@ test "math ok" {
 }
 
 #[test]
+fn analyze_package_for_tests_named_proba_does_not_load_sibling() {
+    let dir = test_temp_dir("named-proba-filter");
+    write_minimal_lib_package(dir.path());
+    fs::write(
+        dir.join("src/cache.proba"),
+        r#"
+test "cache" {
+    assert 1 ≡ 1
+}
+"#,
+    )
+    .expect("cache.proba");
+    fs::write(
+        dir.join("src/decode.proba"),
+        r#"
+test "decode" {
+    assert 1 ≡ 1
+}
+"#,
+    )
+    .expect("decode.proba");
+
+    let package =
+        analyze_tests_with_faber_seams(&Config::default(), &dir.join("src/cache.proba"), None)
+            .expect("analyze named .proba");
+    let proba_names: Vec<_> = package
+        .nodes
+        .values()
+        .filter_map(|unit| {
+            (unit.path.extension().and_then(|ext| ext.to_str()) == Some("proba"))
+                .then(|| unit.path.file_name()?.to_str().map(str::to_owned))
+                .flatten()
+        })
+        .collect();
+    assert_eq!(
+        proba_names,
+        vec!["cache.proba".to_owned()],
+        "named .proba must not pull sibling test sources: {proba_names:?}"
+    );
+}
+
+#[test]
 fn package_inline_proba_runs_on_runner_after_analyze() {
     let dir = test_temp_dir("runner-pkg-inline");
     write_minimal_lib_package(dir.path());

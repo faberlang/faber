@@ -434,7 +434,23 @@ pub fn resolve_import(
     }
 
     match library_resolver.resolve(import_path) {
-        Ok(Some(module)) => return ImportResolution::Library(module),
+        Ok(Some(module)) => {
+            let interface = normalize_path(&module.interface_path);
+            if crate::source_files::is_proba_source_path(&interface) {
+                return ImportResolution::Error(proba_import_forbidden_diagnostic(
+                    from_file,
+                    import_path,
+                ));
+            }
+            // A `provider:module` specifier that names a file in this package
+            // is a self-import. Route it as Local so package analysis walks
+            // the in-tree DAG once instead of re-entering
+            // `analyze_cached_library_interface` for every sibling.
+            if is_self_package_interface(spec, &interface) {
+                return ImportResolution::Local(interface);
+            }
+            return ImportResolution::Library(module);
+        }
         Ok(None) => {}
         Err(err) => return ImportResolution::Error(library_resolve_diagnostic(from_file, err)),
     }
@@ -450,6 +466,12 @@ pub fn resolve_import(
     }
 
     ImportResolution::Unsupported
+}
+
+fn is_self_package_interface(spec: &PackageSpec, interface: &Path) -> bool {
+    let source_root = normalize_path(&spec.source_root);
+    let interface = normalize_path(interface);
+    !source_root.as_os_str().is_empty() && interface.starts_with(&source_root)
 }
 
 fn proba_import_forbidden_diagnostic(from_file: &Path, import_path: &str) -> Diagnostic {

@@ -75,11 +75,18 @@ pub(super) fn cmd_test(args: &TestArgs) {
         fail_fast: args.fail_fast,
     };
 
-    let proba_filter = if args.include.is_empty() && args.exclude.is_empty() {
+    let mut include = args.include.clone();
+    if let Some(name) = explicit_proba_include(&input_path) {
+        // A named `.proba` argument is the source selection. `--include` on
+        // the package root still selects by pattern; a file path does not
+        // pull the rest of the package.
+        include = vec![name];
+    }
+    let proba_filter = if include.is_empty() && args.exclude.is_empty() {
         None
     } else {
         Some(TestSourceFilter {
-            include: args.include.clone(),
+            include,
             exclude: args.exclude.clone(),
         })
     };
@@ -164,6 +171,16 @@ pub(super) fn cmd_test(args: &TestArgs) {
         std::process::exit(0);
     }
     std::process::exit(1);
+}
+
+/// File-name include for a package-route `.proba` argument.
+fn explicit_proba_include(path: &Path) -> Option<String> {
+    if path.extension().and_then(|ext| ext.to_str()) != Some("proba") || !path.is_file() {
+        return None;
+    }
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .map(str::to_owned)
 }
 
 /// Zero selected cases after discovery/filtering. `--include` that matched no

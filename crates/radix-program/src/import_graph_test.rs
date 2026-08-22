@@ -1,6 +1,6 @@
 use super::*;
 use crate::discovery::PackageSpec;
-use crate::library::LibraryResolver;
+use crate::library::{LibraryResolver, LockedLibraryPackage};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
@@ -87,6 +87,57 @@ fn resolve_import_local_source_root_form() {
             assert!(target.ends_with("src/math.fab"), "target: {target:?}")
         }
         other => panic!("expected local resolution, got {other:?}"),
+    }
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn resolve_import_self_provider_module_is_local() {
+    let root = temp_root("self-provider");
+    fs::create_dir_all(root.join("src")).unwrap();
+    fs::write(root.join("src/dom.fab"), "fn f() → vacuum { tacet }\n").unwrap();
+    let from_file = root.join("src/app.fab");
+    let package = spec(root.join("src"), from_file.clone());
+    let mut locked = BTreeMap::new();
+    locked.insert(
+        "web".to_owned(),
+        LockedLibraryPackage {
+            name: "web".to_owned(),
+            version: "0.1.0".to_owned(),
+            interface_root: root.join("src"),
+        },
+    );
+    let resolver =
+        LibraryResolver::with_optional_home(None).with_package_lock(BTreeMap::new(), locked);
+
+    match resolve_import(&package, &resolver, &from_file, "web:dom") {
+        ImportResolution::Local(target) => {
+            assert!(
+                target.ends_with("src/dom.fab"),
+                "self-provider import must resolve in-tree: {target:?}"
+            );
+        }
+        other => panic!("expected local self-import, got {other:?}"),
+    }
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn resolve_import_external_provider_stays_library() {
+    let root = temp_root("external-provider");
+    fs::create_dir_all(root.join("prov/src")).unwrap();
+    fs::create_dir_all(root.join("app/src")).unwrap();
+    fs::write(root.join("prov/src/mod.fab"), "fn f() → vacuum { tacet }\n").unwrap();
+    let from_file = root.join("app/src/main.fab");
+    let package = spec(root.join("app/src"), from_file.clone());
+    let resolver = LibraryResolver::new(&root);
+
+    match resolve_import(&package, &resolver, &from_file, "prov:mod") {
+        ImportResolution::Library(module) => {
+            assert_eq!(module.package, "prov");
+            assert!(module.interface_path.ends_with("prov/src/mod.fab"));
+        }
+        other => panic!("expected external library resolution, got {other:?}"),
     }
     let _ = fs::remove_dir_all(&root);
 }
