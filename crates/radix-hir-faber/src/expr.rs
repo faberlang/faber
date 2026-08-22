@@ -452,11 +452,21 @@ impl super::FaberCodegen {
                 // so the bracket literal parses back as a tuple rather than an
                 // array (bare `[...]` is an array literal in expression
                 // position). The prefix is dropped only for internal
-                // placeholders that never reach emission.
-                if let Some(type_args) = type_args {
+                // placeholders that never reach emission. Lowerings that build
+                // a tuple without explicit type args (e.g. the objectPattern
+                // rest binding) still carry the tuple type on the expression;
+                // derive the prefix from it so re-emit typechecks.
+                let prefix_tys: Vec<_> = match type_args {
+                    Some(args) => args.clone(),
+                    None => match expr.ty.map(|ty| types.get(ty)) {
+                        Some(radix_types::Type::Tuple(elems)) => elems.clone(),
+                        _ => Vec::new(),
+                    },
+                };
+                if !prefix_tys.is_empty() {
                     writer.write(surface.contextual_keyword("iuncta"));
                     writer.write("<");
-                    for (idx, ty) in type_args.iter().enumerate() {
+                    for (idx, ty) in prefix_tys.iter().enumerate() {
                         if idx > 0 {
                             writer.write(", ");
                         }

@@ -926,3 +926,36 @@ fn canonical_reemission_is_idempotent_for_the_cs1_fixture() {
     );
     assert_no_trailing_separator(&first);
 }
+
+/// Roundtrip repair (e2e B2): a lowered tuple that carries no explicit type
+/// args (the objectPattern rest binding) must still emit the `iuncta<...>`
+/// prefix derived from the expression's own tuple type, or the re-emitted
+/// bracket literal parses back as an array and fails the second compile.
+#[test]
+fn tuple_without_type_args_derives_iuncta_prefix_from_expression_type() {
+    let mut interner = Interner::new();
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let one_tuple = types.intern(Type::Tuple(vec![numerus]));
+    let codegen = FaberCodegen::default();
+
+    let rest_tuple = HirExpression {
+        id: radix_hir::HirId(60),
+        kind: HirExpressionKind::Tuple(vec![int(&interner, 7)], None),
+        ty: Some(one_tuple),
+        span: span(),
+    };
+    assert_eq!(
+        render_expr(&codegen, &rest_tuple, &types, &interner),
+        "iuncta<numerus> [7]"
+    );
+
+    // Internal placeholders (no type args, no painted type) stay bare.
+    let untyped = HirExpression {
+        id: radix_hir::HirId(61),
+        kind: HirExpressionKind::Tuple(vec![int(&interner, 1)], None),
+        ty: None,
+        span: span(),
+    };
+    assert_eq!(render_expr(&codegen, &untyped, &types, &interner), "[1]");
+}
