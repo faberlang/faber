@@ -522,7 +522,6 @@ impl Validator<'_, '_> {
             | MirCollectionOp::Replace
             | MirCollectionOp::TensorSet
             | MirCollectionOp::TensorCreate
-            | MirCollectionOp::TensorFromFlat
             | MirCollectionOp::TensorSlice
             | MirCollectionOp::TensorRope
             | MirCollectionOp::TensorRopeHalf
@@ -530,6 +529,10 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorGroupedMatMul
             | MirCollectionOp::TensorSsmConv1d
             | MirCollectionOp::SparseSet => 3,
+            // Route C (AEU-5): the padded bounded-lista snapshot appends a
+            // trailing fill operand after [seed, flat, shape]; the flat path
+            // keeps its exact-count 3-argument contract.
+            MirCollectionOp::TensorFromFlat => 3,
             MirCollectionOp::TensorRmsNorm => 4,
             MirCollectionOp::TensorLayerNorm => 0,
             MirCollectionOp::TensorGather => 0,
@@ -542,6 +545,11 @@ impl Validator<'_, '_> {
         if matches!(op, MirCollectionOp::TensorLayerNorm) {
             if !(3..=5).contains(&call.args.len()) {
                 self.error(span, "collection TensorLayerNorm expects 3-5 MIR arguments");
+            }
+        } else if matches!(op, MirCollectionOp::TensorFromFlat) {
+            // Padded form carries a trailing fill operand (AEU-5 Route C).
+            if !(3..=4).contains(&call.args.len()) {
+                self.error(span, "collection TensorFromFlat expects 3 or 4 MIR arguments");
             }
         } else if matches!(op, MirCollectionOp::TensorGather) {
             // Dense gather is [table, ids]. Packed gather (R-PACK-02N) adds

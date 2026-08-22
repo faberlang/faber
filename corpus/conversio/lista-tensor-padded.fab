@@ -1,0 +1,70 @@
++++
+term = "lista-tensor-padded"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "shape_suffix", "type_arguments", "type_argument", "expression", "conversio_expr", "assignment", "itera_stmt", "member_suffix", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Route C: numeric list<T, N> ↦ tensor<T, [N]> pads spare slots with a real fill (zero default, ⇥ names another); the padded loop unrolls via Route T; non-neutral exits need a caller-built 0/1 len-mask."
+syntax = "xs ↦ tensor<T, [N]> [⇥ fill]"
+related = ["lista", "tensor", "itera", "ex"]
+locale = "en"
++++
+
+# =============================================================================
+# lista-tensor-padded — Route C padded-snapshot conversio (AEU-5).
+# =============================================================================
+#
+# What this teaches:
+#   • `list<T, N> ↦ tensor<T, [N]>` snapshots the live prefix 0..len and pads
+#     slots len..N with a real fill value — the default fill is the numeric
+#     zero of T; a `⇥` value names a different fill (element-typed)
+#   • the fill is a real value written at the conversion site, never a read of
+#     the carrier's uninitialized spare slots
+#   • iterating the padded tensor is a plain Route T unroll (N lanes, budget 64)
+#   • zero fill plus an additive body (`sum`) needs no mask — 0 is the additive
+#     neutral; every non-neutral exit (product, min/max, first-match, append)
+#     requires a caller-built 0/1 len-mask operand at the conversion site
+#     (3F rule: in-region mask construction never admits)
+#
+# Common mistakes:
+#   • Padding a non-numeric list<text, N> — Route C is numeric T only.
+#   • Padding from an unbounded list<T> — the bound must be in the type.
+#   • Relying on zero fill for a product exit — the fill 0 zeroes the product;
+#     pass a 0/1 len-mask operand instead.
+#
+# See also: lista, tensor, itera-ex-air-rank1
+# =============================================================================
+
+# Route C drivers — declaration-only; the semantic/MIR/runner unit tests pin
+# the padded TensorFromFlat fill contract and the mask-required decline.
+
+# Zero-fill additive exit: maskless (0 is the additive neutral).
+fn sumPadded(list<float, 8> xs) → float {
+    const tensor<float, [8]> t ← xs ↦ tensor<float, [8]>
+    var float total ← 0.0
+    for from t const x {
+        total ← total + x
+    }
+    return total
+}
+
+# A ⇥ value names a different dead-slot fill (element-typed).
+fn sumFilled(list<float, 8> xs) → float {
+    const tensor<float, [8]> t ← xs ↦ tensor<float, [8]> ⇥ 1.0
+    var float total ← 0.0
+    for from t const x {
+        total ← total + x
+    }
+    return total
+}
+
+# Non-neutral product exit: the caller builds the 0/1 len-mask outside the
+# region and passes it as an operand at the conversion site.
+fn productMasked(list<float, 8> xs, tensor<float, [8]> lenMask) → float {
+    const tensor<float, [8]> t ← xs ↦ tensor<float, [8]>
+    var float total ← 1.0
+    for from t const x {
+        total ← total * x
+    }
+    return total * lenMask.product()
+}

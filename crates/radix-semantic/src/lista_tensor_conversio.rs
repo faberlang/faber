@@ -24,6 +24,10 @@ pub enum ListaToTensorError {
     NonListaSource,
     NestedLista,
     ElementMismatch,
+    /// Route C admits numeric element types only (AEU-5 fill contract).
+    NonNumericElement,
+    /// Route C requires the bounded capacity to equal the rank-1 tensor dim.
+    CapacityMismatch,
 }
 
 #[derive(Debug)]
@@ -71,14 +75,39 @@ pub fn validate_lista_to_tensor_source(
     target: TypeId,
     types: &TypeTable,
 ) -> Result<(), ListaToTensorError> {
-    let (source_elem, target_elem) = match (
+    match (
         normalized_type(source, types),
         normalized_type(target, types),
     ) {
-        (Type::Array(source_elem), Type::Tensor(target_elem, _)) => (*source_elem, *target_elem),
-        _ => return Err(ListaToTensorError::NonListaSource),
-    };
+        (Type::Array(source_elem), Type::Tensor(target_elem, _)) => {
+            validate_flat_source(*source_elem, *target_elem, types)
+        }
+        // Route C (AEU-5): bounded `lista<T, N>` snapshots into a padded
+        // `tensor<T, [N]>`. Numeric `T` only; the capacity must equal the
+        // rank-1 literal dim so every padded slot is a real fill value.
+        (Type::BoundedArray { element, capacity }, Type::Tensor(target_elem, shape)) => {
+            let elem = *element;
+            validate_flat_source(elem, *target_elem, types)?;
+            if !is_numeric_element(elem, types) {
+                return Err(ListaToTensorError::NonNumericElement);
+            }
+            let dim = i64s_from_literal_index(*shape, types).and_then(|dims| dims.first().copied());
+            let capacity =
+                i64s_from_literal_index(*capacity, types).and_then(|dims| dims.first().copied());
+            if dim.is_none() || dim != capacity {
+                return Err(ListaToTensorError::CapacityMismatch);
+            }
+            Ok(())
+        }
+        _ => Err(ListaToTensorError::NonListaSource),
+    }
+}
 
+fn validate_flat_source(
+    source_elem: TypeId,
+    target_elem: TypeId,
+    types: &TypeTable,
+) -> Result<(), ListaToTensorError> {
     if matches!(normalized_type(source_elem, types), Type::Array(_)) {
         return Err(ListaToTensorError::NestedLista);
     }
@@ -88,6 +117,45 @@ pub fn validate_lista_to_tensor_source(
     }
 
     Ok(())
+}
+
+/// Whether a type is a numeric scalar eligible as a Route C padded-tensor
+/// element (fill contract: zero is a real value, not `MaybeUninit`).
+#[must_use]
+pub fn is_numeric_element(ty: TypeId, types: &TypeTable) -> bool {
+    matches!(
+        normalized_type(ty, types),
+        Type::Primitive(Primitive::Numerus | Primitive::Fractus)
+            | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
+    )
+}
+
+/// Route C padded snapshot facts: the element type and the literal bound `N`,
+/// when `source` is a numeric bounded lista whose capacity matches the
+/// rank-1 literal dim of the tensor `target`.
+#[must_use]
+pub fn resolve_bounded_lista_padded_shape(
+    source: TypeId,
+    target: TypeId,
+    types: &TypeTable,
+) -> Option<(TypeId, i64)> {
+    match (
+        normalized_type(source, types),
+        normalized_type(target, types),
+    ) {
+        (Type::BoundedArray { element, capacity }, Type::Tensor(_, shape)) => {
+            let elem = *element;
+            if !is_numeric_element(elem, types) {
+                return None;
+            }
+            let dim =
+                i64s_from_literal_index(*shape, types).and_then(|dims| dims.first().copied())?;
+            let capacity =
+                i64s_from_literal_index(*capacity, types).and_then(|dims| dims.first().copied())?;
+            (dim == capacity).then_some((elem, dim))
+        }
+        _ => None,
+    }
 }
 
 /// Analyze a rectangular lista literal against a known tensor target type.

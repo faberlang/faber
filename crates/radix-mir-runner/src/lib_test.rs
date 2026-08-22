@@ -4236,3 +4236,100 @@ fn recovery_calls_index_only_orphan_temp_destinations() {
         .expect("orphan recovery call must be indexed");
     assert_eq!(orphan.1, vec![MirOperand::Constant(MirConstant::Int(7))]);
 }
+
+/// AEU-5 Route C: `TensorFromFlat` with a trailing fill operand pads a shorter
+/// bounded-lista snapshot to the literal shape; the fill is a real value, and a
+/// flat longer than the shape still fails the exact-count contract.
+#[test]
+fn conversio_padded_tensor_from_flat_fills_dead_slots() {
+    use crate::host::BufferHost;
+    use radix_lexer::{Interner, Span};
+    use radix_mir::{
+        MirCollectionOp, MirIntrinsic, MirOperand, MirProgram, MirRuntimeCall, MirType,
+        MirValidationContext, MirValueId,
+    };
+    use radix_types::{Primitive, TypeTable};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let type_table = TypeTable::new();
+    let fractus = type_table.primitive(Primitive::Fractus);
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, crate::MirBlockId(0));
+
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(0),
+        crate::Value::Array(Rc::new(RefCell::new(vec![
+            crate::Value::Float(1.0),
+            crate::Value::Float(2.0),
+            crate::Value::Float(3.0),
+        ]))),
+    );
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(1),
+        crate::Value::Array(Rc::new(RefCell::new(vec![crate::Value::Int(8)]))),
+    );
+
+    let padded = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorFromFlat),
+        args: vec![
+            MirOperand::Value(MirValueId(0)), // seed placeholder slot is the
+            // receiver; keep flat at index 1 below by repeating the flat value.
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+            MirOperand::Constant(radix_mir::MirConstant::Float(0.0)),
+        ],
+        return_ty: MirType::semantic(fractus),
+    };
+    let result = runner
+        .eval_runtime_call(&padded, Span::default())
+        .expect("padded snapshot must succeed");
+    let crate::Value::Tensor(tensor) = result else {
+        panic!("padded snapshot must produce a tensor");
+    };
+    let tensor = tensor.borrow();
+    assert_eq!(tensor.shape, vec![8]);
+    assert_eq!(
+        tensor.data,
+        vec![
+            crate::Value::Float(1.0),
+            crate::Value::Float(2.0),
+            crate::Value::Float(3.0),
+            crate::Value::Float(0.0),
+            crate::Value::Float(0.0),
+            crate::Value::Float(0.0),
+            crate::Value::Float(0.0),
+            crate::Value::Float(0.0),
+        ]
+    );
+
+    // A flat longer than the literal shape keeps the exact-count failure.
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(2),
+        crate::Value::Array(Rc::new(RefCell::new((0..9).map(|_| crate::Value::Float(0.0)).collect()))),
+    );
+    let overlong = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorFromFlat),
+        args: vec![
+            MirOperand::Value(MirValueId(2)),
+            MirOperand::Value(MirValueId(2)),
+            MirOperand::Value(MirValueId(1)),
+            MirOperand::Constant(radix_mir::MirConstant::Float(0.0)),
+        ],
+        return_ty: MirType::semantic(fractus),
+    };
+    let err = runner
+        .eval_runtime_call(&overlong, Span::default())
+        .expect_err("overlong flat must fail the count contract");
+    assert!(
+        err.issue.contains("element_count_does_not_match"),
+        "expected element-count failure, got {err:?}"
+    );
+}

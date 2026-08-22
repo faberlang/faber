@@ -22,8 +22,8 @@
 use super::*;
 use crate::hir::HirCallArg;
 use crate::semantic::lista_tensor_conversio::{
-    analyze_rectangular_lista_literal, lista_numerus_type, resolve_lista_to_tensor_shape,
-    validate_lista_to_tensor_source, ListaToTensorShape,
+    analyze_rectangular_lista_literal, lista_numerus_type, resolve_bounded_lista_padded_shape,
+    resolve_lista_to_tensor_shape, validate_lista_to_tensor_source, ListaToTensorShape,
 };
 use crate::semantic::IndexExpr;
 
@@ -2352,6 +2352,21 @@ impl FunctionBuilder<'_> {
                 }
             }
         }
+        // Route C (AEU-5): bounded numeric lista snapshots into a padded
+        // tensor. The trailing `TensorFromFlat` fill operand is a real value —
+        // the caller's `⇥` fill or the numeric zero — never a `MaybeUninit`
+        // read; a `⇥` on the flat path below stays a failure recovery, so the
+        // padded arm runs first and even with a recovery present.
+        if resolve_bounded_lista_padded_shape(source_type_id, target, self.types).is_some() {
+            return self.lower_bounded_lista_to_padded_tensor_conversio(
+                source,
+                source_type_id,
+                target,
+                ty,
+                recovery,
+                expr.span,
+            );
+        }
         if recovery.is_none() && validate_lista_to_tensor_source(source_type_id, target, self.types).is_ok() {
             return self.lower_lista_to_tensor_conversio(source, target, ty, expr.span);
         }
@@ -2578,6 +2593,40 @@ impl FunctionBuilder<'_> {
     ) -> Option<MirOperand> {
         let flat = self.lower_expr_value(source)?;
         self.lower_tensor_from_flat_conversio(flat, target, return_ty, span)
+    }
+
+    /// Route C padded snapshot: `lista<T, N> ↦ tensor<T, [N]>` with the
+    /// caller's fill (a `⇥` value, element-typed) or the numeric zero. The
+    /// runtime `TensorFromFlat` pads slots `len..N` with that real value; the
+    /// bounded carrier's dead slots are never read.
+    fn lower_bounded_lista_to_padded_tensor_conversio(
+        &mut self,
+        source: &HirExpression,
+        source_ty: TypeId,
+        target: TypeId,
+        return_ty: MirType,
+        recovery: Option<&HirExpression>,
+        span: Span,
+    ) -> Option<MirOperand> {
+        let (elem, _) = resolve_bounded_lista_padded_shape(source_ty, target, self.types)?;
+        let flat = self.lower_expr_value(source)?;
+        let fill = match recovery {
+            Some(fill) => self.lower_expr_value(fill)?,
+            None => MirOperand::Constant(numeric_zero_constant(elem, self.types)),
+        };
+        let shape = self.lower_lista_to_tensor_shape(flat.clone(), target, span)?;
+        let seed = self.construct_temp(
+            MirAggregateKind::Tensor,
+            MirAggregateFields::Ordered(Vec::new()),
+            return_ty,
+            span,
+        );
+        Some(self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorFromFlat),
+            vec![seed, flat, shape, fill],
+            return_ty,
+            span,
+        ))
     }
 
     fn lower_rectangular_lista_literal_to_tensor_conversio(
@@ -2929,5 +2978,20 @@ fn numeric_imperativus_binop(method_name: &str) -> Option<MirBinOp> {
         "sinistra" => Some(MirBinOp::Shl),
         "dextra" => Some(MirBinOp::Shr),
         _ => None,
+    }
+}
+
+/// Numeric zero of a Route C element type: the default dead-slot fill when the
+/// caller does not name one with `⇥`.
+fn numeric_zero_constant(elem: TypeId, types: &TypeTable) -> MirConstant {
+    let mut ty = elem;
+    loop {
+        match types.get(ty) {
+            Type::Alias(_, inner) => ty = *inner,
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
+                return MirConstant::Float(0.0);
+            }
+            _ => return MirConstant::Int(0),
+        }
     }
 }

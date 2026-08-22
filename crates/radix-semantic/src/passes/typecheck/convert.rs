@@ -31,8 +31,9 @@
 use super::*;
 
 use crate::lista_tensor_conversio::{
-    analyze_rectangular_lista_literal, ensure_lista_numerus_type, validate_lista_to_tensor_source,
-    ListaToTensorError, RectangularListaLiteralError,
+    analyze_rectangular_lista_literal, ensure_lista_numerus_type,
+    resolve_bounded_lista_padded_shape, validate_lista_to_tensor_source, ListaToTensorError,
+    RectangularListaLiteralError,
 };
 
 const ISSUE_INTERVALLUM_CLAMP_RECOVERY: &str = "intervallum_clamp_recovery_unsupported";
@@ -99,6 +100,8 @@ const ISSUE_LISTA_TO_TABULA_UNSUPPORTED: &str = "lista_to_tabula_unsupported";
 const ISSUE_CROSS_COLLECTION_UNSUPPORTED: &str = "cross_collection_unsupported";
 const ISSUE_LISTA_TO_TENSOR_NESTED: &str = "lista_to_tensor_nested";
 const ISSUE_LISTA_TO_TENSOR_ELEMENT_MISMATCH: &str = "lista_to_tensor_element_mismatch";
+const ISSUE_LISTA_TO_TENSOR_NON_NUMERIC: &str = "lista_to_tensor_non_numeric";
+const ISSUE_LISTA_TO_TENSOR_CAPACITY_MISMATCH: &str = "lista_to_tensor_capacity_mismatch";
 const ISSUE_RECTANGULAR_LISTA_LITERAL_TARGET: &str = "rectangular_lista_literal_target";
 const ISSUE_RECTANGULAR_LISTA_LITERAL_RAGGED: &str = "rectangular_lista_literal_ragged";
 const ISSUE_RECTANGULAR_LISTA_LITERAL_ROW_LENGTH: &str = "rectangular_lista_literal_row_length";
@@ -166,6 +169,8 @@ fn lista_to_tensor_issue(error: ListaToTensorError) -> Option<&'static str> {
         ListaToTensorError::NonListaSource => None,
         ListaToTensorError::NestedLista => Some(ISSUE_LISTA_TO_TENSOR_NESTED),
         ListaToTensorError::ElementMismatch => Some(ISSUE_LISTA_TO_TENSOR_ELEMENT_MISMATCH),
+        ListaToTensorError::NonNumericElement => Some(ISSUE_LISTA_TO_TENSOR_NON_NUMERIC),
+        ListaToTensorError::CapacityMismatch => Some(ISSUE_LISTA_TO_TENSOR_CAPACITY_MISMATCH),
     }
 }
 
@@ -361,6 +366,22 @@ impl TypeChecker<'_> {
         if self.is_bounded_lista_conversio(source_ty, target_resolved) {
             if let Some(recovery) = recovery {
                 self.note_conversio_recovery_checked(recovery, target_resolved);
+            } else {
+                self.check_conversio_propagation_channel(source_ty, target_resolved, span);
+            }
+            return target_resolved;
+        }
+
+        // Route C (AEU-5): numeric `lista<T, N> ↦ tensor<T, [N]>` is a padded
+        // snapshot. The inline `⇥` value names the dead-slot fill (element
+        // type `T`), not a target-typed failure recovery — padding always
+        // succeeds structurally, and the fill must be a real value, never a
+        // read of the carrier's uninitialized slots.
+        if let Some((fill_elem, _bound)) =
+            resolve_bounded_lista_padded_shape(source_ty, target_resolved, self.types)
+        {
+            if let Some(recovery) = recovery {
+                self.note_conversio_recovery_checked(recovery, fill_elem);
             } else {
                 self.check_conversio_propagation_channel(source_ty, target_resolved, span);
             }
@@ -815,14 +836,10 @@ impl TypeChecker<'_> {
             (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Bivalens) => {
                 Some(ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED)
             }
-            (
-                PrimitiveConversioFamily::Numerus,
-                PrimitiveConversioFamily::Fractus,
-            )
-            | (
-                PrimitiveConversioFamily::Fractus,
-                PrimitiveConversioFamily::Numerus,
-            ) => self.bits_pair_issue(source_ty, target_resolved, params),
+            (PrimitiveConversioFamily::Numerus, PrimitiveConversioFamily::Fractus)
+            | (PrimitiveConversioFamily::Fractus, PrimitiveConversioFamily::Numerus) => {
+                self.bits_pair_issue(source_ty, target_resolved, params)
+            }
             _ => None,
         };
 

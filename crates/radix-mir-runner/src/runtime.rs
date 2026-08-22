@@ -1722,9 +1722,42 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     }
 
     fn tensor_from_flat(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
-        let [_receiver, flat, shape] = args else {
-            return Err(RunnerError::internal(span, "tensor from flat arity"));
+        let [_receiver, flat, shape, fill] = args else {
+            // AEU-5 Route C: the padded form carries a trailing fill operand
+            // for slots `len..N` of the bounded-lista snapshot.
+            let [_receiver, flat, shape] = args else {
+                return Err(RunnerError::internal(span, "tensor from flat arity"));
+            };
+            return self.tensor_from_flat_exact(flat, shape, span);
         };
+        let flat = self.array_arg(flat, span)?;
+        let shape = self.shape_arg(
+            shape,
+            span,
+            radix_mir::lista_tensor_conversio::LISTA_TO_TENSOR_STRUCTA_COUNT_MSG,
+        )?;
+        let count = tensor_shape_element_count(&shape)
+            .ok_or_else(|| RunnerError::internal(span, ERR_ELEMENT_COUNT_OVERFLOW))?;
+        // The fill is a real caller value, never a read of the carrier's
+        // uninitialized slots; a flat longer than the shape still fails.
+        if flat.len() > count {
+            return Err(RunnerError::internal(
+                span,
+                radix_mir::lista_tensor_conversio::LISTA_TO_TENSOR_STRUCTA_COUNT_MSG,
+            ));
+        }
+        let fill = self.eval_operand(fill, span)?;
+        let mut data = flat;
+        data.resize(count, fill);
+        Ok(tensor_value(data, shape))
+    }
+
+    fn tensor_from_flat_exact(
+        &mut self,
+        flat: &MirOperand,
+        shape: &MirOperand,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
         let flat = self.array_arg(flat, span)?;
         let shape = self.shape_arg(
             shape,

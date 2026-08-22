@@ -5,11 +5,12 @@
 //! ListaToTensorError diagnostics.
 
 use super::lista_tensor_conversio::{
-    analyze_rectangular_lista_literal, ensure_lista_numerus_type, resolve_lista_to_tensor_shape,
+    analyze_rectangular_lista_literal, ensure_lista_numerus_type,
+    resolve_bounded_lista_padded_shape, resolve_lista_to_tensor_shape,
     validate_lista_to_tensor_source, ListaToTensorError, ListaToTensorShape,
     RectangularListaLiteralError,
 };
-use crate::{IndexExpr, Primitive, Type, TypeTable};
+use crate::{IndexExpr, Primitive, Type, TypeId, TypeTable};
 use radix_hir::{HirArrayElement, HirExpression, HirExpressionKind, HirId, HirLiteral};
 use radix_lexer::Span;
 
@@ -185,4 +186,72 @@ fn nested_int_literal(
         ty: Some(outer_ty),
         span: Span::default(),
     }
+}
+
+fn bounded_lista(types: &mut TypeTable, elem: TypeId, n: u64) -> TypeId {
+    let capacity = types.intern_index(IndexExpr::Literal(n));
+    types.intern(Type::BoundedArray { element: elem, capacity })
+}
+
+#[test]
+fn lista_tensor_conversio_admits_bounded_numeric_source() {
+    let mut types = TypeTable::new();
+    let f32 = types.sized_numeric(Primitive::Fractus, crate::NumericWidth::F32);
+    let lista = bounded_lista(&mut types, f32, 8);
+    let shape = types.intern_index(IndexExpr::Literal(8));
+    let tensor = types.intern(Type::Tensor(f32, shape));
+
+    assert_eq!(
+        validate_lista_to_tensor_source(lista, tensor, &types),
+        Ok(())
+    );
+    assert_eq!(
+        resolve_bounded_lista_padded_shape(lista, tensor, &types),
+        Some((f32, 8))
+    );
+}
+
+#[test]
+fn lista_tensor_conversio_rejects_bounded_non_numeric_source() {
+    let mut types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let lista = bounded_lista(&mut types, textus, 8);
+    let shape = types.intern_index(IndexExpr::Literal(8));
+    let tensor = types.intern(Type::Tensor(textus, shape));
+
+    assert_eq!(
+        validate_lista_to_tensor_source(lista, tensor, &types),
+        Err(ListaToTensorError::NonNumericElement)
+    );
+    assert_eq!(resolve_bounded_lista_padded_shape(lista, tensor, &types), None);
+}
+
+#[test]
+fn lista_tensor_conversio_rejects_capacity_dim_mismatch() {
+    let mut types = TypeTable::new();
+    let f32 = types.sized_numeric(Primitive::Fractus, crate::NumericWidth::F32);
+    let lista = bounded_lista(&mut types, f32, 8);
+    let shape = types.intern_index(IndexExpr::Literal(4));
+    let tensor = types.intern(Type::Tensor(f32, shape));
+
+    assert_eq!(
+        validate_lista_to_tensor_source(lista, tensor, &types),
+        Err(ListaToTensorError::CapacityMismatch)
+    );
+    assert_eq!(resolve_bounded_lista_padded_shape(lista, tensor, &types), None);
+}
+
+#[test]
+fn lista_tensor_conversio_keeps_unbounded_source_on_flat_path() {
+    let mut types = TypeTable::new();
+    let f32 = types.sized_numeric(Primitive::Fractus, crate::NumericWidth::F32);
+    let lista = types.array(f32);
+    let shape = types.intern_index(IndexExpr::Literal(8));
+    let tensor = types.intern(Type::Tensor(f32, shape));
+
+    assert_eq!(
+        validate_lista_to_tensor_source(lista, tensor, &types),
+        Ok(())
+    );
+    assert_eq!(resolve_bounded_lista_padded_shape(lista, tensor, &types), None);
 }
