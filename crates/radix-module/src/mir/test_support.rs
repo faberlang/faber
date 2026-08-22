@@ -4,6 +4,7 @@
 //! extract emitted text or structured diagnostic facts. Target-specific binding
 //! assertions stay in each `*_text_test.rs` module.
 
+use crate::driver::ModuleCompileRequest;
 use crate::codegen::Target;
 use crate::diagnostics::Diagnostic;
 use crate::driver::compile;
@@ -33,7 +34,7 @@ pub fn diagnostic_facts_message(diagnostics: &[Diagnostic]) -> String {
 
 #[must_use]
 pub fn compile_target_result(target: Target, name: &str, source: &str) -> CompileResult {
-    compile(&test_session(target), name, source)
+    compile(&test_session(target), name, source, ModuleCompileRequest::default())
 }
 
 /// Compile source to the given target and return the emitted text.

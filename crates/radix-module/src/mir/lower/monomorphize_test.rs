@@ -54,12 +54,12 @@ fn function_by_id_mut_rewrites_dense_and_sparse() {
 // ── Phase-4 producer fact: instance shape-size substitution ──────────────
 
 use crate::codegen::Target;
-use crate::driver::{Config, Session};
+use crate::driver::{Config, Session, AnalyzeRequest};
 use crate::semantic::IndexId;
 
 fn analyzed_unit(source: &str) -> AnalyzedModule {
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
-    crate::driver::analyze_source(&session, "test.fab", source).expect("analysis succeeds")
+    crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()).expect("analysis succeeds")
 }
 
 fn generic_def_id(unit: &AnalyzedModule, name: &str) -> DefId {

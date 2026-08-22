@@ -12,7 +12,7 @@ use super::{
     KernelResolveError,
 };
 use crate::codegen::Target;
-use crate::driver::{analyze_source, Config, Session};
+use crate::driver::{analyze_source, Config, Session, AnalyzeRequest};
 use crate::mir::lower_analyzed_unit;
 use crate::mir::{MirIntrinsic, MirProvider, MirProviderKind, MirStatementKind};
 
@@ -146,7 +146,7 @@ incipit {
     nota processus.argv()
 }
 "#;
-    let mut unit = analyze_source(&session, "kernel-import.fab", source).expect("analysis");
+    let mut unit = analyze_source(&session, "kernel-import.fab", source, AnalyzeRequest::default()).expect("analysis");
     let program = lower_analyzed_unit(&mut unit, Default::default())
         .map(|lowered| lowered.program)
         .expect("lower");
@@ -180,7 +180,7 @@ incipit {
     nota toml.parse("x = 1")
 }
 "#;
-    let mut unit = analyze_source(&session, "kernel-toml-import.fab", source).expect("analysis");
+    let mut unit = analyze_source(&session, "kernel-toml-import.fab", source, AnalyzeRequest::default()).expect("analysis");
     let program = lower_analyzed_unit(&mut unit, Default::default())
         .map(|lowered| lowered.program)
         .expect("lower");
@@ -215,7 +215,7 @@ incipit {
     nota faber.aleator.uuid()
 }
 "#;
-    let mut unit = analyze_source(&session, "kernel-glob-import.fab", source).expect("analysis");
+    let mut unit = analyze_source(&session, "kernel-glob-import.fab", source, AnalyzeRequest::default()).expect("analysis");
     let program = lower_analyzed_unit(&mut unit, Default::default())
         .map(|lowered| lowered.program)
         .expect("lower");
@@ -254,7 +254,7 @@ incipit {
     nota faber.missing.foo()
 }
 "#;
-    let Err(diagnostics) = analyze_source(&session, "kernel-glob-import.fab", source) else {
+    let Err(diagnostics) = analyze_source(&session, "kernel-glob-import.fab", source, AnalyzeRequest::default()) else {
         panic!("analysis should fail")
     };
     assert!(

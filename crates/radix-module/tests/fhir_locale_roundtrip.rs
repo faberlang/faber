@@ -24,7 +24,7 @@
 //! FHIR intermediary).
 
 use radix_module::codegen::{generate_from_analyzed, Target};
-use radix_module::driver::{analyze_source, AnalyzedModule, Config, Session};
+use radix_module::driver::{analyze_source, AnalyzedModule, Config, Session, AnalyzeRequest};
 use radix_module::hir::artifact::load_fhir;
 use radix_module::locale::{KeywordSurface, LocalePack};
 use radix_module::Output;
@@ -57,7 +57,7 @@ incipit {
 fn analyze_latin_source() -> AnalyzedModule {
     let config = Config::default().with_locale_pack(pack_for("la"));
     let session = Session::new(config);
-    match analyze_source(&session, "fhir-locale.fab", SOURCE) {
+    match analyze_source(&session, "fhir-locale.fab", SOURCE, AnalyzeRequest::default()) {
         Ok(unit) => unit,
         Err(diagnostics) => panic!("analysis failed: {diagnostics:?}"),
     }
@@ -185,7 +185,7 @@ fn fhir_double_locale_round_trip_la_thai_la_restores_latin_surface() {
     // parseable Faber, not a code-echo scaffold).
     let th_config = Config::default().with_locale_pack(pack_for("th-TH"));
     let th_session = Session::new(th_config);
-    let th_unit = analyze_source(&th_session, "fhir-locale-th.fab", &th)
+    let th_unit = analyze_source(&th_session, "fhir-locale-th.fab", &th, AnalyzeRequest::default())
         .unwrap_or_else(|diagnostics| panic!("Thai render must re-analyze under th-TH: {diagnostics:?}"));
     let loaded_th = load_fhir(&export_fhir(&th_unit)).expect("thai FHIR should load");
 

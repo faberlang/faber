@@ -6,7 +6,7 @@ use super::compile;
 #[cfg(feature = "hir-faber")]
 use crate::codegen::faber::compile_canonical_str;
 use crate::codegen::Target;
-use crate::driver::{Config, Session};
+use crate::driver::{Config, Session, AnalyzeRequest, ModuleCompileRequest};
 use crate::test_support::test_session;
 use std::path::PathBuf;
 
@@ -163,7 +163,7 @@ fn statement_level_ad_does_not_roundtrip_through_faber_codegen() {
     nota err
   }
 }"#;
-    let result = compile(&test_session(Target::HirRust), "test.fab", source);
+    let result = compile(&test_session(Target::HirRust), "test.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
     assert!(result
         .diagnostics
@@ -176,7 +176,7 @@ fn rejects_old_verte_aliases_as_postfix_operators() {
     let session = test_session(Target::HirRust);
     for alias in &["qua", "innatum", "novum"] {
         let source = format!("incipit {{ nota 42 {alias} textus }}");
-        let result = compile(&session, "test.fab", &source);
+        let result = compile(&session, "test.fab", &source, ModuleCompileRequest::default());
 
         assert!(!result.success(), "source using old postfix alias '{alias}' must fail");
         assert!(
@@ -222,7 +222,7 @@ fn compact_fac_closure_body_typechecks_with_redde() {
   }
   nota predicate(2)
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
 }
@@ -235,7 +235,7 @@ fn compact_fac_closure_rejects_redde_without_explicit_return_type() {
     redde n > 1
   }
 }";
-    let result = compile(&session, "closure-implicit-return.fab", source);
+    let result = compile(&session, "closure-implicit-return.fab", source, ModuleCompileRequest::default());
 
     assert!(result.output.is_none());
     assert!(!result.success());
@@ -253,7 +253,7 @@ fn contextual_compact_fac_closure_rejects_redde_without_local_return_type() {
     redde n > 1
   }
 }";
-    let result = compile(&session, "closure-contextual-implicit-return.fab", source);
+    let result = compile(&session, "closure-contextual-implicit-return.fab", source, ModuleCompileRequest::default());
 
     assert!(result.output.is_none());
     assert!(!result.success());
@@ -271,7 +271,7 @@ fn compact_fac_closure_accepts_iace_with_explicit_error_channel() {
     iace "bad"
   }
 }"#;
-    let result = compile(&session, "closure-explicit-error-channel.fab", source);
+    let result = compile(&session, "closure-explicit-error-channel.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
 }
@@ -284,7 +284,7 @@ fn compact_fac_closure_rejects_iace_without_local_error_channel() {
     iace "bad"
   }
 }"#;
-    let result = compile(&session, "closure-missing-error-channel.fab", source);
+    let result = compile(&session, "closure-missing-error-channel.fab", source, ModuleCompileRequest::default());
 
     assert!(result.output.is_none());
     assert!(!result.success());
@@ -304,7 +304,7 @@ fn compact_fac_closure_accepts_local_cape_without_error_channel() {
     nota err
   }
 }"#;
-    let result = crate::driver::analyze_source(&session, "closure-local-cape-error.fab", source);
+    let result = crate::driver::analyze_source(&session, "closure-local-cape-error.fab", source, AnalyzeRequest::default());
 
     assert!(result.is_ok(), "{:?}", result.err());
 }
@@ -325,7 +325,7 @@ incipit {
   }
   nota predicate("bad")
 }"#;
-    let result = crate::driver::analyze_source(&session, "test.fab", source);
+    let result = crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default());
 
     assert!(result.is_ok(), "{:?}", result.err());
 }
@@ -338,7 +338,7 @@ fn legacy_block_closure_rejects_redde_without_explicit_return_type() {
     redde n > 1
   }
 }";
-    let result = compile(&session, "legacy-closure-implicit-return.fab", source);
+    let result = compile(&session, "legacy-closure-implicit-return.fab", source, ModuleCompileRequest::default());
 
     assert!(result.output.is_none());
     assert!(!result.success());
@@ -357,7 +357,7 @@ fn legacy_block_closure_body_typechecks_with_redde() {
   }
   nota predicate(2)
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
 }
@@ -374,7 +374,7 @@ incipit {
     nota "Interactive mode"
   }
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.diagnostics.iter().all(|d| d
         .issue()
@@ -394,7 +394,7 @@ incipit {
   consolum.fundeLineam("x")
   consolum.errorLineam("y")
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.diagnostics.iter().all(|d| d
         .issue()
@@ -410,7 +410,7 @@ fn itera_de_array_index_no_longer_leaves_infer_types() {
     nota xs[idx]
   }
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     assert!(result.diagnostics.iter().all(|d| d
@@ -426,7 +426,7 @@ fn itera_ab_range_no_longer_leaves_infer_types() {
     nota i
   }
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     assert!(result.diagnostics.iter().all(|d| d
@@ -442,7 +442,7 @@ fn itera_ab_inclusive_range_glyph_compiles() {
     nota i
   }
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     assert!(result.diagnostics.iter().all(|d| d
@@ -458,7 +458,7 @@ fn deferred_local_assignment_can_drive_inference() {
   value = 42
   nota value
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result
         .diagnostics
@@ -474,7 +474,7 @@ fn cura_allocator_scope_no_longer_reports_infer_variable_error() {
     nota "ok"
   }
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     assert!(result
@@ -493,7 +493,7 @@ fn curata_alias_binding_is_visible_in_function_body() {
 incipit {
   useAllocator()
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     assert!(result
@@ -517,7 +517,7 @@ fn compile_supports_extended_binary_operators() {
   nota a inter [1, 2, 3]
   nota maybe vel 0
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
 }
@@ -538,7 +538,7 @@ fn compile_supports_extended_unary_operators() {
   nota flag est verum
   nota flag est falsum
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
 }
@@ -553,7 +553,7 @@ fn compile_lowers_top_level_proba_to_rust_test_function() {
 }
 
 incipit {}"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.diagnostics.iter().all(|d| d
         .issue()
@@ -575,7 +575,7 @@ proba "case two" futurum "todo" {
 }
 
 incipit {}"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.diagnostics.iter().all(|d| d
         .issue()
@@ -608,7 +608,7 @@ fn compile_lowers_probandum_nested_cases_without_lowering_errors() {
     }
   }
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.diagnostics.iter().all(|d| d
         .issue()
@@ -631,7 +631,7 @@ genus Point {
   numerus x = 0
   numerus y = 0
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result
         .diagnostics
@@ -651,7 +651,7 @@ functio main() → vacuum {
   fixum persona alia ← persona { nomen = "Alice" }
   nota persona.nomen, alia.nomen
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -672,7 +672,7 @@ genus Point {
   numerus x = 0
   numerus y = 0
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -691,7 +691,7 @@ fn array_destructured_vars_can_be_used_in_arithmetic() {
   y ← y + 50
   nota x, y
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result
         .diagnostics
@@ -713,7 +713,7 @@ incipit {
   fixum _ nums ← [1, 2, 3]
   nota accessArray(nums, 1)
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result
         .diagnostics
@@ -747,7 +747,7 @@ incipit {
   nota sumArray(numbers)
   nota maxValue(numbers)
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     assert!(result
@@ -775,7 +775,7 @@ fn assignment_and_tempta_flow_no_longer_report_use_after_move() {
 incipit {
   process("")
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     assert!(result
@@ -793,7 +793,7 @@ fn empty_array_and_spread_literals_no_longer_report_annotation_or_type_errors() 
   fixum _ extended ← [0, sparge first, 99]
   nota empty_list, extended
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     assert!(result
@@ -816,7 +816,7 @@ functio empty_counts() → tabula<textus, numerus> {
   fixum tabula<textus, numerus> counts ← vacua
   redde counts
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -831,7 +831,7 @@ fn context_free_vacua_requires_declared_type() {
     let source = r"functio empty() → vacuum {
   fixum _ xs ← vacua
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.diagnostics.iter().any(|diagnostic| {
         diagnostic.is_error()
@@ -857,7 +857,7 @@ incipit {
   }
   nota syncResults
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.diagnostics.iter().all(|d| d
         .issue()
@@ -887,7 +887,7 @@ incipit {
   fixum _ c ← maybeFn?("x")
   nota a, b, c
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
 }
@@ -910,7 +910,7 @@ incipit {
   fixum _ c ← maybeFn?("x")
   nota a, c
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -929,7 +929,7 @@ fn rust_output_translates_stdlib_lista_methods() {
   fixum _ n ← xs.longitudo()
   nota n
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -951,7 +951,7 @@ fn struct_construction_requires_fields_and_checks_defaults() {
 incipit {
   fixum _ u ← User { email = "a@example.com" }
 }"#;
-    let missing_result = compile(&session, "missing.fab", missing);
+    let missing_result = compile(&session, "missing.fab", missing, ModuleCompileRequest::default());
     assert!(!missing_result.success());
     assert!(missing_result
         .diagnostics
@@ -965,7 +965,7 @@ incipit {
 incipit {
   fixum _ u ← { } ∷ User
 }"#;
-    let default_result = compile(&session, "default.fab", bad_default);
+    let default_result = compile(&session, "default.fab", bad_default, ModuleCompileRequest::default());
     assert!(!default_result.success());
     assert!(default_result
         .diagnostics
@@ -983,7 +983,7 @@ fn rust_output_emits_coalesce_unwrap() {
   fixum _ display ← name vel "Anonymous"
   nota display
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1005,7 +1005,7 @@ incipit {
   nota a.name
   nota b.name
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1033,7 +1033,7 @@ incipit {
   fixum _ b ← User { name = "Lin", email = nihil }
   fixum _ c ← User { name = "Ken", email = "ken@example.com" }
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1062,7 +1062,7 @@ fn ignotum_callee_no_longer_reports_not_callable() {
 incipit {
   nota invoke
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     assert!(result
@@ -1084,7 +1084,7 @@ incipit {
     casu Color.caeruleum { nota "B" }
   }
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.diagnostics.iter().all(|d| d
         .issue()
@@ -1097,7 +1097,7 @@ fn ordo_exemplum_no_longer_reports_elige_literal_error() {
     // Uses relative path from crate root
     let source_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/ordo/ordo.fab");
     let source = std::fs::read_to_string(&source_path).expect("read ordo exemplum");
-    let result = compile(&session, "ordo.fab", &source);
+    let result = compile(&session, "ordo.fab", &source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     assert!(result.diagnostics.iter().all(|d| d
@@ -1135,7 +1135,7 @@ incipit {
   nota analyze("code")
   nota analyze("code", 5)
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result
         .diagnostics
@@ -1164,7 +1164,7 @@ functio duplicate_nullable() → textus ∪ textus ∪ nihil {
 functio nullable_direct() → textus ∪ nihil {
   redde nihil
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -1183,7 +1183,7 @@ fn plain_union_does_not_accept_nihil_without_nullable_member() {
     let source = r"functio badplain() → textus ∪ numerus {
   redde nihil
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(result
@@ -1198,7 +1198,7 @@ fn degenerate_nihil_only_union_is_rejected() {
     let source = r"functio bad() → nihil ∪ nihil {
   redde nihil
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(result
@@ -1217,7 +1217,7 @@ fn array_method_call_no_longer_reports_non_struct_member_error() {
   fixum _ doubled ← numbers.mappata(numerus x ∴ x * 2)
   nota doubled
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
 }
@@ -1239,7 +1239,7 @@ incipit {
   fixum _ c ← Circle {}
   c.draw()
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
 }
@@ -1251,7 +1251,7 @@ fn compact_inferred_closure_argument_uses_expected_method_signature() {
   fixum _ numbers ← [1, 2, 3]
   nota numbers.mappata(_ x ∴ x * 2)
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
 }
@@ -1269,7 +1269,7 @@ fn object_member_and_index_chains_no_longer_report_index_errors() {
   fixum _ data ← { items = ["first", "second"] }
   nota data.items[0]
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.diagnostics.iter().all(|d| d
         .issue()
@@ -1287,7 +1287,7 @@ fn array_method_closure_argument_no_longer_reports_argument_type_mismatch() {
   fixum _ numbers ← [1, 2, 3]
   nota numbers.map(clausura numerus x: x * 2)
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result
         .diagnostics
@@ -1310,7 +1310,7 @@ incipit {
   fixum _ c ← {} ∷ Circulus
   c.crescere(2)
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result
         .diagnostics
@@ -1330,7 +1330,7 @@ incipit {
   fixum _ response ← getResponse()
   nota response
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result
         .diagnostics
@@ -1350,7 +1350,7 @@ fn curator_param_type_is_not_the_allocator_contract() {
 incipit {
   nota "ok"
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result
         .diagnostics
@@ -1365,7 +1365,7 @@ fn quidlibet_container_annotation_no_longer_reports_unknown_type() {
   fixum lista<quidlibet> docs ← [] ∷ lista<quidlibet>
   nota docs
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     assert!(result
@@ -1381,7 +1381,7 @@ fn conversio_type_params_no_longer_report_unknown_type() {
   fixum _ n ← "ff" ↦ numerus<i32, Hex>
   nota n
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     assert!(result
@@ -1401,7 +1401,7 @@ fn verte_vel_no_longer_reports_invalid_cast() {
   fixum lista<textus> items ← vacua
   nota asText, parsed, cache, items
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result
         .diagnostics
@@ -1429,7 +1429,7 @@ incipit {
   fixum _ fallback ← maybe vel "x"
   nota pick(verum), name, words, fallback
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1451,7 +1451,7 @@ fn rust_output_wraps_optional_local_initializers_in_some() {
   fixum textus ∪ nihil maybe ← nihil
   nota actualName, maybe
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1470,7 +1470,7 @@ fn rust_output_uses_or_for_option_coalesce() {
   fixum _ first ← a vel b
   nota first
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1484,7 +1484,7 @@ fn rust_output_uses_debug_format_for_collection_scribe() {
   fixum lista<textus> names ← ["a", "b"]
   nota names
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1501,7 +1501,7 @@ fn rust_output_uses_scalar_display_helpers_for_scribe() {
   nota f, b, a
   nota "§ § §"(f, b, a)
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1530,7 +1530,7 @@ incipit {
     x ← x - 1
   }
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1549,7 +1549,7 @@ importa ex "./commands/greet" publica greet
 incipit {
   nota "ok"
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1576,7 +1576,7 @@ incipit {
   fixum _ c ← Counter {}
   nota c.inc()
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
 }
@@ -1589,7 +1589,7 @@ fn typed_array_index_assignment_no_longer_reports_assignment_type_mismatch() {
   numbers[0] ← 9
   nota numbers[0]
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     assert!(result
@@ -1607,7 +1607,7 @@ fn rust_output_uses_format_macro_for_scriptum() {
   fixum _ value ← 7
   nota scriptum("valor: §", value)
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1622,7 +1622,7 @@ fn rust_output_uses_zero_based_numbered_scriptum_placeholders() {
   fixum _ second ← "secunda"
   nota scriptum("ordo: §1, §0", first, second)
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1636,7 +1636,7 @@ fn rust_output_uses_string_literal_format_application() {
   fixum _ value ← 7
   nota "valor: §"(value)
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1651,7 +1651,7 @@ fn rust_output_uses_numbered_string_literal_format_application() {
   fixum _ second ← "secunda"
   nota "ordo: §1, §0"(first, second)
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1668,7 +1668,7 @@ fn rust_output_supports_unicode_textus_index_and_range_slice() {
   fixum _ stepped ← "abcdef"[0‥6 per 2]
   nota ch, prefix, whole, stepped
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1690,7 +1690,7 @@ incipit {
   count ← count + 1
   nota "§: §"(name, count)
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -1720,7 +1720,7 @@ fn typescript_output_supports_unicode_textus_index_and_range_slice() {
   fixum _ stepped ← "abcdef"[0‥6 per 2]
   nota ch, prefix, whole, stepped
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let Some(crate::Output::TypeScript(output)) = result.output else {
@@ -1743,7 +1743,7 @@ fn go_output_supports_unicode_textus_index_and_range_slice() {
   fixum _ stepped ← "abcdef"[0‥6 per 2]
   nota ch, prefix, whole, stepped
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let Some(crate::Output::Go(output)) = result.output else {
@@ -1763,7 +1763,7 @@ fn hir_smoke_regression_guard_rust_rejects_mangled_emit() {
         return;
     }
     let session = test_session(Target::HirRust);
-    let result = compile(&session, "guard.fab", "incipit { nota \"salve\" }");
+    let result = compile(&session, "guard.fab", "incipit { nota \"salve\" }", ModuleCompileRequest::default());
     assert!(result.success());
     let emitted = super::rust_output(result).code;
     let mangled = crate::backend_smoke::mangle_emitted_text(&emitted);
@@ -1781,7 +1781,7 @@ fn hir_smoke_regression_guard_go_rejects_mangled_emit() {
         return;
     }
     let session = test_session(Target::HirGo);
-    let result = compile(&session, "guard.fab", "incipit { nota 42 }");
+    let result = compile(&session, "guard.fab", "incipit { nota 42 }", ModuleCompileRequest::default());
     assert!(result.success());
     let Some(crate::Output::Go(output)) = result.output else {
         panic!("expected Go output");
@@ -1801,7 +1801,7 @@ fn hir_smoke_regression_guard_typescript_rejects_mangled_emit() {
         return;
     }
     let session = test_session(Target::HirTypeScript);
-    let result = compile(&session, "guard.fab", "incipit { nota 42 }");
+    let result = compile(&session, "guard.fab", "incipit { nota 42 }", ModuleCompileRequest::default());
     assert!(result.success());
     let Some(crate::Output::TypeScript(output)) = result.output else {
         panic!("expected TypeScript output");
@@ -1849,7 +1849,7 @@ incipit {
     }
 }
 ";
-    let result = compile(&test_session(Target::MirLlvm), "loop_call.fab", source);
+    let result = compile(&test_session(Target::MirLlvm), "loop_call.fab", source, ModuleCompileRequest::default());
     assert!(
         result.success(),
         "tensor-returning function call inside itera body should compile; diagnostics: {:?}",
@@ -1877,7 +1877,12 @@ functio uses_undefined() → numerus {
     redde definitely_not_defined
 }
 ";
-    let Err(diagnostics) = crate::driver::analyze_source(&session, "recovered-continuation.fab", source) else {
+    let Err(diagnostics) = crate::driver::analyze_source(
+        &session,
+        "recovered-continuation.fab",
+        source,
+        AnalyzeRequest::default(),
+    ) else {
         panic!("recovered parse must fail analysis");
     };
 

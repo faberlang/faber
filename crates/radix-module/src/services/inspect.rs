@@ -288,13 +288,7 @@ pub fn mir_output_for_source(name: &str, raw_source: &str) -> Result<String, Vec
         Err(diagnostic) => return Err(format_mir_frontend_diagnostics(&source_file, vec![*diagnostic])),
     };
 
-    let mut analysis = match crate::driver::analyze_source_with_module_import_contract(
-        &prepared.session,
-        &source_file.name,
-        raw_source,
-        None,
-        prepared.contract,
-    ) {
+    let mut analysis = match crate::driver::analyze_source(&prepared.session, &source_file.name, raw_source, crate::driver::AnalyzeRequest { cli_program: None, contract: prepared.contract }) {
         Ok(analysis) => analysis,
         Err(diagnostics) => return Err(format_mir_frontend_diagnostics(&source_file, diagnostics)),
     };

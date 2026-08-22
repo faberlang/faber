@@ -20,7 +20,7 @@
 
 use super::*;
 use crate::codegen::Target;
-use crate::driver::{Config, Session};
+use crate::driver::{Config, Session, AnalyzeRequest, ModuleImportContract, ModuleCompileRequest};
 use crate::hir::HirId;
 use crate::mir::type_contains_param;
 use crate::mir::validate_program;
@@ -28,7 +28,7 @@ use std::path::PathBuf;
 
 fn analyze(source: &str) -> AnalyzedModule {
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
-    crate::driver::analyze_source(&session, "test.fab", source).expect("analysis succeeds")
+    crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()).expect("analysis succeeds")
 }
 
 fn dump_source(source: &str) -> String {
@@ -1162,7 +1162,7 @@ fn rejects_statement_level_stream_ad_for_mir() {
     let result = crate::driver::compile(
         &crate::Session::new(crate::Config::default()),
         "stream-ad.fab",
-        r"functio f() → vacuum { ad 'noop:ping' { tuus { rumpe } } }",
+        r"functio f() → vacuum { ad 'noop:ping' { tuus { rumpe } } }", ModuleCompileRequest::default(),
     );
     assert!(
         !result.success(),
@@ -2383,19 +2383,12 @@ fn lowers_imported_nominal_method_to_provider_runtime_call() {
     });
 
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
-    let mut unit = crate::driver::analyze_source_with_cli_program_and_import_contract(
-        &session,
-        "test.fab",
-        r#"
+    let mut unit = crate::driver::analyze_source(&session, "test.fab", r#"
 importa ex "demo:lib" demo
 functio legebatur(demo.Sample value) → numerus {
     redde value.metire()
 }
-"#,
-        None,
-        std::collections::BTreeMap::new(),
-        std::collections::BTreeMap::from([("demo".to_owned(), interface)]),
-    )
+"#, crate::driver::AnalyzeRequest { cli_program: None, contract: ModuleImportContract { namespace_exports: std::collections::BTreeMap::new(), file_interfaces: std::collections::BTreeMap::from([("demo".to_owned(), interface)]), ..ModuleImportContract::default() } })
     .expect("imported nominal method source analyzes");
     let dump = dump_analyzed_unit(&mut unit).expect("imported nominal method lowers");
 
@@ -3318,7 +3311,7 @@ fn rejects_legacy_typed_ad_statement_for_mir() {
   ad "fasciculus:lege" ("salve.txt") → textus textus ⇥ textus {
     nota textus
   }
-}"#,
+}"#, ModuleCompileRequest::default(),
     );
     assert!(
         !result.success(),

@@ -118,11 +118,11 @@ fn pipeline_accepts_schema_decl_end_to_end() {
 #[test]
 #[cfg(feature = "hir-fhir")]
 fn schema_artifact_round_trip_preserves_ordered_metadata() {
-    use crate::driver::{analyze_source, Config, Session};
+    use crate::driver::{analyze_source, Config, Session, AnalyzeRequest};
     use handroll::Sha256;
 
     let session = Session::new(Config::default());
-    let unit = analyze_source(&session, "schema_test.fab", PERSONA_BREVIS).expect("analysis");
+    let unit = analyze_source(&session, "schema_test.fab", PERSONA_BREVIS, AnalyzeRequest::default()).expect("analysis");
     let content_hash = {
         let mut hasher = Sha256::new();
         hasher.update(PERSONA_BREVIS.as_bytes());

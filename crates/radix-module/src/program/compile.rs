@@ -315,13 +315,7 @@ pub fn compile_prepared_program_path(
     source: &str,
 ) -> crate::CompileResult {
     match prepare_program_module(path, source, session) {
-        Ok(prepared) => crate::driver::compile_with_module_import_contract(
-            &prepared.session,
-            &path.display().to_string(),
-            source,
-            prepared.contract,
-            prepared.package_identities,
-        ),
+        Ok(prepared) => crate::driver::compile(&prepared.session, &path.display().to_string(), source, crate::driver::ModuleCompileRequest { contract: prepared.contract, package_identities: prepared.package_identities }),
         Err(diagnostic) => crate::CompileResult { output: None, diagnostics: vec![*diagnostic] },
     }
 }
@@ -405,13 +399,7 @@ pub fn analyze_prepared_program_path(
     source: &str,
 ) -> Result<crate::driver::AnalyzedModule, Vec<crate::Diagnostic>> {
     let prepared = prepare_program_module(path, source, session).map_err(|diagnostic| vec![*diagnostic])?;
-    crate::driver::analyze_source_with_module_import_contract(
-        &prepared.session,
-        &path.display().to_string(),
-        source,
-        None,
-        prepared.contract,
-    )
+    crate::driver::analyze_source(&prepared.session, &path.display().to_string(), source, crate::driver::AnalyzeRequest { cli_program: None, contract: prepared.contract })
 }
 
 /// Analyze a diagnostic name after program-layer discovery when `name` is a file.
@@ -423,7 +411,7 @@ pub fn analyze_prepared_program_name(
     source: &str,
 ) -> Result<crate::driver::AnalyzedModule, Vec<crate::Diagnostic>> {
     let prepared = prepare_program_module_for_name(name, source, session).map_err(|diagnostic| vec![*diagnostic])?;
-    crate::driver::analyze_source_with_module_import_contract(&prepared.session, name, source, None, prepared.contract)
+    crate::driver::analyze_source(&prepared.session, name, source, crate::driver::AnalyzeRequest { cli_program: None, contract: prepared.contract })
 }
 
 /// Resolve and parse one import target through the session cache.

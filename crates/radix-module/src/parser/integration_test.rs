@@ -6,6 +6,7 @@
 //! to the `radix-parser` sibling crate because the diagnostic-conversion trait
 //! is a radix-owned integration surface, not a parser-leaf concern.
 
+use crate::driver::AnalyzeRequest;
 use crate::diagnostics::Diagnostic;
 use crate::diagnostics::DiagnosticConvert;
 use crate::lexer::lex;
@@ -292,7 +293,7 @@ fn parser_bridge_normalizes_inline_comment_as_lex_diagnostic() {
 #[test]
 fn rejects_bare_sparsa() {
     let session = crate::driver::Session::new(crate::driver::Config::default());
-    let result = crate::driver::analyze_source(&session, "bare-sparsa.fab", "incipit { fixum sparsa x ← vacua }");
+    let result = crate::driver::analyze_source(&session, "bare-sparsa.fab", "incipit { fixum sparsa x ← vacua }", AnalyzeRequest::default());
     let Some(diags) = result.err() else {
         panic!("expected sparsa type error, got ok");
     };

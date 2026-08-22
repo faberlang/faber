@@ -6,7 +6,7 @@
 
 use super::{surviving_fragment_calls, ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION};
 use crate::diagnostics::Diagnostic;
-use crate::driver::{self, Config, Session};
+use crate::driver::{self, Config, Session, AnalyzeRequest};
 use crate::lexer::Span;
 use crate::mir::{
     device_roles_from_hir, MirBinOp, MirDeviceRole, MirFunction, MirOperand, MirPlaceBase, MirProgram,
@@ -51,7 +51,7 @@ fn session() -> Session {
 
 fn analyze(source: &str) -> Result<crate::driver::AnalyzedModule, Vec<Diagnostic>> {
     assert_wrapper_route(source);
-    driver::analyze_source(&session(), "device.fab", source)
+    driver::analyze_source(&session(), "device.fab", source, AnalyzeRequest::default())
 }
 
 fn lower(source: &str) -> Result<(crate::driver::AnalyzedModule, MirProgram), Vec<crate::mir::MirError>> {

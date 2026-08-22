@@ -8,7 +8,7 @@
 use super::*;
 use radix_mir::validate::*;
 use crate::codegen::Target;
-use crate::driver::{Config, Session};
+use crate::driver::{Config, Session, AnalyzeRequest};
 use crate::lexer::Symbol;
 use crate::mir::lower_analyzed_unit;
 use crate::semantic::{FuncSig, IndexExpr, InferVar, NumericWidth, SemanticParamMode, ParamType, Primitive, Type, TypeTable};
@@ -231,7 +231,7 @@ fn rejects_atomic_runtime_call_type_mismatch() {
 
 fn analyze(source: &str) -> crate::driver::AnalyzedModule {
     let session = Session::new(Config::default().with_target(Target::HirTypeScript).with_dev_stdlib());
-    crate::driver::analyze_source(&session, "test.fab", source).expect("analysis succeeds")
+    crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()).expect("analysis succeeds")
 }
 
 fn device_view_projection_program(types: &TypeTable, tensor_ty: MirType, element_ty: MirType) -> MirProgram {

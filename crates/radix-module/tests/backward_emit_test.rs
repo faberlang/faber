@@ -12,7 +12,7 @@
 #![cfg(all(feature = "device", feature = "mir-llvm"))]
 
 use radix_module::codegen::Target;
-use radix_module::driver::{compile, Config, Session};
+use radix_module::driver::{compile, Config, Session, ModuleCompileRequest};
 
 fn llvm_session() -> Session {
     Session::new(Config::new().with_target(Target::MirLlvm))
@@ -73,7 +73,7 @@ functio multiplica(tf32[2] a, tf32[2] b) → tf32[2] {
 }
 "#;
 
-    let result = compile(&llvm_session(), "multiplica.fab", source);
+    let result = compile(&llvm_session(), "multiplica.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),

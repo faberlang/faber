@@ -23,7 +23,7 @@
 #![cfg(feature = "hir-faber")]
 
 use radix_module::codegen::{generate_from_analyzed, Target};
-use radix_module::driver::{analyze_source, AnalyzedModule, Config, Session};
+use radix_module::driver::{analyze_source, AnalyzedModule, Config, Session, AnalyzeRequest};
 use radix_module::locale::{KeywordSurface, LocalePack};
 
 /// Installed reader pack for a locale, resolved from the repo stdlib tree.
@@ -39,7 +39,7 @@ fn pack_for(locale: &str) -> LocalePack {
 fn analyze_latin_source(source: &str) -> AnalyzedModule {
     let config = Config::default().with_locale_pack(pack_for("la"));
     let session = Session::new(config);
-    match analyze_source(&session, "render-trivia.fab", source) {
+    match analyze_source(&session, "render-trivia.fab", source, AnalyzeRequest::default()) {
         Ok(unit) => unit,
         Err(diagnostics) => panic!("analysis failed: {diagnostics:?}"),
     }

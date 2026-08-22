@@ -5,6 +5,7 @@
 //! gate.
 
 #[cfg(any(feature = "hir-rust", feature = "hir-faber"))]
+use crate::driver::AnalyzeRequest;
 use crate::Compiler;
 use crate::{Config, Target};
 
@@ -20,7 +21,7 @@ fn compile_for_target(source: &str, target: Target) -> crate::CompileResult {
 
 fn analyze_diagnostics(source: &str) -> Vec<crate::Diagnostic> {
     let session = crate::driver::Session::new(Config::default().with_target(Target::HirRust));
-    match crate::driver::analyze_source(&session, "test.fab", source) {
+    match crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()) {
         Ok(unit) => unit.diagnostics,
         Err(diagnostics) => diagnostics,
     }

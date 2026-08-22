@@ -4,7 +4,7 @@
 
 use super::{lookup_method, lookup_method_for_type, IntrinsicReceiver};
 #[cfg(feature = "hir-rust")]
-use crate::driver::{analyze_source, Config, Session};
+use crate::driver::{analyze_source, Config, Session, AnalyzeRequest};
 use crate::intrinsics::mir_collection_op;
 use crate::semantic::{Primitive, TypeTable};
 use radix_types::MirCollectionOp;
@@ -41,7 +41,7 @@ fn fractus_approximata_typechecks_and_emits_abs_compare() {
     fixum bivalens near ← x.approximata(1.51, 0.05)
     nota near
 }";
-    let result = analyze_source(&session, "fractus-approximata.fab", source);
+    let result = analyze_source(&session, "fractus-approximata.fab", source, AnalyzeRequest::default());
     assert!(result.is_ok(), "typecheck failed: {:?}", result.err());
 
     let code = compile_rust("fractus-approximata.fab", source);

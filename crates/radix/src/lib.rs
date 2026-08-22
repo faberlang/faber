@@ -8,8 +8,7 @@ pub mod module {
     #[cfg(feature = "device")]
     pub use radix_module::air;
     pub use radix_module::driver::{
-        analyze_source, analyze_source_with_module_import_contract, AnalyzedModule,
-        ModuleImportContract,
+        analyze_source, AnalyzeRequest, AnalyzedModule, ModuleCompileRequest, ModuleImportContract,
     };
     #[cfg(feature = "mir-core")]
     pub use radix_module::mir;

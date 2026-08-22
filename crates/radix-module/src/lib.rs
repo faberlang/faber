@@ -103,7 +103,7 @@ use std::path::Path;
 
 pub use codegen::Target;
 pub use diagnostics::{is_known_diagnostic_code, Diagnostic, DiagnosticConvert};
-pub use driver::{apply_warn_policy, Config, Session, WarnPolicy};
+pub use driver::{apply_warn_policy, Config, Session, WarnPolicy, ModuleCompileRequest};
 
 /// Output and diagnostics from one compiler invocation.
 ///
@@ -303,7 +303,7 @@ impl Compiler {
     /// does not imply filesystem-backed package behavior.
     #[must_use]
     pub fn compile_str(&self, name: &str, source: &str) -> CompileResult {
-        driver::compile(&self.session, name, source)
+        driver::compile(&self.session, name, source, ModuleCompileRequest::default())
     }
 }
 

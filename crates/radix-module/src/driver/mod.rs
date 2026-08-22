@@ -75,53 +75,6 @@ pub fn apply_warn_policy(diags: &mut [Diagnostic], policy: &WarnPolicy) {
     }
 }
 
-/// Run analysis and code generation for one source unit.
-///
-/// This is the user-facing driver contract used by CLIs and package tooling
-/// when they want emitted target code. It delegates the shared front half to
-/// `analyze_source` so callers that only need HIR, type tables, or CLI
-/// analysis can stop before backend generation.
-///
-/// Errors from any phase are returned as diagnostics with no output. Warnings
-/// collected before codegen are preserved on success.
-#[must_use]
-pub fn compile(session: &Session, name: &str, source: &str) -> CompileResult {
-    compile_with_namespace_exports(session, name, source, BTreeMap::new())
-}
-
-/// Run analysis and code generation with caller-supplied file namespace exports.
-///
-/// Package and command frontends that have already resolved direct imports can
-/// feed the resolver's namespace table here without making the core driver own
-/// package discovery or stdlib provider policy.
-#[must_use]
-pub fn compile_with_namespace_exports(
-    session: &Session,
-    name: &str,
-    source: &str,
-    namespace_exports: BTreeMap<
-        String,
-        BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>,
-    >,
-) -> CompileResult {
-    compile_with_import_contract(session, name, source, namespace_exports, BTreeMap::new())
-}
-
-/// Run analysis and code generation with caller-supplied namespace exports and typed file interfaces.
-#[must_use]
-pub fn compile_with_import_contract(
-    session: &Session,
-    name: &str,
-    source: &str,
-    namespace_exports: BTreeMap<
-        String,
-        BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>,
-    >,
-    file_interfaces: BTreeMap<String, crate::file_interface::FileInterface>,
-) -> CompileResult {
-    compile_with_import_contract_and_package_identities(session, name, source, namespace_exports, file_interfaces, None)
-}
-
 /// Caller-supplied import contracts for fail-closed module analysis.
 ///
 /// Empty maps stay empty. Module analysis never derives seams, exports, or
@@ -140,47 +93,43 @@ pub struct ModuleImportContract {
         BTreeMap<String, BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>>,
 }
 
-/// Run analysis and code generation with caller-supplied namespace exports,
-/// typed file interfaces, and package-local import identity facts.
+/// Caller-supplied inputs for the single [`compile`] entry.
 ///
-/// Package-aware callers (the CLI compile path, package harnesses) that have
-/// already resolved local sibling imports feed the canonical identity facts
-/// here so MIR lowering records `(product, module_path, item)` identities for
-/// user-code cross-module calls instead of the raw import spelling.
+/// The contract drives fail-closed module analysis; package-aware callers that
+/// resolved local sibling imports also pass canonical identity facts so MIR
+/// lowering records `(product, module_path, item)` identities for user-code
+/// cross-module calls instead of the raw import spelling.
+#[derive(Debug, Clone, Default)]
+pub struct ModuleCompileRequest {
+    /// Fail-closed import contract for the resolver.
+    pub contract: ModuleImportContract,
+    /// Package-local import identity facts, when already resolved.
+    pub package_identities: Option<PackageImportIdentities>,
+}
+
+/// Run analysis and code generation for one source unit.
 ///
-/// Seams and declarations stay empty on this wrapper. Callers that already
-/// computed a full contract should use [`compile_with_module_import_contract`].
+/// This is the user-facing driver contract used by CLIs and package tooling
+/// when they want emitted target code. It delegates the shared front half to
+/// [`analyze_source`] so callers that only need HIR, type tables, or CLI
+/// analysis can stop before backend generation.
+///
+/// Errors from any phase are returned as diagnostics with no output. Warnings
+/// collected before codegen are preserved on success.
 #[must_use]
-pub fn compile_with_import_contract_and_package_identities(
+pub fn compile(
     session: &Session,
     name: &str,
     source: &str,
-    namespace_exports: BTreeMap<
-        String,
-        BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>,
-    >,
-    file_interfaces: BTreeMap<String, crate::file_interface::FileInterface>,
-    package_identities: Option<PackageImportIdentities>,
+    request: ModuleCompileRequest,
 ) -> CompileResult {
-    compile_with_module_import_contract(
+    let ModuleCompileRequest { contract, package_identities } = request;
+    let mut analysis = match analyze_source(
         session,
         name,
         source,
-        ModuleImportContract { namespace_exports, file_interfaces, ..ModuleImportContract::default() },
-        package_identities,
-    )
-}
-
-/// Run analysis and code generation with a complete caller-supplied import contract.
-#[must_use]
-pub fn compile_with_module_import_contract(
-    session: &Session,
-    name: &str,
-    source: &str,
-    contract: ModuleImportContract,
-    package_identities: Option<PackageImportIdentities>,
-) -> CompileResult {
-    let mut analysis = match analyze_source_with_module_import_contract(session, name, source, None, contract) {
+        AnalyzeRequest { cli_program: None, contract },
+    ) {
         Ok(mut analysis) => {
             analysis.package_import_identities = package_identities;
             analysis
@@ -768,7 +717,7 @@ pub fn cuda_kernel_descriptor_json(session: &Session, name: &str, source: &str) 
         )]);
     }
 
-    let mut analysis = analyze_source(session, name, source)?;
+    let mut analysis = analyze_source(session, name, source, AnalyzeRequest::default())?;
 
     // Mirror the llvm-text emit path exactly (generate_llvm_text_output) so
     // the descriptor is built from the same MIR snapshot as the emitted code.
@@ -803,7 +752,7 @@ pub fn cuda_kernel_descriptor_json(session: &Session, name: &str, source: &str) 
 /// fails the legality gate, or the record cannot be serialized.
 #[cfg(feature = "mir-core")]
 pub fn partition_record_json(session: &Session, name: &str, source: &str) -> Result<String, Vec<Diagnostic>> {
-    let mut analysis = analyze_source(session, name, source)?;
+    let mut analysis = analyze_source(session, name, source, AnalyzeRequest::default())?;
     prepare_mir_lowering_interner(&mut analysis);
     let mir = match lower_mir_with_context_for_target(&mut analysis, session.config.no_fuse) {
         Ok(mir) => mir,
@@ -2662,6 +2611,18 @@ pub struct AnalyzedModuleApplicationView<'a> {
     pub interner: &'a Interner,
 }
 
+/// Caller-supplied inputs for the single [`analyze_source`] entry.
+#[derive(Debug, Clone, Default)]
+pub struct AnalyzeRequest {
+    /// Optional package-level CLI program discovered while assembling the
+    /// import graph. When present, the driver interns the CLI symbols into
+    /// this source unit before semantic analysis so CLI bindings and lowered
+    /// HIR share the same symbol space.
+    pub cli_program: Option<crate::cli::CliProgram>,
+    /// Fail-closed import contract for the resolver.
+    pub contract: ModuleImportContract,
+}
+
 /// Run the frontend pipeline without emitting target code.
 ///
 /// This is the analysis-only contract for compiler internals that need the
@@ -2673,105 +2634,13 @@ pub struct AnalyzedModuleApplicationView<'a> {
 /// Returns diagnostic errors when lexing, parsing, target-policy checks,
 /// CLI analysis, or semantic analysis fail. Internal phase-contract violations
 /// are also reported as diagnostics.
-pub fn analyze_source(session: &Session, name: &str, source: &str) -> Result<AnalyzedModule, Vec<Diagnostic>> {
-    analyze_source_with_cli_program(session, name, source, None)
-}
-
-/// Analyze source while optionally supplying a package-level CLI program.
-///
-/// Package compilation may discover mounted CLI commands while assembling the
-/// import graph. When it passes that contract here, the driver interns the CLI
-/// symbols into this source unit before semantic analysis so CLI bindings and
-/// lowered HIR share the same symbol space.
-///
-/// Returns [`AnalyzedModule`] on success. User-source failures return diagnostics;
-/// internal phase-contract failures are also reported as diagnostics to keep the
-/// driver surface uniform.
-///
-/// # Errors
-///
-/// Returns diagnostic errors when any frontend phase fails. See [`analyze_source`]
-/// for the full error surface.
-pub fn analyze_source_with_cli_program(
+pub fn analyze_source(
     session: &Session,
     name: &str,
     source: &str,
-    cli_program_override: Option<crate::cli::CliProgram>,
+    request: AnalyzeRequest,
 ) -> Result<AnalyzedModule, Vec<Diagnostic>> {
-    analyze_source_with_cli_program_and_namespace_exports(session, name, source, cli_program_override, BTreeMap::new())
-}
-
-/// Analyze source while supplying package-level namespace exports.
-///
-/// # Errors
-///
-/// Returns diagnostic errors when any frontend phase fails. See [`analyze_source`]
-/// for the full error surface.
-pub fn analyze_source_with_cli_program_and_namespace_exports(
-    session: &Session,
-    name: &str,
-    source: &str,
-    cli_program_override: Option<crate::cli::CliProgram>,
-    namespace_exports: BTreeMap<
-        String,
-        BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>,
-    >,
-) -> Result<AnalyzedModule, Vec<Diagnostic>> {
-    analyze_source_with_cli_program_and_import_contract(
-        session,
-        name,
-        source,
-        cli_program_override,
-        namespace_exports,
-        BTreeMap::new(),
-    )
-}
-
-/// Analyze source while supplying package-level namespace exports and typed file interfaces.
-///
-/// Seams and declarations stay empty. Callers that already computed a full
-/// contract should use [`analyze_source_with_module_import_contract`].
-///
-/// # Errors
-///
-/// Returns diagnostic errors when any frontend phase fails. See [`analyze_source`]
-/// for the full error surface.
-pub fn analyze_source_with_cli_program_and_import_contract(
-    session: &Session,
-    name: &str,
-    source: &str,
-    cli_program_override: Option<crate::cli::CliProgram>,
-    namespace_exports: BTreeMap<
-        String,
-        BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>,
-    >,
-    file_interfaces: BTreeMap<String, crate::file_interface::FileInterface>,
-) -> Result<AnalyzedModule, Vec<Diagnostic>> {
-    analyze_source_with_module_import_contract(
-        session,
-        name,
-        source,
-        cli_program_override,
-        ModuleImportContract { namespace_exports, file_interfaces, ..ModuleImportContract::default() },
-    )
-}
-
-/// Analyze one already-selected source with caller-supplied import contracts.
-///
-/// Empty contracts stay empty. This path does not open import files, probe a
-/// package root, or walk `FABER_LIBRARY_HOME`.
-///
-/// # Errors
-///
-/// Returns diagnostic errors when any frontend phase fails. See [`analyze_source`]
-/// for the full error surface.
-pub fn analyze_source_with_module_import_contract(
-    session: &Session,
-    name: &str,
-    source: &str,
-    cli_program_override: Option<crate::cli::CliProgram>,
-    contract: ModuleImportContract,
-) -> Result<AnalyzedModule, Vec<Diagnostic>> {
+    let AnalyzeRequest { cli_program: cli_program_override, contract } = request;
     let mut diagnostics = Vec::new();
 
     let Ok(ParsedSourceBody { body, program, mut interner, lex_pack }) =

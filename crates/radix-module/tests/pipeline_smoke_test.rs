@@ -15,7 +15,7 @@
     feature = "mir-wgsl",
     feature = "mir-sexp"
 ))]
-use radix_module::driver::{compile, Config, Session};
+use radix_module::driver::{compile, Config, Session, ModuleCompileRequest};
 #[cfg(feature = "mir-llvm")]
 use radix_module::LlvmTextOutput;
 #[cfg(feature = "mir-metal")]
@@ -67,7 +67,7 @@ functio add_one(fractus<f32> x) → fractus<f32> {
 #[test]
 fn llvm_text_emits_nonempty_output() {
     let session = Session::new(Config::default().with_target(Target::MirLlvm));
-    let result = compile(&session, "smoke.fab", ADD_SOURCE);
+    let result = compile(&session, "smoke.fab", ADD_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
     let Output::LlvmText(LlvmTextOutput { code }) = result.output.expect("LLVM output missing") else {
@@ -80,7 +80,7 @@ fn llvm_text_emits_nonempty_output() {
 #[test]
 fn llvm_text_contains_function_definition() {
     let session = Session::new(Config::default().with_target(Target::MirLlvm));
-    let result = compile(&session, "smoke.fab", ADD_SOURCE);
+    let result = compile(&session, "smoke.fab", ADD_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
     let Output::LlvmText(LlvmTextOutput { code }) = result.output.expect("LLVM output missing") else {
@@ -97,7 +97,7 @@ fn llvm_text_contains_function_definition() {
 #[test]
 fn llvm_text_emits_nonempty_for_incipit() {
     let session = Session::new(Config::default().with_target(Target::MirLlvm));
-    let result = compile(&session, "smoke.fab", INCIPIT_SOURCE);
+    let result = compile(&session, "smoke.fab", INCIPIT_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
     let Output::LlvmText(LlvmTextOutput { code }) = result.output.expect("LLVM output missing") else {
@@ -116,7 +116,7 @@ fn llvm_text_emits_nonempty_for_incipit() {
 #[test]
 fn wgsl_text_emits_nonempty_output() {
     let session = Session::new(Config::default().with_target(Target::MirWgsl));
-    let result = compile(&session, "smoke.fab", KERNEL_SOURCE);
+    let result = compile(&session, "smoke.fab", KERNEL_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
     let Output::WgslText(WgslTextOutput { code, .. }) = result.output.expect("WGSL output missing") else {
@@ -129,7 +129,7 @@ fn wgsl_text_emits_nonempty_output() {
 #[test]
 fn wgsl_text_contains_fn_declaration() {
     let session = Session::new(Config::default().with_target(Target::MirWgsl));
-    let result = compile(&session, "smoke.fab", KERNEL_SOURCE);
+    let result = compile(&session, "smoke.fab", KERNEL_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
     let Output::WgslText(WgslTextOutput { code, .. }) = result.output.expect("WGSL output missing") else {
@@ -145,7 +145,7 @@ fn wgsl_text_contains_fn_declaration() {
 #[test]
 fn wgsl_text_includes_reflection() {
     let session = Session::new(Config::default().with_target(Target::MirWgsl));
-    let result = compile(&session, "smoke.fab", KERNEL_SOURCE);
+    let result = compile(&session, "smoke.fab", KERNEL_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
     let Output::WgslText(WgslTextOutput { reflection, .. }) = result.output.expect("WGSL output missing") else {
@@ -160,7 +160,7 @@ fn wgsl_text_includes_reflection() {
 #[test]
 fn metal_text_emits_nonempty_output() {
     let session = Session::new(Config::default().with_target(Target::MirMetal));
-    let result = compile(&session, "smoke.fab", KERNEL_SOURCE);
+    let result = compile(&session, "smoke.fab", KERNEL_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
     let Output::MetalText(MetalTextOutput { code, .. }) = result.output.expect("Metal output missing") else {
@@ -173,7 +173,7 @@ fn metal_text_emits_nonempty_output() {
 #[test]
 fn metal_text_contains_kernel_declaration() {
     let session = Session::new(Config::default().with_target(Target::MirMetal));
-    let result = compile(&session, "smoke.fab", KERNEL_SOURCE);
+    let result = compile(&session, "smoke.fab", KERNEL_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
     let Output::MetalText(MetalTextOutput { code, .. }) = result.output.expect("Metal output missing") else {
@@ -191,7 +191,7 @@ fn metal_text_contains_kernel_declaration() {
 #[test]
 fn wasm_text_emits_nonempty_output() {
     let session = Session::new(Config::default().with_target(Target::MirWasm));
-    let result = compile(&session, "smoke.fab", ADD_SOURCE);
+    let result = compile(&session, "smoke.fab", ADD_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
     let Output::WasmText(WasmTextOutput { code }) = result.output.expect("WasmText output missing") else {
@@ -204,7 +204,7 @@ fn wasm_text_emits_nonempty_output() {
 #[test]
 fn wasm_text_contains_module() {
     let session = Session::new(Config::default().with_target(Target::MirWasm));
-    let result = compile(&session, "smoke.fab", ADD_SOURCE);
+    let result = compile(&session, "smoke.fab", ADD_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
     let Output::WasmText(WasmTextOutput { code }) = result.output.expect("WasmText output missing") else {
@@ -222,7 +222,7 @@ fn wasm_text_contains_module() {
 #[test]
 fn sexp_text_emits_nonempty_output() {
     let session = Session::new(Config::default().with_target(Target::MirSexp));
-    let result = compile(&session, "smoke.fab", ADD_SOURCE);
+    let result = compile(&session, "smoke.fab", ADD_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
     let Output::Sexp(SexpOutput { code }) = result.output.expect("Sexp output missing") else {

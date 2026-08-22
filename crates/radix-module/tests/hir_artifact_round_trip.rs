@@ -30,7 +30,7 @@
 //! LibraryRegistry) is incomplete and no other fixture would expose it.
 
 use radix_module::codegen::{generate_from_analyzed, CodegenError, Target};
-use radix_module::driver::{analyze_source, Config, Session};
+use radix_module::driver::{analyze_source, Config, Session, AnalyzeRequest};
 use radix_module::hir::artifact::load_fhir;
 use radix_module::locale::{latin_locale_pack, KeywordSurface};
 
@@ -107,7 +107,7 @@ fn run_round_trip(fixture_path: &str, session: &Session, surface: &KeywordSurfac
 
     // Step 1: analyze → original outputs
     let unit =
-        analyze_source(session, name, source).unwrap_or_else(|e| panic!("analyze_source failed for {name}: {e:?}"));
+        analyze_source(session, name, source, AnalyzeRequest::default()).unwrap_or_else(|e| panic!("analyze_source failed for {name}: {e:?}"));
 
     let mut original_codes: Vec<(Target, String)> = Vec::new();
     // Documented F23 exclusions observed on the original unit, keyed by the
@@ -310,7 +310,7 @@ probandum "end parity" {
 }
 "#;
 
-    let unit = analyze_source(&session, "end-parity", source)
+    let unit = analyze_source(&session, "end-parity", source, AnalyzeRequest::default())
         .unwrap_or_else(|e| panic!("analyze_source failed for end-parity source: {e:?}"));
 
     let mut counter = EndCounter::default();

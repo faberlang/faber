@@ -1,6 +1,7 @@
 //! Driver-level backward generation integration tests.
 //! Verifies multi-function, zero-function, mixed-annotation, MIR structural, and unique function IDs.
 
+use crate::driver::ModuleCompileRequest;
 use super::compile;
 use crate::codegen::Target;
 use crate::test_support::test_session;
@@ -25,7 +26,7 @@ functio loss_b(tf32[5] a, tf32[5] b) → fractus {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source);
+    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -78,7 +79,7 @@ functio forward(tf32[5] x, tf32[5] y) → tf32[5] {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source);
+    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -129,7 +130,7 @@ functio plain(tf32[5] x) → tf32[5] {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source);
+    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -187,7 +188,7 @@ functio mean(tf32[5] x, tf32[5] y) → fractus {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source);
+    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "backward function should compile:\n{:?}", result.diagnostics);
 
@@ -252,7 +253,7 @@ functio multi(tf32[5] x, tf32[5] y) → fractus {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source);
+    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "multi-op backward should compile:\n{:?}", result.diagnostics);
 
@@ -341,7 +342,7 @@ incipit {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source);
+    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -402,7 +403,7 @@ functio callee(tf32[5] a, tf32[5] b) → tf32[5] {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source);
+    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),

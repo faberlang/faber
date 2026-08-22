@@ -1,7 +1,7 @@
 //! HIR v1 G2: target-neutral mode and access policy integration tests.
 
 use crate::codegen::Target;
-use crate::driver::{analyze_source, Config, Session};
+use crate::driver::{analyze_source, Config, Session, AnalyzeRequest};
 use crate::semantic::{analyze, PassConfig};
 
 fn analyze_base(source: &str) -> crate::semantic::SemanticResult {
@@ -84,7 +84,7 @@ incipit {
   fixum numerus v ← xs[0]
   nota v
 }
-",
+", AnalyzeRequest::default(),
     )
     .expect("analyze");
     let latin = crate::locale::latin_locale_pack();
@@ -118,7 +118,7 @@ incipit {
   fixum numerus v ← m["a"]
   nota v
 }
-"#,
+"#, AnalyzeRequest::default(),
     )
     .expect("analyze");
     let latin = crate::locale::latin_locale_pack();
@@ -148,7 +148,7 @@ incipit {
   fixum regularene r ← s ↦ regularene
   nota r
 }
-"#,
+"#, AnalyzeRequest::default(),
     );
     // If grammar uses `regex` rather than regularene, accept either green or typed fail.
     if let Ok(unit) = unit {

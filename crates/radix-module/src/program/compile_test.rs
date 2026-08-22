@@ -1,5 +1,6 @@
 //! Provider-import contract tests (Triga SEM002 residual).
 
+use crate::driver::AnalyzeRequest;
 use super::clear_import_target_cache;
 use super::import_contract_for_file;
 use crate::import_resolve::library_home_test_support;
@@ -2450,7 +2451,7 @@ functio via() → leaf.Point {
     .expect("mid");
     let source = fs::read_to_string(&mid).expect("read mid");
     let session = crate::driver::Session::new(crate::driver::Config::default());
-    let empty = crate::driver::analyze_source(&session, &mid.display().to_string(), &source);
+    let empty = crate::driver::analyze_source(&session, &mid.display().to_string(), &source, AnalyzeRequest::default());
     assert!(
         empty.is_err(),
         "empty-contract analyze_source must frontend-fail nested imported type leaf.Point"

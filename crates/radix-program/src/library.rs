@@ -519,7 +519,7 @@ use std::hash::{Hash, Hasher};
 
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::{
-    analyze_source_with_module_import_contract, peel_raw_source, source_load_diagnostic,
+    analyze_source, AnalyzeRequest, peel_raw_source, source_load_diagnostic,
     AnalyzedModule, Config, ModuleImportContract, Session,
 };
 use radix_module::file_interface::FileInterface;
@@ -1231,18 +1231,12 @@ fn analyze_cached_library_interface_body(
             library_interface_declaration_surface(dependency, library_resolver, library_cache)?,
         );
     }
-    let mut analysis = match analyze_source_with_module_import_contract(
-        &session,
-        &import.module.interface_path.display().to_string(),
-        &analysis_source,
-        None,
-        ModuleImportContract {
+    let mut analysis = match analyze_source(&session, &import.module.interface_path.display().to_string(), &analysis_source, AnalyzeRequest { cli_program: None, contract: ModuleImportContract {
             namespace_exports,
             file_interfaces,
             namespace_seams,
             namespace_declarations,
-        },
-    ) {
+        } }) {
         Ok(analysis) => analysis,
         Err(diagnostics) => {
             return Err(diagnostics

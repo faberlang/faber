@@ -10,8 +10,7 @@
 //! produces Faber output. Does not own emit internals.
 
 use crate::codegen::CodegenError;
-use crate::driver::analyze_source_with_module_import_contract;
-use crate::driver::{Config, Session};
+use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
 use crate::locale::{latin_locale_pack, KeywordSurface};
 use crate::program::compile::prepare_program_module_for_name;
 use crate::{Diagnostic, FaberOutput};
@@ -74,7 +73,7 @@ pub fn compile_canonical(session: &Session, name: &str, source: &str) -> FormatC
         Err(diagnostic) => return FormatCompileResult { output: None, diagnostics: vec![*diagnostic] },
     };
     let session = prepared.session;
-    let mut analysis = match analyze_source_with_module_import_contract(&session, name, source, None, prepared.contract)
+    let mut analysis = match analyze_source(&session, name, source, AnalyzeRequest { cli_program: None, contract: prepared.contract })
     {
         Ok(analysis) => analysis,
         Err(diagnostics) => return FormatCompileResult { output: None, diagnostics },

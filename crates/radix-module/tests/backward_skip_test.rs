@@ -12,7 +12,7 @@
 #![cfg(all(feature = "device", feature = "mir-llvm"))]
 
 use radix_module::codegen::Target;
-use radix_module::driver::{compile, Config, Session};
+use radix_module::driver::{compile, Config, Session, ModuleCompileRequest};
 
 fn llvm_session() -> Session {
     Session::new(Config::new().with_target(Target::MirLlvm))
@@ -32,7 +32,7 @@ functio add_numeri(numerus a, numerus b) → numerus {
 }
 "#;
 
-    let result = compile(&llvm_session(), "scalar.fab", source);
+    let result = compile(&llvm_session(), "scalar.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),

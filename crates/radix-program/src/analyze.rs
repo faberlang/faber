@@ -3,7 +3,7 @@
 //! This is the production analysis spine for a package source graph: load
 //! package files, resolve imports/libraries, extract cross-unit file
 //! interfaces, and analyze every unit through the radix driver
-//! (`analyze_source_with_cli_program_and_import_contract` → [`AnalyzedModule`]).
+//! (`analyze_source` with an [`AnalyzeRequest`] → [`AnalyzedModule`]).
 //! The production [`AnalyzedProgram`] contract is radix-program-owned; Faber's
 //! package consumers use it directly.
 //!
@@ -24,7 +24,7 @@ pub const PACKAGE_TEST_ANALYSIS_BUDGET: Duration = Duration::from_secs(30);
 
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::{
-    analyze_source_with_module_import_contract, AnalyzedModule, Config, ModuleImportContract,
+    analyze_source, AnalyzeRequest, AnalyzedModule, Config, ModuleImportContract,
     Session,
 };
 use radix_module::lexer::Interner;
@@ -543,18 +543,12 @@ fn analyze_package_spec_with_deadline(
                 continue;
             }
         };
-        let mut analysis = match analyze_source_with_module_import_contract(
-            &session,
-            &file.path.display().to_string(),
-            &analysis_source,
-            file_cli,
-            ModuleImportContract {
+        let mut analysis = match analyze_source(&session, &file.path.display().to_string(), &analysis_source, AnalyzeRequest { cli_program: file_cli, contract: ModuleImportContract {
                 namespace_exports: namespace_exports.clone(),
                 file_interfaces,
                 namespace_seams,
                 namespace_declarations,
-            },
-        ) {
+            } }) {
             Ok(analysis) => analysis,
             Err(file_diagnostics) => {
                 diagnostics.extend(file_diagnostics);

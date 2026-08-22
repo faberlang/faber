@@ -1,7 +1,7 @@
 //! Driver/codegen remainders that cannot live in `radix-semantic`.
 
 use crate::codegen::Target;
-use crate::driver::{analyze_source, Config, Session};
+use crate::driver::{analyze_source, Config, Session, AnalyzeRequest};
 use crate::Compiler;
 
 #[test]
@@ -49,7 +49,7 @@ functio n() → numerus {
 incipit {
   fixum numerus v ← n()
 }
-",
+", AnalyzeRequest::default(),
     )
     .expect("analyze");
     assert!(unit.analysis_stamp.get() > 0);

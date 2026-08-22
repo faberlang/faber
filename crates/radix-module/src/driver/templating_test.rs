@@ -1,6 +1,7 @@
 //! Template/scriptum, block strings, ASCII literals, octeti literals, valor
 //! assignment policy, and related literal-emission tests.
 
+use crate::driver::ModuleCompileRequest;
 use super::compile;
 use crate::codegen::Target;
 use crate::diagnostics::DiagnosticArg;
@@ -17,7 +18,7 @@ fn backtick_template_captures_forma_without_rendering() {
   fixum _ q ← `select * from accounts where id = § and plan = §`(accountId, plan)
   nota q.template
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     let output = super::rust_output(result);
@@ -35,7 +36,7 @@ fn bare_backtick_template_produces_empty_params() {
   fixum _ q ← `select 1`
   nota q.template
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     let output = super::rust_output(result);
@@ -52,7 +53,7 @@ fn forma_reused_textus_param_is_borrowed_not_moved() {
   nota first.template
   nota second.template
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     let output = super::rust_output(result);
@@ -70,7 +71,7 @@ fn quoted_template_still_renders_via_scriptum() {
   fixum textus message ← "Hello, §!"(name)
   nota message
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -85,7 +86,7 @@ fn compile_lowers_scriptum_expression() {
   fixum _ msg ← scriptum("salve, §!", name)
   nota msg
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
 }
@@ -96,7 +97,7 @@ fn compile_lowers_scriptum_expression() {
 fn block_string_literal_uses_guillemets() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum _ quote ← «he said \"salve\"»\n  nota quote\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -107,7 +108,7 @@ fn block_string_literal_uses_guillemets() {
 fn retired_block_string_glyphs_are_rejected() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum _ quote ← ❝he said \"salve\"❞\n  nota quote\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     // `❝` is an unexpected character, not a block-string token with a
@@ -126,7 +127,7 @@ fn retired_block_string_glyphs_are_rejected() {
 fn guillemet_block_string_template_renders_via_scriptum() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum _ code ← 200\n  fixum _ label ← \"ok\"\n  fixum _ msg ← «status: § (§)»(code, label)\n  nota msg\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -140,7 +141,7 @@ fn guillemet_block_string_template_renders_via_scriptum() {
 fn ascii_literal_compiles_to_faber_ascii() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum _ route ← 'pg:query'\n  nota route\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -177,7 +178,7 @@ fn ascii_literal_rejects_template_application() {
 fn ascii_widens_to_textus() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum _ route ← 'pg:query'\n  fixum textus shown ← route\n  nota shown\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -188,7 +189,7 @@ fn ascii_widens_to_textus() {
 fn textus_to_ascii_conversio_emits_try_from_textus() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum _ raw ← \"ok\"\n  fixum ascii token ← raw ↦ ascii\n  nota token\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -201,7 +202,7 @@ fn textus_to_ascii_conversio_emits_try_from_textus() {
 fn octeti_literal_compiles_to_vec_u8() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum octeti sig ← |de ad be ef|\n  fixum octeti empty_octeti ← ||\n  nota sig\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -254,7 +255,7 @@ fn octeti_literal_matches_in_discerne_pattern() {
     casu |00| ergo nota "miss"
   }
 }"#;
-    let result = compile(&session, "pattern.fab", source);
+    let result = compile(&session, "pattern.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "expected octeti pattern match, got: {:?}", result.diagnostics);
 }
 
@@ -264,7 +265,7 @@ fn octeti_literal_matches_in_discerne_pattern() {
 fn octet_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
     let session = test_session(Target::HirRust);
     let source = "functio firstByte(octeti buf) → octet {\n    fixum octet b ← buf.accipe(0)\n    redde b\n}\n\nincipit {\n    fixum octeti sig ← |de ad be ef|\n    fixum octet a ← firstByte(sig)\n    fixum numerus<u8> raw ← a\n    sig.appende(raw)\n    nota a\n}\n";
-    let result = compile(&session, "octet_builtin.fab", source);
+    let result = compile(&session, "octet_builtin.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "expected success, got: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -282,7 +283,7 @@ fn octet_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
 fn octet_builtin_rejects_width_parameters() {
     let session = test_session(Target::HirRust);
     let source = "incipit { fixum octet<i32> x ← 1 }";
-    let result = compile(&session, "octet_params.fab", source);
+    let result = compile(&session, "octet_params.fab", source, ModuleCompileRequest::default());
     assert!(!result.success(), "expected octet<i32> to be rejected, got success");
 }
 
@@ -371,7 +372,7 @@ fn bare_assignment_keeps_implicit_widening() {
         ("numerus-to-fractus.fab", "incipit {\n  fixum fractus f ← 1\n}"),
         ("ascii-to-textus.fab", "incipit {\n  fixum textus s ← 'ascii'\n}"),
     ] {
-        let result = compile(&session, name, source);
+        let result = compile(&session, name, source, ModuleCompileRequest::default());
         assert!(
             result.success(),
             "expected widening success for {name}, got {:?}",

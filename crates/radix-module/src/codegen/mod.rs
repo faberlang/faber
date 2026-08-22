@@ -515,13 +515,7 @@ fn emit_provider_modules(analysis: &crate::driver::AnalyzedModule) -> Result<Vec
                         args: Vec::new(),
                     }
                 })?;
-            let unit = crate::driver::analyze_source_with_module_import_contract(
-                &prepared.session,
-                &name,
-                &source,
-                None,
-                prepared.contract,
-            )
+            let unit = crate::driver::analyze_source(&prepared.session, &name, &source, crate::driver::AnalyzeRequest { cli_program: None, contract: prepared.contract })
             .map_err(|diags| CodegenError {
                 message: format!(
                     "provider module `{}` failed analysis: {}",

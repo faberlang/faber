@@ -5,12 +5,12 @@
 
 use super::*;
 use crate::codegen::Target;
-use crate::driver::{Config, Session};
+use crate::driver::{Config, Session, AnalyzeRequest};
 use crate::hir::HirId;
 
 fn analyze(source: &str) -> AnalyzedModule {
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
-    crate::driver::analyze_source(&session, "test.fab", source).expect("analysis succeeds")
+    crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()).expect("analysis succeeds")
 }
 
 fn dump_source(source: &str) -> String {

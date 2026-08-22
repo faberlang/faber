@@ -1,5 +1,6 @@
 //! CLI codegen tests — all spawn external toolchains and are #[ignore] by default.
 
+use crate::driver::ModuleCompileRequest;
 use super::compile;
 use crate::codegen::Target;
 use crate::test_support::test_session;
@@ -18,7 +19,7 @@ incipit argumenta args {
   }
 }
 "#;
-    let result = compile(&session, "cli.fab", source);
+    let result = compile(&session, "cli.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "expected compile success: {:?}", result.diagnostics);
     let output = super::rust_output(result);
@@ -57,7 +58,7 @@ incipit argumenta args {
   }
 }
 "#;
-    let result = compile(&session, "cli.fab", source);
+    let result = compile(&session, "cli.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "expected compile success: {:?}", result.diagnostics);
     let output = super::rust_output(result);
@@ -85,7 +86,7 @@ incipit argumenta args {
   nota code
 } exitu numerus
 "#;
-    let result = compile(&session, "cli.fab", source);
+    let result = compile(&session, "cli.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "expected compile success: {:?}", result.diagnostics);
     let output = super::rust_output(result);
@@ -109,7 +110,7 @@ incipit {
     // CLI codegen is currently Rust-only; other targets should produce a clear error.
     for target in &[Target::HirTypeScript, Target::HirGo] {
         let session = test_session(*target);
-        let result = compile(&session, "cli.fab", source);
+        let result = compile(&session, "cli.fab", source, ModuleCompileRequest::default());
 
         assert!(!result.success(), "CLI should fail for {target:?}");
         assert!(
@@ -155,7 +156,7 @@ functio config_set(textus key, textus value) {
   nota key + " = " + value
 }
 "#;
-    let result = compile(&session, "cli.fab", source);
+    let result = compile(&session, "cli.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "expected compile success: {:?}", result.diagnostics);
     let output = super::rust_output(result);
@@ -225,7 +226,7 @@ functio run_remote(textus host) {
   nota host
 }
 "#;
-    let result = compile(&session, "cli.fab", source);
+    let result = compile(&session, "cli.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "expected success: {:?}", result.diagnostics);
     let output = super::rust_output(result);
@@ -280,7 +281,7 @@ functio config_ssl_verify(bivalens enabled) {
   else { nota "off" }
 }
 "#;
-    let result = compile(&session, "cli.fab", source);
+    let result = compile(&session, "cli.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "expected success: {:?}", result.diagnostics);
     let output = super::rust_output(result);
@@ -331,7 +332,7 @@ fn wasm_cli_program_routes_through_the_ordinary_emit_path() {
 incipit argumenta args {
   nota "ok"
 }"#;
-    let result = compile(&session, "cli.fab", source);
+    let result = compile(&session, "cli.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "expected wasm-text CLI success: {:?}", result.diagnostics);
     let crate::Output::WasmText(crate::WasmTextOutput { code }) = result.output.unwrap() else {

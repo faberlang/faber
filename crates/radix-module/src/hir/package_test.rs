@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::codegen::{generate_from_analyzed, Target};
-use crate::driver::{analyze_source, Config, Session};
+use crate::driver::{analyze_source, Config, Session, AnalyzeRequest};
 use crate::locale::{latin_locale_pack, KeywordSurface};
 
 fn analyze(name: &str, source: &str) -> AnalyzedModule {
@@ -12,7 +12,7 @@ fn analyze(name: &str, source: &str) -> AnalyzedModule {
 
 fn analyze_with(name: &str, source: &str, config: Config) -> AnalyzedModule {
     let session = Session::new(config);
-    analyze_source(&session, name, source).expect("analyze test source")
+    analyze_source(&session, name, source, AnalyzeRequest::default()).expect("analyze test source")
 }
 
 fn input<'a>(relative_path: &'a str, is_entry: bool, analysis: &'a AnalyzedModule) -> PackageUnitInput<'a> {
@@ -272,7 +272,7 @@ fn signature_only_fragment_import_fails_closed() {
     let Err(err) = analyze_source(
         &session,
         "iface.fab",
-        "@ nucleum fragment\nfunctio helper(fractus<f32> x) → fractus<f32>\n",
+        "@ nucleum fragment\nfunctio helper(fractus<f32> x) → fractus<f32>\n", AnalyzeRequest::default(),
     ) else {
         panic!("signature-only fragment must fail at compile time");
     };

@@ -7,12 +7,12 @@ use super::{
     rustc_available,
 };
 use crate::codegen::Target;
-use crate::driver::{compile, Config, Session};
+use crate::driver::{compile, Config, Session, ModuleCompileRequest};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 fn emit_rust_from_faber(source: &str) -> String {
     let session = Session::new(Config::default().with_target(Target::HirRust));
-    let result = compile(&session, "smoke.fab", source);
+    let result = compile(&session, "smoke.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "{:?}", result.diagnostics);
     let Some(crate::Output::Rust(output)) = result.output else {
         panic!("expected Rust output");
@@ -22,7 +22,7 @@ fn emit_rust_from_faber(source: &str) -> String {
 
 fn emit_llvm_from_faber(source: &str) -> String {
     let session = Session::new(Config::default().with_target(Target::MirLlvm));
-    let result = compile(&session, "smoke.fab", source);
+    let result = compile(&session, "smoke.fab", source, ModuleCompileRequest::default());
     let Some(crate::Output::LlvmText(output)) = result.output else {
         panic!("expected LLVM text output: {:?}", result.diagnostics);
     };

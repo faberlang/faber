@@ -7,7 +7,7 @@ use super::test_support::{atomic_i32_type, f32_type, indexed_local_place, rank1_
 use super::{
     classify_device_safe, classify_device_safe_for_target_entry, device_roles_from_hir, MirDeviceContext, MirDeviceRole,
 };
-use crate::driver::{self, Config, Session};
+use crate::driver::{self, Config, Session, AnalyzeRequest};
 use crate::hir::{DefId, HirFunction};
 use crate::mir::*;
 use crate::semantic::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
@@ -155,7 +155,7 @@ fn assert_rejected_goto_policy(result: radix_types::Lowerability, message: &str)
 
 fn classify_source(source: &str) -> radix_types::Lowerability {
     let session = Session::new(Config::default());
-    let mut analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
+    let mut analysis = driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = device_roles_from_hir(&analysis.hir);
     let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("lower source to MIR");
     let mut validation = lowered.validated.validation().clone();
@@ -177,7 +177,7 @@ genus Worker {
 }
 ";
     let session = Session::new(Config::default());
-    let analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
+    let analysis = driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
 
     let roles = device_roles_from_hir(&analysis.hir);
     let method_def = analysis
@@ -2232,7 +2232,7 @@ functio k(fractus<f32> x) → fractus<f32> {
 }
 ";
     let session = Session::new(Config::default());
-    let analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
+    let analysis = driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let (def_id, func) = first_function_item(&analysis);
     assert_eq!(func.nucleum_role(), Some(crate::hir::NucleumRole::Entry));
     assert!(func.is_kernel);
@@ -2250,7 +2250,7 @@ functio helper(fractus<f32> x) → fractus<f32> {
 }
 ";
     let session = Session::new(Config::default());
-    let analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
+    let analysis = driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let (def_id, func) = first_function_item(&analysis);
     assert_eq!(func.nucleum_role(), Some(crate::hir::NucleumRole::Fragment));
     assert!(!func.is_kernel);
@@ -2277,7 +2277,7 @@ functio k(fractus<f32> x) → fractus<f32> {
 }
 ";
     let session = Session::new(Config::default());
-    let analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
+    let analysis = driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = device_roles_from_hir(&analysis.hir);
     let mut kernel_entries = 0;
     let mut fragment_entries = 0;
@@ -2309,7 +2309,7 @@ functio k(fractus<f32> x) → fractus<f32> {
 }
 ";
     let session = Session::new(Config::default());
-    let mut analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
+    let mut analysis = driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = device_roles_from_hir(&analysis.hir);
     let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("legal fragment call must compose");
     assert!(

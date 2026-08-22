@@ -4,6 +4,7 @@
 //! acceptance test here fails until R1 lands the unsigned magnitude carrier.
 
 #[cfg(feature = "hir-rust")]
+use crate::driver::AnalyzeRequest;
 use crate::Compiler;
 use crate::{Config, Target};
 
@@ -14,7 +15,7 @@ fn compile(source: &str) -> crate::CompileResult {
 
 fn analyze_diagnostics(source: &str) -> Vec<crate::Diagnostic> {
     let session = crate::driver::Session::new(Config::default().with_target(Target::HirRust));
-    match crate::driver::analyze_source(&session, "test.fab", source) {
+    match crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()) {
         Ok(unit) => unit.diagnostics,
         Err(diagnostics) => diagnostics,
     }

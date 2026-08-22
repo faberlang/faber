@@ -1,19 +1,12 @@
 use super::*;
-use radix_module::driver::{analyze_source_with_cli_program_and_import_contract, Config, Session};
+use radix_module::driver::{analyze_source, AnalyzeRequest, Config, ModuleImportContract, Session};
 use radix_module::file_interface::{FileExportKind, InterfaceStructField, InterfaceTypeSnapshot};
 use radix_module::semantic::Primitive;
 use std::collections::BTreeMap;
 
 fn analyze_with(config: Config, source: &str) -> radix_module::driver::AnalyzedModule {
     let session = Session::new(config);
-    analyze_source_with_cli_program_and_import_contract(
-        &session,
-        "test.fab",
-        source,
-        None,
-        BTreeMap::new(),
-        BTreeMap::new(),
-    )
+    analyze_source(&session, "test.fab", source, AnalyzeRequest { cli_program: None, contract: ModuleImportContract { namespace_exports: BTreeMap::new(), file_interfaces: BTreeMap::new(), ..ModuleImportContract::default() } })
     .expect("analysis must succeed")
 }
 
@@ -113,19 +106,12 @@ fn extract_file_interface_round_trips_public_commune_fields() {
     assert_eq!(export.variants.len(), 2);
     assert_eq!(export.variants[1].fields.len(), 2);
 
-    analyze_source_with_cli_program_and_import_contract(
-        &Session::new(Config::default().with_target(radix_module::codegen::Target::HirRust)),
-        "consumer.fab",
-        r#"importa ex "shape:errors" shape
+    analyze_source(&Session::new(Config::default().with_target(radix_module::codegen::Target::HirRust)), "consumer.fab", r#"importa ex "shape:errors" shape
 
 functio render(shape.ShapeError e) → textus {
     redde e.message
 }
-"#,
-        None,
-        BTreeMap::new(),
-        BTreeMap::from([("shape".to_owned(), interface.clone())]),
-    )
+"#, AnalyzeRequest { cli_program: None, contract: ModuleImportContract { namespace_exports: BTreeMap::new(), file_interfaces: BTreeMap::from([("shape".to_owned(), interface.clone())]), ..ModuleImportContract::default() } })
     .expect("commune field interface round trip");
 }
 
@@ -221,6 +207,7 @@ fn signature_only_fragment_export_fails_closed() {
         &session,
         "test.fab",
         "@ publica\n@ nucleum fragment\nfunctio helper(fractus<f32> x) → fractus<f32>\n",
+        AnalyzeRequest::default(),
     ) else {
         panic!("signature-only fragment must fail at compile time");
     };

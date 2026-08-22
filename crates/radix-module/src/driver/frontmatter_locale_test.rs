@@ -2,6 +2,7 @@
 //! that `+++\nlocale = "..."\n+++` frontmatter correctly selects reader packs
 //! for keyword lexing and type surface resolution.
 
+use crate::driver::ModuleCompileRequest;
 use super::compile;
 use crate::codegen::Target;
 use crate::driver::Config;
@@ -18,7 +19,7 @@ fn compile_uses_frontmatter_locale_for_lexing() {
         .with_stdlib(stdlib_path());
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"zh-Hans\"\n+++\n\n函数 salve() { }";
-    let result = compile(&session, "locale.fab", source);
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
@@ -31,7 +32,7 @@ fn compile_frontmatter_locale_overrides_session_pack() {
         .with_locale_pack(super::zh_locale_pack());
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"la\"\n+++\n\nfunctio salve() { }";
-    let result = compile(&session, "locale.fab", source);
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     assert!(
@@ -57,7 +58,7 @@ fn explicit_session_pack_wins_over_frontmatter_locale() {
         .with_locale_pack_explicit();
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"zh-Hans\"\n+++\n\nfn salve() { }";
-    let result = compile(&session, "locale.fab", source);
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
@@ -69,7 +70,7 @@ fn compile_rejects_unknown_frontmatter_locale() {
         .with_stdlib(stdlib_path());
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"xx\"\n+++\n\nfunctio salve() { }";
-    let result = compile(&session, "locale.fab", source);
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(result
@@ -85,7 +86,7 @@ fn compile_frontmatter_without_locale_falls_back_to_session() {
         .with_locale_pack(super::zh_locale_pack());
     let session = crate::driver::Session::new(config);
     let source = "+++\nterm = \"discerne\"\n+++\n\n函数 salve() { }";
-    let result = compile(&session, "locale.fab", source);
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
@@ -97,7 +98,7 @@ fn compile_rejects_frontmatter_locale_without_stdlib() {
     let config = Config { stdlib_path: None, ..Config::default() }.with_target(Target::HirRust);
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"zh-Hans\"\n+++\n\nfunctio salve() { }";
-    let result = compile(&session, "locale.fab", source);
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(result
@@ -113,7 +114,7 @@ fn compile_rejects_frontmatter_locale_with_parent_traversal() {
         .with_stdlib(stdlib_path());
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"../../etc/passwd\"\n+++\n\nfunctio salve() { }";
-    let result = compile(&session, "locale.fab", source);
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
     assert!(result
         .diagnostics
@@ -128,7 +129,7 @@ fn compile_rejects_frontmatter_locale_empty() {
         .with_stdlib(stdlib_path());
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"\"\n+++\n\nfunctio salve() { }";
-    let result = compile(&session, "locale.fab", source);
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
     assert!(result
         .diagnostics
@@ -143,7 +144,7 @@ fn compile_rejects_frontmatter_locale_absolute_path() {
         .with_stdlib(stdlib_path());
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"/etc\"\n+++\n\nfunctio salve() { }";
-    let result = compile(&session, "locale.fab", source);
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
     assert!(result
         .diagnostics
@@ -158,7 +159,7 @@ fn compile_rejects_frontmatter_locale_absolute_path_deep() {
         .with_stdlib(stdlib_path());
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"/etc/passwd\"\n+++\n\nfunctio salve() { }";
-    let result = compile(&session, "locale.fab", source);
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
     assert!(result
         .diagnostics
@@ -173,7 +174,7 @@ fn compile_rejects_frontmatter_locale_with_path_separator() {
         .with_stdlib(stdlib_path());
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"la/extra\"\n+++\n\nfunctio salve() { }";
-    let result = compile(&session, "locale.fab", source);
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
     assert!(result
         .diagnostics
@@ -188,7 +189,7 @@ fn compile_rejects_non_string_frontmatter_locale() {
         .with_stdlib(stdlib_path());
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = 42\n+++\n\nfunctio salve() { }";
-    let result = compile(&session, "locale.fab", source);
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
     assert!(result
         .diagnostics

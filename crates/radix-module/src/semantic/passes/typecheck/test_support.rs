@@ -20,7 +20,7 @@
 
 use crate::codegen::Target;
 use crate::diagnostics::Diagnostic;
-use crate::driver::{self, AnalyzedModule};
+use crate::driver::{self, AnalyzedModule, AnalyzeRequest};
 use crate::hir::HirStatementKind;
 use crate::semantic::{SemanticError, TypeId};
 use crate::{CompileResult, Compiler, Config};
@@ -57,7 +57,7 @@ pub fn compile_and_get_diagnostics(source: &str) -> Vec<Diagnostic> {
 /// `Err(Vec<Diagnostic>)` arms so callers always receive a flat list.
 pub fn analyze_and_get_diagnostics(source: &str) -> Vec<Diagnostic> {
     let session = driver::Session::new(Config::default().with_target(Target::HirRust));
-    match driver::analyze_source(&session, TEST_NAME, source) {
+    match driver::analyze_source(&session, TEST_NAME, source, AnalyzeRequest::default()) {
         Ok(unit) => unit.diagnostics,
         Err(diagnostics) => diagnostics,
     }
@@ -66,7 +66,7 @@ pub fn analyze_and_get_diagnostics(source: &str) -> Vec<Diagnostic> {
 /// Analyze and return the unit when typecheck produced no errors.
 pub fn analyze_ok(source: &str) -> AnalyzedModule {
     let session = driver::Session::new(Config::default().with_target(Target::HirRust));
-    let unit = driver::analyze_source(&session, TEST_NAME, source).expect("analyze");
+    let unit = driver::analyze_source(&session, TEST_NAME, source, AnalyzeRequest::default()).expect("analyze");
     assert!(
         !unit.diagnostics.iter().any(Diagnostic::is_error),
         "diagnostics: {:?}",

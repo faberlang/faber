@@ -1,6 +1,7 @@
 //! JSON valor literal semantic validation and tabula-ascription tests.
 //! See docs/factory/inline-json-valor/contract.md.
 
+use crate::driver::ModuleCompileRequest;
 use super::compile;
 use crate::codegen::Target;
 use crate::diagnostics::DiagnosticArg;
@@ -24,7 +25,7 @@ fn json_valor_literal_typechecks_as_valor_without_errors() {
     }
     nota spec
 }"#;
-    let result = compile(&session, "json.fab", source);
+    let result = compile(&session, "json.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "expected clean typecheck, got: {:?}", result.diagnostics);
 }
 
@@ -32,7 +33,7 @@ fn json_valor_literal_typechecks_as_valor_without_errors() {
 fn json_valor_literal_empty_object_typechecks_as_valor() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n    fixum _ e ← {}\n    nota e\n}";
-    let result = compile(&session, "empty.fab", source);
+    let result = compile(&session, "empty.fab", source, ModuleCompileRequest::default());
     assert!(
         result.success(),
         "expected empty object to typecheck, got: {:?}",
@@ -72,7 +73,7 @@ fn json_valor_literal_rejects_duplicate_keys_in_nested_object() {
 fn json_valor_literal_distinct_keys_in_different_objects_are_not_duplicates() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n    fixum _ d ← { \"a\": { \"x\": 1 }, \"b\": { \"x\": 2 } }\n    nota d\n}";
-    let result = compile(&session, "siblings.fab", source);
+    let result = compile(&session, "siblings.fab", source, ModuleCompileRequest::default());
     assert!(
         result.success(),
         "sibling-object keys must not be flagged duplicate: {:?}",
@@ -100,7 +101,7 @@ fn json_valor_ascribed_to_tabula_emits_real_hashmap_constant() {
     let session = test_session(Target::HirRust);
     let source =
         "incipit {\n    fixum tabula<textus, numerus> puncta ← { \"aelia\": 95, \"balbus\": 87 }\n    nota puncta\n}";
-    let result = compile(&session, "tabula.fab", source);
+    let result = compile(&session, "tabula.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "expected success, got: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -165,7 +166,7 @@ fn json_valor_ascribed_to_tabula_rejects_nested_value_when_v_is_not_valor() {
 fn json_valor_ascribed_to_tabula_valor_values_lower_to_fabervalue() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n    fixum tabula<textus, valor> nested ← { \"a\": { \"x\": 1 } }\n    nota nested\n}";
-    let result = compile(&session, "nested_valor.fab", source);
+    let result = compile(&session, "nested_valor.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "expected success, got: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(

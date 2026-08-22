@@ -11,7 +11,7 @@
 
 use crate::codegen::Target;
 use crate::diagnostics::{Diagnostic, DiagnosticArg};
-use crate::driver::{compile, Config, Session};
+use crate::driver::{compile, Config, Session, ModuleCompileRequest};
 use crate::lexer::Span;
 use crate::CompileResult;
 use std::path::{Path, PathBuf};
@@ -268,7 +268,7 @@ pub fn assert_no_issue(diagnostics: &[Diagnostic], issue: &str) {
 /// Panics when an assertion or unwrap path fails (test/helper utilities).
 #[must_use]
 pub fn compile_ok(session: &Session, name: &str, source: &str) -> CompileResult {
-    let result = compile(session, name, source);
+    let result = compile(session, name, source, ModuleCompileRequest::default());
     assert!(
         result.success(),
         "expected compile success for {name}, got {:?}",
@@ -283,7 +283,7 @@ pub fn compile_ok(session: &Session, name: &str, source: &str) -> CompileResult 
 /// Panics when an assertion or unwrap path fails (test/helper utilities).
 #[must_use]
 pub fn compile_fail(session: &Session, name: &str, source: &str) -> CompileResult {
-    let result = compile(session, name, source);
+    let result = compile(session, name, source, ModuleCompileRequest::default());
     assert!(
         !result.success(),
         "expected compile failure for {name}, got {:?}",

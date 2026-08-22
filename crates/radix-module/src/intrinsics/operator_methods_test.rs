@@ -7,7 +7,7 @@ use super::{
     is_numeric_bitwise_operator, is_numeric_imperativus_operator, lookup_method, lookup_method_for_type,
     IntrinsicReceiver,
 };
-use crate::driver::{analyze_source, Config, Session};
+use crate::driver::{analyze_source, Config, Session, AnalyzeRequest};
 use crate::semantic::{Primitive, Type, TypeTable};
 
 #[cfg(feature = "hir-rust")]
@@ -22,7 +22,7 @@ fn compile_rust(name: &str, source: &str) -> String {
 
 fn rejects_imperativus_on_fixum(source: &str) {
     let session = Session::new(Config::default());
-    let result = analyze_source(&session, "operator_methods.fab", source);
+    let result = analyze_source(&session, "operator_methods.fab", source, AnalyzeRequest::default());
     let Err(diagnostics) = result else {
         panic!("expected typecheck failure for fixum imperativus receiver");
     };
@@ -174,7 +174,7 @@ incipit {
     varia fractus x ← 2.0
     bump(x)
 }";
-    let result = analyze_source(&session, "in-imperativus.fab", source);
+    let result = analyze_source(&session, "in-imperativus.fab", source, AnalyzeRequest::default());
     assert!(result.is_ok(), "expected in-parameter imperativus to pass: {:?}", result.err());
 }
 
@@ -188,7 +188,7 @@ fn potentia_receiver_codegen_applies_non_positive_base_guard() {
     nota r
 }";
     assert!(
-        analyze_source(&session, "potentia-guard.fab", source).is_ok(),
+        analyze_source(&session, "potentia-guard.fab", source, AnalyzeRequest::default()).is_ok(),
         "potentia receiver should typecheck"
     );
 
@@ -230,7 +230,7 @@ fn rejects_shift_operator_on_fractus_receiver() {
         r"incipit {
     fixum fractus x ← 1.0
     fixum _ y ← x.sinistrata(1.0)
-}",
+}", AnalyzeRequest::default(),
     );
     let Err(diagnostics) = result else {
         panic!("expected shift fractus rejection");
@@ -253,7 +253,7 @@ fn rejects_bitwise_operator_on_fractus_receiver() {
         r"incipit {
     fixum fractus x ← 1.0
     fixum _ y ← x.coniuncta(1.0)
-}",
+}", AnalyzeRequest::default(),
     );
     let Err(diagnostics) = result else {
         panic!("expected bitwise fractus rejection");

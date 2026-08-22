@@ -1,6 +1,6 @@
 use super::*;
 use crate::codegen::Target;
-use crate::driver::{Config, Session};
+use crate::driver::{Config, Session, AnalyzeRequest};
 
 #[test]
 fn lowers_own_textus_param_as_by_value_mir_storage() {
@@ -14,7 +14,7 @@ incipit {
     nota consume("salve")
 }
 "#;
-    let mut unit = crate::driver::analyze_source(&session, "own-textus.fab", source).expect("analysis succeeds");
+    let mut unit = crate::driver::analyze_source(&session, "own-textus.fab", source, AnalyzeRequest::default()).expect("analysis succeeds");
     let textus = unit.types.primitive(crate::semantic::Primitive::Textus);
     let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
     let function = &lowered.program.functions[0];

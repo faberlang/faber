@@ -25,7 +25,7 @@ use crate::codegen::Target;
 use crate::driver::{
     analyze_source, apply_air_backward_bundle, lower_mir_with_context_for_target, prepare_air_backward_bundle,
     FreshMirFunctionIds, SpannedCodegenError,
-};
+    AnalyzeRequest};
 use crate::mir::{lower_analyzed_unit, MirFunctionId};
 use crate::semantic::{IndexExpr, Type};
 use crate::test_support::test_session;
@@ -97,7 +97,7 @@ incipit {
 "
     );
     let session = test_session(Target::MirLlvm);
-    let mut analysis = analyze_source(&session, "generic_backward_concrete.fab", &source)
+    let mut analysis = analyze_source(&session, "generic_backward_concrete.fab", &source, AnalyzeRequest::default())
         .expect("concrete generic backward reduction should analyze cleanly");
 
     let mut lowered = expect_codegen_ok(
@@ -147,7 +147,7 @@ incipit {
 #[test]
 fn unresolved_post_bundle_shape_size_uses_stable_survivor_diagnostic() {
     let session = test_session(Target::MirLlvm);
-    let mut analysis = analyze_source(&session, "generic_backward_unresolved.fab", GENERIC_SIMPLE_LOSS_SOURCE)
+    let mut analysis = analyze_source(&session, "generic_backward_unresolved.fab", GENERIC_SIMPLE_LOSS_SOURCE, AnalyzeRequest::default())
         .expect("symbolic generic backward primal should analyze cleanly");
     let bundle = expect_codegen_ok(
         prepare_air_backward_bundle(&mut analysis),
@@ -187,7 +187,7 @@ fn unresolved_post_bundle_shape_size_uses_stable_survivor_diagnostic() {
 #[test]
 fn generic_backward_primal_generates_symbolic_companion_through_driver() {
     let session = test_session(Target::MirLlvm);
-    let mut analysis = analyze_source(&session, "generic_backward.fab", GENERIC_SIMPLE_LOSS_SOURCE)
+    let mut analysis = analyze_source(&session, "generic_backward.fab", GENERIC_SIMPLE_LOSS_SOURCE, AnalyzeRequest::default())
         .expect("generic backward primal should analyze cleanly");
 
     let bundle = expect_codegen_ok(
@@ -281,7 +281,7 @@ functio gradientes_simple_loss<magnitudo R, magnitudo C>(
 "#;
 
     let session = test_session(Target::MirLlvm);
-    let mut analysis = analyze_source(&session, "generic_wrapper.fab", source)
+    let mut analysis = analyze_source(&session, "generic_wrapper.fab", source, AnalyzeRequest::default())
         .expect("generic wrapper calling the generic companion must typecheck (OQ4)");
 
     // The wrapper's companion call is part of semantic analysis; reaching the
@@ -320,7 +320,7 @@ functio broad_loss<magnitudo R, magnitudo C>(
 "#;
 
     let session = test_session(Target::MirLlvm);
-    let mut analysis = analyze_source(&session, "generic_broadcast.fab", source)
+    let mut analysis = analyze_source(&session, "generic_broadcast.fab", source, AnalyzeRequest::default())
         .expect("generic broadcast primal should analyze cleanly");
 
     let bundle = expect_codegen_ok(
@@ -381,7 +381,7 @@ functio lane_sum(tensor<f32, [4]> x) → f32 {
 "#;
 
     let session = test_session(Target::MirLlvm);
-    let mut analysis = analyze_source(&session, "unroll_lane_sum.fab", source)
+    let mut analysis = analyze_source(&session, "unroll_lane_sum.fab", source, AnalyzeRequest::default())
         .expect("full-prefix unrolled range loop must analyze (SEM059.itera_loop flipped)");
 
     let bundle = expect_codegen_ok(
@@ -441,7 +441,7 @@ functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
 
     let session = test_session(Target::MirLlvm);
     let mut analysis =
-        analyze_source(&session, "unroll_masked_mean.fab", source).expect("mask-mode unrolled range loop must analyze");
+        analyze_source(&session, "unroll_masked_mean.fab", source, AnalyzeRequest::default()).expect("mask-mode unrolled range loop must analyze");
 
     let bundle = expect_codegen_ok(
         prepare_air_backward_bundle(&mut analysis),

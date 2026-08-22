@@ -4,7 +4,7 @@
 //! and collection-op classifications match.
 
 use super::{IntrinsicMirKind, IntrinsicReceiver, INTRINSICS};
-use crate::driver::{analyze_source, Config, Session};
+use crate::driver::{analyze_source, Config, Session, AnalyzeRequest};
 use crate::intrinsics::{
     is_atomic_operator_method, lookup_method, lookup_method_for_type, mir_collection_op, receivers_for_type,
 };
@@ -69,7 +69,7 @@ incipit {
 }
 "#;
     let session = Session::new(Config::default());
-    let result = analyze_source(&session, "tabula-claves.fab", source);
+    let result = analyze_source(&session, "tabula-claves.fab", source, AnalyzeRequest::default());
     assert!(result.is_ok(), "tabula claves must typecheck: {:?}", result.err());
 }
 
@@ -94,7 +94,7 @@ incipit {
 }
 "#;
     let session = Session::new(Config::default());
-    let result = analyze_source(&session, "tabula-valores.fab", source);
+    let result = analyze_source(&session, "tabula-valores.fab", source, AnalyzeRequest::default());
     assert!(result.is_ok(), "tabula valores must typecheck: {:?}", result.err());
 }
 
@@ -119,7 +119,7 @@ incipit {
 }
 ";
     let session = Session::new(Config::default());
-    let result = analyze_source(&session, "intervallum-coercere.fab", source);
+    let result = analyze_source(&session, "intervallum-coercere.fab", source, AnalyzeRequest::default());
     assert!(result.is_ok(), "intervallum coercere must typecheck: {:?}", result.err());
 }
 
@@ -245,7 +245,7 @@ incipit {
 }
 "#;
     let session = Session::new(Config::default());
-    let result = analyze_source(&session, "textus-vacua.fab", source);
+    let result = analyze_source(&session, "textus-vacua.fab", source, AnalyzeRequest::default());
     assert!(result.is_ok(), "textus vacua must typecheck: {:?}", result.err());
 }
 

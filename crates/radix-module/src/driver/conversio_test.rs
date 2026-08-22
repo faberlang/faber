@@ -1,6 +1,7 @@
 //! Type-conversion (conversio) codegen tests. Each compiles a small Faber program
 //! to Rust and asserts the emitted conversion pattern.
 
+use crate::driver::ModuleCompileRequest;
 use super::compile;
 use crate::codegen::Target;
 use crate::test_support::test_session;
@@ -14,7 +15,7 @@ fn conversio_glyph_form_compiles_to_parse() {
   fixum _ n ← "22" ↦ numerus
   nota n
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -28,7 +29,7 @@ fn conversio_emits_parse_not_as_cast() {
   fixum _ n ← "42" ↦ numerus
   nota n
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -43,7 +44,7 @@ fn conversio_with_recovery_emits_unwrap_or() {
   fixum _ n ← "bad" ↦ numerus ⇥ 0
   nota n
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -58,7 +59,7 @@ fn conversio_to_textus_emits_to_string() {
   fixum _ s ← n ↦ textus
   nota s
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -75,7 +76,7 @@ fn textus_to_octeti_conversio_emits_into_bytes() {
   fixum _ b ← s ↦ octeti
   nota b
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(code.contains(".into_bytes()"), "expected into_bytes, got:\n{code}");
@@ -89,7 +90,7 @@ fn octeti_to_textus_conversio_emits_from_utf8_with_expect() {
   fixum _ s ← b ↦ textus
   nota s
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(code.contains("std::str::from_utf8("), "expected from_utf8, got:\n{code}");
@@ -107,7 +108,7 @@ fn octeti_to_textus_conversio_with_recovery_emits_unwrap_or() {
   fixum _ s ← b ↦ textus ⇥ "?"
   nota s
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -125,7 +126,7 @@ fn ascii_octeti_conversio_emits_correct_lowering() {
   fixum _ back ← b ↦ ascii
   nota back
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -144,7 +145,7 @@ fn ascii_octeti_conversio_emits_correct_lowering() {
 fn fractus_to_numerus_conversio_emits_truncate_cast() {
     let session = test_session(Target::HirRust);
     let source = "incipit { fixum _ n ← 3.7 ↦ numerus }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(code.contains(" as i64"), "expected truncate cast, got:\n{code}");
@@ -154,7 +155,7 @@ fn fractus_to_numerus_conversio_emits_truncate_cast() {
 fn fractus_to_bivalens_conversio_emits_nonzero_check() {
     let session = test_session(Target::HirRust);
     let source = "incipit { fixum _ b ← 1.5 ↦ bivalens }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(code.contains(" != 0.0"), "expected nonzero check, got:\n{code}");
@@ -164,7 +165,7 @@ fn fractus_to_bivalens_conversio_emits_nonzero_check() {
 fn bivalens_to_numerus_conversio_emits_bool_cast() {
     let session = test_session(Target::HirRust);
     let source = "incipit { fixum _ n ← verum ↦ numerus }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(code.contains(" as i64"), "expected bool cast, got:\n{code}");
@@ -174,7 +175,7 @@ fn bivalens_to_numerus_conversio_emits_bool_cast() {
 fn bivalens_to_fractus_conversio_emits_conditional_literals() {
     let session = test_session(Target::HirRust);
     let source = "incipit { fixum _ f ← verum ↦ fractus }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -187,7 +188,7 @@ fn bivalens_to_fractus_conversio_emits_conditional_literals() {
 fn ascii_to_bivalens_conversio_emits_is_empty() {
     let session = test_session(Target::HirRust);
     let source = "incipit { fixum _ b ← 'hi' ↦ bivalens }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(code.contains(".is_empty()"), "expected is_empty truthiness, got:\n{code}");
@@ -197,7 +198,7 @@ fn ascii_to_bivalens_conversio_emits_is_empty() {
 fn instans_narrow_conversio_emits_ad_praecisionem() {
     let session = test_session(Target::HirRust);
     let source = "functio narrow(instans<ns> t) → instans { redde t ↦ instans }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -215,7 +216,7 @@ fn valor_to_lista_conversio_emits_from_valor() {
   fixum valor v ← [1, 2, 3]
   fixum lista<numerus> xs ← v ↦ lista<numerus>
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -231,7 +232,7 @@ fn valor_to_tabula_conversio_emits_from_valor() {
   fixum valor v ← { "a": 1 } ↦ valor
   fixum tabula<textus, numerus> m ← v ↦ tabula<textus, numerus>
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -248,7 +249,7 @@ incipit {
   fixum Point pt ← Point { x = 1, y = 2 }
   fixum valor v ← pt ↦ valor
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -264,7 +265,7 @@ fn lista_to_valor_conversio_emits_from() {
   fixum lista<numerus> xs ← [1, 2]
   fixum valor v ← xs ↦ valor
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -280,7 +281,7 @@ fn octeti_to_valor_conversio_emits_byte_list_boxing() {
   fixum octeti bytes ← |de ad|
   fixum valor v ← bytes ↦ valor
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -296,7 +297,7 @@ fn valor_to_numerus_conversio_emits_from_valor() {
   fixum valor v ← 42
   fixum numerus n ← v ↦ numerus
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -312,7 +313,7 @@ fn valor_to_fractus_conversio_emits_from_valor_with_widen() {
   fixum valor v ← 7
   fixum fractus f ← v ↦ fractus
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -333,7 +334,7 @@ incipit {
     nota request_body_bytes({} ↦ valor).longitudo()
 }
 ";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -349,7 +350,7 @@ fn valor_to_textus_conversio_emits_from_valor() {
   fixum valor v ← "1979-05-27T07:32:00Z"
   fixum textus s ← v ↦ textus
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -365,7 +366,7 @@ fn valor_to_numerus_conversio_with_recovery_emits_unwrap_or() {
   fixum valor v ← "bad"
   fixum numerus n ← v ↦ numerus ⇥ 0
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -381,7 +382,7 @@ fn valor_to_instans_conversio_emits_try_from_valor() {
   fixum valor v ← "1979-05-27T07:32:00Z"
   fixum instans<ms> t ← v ↦ instans<ms>
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -405,7 +406,7 @@ fn instans_fine_to_coarse_assignment_rejects_without_conversio() {
 fn scalar_text_order_emits_unicode_scalar_value_compare() {
     let session = test_session(Target::HirRust);
     let source = "incipit { si 'a' ≤ 'z' { nota \"ok\" } }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -418,7 +419,7 @@ fn scalar_text_order_emits_unicode_scalar_value_compare() {
 fn instans_cross_precision_compare_emits_partial_cmp_at_coarser() {
     let session = test_session(Target::HirRust);
     let source = "functio before(instans<ns> fine, instans<ms> coarse) → bivalens { redde fine < coarse }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -431,7 +432,7 @@ fn instans_cross_precision_compare_emits_partial_cmp_at_coarser() {
 fn instans_to_textus_conversio_emits_to_rfc3339() {
     let session = test_session(Target::HirRust);
     let source = "functio wire(instans t) → textus { redde t ↦ textus }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -446,7 +447,7 @@ fn instans_to_textus_conversio_emits_to_rfc3339() {
 fn lista_to_copia_conversio_emits_hashset_collect() {
     let session = test_session(Target::HirRust);
     let source = "incipit { fixum _ s ← [1, 2, 2] ↦ copia<numerus> }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -459,7 +460,7 @@ fn lista_to_copia_conversio_emits_hashset_collect() {
 fn copia_to_lista_conversio_emits_vec_collect() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  varia copia<numerus> s ← vacua\n  s.adde(1)\n  fixum _ xs ← s ↦ lista<numerus>\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -472,7 +473,7 @@ fn copia_to_lista_conversio_emits_vec_collect() {
 fn tensor_to_lista_conversio_emits_planata() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum tensor<numerus, []> t ← vacua\n  fixum _ xs ← t ↦ lista<numerus>\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(code.contains(".planata()"), "expected planata flatten, got:\n{code}");
@@ -480,7 +481,7 @@ fn tensor_to_lista_conversio_emits_planata() {
 
 fn assert_lista_to_tensor_conversio_rust_emit(source: &str, must_contain: &[&str], must_not_contain: &[&str]) {
     let session = test_session(Target::HirRust);
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     for needle in must_contain {
@@ -525,7 +526,7 @@ fn tabula_to_lista_keys_conversio_emits_into_keys() {
   fixum tabula<textus, numerus> m ← { "a": 1, "b": 2 }
   fixum _ ks ← m ↦ lista<textus>
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -541,7 +542,7 @@ fn tabula_to_lista_values_conversio_emits_into_values() {
   fixum tabula<textus, numerus> m ← { "a": 1, "b": 2 }
   fixum _ vs ← m ↦ lista<numerus>
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -556,7 +557,7 @@ fn tabula_to_lista_values_conversio_emits_into_values() {
 fn tensor_numerus_to_fractus_conversio_emits_convert_elements() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum tensor<numerus, []> a ← vacua\n  fixum _ b ← a ↦ tensor<fractus, []>\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -569,7 +570,7 @@ fn tensor_numerus_to_fractus_conversio_emits_convert_elements() {
 fn tensor_fractus_to_numerus_conversio_emits_convert_elements() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum tensor<fractus, []> b ← vacua\n  fixum _ a ← b ↦ tensor<numerus, []>\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -582,7 +583,7 @@ fn tensor_fractus_to_numerus_conversio_emits_convert_elements() {
 fn tensor_numerus_i32_to_i64_conversio_emits_convert_elements() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum tensor<numerus<i32>, []> a ← vacua\n  fixum _ b ← a ↦ tensor<numerus<i64>, []>\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
@@ -605,7 +606,7 @@ fn tensor_element_width_lattice_codegen_matrix() {
             }
             let case = format!("{}_to_{}", from.label, to.label);
             let source = crate::semantic::tensor_element_lattice::conversio_source(from, to);
-            let result = compile(&session, "test.fab", &source);
+            let result = compile(&session, "test.fab", &source, ModuleCompileRequest::default());
             assert!(result.success(), "{case}: {:?}", result.diagnostics);
             let code = super::rust_output(result).code;
             let needle = format!(".convert_elements(|v: {}| v as {})", from.rust, to.rust);
@@ -624,7 +625,7 @@ fn verte_static_ascription_emits_as_cast() {
   fixum _ f ← n ∷ fractus
   nota f
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);

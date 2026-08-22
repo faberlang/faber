@@ -6,7 +6,7 @@
 //! This module serves as the hub: helpers, lane/target policy tests, and basic
 //! compile success tests live here. Topic-specific sub-modules are wired below.
 
-use super::compile;
+use super::{compile, AnalyzeRequest, ModuleCompileRequest};
 #[cfg(feature = "hir-faber")]
 use crate::codegen::faber::compile_canonical_str;
 use crate::codegen::Target;
@@ -115,7 +115,7 @@ functio loss() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::HirRust), "lane.fab", source);
+    let result = compile(&test_session(Target::HirRust), "lane.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success(), "expected lane/target failure");
     assert!(result.diagnostics.iter().any(|diag| {
@@ -145,7 +145,7 @@ functio keep() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::HirRust), "lane.fab", source);
+    let result = compile(&test_session(Target::HirRust), "lane.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -188,7 +188,7 @@ functio wrapper() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::HirRust), "lane.fab", source);
+    let result = compile(&test_session(Target::HirRust), "lane.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success(), "expected lane/target failure");
     assert!(result.diagnostics.iter().any(|diag| {
@@ -222,7 +222,7 @@ functio keep() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::HirRust), "lane.fab", source);
+    let result = compile(&test_session(Target::HirRust), "lane.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -252,7 +252,7 @@ functio loss() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::HirSwift), "lane.fab", source);
+    let result = compile(&test_session(Target::HirSwift), "lane.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success(), "expected lane/target failure");
     assert!(result.diagnostics.iter().any(|diag| {
@@ -275,7 +275,7 @@ functio direct() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirWasm), "lane.fab", source);
+    let result = compile(&test_session(Target::MirWasm), "lane.fab", source, ModuleCompileRequest::default());
 
     assert!(
         !result
@@ -300,7 +300,7 @@ functio loss() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirWasm), "lane.fab", source);
+    let result = compile(&test_session(Target::MirWasm), "lane.fab", source, ModuleCompileRequest::default());
 
     assert!(
         !result
@@ -331,7 +331,7 @@ functio loss() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::HirFaber), "lane.fab", source);
+    let result = compile(&test_session(Target::HirFaber), "lane.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -361,7 +361,7 @@ functio loss() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirWasm), "lane.fab", source);
+    let result = compile(&test_session(Target::MirWasm), "lane.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -387,7 +387,7 @@ functio sum(numerus a, numerus b) → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirLlvm), "lane.fab", source);
+    let result = compile(&test_session(Target::MirLlvm), "lane.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -410,7 +410,7 @@ fn go_target_policy_runs_for_programs_without_cli() {
     let source = r"incipit {
   nota 42
 }";
-    let result = compile(&session, "policy.fab", source);
+    let result = compile(&session, "policy.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "Go should compile simple incipit: {:?}", result.diagnostics);
 }
 
@@ -426,7 +426,7 @@ incipit argumenta args {
   nota x
 }
 "#;
-    let result = compile(&session, "cli.fab", source);
+    let result = compile(&session, "cli.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success(), "Go CLI with modulus must fail");
     assert!(
@@ -448,7 +448,7 @@ fn typescript_target_policy_does_not_silently_fail() {
     let source = r"incipit {
   nota 42
 }";
-    let result = compile(&session, "policy.fab", source);
+    let result = compile(&session, "policy.fab", source, ModuleCompileRequest::default());
     assert!(
         result.success(),
         "TypeScript should compile simple incipit: {:?}",
@@ -464,7 +464,7 @@ fn compile_rust_success_emits_output() {
     let source = r"incipit {
   nota 42
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = rust_output(result);
@@ -488,7 +488,7 @@ fn compile_typescript_success_emits_output() {
     let source = r"incipit {
   nota 42
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     assert!(matches!(result.output, Some(crate::Output::TypeScript(_))));
@@ -500,7 +500,7 @@ fn typescript_output_preserves_diagnostic_severity() {
     let source = r"incipit {
   fixum _ unused ← 1
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     let warning = result
         .diagnostics
@@ -525,7 +525,7 @@ functio combine(tf32[2, 2] x, tf32[2, 2] y) → tf32[2, 2] {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source);
+    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -560,7 +560,7 @@ functio combine(tf32[2, 2] x, tf32[2, 2] y) → tf32[2, 2] {
 fn mir_lowering_error_carries_source_span() {
     let session = test_session(Target::MirLlvm);
     let source = "functio id(f32 a) → f32 { redde a }\nincipit { nota id }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     let diag = result
         .diagnostics
         .iter()
@@ -642,11 +642,11 @@ fn deny_policy_does_not_touch_info_or_errors() {
 
 #[test]
 fn deny_warnings_suppresses_output_after_promotion() {
-    use crate::driver::{Config, Session, WarnPolicy};
+    use crate::driver::{Config, Session, WarnPolicy, AnalyzeRequest, ModuleCompileRequest};
 
     let session =
         Session::new(Config::default().with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] }));
-    let result = compile(&session, "deny-unused.fab", "incipit { fixum numerus unused ← 1 }");
+    let result = compile(&session, "deny-unused.fab", "incipit { fixum numerus unused ← 1 }", ModuleCompileRequest::default());
 
     assert!(result.output.is_none(), "promoted warnings must stop codegen output");
     assert!(
@@ -712,7 +712,7 @@ incipit {
     fixum textus m ← "a" + x + "b"
     nota m
 }
-"#,
+"#, ModuleCompileRequest::default(),
     );
 
     let warned = result
@@ -749,7 +749,7 @@ incipit {
     fixum textus m ← "a" + x + "b"
     nota m
 }
-"#,
+"#, ModuleCompileRequest::default(),
     );
 
     let warned = result
@@ -789,7 +789,7 @@ incipit {
     fixum textus m ← "a" + x
     nota m
 }
-"#,
+"#, ModuleCompileRequest::default(),
     );
 
     assert!(
@@ -835,7 +835,7 @@ incipit {
     fixum textus m ← x + y + z
     nota m
 }
-"#,
+"#, ModuleCompileRequest::default(),
     );
 
     assert!(
@@ -868,7 +868,7 @@ incipit {
 fn call_argument_type_mismatch_renders_code_file_line_and_expected_got() {
     let source = "incipit {\n    tacet\n}\n";
     let session = test_session(Target::HirTypeScript);
-    let analysis = super::analyze_source(&session, "probe.fab", source).expect("analyze");
+    let analysis = super::analyze_source(&session, "probe.fab", source, AnalyzeRequest::default()).expect("analyze");
     let start = u32::try_from(source.find("tacet").expect("tacet")).expect("fits u32");
     let errors = vec![crate::mir::MirError {
         message: "invalid MIR: call argument type mismatch (arg 1: expected tensor<fractus<32>, [8, 8]>, got tensor<fractus<32>, [8]>)"

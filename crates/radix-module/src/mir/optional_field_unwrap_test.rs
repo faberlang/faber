@@ -8,11 +8,11 @@
 
 use super::*;
 use crate::codegen::Target;
-use crate::driver::{Config, Session};
+use crate::driver::{Config, Session, AnalyzeRequest};
 
 fn analyze(source: &str) -> AnalyzedModule {
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
-    crate::driver::analyze_source(&session, "test.fab", source).unwrap_or_else(|diagnostics| {
+    crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()).unwrap_or_else(|diagnostics| {
         panic!(
             "analysis succeeds: {:?}",
             diagnostics

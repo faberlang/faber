@@ -4,7 +4,7 @@ use super::{
     compose, reject_surviving_fragment_calls, surviving_fragment_calls, ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION,
 };
 use crate::diagnostics::{semantic_message, DiagnosticArg};
-use crate::driver::{self, Config, Session};
+use crate::driver::{self, Config, Session, AnalyzeRequest};
 use crate::hir::DefId;
 use crate::lexer::Span;
 use crate::mir::{
@@ -580,7 +580,7 @@ functio k(fractus<f32> x) → fractus<f32> {
 }
 ";
     let session = Session::new(Config::default());
-    let mut analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
+    let mut analysis = driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
     let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("composition must succeed");
     assert!(
@@ -609,7 +609,7 @@ functio k(fractus<f32> x) → fractus<f32> {
 }
 ";
     let session = Session::new(Config::default());
-    let mut analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
+    let mut analysis = driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("cycle must fail closed");
     assert!(
         errors.iter().any(|err| err.issue == ISSUE_CYCLE),
@@ -633,7 +633,7 @@ functio k(fractus<f32> x) → fractus<f32> {
     let budget = ExpansionBudget { max_concrete_instances: 0, ..ExpansionBudget::DOCUMENTED_DEFAULTS };
     with_budget_override(budget, || {
         let session = Session::new(Config::default());
-        let mut analysis = driver::analyze_source(&session, "device.fab", source).expect("analyze source");
+        let mut analysis = driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
         let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("budget must fail closed");
         assert!(
             errors.iter().any(|err| err.issue == ISSUE_EXPANSION),

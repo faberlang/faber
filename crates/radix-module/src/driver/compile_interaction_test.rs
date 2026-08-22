@@ -3,7 +3,7 @@
 
 use super::compile;
 use crate::codegen::Target;
-use crate::driver::{Config, Session};
+use crate::driver::{Config, Session, ModuleCompileRequest};
 use crate::test_support::test_session;
 
 // ── reader-pack integration ──
@@ -15,7 +15,7 @@ fn compile_uses_locale_pack_for_keyword_lexing() {
         .with_locale_pack(super::zh_locale_pack());
     let session = Session::new(config);
     let source = "函数 salve() { }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
@@ -29,7 +29,7 @@ fn compile_accepts_en_require_surface_with_alternate_exit() {
         .with_locale_pack(pack);
     let session = Session::new(config);
     let source = "fn f() → int ⇥ string {\n  require true throw \"bad\"\n  return 1\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
@@ -43,7 +43,7 @@ fn compile_rejects_en_require_in_arrowless_function() {
         .with_locale_pack(pack);
     let session = Session::new(config);
     let source = "fn f() → int {\n  require true throw \"bad\"\n  return 1\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
         !result.success(),
@@ -72,7 +72,7 @@ fn compile_en_empty_marker_and_is_empty_intrinsic() {
         .with_locale_pack(pack);
     let session = Session::new(config);
     let source = "fn f() → int {\n  var list<int> xs ← empty\n  const _ vacant ← xs.is_empty()\n  return 0\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(
         result.success(),
         "en `empty` marker plus `is_empty` intrinsic must compile: {:?}",
@@ -91,7 +91,7 @@ fn compile_en_vacua_marker_rejected() {
         .with_locale_pack(pack);
     let session = Session::new(config);
     let source = "fn f() → int {\n  var list<int> xs ← vacua\n  return 0\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(
         !result.success(),
         "en `vacua` must not claim as the empty-collection marker: {:?}",
@@ -115,7 +115,7 @@ fn compile_la_vacua_marker_untouched() {
         .with_locale_pack(pack);
     let session = Session::new(config);
     let source = "functio f() → numerus {\n  varia lista<numerus> xs ← vacua\n  redde 0\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "la `vacua` marker must still claim: {:?}", result.diagnostics);
 }
 
@@ -132,7 +132,7 @@ fn compile_rejects_undeclared_latin_keyword_in_grammar_position() {
         .with_locale_pack(super::zh_locale_pack());
     let session = Session::new(config);
     let source = "functio salve() { }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
         !result.success(),
@@ -169,7 +169,7 @@ fn compile_uses_locale_pack_for_primitive_type_surface() {
     let source = r#"ฟังก์ชัน salve() → ข้อความ {
   คืน "สวัสดี"
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
@@ -185,7 +185,7 @@ fn compile_rejects_undeclared_tokenless_latin_keyword_in_grammar_slot() {
         .with_locale_pack(super::zh_locale_pack());
     let session = Session::new(config);
     let source = "functio salve() → numerus {\n  fixum _ t ← iuncta<numerus> [1]\n  redde 0\n}\n";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
         !result.success(),
@@ -217,7 +217,7 @@ fn deny_warnings_does_not_escalate_undeclared_latin_keyword_failure() {
         .with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] });
     let session = Session::new(config);
     let source = "functio salve() → numerus {\n  fixum _ t ← iuncta<numerus> [1]\n  redde 0\n}\n";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
         !result
@@ -262,7 +262,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     // name (type-first binding syntax) and is used as a value, never a
     // keyword claim.
     let source = "函数 salve() → numerus {\n  常量 numerus functio ← 1\n  redde functio\n}\n";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -304,7 +304,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
         .with_locale_pack(pack);
     let session = Session::new(config);
     let source = "functio salve() { }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -330,7 +330,7 @@ fn compile_canonical_latin_keywords_under_la_and_no_pack() {
         .with_locale_pack(crate::locale::latin_locale_pack());
     let session = Session::new(config);
     let source = "functio salve() { }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(
         result.success(),
         "canonical Latin keyword must claim under the la pack: {:?}",
@@ -338,7 +338,7 @@ fn compile_canonical_latin_keywords_under_la_and_no_pack() {
     );
 
     let session = test_session(Target::HirRust);
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(
         result.success(),
         "canonical Latin keyword must claim with no pack selected: {:?}",
@@ -384,7 +384,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
   fixum 元组<textus, numerus> t ← 元组<textus, numerus> ["salve", 7]
   redde 0
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
@@ -431,7 +431,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
   fixum _ t ← 读入
   redde 0
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
@@ -479,7 +479,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
   fixum _ n ← nihil 兜底 0
   redde 0
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
@@ -521,7 +521,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
   设 z ← 7
   redde x
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
@@ -573,7 +573,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
   } 当 1 > 0
   返回 0
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
@@ -612,7 +612,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
   常量 _ r ← 1 到 5
   返回 x
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
@@ -648,7 +648,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
         .with_target(Target::HirRust)
         .with_locale_pack(pack.clone());
     let session = Session::new(config);
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     assert!(
         !result
@@ -666,7 +666,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
         .with_locale_pack(pack)
         .with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] });
     let session = Session::new(config);
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(
         result.success(),
         "exact declared spellings must pass --deny-warnings: {:?}",
@@ -693,7 +693,7 @@ fn compile_one_letter_parameter_names_do_not_suggest_reader002() {
 main {
     print double(21)
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -742,7 +742,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
         .with_locale_pack(pack);
     let session = Session::new(config);
     let source = "函数 f(整数 x) → 布尔 { 返回 x 是 整数 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     assert!(
@@ -759,7 +759,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
 fn compile_accepts_exempla_metadata_in_frontmatter() {
     let session = test_session(Target::HirRust);
     let source = "+++\n[exempla]\n\"test\" = \"./exempla/test.fab\"\n+++\n\nincipit {\n  nota 42\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
 
@@ -767,7 +767,7 @@ fn compile_accepts_exempla_metadata_in_frontmatter() {
 fn compile_strips_frontmatter_before_analysis() {
     let session = test_session(Target::HirRust);
     let source = "+++\ntitle = \"salve\"\n+++\n\nincipit {\n  nota 42\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
 
@@ -775,7 +775,7 @@ fn compile_strips_frontmatter_before_analysis() {
 fn compile_rejects_invalid_frontmatter_toml() {
     let session = test_session(Target::HirRust);
     let source = "+++\nbad toml [[\n+++\n\nincipit {\n  nota 42\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
     assert!(result
         .diagnostics
@@ -787,7 +787,7 @@ fn compile_rejects_invalid_frontmatter_toml() {
 fn compile_rejects_line_start_section_directive() {
     let session = test_session(Target::HirRust);
     let source = "§ 1.0\nincipit {\n  nota 42\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
     assert!(result
         .diagnostics
@@ -799,7 +799,7 @@ fn compile_rejects_line_start_section_directive() {
 fn compile_rejects_c_style_line_comment() {
     let session = test_session(Target::HirRust);
     let source = "// This should fail\nincipit {\n  nota 42\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
     assert!(result
         .diagnostics
@@ -811,7 +811,7 @@ fn compile_rejects_c_style_line_comment() {
 fn compile_accepts_frontmatter_only_file() {
     let session = test_session(Target::HirRust);
     let source = "+++\nkey = \"value\"\n+++";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "frontmatter-only file must succeed as empty program");
 }
 
@@ -821,7 +821,7 @@ fn compile_accepts_frontmatter_only_file() {
 fn compile_reports_lex_errors() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum _ s ← \"hello\n}"; // unterminated string → LEX001
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(result.diagnostics.iter().any(|d| d.code == Some("LEX001")));
@@ -832,7 +832,7 @@ fn compile_reports_lex_errors() {
 fn compile_reports_parse_errors() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum _ ← 1 + \n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(result
@@ -846,7 +846,7 @@ fn compile_reports_parse_errors() {
 fn compile_rejects_retired_itera_pro_mode() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum _ xs ← [1, 2, 3]\n  itera pro fixum x de xs {\n    nota x\n  }\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(result
@@ -863,7 +863,7 @@ fn compile_reports_semantic_errors() {
   fixum numerus n ← 1
   fixum textus t ← n
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(result.diagnostics.iter().any(|d| d.code == Some("SEM010")));
@@ -874,7 +874,7 @@ fn compile_reports_semantic_errors() {
 fn compile_rejects_itera_ab_over_collection() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum _ xs ← [1, 2, 3]\n  itera ab xs fixum i {\n    nota i\n  }\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(result
@@ -889,7 +889,7 @@ fn compile_rejects_itera_ab_over_collection() {
 fn compile_rejects_redde_without_explicit_return_type() {
     let session = test_session(Target::HirRust);
     let source = "functio bad() {\n  redde 1\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(result
@@ -905,7 +905,7 @@ fn compile_accepts_effect_only_failable_function_without_return_arrow() {
   nota path
   nota data
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success());
 }
 
@@ -929,7 +929,7 @@ incipit {
   fixum _ c ← Circle {}
   c.draw()
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -956,7 +956,7 @@ incipit {
   fixum _ c ← Circle {}
   c.draw()
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
         result.success(),
@@ -977,7 +977,7 @@ fn compile_rejects_iace_without_function_error_channel() {
     let source = r#"functio fails() {
   iace "bad"
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
     assert!(result
         .diagnostics
@@ -1010,7 +1010,7 @@ fn custodi_multi_guard_emits_guards_in_source_order() {
   }
   nota x
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     let output = super::rust_output(result);
@@ -1069,7 +1069,7 @@ fn rust_target_accepts_fac_cape_and_iace() {
 incipit {
   probe(verum)
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     assert!(matches!(result.output, Some(crate::Output::Rust(_))));
@@ -1089,7 +1089,7 @@ fn rust_target_accepts_si_cape_attachments() {
 incipit {
   probe(verum)
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     assert!(matches!(result.output, Some(crate::Output::Rust(_))));
@@ -1119,7 +1119,7 @@ fn rust_target_accepts_elige_cape_attachments() {
 incipit {
   probe(1)
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     assert!(matches!(result.output, Some(crate::Output::Rust(_))));
@@ -1135,7 +1135,7 @@ fn rust_target_accepts_cura_cape_attachments() {
     tacet
   }
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     assert!(matches!(result.output, Some(crate::Output::Rust(_))));
@@ -1148,7 +1148,7 @@ fn rust_target_accepts_lege_expression() {
   fixum _ x ← lege
   nota x
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     assert!(matches!(result.output, Some(crate::Output::Rust(_))));
@@ -1179,7 +1179,7 @@ fn regex_conversio_no_longer_reports_unsupported_lowering_error() {
 fn retired_sed_fails_without_targeted_diagnostic() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit { fixum _ r ← sed "\d+" g }"#;
-    let result = compile(&session, "sed-retired.fab", source);
+    let result = compile(&session, "sed-retired.fab", source, ModuleCompileRequest::default());
     // `sed` is a plain identifier now; the source fails with generic
     // unknown-identifier errors, never the retired `PARSE030.retired_sed`.
     assert!(!result.success());
@@ -1200,7 +1200,7 @@ fn rust_target_reports_cura_arena_noop_warning() {
   cura "arena" fixum _ mem {
   }
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     result
         .diagnostics
@@ -1216,7 +1216,7 @@ fn typescript_target_skips_rust_specific_cura_arena_warning() {
   cura "arena" fixum _ mem {
   }
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result
         .diagnostics
@@ -1230,7 +1230,7 @@ fn warning_only_semantic_diagnostics_still_emit_output() {
     let source = r"incipit {
   fixum _ unused ← 1
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(matches!(result.output, Some(crate::Output::Rust(_))));
     assert!(result.diagnostics.iter().any(|d| !d.is_error()));
@@ -1248,7 +1248,7 @@ fn compile_accepts_textus_concatenation_and_explicit_append() {
   s ← s + "!"
   nota "dicit: " + s
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     let output = super::rust_output(result);
@@ -1265,7 +1265,7 @@ fn compile_accepts_textus_explicit_append_with_ascii_operand() {
   buf ← buf + tag
   nota buf
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     crate::backend_smoke::assert_hir_emitted_smoke(
@@ -1285,7 +1285,7 @@ fn go_target_rejects_ad_with_explicit_policy_diagnostic() {
     nota response
   }
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.output.is_none());
     assert!(!result.success());
@@ -1304,7 +1304,7 @@ fixum ignotum process
 incipit {
   nota process.argv
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.output.is_none());
     assert!(!result.success());
@@ -1326,7 +1326,7 @@ incipit {
   fixum _ args ← argv() ∷ lista<textus>
   nota args.longitudo()
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(result.output.is_none());
@@ -1346,7 +1346,7 @@ fn retired_ab_pipeline_is_not_active_rust_syntax() {
   fixum _ active ← ab users activus
   nota active
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(result.output.is_none());
@@ -1359,7 +1359,7 @@ fn triple_quote_is_not_a_block_string_surface() {
     // as an ordinary unterminated string, never with the retired
     // `unsupported_triple_quote_string` diagnostic.
     let source = "incipit {\n  fixum _ value ← \"\"\"\n  nota value\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(!result
@@ -1372,7 +1372,7 @@ fn triple_quote_is_not_a_block_string_surface() {
 fn slash_line_comment_is_not_faber_syntax() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  // old comment\n  nota \"ok\"\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(result.output.is_none());
@@ -1382,7 +1382,7 @@ fn slash_line_comment_is_not_faber_syntax() {
 fn slash_block_comment_is_not_faber_syntax() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  /* old block */\n  nota \"ok\"\n}";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(result
@@ -1407,7 +1407,7 @@ incipit {
   nota e1
   nota e2
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     assert!(matches!(result.output, Some(crate::Output::Rust(_))));
@@ -1419,7 +1419,7 @@ fn rejects_statement_level_legacy_ad_string_route() {
     let source = r#"incipit {
   ad "notificatio:mitte" ("User logged in", userId)
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     assert!(result
@@ -1442,7 +1442,7 @@ incipit {
   ex person fixum name
   nota name
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     assert!(matches!(result.output, Some(crate::Output::Rust(_))));
@@ -1460,7 +1460,7 @@ incipit {
     casu Color.viridis { nota "v" }
   }
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     assert!(result
@@ -1480,7 +1480,7 @@ incipit {
   fixum _ c ← Color.rubrum
   fixum _ e ← Color
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     // Bare `Color` is not a value — expect a name_not_value diagnostic.
     let name_not_value_issues: Vec<_> = result
@@ -1519,7 +1519,7 @@ fn compile_accepts_param_alias_binding() {
 incipit {
   greet("A", verum)
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     assert!(matches!(result.output, Some(crate::Output::Rust(_))));
@@ -1536,7 +1536,7 @@ fn est_verum_and_falsum_accept_ignotum_operands() {
 incipit {
   check(verum)
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result
         .diagnostics
@@ -1553,7 +1553,7 @@ fixum ignotum Bun
 incipit {
   nota Bun
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     // `@ externa` is a retired surface; the unknown-annotation rejection
@@ -1575,7 +1575,7 @@ incipit {
   fixum lista<numerus> values ← [3, 7]
   nota add(sparge values)
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result
         .diagnostics
@@ -1595,7 +1595,7 @@ fn import_alias_usage_no_longer_reports_unknown_identifier() {
     incipit {
   consolum.fundeLineam("x")
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(matches!(result.output, Some(crate::Output::Rust(_))));
     assert!(result.diagnostics.iter().all(|d| !d.is_error()));
@@ -1614,7 +1614,7 @@ importa ex "./helpers" item
 incipit {
   nota "ok"
 }"#;
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
     assert!(result
@@ -1633,7 +1633,7 @@ incipit {
   fixum _ args ← process.argv ∷ lista<textus>
   nota args.longitudo()
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
     // `@ externa` is a retired surface; the unknown-annotation rejection
@@ -1657,7 +1657,7 @@ incipit {
   active ← falsum
   nota count, active
 }";
-    let result = compile(&session, "test.fab", source);
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
     assert!(result

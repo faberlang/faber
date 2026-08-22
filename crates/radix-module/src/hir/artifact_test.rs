@@ -1,3 +1,4 @@
+use crate::driver::AnalyzeRequest;
 use super::*;
 use radix_hir_fhir::HirArtifact;
 use std::error::Error;
@@ -1019,7 +1020,7 @@ fn hir_artifact_round_trip_acceptance() {
     let source = "incipit {\n    nota \"Salve, Munde!\"\n}\n";
 
     let session = crate::driver::Session::new(crate::driver::Config::default());
-    let unit = crate::driver::analyze_source(&session, "test.faber", source).expect("analyze hello-world fixture");
+    let unit = crate::driver::analyze_source(&session, "test.faber", source, AnalyzeRequest::default()).expect("analyze hello-world fixture");
 
     let latin = crate::locale::latin_locale_pack();
     let surface = crate::locale::KeywordSurface::new(&latin);
@@ -1081,7 +1082,7 @@ fn conversio_assign_fhir_artifact_round_trip_preserves_operator() {
     let source = "incipit {\n  varia numerus count ← 0\n  count ↤ \"42\" ⇥ 0\n  nota count\n}\n";
 
     let session = crate::driver::Session::new(crate::driver::Config::default());
-    let unit = crate::driver::analyze_source(&session, "conversio-assign.faber", source).expect("analyze ↤ fixture");
+    let unit = crate::driver::analyze_source(&session, "conversio-assign.faber", source, AnalyzeRequest::default()).expect("analyze ↤ fixture");
 
     let latin = crate::locale::latin_locale_pack();
     let surface = crate::locale::KeywordSurface::new(&latin);

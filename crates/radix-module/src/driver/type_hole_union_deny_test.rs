@@ -11,7 +11,7 @@
 use super::compile;
 use crate::codegen::Target;
 use crate::diagnostics::is_known_diagnostic_code;
-use crate::driver::{analyze_source, Config, Session, WarnPolicy};
+use crate::driver::{analyze_source, Config, Session, WarnPolicy, AnalyzeRequest, ModuleCompileRequest};
 use crate::{CompileResult, Diagnostic};
 
 /// Emits both shape warnings: `_` solved to a multi-member union (WARN016) and
@@ -31,7 +31,7 @@ fn compile_with_policy(policy: WarnPolicy) -> CompileResult {
         .with_target(Target::HirRust)
         .with_warn_policy(policy);
     let session = Session::new(config);
-    compile(&session, "test.fab", WARN016_WARN017_SOURCE)
+    compile(&session, "test.fab", WARN016_WARN017_SOURCE, ModuleCompileRequest::default())
 }
 
 fn has_code_promoted(result: &CompileResult, code: &str) -> bool {
@@ -53,7 +53,7 @@ fn baseline_source_emits_both_hole_warnings() {
     // Sanity on the analysis path (stops before codegen): the fixture really
     // carries WARN016 + WARN017 as warnings, which the deny tests promote.
     let session = Session::new(Config::default().with_target(Target::HirRust));
-    let diagnostics = match analyze_source(&session, "test.fab", WARN016_WARN017_SOURCE) {
+    let diagnostics = match analyze_source(&session, "test.fab", WARN016_WARN017_SOURCE, AnalyzeRequest::default()) {
         Ok(unit) => unit.diagnostics,
         Err(diags) => diags,
     };

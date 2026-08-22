@@ -26,7 +26,7 @@
 //!    changes (the canonical name flows through the HIR).
 
 use crate::diagnostics::Diagnostic;
-use crate::driver::{analyze_source, Config, Session};
+use crate::driver::{analyze_source, Config, Session, AnalyzeRequest};
 use crate::hir::{HirExpression, HirExpressionKind, HirModule, HirStatementKind};
 use crate::mir::lower_analyzed_unit;
 use crate::mir::{MirCollectionOp, MirIntrinsic, MirProgram, MirStatementKind};
@@ -55,7 +55,7 @@ fn analyze(
         None => Config::default(),
     };
     let session = Session::new(config);
-    analyze_source(&session, "intrinsic_locale.fab", source)
+    analyze_source(&session, "intrinsic_locale.fab", source, AnalyzeRequest::default())
 }
 
 fn diagnostic_summary(diagnostics: &[Diagnostic]) -> Vec<String> {
