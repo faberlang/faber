@@ -28,6 +28,10 @@ mod wgsl_text;
 #[path = "test_support.rs"]
 pub mod test_support;
 
+#[cfg(test)]
+#[path = "itera_destructure_test.rs"]
+mod itera_destructure_tests;
+
 // --- Core from radix-mir (module paths for residual code) ---
 pub use radix_mir::{
     abi, ai_workbench_stage5, artifact_completeness, boundary_abi, capability, control, device, device_semantics, dump,
