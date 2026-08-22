@@ -1,4 +1,4 @@
-//! BRI-1 red drivers for the HIR-hosted borrow-region contract.
+//! BRI-1/BRI-3 drivers for the HIR-hosted borrow-region contract.
 //!
 //! The delivery artifact settles the host as a semantic CFG derived from
 //! typed HIR. Locations retain HIR identity (`HirId`/`DefId`/`Span`), and a
@@ -7,31 +7,37 @@
 //! region-based checker may accept these cases after last-use inference, but
 //! it must not reject anything accepted by the current approximation.
 //!
-//! These fixtures intentionally pin the current scope checker's red result.
-//! Once the region authority lands, both programs are expected to analyze
-//! successfully because the marked mutable borrow is last used before the
-//! source write. Do not weaken the red expectation in this unit.
+//! The cyclic fixtures below were pinned red against the retired block-scope
+//! approximation (BRI-1). Since BRI-3 routed marked-value diagnostics through
+//! the region engine, both programs analyze successfully: the marked mutable
+//! borrow is last used before the source write, so its region is dead at the
+//! write even though the loop back-edge re-enters the condition.
 
 use super::borrow_region;
 use super::borrow_region_cfg::{CfgEdgeKind, CfgNodeKind};
-use crate::test_support::{analyze_source, issue};
+use crate::test_support::{analyze_ok, analyze_source, issue};
 use crate::SemanticErrorKind;
 use radix_hir::visit::{walk_expr, HirVisitor};
 use radix_hir::{HirBlock, HirExpression, HirExpressionKind, HirId};
 
-fn assert_current_scope_red(source: &str, label: &str) {
+fn assert_region_accepted(source: &str, label: &str) {
+    // POST-BRI-3: the production path consults the region facts, so the old
+    // false `write_while_borrowed` conflict must be gone.
     let result = analyze_source(source);
     assert!(
-        result.is_err(),
-        "{label} must remain a current-scope red driver; diagnostics: {:?}",
+        result.is_ok(),
+        "{label} must be region-accepted; diagnostics: {:?}",
         result.diagnostics
     );
     assert!(
-        result.diagnostics.iter().any(|diagnostic| {
-            diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
-                && issue(diagnostic) == Some("write_while_borrowed")
-        }),
-        "{label} must expose MutableBorrowConflict/write_while_borrowed; diagnostics: {:?}",
+        !result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| {
+                diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
+                    && issue(diagnostic) == Some("write_while_borrowed")
+            }),
+        "{label} must not report write_while_borrowed; diagnostics: {:?}",
         result.diagnostics
     );
 }
@@ -93,10 +99,9 @@ incipit {
 }
 "#;
 
-    // PRE-BRI-3: block-scope tracking keeps `view` live until the body exits,
-    // so the current authority reports write_while_borrowed. POST-BRI-3, the
-    // last-use region should accept this fixture.
-    assert_current_scope_red(source, "dum back-edge release-before-write");
+    // POST-BRI-3 payoff: last-use region inference accepts this fixture
+    // through the production borrow path without the old false conflict.
+    assert_region_accepted(source, "dum back-edge release-before-write");
 }
 
 #[test]
@@ -116,10 +121,59 @@ incipit {
 }
 "#;
 
-    // PRE-BRI-3: the current block-scope authority reports the same red.
-    // POST-BRI-3: last-use region inference should accept the fixture while
-    // preserving the explicit `rumpe` exit edge.
-    assert_current_scope_red(source, "loop rumpe release-before-write");
+    // POST-BRI-3 payoff: accepted while the explicit `rumpe` exit edge stays.
+    assert_region_accepted(source, "loop rumpe release-before-write");
+}
+
+#[test]
+fn cyclic_release_does_not_weaken_conflict_when_borrow_still_live() {
+    // Same cyclic shape, but the source write precedes the borrow's last
+    // use: the region is live at the write and SEM052 must still fire.
+    let result = analyze_source(
+        r#"
+incipit {
+    varia lista<numerus> xs ← [1, 2, 3]
+    dum xs.longitudo() < 5 {
+        varia in lista<numerus> view ← xs
+        xs.appende(4)
+        nota view.longitudo()
+    }
+}
+"#,
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| {
+                diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
+                    && issue(diagnostic) == Some("write_while_borrowed")
+            }),
+        "live region must keep write_while_borrowed; diagnostics: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn production_path_consumes_the_handoff_table() {
+    // The pipeline result carries the one access-fact table, and the region
+    // facts the borrow path consulted were derived from that same table.
+    let result = analyze_ok(
+        r#"
+incipit {
+    varia lista<numerus> xs ← [1, 2, 3]
+    dum xs.longitudo() < 5 {
+        varia in lista<numerus> view ← xs
+        nota view.longitudo()
+        xs.appende(4)
+    }
+}
+"#,
+    );
+    let facts = result.access_facts.as_ref().expect("handoff table");
+    let hir = result.hir.as_ref().expect("HIR");
+    let regions = borrow_region::analyze(hir, &result.types, facts).expect("regions");
+    assert!(regions.fact_reads() > 0, "engine must read the table");
 }
 
 #[test]

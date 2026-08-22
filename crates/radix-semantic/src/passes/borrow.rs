@@ -43,8 +43,17 @@
 //!   reusable within one block.
 //! - The `TypeTable` is consulted only for callee signatures, because argument
 //!   modes determine whether a call reads, mutably borrows, or moves an input.
+//! - Marked-value borrows (`mut`/`ref` local binds and explicit refs of
+//!   marked roots) route their conflict decisions through the BRI-2 region
+//!   engine when region facts are supplied: a borrow conflicts only while its
+//!   region is live at the consuming statement, so last-use release replaces
+//!   the old block-exit approximation inside cyclic bodies. When no region
+//!   facts are available the previous block-scope approximation decides.
 //! - Warnings produced here remain non-fatal unless the semantic driver or
 //!   diagnostic consumer treats warning-kind diagnostics as errors.
+
+use super::borrow_region::RegionFacts;
+use super::borrow_region_cfg::CfgNodeId;
 
 use crate::{
     AccessMarker, FuncSig, ParamType, Primitive, Resolver, SemanticError, SemanticErrorKind,
@@ -85,7 +94,22 @@ pub fn analyze_modes(
     _resolver: &Resolver,
     types: &TypeTable,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, false, true)
+    run(hir, types, false, true, None)
+}
+
+/// Region-routed [`analyze_modes`]: marked-value borrow conflicts consult the
+/// supplied region facts (produced by BRI-2 from the one `AccessFactTable`).
+///
+/// # Errors
+///
+/// Returns access violations as a list of [`SemanticError`]s.
+pub fn analyze_modes_with_regions(
+    hir: &HirModule,
+    resolver: &Resolver,
+    types: &TypeTable,
+    regions: Option<&RegionFacts>,
+) -> Result<(), Vec<SemanticError>> {
+    run(hir, types, false, true, regions)
 }
 
 /// Legacy Rust-target analysis: declared access facts plus the Rust lifetime
@@ -101,7 +125,23 @@ pub fn analyze(
     _resolver: &Resolver,
     types: &TypeTable,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, true, true)
+    run(hir, types, true, true, None)
+}
+
+/// Region-routed [`analyze`]: marked-value borrow conflicts consult the
+/// supplied region facts while the Rust-lifetime simulation keeps its
+/// existing call-scoped behavior.
+///
+/// # Errors
+///
+/// Returns borrow/lifetime violations as a list of [`SemanticError`]s.
+pub fn analyze_with_regions(
+    hir: &HirModule,
+    resolver: &Resolver,
+    types: &TypeTable,
+    regions: Option<&RegionFacts>,
+) -> Result<(), Vec<SemanticError>> {
+    run(hir, types, true, true, regions)
 }
 
 /// Retired Rust lifetime simulation hook.
@@ -127,8 +167,9 @@ fn run(
     types: &TypeTable,
     rust_lifetime: bool,
     language_conflicts: bool,
+    regions: Option<&RegionFacts>,
 ) -> Result<(), Vec<SemanticError>> {
-    let mut checker = BorrowChecker::new(types, rust_lifetime, language_conflicts);
+    let mut checker = BorrowChecker::new(types, rust_lifetime, language_conflicts, regions);
     checker.check_program(hir);
 
     if checker.errors.is_empty() {
@@ -143,21 +184,43 @@ fn run(
 /// The pass intentionally does not model partial moves or field-granular
 /// borrowing. Projections collapse through `root_def_id`, which keeps the
 /// pre-codegen check conservative and aligned with the current HIR surface.
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default)]
 struct BorrowState {
     moved: bool,
     shared: u32,
     mutable: bool,
+    /// Marked-value borrows whose conflict decision is routed through the
+    /// region engine, keyed by the borrowing local. Missing or live-less
+    /// region facts fall back to the block-scope approximation.
+    region_borrows: Vec<TrackedRegionBorrow>,
 }
 
-#[derive(Clone, Copy)]
+/// One region-routed borrow retained on the source's [`BorrowState`].
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct TrackedRegionBorrow {
+    borrower: DefId,
+    kind: BorrowKind,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum BorrowKind {
     Shared,
     Mutable,
 }
 
+/// A borrow registered against the innermost [`BorrowScope`].
+///
+/// `Region` entries borrow the block-scope lifetime (they are dropped when
+/// the block exits) but their conflict decision while in scope belongs to the
+/// region engine.
+#[derive(Clone, Copy)]
+enum ScopeBorrow {
+    Flagged(DefId, BorrowKind),
+    Region { source: DefId, borrower: DefId },
+}
+
 struct BorrowScope {
-    borrows: Vec<(DefId, BorrowKind)>,
+    borrows: Vec<ScopeBorrow>,
 }
 
 struct BorrowChecker<'a> {
@@ -186,6 +249,12 @@ struct BorrowChecker<'a> {
     /// Function param contracts keyed by callee `DefId` (named calls leave
     /// `callee.ty` unset; this index supplies own-param dest facts).
     func_params: FxHashMap<DefId, Vec<ParamType>>,
+    /// BRI-2 region facts consumed (never reconstructed) for marked-value
+    /// conflict decisions; `None` keeps the block-scope approximation.
+    regions: Option<&'a RegionFacts>,
+    /// CFG node of the statement under analysis, used for region-liveness
+    /// queries. `None` (or a missing region) is conservatively "live".
+    stmt_node: Option<CfgNodeId>,
     errors: Vec<SemanticError>,
 }
 
@@ -206,7 +275,12 @@ struct ParamUsage {
 }
 
 impl<'a> BorrowChecker<'a> {
-    fn new(types: &'a TypeTable, rust_lifetime: bool, language_conflicts: bool) -> Self {
+    fn new(
+        types: &'a TypeTable,
+        rust_lifetime: bool,
+        language_conflicts: bool,
+        regions: Option<&'a RegionFacts>,
+    ) -> Self {
         Self {
             types,
             rust_lifetime,
@@ -220,6 +294,8 @@ impl<'a> BorrowChecker<'a> {
             copy_roots: FxHashSet::default(),
             unmarked_own_binds: FxHashMap::default(),
             func_params: FxHashMap::default(),
+            regions,
+            stmt_node: None,
             errors: Vec::new(),
         }
     }
@@ -321,6 +397,7 @@ impl<'a> BorrowChecker<'a> {
         self.own_roots.clear();
         self.copy_roots.clear();
         self.unmarked_own_binds.clear();
+        self.stmt_node = None;
     }
 
     fn check_block(&mut self, block: &HirBlock) {
@@ -335,6 +412,9 @@ impl<'a> BorrowChecker<'a> {
     }
 
     fn check_stmt(&mut self, stmt: &HirStatement) {
+        self.stmt_node = self
+            .regions
+            .and_then(|facts| facts.cfg().node_for_hir_id(stmt.id));
         match &stmt.kind {
             HirStatementKind::Local(local) => {
                 self.ensure_state(local.def_id);
@@ -348,6 +428,36 @@ impl<'a> BorrowChecker<'a> {
                     }
                 }
                 if let Some(init) = &local.init {
+                    // Region-routed explicit-ref bind of a marked root: the
+                    // borrowing local's region releases the conflict at last
+                    // use instead of the old block-exit approximation.
+                    if let HirExpressionKind::Ref(kind, inner) = &init.kind {
+                        if let Some(source) = Self::root_def_id(inner) {
+                            if self.tracks_explicit_ref(source)
+                                && (self.mut_roots.contains(&source)
+                                    || self.ref_roots.contains(&source))
+                            {
+                                self.check_projection_inputs(inner);
+                                match kind {
+                                    radix_hir::HirRefKind::Shared => {
+                                        self.borrow_shared_with(
+                                            source,
+                                            Some(local.def_id),
+                                            init.span,
+                                        );
+                                    }
+                                    radix_hir::HirRefKind::Mutable => {
+                                        self.borrow_mut_with(
+                                            source,
+                                            Some(local.def_id),
+                                            init.span,
+                                        );
+                                    }
+                                }
+                                return;
+                            }
+                        }
+                    }
                     if local.ty.is_some_and(|ty| self.types.is_copy_view(ty)) {
                         self.bind_copy_from(init);
                     } else if local.ty.is_some_and(|ty| self.types.is_own_view(ty)) {
@@ -355,11 +465,11 @@ impl<'a> BorrowChecker<'a> {
                     } else if self.language_conflicts
                         && local.ty.is_some_and(|ty| self.types.is_mut_view(ty))
                     {
-                        self.bind_mut_from(init);
+                        self.bind_mut_from(init, Some(local.def_id));
                     } else if self.language_conflicts
                         && local.ty.is_some_and(|ty| self.types.is_ref_view(ty))
                     {
-                        self.bind_ref_from(init);
+                        self.bind_ref_from(init, Some(local.def_id));
                     } else {
                         self.check_expr(init);
                     }
@@ -490,9 +600,9 @@ impl<'a> BorrowChecker<'a> {
             }
             if language_call_borrows {
                 if self.dest_is_mut(param) {
-                    self.borrow_from_expr(&arg.expr, BorrowKind::Mutable);
+                    self.borrow_from_expr(&arg.expr, BorrowKind::Mutable, None);
                 } else if self.dest_is_ref(param) {
-                    self.borrow_from_expr(&arg.expr, BorrowKind::Shared);
+                    self.borrow_from_expr(&arg.expr, BorrowKind::Shared, None);
                 } else {
                     self.check_expr(&arg.expr);
                 }
@@ -501,7 +611,7 @@ impl<'a> BorrowChecker<'a> {
             match param.mode {
                 SemanticParamMode::Ref => {
                     if self.rust_lifetime {
-                        self.borrow_from_expr(&arg.expr, BorrowKind::Shared);
+                        self.borrow_from_expr(&arg.expr, BorrowKind::Shared, None);
                     } else {
                         // Mode-only: treat as a read of the root value.
                         if let Some(def_id) = Self::root_def_id(&arg.expr) {
@@ -514,7 +624,7 @@ impl<'a> BorrowChecker<'a> {
                 }
                 SemanticParamMode::MutRef => {
                     if self.rust_lifetime {
-                        self.borrow_from_expr(&arg.expr, BorrowKind::Mutable);
+                        self.borrow_from_expr(&arg.expr, BorrowKind::Mutable, None);
                     } else if let Some(def_id) = Self::root_def_id(&arg.expr) {
                         self.check_projection_inputs(&arg.expr);
                         // Mutate demand without registering a Rust borrow scope.
@@ -567,12 +677,17 @@ impl<'a> BorrowChecker<'a> {
         }
     }
 
-    fn borrow_from_expr(&mut self, expr: &HirExpression, kind: BorrowKind) {
+    fn borrow_from_expr(
+        &mut self,
+        expr: &HirExpression,
+        kind: BorrowKind,
+        borrower: Option<DefId>,
+    ) {
         if let Some(def_id) = Self::root_def_id(expr) {
             self.check_projection_inputs(expr);
             match kind {
-                BorrowKind::Shared => self.borrow_shared(def_id, expr.span),
-                BorrowKind::Mutable => self.borrow_mut(def_id, expr.span),
+                BorrowKind::Shared => self.borrow_shared_with(def_id, borrower, expr.span),
+                BorrowKind::Mutable => self.borrow_mut_with(def_id, borrower, expr.span),
             }
         } else {
             self.check_expr(expr);
@@ -651,13 +766,16 @@ impl<'a> BorrowChecker<'a> {
     }
 
     /// Exclusive-borrow bind of a `mut` local from a path (or projection root).
-    fn bind_mut_from(&mut self, rhs: &HirExpression) {
-        self.borrow_from_expr(rhs, BorrowKind::Mutable);
+    ///
+    /// `borrower` is the bound local; when present the conflict decision is
+    /// region-routed through that local's inferred borrow region.
+    fn bind_mut_from(&mut self, rhs: &HirExpression, borrower: Option<DefId>) {
+        self.borrow_from_expr(rhs, BorrowKind::Mutable, borrower);
     }
 
     /// Shared-borrow bind of a `ref` local from a path (or projection root).
-    fn bind_ref_from(&mut self, rhs: &HirExpression) {
-        self.borrow_from_expr(rhs, BorrowKind::Shared);
+    fn bind_ref_from(&mut self, rhs: &HirExpression, borrower: Option<DefId>) {
+        self.borrow_from_expr(rhs, BorrowKind::Shared, borrower);
     }
 
     /// Bind-site duplicate acquisition for a `copy` destination.
@@ -769,12 +887,13 @@ impl<'a> BorrowChecker<'a> {
 
     fn read_use(&mut self, def_id: DefId, span: radix_lexer::Span) {
         self.note_live_unmarked_own_bind(def_id);
+        let (region_mut_live, _) = self.region_liveness(def_id);
         let state = self.states.entry(def_id).or_default();
         if state.moved {
             self.error(SemanticErrorKind::UseAfterMove, ISSUE_USE_AFTER_MOVE, span);
             return;
         }
-        if state.mutable {
+        if state.mutable || region_mut_live {
             self.error(
                 SemanticErrorKind::MutableBorrowConflict,
                 ISSUE_USE_WHILE_MUTABLY_BORROWED,
@@ -796,12 +915,13 @@ impl<'a> BorrowChecker<'a> {
                 usage.mutated = true;
             }
         }
+        let (region_mut_live, region_any_live) = self.region_liveness(def_id);
         let state = self.states.entry(def_id).or_default();
         if state.moved {
             self.error(SemanticErrorKind::UseAfterMove, ISSUE_USE_AFTER_MOVE, span);
             return;
         }
-        if state.mutable || state.shared > 0 {
+        if state.mutable || state.shared > 0 || region_any_live {
             self.error(
                 SemanticErrorKind::MutableBorrowConflict,
                 ISSUE_WRITE_WHILE_BORROWED,
@@ -815,12 +935,13 @@ impl<'a> BorrowChecker<'a> {
         if let Some(usage) = self.param_usage.get_mut(&def_id) {
             usage.moved = true;
         }
+        let (_, region_any_live) = self.region_liveness(def_id);
         let state = self.states.entry(def_id).or_default();
         if state.moved {
             self.error(SemanticErrorKind::UseAfterMove, ISSUE_USE_AFTER_MOVE, span);
             return;
         }
-        if state.mutable || state.shared > 0 {
+        if state.mutable || state.shared > 0 || region_any_live {
             self.error(
                 SemanticErrorKind::CannotMoveOut,
                 ISSUE_CANNOT_MOVE_WHILE_BORROWED,
@@ -832,6 +953,16 @@ impl<'a> BorrowChecker<'a> {
     }
 
     fn borrow_shared(&mut self, def_id: DefId, span: radix_lexer::Span) {
+        self.borrow_shared_with(def_id, None, span);
+    }
+
+    fn borrow_shared_with(
+        &mut self,
+        def_id: DefId,
+        borrower: Option<DefId>,
+        span: radix_lexer::Span,
+    ) {
+        let (region_mut_live, _) = self.region_liveness(def_id);
         let state = self.states.entry(def_id).or_default();
         if state.moved {
             // Use-after-consume is language policy even without Rust lifetime.
@@ -850,7 +981,7 @@ impl<'a> BorrowChecker<'a> {
             );
             return;
         }
-        if state.mutable {
+        if state.mutable || region_mut_live {
             self.error(
                 SemanticErrorKind::MutableBorrowConflict,
                 ISSUE_SHARED_BORROW_CONFLICT,
@@ -858,13 +989,36 @@ impl<'a> BorrowChecker<'a> {
             );
             return;
         }
-        state.shared = state.shared.saturating_add(1);
-        if let Some(scope) = self.scopes.last_mut() {
-            scope.borrows.push((def_id, BorrowKind::Shared));
+        if let Some(borrower) = borrower {
+            state.region_borrows.push(TrackedRegionBorrow {
+                borrower,
+                kind: BorrowKind::Shared,
+            });
+            if let Some(scope) = self.scopes.last_mut() {
+                scope.borrows.push(ScopeBorrow::Region {
+                    source: def_id,
+                    borrower,
+                });
+            }
+        } else {
+            state.shared = state.shared.saturating_add(1);
+            if let Some(scope) = self.scopes.last_mut() {
+                scope.borrows.push(ScopeBorrow::Flagged(def_id, BorrowKind::Shared));
+            }
         }
     }
 
     fn borrow_mut(&mut self, def_id: DefId, span: radix_lexer::Span) {
+        self.borrow_mut_with(def_id, None, span);
+    }
+
+    fn borrow_mut_with(
+        &mut self,
+        def_id: DefId,
+        borrower: Option<DefId>,
+        span: radix_lexer::Span,
+    ) {
+        let (_, region_any_live) = self.region_liveness(def_id);
         let state = self.states.entry(def_id).or_default();
         if state.moved {
             self.error(
@@ -882,7 +1036,7 @@ impl<'a> BorrowChecker<'a> {
             );
             return;
         }
-        if state.mutable || state.shared > 0 {
+        if state.mutable || state.shared > 0 || region_any_live {
             self.error(
                 SemanticErrorKind::MutableBorrowConflict,
                 ISSUE_MUTABLE_BORROW_CONFLICT,
@@ -890,9 +1044,55 @@ impl<'a> BorrowChecker<'a> {
             );
             return;
         }
-        state.mutable = true;
-        if let Some(scope) = self.scopes.last_mut() {
-            scope.borrows.push((def_id, BorrowKind::Mutable));
+        if let Some(borrower) = borrower {
+            state.region_borrows.push(TrackedRegionBorrow {
+                borrower,
+                kind: BorrowKind::Mutable,
+            });
+            if let Some(scope) = self.scopes.last_mut() {
+                scope.borrows.push(ScopeBorrow::Region {
+                    source: def_id,
+                    borrower,
+                });
+            }
+        } else {
+            state.mutable = true;
+            if let Some(scope) = self.scopes.last_mut() {
+                scope.borrows.push(ScopeBorrow::Flagged(def_id, BorrowKind::Mutable));
+            }
+        }
+    }
+
+    /// Region-liveness flags for a source's outstanding region-routed borrows:
+    /// `(mutable live, any live)`. Missing region facts or locations are
+    /// treated as live, matching the old block-exit approximation.
+    fn region_liveness(&self, def_id: DefId) -> (bool, bool) {
+        let Some(state) = self.states.get(&def_id) else {
+            return (false, false);
+        };
+        let mut mutable_live = false;
+        let mut any_live = false;
+        for tracked in &state.region_borrows {
+            if self.tracked_region_live(tracked.borrower) {
+                any_live = true;
+                if matches!(tracked.kind, BorrowKind::Mutable) {
+                    mutable_live = true;
+                }
+            }
+        }
+        (mutable_live, any_live)
+    }
+
+    fn tracked_region_live(&self, borrower: DefId) -> bool {
+        let Some(facts) = self.regions else {
+            return true;
+        };
+        match facts.region_for(borrower) {
+            None => true,
+            Some(region) => match self.stmt_node {
+                None => true,
+                Some(node) => region.is_live_at(node),
+            },
         }
     }
 
@@ -906,14 +1106,25 @@ impl<'a> BorrowChecker<'a> {
         let Some(scope) = self.scopes.pop() else {
             return;
         };
-        for (def_id, kind) in scope.borrows {
-            if let Some(state) = self.states.get_mut(&def_id) {
-                match kind {
-                    BorrowKind::Shared => {
-                        state.shared = state.shared.saturating_sub(1);
+        for borrow in scope.borrows {
+            match borrow {
+                ScopeBorrow::Flagged(def_id, kind) => {
+                    if let Some(state) = self.states.get_mut(&def_id) {
+                        match kind {
+                            BorrowKind::Shared => {
+                                state.shared = state.shared.saturating_sub(1);
+                            }
+                            BorrowKind::Mutable => {
+                                state.mutable = false;
+                            }
+                        }
                     }
-                    BorrowKind::Mutable => {
-                        state.mutable = false;
+                }
+                ScopeBorrow::Region { source, borrower } => {
+                    // The borrowing block exited; region liveness no longer
+                    // decides this borrow, matching the old release point.
+                    if let Some(state) = self.states.get_mut(&source) {
+                        state.region_borrows.retain(|tracked| tracked.borrower != borrower);
                     }
                 }
             }
@@ -1022,7 +1233,7 @@ impl HirVisitor for BorrowChecker<'_> {
                     && (target.ty.is_some_and(|ty| self.types.is_mut_view(ty))
                         || Self::root_def_id(target).is_some_and(|id| self.mut_roots.contains(&id)))
                 {
-                    self.bind_mut_from(value);
+                    self.bind_mut_from(value, None);
                 } else {
                     self.visit_expr(value);
                 }

@@ -600,7 +600,7 @@ pub fn analyze_with_cli(
     // forward for the analyzed-application snapshot. Unsupported HIR shapes
     // leave region facts unavailable rather than receiving an approximation.
     let access_facts = analyze_access_facts_with_types(&hir, &types);
-    let _region_facts = passes::borrow_region::analyze(&hir, &types, &access_facts);
+    let region_facts = passes::borrow_region::analyze(&hir, &types, &access_facts).ok();
 
     diagnostics
         .extend(passes::fragment_definition::check(&hir, &resolver, &types, interner).errors);
@@ -609,10 +609,17 @@ pub fn analyze_with_cli(
     // When borrow_analysis is already on (legacy for_target(Rust)), full
     // `borrow::analyze` covers modes + Rust lifetime — skip the dual pass.
     if config.borrow_analysis {
-        if let Err(e) = passes::borrow::analyze(&hir, &resolver, &types) {
+        if let Err(e) =
+            passes::borrow::analyze_with_regions(&hir, &resolver, &types, region_facts.as_ref())
+        {
             diagnostics.extend(e);
         }
-    } else if let Err(e) = passes::borrow::analyze_modes(&hir, &resolver, &types) {
+    } else if let Err(e) = passes::borrow::analyze_modes_with_regions(
+        &hir,
+        &resolver,
+        &types,
+        region_facts.as_ref(),
+    ) {
         diagnostics.extend(e);
     }
 
