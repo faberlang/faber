@@ -607,15 +607,19 @@ functio bounded_sum() → vacuum {
     );
     assert!(
         air_errors_from(&result).iter().all(|error| {
-            !error.args.iter().any(|arg| {
-                arg.name == "issue" && arg.value == "itera_loop"
-            })
+            !error
+                .args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "itera_loop")
         }),
         "full bounded lista must not decline its itera loop: {:?}",
         result.diagnostics
     );
     let hir = result.hir.as_ref().expect("typed HIR");
-    assert!(!has_itera(hir), "full bounded lista iteration must be erased");
+    assert!(
+        !has_itera(hir),
+        "full bounded lista iteration must be erased"
+    );
     assert!(!has_si(hir), "full bounded lista iteration is guard-free");
     let mut gathers = CountIndexes(0);
     walk_program(&mut gathers, hir);
@@ -637,9 +641,10 @@ functio bounded_chain() → vacuum {
     );
     assert!(
         air_errors_from(&result).iter().all(|error| {
-            !error.args.iter().any(|arg| {
-                arg.name == "issue" && arg.value == "itera_loop"
-            })
+            !error
+                .args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "itera_loop")
         }),
         "inference-chained full bounded lista must not decline its itera loop: {:?}",
         result.diagnostics
