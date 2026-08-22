@@ -199,7 +199,7 @@ pub fn compile_with_module_import_contract(
     }
 
     if analysis.cli_program.is_some() {
-        return compile_cli_program(session.config.target, name, analysis, session.config.no_fuse);
+        return compile_cli_program(session.config.target, name, source, analysis, session.config.no_fuse);
     }
 
     // -------------------------------------------------------------------------
@@ -223,11 +223,17 @@ pub fn compile_with_module_import_contract(
         session.config.emit_nvvm_device_module,
     ) {
         Ok(output) => CompileResult { output: Some(output), diagnostics: analysis.diagnostics },
-        Err(err) => compile_codegen_error(analysis, name, err),
+        Err(err) => compile_codegen_error(analysis, name, source, err),
     }
 }
 
-fn compile_cli_program(target: Target, name: &str, analysis: AnalyzedModule, no_fuse: bool) -> CompileResult {
+fn compile_cli_program(
+    target: Target,
+    name: &str,
+    source: &str,
+    analysis: AnalyzedModule,
+    no_fuse: bool,
+) -> CompileResult {
     if let Some(diagnostic) = cli_codegen_diagnostic(target, name, &analysis) {
         return compile_error(analysis, diagnostic);
     }
@@ -244,7 +250,7 @@ fn compile_cli_program(target: Target, name: &str, analysis: AnalyzedModule, no_
             let mut analysis = analysis;
             match generate_wasm_text_output(&mut analysis, no_fuse) {
                 Ok(output) => CompileResult { output: Some(output), diagnostics: analysis.diagnostics },
-                Err(err) => compile_codegen_error(analysis, name, err),
+                Err(err) => compile_codegen_error(analysis, name, source, err),
             }
         }
         Target::HirRust | Target::HirGo => {
@@ -261,18 +267,18 @@ fn compile_cli_program(target: Target, name: &str, analysis: AnalyzedModule, no_
                             output: Some(crate::Output::Rust(output)),
                             diagnostics: analysis.diagnostics,
                         },
-                        Err(err) => compile_codegen_error(analysis, name, err.into()),
+                        Err(err) => compile_codegen_error(analysis, name, source, err.into()),
                     }
                 }
                 Target::HirGo => {
                     if let Err(err) = reject_modular_word_target(&analysis, "Go") {
-                        return compile_codegen_error(analysis, name, err.into());
+                        return compile_codegen_error(analysis, name, source, err.into());
                     }
                     match codegen::generate_go_cli(&analysis.hir, &analysis.types, &analysis.interner, cli_program) {
                         Ok(output) => {
                             CompileResult { output: Some(crate::Output::Go(output)), diagnostics: analysis.diagnostics }
                         }
-                        Err(err) => compile_codegen_error(analysis, name, err.into()),
+                        Err(err) => compile_codegen_error(analysis, name, source, err.into()),
                     }
                 }
                 _ => unreachable!("match target above narrowed to Rust | Go"),
@@ -487,12 +493,17 @@ fn mir_validation_errors_to_spanned(errors: Vec<crate::mir::MirValidationError>)
     SpannedCodegenError { message, args, span }
 }
 
-fn compile_codegen_error(analysis: AnalyzedModule, name: &str, err: SpannedCodegenError) -> CompileResult {
-    let mut diagnostic = Diagnostic::codegen_error(&err.message)
-        .with_args(err.args)
-        .with_file(name);
+fn compile_codegen_error(
+    analysis: AnalyzedModule,
+    name: &str,
+    source: &str,
+    err: SpannedCodegenError,
+) -> CompileResult {
+    let mut diagnostic = Diagnostic::codegen_error(&err.message).with_args(err.args);
     if let Some(span) = err.span {
-        diagnostic = diagnostic.with_span(span);
+        diagnostic = diagnostic.with_source_context(name, source, span);
+    } else {
+        diagnostic = diagnostic.with_file(name);
     }
     compile_error(analysis, diagnostic)
 }
@@ -760,7 +771,7 @@ pub fn cuda_kernel_descriptor_json(session: &Session, name: &str, source: &str) 
     let device_roles = crate::mir::device_roles_from_hir(&analysis.hir);
     let mir = match lower_mir_with_context_for_target(&mut analysis, session.config.no_fuse) {
         Ok(mir) => mir,
-        Err(err) => return Err(compile_codegen_error(analysis, name, err).diagnostics),
+        Err(err) => return Err(compile_codegen_error(analysis, name, source, err).diagnostics),
     };
 
     let mut device = crate::mir::MirDeviceContext::from_hir_roles(device_roles);
@@ -791,7 +802,7 @@ pub fn partition_record_json(session: &Session, name: &str, source: &str) -> Res
     prepare_mir_lowering_interner(&mut analysis);
     let mir = match lower_mir_with_context_for_target(&mut analysis, session.config.no_fuse) {
         Ok(mir) => mir,
-        Err(err) => return Err(compile_codegen_error(analysis, name, err).diagnostics),
+        Err(err) => return Err(compile_codegen_error(analysis, name, source, err).diagnostics),
     };
     let legality = crate::mir::device_semantics::DeviceLegalityFacts::default();
     let record = crate::mir::derive_partition_record(&mir.validated, &mir.interner, name, &legality)

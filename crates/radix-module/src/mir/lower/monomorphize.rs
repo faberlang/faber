@@ -316,9 +316,15 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 &mut bindings,
                 &mut shape_bindings,
             ) {
-                self.lowerer
-                    .errors
-                    .push(MirError::validation(span, "call argument type mismatch"));
+                let expected_ty = self.format_ty(expected.ty);
+                let actual_ty = self.format_ty(actual);
+                self.lowerer.errors.push(MirError {
+                    message: format!(
+                        "invalid MIR: call argument type mismatch (arg {index}: expected {expected_ty}, got {actual_ty})"
+                    ),
+                    issue: "invalid_mir_call_argument_type_mismatch".to_owned(),
+                    span,
+                });
                 return None;
             }
         }
@@ -824,6 +830,15 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
 
     fn types(&self) -> &TypeTable {
         &self.lowerer.unit.types
+    }
+
+    fn format_ty(&self, ty: MirType) -> String {
+        crate::semantic::format_faber_type(ty.semantic_id(), self.types(), &self.lowerer.unit.interner, &|def_id| {
+            self.lowerer.unit.resolver.get_symbol(def_id).map_or_else(
+                || format!("def{}", def_id.0),
+                |symbol| self.lowerer.unit.interner.resolve(symbol.name).to_owned(),
+            )
+        })
     }
 }
 

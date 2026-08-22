@@ -10,7 +10,7 @@ use crate::{
 };
 use radix_hir::DefId;
 use radix_lexer::Span;
-use radix_types::{Primitive, Type, TypeId};
+use radix_types::{IndexExpr, IndexId, Primitive, Type, TypeId, TypeTable};
 
 impl Validator<'_, '_> {
     pub(crate) fn validate_value(&mut self, scope: &FunctionScope<'_, '_>, value: &MirValue) {
@@ -433,7 +433,7 @@ impl Validator<'_, '_> {
                     arg_ty,
                     generic_bindings,
                     span,
-                    "call argument type mismatch",
+                    call_argument_mismatch(self.context.types, index, expected.ty, arg_ty),
                 );
                 if let Some(expected_ty) =
                     self.instantiate_generic_type(expected.ty, generic_bindings, span)
@@ -442,7 +442,7 @@ impl Validator<'_, '_> {
                         arg_ty,
                         expected_ty,
                         span,
-                        "call argument type mismatch",
+                        call_argument_mismatch(self.context.types, index, expected_ty, arg_ty),
                     );
                 }
             }
@@ -455,7 +455,7 @@ impl Validator<'_, '_> {
         actual: MirType,
         generic_bindings: &mut GenericTypeBindings,
         span: Span,
-        message: &'static str,
+        message: impl Into<String>,
     ) {
         if crate::bind_generic_type_witness(self.context.types, expected, actual, generic_bindings)
         {
@@ -566,5 +566,79 @@ impl Validator<'_, '_> {
         }
 
         Some(ty)
+    }
+}
+
+fn call_argument_mismatch(
+    types: &TypeTable,
+    index: usize,
+    expected: MirType,
+    actual: MirType,
+) -> String {
+    format!(
+        "call argument type mismatch (arg {index}: expected {}, got {})",
+        spell_mismatch_ty(types, expected),
+        spell_mismatch_ty(types, actual),
+    )
+}
+
+fn spell_mismatch_ty(types: &TypeTable, ty: MirType) -> String {
+    spell_type_id(types, ty.semantic_id(), 0)
+}
+
+fn spell_type_id(types: &TypeTable, id: TypeId, depth: u8) -> String {
+    if depth > 6 {
+        return "_".to_owned();
+    }
+    match types.get(id) {
+        Type::Primitive(prim) => match prim {
+            Primitive::Ascii => "ascii",
+            Primitive::Textus => "textus",
+            Primitive::Numerus => "numerus",
+            Primitive::Fractus => "fractus",
+            Primitive::Bivalens => "bivalens",
+            Primitive::Nihil => "nihil",
+            Primitive::Vacuum => "vacuum",
+            Primitive::Numquam => "numquam",
+            Primitive::Ignotum => "ignotum",
+            Primitive::Octeti => "octeti",
+            Primitive::Regex => "regex",
+            Primitive::Json => "json",
+            Primitive::Valor => "valor",
+            Primitive::Instans => "instans",
+        }
+        .to_owned(),
+        Type::SizedNumeric(prim, width) => match prim {
+            Primitive::Numerus => format!("numerus<{}>", width.faber_marker()),
+            Primitive::Fractus => format!("fractus<{}>", width.faber_marker()),
+            _ => "ignotum".to_owned(),
+        },
+        Type::Tensor(elem, shape) => format!(
+            "tensor<{}, {}>",
+            spell_type_id(types, *elem, depth + 1),
+            spell_index(types, *shape, depth + 1)
+        ),
+        Type::Array(elem) => format!("lista<{}>", spell_type_id(types, *elem, depth + 1)),
+        Type::Alias(_, inner) => spell_type_id(types, *inner, depth + 1),
+        Type::Param(_) => "T".to_owned(),
+        other => format!("{other:?}"),
+    }
+}
+
+fn spell_index(types: &TypeTable, id: IndexId, depth: u8) -> String {
+    if depth > 6 {
+        return "_".to_owned();
+    }
+    match types.get_index(id) {
+        IndexExpr::Literal(n) => n.to_string(),
+        IndexExpr::Tuple(dims) => {
+            let parts = dims
+                .iter()
+                .map(|dim| spell_index(types, *dim, depth + 1))
+                .collect::<Vec<_>>();
+            format!("[{}]", parts.join(", "))
+        }
+        IndexExpr::Param(_) => "N".to_owned(),
+        IndexExpr::Infer(_) | IndexExpr::Unspecified => "_".to_owned(),
     }
 }

@@ -864,6 +864,41 @@ incipit {
     );
 }
 
+#[test]
+fn call_argument_type_mismatch_renders_code_file_line_and_expected_got() {
+    let source = "incipit {\n    tacet\n}\n";
+    let session = test_session(Target::HirTypeScript);
+    let analysis = super::analyze_source(&session, "probe.fab", source).expect("analyze");
+    let start = u32::try_from(source.find("tacet").expect("tacet")).expect("fits u32");
+    let errors = vec![crate::mir::MirError {
+        message: "invalid MIR: call argument type mismatch (arg 1: expected tensor<fractus<32>, [8, 8]>, got tensor<fractus<32>, [8]>)"
+            .to_owned(),
+        issue: "invalid_mir_call_argument_type_mismatch".to_owned(),
+        span: crate::lexer::Span { start, end: start + 5 },
+    }];
+    let err = super::mir_errors_to_spanned(errors);
+    let result = super::compile_codegen_error(analysis, "probe.fab", source, err);
+    let diag = result
+        .diagnostics
+        .iter()
+        .find(|d| d.is_error())
+        .expect("error diagnostic");
+    let rendered = crate::diagnostics::render_plain(diag);
+    assert!(
+        rendered.contains("CODEGEN001"),
+        "driver route must carry a catalog code: {rendered}"
+    );
+    assert!(
+        rendered.contains("probe.fab:2"),
+        "driver route must use a physical file:line: {rendered}"
+    );
+    assert!(
+        rendered.contains("arg 1") && rendered.contains("expected") && rendered.contains("got"),
+        "driver route must name which-arg and expected-vs-got: {rendered}"
+    );
+    assert_eq!(diag.line, Some(2));
+}
+
 // -- wired sub-modules (W1-B recovery / wave1 audit P0-1) --
 // Nested under this hub so children resolve helpers via `super::`
 // (`zh_locale_pack`, `rust_output`, `compile_rust_source_with_rustc`, …).

@@ -583,7 +583,7 @@ impl Validator<'_, '_> {
         from: MirType,
         to: MirType,
         span: Span,
-        message: &'static str,
+        message: impl Into<String>,
     ) {
         if !self
             .context
