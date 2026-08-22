@@ -1,6 +1,6 @@
 # GOAL: typed-error-union — `@ commune` shared variant fields + typed error identity
 
-**Status**: active — 5/9 units landed: TEU1 (`a5140f879`+`b258b80`), TEU2 (`d6e869059`), TEU3 (`9f3ae1dce`), TEU5 (`6fb6897`), TEU4 (`25919c4c6` — all eight tail leaves + fire-9 enumeration); TEU6 GATED on receiver-method MIR lowering (fd83825f — done-when requires gradus probas green); TEU7/8 gated on X1 defect-sprint; TEU9 closeout last
+**Status**: active — 6/9 units landed: TEU1 (`a5140f879`+`b258b80`), TEU2 (`d6e869059`), TEU3 (`9f3ae1dce`), TEU5 (`6fb6897`), TEU4 (`25919c4c6` — all eight tail leaves + fire-9 enumeration), TEU6 (`04fe8156` + `2443bb6`); TEU7/8 remain gated on X1 defect-sprint; TEU9 closeout last
 **Created**: 2026-08-21
 **Campaign:** `—` (standalone; operator design session 2026-08-21)
 **Source:** [`docs/design/typed-error-union.md`](../../design/typed-error-union.md) (operator session decisions; 316 lines); Vivi task `c72f9481`; origin chain `be9013ce` → `0606c6d6` → `b0bb1fb8` → `640db2ff`
@@ -153,8 +153,8 @@ proba `mod.message(e)` call sites become `e.message`; throw sites
 | TEU9 | Closeout: ledger, matrix check, census re-run, archive | all | none |
 
 **External dependency X1** — `compiler-defect-sprint` `cds-u1` (row 1) +
-`cds-u7`/`cds-u8` (row 9) landed. Blocks TEU7/TEU8; owned elsewhere, never
-re-implemented here.
+`cds-u7`/`cds-u8` (row 9) are not landed in the owning goal. Blocks TEU7/TEU8;
+owned elsewhere, never re-implemented here.
 
 ## Validation
 
@@ -182,10 +182,20 @@ compiler unit; gradus `scripta/check-source`/`check-compile`; stages 4–6,
 | TEU3 | done | aa1bc13b | `9f3ae1dce` | emit primaries; HIR commune_fields + Rust/TS payloads + MIR stepper |
 | TEU4 | done | 69eeb1c5 | `25919c4c6` | all 8 tail leaves + fire-9 enumeration (Mind: commit + scope verified; per-leaf filters in seat report) |
 | TEU5 | done | — | `6fb6897` | lean-B1 ruling recorded |
-| TEU6 | pending | — | — | clean break v1.2.2; GATED on fd83825f (probas-green requirement) |
-| TEU7 | pending | — | — | blocked on X1 |
+| TEU6 | done | `c1a15831` | `04fe8156` + `2443bb6` | clean break v1.2.2; migration and compatibility receipt filed below |
+| TEU7 | pending | — | — | **gated on X1**: `cds-u1` + `cds-u7`/`cds-u8` are not landed in `compiler-defect-sprint`; do not execute this cell |
 | TEU8 | pending | — | — | blocked on X1 |
 | TEU9 | pending | — | — | closeout |
+
+### TEU6 and export-seam receipts
+
+| Receipt | Kind | Evidence |
+| --- | --- | --- |
+| Gradus commune migration | measured | 46 message fields migrated; 36 commune regions present; 0 `fn message(` mirrors remain. |
+| Gradus compatibility / check | measured | Unpatched Gradus check is green; clean-break policy is recorded by `2443bb6`. |
+| TEU3 export seam round-trip | measured | 7 seam round-trip cases passed under `87ccd8594`. |
+| Export seam ownership | structural | `87ccd8594` exports commune fields on enums; this is the radix seam receipt consumed by the Gradus migration, not a second Gradus migration. |
+| TEU7 next-cell gate | structural | The next cell remains blocked by external X1 (`cds-u1` union matching plus `cds-u7` generic construction and `cds-u8` import-binding collisions). The owning radix goal still reports planning / no fix units implemented, so TEU7 is not admitted in this unit. |
 
 ## Open questions
 
