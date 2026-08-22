@@ -289,8 +289,8 @@ pub struct KeywordGroupSpec {
 /// Validation issue for the static keyword group declarations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeywordGroupValidationError {
-    /// A group was declared without any members.
-    EmptyGroup { group: &'static str },
+    /// A group is missing its required members.
+    MissingGroupMembers { group: &'static str },
 
     /// A group references a keyword key that has no registry row.
     UnknownMember { group: &'static str, key: String },
@@ -1328,7 +1328,7 @@ pub fn validate_keyword_groups() -> Vec<KeywordGroupValidationError> {
 
     for group in KEYWORD_GROUP_SPECS {
         if group.members.is_empty() {
-            errors.push(KeywordGroupValidationError::EmptyGroup { group: group.id });
+            errors.push(KeywordGroupValidationError::MissingGroupMembers { group: group.id });
             continue;
         }
 
