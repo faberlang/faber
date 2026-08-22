@@ -1,6 +1,7 @@
 +++
 term = "varia"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "sit_decl", "hole_type", "assignment", "place", "additive_expr", "expression", "literal", "nota_stmt"]
 category = "binding"
 canonical = true
 summary = "Declares a mutable binding."

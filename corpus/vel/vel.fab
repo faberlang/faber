@@ -1,6 +1,7 @@
 +++
 term = "vel"
 kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "sit_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "vel_expr", "vel_rhs", "proba_stmt", "adfirma_stmt", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
 category = "logic"
 canonical = true
 summary = "Provides a default when the left side is null."
