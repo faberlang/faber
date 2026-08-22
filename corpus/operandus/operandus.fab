@@ -1,6 +1,7 @@
 +++
 term = "operandus"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_sugar", "annotation_name", "entry_header", "expression", "literal", "nota_stmt"]
 category = "cli"
 canonical = true
 summary = "Declares a CLI operand annotation."

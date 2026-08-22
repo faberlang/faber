@@ -1,6 +1,7 @@
 +++
 term = "≈"
 kind = "operator"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "cast_expr", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
 category = "comparison"
 canonical = true
 summary = "Numeric value equality after promotion join — not fuzzy float."

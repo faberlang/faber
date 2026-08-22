@@ -1,6 +1,7 @@
 +++
 term = "≡"
 kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "comparison", "equality", "equality_tail", "et_expr", "expression", "literal", "nota_stmt"]
 category = "comparison"
 canonical = true
 summary = "Equality and ordering comparisons returning bivalens."

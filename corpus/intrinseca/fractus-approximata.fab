@@ -1,6 +1,7 @@
 +++
 term = "fractus-approximata"
 kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt", "unary_expr", "equality", "equality_tail"]
 category = "intrinseca"
 canonical = false
 summary = "DEFER-036 tolerance compare on fractus receiver (not ≈)."

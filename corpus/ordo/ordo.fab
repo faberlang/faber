@@ -1,6 +1,7 @@
 +++
 term = "ordo"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "ordo_decl", "enum_member", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "elige_stmt", "casu_elige_clause", "expression", "literal", "nota_stmt"]
 category = "type"
 canonical = true
 summary = "Declares an enumeration."
