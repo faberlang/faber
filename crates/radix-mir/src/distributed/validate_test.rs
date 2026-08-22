@@ -13,8 +13,8 @@
 //! depend on radix-mir-fmir).
 
 use super::{
-    BoundaryRef, CollectiveViolation, ContractFingerprint, OpRef, TopologyRef, ValidateKind,
-    ValidateError,
+    BoundaryRef, CollectiveViolation, ContractFingerprint, OpRef, TopologyRef, ValidateError,
+    ValidateKind,
 };
 use crate::abi::{
     MirKernelDispatchSize, MirKernelResourceAccess, MirKernelWorkgroupCount, MirWorkgroupSize,

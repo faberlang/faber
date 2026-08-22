@@ -4,7 +4,7 @@
 //! and collection-op classifications match.
 
 use super::{IntrinsicMirKind, IntrinsicReceiver, INTRINSICS};
-use crate::driver::{analyze_source, Config, Session, AnalyzeRequest};
+use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
 use crate::intrinsics::{
     is_atomic_operator_method, lookup_method, lookup_method_for_type, mir_collection_op, receivers_for_type,
 };

@@ -7,7 +7,7 @@
 //! has no phase position in the semantic pipeline.
 
 use crate::diagnostics::DiagnosticArg;
-use crate::driver::{analyze_source, Config, Session, AnalyzeRequest};
+use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
 use crate::semantic::{NumericWidth, Primitive, Type, TypeTable};
 
 pub fn run_types_gate() {
@@ -33,7 +33,8 @@ pub fn run_types_gate() {
     let result = analyze_source(
         &session,
         "gate-tensor-decl.fab",
-        "functio hold(tensor<fractus<f32>, _> value) → vacuum {}", AnalyzeRequest::default(),
+        "functio hold(tensor<fractus<f32>, _> value) → vacuum {}",
+        AnalyzeRequest::default(),
     );
     assert!(result.is_ok(), "tensor decl should typecheck: {:?}", result.err());
 }
@@ -47,7 +48,8 @@ pub fn run_convert_gate() {
         r#"incipit {
   fixum numerus<i32> n ← "42" ↦ numerus<i32>
   nota n
-}"#, AnalyzeRequest::default(),
+}"#,
+        AnalyzeRequest::default(),
     );
     assert!(i32_ok.is_ok(), "expected sized i32 conversio to typecheck: {:?}", i32_ok.err());
 
@@ -57,7 +59,8 @@ pub fn run_convert_gate() {
         r#"incipit {
   fixum fractus<f32> f ← "1.5" ↦ fractus<f32>
   nota f
-}"#, AnalyzeRequest::default(),
+}"#,
+        AnalyzeRequest::default(),
     );
     assert!(f32_ok.is_ok(), "expected sized f32 conversio to typecheck: {:?}", f32_ok.err());
 
@@ -67,7 +70,8 @@ pub fn run_convert_gate() {
         r"incipit {
   fixum numerus<f32> invalid ← 1.0 ∷ fractus<f32>
   nota invalid
-}", AnalyzeRequest::default(),
+}",
+        AnalyzeRequest::default(),
     );
     assert!(
         family_err.is_err(),

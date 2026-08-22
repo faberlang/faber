@@ -73,8 +73,12 @@ pub fn compile_canonical(session: &Session, name: &str, source: &str) -> FormatC
         Err(diagnostic) => return FormatCompileResult { output: None, diagnostics: vec![*diagnostic] },
     };
     let session = prepared.session;
-    let mut analysis = match analyze_source(&session, name, source, AnalyzeRequest { cli_program: None, contract: prepared.contract })
-    {
+    let mut analysis = match analyze_source(
+        &session,
+        name,
+        source,
+        AnalyzeRequest { cli_program: None, contract: prepared.contract },
+    ) {
         Ok(analysis) => analysis,
         Err(diagnostics) => return FormatCompileResult { output: None, diagnostics },
     };

@@ -1,11 +1,16 @@
-use crate::driver::ModuleCompileRequest;
 use crate::codegen::Target;
 use crate::driver::compile;
+use crate::driver::ModuleCompileRequest;
 use crate::mir::MirKernelShaderStage;
 use crate::test_support::test_session;
 
 fn compile_source(source: &str) -> crate::CompileResult {
-    compile(&test_session(Target::MirWgsl), "shader_contract.fab", source, ModuleCompileRequest::default())
+    compile(
+        &test_session(Target::MirWgsl),
+        "shader_contract.fab",
+        source,
+        ModuleCompileRequest::default(),
+    )
 }
 
 fn wgsl_output(result: crate::CompileResult) -> crate::mir::MirGpuReflection {

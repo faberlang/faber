@@ -22,7 +22,7 @@
 
 use crate::air::{lower_program, AirExpr, AirTensorOp};
 use crate::codegen::Target;
-use crate::driver::{analyze_source, compile, Config, Session, AnalyzeRequest, ModuleCompileRequest};
+use crate::driver::{analyze_source, compile, AnalyzeRequest, Config, ModuleCompileRequest, Session};
 use crate::mir::{
     run_entry, run_source, validate_program, BufferHost, MirAggregateFields, MirCollectionOp, MirIntrinsic, MirOperand,
     MirPlaceBase, MirRuntimeCall, MirStatementKind, MirTempId, MirValidationContext, RunSourceError, ValidatedMir,
@@ -326,7 +326,12 @@ incipit {
     );
 
     // Driver compile to a MIR-backed target stays green.
-    let result = compile(&test_session(Target::MirLlvm), "tensor_get_slice.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &test_session(Target::MirLlvm),
+        "tensor_get_slice.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
     assert!(
         result.success(),
         "TensorGet/TensorSlice should still compile: {:?}",
@@ -352,7 +357,8 @@ incipit {
     nota out.magnitudines()
 }
 ";
-    let mut analysis = analyze_source(&runner_session(), "gather_empty.fab", source, AnalyzeRequest::default()).expect("frontend");
+    let mut analysis =
+        analyze_source(&runner_session(), "gather_empty.fab", source, AnalyzeRequest::default()).expect("frontend");
     let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("lowering");
 
     let mut empty_program = lowered.program.clone();

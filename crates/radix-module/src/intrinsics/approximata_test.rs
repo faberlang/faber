@@ -4,7 +4,7 @@
 
 use super::{lookup_method, lookup_method_for_type, IntrinsicReceiver};
 #[cfg(feature = "hir-rust")]
-use crate::driver::{analyze_source, Config, Session, AnalyzeRequest};
+use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
 use crate::intrinsics::mir_collection_op;
 use crate::semantic::{Primitive, TypeTable};
 use radix_types::MirCollectionOp;

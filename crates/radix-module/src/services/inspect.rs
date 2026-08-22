@@ -207,7 +207,15 @@ pub fn hir_inspection_for_source(name: &str, source: &str) -> SourceInspection {
         Ok(ready) => ready,
         Err(errors) => return SourceInspection { text: String::new(), success: false, errors },
     };
-    let (lowered, errors) = crate::hir::lower(crate::hir::LowerRequest { program: &program, resolver: &mut resolver, types: &mut types, interner: &mut interner, cli_program: None, locale_pack: None, annotation_contracts: None });
+    let (lowered, errors) = crate::hir::lower(crate::hir::LowerRequest {
+        program: &program,
+        resolver: &mut resolver,
+        types: &mut types,
+        interner: &mut interner,
+        cli_program: None,
+        locale_pack: None,
+        annotation_contracts: None,
+    });
     SourceInspection {
         text: hir_inspection_json(&source_file, &lowered.hir, Some(&lowered.presentation), &interner, &errors),
         success: errors.is_empty(),
@@ -288,7 +296,12 @@ pub fn mir_output_for_source(name: &str, raw_source: &str) -> Result<String, Vec
         Err(diagnostic) => return Err(format_mir_frontend_diagnostics(&source_file, vec![*diagnostic])),
     };
 
-    let mut analysis = match crate::driver::analyze_source(&prepared.session, &source_file.name, raw_source, crate::driver::AnalyzeRequest { cli_program: None, contract: prepared.contract }) {
+    let mut analysis = match crate::driver::analyze_source(
+        &prepared.session,
+        &source_file.name,
+        raw_source,
+        crate::driver::AnalyzeRequest { cli_program: None, contract: prepared.contract },
+    ) {
         Ok(analysis) => analysis,
         Err(diagnostics) => return Err(format_mir_frontend_diagnostics(&source_file, diagnostics)),
     };

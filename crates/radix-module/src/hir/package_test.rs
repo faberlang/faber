@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::codegen::{generate_from_analyzed, Target};
-use crate::driver::{analyze_source, Config, Session, AnalyzeRequest};
+use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
 use crate::locale::{latin_locale_pack, KeywordSurface};
 
 fn analyze(name: &str, source: &str) -> AnalyzedModule {
@@ -272,7 +272,8 @@ fn signature_only_fragment_import_fails_closed() {
     let Err(err) = analyze_source(
         &session,
         "iface.fab",
-        "@ nucleum fragment\nfunctio helper(fractus<f32> x) → fractus<f32>\n", AnalyzeRequest::default(),
+        "@ nucleum fragment\nfunctio helper(fractus<f32> x) → fractus<f32>\n",
+        AnalyzeRequest::default(),
     ) else {
         panic!("signature-only fragment must fail at compile time");
     };

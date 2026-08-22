@@ -24,8 +24,7 @@ pub const PACKAGE_TEST_ANALYSIS_BUDGET: Duration = Duration::from_secs(30);
 
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::{
-    analyze_source, AnalyzeRequest, AnalyzedModule, Config, ModuleImportContract,
-    Session,
+    analyze_source, AnalyzeRequest, AnalyzedModule, Config, ModuleImportContract, Session,
 };
 use radix_module::lexer::Interner;
 use radix_module::semantic::passes::visibility_annotation::VisibilityTier;
@@ -543,12 +542,20 @@ fn analyze_package_spec_with_deadline(
                 continue;
             }
         };
-        let mut analysis = match analyze_source(&session, &file.path.display().to_string(), &analysis_source, AnalyzeRequest { cli_program: file_cli, contract: ModuleImportContract {
-                namespace_exports: namespace_exports.clone(),
-                file_interfaces,
-                namespace_seams,
-                namespace_declarations,
-            } }) {
+        let mut analysis = match analyze_source(
+            &session,
+            &file.path.display().to_string(),
+            &analysis_source,
+            AnalyzeRequest {
+                cli_program: file_cli,
+                contract: ModuleImportContract {
+                    namespace_exports: namespace_exports.clone(),
+                    file_interfaces,
+                    namespace_seams,
+                    namespace_declarations,
+                },
+            },
+        ) {
             Ok(analysis) => analysis,
             Err(file_diagnostics) => {
                 diagnostics.extend(file_diagnostics);

@@ -4,10 +4,10 @@
 //! extract emitted text or structured diagnostic facts. Target-specific binding
 //! assertions stay in each `*_text_test.rs` module.
 
-use crate::driver::ModuleCompileRequest;
 use crate::codegen::Target;
 use crate::diagnostics::Diagnostic;
 use crate::driver::compile;
+use crate::driver::ModuleCompileRequest;
 use crate::test_support::test_session;
 use crate::{CompileResult, MetalTextOutput, Output, WgslTextOutput};
 

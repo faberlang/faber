@@ -117,19 +117,9 @@ pub struct ModuleCompileRequest {
 /// Errors from any phase are returned as diagnostics with no output. Warnings
 /// collected before codegen are preserved on success.
 #[must_use]
-pub fn compile(
-    session: &Session,
-    name: &str,
-    source: &str,
-    request: ModuleCompileRequest,
-) -> CompileResult {
+pub fn compile(session: &Session, name: &str, source: &str, request: ModuleCompileRequest) -> CompileResult {
     let ModuleCompileRequest { contract, package_identities } = request;
-    let mut analysis = match analyze_source(
-        session,
-        name,
-        source,
-        AnalyzeRequest { cli_program: None, contract },
-    ) {
+    let mut analysis = match analyze_source(session, name, source, AnalyzeRequest { cli_program: None, contract }) {
         Ok(mut analysis) => {
             analysis.package_import_identities = package_identities;
             analysis
@@ -566,7 +556,7 @@ fn generate_output(
         Target::HirRust => {
             codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
                 .map_err(std::convert::Into::into)
-        },
+        }
         Target::HirFaber => {
             codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
                 .map_err(std::convert::Into::into)

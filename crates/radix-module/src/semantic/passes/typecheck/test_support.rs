@@ -20,7 +20,7 @@
 
 use crate::codegen::Target;
 use crate::diagnostics::Diagnostic;
-use crate::driver::{self, AnalyzedModule, AnalyzeRequest};
+use crate::driver::{self, AnalyzeRequest, AnalyzedModule};
 use crate::hir::HirStatementKind;
 use crate::semantic::{SemanticError, TypeId};
 use crate::{CompileResult, Compiler, Config};

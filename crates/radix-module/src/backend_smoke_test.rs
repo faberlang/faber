@@ -7,7 +7,7 @@ use super::{
     rustc_available,
 };
 use crate::codegen::Target;
-use crate::driver::{compile, Config, Session, ModuleCompileRequest};
+use crate::driver::{compile, Config, ModuleCompileRequest, Session};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 fn emit_rust_from_faber(source: &str) -> String {

@@ -29,7 +29,7 @@ use radix_module::codegen::{generate_from_analyzed, Target};
     feature = "hir-faber",
     feature = "hir-swift"
 ))]
-use radix_module::driver::{analyze_source, Config, Session, AnalyzeRequest};
+use radix_module::driver::{analyze_source, AnalyzeRequest, Config, Session};
 #[cfg(any(
     feature = "hir-rust",
     feature = "hir-ts",

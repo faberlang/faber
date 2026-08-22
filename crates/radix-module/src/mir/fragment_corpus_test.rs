@@ -6,7 +6,7 @@
 
 use super::{surviving_fragment_calls, ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION};
 use crate::diagnostics::Diagnostic;
-use crate::driver::{self, Config, Session, AnalyzeRequest};
+use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::lexer::Span;
 use crate::mir::{
     device_roles_from_hir, MirBinOp, MirDeviceRole, MirFunction, MirOperand, MirPlaceBase, MirProgram,
@@ -185,7 +185,8 @@ functio host(fractus<f32> x) → fractus<f32> {
 }
 ";
     let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("host→fragment analyzes: {errors:?}"));
-    let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("host→fragment must fail at instantiation");
+    let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default())
+        .expect_err("host→fragment must fail at instantiation");
     let err = expect_lower_issue(&errors, ISSUE_CONTEXT);
     assert_eq!(
         spanned(source, err.span),
@@ -243,7 +244,8 @@ functio k(textus x) → textus {
 }
 ";
     let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("textus fragment must typecheck: {errors:?}"));
-    let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("target-illegal fragment type must fail");
+    let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default())
+        .expect_err("target-illegal fragment type must fail");
     let err = expect_lower_issue(&errors, ISSUE_TYPE);
     assert!(
         span_in(err.span, source, "helper(x)"),
@@ -397,7 +399,8 @@ functio k() → vacuum {
 }
 ";
     let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("entry→graphics analyzes: {errors:?}"));
-    let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("Entry→graphics must fail");
+    let errors =
+        crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("Entry→graphics must fail");
     let err = expect_lower_issue(&errors, ISSUE_CONTEXT);
     assert_eq!(
         spanned(source, err.span),
@@ -425,7 +428,8 @@ functio k(fractus<f32> x) → fractus<f32> {
 }
 ";
     let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("entry→host analyzes: {errors:?}"));
-    let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("Entry→ordinary must fail");
+    let errors =
+        crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("Entry→ordinary must fail");
     let err = expect_lower_issue(&errors, ISSUE_CONTEXT);
     assert_eq!(
         spanned(source, err.span),
@@ -510,7 +514,8 @@ functio k(fractus<f32> x) → fractus<f32> {
 }
 ";
     let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("cycle analyzes: {errors:?}"));
-    let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("cycle must fail closed");
+    let errors =
+        crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("cycle must fail closed");
     let err = expect_lower_issue(&errors, ISSUE_CYCLE);
     assert!(span_in(err.span, source, "pong(x)") || span_in(err.span, source, "ping(x)"));
 }
@@ -531,7 +536,8 @@ functio k(fractus<f32> x) → fractus<f32> {
     let budget = ExpansionBudget { max_concrete_instances: 0, ..ExpansionBudget::DOCUMENTED_DEFAULTS };
     with_budget_override(budget, || {
         let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("budget fixture analyzes: {errors:?}"));
-        let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("budget override must fail closed");
+        let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default())
+            .expect_err("budget override must fail closed");
         let err = expect_lower_issue(&errors, ISSUE_EXPANSION);
         assert!(
             span_in(err.span, source, "helper(x)"),

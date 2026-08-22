@@ -256,7 +256,10 @@ fn output_bind_preserves_sequence_major_context_stride() {
 
 #[test]
 fn library_operation_spellings_have_one_owner_per_match_site() {
-    let compiler = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/device_plan_compiler.rs"));
+    let compiler = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/device_plan_compiler.rs"
+    ));
     let section = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../faber/src/package/device/section.rs"

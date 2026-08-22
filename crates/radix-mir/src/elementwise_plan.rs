@@ -579,12 +579,16 @@ impl PlanBuilder<'_, '_> {
         let policy = NumericalPolicy::SOURCE_ORDER;
         match op {
             ElementwiseOp::Add | ElementwiseOp::Sub | ElementwiseOp::Mul | ElementwiseOp::Div => {
-                let lhs = args.first().ok_or(ElementwiseBarrierError::UnresolvedShape {
-                    span: producer_span,
-                })?;
-                let rhs = args.get(1).ok_or(ElementwiseBarrierError::UnresolvedShape {
-                    span: producer_span,
-                })?;
+                let lhs = args
+                    .first()
+                    .ok_or(ElementwiseBarrierError::UnresolvedShape {
+                        span: producer_span,
+                    })?;
+                let rhs = args
+                    .get(1)
+                    .ok_or(ElementwiseBarrierError::UnresolvedShape {
+                        span: producer_span,
+                    })?;
                 let lhs = self.expr_for_operand(lhs, producer_span)?;
                 let rhs = self.expr_for_operand(rhs, producer_span)?;
                 Ok(ElementwiseExpr::Binary {

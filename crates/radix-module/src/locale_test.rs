@@ -11,7 +11,7 @@ use super::{
 use crate::codegen::Target;
 use crate::diagnostics::DiagnosticConvert;
 use crate::diagnostics::{Diagnostic, DiagnosticArg};
-use crate::driver::{compile, Config, Session, ModuleCompileRequest};
+use crate::driver::{compile, Config, ModuleCompileRequest, Session};
 use crate::file_interface::{InterfaceLibraryIdentity, InterfaceMemberKind};
 use crate::lexer::{lex_with_locale_pack, LexError, LexErrorKind, LocaleSuggestion, Span, TokenKind};
 use crate::locale::TypeBindingKind;
@@ -1348,7 +1348,8 @@ fn en_empty_named_binding_rhs_claims_as_marker() {
                 .with_locale_pack_explicit(),
         ),
         "en-empty-reference.fab",
-        "main { print empty }", ModuleCompileRequest::default(),
+        "main { print empty }",
+        ModuleCompileRequest::default(),
     );
     assert!(
         reference.diagnostics.iter().any(|diagnostic| {
@@ -1382,7 +1383,8 @@ fn marker_named_bindings_warn_under_en_and_la_packs() {
                     .with_locale_pack_explicit(),
             ),
             &format!("{locale}-marker-shadow.fab"),
-            source, ModuleCompileRequest::default(),
+            source,
+            ModuleCompileRequest::default(),
         );
         assert!(
             result.success(),

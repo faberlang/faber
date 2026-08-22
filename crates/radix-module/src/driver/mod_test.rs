@@ -115,7 +115,12 @@ functio loss() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::HirRust), "lane.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &test_session(Target::HirRust),
+        "lane.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
 
     assert!(!result.success(), "expected lane/target failure");
     assert!(result.diagnostics.iter().any(|diag| {
@@ -145,7 +150,12 @@ functio keep() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::HirRust), "lane.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &test_session(Target::HirRust),
+        "lane.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
 
     assert!(
         result.success(),
@@ -188,7 +198,12 @@ functio wrapper() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::HirRust), "lane.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &test_session(Target::HirRust),
+        "lane.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
 
     assert!(!result.success(), "expected lane/target failure");
     assert!(result.diagnostics.iter().any(|diag| {
@@ -222,7 +237,12 @@ functio keep() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::HirRust), "lane.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &test_session(Target::HirRust),
+        "lane.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
 
     assert!(
         result.success(),
@@ -252,7 +272,12 @@ functio loss() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::HirSwift), "lane.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &test_session(Target::HirSwift),
+        "lane.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
 
     assert!(!result.success(), "expected lane/target failure");
     assert!(result.diagnostics.iter().any(|diag| {
@@ -275,7 +300,12 @@ functio direct() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirWasm), "lane.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &test_session(Target::MirWasm),
+        "lane.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
 
     assert!(
         !result
@@ -300,7 +330,12 @@ functio loss() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirWasm), "lane.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &test_session(Target::MirWasm),
+        "lane.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
 
     assert!(
         !result
@@ -331,7 +366,12 @@ functio loss() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::HirFaber), "lane.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &test_session(Target::HirFaber),
+        "lane.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
 
     assert!(
         result.success(),
@@ -361,7 +401,12 @@ functio loss() → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirWasm), "lane.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &test_session(Target::MirWasm),
+        "lane.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
 
     assert!(
         result.success(),
@@ -387,7 +432,12 @@ functio sum(numerus a, numerus b) → numerus {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirLlvm), "lane.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &test_session(Target::MirLlvm),
+        "lane.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
 
     assert!(
         result.success(),
@@ -525,7 +575,12 @@ functio combine(tf32[2, 2] x, tf32[2, 2] y) → tf32[2, 2] {
 }
 "#;
 
-    let result = compile(&test_session(Target::MirLlvm), "backward.fab", source, ModuleCompileRequest::default());
+    let result = compile(
+        &test_session(Target::MirLlvm),
+        "backward.fab",
+        source,
+        ModuleCompileRequest::default(),
+    );
 
     assert!(
         result.success(),
@@ -642,11 +697,16 @@ fn deny_policy_does_not_touch_info_or_errors() {
 
 #[test]
 fn deny_warnings_suppresses_output_after_promotion() {
-    use crate::driver::{Config, Session, WarnPolicy, AnalyzeRequest, ModuleCompileRequest};
+    use crate::driver::{AnalyzeRequest, Config, ModuleCompileRequest, Session, WarnPolicy};
 
     let session =
         Session::new(Config::default().with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] }));
-    let result = compile(&session, "deny-unused.fab", "incipit { fixum numerus unused ← 1 }", ModuleCompileRequest::default());
+    let result = compile(
+        &session,
+        "deny-unused.fab",
+        "incipit { fixum numerus unused ← 1 }",
+        ModuleCompileRequest::default(),
+    );
 
     assert!(result.output.is_none(), "promoted warnings must stop codegen output");
     assert!(
@@ -712,7 +772,8 @@ incipit {
     fixum textus m ← "a" + x + "b"
     nota m
 }
-"#, ModuleCompileRequest::default(),
+"#,
+        ModuleCompileRequest::default(),
     );
 
     let warned = result
@@ -749,7 +810,8 @@ incipit {
     fixum textus m ← "a" + x + "b"
     nota m
 }
-"#, ModuleCompileRequest::default(),
+"#,
+        ModuleCompileRequest::default(),
     );
 
     let warned = result
@@ -789,7 +851,8 @@ incipit {
     fixum textus m ← "a" + x
     nota m
 }
-"#, ModuleCompileRequest::default(),
+"#,
+        ModuleCompileRequest::default(),
     );
 
     assert!(
@@ -835,7 +898,8 @@ incipit {
     fixum textus m ← x + y + z
     nota m
 }
-"#, ModuleCompileRequest::default(),
+"#,
+        ModuleCompileRequest::default(),
     );
 
     assert!(

@@ -11,7 +11,7 @@
 use super::compile;
 use crate::codegen::Target;
 use crate::diagnostics::is_known_diagnostic_code;
-use crate::driver::{analyze_source, Config, Session, WarnPolicy, AnalyzeRequest, ModuleCompileRequest};
+use crate::driver::{analyze_source, AnalyzeRequest, Config, ModuleCompileRequest, Session, WarnPolicy};
 use crate::{CompileResult, Diagnostic};
 
 /// Emits both shape warnings: `_` solved to a multi-member union (WARN016) and

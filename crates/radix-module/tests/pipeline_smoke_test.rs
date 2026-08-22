@@ -15,7 +15,7 @@
     feature = "mir-wgsl",
     feature = "mir-sexp"
 ))]
-use radix_module::driver::{compile, Config, Session, ModuleCompileRequest};
+use radix_module::driver::{compile, Config, ModuleCompileRequest, Session};
 #[cfg(feature = "mir-llvm")]
 use radix_module::LlvmTextOutput;
 #[cfg(feature = "mir-metal")]

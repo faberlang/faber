@@ -7,7 +7,7 @@ use super::{
     is_numeric_bitwise_operator, is_numeric_imperativus_operator, lookup_method, lookup_method_for_type,
     IntrinsicReceiver,
 };
-use crate::driver::{analyze_source, Config, Session, AnalyzeRequest};
+use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
 use crate::semantic::{Primitive, Type, TypeTable};
 
 #[cfg(feature = "hir-rust")]
@@ -230,7 +230,8 @@ fn rejects_shift_operator_on_fractus_receiver() {
         r"incipit {
     fixum fractus x ← 1.0
     fixum _ y ← x.sinistrata(1.0)
-}", AnalyzeRequest::default(),
+}",
+        AnalyzeRequest::default(),
     );
     let Err(diagnostics) = result else {
         panic!("expected shift fractus rejection");
@@ -253,7 +254,8 @@ fn rejects_bitwise_operator_on_fractus_receiver() {
         r"incipit {
     fixum fractus x ← 1.0
     fixum _ y ← x.coniuncta(1.0)
-}", AnalyzeRequest::default(),
+}",
+        AnalyzeRequest::default(),
     );
     let Err(diagnostics) = result else {
         panic!("expected bitwise fractus rejection");

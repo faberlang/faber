@@ -103,7 +103,7 @@ use std::path::Path;
 
 pub use codegen::Target;
 pub use diagnostics::{is_known_diagnostic_code, Diagnostic, DiagnosticConvert};
-pub use driver::{apply_warn_policy, Config, Session, WarnPolicy, ModuleCompileRequest};
+pub use driver::{apply_warn_policy, Config, ModuleCompileRequest, Session, WarnPolicy};
 
 /// Output and diagnostics from one compiler invocation.
 ///

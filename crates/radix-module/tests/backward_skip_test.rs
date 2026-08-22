@@ -12,7 +12,7 @@
 #![cfg(all(feature = "device", feature = "mir-llvm"))]
 
 use radix_module::codegen::Target;
-use radix_module::driver::{compile, Config, Session, ModuleCompileRequest};
+use radix_module::driver::{compile, Config, ModuleCompileRequest, Session};
 
 fn llvm_session() -> Session {
     Session::new(Config::new().with_target(Target::MirLlvm))

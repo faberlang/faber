@@ -35,7 +35,15 @@ fn prepare_lower_pipeline(source: &str) -> (crate::syntax::Program, Resolver, Ty
 
 fn lower_schema_source(source: &str) -> (crate::hir::LoweredProgram, crate::lexer::Interner, TypeTable) {
     let (program, mut resolver, mut types, mut interner) = prepare_lower_pipeline(source);
-    let (lowered, errors) = lower(LowerRequest { program: &program, resolver: &mut resolver, types: &mut types, interner: &mut interner, cli_program: None, locale_pack: None, annotation_contracts: None });
+    let (lowered, errors) = lower(LowerRequest {
+        program: &program,
+        resolver: &mut resolver,
+        types: &mut types,
+        interner: &mut interner,
+        cli_program: None,
+        locale_pack: None,
+        annotation_contracts: None,
+    });
     assert!(errors.is_empty(), "lower failed: {errors:?}");
     (lowered, interner, types)
 }
@@ -118,11 +126,12 @@ fn pipeline_accepts_schema_decl_end_to_end() {
 #[test]
 #[cfg(feature = "hir-fhir")]
 fn schema_artifact_round_trip_preserves_ordered_metadata() {
-    use crate::driver::{analyze_source, Config, Session, AnalyzeRequest};
+    use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
     use handroll::Sha256;
 
     let session = Session::new(Config::default());
-    let unit = analyze_source(&session, "schema_test.fab", PERSONA_BREVIS, AnalyzeRequest::default()).expect("analysis");
+    let unit =
+        analyze_source(&session, "schema_test.fab", PERSONA_BREVIS, AnalyzeRequest::default()).expect("analysis");
     let content_hash = {
         let mut hasher = Sha256::new();
         hasher.update(PERSONA_BREVIS.as_bytes());

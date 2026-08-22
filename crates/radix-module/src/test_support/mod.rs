@@ -11,7 +11,7 @@
 
 use crate::codegen::Target;
 use crate::diagnostics::{Diagnostic, DiagnosticArg};
-use crate::driver::{compile, Config, Session, ModuleCompileRequest};
+use crate::driver::{compile, Config, ModuleCompileRequest, Session};
 use crate::lexer::Span;
 use crate::CompileResult;
 use std::path::{Path, PathBuf};

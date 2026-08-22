@@ -2,7 +2,7 @@
 
 use super::{check, FragmentInstantiationError, ISSUE_CONTEXT, ISSUE_TYPE};
 use crate::diagnostics::{semantic_message, DiagnosticArg};
-use crate::driver::{self, Config, Session, AnalyzeRequest};
+use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::DefId;
 use crate::lexer::Span;
 use crate::mir::{
@@ -659,8 +659,10 @@ functio outer(fractus<f32> x) → fractus<f32> {
 }
 ";
     let session = Session::new(Config::default());
-    let mut analysis = driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
-    let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("Entry→Entry must be rejected");
+    let mut analysis =
+        driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
+    let errors =
+        crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("Entry→Entry must be rejected");
     assert!(
         errors.iter().any(|err| err.issue == ISSUE_CONTEXT),
         "expected NUCLEUM_FRAGMENT_CONTEXT, got {errors:?}"
@@ -681,9 +683,11 @@ functio k(fractus<f32> x) → fractus<f32> {
 }
 ";
     let session = Session::new(Config::default());
-    let mut analysis = driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
+    let mut analysis =
+        driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("legal Entry→Fragment must compose");
+    let lowered =
+        crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("legal Entry→Fragment must compose");
     assert!(
         crate::mir::fragment_composition::surviving_fragment_calls(&lowered.program.functions, &[], &roles).is_empty(),
         "staging-gate rejection narrowed to composition success"

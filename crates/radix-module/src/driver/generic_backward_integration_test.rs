@@ -24,8 +24,8 @@
 use crate::codegen::Target;
 use crate::driver::{
     analyze_source, apply_air_backward_bundle, lower_mir_with_context_for_target, prepare_air_backward_bundle,
-    FreshMirFunctionIds, SpannedCodegenError,
-    AnalyzeRequest};
+    AnalyzeRequest, FreshMirFunctionIds, SpannedCodegenError,
+};
 use crate::mir::{lower_analyzed_unit, MirFunctionId};
 use crate::semantic::{IndexExpr, Type};
 use crate::test_support::test_session;
@@ -147,8 +147,13 @@ incipit {
 #[test]
 fn unresolved_post_bundle_shape_size_uses_stable_survivor_diagnostic() {
     let session = test_session(Target::MirLlvm);
-    let mut analysis = analyze_source(&session, "generic_backward_unresolved.fab", GENERIC_SIMPLE_LOSS_SOURCE, AnalyzeRequest::default())
-        .expect("symbolic generic backward primal should analyze cleanly");
+    let mut analysis = analyze_source(
+        &session,
+        "generic_backward_unresolved.fab",
+        GENERIC_SIMPLE_LOSS_SOURCE,
+        AnalyzeRequest::default(),
+    )
+    .expect("symbolic generic backward primal should analyze cleanly");
     let bundle = expect_codegen_ok(
         prepare_air_backward_bundle(&mut analysis),
         "backward bundle preparation should succeed",
@@ -187,8 +192,13 @@ fn unresolved_post_bundle_shape_size_uses_stable_survivor_diagnostic() {
 #[test]
 fn generic_backward_primal_generates_symbolic_companion_through_driver() {
     let session = test_session(Target::MirLlvm);
-    let mut analysis = analyze_source(&session, "generic_backward.fab", GENERIC_SIMPLE_LOSS_SOURCE, AnalyzeRequest::default())
-        .expect("generic backward primal should analyze cleanly");
+    let mut analysis = analyze_source(
+        &session,
+        "generic_backward.fab",
+        GENERIC_SIMPLE_LOSS_SOURCE,
+        AnalyzeRequest::default(),
+    )
+    .expect("generic backward primal should analyze cleanly");
 
     let bundle = expect_codegen_ok(
         prepare_air_backward_bundle(&mut analysis),
@@ -224,7 +234,8 @@ fn generic_backward_primal_generates_symbolic_companion_through_driver() {
         }
     }
 
-    let mut lowered = lower_analyzed_unit(&mut analysis, Default::default()).expect("generic primal should lower to MIR");
+    let mut lowered =
+        lower_analyzed_unit(&mut analysis, Default::default()).expect("generic primal should lower to MIR");
     expect_codegen_ok(
         apply_air_backward_bundle(&mut lowered, bundle, false),
         "generic companion must install without a symbolic-shape error",
@@ -293,7 +304,8 @@ functio gradientes_simple_loss<magnitudo R, magnitudo C>(
     )
     .expect("an AIR lane with backward annotations must produce a bundle");
 
-    let mut lowered = lower_analyzed_unit(&mut analysis, Default::default()).expect("generic wrapper should lower to MIR");
+    let mut lowered =
+        lower_analyzed_unit(&mut analysis, Default::default()).expect("generic wrapper should lower to MIR");
     expect_codegen_ok(
         apply_air_backward_bundle(&mut lowered, bundle, false),
         "generic companion must install without a symbolic-shape error",
@@ -406,7 +418,8 @@ functio lane_sum(tensor<f32, [4]> x) → f32 {
         "full-prefix unroll must reach reverse_ad as a guard-free straight line"
     );
 
-    let mut lowered = lower_analyzed_unit(&mut analysis, Default::default()).expect("unrolled primal should lower to MIR");
+    let mut lowered =
+        lower_analyzed_unit(&mut analysis, Default::default()).expect("unrolled primal should lower to MIR");
     expect_codegen_ok(
         apply_air_backward_bundle(&mut lowered, bundle, false),
         "unrolled full-prefix body must generate a reverse_ad companion",
@@ -440,8 +453,8 @@ functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
 "#;
 
     let session = test_session(Target::MirLlvm);
-    let mut analysis =
-        analyze_source(&session, "unroll_masked_mean.fab", source, AnalyzeRequest::default()).expect("mask-mode unrolled range loop must analyze");
+    let mut analysis = analyze_source(&session, "unroll_masked_mean.fab", source, AnalyzeRequest::default())
+        .expect("mask-mode unrolled range loop must analyze");
 
     let bundle = expect_codegen_ok(
         prepare_air_backward_bundle(&mut analysis),
@@ -465,7 +478,8 @@ functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
         "mask-mode unroll must reach reverse_ad as a guard-free straight line"
     );
 
-    let mut lowered = lower_analyzed_unit(&mut analysis, Default::default()).expect("masked primal should lower to MIR");
+    let mut lowered =
+        lower_analyzed_unit(&mut analysis, Default::default()).expect("masked primal should lower to MIR");
     expect_codegen_ok(
         apply_air_backward_bundle(&mut lowered, bundle, false),
         "masked unrolled body must generate a reverse_ad companion",

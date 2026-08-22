@@ -6,7 +6,19 @@ use std::collections::BTreeMap;
 
 fn analyze_with(config: Config, source: &str) -> radix_module::driver::AnalyzedModule {
     let session = Session::new(config);
-    analyze_source(&session, "test.fab", source, AnalyzeRequest { cli_program: None, contract: ModuleImportContract { namespace_exports: BTreeMap::new(), file_interfaces: BTreeMap::new(), ..ModuleImportContract::default() } })
+    analyze_source(
+        &session,
+        "test.fab",
+        source,
+        AnalyzeRequest {
+            cli_program: None,
+            contract: ModuleImportContract {
+                namespace_exports: BTreeMap::new(),
+                file_interfaces: BTreeMap::new(),
+                ..ModuleImportContract::default()
+            },
+        },
+    )
     .expect("analysis must succeed")
 }
 
@@ -106,12 +118,24 @@ fn extract_file_interface_round_trips_public_commune_fields() {
     assert_eq!(export.variants.len(), 2);
     assert_eq!(export.variants[1].fields.len(), 2);
 
-    analyze_source(&Session::new(Config::default().with_target(radix_module::codegen::Target::HirRust)), "consumer.fab", r#"importa ex "shape:errors" shape
+    analyze_source(
+        &Session::new(Config::default().with_target(radix_module::codegen::Target::HirRust)),
+        "consumer.fab",
+        r#"importa ex "shape:errors" shape
 
 functio render(shape.ShapeError e) → textus {
     redde e.message
 }
-"#, AnalyzeRequest { cli_program: None, contract: ModuleImportContract { namespace_exports: BTreeMap::new(), file_interfaces: BTreeMap::from([("shape".to_owned(), interface.clone())]), ..ModuleImportContract::default() } })
+"#,
+        AnalyzeRequest {
+            cli_program: None,
+            contract: ModuleImportContract {
+                namespace_exports: BTreeMap::new(),
+                file_interfaces: BTreeMap::from([("shape".to_owned(), interface.clone())]),
+                ..ModuleImportContract::default()
+            },
+        },
+    )
     .expect("commune field interface round trip");
 }
 

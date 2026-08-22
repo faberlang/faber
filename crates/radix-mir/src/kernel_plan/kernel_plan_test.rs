@@ -1635,12 +1635,8 @@ fn grouped_and_ssm_plans_resolve_typed_variants() {
 
 // ── R-PACK-02A packed admission / dequant resolution ──────────────────────
 
-fn section5_packed_layouts() -> [(
-    crate::abi::PackedStorageLayout,
-    PackedDequantKind,
-    u32,
-    u32,
-); 8] {
+fn section5_packed_layouts() -> [(crate::abi::PackedStorageLayout, PackedDequantKind, u32, u32); 8]
+{
     use crate::abi::PackedStorageLayout;
     [
         (
