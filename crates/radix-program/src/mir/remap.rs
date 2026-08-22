@@ -214,6 +214,9 @@ pub(super) fn remap_runtime_call_text_symbols(
         *template = target.intern(source.resolve(*template));
     }
     if let radix_module::mir::MirIntrinsic::Convert(conversion) = &mut call.intrinsic {
+        for param in &mut conversion.params {
+            *param = target.intern(source.resolve(*param));
+        }
         if let Some(recovery) = &mut conversion.recovery {
             remap_operand_text_symbols(recovery, source, target);
         }

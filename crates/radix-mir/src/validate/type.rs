@@ -317,6 +317,22 @@ impl Validator<'_, '_> {
             }
             Type::Primitive(Primitive::Octeti) => {
                 if let Some((_, index_ty)) = index {
+                    // A range index is a window read, not a scalar numerus key.
+                    // Its bounds must still be integer-valued, and the window
+                    // preserves the octeti carrier for a following conversion.
+                    let range_bound = match self.type_kind(index_ty) {
+                        Type::Intervallum(bound) => Some(*bound),
+                        _ => None,
+                    };
+                    if let Some(range_bound) = range_bound {
+                        self.require_assignable(
+                            MirType::semantic(range_bound),
+                            self.primitive(Primitive::Numerus),
+                            span,
+                            "octeti index range bounds are not numerus",
+                        );
+                        return Some(self.primitive(Primitive::Octeti));
+                    }
                     self.require_assignable(
                         index_ty,
                         self.primitive(Primitive::Numerus),

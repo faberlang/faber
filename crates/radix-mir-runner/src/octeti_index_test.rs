@@ -83,6 +83,19 @@ fn octeti_index_range_out_of_bounds_fails() {
 }
 
 #[test]
+fn octeti_index_range_accepts_byte_list_carrier() {
+    let receiver = Value::Array(std::rc::Rc::new(std::cell::RefCell::new(
+        [0xde, 0xad, 0xbe, 0xef]
+            .into_iter()
+            .map(|byte| Value::Int(i64::from(byte)))
+            .collect(),
+    )));
+    let result = eval_octeti_index(receiver, exclusive_range(0, 4))
+        .expect("byte-list carrier must support octeti window reads");
+    assert_eq!(result, Value::Octeti(vec![0xde, 0xad, 0xbe, 0xef]));
+}
+
+#[test]
 fn octeti_index_scalar_still_returns_byte() {
     let result = eval_octeti_index(Value::Octeti(vec![0xde, 0xad, 0xbe, 0xef]), Value::Int(1))
         .expect("in-bounds octeti scalar");
