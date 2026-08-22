@@ -1,6 +1,7 @@
 +++
 term = "cede"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "callable_posture", "return_clause", "cede_stmt", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "nota_stmt"]
 category = "async"
 canonical = true
 summary = "Yields one value from a generator."

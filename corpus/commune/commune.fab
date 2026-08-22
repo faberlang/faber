@@ -1,6 +1,7 @@
 +++
 term = "commune"
 kind = "annotation"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "discretio_decl", "union_member", "annotation", "annotation_sugar", "annotation_name", "field_decl", "variant", "variant_fields", "functio_decl", "param_list", "parameter", "type_annotation", "owned_type", "base_type", "qualified_type", "return_clause", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "finge_expr", "qualified_ident", "field_list", "field_init", "field_key", "redde_stmt", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
 category = "type"
 canonical = true
 summary = "Declares shared fields once on a tagged union."

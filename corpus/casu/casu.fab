@@ -1,6 +1,7 @@
 +++
 term = "casu"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "elige_stmt", "casu_elige_clause", "ceterum_clause", "expression", "literal", "nota_stmt"]
 category = "control-flow"
 canonical = true
 summary = "Introduces a branch inside an elige or discerne statement."

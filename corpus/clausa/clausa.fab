@@ -1,6 +1,7 @@
 +++
 term = "clausa"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "clausura_expr", "compact_clausura_expr", "clausura_signature", "clausura_param", "clausura_params", "clausura_joint", "return_clause", "itera_stmt", "expression", "equality", "equality_tail", "comparison", "additive_expr", "multiplicative_expr", "literal", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
 category = "function"
 canonical = true
 summary = "Closure and lambda expressions with inferred or annotated types."
