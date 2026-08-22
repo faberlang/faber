@@ -38,6 +38,14 @@ fn count_inline(src: &str) -> usize {
 }
 
 #[test]
+fn alphabetic_char_literals_do_not_swallow_following_code() {
+    let source = "fn probe(input: &str) {\n    let (date, rest) = input.split_once('T').or_else(|| input.split_once('t'))?;\n    let _ = rest;\n    let _ = date;\n}\n";
+    let scrubbed = hygiene_ratchet::scrub_rust_source(source);
+
+    assert_eq!(scrubbed.matches("let _ =").count(), 2);
+}
+
+#[test]
 fn inline_test_modules_count_any_cfg_test_gated_name() {
     assert_eq!(count_inline("#[cfg(test)]\nmod tests {\n}\n"), 1);
     assert_eq!(count_inline("#[cfg(test)]\nmod smoke_tests {\n}\n"), 1);

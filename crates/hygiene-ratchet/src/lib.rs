@@ -393,6 +393,22 @@ fn is_ident_continue(ch: char) -> bool {
     ch.is_ascii_alphanumeric() || ch == '_'
 }
 
+fn looks_like_char_literal<I>(chars: &std::iter::Peekable<I>) -> bool
+where
+    I: Iterator<Item = char> + Clone,
+{
+    let mut lookahead = chars.clone();
+    let Some(first) = lookahead.next() else {
+        return false;
+    };
+
+    match first {
+        '\\' => lookahead.next().is_some() && lookahead.next() == Some('\''),
+        first if first != '\'' && first != '\n' => lookahead.next() == Some('\''),
+        _ => false,
+    }
+}
+
 /// Strip comments and string/char literal bodies so budget scans see code only.
 #[must_use]
 // State machine for full-file scrubbing is naturally long; split deferred.
@@ -432,9 +448,12 @@ pub fn scrub_rust_source(source: &str) -> String {
                 }
                 '\'' => {
                     // Distinguish lifetimes ('ident) from char literals ('x' / '\x').
-                    // A lifetime starts with ' followed by an identifier character.
+                    // A closing quote within the short literal forms takes precedence
+                    // over the shared alphabetic prefix of a lifetime and char literal.
                     out.push(' ');
-                    if let Some(&next) = chars.peek() {
+                    if looks_like_char_literal(&chars) {
+                        state = State::Char;
+                    } else if let Some(&next) = chars.peek() {
                         if next.is_ascii_alphabetic() || next == '_' {
                             // Lifetime: skip the identifier but keep emitting spaces
                             while let Some(&c) = chars.peek() {

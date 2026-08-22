@@ -14,7 +14,7 @@ fn config() -> ScanConfig {
 
 const BUDGETS: Budgets = Budgets {
     // WHY: minted at D-03 baseline; frozen, not audited here.
-    unwrap: 0,
+    unwrap: 1,
     // WHY: minted at D-03 baseline after D03-MIR extraction; frozen, not audited here.
     expect: 59,
     // WHY: minted at D-03 baseline; frozen, not audited here.
