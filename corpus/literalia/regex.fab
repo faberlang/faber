@@ -1,6 +1,7 @@
 +++
 term = "regex"
 kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "qualified_type", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
 category = "literal"
 canonical = true
 summary = "Compile textus patterns to regex via ↦ regex."

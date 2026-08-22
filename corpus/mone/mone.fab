@@ -1,6 +1,7 @@
 +++
 term = "mone"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "expression", "literal", "nota_stmt"]
 category = "output"
 canonical = true
 summary = "Writes a warning message."

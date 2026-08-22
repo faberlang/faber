@@ -1,6 +1,7 @@
 +++
 term = "keyword-as-ident"
 kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
 category = "identifier"
 canonical = true
 summary = "A binding named print used as the argument of the bare output intrinsic."

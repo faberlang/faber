@@ -1,6 +1,7 @@
 +++
 term = "manifest"
 kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "expression", "literal", "nota_stmt"]
 category = "package"
 canonical = true
 summary = "faber.toml package metadata for build, run, and test."

@@ -1,6 +1,7 @@
 +++
 term = "keyword-as-ident"
 kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "lege_expr", "expression", "nota_stmt"]
 category = "identifier"
 canonical = true
 summary = "Unshadowed read stays the lege builtin."

@@ -1,6 +1,7 @@
 +++
 term = "keyword-as-ident"
 kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "type_annotation", "owned_type", "base_type", "incipit_stmt", "expr_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
 category = "identifier"
 canonical = true
 summary = "Statement-initial print(...) is a user function call, not the output intrinsic."

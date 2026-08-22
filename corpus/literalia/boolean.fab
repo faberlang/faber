@@ -1,6 +1,7 @@
 +++
 term = "verum"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "et_expr", "unary_expr", "expression", "literal", "nota_stmt"]
 category = "literal"
 canonical = true
 summary = "Boolean literals verum and falsum with bivalens bindings."
