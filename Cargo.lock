@@ -791,6 +791,9 @@ dependencies = [
 [[package]]
 name = "radix-runtime-contract"
 version = "0.83.0"
+dependencies = [
+ "hygiene-ratchet",
+]
 
 [[package]]
 name = "radix-semantic"
