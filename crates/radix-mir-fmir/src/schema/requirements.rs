@@ -171,7 +171,7 @@ pub fn validate_duplicate_target_features(target: &DeviceTargetId) -> Result<(),
 ///
 /// # Errors
 ///
-/// Returns [`FmirImageError::UnsupportedTargetFeature`] on the first unknown
+/// Returns [`FmirImageError::NonAdmittedTargetFeature`] on the first unknown
 /// required feature and [`FmirImageError::DuplicateRequiredFeature`] on the
 /// first duplicate.
 pub fn validate_target_features_in(
@@ -181,7 +181,7 @@ pub fn validate_target_features_in(
     validate_duplicate_target_features(target)?;
     for feature in &target.required_features {
         if !is_known_target_feature_in(table, feature) {
-            return Err(FmirImageError::UnsupportedTargetFeature {
+            return Err(FmirImageError::NonAdmittedTargetFeature {
                 feature: feature.clone(),
             });
         }
@@ -194,7 +194,7 @@ pub fn validate_target_features_in(
 ///
 /// # Errors
 ///
-/// Returns [`FmirImageError::UnsupportedTargetFeature`] /
+/// Returns [`FmirImageError::NonAdmittedTargetFeature`] /
 /// [`FmirImageError::DuplicateRequiredFeature`].
 pub fn validate_target_features(target: &DeviceTargetId) -> Result<(), FmirImageError> {
     validate_target_features_in(target, &default_compatibility_table())
@@ -209,7 +209,7 @@ pub fn validate_target_features(target: &DeviceTargetId) -> Result<(), FmirImage
 ///
 /// # Errors
 ///
-/// Returns [`FmirImageError::IncompatibleTargetId`] when a compiled-in leaf
+/// Returns [`FmirImageError::TargetIdMismatch`] when a compiled-in leaf
 /// artifact declares a target id that is not in its backend's rows.
 pub fn validate_compiled_in_target_in(
     backend: &FmirDeviceBackend,
@@ -230,7 +230,7 @@ pub fn validate_compiled_in_target_in(
         return Ok(());
     }
     let expected = rows[0].target;
-    Err(FmirImageError::IncompatibleTargetId {
+    Err(FmirImageError::TargetIdMismatch {
         backend: backend_spelling,
         target: target.id.clone(),
         expected: expected.to_owned(),
@@ -242,7 +242,7 @@ pub fn validate_compiled_in_target_in(
 ///
 /// # Errors
 ///
-/// Returns [`FmirImageError::IncompatibleTargetId`].
+/// Returns [`FmirImageError::TargetIdMismatch`].
 pub fn validate_compiled_in_target(
     backend: &FmirDeviceBackend,
     target: &DeviceTargetId,

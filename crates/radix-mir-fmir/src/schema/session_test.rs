@@ -438,7 +438,7 @@ fn mutated_byte_in_the_serialized_version_fails_closed() {
         postcard::from_bytes(&mutated).expect("mutated section still decodes");
     assert!(matches!(
         admit_session_section(&decoded, &wire_program_fixture()),
-        Err(FmirImageError::UnsupportedSessionSectionVersion { actual, expected })
+        Err(FmirImageError::SessionSectionVersionMismatch { actual, expected })
             if actual == 1 && expected == WIRE_SESSION_SECTION_VERSION
     ));
 }
@@ -568,7 +568,7 @@ fn stale_session_section_version_fails_closed() {
         let mut section = honest_session_section();
         section.v = stale;
         match admit_session_section(&section, &wire_program_fixture()) {
-            Err(FmirImageError::UnsupportedSessionSectionVersion { actual, expected }) => {
+            Err(FmirImageError::SessionSectionVersionMismatch { actual, expected }) => {
                 assert_eq!(actual, stale);
                 assert_eq!(expected, WIRE_SESSION_SECTION_VERSION);
             }
@@ -579,7 +579,7 @@ fn stale_session_section_version_fails_closed() {
         // The stale section also fails the full device-section load boundary.
         assert!(matches!(
             admit_device_section(&device_section_with_session(Some(section))),
-            Err(FmirImageError::UnsupportedSessionSectionVersion { .. })
+            Err(FmirImageError::SessionSectionVersionMismatch { .. })
         ));
     }
 }

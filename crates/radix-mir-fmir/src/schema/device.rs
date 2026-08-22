@@ -379,7 +379,7 @@ pub struct FmirDeviceArtifact {
     /// CTO9-6 f, superseding the earlier reject-at-admission stance): they
     /// are admitted at load with encodings/digests/canonicalization still
     /// validated as far as their declared fields allow, and rejected at
-    /// selection use ([`FmirImageError::UnsupportedSelectedBackend`]) —
+    /// selection use ([`FmirImageError::NonAdmittedSelectedBackend`]) —
     /// never silently dropped, remapped, or fallback-laned.
     pub backend: FmirDeviceBackend,
     /// Explicit format id — declared, never inferred from blob content.
@@ -534,7 +534,7 @@ impl FmirDeviceArtifact {
         match &self.encoding {
             DevicePayloadEncoding::Text => {
                 let text = std::str::from_utf8(&self.bytes).map_err(|error| {
-                    DevicePayloadEncodingError::NonCanonicalUtf8 {
+                    DevicePayloadEncodingError::Utf8CanonicalityMismatch {
                         detail: error.to_string(),
                     }
                 })?;
@@ -551,7 +551,7 @@ impl FmirDeviceArtifact {
                 canonical_unpadded_base64: declared_base64,
             } => {
                 if encoding_tag.is_empty() {
-                    return Err(DevicePayloadEncodingError::EmptyEncodingTag);
+                    return Err(DevicePayloadEncodingError::EncodingTagEmpty);
                 }
                 if *decoded_byte_length != self.bytes.len() as u64 {
                     return Err(DevicePayloadEncodingError::DecodedByteLengthMismatch {
@@ -561,7 +561,7 @@ impl FmirDeviceArtifact {
                 }
                 let canonical = canonical_unpadded_base64(&self.bytes);
                 if canonical != *declared_base64 {
-                    return Err(DevicePayloadEncodingError::NonCanonicalBase64 {
+                    return Err(DevicePayloadEncodingError::Base64CanonicalityMismatch {
                         detail: format!(
                             "declared `{declared_base64}` is not the canonical unpadded base64 (`{canonical}`) of the decoded bytes"
                         ),
@@ -716,27 +716,27 @@ pub enum DevicePayloadEncoding {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DevicePayloadEncodingError {
     /// A text-encoded payload's bytes are not valid UTF-8.
-    NonCanonicalUtf8 { detail: String },
+    Utf8CanonicalityMismatch { detail: String },
     /// A text-encoded payload begins with a UTF-8 BOM.
     Utf8Bom { detail: String },
     /// A binary-encoded payload carries an empty encoding tag.
-    EmptyEncodingTag,
+    EncodingTagEmpty,
     /// The declared decoded byte length disagrees with the artifact bytes.
     DecodedByteLengthMismatch { declared: u64, actual: usize },
     /// The declared base64 is not the canonical unpadded base64 of the bytes.
-    NonCanonicalBase64 { detail: String },
+    Base64CanonicalityMismatch { detail: String },
 }
 
 impl std::fmt::Display for DevicePayloadEncodingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NonCanonicalUtf8 { detail } => {
+            Self::Utf8CanonicalityMismatch { detail } => {
                 write!(f, "text payload is not canonical UTF-8: {detail}")
             }
-            Self::Utf8Bom { detail } | Self::NonCanonicalBase64 { detail } => {
+            Self::Utf8Bom { detail } | Self::Base64CanonicalityMismatch { detail } => {
                 write!(f, "{detail}")
             }
-            Self::EmptyEncodingTag => {
+            Self::EncodingTagEmpty => {
                 write!(f, "binary payload carries an empty encoding tag")
             }
             Self::DecodedByteLengthMismatch { declared, actual } => write!(

@@ -14,7 +14,7 @@ pub struct FmirTextImageFile {
     /// parse and before the target/toolchain/device admission checks; the
     /// binary decoder pre-scans the first postcard varint so a version
     /// mismatch fails with
-    /// [`UnsupportedVersion`](crate::error::FmirImageError::UnsupportedVersion)
+    /// [`UnsupportedVersion`](crate::error::FmirImageError::VersionMismatch)
     /// before any structural decode.
     pub version: u32,
     pub target: String,
@@ -41,7 +41,7 @@ pub struct FmirBinaryImageFile {
     /// First wire field (postcard varint). [`decode_binary_image`](crate::decode_binary_image)
     /// pre-scans this varint so a legacy-layout image (e.g. version 3
     /// without the device field, N1.7) fails with
-    /// [`UnsupportedVersion`](crate::error::FmirImageError::UnsupportedVersion)
+    /// [`UnsupportedVersion`](crate::error::FmirImageError::VersionMismatch)
     /// instead of a structural `Parse` error.
     pub version: u32,
     pub target: String,

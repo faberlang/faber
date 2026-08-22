@@ -14,7 +14,7 @@ pub enum FmirImageError {
 
     /// The image carries an artifact version the loader does not support.
     /// Version ratchets are clean breaks; there is no compatibility decoder.
-    UnsupportedVersion {
+    VersionMismatch {
         /// Version encoded in the image.
         actual: u32,
         /// Version this loader accepts.
@@ -22,7 +22,7 @@ pub enum FmirImageError {
     },
 
     /// The image `target` tag does not match the format it was decoded as.
-    WrongTarget {
+    TargetMismatch {
         /// Target tag encoded in the image.
         found: String,
         /// Target tag the format requires (`fmir-text` or `fmir`).
@@ -32,7 +32,7 @@ pub enum FmirImageError {
     /// The toolchain version recorded in the image does not match the
     /// expected compiler version (faber's crate version). A device payload is
     /// admitted only from the exact producing toolchain version (N1.7).
-    UnsupportedToolchain {
+    ToolchainMismatch {
         /// Toolchain version recorded in the image.
         found: String,
         /// Toolchain version the loader expects.
@@ -71,14 +71,14 @@ pub enum FmirImageError {
     /// An artifact's typed target feature is not known to the compiled-in
     /// leaves (DDCP2-U3). Unknown features are rejected honestly, never
     /// guessed, never silently dropped.
-    UnsupportedTargetFeature {
+    NonAdmittedTargetFeature {
         /// The unknown feature id.
         feature: String,
     },
 
     /// A compiled-in leaf artifact declares a target id that is not its
     /// leaf's target (exhaustive compiled-in validation).
-    IncompatibleTargetId {
+    TargetIdMismatch {
         /// Backend of the offending artifact.
         backend: String,
         /// Target id the artifact declares.
@@ -90,7 +90,7 @@ pub enum FmirImageError {
     /// An explicit backend selection names no artifact of the selected
     /// backend (DDCP2-U3): a missing artifact fails closed with the named
     /// rule.
-    MissingArtifactForSelection {
+    AbsentArtifactForSelection {
         /// The selected backend id.
         selection: String,
     },
@@ -113,11 +113,11 @@ pub enum FmirImageError {
     /// leaf. Representable on the packet and preserved-until-selection
     /// (DDCP3-U0 (f)): admission no longer rejects it at load; selection use
     /// of an unknown backend fails with
-    /// [`FmirImageError::UnsupportedSelectedBackend`]. **Retained as a
+    /// [`FmirImageError::NonAdmittedSelectedBackend`]. **Retained as a
     /// same-boundary compatibility shim** — faber's landed diagnostic
     /// mapping (`mir/image.rs` §Unknown) still matches this variant; removal
     /// routes through DDPP1-U5/U6 (recorded residual, not removed here).
-    UnsupportedArtifactBackend {
+    NonAdmittedArtifactBackend {
         /// The unknown backend id.
         backend: String,
     },
@@ -129,7 +129,7 @@ pub enum FmirImageError {
     /// (`HOST_CALL_ABI_VERSION == DEVICE_RUN_PLAN_VERSION`). A deliberate
     /// future minor-compatibility lane is an explicit decision, never a
     /// silent addition.
-    UnsupportedArtifactAbiVersion {
+    ArtifactAbiVersionMismatch {
         /// Backend of the offending artifact.
         backend: String,
         /// ABI/schema version the artifact declares.
@@ -173,7 +173,7 @@ pub enum FmirImageError {
     /// landed fail-closed `FmirDeviceSelection::Unknown(_)` arm. Unknown
     /// backend ARTIFACTS are preserved-until-selection (admitted at load,
     /// validated as far as their declared fields allow).
-    UnsupportedSelectedBackend {
+    NonAdmittedSelectedBackend {
         /// The selected backend id.
         backend: String,
     },
@@ -182,7 +182,7 @@ pub enum FmirImageError {
     /// version is admitted independently of the outer FMIR image version
     /// (Stage 3R S8/F7), before any field-level interpretation of the device
     /// section.
-    UnsupportedDeviceProgramVersion {
+    DeviceProgramVersionMismatch {
         /// Version encoded in the device section.
         actual: u32,
         /// Version this loader accepts.
@@ -190,7 +190,7 @@ pub enum FmirImageError {
     },
 
     /// The separately versioned executor-plan section is unsupported.
-    UnsupportedExecutorPlanSectionVersion {
+    ExecutorPlanSectionVersionMismatch {
         /// Version encoded in the executor-plan section.
         actual: u32,
         /// Version this loader accepts.
@@ -218,7 +218,7 @@ pub enum FmirImageError {
     /// The distributed section carries its OWN version ratchet, admitted
     /// fail-closed before any field-level interpretation — independently of
     /// the nested device-program wire version and the outer image version.
-    UnsupportedDistributedSectionVersion {
+    DistributedSectionVersionMismatch {
         /// Version encoded in the distributed section.
         actual: u32,
         /// Version this loader accepts.
@@ -260,7 +260,7 @@ pub enum FmirImageError {
     /// cadence/session section carries its OWN version ratchet, admitted
     /// fail-closed before any field-level interpretation — independently of
     /// the nested device-program wire version and the outer image version.
-    UnsupportedSessionSectionVersion {
+    SessionSectionVersionMismatch {
         /// Version encoded in the session section.
         actual: u32,
         /// Version this loader accepts.
@@ -285,19 +285,19 @@ impl fmt::Display for FmirImageError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Parse(detail) => write!(f, "{detail}"),
-            Self::UnsupportedVersion { actual, expected } => {
+            Self::VersionMismatch { actual, expected } => {
                 write!(
                     f,
                     "unsupported FMIR image version {actual}; expected {expected}"
                 )
             }
-            Self::WrongTarget { found, expected } => {
+            Self::TargetMismatch { found, expected } => {
                 write!(
                     f,
                     "FMIR image target must be `{expected}` (found `{found}`)"
                 )
             }
-            Self::UnsupportedToolchain { found, expected } => {
+            Self::ToolchainMismatch { found, expected } => {
                 write!(
                     f,
                     "unsupported FMIR image toolchain {found}; expected {expected}"
@@ -316,11 +316,11 @@ impl fmt::Display for FmirImageError {
                 f,
                 "FMIR device artifact `{backend}` provenance rule violated: {detail}"
             ),
-            Self::UnsupportedTargetFeature { feature } => write!(
+            Self::NonAdmittedTargetFeature { feature } => write!(
                 f,
                 "FMIR device artifact declares target feature `{feature}`, which is not known to the compiled-in leaves — representable and rejected honestly, never guessed (DDCP2-U3 typed target features)"
             ),
-            Self::IncompatibleTargetId {
+            Self::TargetIdMismatch {
                 backend,
                 target,
                 expected,
@@ -328,7 +328,7 @@ impl fmt::Display for FmirImageError {
                 f,
                 "FMIR device artifact `{backend}` declares target id `{target}`, but the compiled-in leaf's target is `{expected}` — exhaustive compiled-in validation fails closed"
             ),
-            Self::MissingArtifactForSelection { selection } => write!(
+            Self::AbsentArtifactForSelection { selection } => write!(
                 f,
                 "FMIR device backend selection `{selection}` has no artifact of that backend — a missing artifact fails closed (DDCP2-U3 selection validation)"
             ),
@@ -338,13 +338,13 @@ impl fmt::Display for FmirImageError {
                     "FMIR device artifact `{backend}` payload-encoding mismatch: {detail} (contract §Payload encoding)"
                 )
             }
-            Self::UnsupportedArtifactBackend { backend } => {
+            Self::NonAdmittedArtifactBackend { backend } => {
                 write!(
                     f,
                     "FMIR device artifact backend `{backend}` is not a compiled-in leaf — representable on the packet and preserved-until-selection (DDCP3-U0 (f)); selection use fails closed with `UnsupportedSelectedBackend`, never silently dropped, remapped, or fallback-laned (contract §Unknown future backends)"
                 )
             }
-            Self::UnsupportedArtifactAbiVersion {
+            Self::ArtifactAbiVersionMismatch {
                 backend,
                 actual,
                 accepted,
@@ -364,17 +364,17 @@ impl fmt::Display for FmirImageError {
                 f,
                 "FMIR device artifact declares entrypoint `{entry}` more than once — duplicate entrypoint identities fail admission (DDCP3-U0 (b))"
             ),
-            Self::UnsupportedSelectedBackend { backend } => write!(
+            Self::NonAdmittedSelectedBackend { backend } => write!(
                 f,
                 "FMIR device backend selection `{backend}` is unknown — selection resolution fails closed (DDCP3-U0 (f) preserve-until-selection; unknown backend artifacts are admitted at load and rejected at selection use)"
             ),
-            Self::UnsupportedDeviceProgramVersion { actual, expected } => {
+            Self::DeviceProgramVersionMismatch { actual, expected } => {
                 write!(
                     f,
                     "incompatible device-program wire version {actual}; this loader accepts wire version {expected} — the serialized device program was produced by a different (incompatible) radix wire revision"
                 )
             }
-            Self::UnsupportedExecutorPlanSectionVersion { actual, expected } => write!(
+            Self::ExecutorPlanSectionVersionMismatch { actual, expected } => write!(
                 f,
                 "unsupported executor-plan section version {actual}; expected {expected}"
             ),
@@ -384,7 +384,7 @@ impl fmt::Display for FmirImageError {
             Self::WireProgramInvalid { detail } => {
                 write!(f, "invalid device program: {detail}")
             }
-            Self::UnsupportedDistributedSectionVersion { actual, expected } => {
+            Self::DistributedSectionVersionMismatch { actual, expected } => {
                 write!(
                     f,
                     "unsupported distributed-section version {actual}; expected {expected}"
@@ -402,7 +402,7 @@ impl fmt::Display for FmirImageError {
                     "distributed-section logical-plan hash {expected} does not match the delivered plan (recomputed {recomputed})"
                 )
             }
-            Self::UnsupportedSessionSectionVersion { actual, expected } => {
+            Self::SessionSectionVersionMismatch { actual, expected } => {
                 write!(
                     f,
                     "unsupported session-section version {actual}; expected {expected}"

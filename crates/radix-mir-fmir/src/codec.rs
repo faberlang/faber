@@ -40,7 +40,7 @@ pub fn encode_binary_image(image: &FmirBinaryImageFile) -> Result<Vec<u8>, FmirI
 ///
 /// Returns [`FmirImageError::Parse`] on TOML decode failure, and the
 /// version / target / toolchain / device-admission gate errors
-/// ([`FmirImageError::UnsupportedVersion`], target and toolchain
+/// ([`FmirImageError::VersionMismatch`], target and toolchain
 /// mismatches) from the fail-closed admission checks.
 pub fn decode_text_image(
     text: &str,
@@ -60,7 +60,7 @@ pub fn decode_text_image(
 /// Pre-scan the first wire field of a postcard image as a `u32` varint.
 ///
 /// `version` is the first serialized field in both image formats. A full
-/// struct parse cannot report [`FmirImageError::UnsupportedVersion`] for a
+/// struct parse cannot report [`FmirImageError::VersionMismatch`] for a
 /// legacy-layout image (the layout diverges before the parse completes), so
 /// [`decode_binary_image`] pre-scans the varint to gate on the version first.
 ///
@@ -89,7 +89,7 @@ fn read_version_varint(bytes: &[u8]) -> Option<u32> {
 ///
 /// The first wire field (`version`) is pre-scanned as a postcard varint so a
 /// legacy-layout image (e.g. version 3 without the device section, N1.7)
-/// fails with [`FmirImageError::UnsupportedVersion`] instead of a structural
+/// fails with [`FmirImageError::VersionMismatch`] instead of a structural
 /// `Parse` error.
 ///
 /// The `expected_toolchain` is the compiler crate version the image must have
@@ -97,7 +97,7 @@ fn read_version_varint(bytes: &[u8]) -> Option<u32> {
 ///
 /// # Errors
 ///
-/// Returns [`FmirImageError::UnsupportedVersion`] when the pre-scanned
+/// Returns [`FmirImageError::VersionMismatch`] when the pre-scanned
 /// version field does not match the supported artifact version,
 /// [`FmirImageError::Parse`] on postcard decode failure, and the target /
 /// toolchain / device-admission gate errors from the fail-closed checks.
@@ -110,7 +110,7 @@ pub fn decode_binary_image(
     // must report UnsupportedVersion, not a generic Parse error.
     if let Some(actual) = read_version_varint(bytes) {
         if actual != PACKAGE_MIR_ARTIFACT_VERSION {
-            return Err(FmirImageError::UnsupportedVersion {
+            return Err(FmirImageError::VersionMismatch {
                 actual,
                 expected: PACKAGE_MIR_ARTIFACT_VERSION,
             });

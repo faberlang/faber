@@ -255,7 +255,7 @@ fn eight_rank_stale_section_version_fails_closed() {
         let mut section = eight_rank_section();
         section.v = stale;
         match admit_distributed_section(&section, &eight_rank_program()) {
-            Err(FmirImageError::UnsupportedDistributedSectionVersion { actual, expected }) => {
+            Err(FmirImageError::DistributedSectionVersionMismatch { actual, expected }) => {
                 assert_eq!(actual, stale);
                 assert_eq!(expected, WIRE_DISTRIBUTED_SECTION_VERSION);
             }
@@ -269,7 +269,7 @@ fn eight_rank_stale_section_version_fails_closed() {
                 device.distributed = Some(section);
                 device
             }),
-            Err(FmirImageError::UnsupportedDistributedSectionVersion { .. })
+            Err(FmirImageError::DistributedSectionVersionMismatch { .. })
         ));
     }
 }

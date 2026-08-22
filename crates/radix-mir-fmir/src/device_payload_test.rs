@@ -250,7 +250,7 @@ fn executor_plan_section_version_skew_fails_closed_before_field_admission() {
     .expect_err("executor-plan version skew must fail closed");
     assert!(matches!(
         error,
-        FmirImageError::UnsupportedExecutorPlanSectionVersion {
+        FmirImageError::ExecutorPlanSectionVersionMismatch {
             actual: 3,
             expected: 2
         }
@@ -672,7 +672,7 @@ fn decode_rejects_unknown_target_feature() {
     let image = text_image_with_device(Some(section));
     let text = encode_text_image(&image).expect("encode text image");
     match decode_text_image(&text, TOOLCHAIN) {
-        Err(FmirImageError::UnsupportedTargetFeature { feature }) => {
+        Err(FmirImageError::NonAdmittedTargetFeature { feature }) => {
             assert_eq!(feature, "vulkan");
         }
         other => panic!("expected UnsupportedTargetFeature, got {other:?}"),
@@ -692,7 +692,7 @@ fn decode_rejects_incompatible_compiled_in_target() {
     let bytes = encode_binary_image(&image).expect("encode binary image");
     assert!(matches!(
         decode_binary_image(&bytes, TOOLCHAIN),
-        Err(FmirImageError::IncompatibleTargetId { backend, .. }) if backend == "metal"
+        Err(FmirImageError::TargetIdMismatch { backend, .. }) if backend == "metal"
     ));
 }
 
@@ -1259,7 +1259,7 @@ fn unsupported_artifact_abi_version_rejected_at_admission() {
     let image = text_image_with_device(Some(section));
     let text = encode_text_image(&image).expect("encode text image");
     match decode_text_image(&text, TOOLCHAIN) {
-        Err(FmirImageError::UnsupportedArtifactAbiVersion {
+        Err(FmirImageError::ArtifactAbiVersionMismatch {
             backend,
             actual,
             accepted,
@@ -1347,7 +1347,7 @@ fn incompatible_artifact_combination_rejected_at_admission() {
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, TOOLCHAIN),
-        Err(FmirImageError::UnsupportedTargetFeature { feature }) if feature == "vulkan"
+        Err(FmirImageError::NonAdmittedTargetFeature { feature }) if feature == "vulkan"
     ));
 }
 
@@ -1526,7 +1526,7 @@ fn unknown_selection_is_representable_and_rejected_at_resolution() {
         "selection = { unknown = \"vulkan\" }",
     );
     match decode_text_image(&text, TOOLCHAIN) {
-        Err(FmirImageError::UnsupportedSelectedBackend { backend }) => {
+        Err(FmirImageError::NonAdmittedSelectedBackend { backend }) => {
             assert_eq!(backend, "vulkan");
         }
         other => panic!("expected UnsupportedSelectedBackend, got {other:?}"),
@@ -1579,7 +1579,7 @@ fn unknown_backend_is_representable_and_preserved_at_load() {
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, TOOLCHAIN),
-        Err(FmirImageError::UnsupportedSelectedBackend { backend }) if backend == "rocm"
+        Err(FmirImageError::NonAdmittedSelectedBackend { backend }) if backend == "rocm"
     ));
 }
 
@@ -1664,7 +1664,7 @@ fn amd_artifact_mismatched_target_fails_closed() {
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, TOOLCHAIN),
-        Err(FmirImageError::IncompatibleTargetId { backend, target, .. })
+        Err(FmirImageError::TargetIdMismatch { backend, target, .. })
             if backend == "amd" && target == "sm_120"
     ));
 }
@@ -1703,7 +1703,7 @@ fn amd_selection_requires_an_amd_artifact() {
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, TOOLCHAIN),
-        Err(FmirImageError::MissingArtifactForSelection { selection }) if selection == "amd"
+        Err(FmirImageError::AbsentArtifactForSelection { selection }) if selection == "amd"
     ));
 }
 
@@ -1726,7 +1726,7 @@ fn amd_spelling_round_trips_as_explicit_variant_not_unknown() {
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, TOOLCHAIN),
-        Err(FmirImageError::UnsupportedSelectedBackend { backend }) if backend == "rocm"
+        Err(FmirImageError::NonAdmittedSelectedBackend { backend }) if backend == "rocm"
     ));
 }
 
@@ -1745,7 +1745,7 @@ fn decode_rejects_pre_break_version_5_image_with_device() {
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, TOOLCHAIN),
-        Err(FmirImageError::UnsupportedVersion {
+        Err(FmirImageError::VersionMismatch {
             actual: 5,
             expected: PACKAGE_MIR_ARTIFACT_VERSION
         })
@@ -1768,7 +1768,7 @@ fn decode_rejects_genuine_v5_layout_binary_image() {
     bytes[0] = 5;
     assert!(matches!(
         decode_binary_image(&bytes, TOOLCHAIN),
-        Err(FmirImageError::UnsupportedVersion {
+        Err(FmirImageError::VersionMismatch {
             actual: 5,
             expected: PACKAGE_MIR_ARTIFACT_VERSION
         })
@@ -1791,7 +1791,7 @@ fn decode_rejects_old_wire_version_in_device_section() {
     let image = text_image_with_device(Some(section));
     let text = encode_text_image(&image).expect("encode text image");
     match decode_text_image(&text, TOOLCHAIN) {
-        Err(FmirImageError::UnsupportedDeviceProgramVersion { actual, expected }) => {
+        Err(FmirImageError::DeviceProgramVersionMismatch { actual, expected }) => {
             assert_eq!(actual, 3);
             assert_eq!(expected, WIRE_DEVICE_PROGRAM_VERSION);
         }
@@ -1807,7 +1807,7 @@ fn decode_rejects_old_wire_version_in_binary_image() {
     let bytes = encode_binary_image(&image).expect("encode binary image");
     assert!(matches!(
         decode_binary_image(&bytes, TOOLCHAIN),
-        Err(FmirImageError::UnsupportedDeviceProgramVersion { actual, expected })
+        Err(FmirImageError::DeviceProgramVersionMismatch { actual, expected })
             if actual == 3 && expected == WIRE_DEVICE_PROGRAM_VERSION
     ));
 }
@@ -1825,11 +1825,11 @@ fn mixed_wire_version_fails_with_the_named_incompatible_diagnostic() {
     let image = text_image_with_device(Some(section.clone()));
     let text = encode_text_image(&image).expect("encode text image");
     match decode_text_image(&text, TOOLCHAIN) {
-        Err(FmirImageError::UnsupportedDeviceProgramVersion { actual, expected }) => {
+        Err(FmirImageError::DeviceProgramVersionMismatch { actual, expected }) => {
             assert_eq!(actual, WIRE_DEVICE_PROGRAM_VERSION - 1);
             assert_eq!(expected, WIRE_DEVICE_PROGRAM_VERSION);
             let message =
-                FmirImageError::UnsupportedDeviceProgramVersion { actual, expected }.to_string();
+                FmirImageError::DeviceProgramVersionMismatch { actual, expected }.to_string();
             assert!(
                 message.contains("incompatible") && message.contains("wire version"),
                 "the diagnostic must name the incompatible wire version, got: {message}"
@@ -1844,7 +1844,7 @@ fn mixed_wire_version_fails_with_the_named_incompatible_diagnostic() {
     assert!(
         matches!(
             decode_binary_image(&bytes, TOOLCHAIN),
-            Err(FmirImageError::UnsupportedDeviceProgramVersion { actual, expected })
+            Err(FmirImageError::DeviceProgramVersionMismatch { actual, expected })
                 if actual == WIRE_DEVICE_PROGRAM_VERSION - 1
                     && expected == WIRE_DEVICE_PROGRAM_VERSION
         ),
@@ -1862,7 +1862,7 @@ fn decode_rejects_outer_version_independently_of_nested_version() {
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, TOOLCHAIN),
-        Err(FmirImageError::UnsupportedVersion {
+        Err(FmirImageError::VersionMismatch {
             actual: 5,
             expected: PACKAGE_MIR_ARTIFACT_VERSION
         })
@@ -1877,7 +1877,7 @@ fn decode_rejects_device_payload_from_wrong_toolchain() {
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, "0.78.0"),
-        Err(FmirImageError::UnsupportedToolchain { found, expected })
+        Err(FmirImageError::ToolchainMismatch { found, expected })
             if found == "0.79.0" && expected == "0.78.0"
     ));
 }
@@ -2638,7 +2638,7 @@ fn wire_version_2_payload_fails_faber_admission_closed() {
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, TOOLCHAIN),
-        Err(FmirImageError::UnsupportedDeviceProgramVersion { actual, expected })
+        Err(FmirImageError::DeviceProgramVersionMismatch { actual, expected })
             if actual == 2 && expected == WIRE_DEVICE_PROGRAM_VERSION
     ));
 }
@@ -2747,7 +2747,7 @@ fn explicit_selection_without_the_selected_artifact_fails_closed() {
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, TOOLCHAIN),
-        Err(FmirImageError::MissingArtifactForSelection { selection })
+        Err(FmirImageError::AbsentArtifactForSelection { selection })
             if selection == "metal"
     ));
 }

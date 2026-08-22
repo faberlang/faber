@@ -227,7 +227,7 @@ fn either_v2_section_version_skew_fails_closed() {
     section.v = WIRE_SESSION_SECTION_VERSION - 1;
     assert!(matches!(
         admit(&section, &runtime()),
-        Err(FmirImageError::UnsupportedSessionSectionVersion {
+        Err(FmirImageError::SessionSectionVersionMismatch {
             actual: 1,
             expected: 2
         })
@@ -237,7 +237,7 @@ fn either_v2_section_version_skew_fails_closed() {
     runtime.v = EXECUTOR_PLAN_SECTION_VERSION - 1;
     assert!(matches!(
         admit(&session(), &runtime),
-        Err(FmirImageError::UnsupportedExecutorPlanSectionVersion {
+        Err(FmirImageError::ExecutorPlanSectionVersionMismatch {
             actual: 1,
             expected: 2
         })

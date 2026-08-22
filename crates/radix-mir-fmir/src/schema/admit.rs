@@ -27,7 +27,7 @@ pub(crate) fn check_version(actual: u32) -> Result<(), crate::error::FmirImageEr
     if actual == PACKAGE_MIR_ARTIFACT_VERSION {
         Ok(())
     } else {
-        Err(crate::error::FmirImageError::UnsupportedVersion {
+        Err(crate::error::FmirImageError::VersionMismatch {
             actual,
             expected: PACKAGE_MIR_ARTIFACT_VERSION,
         })
@@ -43,7 +43,7 @@ pub(crate) fn check_target(
     if found == expected {
         Ok(())
     } else {
-        Err(crate::error::FmirImageError::WrongTarget {
+        Err(crate::error::FmirImageError::TargetMismatch {
             found: found.to_owned(),
             expected,
         })
@@ -60,7 +60,7 @@ pub(crate) fn check_toolchain(
     if found == expected {
         Ok(())
     } else {
-        Err(crate::error::FmirImageError::UnsupportedToolchain {
+        Err(crate::error::FmirImageError::ToolchainMismatch {
             found: found.to_owned(),
             expected: expected.to_owned(),
         })
@@ -137,7 +137,7 @@ pub(crate) fn check_artifact_abi_versions(
     for artifact in &device.artifacts.artifact {
         if artifact.abi_version != ARTIFACT_ABI_VERSION {
             return Err(
-                crate::error::FmirImageError::UnsupportedArtifactAbiVersion {
+                crate::error::FmirImageError::ArtifactAbiVersionMismatch {
                     backend: artifact.backend.spelling(),
                     actual: artifact.abi_version,
                     accepted: ARTIFACT_ABI_VERSION,
@@ -210,7 +210,7 @@ pub(crate) fn check_artifact_entrypoints(
 /// for the selected backend — a missing artifact fails closed with the
 /// named rule. `Auto` is admitted (selection resolves at run time); an
 /// **explicit selection of an unknown backend fails at selection
-/// resolution** with [`FmirImageError::UnsupportedSelectedBackend`] —
+/// resolution** with [`FmirImageError::NonAdmittedSelectedBackend`] —
 /// aligned with faber's landed fail-closed `Unknown(_)` arm. Unknown
 /// backend ARTIFACTS are preserved-until-selection (admitted at load,
 /// rejected at selection use); never silently remapped.
@@ -228,13 +228,13 @@ pub(crate) fn check_selection_artifacts(
                 .iter()
                 .any(|artifact| artifact.backend.spelling() == selected);
             if !present {
-                return Err(crate::error::FmirImageError::MissingArtifactForSelection {
+                return Err(crate::error::FmirImageError::AbsentArtifactForSelection {
                     selection: selected,
                 });
             }
         }
         crate::schema::FmirDeviceSelection::Unknown(backend) => {
-            return Err(crate::error::FmirImageError::UnsupportedSelectedBackend {
+            return Err(crate::error::FmirImageError::NonAdmittedSelectedBackend {
                 backend: backend.clone(),
             });
         }
@@ -283,7 +283,7 @@ pub(crate) fn check_artifact_encodings(
 ///
 /// # Errors
 ///
-/// Returns [`FmirImageError::UnsupportedDeviceProgramVersion`] when the
+/// Returns [`FmirImageError::DeviceProgramVersionMismatch`] when the
 /// nested device-program wire version is unsupported, and the named
 /// [`FmirImageError`] variant for the first fail-closed rule the section
 /// violates (payload encodings, artifact ABI versions, typed targets +
@@ -295,7 +295,7 @@ fn admit_executor_plan_section(
 ) -> Result<(), crate::error::FmirImageError> {
     if section.v != EXECUTOR_PLAN_SECTION_VERSION {
         return Err(
-            crate::error::FmirImageError::UnsupportedExecutorPlanSectionVersion {
+            crate::error::FmirImageError::ExecutorPlanSectionVersionMismatch {
                 actual: section.v,
                 expected: EXECUTOR_PLAN_SECTION_VERSION,
             },
@@ -404,7 +404,7 @@ pub fn admit_device_section_with_compat(
     // outer FMIR version, with a focused diagnostic.
     if device.device_program.v != WIRE_DEVICE_PROGRAM_VERSION {
         return Err(
-            crate::error::FmirImageError::UnsupportedDeviceProgramVersion {
+            crate::error::FmirImageError::DeviceProgramVersionMismatch {
                 actual: device.device_program.v,
                 expected: WIRE_DEVICE_PROGRAM_VERSION,
             },
@@ -472,7 +472,7 @@ pub(crate) fn admit_session_section(
     // version and the outer image version.
     if section.v != WIRE_SESSION_SECTION_VERSION {
         return Err(
-            crate::error::FmirImageError::UnsupportedSessionSectionVersion {
+            crate::error::FmirImageError::SessionSectionVersionMismatch {
                 actual: section.v,
                 expected: WIRE_SESSION_SECTION_VERSION,
             },
@@ -500,7 +500,7 @@ pub(crate) fn admit_session_section_v2(
 ) -> Result<(), crate::error::FmirImageError> {
     if section.v != WIRE_SESSION_SECTION_VERSION {
         return Err(
-            crate::error::FmirImageError::UnsupportedSessionSectionVersion {
+            crate::error::FmirImageError::SessionSectionVersionMismatch {
                 actual: section.v,
                 expected: WIRE_SESSION_SECTION_VERSION,
             },
@@ -526,7 +526,7 @@ fn map_executor_plan_admission_error(
 ) -> crate::error::FmirImageError {
     match error {
         ExecutorPlanAdmissionError::UnsupportedSectionVersion { actual, expected } => {
-            crate::error::FmirImageError::UnsupportedExecutorPlanSectionVersion { actual, expected }
+            crate::error::FmirImageError::ExecutorPlanSectionVersionMismatch { actual, expected }
         }
         other => crate::error::FmirImageError::ExecutorPlanSectionInvalid {
             detail: other.to_string(),
@@ -561,7 +561,7 @@ pub(crate) fn admit_distributed_section(
     // version and the outer image version.
     if section.v != WIRE_DISTRIBUTED_SECTION_VERSION {
         return Err(
-            crate::error::FmirImageError::UnsupportedDistributedSectionVersion {
+            crate::error::FmirImageError::DistributedSectionVersionMismatch {
                 actual: section.v,
                 expected: WIRE_DISTRIBUTED_SECTION_VERSION,
             },

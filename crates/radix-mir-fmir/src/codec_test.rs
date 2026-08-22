@@ -110,7 +110,7 @@ fn decode_rejects_unsupported_version() {
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, "0.79.0"),
-        Err(FmirImageError::UnsupportedVersion {
+        Err(FmirImageError::VersionMismatch {
             actual: 5,
             expected: PACKAGE_MIR_ARTIFACT_VERSION
         })
@@ -124,7 +124,7 @@ fn decode_rejects_wrong_target() {
     let bytes = encode_binary_image(&image).expect("encode binary image");
     assert!(matches!(
         decode_binary_image(&bytes, "0.79.0"),
-        Err(FmirImageError::WrongTarget { found, expected: FMIR_TARGET_NAME }) if found == "scena"
+        Err(FmirImageError::TargetMismatch { found, expected: FMIR_TARGET_NAME }) if found == "scena"
     ));
 }
 
@@ -135,7 +135,7 @@ fn decode_rejects_mismatched_toolchain() {
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, "0.79.0"),
-        Err(FmirImageError::UnsupportedToolchain { found, expected }) if found == "0.78.0" && expected == "0.79.0"
+        Err(FmirImageError::ToolchainMismatch { found, expected }) if found == "0.78.0" && expected == "0.79.0"
     ));
 }
 

@@ -613,7 +613,7 @@ pub(super) fn fmir_image_decode_error(
                 ),
             )],
         },
-        FmirImageError::UnsupportedVersion { actual, expected } => vec![mir_issue_diag(
+        FmirImageError::VersionMismatch { actual, expected } => vec![mir_issue_diag(
             path,
             style.version_issue,
             format!(
@@ -623,11 +623,11 @@ pub(super) fn fmir_image_decode_error(
         )
         .with_arg("actual", actual.to_string())
         .with_arg("expected", expected.to_string())],
-        FmirImageError::WrongTarget { found: _, expected } => vec![mir_diag(
+        FmirImageError::TargetMismatch { found: _, expected } => vec![mir_diag(
             path,
             format!("{} image target must be `{expected}`", style.label),
         )],
-        FmirImageError::UnsupportedToolchain { found, expected } => vec![mir_diag(
+        FmirImageError::ToolchainMismatch { found, expected } => vec![mir_diag(
             path,
             format!(
                 "unsupported {} image toolchain {found}; expected {expected}",
@@ -653,14 +653,14 @@ pub(super) fn fmir_image_decode_error(
                 style.label
             ),
         )],
-        FmirImageError::UnsupportedTargetFeature { feature } => vec![mir_diag(
+        FmirImageError::NonAdmittedTargetFeature { feature } => vec![mir_diag(
             path,
             format!(
                 "{} image device artifact requires unknown target feature `{feature}`",
                 style.label
             ),
         )],
-        FmirImageError::IncompatibleTargetId {
+        FmirImageError::TargetIdMismatch {
             backend,
             target,
             expected,
@@ -671,7 +671,7 @@ pub(super) fn fmir_image_decode_error(
                 style.label
             ),
         )],
-        FmirImageError::MissingArtifactForSelection { selection } => vec![mir_diag(
+        FmirImageError::AbsentArtifactForSelection { selection } => vec![mir_diag(
             path,
             format!(
                 "{} image device selection `{selection}` names no declared artifact of that backend",
@@ -685,7 +685,7 @@ pub(super) fn fmir_image_decode_error(
                 style.label
             ),
         )],
-        FmirImageError::UnsupportedArtifactBackend { backend } => vec![mir_diag(
+        FmirImageError::NonAdmittedArtifactBackend { backend } => vec![mir_diag(
             path,
             format!(
                 "{} image device artifact backend `{backend}` is not a compiled-in leaf",
@@ -694,7 +694,7 @@ pub(super) fn fmir_image_decode_error(
         )],
         // DDCP3-U0: artifact admission and selection-resolution failure
         // classes mapped to focused diagnostics (exact-match clean break).
-        FmirImageError::UnsupportedArtifactAbiVersion {
+        FmirImageError::ArtifactAbiVersionMismatch {
             backend,
             actual,
             accepted,
@@ -736,7 +736,7 @@ pub(super) fn fmir_image_decode_error(
                 style.label
             ),
         )],
-        FmirImageError::UnsupportedSelectedBackend { backend } => vec![mir_issue_diag(
+        FmirImageError::NonAdmittedSelectedBackend { backend } => vec![mir_issue_diag(
             path,
             "fmir_image_selected_backend_unsupported",
             format!(
@@ -745,7 +745,7 @@ pub(super) fn fmir_image_decode_error(
             ),
         )
         .with_arg("backend", backend)],
-        FmirImageError::UnsupportedDeviceProgramVersion { actual, expected } => vec![
+        FmirImageError::DeviceProgramVersionMismatch { actual, expected } => vec![
             mir_issue_diag(
                 path,
                 "fmir_image_device_program_version_unsupported",
@@ -759,7 +759,7 @@ pub(super) fn fmir_image_decode_error(
             "fmir_image_device_program_invalid",
             format!("invalid device program in image: {detail}"),
         )],
-        FmirImageError::UnsupportedExecutorPlanSectionVersion { actual, expected } => vec![
+        FmirImageError::ExecutorPlanSectionVersionMismatch { actual, expected } => vec![
             mir_issue_diag(
                 path,
                 "fmir_image_executor_plan_section_version_unsupported",
@@ -775,7 +775,7 @@ pub(super) fn fmir_image_decode_error(
         )],
         // MD2-W1: the distributed execution section is admitted fail-closed
         // at load; each failure class maps to a focused diagnostic.
-        FmirImageError::UnsupportedDistributedSectionVersion { actual, expected } => vec![
+        FmirImageError::DistributedSectionVersionMismatch { actual, expected } => vec![
             mir_issue_diag(
                 path,
                 "fmir_image_distributed_section_version_unsupported",
@@ -809,7 +809,7 @@ pub(super) fn fmir_image_decode_error(
         // GI4-2: the cadence/session section is admitted fail-closed with its
         // own version ratchet, independently of the device-program wire and
         // outer image versions.
-        FmirImageError::UnsupportedSessionSectionVersion { actual, expected } => vec![
+        FmirImageError::SessionSectionVersionMismatch { actual, expected } => vec![
             mir_issue_diag(
                 path,
                 "fmir_image_session_section_version_unsupported",

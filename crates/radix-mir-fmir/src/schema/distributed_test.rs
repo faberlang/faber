@@ -572,7 +572,7 @@ fn stale_distributed_section_version_fails_closed() {
         let mut section = honest_section();
         section.v = stale;
         match admit_distributed_section(&section, &wire_program_fixture()) {
-            Err(FmirImageError::UnsupportedDistributedSectionVersion { actual, expected }) => {
+            Err(FmirImageError::DistributedSectionVersionMismatch { actual, expected }) => {
                 assert_eq!(actual, stale);
                 assert_eq!(expected, WIRE_DISTRIBUTED_SECTION_VERSION);
             }
@@ -583,7 +583,7 @@ fn stale_distributed_section_version_fails_closed() {
         // The stale section also fails the full device-section load boundary.
         assert!(matches!(
             admit_device_section(&device_section_with_distributed(Some(section))),
-            Err(FmirImageError::UnsupportedDistributedSectionVersion { .. })
+            Err(FmirImageError::DistributedSectionVersionMismatch { .. })
         ));
     }
 }

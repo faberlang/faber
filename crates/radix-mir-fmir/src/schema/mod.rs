@@ -92,7 +92,7 @@ mod wire_test;
 /// `content_sha256`/`packet_sha256` identity fields; FNV artifact provenance
 /// removed). The nested device-program wire version is untouched (no
 /// `DeviceProgram` semantic field changes). Old version-6 images fail closed
-/// with [`UnsupportedVersion`](crate::error::FmirImageError::UnsupportedVersion).
+/// with [`UnsupportedVersion`](crate::error::FmirImageError::VersionMismatch).
 pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 7;
 
 /// The accepted artifact ABI/schema version of the `DeviceArtifact` packet
@@ -102,7 +102,7 @@ pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 7;
 /// versioned typed-boundary the artifact is produced against. A deliberate
 /// future minor-compatibility lane is an explicit decision, never a silent
 /// addition; a packet whose `abi_version` is not this value fails admission
-/// with [`UnsupportedArtifactAbiVersion`](crate::error::FmirImageError::UnsupportedArtifactAbiVersion).
+/// with [`UnsupportedArtifactAbiVersion`](crate::error::FmirImageError::ArtifactAbiVersionMismatch).
 ///
 /// NOTE (rebaselined at DDCP3-U0; amended at the fire-12/fire-13 cleanup):
 /// faber's landed `DEVICE_ARTIFACT_ABI_VERSION` is **8** (aligned with this
@@ -138,7 +138,7 @@ pub const ARTIFACT_ABI_VERSION: u32 = 8;
 /// Admitted independently of the outer image version:
 /// [`admit_device_section`] rejects a mismatched nested version before any
 /// field-level interpretation, with a focused diagnostic
-/// ([`UnsupportedDeviceProgramVersion`](crate::error::FmirImageError::UnsupportedDeviceProgramVersion)).
+/// ([`UnsupportedDeviceProgramVersion`](crate::error::FmirImageError::DeviceProgramVersionMismatch)).
 pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 8;
 
 /// The version ratchet of the optional distributed execution section
