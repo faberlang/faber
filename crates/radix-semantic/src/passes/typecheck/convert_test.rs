@@ -1101,6 +1101,17 @@ fn conversio_assign_typed_fixum_initializer_accepts() {
 }
 
 #[test]
+fn conversio_assign_typed_fixum_item_scope_initializer_accepts() {
+    // Item-scope typed `fixum T x ↤ y` is the same conversion-directed
+    // initializer as the local form, not SEM020 assignment to a constant.
+    test_support::assert_accepts(r#"fixum numerus n ↤ "42""#);
+    test_support::assert_rejects_with_issue(
+        "fixum numerus n ↤ \"42\"\nincipit { n ← 1 }",
+        "assignment_to_constant",
+    );
+}
+
+#[test]
 fn conversio_assign_untyped_fixum_initializer_rejects() {
     // `fixum _` has no written type → no concrete conversion target.
     test_support::assert_rejects_with_issue(

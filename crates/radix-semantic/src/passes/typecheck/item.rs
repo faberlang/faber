@@ -120,7 +120,24 @@ impl TypeChecker<'_> {
     /// phases read the annotated HIR.
     pub fn check_const(&mut self, def_id: DefId, const_item: &mut radix_hir::HirConst) {
         let ty = if let Some(annotated) = const_item.ty {
-            let value_ty = self.check_expr_with_expected(&mut const_item.value, Some(annotated));
+            // Typed `fixum T x ↤ y` at item scope is conversion-directed
+            // initialization, not assignment to a constant. Expose the
+            // binding only while the initializer is checked so lvalue
+            // resolution does not fire SEM020, then drop it so later
+            // assignment still reports assignment_to_constant.
+            let value_ty = if matches!(
+                const_item.value.kind,
+                HirExpressionKind::ConversioAssign { .. }
+            ) {
+                self.push_scope();
+                self.insert_binding_with_scalar(def_id, annotated, false, const_item.mutable);
+                let value_ty =
+                    self.check_expr_with_expected(&mut const_item.value, Some(annotated));
+                self.pop_scope();
+                value_ty
+            } else {
+                self.check_expr_with_expected(&mut const_item.value, Some(annotated))
+            };
             self.unify_assign_issue(
                 value_ty,
                 annotated,
