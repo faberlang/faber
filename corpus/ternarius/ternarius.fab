@@ -1,6 +1,7 @@
 +++
 term = "sic"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "type_annotation", "owned_type", "base_type", "qualified_type", "ternary", "comparison", "equality", "equality_tail", "cast_expr", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
 category = "control-flow"
 canonical = false
 summary = "Ternary conditional expressions with sic and secus."

@@ -1,6 +1,7 @@
 +++
 term = "ubique"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "entry_header", "annotation", "annotation_sugar", "annotation_name"]
 category = "cli"
 canonical = true
 summary = "Marks an option or operand as global."

@@ -1,6 +1,7 @@
 +++
 term = "temporis"
 kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "proba_stmt", "proba_modifier", "adfirma_stmt", "expression", "literal"]
 category = "testing"
 canonical = true
 summary = "Sets a timeout-like duration for a test modifier."
