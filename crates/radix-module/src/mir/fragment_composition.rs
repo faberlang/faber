@@ -25,8 +25,8 @@ use crate::mir::{
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::Cell;
 
-pub const ISSUE_CYCLE: &str = "NUCLEUM_FRAGMENT_CYCLE";
-pub const ISSUE_EXPANSION: &str = "NUCLEUM_FRAGMENT_EXPANSION";
+pub const ISSUE_CYCLE: &str = "nucleum_fragment_cycle";
+pub const ISSUE_EXPANSION: &str = "nucleum_fragment_expansion";
 
 /// Documented bounded defaults for the composition budgets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

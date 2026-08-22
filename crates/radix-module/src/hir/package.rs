@@ -251,12 +251,12 @@ impl NucleumPackageError {
         }
     }
 
-    /// Diagnostic issue identifier (`NUCLEUM_FRAGMENT_EFFECT` / `_CYCLE`).
+    /// Diagnostic issue identifier (`nucleum_fragment_effect` / `_cycle`).
     #[must_use]
     pub fn issue(&self) -> &'static str {
         match self {
-            Self::SignatureOnlyImport { .. } | Self::MirBodyMissing { .. } => "NUCLEUM_FRAGMENT_EFFECT",
-            Self::CyclicCallGraph { .. } => "NUCLEUM_FRAGMENT_CYCLE",
+            Self::SignatureOnlyImport { .. } | Self::MirBodyMissing { .. } => "nucleum_fragment_effect",
+            Self::CyclicCallGraph { .. } => "nucleum_fragment_cycle",
         }
     }
 

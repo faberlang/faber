@@ -616,7 +616,7 @@ functio k(fractus<f32> x) → fractus<f32> {
         crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("cycle must fail closed");
     assert!(
         errors.iter().any(|err| err.issue == ISSUE_CYCLE),
-        "expected NUCLEUM_FRAGMENT_CYCLE, got {errors:?}"
+        "expected nucleum_fragment_cycle, got {errors:?}"
     );
 }
 
@@ -642,7 +642,7 @@ functio k(fractus<f32> x) → fractus<f32> {
             crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("budget must fail closed");
         assert!(
             errors.iter().any(|err| err.issue == ISSUE_EXPANSION),
-            "expected NUCLEUM_FRAGMENT_EXPANSION, got {errors:?}"
+            "expected nucleum_fragment_expansion, got {errors:?}"
         );
     });
 }

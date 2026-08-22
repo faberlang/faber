@@ -19,8 +19,8 @@ use crate::semantic::{
 };
 use rustc_hash::FxHashMap;
 
-pub const ISSUE_CONTEXT: &str = "NUCLEUM_FRAGMENT_CONTEXT";
-pub const ISSUE_TYPE: &str = "NUCLEUM_FRAGMENT_TYPE";
+pub const ISSUE_CONTEXT: &str = "nucleum_fragment_context";
+pub const ISSUE_TYPE: &str = "nucleum_fragment_type";
 
 /// One instantiation or matrix diagnostic.
 #[derive(Debug, Clone, PartialEq, Eq)]

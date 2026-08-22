@@ -665,7 +665,7 @@ functio outer(fractus<f32> x) → fractus<f32> {
         crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("Entry→Entry must be rejected");
     assert!(
         errors.iter().any(|err| err.issue == ISSUE_CONTEXT),
-        "expected NUCLEUM_FRAGMENT_CONTEXT, got {errors:?}"
+        "expected nucleum_fragment_context, got {errors:?}"
     );
 }
 
