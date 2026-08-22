@@ -669,3 +669,41 @@ functio bounded_partial() → vacuum {
     );
     expect_decline_causa(&errors, "not_concrete");
 }
+
+#[test]
+fn pipeline_unroll_admits_arc3_intrinsic_before_purity() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio combine(fractus a, fractus b) → fractus {
+    redde a + b
+}
+
+@ radix lane "air"
+functio reduce_tensor(tensor<f32, [4]> x) → f32 {
+    varia f32 total ← 0.0
+    itera ab 0‥4 fixum i {
+        total ← total + x.reducta(combine, 0.0)
+    }
+    redde total
+}
+"#,
+    );
+    assert!(
+        result.is_ok(),
+        "ARC-3 intrinsic must pass the first-running unroll pass and purity: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result.diagnostics.iter().all(|error| {
+            !error
+                .args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "itera_loop")
+        }),
+        "the pre-purity unroll pass must not decline an ARC-3 intrinsic: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "the pipeline must erase the admitted loop");
+}

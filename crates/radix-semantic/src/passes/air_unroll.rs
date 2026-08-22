@@ -22,6 +22,7 @@
 //! decline. In-region mask construction (`Fill` / runtime comparison) never
 //! admits.
 
+use super::air_tensor_intrinsics::is_allowed_tensor_intrinsic;
 use crate::tensor_type_directed::is_tensor_type;
 use crate::{
     IndexExpr, RadixLane, RadixLaneMetadata, SemanticError, SemanticErrorKind, Type, TypeId,
@@ -1930,36 +1931,6 @@ fn foldable_after_index(expr: &HirExpression, index_def: DefId) -> bool {
         }
         _ => false,
     }
-}
-
-fn is_allowed_tensor_intrinsic(method: &str) -> bool {
-    matches!(
-        method,
-        "addita"
-            | "addita_bias"
-            | "subtrahe"
-            | "multiplica"
-            | "divisio"
-            | "nega"
-            | "summa"
-            | "media"
-            | "matmul"
-            | "transpone"
-            | "forma"
-            | "exponentia"
-            | "logarithmus"
-            | "activatio_relu"
-            | "radix"
-            | "gelu"
-            | "activatio_tanh"
-            | "activatio_softmax"
-            | "laminatio"
-            | "summa_axis"
-            | "crux_entropia"
-            | "rms_norm"
-            | "rope_norm"
-            | "gather"
-    )
 }
 
 struct IdGen {

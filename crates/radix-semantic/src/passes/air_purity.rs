@@ -5,6 +5,7 @@
 //! semantic lane metadata keyed by `DefId`; it does not inspect source
 //! annotations, re-resolve names, or rebuild type facts.
 
+use super::air_tensor_intrinsics::is_allowed_tensor_intrinsic;
 use crate::{RadixLane, RadixLaneMetadata, SemanticError, SemanticErrorKind, TypeTable};
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirCape, HirExpression, HirExpressionKind, HirFunction,
@@ -467,46 +468,6 @@ impl AirPurityChecker<'_> {
             .ty
             .is_some_and(|ty| crate::tensor_type_directed::is_tensor_type(ty, self.types))
     }
-}
-
-fn is_allowed_tensor_intrinsic(method: &str) -> bool {
-    matches!(
-        method,
-        "addita"
-            | // S6-C2: the bounded bias-broadcast add is an AIR-lane tensor method.
-            "addita_bias"
-            | "subtrahe"
-            | "multiplica"
-            | "divisio"
-            | "nega"
-            | "summa"
-            | "media"
-            | "matmul"
-            | "transpone"
-            | "forma"
-            | "exponentia"
-            | "logarithmus"
-            | "activatio_relu"
-            | "radix"
-            | "gelu"
-            | "activatio_tanh"
-            | "activatio_softmax"
-            | "laminatio"
-            | "summa_axis"
-            | "crux_entropia"
-            // CCI-1: the three common-case intrinsic source contracts are
-            // AIR-lane tensor methods (forward-only in v1; reverse AD rejects
-            // them upstream via `reverse_ad_no_vjp_rule`).
-            | "rms_norm"
-            | "rope_norm"
-            | "gather"
-            // ARC-3: higher-order tensor methods admit named AIR combines;
-            // closure combines remain rejected by the purity traversal.
-            | "reducta"
-            | "cumulata"
-            | "mappata"
-            | "filtrata"
-    )
 }
 
 fn is_control_expr_statement(expr: &HirExpression) -> bool {

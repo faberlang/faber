@@ -43,6 +43,7 @@
 //! severities rather than from pass execution alone.
 
 pub mod air_closure_lift;
+mod air_tensor_intrinsics;
 pub mod air_purity;
 pub mod air_unroll;
 pub mod borrow;
@@ -74,6 +75,10 @@ pub use crate::{
 #[cfg(test)]
 #[path = "air_closure_lift_test.rs"]
 mod air_closure_lift_test;
+
+#[cfg(test)]
+#[path = "air_tensor_intrinsics_test.rs"]
+mod air_tensor_intrinsics_test;
 
 #[cfg(test)]
 #[path = "air_purity_test.rs"]
