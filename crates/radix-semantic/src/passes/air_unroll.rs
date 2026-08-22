@@ -23,7 +23,10 @@
 //! admits.
 
 use crate::tensor_type_directed::is_tensor_type;
-use crate::{RadixLane, RadixLaneMetadata, SemanticError, SemanticErrorKind, TypeTable};
+use crate::{
+    IndexExpr, RadixLane, RadixLaneMetadata, SemanticError, SemanticErrorKind, Type, TypeId,
+    TypeTable,
+};
 use radix_hir::visit::{
     walk_block, walk_expr, walk_expr_mut, walk_item, walk_program, walk_stmt, walk_stmt_mut,
     HirVisitor, HirVisitorMut,
@@ -46,6 +49,7 @@ const CAUSA_NOT_CONCRETE: &str = "not_concrete";
 const CAUSA_IN_REGION_MASK: &str = "in_region_mask";
 const CAUSA_NAN_UNSAFE: &str = "nan_unsafe";
 const CAUSA_UNMASKED_EXIT: &str = "unmasked_exit";
+const CAUSA_DEFER_COORDINATES: &str = "defer_coordinates";
 
 /// Rewrite eligible AIR-lane `itera ab` range loops into straight-line bindings.
 ///
@@ -92,7 +96,17 @@ fn unroll_function(
         return;
     };
     let mask = MaskAnalysis::analyze(&function.params, body, types, interner);
-    rewrite_block(body, lanes, interner, ids, errors, &mask);
+    let mut emitted_lanes = 0;
+    rewrite_block(
+        body,
+        lanes,
+        interner,
+        ids,
+        errors,
+        &mask,
+        types,
+        &mut emitted_lanes,
+    );
 }
 
 fn rewrite_block(
@@ -102,12 +116,22 @@ fn rewrite_block(
     ids: &mut IdGen,
     errors: &mut Vec<SemanticError>,
     mask: &MaskAnalysis,
+    types: &TypeTable,
+    emitted_lanes: &mut usize,
 ) {
     let mut index = 0;
     while index < block.statements.len() {
         // Classify `itera` before walking into it so a nested range loop is
         // still visible to the outer decline check.
-        let plan = classify_itera_stmt(&block.statements[index], block, lanes, interner, mask);
+        let plan = classify_itera_stmt(
+            &block.statements[index],
+            block,
+            lanes,
+            interner,
+            mask,
+            types,
+            emitted_lanes,
+        );
         if plan.is_none() {
             rewrite_nested_stmt(
                 &mut block.statements[index],
@@ -116,6 +140,8 @@ fn rewrite_block(
                 ids,
                 errors,
                 mask,
+                types,
+                emitted_lanes,
             );
         }
         let Some(plan) = plan else {
@@ -145,8 +171,17 @@ fn rewrite_block(
     }
 
     if let Some(mut expr) = block.expr.take() {
-        rewrite_nested_expr(&mut expr, lanes, interner, ids, errors, mask);
-        match classify_itera_expr(&expr, block, lanes, interner, mask) {
+        rewrite_nested_expr(
+            &mut expr,
+            lanes,
+            interner,
+            ids,
+            errors,
+            mask,
+            types,
+            emitted_lanes,
+        );
+        match classify_itera_expr(&expr, block, lanes, interner, mask, types, emitted_lanes) {
             Some(UnrollPlan::Decline { span, causa }) => {
                 errors.push(decline(span, causa));
                 block.expr = Some(expr);
@@ -176,20 +211,58 @@ fn rewrite_nested_stmt(
     ids: &mut IdGen,
     errors: &mut Vec<SemanticError>,
     mask: &MaskAnalysis,
+    types: &TypeTable,
+    emitted_lanes: &mut usize,
 ) {
     match &mut stmt.kind {
         HirStatementKind::Local(local) => {
             if let Some(init) = &mut local.init {
-                rewrite_nested_expr(init, lanes, interner, ids, errors, mask);
+                rewrite_nested_expr(
+                    init,
+                    lanes,
+                    interner,
+                    ids,
+                    errors,
+                    mask,
+                    types,
+                    emitted_lanes,
+                );
             }
         }
         HirStatementKind::Expr(expr) | HirStatementKind::Redde(Some(expr)) => {
-            rewrite_nested_expr(expr, lanes, interner, ids, errors, mask);
+            rewrite_nested_expr(
+                expr,
+                lanes,
+                interner,
+                ids,
+                errors,
+                mask,
+                types,
+                emitted_lanes,
+            );
         }
         HirStatementKind::Custodi(custodi) => {
             for clause in &mut custodi.clauses {
-                rewrite_nested_expr(&mut clause.cond, lanes, interner, ids, errors, mask);
-                rewrite_block(&mut clause.body, lanes, interner, ids, errors, mask);
+                rewrite_nested_expr(
+                    &mut clause.cond,
+                    lanes,
+                    interner,
+                    ids,
+                    errors,
+                    mask,
+                    types,
+                    emitted_lanes,
+                );
+                rewrite_block(
+                    &mut clause.body,
+                    lanes,
+                    interner,
+                    ids,
+                    errors,
+                    mask,
+                    types,
+                    emitted_lanes,
+                );
             }
         }
         HirStatementKind::Redde(None)
@@ -207,47 +280,166 @@ fn rewrite_nested_expr(
     ids: &mut IdGen,
     errors: &mut Vec<SemanticError>,
     mask: &MaskAnalysis,
+    types: &TypeTable,
+    emitted_lanes: &mut usize,
 ) {
     match &mut expr.kind {
-        HirExpressionKind::Block(block) => rewrite_block(block, lanes, interner, ids, errors, mask),
+        HirExpressionKind::Block(block) => rewrite_block(
+            block,
+            lanes,
+            interner,
+            ids,
+            errors,
+            mask,
+            types,
+            emitted_lanes,
+        ),
         HirExpressionKind::Si {
             cond,
             then_block,
             then_catch,
             else_block,
         } => {
-            rewrite_nested_expr(cond, lanes, interner, ids, errors, mask);
-            rewrite_block(then_block, lanes, interner, ids, errors, mask);
+            rewrite_nested_expr(
+                cond,
+                lanes,
+                interner,
+                ids,
+                errors,
+                mask,
+                types,
+                emitted_lanes,
+            );
+            rewrite_block(
+                then_block,
+                lanes,
+                interner,
+                ids,
+                errors,
+                mask,
+                types,
+                emitted_lanes,
+            );
             if let Some(catch) = then_catch {
-                rewrite_block(&mut catch.body, lanes, interner, ids, errors, mask);
+                rewrite_block(
+                    &mut catch.body,
+                    lanes,
+                    interner,
+                    ids,
+                    errors,
+                    mask,
+                    types,
+                    emitted_lanes,
+                );
             }
             if let Some(else_block) = else_block {
-                rewrite_block(else_block, lanes, interner, ids, errors, mask);
+                rewrite_block(
+                    else_block,
+                    lanes,
+                    interner,
+                    ids,
+                    errors,
+                    mask,
+                    types,
+                    emitted_lanes,
+                );
             }
         }
         HirExpressionKind::Discerne {
             scrutinees, arms, ..
         } => {
             for scrutinee in scrutinees {
-                rewrite_nested_expr(scrutinee, lanes, interner, ids, errors, mask);
+                rewrite_nested_expr(
+                    scrutinee,
+                    lanes,
+                    interner,
+                    ids,
+                    errors,
+                    mask,
+                    types,
+                    emitted_lanes,
+                );
             }
             for arm in arms {
                 if let Some(guard) = &mut arm.guard {
-                    rewrite_nested_expr(guard, lanes, interner, ids, errors, mask);
+                    rewrite_nested_expr(
+                        guard,
+                        lanes,
+                        interner,
+                        ids,
+                        errors,
+                        mask,
+                        types,
+                        emitted_lanes,
+                    );
                 }
-                rewrite_nested_expr(&mut arm.body, lanes, interner, ids, errors, mask);
+                rewrite_nested_expr(
+                    &mut arm.body,
+                    lanes,
+                    interner,
+                    ids,
+                    errors,
+                    mask,
+                    types,
+                    emitted_lanes,
+                );
             }
         }
         HirExpressionKind::Loop(block) | HirExpressionKind::Itera(_, _, _, _, block) => {
-            rewrite_block(block, lanes, interner, ids, errors, mask);
+            rewrite_block(
+                block,
+                lanes,
+                interner,
+                ids,
+                errors,
+                mask,
+                types,
+                emitted_lanes,
+            );
         }
         HirExpressionKind::Dum(cond, block) => {
-            rewrite_nested_expr(cond, lanes, interner, ids, errors, mask);
-            rewrite_block(block, lanes, interner, ids, errors, mask);
+            rewrite_nested_expr(
+                cond,
+                lanes,
+                interner,
+                ids,
+                errors,
+                mask,
+                types,
+                emitted_lanes,
+            );
+            rewrite_block(
+                block,
+                lanes,
+                interner,
+                ids,
+                errors,
+                mask,
+                types,
+                emitted_lanes,
+            );
         }
         HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
-            rewrite_nested_expr(lhs, lanes, interner, ids, errors, mask);
-            rewrite_nested_expr(rhs, lanes, interner, ids, errors, mask);
+            rewrite_nested_expr(
+                lhs,
+                lanes,
+                interner,
+                ids,
+                errors,
+                mask,
+                types,
+                emitted_lanes,
+            );
+            rewrite_nested_expr(
+                rhs,
+                lanes,
+                interner,
+                ids,
+                errors,
+                mask,
+                types,
+                emitted_lanes,
+            );
         }
         HirExpressionKind::Unary(_, operand)
         | HirExpressionKind::Field(operand, _)
@@ -259,22 +451,85 @@ fn rewrite_nested_expr(
         | HirExpressionKind::Tacebit(operand)
         | HirExpressionKind::Yield(operand)
         | HirExpressionKind::TypeCheck { expr: operand, .. } => {
-            rewrite_nested_expr(operand, lanes, interner, ids, errors, mask);
+            rewrite_nested_expr(
+                operand,
+                lanes,
+                interner,
+                ids,
+                errors,
+                mask,
+                types,
+                emitted_lanes,
+            );
         }
         HirExpressionKind::Index(object, index) => {
-            rewrite_nested_expr(object, lanes, interner, ids, errors, mask);
-            rewrite_nested_expr(index, lanes, interner, ids, errors, mask);
+            rewrite_nested_expr(
+                object,
+                lanes,
+                interner,
+                ids,
+                errors,
+                mask,
+                types,
+                emitted_lanes,
+            );
+            rewrite_nested_expr(
+                index,
+                lanes,
+                interner,
+                ids,
+                errors,
+                mask,
+                types,
+                emitted_lanes,
+            );
         }
         HirExpressionKind::Call(callee, _, args) => {
-            rewrite_nested_expr(callee, lanes, interner, ids, errors, mask);
+            rewrite_nested_expr(
+                callee,
+                lanes,
+                interner,
+                ids,
+                errors,
+                mask,
+                types,
+                emitted_lanes,
+            );
             for arg in args {
-                rewrite_nested_expr(&mut arg.expr, lanes, interner, ids, errors, mask);
+                rewrite_nested_expr(
+                    &mut arg.expr,
+                    lanes,
+                    interner,
+                    ids,
+                    errors,
+                    mask,
+                    types,
+                    emitted_lanes,
+                );
             }
         }
         HirExpressionKind::MethodCall(receiver, _, _, args) => {
-            rewrite_nested_expr(receiver, lanes, interner, ids, errors, mask);
+            rewrite_nested_expr(
+                receiver,
+                lanes,
+                interner,
+                ids,
+                errors,
+                mask,
+                types,
+                emitted_lanes,
+            );
             for arg in args {
-                rewrite_nested_expr(&mut arg.expr, lanes, interner, ids, errors, mask);
+                rewrite_nested_expr(
+                    &mut arg.expr,
+                    lanes,
+                    interner,
+                    ids,
+                    errors,
+                    mask,
+                    types,
+                    emitted_lanes,
+                );
             }
         }
         _ => {}
@@ -291,6 +546,8 @@ struct ReadyUnroll {
     lanes: Vec<i64>,
     body: HirBlock,
     accumulators: FxHashMap<DefId, AccInfo>,
+    tensor_source: Option<HirExpression>,
+    tensor_binding_ty: Option<TypeId>,
 }
 
 #[derive(Clone, Copy)]
@@ -304,11 +561,13 @@ fn classify_itera_stmt(
     lanes: &RadixLaneMetadata,
     interner: &Interner,
     mask: &MaskAnalysis,
+    types: &TypeTable,
+    emitted_lanes: &mut usize,
 ) -> Option<UnrollPlan> {
     let HirStatementKind::Expr(expr) = &stmt.kind else {
         return None;
     };
-    classify_itera_expr(expr, block, lanes, interner, mask)
+    classify_itera_expr(expr, block, lanes, interner, mask, types, emitted_lanes)
 }
 
 fn classify_itera_expr(
@@ -317,19 +576,41 @@ fn classify_itera_expr(
     lanes: &RadixLaneMetadata,
     interner: &Interner,
     mask: &MaskAnalysis,
+    types: &TypeTable,
+    emitted_lanes: &mut usize,
 ) -> Option<UnrollPlan> {
     let HirExpressionKind::Itera(mode, index_def, _, source, body) = &expr.kind else {
         return None;
     };
-    if *mode != HirIteraMode::Ab {
-        return Some(UnrollPlan::Decline {
+    match mode {
+        HirIteraMode::Ab => Some(classify_ab_loop(
+            expr.span,
+            *index_def,
+            source,
+            body,
+            block,
+            lanes,
+            interner,
+            mask,
+            emitted_lanes,
+        )),
+        HirIteraMode::Ex => Some(classify_ex_loop(
+            expr.span,
+            *index_def,
+            source,
+            body,
+            block,
+            lanes,
+            interner,
+            mask,
+            types,
+            emitted_lanes,
+        )),
+        HirIteraMode::De => Some(UnrollPlan::Decline {
             span: expr.span,
             causa: CAUSA_NOT_CONCRETE,
-        });
+        }),
     }
-    Some(classify_ab_loop(
-        expr.span, *index_def, source, body, block, lanes, interner, mask,
-    ))
 }
 
 fn classify_ab_loop(
@@ -341,6 +622,7 @@ fn classify_ab_loop(
     lanes: &RadixLaneMetadata,
     interner: &Interner,
     mask: &MaskAnalysis,
+    emitted_lanes: &mut usize,
 ) -> UnrollPlan {
     let Some(values) = concrete_range_values(source) else {
         return UnrollPlan::Decline {
@@ -348,7 +630,7 @@ fn classify_ab_loop(
             causa: CAUSA_NOT_CONCRETE,
         };
     };
-    if values.len() > UNROLL_BUDGET {
+    if values.len() > UNROLL_BUDGET.saturating_sub(*emitted_lanes) {
         return UnrollPlan::Decline {
             span,
             causa: CAUSA_BUDGET,
@@ -367,11 +649,114 @@ fn classify_ab_loop(
         return UnrollPlan::Decline { span, causa };
     }
     let accumulators = block_accumulators(block, body);
+    *emitted_lanes += values.len();
     UnrollPlan::Ready(ReadyUnroll {
         index_def,
         lanes: values,
         body: body.clone(),
         accumulators,
+        tensor_source: None,
+        tensor_binding_ty: None,
+    })
+}
+
+fn classify_ex_loop(
+    span: Span,
+    index_def: DefId,
+    source: &HirExpression,
+    body: &HirBlock,
+    block: &HirBlock,
+    lanes: &RadixLaneMetadata,
+    interner: &Interner,
+    mask: &MaskAnalysis,
+    types: &TypeTable,
+    emitted_lanes: &mut usize,
+) -> UnrollPlan {
+    let Some(source_ty) = source.ty else {
+        return UnrollPlan::Decline {
+            span,
+            causa: CAUSA_NOT_CONCRETE,
+        };
+    };
+    let (_, source_ty) = types.peel_access_marker(source_ty);
+    let Type::Tensor(element_ty, shape) = types.get(source_ty) else {
+        return UnrollPlan::Decline {
+            span,
+            causa: CAUSA_NOT_CONCRETE,
+        };
+    };
+
+    let lane_count = match types.get_index(*shape) {
+        IndexExpr::Literal(value) => match usize::try_from(*value) {
+            Ok(count) => count,
+            Err(_) => {
+                return UnrollPlan::Decline {
+                    span,
+                    causa: CAUSA_BUDGET,
+                };
+            }
+        },
+        IndexExpr::Tuple(dims) if dims.len() > 1 => {
+            return UnrollPlan::Decline {
+                span,
+                causa: CAUSA_DEFER_COORDINATES,
+            };
+        }
+        IndexExpr::Tuple(dims) if dims.len() == 1 => {
+            if !matches!(types.get_index(dims[0]), IndexExpr::Literal(_)) {
+                return UnrollPlan::Decline {
+                    span,
+                    causa: CAUSA_NOT_CONCRETE,
+                };
+            }
+            match types.get_index(dims[0]) {
+                IndexExpr::Literal(value) => match usize::try_from(*value) {
+                    Ok(count) => count,
+                    Err(_) => {
+                        return UnrollPlan::Decline {
+                            span,
+                            causa: CAUSA_BUDGET,
+                        };
+                    }
+                },
+                _ => unreachable!("literal tensor dimension was checked above"),
+            }
+        }
+        IndexExpr::Tuple(_)
+        | IndexExpr::Param(_)
+        | IndexExpr::Infer(_)
+        | IndexExpr::Unspecified => {
+            return UnrollPlan::Decline {
+                span,
+                causa: CAUSA_NOT_CONCRETE,
+            };
+        }
+    };
+
+    if lane_count > UNROLL_BUDGET.saturating_sub(*emitted_lanes) {
+        return UnrollPlan::Decline {
+            span,
+            causa: CAUSA_BUDGET,
+        };
+    }
+    if let Some(causa) = mask.decline() {
+        return UnrollPlan::Decline { span, causa };
+    }
+    if let Some(causa) = body_decline(body, block, index_def, lanes, interner) {
+        return UnrollPlan::Decline { span, causa };
+    }
+
+    let accumulators = block_accumulators(block, body);
+    *emitted_lanes += lane_count;
+    #[allow(clippy::cast_possible_wrap)]
+    let values = (0..lane_count).map(|lane| lane as i64).collect();
+    UnrollPlan::Ready(ReadyUnroll {
+        index_def,
+        lanes: values,
+        body: body.clone(),
+        accumulators,
+        tensor_source: Some(source.clone()),
+        tensor_binding_ty: Some(*element_ty),
     })
 }
 
@@ -678,9 +1063,42 @@ fn emit_unrolled_lanes(
             index_def: ready.index_def,
             index_value: *value,
             index_ty: None,
+            binding_value: None,
             acc_current: acc_current.clone(),
             local_map: FxHashMap::default(),
         };
+        if let Some(source) = &ready.tensor_source {
+            let mut source = source.clone();
+            remap_fresh_expr(&mut source, &remap, ids);
+            let binding_def = ids.next_def();
+            let index = HirExpression {
+                id: ids.next_hir(),
+                kind: int_literal(*value, ids),
+                ty: None,
+                span: source.span,
+            };
+            let element = HirExpression {
+                id: ids.next_hir(),
+                kind: HirExpressionKind::Index(Box::new(source), Box::new(index)),
+                ty: ready.tensor_binding_ty,
+                span: ready.body.span,
+            };
+            let binding = HirLocal {
+                def_id: binding_def,
+                name: interner.intern(&format!("__unroll_{}", binding_def.0)),
+                ty: ready.tensor_binding_ty,
+                init: Some(element),
+                mutable: false,
+                is_await: false,
+                runtime_provided: false,
+            };
+            out.push(HirStatement {
+                id: ids.next_hir(),
+                kind: HirStatementKind::Local(binding),
+                span: ready.body.span,
+            });
+            remap.binding_value = Some(binding_def);
+        }
         let stmts = emit_iteration(&ready.body, &ready.accumulators, &mut remap, interner, ids);
         acc_current = remap.acc_current;
         out.extend(stmts);
@@ -790,6 +1208,7 @@ struct Remap {
     index_def: DefId,
     index_value: i64,
     index_ty: Option<crate::TypeId>,
+    binding_value: Option<DefId>,
     acc_current: FxHashMap<DefId, DefId>,
     local_map: FxHashMap<DefId, DefId>,
 }
@@ -829,9 +1248,13 @@ impl HirVisitorMut for FreshRemap<'_> {
         expr.id = self.ids.next_hir();
         if let HirExpressionKind::Path(def) = expr.kind {
             if def == self.remap.index_def {
-                expr.kind = int_literal(self.remap.index_value, self.ids);
-                if expr.ty.is_none() {
-                    expr.ty = self.remap.index_ty;
+                if let Some(binding) = self.remap.binding_value {
+                    expr.kind = HirExpressionKind::Path(binding);
+                } else {
+                    expr.kind = int_literal(self.remap.index_value, self.ids);
+                    if expr.ty.is_none() {
+                        expr.ty = self.remap.index_ty;
+                    }
                 }
                 return;
             }

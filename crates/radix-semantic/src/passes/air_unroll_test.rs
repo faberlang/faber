@@ -154,6 +154,131 @@ functio lane_sum(tensor<f32, [4]> x) → f32 {
 }
 "#;
 
+const TENSOR_EX_LOOP: &str = r#"
+@ radix lane "air"
+functio tensor_sum(tensor<f32, [4]> x) → f32 {
+    varia f32 total ← 0.0
+    itera ex x fixum value {
+        total ← total + value
+    }
+    redde total
+}
+"#;
+
+#[test]
+fn tensor_ex_rank1_admits_guard_free_element_lets() {
+    let result = analyze(TENSOR_EX_LOOP);
+    assert!(
+        result.is_ok(),
+        "rank-1 tensor itera ex must analyze cleanly: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "admitted tensor iteration must be erased");
+    assert!(!has_si(hir), "tensor iteration is guard-free");
+    let mut gathers = CountIndexes(0);
+    walk_program(&mut gathers, hir);
+    assert_eq!(
+        gathers.0, 4,
+        "one tensor element gather must be emitted per lane"
+    );
+}
+
+#[test]
+fn tensor_ex_rank2_defers_to_coordinates_with_distinct_causa() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio grid_sum(tensor<f32, [2, 2]> x) → f32 {
+    itera ex x fixum value { }
+    redde 0.0
+}
+"#,
+    );
+    expect_decline_causa(&errors, "defer_coordinates");
+    assert!(
+        !errors.iter().any(|error| {
+            error
+                .args
+                .iter()
+                .any(|arg| arg.name == "causa" && arg.value == "not_concrete")
+        }),
+        "rank-2 defer must not collapse into not_concrete: {errors:?}"
+    );
+}
+
+#[test]
+fn tensor_ex_symbolic_shape_declines_not_concrete() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio generic_sum<magnitudo N>(tensor<f32, [N]> x) → f32 {
+    itera ex x fixum value { }
+    redde 0.0
+}
+"#,
+    );
+    expect_decline_causa(&errors, "not_concrete");
+}
+
+#[test]
+fn tensor_ex_single_loop_over_budget_declines() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio too_wide(tensor<f32, [65]> x) → f32 {
+    itera ex x fixum value { }
+    redde 0.0
+}
+"#,
+    );
+    expect_decline_causa(&errors, "budget");
+}
+
+#[test]
+fn tensor_ex_budget_is_per_function_total() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio two_loops(tensor<f32, [40]> a, tensor<f32, [40]> b) → f32 {
+    varia f32 total ← 0.0
+    itera ex a fixum first {
+        total ← total + first
+    }
+    itera ex b fixum second {
+        total ← total + second
+    }
+    redde total
+}
+"#,
+    );
+    expect_decline_causa(&air_errors_from(&result), "budget");
+    let hir = result.hir.as_ref().expect("typed HIR despite AIR decline");
+    assert!(
+        has_itera(hir),
+        "the over-budget second loop must remain whole"
+    );
+}
+
+fn air_errors_from(result: &crate::SemanticResult) -> Vec<SemanticError> {
+    result
+        .diagnostics
+        .iter()
+        .filter(|error| error.kind == SemanticErrorKind::AirPurityViolation)
+        .cloned()
+        .collect()
+}
+
+struct CountIndexes(usize);
+impl HirVisitor for CountIndexes {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if matches!(expr.kind, HirExpressionKind::Index(..)) {
+            self.0 += 1;
+        }
+        walk_expr(self, expr);
+    }
+}
+
 #[test]
 fn concrete_range_loop_admits_after_unroll() {
     let result = analyze(SECTION3_SCALAR_LOOP);

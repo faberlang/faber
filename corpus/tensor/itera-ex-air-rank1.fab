@@ -1,0 +1,42 @@
++++
+term = "itera-ex-air-rank1"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "shape_suffix", "expression", "assignment", "itera_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "AIR-lane itera ex over a rank-1 tensor unrolls into guard-free element lets within the per-function lane budget."
+syntax = "@ radix lane \"air\"; itera ex tensor<T, [N]>"
+related = ["tensor", "ex", "itera", "radix"]
+locale = "en"
++++
+
+# =============================================================================
+# itera-ex-air-rank1 — AIR-lane rank-1 tensor iteration.
+# =============================================================================
+#
+# What this teaches:
+#   • a rank-1 literal tensor shape is an exact N-lane proof for AIR unroll
+#   • each lane gathers one tensor element into a fresh straight-line let
+#   • the function-wide budget is 64 emitted lanes, not 64 per loop
+#
+# Decline proofs kept beside the runnable admit:
+#   • tensor<f32, [2, 2]> declines SEM059.itera_loop with
+#     causa=defer_coordinates; itera-apud-coordinates owns higher ranks
+#   • tensor<f32, [65]> declines SEM059.itera_loop with causa=budget
+#   • two tensor<f32, [40]> loops decline the second whole with causa=budget
+#   • tensor<f32, [N]> declines SEM059.itera_loop with causa=not_concrete
+#
+# See also: tensor, ex, itera
+# =============================================================================
+
+# Declaration-only AIR driver; the semantic unit tests pin the emitted lanes
+# and the three decline cases without routing an AIR function through main.
+
+@ radix lane "air"
+fn tensor_sum(tf32[4] x) → f32 {
+    var f32 total ← 0.0
+    for from x const value {
+        total ← total + value
+    }
+    return total
+}
