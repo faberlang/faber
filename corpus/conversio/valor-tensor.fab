@@ -1,6 +1,7 @@
 +++
 term = "valor"
 kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "array_literal", "json_literal", "json_object", "json_member", "json_value", "json_string", "json_number", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "optional_suffix", "equality", "equality_tail", "expression", "literal"]
 category = "conversion"
 canonical = true
 summary = "Compose valor ↔ tensor roundtrip via lista bridges (no dedicated valor↔tensor arms)."

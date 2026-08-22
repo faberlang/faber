@@ -1,6 +1,7 @@
 +++
 term = "↦"
 kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "labeled_type_argument", "range_expr", "range_tail", "conversio_expr", "expression", "literal"]
 category = "conversion"
 canonical = false
 summary = "Endian integer unpack from an octeti window."

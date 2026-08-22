@@ -1,6 +1,7 @@
 +++
 term = "↦"
 kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "expression", "literal"]
 category = "conversion"
 canonical = false
 summary = "Scalar numeric and bivalens primitive conversio."
