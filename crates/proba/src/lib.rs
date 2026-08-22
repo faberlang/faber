@@ -743,7 +743,7 @@ fn is_step_budget_exhausted(message: &str) -> bool {
 
 fn is_capability_gap_message(message: &str) -> bool {
     message.contains("unsupported MIR lowering")
-        || message.contains("FaberScript unsupported:")
+        || message.contains("faberscript unsupported:")
         || message.contains("missing type information for MIR lowering")
 }
 
