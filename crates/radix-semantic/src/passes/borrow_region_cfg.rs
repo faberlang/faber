@@ -503,7 +503,7 @@ impl Builder {
                 self.connect_transfers(&body_fragment, header, exit);
                 Ok(Fragment::terminal_with_entry(header, exit))
             }
-            HirExpressionKind::Itera(_, _, _, source, body) => {
+            HirExpressionKind::Itera(_, _, _, _, source, body) => {
                 let source_fragment = self.build_expression(source, loop_context)?;
                 let header = self.cfg.add_node(
                     CfgNodeKind::LoopHeader,
@@ -601,7 +601,7 @@ fn is_control_expression(expression: &HirExpression) -> bool {
             | HirExpressionKind::Si { .. }
             | HirExpressionKind::Dum(_, _)
             | HirExpressionKind::Loop(_)
-            | HirExpressionKind::Itera(_, _, _, _, _)
+            | HirExpressionKind::Itera(_, _, _, _, _, _)
             | HirExpressionKind::Discerne { .. }
             | HirExpressionKind::Handled { .. }
     )

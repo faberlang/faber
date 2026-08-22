@@ -340,7 +340,7 @@ fn contains_rumpe_expr(expr: &HirExpression) -> bool {
         }
         HirExpressionKind::Loop(body) => contains_rumpe_block(body),
         HirExpressionKind::Dum(_, body) => contains_rumpe_block(body),
-        HirExpressionKind::Itera(_, _, _, _, body) => contains_rumpe_block(body),
+        HirExpressionKind::Itera(_, _, _, _, _, body) => contains_rumpe_block(body),
         HirExpressionKind::Handled { body, catch } => {
             contains_rumpe_block(body) || contains_rumpe_block(&catch.body)
         }

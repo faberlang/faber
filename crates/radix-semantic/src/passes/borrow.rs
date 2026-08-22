@@ -1214,7 +1214,7 @@ impl HirVisitor for BorrowChecker<'_> {
                     self.pop_scope();
                 }
             }
-            HirExpressionKind::Itera(_, binding, _, iter, block) => {
+            HirExpressionKind::Itera(_, _, binding, _, iter, block) => {
                 self.visit_expr(iter);
                 self.ensure_state(*binding);
                 self.check_block(block);

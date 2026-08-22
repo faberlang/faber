@@ -340,7 +340,7 @@ impl super::FaberCodegen {
                 });
                 writer.write("}");
             }
-            HirExpressionKind::Itera(mode, _binding, binding_name, iter, block) => {
+            HirExpressionKind::Itera(mode, _, _binding, binding_name, iter, block) => {
                 writer.write(surface.keyword(TokenKind::Itera));
                 writer.write(" ");
                 writer.write(match mode {

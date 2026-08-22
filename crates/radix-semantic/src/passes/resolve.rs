@@ -423,6 +423,16 @@ fn resolve_stmt(
         StmtKind::Itera(stmt) => {
             resolve_expr(resolver, interner, &stmt.iterable, errors);
             resolver.enter_scope(ScopeKind::Loop);
+            for ident in &stmt.apud {
+                define_symbol(
+                    resolver,
+                    ident.name,
+                    ident.span,
+                    SymbolKind::Local,
+                    false,
+                    errors,
+                );
+            }
             define_binding_pattern(
                 resolver,
                 &stmt.binding,

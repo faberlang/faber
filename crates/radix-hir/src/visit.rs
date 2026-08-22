@@ -385,7 +385,10 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
             visitor.visit_expr(cond);
             visitor.visit_block(block);
         }
-        HirExpressionKind::Itera(_, def_id, name, iter, block) => {
+        HirExpressionKind::Itera(_, coordinates, def_id, name, iter, block) => {
+            for (coordinate_def_id, coordinate_name) in coordinates {
+                visitor.visit_def(*coordinate_def_id, *coordinate_name);
+            }
             visitor.visit_def(*def_id, *name);
             visitor.visit_expr(iter);
             visitor.visit_block(block);
@@ -881,7 +884,10 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             visitor.visit_expr_mut(cond);
             visitor.visit_block_mut(block);
         }
-        HirExpressionKind::Itera(_, def_id, name, iter, block) => {
+        HirExpressionKind::Itera(_, coordinates, def_id, name, iter, block) => {
+            for (coordinate_def_id, coordinate_name) in coordinates {
+                visitor.visit_def(*coordinate_def_id, *coordinate_name);
+            }
             visitor.visit_def(*def_id, *name);
             visitor.visit_expr_mut(iter);
             visitor.visit_block_mut(block);

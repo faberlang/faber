@@ -554,7 +554,7 @@ impl HirVisitor for LintContext<'_> {
                 self.visit_expr(cond);
                 self.check_block(block, true);
             }
-            HirExpressionKind::Itera(_, _, _, iter, block) => {
+            HirExpressionKind::Itera(_, _, _, _, iter, block) => {
                 self.visit_expr(iter);
                 self.check_block(block, true);
             }

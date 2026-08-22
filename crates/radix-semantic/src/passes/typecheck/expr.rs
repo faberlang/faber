@@ -114,7 +114,7 @@ impl TypeChecker<'_> {
                 self.check_block(block, None);
                 self.vacuum_type()
             }
-            HirExpressionKind::Itera(mode, binding, _, iter, block) => {
+            HirExpressionKind::Itera(mode, _, binding, _, iter, block) => {
                 let iter_ty = if matches!(mode, radix_hir::HirIteraMode::Ab) {
                     self.check_expr_allowing_direct_intervallum_step(iter)
                 } else {

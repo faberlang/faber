@@ -79,7 +79,7 @@ pub(super) trait HirExpressionLoweringVisitor {
             HirExpressionKind::Discerne { scrutinees, arms, .. } => self.visit_discerne_expr(scrutinees, arms, expr),
             HirExpressionKind::Loop(block) => self.visit_loop_expr(block, expr),
             HirExpressionKind::Dum(cond, block) => self.visit_dum_expr(cond, block, expr),
-            HirExpressionKind::Itera(mode, binding, name, iter, block) => {
+            HirExpressionKind::Itera(mode, _, binding, name, iter, block) => {
                 self.visit_itera_expr(*mode, *binding, *name, iter, block, expr)
             }
             HirExpressionKind::Handled { body, catch } => self.visit_handled_expr(body, catch, expr),

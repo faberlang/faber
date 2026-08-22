@@ -1011,8 +1011,15 @@ pub enum HirExpressionKind {
     /// While loop.
     Dum(Box<HirExpression>, HirBlock),
 
-    /// Iteration loop with a binding introduced by the loop head.
-    Itera(HirIteraMode, DefId, Symbol, Box<HirExpression>, HirBlock),
+    /// Iteration loop with coordinate and element bindings introduced by the loop head.
+    Itera(
+        HirIteraMode,
+        Vec<(DefId, Symbol)>,
+        DefId,
+        Symbol,
+        Box<HirExpression>,
+        HirBlock,
+    ),
 
     /// Range (`intervallum`).
     Intervallum {

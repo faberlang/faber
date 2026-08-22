@@ -271,7 +271,7 @@ impl FragmentDefinitionChecker<'_> {
                 self.check_expr(cond);
                 self.check_block(block);
             }
-            HirExpressionKind::Itera(_, _, _, source, block) => {
+            HirExpressionKind::Itera(_, _, _, _, source, block) => {
                 self.check_expr(source);
                 self.check_block(block);
             }

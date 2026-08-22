@@ -693,6 +693,15 @@ impl Lowerer<'_> {
         };
 
         self.push_scope();
+        let coordinate_bindings = iter_stmt
+            .apud
+            .iter()
+            .map(|ident| {
+                let def_id = self.next_def_id();
+                self.bind_local(ident.name, def_id);
+                (def_id, ident.name)
+            })
+            .collect();
         self.bind_local(binding_name, binding);
         if matches!(
             iter_stmt.binding,
@@ -723,7 +732,14 @@ impl Lowerer<'_> {
         self.pop_scope();
         let expr = HirExpression {
             id: self.next_hir_id(),
-            kind: HirExpressionKind::Itera(mode, binding, binding_name, Box::new(iter), body),
+            kind: HirExpressionKind::Itera(
+                mode,
+                coordinate_bindings,
+                binding,
+                binding_name,
+                Box::new(iter),
+                body,
+            ),
             ty: None,
             span: self.current_span,
         };

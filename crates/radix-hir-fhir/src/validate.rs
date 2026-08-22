@@ -368,7 +368,10 @@ fn collect_expr_defs(
             collect_expr_defs(cond, registry);
             collect_block_defs(body, registry);
         }
-        HirExpressionKind::Itera(_, def_id, _, iterable, body) => {
+        HirExpressionKind::Itera(_, coordinates, def_id, _, iterable, body) => {
+            for (coordinate_def_id, _) in coordinates {
+                registry.insert(*coordinate_def_id);
+            }
             registry.insert(*def_id);
             collect_expr_defs(iterable, registry);
             collect_block_defs(body, registry);
@@ -648,7 +651,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                 collect_expr(cond, registry);
                 collect_block(body, registry);
             }
-            HirExpressionKind::Itera(_, _, _, iterable, body) => {
+            HirExpressionKind::Itera(_, _, _, _, iterable, body) => {
                 collect_expr(iterable, registry);
                 collect_block(body, registry);
             }
@@ -1380,7 +1383,11 @@ pub(crate) fn validate_referential_integrity(
                 validate_expr(cond, check_symbol, check_def, check_hir, check_type)?;
                 validate_block(body, check_symbol, check_def, check_hir, check_type)?;
             }
-            HirExpressionKind::Itera(_, def_id, sym, iterable, body) => {
+            HirExpressionKind::Itera(_, coordinates, def_id, sym, iterable, body) => {
+                for (coordinate_def_id, coordinate_name) in coordinates {
+                    check_def(*coordinate_def_id)?;
+                    check_symbol(*coordinate_name)?;
+                }
                 check_def(*def_id)?;
                 check_symbol(*sym)?;
                 validate_expr(iterable, check_symbol, check_def, check_hir, check_type)?;

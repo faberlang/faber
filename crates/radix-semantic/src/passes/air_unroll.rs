@@ -414,7 +414,7 @@ fn rewrite_nested_expr(
                 );
             }
         }
-        HirExpressionKind::Loop(block) | HirExpressionKind::Itera(_, _, _, _, block) => {
+        HirExpressionKind::Loop(block) | HirExpressionKind::Itera(_, _, _, _, _, block) => {
             rewrite_block(
                 block,
                 lanes,
@@ -713,7 +713,7 @@ fn classify_itera_expr(
     fullness: &FxHashMap<DefId, usize>,
     emitted_lanes: &mut usize,
 ) -> Option<UnrollPlan> {
-    let HirExpressionKind::Itera(mode, index_def, _, source, body) = &expr.kind else {
+    let HirExpressionKind::Itera(mode, _, index_def, _, source, body) = &expr.kind else {
         return None;
     };
     match mode {
@@ -1143,7 +1143,7 @@ impl BodyDecline<'_> {
             }
             HirExpressionKind::Loop(_)
             | HirExpressionKind::Dum(_, _)
-            | HirExpressionKind::Itera(_, _, _, _, _)
+            | HirExpressionKind::Itera(_, _, _, _, _, _)
             | HirExpressionKind::Discerne { .. } => self.reject(CAUSA_UNSUPPORTED_CONTROL),
             HirExpressionKind::Call(callee, _, args) => {
                 if !matches!(&callee.kind, HirExpressionKind::Path(def) if self.lanes.lane_for(*def) == Some(RadixLane::Air))
@@ -1743,7 +1743,7 @@ impl MaskCollector<'_> {
                 }
             }
             HirExpressionKind::Block(block) => self.scan_block(block),
-            HirExpressionKind::Loop(block) | HirExpressionKind::Itera(_, _, _, _, block) => {
+            HirExpressionKind::Loop(block) | HirExpressionKind::Itera(_, _, _, _, _, block) => {
                 self.scan_block(block)
             }
             HirExpressionKind::Dum(cond, block) => {

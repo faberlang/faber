@@ -74,7 +74,7 @@ fn loop_body(unit: &AnalyzedFixture) -> &HirBlock {
     let HirStatementKind::Expr(expr) = &statement.kind else {
         unreachable!("loop statement is an expression statement");
     };
-    let HirExpressionKind::Itera(_, _, _, _, body) = &expr.kind else {
+    let HirExpressionKind::Itera(_, _, _, _, _, body) = &expr.kind else {
         panic!("expected itera HIR, got {:?}", expr.kind);
     };
     body
