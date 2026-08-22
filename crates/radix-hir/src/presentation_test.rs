@@ -19,7 +19,7 @@ use crate::visit::{walk_block, walk_stmt, HirVisitor};
 use radix_lexer::{Span, Symbol};
 
 /// Half-open span helper so tests avoid raw byte literals.
-fn span(offset: u32) -> Span {
+fn make_span(offset: u32) -> Span {
     Span::new(offset, offset + 1)
 }
 
@@ -48,16 +48,16 @@ fn sample_presentation() -> HirPresentation {
             leading: vec![
                 HirTrivia::CommentLine {
                     text: Symbol(10),
-                    span: span(0),
+                    span: make_span(0),
                 },
-                HirTrivia::Newline { span: span(1) },
+                HirTrivia::Newline { span: make_span(1) },
             ],
         },
         HirTriviaAttachment {
             anchor: HirSourceAnchorId(2),
             leading: vec![HirTrivia::CommentLine {
                 text: Symbol(11),
-                span: span(30),
+                span: make_span(30),
             }],
         },
     ];
@@ -66,11 +66,11 @@ fn sample_presentation() -> HirPresentation {
         attachments,
         block_ends: vec![HirBlockEnd {
             id: HirSourceAnchorId(2),
-            span: span(30),
+            span: make_span(30),
         }],
         program_end: HirModuleEnd {
             id: HirSourceAnchorId(3),
-            span: span(90),
+            span: make_span(90),
         },
         entry_start_anchor: Some(HirSourceAnchorId(1)),
     }
@@ -81,12 +81,12 @@ fn sample_presentation() -> HirPresentation {
 fn authored_blocks_carry_exactly_one_structural_end() {
     let end = HirBlockEnd {
         id: HirSourceAnchorId(7),
-        span: span(20),
+        span: make_span(20),
     };
     let authored = HirBlock {
         statements: Vec::new(),
         expr: None,
-        span: span(0),
+        span: make_span(0),
         breakable: None,
         end: Some(end.clone()),
     };
@@ -102,7 +102,7 @@ fn authored_blocks_carry_exactly_one_structural_end() {
 /// Compiler-synthesized blocks do not impersonate authored boundaries.
 #[test]
 fn synthesized_blocks_do_not_impersonate_authored_boundaries() {
-    let synthesized = HirBlock::simple(Vec::new(), None, span(0));
+    let synthesized = HirBlock::simple(Vec::new(), None, make_span(0));
     assert!(
         synthesized.end.is_none(),
         "synthesized blocks carry no authored end"
@@ -187,14 +187,14 @@ fn visitor_does_not_count_structural_ends_as_statements() {
         statements: vec![HirStatement {
             id: HirId(0),
             kind: HirStatementKind::Tacet,
-            span: span(0),
+            span: make_span(0),
         }],
         expr: None,
-        span: span(0),
+        span: make_span(0),
         breakable: None,
         end: Some(HirBlockEnd {
             id: HirSourceAnchorId(1),
-            span: span(5),
+            span: make_span(5),
         }),
     };
     let mut counter = StmtCounter::default();
@@ -214,11 +214,11 @@ fn explicit_tacet_is_the_only_hir_no_op_statement() {
     let end_only = HirBlock {
         statements: Vec::new(),
         expr: None,
-        span: span(0),
+        span: make_span(0),
         breakable: None,
         end: Some(HirBlockEnd {
             id: HirSourceAnchorId(1),
-            span: span(5),
+            span: make_span(5),
         }),
     };
     assert!(
@@ -229,7 +229,7 @@ fn explicit_tacet_is_the_only_hir_no_op_statement() {
     let tacet = HirStatement {
         id: HirId(0),
         kind: HirStatementKind::Tacet,
-        span: span(0),
+        span: make_span(0),
     };
     assert!(matches!(tacet.kind, HirStatementKind::Tacet));
 }
@@ -240,9 +240,9 @@ fn explicit_tacet_is_the_only_hir_no_op_statement() {
 fn trivia_is_a_standalone_presentation_type() {
     let comment = HirTrivia::CommentLine {
         text: Symbol(1),
-        span: span(0),
+        span: make_span(0),
     };
-    let newline = HirTrivia::Newline { span: span(4) };
+    let newline = HirTrivia::Newline { span: make_span(4) };
     assert!(matches!(
         comment,
         HirTrivia::CommentLine {
@@ -263,7 +263,7 @@ fn presentation_equality_is_deterministic() {
     let mut changed_end = sample_presentation();
     changed_end.program_end = HirModuleEnd {
         id: HirSourceAnchorId(999),
-        span: span(90),
+        span: make_span(90),
     };
     assert_ne!(
         first, changed_end,
@@ -290,12 +290,12 @@ fn postcard_round_trip_preserves_presentation_data() {
         restored.attachments[0].leading[0],
         HirTrivia::CommentLine {
             text: Symbol(10),
-            span: span(0),
+            span: make_span(0),
         }
     );
     assert_eq!(
         restored.attachments[0].leading[1],
-        HirTrivia::Newline { span: span(1) }
+        HirTrivia::Newline { span: make_span(1) }
     );
     assert_eq!(restored.block_ends[0].id, HirSourceAnchorId(2));
     assert_eq!(restored.entry_start_anchor, Some(HirSourceAnchorId(1)));
