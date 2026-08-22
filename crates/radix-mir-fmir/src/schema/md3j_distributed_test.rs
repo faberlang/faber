@@ -8,10 +8,13 @@
 mod md3j_fixtures;
 
 use super::{
-    admit_device_section, admit_distributed_section, wire_plan_to_plan, FmirDeviceSection,
-    WirePlacementConstraint, WIRE_DISTRIBUTED_SECTION_VERSION,
+    FmirDeviceSection, WIRE_DISTRIBUTED_SECTION_VERSION, WirePlacementConstraint,
+    admit_device_section, admit_distributed_section, wire_plan_to_plan,
 };
-use md3j_fixtures::{EIGHT_GIB_BYTES, EIGHT_RANK_COUNT, OVER_BUDGET_BYTES};
+use md3j_fixtures::{
+    EIGHT_GIB_BYTES, EIGHT_RANK_COUNT, OVER_BUDGET_BYTES, REALCARD_OVER_BUDGET_BYTES,
+    REALCARD_OVER_BUDGET_DECLARED_TOTAL_BYTES,
+};
 
 fn eight_gib_device_section() -> FmirDeviceSection {
     md3j_fixtures::eight_gib_device_section().expect("MD3J honest fixture builds")
@@ -19,6 +22,11 @@ fn eight_gib_device_section() -> FmirDeviceSection {
 
 fn over_budget_device_section() -> FmirDeviceSection {
     md3j_fixtures::over_budget_device_section().expect("MD3J over-budget fixture builds")
+}
+
+fn realcard_over_budget_device_section() -> FmirDeviceSection {
+    md3j_fixtures::realcard_over_budget_device_section()
+        .expect("MD3J real-card over-budget fixture builds")
 }
 
 fn distributed(device: &FmirDeviceSection) -> &super::FmirDistributedExecutionSection {
@@ -90,6 +98,35 @@ fn over_budget_image_is_wire_legal_and_admitted_before_hosts_policy() {
 }
 
 #[test]
+fn realcard_over_budget_image_is_wire_legal_and_documents_the_policy_margin() {
+    let device = realcard_over_budget_device_section();
+    assert_admits_at_wire_level(&device);
+    assert_eq!(
+        REALCARD_OVER_BUDGET_BYTES / 2,
+        REALCARD_OVER_BUDGET_DECLARED_TOTAL_BYTES
+    );
+    assert!(
+        REALCARD_OVER_BUDGET_DECLARED_TOTAL_BYTES > (80 * 1024 * 1024 * 1024 * 9) / 10,
+        "79 GiB ledger declaration must exceed the 80 GiB A100 OQ-2 limit"
+    );
+    assert_eq!(
+        budgets(&device),
+        (0..EIGHT_RANK_COUNT)
+            .map(|partition| {
+                (
+                    partition,
+                    if partition == 0 {
+                        REALCARD_OVER_BUDGET_BYTES
+                    } else {
+                        EIGHT_GIB_BYTES
+                    },
+                )
+            })
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn budget_variants_keep_the_md3h_program_and_logical_graph_byte_stable() {
     let baseline: FmirDeviceSection = postcard::from_bytes(include_bytes!(
         "../../tests/fixtures/md3h/eight-rank.postcard"
@@ -99,7 +136,11 @@ fn budget_variants_keep_the_md3h_program_and_logical_graph_byte_stable() {
     let baseline_graph = postcard::to_allocvec(&baseline_section.logical_plan.graph)
         .expect("MD3H logical graph serializes");
 
-    for candidate in [eight_gib_device_section(), over_budget_device_section()] {
+    for candidate in [
+        eight_gib_device_section(),
+        over_budget_device_section(),
+        realcard_over_budget_device_section(),
+    ] {
         let candidate_section = distributed(&candidate);
         assert_eq!(
             candidate.device_program.program, baseline.device_program.program,
@@ -143,7 +184,11 @@ fn the_same_image_admits_unchanged_for_bind_counts_one_and_two() {
 
 #[test]
 fn md3j_logical_hash_matches_the_reconstructed_wire_plan() {
-    for device in [eight_gib_device_section(), over_budget_device_section()] {
+    for device in [
+        eight_gib_device_section(),
+        over_budget_device_section(),
+        realcard_over_budget_device_section(),
+    ] {
         let section = distributed(&device);
         let reconstructed =
             wire_plan_to_plan(&section.logical_plan).expect("MD3J plan reconstructs");
@@ -182,5 +227,14 @@ fn committed_over_budget_postcard_matches_the_builder() {
         "eight-rank-over-budget.postcard",
         include_bytes!("../../tests/fixtures/md3j/eight-rank-over-budget.postcard"),
         &over_budget_device_section(),
+    );
+}
+
+#[test]
+fn committed_realcard_over_budget_postcard_matches_the_builder() {
+    assert_committed_postcard(
+        "eight-rank-over-budget-realcard.postcard",
+        include_bytes!("../../tests/fixtures/md3j/eight-rank-over-budget-realcard.postcard"),
+        &realcard_over_budget_device_section(),
     );
 }
