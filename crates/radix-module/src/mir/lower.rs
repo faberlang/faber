@@ -67,6 +67,7 @@ mod control;
 mod expr;
 mod item;
 mod monomorphize;
+mod package_instantiate;
 mod place;
 mod runtime;
 mod stmt;
@@ -74,6 +75,7 @@ mod stmt;
 use context::{function_param_map, struct_field_map, LoweringContextMaps};
 use expr::HirExpressionLoweringVisitor;
 use item::ItemLoweringPass;
+pub use package_instantiate::instantiate_merged_generic_calls;
 
 /// Developer-facing MIR lowering diagnostic.
 ///
@@ -153,6 +155,14 @@ pub struct LoweredMirUnit<'a> {
     pub interner: Interner,
     pub monomorphizations: Vec<MirMonomorphization>,
     pub closure_environments: Vec<MirClosureEnvironment>,
+    /// Generic source bodies removed from [`Self::program`] after unit
+    /// monomorphization. Package linking keeps them so a later unit can
+    /// instantiate a shape the defining unit never called.
+    pub generic_templates: Vec<MirFunction>,
+    /// Declaration-order generic parameters for [`Self::generic_templates`],
+    /// keyed by the template's `function.source` (rewritten to a synthetic
+    /// def at package link). `is_shape` is `magnitudo`; otherwise `typus`.
+    pub generic_params: Vec<(DefId, Vec<MirGenericParam>)>,
     /// Validated MIR token: proof that `program` (or a clone of it) passed
     /// [`validate_program`] against the enclosed context.
     pub validated: ValidatedMir<'a>,
@@ -162,6 +172,13 @@ pub struct LoweredMirUnit<'a> {
     /// instead of being discarded after validation. The faber device-program
     /// constructor consumes it to lower generated companions into kernels.
     pub companions: radix_mir::device::MirCompanionMap,
+}
+
+/// One generic parameter in source declaration order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MirGenericParam {
+    pub name: Symbol,
+    pub is_shape: bool,
 }
 
 /// Lower a semantically analyzed HIR unit and retain validation metadata.
@@ -358,7 +375,8 @@ fn lower_analyzed_unit_with_options(
 
     let lowering_errors = std::mem::take(&mut lowerer.errors);
     if lowering_errors.is_empty() {
-        let monomorphizations = lowerer.monomorphize();
+        let monomorphize::MonomorphizeOutput { monomorphizations, templates: generic_templates, generic_params } =
+            lowerer.monomorphize();
         let monomorphization_errors = std::mem::take(&mut lowerer.errors);
         if !monomorphization_errors.is_empty() {
             return Err(monomorphization_errors);
@@ -426,6 +444,8 @@ fn lower_analyzed_unit_with_options(
             interner,
             monomorphizations,
             closure_environments,
+            generic_templates,
+            generic_params,
             validated,
             companions: radix_mir::device::MirCompanionMap::default(),
         })

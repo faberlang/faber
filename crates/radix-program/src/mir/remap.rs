@@ -20,35 +20,43 @@ pub(super) fn remap_optional_symbol(
     })
 }
 
+pub(super) fn remap_function_text_symbols(
+    function: &mut MirFunction,
+    source: &Interner,
+    target: &mut Interner,
+) {
+    // Function names are symbols from the lowering interner; they must be
+    // remapped too or `MirNames` (built against the merged interner)
+    // resolves a foreign symbol value.
+    function.name = remap_optional_symbol(function.name, source, target);
+    // Param and local names are the same kind of lowering-interner
+    // symbols: without remapping they resolve to UNRELATED strings in the
+    // merged interner (the entry's symbol space), garbling the
+    // device-constructor's buffer names — the library-backed train_step
+    // slots then alias the entry's locals (`vacua`/`strue` instead of
+    // `weight`/`bias`). S5-U5c: remap them so the merged library body
+    // keeps its declared names.
+    for param in &mut function.params {
+        param.name = remap_optional_symbol(param.name, source, target);
+    }
+    for local in &mut function.locals {
+        local.name = remap_optional_symbol(local.name, source, target);
+    }
+    for block in &mut function.blocks {
+        for statement in &mut block.statements {
+            remap_statement_text_symbols(statement, source, target);
+        }
+        remap_terminator_text_symbols(&mut block.terminator, source, target);
+    }
+}
+
 pub(super) fn remap_program_text_symbols(
     program: &mut MirProgram,
     source: &Interner,
     target: &mut Interner,
 ) {
     for function in &mut program.functions {
-        // Function names are symbols from the lowering interner; they must be
-        // remapped too or `MirNames` (built against the merged interner)
-        // resolves a foreign symbol value.
-        function.name = remap_optional_symbol(function.name, source, target);
-        // Param and local names are the same kind of lowering-interner
-        // symbols: without remapping they resolve to UNRELATED strings in the
-        // merged interner (the entry's symbol space), garbling the
-        // device-constructor's buffer names — the library-backed train_step
-        // slots then alias the entry's locals (`vacua`/`strue` instead of
-        // `weight`/`bias`). S5-U5c: remap them so the merged library body
-        // keeps its declared names.
-        for param in &mut function.params {
-            param.name = remap_optional_symbol(param.name, source, target);
-        }
-        for local in &mut function.locals {
-            local.name = remap_optional_symbol(local.name, source, target);
-        }
-        for block in &mut function.blocks {
-            for statement in &mut block.statements {
-                remap_statement_text_symbols(statement, source, target);
-            }
-            remap_terminator_text_symbols(&mut block.terminator, source, target);
-        }
+        remap_function_text_symbols(function, source, target);
     }
 }
 

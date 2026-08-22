@@ -2,6 +2,38 @@
 
 use super::*;
 
+pub(super) fn rewrite_templates_sources(
+    templates: &mut [MirFunction],
+    unit_path: &Path,
+    source_rewrites: &SourceRewrites,
+) {
+    if source_rewrites.is_empty() || templates.is_empty() {
+        return;
+    }
+    let mut program = MirProgram {
+        functions: templates.to_vec(),
+    };
+    rewrite_program_sources(&mut program, unit_path, source_rewrites);
+    for (template, rewritten) in templates.iter_mut().zip(program.functions) {
+        *template = rewritten;
+    }
+}
+
+pub(super) fn rewrite_generic_param_sources(
+    generic_params: &mut [(DefId, Vec<radix_module::mir::MirGenericParam>)],
+    unit_path: &Path,
+    source_rewrites: &SourceRewrites,
+) {
+    if source_rewrites.is_empty() {
+        return;
+    }
+    for (source, _) in generic_params {
+        if let Some(rewritten) = rewritten_source(unit_path, *source, source_rewrites) {
+            *source = rewritten;
+        }
+    }
+}
+
 pub(super) fn rewrite_program_sources(
     program: &mut MirProgram,
     unit_path: &Path,

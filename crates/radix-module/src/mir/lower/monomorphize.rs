@@ -67,11 +67,37 @@ struct CallWitness<'a> {
     scope: &'a FunctionTypeScope,
 }
 
+pub(super) struct MonomorphizeOutput {
+    pub monomorphizations: Vec<MirMonomorphization>,
+    pub templates: Vec<MirFunction>,
+    pub generic_params: Vec<(DefId, Vec<super::MirGenericParam>)>,
+}
+
 impl MirLowerer<'_> {
-    pub(super) fn monomorphize(&mut self) -> Vec<MirMonomorphization> {
+    pub(super) fn monomorphize(&mut self) -> MonomorphizeOutput {
         let mut state = MonomorphizationState::new(self);
         state.run();
-        state.monomorphizations
+        let generic_params = state
+            .generic_param_order
+            .iter()
+            .map(|(source, params)| {
+                (
+                    *source,
+                    params
+                        .iter()
+                        .map(|param| super::MirGenericParam {
+                            name: param.name,
+                            is_shape: param.kind == ParamKind::Magnitudo,
+                        })
+                        .collect(),
+                )
+            })
+            .collect();
+        MonomorphizeOutput {
+            monomorphizations: state.monomorphizations,
+            templates: state.templates.into_values().collect(),
+            generic_params,
+        }
     }
 }
 
@@ -906,7 +932,7 @@ fn generic_param_order(unit: &AnalyzedModule) -> FxHashMap<DefId, Vec<OrderedPar
 /// instance. Tuple terms are accepted only when every child resolves; a shape
 /// that remains a parameter, inference hole, or unspecified is genuinely
 /// unbound and fails closed under D6.
-fn resolve_parent_shape_binding(
+pub(super) fn resolve_parent_shape_binding(
     types: &TypeTable,
     shape: IndexId,
     parent_shape_bindings: &MirShapeBindings,
@@ -961,7 +987,7 @@ fn generic_param_names(params: &[crate::hir::HirTypeParam]) -> Vec<OrderedParam>
 
 /// O(1) when `id.0` matches the dense vector index (common lowering order).
 /// Linear fallback keeps sparse/reordered IDs correct after template removal.
-fn function_by_id(functions: &[MirFunction], id: MirFunctionId) -> Option<&MirFunction> {
+pub(super) fn function_by_id(functions: &[MirFunction], id: MirFunctionId) -> Option<&MirFunction> {
     if let Some(function) = functions.get(id.0 as usize) {
         if function.id == id {
             return Some(function);
@@ -971,7 +997,7 @@ fn function_by_id(functions: &[MirFunction], id: MirFunctionId) -> Option<&MirFu
 }
 
 /// Mutable variant of [`function_by_id`] for monomorphization rewrites.
-fn function_by_id_mut(functions: &mut [MirFunction], id: MirFunctionId) -> Option<&mut MirFunction> {
+pub(super) fn function_by_id_mut(functions: &mut [MirFunction], id: MirFunctionId) -> Option<&mut MirFunction> {
     if functions
         .get(id.0 as usize)
         .is_some_and(|function| function.id == id)
@@ -1165,7 +1191,7 @@ fn finalize_type_shapes(
 }
 
 /// Whether any param-bearing type survives in a function (D6 net).
-fn function_contains_param(types: &TypeTable, function: &MirFunction) -> bool {
+pub(super) fn function_contains_param(types: &TypeTable, function: &MirFunction) -> bool {
     function
         .params
         .iter()

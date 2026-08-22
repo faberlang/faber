@@ -597,3 +597,7 @@ mod lane_tests;
 #[cfg(test)]
 #[path = "receiver_method_lane_test.rs"]
 mod receiver_method_lane_tests;
+
+#[cfg(test)]
+#[path = "mixed_shape_link_test.rs"]
+mod mixed_shape_link_tests;

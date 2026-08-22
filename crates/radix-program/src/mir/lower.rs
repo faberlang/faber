@@ -104,6 +104,7 @@ pub(super) fn lower_package_units<'a>(
             &lowered.interner,
             &mut entry.analysis.interner,
         );
+        remap_templates_text_symbols(&mut lowered, &mut entry.analysis.interner);
         let nominal = NominalImportContext {
             nominal_map: &nominal_map,
         };
@@ -131,6 +132,7 @@ pub(super) fn lower_package_units<'a>(
             rewrite_lowered_type_ids(&mut lowered, &dispatch_rewrites);
         }
         rewrite_program_sources(&mut lowered.program, &unit_path, &source_rewrites);
+        rewrite_generic_identity(&mut lowered, &unit_path, &source_rewrites);
         ensure_unique_definition_sources(&lowered.program, &unit_path)?;
         let dispatch_function = selected_cli_dispatch_function(
             cli_plan,
@@ -150,7 +152,7 @@ pub(super) fn lower_package_units<'a>(
     // merged program. The lowered library programs are owned (functions +
     // closure environments); the validation token is rebuilt on the merged
     // program below.
-    let mut library_parts: Vec<(MirProgram, Vec<MirClosureEnvironment>)> = Vec::new();
+    let mut library_parts: Vec<LibraryMirParts> = Vec::new();
     for library in &links.libraries {
         let mut diagnostics = Vec::new();
         with_library_cached_analysis_mut(
@@ -248,6 +250,7 @@ pub(super) fn lower_package_units<'a>(
                     &lowered.interner,
                     &mut entry.analysis.interner,
                 );
+                remap_templates_text_symbols(&mut lowered, &mut entry.analysis.interner);
                 let nominal = NominalImportContext {
                     nominal_map: &nominal_map,
                 };
@@ -273,13 +276,19 @@ pub(super) fn lower_package_units<'a>(
                     &mut next_synthetic,
                 );
                 rewrite_program_sources(&mut lowered.program, &library.path, &source_rewrites);
+                rewrite_generic_identity(&mut lowered, &library.path, &source_rewrites);
                 if let Err(errors) =
                     ensure_unique_definition_sources(&lowered.program, &library.path)
                 {
                     diagnostics.extend(errors);
                     return Ok(());
                 }
-                library_parts.push((lowered.program, lowered.closure_environments));
+                library_parts.push(LibraryMirParts {
+                    program: lowered.program,
+                    environments: lowered.closure_environments,
+                    templates: lowered.generic_templates,
+                    generic_params: lowered.generic_params,
+                });
                 Ok(())
             },
         )
@@ -308,24 +317,33 @@ pub(super) fn lower_package_units<'a>(
         &merged.interner,
     );
 
+    let mut generic_templates = std::mem::take(&mut merged.generic_templates);
+    let mut generic_params = std::mem::take(&mut merged.generic_params);
     for mut unit in pending {
         let offset = append_shifted_program(&mut merged, &mut unit.lowered, &entry_path)?;
+        shift_templates(&mut unit.lowered.generic_templates, offset);
+        generic_templates.append(&mut unit.lowered.generic_templates);
+        generic_params.append(&mut unit.lowered.generic_params);
         if let Some(local_id) = unit.dispatch_function {
             dispatch_function = Some(checked_shifted_function_id(local_id, offset, &entry_path)?);
         }
         ensure_unique_definition_sources(&merged.program, &entry_path)?;
     }
     let _ = others;
-    for (mut program, mut closure_environments) in library_parts {
-        append_shifted_parts(
+    for mut library in library_parts {
+        let offset = append_shifted_parts(
             &mut merged.program,
             &mut merged.closure_environments,
-            &mut program,
-            &mut closure_environments,
+            &mut library.program,
+            &mut library.environments,
             &entry_path,
         )?;
+        shift_templates(&mut library.templates, offset);
+        generic_templates.append(&mut library.templates);
+        generic_params.append(&mut library.generic_params);
         ensure_unique_definition_sources(&merged.program, &entry_path)?;
     }
+    instantiate_package_generics(&mut merged, generic_templates, generic_params, &entry_path)?;
     rebuild_merged_validated(&mut merged, &entry_path)?;
 
     if cli_plan.dispatch.is_some() {
@@ -857,29 +875,116 @@ pub(super) fn rewrite_lowered_type_ids(
     rewrites: &[(TypeId, TypeId)],
 ) {
     for function in &mut lowered.program.functions {
-        rewrite_type_id(&mut function.return_ty, rewrites);
-        if let Some(error_ty) = &mut function.error_ty {
-            rewrite_type_id(error_ty, rewrites);
-        }
-        for param in &mut function.params {
-            rewrite_type_id(&mut param.ty, rewrites);
-        }
-        for local in &mut function.locals {
-            rewrite_type_id(&mut local.ty, rewrites);
-        }
-        for temp in &mut function.temps {
-            rewrite_type_id(&mut temp.ty, rewrites);
-        }
-        for block in &mut function.blocks {
-            for statement in &mut block.statements {
-                rewrite_statement_type_id(statement, rewrites);
-            }
-        }
+        rewrite_function_type_ids(function, rewrites);
+    }
+    for function in &mut lowered.generic_templates {
+        rewrite_function_type_ids(function, rewrites);
     }
     for environment in &mut lowered.closure_environments {
         rewrite_type_id(&mut environment.value_ty, rewrites);
         for capture in &mut environment.captures {
             rewrite_type_id(&mut capture.ty, rewrites);
+        }
+    }
+}
+
+fn remap_templates_text_symbols(lowered: &mut LoweredMirUnit<'_>, target: &mut Interner) {
+    let source = lowered.interner.clone();
+    for template in &mut lowered.generic_templates {
+        remap_function_text_symbols(template, &source, target);
+    }
+}
+
+fn rewrite_generic_identity(
+    lowered: &mut LoweredMirUnit<'_>,
+    unit_path: &Path,
+    source_rewrites: &SourceRewrites,
+) {
+    rewrite_templates_sources(&mut lowered.generic_templates, unit_path, source_rewrites);
+    rewrite_generic_param_sources(&mut lowered.generic_params, unit_path, source_rewrites);
+}
+
+fn shift_templates(templates: &mut [MirFunction], offset: u32) {
+    if offset == 0 {
+        return;
+    }
+    for template in templates {
+        shift_function_id(&mut template.id, offset);
+        for block in &mut template.blocks {
+            for statement in &mut block.statements {
+                shift_statement_ids(statement, offset);
+            }
+            shift_terminator_ids(&mut block.terminator, offset);
+        }
+    }
+}
+
+fn instantiate_package_generics(
+    merged: &mut LoweredMirUnit<'_>,
+    templates: Vec<MirFunction>,
+    generic_params: Vec<(DefId, Vec<radix_module::mir::MirGenericParam>)>,
+    diagnostic_path: &Path,
+) -> Result<(), Vec<Diagnostic>> {
+    if templates.is_empty() {
+        merged.generic_templates = templates;
+        merged.generic_params = generic_params;
+        return Ok(());
+    }
+    let mut types =
+        radix_types::TypeTable::from_snapshot(merged.validated.validation().types.snapshot())
+            .map_err(|message| vec![mir_lowering_diag(diagnostic_path, message)])?;
+    let extra = radix_module::mir::instantiate_merged_generic_calls(
+        &mut merged.program,
+        &templates,
+        &generic_params,
+        &mut types,
+        &merged.interner,
+    )
+    .map_err(|errors| {
+        errors
+            .into_iter()
+            .map(|error| mir_lowering_diag(diagnostic_path, error.message))
+            .collect::<Vec<_>>()
+    })?;
+    merged.monomorphizations.extend(extra);
+    merged.generic_templates = templates;
+    merged.generic_params = generic_params;
+    let types: &'static radix_types::TypeTable = Box::leak(Box::new(types));
+    let mut context = merged.validated.validation().with_types(types);
+    context.closure_environments.clear();
+    for environment in &merged.closure_environments {
+        context
+            .closure_environments
+            .insert(environment.id, environment.clone());
+    }
+    context.layouts = radix_module::mir::MirLayoutTable::from_types(types);
+    merged.validated = radix_module::mir::ValidatedMir::new(merged.program.clone(), context)
+        .map_err(|errors| {
+            errors
+                .into_iter()
+                .map(|error| mir_lowering_diag(diagnostic_path, error.message))
+                .collect::<Vec<_>>()
+        })?;
+    Ok(())
+}
+
+fn rewrite_function_type_ids(function: &mut MirFunction, rewrites: &[(TypeId, TypeId)]) {
+    rewrite_type_id(&mut function.return_ty, rewrites);
+    if let Some(error_ty) = &mut function.error_ty {
+        rewrite_type_id(error_ty, rewrites);
+    }
+    for param in &mut function.params {
+        rewrite_type_id(&mut param.ty, rewrites);
+    }
+    for local in &mut function.locals {
+        rewrite_type_id(&mut local.ty, rewrites);
+    }
+    for temp in &mut function.temps {
+        rewrite_type_id(&mut temp.ty, rewrites);
+    }
+    for block in &mut function.blocks {
+        for statement in &mut block.statements {
+            rewrite_statement_type_id(statement, rewrites);
         }
     }
 }
@@ -936,12 +1041,22 @@ pub(super) fn rewrite_lowered_variant_defs(
         return;
     }
     for function in &mut lowered.program.functions {
-        for block in &mut function.blocks {
-            for statement in &mut block.statements {
-                rewrite_statement_variant_defs(statement, variant_remap);
-            }
-            rewrite_terminator_variant_defs(&mut block.terminator, variant_remap);
+        rewrite_function_variant_defs(function, variant_remap);
+    }
+    for function in &mut lowered.generic_templates {
+        rewrite_function_variant_defs(function, variant_remap);
+    }
+}
+
+fn rewrite_function_variant_defs(
+    function: &mut MirFunction,
+    variant_remap: &HashMap<DefId, DefId>,
+) {
+    for block in &mut function.blocks {
+        for statement in &mut block.statements {
+            rewrite_statement_variant_defs(statement, variant_remap);
         }
+        rewrite_terminator_variant_defs(&mut block.terminator, variant_remap);
     }
 }
 
@@ -973,15 +1088,22 @@ fn rewrite_lowered_struct_defs(
         return;
     }
     for function in &mut lowered.program.functions {
-        for block in &mut function.blocks {
-            for statement in &mut block.statements {
-                let MirStatementKind::Construct { aggregate, .. } = &mut statement.kind else {
-                    continue;
-                };
-                if let MirAggregateKind::Struct(def_id) = &mut aggregate.kind {
-                    if let Some(rewritten) = struct_remap.get(def_id) {
-                        aggregate.kind = MirAggregateKind::Struct(*rewritten);
-                    }
+        rewrite_function_struct_defs(function, struct_remap);
+    }
+    for function in &mut lowered.generic_templates {
+        rewrite_function_struct_defs(function, struct_remap);
+    }
+}
+
+fn rewrite_function_struct_defs(function: &mut MirFunction, struct_remap: &HashMap<DefId, DefId>) {
+    for block in &mut function.blocks {
+        for statement in &mut block.statements {
+            let MirStatementKind::Construct { aggregate, .. } = &mut statement.kind else {
+                continue;
+            };
+            if let MirAggregateKind::Struct(def_id) = &mut aggregate.kind {
+                if let Some(rewritten) = struct_remap.get(def_id) {
+                    aggregate.kind = MirAggregateKind::Struct(*rewritten);
                 }
             }
         }
@@ -1714,8 +1836,15 @@ impl radix_module::hir::visit::HirVisitor for SyntheticReferenceCollector {
 /// the seed until no library gains a function. Closure environments
 /// referenced by kept functions are kept; unreferenced ones are dropped
 /// alongside their (pruned) functions.
+struct LibraryMirParts {
+    program: MirProgram,
+    environments: Vec<MirClosureEnvironment>,
+    templates: Vec<MirFunction>,
+    generic_params: Vec<(DefId, Vec<radix_module::mir::MirGenericParam>)>,
+}
+
 fn prune_unreachable_library_functions(
-    library_parts: &mut Vec<(MirProgram, Vec<MirClosureEnvironment>)>,
+    library_parts: &mut Vec<LibraryMirParts>,
     reachable_seed: &mut HashSet<DefId>,
 ) {
     if library_parts.is_empty() {
@@ -1724,8 +1853,9 @@ fn prune_unreachable_library_functions(
     loop {
         let mut new_seed = HashSet::new();
         let mut keep_sets = Vec::with_capacity(library_parts.len());
-        for (program, _) in library_parts.iter() {
-            let (reachable, definitions) = reachable_library_function_set(program, reachable_seed);
+        for library in library_parts.iter() {
+            let (reachable, definitions) =
+                reachable_library_function_set(&library.program, reachable_seed);
             keep_sets.push(reachable);
             new_seed.extend(definitions);
         }
@@ -1739,20 +1869,35 @@ fn prune_unreachable_library_functions(
         // Final keep sets (computed against the settled seed): filter each
         // library program to its reachable functions and keep only the
         // closure environments those functions reference.
-        for ((program, environments), keep) in library_parts.iter_mut().zip(keep_sets.iter()) {
+        for (library, keep) in library_parts.iter_mut().zip(keep_sets.iter()) {
             let mut referenced_environments = HashSet::new();
             for function_id in keep.iter().copied() {
-                referenced_environments
-                    .extend(scan_mir_function_references(program, function_id).environments);
+                referenced_environments.extend(
+                    scan_mir_function_references(&library.program, function_id).environments,
+                );
             }
-            program
+            library
+                .program
                 .functions
                 .retain(|function| keep.contains(&function.id));
-            environments.retain(|environment| referenced_environments.contains(&environment.id));
+            library
+                .environments
+                .retain(|environment| referenced_environments.contains(&environment.id));
             // The reachability pruning leaves function-id gaps; the merge
             // shift assumes each appended program's ids are zero-based and
             // contiguous, so re-index the kept functions before merging.
-            reindex_function_ids(program, environments);
+            reindex_function_ids(&mut library.program, &mut library.environments);
+            library.templates.retain(|template| {
+                template
+                    .source
+                    .is_some_and(|source| reachable_seed.contains(&source))
+            });
+            library.generic_params.retain(|(source, _)| {
+                library
+                    .templates
+                    .iter()
+                    .any(|template| template.source == Some(*source))
+            });
         }
         break;
     }

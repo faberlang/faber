@@ -205,6 +205,31 @@ fn package_mir_link_allows_same_source_monomorphs() {
 }
 
 #[test]
+fn package_mir_monomorphization_key_distinguishes_shapes() {
+    // Instantiation identity is (source, type_args, shape_args). Two
+    // instances of one generic at [2] and [8] must not collide in the
+    // package-link instance index (MIXED-SHAPE-MIR-LINK).
+    let source = DefId(2_000_000_143);
+    let two = radix_module::mir::MirMonomorphizationKey {
+        source,
+        type_args: Vec::new(),
+        shape_args: vec![radix_module::semantic::IndexId(2)],
+    };
+    let eight = radix_module::mir::MirMonomorphizationKey {
+        source,
+        type_args: Vec::new(),
+        shape_args: vec![radix_module::semantic::IndexId(8)],
+    };
+    assert_ne!(two, eight, "distinct shapes must not share a key");
+    let mut index = std::collections::HashMap::new();
+    index.insert(two.clone(), MirFunctionId(1));
+    index.insert(eight.clone(), MirFunctionId(2));
+    assert_eq!(index.get(&two), Some(&MirFunctionId(1)));
+    assert_eq!(index.get(&eight), Some(&MirFunctionId(2)));
+    assert_eq!(index.len(), 2);
+}
+
+#[test]
 fn package_mir_link_rejects_distinct_defs_on_one_source() {
     let mut first = stub_mir_function(1);
     first.source = Some(DefId(2_000_000_143));

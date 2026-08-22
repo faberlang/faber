@@ -57,10 +57,12 @@ pub use llvm_text::{
 };
 pub use lower::prepare_mir_lowering_interner;
 pub use lower::{
-    dump_analyzed_unit, lower_analyzed_unit, lower_analyzed_unit_allowing_cli_entry_record_with_context,
-    lower_analyzed_unit_allowing_cli_entry_with_context, lower_analyzed_unit_allowing_cli_records_with_context,
+    dump_analyzed_unit, instantiate_merged_generic_calls, lower_analyzed_unit,
+    lower_analyzed_unit_allowing_cli_entry_record_with_context, lower_analyzed_unit_allowing_cli_entry_with_context,
+    lower_analyzed_unit_allowing_cli_records_with_context,
     lower_analyzed_unit_allowing_cli_runtime_records_with_context, lower_analyzed_unit_with_cli_adapter_with_context,
-    lower_analyzed_unit_with_context, LoweredMirUnit, MirError, MirRuntimeRecordField, MirRuntimeRecordValue,
+    lower_analyzed_unit_with_context, LoweredMirUnit, MirError, MirGenericParam, MirRuntimeRecordField,
+    MirRuntimeRecordValue,
 };
 #[cfg(feature = "mir-metal")]
 pub use metal_text::{
