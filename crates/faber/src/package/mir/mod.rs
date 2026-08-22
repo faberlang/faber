@@ -188,7 +188,7 @@ fn device_section_builder(
             super::device::DeviceSectionBuild {
                 selection,
                 inputs: &device_inputs,
-                ptx_target: S1_6_PTX_TARGET,
+                ptx_target: super::device::ptx_target_for(None),
                 repeating_steps: step_count,
             },
         )?;
@@ -200,11 +200,6 @@ fn device_section_builder(
         Ok(None)
     }
 }
-
-/// The NVPTX target the S1-6 device images compile for (faber-side with the
-/// device-section builder seam).
-#[cfg(feature = "device-runtime")]
-const S1_6_PTX_TARGET: &str = "sm_90";
 
 /// The faber host-construction policy (N1.1/N1.5, S1-6): decide whether a
 /// loaded image runs on the CPU/FMIR runner or a device route, and execute
