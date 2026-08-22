@@ -152,7 +152,7 @@ pub use def_id_closure::{
 };
 pub use error::{SemanticError, SemanticErrorKind, WarningKind};
 pub use figura::{
-    format_figura, literal_index_i64s, lower_figura_expr, FIGURA_NOT_INDEX_PARAM_MSG,
+    format_figura, i64s_from_literal_index, lower_figura_expr, FIGURA_NOT_INDEX_PARAM_MSG,
     FIGURA_TYPE_PARAM_IN_INDEX_MSG, FIGURA_UNKNOWN_INDEX_MSG, SPARSA_INCOMPLETE_MSG,
     SPARSA_MISSING_FIGURA_MSG, TENSOR_INCOMPLETE_MSG, TENSOR_MISSING_FIGURA_MSG,
 };

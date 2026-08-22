@@ -6,7 +6,7 @@
 use radix_lexer::Interner;
 use radix_types::{IndexExpr, IndexId, TypeTable};
 
-pub fn literal_index_i64s(index_id: IndexId, types: &TypeTable) -> Option<Vec<i64>> {
+pub fn i64s_from_literal_index(index_id: IndexId, types: &TypeTable) -> Option<Vec<i64>> {
     match types.get_index(index_id) {
         IndexExpr::Literal(value) => Some(vec![i64::try_from(*value).ok()?]),
         IndexExpr::Tuple(dims) => {

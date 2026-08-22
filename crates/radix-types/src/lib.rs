@@ -31,7 +31,7 @@ pub use vocabulary::{
 /// compiler crate.
 pub const USER_DEF_ID_BASE: u32 = 0x0000_1000;
 pub use index::{
-    compute_cotangent_reduction_axes, literal_index_i64s, parse_natural_capacity, IndexExpr,
+    compute_cotangent_reduction_axes, i64s_from_literal_index, parse_natural_capacity, IndexExpr,
     IndexId, IndexVar,
 };
 pub use instans_precision::{

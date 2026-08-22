@@ -3,7 +3,7 @@
 //! Static spellings carry the complete result tensor in an explicit type
 //! argument; dynamic receiver methods carry runtime shape values as arguments.
 
-use super::{literal_index_i64s, Type, TypeId, TypeTable};
+use super::{i64s_from_literal_index, Type, TypeId, TypeTable};
 
 /// Resolved complete tensor type with a literal static shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,7 +43,7 @@ pub fn complete_tensor_type(ty: TypeId, types: &TypeTable) -> Option<CompleteTen
     let Type::Tensor(elem, shape) = normalized_type(ty, types) else {
         return None;
     };
-    let dims = literal_index_i64s(*shape, types)?;
+    let dims = i64s_from_literal_index(*shape, types)?;
     Some(CompleteTensorType {
         elem: *elem,
         shape: *shape,

@@ -13,7 +13,7 @@ use crate::{
 };
 use radix_lexer::{Span, Symbol};
 use radix_types::{
-    literal_index_i64s, FuncSig, IndexExpr, IndexId, ParamType, Type, TypeId, TypeTable,
+    i64s_from_literal_index, FuncSig, IndexExpr, IndexId, ParamType, Type, TypeId, TypeTable,
 };
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use std::hash::{Hash, Hasher};
@@ -1604,7 +1604,7 @@ pub fn fold_shape_size_constant(
     shape_bindings: &MirShapeBindings,
 ) -> Option<MirConstant> {
     let substituted = substitute_index_params(types, shape, shape_bindings);
-    let dims = literal_index_i64s(substituted, types)?;
+    let dims = i64s_from_literal_index(substituted, types)?;
     let value = match axis {
         None => dims.iter().product::<i64>(),
         Some(a) => {

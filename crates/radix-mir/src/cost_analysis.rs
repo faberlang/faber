@@ -6,7 +6,7 @@
 //! are walker-applied. Per-function roll-up *rendering* belongs to `faber
 //! cost`; [`cost_rollups`] produces the data.
 
-use crate::figura::literal_index_i64s;
+use crate::figura::i64s_from_literal_index;
 use crate::read_analysis::{operand_local, statement_destination, temp_forward_local};
 use crate::visit::terminator_successors;
 use crate::{
@@ -572,14 +572,14 @@ fn conversion_element_count(conversion: &MirConversion, types: &TypeTable) -> Op
 }
 
 /// Literal tensor/list element count — same index facts [`crate::static_shape_fold`]
-/// reads via [`literal_index_i64s`].
+/// reads via [`i64s_from_literal_index`].
 fn static_element_count(ty: MirType, types: &TypeTable) -> Option<u64> {
     let shape = match type_kind(types, ty) {
         Type::Tensor(_, shape) => *shape,
         Type::BoundedArray { capacity, .. } => *capacity,
         _ => return None,
     };
-    let dims = literal_index_i64s(shape, types)?;
+    let dims = i64s_from_literal_index(shape, types)?;
     let mut product = 1u64;
     for dim in dims {
         product = product.saturating_mul(u64::try_from(dim).ok()?);

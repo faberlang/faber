@@ -56,7 +56,7 @@ impl IndexExpr {
 ///
 /// Returns `None` when any dimension is symbolic (`Param`, `Infer`, `Unspecified`).
 #[must_use]
-pub fn literal_index_i64s(index_id: IndexId, types: &crate::TypeTable) -> Option<Vec<i64>> {
+pub fn i64s_from_literal_index(index_id: IndexId, types: &crate::TypeTable) -> Option<Vec<i64>> {
     match types.get_index(index_id) {
         IndexExpr::Literal(value) => Some(vec![i64::try_from(*value).ok()?]),
         IndexExpr::Tuple(dims) => {
@@ -85,8 +85,8 @@ pub fn compute_cotangent_reduction_axes(
     result_shape: IndexId,
     types: &crate::TypeTable,
 ) -> Option<Vec<usize>> {
-    let op_dims = resolve_shape_to_dims(operand_shape, types);
-    let res_dims = resolve_shape_to_dims(result_shape, types);
+    let op_dims = dims_from_shape(operand_shape, types);
+    let res_dims = dims_from_shape(result_shape, types);
 
     let op_rank = op_dims.len();
     let res_rank = res_dims.len();
@@ -124,7 +124,7 @@ pub fn compute_cotangent_reduction_axes(
     Some(axes)
 }
 
-fn resolve_shape_to_dims(shape_id: IndexId, types: &crate::TypeTable) -> Vec<IndexId> {
+fn dims_from_shape(shape_id: IndexId, types: &crate::TypeTable) -> Vec<IndexId> {
     match types.get_index(shape_id) {
         IndexExpr::Tuple(dims) => dims.clone(),
         IndexExpr::Literal(_) | IndexExpr::Param(_) | IndexExpr::Infer(_) => vec![shape_id],

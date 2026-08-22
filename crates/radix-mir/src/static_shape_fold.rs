@@ -37,7 +37,7 @@
 
 use crate::abi::MirKernelSignature;
 use crate::device_program_plans::kernel_plan_for_function;
-use crate::figura::literal_index_i64s;
+use crate::figura::i64s_from_literal_index;
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirCollectionOp,
@@ -570,7 +570,7 @@ fn tensor_literal_dims(ty: MirType, validation: &MirValidationContext<'_>) -> Op
     let Type::Tensor(_, shape) = validation.types.get(ty.semantic_id()) else {
         return None;
     };
-    literal_index_i64s(*shape, validation.types)
+    i64s_from_literal_index(*shape, validation.types)
 }
 
 /// The element type of a tensor type.

@@ -7,7 +7,7 @@
 //! cover the returned tensor completely.
 
 use crate::{
-    figura::literal_index_i64s, MirAggregateFields, MirAggregateItem, MirAggregateKind,
+    figura::i64s_from_literal_index, MirAggregateFields, MirAggregateItem, MirAggregateKind,
     MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirLocalId, MirOperand, MirOptionOp,
     MirPlace, MirPlaceBase, MirRuntimeCall, MirStatementKind, MirTempId, MirTerminatorKind,
     MirType, MirValueKind,
@@ -251,7 +251,7 @@ fn tensor_parts(ty: MirType, types: &TypeTable) -> Option<(radix_types::TypeId, 
         match types.get(semantic) {
             Type::Alias(_, inner) => semantic = *inner,
             Type::Tensor(element, shape) => {
-                let dims = literal_index_i64s(*shape, types)?
+                let dims = i64s_from_literal_index(*shape, types)?
                     .into_iter()
                     .map(u64::try_from)
                     .collect::<Result<Vec<_>, _>>()

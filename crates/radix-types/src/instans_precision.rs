@@ -109,7 +109,7 @@ pub fn lower_sized_instans(
                     var: crate::InferVar(params[0].span.start),
                 });
             }
-            if let Some(marker) = type_expr_precision_marker(&params[0], interner) {
+            if let Some(marker) = precision_marker_from_type_expr(&params[0], interner) {
                 match InstansPrecision::from_marker(marker) {
                     Ok(precision) => types.sized_instans(precision),
                     Err(err) => {
@@ -129,7 +129,7 @@ pub fn lower_sized_instans(
     }
 }
 
-fn type_expr_precision_marker<'a>(
+fn precision_marker_from_type_expr<'a>(
     ty: &'a radix_syntax::TypeExpr,
     interner: &'a radix_lexer::Interner,
 ) -> Option<&'a str> {

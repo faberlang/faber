@@ -202,7 +202,7 @@ fn parse_rfc3339(input: &str) -> Option<i64> {
     validate_time_of_day(hour, minute, second)?;
 
     let local_nanos = civil_datetime_nanos(year, month, day, hour, minute, second, fraction_nanos)?;
-    let offset_nanos = offset_minutes_to_nanos(offset_minutes)?;
+    let offset_nanos = nanos_from_offset_minutes(offset_minutes)?;
     local_nanos.checked_sub(offset_nanos)
 }
 
@@ -226,7 +226,7 @@ fn civil_datetime_nanos(
     day_nanos.checked_add(time_nanos)
 }
 
-fn offset_minutes_to_nanos(offset_minutes: i32) -> Option<i64> {
+fn nanos_from_offset_minutes(offset_minutes: i32) -> Option<i64> {
     i64::from(offset_minutes)
         .checked_mul(60)?
         .checked_mul(NANOS_PER_SECOND)

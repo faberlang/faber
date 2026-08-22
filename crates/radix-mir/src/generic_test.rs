@@ -519,7 +519,7 @@ fn instantiate_generic_type_with_shapes_substitutes_tuple_tensor_shape() {
         panic!("resolved tuple element is not a Tensor");
     };
     assert_eq!(
-        literal_index_i64s(*resolved_shape, &types),
+        i64s_from_literal_index(*resolved_shape, &types),
         Some(vec![2, 8])
     );
 }

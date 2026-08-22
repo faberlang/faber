@@ -5,7 +5,7 @@
 //! Includes regression for Option→ignotum assignment (F2 regression) and
 //! bidirectional octeti↔lista<numerus<u8>> unify.
 
-use crate::index::{literal_index_i64s, IndexExpr, IndexId};
+use crate::index::{i64s_from_literal_index, IndexExpr, IndexId};
 use crate::DefId;
 use crate::InstansPrecision;
 use crate::NumericWidth;
@@ -1175,30 +1175,30 @@ fn f004_func_sig_equal_when_type_params_match() {
 // --- F-005: Index u64::MAX clamp ---
 
 #[test]
-fn f005_literal_index_i64s_rejects_u64_max() {
+fn f005_i64s_from_literal_index_rejects_u64_max() {
     // u64::MAX must return None, not silently clamp to i64::MAX.
     let mut types = TypeTable::new();
     let max_id = types.intern_index(IndexExpr::Literal(u64::MAX));
     assert!(
-        literal_index_i64s(max_id, &types).is_none(),
+        i64s_from_literal_index(max_id, &types).is_none(),
         "F-005: u64::MAX literal index must not silently clamp to i64::MAX"
     );
 }
 
 #[test]
-fn f005_literal_index_i64s_still_accepts_i64_max_below() {
+fn f005_i64s_from_literal_index_still_accepts_i64_max_below() {
     // Values that DO fit in i64 must still be accepted.
     let mut types = TypeTable::new();
     let ok_id = types.intern_index(IndexExpr::Literal(42));
     assert_eq!(
-        literal_index_i64s(ok_id, &types),
+        i64s_from_literal_index(ok_id, &types),
         Some(vec![42]),
         "F-005: literal index 42 must still resolve"
     );
 
     let max_i64_id = types.intern_index(IndexExpr::Literal(i64::MAX as u64));
     assert_eq!(
-        literal_index_i64s(max_i64_id, &types),
+        i64s_from_literal_index(max_i64_id, &types),
         Some(vec![i64::MAX]),
         "F-005: literal index i64::MAX must still resolve"
     );
@@ -1206,7 +1206,7 @@ fn f005_literal_index_i64s_still_accepts_i64_max_below() {
     // i64::MAX + 1 (first value that overflows i64)
     let overflow_id = types.intern_index(IndexExpr::Literal((i64::MAX as u64) + 1));
     assert!(
-        literal_index_i64s(overflow_id, &types).is_none(),
+        i64s_from_literal_index(overflow_id, &types).is_none(),
         "F-005: literal index i64::MAX + 1 must return None"
     );
 }

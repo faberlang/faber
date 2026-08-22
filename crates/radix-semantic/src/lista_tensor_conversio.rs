@@ -7,7 +7,7 @@
 
 use radix_hir::{HirArrayElement, HirExpression, HirExpressionKind};
 
-use super::{literal_index_i64s, Primitive, Type, TypeId, TypeTable};
+use super::{i64s_from_literal_index, Primitive, Type, TypeId, TypeTable};
 
 /// Outcome-ladder label when `structa` rejects a flat buffer against the target `Figura`.
 pub const LISTA_TO_TENSOR_STRUCTA_COUNT_MSG: &str =
@@ -54,7 +54,7 @@ pub fn resolve_lista_to_tensor_shape(
     let Type::Tensor(_, shape_id) = normalized_type(target, types) else {
         return None;
     };
-    Some(match literal_index_i64s(*shape_id, types) {
+    Some(match i64s_from_literal_index(*shape_id, types) {
         Some(dims) => ListaToTensorShape::Literal(dims),
         None => ListaToTensorShape::InferOneD,
     })

@@ -66,10 +66,10 @@ fn resolve_index_param(
 
 /// Extract compile-time literal dimensions when every term is a natural literal.
 ///
-/// Re-exported from `radix-types` — see [`radix_types::literal_index_i64s`].
+/// Re-exported from `radix-types` — see [`radix_types::i64s_from_literal_index`].
 #[must_use]
-pub fn literal_index_i64s(index_id: IndexId, types: &TypeTable) -> Option<Vec<i64>> {
-    radix_types::literal_index_i64s(index_id, types)
+pub fn i64s_from_literal_index(index_id: IndexId, types: &TypeTable) -> Option<Vec<i64>> {
+    radix_types::i64s_from_literal_index(index_id, types)
 }
 
 /// Pretty-print an interned index expression as Faber `Figura` syntax.
