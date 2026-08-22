@@ -18,7 +18,7 @@ pub enum HirArtifactError {
 
     /// The payload ends before the deserializer could consume a complete
     /// [`crate::artifact::HirArtifact`].
-    Truncated,
+    TruncatedArtifact,
 
     /// The artifact was produced by a schema version the current loader
     /// does not support (F3: ratchet — refuse forward and backward).
@@ -71,7 +71,7 @@ impl fmt::Display for HirArtifactError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Malformed(inner) => write!(f, "malformed HIR artifact: {inner}"),
-            Self::Truncated => write!(f, "truncated HIR artifact: unexpected end of data"),
+            Self::TruncatedArtifact => write!(f, "truncated HIR artifact: unexpected end of data"),
             Self::UnsupportedSchemaVersion { found, expected } => {
                 write!(
                     f,

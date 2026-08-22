@@ -1,5 +1,5 @@
-use crate::driver::AnalyzeRequest;
 use super::*;
+use crate::driver::AnalyzeRequest;
 use radix_hir_fhir::HirArtifact;
 use std::error::Error;
 
@@ -8,7 +8,7 @@ fn error_display_messages() {
     let malformed = HirArtifactError::Malformed(postcard::Error::DeserializeUnexpectedEnd);
     assert!(format!("{malformed}").contains("malformed HIR artifact"));
 
-    let truncated = HirArtifactError::Truncated;
+    let truncated = HirArtifactError::TruncatedArtifact;
     assert!(format!("{truncated}").contains("truncated HIR artifact"));
 
     let version = HirArtifactError::UnsupportedSchemaVersion { found: 1, expected: 2 };
@@ -42,7 +42,7 @@ fn malformed_has_source() {
 
 #[test]
 fn non_malformed_has_no_source() {
-    let err = HirArtifactError::Truncated;
+    let err = HirArtifactError::TruncatedArtifact;
     assert!(Error::source(&err).is_none());
 
     let err = HirArtifactError::UnsupportedSchemaVersion { found: 1, expected: 2 };
@@ -270,7 +270,7 @@ fn loader_fail_closed() {
     // Truncated: empty slice → Truncated variant.
     let result = load_fhir(b"");
     match result {
-        Err(HirArtifactError::Truncated) => {}
+        Err(HirArtifactError::TruncatedArtifact) => {}
         Err(other) => panic!("expected Truncated, got {other:?}"),
         Ok(_) => panic!("expected Truncated, got Ok"),
     }
@@ -282,7 +282,7 @@ fn loader_fail_closed() {
     let truncated_bytes = &full_bytes[..full_bytes.len() - 1];
     let result = load_fhir(truncated_bytes);
     match result {
-        Err(HirArtifactError::Truncated) => {}
+        Err(HirArtifactError::TruncatedArtifact) => {}
         Err(other) => panic!("expected Truncated from partial bytes, got {other:?}"),
         Ok(_) => panic!("expected Truncated from partial bytes, got Ok"),
     }
@@ -618,7 +618,7 @@ fn adversarial_truncated_postcard() {
     let truncated = &bytes[..bytes.len() - 1];
     let result = load_fhir(truncated);
     match result {
-        Err(HirArtifactError::Truncated) => {}
+        Err(HirArtifactError::TruncatedArtifact) => {}
         Err(other) => panic!("expected Truncated, got {other:?}"),
         Ok(_) => panic!("expected Truncated, got Ok"),
     }
@@ -1020,7 +1020,8 @@ fn hir_artifact_round_trip_acceptance() {
     let source = "incipit {\n    nota \"Salve, Munde!\"\n}\n";
 
     let session = crate::driver::Session::new(crate::driver::Config::default());
-    let unit = crate::driver::analyze_source(&session, "test.faber", source, AnalyzeRequest::default()).expect("analyze hello-world fixture");
+    let unit = crate::driver::analyze_source(&session, "test.faber", source, AnalyzeRequest::default())
+        .expect("analyze hello-world fixture");
 
     let latin = crate::locale::latin_locale_pack();
     let surface = crate::locale::KeywordSurface::new(&latin);
@@ -1082,7 +1083,8 @@ fn conversio_assign_fhir_artifact_round_trip_preserves_operator() {
     let source = "incipit {\n  varia numerus count ← 0\n  count ↤ \"42\" ⇥ 0\n  nota count\n}\n";
 
     let session = crate::driver::Session::new(crate::driver::Config::default());
-    let unit = crate::driver::analyze_source(&session, "conversio-assign.faber", source, AnalyzeRequest::default()).expect("analyze ↤ fixture");
+    let unit = crate::driver::analyze_source(&session, "conversio-assign.faber", source, AnalyzeRequest::default())
+        .expect("analyze ↤ fixture");
 
     let latin = crate::locale::latin_locale_pack();
     let surface = crate::locale::KeywordSurface::new(&latin);

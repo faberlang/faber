@@ -155,7 +155,7 @@ pub enum FhirPackageError {
     /// The binary payload is not valid `postcard`-encoded data.
     Malformed(postcard::Error),
     /// The payload ends before a complete package could be consumed.
-    Truncated,
+    TruncatedPackage,
     /// The envelope was produced by a package schema version this loader
     /// does not support (clean break — no v0 decoder).
     UnsupportedPackageSchemaVersion { found: u32, expected: u32 },
@@ -192,7 +192,7 @@ impl std::fmt::Display for FhirPackageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Malformed(inner) => write!(f, "malformed FHIR package: {inner}"),
-            Self::Truncated => write!(f, "truncated FHIR package: unexpected end of data"),
+            Self::TruncatedPackage => write!(f, "truncated FHIR package: unexpected end of data"),
             Self::UnsupportedPackageSchemaVersion { found, expected } => write!(
                 f,
                 "unsupported FHIR package schema version {found} (expected {expected})"
@@ -269,7 +269,7 @@ pub fn encode_package(pkg: &FhirPackage) -> Result<Vec<u8>, postcard::Error> {
 ///
 /// # Errors
 ///
-/// Returns [`FhirPackageError::Truncated`] on truncated input,
+/// Returns [`FhirPackageError::TruncatedPackage`] on truncated input,
 /// [`FhirPackageError::Malformed`] on postcard decoding failures,
 /// [`FhirPackageError::UnsupportedPackageSchemaVersion`] on a version
 /// mismatch, [`FhirPackageError::UnsupportedUnitSchemaVersion`] on a unit
@@ -278,7 +278,7 @@ pub fn encode_package(pkg: &FhirPackage) -> Result<Vec<u8>, postcard::Error> {
 pub fn decode_package(bytes: &[u8]) -> Result<DecodedFhirPackage, FhirPackageError> {
     let (schema_version, _rest) = postcard::take_from_bytes::<u32>(bytes).map_err(|e| {
         if matches!(e, postcard::Error::DeserializeUnexpectedEnd) {
-            FhirPackageError::Truncated
+            FhirPackageError::TruncatedPackage
         } else {
             FhirPackageError::Malformed(e)
         }
@@ -292,7 +292,7 @@ pub fn decode_package(bytes: &[u8]) -> Result<DecodedFhirPackage, FhirPackageErr
 
     let pkg: FhirPackage = postcard::from_bytes(bytes).map_err(|e| {
         if matches!(e, postcard::Error::DeserializeUnexpectedEnd) {
-            FhirPackageError::Truncated
+            FhirPackageError::TruncatedPackage
         } else {
             FhirPackageError::Malformed(e)
         }

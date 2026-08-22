@@ -34,7 +34,7 @@ pub fn encode(artifact: &HirArtifact) -> Result<Vec<u8>, postcard::Error> {
 ///
 /// # Errors
 ///
-/// Returns [`HirArtifactError::Truncated`] on truncated input,
+/// Returns [`HirArtifactError::TruncatedArtifact`] on truncated input,
 /// [`HirArtifactError::Malformed`] on postcard decoding failures,
 /// [`HirArtifactError::UnsupportedSchemaVersion`] on a version mismatch,
 /// and the validation errors from the referential-integrity gate (U2.3).
@@ -45,7 +45,7 @@ pub fn decode(bytes: &[u8]) -> Result<HirArtifact, HirArtifactError> {
     // field-layout error.
     let (schema_version, _rest) = postcard::take_from_bytes::<u32>(bytes).map_err(|e| {
         if matches!(e, postcard::Error::DeserializeUnexpectedEnd) {
-            HirArtifactError::Truncated
+            HirArtifactError::TruncatedArtifact
         } else {
             HirArtifactError::Malformed(e)
         }
@@ -60,7 +60,7 @@ pub fn decode(bytes: &[u8]) -> Result<HirArtifact, HirArtifactError> {
     // Payload interpretation begins only after the version prefix is accepted.
     let artifact: HirArtifact = postcard::from_bytes(bytes).map_err(|e| {
         if matches!(e, postcard::Error::DeserializeUnexpectedEnd) {
-            HirArtifactError::Truncated
+            HirArtifactError::TruncatedArtifact
         } else {
             HirArtifactError::Malformed(e)
         }

@@ -69,7 +69,7 @@ fn package_rejects_garbage_bytes_fail_closed() {
     assert!(
         matches!(
             result,
-            Err(FhirPackageError::Malformed(_) | FhirPackageError::Truncated)
+            Err(FhirPackageError::Malformed(_) | FhirPackageError::TruncatedPackage)
         ),
         "garbage after valid version prefix must fail closed, got {result:?}"
     );
@@ -80,7 +80,7 @@ fn package_rejects_truncated_payload() {
     let bytes = encode(&stub_package());
     let truncated = &bytes[..bytes.len() / 2];
     assert!(
-        matches!(decode_package(truncated), Err(FhirPackageError::Truncated)),
+        matches!(decode_package(truncated), Err(FhirPackageError::TruncatedPackage)),
         "mid-payload truncation must be classified as Truncated"
     );
 }

@@ -32,7 +32,7 @@ generation recipes for each fixture class.
 ```rust
 let bytes = include_bytes!("fixtures/hir_artifact/adversarial/truncated_minimal.bin");
 let result = radix::hir::artifact::load_fhir(bytes);
-assert!(matches!(result, Err(HirArtifactError::Truncated)));
+assert!(matches!(result, Err(HirArtifactError::TruncatedArtifact)));
 ```
 
 ## Code of Fixture Generation

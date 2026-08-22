@@ -20,7 +20,7 @@ fn decode_rejects_truncated_payload() {
     let bytes = encode(&stub_artifact()).expect("encode artifact");
     let truncated = &bytes[..bytes.len() / 2];
     assert!(
-        matches!(decode(truncated), Err(HirArtifactError::Truncated)),
+        matches!(decode(truncated), Err(HirArtifactError::TruncatedArtifact)),
         "mid-payload truncation must be classified as Truncated"
     );
 }
