@@ -15,6 +15,7 @@ rustc-hash = "2"
 serde = { version = "1.0.228", features = ["derive"] }
 
 [dev-dependencies]
+hygiene-ratchet = { path = "../hygiene-ratchet" }
 radix-syntax = { path = "../radix-syntax" }
 
 [lints.clippy]
