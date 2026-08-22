@@ -2230,6 +2230,24 @@ functio check(textus name, numerus count) → vacuum {
 }
 
 #[test]
+fn lowers_ascii_format_hole_with_materialized_conversion_target() {
+    let dump = dump_source(
+        r#"
+incipit {
+    const _ inferred_hex ← 255 ↦ ascii<_, Hex>
+    const _ inferred_bin ← 255 ↦ ascii<_, Bin>
+    const _ inferred_oct ← 255 ↦ ascii<_, Oct>
+}
+"#,
+    );
+    assert_eq!(
+        count_occurrences(&dump, "runtime convert runtime"),
+        3,
+        "each inferred ascii format pack must lower to one conversion:\n{dump}"
+    );
+}
+
+#[test]
 fn lowers_format_conversion_collection_and_provider_runtime_intrinsics() {
     let format_dump = dump_source(r#"functio greet(textus name) → textus { redde "Salve, §!"(name) }"#);
     assert!(format_dump.contains("runtime format_string template sym#"));

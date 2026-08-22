@@ -2325,6 +2325,7 @@ impl FunctionBuilder<'_> {
         let source_ty = self.expr_ty(source)?;
         let source_type_id = source_ty.semantic_id();
         let ty = self.expr_ty(expr)?;
+        let target = self.materialized_conversio_target(target, ty);
         if recovery.is_none()
             && matches!(self.normalized_type(source_type_id), Type::Intervallum(_))
             && matches!(self.normalized_type(target), Type::Array(_) | Type::Tensor(_, _))
@@ -2391,6 +2392,31 @@ impl FunctionBuilder<'_> {
             ty,
             expr.span,
         ))
+    }
+
+    /// Finalize the conversion target when semantic hole solving only updates
+    /// the HIR result type. A surface `ascii<_, Radix>` target can retain its
+    /// inference index in `HirConversioTarget`, while `expr.ty` already carries
+    /// the literal capacity witnessed by the source. MIR validation requires
+    /// the conversion target and runtime-call result to agree, so reuse that
+    /// materialized result type for the bounded-ascii pack family only.
+    fn materialized_conversio_target(&self, target: TypeId, return_ty: MirType) -> TypeId {
+        let Type::BoundedAscii { capacity } = self.normalized_type(target) else {
+            return target;
+        };
+        if matches!(self.types.get_index(*capacity), IndexExpr::Literal(_)) {
+            return target;
+        }
+
+        let result = return_ty.semantic_id();
+        let Type::BoundedAscii { capacity } = self.normalized_type(result) else {
+            return target;
+        };
+        if matches!(self.types.get_index(*capacity), IndexExpr::Literal(_)) {
+            result
+        } else {
+            target
+        }
     }
 
     fn lower_conversio_source(&mut self, source: &HirExpression, target: TypeId) -> Option<MirOperand> {
