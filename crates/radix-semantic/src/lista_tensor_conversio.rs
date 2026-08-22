@@ -21,7 +21,7 @@ pub enum ListaToTensorShape {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ListaToTensorError {
-    NotListaToTensor,
+    NonListaSource,
     NestedLista,
     ElementMismatch,
 }
@@ -35,14 +35,14 @@ pub struct RectangularListaLiteral<'a> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RectangularListaLiteralError {
-    NotNestedLiteral,
+    NonNestedLiteral,
     NonLiteralTarget,
     Ragged,
     RowLengthMismatch,
     ShapeMismatch,
     Spread,
     NonLiteralLeaf,
-    MissingLeafType,
+    AbsentLeafType,
     ElementMismatch,
 }
 
@@ -76,7 +76,7 @@ pub fn validate_lista_to_tensor_source(
         normalized_type(target, types),
     ) {
         (Type::Array(source_elem), Type::Tensor(target_elem, _)) => (*source_elem, *target_elem),
-        _ => return Err(ListaToTensorError::NotListaToTensor),
+        _ => return Err(ListaToTensorError::NonListaSource),
     };
 
     if matches!(normalized_type(source_elem, types), Type::Array(_)) {
@@ -103,7 +103,7 @@ pub fn analyze_rectangular_lista_literal<'a>(
 ) -> Result<RectangularListaLiteral<'a>, RectangularListaLiteralError> {
     let literal_target = rank_two_literal_target(target, types)?;
     let HirExpressionKind::Array(rows) = &expr.kind else {
-        return Err(RectangularListaLiteralError::NotNestedLiteral);
+        return Err(RectangularListaLiteralError::NonNestedLiteral);
     };
     if rows.is_empty() {
         return Err(RectangularListaLiteralError::Ragged);
@@ -143,7 +143,7 @@ fn rank_two_literal_target(
     types: &TypeTable,
 ) -> Result<RankTwoLiteralTarget, RectangularListaLiteralError> {
     if !matches!(normalized_type(target, types), Type::Tensor(_, _)) {
-        return Err(RectangularListaLiteralError::NotNestedLiteral);
+        return Err(RectangularListaLiteralError::NonNestedLiteral);
     }
     let ListaToTensorShape::Literal(dims) = resolve_lista_to_tensor_shape(target, types)
         .ok_or(RectangularListaLiteralError::NonLiteralTarget)?
@@ -169,7 +169,7 @@ fn tensor_element(
 ) -> Result<TypeId, RectangularListaLiteralError> {
     match normalized_type(target, types) {
         Type::Tensor(elem, _) => Ok(*elem),
-        _ => Err(RectangularListaLiteralError::NotNestedLiteral),
+        _ => Err(RectangularListaLiteralError::NonNestedLiteral),
     }
 }
 
@@ -184,7 +184,7 @@ fn collect_literal_row_leaves<'a>(
         return Err(RectangularListaLiteralError::Spread);
     };
     let HirExpressionKind::Array(cells) = &row_expr.kind else {
-        return Err(RectangularListaLiteralError::NotNestedLiteral);
+        return Err(RectangularListaLiteralError::NonNestedLiteral);
     };
     if cells.is_empty() {
         return Err(RectangularListaLiteralError::Ragged);
@@ -202,7 +202,7 @@ fn collect_literal_row_leaves<'a>(
         }
         let leaf_ty = leaf
             .ty
-            .ok_or(RectangularListaLiteralError::MissingLeafType)?;
+            .ok_or(RectangularListaLiteralError::AbsentLeafType)?;
         if !types.equals(leaf_ty, target_elem) {
             return Err(RectangularListaLiteralError::ElementMismatch);
         }

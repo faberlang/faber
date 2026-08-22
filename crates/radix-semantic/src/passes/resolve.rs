@@ -2420,7 +2420,7 @@ struct AliasEntry<'a> {
 }
 
 enum TypeLowerError {
-    UnresolvedAlias,
+    UnboundAlias,
     Issue(&'static str),
     CollectionArity(CollectionKind),
 }
@@ -2464,7 +2464,7 @@ fn resolve_alias_types(
                     }
                     progress = true;
                 }
-                Err(TypeLowerError::UnresolvedAlias) => {
+                Err(TypeLowerError::UnboundAlias) => {
                     next_pending.push(alias);
                 }
                 Err(TypeLowerError::Issue(issue)) => {
@@ -2578,7 +2578,7 @@ fn resolve_schema_decls(
             let ty = match lower_type_expr(&column.ty, resolver, interner, types) {
                 Ok(ty) => ty,
                 Err(
-                    TypeLowerError::UnresolvedAlias
+                    TypeLowerError::UnboundAlias
                     | TypeLowerError::Issue(_)
                     | TypeLowerError::CollectionArity(_),
                 ) => {
@@ -3163,7 +3163,7 @@ fn lower_named_type(
                 let body = crate::index::freshen_bounded_capacity_holes(types, resolved);
                 types.intern(Type::Alias(def_id, body))
             }
-            None => return Err(TypeLowerError::UnresolvedAlias),
+            None => return Err(TypeLowerError::UnboundAlias),
         },
         SymbolKind::TypeParam => types.intern(Type::Param(symbol.name)),
         SymbolKind::Schema => {

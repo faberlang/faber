@@ -39,13 +39,13 @@ impl AnalysisStamp {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AnalyzedApplicationError {
     /// Required HIR is missing (hard semantic failure).
-    MissingHir,
+    AbsentHir,
     /// Function facts were not produced for a declared function.
     IncompleteFunctionFacts { def_id: radix_hir::DefId },
     /// Caller attempted to mix fields from different analysis stamps.
     StampMismatch { expected: u64, found: u64 },
     /// Required fact family is absent from the snapshot.
-    MissingRequiredFacts { family: &'static str },
+    AbsentRequiredFacts { family: &'static str },
     /// `parts.semantic_diagnostics` contains one or more hard (fatal) entries.
     HardSemanticErrors { count: usize },
 }
@@ -53,7 +53,7 @@ pub enum AnalyzedApplicationError {
 impl std::fmt::Display for AnalyzedApplicationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::MissingHir => write!(f, "analyzed application requires lowered HIR"),
+            Self::AbsentHir => write!(f, "analyzed application requires lowered HIR"),
             Self::IncompleteFunctionFacts { def_id } => {
                 write!(f, "missing function facts for DefId({})", def_id.0)
             }
@@ -63,7 +63,7 @@ impl std::fmt::Display for AnalyzedApplicationError {
                     "analysis stamp mismatch: expected {expected}, found {found}"
                 )
             }
-            Self::MissingRequiredFacts { family } => {
+            Self::AbsentRequiredFacts { family } => {
                 write!(f, "analyzed application missing required facts: {family}")
             }
             Self::HardSemanticErrors { count } => {

@@ -163,7 +163,7 @@ impl CollectionConversioFamily {
 
 fn lista_to_tensor_issue(error: ListaToTensorError) -> Option<&'static str> {
     match error {
-        ListaToTensorError::NotListaToTensor => None,
+        ListaToTensorError::NonListaSource => None,
         ListaToTensorError::NestedLista => Some(ISSUE_LISTA_TO_TENSOR_NESTED),
         ListaToTensorError::ElementMismatch => Some(ISSUE_LISTA_TO_TENSOR_ELEMENT_MISMATCH),
     }
@@ -230,7 +230,7 @@ fn static_exclusive_range_len(index: &HirExpression) -> Option<usize> {
 
 fn rectangular_lista_literal_issue(error: RectangularListaLiteralError) -> &'static str {
     match error {
-        RectangularListaLiteralError::NotNestedLiteral => ISSUE_LISTA_TO_TENSOR_NESTED,
+        RectangularListaLiteralError::NonNestedLiteral => ISSUE_LISTA_TO_TENSOR_NESTED,
         RectangularListaLiteralError::NonLiteralTarget => ISSUE_RECTANGULAR_LISTA_LITERAL_TARGET,
         RectangularListaLiteralError::Ragged => ISSUE_RECTANGULAR_LISTA_LITERAL_RAGGED,
         RectangularListaLiteralError::RowLengthMismatch => {
@@ -239,7 +239,7 @@ fn rectangular_lista_literal_issue(error: RectangularListaLiteralError) -> &'sta
         RectangularListaLiteralError::ShapeMismatch => ISSUE_RECTANGULAR_LISTA_LITERAL_SHAPE,
         RectangularListaLiteralError::Spread => ISSUE_RECTANGULAR_LISTA_LITERAL_SPREAD,
         RectangularListaLiteralError::NonLiteralLeaf => ISSUE_RECTANGULAR_LISTA_LITERAL_LEAF,
-        RectangularListaLiteralError::MissingLeafType
+        RectangularListaLiteralError::AbsentLeafType
         | RectangularListaLiteralError::ElementMismatch => ISSUE_LISTA_TO_TENSOR_ELEMENT_MISMATCH,
     }
 }
@@ -1197,7 +1197,7 @@ impl TypeChecker<'_> {
                 self.register_lista_to_tensor_conversio_prereqs();
                 return None;
             }
-            Err(ListaToTensorError::NotListaToTensor) => {}
+            Err(ListaToTensorError::NonListaSource) => {}
             Err(ListaToTensorError::NestedLista) => {
                 return self.check_rectangular_lista_literal_conversio(
                     source,
@@ -1348,7 +1348,7 @@ impl TypeChecker<'_> {
     ) -> Option<TypeId> {
         if !matches!(source.kind, HirExpressionKind::Array(_)) {
             self.invalid_conversion(
-                rectangular_lista_literal_issue(RectangularListaLiteralError::NotNestedLiteral),
+                rectangular_lista_literal_issue(RectangularListaLiteralError::NonNestedLiteral),
                 span,
             );
             return Some(self.error_type);

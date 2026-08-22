@@ -57,7 +57,7 @@ fn finalize_rejects_unresolved_hole() {
     let hole = infer.fresh_hole(&mut types);
     assert_eq!(
         infer.finalize(&mut types, hole),
-        Err(IndexInferError::UnresolvedHole)
+        Err(IndexInferError::UnboundHole)
     );
 }
 
@@ -71,7 +71,7 @@ fn finalize_rejects_tuple_with_unresolved_dim() {
 
     assert_eq!(
         infer.finalize(&mut types, shape),
-        Err(IndexInferError::UnresolvedHole)
+        Err(IndexInferError::UnboundHole)
     );
 }
 

@@ -156,7 +156,7 @@ impl IndexInferState {
     ///
     /// # Errors
     ///
-    /// Returns [`IndexInferError::UnresolvedHole`] when the index term still
+    /// Returns [`IndexInferError::UnboundHole`] when the index term still
     /// contains an unresolved inference variable after substitution and
     /// canonicalization.
     pub fn finalize(
@@ -166,7 +166,7 @@ impl IndexInferState {
     ) -> Result<IndexId, IndexInferError> {
         let canonical = self.canonicalize(types, id);
         if self.contains_unresolved_hole(types, canonical) {
-            Err(IndexInferError::UnresolvedHole)
+            Err(IndexInferError::UnboundHole)
         } else {
             Ok(canonical)
         }
@@ -197,7 +197,7 @@ impl IndexInferState {
 /// Index inference failure at finalize or constraint generation time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexInferError {
-    UnresolvedHole,
+    UnboundHole,
     Mismatch,
     Occurs,
 }

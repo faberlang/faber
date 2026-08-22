@@ -71,7 +71,7 @@ impl TypeChecker<'_> {
     pub fn finalize_index(&mut self, id: IndexId, span: Span, issue: &'static str) -> IndexId {
         match self.index_infer.finalize(self.types, id) {
             Ok(canonical) => canonical,
-            Err(IndexInferError::UnresolvedHole) => {
+            Err(IndexInferError::UnboundHole) => {
                 self.missing_type_annotation(issue, span);
                 id
             }
