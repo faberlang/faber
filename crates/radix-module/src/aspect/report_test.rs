@@ -315,12 +315,7 @@ fn air_call_expr(id: u32, span: Span, callee: DefId) -> HirExpression {
     HirExpression {
         id: HirId(id),
         kind: HirExpressionKind::Call(
-            Box::new(HirExpression {
-                id: HirId(id + 1),
-                kind: HirExpressionKind::Path(callee),
-                ty: None,
-                span,
-            }),
+            Box::new(HirExpression { id: HirId(id + 1), kind: HirExpressionKind::Path(callee), ty: None, span }),
             Vec::new(),
             Vec::new(),
         ),
@@ -377,7 +372,10 @@ fn air_aspect_kinds_are_representable_and_distinguishable_in_records() {
         HirAspectKind::GatePurity,
     ];
 
-    let records: Vec<_> = kinds.iter().map(|&kind| HirAspectRecord::recognized(kind, span, Some(HirId(7)))).collect();
+    let records: Vec<_> = kinds
+        .iter()
+        .map(|&kind| HirAspectRecord::recognized(kind, span, Some(HirId(7))))
+        .collect();
 
     for (record, &kind) in records.iter().zip(kinds.iter()) {
         assert_eq!(record.aspect, kind);
@@ -389,7 +387,10 @@ fn air_aspect_kinds_are_representable_and_distinguishable_in_records() {
         }
     }
     // Deterministic labels are pairwise distinct.
-    let mut labels: Vec<_> = kinds.iter().map(|&k| only_registered_aspect_kind_label(k)).collect();
+    let mut labels: Vec<_> = kinds
+        .iter()
+        .map(|&k| only_registered_aspect_kind_label(k))
+        .collect();
     labels.sort_unstable();
     labels.dedup();
     assert_eq!(labels.len(), kinds.len());

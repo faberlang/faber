@@ -111,14 +111,18 @@ fn eot_transfer_glyph_is_currently_an_unexpected_character() {
         .iter()
         .find(|error| error.kind == crate::LexErrorKind::CharacterUnexpected)
         .expect("U+21C7 must be absent from the current token set");
-    assert!(error.args.iter().any(|arg| {
-        arg.name == "issue" && arg.value == "unexpected_character"
-    }));
+    assert!(error
+        .args
+        .iter()
+        .any(|arg| { arg.name == "issue" && arg.value == "unexpected_character" }));
     assert!(error.args.iter().any(|arg| {
         arg.name == "char" && arg.value == format!("'{}'", '\u{21C7}'.escape_default())
     }));
     assert!(
-        result.tokens.iter().any(|token| token.kind == TokenKind::Error),
+        result
+            .tokens
+            .iter()
+            .any(|token| token.kind == TokenKind::Error),
         "an absent glyph must use the lexer Error recovery token"
     );
 }

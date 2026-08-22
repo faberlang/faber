@@ -1997,7 +1997,10 @@ fn eot_transfer_glyph_lexes_as_a_dedicated_token() {
         result.errors
     );
     assert!(
-        !result.tokens.iter().any(|token| token.kind == TokenKind::Error),
+        !result
+            .tokens
+            .iter()
+            .any(|token| token.kind == TokenKind::Error),
         "EOT-3L red driver: U+21C7 must not produce an Error token"
     );
 }
@@ -2021,7 +2024,10 @@ fn eot_transfer_glyph_absence_receipt_is_exact_and_non_aliasing() {
         error.args
     );
     assert!(
-        result.tokens.iter().any(|token| token.kind == TokenKind::Error),
+        result
+            .tokens
+            .iter()
+            .any(|token| token.kind == TokenKind::Error),
         "the absent glyph must recover as an Error token"
     );
 }

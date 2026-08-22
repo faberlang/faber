@@ -65,9 +65,7 @@ pub struct RunnerError {
 
 /// Lowercase identifier fragment for a structured fact value.
 fn runner_slug(value: &str) -> String {
-    runner_issue(value)
-        .trim_start_matches("runner_")
-        .to_owned()
+    runner_issue(value).trim_start_matches("runner_").to_owned()
 }
 
 impl RunnerError {

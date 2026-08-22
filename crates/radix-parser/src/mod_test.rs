@@ -4490,7 +4490,10 @@ fn parses_libera_before_return_clause_in_compact_and_legacy_forms() {
             panic!("expected closure expression");
         };
         assert!(closure.libera);
-        assert!(closure.ret.is_some(), "libera must precede the return clause");
+        assert!(
+            closure.ret.is_some(),
+            "libera must precede the return clause"
+        );
     }
 }
 
@@ -4534,7 +4537,10 @@ const EOT_TRANSFER_ISSUES: &[&str] = &[
 fn eot_selective_import_is_currently_rejected_at_the_expression_boundary() {
     let source = r#"importa ex "norma:consolum" fixum dic ut output, funde ut output_bytes,"#;
     let result = parse_program(source);
-    assert!(!result.success(), "selective import must remain absent before EOT-2S");
+    assert!(
+        !result.success(),
+        "selective import must remain absent before EOT-2S"
+    );
     assert!(
         result
             .errors

@@ -251,8 +251,7 @@ fn cli_codegen_diagnostic(target: Target, name: &str, analysis: &AnalyzedModule)
                 ));
             }
             phase03_cli_codegen_gap(cli_program).map(|(issue, message)| {
-                codegen_diagnostic(name, "CODEGEN005", message)
-                    .with_args(vec![DiagnosticArg::new("issue", issue)])
+                codegen_diagnostic(name, "CODEGEN005", message).with_args(vec![DiagnosticArg::new("issue", issue)])
             })
         }
         Target::HirGo => go_cli_codegen_diagnostic(name, cli_program),
@@ -1574,7 +1573,10 @@ fn finalize_air_backward_shapes(lowered: &mut crate::mir::LoweredMirUnit<'_>) ->
                     "MIR validation after backward shape finalization failed: {}",
                     messages.join("; ")
                 ),
-                args: vec![DiagnosticArg::new("issue", "mir_validation_after_shape_finalization_failed")],
+                args: vec![DiagnosticArg::new(
+                    "issue",
+                    "mir_validation_after_shape_finalization_failed",
+                )],
                 span: errors.first().map(|error| error.span),
             }
         })?;
@@ -1916,7 +1918,10 @@ fn lower_mir_with_context_for_target(
                     "MIR validation after backward companion addition failed: {}",
                     messages.join("; ")
                 ),
-                args: vec![DiagnosticArg::new("issue", "mir_validation_after_companion_addition_failed")],
+                args: vec![DiagnosticArg::new(
+                    "issue",
+                    "mir_validation_after_companion_addition_failed",
+                )],
                 span: None,
             }
         })?;
@@ -3245,10 +3250,7 @@ fn analyzed_unit_from_semantic(
             Diagnostic::error("semantic analysis did not produce access facts")
                 .with_phase(DiagnosticPhase::Analysis)
                 .with_code("INTERNAL001")
-                .with_args(vec![DiagnosticArg::new(
-                    "issue",
-                    "semantic_result_missing_access_facts",
-                )])
+                .with_args(vec![DiagnosticArg::new("issue", "semantic_result_missing_access_facts")])
                 .with_file(name.to_owned()),
         );
         return Err(());

@@ -3019,7 +3019,7 @@ fn collection_callback_errors_do_not_publish_synthetic_functions() {
             Some(numerus),
             None,
             Box::new(callback_body),
-        false,
+            false,
         ),
         ty: None,
         span,

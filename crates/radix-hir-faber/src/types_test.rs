@@ -1244,7 +1244,7 @@ fn closure_params_preserve_sponte_and_defaults() {
                 ty: Some(textus),
                 span: span(),
             }),
-        false,
+            false,
         ),
         ty: Some(textus),
         span: span(),

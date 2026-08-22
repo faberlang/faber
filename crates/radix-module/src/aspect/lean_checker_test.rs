@@ -845,12 +845,7 @@ fn lean_checker_verifier_fabricates_no_results_for_unproven_records() {
             None,
             HirAspectReason::MissingExplicitVariants,
         ),
-        HirAspectRecord::skipped_candidate(
-            HirAspectKind::DiscerneOmnia,
-            span,
-            None,
-            HirAspectReason::NonOmniaDiscerne,
-        ),
+        HirAspectRecord::skipped_candidate(HirAspectKind::DiscerneOmnia, span, None, HirAspectReason::NonOmniaDiscerne),
     ];
     let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, records);
 
@@ -880,8 +875,7 @@ fn lean_checker_missing_toolchain_is_never_proven_for_recognized_records() {
     assert_eq!(results.len(), 1);
     assert_ne!(results[0].status, HirAspectCheckStatus::Proven);
     assert!(
-        results[0].status == HirAspectCheckStatus::ToolchainMissing
-            || results[0].status == HirAspectCheckStatus::Error,
+        results[0].status == HirAspectCheckStatus::ToolchainMissing || results[0].status == HirAspectCheckStatus::Error,
         "expected ToolchainMissing or Error, got {:?}",
         results[0].status
     );
@@ -945,17 +939,31 @@ fn lean_checker_air_kind_records_never_become_proven_via_placeholder_generator()
         HirAspectKind::MaskNeutrality,
         HirAspectKind::GatePurity,
     ];
-    let records: Vec<HirAspectRecord> =
-        air_kinds.iter().map(|&kind| HirAspectRecord::recognized(kind, span, Some(crate::hir::HirId(1)))).collect();
+    let records: Vec<HirAspectRecord> = air_kinds
+        .iter()
+        .map(|&kind| HirAspectRecord::recognized(kind, span, Some(crate::hir::HirId(1))))
+        .collect();
     let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, records);
 
     let results = checker.verify(&report);
     assert_eq!(results.len(), air_kinds.len());
     for result in &results {
-        assert_ne!(result.status, HirAspectCheckStatus::Proven, "AIR kind must not be Proven pre-line-proof");
-        assert_eq!(result.status, HirAspectCheckStatus::Failed, "expected refused result, got {:?}", result.status);
+        assert_ne!(
+            result.status,
+            HirAspectCheckStatus::Proven,
+            "AIR kind must not be Proven pre-line-proof"
+        );
+        assert_eq!(
+            result.status,
+            HirAspectCheckStatus::Failed,
+            "expected refused result, got {:?}",
+            result.status
+        );
         assert_eq!(result.backend, HirAspectBackendKind::Lean);
-        assert!(result.evidence.0.contains("registered without proof content"));
+        assert!(result
+            .evidence
+            .0
+            .contains("registered without proof content"));
         assert!(result.evidence.0.contains("refusing placeholder proof"));
     }
 }
@@ -986,8 +994,7 @@ fn lean_checker_air_refusal_preserves_per_record_order_alongside_checkable_kinds
     // missing toolchain is ToolchainMissing/Error, never Proven; the AIR
     // kinds keep their deterministic refusals, in order.
     assert!(
-        results[0].status == HirAspectCheckStatus::ToolchainMissing
-            || results[0].status == HirAspectCheckStatus::Error
+        results[0].status == HirAspectCheckStatus::ToolchainMissing || results[0].status == HirAspectCheckStatus::Error
     );
     assert_eq!(results[1].status, HirAspectCheckStatus::Failed);
     assert!(results[1].evidence.0.contains("unroll_equivalence"));

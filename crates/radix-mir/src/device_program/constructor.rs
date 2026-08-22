@@ -19,7 +19,7 @@ use crate::device_semantics::{
 };
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::layout::MirTensorStorageLayout;
-use crate::static_shape_fold::{ShapeFoldError, fold_validated_device_program};
+use crate::static_shape_fold::{fold_validated_device_program, ShapeFoldError};
 use crate::{MirFunction, MirFunctionId, MirLocalId, ValidatedMir};
 use radix_lexer::Interner;
 use std::collections::{BTreeMap, BTreeSet};

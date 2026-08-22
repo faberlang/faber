@@ -72,7 +72,9 @@ fn read_input_source(input: &[String]) -> Result<(String, String), crate::Diagno
     }
     let path = PathBuf::from(&input[0]);
     let source = std::fs::read_to_string(&path).map_err(|err| {
-        crate::Diagnostic::io_error(&path, &err).with_code("IO001").with_arg("issue", "source_read_failed")
+        crate::Diagnostic::io_error(&path, &err)
+            .with_code("IO001")
+            .with_arg("issue", "source_read_failed")
     })?;
     Ok((input[0].clone(), source))
 }
@@ -213,9 +215,9 @@ fn compile_cli_path_with_locale_pack_inner(
         Err(err) => {
             return crate::CompileResult {
                 output: None,
-                diagnostics: vec![
-                    crate::Diagnostic::io_error(path, &err).with_code("IO001").with_arg("issue", "source_read_failed"),
-                ],
+                diagnostics: vec![crate::Diagnostic::io_error(path, &err)
+                    .with_code("IO001")
+                    .with_arg("issue", "source_read_failed")],
             };
         }
     };

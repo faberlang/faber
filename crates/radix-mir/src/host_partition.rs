@@ -63,12 +63,12 @@
 //! ratchet in lockstep under their named owners.
 
 use crate::boundary_abi::{
-    BoundaryAbiError, BoundaryCall, derive_boundary_calls, validate_boundary_abi,
+    derive_boundary_calls, validate_boundary_abi, BoundaryAbiError, BoundaryCall,
 };
 use crate::device_program::LaunchId;
 use crate::device_program::{
-    BufferLifetime, BufferRole, DeviceProgram, DeviceProgramBuildError, DeviceProgramError,
-    DeviceProgramLifetime, ObservationCadence, build_device_program,
+    build_device_program, BufferLifetime, BufferRole, DeviceProgram, DeviceProgramBuildError,
+    DeviceProgramError, DeviceProgramLifetime, ObservationCadence,
 };
 use crate::device_semantics::{DeviceEffectBoundaryKind, DeviceLegalityFacts};
 use crate::layout::MirTensorStorageLayout;
