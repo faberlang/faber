@@ -433,6 +433,8 @@ fn wire_storage_to_storage(storage: WireStorageLayout) -> MirTensorStorageLayout
     match storage {
         WireStorageLayout::HostOwned => MirTensorStorageLayout::HostOwned,
         WireStorageLayout::DeviceHandle => MirTensorStorageLayout::DeviceHandle,
+        // MLC-4: the wire marker round-trips to the sparse layout fact.
+        WireStorageLayout::Sparse => MirTensorStorageLayout::Sparse,
     }
 }
 
@@ -1059,6 +1061,8 @@ fn operation_to_wire(operation: &ExecutionOperation) -> WireExecutionOperation {
                 layout: match transfer.layout {
                     MirTensorStorageLayout::HostOwned => WireStorageLayout::HostOwned,
                     MirTensorStorageLayout::DeviceHandle => WireStorageLayout::DeviceHandle,
+                    // MLC-4: carried as the sparse marker; never coerced to a host/device row.
+                    MirTensorStorageLayout::Sparse => WireStorageLayout::Sparse,
                 },
                 path_label: match transfer.path_label {
                     TransportPath::HostStaged => WireTransportPath::HostStaged,

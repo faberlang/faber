@@ -455,6 +455,8 @@ fn wire_storage_layout(storage: radix_mir::MirTensorStorageLayout) -> WireStorag
     match storage {
         radix_mir::MirTensorStorageLayout::HostOwned => WireStorageLayout::HostOwned,
         radix_mir::MirTensorStorageLayout::DeviceHandle => WireStorageLayout::DeviceHandle,
+        // MLC-4: carried as the sparse marker; never coerced to a host/device row.
+        radix_mir::MirTensorStorageLayout::Sparse => WireStorageLayout::Sparse,
     }
 }
 

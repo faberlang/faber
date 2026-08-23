@@ -451,6 +451,9 @@ pub enum WireResourceAccess {
 pub enum WireStorageLayout {
     HostOwned,
     DeviceHandle,
+    /// MLC-4: sparse backing store (`sparsa` values) — layout fact carried on
+    /// the wire; kernel admission surfaces reject it by name, fail-closed.
+    Sparse,
 }
 
 /// Program execution-lifetime regime. A `RepeatingStep` program carries its
