@@ -7,6 +7,7 @@ canonical = true
 summary = "Labeled ad-hoc record type: construction, .name access, objectPattern, and holes."
 syntax = "record<label: type, …> { label = value }"
 related = ["genus", "ceteri", "iuncta"]
+aliases = ["record"]
 locale = "en"
 +++
 
