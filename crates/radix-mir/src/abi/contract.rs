@@ -3,6 +3,7 @@ use crate::{
     MirPlaceBase, MirRuntimeCall, MirStatementKind, MirValidationContext,
 };
 use radix_lexer::Interner;
+use radix_types::NumericWidth;
 
 use super::{
     device_view_element_count, require_u32_index, MirAbiError, MirKernelBufferBindingKind,
@@ -290,6 +291,49 @@ impl PackedStorageLayout {
             return None;
         }
         (logical_elems / block_elements).checked_mul(block_bytes)
+    }
+
+    /// Language width carried by a native layout, if any.
+    ///
+    /// The plan seam correspondence: `PackedStorageLayout::Bf16 ↔
+    /// NumericWidth::BF16` (and the sibling native layouts) is named here so
+    /// packed admission and language widths share one fact. Quantized layouts
+    /// have no single language width — `None` keeps the seam fail-closed.
+    #[must_use]
+    pub const fn numeric_width(self) -> Option<NumericWidth> {
+        match self {
+            Self::F32 => Some(NumericWidth::F32),
+            Self::F16 => Some(NumericWidth::F16),
+            Self::Bf16 => Some(NumericWidth::BF16),
+            Self::Q8_0
+            | Self::Q5_0
+            | Self::Q4_K
+            | Self::Q5_K
+            | Self::Q6_K
+            | Self::MXFP4 => None,
+        }
+    }
+
+    /// Admitted native layout for a language width, if any.
+    ///
+    /// Reverse of [`PackedStorageLayout::numeric_width`]; integer and f64
+    /// widths have no packed layout today, so `None` fails the seam closed.
+    #[must_use]
+    pub const fn from_numeric_width(width: NumericWidth) -> Option<Self> {
+        match width {
+            NumericWidth::F32 => Some(Self::F32),
+            NumericWidth::F16 => Some(Self::F16),
+            NumericWidth::BF16 => Some(Self::Bf16),
+            NumericWidth::I8
+            | NumericWidth::I16
+            | NumericWidth::I32
+            | NumericWidth::I64
+            | NumericWidth::U8
+            | NumericWidth::U16
+            | NumericWidth::U32
+            | NumericWidth::U64
+            | NumericWidth::F64 => None,
+        }
     }
 }
 

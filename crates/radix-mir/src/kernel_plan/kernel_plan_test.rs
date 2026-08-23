@@ -1699,6 +1699,49 @@ fn packed_dequant_resolution_binds_section5_layout_table() {
 }
 
 #[test]
+fn bf16_plan_seam_pins_width_mapping_both_directions() {
+    // U5: the `PackedStorageLayout::Bf16 ↔ NumericWidth::BF16` correspondence
+    // is named and pinned at the plan seam, not incidental — GGML-30, the
+    // 2-byte width, and the NativeBf16Convert admission receipt hold in both
+    // directions.
+    use crate::abi::PackedStorageLayout;
+    use radix_types::NumericWidth;
+
+    // GGML-30 → Bf16 layout → NumericWidth::BF16 → 2-byte width.
+    let layout = PackedStorageLayout::from_ggml_type_id(30)
+        .expect("GGML type id 30 is an admitted packed layout");
+    assert_eq!(layout, PackedStorageLayout::Bf16);
+    assert_eq!(layout.numeric_width(), Some(NumericWidth::BF16));
+    assert_eq!(layout.block_bytes(), 2);
+
+    // NumericWidth::BF16 → Bf16 layout → GGML-30 → 2-byte width.
+    let layout = PackedStorageLayout::from_numeric_width(NumericWidth::BF16)
+        .expect("NumericWidth::BF16 is an admitted packed layout");
+    assert_eq!(layout, PackedStorageLayout::Bf16);
+    assert_eq!(layout.ggml_type_id(), 30);
+    assert_eq!(layout.block_bytes(), 2);
+
+    // Receipts row pinned as-is: Bf16 admits QuantizedMatMul via
+    // NativeBf16Convert — no new kernels, Metal body unchanged.
+    let plan = admit_quantized_matmul_from_ggml_type_id(30, MatMulShapes { m: 8, k: 16, n: 16 })
+        .expect("BF16 type id 30 admits QuantizedMatMul");
+    let CollectionKernelPlan::QuantizedMatMul(quantized) = &plan else {
+        panic!("BF16 must admit QuantizedMatMul, got {plan:?}");
+    };
+    assert_eq!(
+        quantized.dequant_resolution().class,
+        PackedDequantKind::NativeBf16Convert
+    );
+    assert_eq!(
+        (
+            quantized.dequant_resolution().block_elements,
+            quantized.dequant_resolution().block_bytes
+        ),
+        (1, 2)
+    );
+}
+
+#[test]
 fn admit_quantized_matmul_falls_back_f32_to_tiled_matmul() {
     use crate::abi::PackedStorageLayout;
     let shapes = MatMulShapes { m: 8, k: 16, n: 16 };
