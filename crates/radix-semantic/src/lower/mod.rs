@@ -981,7 +981,7 @@ fn lowering_issue_args_from_message(message: &str) -> Vec<DiagnosticArg> {
         "copia requires one type parameter" => issue_args("copia_arity"),
         "promissum requires one type parameter" => issue_args("promissum_arity"),
         "cursor requires one type parameter" => issue_args("cursor_arity"),
-        "f16, f32, and f64 are fractus widths; use fractus<f16>, fractus<f32>, or fractus<f64>" => {
+        "f16, f32, f64, and bf16 are fractus widths; use fractus<f16>, fractus<f32>, fractus<f64>, or fractus<bf16>" => {
             issue_args("float_width_on_numerus")
         }
         "integer width markers are numerus widths; use numerus<…>" => issue_args("integer_width_on_fractus"),
@@ -989,7 +989,7 @@ fn lowering_issue_args_from_message(message: &str) -> Vec<DiagnosticArg> {
         "fractus accepts at most one width marker" => issue_args("fractus_width_params"),
         "primitive accepts at most one width marker" => issue_args("primitive_width_params"),
         "unknown width marker for numerus" => issue_args("invalid_numerus_width_marker"),
-        "fractus accepts only f16, f32, or f64" => issue_args("invalid_fractus_width_marker"),
+        "fractus accepts only f16, f32, f64, or bf16" => issue_args("invalid_fractus_width_marker"),
         "unknown width marker for this family" => issue_args("invalid_width_marker"),
         "instans accepts only ms, us, or ns as a precision marker" => issue_args("invalid_precision_marker"),
         "instans accepts at most one precision marker" => issue_args("instans_precision_params"),

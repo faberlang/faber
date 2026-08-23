@@ -20,6 +20,7 @@ pub enum NumericWidth {
     U32,
     U64,
     F16,
+    BF16,
     F32,
     F64,
 }
@@ -66,8 +67,9 @@ impl NumericWidth {
             ("u16", Primitive::Numerus) => Ok(Self::U16),
             ("u32", Primitive::Numerus) => Ok(Self::U32),
             ("u64", Primitive::Numerus) => Ok(Self::U64),
-            ("f16" | "f32" | "f64", Primitive::Numerus) => Err(WidthError::FloatOnNumerus),
+            ("f16" | "f32" | "f64" | "bf16", Primitive::Numerus) => Err(WidthError::FloatOnNumerus),
             ("f16", Primitive::Fractus) => Ok(Self::F16),
+            ("bf16", Primitive::Fractus) => Ok(Self::BF16),
             ("f32", Primitive::Fractus) => Ok(Self::F32),
             ("f64", Primitive::Fractus) => Ok(Self::F64),
             ("i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64", Primitive::Fractus) => {
@@ -101,7 +103,7 @@ impl NumericWidth {
 
     #[must_use]
     pub fn is_float(self) -> bool {
-        matches!(self, Self::F16 | Self::F32 | Self::F64)
+        matches!(self, Self::F16 | Self::BF16 | Self::F32 | Self::F64)
     }
 
     /// Rust primitive spelling for codegen.
@@ -117,6 +119,7 @@ impl NumericWidth {
             Self::U32 => "u32",
             Self::U64 => "u64",
             Self::F16 => "f16",
+            Self::BF16 => "bf16",
             Self::F32 => "f32",
             Self::F64 => "f64",
         }
@@ -185,14 +188,16 @@ impl WidthError {
     pub fn message(self, prim: Primitive) -> &'static str {
         match (self, prim) {
             (WidthError::FloatOnNumerus, _) => {
-                "f16, f32, and f64 are fractus widths; use fractus<f16>, fractus<f32>, or fractus<f64>"
+                "f16, f32, f64, and bf16 are fractus widths; use fractus<f16>, fractus<f32>, fractus<f64>, or fractus<bf16>"
             }
             (WidthError::IntOnFractus, _) => "integer width markers are numerus widths; use numerus<…>",
             (WidthError::TooManyParams, Primitive::Numerus) => "numerus accepts at most one width marker",
             (WidthError::TooManyParams, Primitive::Fractus) => "fractus accepts at most one width marker",
             (WidthError::TooManyParams, _) => "primitive accepts at most one width marker",
             (WidthError::UnrecognizedMarker, Primitive::Numerus) => "unknown width marker for numerus",
-            (WidthError::UnrecognizedMarker, Primitive::Fractus) => "fractus accepts only f16, f32, or f64",
+            (WidthError::UnrecognizedMarker, Primitive::Fractus) => {
+                "fractus accepts only f16, f32, f64, or bf16"
+            }
             (WidthError::UnrecognizedMarker, _) => "unknown width marker for this family",
         }
     }

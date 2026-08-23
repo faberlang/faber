@@ -529,7 +529,7 @@ pub fn int_width_range(width: NumericWidth) -> (i128, i128) {
         NumericWidth::U32 => (0, u32::MAX as i128),
         NumericWidth::U64 => (0, u64::MAX as i128),
         // Floats are not range-checked here; their width is a separate fidelity gap.
-        NumericWidth::F16 | NumericWidth::F32 | NumericWidth::F64 => {
+        NumericWidth::F16 | NumericWidth::BF16 | NumericWidth::F32 | NumericWidth::F64 => {
             (i64::MIN as i128, i64::MAX as i128)
         }
     }

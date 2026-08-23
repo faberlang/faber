@@ -800,7 +800,7 @@ fn numerus_width_range(width: NumericWidth) -> (i128, i128) {
         NumericWidth::U16 => (0, i128::from(u16::MAX)),
         NumericWidth::U32 => (0, i128::from(u32::MAX)),
         NumericWidth::U64 => (0, i128::from(u64::MAX)),
-        NumericWidth::F16 | NumericWidth::F32 | NumericWidth::F64 => {
+        NumericWidth::F16 | NumericWidth::BF16 | NumericWidth::F32 | NumericWidth::F64 => {
             (i128::from(i64::MIN), i128::from(i64::MAX))
         }
     }

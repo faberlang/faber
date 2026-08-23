@@ -1626,7 +1626,7 @@ fn semantic_undefined_type_message(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
         "figura_unknown_index" => Some("unknown index parameter in Figura".to_owned()),
         "float_width_on_numerus" => Some(
-            "f16, f32, and f64 are fractus widths; use fractus<f16>, fractus<f32>, or fractus<f64>"
+            "f16, f32, f64, and bf16 are fractus widths; use fractus<f16>, fractus<f32>, fractus<f64>, or fractus<bf16>"
                 .to_owned(),
         ),
         "integer_width_on_fractus" => {
@@ -1635,7 +1635,9 @@ fn semantic_undefined_type_message(args: &[DiagnosticArg]) -> Option<String> {
         "invalid_precision_marker" => {
             Some("instans accepts only ms, us, or ns as a precision marker".to_owned())
         }
-        "invalid_fractus_width_marker" => Some("fractus accepts only f16, f32, or f64".to_owned()),
+        "invalid_fractus_width_marker" => {
+            Some("fractus accepts only f16, f32, f64, or bf16".to_owned())
+        }
         "invalid_numerus_width_marker" => Some("unknown width marker for numerus".to_owned()),
         "invalid_width_marker" => Some("unknown width marker for this family".to_owned()),
         "name_not_type" => Some("name does not refer to a type".to_owned()),
@@ -1722,7 +1724,7 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
         }
         "figura_unknown_index" => Some("unknown index variable in Figura".to_owned()),
         "float_width_on_numerus" => Some(
-            "f16, f32, and f64 are fractus widths; use fractus<f16>, fractus<f32>, or fractus<f64>"
+            "f16, f32, f64, and bf16 are fractus widths; use fractus<f16>, fractus<f32>, fractus<f64>, or fractus<bf16>"
                 .to_owned(),
         ),
         "forma_builtin_missing" => Some("builtin forma genus is not registered".to_owned()),
@@ -1754,13 +1756,10 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
             Some("atomic element type must be numerus<i32> or numerus<u32>".to_owned())
         }
         "atomic_incomplete" => Some("atomic requires one element type; use atomic<T>".to_owned()),
-        "invalid_fractus_width_marker" => Some("fractus accepts only f16, f32, or f64".to_owned()),
+        "invalid_fractus_width_marker" => Some("fractus accepts only f16, f32, f64, or bf16".to_owned()),
         "invalid_lowered_expression" => {
             Some("invalid expression produced during lowering".to_owned())
         }
-        "summa_expression_unsupported" => Some(
-            "`summa ex` is admitted in HIR but not yet lowered; the reduction admission lands in SFR-3/SFR-4".to_owned(),
-        ),
         "invalid_numerus_width_marker" => Some("unknown width marker for numerus".to_owned()),
         "invalid_precision_marker" => {
             Some("instans accepts only ms, us, or ns as a precision marker".to_owned())

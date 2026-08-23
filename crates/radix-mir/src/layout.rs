@@ -767,7 +767,9 @@ fn int_layout(width: NumericWidth) -> Option<MirLayoutKind> {
         NumericWidth::U16 => MirScalarLayout::U16,
         NumericWidth::U32 => MirScalarLayout::U32,
         NumericWidth::U64 => MirScalarLayout::U64,
-        NumericWidth::F16 | NumericWidth::F32 | NumericWidth::F64 => return None,
+        NumericWidth::F16 | NumericWidth::BF16 | NumericWidth::F32 | NumericWidth::F64 => {
+            return None
+        }
     };
     Some(MirLayoutKind::Scalar(scalar))
 }

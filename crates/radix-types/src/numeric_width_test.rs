@@ -3,8 +3,9 @@
 
 use crate::{
     is_ascii_format_hint, is_conversio_radix_hint, is_numeric_width_type_sugar,
-    lista_sugar_width_marker, sparsa_sugar_width_marker, standalone_width_type,
-    tensor_sugar_width_marker, NumericWidth, WidthError,
+    lista_sugar_width_marker, matrix_sugar_width_marker, sparsa_sugar_width_marker,
+    standalone_width_type, tensor_sugar_width_marker, vector_sugar_width_marker, NumericWidth,
+    WidthError,
 };
 use crate::{Primitive, TypeTable};
 
@@ -32,6 +33,7 @@ fn standalone_width_type_maps_integer_markers() {
 fn standalone_width_type_maps_float_markers() {
     for (marker, width) in [
         ("f16", NumericWidth::F16),
+        ("bf16", NumericWidth::BF16),
         ("f32", NumericWidth::F32),
         ("f64", NumericWidth::F64),
     ] {
@@ -72,6 +74,8 @@ fn is_numeric_width_type_sugar_recognizes_bare_and_prefixed_markers() {
     assert!(is_numeric_width_type_sugar("tf32"));
     assert!(is_numeric_width_type_sugar("sf32"));
     assert!(is_numeric_width_type_sugar("lu32"));
+    assert!(is_numeric_width_type_sugar("bf16"));
+    assert!(is_numeric_width_type_sugar("tbf16"));
     assert!(!is_numeric_width_type_sugar("textus"));
     assert!(!is_numeric_width_type_sugar("lista"));
 }
@@ -110,6 +114,96 @@ fn rejects_float_markers_on_numerus() {
     assert_eq!(
         NumericWidth::from_marker("f32", Primitive::Numerus),
         Err(WidthError::FloatOnNumerus)
+    );
+    assert_eq!(
+        NumericWidth::from_marker("bf16", Primitive::Numerus),
+        Err(WidthError::FloatOnNumerus)
+    );
+}
+
+#[test]
+fn from_marker_admits_bf16_on_fractus() {
+    assert_eq!(
+        NumericWidth::from_marker("bf16", Primitive::Fractus),
+        Ok(NumericWidth::BF16)
+    );
+    assert!(NumericWidth::BF16.is_float());
+}
+
+#[test]
+fn bf16_sugar_compositions_resolve() {
+    assert_eq!(
+        tensor_sugar_width_marker("tbf16"),
+        Some("bf16"),
+        "tensor sugar tbf16 resolves to bf16"
+    );
+    assert_eq!(
+        lista_sugar_width_marker("lbf16"),
+        Some("bf16"),
+        "lista sugar lbf16 resolves to bf16"
+    );
+    assert_eq!(
+        vector_sugar_width_marker("vbf16"),
+        Some("bf16"),
+        "vector sugar vbf16 resolves to bf16"
+    );
+    assert_eq!(
+        matrix_sugar_width_marker("mbf16"),
+        Some("bf16"),
+        "matrix sugar mbf16 resolves to bf16"
+    );
+    assert_eq!(
+        sparsa_sugar_width_marker("sbf16"),
+        Some("bf16"),
+        "sparsa sugar sbf16 resolves to bf16"
+    );
+}
+
+#[test]
+fn prefix_closure_law_bf16_never_decomposes() {
+    // `bf16` is a whole width marker, admitted by name in `from_marker`.
+    assert_eq!(
+        standalone_width_type("bf16"),
+        Some((Primitive::Fractus, NumericWidth::BF16))
+    );
+    // The sugar grammar strips a prefix char, so `b` + `f16` would shadow the
+    // whole marker if `b` ever joined the prefix set. It must never do so:
+    // the five sugar prefixes are t/l/v/m/s, and none is `b`.
+    for prefix in ['t', 'l', 'v', 'm', 's'] {
+        assert_ne!(prefix, 'b', "prefix {prefix:?} must not be 'b'");
+        assert_eq!(
+            super::width_prefixed_sugar_marker("bf16", prefix),
+            None,
+            "sugar prefix {prefix:?} must not decompose bf16"
+        );
+    }
+    // No sugar entry point decomposes `bf16`.
+    assert_eq!(tensor_sugar_width_marker("bf16"), None);
+    assert_eq!(lista_sugar_width_marker("bf16"), None);
+    assert_eq!(vector_sugar_width_marker("bf16"), None);
+    assert_eq!(matrix_sugar_width_marker("bf16"), None);
+    assert_eq!(sparsa_sugar_width_marker("bf16"), None);
+    // The hazard the law prevents: `b` + `f16` *is* a valid decomposition, so
+    // the `b` prefix stays excluded from the sugar prefix set forever.
+    assert_eq!(
+        super::width_prefixed_sugar_marker("bf16", 'b'),
+        Some("f16")
+    );
+}
+
+#[test]
+fn width_error_strings_mention_bf16() {
+    assert!(
+        WidthError::FloatOnNumerus
+            .message(Primitive::Numerus)
+            .contains("bf16"),
+        "FloatOnNumerus message should name bf16"
+    );
+    assert!(
+        WidthError::UnrecognizedMarker
+            .message(Primitive::Fractus)
+            .contains("bf16"),
+        "UnrecognizedMarker message for fractus should name bf16"
     );
 }
 

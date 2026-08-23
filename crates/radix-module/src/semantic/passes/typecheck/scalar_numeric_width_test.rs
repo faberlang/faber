@@ -79,14 +79,13 @@ functio bad(numerus<f16> x) → numerus<f16> {
 }
 
 #[test]
-fn bf16_remains_deferred() {
-    test_support::assert_analysis_rejects_with_issue(
+fn bf16_is_admitted_as_a_whole_width_marker() {
+    test_support::assert_analysis_accepts(
         r"
-functio bad(fractus<bf16> x) → fractus<bf16> {
+functio keep(fractus<bf16> x) → fractus<bf16> {
     redde x
 }
 ",
-        "invalid_fractus_width_marker",
     );
 }
 

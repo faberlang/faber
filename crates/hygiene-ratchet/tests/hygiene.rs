@@ -371,7 +371,7 @@ fn contains_e2e_diagnostic_metadata_text(line: &str) -> bool {
         "tensor and sparsa conversio requires",
         "sparsa element type must",
         "tensor arithmetic requires",
-        "f16, f32, and f64 are fractus widths",
+        "f16, f32, f64, and bf16 are fractus widths",
         "Rust target does not support",
         "are not supported for this target",
     ]

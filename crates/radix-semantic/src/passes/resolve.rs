@@ -2848,11 +2848,11 @@ fn type_lower_error_from_message(message: &str) -> TypeLowerError {
         crate::MATRIX_SHAPE_TWO_DIM_MSG => ISSUE_MATRIX_SHAPE_TWO_DIM,
         crate::ATOMIC_ELEMENT_MSG => ISSUE_ATOMIC_ELEMENT,
         crate::VECTOR_WIDTH_SINGLE_DIM_MSG => ISSUE_VECTOR_WIDTH_SINGLE_DIM,
-        "f16, f32, and f64 are fractus widths; use fractus<f16>, fractus<f32>, or fractus<f64>" => {
+        "f16, f32, f64, and bf16 are fractus widths; use fractus<f16>, fractus<f32>, fractus<f64>, or fractus<bf16>" => {
             "float_width_on_numerus"
         }
         "fractus accepts at most one width marker" => "fractus_width_params",
-        "fractus accepts only f16, f32, or f64" => "invalid_fractus_width_marker",
+        "fractus accepts only f16, f32, f64, or bf16" => "invalid_fractus_width_marker",
         "integer width markers are numerus widths; use numerus<…>" => "integer_width_on_fractus",
         "instans accepts at most one precision marker" => "instans_precision_params",
         "instans accepts only ms, us, or ns as a precision marker" => {
