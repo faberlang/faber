@@ -512,9 +512,11 @@ fn cmd_check_file(command: CheckCommand, air: bool, json: bool) {
         if let Some(rows) = check_air::advisory_rows(&name, &source) {
             let mut out = std::io::stdout().lock();
             if json {
-                let _ = air_json::render_json_rows(&mut out, &rows);
-            } else {
-                let _ = check_air::render_report(&mut out, &rows);
+                if let Err(err) = air_json::render_json_rows(&mut out, &rows) {
+                    eprint_io_error(std::path::Path::new("<stdout>"), &err);
+                }
+            } else if let Err(err) = check_air::render_report(&mut out, &rows) {
+                eprint_io_error(std::path::Path::new("<stdout>"), &err);
             }
         }
     }
