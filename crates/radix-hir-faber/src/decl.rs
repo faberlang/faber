@@ -124,6 +124,35 @@ impl super::FaberCodegen {
                     writer.write(" ");
                     writer.write(surface.keyword(TokenKind::Publica));
                 }
+                if import.selective {
+                    // EOT-2 selective import: `fixum member [ut alias], …`.
+                    // `name` is the exported spelling (source order preserved),
+                    // `alias` the caller-owned local. An explicit identity
+                    // alias collapses to the bare exported name: the member
+                    // list is not a namespace form, so the `* ut` wildcard
+                    // shape never applies here.
+                    writer.write(" ");
+                    writer.write(surface.keyword(TokenKind::Fixum));
+                    for (idx, item) in import.items.iter().enumerate() {
+                        if idx > 0 {
+                            writer.write(",");
+                        }
+                        writer.write(" ");
+                        let name = self.symbol_to_string(item.name, interner);
+                        match item.alias {
+                            Some(alias) if alias != item.name => {
+                                writer.write(&name);
+                                writer.write(" ");
+                                writer.write(surface.keyword(TokenKind::Ut));
+                                writer.write(" ");
+                                writer.write(&self.symbol_to_string(alias, interner));
+                            }
+                            _ => writer.write(&name),
+                        }
+                    }
+                    writer.newline();
+                    return;
+                }
                 for item in &import.items {
                     writer.write(" ");
                     let name = self.symbol_to_string(item.name, interner);

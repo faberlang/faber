@@ -198,6 +198,60 @@ fn loader_resolver_builtins() {
     assert!(unit.resolver.builtin_tuus_def_id().is_none());
 }
 
+// ── EOT-2W selective-import loader round-trip ────────────────────────────
+
+#[test]
+fn selective_import_survives_module_hir_load() {
+    // EOT-2M's `HirImport.selective` is an additive `#[serde(default)]` field,
+    // so the module HIR serialize/load path carries it without a schema
+    // ratchet: the ordered member/alias list and the marker must both survive
+    // `load_fhir` (postcard decode + referential-integrity gate + cache
+    // rebuild) unchanged.
+    use radix_hir::{HirImport, HirImportItem};
+
+    let mut artifact = minimal_test_artifact();
+    artifact.interner = vec![
+        "main".to_string(),
+        "test".to_string(),
+        "norma:consolum".to_string(),
+        "dic".to_string(),
+        "output".to_string(),
+        "funde".to_string(),
+    ];
+    artifact.hir.items.push(radix_hir::HirItem {
+        id: radix_hir::HirId(1),
+        def_id: radix_types::DefId(radix_types::USER_DEF_ID_BASE + 42),
+        kind: radix_hir::HirItemKind::Import(HirImport {
+            path: radix_lexer::Symbol(2),
+            visibility: radix_syntax::Visibility::Privata,
+            items: vec![
+                HirImportItem {
+                    def_id: radix_types::DefId(radix_types::USER_DEF_ID_BASE + 40),
+                    name: radix_lexer::Symbol(3),
+                    alias: Some(radix_lexer::Symbol(4)),
+                },
+                HirImportItem {
+                    def_id: radix_types::DefId(radix_types::USER_DEF_ID_BASE + 41),
+                    name: radix_lexer::Symbol(5),
+                    alias: None,
+                },
+            ],
+            selective: true,
+        }),
+        span: radix_lexer::Span::default(),
+    });
+
+    let bytes = serialize_artifact(&artifact);
+    let unit = load_fhir(&bytes).expect("selective artifact must load");
+
+    let radix_hir::HirItemKind::Import(import) = &unit.hir.items[1].kind else {
+        panic!("expected import item");
+    };
+    assert!(import.selective, "selective marker must survive load_fhir");
+    assert_eq!(import.items.len(), 2, "ordered member list must survive");
+    assert_eq!(import.items[0].alias, Some(radix_lexer::Symbol(4)));
+}
+
 #[test]
 fn loader_interner_reconstruction() {
     let mut artifact = minimal_test_artifact();

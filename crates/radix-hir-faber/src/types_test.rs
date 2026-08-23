@@ -1356,6 +1356,168 @@ fn import_privata_emits_no_visibility_keyword() {
     );
 }
 
+/// Reader-locale surface that localizes the selective-import keywords so the
+/// locale-preservation proof exercises real pack spellings, not Latin identity.
+struct LocaleSurface;
+
+impl KeywordSurface for LocaleSurface {
+    fn keyword(&self, kind: TokenKind) -> &str {
+        match kind {
+            TokenKind::Importa => "import",
+            TokenKind::Ex => "from",
+            TokenKind::Publica => "public",
+            TokenKind::Fixum => "const",
+            TokenKind::Ut => "as",
+            _ => LatinSurface.keyword(kind),
+        }
+    }
+
+    fn type_surface(&self, kind: TypeBindingKind) -> &str {
+        LatinSurface.type_surface(kind)
+    }
+}
+
+fn selective_import_program(interner: &mut Interner, publica: bool) -> HirModule {
+    let path_sym = interner.intern("norma:consolum");
+    let dic = interner.intern("dic");
+    let output = interner.intern("output");
+    let funde = interner.intern("funde");
+
+    let import = HirImport {
+        path: path_sym,
+        visibility: if publica {
+            radix_syntax::Visibility::Publica
+        } else {
+            radix_syntax::Visibility::Privata
+        },
+        items: vec![
+            HirImportItem {
+                def_id: DefId(1),
+                name: dic,
+                alias: Some(output),
+            },
+            HirImportItem {
+                def_id: DefId(2),
+                name: funde,
+                alias: None,
+            },
+        ],
+        selective: true,
+    };
+
+    HirModule {
+        items: vec![HirItem {
+            id: HirId(0),
+            def_id: DefId(radix_types::USER_DEF_ID_BASE),
+            kind: HirItemKind::Import(import),
+            span: span(),
+        }],
+        entry: None,
+        entry_annotations: Vec::new(),
+        entry_args_name: None,
+        entry_is_async: false,
+    }
+}
+
+#[test]
+fn selective_import_emits_ordered_fixum_member_list() {
+    // EOT-2W: canonical selective re-emission keeps `fixum` and the ordered
+    // member/alias list (`dic ut output, funde`), never the namespace item
+    // shape and never the `* ut` wildcard spelling.
+    let mut interner = Interner::new();
+    let program = selective_import_program(&mut interner, false);
+    let types = TypeTable::new();
+
+    let code = generate_faber(&program, &types, &interner);
+    assert_eq!(
+        code.trim(),
+        r#"importa ex "norma:consolum" fixum dic ut output, funde"#,
+        "selective import must re-emit the ordered fixum member list"
+    );
+}
+
+#[test]
+fn selective_import_publica_emits_visibility_before_fixum() {
+    let mut interner = Interner::new();
+    let program = selective_import_program(&mut interner, true);
+    let types = TypeTable::new();
+
+    let code = generate_faber(&program, &types, &interner);
+    assert_eq!(
+        code.trim(),
+        r#"importa ex "norma:consolum" publica fixum dic ut output, funde"#,
+        "selective publica import keeps the visibility tier before `fixum`"
+    );
+}
+
+#[test]
+fn selective_import_localized_surface_projects_fixum_keyword() {
+    // Locale-preserving re-emission: the `fixum` marker and the alias keyword
+    // project through the reader surface, while the exported member spellings
+    // and the caller-owned alias stay exactly as interned.
+    let mut interner = Interner::new();
+    let program = selective_import_program(&mut interner, false);
+    let types = TypeTable::new();
+
+    let code = FaberCodegen::default()
+        .generate(
+            &program,
+            &empty_presentation(),
+            &types,
+            &interner,
+            &LocaleSurface,
+        )
+        .expect("codegen")
+        .code;
+    assert_eq!(
+        code.trim(),
+        r#"import from "norma:consolum" const dic as output, funde"#,
+        "localized selective import must keep the locale keyword spellings"
+    );
+}
+
+#[test]
+fn selective_import_identity_alias_collapses_to_member_name() {
+    // An explicit identity alias (`funde ut funde`) is semantically the bare
+    // member binding; canonical emission collapses it instead of inventing a
+    // redundant `ut` pair.
+    let mut interner = Interner::new();
+    let path_sym = interner.intern("pkg");
+    let funde = interner.intern("funde");
+
+    let import = HirImport {
+        path: path_sym,
+        visibility: radix_syntax::Visibility::Privata,
+        items: vec![HirImportItem {
+            def_id: DefId(1),
+            name: funde,
+            alias: Some(funde),
+        }],
+        selective: true,
+    };
+
+    let program = HirModule {
+        items: vec![HirItem {
+            id: HirId(0),
+            def_id: DefId(radix_types::USER_DEF_ID_BASE),
+            kind: HirItemKind::Import(import),
+            span: span(),
+        }],
+        entry: None,
+        entry_annotations: Vec::new(),
+        entry_args_name: None,
+        entry_is_async: false,
+    };
+
+    let types = TypeTable::new();
+    let code = generate_faber(&program, &types, &interner);
+    assert_eq!(
+        code.trim(),
+        r#"importa ex "pkg" fixum funde"#,
+        "identity alias must collapse; `* ut` is the namespace wildcard shape"
+    );
+}
+
 #[test]
 fn union_last_variant_has_no_trailing_comma() {
     // Canonical union layout separates variants with a comma; the last
