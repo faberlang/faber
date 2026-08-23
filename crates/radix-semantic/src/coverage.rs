@@ -133,6 +133,12 @@ fn classify_rust(_hir: &HirModule, types: &TypeTable) -> Lowerability {
                     slug: "rust_target_fractus_f16_unsupported",
                 });
             }
+            Type::SizedNumeric(Primitive::Fractus, NumericWidth::BF16) => {
+                gaps.push(CapabilityGap::TargetPolicyRejection {
+                    shape: "fractus<bf16>".to_owned(),
+                    slug: "rust_target_fractus_bf16_unsupported",
+                });
+            }
             Type::Atomic(_) => {
                 gaps.push(CapabilityGap::TargetPolicyRejection {
                     shape: "atomic type".to_owned(),
