@@ -6,7 +6,7 @@
 
 use crate::parse;
 use crate::test_support::args_have_no_legacy_message;
-use crate::test_support::{assert_parse_error_issue, parse_ok};
+use crate::test_support::{assert_parse_error_issue, parse_ok, parse_program};
 use crate::ParseResult;
 use radix_lexer::lex;
 use radix_syntax::{
@@ -616,9 +616,15 @@ fn parses_ratio_construction_as_verte_with_labeled_type() {
 
 #[test]
 fn rejects_unlabeled_ratio_constructor_type_argument() {
-    assert_parse_error_issue(
-        r#"incipit { fixum _ point ← ratio<f32, w: numerus> { g = 1.0, w = 2 } }"#,
-        "ratio_type_arg_label_required",
+    // Unlabeled ratio tails no longer divert into the ratio constructor (the
+    // `<` falls through to comparison parsing, per the two-token label
+    // lookahead), so the specific `ratio_type_arg_label_required` issue is
+    // gone — the unlabeled form must still fail at parse time.
+    let result = parse_program(r#"incipit { fixum _ point ← ratio<f32, w: numerus> { g = 1.0, w = 2 } }"#);
+    assert!(
+        !result.success(),
+        "unlabeled ratio constructor type argument must stay rejected, got {:?}",
+        result.errors
     );
 }
 

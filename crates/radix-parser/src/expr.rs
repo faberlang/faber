@@ -1032,7 +1032,16 @@ impl Parser {
             return Ok(());
         };
 
-        if !Self::is_conversio_type_keyword(name) {
+        // Locale ruling: retired-call guards resolve the surface spelling to
+        // its latin identity before the conversio-type match, mirroring
+        // `can_start_type_name` — `string(5)` under the en pack is the same
+        // retired type-call shape as `textus(5)` and is rejected under every
+        // locale (map-in-both, not neither).
+        let latin = self
+            .reader_type_latin_keys
+            .get(name)
+            .map_or(name, String::as_str);
+        if !Self::is_conversio_type_keyword(latin) {
             return Ok(());
         }
 
@@ -1046,11 +1055,16 @@ impl Parser {
         let Some(name) = self.callee_ident_name(callee) else {
             return Ok(());
         };
-        if !Self::is_conversio_type_keyword(name) {
+        // Same locale ruling as the bare-call guard: map-in-both.
+        let latin = self
+            .reader_type_latin_keys
+            .get(name)
+            .map_or(name, String::as_str);
+        if !Self::is_conversio_type_keyword(latin) {
             return Ok(());
         }
         // Capture shape kind before mutable token ops so the intern borrow ends.
-        let shape_issue = match name {
+        let shape_issue = match latin {
             "tensor" => Some("tensor_figura_after_element"),
             "sparsa" => Some("sparsa_figura_after_element"),
             "matrix" => Some("matrix_figura_after_element"),
@@ -1060,15 +1074,28 @@ impl Parser {
 
         let checkpoint = self.checkpoint();
         self.expect(&TokenKind::LtAscii, "expected '<'")?;
+        // Speculative tail: a malformed parse means this `<` is a comparison
+        // operator, not a type-argument list (`textus < 5`) — restore and fall
+        // through instead of propagating past the checkpoint. The shape-sugar
+        // figura-law errors (missing comma after the element type) are genuine
+        // diagnostics and still propagate.
         if let Some(issue) = shape_issue {
-            let _elem = self.parse_type()?;
-            if !self.eat(&TokenKind::Comma) {
-                return Err(self.expected_expression_error(issue));
+            let malformed = match self.parse_type() {
+                Err(_) => true,
+                Ok(_) => {
+                    if !self.eat(&TokenKind::Comma) {
+                        return Err(self.expected_expression_error(issue));
+                    }
+                    self.parse_figura().is_err() || !self.eat(&TokenKind::GtAscii)
+                }
+            };
+            if malformed {
+                self.restore(checkpoint);
+                return Ok(());
             }
-            let _figura = self.parse_figura()?;
-            self.expect(&TokenKind::GtAscii, "expected '>'")?;
-        } else {
-            let _params = self.finish_type_args_list()?;
+        } else if self.finish_type_args_list().is_err() {
+            self.restore(checkpoint);
+            return Ok(());
         }
 
         if self.check(&TokenKind::LParen) {
@@ -1475,6 +1502,7 @@ impl Parser {
                     ExprKind::Vacua(ident)
                 } else if self.interner.resolve(ident.name) == "ratio"
                     && self.check(&TokenKind::LtAscii)
+                    && self.ratio_constructor_head()
                 {
                     self.parse_ratio_constructor(ident)?
                 } else if let Some(constructor) =
@@ -1539,6 +1567,18 @@ impl Parser {
 
         let span = start.merge(self.previous_span());
         Ok(Expr { id, kind, span })
+    }
+
+    /// Two-token lookahead for the expression-position `ratio` constructor
+    /// claim (mirrors `is_summa_expr_head`): commit only when the tokens after
+    /// `<` open a labeled element (`IDENT/Tag` then `:`), the same
+    /// `is_label` shape `parse_ratio_type_argument` requires. Anything else
+    /// (`ratio < 5`) is an ordinary identifier followed by a comparison.
+    fn ratio_constructor_head(&self) -> bool {
+        matches!(
+            self.peek_at(1).kind,
+            TokenKind::Ident(_) | TokenKind::Tag
+        ) && matches!(self.peek_at(2).kind, TokenKind::Colon)
     }
 
     /// Parse the ratio constructor claim: `ratio<label: T, …> { field = value, … }`.
