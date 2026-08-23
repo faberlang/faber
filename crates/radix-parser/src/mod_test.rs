@@ -1250,7 +1250,9 @@ fn parses_import_with_public_alias() {
                 "Alias"
             );
         }
-        ImportKind::Wildcard { .. } => panic!("expected named import"),
+        ImportKind::Wildcard { .. } | ImportKind::Selective { .. } => {
+            panic!("expected named import")
+        }
     }
 }
 
@@ -4535,19 +4537,24 @@ const EOT_TRANSFER_ISSUES: &[&str] = &[
 
 #[test]
 fn eot_selective_import_is_currently_rejected_at_the_expression_boundary() {
+    // EOT-2S: the selective form now parses as one declaration instead of
+    // failing at the expression boundary; this is the EOT-1 driver flip.
     let source = r#"importa ex "norma:consolum" fixum dic ut output, funde ut output_bytes,"#;
     let result = parse_program(source);
     assert!(
-        !result.success(),
-        "selective import must remain absent before EOT-2S"
-    );
-    assert!(
-        result
-            .errors
-            .iter()
-            .any(|error| has_arg(error, "issue", "expected_expression")),
-        "the current parser must expose the known pre-EOT issue `expected_expression`, got {:?}",
+        result.success(),
+        "selective import must parse as one declaration; errors={:?}",
         result.errors
+    );
+    let program = result.program.expect("selective import program");
+    assert_eq!(program.statements.len(), 1, "one selective declaration");
+    let StmtKind::Import(import) = &program.statements[0].kind else {
+        panic!("expected import statement");
+    };
+    assert!(
+        matches!(import.kind, ImportKind::Selective { .. }),
+        "expected selective import kind, got {:?}",
+        import.kind
     );
 }
 
@@ -4589,4 +4596,184 @@ fn eot_legacy_import_output_and_input_forms_remain_accepted() {
             result.errors
         );
     }
+}
+
+// =============================================================================
+// EOT-2S — selective-import syntax and AST
+// =============================================================================
+
+#[test]
+fn eot_selective_import_preserves_member_order_and_exact_spans() {
+    let source = r#"importa ex "norma:consolum" fixum dic ut output, funde ut output_bytes,"#;
+    let result = parse_ok(source);
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1, "one selective declaration");
+
+    let StmtKind::Import(import) = &program.statements[0].kind else {
+        panic!("expected import statement");
+    };
+    assert_eq!(symbol_name(&result, import.path), "norma:consolum");
+    let ImportKind::Selective { members } = &import.kind else {
+        panic!("expected selective import kind, got {:?}", import.kind);
+    };
+    assert_eq!(members.len(), 2, "both selective members in source order");
+
+    assert_eq!(symbol_name(&result, members[0].name.name), "dic");
+    assert_eq!(
+        symbol_name(&result, members[0].alias.as_ref().expect("alias").name),
+        "output"
+    );
+    assert_eq!(symbol_name(&result, members[1].name.name), "funde");
+    assert_eq!(
+        symbol_name(&result, members[1].alias.as_ref().expect("alias").name),
+        "output_bytes"
+    );
+
+    // Exact source spans for every member name and alias.
+    assert_eq!(members[0].name.span, span_for(source, "dic"));
+    assert_eq!(
+        members[0].alias.as_ref().expect("alias").span,
+        span_for(source, "output")
+    );
+    assert_eq!(members[1].name.span, span_for(source, "funde"));
+    assert_eq!(
+        members[1].alias.as_ref().expect("alias").span,
+        span_for(source, "output_bytes")
+    );
+    assert_eq!(
+        members[0].span,
+        span_for(source, "dic").merge(span_for(source, "output"))
+    );
+}
+
+#[test]
+fn eot_selective_import_mixed_aliased_and_unaliased_members() {
+    let result = parse_ok(r#"importa ex "norma:consolum" fixum dic, funde ut output_bytes,"#);
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    let StmtKind::Import(import) = &program.statements[0].kind else {
+        panic!("expected import statement");
+    };
+    let ImportKind::Selective { members } = &import.kind else {
+        panic!("expected selective import kind, got {:?}", import.kind);
+    };
+    assert_eq!(members.len(), 2);
+    assert_eq!(symbol_name(&result, members[0].name.name), "dic");
+    assert!(members[0].alias.is_none(), "unaliased member stays unaliased");
+    assert_eq!(symbol_name(&result, members[1].name.name), "funde");
+    assert_eq!(
+        symbol_name(&result, members[1].alias.as_ref().expect("alias").name),
+        "output_bytes"
+    );
+}
+
+#[test]
+fn eot_selective_import_trailing_comma_without_following_member() {
+    let result = parse_ok(r#"importa ex "norma:consolum" fixum dic ut output,"#);
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    let StmtKind::Import(import) = &program.statements[0].kind else {
+        panic!("expected import statement");
+    };
+    let ImportKind::Selective { members } = &import.kind else {
+        panic!("expected selective import kind, got {:?}", import.kind);
+    };
+    assert_eq!(members.len(), 1);
+    assert_eq!(symbol_name(&result, members[0].name.name), "dic");
+}
+
+#[test]
+fn eot_selective_import_does_not_consume_following_declaration() {
+    let result = parse_ok(
+        r#"importa ex "norma:consolum" fixum dic ut output, funde ut output_bytes,
+nota "importa-selective"
+"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 2, "import + following declaration");
+
+    let StmtKind::Import(import) = &program.statements[0].kind else {
+        panic!("expected import statement");
+    };
+    let ImportKind::Selective { members } = &import.kind else {
+        panic!("expected selective import kind, got {:?}", import.kind);
+    };
+    assert_eq!(members.len(), 2);
+    assert_eq!(symbol_name(&result, members[0].name.name), "dic");
+    assert_eq!(symbol_name(&result, members[1].name.name), "funde");
+    assert!(
+        matches!(program.statements[1].kind, StmtKind::Scribe(_)),
+        "following declaration must not be consumed as a member"
+    );
+}
+
+#[test]
+fn eot_selective_import_visibility_marker_preserved() {
+    let result = parse_ok(r#"importa ex "norma:consolum" publica fixum dic ut output,"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Import(import) = &program.statements[0].kind else {
+        panic!("expected import statement");
+    };
+    assert_eq!(import.visibility, radix_syntax::Visibility::Publica);
+    let ImportKind::Selective { members } = &import.kind else {
+        panic!("expected selective import kind, got {:?}", import.kind);
+    };
+    assert_eq!(members.len(), 1);
+    assert_eq!(symbol_name(&result, members[0].name.name), "dic");
+}
+
+#[test]
+fn eot_selective_import_empty_list_rejected() {
+    assert_parse_error_matches(
+        r#"importa ex "norma:consolum" fixum"#,
+        ParseExpectation::Issue("selective_import_missing_member"),
+    );
+    assert_parse_error_matches(
+        r#"importa ex "norma:consolum" fixum ,"#,
+        ParseExpectation::Issue("selective_import_missing_member"),
+    );
+}
+
+#[test]
+fn eot_selective_import_malformed_alias_rejected() {
+    assert_parse_error_matches(
+        r#"importa ex "norma:consolum" fixum dic ut"#,
+        ParseExpectation::Issue("selective_import_binding_expected"),
+    );
+    assert_parse_error_matches(
+        r#"importa ex "norma:consolum" fixum dic ut,"#,
+        ParseExpectation::Issue("selective_import_binding_expected"),
+    );
+    assert_parse_error_matches(
+        r#"importa ex "norma:consolum" fixum ut output"#,
+        ParseExpectation::Issue("selective_import_binding_expected"),
+    );
+}
+
+#[test]
+fn eot_selective_import_wildcard_mixing_rejected() {
+    assert_parse_error_matches(
+        r#"importa ex "norma:consolum" fixum * ut all"#,
+        ParseExpectation::Issue("selective_import_wildcard_mixing"),
+    );
+    assert_parse_error_matches(
+        r#"importa ex "norma:consolum" fixum dic, * ut all"#,
+        ParseExpectation::Issue("selective_import_wildcard_mixing"),
+    );
+    assert_parse_error_matches(
+        r#"importa ex "norma:consolum" fixum dic * ut all"#,
+        ParseExpectation::Issue("selective_import_wildcard_mixing"),
+    );
+}
+
+#[test]
+fn eot_selective_import_missing_separator_rejected() {
+    // An unaliased first member (`fixum dic funde`) is genuinely ambiguous with
+    // a following typed `fixum` declaration, so it keeps the following-statement
+    // reading. After an aliased member the list is unambiguous and a bare name
+    // next to it reports the missing separator.
+    assert_parse_error_matches(
+        r#"importa ex "norma:consolum" fixum dic ut output funde"#,
+        ParseExpectation::Issue("item_list_missing_separator"),
+    );
 }

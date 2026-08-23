@@ -296,6 +296,14 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
             ImportKind::Wildcard { alias } => {
                 visitor.visit_ident(alias);
             }
+            ImportKind::Selective { members } => {
+                for member in members {
+                    visitor.visit_ident(&member.name);
+                    if let Some(alias) = &member.alias {
+                        visitor.visit_ident(alias);
+                    }
+                }
+            }
         },
         StmtKind::Probandum(decl) => {
             for setup in &decl.body.setup {

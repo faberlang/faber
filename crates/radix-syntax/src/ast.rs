@@ -538,6 +538,22 @@ pub enum ImportKind {
     Wildcard {
         alias: Ident,
     },
+    Selective {
+        /// Ordered selective members. The list is never empty; an empty or
+        /// wildcard-mixed list is rejected during parse.
+        members: Vec<ImportValueBinding>,
+    },
+}
+
+/// One member of a selective import list: an exported value name plus the
+/// caller-owned local binding it is aliased to when one is spelled.
+#[derive(Debug)]
+pub struct ImportValueBinding {
+    /// Exported value name exactly as spelled in source.
+    pub name: Ident,
+    /// Caller-owned local binding; `None` for an unaliased member.
+    pub alias: Option<Ident>,
+    pub span: Span,
 }
 
 #[derive(Debug)]

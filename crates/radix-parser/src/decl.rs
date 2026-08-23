@@ -1253,6 +1253,8 @@ impl Parser {
     /// GRAMMAR:
     ///   import-decl := `importa` `ex` string [`publica`] import-kind
     ///   import-kind := ident [`ut` ident] | '*' `ut` ident
+    ///                | `fixum` import-value-binding (`,` import-value-binding)* `,`?
+    ///   import-value-binding := ident [`ut` ident]
     ///
     /// The parser only records the import specifier, visibility, and binding
     /// shape. Package and library resolution decide later whether the string
@@ -1304,6 +1306,13 @@ impl Parser {
             self.expect_keyword_ident(TokenKind::Ut, "expected 'ut'")?;
             let alias = self.parse_ident()?;
             ImportKind::Wildcard { alias }
+        } else if self.check_keyword_ident(TokenKind::Fixum)
+            && self.import_fixum_starts_selective_list()
+        {
+            self.eat_keyword_ident(TokenKind::Fixum);
+            ImportKind::Selective {
+                members: self.parse_selective_import_members()?,
+            }
         } else if self.is_import_named_binding_start()
             && (explicit_visibility || !self.import_binding_continues_expression())
             && (explicit_visibility || !matches!(self.peek().kind, TokenKind::Tag))
@@ -1430,10 +1439,117 @@ impl Parser {
     }
 
     fn is_import_named_binding_start(&self) -> bool {
-        match &self.peek().kind {
+        Self::is_import_binding_name(&self.peek().kind)
+    }
+
+    /// Whether a token may occupy an import binding name slot.
+    ///
+    /// Declaration name slots accept every keyword spelling, matching
+    /// `parse_decl_name`; `ut` is excluded only in the selective member parser,
+    /// where it is the alias marker.
+    fn is_import_binding_name(kind: &TokenKind) -> bool {
+        match kind {
             TokenKind::Ident(_) | TokenKind::Underscore(_) | TokenKind::Tag => true,
             kind => keyword_allowed_as_ident(KeywordOwner::DeclarationName, kind).is_some(),
         }
+    }
+
+    /// Whether a `fixum` keyword after the import source opens a selective
+    /// member list instead of starting a following `fixum` statement.
+    ///
+    /// The following-statement reading wins when the token after `fixum` is a
+    /// name followed by an expression continuation (`fixum count ← …`, typed
+    /// declarations, postfix access). The selective reading wins when the list
+    /// is closed or continued (`fixum` at EOF, `fixum dic,`), a wildcard or
+    /// orphaned `ut` member is attempted, or the first member is followed by
+    /// an alias or a declaration keyword.
+    fn import_fixum_starts_selective_list(&self) -> bool {
+        match &self.peek_at(1).kind {
+            TokenKind::Eof | TokenKind::Comma | TokenKind::Star | TokenKind::Ut => true,
+            // `ut` lexes as an identifier and claims the alias marker by
+            // identity; a spelled `fixum … ut …` is a member with no name.
+            TokenKind::Ident(_) if self.keyword_ident_at(1) == Some(TokenKind::Ut) => true,
+            kind if Self::is_import_binding_name(kind) => match &self.peek_at(2).kind {
+                TokenKind::Ut | TokenKind::Eof | TokenKind::Comma | TokenKind::Star => true,
+                TokenKind::Ident(_) => self.keyword_ident_at(2).is_some(),
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
+    fn parse_selective_import_members(&mut self) -> Result<Vec<ImportValueBinding>, ParseError> {
+        let mut members = Vec::new();
+        loop {
+            if members.is_empty() && !Self::is_import_binding_name(&self.peek().kind) {
+                // The first member is mandatory; an empty list is malformed.
+                return Err(match self.peek().kind {
+                    TokenKind::Star => {
+                        self.invalid_import_error("selective_import_wildcard_mixing")
+                    }
+                    _ => self.invalid_import_error("selective_import_missing_member"),
+                });
+            }
+            members.push(self.parse_import_value_binding()?);
+            if !self.eat(&TokenKind::Comma) {
+                if matches!(self.peek().kind, TokenKind::Star) {
+                    return Err(self.invalid_import_error("selective_import_wildcard_mixing"));
+                }
+                if self.import_value_member_starts_here() {
+                    return Err(self.missing_import_separator_error());
+                }
+                break;
+            }
+            if !self.import_value_member_starts_here() {
+                break; // trailing comma
+            }
+        }
+        Ok(members)
+    }
+
+    /// Whether the current token can start another selective member after a
+    /// comma. Keywords are excluded so a following declaration is not consumed
+    /// as a member after a trailing comma; `*` is admitted so a wildcard
+    /// attempt inside the list reports the structured mixing diagnostic.
+    fn import_value_member_starts_here(&self) -> bool {
+        match &self.peek().kind {
+            TokenKind::Ident(sym) => self
+                .keyword_claim_key(*sym)
+                .and_then(lookup_keyword_spec)
+                .is_none(),
+            TokenKind::Underscore(_) | TokenKind::Star => true,
+            _ => false,
+        }
+    }
+
+    fn parse_import_value_binding(&mut self) -> Result<ImportValueBinding, ParseError> {
+        let start = self.current_span();
+        let name = self.parse_import_value_binding_name()?;
+        let alias = if self.eat_keyword_ident(TokenKind::Ut) {
+            Some(self.parse_import_value_binding_name()?)
+        } else {
+            None
+        };
+        let span = start.merge(self.previous_span());
+        Ok(ImportValueBinding { name, alias, span })
+    }
+
+    fn parse_import_value_binding_name(&mut self) -> Result<Ident, ParseError> {
+        let kind = &self.peek().kind;
+        if matches!(kind, TokenKind::Star) {
+            return Err(self.invalid_import_error("selective_import_wildcard_mixing"));
+        }
+        if self.is_import_alias_marker() || !Self::is_import_binding_name(kind) {
+            return Err(self.invalid_import_error("selective_import_binding_expected"));
+        }
+        self.parse_decl_name()
+    }
+
+    /// Whether the current token is the `ut` alias marker — as a dedicated
+    /// token or by keyword identity — which is not a legal member name.
+    fn is_import_alias_marker(&self) -> bool {
+        matches!(self.peek().kind, TokenKind::Ut)
+            || self.keyword_ident_at(0) == Some(TokenKind::Ut)
     }
 
     /// Whether the token after a candidate import binding continues an
@@ -1506,6 +1622,14 @@ impl Parser {
 
     fn invalid_import_error(&self, issue: &'static str) -> ParseError {
         Self::invalid_import_error_at(issue, self.current_span())
+    }
+
+    fn missing_import_separator_error(&self) -> ParseError {
+        ParseError::structured(ParseErrorKind::Expected, self.current_span())
+            .with_arg("issue", "item_list_missing_separator")
+            .with_arg("family", "item_list")
+            .with_arg("position", "selective_import_members")
+            .with_arg("expected", "comma between items")
     }
 
     fn invalid_import_error_at(issue: &'static str, span: radix_lexer::Span) -> ParseError {
