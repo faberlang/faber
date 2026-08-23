@@ -602,10 +602,10 @@ fn generate_lean_source(records: &[&HirAspectRecord]) -> String {
                 // `verify` (it short-circuits to its named finding), and no
                 // fabricated theorem may stand in for it.
                 HirAspectDetail::GatePurityHole { issue } => {
-                    write!(out, "-- gate hole {label}: {} — no proof fabricated\n", issue.label()).ok();
+                    writeln!(out, "-- gate hole {label}: {} — no proof fabricated", issue.label()).ok();
                 }
                 _ => {
-                    write!(out, "-- {label}: no structural contract; no proof fabricated\n").ok();
+                    writeln!(out, "-- {label}: no structural contract; no proof fabricated").ok();
                 }
             },
             _ => {
