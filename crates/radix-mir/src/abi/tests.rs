@@ -1542,6 +1542,39 @@ fn quantized_matmul_contract_resolves_q4k_layout() {
 }
 
 #[test]
+fn quantized_matmul_contract_resolves_m1_decode_dispatch() {
+    // Lane-neutral shared statement (SAB-2): an M=1 quantized dispatch
+    // exists with a single flat grid row — `ceil(N/8)` workgroups along x,
+    // one row. The GEMV body and its thread geometry are per-lane recipe
+    // facts (Metal states them in radix-mir-metal quantized_matmul emit);
+    // ELP-02's lane admission map is the handoff.
+    let mut types = TypeTable::new();
+    let function = packed_binary_function(
+        &mut types,
+        [1, 16],
+        [16, 16],
+        [1, 16],
+        MirCollectionOp::TensorQuantizedMatMul,
+        12,
+    );
+    let validation = MirValidationContext::new(&types);
+    let contract = collection_op_contract(&function, &validation)
+        .expect("M=1 Q4_K facts resolve")
+        .expect("M=1 body carries a packed contract");
+    assert_eq!(
+        contract,
+        CollectionOpContract::QuantizedMatMul {
+            dispatch_x: 2,
+            dispatch_y: 1,
+            m: 1,
+            k: 16,
+            n: 16,
+            layout: PackedStorageLayout::Q4_K,
+        }
+    );
+}
+
+#[test]
 fn quantized_matmul_contract_rejects_unknown_layout() {
     let mut types = TypeTable::new();
     let function = packed_binary_function(
@@ -1651,7 +1684,8 @@ fn v_projection_function(
 #[test]
 fn projection_gemv_dispatch_uses_step_rows_not_seq_const() {
     // Decode continuation: seq const is N+1 (literal sequence position), but
-    // THIS step has one row (M=1). GEMV launch must expand by NR0=4 → ×8.
+    // THIS step has one row (M=1). GEMV launch must expand by the per-lane
+    // dispatch multiplier (×8).
     let mut types = TypeTable::new();
     let function = v_projection_function(&mut types, 1, 10, 2, 3, 4, 24);
     let validation = MirValidationContext::new(&types);

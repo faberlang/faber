@@ -12,12 +12,6 @@ use super::{
     ERR_KERNEL_BUILTIN_UNKNOWN_NAME,
 };
 
-/// Dispatch multiplier for sequence-one projection GEMV.
-///
-/// Four output columns share one 32-lane simdgroup (`NR0=4`, the llama.cpp
-/// `mul_mat_vec_q` mapping), so the flat launch is `N × 8` threads.
-const DECODE_GEMV_LANES: u64 = 8;
-
 pub(crate) fn combined_builtin_dependencies(
     input_builtins: impl IntoIterator<Item = MirKernelBuiltin>,
     called_builtins: &[MirKernelBuiltin],
@@ -622,9 +616,14 @@ pub fn collection_op_contract(
                     let tile: u64 = 8;
                     let m = left_dims[0];
                     let n = right_dims[1];
-                    // M=1 decode: two simdgroups per 8×8 workgroup, four
-                    // output columns each (`NR0=4`). Prefill keeps the tiled
-                    // GEMM grid (same `ceil(N/8)` workgroups along x).
+                    // M=1 quantized dispatch exists as a shared, lane-neutral
+                    // contract: a single flat grid row (same `ceil(N/8)`
+                    // workgroups along x). Whether a device lane carries a
+                    // dedicated GEMV body — and its thread geometry — is a
+                    // per-lane recipe fact (Metal: `radix-mir-metal`
+                    // quantized_matmul emit); the ELP-02 lane admission map
+                    // is the handoff for stating it per lane. Prefill keeps
+                    // the tiled GEMM grid.
                     let (dispatch_x, dispatch_y) = if m == 1 {
                         (n.div_ceil(tile), 1)
                     } else {
@@ -730,6 +729,14 @@ fn packed_rank2_matmul_operands(
         layout,
     ))
 }
+
+/// Flat-dispatch expansion for single-row (M=1) projection GEMV.
+///
+/// The dispatch domain pads the logical output columns by this multiplier;
+/// the concrete thread geometry is a per-lane recipe fact (Metal states it
+/// in `radix-mir-metal` quantized_matmul emit). The ELP-02 lane admission
+/// map is the handoff for owning it per lane.
+const PROJECTION_GEMV_DISPATCH_LANES: u64 = 8;
 
 fn batched_attention_contract(
     function: &MirFunction,
@@ -847,17 +854,16 @@ fn batched_attention_contract(
             .checked_mul(*dim)
             .ok_or_else(|| MirAbiError::new("batched attention output size overflow"))
     })?;
-    // Single-row Q/K/V projections are lowered as one simdgroup per four
-    // output columns (`NR0=4`).  The logical output shape stays unchanged;
-    // the flat launch is `N × 8` so 32 lanes reduce four packed columns.
-    // GEMV selection off (CTO `f083c057`) keeps the logical, unpadded
-    // output: the batched body needs no padded dispatch domain.
+    // Single-row Q/K/V projections expand the flat output domain by the
+    // per-lane GEMV dispatch multiplier. The logical output shape stays
+    // unchanged. GEMV selection off (CTO `f083c057`) keeps the logical,
+    // unpadded output: the batched body needs no padded dispatch domain.
     let output_elements = if is_projection
         && step_rows == 1
         && crate::device_program_plans::DECODE_GEMV_SELECTION_ENABLED
     {
         output_elements
-            .checked_mul(DECODE_GEMV_LANES)
+            .checked_mul(PROJECTION_GEMV_DISPATCH_LANES)
             .ok_or_else(|| MirAbiError::new("decode GEMV dispatch size overflow"))?
     } else {
         output_elements
