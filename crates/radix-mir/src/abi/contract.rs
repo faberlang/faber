@@ -1,6 +1,6 @@
 use crate::{
-    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirOperand, MirParam, MirRuntimeCall,
-    MirStatementKind, MirValidationContext,
+    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirOperand, MirParam,
+    MirPlaceBase, MirRuntimeCall, MirStatementKind, MirValidationContext,
 };
 use radix_lexer::Interner;
 
@@ -302,6 +302,33 @@ pub(crate) fn apply_collection_op_contract(
     signature: &mut MirKernelSignature,
     validation: &MirValidationContext<'_>,
 ) -> Result<(), MirAbiError> {
+    // SFR-6: a `FilumSum` declaration is the author-stated recipe — it has
+    // no collection-op contract, so the collection scan below never sees
+    // it. The native collective arm needs the declaration's launch shape
+    // (workgroup = lane width W, dispatch = source length, one partial
+    // slot per workgroup) from the same facts the plan pass resolves
+    // (`kernel_plan_for_function`'s declared-recipe scan).
+    if let Some((lane_width, length)) = filum_declaration_launch_facts(function, validation)? {
+        let partials = if lane_width == 0 {
+            return Err(MirAbiError::new(
+                "filum summa lane width must be non-zero",
+            ));
+        } else {
+            length.div_ceil(u64::from(lane_width))
+        };
+        signature.workgroup = MirWorkgroupSize {
+            x: lane_width,
+            y: 1,
+            z: 1,
+        };
+        signature.dispatch_size = MirKernelDispatchSize {
+            x: length,
+            y: 1,
+            z: 1,
+        };
+        signature.output.element_count = partials;
+        return Ok(());
+    }
     let Some(contract) = collection_op_contract(function, validation)? else {
         return Ok(());
     };
@@ -405,6 +432,46 @@ pub(crate) fn apply_collection_op_contract(
         }
     }
     Ok(())
+}
+
+/// The launch facts of the kernel body's `FilumSum` declaration (SFR-6):
+/// `(lane width W, source length K)` resolved from the declaration's lone
+/// tensor operand type — `None` when the body declares none.
+fn filum_declaration_launch_facts(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> Result<Option<(u32, u64)>, MirAbiError> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let MirStatementKind::RuntimeCall {
+                call:
+                    MirRuntimeCall {
+                        intrinsic: MirIntrinsic::FilumSum(filum),
+                        args,
+                        ..
+                    },
+                ..
+            } = &statement.kind
+            else {
+                continue;
+            };
+            let Some(MirOperand::Place(place)) = args.first() else {
+                continue;
+            };
+            if !place.projections.is_empty() {
+                continue;
+            }
+            let MirPlaceBase::Local(source_local) = place.base else {
+                continue;
+            };
+            let Some(param) = function.params.iter().find(|p| p.local == source_local) else {
+                continue;
+            };
+            let length = device_view_element_count(param.ty, validation)?;
+            return Ok(Some((filum.lane_width, length)));
+        }
+    }
+    Ok(None)
 }
 
 /// Detect a collection-op kernel and resolve its dispatch contract from the
