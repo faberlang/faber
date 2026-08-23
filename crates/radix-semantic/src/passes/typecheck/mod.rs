@@ -675,6 +675,10 @@ mod register_conversio_test;
 mod bits_conversio_test;
 
 #[cfg(test)]
+#[path = "bf16_conversio_test.rs"]
+mod bf16_conversio_test;
+
+#[cfg(test)]
 #[path = "octeti_lista_conversio_test.rs"]
 mod octeti_lista_conversio_test;
 

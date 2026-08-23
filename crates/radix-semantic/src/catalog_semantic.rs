@@ -708,7 +708,7 @@ fn semantic_invalid_conversion_message(args: &[DiagnosticArg]) -> Option<String>
             "conversion from octeti to fractus is unspecified (IEEE width and endianness); use `chorda` or explicit byte verbs instead".to_owned(),
         ),
         "bits_pair_width_mismatch" => Some(
-            "the Bits bitcast requires exact-width pairs: numerus<u32> ↔ fractus<f32> and numerus<u64> ↔ fractus<f64>".to_owned(),
+            "the Bits bitcast requires exact-width pairs: numerus<u16> ↔ fractus<bf16>, numerus<u32> ↔ fractus<f32>, or numerus<u64> ↔ fractus<f64>".to_owned(),
         ),
         "octeti_to_bivalens_unsupported" => {
             Some("conversion from octeti to bivalens has no default meaning; decode to textus or compare bytes explicitly".to_owned())
@@ -820,7 +820,7 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("use a window of 2, 4, or 8 bytes matching i16/u16, i32/u32, or i64/u64".to_owned())
         }
         "bits_pair_width_mismatch" => {
-            Some("convert to the matching IEEE width first: u32 pairs with f32, u64 with f64".to_owned())
+            Some("convert to the matching IEEE width first: u16 pairs with bf16, u32 with f32, or u64 with f64".to_owned())
         }
         "ascii_format_hint_not_capacity" => {
             Some("write ascii<N, Hex>, ascii<N, Bin>, or ascii<N, Oct> with N as digit width".to_owned())

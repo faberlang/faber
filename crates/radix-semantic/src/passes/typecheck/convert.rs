@@ -1007,11 +1007,14 @@ impl TypeChecker<'_> {
             (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Bivalens) => {
                 Some(ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED)
             }
+            // `Bits` is also checked for same-family pairs below. That keeps
+            // `bf16 ↔ f16` a value conversion only; it is never an integer
+            // view or a silently widened f32 route.
             (PrimitiveConversioFamily::Numerus, PrimitiveConversioFamily::Fractus)
             | (PrimitiveConversioFamily::Fractus, PrimitiveConversioFamily::Numerus) => {
                 self.bits_pair_issue(source_ty, target_resolved, params)
             }
-            _ => None,
+            _ => self.bits_pair_issue(source_ty, target_resolved, params),
         };
 
         if let Some(issue) = issue {
@@ -1072,8 +1075,10 @@ impl TypeChecker<'_> {
             .any(|param| matches!(interner.resolve(*param), "Be" | "Le"))
     }
 
-    /// `Bits` is an exact-width IEEE bitcast: `u16↔f16`, `u32↔f32` and
-    /// `u64↔f64` only. Any other pair (or unsized primitive) fail-closes;
+    /// `Bits` is an exact-width IEEE bitcast: `u16↔bf16`, `u16↔f16`,
+    /// `u32↔f32`, and `u64↔f64` only. `bf16` is the top half of an f32
+    /// value, not an f16 representation, so `bf16↔f16` remains an ordinary
+    /// value conversion. Any other pair (or unsized primitive) fail-closes;
     /// without the hint the ordinary value-conversion families stay in charge.
     fn bits_pair_issue(
         &self,
@@ -1095,6 +1100,9 @@ impl TypeChecker<'_> {
         let exact_pair = matches!(
             (source, target),
             (
+                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16),
+                Type::SizedNumeric(Primitive::Fractus, NumericWidth::BF16)
+            ) | (
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32),
                 Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32)
             ) | (
@@ -1103,6 +1111,9 @@ impl TypeChecker<'_> {
             ) | (
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64),
                 Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64)
+            ) | (
+                Type::SizedNumeric(Primitive::Fractus, NumericWidth::BF16),
+                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16)
             ) | (
                 Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32),
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)
