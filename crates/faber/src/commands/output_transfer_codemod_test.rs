@@ -67,6 +67,26 @@ incipit {
 }
 
 #[test]
+fn declines_unsupported_locale_through_the_structured_header_decline() {
+    // The None arm of the surface-header let-else: an explicit unknown reader
+    // locale yields no safe header, so the rewrite declines instead of
+    // panicking. Proven at the rewrite seam; the command layer surfaces this
+    // locale error before the decline print.
+    let source = r#"+++
+locale = "fr"
++++
+incipit {
+    nota "salve"
+}
+"#;
+    let (rewritten, count, declines) = super::rewrite_source(source).expect("source lexes");
+    assert_eq!(count, 0);
+    assert_eq!(declines.len(), 1);
+    assert_decline(&declines[0], "unsupported_locale");
+    assert_eq!(rewritten, source);
+}
+
+#[test]
 fn cli_exposes_the_dedicated_output_transfer_codemod_command() {
     let cli = crate::cli::Cli::try_parse_from([
         "faber",

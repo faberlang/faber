@@ -255,22 +255,24 @@ fn rewrite_source(source: &str) -> Result<(String, usize, Vec<DeclineReason>), S
         return Ok((source.to_owned(), 0, declines));
     }
 
-    if surface == Surface::Unsupported {
+    // The None arm covers every surface without a safe source-local header
+    // (unknown reader locale): such sources decline instead of panicking.
+    let Some(header) = surface.header() else {
         if lexed
             .tokens
             .iter()
             .any(|token| token_text(body, token) == "print" || token_text(body, token) == "nota")
         {
-            declines.push(DeclineReason {
-                code: "unsupported_locale".to_owned(),
-                message: "the codemod has no safe source-local header for this reader locale"
-                    .to_owned(),
-                start: body_offset as u32,
-                end: source.len() as u32,
-            });
+            declines.push(reason(
+                "unsupported_locale",
+                "the codemod has no safe source-local header for this reader locale",
+                body_offset,
+                0,
+                source.len() - body_offset,
+            ));
         }
         return Ok((source.to_owned(), 0, declines));
-    }
+    };
 
     if let Some(token) = lexed
         .tokens
@@ -394,7 +396,7 @@ fn rewrite_source(source: &str) -> Result<(String, usize, Vec<DeclineReason>), S
     }
     let mut rewritten = String::with_capacity(source.len() + 96);
     rewritten.push_str(&source[..body_offset]);
-    rewritten.push_str(surface.header().expect("supported surface header"));
+    rewritten.push_str(header);
     rewritten.push_str(&rewritten_body);
     Ok((rewritten, replacements.len(), declines))
 }
