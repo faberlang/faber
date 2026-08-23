@@ -401,6 +401,68 @@ impl FunctionBuilder<'_> {
         Some(MirOperand::Constant(MirConstant::Unit))
     }
 
+    /// Lower the sequential `summa ex` spelling to a MIR fold over the shared
+    /// apud tensor-iteration arm (SFR-4).
+    ///
+    /// The accumulator starts at the `+` identity; a valued `redde` in the
+    /// term body adds its value into the accumulator (through the summa fold
+    /// context, never as a function return) and continues the iteration loop.
+    /// The distributed `filum` spelling stays unsupported here — SFR-5 lowers
+    /// it through the kernel-plan entry instead of inline base-lane MIR.
+    pub(super) fn lower_summa_expr(
+        &mut self,
+        source: &HirExpression,
+        coordinates: &[(DefId, Symbol)],
+        filum: Option<&(DefId, Symbol)>,
+        binding: &(DefId, Symbol),
+        body: &HirBlock,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        if filum.is_some() {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "filum summa before distributed reduction MIR lowering",
+            ));
+            return None;
+        }
+        let Some(term_ty) = expr.ty else {
+            self.errors
+                .push(MirError::missing_type(expr.span, "summa term type"));
+            return None;
+        };
+        let term_mir_ty = MirType::semantic(term_ty);
+        let zero = match self.types.get(term_ty) {
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => MirConstant::Float(0.0),
+            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => MirConstant::Int(0),
+            _ => {
+                self.errors.push(MirError::unsupported(
+                    expr.span,
+                    "summa term before numeric scalar MIR lowering",
+                ));
+                return None;
+            }
+        };
+        let accumulator = self.next_local_id();
+        self.locals
+            .push(MirLocalDecl { id: accumulator, name: None, ty: term_mir_ty, mutable: true, span: expr.span });
+        self.assign(MirPlace::local(accumulator), MirOperand::Constant(zero), term_mir_ty, expr.span);
+        let previous_fold = self
+            .summa_fold
+            .replace(SummaFoldContext { accumulator, ty: term_mir_ty });
+        let lowered = self.lower_array_itera(ArrayIteraLowering {
+            mode: HirIteraMode::Ex,
+            coordinates,
+            binding: binding.0,
+            name: binding.1,
+            iter: source,
+            body,
+            span: expr.span,
+        });
+        self.summa_fold = previous_fold;
+        lowered?;
+        Some(MirOperand::Place(MirPlace::local(accumulator)))
+    }
+
     /// Lower the literal `elige` subset into a MIR switch.
     ///
     /// HIR represents `elige` as `Discerne` with one scrutinee and literal

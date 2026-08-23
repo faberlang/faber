@@ -4933,3 +4933,81 @@ fn conversio_assign_chain_lowers_inner_then_outer_conversion() {
     assert_eq!(count_occurrences(&dump, " = %"), 2, "chain must store once per link:\n{dump}");
     assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
 }
+
+// ---------------------------------------------------------------------------
+// SFR-4: sequential `summa ex` MIR fold over the apud tensor-iteration arm
+// ---------------------------------------------------------------------------
+
+#[test]
+fn sequential_summa_identity_term_lowers_to_a_fold() {
+    // Identity term: every element folds with `+` from a zero accumulator —
+    // the sequential spelling of `a.summa()`.
+    let dump = dump_source(
+        r"functio total(tensor<f32, [8]> a) → f32 {
+    redde summa ex a apud [i] fixum s { redde s }
+}",
+    );
+    assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
+    assert!(dump.contains("0.0"), "accumulator zero-init must be present:\n{dump}");
+    assert!(dump.contains("+"), "the fold combine must be an add:\n{dump}");
+}
+
+#[test]
+fn sequential_summa_without_apud_lowers_rank1() {
+    let dump = dump_source(
+        r"functio total(tensor<f32, [8]> a) → f32 {
+    redde summa ex a fixum s { redde s }
+}",
+    );
+    assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
+}
+
+#[test]
+fn sequential_summa_numerus_term_folds_int_zero() {
+    let dump = dump_source(
+        r"functio total(tensor<i32, [4]> a) → i32 {
+    redde summa ex a apud [i] fixum s { redde s }
+}",
+    );
+    assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
+    assert!(
+        dump.contains("const int 0"),
+        "numerus accumulator zero-init must be present:\n{dump}"
+    );
+}
+
+#[test]
+fn sequential_summa_transformed_term_folds_per_element_body() {
+    // Non-identity term: the body's local mutation still folds once per
+    // element — term `s + 1.0` over 8 lanes.
+    let dump = dump_source(
+        r"functio total(tensor<f32, [8]> a) → f32 {
+    redde summa ex a apud [i] fixum s {
+        varia f32 t ← s
+        t ← t + 1.0
+        redde t
+    }
+}",
+    );
+    assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
+    assert!(
+        dump.contains("runtime collection tensor_get"),
+        "element gather must ride the tensor arm:\n{dump}"
+    );
+}
+
+#[test]
+fn filum_summa_stays_unsupported_before_sfr5() {
+    let mut unit = analyze(
+        r"@ nucleum
+functio k(tensor<f32, [256]> a) → f32 {
+    redde summa ex a apud [i] filum f fixum s { redde s }
+}",
+    );
+    let errors = dump_analyzed_unit(&mut unit).expect_err("filum summa must fail closed pre-SFR-5");
+    assert!(
+        errors.iter().any(|err| err.issue.contains("filum_summa")),
+        "expected a filum summa unsupported issue, got: {:?}",
+        errors.iter().map(|err| &err.issue).collect::<Vec<_>>()
+    );
+}

@@ -82,6 +82,9 @@ pub(super) trait HirExpressionLoweringVisitor {
             HirExpressionKind::Itera(mode, coordinates, binding, name, iter, block) => {
                 self.visit_itera_expr(*mode, coordinates, *binding, *name, iter, block, expr)
             }
+            HirExpressionKind::Summa { source, coordinates, filum, binding, body } => {
+                self.visit_summa_expr(source, coordinates, filum.as_ref(), binding, body, expr)
+            }
             HirExpressionKind::Handled { body, catch } => self.visit_handled_expr(body, catch, expr),
             HirExpressionKind::Assign(_, _) => self.visit_assignment_expr(expr),
             HirExpressionKind::ConversioAssign { .. } => self.visit_conversio_assign_expr(expr),
@@ -240,6 +243,15 @@ pub(super) trait HirExpressionLoweringVisitor {
         name: Symbol,
         iter: &HirExpression,
         block: &HirBlock,
+        expr: &HirExpression,
+    ) -> Option<MirOperand>;
+    fn visit_summa_expr(
+        &mut self,
+        source: &HirExpression,
+        coordinates: &[(DefId, Symbol)],
+        filum: Option<&(DefId, Symbol)>,
+        binding: &(DefId, Symbol),
+        body: &HirBlock,
         expr: &HirExpression,
     ) -> Option<MirOperand>;
     fn visit_handled_expr(&mut self, body: &HirBlock, catch: &HirCape, expr: &HirExpression) -> Option<MirOperand>;
@@ -561,6 +573,18 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         outer: &HirExpression,
     ) -> Option<MirOperand> {
         self.lower_type_check(positive, ty, expr, outer)
+    }
+
+    fn visit_summa_expr(
+        &mut self,
+        source: &HirExpression,
+        coordinates: &[(DefId, Symbol)],
+        filum: Option<&(DefId, Symbol)>,
+        binding: &(DefId, Symbol),
+        body: &HirBlock,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        self.lower_summa_expr(source, coordinates, filum, binding, body, expr)
     }
 
     fn visit_unsupported_expr(&mut self, kind: &HirExpressionKind, expr: &HirExpression) -> Option<MirOperand> {

@@ -593,22 +593,34 @@ fn ensure_itera_coordinate_array_types(hir: &crate::hir::HirModule, types: &mut 
 
     impl HirVisitor for IteraCoordinateCollector<'_> {
         fn visit_expr(&mut self, expr: &HirExpression) {
-            if let HirExpressionKind::Itera(_, coordinates, _, _, iter, _) = &expr.kind {
-                if !coordinates.is_empty() {
-                    let mut iter_ty = iter.ty;
-                    while let Some(ty) = iter_ty {
-                        match self.types.get(ty) {
-                            Type::Alias(_, inner) => iter_ty = Some(*inner),
-                            Type::Tensor(element, _) | Type::Matrix(element, _) => {
-                                self.elements.insert(*element);
-                                break;
-                            }
-                            _ => break,
-                        }
-                    }
+            match &expr.kind {
+                HirExpressionKind::Itera(_, coordinates, _, _, iter, _) if !coordinates.is_empty() => {
+                    self.collect_shaped_element(iter);
                 }
+                // The sequential `summa ex` fold rides the shaped itera arm
+                // (SFR-4), so its coordinate list needs the same array types.
+                HirExpressionKind::Summa { source, coordinates, .. } if !coordinates.is_empty() => {
+                    self.collect_shaped_element(source);
+                }
+                _ => {}
             }
             walk_expr(self, expr);
+        }
+    }
+
+    impl IteraCoordinateCollector<'_> {
+        fn collect_shaped_element(&mut self, iter: &HirExpression) {
+            let mut iter_ty = iter.ty;
+            while let Some(ty) = iter_ty {
+                match self.types.get(ty) {
+                    Type::Alias(_, inner) => iter_ty = Some(*inner),
+                    Type::Tensor(element, _) | Type::Matrix(element, _) => {
+                        self.elements.insert(*element);
+                        break;
+                    }
+                    _ => break,
+                }
+            }
         }
     }
 
@@ -1100,6 +1112,15 @@ struct BreakableContext {
     rumpe_used: bool,
 }
 
+/// Active `summa ex` sequential fold (SFR-4): a valued `redde` inside the
+/// term body adds into `accumulator` with `+` and continues the iteration
+/// loop instead of returning from the enclosing function.
+#[derive(Debug, Clone, Copy)]
+struct SummaFoldContext {
+    accumulator: MirLocalId,
+    ty: MirType,
+}
+
 #[derive(Debug, Clone)]
 struct HandlerContext {
     error_place: MirPlace,
@@ -1270,6 +1291,7 @@ struct FunctionBuilder<'a> {
     blocks: Vec<OpenBlock>,
     current: Option<MirBlockId>,
     breakables: Vec<BreakableContext>,
+    summa_fold: Option<SummaFoldContext>,
     handlers: Vec<HandlerContext>,
     materializing_consts: FxHashSet<DefId>,
     errors: Vec<MirError>,
@@ -1310,6 +1332,7 @@ impl<'a> FunctionBuilder<'a> {
             blocks: Vec::new(),
             current: None,
             breakables: Vec::new(),
+            summa_fold: None,
             handlers: Vec::new(),
             materializing_consts: FxHashSet::default(),
             errors: Vec::new(),

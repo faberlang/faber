@@ -1,0 +1,58 @@
++++
+term = "summa"
+kind = "expression"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "incipit_stmt", "fixum_decl", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Sequential sum-reduce expression: summa ex <tensor> apud [i] fixum s { redde <term> }."
+syntax = "summa ex <source> apud [coords] fixum <binder> { redde <term> }"
+related = ["tensor", "apud", "filum"]
+locale = "la"
++++
+
+# =============================================================================
+# summa — one-expression sequential sum-reduce over a tensor
+# =============================================================================
+#
+# What this teaches:
+#   • Sequential fold — `summa ex` lowers to a MIR fold over the tensor's
+#     apud iteration arm: a `+` accumulator seeded at zero, one term per
+#     element, `redde` inside the body yields the term value.
+#   • Identity term — `redde s` is the sequential spelling of `a.summa()`;
+#     the printed pair matches under the numeric tolerance contract.
+#   • Transformed term — the body may compute any numeric scalar term from
+#     the bound element (here `s + 1.0` per lane).
+#
+# Common mistakes:
+#   • non-scalar terms — the term must be a numeric scalar (fractus/numerus)
+#   • the distributed `filum` spelling is admitted only inside `@ nucleum`
+#     kernels (v1)
+#
+# See also: tensor, apud, filum
+# =============================================================================
+
+functio identity(tensor<f32, [8]> a) → f32 {
+    redde summa ex a apud [i] fixum s { redde s }
+}
+
+functio shifted(tensor<f32, [8]> a) → f32 {
+    redde summa ex a apud [i] fixum s {
+        varia f32 t ← s
+        t ← t + 1.0
+        redde t
+    }
+}
+
+incipit {
+    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    fixum tf32[] seed ← vacua
+    fixum tf32[8] a ← seed.strue(flat, [8])
+
+    fixum f32 per_summam ← a.summa()
+    fixum f32 plicatum ← identity(a)
+    fixum f32 summam_totam ← shifted(a)
+
+    nota per_summam
+    nota plicatum
+    nota summam_totam
+}

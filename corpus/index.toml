@@ -2743,6 +2743,12 @@ kind = "existing-home"
 category = "collection"
 
 [[files]]
+path = "summa/summa.fab"
+term = "summa"
+kind = "expression"
+category = "collection"
+
+[[files]]
 path = "lista/methodi-mutatio.fab"
 term = "lista"
 kind = "keyword"

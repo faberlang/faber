@@ -60,11 +60,45 @@ impl HirVisitor for FunctionBuilder<'_> {
             }
             HirStatementKind::Expr(expr) => self.visit_expr(expr),
             HirStatementKind::Redde(Some(expr)) => {
+                // Inside a `summa ex` term body (SFR-4), `redde` yields the
+                // term value: fold it into the accumulator and continue the
+                // iteration loop rather than returning from the function.
+                if let Some(fold) = self.summa_fold {
+                    let Some(value) = self.lower_expr_value(expr) else {
+                        return;
+                    };
+                    let combined = self.binary_temp(
+                        MirBinOp::Add,
+                        MirOperand::Place(MirPlace::local(fold.accumulator)),
+                        value,
+                        fold.ty,
+                        stmt.span,
+                    );
+                    self.assign(MirPlace::local(fold.accumulator), combined, fold.ty, stmt.span);
+                    match self
+                        .breakables
+                        .last()
+                        .and_then(|context| context.perge_target)
+                    {
+                        Some(continue_target) => {
+                            self.terminate_current(MirTerminatorKind::Goto(continue_target), stmt.span);
+                        }
+                        None => self
+                            .errors
+                            .push(MirError::unsupported(stmt.span, "summa redde outside its iteration loop")),
+                    }
+                    return;
+                }
                 if let Some(value) = self.lower_return_expr(expr) {
                     self.terminate_current(MirTerminatorKind::Return(Some(value)), stmt.span);
                 }
             }
             HirStatementKind::Redde(None) => {
+                if self.summa_fold.is_some() {
+                    self.errors
+                        .push(MirError::unsupported(stmt.span, "summa redde without a term value"));
+                    return;
+                }
                 self.terminate_current(MirTerminatorKind::Return(None), stmt.span);
             }
             HirStatementKind::Rumpe => self.lower_rumpe(stmt.span),
