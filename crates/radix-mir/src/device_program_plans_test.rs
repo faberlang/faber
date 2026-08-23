@@ -4037,7 +4037,10 @@ fn distributed_sum_floor_is_the_tree_reduction_recipe() {
         RecipeKind::from_plan(&declared),
         RecipeKind::from_plan(&recognized)
     );
-    assert_eq!(plan_shared_memory_bytes(&declared), plan_shared_memory_bytes(&recognized));
+    assert_eq!(
+        plan_shared_memory_bytes(&declared),
+        plan_shared_memory_bytes(&recognized)
+    );
     let _ = validation;
 }
 

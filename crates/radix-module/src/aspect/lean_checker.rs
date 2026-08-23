@@ -299,33 +299,6 @@ impl LeanAspectChecker {
         is_bare_or_found(&self.config.lake_bin) && is_bare_or_found(&self.config.lean_bin)
     }
 
-    /// Run `lean` on a single `.lean` file and return combined stdout+stderr.
-    fn run_lean_command(&self, file_path: &Path) -> String {
-        if !self.toolchain_available() {
-            return format!("lean ({}) not found on PATH", self.config.lean_bin.display());
-        }
-
-        match std::process::Command::new(&self.config.lean_bin)
-            .arg(file_path)
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .output()
-        {
-            Ok(output) => {
-                let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-                let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-                if stdout.is_empty() {
-                    stderr
-                } else {
-                    stdout
-                }
-            }
-            Err(error) => {
-                format!("failed to launch lean: {error}")
-            }
-        }
-    }
-
     /// Run `lean` with an explicit `LEAN_PATH` so wrapper imports resolve
     /// against the built module.
     fn run_lean_command_with_lean_path(&self, file_path: &Path, lean_path: &str) -> String {

@@ -12,8 +12,7 @@ use super::validate::{
     validate_causal_masked_softmax_plan, validate_distributed_sum_plan, validate_gather_plan,
     validate_grouped_matmul_plan, validate_matmul_plan, validate_quantized_matmul_plan,
     validate_reduction_plan, validate_rms_normalization_plan, validate_rope_plan,
-    validate_ssm_conv1d_plan, validate_ssm_scan_plan, validate_transpose_plan,
-    PlanValidationError,
+    validate_ssm_conv1d_plan, validate_ssm_scan_plan, validate_transpose_plan, PlanValidationError,
 };
 use crate::abi::{CollectionOpContract, MirKernelSignature};
 use crate::{

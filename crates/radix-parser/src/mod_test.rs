@@ -4659,7 +4659,10 @@ fn eot_selective_import_mixed_aliased_and_unaliased_members() {
     };
     assert_eq!(members.len(), 2);
     assert_eq!(symbol_name(&result, members[0].name.name), "dic");
-    assert!(members[0].alias.is_none(), "unaliased member stays unaliased");
+    assert!(
+        members[0].alias.is_none(),
+        "unaliased member stays unaliased"
+    );
     assert_eq!(symbol_name(&result, members[1].name.name), "funde");
     assert_eq!(
         symbol_name(&result, members[1].alias.as_ref().expect("alias").name),
@@ -4690,7 +4693,11 @@ nota "importa-selective"
 "#,
     );
     let program = result.program.as_ref().expect("program");
-    assert_eq!(program.statements.len(), 2, "import + following declaration");
+    assert_eq!(
+        program.statements.len(),
+        2,
+        "import + following declaration"
+    );
 
     let StmtKind::Import(import) = &program.statements[0].kind else {
         panic!("expected import statement");

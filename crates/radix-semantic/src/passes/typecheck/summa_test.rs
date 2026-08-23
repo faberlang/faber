@@ -44,7 +44,11 @@ fn assert_rejects_with_issue(source: &str, issue: &str) -> crate::SemanticError 
     );
     let err = find_error(&result, issue)
         .unwrap_or_else(|| panic!("missing {issue:?} in {:?}", result.diagnostics));
-    assert_eq!(crate::semantic_spec(err.kind).code, "SEM010", "issue {issue:?}");
+    assert_eq!(
+        crate::semantic_spec(err.kind).code,
+        "SEM010",
+        "issue {issue:?}"
+    );
     err
 }
 

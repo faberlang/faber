@@ -573,7 +573,9 @@ fn layout_kind_for_type(
         | Type::Error => LayoutResolution::NoLayout,
         Type::Array(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Array)),
         Type::Map(_, _) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Map)),
-        Type::Record(_) => LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Record)),
+        Type::Record(_) => {
+            LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Record))
+        }
         Type::Set(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Set)),
         Type::Tensor(element, shape) => tensor_layout_kind(types, *element, *shape, memo, visiting),
         Type::Sparsa(element, figura) => {
@@ -593,7 +595,9 @@ fn layout_kind_for_type(
             bounded_text_layout_kind(MirAggregateFamily::BoundedAscii, types, *capacity)
         }
         Type::Option(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Option)),
-        Type::Struct(_) => LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Struct)),
+        Type::Struct(_) => {
+            LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Struct))
+        }
         Type::Enum(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Enum)),
         Type::Union(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Union)),
         Type::Tuple(_) => LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Tuple)),

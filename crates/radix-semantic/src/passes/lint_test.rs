@@ -1104,11 +1104,7 @@ fn selective_import_lint_warns_unused_member_per_binding() {
         r#"importa ex "norma:consolum" fixum dic ut output, funde,
 incipit { nota output }"#,
     );
-    assert!(
-        result.is_ok(),
-        "diagnostics: {:?}",
-        result.diagnostics
-    );
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
     let unused: Vec<_> = result
         .diagnostics
         .iter()
@@ -1126,8 +1122,14 @@ incipit { nota output }"#,
     let mut interner = result.interner.clone();
     let output_name = interner.intern("output");
     let funde_name = interner.intern("funde");
-    let output_def = result.resolver.lookup(output_name).expect("used alias DefId");
-    let funde_def = result.resolver.lookup(funde_name).expect("unused member DefId");
+    let output_def = result
+        .resolver
+        .lookup(output_name)
+        .expect("used alias DefId");
+    let funde_def = result
+        .resolver
+        .lookup(funde_name)
+        .expect("unused member DefId");
     assert_ne!(output_def, funde_def);
 }
 
@@ -1147,8 +1149,14 @@ incipit { output("salve") }"#,
 
     let output_name = result.interner.intern("output");
     let funde_name = result.interner.intern("funde");
-    let output_def = result.resolver.lookup(output_name).expect("used alias DefId");
-    let funde_def = result.resolver.lookup(funde_name).expect("unused member DefId");
+    let output_def = result
+        .resolver
+        .lookup(output_name)
+        .expect("used alias DefId");
+    let funde_def = result
+        .resolver
+        .lookup(funde_name)
+        .expect("unused member DefId");
 
     // One ImportBinding receipt per selective member, on its own DefId.
     // (ImportBinding receipts are keyed, not use-site indexed; scan `uses`.)

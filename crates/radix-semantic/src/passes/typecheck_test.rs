@@ -2329,7 +2329,10 @@ incipit { tacet }"#,
         .resolver
         .lookup(pi_name)
         .expect("const alias binding DefId");
-    let symbol = result.resolver.get_symbol(def_id).expect("const alias symbol");
+    let symbol = result
+        .resolver
+        .get_symbol(def_id)
+        .expect("const alias symbol");
     assert_eq!(
         symbol.ty,
         Some(result.types.primitive(crate::Primitive::Fractus)),
@@ -2394,4 +2397,3 @@ incipit { tacet }"#,
         .expect("legacy import item");
     assert!(!legacy_import.selective, "namespace import stays unmarked");
 }
-

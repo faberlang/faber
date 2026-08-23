@@ -141,8 +141,7 @@ fn allowlisted_and_out_of_scope_surfaces_still_spawn() {
         "crates/exempla/src/exempla_e2e/llvm_runtime.rs",
     ] {
         let path = workspace.join(rel);
-        let content = fs::read_to_string(&path)
-            .unwrap_or_else(|err| panic!("read {rel}: {err}"));
+        let content = fs::read_to_string(&path).unwrap_or_else(|err| panic!("read {rel}: {err}"));
         let scrubbed = hygiene_ratchet::scrub_rust_source(&content);
         assert!(
             scrubbed.contains("Command::new"),

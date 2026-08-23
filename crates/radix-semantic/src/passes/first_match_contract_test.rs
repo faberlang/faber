@@ -25,9 +25,7 @@ fn analyze(source: &str) -> Vec<SemanticError> {
          {:?}",
         parse.errors
     );
-    let program = parse
-        .program
-        .expect("successful parse yields a program");
+    let program = parse.program.expect("successful parse yields a program");
     let config = PassConfig::for_target(Target::MirWasm);
     crate::analyze(&program, &config, &mut parse.interner).diagnostics
 }

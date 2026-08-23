@@ -88,9 +88,7 @@ pub fn runner_dispatch_status(family: MirRuntimeAbiFamily) -> RunnerDispatchStat
         // script runner rejects it by target policy.
         MirRuntimeAbiFamily::RuntimeFilumSum
         | MirRuntimeAbiFamily::RuntimeAtomic
-        | MirRuntimeAbiFamily::RuntimeGpuBuiltin => {
-            RunnerDispatchStatus::IntentionalReject
-        }
+        | MirRuntimeAbiFamily::RuntimeGpuBuiltin => RunnerDispatchStatus::IntentionalReject,
     }
 }
 

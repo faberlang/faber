@@ -185,10 +185,7 @@ fn prefix_closure_law_bf16_never_decomposes() {
     assert_eq!(sparsa_sugar_width_marker("bf16"), None);
     // The hazard the law prevents: `b` + `f16` *is* a valid decomposition, so
     // the `b` prefix stays excluded from the sugar prefix set forever.
-    assert_eq!(
-        super::width_prefixed_sugar_marker("bf16", 'b'),
-        Some("f16")
-    );
+    assert_eq!(super::width_prefixed_sugar_marker("bf16", 'b'), Some("f16"));
 }
 
 #[test]

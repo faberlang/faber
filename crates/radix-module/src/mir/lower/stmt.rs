@@ -77,10 +77,9 @@ impl HirVisitor for FunctionBuilder<'_> {
                         Some(exit_target) => {
                             self.terminate_current(MirTerminatorKind::Goto(exit_target), stmt.span);
                         }
-                        None => self.errors.push(MirError::unsupported(
-                            stmt.span,
-                            "filum redde outside its captured term body",
-                        )),
+                        None => self
+                            .errors
+                            .push(MirError::unsupported(stmt.span, "filum redde outside its captured term body")),
                     }
                     return;
                 }

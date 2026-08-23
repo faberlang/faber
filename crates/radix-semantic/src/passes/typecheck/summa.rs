@@ -12,10 +12,10 @@
 //! is checked under a term return contract so every `redde` in the body is
 //! unified against the term type rather than the enclosing function's return.
 
+use super::expr::{apud_arity, ApudArity, ISSUE_ITERA_APUD_ARITY_MISMATCH};
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
-use super::expr::{apud_arity, ApudArity, ISSUE_ITERA_APUD_ARITY_MISMATCH};
 use crate::passes::fragment_definition::{
     is_allowed_device_method, is_device_value_type, struct_def_from_type,
 };
@@ -64,13 +64,25 @@ pub(super) fn check_summa_expr(
                 ISSUE_SUMMA_REQUIRES_SHAPED_ITERABLE,
                 span,
             );
-            check_summa_body(checker, coordinates, filum, binding, body, checker.error_type);
+            check_summa_body(
+                checker,
+                coordinates,
+                filum,
+                binding,
+                body,
+                checker.error_type,
+            );
             return checker.error_type;
         }
     };
 
     // Shared apud arity rule: coordinate count must equal the iterable rank.
-    match apud_arity(checker.types, dispatch_ty, !coordinates.is_empty(), coordinates.len()) {
+    match apud_arity(
+        checker.types,
+        dispatch_ty,
+        !coordinates.is_empty(),
+        coordinates.len(),
+    ) {
         ApudArity::Admitted => {}
         ApudArity::RequiresShaped => checker.error_issue(
             SemanticErrorKind::TypeMismatch,
@@ -280,8 +292,13 @@ impl SummaBodyState {
                 self.walk_expr(checker, rhs);
             }
             HirExpressionKind::Unary(_, operand) => self.walk_expr(checker, operand),
-            HirExpressionKind::Call(callee, _, args) => self.walk_call(checker, callee, args, expr.span),
-            HirExpressionKind::Gradient { call, selected_arguments } => {
+            HirExpressionKind::Call(callee, _, args) => {
+                self.walk_call(checker, callee, args, expr.span)
+            }
+            HirExpressionKind::Gradient {
+                call,
+                selected_arguments,
+            } => {
                 effect(checker, expr.span, "unapproved_effect");
                 self.walk_expr(checker, call);
                 for selector in selected_arguments {

@@ -68,7 +68,6 @@ fn filum_substring_law_keeps_containing_identifiers_plain() {
     }
 }
 
-
 #[test]
 fn registry_texts_are_unique() {
     let mut texts = std::collections::BTreeSet::new();

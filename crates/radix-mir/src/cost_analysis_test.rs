@@ -188,14 +188,8 @@ fn register_window_rows_are_c0() {
         conversion_family(&window_out, &types),
         CostFamily::RegisterWindow
     );
-    assert_eq!(
-        classify(&window_in, &types),
-        CostTag::Class(CostClass::C0)
-    );
-    assert_eq!(
-        classify(&window_out, &types),
-        CostTag::Class(CostClass::C0)
-    );
+    assert_eq!(classify(&window_in, &types), CostTag::Class(CostClass::C0));
+    assert_eq!(classify(&window_out, &types), CostTag::Class(CostClass::C0));
 }
 
 #[test]
@@ -207,10 +201,7 @@ fn register_bridge_is_c0() {
     let v_u32x4 = MirType::semantic(types.vector_with_width(u32, width4));
     let v_f32x4 = MirType::semantic(types.vector_with_width(f32, width4));
     let conv = runtime(v_u32x4, v_f32x4);
-    assert_eq!(
-        conversion_family(&conv, &types),
-        CostFamily::RegisterBridge
-    );
+    assert_eq!(conversion_family(&conv, &types), CostFamily::RegisterBridge);
     assert_eq!(classify(&conv, &types), CostTag::Class(CostClass::C0));
 }
 

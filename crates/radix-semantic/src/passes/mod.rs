@@ -209,11 +209,11 @@ mod ratio_test;
 mod ratio_hole_test;
 
 #[cfg(test)]
-#[path = "visibility_annotation_test.rs"]
-mod visibility_annotation_test;
-#[cfg(test)]
 #[path = "summa_disambiguation_test.rs"]
 mod summa_disambiguation_test;
+#[cfg(test)]
+#[path = "visibility_annotation_test.rs"]
+mod visibility_annotation_test;
 
 #[cfg(test)]
 #[path = "first_match_contract_test.rs"]

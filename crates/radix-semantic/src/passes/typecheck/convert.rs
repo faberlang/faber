@@ -885,8 +885,7 @@ impl TypeChecker<'_> {
                     self.invalid_conversion(ISSUE_REGISTER_WINDOW_WIDTH_MISMATCH, span);
                     return Some(self.error_type);
                 };
-                let Some(window_bytes) = self.register_window_len(source, source_resolved)
-                else {
+                let Some(window_bytes) = self.register_window_len(source, source_resolved) else {
                     self.invalid_conversion(ISSUE_OCTETI_TO_VECTOR_UNSPECIFIED, span);
                     return Some(self.error_type);
                 };
@@ -920,8 +919,7 @@ impl TypeChecker<'_> {
                             self.invalid_conversion(ISSUE_REGISTER_WINDOW_WIDTH_MISMATCH, span);
                             return Some(self.error_type);
                         };
-                        let IndexExpr::Literal(capacity) =
-                            self.types.get_index(capacity).clone()
+                        let IndexExpr::Literal(capacity) = self.types.get_index(capacity).clone()
                         else {
                             self.invalid_conversion(ISSUE_REGISTER_WINDOW_WIDTH_MISMATCH, span);
                             return Some(self.error_type);
@@ -1101,10 +1099,7 @@ impl TypeChecker<'_> {
         if !self.conversio_has_bits_hint(params) {
             return None;
         }
-        if params
-            .iter()
-            .any(|param| self.is_format_hint(*param))
-        {
+        if params.iter().any(|param| self.is_format_hint(*param)) {
             return Some(ISSUE_BITS_HINT_CONFLICT);
         }
         let source = self.types.get(self.resolve_inferred_type(source_ty));
@@ -1768,13 +1763,12 @@ impl TypeChecker<'_> {
                 self.types.get(self.resolve_inferred_type(source_ty)),
                 self.types.get(self.resolve_inferred_type(target_ty)),
             ),
-            (
-                Type::BoundedAscii { .. },
-                Type::BoundedAscii { .. }
-            ) | (
-                Type::BoundedAscii { .. },
-                Type::Primitive(Primitive::Ascii | Primitive::Textus)
-            ) | (Type::Primitive(Primitive::Ascii), Type::BoundedAscii { .. })
+            (Type::BoundedAscii { .. }, Type::BoundedAscii { .. })
+                | (
+                    Type::BoundedAscii { .. },
+                    Type::Primitive(Primitive::Ascii | Primitive::Textus)
+                )
+                | (Type::Primitive(Primitive::Ascii), Type::BoundedAscii { .. })
         )
     }
 

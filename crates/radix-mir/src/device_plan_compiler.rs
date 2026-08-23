@@ -7,14 +7,14 @@
 //! fallback schedule entries and an incomplete pattern is a typed miss rather
 //! than a guessed fusion.
 
-use crate::MirKernelWorkgroupCount;
 use crate::abi::PackedStorageLayout;
 use crate::device_program::{Binding, DeviceProgram};
 use crate::device_program_plans::{
-    BackendRequirement, BindDescriptor, BindLayout, EXECUTOR_PLAN_BIND_ABI_VERSION,
-    ExecutorPlanExtension, LibraryBind, LibrarySelection, LogicalSignature, OffsetBinding,
-    PlanProvenance, UniformBinding, WorkspaceBinding,
+    BackendRequirement, BindDescriptor, BindLayout, ExecutorPlanExtension, LibraryBind,
+    LibrarySelection, LogicalSignature, OffsetBinding, PlanProvenance, UniformBinding,
+    WorkspaceBinding, EXECUTOR_PLAN_BIND_ABI_VERSION,
 };
+use crate::MirKernelWorkgroupCount;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
@@ -1329,6 +1329,7 @@ impl PlanCompiler {
             .unwrap_or(0)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn selection_for_candidate(
         &self,
         candidate: &Candidate,

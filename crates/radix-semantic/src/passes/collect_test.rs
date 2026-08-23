@@ -620,7 +620,11 @@ fn selective_import_duplicate_alias_fails_with_named_issue() {
     let parsed = parse(lex(
         r#"importa ex "norma:consolum" fixum dic ut output, funde ut output,"#,
     ));
-    assert!(parsed.errors.is_empty(), "parse errors: {:?}", parsed.errors);
+    assert!(
+        parsed.errors.is_empty(),
+        "parse errors: {:?}",
+        parsed.errors
+    );
     let program = parsed.program.expect("selective import program");
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();
@@ -636,11 +640,13 @@ fn selective_import_duplicate_alias_fails_with_named_issue() {
 
 #[test]
 fn selective_import_local_collision_reports_ordinary_duplicate() {
-    let parsed = parse(lex(
-        r#"functio output() → vacuum { tacet }
-importa ex "norma:consolum" fixum dic ut output,"#,
-    ));
-    assert!(parsed.errors.is_empty(), "parse errors: {:?}", parsed.errors);
+    let parsed = parse(lex(r#"functio output() → vacuum { tacet }
+importa ex "norma:consolum" fixum dic ut output,"#));
+    assert!(
+        parsed.errors.is_empty(),
+        "parse errors: {:?}",
+        parsed.errors
+    );
     let program = parsed.program.expect("program");
     let mut resolver = Resolver::new();
     let mut types = TypeTable::new();

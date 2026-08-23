@@ -520,8 +520,7 @@ impl FunctionBuilder<'_> {
         // The source operand lowers into the real flow (ahead of the
         // capture) so the declaration's argument is a live kernel value.
         let source_operand = self.lower_expr_value(source)?;
-        let source_operand =
-            self.materialize_operand_place(source_operand, MirType::semantic(source_ty), source.span);
+        let source_operand = self.materialize_operand_place(source_operand, MirType::semantic(source_ty), source.span);
 
         // Per-element binders: coordinates (numerus, one per axis) and the
         // term binder (the element type). They live as real locals so the
@@ -538,7 +537,11 @@ impl FunctionBuilder<'_> {
                 mutable: false,
                 span: expr.span,
             });
-            saved_bindings.push((*def_id, self.bindings.insert(*def_id, LocalBinding { local, ty: numerus_ty })));
+            saved_bindings.push((
+                *def_id,
+                self.bindings
+                    .insert(*def_id, LocalBinding { local, ty: numerus_ty }),
+            ));
             coordinate_facts.push(MirFilumCoordinate { local, name: Some(*name) });
         }
         let binder_local = self.next_local_id();
@@ -552,16 +555,12 @@ impl FunctionBuilder<'_> {
         });
         saved_bindings.push((
             binding.0,
-            self.bindings.insert(binding.0, LocalBinding { local: binder_local, ty: binder_ty }),
+            self.bindings
+                .insert(binding.0, LocalBinding { local: binder_local, ty: binder_ty }),
         ));
         let term_result = self.next_local_id();
-        self.locals.push(MirLocalDecl {
-            id: term_result,
-            name: None,
-            ty: term_mir_ty,
-            mutable: true,
-            span: expr.span,
-        });
+        self.locals
+            .push(MirLocalDecl { id: term_result, name: None, ty: term_mir_ty, mutable: true, span: expr.span });
 
         // Capture the term body into scratch blocks: the redde arm stores
         // the term value into `term_result` and jumps to the capture exit.
@@ -575,16 +574,18 @@ impl FunctionBuilder<'_> {
             rumpe_target: capture_exit,
             rumpe_used: false,
         });
-        let previous_capture =
-            self.filum_capture.replace(SummaFoldContext { accumulator: term_result, ty: term_mir_ty });
+        let previous_capture = self
+            .filum_capture
+            .replace(SummaFoldContext { accumulator: term_result, ty: term_mir_ty });
         self.visit_block(body);
         self.filum_capture = previous_capture;
         self.breakables.pop();
-        if !self.blocks[blocks_mark..].iter().any(|block| block.terminator.is_some()) {
-            self.errors.push(MirError::unsupported(
-                expr.span,
-                "filum summa term body without a valued redde",
-            ));
+        if !self.blocks[blocks_mark..]
+            .iter()
+            .any(|block| block.terminator.is_some())
+        {
+            self.errors
+                .push(MirError::unsupported(expr.span, "filum summa term body without a valued redde"));
         }
         let term_body: Vec<MirStatement> = self.blocks[blocks_mark..]
             .iter()

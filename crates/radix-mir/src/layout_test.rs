@@ -84,10 +84,10 @@ fn unbounded_octeti_primitive_stays_opaque() {
 // compilation, and the runtime assertions pin the corrected census
 // (14 physical / 6 opaque-agg / 24 OpaqueHandle-by-design / 5 internal).
 
+use radix_lexer::Symbol as LexSymbol;
 use radix_types::{
     DefId, FuncSig, InferVar, InstansPrecision, MarkerFamily, NumericWidth, SemanticMutability,
 };
-use radix_lexer::Symbol as LexSymbol;
 use rustc_hash::FxHashMap;
 
 /// The four census buckets (goal census table; the sized-numeric row is a
@@ -126,7 +126,10 @@ fn intended_bucket(ty: &Type) -> Bucket {
         Type::SizedNumeric(_, _) | Type::ModularWord(_) => Bucket::Physical,
         // MLC-4: `sparsa` with a scalar element and resolvable figura rank
         // resolves a sparse-marker `DeviceView` row.
-        Type::Tensor(_, _) | Type::Sparsa(_, _) | Type::Vector(_, _) | Type::Matrix(_, _)
+        Type::Tensor(_, _)
+        | Type::Sparsa(_, _)
+        | Type::Vector(_, _)
+        | Type::Matrix(_, _)
         | Type::Atomic(_) => Bucket::Physical,
         Type::Record(_) | Type::Struct(_) | Type::Tuple(_) => Bucket::Physical,
         // MLC-3: the bounded families with literal capacities are physical
@@ -192,7 +195,10 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     rows.push(Type::Vector(float64_ty, vector_width));
     rows.push(Type::Matrix(float64_ty, matrix_shape));
     rows.push(Type::Atomic(int32_ty));
-    rows.push(Type::Record(FxHashMap::from_iter([(LexSymbol(1), int64_ty)])));
+    rows.push(Type::Record(FxHashMap::from_iter([(
+        LexSymbol(1),
+        int64_ty,
+    )])));
     rows.push(Type::Struct(DefId(10)));
     rows.push(Type::Tuple(vec![int64_ty]));
     // MLC-3: the bounded families with literal capacities are physical
@@ -262,7 +268,11 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
         var: InferVar(2),
     });
     rows.push(Type::Error);
-    assert_eq!(rows.len(), 49, "the census must stay 49 Primitive-expanded rows");
+    assert_eq!(
+        rows.len(),
+        49,
+        "the census must stay 49 Primitive-expanded rows"
+    );
     rows
 }
 
@@ -285,7 +295,10 @@ fn pin_table_census_is_49_rows_across_the_four_buckets() {
     }
     assert_eq!(physical, 18, "physical census rows (MLC-4: +1 sparsa)");
     assert_eq!(aggregate, 6, "opaque-aggregate census rows");
-    assert_eq!(opaque, 20, "opaque-by-design census rows (MLC-4: -1 to physical)");
+    assert_eq!(
+        opaque, 20,
+        "opaque-by-design census rows (MLC-4: -1 to physical)"
+    );
     assert_eq!(internal, 5, "internal census rows");
 }
 
@@ -349,9 +362,8 @@ fn alias_is_transparent_and_not_a_census_row() {
     let float64_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
     let alias = Type::Alias(DefId(20), float64_ty);
 
-    let refused = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        intended_bucket(&alias)
-    }));
+    let refused =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| intended_bucket(&alias)));
     assert!(refused.is_err(), "alias must not occupy a census bucket");
 
     let alias_ty = types.intern(alias);
@@ -565,11 +577,17 @@ fn bounded_ascii_and_textus_resolve_physical_byte_aggregates_with_length_member(
     let textus_layout = table
         .layout_for_type(MirType::semantic(textus_ty))
         .expect("textus<16> layout fact");
-    assert_eq!(textus_layout.kind, expected(MirAggregateFamily::BoundedTextus));
+    assert_eq!(
+        textus_layout.kind,
+        expected(MirAggregateFamily::BoundedTextus)
+    );
     let ascii_layout = table
         .layout_for_type(MirType::semantic(ascii_ty))
         .expect("ascii<16> layout fact");
-    assert_eq!(ascii_layout.kind, expected(MirAggregateFamily::BoundedAscii));
+    assert_eq!(
+        ascii_layout.kind,
+        expected(MirAggregateFamily::BoundedAscii)
+    );
 }
 
 // MLC-4: `Sparsa<T, Figura>` — a scalar element with a resolvable figura

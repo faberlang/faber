@@ -46,13 +46,12 @@ use crate::mir::{
     MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock, MirBlockId, MirCallee, MirClosureCallee, MirClosureCapture,
     MirClosureEnvironment, MirClosureEnvironmentId, MirClosureValue, MirConstant, MirConversion, MirConversionFlavor,
     MirDeviceRole, MirDiagnosticKind, MirFilumCoordinate, MirFilumSumOp, MirFunction, MirFunctionId,
-    MirGenericBindings, MirIntrinsic,
-    MirKernelShaderStage, MirKeyValueOperand, MirLayoutTable, MirLocal as MirLocalDecl, MirLocalId,
-    MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirParam,
-    MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirProjection, MirProvider, MirProviderKind, MirRuntimeCall,
-    MirStatement, MirStatementKind, MirStructFieldDefaults, MirSwitchCase, MirTemp, MirTempId, MirTerminator,
-    MirTerminatorKind, MirType, MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind,
-    ValidatedMir,
+    MirGenericBindings, MirIntrinsic, MirKernelShaderStage, MirKeyValueOperand, MirLayoutTable,
+    MirLocal as MirLocalDecl, MirLocalId, MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink,
+    MirOptionOp, MirOptionUnwrapMode, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirProjection,
+    MirProvider, MirProviderKind, MirRuntimeCall, MirStatement, MirStatementKind, MirStructFieldDefaults,
+    MirSwitchCase, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType, MirTypeCheckOp, MirUnOp,
+    MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
 };
 use crate::semantic::{IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
 use radix_types::{MirCollectionOp, MirKernelBuiltin};

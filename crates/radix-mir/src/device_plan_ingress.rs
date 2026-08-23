@@ -7,8 +7,8 @@
 //! construction is not a path.  Generated Faber is debug-only.
 
 use crate::device_plan_compiler::{
-    AttentionFacts, CompiledDevicePlan, GraphError, GraphNodeId, LibraryOperation,
-    PLAN_COMPILER_REVISION, PlanCompiler, TensorShape, TypedModelGraph, TypedOp, TypedOpNode,
+    AttentionFacts, CompiledDevicePlan, GraphError, GraphNodeId, LibraryOperation, PlanCompiler,
+    TensorShape, TypedModelGraph, TypedOp, TypedOpNode, PLAN_COMPILER_REVISION,
 };
 use std::fmt::Write as _;
 

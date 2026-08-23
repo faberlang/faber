@@ -21,7 +21,9 @@ fn first_match_head_parses_into_a_dedicated_expression() {
     // statically bounded source with an owned predicate tail.
     // RED today: the placeholder head spelling is parse-rejected (no such
     // production exists yet). AFM-2's terminal choice replaces the spelling.
-    parse_ok("functio t(tf32[4] a) → fractus ∪ nihil { redde primus_quem(a, fixum x { x > 0.0 }) }");
+    parse_ok(
+        "functio t(tf32[4] a) → fractus ∪ nihil { redde primus_quem(a, fixum x { x > 0.0 }) }",
+    );
 }
 
 #[test]

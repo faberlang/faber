@@ -1548,8 +1548,7 @@ impl Parser {
     /// Whether the current token is the `ut` alias marker — as a dedicated
     /// token or by keyword identity — which is not a legal member name.
     fn is_import_alias_marker(&self) -> bool {
-        matches!(self.peek().kind, TokenKind::Ut)
-            || self.keyword_ident_at(0) == Some(TokenKind::Ut)
+        matches!(self.peek().kind, TokenKind::Ut) || self.keyword_ident_at(0) == Some(TokenKind::Ut)
     }
 
     /// Whether the token after a candidate import binding continues an

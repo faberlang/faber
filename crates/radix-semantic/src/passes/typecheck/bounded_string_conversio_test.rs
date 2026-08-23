@@ -79,6 +79,4 @@ fn textus_literal_over_capacity_rejects() {
 }
 
 #[test]
-fn probe_ascii_literal_to_bounded() {
-
-}
+fn probe_ascii_literal_to_bounded() {}
