@@ -39,9 +39,15 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::artifact::{
     CliProgramWire, FunctionFactTableWire, FunctionFactWire, GpuBuiltinWire, HirArtifact,
-    ResolverSnapshot, ResolvedUseWire, SourceIdentity, SCHEMA_VERSION,
+    ResolvedUseWire, ResolverSnapshot, SourceIdentity, SCHEMA_VERSION,
 };
+use crate::decode::{decode as decode_unit_bytes, encode as encode_unit_bytes};
 use crate::error::HirArtifactError;
+use crate::package::{
+    validate_dependencies, validate_local_links, validate_module_table, FhirPackage,
+    FhirPackageError, FhirPackageModule, LibraryImportWire, LocalLinkWire, PackageDependencyWire,
+    PackageIdentityWire, PACKAGE_SCHEMA_VERSION,
+};
 use crate::validate::validate_referential_integrity;
 use radix_hir::{HirModule, HirPresentation, LibraryRegistry};
 use radix_types::{DefId, TypeTableSnapshot};
@@ -76,6 +82,18 @@ pub enum MsgpackError {
     },
     /// The decoded artifact failed the referential-integrity gate (U2.3).
     Invalid(HirArtifactError),
+    /// The package value carries a package schema version this codec does
+    /// not support (fail-closed, mirrors `FhirPackageError`).
+    UnsupportedPackageSchemaVersion {
+        /// Version encoded in the package value.
+        found: u32,
+        /// Version this codec accepts.
+        expected: u32,
+    },
+    /// The package value failed a package-level gate: embedded-unit version
+    /// manifest, unit validation, source-hash consistency, or the
+    /// module/dependency/link-table checks shared with the postcard path.
+    InvalidPackage(crate::package::FhirPackageError),
 }
 
 impl std::fmt::Display for MsgpackError {
@@ -89,6 +107,11 @@ impl std::fmt::Display for MsgpackError {
                 "unsupported msgpack unit schema version {found} (expected {expected})"
             ),
             Self::Invalid(inner) => write!(f, "invalid msgpack artifact: {inner}"),
+            Self::UnsupportedPackageSchemaVersion { found, expected } => write!(
+                f,
+                "unsupported msgpack package schema version {found} (expected {expected})"
+            ),
+            Self::InvalidPackage(inner) => write!(f, "invalid msgpack package: {inner}"),
         }
     }
 }
@@ -97,8 +120,15 @@ impl std::error::Error for MsgpackError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Invalid(inner) => Some(inner),
+            Self::InvalidPackage(inner) => Some(inner),
             _ => None,
         }
+    }
+}
+
+impl From<FhirPackageError> for MsgpackError {
+    fn from(inner: FhirPackageError) -> Self {
+        Self::InvalidPackage(inner)
     }
 }
 
@@ -214,9 +244,8 @@ fn write_str(out: &mut Vec<u8>, s: &str) -> Result<(), MsgpackError> {
         out.push(0xda);
         out.extend_from_slice(&u16::try_from(len).expect("checked <= 0xffff").to_be_bytes());
     } else {
-        let len32 = u32::try_from(len).map_err(|_| MsgpackError::Encode(
-            "string length exceeds msgpack u32".to_string(),
-        ))?;
+        let len32 = u32::try_from(len)
+            .map_err(|_| MsgpackError::Encode("string length exceeds msgpack u32".to_string()))?;
         out.push(0xdb);
         out.extend_from_slice(&len32.to_be_bytes());
     }
@@ -233,9 +262,8 @@ fn write_bin(out: &mut Vec<u8>, b: &[u8]) -> Result<(), MsgpackError> {
         out.push(0xc5);
         out.extend_from_slice(&u16::try_from(len).expect("checked <= 0xffff").to_be_bytes());
     } else {
-        let len32 = u32::try_from(len).map_err(|_| MsgpackError::Encode(
-            "byte length exceeds msgpack u32".to_string(),
-        ))?;
+        let len32 = u32::try_from(len)
+            .map_err(|_| MsgpackError::Encode("byte length exceeds msgpack u32".to_string()))?;
         out.push(0xc6);
         out.extend_from_slice(&len32.to_be_bytes());
     }
@@ -586,9 +614,12 @@ impl<'a> serde::Serializer for Serializer<'a> {
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Compound<'a>, MsgpackError> {
-        write_array_len(&mut *self.out, len.ok_or_else(|| {
-            MsgpackError::Encode("msgpack requires a sequence length".to_string())
-        })?)?;
+        write_array_len(
+            &mut *self.out,
+            len.ok_or_else(|| {
+                MsgpackError::Encode("msgpack requires a sequence length".to_string())
+            })?,
+        )?;
         Ok(Compound { out: self.out })
     }
 
@@ -622,9 +653,10 @@ impl<'a> serde::Serializer for Serializer<'a> {
     }
 
     fn serialize_map(self, len: Option<usize>) -> Result<Compound<'a>, MsgpackError> {
-        write_map_len(&mut *self.out, len.ok_or_else(|| {
-            MsgpackError::Encode("msgpack requires a map length".to_string())
-        })?)?;
+        write_map_len(
+            &mut *self.out,
+            len.ok_or_else(|| MsgpackError::Encode("msgpack requires a map length".to_string()))?,
+        )?;
         Ok(Compound { out: self.out })
     }
 
@@ -645,9 +677,12 @@ impl<'a> serde::Serializer for Serializer<'a> {
         len: usize,
     ) -> Result<Compound<'a>, MsgpackError> {
         // "tag" plus the inlined struct-variant payload fields (§1.4).
-        write_map_len(&mut *self.out, len.checked_add(1).ok_or_else(|| {
-            MsgpackError::Encode("struct variant field count overflow".to_string())
-        })?)?;
+        write_map_len(
+            &mut *self.out,
+            len.checked_add(1).ok_or_else(|| {
+                MsgpackError::Encode("struct variant field count overflow".to_string())
+            })?,
+        )?;
         write_str(&mut *self.out, "tag")?;
         write_str(&mut *self.out, variant_name)?;
         Ok(Compound { out: self.out })
@@ -839,9 +874,12 @@ impl<'de> EnumAccess<'de> for EnumDeserializer {
         seed: V,
     ) -> Result<(V::Value, VariantDeserializer), MsgpackError> {
         let variant = seed.deserialize(Value::Str(self.tag))?;
-        Ok((variant, VariantDeserializer {
-            entries: self.entries,
-        }))
+        Ok((
+            variant,
+            VariantDeserializer {
+                entries: self.entries,
+            },
+        ))
     }
 }
 
@@ -1145,10 +1183,7 @@ impl<'de> Deserializer<'de> for Value {
         visitor.visit_enum(EnumDeserializer { tag, entries })
     }
 
-    fn deserialize_identifier<V: Visitor<'de>>(
-        self,
-        visitor: V,
-    ) -> Result<V::Value, MsgpackError> {
+    fn deserialize_identifier<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
         self.deserialize_string(visitor)
     }
 
@@ -1276,6 +1311,251 @@ impl From<HirArtifactDto> for HirArtifact {
 }
 
 // ---------------------------------------------------------------------------
+// Package DTO (FPF-3): envelope with nested named unit values (OQ-3)
+// ---------------------------------------------------------------------------
+
+/// One module record on the package wire. Identical to
+/// [`FhirPackageModule`] except `unit`, which is the embedded unit's
+/// **nested named value** (a [`HirArtifactDto`] map, spec §1.1), not opaque
+/// nested bytes — the whole package is one MessagePack document (OQ-3
+/// ruling, confirmed at FPF-3 dispatch).
+#[derive(Serialize, Deserialize)]
+struct FhirPackageModuleDto {
+    path: String,
+    module_segments: Vec<String>,
+    is_entry: bool,
+    export_names: Vec<String>,
+    local_links: Vec<LocalLinkWire>,
+    library_imports: Vec<LibraryImportWire>,
+    source_hash: String,
+    unit_schema_version: u32,
+    unit: HirArtifactDto,
+}
+
+/// Package wire shape: the envelope's named keys in declaration order
+/// (`package_schema_version` first, the version prefix gate), modules
+/// carrying nested named unit values.
+#[derive(Serialize, Deserialize)]
+struct FhirPackageDto {
+    package_schema_version: u32,
+    identity: PackageIdentityWire,
+    entry_path: String,
+    entry_frontmatter: Option<String>,
+    modules: Vec<FhirPackageModuleDto>,
+    dependencies: Vec<PackageDependencyWire>,
+}
+
+impl FhirPackageDto {
+    /// Decodes each module's postcard unit bytes and embeds it as a nested
+    /// named value. Fail-closed: a module whose unit bytes do not decode
+    /// through the unit codec's own gates cannot be embedded.
+    fn from_package(pkg: &FhirPackage) -> Result<Self, MsgpackError> {
+        let mut modules = Vec::with_capacity(pkg.modules.len());
+        for module in &pkg.modules {
+            let artifact = decode_unit_bytes(&module.unit).map_err(|error| {
+                MsgpackError::Encode(format!(
+                    "module `{}` unit failed to decode for embedding: {error}",
+                    module.path
+                ))
+            })?;
+            modules.push(FhirPackageModuleDto {
+                path: module.path.clone(),
+                module_segments: module.module_segments.clone(),
+                is_entry: module.is_entry,
+                export_names: module.export_names.clone(),
+                local_links: module.local_links.clone(),
+                library_imports: module.library_imports.clone(),
+                source_hash: module.source_hash.clone(),
+                unit_schema_version: module.unit_schema_version,
+                unit: HirArtifactDto::from(&artifact),
+            });
+        }
+        Ok(Self {
+            package_schema_version: pkg.package_schema_version,
+            identity: pkg.identity.clone(),
+            entry_path: pkg.entry_path.clone(),
+            entry_frontmatter: pkg.entry_frontmatter.clone(),
+            modules,
+            dependencies: pkg.dependencies.clone(),
+        })
+    }
+
+    /// Rehydrates the wire [`FhirPackage`]: per-unit gates first (referential
+    /// integrity, source-hash consistency, postcard re-encode of the unit
+    /// bytes), then the package-level checks shared with the postcard path.
+    fn into_package(self) -> Result<FhirPackage, MsgpackError> {
+        use crate::package::DecodedFhirPackageModule;
+
+        let mut modules = Vec::with_capacity(self.modules.len());
+        let mut decoded = Vec::with_capacity(self.modules.len());
+        for module in self.modules {
+            let artifact = HirArtifact::from(module.unit);
+            let type_count = artifact.types.type_count();
+            let interner_len = artifact.interner.len();
+            validate_referential_integrity(&artifact, type_count, interner_len).map_err(
+                |error| {
+                    MsgpackError::InvalidPackage(FhirPackageError::MalformedUnit {
+                        module: module.path.clone(),
+                        detail: error.to_string(),
+                    })
+                },
+            )?;
+            if artifact.source_identity.content_hash != module.source_hash {
+                return Err(MsgpackError::InvalidPackage(
+                    FhirPackageError::MismatchedContentHash {
+                        module: module.path.clone(),
+                        expected: module.source_hash.clone(),
+                        actual: artifact.source_identity.content_hash.clone(),
+                    },
+                ));
+            }
+            // The live wire unit stays postcard bytes (FPF-5 owns any
+            // switch); the nested named value is re-encoded deterministically.
+            let unit = encode_unit_bytes(&artifact).map_err(|error| {
+                MsgpackError::Encode(format!(
+                    "module `{}` unit failed to re-encode: {error}",
+                    module.path
+                ))
+            })?;
+            modules.push(FhirPackageModule {
+                path: module.path.clone(),
+                module_segments: module.module_segments.clone(),
+                is_entry: module.is_entry,
+                export_names: module.export_names.clone(),
+                local_links: module.local_links.clone(),
+                library_imports: module.library_imports.clone(),
+                source_hash: module.source_hash.clone(),
+                unit_schema_version: module.unit_schema_version,
+                unit,
+            });
+            decoded.push(DecodedFhirPackageModule {
+                path: module.path,
+                module_segments: module.module_segments,
+                is_entry: module.is_entry,
+                export_names: module.export_names,
+                local_links: module.local_links,
+                library_imports: module.library_imports,
+                unit: artifact,
+            });
+        }
+        let pkg = FhirPackage {
+            package_schema_version: self.package_schema_version,
+            identity: self.identity,
+            entry_path: self.entry_path,
+            entry_frontmatter: self.entry_frontmatter,
+            modules,
+            dependencies: self.dependencies,
+        };
+        validate_module_table(&pkg, &decoded)?;
+        validate_dependencies(&pkg)?;
+        validate_local_links(&pkg)?;
+        Ok(pkg)
+    }
+}
+
+/// Reads a named `uint` field from a map value.
+fn named_field<'a>(entries: &'a [(Value, Value)], key: &str) -> Result<&'a Value, MsgpackError> {
+    entries
+        .iter()
+        .find(|(k, _)| matches!(k, Value::Str(s) if s == key))
+        .map(|(_, v)| v)
+        .ok_or_else(|| {
+            MsgpackError::Decode(format!("value must carry {key} as a named uint field"))
+        })
+}
+
+/// Version gates read from the parsed package value **before** payload
+/// interpretation (§1.2, fail-closed):
+///
+/// 1. `package_schema_version` must equal [`PACKAGE_SCHEMA_VERSION`];
+/// 2. every module's `unit_schema_version` manifest copy and its nested
+///    unit's own `schema_version` must equal [`SCHEMA_VERSION`], with
+///    module attribution.
+fn gate_package_versions(value: &Value) -> Result<(), MsgpackError> {
+    let entries = match value {
+        Value::Map(entries) => entries,
+        _ => {
+            return Err(MsgpackError::Decode(
+                "the package value must be a map of named fields".to_string(),
+            ));
+        }
+    };
+    let found = named_field(entries, "package_schema_version")?
+        .as_u64()
+        .ok_or_else(|| MsgpackError::Decode("package_schema_version must be a uint".to_string()))?;
+    if found != u64::from(PACKAGE_SCHEMA_VERSION) {
+        return Err(MsgpackError::UnsupportedPackageSchemaVersion {
+            found: u32::try_from(found).unwrap_or(u32::MAX),
+            expected: PACKAGE_SCHEMA_VERSION,
+        });
+    }
+
+    let modules = match named_field(entries, "modules")? {
+        Value::Array(modules) => modules,
+        other => {
+            return Err(MsgpackError::Decode(format!(
+                "modules must be an array, found {other:?}"
+            )));
+        }
+    };
+    for module in modules {
+        let module_entries = match module {
+            Value::Map(entries) => entries,
+            other => {
+                return Err(MsgpackError::Decode(format!(
+                    "a module record must be a map, found {other:?}"
+                )));
+            }
+        };
+        let path = match named_field(module_entries, "path")? {
+            Value::Str(path) => path.clone(),
+            other => {
+                return Err(MsgpackError::Decode(format!(
+                    "module path must be a str, found {other:?}"
+                )));
+            }
+        };
+        let manifest = named_field(module_entries, "unit_schema_version")?
+            .as_u64()
+            .ok_or_else(|| {
+                MsgpackError::Decode("unit_schema_version must be a uint".to_string())
+            })?;
+        if manifest != u64::from(SCHEMA_VERSION) {
+            return Err(MsgpackError::InvalidPackage(
+                FhirPackageError::UnsupportedUnitSchemaVersion {
+                    module: path,
+                    found: u32::try_from(manifest).unwrap_or(u32::MAX),
+                    expected: SCHEMA_VERSION,
+                },
+            ));
+        }
+        let unit_entries = match named_field(module_entries, "unit")? {
+            Value::Map(entries) => entries,
+            other => {
+                return Err(MsgpackError::Decode(format!(
+                    "the embedded unit must be a nested named map, found {other:?}"
+                )));
+            }
+        };
+        let unit_version = named_field(unit_entries, "schema_version")?
+            .as_u64()
+            .ok_or_else(|| {
+                MsgpackError::Decode("unit schema_version must be a uint".to_string())
+            })?;
+        if unit_version != u64::from(SCHEMA_VERSION) {
+            return Err(MsgpackError::InvalidPackage(
+                FhirPackageError::UnsupportedUnitSchemaVersion {
+                    module: path,
+                    found: u32::try_from(unit_version).unwrap_or(u32::MAX),
+                    expected: SCHEMA_VERSION,
+                },
+            ));
+        }
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // Public codec entry points
 // ---------------------------------------------------------------------------
 
@@ -1356,6 +1636,61 @@ pub fn decode_msgpack(bytes: &[u8]) -> Result<HirArtifact, MsgpackError> {
         .map_err(MsgpackError::Invalid)?;
 
     Ok(artifact)
+}
+
+/// Serializes a [`FhirPackage`] to a spec-conformant named-field MessagePack
+/// package value (FPF-3): the envelope's named keys with each embedded unit
+/// carried as a **nested named value** (OQ-3), not opaque nested bytes.
+/// Postcard ([`crate::package::encode_package`]) remains the live wire;
+/// this codec is additive.
+///
+/// # Errors
+///
+/// Returns [`MsgpackError::Encode`] if serialization fails or a module's
+/// postcard unit bytes fail the unit decode gates (a package whose units
+/// cannot be embedded cannot be encoded); a valid package is expected to
+/// succeed.
+pub fn encode_package_msgpack(pkg: &FhirPackage) -> Result<Vec<u8>, MsgpackError> {
+    let dto = FhirPackageDto::from_package(pkg)?;
+    let mut out = Vec::new();
+    dto.serialize(Serializer { out: &mut out })?;
+    Ok(out)
+}
+
+/// Deserializes and validates a [`FhirPackage`] from a MessagePack package
+/// value, mirroring the postcard [`crate::package::decode_package`] gates:
+///
+/// 1. `package_schema_version` prefix gate (read before payload
+///    interpretation; mismatch fails closed, no compatibility decoder);
+/// 2. per-module `unit_schema_version` manifest gate and each nested unit's
+///    own `schema_version` gate, with module attribution;
+/// 3. full DTO deserialize, then per-unit referential-integrity validation
+///    and source-hash consistency;
+/// 4. package-level checks (sorted/unique module table and dependencies,
+///    entry presence/flag consistency, link-table targets).
+///
+/// The returned package's unit bytes are deterministically re-encoded
+/// postcard (the live wire), so structural equality against the pre-encode
+/// package is the round-trip proof.
+///
+/// # Errors
+///
+/// Returns [`MsgpackError::Truncated`] on short input,
+/// [`MsgpackError::Decode`] on malformed or non-conformant values,
+/// [`MsgpackError::UnsupportedPackageSchemaVersion`] on an envelope version
+/// mismatch, and [`MsgpackError::InvalidPackage`] for every package-level
+/// gate failure (unit version manifest, unit validation, hash consistency,
+/// module/dependency/link-table checks).
+pub fn decode_package_msgpack(bytes: &[u8]) -> Result<FhirPackage, MsgpackError> {
+    let value = Value::from_bytes(bytes)?;
+
+    // §1.2: both version gates run before payload interpretation.
+    gate_package_versions(&value)?;
+
+    // Payload interpretation begins only after the version gates accept.
+    let dto = FhirPackageDto::deserialize(value)?;
+
+    dto.into_package()
 }
 
 #[cfg(test)]

@@ -347,8 +347,9 @@ pub fn decode_package(bytes: &[u8]) -> Result<DecodedFhirPackage, FhirPackageErr
 // ---------------------------------------------------------------------------
 
 /// Module table checks: canonical sorted order, uniqueness, entry presence,
-/// and entry-flag consistency.
-fn validate_module_table(
+/// and entry-flag consistency. Shared with the FPF-3 MessagePack package
+/// codec ([`crate::msgpack::decode_package_msgpack`]).
+pub(crate) fn validate_module_table(
     pkg: &FhirPackage,
     decoded: &[DecodedFhirPackageModule],
 ) -> Result<(), FhirPackageError> {
@@ -380,7 +381,7 @@ fn validate_module_table(
 }
 
 /// Dependency checks: canonical sorted order and uniqueness by name.
-fn validate_dependencies(pkg: &FhirPackage) -> Result<(), FhirPackageError> {
+pub(crate) fn validate_dependencies(pkg: &FhirPackage) -> Result<(), FhirPackageError> {
     for pair in pkg.dependencies.windows(2) {
         if pair[0].name >= pair[1].name {
             if pair[0].name == pair[1].name {
@@ -399,7 +400,7 @@ fn validate_dependencies(pkg: &FhirPackage) -> Result<(), FhirPackageError> {
 
 /// Link-table checks: sorted/unique bindings per module, and every link
 /// target present in the module table (no dangling local references).
-fn validate_local_links(pkg: &FhirPackage) -> Result<(), FhirPackageError> {
+pub(crate) fn validate_local_links(pkg: &FhirPackage) -> Result<(), FhirPackageError> {
     let paths = pkg
         .modules
         .iter()

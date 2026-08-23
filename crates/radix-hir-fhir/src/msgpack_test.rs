@@ -210,7 +210,10 @@ fn enums_encode_as_tag_maps() {
         .expect("hir.items[0].kind");
     let keys = top_keys(item_kind);
     assert_eq!(keys, vec!["tag", "value"]);
-    assert_eq!(get(item_kind, &["tag"]), Some(&Value::Str("Function".into())));
+    assert_eq!(
+        get(item_kind, &["tag"]),
+        Some(&Value::Str("Function".into()))
+    );
 
     // Struct variant (Transfer): payload fields inlined next to "tag".
     let transfer = crate::artifact::tests::transfer_artifact();
@@ -403,4 +406,459 @@ fn msgpack_decode_rejects_truncated_and_malformed_input() {
         decode_msgpack(&[0x90]),
         Err(MsgpackError::Decode(_))
     ));
+}
+
+// ── FPF-3: package codec (nested named unit values, OQ-3) ────────────────
+
+use crate::package::{
+    FhirPackage, FhirPackageModule, LibraryImportWire, LocalLinkWire, PackageDependencyWire,
+    PackageIdentityWire, PACKAGE_SCHEMA_VERSION,
+};
+
+/// One step in a wire-tree walk: a map key or an array index.
+#[derive(Clone, Copy)]
+enum Step {
+    Key(&'static str),
+    Idx(usize),
+}
+
+fn at<'a>(value: &'a Value, steps: &[Step]) -> Option<&'a Value> {
+    let mut current = value;
+    for step in steps {
+        current = match (current, step) {
+            (Value::Map(entries), Step::Key(key)) => {
+                &entries
+                    .iter()
+                    .find(|(k, _)| matches!(k, Value::Str(s) if s == key))?
+                    .1
+            }
+            (Value::Array(items), Step::Idx(i)) => items.get(*i)?,
+            _ => return None,
+        };
+    }
+    Some(current)
+}
+
+fn at_mut<'a>(value: &'a mut Value, steps: &[Step]) -> Option<&'a mut Value> {
+    let mut current = value;
+    for step in steps {
+        current = match (current, step) {
+            (Value::Map(entries), Step::Key(key)) => {
+                &mut entries
+                    .iter_mut()
+                    .find(|(k, _)| matches!(k, Value::Str(s) if s == key))?
+                    .1
+            }
+            (Value::Array(items), Step::Idx(i)) => items.get_mut(*i)?,
+            _ => return None,
+        };
+    }
+    Some(current)
+}
+
+/// Re-encodes a patched wire tree back to bytes (gate-patching seam).
+fn reserialize(value: &Value) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    write_value(&mut bytes, value).expect("re-encode patched value");
+    bytes
+}
+
+/// Patches one named uint field on the wire tree and re-encodes.
+fn patch_uint(bytes: &[u8], steps: &[Step], replacement: u64) -> Vec<u8> {
+    let mut value = parse(bytes);
+    *at_mut(&mut value, steps).expect("patch target must exist") = Value::Uint(replacement);
+    reserialize(&value)
+}
+
+/// The 6 envelope named keys, in declaration order (version prefix first).
+const PACKAGE_KEYS: [&str; 6] = [
+    "package_schema_version",
+    "identity",
+    "entry_path",
+    "entry_frontmatter",
+    "modules",
+    "dependencies",
+];
+
+/// The 9 module-record named keys, in declaration order.
+const MODULE_KEYS: [&str; 9] = [
+    "path",
+    "module_segments",
+    "is_entry",
+    "export_names",
+    "local_links",
+    "library_imports",
+    "source_hash",
+    "unit_schema_version",
+    "unit",
+];
+
+fn pkg_module(
+    path: &str,
+    is_entry: bool,
+    artifact: &crate::artifact::HirArtifact,
+) -> FhirPackageModule {
+    let unit = crate::encode(artifact).expect("encode unit");
+    FhirPackageModule {
+        path: path.to_owned(),
+        module_segments: path
+            .trim_start_matches("src/")
+            .trim_end_matches(".fab")
+            .split('/')
+            .map(str::to_owned)
+            .collect(),
+        is_entry,
+        export_names: vec!["public_fn".to_owned()],
+        local_links: vec![],
+        library_imports: vec![],
+        source_hash: artifact.source_identity.content_hash.clone(),
+        unit_schema_version: SCHEMA_VERSION,
+        unit,
+    }
+}
+
+/// A multi-module package: three modules sorted by path, the entry module
+/// linking to both siblings (multi-module link table), a library import on
+/// `aux`, frontmatter, and a sorted two-entry dependency table. Three
+/// distinct artifact fixtures ride as embedded units.
+fn multi_module_package() -> FhirPackage {
+    let mut aux = pkg_module(
+        "src/aux.fab",
+        false,
+        &crate::artifact::tests::selective_import_artifact(),
+    );
+    aux.library_imports = vec![LibraryImportWire {
+        binding: "norma".to_owned(),
+        package: "norma".to_owned(),
+        module: vec!["math".to_owned()],
+    }];
+    let mut math = pkg_module(
+        "src/lib/math.fab",
+        false,
+        &crate::artifact::tests::transfer_artifact(),
+    );
+    math.export_names = vec!["add".to_owned(), "sub".to_owned()];
+    let mut main = pkg_module("src/main.fab", true, &stub_artifact());
+    main.local_links = vec![
+        LocalLinkWire {
+            binding: "aux".to_owned(),
+            target: "src/aux.fab".to_owned(),
+        },
+        LocalLinkWire {
+            binding: "math".to_owned(),
+            target: "src/lib/math.fab".to_owned(),
+        },
+    ];
+    FhirPackage {
+        package_schema_version: PACKAGE_SCHEMA_VERSION,
+        identity: PackageIdentityWire {
+            name: "exemplum".to_owned(),
+            version: "0.1.0".to_owned(),
+            edition: "2026".to_owned(),
+        },
+        entry_path: "src/main.fab".to_owned(),
+        entry_frontmatter: Some("[entry]\nname = \"exemplum\"\n".to_owned()),
+        modules: vec![aux, math, main],
+        dependencies: vec![
+            PackageDependencyWire {
+                name: "norma".to_owned(),
+                version: "1.0.0".to_owned(),
+                lock_identity: "path:/tmp/norma".to_owned(),
+                checksum: Some("cafe01".to_owned()),
+            },
+            PackageDependencyWire {
+                name: "triga".to_owned(),
+                version: "0.9.0".to_owned(),
+                lock_identity: "path:/tmp/triga".to_owned(),
+                checksum: None,
+            },
+        ],
+    }
+}
+
+#[test]
+fn multi_module_package_round_trips_through_msgpack() {
+    let original = multi_module_package();
+    let bytes = encode_package_msgpack(&original).expect("msgpack-encode FhirPackage");
+    let decoded = decode_package_msgpack(&bytes).expect("msgpack-decode FhirPackage");
+    assert_eq!(decoded.package_schema_version, PACKAGE_SCHEMA_VERSION);
+    assert_eq!(
+        decoded, original,
+        "structural equality vs pre-encode package"
+    );
+    // Link tables and the dependency table survive the wire.
+    assert_eq!(decoded.modules[2].local_links.len(), 2);
+    assert_eq!(decoded.modules[0].library_imports.len(), 1);
+    assert_eq!(decoded.dependencies.len(), 2);
+}
+
+#[test]
+fn package_msgpack_encode_is_deterministic() {
+    let pkg = multi_module_package();
+    assert_eq!(
+        encode_package_msgpack(&pkg).expect("encode"),
+        encode_package_msgpack(&pkg).expect("encode again")
+    );
+}
+
+#[test]
+fn package_msgpack_wire_uses_named_keys_and_nested_unit_values() {
+    // OQ-3: embedded units are nested named values — the whole package is
+    // one MessagePack document; no opaque nested bytes on the wire.
+    let bytes = encode_package_msgpack(&multi_module_package()).expect("encode");
+    let value = parse(&bytes);
+    assert_eq!(top_keys(&value), PACKAGE_KEYS);
+    assert_eq!(
+        get(&value, &["package_schema_version"]),
+        Some(&Value::Uint(1))
+    );
+
+    // modules[0] is src/aux.fab; its record carries the named module keys.
+    let aux = at(&value, &[Step::Key("modules"), Step::Idx(0)]).expect("modules[0]");
+    assert_eq!(top_keys(aux), MODULE_KEYS);
+    assert_eq!(get(aux, &["unit_schema_version"]), Some(&Value::Uint(5)));
+
+    // The unit is a nested named map with the 13 unit keys — not bin.
+    let unit = get(aux, &["unit"]).expect("nested unit");
+    assert!(
+        matches!(unit, Value::Map(_)),
+        "unit must be a nested named map"
+    );
+    assert_eq!(top_keys(unit), UNIT_KEYS);
+    // Link table entries are named maps too (binding → target).
+    let main = at(&value, &[Step::Key("modules"), Step::Idx(2)]).expect("modules[2]");
+    let link = get(main, &["local_links"])
+        .and_then(|v| match v {
+            Value::Array(items) => items.first(),
+            _ => None,
+        })
+        .expect("local_links[0]");
+    assert_eq!(top_keys(link), vec!["binding", "target"]);
+}
+
+#[test]
+fn package_msgpack_rejects_unsupported_package_schema_version() {
+    // Envelope gate: read before payload interpretation, fail closed.
+    let bytes = encode_package_msgpack(&multi_module_package()).expect("encode");
+    for wrong in [0u64, 2, 99] {
+        let patched = patch_uint(&bytes, &[Step::Key("package_schema_version")], wrong);
+        match decode_package_msgpack(&patched) {
+            Err(MsgpackError::UnsupportedPackageSchemaVersion { found, expected }) => {
+                assert_eq!(u64::from(found), wrong);
+                assert_eq!(expected, PACKAGE_SCHEMA_VERSION);
+            }
+            other => panic!("expected package version rejection for {wrong}, got {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn package_msgpack_rejects_unsupported_manifest_unit_version() {
+    let bytes = encode_package_msgpack(&multi_module_package()).expect("encode");
+    let patched = patch_uint(
+        &bytes,
+        &[
+            Step::Key("modules"),
+            Step::Idx(0),
+            Step::Key("unit_schema_version"),
+        ],
+        99,
+    );
+    match decode_package_msgpack(&patched) {
+        Err(MsgpackError::InvalidPackage(FhirPackageError::UnsupportedUnitSchemaVersion {
+            module,
+            found,
+            expected,
+        })) => {
+            assert_eq!(module, "src/aux.fab");
+            assert_eq!(found, 99);
+            assert_eq!(expected, SCHEMA_VERSION);
+        }
+        other => panic!("expected manifest unit version rejection, got {other:?}"),
+    }
+}
+
+#[test]
+fn package_msgpack_rejects_unsupported_nested_unit_version() {
+    // The nested unit's own schema_version gate fails closed with module
+    // attribution even when the manifest copy still says 5.
+    let bytes = encode_package_msgpack(&multi_module_package()).expect("encode");
+    let patched = patch_uint(
+        &bytes,
+        &[
+            Step::Key("modules"),
+            Step::Idx(1),
+            Step::Key("unit"),
+            Step::Key("schema_version"),
+        ],
+        4,
+    );
+    match decode_package_msgpack(&patched) {
+        Err(MsgpackError::InvalidPackage(FhirPackageError::UnsupportedUnitSchemaVersion {
+            module,
+            found,
+            expected,
+        })) => {
+            assert_eq!(module, "src/lib/math.fab");
+            assert_eq!(found, 4);
+            assert_eq!(expected, SCHEMA_VERSION);
+        }
+        other => panic!("expected nested unit version rejection, got {other:?}"),
+    }
+}
+
+#[test]
+fn package_msgpack_rejects_truncated_and_malformed_input() {
+    let bytes = encode_package_msgpack(&multi_module_package()).expect("encode");
+    assert!(matches!(
+        decode_package_msgpack(&bytes[..bytes.len() - 1]),
+        Err(MsgpackError::Truncated | MsgpackError::Decode(_))
+    ));
+    assert!(matches!(
+        decode_package_msgpack(&[0x90]),
+        Err(MsgpackError::Decode(_))
+    ));
+}
+
+#[test]
+fn package_msgpack_rejects_dangling_local_link() {
+    let mut pkg = multi_module_package();
+    pkg.modules[2].local_links.push(LocalLinkWire {
+        binding: "ghost".to_owned(),
+        target: "src/absent.fab".to_owned(),
+    });
+    // Keep the link table canonically sorted so the failure is the dangling
+    // target, not the sortedness gate.
+    pkg.modules[2]
+        .local_links
+        .sort_by(|a, b| a.binding.cmp(&b.binding));
+    let bytes = encode_package_msgpack(&pkg).expect("encode");
+    assert!(matches!(
+        decode_package_msgpack(&bytes),
+        Err(MsgpackError::InvalidPackage(
+            FhirPackageError::DanglingModuleRef { from, to }
+        )) if from == "src/main.fab" && to == "src/absent.fab"
+    ));
+}
+
+#[test]
+fn package_msgpack_rejects_missing_entry() {
+    let mut pkg = multi_module_package();
+    pkg.entry_path = "src/absent.fab".to_owned();
+    let bytes = encode_package_msgpack(&pkg).expect("encode");
+    assert!(matches!(
+        decode_package_msgpack(&bytes),
+        Err(MsgpackError::InvalidPackage(FhirPackageError::MissingEntry {
+            entry
+        })) if entry == "src/absent.fab"
+    ));
+}
+
+#[test]
+fn package_msgpack_rejects_entry_flag_inconsistent_with_entry_path() {
+    let mut pkg = multi_module_package();
+    pkg.modules[2].is_entry = false;
+    pkg.modules[0].is_entry = true;
+    let bytes = encode_package_msgpack(&pkg).expect("encode");
+    assert!(matches!(
+        decode_package_msgpack(&bytes),
+        Err(MsgpackError::InvalidPackage(
+            FhirPackageError::MissingEntry { .. }
+        ))
+    ));
+}
+
+#[test]
+fn package_msgpack_rejects_duplicate_module_paths() {
+    let mut pkg = multi_module_package();
+    // Duplicate of the last module: adjacent equal paths hit the duplicate
+    // branch (not merely the sortedness branch).
+    let clone = pkg.modules[2].clone();
+    pkg.modules.push(clone);
+    let bytes = encode_package_msgpack(&pkg).expect("encode");
+    assert!(matches!(
+        decode_package_msgpack(&bytes),
+        Err(MsgpackError::InvalidPackage(
+            FhirPackageError::DuplicateModulePath { path }
+        )) if path == "src/main.fab"
+    ));
+}
+
+#[test]
+fn package_msgpack_rejects_duplicate_dependencies() {
+    let mut pkg = multi_module_package();
+    let dup = pkg.dependencies[0].clone();
+    pkg.dependencies.push(dup);
+    // Keep the table canonically sorted so the failure is the duplicate
+    // name, not the sortedness gate.
+    pkg.dependencies.sort_by(|a, b| a.name.cmp(&b.name));
+    let bytes = encode_package_msgpack(&pkg).expect("encode");
+    assert!(matches!(
+        decode_package_msgpack(&bytes),
+        Err(MsgpackError::InvalidPackage(
+            FhirPackageError::MissingDependencyArtifact { name, .. }
+        )) if name == "norma"
+    ));
+}
+
+#[test]
+fn package_msgpack_rejects_mismatched_content_hash() {
+    let mut pkg = multi_module_package();
+    pkg.modules[0].source_hash = "deadbeef".to_owned();
+    let bytes = encode_package_msgpack(&pkg).expect("encode");
+    assert!(matches!(
+        decode_package_msgpack(&bytes),
+        Err(MsgpackError::InvalidPackage(
+            FhirPackageError::MismatchedContentHash { module, .. }
+        )) if module == "src/aux.fab"
+    ));
+}
+
+#[test]
+fn package_msgpack_rejects_unit_failing_referential_integrity() {
+    // Emptying the interner on the nested unit must fail the unit's
+    // referential-integrity gate with module attribution — never a panic.
+    let bytes = encode_package_msgpack(&multi_module_package()).expect("encode");
+    let mut value = parse(&bytes);
+    *at_mut(
+        &mut value,
+        &[
+            Step::Key("modules"),
+            Step::Idx(0),
+            Step::Key("unit"),
+            Step::Key("interner"),
+        ],
+    )
+    .expect("interner must exist") = Value::Array(Vec::new());
+    match decode_package_msgpack(&reserialize(&value)) {
+        Err(MsgpackError::InvalidPackage(FhirPackageError::MalformedUnit { module, .. })) => {
+            assert_eq!(module, "src/aux.fab")
+        }
+        other => panic!("expected MalformedUnit, got {other:?}"),
+    }
+}
+
+#[test]
+fn package_msgpack_encode_fails_closed_on_undecodable_unit() {
+    let mut pkg = multi_module_package();
+    pkg.modules[0].unit = vec![0xde, 0xad, 0xbe, 0xef];
+    assert!(
+        encode_package_msgpack(&pkg).is_err(),
+        "a module whose postcard unit cannot decode must not be embeddable"
+    );
+}
+
+#[test]
+fn package_msgpack_codec_is_additive_postcard_stays_live() {
+    // Both codecs produce distinct bytes and both decode through their own
+    // path; the postcard codec (encode_package/decode_package) is untouched.
+    let pkg = multi_module_package();
+    let msgpack_bytes = encode_package_msgpack(&pkg).expect("msgpack encode");
+    let postcard_bytes = crate::package::encode_package(&pkg).expect("postcard encode");
+    assert_ne!(msgpack_bytes, postcard_bytes);
+    let via_msgpack = decode_package_msgpack(&msgpack_bytes).expect("msgpack decode");
+    let via_postcard = crate::package::decode_package(&postcard_bytes).expect("postcard decode");
+    assert_eq!(via_msgpack.identity, via_postcard.identity);
+    assert_eq!(via_msgpack.entry_path, via_postcard.entry_path);
+    assert_eq!(via_msgpack.modules.len(), via_postcard.modules.len());
 }
