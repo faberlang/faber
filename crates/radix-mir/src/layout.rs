@@ -78,6 +78,9 @@ pub struct MirDeviceViewLayout {
     pub contiguous: bool,
     pub row_major: bool,
     pub stride: MirTensorStrideLayout,
+    /// Static element count when the view's extent is a compile-time bound.
+    /// `None` for tensor views (runtime extent) — `octeti<N>` sets it to `N`.
+    pub length: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -518,6 +521,7 @@ fn layout_kind_for_type(
         Type::Vector(element, width) => vector_layout_kind(types, *element, *width, memo, visiting),
         Type::Matrix(element, shape) => matrix_layout_kind(types, *element, *shape, memo, visiting),
         Type::Atomic(element) => atomic_layout_kind(types, *element, memo, visiting),
+        Type::BoundedOcteti { capacity } => bounded_octeti_layout_kind(types, *capacity),
         Type::Option(_) => Some(opaque_aggregate(MirAggregateFamily::Option)),
         Type::Struct(_) => Some(physical_aggregate(MirAggregateFamily::Struct)),
         Type::Enum(_) => Some(opaque_aggregate(MirAggregateFamily::Enum)),
@@ -547,8 +551,7 @@ fn layout_kind_for_type(
         | Type::Applied(_, _)
         | Type::BoundedArray { .. }
         | Type::BoundedTextus { .. }
-        | Type::BoundedAscii { .. }
-        | Type::BoundedOcteti { .. } => Some(MirLayoutKind::OpaqueHandle),
+        | Type::BoundedAscii { .. } => Some(MirLayoutKind::OpaqueHandle),
     };
     visiting.remove(&ty);
     memo.insert(ty, kind);
@@ -668,6 +671,18 @@ fn tensor_layout_kind(
     ))
 }
 
+/// `octeti<N>` — a statically-bounded byte buffer is a rank-1 `u8` device
+/// view with its static length. A capacity that is not a compile-time
+/// literal has no provable bounds and stays opaque.
+fn bounded_octeti_layout_kind(types: &TypeTable, capacity: radix_types::IndexId) -> Option<MirLayoutKind> {
+    match types.get_index(capacity) {
+        IndexExpr::Literal(length) => Some(MirLayoutKind::DeviceView(
+            MirDeviceViewLayout::static_byte_buffer(*length),
+        )),
+        _ => Some(MirLayoutKind::OpaqueHandle),
+    }
+}
+
 impl MirDeviceViewLayout {
     #[must_use]
     pub fn materialized_row_major(element: MirScalarLayout, rank: u8) -> Self {
@@ -681,6 +696,17 @@ impl MirDeviceViewLayout {
             contiguous: true,
             row_major: true,
             stride: MirTensorStrideLayout::RowMajor,
+            length: None,
+        }
+    }
+
+    /// `octeti<N>` byte view: host-staged per the existing tensor facts,
+    /// with the static capacity carried as the view length.
+    #[must_use]
+    pub fn static_byte_buffer(length: u64) -> Self {
+        Self {
+            length: Some(length),
+            ..Self::materialized_row_major(MirScalarLayout::U8, 1)
         }
     }
 
@@ -696,6 +722,7 @@ impl MirDeviceViewLayout {
             contiguous: true,
             row_major: true,
             stride: MirTensorStrideLayout::RowMajor,
+            length: None,
         }
     }
 
@@ -716,6 +743,7 @@ impl MirDeviceViewLayout {
             contiguous: false,
             row_major: true,
             stride: MirTensorStrideLayout::Axis0 { stride_elements },
+            length: None,
         }
     }
 }

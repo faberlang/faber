@@ -3307,3 +3307,51 @@ fn named_aggregate_rejects_non_integer_field_mismatch() {
         "expected bool into int<u32> field still rejected, got: {errors:?}"
     );
 }
+
+// -----------------------------------------------------------------------
+// MLC-1: octeti<N> carrier validation row
+// -----------------------------------------------------------------------
+
+/// Minimal valid program with one local of `octeti<N>` — the bounded byte
+/// carrier is a validation leaf and must validate cleanly.
+#[test]
+fn bounded_octeti_local_validates_as_leaf_carrier() {
+    let mut types = TypeTable::new();
+    let capacity = types.intern_index(IndexExpr::Literal(8));
+    let octeti8 = MirType::semantic(types.intern(Type::BoundedOcteti { capacity }));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: octeti8,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}

@@ -232,6 +232,7 @@ fn dense_tensor_layout_records_materialized_row_major_facts() {
             contiguous: true,
             row_major: true,
             stride: MirTensorStrideLayout::RowMajor,
+            length: None,
         })
     );
 }
@@ -250,6 +251,7 @@ fn dense_tensor_layout_can_represent_axis0_views() {
             contiguous: false,
             row_major: true,
             stride: MirTensorStrideLayout::Axis0 { stride_elements: 3 },
+            length: None,
         }
     );
 }
@@ -268,6 +270,7 @@ fn dense_tensor_layout_can_represent_device_handle_locus() {
             contiguous: true,
             row_major: true,
             stride: MirTensorStrideLayout::RowMajor,
+            length: None,
         }
     );
 }
