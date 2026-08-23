@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 6,
-    "analyzable": 302
+    "analyzable": 305
   },
   "terms": [
     {
@@ -217,7 +217,7 @@
       "term": "↦",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 14
+      "analyzable": 13
     },
     {
       "term": "copia",
@@ -931,7 +931,7 @@
       "term": "block-string",
       "rule": "existing-home",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 0
     },
     {
       "term": "§",
@@ -1018,8 +1018,44 @@
       "analyzable": 1
     },
     {
+      "term": "selective_import",
+      "rule": "keyword",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
+      "term": "primus_quem",
+      "rule": "concept",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
+      "term": "filum",
+      "rule": "concept",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
+      "term": "finite",
+      "rule": "conversio",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
+      "term": "Bits",
+      "rule": "conversio",
+      "capable": 0,
+      "analyzable": 0
+    },
+    {
+      "term": "⇇",
+      "rule": "operator",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
       "term": "summa",
-      "rule": "existing-home",
+      "rule": "concept",
       "capable": 0,
       "analyzable": 2
     },
