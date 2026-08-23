@@ -145,6 +145,47 @@ pub fn assert_budgets(counts: Counts, budgets: Budgets) {
     );
 }
 
+/// One toolchain spawn (`Command::new(…)`) found in a production file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandSpawn {
+    pub path: PathBuf,
+    /// 1-based line number of the spawn token in the source file.
+    pub line: usize,
+}
+
+/// Scan production files for `Command::new(…)` spawns.
+///
+/// Detection runs on the scrubbed source (comments, strings, and char
+/// literals are blanked), so a spawn spelled out in prose does not count —
+/// same convention as the hygiene budgets. A match only counts when the
+/// `Command` token starts at an identifier boundary, so `MyCommand::new`
+/// is not a false positive while `std::process::Command::new` is caught.
+#[must_use]
+pub fn scan_command_new(files: &[SourceFile]) -> Vec<CommandSpawn> {
+    let mut spawns = Vec::new();
+    for file in files {
+        for (index, line) in file.scrubbed.lines().enumerate() {
+            let mut offset = 0;
+            while let Some(relative) = line[offset..].find("Command::new") {
+                let absolute = offset + relative;
+                let starts_at_ident = absolute > 0
+                    && line[..absolute]
+                        .chars()
+                        .next_back()
+                        .is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_');
+                if !starts_at_ident {
+                    spawns.push(CommandSpawn {
+                        path: file.path.clone(),
+                        line: index + 1,
+                    });
+                }
+                offset = absolute + "Command::new".len();
+            }
+        }
+    }
+    spawns
+}
+
 /// Assert each production file that has a companion `*_test.rs` embeds the
 /// repo `#[cfg(test)]` + `#[path = …]` module wiring.
 ///
