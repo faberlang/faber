@@ -208,6 +208,7 @@ fn write_storage_layout(bytes: &mut Vec<u8>, layout: MirTensorStorageLayout) {
     match layout {
         MirTensorStorageLayout::HostOwned => bytes.push(0x00),
         MirTensorStorageLayout::DeviceHandle => bytes.push(0x01),
+        MirTensorStorageLayout::Sparse => bytes.push(0x02),
     }
 }
 

@@ -16,8 +16,7 @@ pub(crate) const ERR_KERNEL_BUILTIN_SCALAR_INPUT: &str = "kernel builtin input m
 // agree on element type AND element count. The count arm is what a matmul
 // author hits (input/return shapes differ), so the message names the equality
 // law and points to the indexed-view ABI that carries the matmul contract.
-pub(crate) const ERR_KERNEL_IO_ELEMENT_MISMATCH: &str =
-    "kernel input and output resource element types and counts must match; the return-buffer ABI is elementwise-only — matmul and reduction kernels must use the indexed-view ABI";
+pub(crate) const ERR_KERNEL_IO_ELEMENT_MISMATCH: &str = "kernel input and output resource element types and counts must match; the return-buffer ABI is elementwise-only — matmul and reduction kernels must use the indexed-view ABI";
 pub(crate) const ERR_KERNEL_INDEX_U32: &str = "kernel index parameter must be u32";
 pub(crate) const ERR_KERNEL_DEVICE_VIEW_ELEMENT: &str = "kernel device view element type";
 pub(crate) const ERR_KERNEL_VECTOR_PARAM: &str = "kernel vector param";
@@ -34,6 +33,9 @@ pub(crate) const ERR_KERNEL_RESULT_TUPLE_REQUIRES_INPUT: &str =
     "result-tuple kernel requires at least one input parameter";
 pub(crate) const ERR_KERNEL_TENSOR_STORAGE_LOCUS: &str =
     "kernel tensor storage/locus requires device handle";
+/// MLC-4: fail-closed sparse admission row — layout facts exist, kernels do
+/// not admit them.
+pub(crate) const ERR_KERNEL_SPARSE_STORAGE: &str = "kernel sparse tensor storage is not admitted";
 pub(crate) const ERR_KERNEL_VOID_SCALAR: &str = "void kernel scalar";
 pub(crate) const ERR_KERNEL_NEVER_SCALAR: &str = "never kernel scalar";
 pub(crate) const ERR_INDEXED_KERNEL_DEVICE_VIEW: &str =
@@ -125,6 +127,8 @@ fn abi_issue(message: &str) -> &'static str {
         "mir_kernel_workgroup_nonzero"
     } else if message == ERR_KERNEL_TENSOR_STORAGE_LOCUS {
         "mir_kernel_tensor_storage_locus_unsupported"
+    } else if message == ERR_KERNEL_SPARSE_STORAGE {
+        "mir_kernel_sparse_storage_unsupported"
     } else if message == ERR_KERNEL_REFLECTION_BYTE_OVERFLOW {
         "mir_kernel_reflection_byte_length_overflow"
     } else if message == ERR_INDEXED_KERNEL_DEVICE_VIEW {

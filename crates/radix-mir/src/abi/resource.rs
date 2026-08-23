@@ -12,7 +12,7 @@ use super::{
     ERR_KERNEL_DEVICE_VIEW_ELEMENT_COUNT, ERR_KERNEL_INDEX_U32, ERR_KERNEL_IO_ELEMENT_MISMATCH,
     ERR_KERNEL_MATRIX_PARAM, ERR_KERNEL_NEVER_SCALAR, ERR_KERNEL_OPAQUE_LAYOUT,
     ERR_KERNEL_REFLECTION_BYTE_OVERFLOW, ERR_KERNEL_REFLECTION_SCALAR_ELEMENT,
-    ERR_KERNEL_TENSOR_STORAGE_LOCUS, ERR_KERNEL_VECTOR_ELEMENT_COUNT, ERR_KERNEL_VECTOR_PARAM,
+    ERR_KERNEL_SPARSE_STORAGE, ERR_KERNEL_TENSOR_STORAGE_LOCUS, ERR_KERNEL_VECTOR_ELEMENT_COUNT, ERR_KERNEL_VECTOR_PARAM,
     ERR_KERNEL_VOID_SCALAR, ERR_KERNEL_WORKGROUP_NONZERO,
 };
 
@@ -294,7 +294,7 @@ pub(crate) fn reflect_kernel_resource(
         MirLayoutKind::Atomic(atomic) => {
             return Err(MirAbiError::new(kernel_atomic_reflection_error(
                 atomic.element,
-            )))
+            )));
         }
         _ => return Err(MirAbiError::new(ERR_KERNEL_REFLECTION_SCALAR_ELEMENT)),
     };
@@ -460,6 +460,15 @@ pub(crate) fn require_kernel_device_view(
     view: crate::MirDeviceViewLayout,
     allow_host_owned_tensor_entry: bool,
 ) -> Result<(), MirAbiError> {
+    // MLC-4: sparse storage is rejected by name, before the generic
+    // storage/locus row — fail-closed with a stable issue.
+    if view.storage == crate::MirTensorStorageLayout::Sparse {
+        return Err(MirAbiError::with_detail(
+            ERR_KERNEL_SPARSE_STORAGE,
+            "mir_kernel_sparse_storage_unsupported",
+            "sparsa",
+        ));
+    }
     if allow_host_owned_tensor_entry
         && view.storage == crate::MirTensorStorageLayout::HostOwned
         && view.locus == crate::MirTensorLocusLayout::Host
@@ -577,7 +586,7 @@ pub(crate) fn device_view_element_count_from_shape(
                     _ => {
                         return Err(MirAbiError::new(
                             "kernel device view element count must be literal dimensions",
-                        ))
+                        ));
                     }
                 }
             }

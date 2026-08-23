@@ -98,6 +98,9 @@ pub struct MirDeviceViewLayout {
 pub enum MirTensorStorageLayout {
     HostOwned,
     DeviceHandle,
+    /// MLC-4: sparse backing store (`sparsa` values) — layout facts only;
+    /// every kernel admission surface rejects it by name, fail-closed.
+    Sparse,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -573,6 +576,9 @@ fn layout_kind_for_type(
         Type::Record(_) => LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Record)),
         Type::Set(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Set)),
         Type::Tensor(element, shape) => tensor_layout_kind(types, *element, *shape, memo, visiting),
+        Type::Sparsa(element, figura) => {
+            sparsa_layout_kind(types, *element, *figura, memo, visiting)
+        }
         Type::Vector(element, width) => vector_layout_kind(types, *element, *width, memo, visiting),
         Type::Matrix(element, shape) => matrix_layout_kind(types, *element, *shape, memo, visiting),
         Type::Atomic(element) => atomic_layout_kind(types, *element, memo, visiting),
@@ -607,7 +613,6 @@ fn layout_kind_for_type(
         | Type::PromissumFailable(_, _)
         | Type::AsyncCursor(_, _)
         | Type::Cursor(_)
-        | Type::Sparsa(_, _)
         | Type::Intervallum(_)
         | Type::Ref(_, _)
         | Type::Interface(_)
@@ -774,6 +779,30 @@ fn device_matrix_align(element: MirScalarLayout, rows: u8) -> u8 {
     device_vector_align(element, rows)
 }
 
+/// MLC-4: `Sparsa<T, Figura>` — a scalar `T` with a resolvable figura rank
+/// resolves to a host-locus `DeviceView` row carrying the sparse storage
+/// marker. A non-scalar element or an unresolvable figura has no provable
+/// physical facts and stays opaque (same law as `Tensor`).
+fn sparsa_layout_kind(
+    types: &TypeTable,
+    element: TypeId,
+    figura: radix_types::IndexId,
+    memo: &mut FxHashMap<TypeId, LayoutResolution>,
+    visiting: &mut FxHashSet<TypeId>,
+) -> LayoutResolution {
+    layout_kind_for_type(types, element, memo, visiting).then(|element| {
+        let MirLayoutKind::Scalar(element) = element else {
+            return LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle);
+        };
+        let Some(rank) = tensor_rank(types, figura) else {
+            return LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle);
+        };
+        LayoutResolution::Resolved(MirLayoutKind::DeviceView(
+            MirDeviceViewLayout::sparse_row_major(element, rank),
+        ))
+    })
+}
+
 fn tensor_layout_kind(
     types: &TypeTable,
     element: TypeId,
@@ -833,6 +862,16 @@ impl MirDeviceViewLayout {
         Self {
             length: Some(length),
             ..Self::materialized_row_major(MirScalarLayout::U8, 1)
+        }
+    }
+
+    /// MLC-4: `sparsa` row — host-locus materialized view with the sparse
+    /// storage marker. Layout fact only; kernel admission rejects it by name.
+    #[must_use]
+    pub fn sparse_row_major(element: MirScalarLayout, rank: u8) -> Self {
+        Self {
+            storage: MirTensorStorageLayout::Sparse,
+            ..Self::materialized_row_major(element, rank)
         }
     }
 

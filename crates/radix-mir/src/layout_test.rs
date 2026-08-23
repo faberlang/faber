@@ -124,9 +124,10 @@ fn intended_bucket(ty: &Type) -> Bucket {
             | Primitive::Instans,
         ) => Bucket::OpaqueHandle,
         Type::SizedNumeric(_, _) | Type::ModularWord(_) => Bucket::Physical,
-        Type::Tensor(_, _) | Type::Vector(_, _) | Type::Matrix(_, _) | Type::Atomic(_) => {
-            Bucket::Physical
-        }
+        // MLC-4: `sparsa` with a scalar element and resolvable figura rank
+        // resolves a sparse-marker `DeviceView` row.
+        Type::Tensor(_, _) | Type::Sparsa(_, _) | Type::Vector(_, _) | Type::Matrix(_, _)
+        | Type::Atomic(_) => Bucket::Physical,
         Type::Record(_) | Type::Struct(_) | Type::Tuple(_) => Bucket::Physical,
         // MLC-3: the bounded families with literal capacities are physical
         // aggregates (row-of-T / byte-storage + length member).
@@ -146,7 +147,6 @@ fn intended_bucket(ty: &Type) -> Bucket {
         | Type::Error => Bucket::Internal,
         Type::Alias(_, _) => panic!("alias is transparent; pinned separately, not a census row"),
         Type::BoundedOcteti { .. }
-        | Type::Sparsa(_, _)
         | Type::Intervallum(_)
         | Type::SizedInstans(_)
         | Type::Promissum(_)
@@ -203,6 +203,9 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     });
     rows.push(Type::BoundedTextus { capacity: cap });
     rows.push(Type::BoundedAscii { capacity: cap });
+    // MLC-4: the sparse seat is the scalar+literal-figura state; the
+    // non-scalar / unresolvable-figura states stay opaque (MLC-6).
+    rows.push(Type::Sparsa(float64_ty, tensor_shape));
     // Opaque aggregate (6).
     rows.push(Type::Array(float64_ty));
     rows.push(Type::Map(int64_ty, float64_ty));
@@ -232,7 +235,6 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     rows.push(Type::BoundedOcteti {
         capacity: dynamic_cap,
     });
-    rows.push(Type::Sparsa(float64_ty, tensor_shape));
     rows.push(Type::Intervallum(float64_ty));
     rows.push(Type::SizedInstans(InstansPrecision::Millis));
     rows.push(Type::Promissum(float64_ty));
@@ -281,9 +283,9 @@ fn pin_table_census_is_49_rows_across_the_four_buckets() {
             Bucket::Internal => internal += 1,
         }
     }
-    assert_eq!(physical, 17, "physical census rows (MLC-3: +3 bounded families)");
+    assert_eq!(physical, 18, "physical census rows (MLC-4: +1 sparsa)");
     assert_eq!(aggregate, 6, "opaque-aggregate census rows");
-    assert_eq!(opaque, 21, "opaque-by-design census rows (MLC-3: -3 to physical)");
+    assert_eq!(opaque, 20, "opaque-by-design census rows (MLC-4: -1 to physical)");
     assert_eq!(internal, 5, "internal census rows");
 }
 
@@ -568,6 +570,67 @@ fn bounded_ascii_and_textus_resolve_physical_byte_aggregates_with_length_member(
         .layout_for_type(MirType::semantic(ascii_ty))
         .expect("ascii<16> layout fact");
     assert_eq!(ascii_layout.kind, expected(MirAggregateFamily::BoundedAscii));
+}
+
+// MLC-4: `Sparsa<T, Figura>` — a scalar element with a resolvable figura
+// rank resolves to a `DeviceView` row carrying the sparse storage marker
+// (`MirTensorStorageLayout::Sparse`); non-scalar elements and unresolvable
+// figurae stay opaque as today. Every kernel admission surface keeps
+// rejecting the sparse marker with a named fail-closed row (pinned below).
+
+#[test]
+fn sparsa_resolves_sparse_storage_device_view_row() {
+    let mut types = TypeTable::new();
+    let float64_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
+    let dim3 = types.intern_index(IndexExpr::Literal(3));
+    let dim4 = types.intern_index(IndexExpr::Literal(4));
+    let figura = types.intern_index(IndexExpr::Tuple(vec![dim3, dim4]));
+    let sparsa_ty = types.intern(Type::Sparsa(float64_ty, figura));
+    let table = MirLayoutTable::from_types(&types);
+
+    let layout = table
+        .layout_for_type(MirType::semantic(sparsa_ty))
+        .expect("Sparsa layout fact");
+    assert_eq!(
+        layout.kind,
+        MirLayoutKind::DeviceView(MirDeviceViewLayout {
+            element: MirScalarLayout::F64,
+            rank: 2,
+            storage: MirTensorStorageLayout::Sparse,
+            locus: MirTensorLocusLayout::Host,
+            view: MirTensorViewLayout::Materialized,
+            offset_elements: 0,
+            contiguous: true,
+            row_major: true,
+            stride: MirTensorStrideLayout::RowMajor,
+            length: None,
+        })
+    );
+}
+
+#[test]
+fn sparsa_with_non_scalar_element_or_unresolvable_figura_stays_opaque() {
+    let mut types = TypeTable::new();
+    let float64_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
+    let tuple_ty = types.intern(Type::Tuple(vec![float64_ty]));
+    let figura = types.intern_index(IndexExpr::Literal(1));
+    let unresolved_figura = types.intern_index(IndexExpr::Unspecified);
+    let rows = [
+        types.intern(Type::Sparsa(tuple_ty, figura)),
+        types.intern(Type::Sparsa(float64_ty, unresolved_figura)),
+    ];
+    let table = MirLayoutTable::from_types(&types);
+
+    for ty in rows {
+        let layout = table
+            .layout_for_type(MirType::semantic(ty))
+            .expect("Sparsa layout fact");
+        assert_eq!(
+            layout.kind,
+            MirLayoutKind::OpaqueHandle,
+            "non-scalar/unresolvable sparsa stays opaque"
+        );
+    }
 }
 
 #[test]

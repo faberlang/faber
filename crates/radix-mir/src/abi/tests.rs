@@ -1697,3 +1697,17 @@ fn projection_prefill_does_not_expand_when_step_has_many_rows() {
     assert_eq!(seq, 10);
     assert_eq!(output_elements, 80, "logical 2*10*4=80, no GEMV expansion");
 }
+
+// MLC-4: fail-closed sparse admission — a `DeviceView` carrying the sparse
+// storage marker is rejected by name at the wire admission boundary, before
+// the generic storage/locus row, with a stable issue.
+#[test]
+fn kernel_admission_rejects_sparse_storage_by_name() {
+    let sparse = crate::MirDeviceViewLayout::sparse_row_major(crate::MirScalarLayout::F32, 2);
+    for allow_host_owned in [false, true] {
+        let err = require_kernel_device_view(sparse, allow_host_owned)
+            .expect_err("sparse storage must not be admitted to kernels");
+        assert_eq!(err.message, "kernel sparse tensor storage is not admitted");
+        assert_eq!(err.issue, "mir_kernel_sparse_storage_unsupported");
+    }
+}

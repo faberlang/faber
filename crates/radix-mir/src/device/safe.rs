@@ -49,6 +49,8 @@ const SHAPE_DEVICE_NIHIL_VALUE: &str = "device nihil value";
 const SHAPE_KERNEL_AGGREGATE_LAYOUT: &str = "kernel aggregate layout";
 const SHAPE_KERNEL_OPAQUE_LAYOUT: &str = "kernel opaque layout";
 const SHAPE_KERNEL_HOST_TENSOR_STORAGE: &str = "kernel tensor storage/locus requires device handle";
+/// MLC-4: fail-closed sparse admission row — same spelling as the ABI gate.
+const SHAPE_KERNEL_SPARSE_STORAGE: &str = "kernel sparse tensor storage is not admitted";
 const SHAPE_DEVICE_PLACE_PROJECTION: &str = "device place projection";
 const SHAPE_ASYNC_GENERATOR_DEVICE_FN: &str = "async/generator device function";
 const SHAPE_DEVICE_MULTI_BLOCK_CFG: &str = "device multi-block control flow";
@@ -313,6 +315,12 @@ impl<'a> DeviceSafeClassifier<'a> {
                     self.record_layout(SHAPE_KERNEL_AGGREGATE_LAYOUT);
                 }
                 MirLayoutKind::DeviceView(view) => {
+                    // MLC-4: sparse storage is rejected by name, fail-closed,
+                    // before the host-owned entry and generic storage rows.
+                    if view.storage == MirTensorStorageLayout::Sparse {
+                        self.record_policy(SHAPE_KERNEL_SPARSE_STORAGE);
+                        return;
+                    }
                     let host_owned_entry = self.allow_host_owned_tensor_entry
                         && view.storage == MirTensorStorageLayout::HostOwned
                         && view.locus == MirTensorLocusLayout::Host;
