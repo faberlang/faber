@@ -175,3 +175,156 @@ functio pick(tf32[2, 2] x) → fractus ∪ nihil {
          method row (ruling 94786e02 differentiation); got: {errors:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// AFM-4 — AIR-lane bounded-source admission rows (air_unroll routes).
+// ---------------------------------------------------------------------------
+
+fn no_first_match_decline(source: &str) {
+    let errors = air_errors(source);
+    let first_match_declines: Vec<_> = errors
+        .iter()
+        .filter(|err| {
+            err.args.iter().any(|arg| {
+                arg.name == "issue"
+                    && (arg.value == "first_match_unbounded_source"
+                        || arg.value == "first_match_expression_unsupported")
+            })
+        })
+        .collect();
+    assert!(
+        first_match_declines.is_empty(),
+        "bounded first-match source must admit on the AIR lane: {first_match_declines:?} \
+         (all diagnostics: {errors:?})"
+    );
+}
+
+#[test]
+fn air_first_match_literal_array_source_admits_route_t() {
+    // Route T: array literal with per-element entries (no spread).
+    no_first_match_decline(
+        r#"
+@ radix lane "air"
+functio pick() → fractus ∪ nihil {
+    redde primus_quem([1.0, -2.0, 3.0], ubi x { x > 0.0 })
+}
+"#,
+    );
+}
+
+#[test]
+fn air_first_match_static_tensor_shape_admits_route_m() {
+    // Route M: statically shaped tensor parameter (the AFM-1 red pin, now
+    // green; kept here as the route row alongside the other sources).
+    no_first_match_decline(
+        r#"
+@ radix lane "air"
+functio keep(fractus x) → bivalens {
+    redde x > 0.0
+}
+
+@ radix lane "air"
+functio pick(tf32[2, 2] x) → fractus ∪ nihil {
+    redde primus_quem(x, ubi v { keep(v) })
+}
+"#,
+    );
+}
+
+#[test]
+fn air_first_match_zero_extent_tensor_admits_empty_nihil() {
+    // Nihil contract on the AIR lane: a statically zero-extent source is a
+    // bounded route (route M with extent 0) and admits; `nihil` behavior is
+    // the base-lane pin above, carried unchanged through the gate.
+    no_first_match_decline(
+        r#"
+@ radix lane "air"
+functio pick(tf32[0] x) → fractus ∪ nihil {
+    redde primus_quem(x, ubi v { v > 0.0 })
+}
+"#,
+    );
+}
+
+#[test]
+fn air_first_match_unbounded_lista_param_declines_not_bounded() {
+    // Keep-out: an unbounded `lista` parameter has no static extent —
+    // decline `first_match_unbounded_source` / `not_bounded`.
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio pick(lista<f32> xs) → fractus ∪ nihil {
+    redde primus_quem(xs, ubi v { v > 0.0 })
+}
+"#,
+    );
+    assert!(
+        errors.iter().any(|err| {
+            err.args.iter().any(|arg| arg.name == "issue"
+                && arg.value == "first_match_unbounded_source")
+                && err.args
+                    .iter()
+                    .any(|arg| arg.name == "causa" && arg.value == "not_bounded")
+        }),
+        "unbounded lista source must decline with causa not_bounded; got: {errors:?}"
+    );
+}
+
+#[test]
+fn air_first_match_unbounded_lista_local_path_declines_not_bounded() {
+    // A `lista<f32>` local is an unbounded array even when the initializer
+    // is a literal: the route classifier sees the unbounded path type, not
+    // the initializer. Decline `not_bounded`; a runtime-bound predicate
+    // over an inline literal (Route T) admits.
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio pick(numerus n) → fractus ∪ nihil {
+    fixum lista<f32> xs ← [1.0, 2.0, 3.0]
+    redde primus_quem(xs, ubi v { v > n })
+}
+"#,
+    );
+    assert!(
+        errors.iter().any(|err| {
+            err.args.iter().any(|arg| arg.name == "issue"
+                && arg.value == "first_match_unbounded_source")
+                && err.args
+                    .iter()
+                    .any(|arg| arg.name == "causa" && arg.value == "not_bounded")
+        }),
+        "unbounded lista path must decline with causa not_bounded; got: {errors:?}"
+    );
+    no_first_match_decline(
+        r#"
+@ radix lane "air"
+functio pick2(numerus n) → fractus ∪ nihil {
+    redde primus_quem([1.0, 2.0, 3.0], ubi v { v > n })
+}
+"#,
+    );
+}
+
+#[test]
+fn air_first_match_keep_outs_unchanged_alongside_admitted_head() {
+    // The standing keep-outs (`dum`, `loop`) keep their existing decline
+    // causes even in a function that also admits a bounded first-match.
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio pick(tf32[2] x) → fractus ∪ nihil {
+    dum verum {
+        redde nihil
+    }
+}
+"#,
+    );
+    assert!(
+        errors.iter().any(|err| {
+            err.args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "dum_loop")
+        }),
+        "dum keep-out must keep its decline cause: {errors:?}"
+    );
+}

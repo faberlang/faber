@@ -267,12 +267,24 @@ impl AirPurityChecker<'_> {
                 self.check_expr(source);
                 self.check_block(body);
             }
-            HirExpressionKind::FirstMatch { source, body, .. } => {
-                // AFM-2 lands the source shape only; the head stays AIR-rejected
-                // until AFM-4 lands the bounded-source admission rules.
-                self.reject(expr.span, "first_match_expression_unsupported");
+            HirExpressionKind::FirstMatch { source, coordinates, body, .. } => {
+                // AFM-4: bounded sources admit on the AIR lane (forward
+                // execution; reverse AD is fail-closed — see the vjp.rs
+                // forward-only note). The predicate is still traversed so
+                // impure bodies keep their own decline causes.
                 self.check_expr(source);
                 self.check_block(body);
+                if !coordinates.is_empty() {
+                    self.reject(expr.span, "first_match_expression_unsupported");
+                } else if super::air_unroll::first_match_source_route(source, self.types).is_none()
+                {
+                    self.reject_with_arg(
+                        expr.span,
+                        "first_match_unbounded_source",
+                        "causa",
+                        "not_bounded",
+                    );
+                }
             }
             HirExpressionKind::Intervallum {
                 start, end, step, ..
