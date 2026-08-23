@@ -159,7 +159,10 @@ fn en_like_pack_mapped_spelling_less_than_parses_as_comparison() {
     for cell in ["string < 5", "value < 5", "record < 5"] {
         let source = format!("incipit {{\n    fixum bivalens ok ← {cell}\n}}");
         let result = parse_ok_with_en_like_pack(&source);
-        assert!(matches!(incipit_init_expr(&result).kind, ExprKind::Binary(_)));
+        assert!(matches!(
+            incipit_init_expr(&result).kind,
+            ExprKind::Binary(_)
+        ));
     }
 }
 
@@ -222,19 +225,21 @@ fn retired_bare_type_call_is_rejected_for_mapped_spelling_under_pack() {
     // `textus`, so `string(5)` is the same retired shape as `textus(5)`.
     let result = parse_with_en_like_pack("incipit {\n    string(5)\n}");
     assert!(
-        result
-            .errors
-            .iter()
-            .any(|err| crate::test_support::has_arg(err, "issue", "retired_type_call_constructor")),
+        result.errors.iter().any(|err| crate::test_support::has_arg(
+            err,
+            "issue",
+            "retired_type_call_constructor"
+        )),
         "expected retired_type_call_constructor under en-like pack, got {:?}",
         result.errors
     );
     let result = parse_with_en_like_pack("incipit {\n    textus(5)\n}");
     assert!(
-        result
-            .errors
-            .iter()
-            .any(|err| crate::test_support::has_arg(err, "issue", "retired_type_call_constructor")),
+        result.errors.iter().any(|err| crate::test_support::has_arg(
+            err,
+            "issue",
+            "retired_type_call_constructor"
+        )),
         "latin spelling must stay rejected under a reader pack, got {:?}",
         result.errors
     );

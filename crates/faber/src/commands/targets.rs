@@ -9,9 +9,7 @@
 //! per-row availability; device/host-leaf/device-runtime capability rows are
 //! **compiled-only** — a build without the feature reports no row for it.
 
-use radix::services::{
-    target_capabilities_for_surface, TargetCapabilities, TargetCommandSurface,
-};
+use radix::services::{target_capabilities_for_surface, TargetCapabilities, TargetCommandSurface};
 use std::collections::BTreeSet;
 
 /// Emit-target rows keyed to the faber feature that must be compiled for the
@@ -83,7 +81,11 @@ const FABER_TARGET_ROWS: &[(radix::module::codegen::Target, &str, &str)] = &[
         "mir-wgsl",
     ),
     (radix::module::codegen::Target::MirSexp, "sexp", "mir-sexp"),
-    (radix::module::codegen::Target::HirTypeScript, "ts", "hir-ts"),
+    (
+        radix::module::codegen::Target::HirTypeScript,
+        "ts",
+        "hir-ts",
+    ),
 ];
 
 /// Compiled-only capability rows for the device/host-leaf/device-runtime

@@ -5454,12 +5454,16 @@ incipit {
     };
 
     assert!(
-        output.code.contains("use crate::consolum::lege as line_reader"),
+        output
+            .code
+            .contains("use crate::consolum::lege as line_reader"),
         "expected la lege to resolve to the consolum member, not solum:\n{}",
         output.code
     );
     assert!(
-        output.code.contains("use crate::consolum::hauri as bytes_reader"),
+        output
+            .code
+            .contains("use crate::consolum::hauri as bytes_reader"),
         "expected la hauri to resolve to the consolum member:\n{}",
         output.code
     );
@@ -5521,7 +5525,10 @@ main {
             .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
             .collect::<Vec<_>>()
     );
-    assert_eq!(host.stdout_lines, vec!["salve".to_owned(), "BYTE".to_owned()]);
+    assert_eq!(
+        host.stdout_lines,
+        vec!["salve".to_owned(), "BYTE".to_owned()]
+    );
 }
 
 #[test]

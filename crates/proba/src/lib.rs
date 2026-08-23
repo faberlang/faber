@@ -13,8 +13,8 @@ mod tests;
 use radix::hir::{DefId, HirItemKind, HirModule, HirTestMetadata, HirTestModifier};
 use radix::lexer::Interner;
 use radix::mir::{
-    lower_analyzed_unit, run_function_with_step_budget, BufferHost, MirFunctionId,
-    RunSourceError, RunnerError, ValidatedMir,
+    lower_analyzed_unit, run_function_with_step_budget, BufferHost, MirFunctionId, RunSourceError,
+    RunnerError, ValidatedMir,
 };
 use radix::module::{AnalyzedModule, Session};
 use radix::program::analyze_prepared_program_name;

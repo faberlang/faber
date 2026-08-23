@@ -786,7 +786,8 @@ pub fn combined_verdict(
         return HirAspectCheckResult {
             status: HirAspectCheckStatus::Failed,
             evidence: HirAspectEvidence(
-                "axiom audit unresolved: the #print-axioms wrapper import did not resolve; axioms are unverified".into(),
+                "axiom audit unresolved: the #print-axioms wrapper import did not resolve; axioms are unverified"
+                    .into(),
             ),
             backend: HirAspectBackendKind::Lean,
         };

@@ -27,7 +27,6 @@ mod doctor_test;
 mod emit;
 mod explain;
 mod format;
-mod output_transfer_codemod;
 #[cfg(test)]
 #[path = "format_corpus_test.rs"]
 mod format_corpus_test;
@@ -37,6 +36,7 @@ pub(crate) mod format_test;
 pub mod host;
 pub(crate) mod init;
 mod model;
+mod output_transfer_codemod;
 mod run;
 pub(crate) mod self_update;
 #[cfg(test)]
@@ -59,9 +59,9 @@ use doctor::cmd_doctor;
 use explain::cmd_explain;
 use format::cmd_format;
 use host::cmd_host;
-use output_transfer_codemod::cmd_output_transfer_codemod;
 use init::cmd_init;
 use model::cmd_model;
+use output_transfer_codemod::cmd_output_transfer_codemod;
 use run::{cmd_eval, cmd_fmir_run_image, cmd_repl, cmd_run};
 use self_update::cmd_self;
 use targets::cmd_targets;

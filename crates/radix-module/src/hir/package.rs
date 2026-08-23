@@ -24,10 +24,9 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 pub use radix_hir_fhir::{
-    decode_package, decode_package_msgpack, encode_package, encode_package_msgpack,
-    DecodedFhirPackage, FhirPackage, FhirPackageError, LibraryImportWire, LocalLinkWire,
-    PackageDependencyWire, PackageIdentityWire, LEGACY_PACKAGE_SCHEMA_VERSION,
-    PACKAGE_SCHEMA_VERSION,
+    decode_package, decode_package_msgpack, encode_package, encode_package_msgpack, DecodedFhirPackage, FhirPackage,
+    FhirPackageError, LibraryImportWire, LocalLinkWire, PackageDependencyWire, PackageIdentityWire,
+    LEGACY_PACKAGE_SCHEMA_VERSION, PACKAGE_SCHEMA_VERSION,
 };
 
 /// Compiler version recorded on fragment body artifacts (radix-module crate).
@@ -201,8 +200,9 @@ pub fn load_package(bytes: &[u8]) -> Result<LoadedHirPackage, FhirPackageError> 
     let pkg = decode_package_msgpack(bytes).map_err(FhirPackageError::from)?;
     let mut modules = Vec::with_capacity(pkg.modules.len());
     for module in pkg.modules {
-        let artifact = radix_hir_fhir::decode(&module.unit).map_err(|error| {
-            FhirPackageError::MalformedUnit { module: module.path.clone(), detail: error.to_string() }
+        let artifact = radix_hir_fhir::decode(&module.unit).map_err(|error| FhirPackageError::MalformedUnit {
+            module: module.path.clone(),
+            detail: error.to_string(),
         })?;
         let unit = crate::hir::artifact::reconstruct_unit(artifact).map_err(|error| {
             FhirPackageError::MalformedUnit { module: module.path.clone(), detail: error.to_string() }

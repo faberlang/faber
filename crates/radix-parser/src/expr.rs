@@ -1589,10 +1589,8 @@ impl Parser {
     /// `is_label` shape `parse_ratio_type_argument` requires. Anything else
     /// (`ratio < 5`) is an ordinary identifier followed by a comparison.
     fn ratio_constructor_head(&self) -> bool {
-        matches!(
-            self.peek_at(1).kind,
-            TokenKind::Ident(_) | TokenKind::Tag
-        ) && matches!(self.peek_at(2).kind, TokenKind::Colon)
+        matches!(self.peek_at(1).kind, TokenKind::Ident(_) | TokenKind::Tag)
+            && matches!(self.peek_at(2).kind, TokenKind::Colon)
     }
 
     /// Parse the ratio constructor claim: `ratio<label: T, …> { field = value, … }`.

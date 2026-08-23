@@ -439,7 +439,11 @@ fn resolve_outcome(table: &MirLayoutTable, ty: radix_types::TypeId) -> SizedNume
             );
             // Named missing-fact row: the failing type id is the structured
             // identity of the fallthrough-law error (no named layout arm).
-            assert_eq!(err.ty, Some(ty), "fallthrough error names the type: {err:?}");
+            assert_eq!(
+                err.ty,
+                Some(ty),
+                "fallthrough error names the type: {err:?}"
+            );
             SizedNumericOutcome::LoudError
         }
     }

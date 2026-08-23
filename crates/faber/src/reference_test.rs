@@ -250,11 +250,23 @@ fn audit_finding_topics_resolve_with_current_behavior() {
     // ⇇ transfer: alias and term both reach the same canonical entry, and the
     // body carries the EBNF [126]/[127] precedence rows.
     assert!(matches!(registry.lookup("⇇"), Some(Lookup::Exact(_))));
-    assert!(matches!(registry.lookup("transfer"), Some(Lookup::Alias { .. })));
+    assert!(matches!(
+        registry.lookup("transfer"),
+        Some(Lookup::Alias { .. })
+    ));
     let transfer = render_plain(&registry.lookup("⇇").expect("transfer resolves"));
-    assert!(transfer.contains("[126]"), "transfer entry cites EBNF row 126");
-    assert!(transfer.contains("[127]"), "transfer entry cites EBNF row 127");
-    assert!(transfer.contains("vacuum"), "transfer chain result is vacuum");
+    assert!(
+        transfer.contains("[126]"),
+        "transfer entry cites EBNF row 126"
+    );
+    assert!(
+        transfer.contains("[127]"),
+        "transfer entry cites EBNF row 127"
+    );
+    assert!(
+        transfer.contains("vacuum"),
+        "transfer chain result is vacuum"
+    );
 
     // Selective imports cite the [067]/[071] rows and the fixum member rule.
     let selective = render_plain(&registry.lookup("selective_import").expect("selective"));
@@ -286,7 +298,10 @@ fn audit_finding_topics_resolve_with_current_behavior() {
     // summa explains the grammar reduction, not the list `.summa()` method.
     let summa_lookup = registry.lookup("summa").expect("summa resolves");
     let summa = render_plain(&summa_lookup);
-    assert!(summa.contains("summa ex"), "summa entry is the reduce grammar");
+    assert!(
+        summa.contains("summa ex"),
+        "summa entry is the reduce grammar"
+    );
     assert!(!summa.contains(".sum()"));
 }
 

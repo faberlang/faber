@@ -5,8 +5,8 @@
 //! developer tools as part of user-facing build/emit workflows.
 
 use radix::module::codegen::Target;
-use radix::services::DiagnosticMode;
 use radix::module::Output;
+use radix::services::DiagnosticMode;
 use std::path::Path;
 use std::{fs, io};
 
@@ -45,12 +45,7 @@ pub fn write_output_artifact(
 ) {
     ensure_artifact_parent(path);
 
-    let code = postprocess_code(
-        radix::services::output_code(output),
-        target,
-        format,
-        linter,
-    );
+    let code = postprocess_code(radix::services::output_code(output), target, format, linter);
     write_artifact_contents(path, code);
 }
 

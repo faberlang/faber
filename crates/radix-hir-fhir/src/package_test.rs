@@ -113,7 +113,10 @@ fn package_legacy_rejects_live_msgpack_schema_version() {
     assert!(
         matches!(
             decode_package(&encode(&pkg)),
-            Err(FhirPackageError::UnsupportedPackageSchemaVersion { found: 2, expected: 1 })
+            Err(FhirPackageError::UnsupportedPackageSchemaVersion {
+                found: 2,
+                expected: 1
+            })
         ),
         "the legacy postcard decoder must not grow a v2 envelope"
     );

@@ -364,6 +364,9 @@ dependencies = [
 [[package]]
 name = "handroll"
 version = "0.1.0"
+dependencies = [
+ "hygiene-ratchet",
+]
 
 [[package]]
 name = "hash32"
@@ -610,6 +613,7 @@ dependencies = [
 name = "radix-diagnostics"
 version = "0.83.0"
 dependencies = [
+ "hygiene-ratchet",
  "serde",
 ]
 

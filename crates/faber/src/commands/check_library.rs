@@ -187,8 +187,11 @@ fn check_target(provider_repo: &Path, root_rule: LibraryRootRule) -> Target {
     let Ok(manifest) = crate::package::read_manifest(&manifest_path) else {
         return Target::HirRust;
     };
-    radix::program::manifest::manifest_build_target(manifest.build.target.as_deref(), &manifest_path)
-        .unwrap_or(Target::HirRust)
+    radix::program::manifest::manifest_build_target(
+        manifest.build.target.as_deref(),
+        &manifest_path,
+    )
+    .unwrap_or(Target::HirRust)
 }
 
 /// Analyze the library interface graph. Does not include `.proba`.

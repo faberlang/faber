@@ -146,14 +146,13 @@ use radix_module::hir::{
 };
 use radix_module::lexer::{Interner, Symbol};
 use radix_module::mir::{
-    lower_analyzed_unit, run_entry, validate_program, Host, LoweredMirUnit,
-    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirBlockId,
-    MirCallee, MirClosureCallee, MirClosureEnvironment, MirClosureEnvironmentId, MirClosureValue,
-    MirConstant, MirDiagnosticKind, MirFunction, MirFunctionId, MirIntrinsic, MirNamedOperand,
-    MirOperand, MirOptionChainLink, MirOptionOp, MirPlace, MirProgram, MirProjection,
-    MirProviderKind, MirRuntimeCall, MirRuntimeRecordField, MirRuntimeRecordValue, MirStatement,
-    MirStatementKind, MirSwitchCase, MirTerminator, MirTerminatorKind, MirType, MirValue,
-    MirValueKind, RunnerError,
+    lower_analyzed_unit, run_entry, validate_program, Host, LoweredMirUnit, MirAggregate,
+    MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirBlockId, MirCallee,
+    MirClosureCallee, MirClosureEnvironment, MirClosureEnvironmentId, MirClosureValue, MirConstant,
+    MirDiagnosticKind, MirFunction, MirFunctionId, MirIntrinsic, MirNamedOperand, MirOperand,
+    MirOptionChainLink, MirOptionOp, MirPlace, MirProgram, MirProjection, MirProviderKind,
+    MirRuntimeCall, MirRuntimeRecordField, MirRuntimeRecordValue, MirStatement, MirStatementKind,
+    MirSwitchCase, MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueKind, RunnerError,
 };
 use radix_module::semantic::{
     IndexExpr, Primitive, Resolver, SymbolKind, Type, TypeId, TypeTable, TypeTableSnapshot,

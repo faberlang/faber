@@ -93,17 +93,18 @@ pub fn attach_canonical_mir(
             continue;
         }
         let lowered =
-            radix_module::mir::lower_analyzed_unit(&mut node.analysis, Default::default()).map_err(|errors| {
-                errors
-                    .into_iter()
-                    .map(|error| {
-                        crate::package_diagnostic_error(error.message)
-                            .with_phase(DiagnosticPhase::Analysis)
-                            .with_file(node.path.display().to_string())
-                            .with_arg("issue", error.issue)
-                    })
-                    .collect::<Vec<_>>()
-            })?;
+            radix_module::mir::lower_analyzed_unit(&mut node.analysis, Default::default())
+                .map_err(|errors| {
+                    errors
+                        .into_iter()
+                        .map(|error| {
+                            crate::package_diagnostic_error(error.message)
+                                .with_phase(DiagnosticPhase::Analysis)
+                                .with_file(node.path.display().to_string())
+                                .with_arg("issue", error.issue)
+                        })
+                        .collect::<Vec<_>>()
+                })?;
         metadata.attach_canonical_mir(lowered.validated.program(), &relative);
     }
     metadata

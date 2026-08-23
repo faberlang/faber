@@ -103,8 +103,7 @@ fn load_package_legacy_postcard(bytes: &[u8]) -> LoadedHirPackage {
     let decoded = decode_package(bytes).expect("decode legacy postcard package");
     let mut modules = Vec::with_capacity(decoded.modules.len());
     for module in decoded.modules {
-        let unit = crate::hir::artifact::reconstruct_unit(module.unit)
-            .expect("reconstruct legacy postcard unit");
+        let unit = crate::hir::artifact::reconstruct_unit(module.unit).expect("reconstruct legacy postcard unit");
         modules.push(LoadedHirModule {
             relative_path: module.path,
             module_segments: module.module_segments,
@@ -115,8 +114,7 @@ fn load_package_legacy_postcard(bytes: &[u8]) -> LoadedHirPackage {
             unit,
         });
     }
-    let nucleum =
-        nucleum_metadata_from_loaded_modules(&modules).expect("legacy postcard nucleum metadata");
+    let nucleum = nucleum_metadata_from_loaded_modules(&modules).expect("legacy postcard nucleum metadata");
     LoadedHirPackage {
         identity: decoded.identity,
         entry_path: decoded.entry_path,
@@ -140,8 +138,7 @@ fn both_codec_loaded_package_equivalence() {
 
     let mut main_input = input("main.fab", true, &main);
     main_input.export_names = vec!["computa".to_owned()];
-    main_input.local_links =
-        vec![LocalLinkWire { binding: "aux".to_owned(), target: "aux.fab".to_owned() }];
+    main_input.local_links = vec![LocalLinkWire { binding: "aux".to_owned(), target: "aux.fab".to_owned() }];
     main_input.library_imports = vec![LibraryImportWire {
         binding: "mathesis".to_owned(),
         package: "norma".to_owned(),
@@ -217,10 +214,10 @@ fn both_codec_loaded_package_equivalence() {
         );
 
         // Canonical-Faber emit equality from the loaded HIR.
-        let postcard_output =
-            generate_from_analyzed(Target::HirFaber, &postcard_module.unit, &surface).expect("canonical Faber (postcard)");
-        let msgpack_output =
-            generate_from_analyzed(Target::HirFaber, &msgpack_module.unit, &surface).expect("canonical Faber (msgpack)");
+        let postcard_output = generate_from_analyzed(Target::HirFaber, &postcard_module.unit, &surface)
+            .expect("canonical Faber (postcard)");
+        let msgpack_output = generate_from_analyzed(Target::HirFaber, &msgpack_module.unit, &surface)
+            .expect("canonical Faber (msgpack)");
         let postcard_faber = faber_code(&postcard_output);
         let msgpack_faber = faber_code(&msgpack_output);
         assert_eq!(
@@ -234,8 +231,7 @@ fn both_codec_loaded_package_equivalence() {
     // Both loaded programs emit the same canonical Faber as the original
     // in-session analysis (loaded HIR is as capable as the analyzed HIR).
     for (relative_path, original) in [("aux.fab", &aux), ("main.fab", &main)] {
-        let original_output =
-            generate_from_analyzed(Target::HirFaber, original, &surface).expect("original emit");
+        let original_output = generate_from_analyzed(Target::HirFaber, original, &surface).expect("original emit");
         let original_faber = faber_code(&original_output);
         for loaded in [&loaded_postcard, &loaded_msgpack] {
             let module = loaded
@@ -243,8 +239,7 @@ fn both_codec_loaded_package_equivalence() {
                 .iter()
                 .find(|module| module.relative_path == relative_path)
                 .expect("module paired with original");
-            let loaded_output =
-                generate_from_analyzed(Target::HirFaber, &module.unit, &surface).expect("loaded emit");
+            let loaded_output = generate_from_analyzed(Target::HirFaber, &module.unit, &surface).expect("loaded emit");
             let loaded_faber = faber_code(&loaded_output);
             assert_eq!(
                 loaded_faber, original_faber,

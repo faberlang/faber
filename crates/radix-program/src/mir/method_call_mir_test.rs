@@ -234,10 +234,7 @@ fn package_mir_nested_library_method_calls_execute() {
         &mut host,
     )
     .unwrap_or_else(|diagnostics| {
-        panic!(
-            "nested tensor method calls must link: {:?}",
-            diagnostics
-        )
+        panic!("nested tensor method calls must link: {:?}", diagnostics)
     });
     assert_nested_tensor_output(host.stdout_lines);
 }
@@ -553,12 +550,7 @@ fn gradus_cache_proba_package_test_links() {
         }),
         &crate::test_support::test_analysis_seams(),
     )
-    .unwrap_or_else(|diagnostics| {
-        panic!(
-            "analyze gradus cache.proba: {:?}",
-            diagnostics
-        )
-    });
+    .unwrap_or_else(|diagnostics| panic!("analyze gradus cache.proba: {:?}", diagnostics));
     let (root_id, _) = package
         .node_by_path(&proba_path)
         .expect("cache.proba is an analyzed node");
@@ -590,12 +582,7 @@ fn gradus_cache_proba_package_test_links() {
         &crate::test_support::test_mir_seams(),
         |_, _| (),
     )
-    .unwrap_or_else(|diagnostics| {
-        panic!(
-            "gradus cache.proba must link: {:?}",
-            diagnostics
-        )
-    });
+    .unwrap_or_else(|diagnostics| panic!("gradus cache.proba must link: {:?}", diagnostics));
 }
 
 #[test]

@@ -620,7 +620,8 @@ fn rejects_unlabeled_ratio_constructor_type_argument() {
     // `<` falls through to comparison parsing, per the two-token label
     // lookahead), so the specific `ratio_type_arg_label_required` issue is
     // gone — the unlabeled form must still fail at parse time.
-    let result = parse_program(r#"incipit { fixum _ point ← ratio<f32, w: numerus> { g = 1.0, w = 2 } }"#);
+    let result =
+        parse_program(r#"incipit { fixum _ point ← ratio<f32, w: numerus> { g = 1.0, w = 2 } }"#);
     assert!(
         !result.success(),
         "unlabeled ratio constructor type argument must stay rejected, got {:?}",

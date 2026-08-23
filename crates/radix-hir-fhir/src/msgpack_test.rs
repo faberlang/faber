@@ -893,7 +893,10 @@ fn package_msgpack_rejects_bare_postcard_version_prefix() {
         matches!(
             legacy,
             Err(MsgpackError::InvalidPackage(
-                FhirPackageError::LegacyPostcardPackage { found: 1, expected: 2 }
+                FhirPackageError::LegacyPostcardPackage {
+                    found: 1,
+                    expected: 2
+                }
             ))
         ),
         "postcard-shaped bytes must fail closed as legacy, got {legacy:?}"
@@ -934,11 +937,7 @@ fn write_uint_width_classes_pin_the_467866aaf_boundaries() {
     // Each value class selects exactly one marker; the boundary values are
     // the ones FPF-2's minimal-width selection moved between.
     assert_wire(&Value::Uint(0x7f), &[0x7f], "positive fixint top 0x7f");
-    assert_wire(
-        &Value::Uint(0x80),
-        &[0xcc, 0x80],
-        "uint8 bottom 128",
-    );
+    assert_wire(&Value::Uint(0x80), &[0xcc, 0x80], "uint8 bottom 128");
     assert_wire(&Value::Uint(0xff), &[0xcc, 0xff], "uint8 top 255");
     assert_wire(
         &Value::Uint(0x100),
@@ -977,16 +976,8 @@ fn write_uint_width_classes_pin_the_467866aaf_boundaries() {
 #[test]
 fn str_length_markers_pin_fixstr32_str8_256_str16_65536_boundaries() {
     assert_wire(&Value::Str("a".repeat(31)), &[0xbf], "fixstr top 31");
-    assert_wire(
-        &Value::Str("a".repeat(32)),
-        &[0xd9, 0x20],
-        "str8 bottom 32",
-    );
-    assert_wire(
-        &Value::Str("a".repeat(0xff)),
-        &[0xd9, 0xff],
-        "str8 top 255",
-    );
+    assert_wire(&Value::Str("a".repeat(32)), &[0xd9, 0x20], "str8 bottom 32");
+    assert_wire(&Value::Str("a".repeat(0xff)), &[0xd9, 0xff], "str8 top 255");
     assert_wire(
         &Value::Str("a".repeat(0x100)),
         &[0xda, 0x01, 0x00],
@@ -1039,9 +1030,7 @@ fn array_length_markers_pin_fixarray16_array16_65536_boundaries() {
 
 #[test]
 fn map_length_markers_pin_fixmap16_map16_65536_boundaries() {
-    let nilmap = |n: usize| {
-        Value::Map((0..n).map(|_| (Value::Nil, Value::Nil)).collect())
-    };
+    let nilmap = |n: usize| Value::Map((0..n).map(|_| (Value::Nil, Value::Nil)).collect());
     assert_wire(&nilmap(15), &[0x8f], "fixmap top 15");
     assert_wire(&nilmap(16), &[0xde, 0x00, 0x10], "map16 bottom 16");
     assert_wire(&nilmap(0xffff), &[0xde, 0xff, 0xff], "map16 top 65535");
@@ -1067,9 +1056,7 @@ fn int_width_markers_pin_negative_fixint_and_signed_classes() {
     );
     assert_wire(
         &Value::Int(i64::MIN),
-        &[
-            0xd3, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ],
+        &[0xd3, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
         "int64 bottom i64::MIN",
     );
 }

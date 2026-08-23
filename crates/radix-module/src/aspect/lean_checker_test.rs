@@ -321,7 +321,11 @@ fn lean_checker_axiom_unresolved_wrapper_import_is_failure() {
 
     let result = combined_verdict(proven_result(), &verdict, &SorryVerdict::Clean);
     assert_eq!(result.status, HirAspectCheckStatus::Failed);
-    assert!(result.evidence.0.contains("unresolved"), "expected unresolved-import evidence, got: {}", result.evidence.0);
+    assert!(
+        result.evidence.0.contains("unresolved"),
+        "expected unresolved-import evidence, got: {}",
+        result.evidence.0
+    );
 }
 
 #[test]
@@ -336,8 +340,10 @@ fn lean_checker_axiom_parse_output_all_clean() {
 
 #[test]
 fn lean_checker_axiom_allowlist_accepts_propext() {
-    let audit =
-        AxiomAudit { dependencies: vec![AxiomDependency { axiom_name: "propext".into(), declaration: "thm".into() }], unresolved_import: false };
+    let audit = AxiomAudit {
+        dependencies: vec![AxiomDependency { axiom_name: "propext".into(), declaration: "thm".into() }],
+        unresolved_import: false,
+    };
     assert_eq!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::Allowed);
 }
 

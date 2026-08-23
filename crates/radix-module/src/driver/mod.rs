@@ -2137,9 +2137,8 @@ fn generate_air_lane_backward_with_companion(
     use crate::air::{
         admit_generated_gradient_check, air_gradient_check_eligibility_witness,
         validate_generated_backward_to_mir_from_function, validate_mir_backward_result_contract,
-        AirCompanionDerivativeKind, AirCompanionErrorChannel, AirCompanionOracleRef,
-        AirCompanionRelation, AirCompanionSelectedInput, AirCompanionSelectedOutput,
-        AirGradientCheckAdmissionInputs,
+        AirCompanionDerivativeKind, AirCompanionErrorChannel, AirCompanionOracleRef, AirCompanionRelation,
+        AirCompanionSelectedInput, AirCompanionSelectedOutput, AirGradientCheckAdmissionInputs,
     };
 
     let types_ref = lowered.validated.validation().types;

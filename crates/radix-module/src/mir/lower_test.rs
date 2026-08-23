@@ -1578,7 +1578,10 @@ functio summaCrateris(MODUS Crater c) → numerus {
         !field_borrowed.contains("itera collection before iterator MIR lowering"),
         "itera ex over a de struct param field must lower: {field_borrowed}"
     );
-    assert_eq!(field_borrowed, field_by_value, "de struct field receiver must match by-value twin");
+    assert_eq!(
+        field_borrowed, field_by_value,
+        "de struct field receiver must match by-value twin"
+    );
 
     let map_borrowed = twin_dump(
         "de",
@@ -1739,7 +1742,9 @@ fn borrowed_pointee_outside_carrier_arms_keeps_fail_closed_decline() {
         .map(|error| error.message)
         .collect::<Vec<_>>();
     assert!(
-        errors.iter().any(|message| message.contains("itera collection before iterator MIR lowering")),
+        errors
+            .iter()
+            .any(|message| message.contains("itera collection before iterator MIR lowering")),
         "borrowed tensor itera ex must keep the decline: {errors:?}"
     );
 }
