@@ -165,9 +165,9 @@ pub fn kernel_plan_for_function_with_limit(
     validation: &MirValidationContext<'_>,
     limit: StorageBufferLimitRecord,
 ) -> Result<Option<CollectionKernelPlan>, PlanMappingError> {
-    // A kernel whose storage-buffer binding count exceeds the per-kernel
-    // maximum cannot be emitted as ONE kernel (Metal's `[[buffer(N)]]`
-    // attribute allows bindings 0..=30). The whole-function plan is refused
+    // A kernel whose storage-buffer binding count exceeds the per-lane
+    // `StorageBufferLimitRecord` capacity cannot be emitted as ONE kernel
+    // (the shared default is the minimum across admitted lanes). The whole-function plan is refused
     // with a typed diagnostic so the callers (faber, both emitters) fall
     // through to the decomposition path, which splits the body into
     // budget-fitting kernels — never a silent Elementwise floor.

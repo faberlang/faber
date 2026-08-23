@@ -278,8 +278,9 @@ impl MirKernelSignature {
                     allow_host_owned_tensor_entry,
                 )?
             };
-        // The per-kernel storage-buffer binding maximum (Metal's
-        // `[[buffer(N)]]` attribute allows bindings 0..=30): a signature over
+        // The per-kernel storage-buffer binding maximum (the active
+        // per-lane `StorageBufferLimitRecord`; the shared default is the
+        // minimum capacity across admitted lanes): a signature over
         // it cannot be emitted as one kernel, so the synthesis refuses it
         // fail-closed — the callers (the faber whole-function path, the
         // emitters' whole-kernel cross-check, the image input resolution)

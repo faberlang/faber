@@ -1674,8 +1674,8 @@ fn transformer_subchain_dispatch_covers_the_union_of_output_extents() {
 }
 
 /// The whole-function plan gate: a kernel signature whose storage-buffer
-/// count exceeds [`MAX_STORAGE_BUFFERS_PER_KERNEL`] (Metal's `[[buffer(N)]]`
-/// maximum, 31) is refused with a typed diagnostic so the callers fall
+/// count exceeds the active [`StorageBufferLimitRecord`] (shared default:
+/// minimum capacity across admitted lanes) is refused with a typed diagnostic so the callers fall
 /// through to the decomposition split — never a silent Elementwise floor.
 #[test]
 fn kernel_plan_refuses_signature_over_the_buffer_binding_maximum() {
