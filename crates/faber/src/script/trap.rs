@@ -67,6 +67,26 @@ impl Host for TrapHost<'_> {
         self.inner.write_stdout_raw(text)
     }
 
+    fn write_stdout_bytes(&mut self, bytes: &[u8]) -> Result<(), RunnerError> {
+        self.inner.write_stdout_bytes(bytes)
+    }
+
+    fn read_bytes(&mut self, len: usize) -> Result<Vec<u8>, RunnerError> {
+        self.inner.read_bytes(len)
+    }
+
+    fn stdin_is_tty(&self) -> Result<bool, RunnerError> {
+        self.inner.stdin_is_tty()
+    }
+
+    fn stdout_is_tty(&self) -> Result<bool, RunnerError> {
+        self.inner.stdout_is_tty()
+    }
+
+    fn stderr_is_tty(&self) -> Result<bool, RunnerError> {
+        self.inner.stderr_is_tty()
+    }
+
     fn exit(&mut self, code: i32) -> ! {
         panic_trap(HostTrap::Exit(code));
     }

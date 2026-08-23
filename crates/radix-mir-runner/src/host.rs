@@ -6,7 +6,7 @@ use radix_mir::KernelModule;
 use radix_mir::{MirDiagnosticKind, MirProvider, MirProviderKind};
 use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, IsTerminal, Read, Write};
 
 /// Render a provider route without exposing interner allocation numbers.
 ///
@@ -95,6 +95,71 @@ pub trait Host {
         ))
     }
 
+    /// Write bytes to stdout **without** appending a newline (`consolum.write_bytes`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the underlying write fails, or when the host does
+    /// not expose a console.
+    fn write_stdout_bytes(&mut self, _bytes: &[u8]) -> Result<(), RunnerError> {
+        Err(RunnerError::unsupported(
+            Span::default(),
+            "host write_stdout_bytes (consolum.write_bytes)",
+        ))
+    }
+
+    /// Read up to `len` bytes from stdin (`consolum.read_bytes`).
+    ///
+    /// Short reads (including EOF) return the bytes obtained. `len == 0`
+    /// returns an empty buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the underlying read fails, or when the host does
+    /// not expose stdin.
+    fn read_bytes(&mut self, _len: usize) -> Result<Vec<u8>, RunnerError> {
+        Err(RunnerError::unsupported(
+            Span::default(),
+            "host read_bytes (consolum.read_bytes)",
+        ))
+    }
+
+    /// Whether stdin is a TTY (`consolum.stdin_is_tty`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the host does not expose TTY probes.
+    fn stdin_is_tty(&self) -> Result<bool, RunnerError> {
+        Err(RunnerError::unsupported(
+            Span::default(),
+            "host stdin_is_tty (consolum.stdin_is_tty)",
+        ))
+    }
+
+    /// Whether stdout is a TTY (`consolum.stdout_is_tty`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the host does not expose TTY probes.
+    fn stdout_is_tty(&self) -> Result<bool, RunnerError> {
+        Err(RunnerError::unsupported(
+            Span::default(),
+            "host stdout_is_tty (consolum.stdout_is_tty)",
+        ))
+    }
+
+    /// Whether stderr is a TTY (`consolum.stderr_is_tty`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the host does not expose TTY probes.
+    fn stderr_is_tty(&self) -> Result<bool, RunnerError> {
+        Err(RunnerError::unsupported(
+            Span::default(),
+            "host stderr_is_tty (consolum.stderr_is_tty)",
+        ))
+    }
+
     /// Script arguments forwarded after `faber run script.fab -- …`.
     ///
     /// # Errors
@@ -165,6 +230,8 @@ pub struct BufferHost {
     /// line writer (`nota` / `consolum.write_line`).
     pub pending_stdout: String,
     pub stdin_lines: VecDeque<String>,
+    /// Byte stdin for `consolum.read_bytes` (independent of `stdin_lines`).
+    pub stdin_bytes: VecDeque<u8>,
     pub argumenta: Vec<String>,
     pub env: FxHashMap<String, String>,
     pub cwd: String,
@@ -200,6 +267,12 @@ impl BufferHost {
         self.stdin_lines = lines.into_iter().map(Into::into).collect();
         self
     }
+
+    #[must_use]
+    pub fn with_stdin_bytes(mut self, bytes: impl Into<Vec<u8>>) -> Self {
+        self.stdin_bytes = bytes.into().into();
+        self
+    }
 }
 
 impl Host for BufferHost {
@@ -219,8 +292,31 @@ impl Host for BufferHost {
         Ok(())
     }
 
+    fn write_stdout_bytes(&mut self, bytes: &[u8]) -> Result<(), RunnerError> {
+        self.pending_stdout
+            .push_str(&String::from_utf8_lossy(bytes));
+        Ok(())
+    }
+
     fn read_line(&mut self) -> Result<Option<String>, RunnerError> {
         Ok(self.stdin_lines.pop_front())
+    }
+
+    fn read_bytes(&mut self, len: usize) -> Result<Vec<u8>, RunnerError> {
+        let n = len.min(self.stdin_bytes.len());
+        Ok(self.stdin_bytes.drain(..n).collect())
+    }
+
+    fn stdin_is_tty(&self) -> Result<bool, RunnerError> {
+        Ok(false)
+    }
+
+    fn stdout_is_tty(&self) -> Result<bool, RunnerError> {
+        Ok(false)
+    }
+
+    fn stderr_is_tty(&self) -> Result<bool, RunnerError> {
+        Ok(false)
     }
 
     fn abort(&mut self, reason: &str) -> ! {
@@ -307,6 +403,14 @@ impl Host for StdioHost {
             .map_err(|err| RunnerError::internal(Span::default(), err.to_string()))
     }
 
+    fn write_stdout_bytes(&mut self, bytes: &[u8]) -> Result<(), RunnerError> {
+        let mut out = io::stdout();
+        out.write_all(bytes)
+            .map_err(|err| RunnerError::internal(Span::default(), err.to_string()))?;
+        out.flush()
+            .map_err(|err| RunnerError::internal(Span::default(), err.to_string()))
+    }
+
     fn read_line(&mut self) -> Result<Option<String>, RunnerError> {
         let mut line = String::new();
         let read = io::stdin()
@@ -320,6 +424,31 @@ impl Host for StdioHost {
             line.pop();
         }
         Ok(Some(line))
+    }
+
+    fn read_bytes(&mut self, len: usize) -> Result<Vec<u8>, RunnerError> {
+        if len == 0 {
+            return Ok(Vec::new());
+        }
+        let mut buffer = vec![0_u8; len];
+        let read = io::stdin()
+            .lock()
+            .read(&mut buffer)
+            .map_err(|err| RunnerError::internal(Span::default(), err.to_string()))?;
+        buffer.truncate(read);
+        Ok(buffer)
+    }
+
+    fn stdin_is_tty(&self) -> Result<bool, RunnerError> {
+        Ok(io::stdin().is_terminal())
+    }
+
+    fn stdout_is_tty(&self) -> Result<bool, RunnerError> {
+        Ok(io::stdout().is_terminal())
+    }
+
+    fn stderr_is_tty(&self) -> Result<bool, RunnerError> {
+        Ok(io::stderr().is_terminal())
     }
 
     fn abort(&mut self, reason: &str) -> ! {

@@ -2398,3 +2398,81 @@ main args args {
     assert_eq!(stdout, "first-arg\n");
     assert_no_generated_rust(&package);
 }
+
+fn run_faber_with_stdin(args: &[&str], stdin: &[u8]) -> (String, String, bool) {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_faber"));
+    command
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = command.spawn().expect("spawn faber run");
+    {
+        let mut input = child.stdin.take().expect("stdin");
+        input.write_all(stdin).expect("write stdin");
+    }
+
+    let mut stdout = String::new();
+    child
+        .stdout
+        .take()
+        .expect("stdout")
+        .read_to_string(&mut stdout)
+        .expect("read stdout");
+
+    let mut stderr = String::new();
+    if let Some(mut err) = child.stderr.take() {
+        let _ = err.read_to_string(&mut stderr);
+    }
+    let status = child.wait().expect("wait");
+    (stdout, stderr, status.success())
+}
+
+#[test]
+fn run_norma_consolum_selective_transfer_is_byte_exact() {
+    // EOT-4R: interpreted lane executes the consolum contract through
+    // selective imports + ⇇. Captured stdout is byte-identical to the
+    // concatenated payloads (write_partial, write_bytes, read_line).
+    let package = temp_dir("norma-consolum-eot4r");
+    let src = package.join("src");
+    fs::create_dir_all(&src).expect("create src");
+    fs::write(
+        package.join("faber.toml"),
+        r#"
+[package]
+name = "norma-consolum-eot4r"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(
+        src.join("main.fab"),
+        r#"import from "norma:consolum" const write_partial, write_bytes, read_line
+
+main {
+  const _ partial ← (string msg) → void ∴ write_partial(msg)
+  const _ out_bytes ← (bytes data) → void ∴ write_bytes(data)
+  partial ⇇ "P"
+  out_bytes ⇇ |41|
+  partial ⇇ read_line()
+}
+"#,
+    )
+    .expect("write entry");
+
+    let (stdout, stderr, ok) = run_faber_with_stdin(
+        &["run", package.to_str().expect("utf8 package path")],
+        b"LINE\n",
+    );
+
+    assert!(ok, "norma:consolum interpreted transfer failed:\n{stderr}");
+    assert_eq!(stdout, "PALINE");
+    assert!(
+        !stderr.contains("Compiling") && !stderr.contains("cargo"),
+        "interpreted package bridge must not invoke Cargo:\n{stderr}"
+    );
+    assert_no_generated_rust(&package);
+}

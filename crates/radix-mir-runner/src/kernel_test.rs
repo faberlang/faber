@@ -820,3 +820,111 @@ fn consolum_write_partial_writes_stdout_without_newline() {
     assert_eq!(host.stdout_lines, vec!["hello world!".to_owned()]);
     assert!(host.pending_stdout.is_empty());
 }
+
+fn consolum(
+    host: &mut BufferHost,
+    verb: &str,
+    args: &[Value],
+) -> Result<Value, super::RunnerError> {
+    dispatch_kernel(host, KernelModule::Consolum, verb, args, Span::default())
+}
+
+#[test]
+fn consolum_write_bytes_writes_stdout_without_newline() {
+    let mut host = BufferHost::default();
+    consolum(&mut host, "write_bytes", &[Value::Octeti(b"abc".to_vec())])
+        .expect("consolum.write_bytes");
+    assert_eq!(host.pending_stdout, "abc");
+    assert!(host.stdout_lines.is_empty());
+    assert!(host.stderr_lines.is_empty());
+
+    let err = consolum(&mut host, "write_bytes", &[]).expect_err("arity");
+    assert!(err.issue.contains("write_bytes_provider_arity"));
+    let err = consolum(&mut host, "write_bytes", &[Value::Str("x".to_owned())]).expect_err("type");
+    assert!(err.issue.contains("expects_octeti"));
+}
+
+#[test]
+fn consolum_debug_line_writes_stderr() {
+    let mut host = BufferHost::default();
+    consolum(&mut host, "debug_line", &[Value::Str("trace".to_owned())])
+        .expect("consolum.debug_line");
+    assert_eq!(host.stderr_lines, vec!["trace".to_owned()]);
+    assert!(host.stdout_lines.is_empty());
+    assert!(host.pending_stdout.is_empty());
+
+    let err = consolum(&mut host, "debug_line", &[]).expect_err("arity");
+    assert!(err.issue.contains("debug_line_provider_arity"));
+}
+
+#[test]
+fn consolum_read_line_reads_host_stdin() {
+    let mut host = BufferHost::default().with_stdin_lines(["first", "second"]);
+    let value = consolum(&mut host, "read_line", &[]).expect("consolum.read_line");
+    assert_eq!(value, Value::Str("first".to_owned()));
+    let value = consolum(&mut host, "read_line", &[]).expect("consolum.read_line second");
+    assert_eq!(value, Value::Str("second".to_owned()));
+    let eof = consolum(&mut host, "read_line", &[]).expect("consolum.read_line eof");
+    assert_eq!(eof, Value::Str(String::new()));
+
+    let err =
+        consolum(&mut host, "read_line", &[Value::Str("extra".to_owned())]).expect_err("arity");
+    assert!(err.issue.contains("read_line_provider_arity"));
+}
+
+#[test]
+fn consolum_read_bytes_reads_bounded_stdin() {
+    let mut host = BufferHost::default().with_stdin_bytes(b"abcdef".to_vec());
+    let value = consolum(&mut host, "read_bytes", &[Value::Int(3)]).expect("read_bytes");
+    assert_eq!(value, Value::Octeti(b"abc".to_vec()));
+    let rest = consolum(&mut host, "read_bytes", &[Value::Int(8)]).expect("short read");
+    assert_eq!(rest, Value::Octeti(b"def".to_vec()));
+    let empty = consolum(&mut host, "read_bytes", &[Value::Int(4)]).expect("eof");
+    assert_eq!(empty, Value::Octeti(Vec::new()));
+    let zero = consolum(&mut host, "read_bytes", &[Value::Int(0)]).expect("zero");
+    assert_eq!(zero, Value::Octeti(Vec::new()));
+    let negative = consolum(&mut host, "read_bytes", &[Value::Int(-1)]).expect("negative");
+    assert_eq!(negative, Value::Octeti(Vec::new()));
+
+    let err = consolum(&mut host, "read_bytes", &[]).expect_err("arity");
+    assert!(err.issue.contains("read_bytes_provider_arity"));
+    let err = consolum(&mut host, "read_bytes", &[Value::Str("x".to_owned())]).expect_err("type");
+    assert!(err.issue.contains("expects_numerus"));
+    let err = consolum(&mut host, "read_bytes", &[Value::Int(1024 * 1024 + 1)]).expect_err("bound");
+    assert!(err.issue.contains("must_be_at_most"));
+}
+
+#[test]
+fn consolum_tty_probes_return_bool_and_reject_arity() {
+    let mut host = BufferHost::default();
+    assert_eq!(
+        consolum(&mut host, "stdin_is_tty", &[]).expect("stdin_is_tty"),
+        Value::Bool(false)
+    );
+    assert_eq!(
+        consolum(&mut host, "stdout_is_tty", &[]).expect("stdout_is_tty"),
+        Value::Bool(false)
+    );
+    assert_eq!(
+        consolum(&mut host, "stderr_is_tty", &[]).expect("stderr_is_tty"),
+        Value::Bool(false)
+    );
+    let err = consolum(&mut host, "stdin_is_tty", &[Value::Bool(true)]).expect_err("arity");
+    assert!(err.issue.contains("stdin_is_tty_provider_arity"));
+}
+
+#[test]
+fn consolum_unknown_verb_fails_closed() {
+    let mut host = BufferHost::default();
+    let err = consolum(&mut host, "write_bytes_async", &[]).expect_err("async");
+    assert!(
+        err.issue.contains("consolum_kernel_verb"),
+        "unknown verb must stay fail-closed, got {}",
+        err.issue
+    );
+    assert!(err
+        .message
+        .contains("consolum kernel verb `write_bytes_async`"));
+    let err = consolum(&mut host, "not_a_verb", &[]).expect_err("unknown");
+    assert!(err.message.contains("consolum kernel verb `not_a_verb`"));
+}

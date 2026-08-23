@@ -126,10 +126,23 @@ const MANIFEST: &[KernelManifestEntry] = &[
         import_path: "faber:consolum",
         provider_module: "faber/kernel/consolum",
         // English canonicals (Pass B): dic→write_partial, scribe→write_line,
-        // mone→warn_line. Raw/partial stdout (`write_partial`) unblocks
+        // mone→warn_line, funde→write_bytes, vide→debug_line, lege→read_line,
+        // hauri→read_bytes, audit→stdin_is_tty, loquitur→stdout_is_tty,
+        // admonet→stderr_is_tty. Raw/partial stdout (`write_partial`) unblocks
         // package-MIR coreutils such as `echo -n` and GNU `printf` without an
         // implicit newline. The runner dispatch speaks the same names.
-        verbs: &["write_partial", "write_line", "warn_line"],
+        verbs: &[
+            "write_partial",
+            "write_bytes",
+            "write_line",
+            "warn_line",
+            "debug_line",
+            "read_line",
+            "read_bytes",
+            "stdin_is_tty",
+            "stdout_is_tty",
+            "stderr_is_tty",
+        ],
         since: V1_SINCE,
     },
     KernelManifestEntry {
