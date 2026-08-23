@@ -113,6 +113,7 @@ fn extract_file_interface_round_trips_public_commune_fields() {
             ty: InterfaceTypeSnapshot::Primitive(Primitive::Textus),
             optional: false,
             required: true,
+            default: None,
         }]
     );
     assert_eq!(export.variants.len(), 2);

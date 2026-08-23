@@ -321,6 +321,7 @@ functio apply() → vacuum {
                 ty: InterfaceTypeSnapshot::Primitive(Primitive::Textus),
                 optional: false,
                 required: true,
+                default: None,
             }],
             methods: Vec::new(),
             annotation_contract: Some(InterfaceAnnotationContract {

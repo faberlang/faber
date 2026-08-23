@@ -44,6 +44,7 @@ fn shape_error_interface() -> FileInterface {
         ty: InterfaceTypeSnapshot::Primitive(Primitive::Textus),
         optional: false,
         required: true,
+        default: None,
     };
     interface.insert(FileExport {
         name: "ShapeError".to_owned(),
@@ -64,12 +65,14 @@ fn shape_error_interface() -> FileInterface {
                             ty: InterfaceTypeSnapshot::Primitive(Primitive::Numerus),
                             optional: false,
                             required: true,
+                            default: None,
                         },
                         InterfaceStructField {
                             name: "actual".to_owned(),
                             ty: InterfaceTypeSnapshot::Primitive(Primitive::Numerus),
                             optional: false,
                             required: true,
+                            default: None,
                         },
                     ],
                 },

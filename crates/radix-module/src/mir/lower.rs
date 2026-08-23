@@ -1172,6 +1172,8 @@ struct FunctionBuilderContext<'a> {
     function_generator: Arc<FxHashMap<DefId, bool>>,
     function_params: Arc<FxHashMap<DefId, Vec<context::CallableParamMeta<'a>>>>,
     structs: Arc<FxHashMap<DefId, Vec<&'a HirField>>>,
+    /// Producer-side defaults for imported class fields.
+    imported_struct_defaults: Arc<FxHashMap<DefId, Vec<(Symbol, HirExpression)>>>,
     /// Field-name → MirType metadata for EVERY struct the analysis knows
     /// (local + imported file-interface structs). Local structs are also in
     /// [`Self::structs`]; imported structs exist only here. Aggregate
@@ -1235,6 +1237,7 @@ impl<'a> FunctionBuilderContext<'a> {
             function_generator: Arc::new(FxHashMap::default()),
             function_params: Arc::new(FxHashMap::default()),
             structs: Arc::new(FxHashMap::default()),
+            imported_struct_defaults: Arc::new(FxHashMap::default()),
             struct_field_types: Arc::new(FxHashMap::default()),
             variant_parents: Arc::new(FxHashMap::default()),
             enum_variants: Arc::new(FxHashMap::default()),
