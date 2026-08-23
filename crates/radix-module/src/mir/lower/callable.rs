@@ -319,6 +319,7 @@ impl FunctionBuilder<'_> {
             function_async: Arc::clone(&context.function_async),
             function_generator: Arc::clone(&context.function_generator),
             structs: Arc::clone(&context.structs),
+            imported_struct_defaults: Arc::clone(&context.imported_struct_defaults),
             struct_field_types: Arc::clone(&context.struct_field_types),
             variant_parents: Arc::clone(&context.variant_parents),
             enum_variants: Arc::clone(&context.enum_variants),

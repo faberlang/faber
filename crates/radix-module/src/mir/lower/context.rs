@@ -103,6 +103,8 @@ pub(super) struct LoweringContextMaps<'a> {
     top_level_consts: FxHashMap<DefId, &'a HirConst>,
     provider_imports: FxHashMap<DefId, ProviderImport>,
     imported_method_providers: FxHashMap<(DefId, Symbol), ImportedMethodProvider>,
+    /// Producer-side defaults for imported class fields, keyed by importer-local type.
+    imported_struct_defaults: FxHashMap<DefId, Vec<(Symbol, HirExpression)>>,
     /// Package-resolved file-interface call targets keyed by import-item
     /// `DefId`: `verb → synthesized external-definition id`. Populated from
     /// `unit.package_import_identities` when package-aware callers supply the
@@ -145,6 +147,7 @@ impl<'a> LoweringContextMaps<'a> {
             top_level_consts: FxHashMap::default(),
             provider_imports: FxHashMap::default(),
             imported_method_providers: FxHashMap::default(),
+            imported_struct_defaults: FxHashMap::default(),
             package_file_interface_exports: FxHashMap::default(),
             package_product: None,
             package_module_segments: Vec::new(),
@@ -256,6 +259,7 @@ impl<'a> LoweringContextMaps<'a> {
             function_params,
             structs,
             struct_field_types,
+            imported_struct_defaults: Arc::new(self.imported_struct_defaults.clone()),
             variant_parents: Arc::clone(&self.frozen.variant_parents),
             enum_variants: Arc::clone(&self.frozen.enum_variants),
             enum_type_params: Arc::clone(&self.frozen.enum_type_params),
@@ -446,8 +450,12 @@ impl<'a> LoweringContextMaps<'a> {
             let mut fields = FxHashMap::default();
             let mut optional_fields = FxHashSet::default();
             let mut nullable_fields = FxHashSet::default();
+            let mut defaults = Vec::new();
             for field in imported_fields {
                 fields.insert(field.name, MirType::semantic(field.ty));
+                if let Some(init) = field.init {
+                    defaults.push((field.name, init));
+                }
                 if field.optional || !field.required {
                     optional_fields.insert(field.name);
                 }
@@ -462,6 +470,9 @@ impl<'a> LoweringContextMaps<'a> {
             self.validation
                 .nullable_struct_fields
                 .insert(def_id, nullable_fields);
+            if !defaults.is_empty() {
+                self.imported_struct_defaults.insert(def_id, defaults);
+            }
         }
 
         // A direct single-file MIR route has no sibling body to link for an

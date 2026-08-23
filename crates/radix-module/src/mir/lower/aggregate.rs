@@ -373,6 +373,16 @@ impl FunctionBuilder<'_> {
                 };
                 fields.push(MirNamedOperand { name: field.name, value });
             }
+        } else if matches!(fill, StructFieldFill::Construction) {
+            if let Some(defaults) = self.context.imported_struct_defaults.get(&def_id).cloned() {
+                for (name, init) in defaults {
+                    if supplied.contains(&name) {
+                        continue;
+                    }
+                    let value = self.lower_expr_value(&init)?;
+                    fields.push(MirNamedOperand { name, value });
+                }
+            }
         } else if matches!(fill, StructFieldFill::AllZero) {
             // Zero-init of a value whose struct is only known through the
             // validation metadata (an imported file-interface struct): the

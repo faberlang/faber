@@ -252,6 +252,7 @@ fn snapshot_enum(
                         ty,
                         optional: false,
                         required: true,
+                        default: None,
                     })
                     .map_err(|err| {
                         interface_error(file_label, &variant_name(analysis, variant), err)
@@ -280,6 +281,7 @@ fn snapshot_enum(
                 ty,
                 optional: false,
                 required: true,
+                default: None,
             })
             .map_err(|err| interface_error(file_label, &name, err))
         })
@@ -367,6 +369,7 @@ fn snapshot_struct(
                 .map_err(|err| interface_error(file_label, name, err))?,
                 optional: field.sponte,
                 required: !field.sponte && field.init.is_none(),
+                default: field.init.clone(),
             })
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;

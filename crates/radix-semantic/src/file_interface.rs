@@ -9,7 +9,7 @@ use crate::{
     SemanticMutability, SemanticParamMode, SymbolKind, Type, TypeId, TypeParamConstraint,
     TypeTable,
 };
-use radix_hir::DefId;
+use radix_hir::{DefId, HirExpression};
 use radix_lexer::Interner;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -150,6 +150,8 @@ pub struct InterfaceStructField {
     pub ty: InterfaceTypeSnapshot,
     pub optional: bool,
     pub required: bool,
+    /// Producer-side compile-time initializer for imported class construction.
+    pub default: Option<HirExpression>,
 }
 
 /// Nominal declarations whose import contract is their type identity.

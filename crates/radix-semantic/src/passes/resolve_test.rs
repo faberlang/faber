@@ -695,6 +695,7 @@ fn imports_function_export_before_struct_alphabetically() {
                 ty: InterfaceTypeSnapshot::Primitive(Primitive::Fractus),
                 optional: false,
                 required: true,
+                default: None,
             }],
             methods: Vec::new(),
             annotation_contract: None,
@@ -891,6 +892,7 @@ fn skipped_locale_members_keep_structured_provenance_and_sibling_exports() {
                 ty: poison(),
                 optional: false,
                 required: true,
+                default: None,
             }],
             methods: vec![
                 InterfaceMethodExport {
@@ -1151,6 +1153,7 @@ fn imports_nominal_fields_across_namespaces_before_payloads() {
                 }),
                 optional: false,
                 required: true,
+                default: None,
             }],
             methods: Vec::new(),
             annotation_contract: None,
@@ -1210,6 +1213,7 @@ fn ambiguous_nominal_fields_do_not_bind_to_last_namespace() {
                 }),
                 optional: false,
                 required: true,
+                default: None,
             }],
             methods: Vec::new(),
             annotation_contract: None,

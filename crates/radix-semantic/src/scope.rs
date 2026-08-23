@@ -37,7 +37,7 @@ use crate::file_interface::{
 };
 use crate::locale::LocalePack;
 use crate::passes::visibility_annotation::VisibilityTier;
-use radix_hir::DefId;
+use radix_hir::{DefId, HirExpression};
 use radix_lexer::{Span, Symbol as LexSymbol};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
@@ -294,12 +294,13 @@ struct ImportedFileStruct {
     methods: Vec<ImportedFileInterfaceMethod>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ImportedFileStructField {
     pub name: LexSymbol,
     pub ty: TypeId,
     pub optional: bool,
     pub required: bool,
+    pub init: Option<HirExpression>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1369,6 +1370,7 @@ impl Resolver {
                                 ty,
                                 optional: field.optional,
                                 required: field.required,
+                                init: field.default.clone(),
                             },
                         )
                     })
@@ -1574,6 +1576,7 @@ impl Resolver {
                 ty,
                 optional: field.optional,
                 required: field.required,
+                init: field.default.clone(),
             });
         }
         (imported, skipped)
@@ -3082,6 +3085,7 @@ impl Resolver {
                                         ty: field.ty,
                                         optional: field.optional,
                                         required: field.required,
+                                        init: None,
                                     })
                                     .collect();
                                 ImportedFileExport::Struct(ImportedFileStruct {

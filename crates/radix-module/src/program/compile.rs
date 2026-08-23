@@ -1143,6 +1143,7 @@ fn file_export_from_stmt(
                         ty: interface_type_from_type_expr(&field.ty, interner, &no_params, nominal_kinds, ctx)?,
                         optional: field.sponte,
                         required: !field.sponte && field.init.is_none(),
+                        default: None,
                     })
                 })
                 .collect::<Vec<_>>();
@@ -1276,6 +1277,7 @@ fn file_export_from_stmt(
                                     )?,
                                     optional: false,
                                     required: true,
+                                    default: None,
                                 })
                             })
                             .collect::<Vec<_>>();
@@ -1297,6 +1299,7 @@ fn file_export_from_stmt(
                             )?,
                             optional: false,
                             required: true,
+                            default: None,
                         })
                     })
                     .collect::<Vec<_>>();

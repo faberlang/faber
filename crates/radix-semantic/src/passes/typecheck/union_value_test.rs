@@ -42,6 +42,7 @@ fn token_union_interface() -> FileInterface {
                         ty: InterfaceTypeSnapshot::Primitive(Primitive::Numerus),
                         optional: false,
                         required: true,
+                        default: None,
                     }],
                 },
             ],
