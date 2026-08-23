@@ -542,6 +542,8 @@ pub(crate) fn import_contract_for_file(
 
     let mut contract = ImportContract::default();
     let pack_key = resolved_pack.as_ref().map(|pack| pack.metadata.id.clone());
+    let mut transitive_visited: BTreeSet<PathBuf> = BTreeSet::new();
+    let mut transitive_interfaces: Vec<(String, FileInterface)> = Vec::new();
     for stmt in &program.statements {
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
@@ -567,21 +569,101 @@ pub(crate) fn import_contract_for_file(
             .insert(binding.clone(), target.declarations);
         contract
             .file_interfaces
-            .insert(binding.clone(), target.interface);
+            .insert(binding.clone(), target.interface.clone());
         // The seam is recomputed relative to the *current* consumer on the
         // retained target path, not through a fresh resolution: the second
         // call must serve the same contract even after the target is deleted.
         let target_path = &target.target_path;
         contract
             .namespace_seams
-            .insert(binding, crate::import_resolve::same_package(path, target_path));
+            .insert(binding.clone(), crate::import_resolve::same_package(path, target_path));
         if import_path.contains(':') {
             if let Some(root) = crate::import_resolve::find_package_root(target_path) {
                 contract.library_package_roots.insert(root);
             }
         }
+        // Seed the transitive relative-import walk from every direct relative
+        // import target (MRL-4): a module's public surface can name sibling
+        // nominals through its own relative imports (`list<p.Punctum>` in a
+        // `Catena` field), and a consumer that imports only the outer module
+        // cannot remap those fields without the sibling's nominal
+        // registrations.
+        if import_path.starts_with("./") {
+            collect_transitive_relative_interfaces(
+                &target.target_path,
+                pack_key.as_ref(),
+                templates,
+                &mut transitive_visited,
+                &mut transitive_interfaces,
+            );
+        }
+    }
+    // Transitive sibling interfaces install under their producer-side
+    // bindings; a consumer's own binding for the same name always wins, and
+    // the extra namespaces stay inert (the consumer's HIR has no import
+    // binding for them, mirroring the transitive library-leaf install).
+    for (binding, interface) in transitive_interfaces {
+        contract.file_interfaces.entry(binding).or_insert(interface);
     }
     contract
+}
+
+/// Collect file interfaces for the relative imports of an imported module,
+/// transitively (MRL-4).
+///
+/// Only relative-import edges are followed: provider/library imports keep
+/// their own seam machinery. `visited` guards cycles (a module diamond or a
+/// genuine import cycle both stop at the first visit). Interfaces are keyed
+/// by the producer-side binding; the caller decides precedence against the
+/// consumer's own bindings.
+fn collect_transitive_relative_interfaces(
+    from_file: &Path,
+    pack_key: Option<&String>,
+    templates: Option<&BTreeMap<String, String>>,
+    visited: &mut BTreeSet<PathBuf>,
+    out: &mut Vec<(String, FileInterface)>,
+) {
+    let Ok(source) = std::fs::read_to_string(from_file) else {
+        return;
+    };
+    let pack = import_target_locale_pack(from_file, &source, None);
+    let pack_ref = pack.as_ref();
+    let Some((program, interner)) =
+        parse_program_for_namespace_exports(&from_file.display().to_string(), &source, pack_ref)
+    else {
+        return;
+    };
+    for stmt in &program.statements {
+        let StmtKind::Import(decl) = &stmt.kind else {
+            continue;
+        };
+        let import_path = interner.resolve(decl.path);
+        if !import_path.starts_with("./") {
+            continue;
+        };
+        if !import_contract_path_allowed(import_path, templates) {
+            continue;
+        }
+        let Some(binding) = import_binding(&interner, &decl.kind) else {
+            continue;
+        };
+        let Some(target) =
+            cached_import_target(from_file, import_path, pack_key, pack_ref, templates)
+        else {
+            continue;
+        };
+        if !visited.insert(target.target_path.clone()) {
+            continue;
+        }
+        out.push((binding, target.interface.clone()));
+        collect_transitive_relative_interfaces(
+            &target.target_path,
+            pack_key,
+            templates,
+            visited,
+            out,
+        );
+    }
 }
 
 /// Overlay library-owned member fragments for the consumer locale onto `pack`.

@@ -504,6 +504,7 @@ fn analyze_package_spec_with_deadline(
         let file_interfaces = match file_interfaces_for_file(
             &spec,
             file,
+            &files_by_path,
             library_resolver,
             &mut library_cache,
             &analyzed_interfaces_by_path,
@@ -1068,11 +1069,13 @@ fn visit_package_analysis_file<'a>(
 fn file_interfaces_for_file(
     spec: &PackageSpec,
     file: &PackageFile,
+    files_by_path: &BTreeMap<PathBuf, &PackageFile>,
     library_resolver: &LibraryResolver,
     library_cache: &mut LibraryInterfaceCache,
     analyzed_interfaces_by_path: &BTreeMap<PathBuf, radix_module::file_interface::FileInterface>,
 ) -> Result<BTreeMap<String, radix_module::file_interface::FileInterface>, Diagnostic> {
     let mut interfaces = BTreeMap::new();
+    let mut transitive_visited: BTreeSet<PathBuf> = BTreeSet::new();
     for stmt in &file.program.statements {
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
@@ -1091,6 +1094,15 @@ fn file_interfaces_for_file(
                     .with_span(decl.span));
                 };
                 interfaces.insert(binding, interface);
+                install_transitive_local_interfaces(
+                    spec,
+                    &target,
+                    files_by_path,
+                    library_resolver,
+                    analyzed_interfaces_by_path,
+                    &mut transitive_visited,
+                    &mut interfaces,
+                )?;
             }
             ImportResolution::Library(module) => {
                 let Some(import) = library_import_binding(&file.interner, decl, module) else {
@@ -1117,6 +1129,66 @@ fn file_interfaces_for_file(
         );
     }
     Ok(interfaces)
+}
+
+/// Install file interfaces for a local import target's own local imports,
+/// transitively (MRL-4).
+///
+/// A package module's public surface can name sibling nominals through its
+/// own imports (`list<attribute.BufferAttribute>` in a `data.BufferGeometry`
+/// field); a consumer that imports only the outer module cannot remap those
+/// fields without the sibling modules' nominal registrations. Mirrors the
+/// transitive library-leaf install: sibling namespaces carry the producer's
+/// binding but have no consumer HIR import binding, so they stay inert
+/// unless a snapshot resolves a nominal through them. A consumer's own
+/// direct binding for the same name always wins.
+fn install_transitive_local_interfaces(
+    spec: &PackageSpec,
+    target: &Path,
+    files_by_path: &BTreeMap<PathBuf, &PackageFile>,
+    library_resolver: &LibraryResolver,
+    analyzed_interfaces_by_path: &BTreeMap<PathBuf, radix_module::file_interface::FileInterface>,
+    visited: &mut BTreeSet<PathBuf>,
+    interfaces: &mut BTreeMap<String, radix_module::file_interface::FileInterface>,
+) -> Result<(), Diagnostic> {
+    let Some(target_file) = files_by_path.get(target).copied() else {
+        return Ok(());
+    };
+    for stmt in &target_file.program.statements {
+        let StmtKind::Import(decl) = &stmt.kind else {
+            continue;
+        };
+        let Some(binding) = import_binding(&target_file.interner, decl) else {
+            continue;
+        };
+        let import_path = target_file.interner.resolve(decl.path);
+        let ImportResolution::Local(inner) =
+            resolve_import(spec, library_resolver, &target_file.path, import_path)
+        else {
+            continue;
+        };
+        if !visited.insert(inner.clone()) {
+            continue;
+        }
+        let Some(interface) = analyzed_interfaces_by_path.get(&inner).cloned() else {
+            return Err(crate::package_diagnostic_error(format!(
+                "local import `{import_path}` interface was not analyzed before importer"
+            ))
+            .with_file(target_file.path.display().to_string())
+            .with_span(decl.span));
+        };
+        interfaces.entry(binding).or_insert(interface);
+        install_transitive_local_interfaces(
+            spec,
+            &inner,
+            files_by_path,
+            library_resolver,
+            analyzed_interfaces_by_path,
+            visited,
+            interfaces,
+        )?;
+    }
+    Ok(())
 }
 
 /// Resolve every import binding's exported namespace surface for a file.

@@ -2844,3 +2844,92 @@ incipit {
             .collect::<Vec<_>>()
     );
 }
+
+#[test]
+fn import_contract_installs_transitive_relative_import_interfaces() {
+    // MRL-4: a module's public surface can name sibling nominals through its
+    // own relative imports (`list<p.Punctum>` in a `Catena` field). The
+    // consumer's contract must carry the sibling module's interface under the
+    // producer's binding or the field cannot remap cross-module.
+    let (_td, home) = temp_dir("transitive-contract");
+    fs::write(
+        home.join("lib_punctum.fab"),
+        r#"+++
+locale = "en"
++++
+
+@ public
+class Punctum {
+    int<u32> gradus
+}
+"#,
+    )
+    .expect("punctum");
+    fs::write(
+        home.join("lib_lista.fab"),
+        r#"+++
+locale = "en"
++++
+
+import from "./lib_punctum" * as p
+
+@ public
+class Catena {
+    list<p.Punctum> puncta
+}
+"#,
+    )
+    .expect("lista");
+    let consumer = home.join("consumer.fab");
+    fs::write(
+        &consumer,
+        r#"+++
+locale = "en"
++++
+
+import from "./lib_lista" * as l
+"#,
+    )
+    .expect("consumer");
+    let source = fs::read_to_string(&consumer).expect("read consumer");
+
+    let contract = import_contract_for_file(&consumer, &source, None, None);
+    let _lista = contract
+        .file_interfaces
+        .get("l")
+        .expect("direct binding installed");
+    let punctum = contract
+        .file_interfaces
+        .get("p")
+        .expect("transitive sibling interface installed under the producer binding");
+    assert!(
+        punctum.exports.contains_key("Punctum"),
+        "expected Punctum export, got {:?}",
+        punctum.exports.keys().collect::<Vec<_>>()
+    );
+
+    // The consumer's own binding for the same name always wins: a direct
+    // `* as p` of lib_lista must not be overwritten by the sibling install.
+    let shadowing = home.join("shadowing.fab");
+    fs::write(
+        &shadowing,
+        r#"+++
+locale = "en"
++++
+
+import from "./lib_lista" * as p
+"#,
+    )
+    .expect("shadowing consumer");
+    let shadow_source = fs::read_to_string(&shadowing).expect("read shadowing");
+    let shadow_contract = import_contract_for_file(&shadowing, &shadow_source, None, None);
+    let direct = shadow_contract
+        .file_interfaces
+        .get("p")
+        .expect("consumer binding installed");
+    assert!(
+        direct.exports.contains_key("Catena"),
+        "consumer's own binding must win over the transitive sibling install, got {:?}",
+        direct.exports.keys().collect::<Vec<_>>()
+    );
+}
