@@ -655,7 +655,7 @@ fn collect_struct_method_defs(hir: &HirModule) -> FxHashMap<(DefId, Symbol), Def
     index
 }
 
-fn resolve_method_call_def(
+pub(crate) fn resolve_method_call_def(
     method_index: &FxHashMap<(DefId, Symbol), DefId>,
     receiver: &HirExpression,
     method: Symbol,
@@ -666,7 +666,7 @@ fn resolve_method_call_def(
     method_index.get(&(struct_def, method)).copied()
 }
 
-fn struct_def_from_type(ty: TypeId, types: &TypeTable) -> Option<DefId> {
+pub(crate) fn struct_def_from_type(ty: TypeId, types: &TypeTable) -> Option<DefId> {
     match types.get(ty) {
         Type::Struct(def) => Some(*def),
         Type::Ref(_, inner) | Type::Applied(inner, _) | Type::Alias(_, inner) => {
@@ -687,7 +687,7 @@ fn is_func_type(ty: TypeId, types: &TypeTable) -> bool {
     }
 }
 
-fn is_device_value_type(ty: TypeId, types: &TypeTable) -> bool {
+pub(crate) fn is_device_value_type(ty: TypeId, types: &TypeTable) -> bool {
     match types.get(ty) {
         Type::Tensor(_, _) | Type::Vector(_, _) | Type::Matrix(_, _) | Type::Sparsa(_, _) => true,
         Type::Alias(_, inner) | Type::Ref(_, inner) | Type::Applied(inner, _) => {
@@ -697,7 +697,7 @@ fn is_device_value_type(ty: TypeId, types: &TypeTable) -> bool {
     }
 }
 
-fn is_allowed_device_method(method: &str) -> bool {
+pub(crate) fn is_allowed_device_method(method: &str) -> bool {
     matches!(
         method,
         "addita"

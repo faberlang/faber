@@ -35,14 +35,14 @@ const ISSUE_EXPRESSION_TYPE_MISMATCH: &str = "expression_type_mismatch";
 const ISSUE_ITERA_AB_SOURCE_REQUIRES_RANGE: &str = "itera_ab_source_requires_range";
 const ISSUE_CURSOR_ITERATION_REQUIRES_EX: &str = "cursor_iteration_requires_ex";
 const ISSUE_ITERA_APUD_REQUIRES_EX: &str = "itera_apud_requires_ex";
-const ISSUE_ITERA_APUD_ARITY_MISMATCH: &str = "itera_apud_arity_mismatch";
-const ISSUE_ITERA_APUD_REQUIRES_SHAPED_ITERABLE: &str = "itera_apud_requires_shaped_iterable";
+pub(super) const ISSUE_ITERA_APUD_ARITY_MISMATCH: &str = "itera_apud_arity_mismatch";
+pub(super) const ISSUE_ITERA_APUD_REQUIRES_SHAPED_ITERABLE: &str =
+    "itera_apud_requires_shaped_iterable";
 const ISSUE_CEDE_REQUIRES_PROMISSUM: &str = "cede_requires_promissum";
 const ISSUE_CEDE_REQUIRES_GENERATOR: &str = "cede_requires_generator";
 const ISSUE_REDDET_REQUIRES_ASYNC_FUNCTION: &str = "reddet_requires_async_function";
 const ISSUE_TACEBIT_REQUIRES_ASYNC_CONTEXT: &str = "tacebit_requires_async_context";
 const ISSUE_INVALID_LOWERED_EXPRESSION: &str = "invalid_lowered_expression";
-const ISSUE_SUMMA_EXPRESSION_UNSUPPORTED: &str = "summa_expression_unsupported";
 /// Phase 2A fail-closed fact: the dedicated gradient node exists in HIR, but the
 /// operand-eligibility and selector rules land with tensor-glyphs 2B. No `∇`
 /// expression may pass typecheck untyped or silently.
@@ -59,6 +59,44 @@ fn tensor_shape_rank(types: &TypeTable, shape: crate::IndexId) -> Option<u64> {
         IndexExpr::Tuple(dims) => Some(dims.len() as u64),
         IndexExpr::Param(_) => Some(1),
         IndexExpr::Infer(_) | IndexExpr::Unspecified => None,
+    }
+}
+
+/// Shared `apud` arity law (AC-5; reused by the `summa ex` admission, SFR-3):
+/// the coordinate count must equal the iterable's rank — tensor shape length
+/// or matrix 2 — never a partial bind. A rank >= 2 iterable without an `apud`
+/// clause is arity 0 != rank. Non-shaped iterables reject coordinates
+/// fail-closed; coordinate-free iteration over a non-shaped iterable is left
+/// to the owning construct's own iterable surface.
+pub(super) enum ApudArity {
+    /// Coordinate-free rank-1 shaped iterable, or exact coordinate/rank match.
+    Admitted,
+    /// Non-shaped iterable carrying `apud` coordinates (fail closed).
+    RequiresShaped,
+    /// Coordinate count does not equal the iterable's rank.
+    Mismatch { expected: u64, actual: usize },
+}
+
+pub(super) fn apud_arity(
+    types: &TypeTable,
+    dispatch_ty: TypeId,
+    has_coordinates: bool,
+    coordinate_count: usize,
+) -> ApudArity {
+    let rank = match types.get(dispatch_ty) {
+        Type::Tensor(_, shape) => tensor_shape_rank(types, *shape),
+        Type::Matrix(_, _) => Some(2),
+        _ => None,
+    };
+    match rank {
+        Some(rank) if !has_coordinates && rank == 1 => ApudArity::Admitted,
+        Some(rank) if rank == coordinate_count as u64 => ApudArity::Admitted,
+        Some(rank) => ApudArity::Mismatch {
+            expected: rank,
+            actual: coordinate_count,
+        },
+        None if has_coordinates => ApudArity::RequiresShaped,
+        None => ApudArity::Admitted,
     }
 }
 
@@ -164,28 +202,27 @@ impl TypeChecker<'_> {
                 // rank (tensor shape length; matrix = 2) — never partial
                 // binding. A rank >= 2 iterable without an `apud` clause is
                 // arity 0 != rank, hence also a type error. Non-shaped
-                // iterables reject `apud` fail-closed.
+                // iterables reject `apud` fail-closed. Shared with the summa
+                // admission (SFR-3): same rule, same causae.
                 if matches!(mode, radix_hir::HirIteraMode::Ex) {
-                    let rank = match self.types.get(dispatch_ty) {
-                        Type::Tensor(_, shape) => tensor_shape_rank(self.types, *shape),
-                        Type::Matrix(_, _) => Some(2),
-                        _ => None,
-                    };
-                    match rank {
-                        Some(rank) if !has_coordinates && rank == 1 => {}
-                        Some(rank) if rank == coordinate_bindings.len() as u64 => {}
-                        Some(rank) => self.errors.push(
-                            SemanticError::structured(SemanticErrorKind::TypeMismatch, iter.span)
-                                .with_arg("issue", ISSUE_ITERA_APUD_ARITY_MISMATCH)
-                                .with_arg("expected", rank.to_string())
-                                .with_arg("actual", coordinate_bindings.len().to_string()),
-                        ),
-                        None if has_coordinates => self.error_issue(
+                    match apud_arity(
+                        self.types,
+                        dispatch_ty,
+                        has_coordinates,
+                        coordinate_bindings.len(),
+                    ) {
+                        ApudArity::Admitted => {}
+                        ApudArity::RequiresShaped => self.error_issue(
                             SemanticErrorKind::TypeMismatch,
                             ISSUE_ITERA_APUD_REQUIRES_SHAPED_ITERABLE,
                             iter.span,
                         ),
-                        None => {}
+                        ApudArity::Mismatch { expected, actual } => self.errors.push(
+                            SemanticError::structured(SemanticErrorKind::TypeMismatch, iter.span)
+                                .with_arg("issue", ISSUE_ITERA_APUD_ARITY_MISMATCH)
+                                .with_arg("expected", expected.to_string())
+                                .with_arg("actual", actual.to_string()),
+                        ),
                     }
                 }
 
@@ -307,16 +344,21 @@ impl TypeChecker<'_> {
                 self.pop_scope();
                 self.vacuum_type()
             }
-            HirExpressionKind::Summa { .. } => {
-                // SFR-2 admits the source-shaped HIR node, but SFR-3 owns
-                // admission and SFR-4 owns the sequential fold lowering.
-                self.error_issue(
-                    SemanticErrorKind::LoweringError,
-                    ISSUE_SUMMA_EXPRESSION_UNSUPPORTED,
-                    expr.span,
-                );
-                self.error_type
-            }
+            HirExpressionKind::Summa {
+                source,
+                coordinates,
+                filum,
+                binding,
+                body,
+            } => super::summa::check_summa_expr(
+                self,
+                source,
+                coordinates,
+                filum.as_ref(),
+                binding,
+                body,
+                expr.span,
+            ),
             HirExpressionKind::Intervallum {
                 start, end, step, ..
             } => self.check_intervallum_expr(start, end, step, expr.span),

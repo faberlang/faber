@@ -94,6 +94,7 @@ pub mod ops;
 pub mod pattern;
 pub mod scalar_text;
 pub mod stmt;
+pub mod summa;
 pub mod tensor_index;
 pub mod tensor_type_directed;
 
@@ -251,6 +252,11 @@ pub(crate) struct TypeChecker<'a> {
 
     /// Whether the active body is a systems device entry/helper.
     pub current_device_function: bool,
+
+    /// Whether the active body is an `@ nucleum` device-entry kernel (not a
+    /// fragment). The `summa … filum` placement law (SFR-3) admits the
+    /// distributed form only inside kernels.
+    pub current_nucleum_entry: bool,
 
     /// Whether the active body is a source-owned graphics shader entry.
     pub current_shader_function: bool,
@@ -421,6 +427,7 @@ impl<'a> TypeChecker<'a> {
             current_return: None,
             current_error: None,
             current_device_function: false,
+            current_nucleum_entry: false,
             current_shader_function: false,
             current_generator_function: false,
             current_await_context: false,
@@ -627,6 +634,10 @@ mod infer_test;
 #[cfg(test)]
 #[path = "itera_apud_test.rs"]
 mod itera_apud_test;
+
+#[cfg(test)]
+#[path = "summa_test.rs"]
+mod summa_test;
 
 #[cfg(test)]
 #[path = "literal_inference_test.rs"]

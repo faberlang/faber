@@ -64,6 +64,7 @@ impl TypeChecker<'_> {
         let prev_return = self.current_return;
         let prev_error = self.current_error;
         let prev_device_function = self.current_device_function;
+        let prev_nucleum_entry = self.current_nucleum_entry;
         let prev_shader_function = self.current_shader_function;
         let prev_generator_function = self.current_generator_function;
         let prev_await_context = self.current_await_context;
@@ -73,6 +74,7 @@ impl TypeChecker<'_> {
         self.current_return = func.ret_ty;
         self.current_error = func.err_ty.map(ErrorSink::Function);
         self.current_device_function = func.is_kernel || func.nucleum_fragment;
+        self.current_nucleum_entry = func.is_kernel;
         self.current_shader_function = func.is_vertex || func.is_fragment;
         self.current_generator_function = func.is_generator;
         self.current_await_context = func.is_async;
@@ -103,6 +105,7 @@ impl TypeChecker<'_> {
         self.current_return = prev_return;
         self.current_error = prev_error;
         self.current_device_function = prev_device_function;
+        self.current_nucleum_entry = prev_nucleum_entry;
         self.current_shader_function = prev_shader_function;
         self.current_generator_function = prev_generator_function;
         self.current_await_context = prev_await_context;

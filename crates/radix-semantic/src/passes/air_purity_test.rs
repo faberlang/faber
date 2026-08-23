@@ -114,6 +114,21 @@ functio combine(fractus x, fractus y) → fractus {
 }
 
 #[test]
+fn rejects_summa_reduce_expression_by_design() {
+    // SFR-3 non_goals: AIR declines the summa reduce expression in v1 by
+    // design (device admission only) — the pin test the row calls for.
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio loss(tensor<f32, [8]> a) → f32 {
+    redde summa ex a apud [i] fixum s { redde s }
+}
+"#,
+    );
+    expect_air_issue(&errors, "summa_expression_unsupported");
+}
+
+#[test]
 fn rejects_mutation_and_deferred_init() {
     let errors = air_errors(
         r#"

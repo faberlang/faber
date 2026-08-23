@@ -2192,6 +2192,67 @@ fn semantic_type_mismatch_message(args: &[DiagnosticArg]) -> Option<String> {
         "vector_incomplete" => Some("vector requires element type and width; use vector<T, N>".to_owned()),
         "vector_missing_width" => Some("vector requires a width; use vector<T, 4> or vf32[4]".to_owned()),
         "octeti_index_out_of_bounds" => Some("octeti index out of bounds".to_owned()),
+        "summa_requires_shaped_iterable" => Some(
+            "summa ex requires a tensor or matrix iterable in v1; lista and bounded buffers stay with the `.summa()` method".to_owned(),
+        ),
+        "summa_term_type_non_scalar" => Some(
+            "summa terms must be numeric scalars (fractus/numerus family)".to_owned(),
+        ),
+        "summa_filum_requires_nucleum_kernel" => Some(
+            "the summa … filum distributed form admits only inside an @ nucleum kernel".to_owned(),
+        ),
+        "summa_tail_not_aligned" => Some(
+            "summa … filum requires the source length K to be a multiple of the 32-lane width in v1 (K % 32 ≠ 0 fails closed)".to_owned(),
+        ),
+        "summa_body_requires_single_redde" => Some(
+            "summa term body must contain exactly one `redde` value".to_owned(),
+        ),
+        "summa_body_forbids_rumpe" => Some(
+            "summa term body must be pure; `rumpe` is not allowed".to_owned(),
+        ),
+        "summa_body_forbids_cede" => Some(
+            "summa term body must be pure; `cede` is not allowed".to_owned(),
+        ),
+        "summa_body_forbids_cape" => Some(
+            "summa term body must be pure; `cape`/alternate-exit recovery is not allowed".to_owned(),
+        ),
+        "summa_body_forbids_iace" => Some(
+            "summa term body must be pure; `iace` is not allowed".to_owned(),
+        ),
+        "summa_body_effect" => Some(match arg_value(args, "reason")? {
+            "alternate_exit" => {
+                "summa term body must be infallible; alternate-exit (⇥) is not allowed".to_owned()
+            }
+            "async_posture" => "summa term body cannot use an async (fiet) posture".to_owned(),
+            "generator_posture" => {
+                "summa term body cannot use a generator (fiunt/fient) posture".to_owned()
+            }
+            "host_io" => "summa term body cannot perform host I/O".to_owned(),
+            "host_allocation" => "summa term body cannot perform host allocation".to_owned(),
+            "host_runtime" => "summa term body cannot invoke a host runtime helper".to_owned(),
+            "captured_mut_host" => {
+                "summa term body cannot mutate captured host state".to_owned()
+            }
+            "dynamic_function" => {
+                "summa term body cannot use a dynamic function value".to_owned()
+            }
+            "address_taking" => "summa term body cannot take or dereference an address".to_owned(),
+            "hidden_storage" => "summa term body cannot use hidden persistent storage".to_owned(),
+            "unapproved_effect" => {
+                "summa term body is outside the fragment-compatible pure effect subset".to_owned()
+            }
+            _ => return None,
+        }),
+        "summa_body_context" => Some(match arg_value(args, "reason")? {
+            "entry_callee" => {
+                "summa term body cannot call an @ nucleum entry kernel".to_owned()
+            }
+            "graphics_stage" => "summa term body cannot call a graphics stage".to_owned(),
+            "host_callable" => {
+                "summa term body cannot call a host function; compose @ nucleum fragments instead".to_owned()
+            }
+            _ => return None,
+        }),
         _ => None,
     }
 }
@@ -2239,6 +2300,9 @@ fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
         }
         "loop" => "loops are outside the v1 AIR subset".to_owned(),
         "loop_control" => "loop control is outside the v1 AIR subset".to_owned(),
+        "summa_expression_unsupported" => {
+            "the summa reduce expression is outside the v1 AIR subset by design (device admission only)".to_owned()
+        }
         "method_call" => {
             let method = arg_value(args, "method")?;
             format!("method call `{method}` is outside the v1 AIR subset")

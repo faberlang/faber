@@ -18,9 +18,16 @@ fn summa_receiver_remains_ordinary_tensor_intrinsic() {
 }
 
 #[test]
-fn summa_expression_lowers_to_hir_then_declines_with_catalog_issue() {
+fn summa_expression_lowers_to_hir_and_admits_sequential() {
+    // SFR-3 replaces the SFR-2 fail-closed gate with the real admission laws:
+    // the sequential (filum-omitted) spelling over a tensor now typechecks.
     let result = analyze_source(
-        "functio t(numerus a) → numerus { summa ex a apud [i] filum f fixum s { s } }",
+        "functio t(tensor<f32, [8]> a) → vacuum { summa ex a apud [i] fixum s { redde s } }",
+    );
+    assert!(
+        result.is_ok(),
+        "sequential summa should admit, diagnostics: {:?}",
+        result.diagnostics
     );
     let hir = result
         .hir
@@ -52,11 +59,14 @@ fn summa_expression_lowers_to_hir_then_declines_with_catalog_issue() {
     };
     assert!(matches!(source.kind, HirExpressionKind::Path(_)));
     assert_eq!(coordinates.len(), 1);
-    assert!(filum.is_some());
+    assert!(filum.is_none(), "sequential spelling has no filum binder");
     assert_eq!(result.interner.resolve(binding.1), "s");
     assert_eq!(term_body.statements.len(), 1);
-    assert!(result.diagnostics.iter().any(|diagnostic| {
-        crate::semantic_spec(diagnostic.kind).code == "SEM008"
-            && diagnostic.issue() == Some("summa_expression_unsupported")
-    }));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.issue() != Some("summa_expression_unsupported")),
+        "the SFR-2 fail-closed gate must not fire after SFR-3 admission"
+    );
 }
