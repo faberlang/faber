@@ -17,7 +17,7 @@ locale = "en"
 # What this teaches:
 #   • Both directions — `n ↦ float<f32, Bits>` and `x ↦ int<u32, Bits>` (plus the u16/f16 and u64/f64 twins).
 #   • Exact pairs only — u16 pairs with f16, u32 with f32, u64 with f64; anything else rejects.
-#   • Bit-identical — NaN payloads pass through unchanged; no canonicalization.
+#   • Bit-identical for the pinned payloads; the runner seam re-canonicalizes non-0x7E00 NaN spellings (0xFE00→0x7E00) — see the bits-f16 goal ledger residual.
 #   • The chain — `octeti[0‥2] ↦ int<u16, Le> ↦ float<f16, Bits> ↦ float<f32>` widens the f16 value exactly, with no intermediate binding.
 #   • Extended composition law, observable side — `octeti[0‥2] ↦ int<u16, Le> ↦ float<f16, Bits> ↦ float<f32>` equals the oracle f32 value. The direct `octeti[0‥2] ↦ float<f16, Le>` window row is unshipped (OQ1); the equivalence to it is the derived claim, not executed here.
 #   • Bits is reinterpretation, not value conversion — the same u16 window prints 15872.0 without the hint and 1.5 through `float<f16, Bits>`.
