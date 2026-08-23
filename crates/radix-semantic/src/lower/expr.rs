@@ -170,7 +170,8 @@ fn lower_first_match(
         .collect();
     let binding_def_id = lowerer.next_def_id();
     lowerer.bind_local(first_match.binding.name, binding_def_id);
-    let body = lowerer.lower_block(&first_match.body);
+    let mut body = lowerer.lower_block(&first_match.body);
+    lift_trailing_predicate_expr(&mut body);
     lowerer.pop_scope();
 
     HirExpressionKind::FirstMatch {
@@ -193,6 +194,35 @@ fn lower_literal(lowerer: &mut Lowerer, lit: &Literal) -> HirExpressionKind {
             }
         },
     }
+}
+
+/// Lift the `ubi` predicate block's trailing expression statement into the
+/// block's tail-expression slot (AFM-3).
+///
+/// Authored blocks lower with `expr: None` (block values are ordinarily
+/// `redde`-driven), but the first-match predicate is a bare trailing
+/// expression: `ubi x { x < 0.0 }`. The last expression statement of the
+/// predicate block is the predicate value; everything before it is ordinary
+/// sequential preamble.
+fn lift_trailing_predicate_expr(body: &mut radix_hir::HirBlock) {
+    if body.expr.is_some() {
+        return;
+    }
+    let Some(trailing) = body.statements.pop() else {
+        return;
+    };
+    let expr = match trailing.kind {
+        radix_hir::HirStatementKind::Expr(expr) => expr,
+        other => {
+            body.statements.push(radix_hir::HirStatement {
+                id: trailing.id,
+                span: trailing.span,
+                kind: other,
+            });
+            return;
+        }
+    };
+    body.expr = Some(Box::new(expr));
 }
 
 impl Lowerer<'_> {

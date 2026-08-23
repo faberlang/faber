@@ -86,6 +86,9 @@ pub(super) trait HirExpressionLoweringVisitor {
             HirExpressionKind::Summa { source, coordinates, filum, binding, body } => {
                 self.visit_summa_expr(source, coordinates, filum.as_ref(), binding, body, expr)
             }
+            HirExpressionKind::FirstMatch { source, coordinates, binding, body } => {
+                self.visit_first_match_expr(source, coordinates, binding, body, expr)
+            }
             HirExpressionKind::Handled { body, catch } => self.visit_handled_expr(body, catch, expr),
             HirExpressionKind::Assign(_, _) => self.visit_assignment_expr(expr),
             HirExpressionKind::ConversioAssign { .. } => self.visit_conversio_assign_expr(expr),
@@ -257,6 +260,14 @@ pub(super) trait HirExpressionLoweringVisitor {
         source: &HirExpression,
         coordinates: &[(DefId, Symbol)],
         filum: Option<&(DefId, Symbol)>,
+        binding: &(DefId, Symbol),
+        body: &HirBlock,
+        expr: &HirExpression,
+    ) -> Option<MirOperand>;
+    fn visit_first_match_expr(
+        &mut self,
+        source: &HirExpression,
+        coordinates: &[(DefId, Symbol)],
         binding: &(DefId, Symbol),
         body: &HirBlock,
         expr: &HirExpression,
@@ -620,6 +631,17 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         self.lower_summa_expr(source, coordinates, filum, binding, body, expr)
+    }
+
+    fn visit_first_match_expr(
+        &mut self,
+        source: &HirExpression,
+        coordinates: &[(DefId, Symbol)],
+        binding: &(DefId, Symbol),
+        body: &HirBlock,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        self.lower_first_match_expr(source, coordinates, binding, body, expr)
     }
 
     fn visit_unsupported_expr(&mut self, kind: &HirExpressionKind, expr: &HirExpression) -> Option<MirOperand> {

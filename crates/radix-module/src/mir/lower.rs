@@ -62,9 +62,13 @@ mod aggregate;
 mod async_surface;
 mod callable;
 mod collection_higher_order;
+
 mod context;
 mod control;
 mod expr;
+#[cfg(test)]
+#[path = "lower/first_match_test.rs"]
+mod first_match_tests;
 mod item;
 mod monomorphize;
 mod package_instantiate;
@@ -2572,9 +2576,9 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Dum(_, _) => "dum before control-flow MIR lowering",
         HirExpressionKind::Itera(_, _, _, _, _, _) => "itera before iterator MIR lowering",
         HirExpressionKind::Summa { .. } => "summa before term-fold MIR lowering",
-        HirExpressionKind::FirstMatch { .. } => {
-            "primus_quem before first-match MIR lowering"
-        }
+        // Unreachable from the lowering dispatcher (first-match lowers through
+        // `collection_higher_order`); kept so this naming match stays exhaustive.
+        HirExpressionKind::FirstMatch { .. } => "primus_quem before first-match MIR lowering",
         HirExpressionKind::Intervallum { .. } => "range expressions before range MIR lowering",
         HirExpressionKind::Array(_) => "array literals before aggregate MIR lowering",
         HirExpressionKind::Struct(_, _) => "struct literals before aggregate MIR lowering",

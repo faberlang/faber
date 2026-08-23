@@ -36,6 +36,16 @@ fn analyze(source: &str) -> Vec<SemanticError> {
     crate::analyze(&program, &config, &mut parse.interner).diagnostics
 }
 
+/// Base-lane pins assert on ERROR diagnostics only: these single-function
+/// probes always carry the non-fatal `unused_function` lint warning (the
+/// `air_errors` filter in this file already follows the same split).
+fn base_errors(source: &str) -> Vec<SemanticError> {
+    analyze(source)
+        .into_iter()
+        .filter(|err| err.is_error())
+        .collect()
+}
+
 fn air_errors(source: &str) -> Vec<SemanticError> {
     analyze(source)
         .into_iter()
@@ -55,7 +65,7 @@ fn first_match_total_evaluation_observes_post_match_predicate_error() {
     // including lanes after the first live match (post-match trap is
     // observable) — dataflow first-live selection, no early exit.
     // RED today: typecheck declines the head (AFM-2 admits the parse only).
-    let errors = analyze(
+    let errors = base_errors(
         r#"
 functio t(tf32[4] a) → fractus ∪ nihil {
     redde primus_quem(a, ubi x { (x ↦ u8) > 0 })
@@ -69,7 +79,7 @@ functio t(tf32[4] a) → fractus ∪ nihil {
 fn first_match_no_match_yields_nihil() {
     // Contract row: no live match → `nihil`, never an error.
     // RED today: typecheck declines the head (AFM-2 admits the parse only).
-    let errors = analyze(
+    let errors = base_errors(
         r#"
 functio t(tf32[4] a) → fractus ∪ nihil {
     redde primus_quem(a, ubi x { x < 0.0 })
@@ -83,7 +93,7 @@ functio t(tf32[4] a) → fractus ∪ nihil {
 fn first_match_empty_source_yields_nihil() {
     // Contract row: empty (statically zero-length) source → `nihil`.
     // RED today: typecheck declines the head (AFM-2 admits the parse only).
-    let errors = analyze(
+    let errors = base_errors(
         r#"
 functio t(tf32[0] a) → fractus ∪ nihil {
     redde primus_quem(a, ubi x { x > 0.0 })
@@ -99,7 +109,7 @@ fn first_match_predicate_error_propagates_never_becomes_nihil() {
     // converted to a `nihil` result. The nullable result covers only
     // no-match/empty, not predicate failure.
     // RED today: typecheck declines the head (AFM-2 admits the parse only).
-    let errors = analyze(
+    let errors = base_errors(
         r#"
 functio t(tf32[4] a) → fractus ∪ nihil {
     redde primus_quem(a, ubi x { (x ↦ u8) > 100 })

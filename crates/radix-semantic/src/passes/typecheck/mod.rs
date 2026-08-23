@@ -82,6 +82,7 @@ pub mod control;
 pub mod convert;
 pub mod expr;
 pub mod finalize;
+pub mod first_match;
 pub mod generic;
 pub mod index_infer;
 pub mod infer;
