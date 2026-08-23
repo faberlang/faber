@@ -904,13 +904,19 @@ ut_field := 'ut' '=' IDENTIFIER
 omnia_field := 'omnia' '=' IDENTIFIER
 
 @formerly importSugar
-importa_sugar    := 'importa' 'ex' STRING publica? (named_import | wildcard_import)?
+importa_sugar    := 'importa' 'ex' STRING publica? (named_import | wildcard_import | selective_import)?
 @formerly visibility
 publica    := 'publica'
 @formerly namedImport
 named_import   := IDENTIFIER ('ut' IDENTIFIER)?
 @formerly wildcardImport
 wildcard_import := '*' 'ut' IDENTIFIER
+# Selective value imports (EOT-2): one immutable local binding per exported
+# value member; the imported interface supplies the complete type. The parser
+# tolerates one trailing comma after the final member; the canonical spine
+# keeps every comma required (comma law).
+selective_import := 'fixum' import_value_binding (',' import_value_binding)*
+import_value_binding := IDENTIFIER ('ut' IDENTIFIER)?
 
 @formerly typeAnnotation
 type_annotation := owned_type ('∪' owned_type)*
@@ -1024,7 +1030,10 @@ adfirma_stmt        := 'adfirma' expression ('mori' expression)?
 requirit_stmt      := 'requirit' expression 'iace' expression
 
 expression := assignment
-assignment := ternary ('←' assignment | '↤' assignment inline_recovery?)?
+# Exact-output transfer (EOT-3): sink ⇇ payload chains bind below assignment
+# and above ternary; operands are complete before transfer.
+transfer   := ternary ('⇇' ternary)*
+assignment := transfer ('←' assignment | '↤' assignment inline_recovery?)?
 @formerly incDecStmt
 inc_dec_stmt := place ('↑' | '↓')
 place      := call_expr  (* semantic analysis requires an assignable target *)
