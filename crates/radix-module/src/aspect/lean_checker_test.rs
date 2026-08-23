@@ -9,8 +9,8 @@ use super::{
 };
 use crate::aspect::verifier::{HirAspectCheckResult, HirAspectCheckStatus, HirAspectEvidence, HirAspectVerifier};
 use crate::aspect::{
-    HirAspectBackendKind, HirAspectKind, HirAspectPrecondition, HirAspectReason, HirAspectRecord, HirAspectReport,
-    HirAspectSpan,
+    HirAspectBackendKind, HirAspectDetail, HirAspectKind, HirAspectPrecondition, HirAspectReason, HirAspectRecord,
+    HirAspectReport, HirAspectSpan, MaskNeutralityFamily,
 };
 use crate::lexer::Span;
 use std::path::PathBuf;
@@ -882,6 +882,103 @@ fn lean_checker_missing_toolchain_is_never_proven_for_recognized_records() {
 }
 
 // ---------------------------------------------------------------------------
+// APA-L2 pins: additive mask-neutrality source is real proof content, and the
+// existing trust gates remain fail-closed for its negative fixtures.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lean_checker_mask_neutrality_generates_real_float_free_obligation() {
+    let record = HirAspectRecord::recognized(
+        HirAspectKind::MaskNeutrality,
+        HirAspectSpan::Source(Span::new(0, 10)),
+        Some(crate::hir::HirId(7)),
+    )
+    .with_detail(HirAspectDetail::MaskNeutrality { family: MaskNeutralityFamily::Reduce });
+
+    let source = super::generate_lean_source(&[&record]);
+
+    assert!(source.contains("foldNeutralSuffix"));
+    assert!(source.contains("additiveReduceMaskNeutrality"));
+    assert!(source.contains("zeroFilledSuffix"));
+    assert!(source.contains("live : List Nat"));
+    assert!(source.contains("dead : Nat"));
+    assert!(!source.contains(": True := trivial"));
+    assert!(!source.contains("f32"));
+    assert!(!source.contains("f64"));
+    assert_eq!(LeanAspectChecker::scan_for_sorry(&source), SorryVerdict::Clean);
+}
+
+#[test]
+fn lean_checker_mask_neutrality_seeded_sorry_is_rejected() {
+    let source = concat!(
+        "theorem mask_neutrality_seeded_sorry (live : List Nat) :\n",
+        "  live = live := by\n",
+        "  sorry\n",
+    );
+    assert_eq!(
+        LeanAspectChecker::scan_for_sorry(source),
+        SorryVerdict::Found { line_numbers: vec![3] }
+    );
+    let result = super::combined_verdict(
+        HirAspectCheckResult {
+            status: HirAspectCheckStatus::Proven,
+            evidence: HirAspectEvidence("lake build succeeded".into()),
+            backend: HirAspectBackendKind::Lean,
+        },
+        &AxiomVerdict::Allowed,
+        &SorryVerdict::Found { line_numbers: vec![3] },
+    );
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+    assert!(result.evidence.0.contains("sorry"));
+}
+
+#[test]
+fn lean_checker_mask_neutrality_seeded_non_allowlisted_axiom_is_rejected() {
+    let audit = AxiomAudit {
+        dependencies: vec![AxiomDependency {
+            axiom_name: "maskNeutralityExternalAssumption".into(),
+            declaration: "mask_neutrality_seeded_axiom".into(),
+        }],
+    };
+    let verdict = LeanAspectChecker::classify_axioms(&audit);
+    match verdict {
+        AxiomVerdict::Rejected { disallowed } => {
+            assert_eq!(disallowed.len(), 1);
+            assert_eq!(disallowed[0].axiom_name, "maskNeutralityExternalAssumption");
+        }
+        AxiomVerdict::Allowed => panic!("seeded non-allowlisted axiom must be rejected"),
+    }
+}
+
+#[test]
+fn lean_checker_mask_neutrality_missing_toolchain_is_not_proven() {
+    let temp_dir = crate::test_support::test_temp_dir("lean-verifier-apa-l2-missing-tc");
+    let temp = temp_dir.path().to_path_buf();
+    let config = LeanAspectCheckerConfig {
+        lake_bin: temp.join("nonexistent-lake"),
+        lean_bin: temp.join("nonexistent-lean"),
+        timeout: Duration::from_secs(5),
+    };
+    let checker = LeanAspectChecker::new(config, temp);
+    let record = HirAspectRecord::recognized(
+        HirAspectKind::MaskNeutrality,
+        HirAspectSpan::Source(Span::new(0, 10)),
+        Some(crate::hir::HirId(7)),
+    )
+    .with_detail(HirAspectDetail::MaskNeutrality { family: MaskNeutralityFamily::Scan });
+    let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, vec![record]);
+
+    let results = checker.verify(&report);
+    assert_eq!(results.len(), 1);
+    assert_ne!(results[0].status, HirAspectCheckStatus::Proven);
+    assert!(
+        results[0].status == HirAspectCheckStatus::ToolchainMissing || results[0].status == HirAspectCheckStatus::Error,
+        "expected missing-toolchain/error result, got {:?}",
+        results[0].status
+    );
+}
+
+// ---------------------------------------------------------------------------
 // APA-2 pins: registered AIR kinds carry deterministic labels and cannot fall
 // through the generic `True := trivial` generator as if proven.
 // ---------------------------------------------------------------------------
@@ -934,11 +1031,7 @@ fn lean_checker_air_kind_records_never_become_proven_via_placeholder_generator()
     let checker = LeanAspectChecker::new(config, temp);
 
     let span = HirAspectSpan::Source(Span::new(0, 10));
-    let air_kinds = [
-        HirAspectKind::UnrollEquivalence,
-        HirAspectKind::MaskNeutrality,
-        HirAspectKind::GatePurity,
-    ];
+    let air_kinds = [HirAspectKind::UnrollEquivalence, HirAspectKind::GatePurity];
     let records: Vec<HirAspectRecord> = air_kinds
         .iter()
         .map(|&kind| HirAspectRecord::recognized(kind, span, Some(crate::hir::HirId(1))))

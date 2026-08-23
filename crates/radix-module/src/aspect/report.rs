@@ -7,8 +7,12 @@
 //! the exhaustive-match pass so aspect recognition and pattern checking agree.
 
 use crate::hir::visit::{walk_expr, HirVisitor};
-use crate::hir::{DefId, HirCasuArm, HirExpression, HirExpressionKind, HirId, HirModule};
-use crate::lexer::Span;
+use crate::hir::{DefId, HirCasuArm, HirExpression, HirExpressionKind, HirId, HirItemKind, HirModule};
+use crate::lexer::{Interner, Span};
+
+use super::air_mask_proof::{
+    is_additive_body, is_additive_combine, is_integer_zero_seed, reduction_family, MaskNeutralityFamily,
+};
 use crate::semantic::passes::exhaustive::{collect_enum_variants, enum_def_from_type, pattern_variant_id};
 use crate::semantic::TypeTable;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -23,8 +27,26 @@ mod tests;
 /// checked HIR facts instead of re-resolving source names.
 #[must_use]
 pub fn report_hir_aspects(hir: &HirModule, types: &TypeTable) -> HirAspectReport {
+    report_hir_aspects_with_optional_interner(hir, types, None)
+}
+
+/// Build an aspect report with source-name resolution available to concrete
+/// AIR recognizers.  The legacy [`report_hir_aspects`] entry point stays
+/// interner-free for callers that only need the backend-neutral Discerne
+/// report; Line-2 callers use this entry point so method names are resolved
+/// from the checked source table rather than from unstable `Symbol` numbers.
+#[must_use]
+pub fn report_hir_aspects_with_interner(hir: &HirModule, types: &TypeTable, interner: &Interner) -> HirAspectReport {
+    report_hir_aspects_with_optional_interner(hir, types, Some(interner))
+}
+
+fn report_hir_aspects_with_optional_interner(
+    hir: &HirModule,
+    types: &TypeTable,
+    interner: Option<&Interner>,
+) -> HirAspectReport {
     let enum_variants = collect_enum_variants(hir);
-    let mut collector = HirAspectCollector::new(types, enum_variants);
+    let mut collector = HirAspectCollector::new(hir, types, enum_variants, interner);
     collector.visit_program(hir);
     collector.finish()
 }
@@ -145,7 +167,14 @@ impl HirAspectRecord {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HirAspectDetail {
     None,
-    DiscerneOmnia { variants: Vec<DefId>, covered: Vec<DefId> },
+    DiscerneOmnia {
+        variants: Vec<DefId>,
+        covered: Vec<DefId>,
+    },
+    /// Structural contract consumed by the Line-2 Lean proof emitter.
+    MaskNeutrality {
+        family: MaskNeutralityFamily,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -239,6 +268,18 @@ pub enum HirAspectReason {
     /// At least one enum variant is not covered by an unguarded explicit
     /// variant pattern.
     MissingExplicitVariants,
+
+    /// A reduction/scan candidate did not carry its two required arguments.
+    MissingReductionArguments,
+
+    /// A reduction/scan candidate used a non-additive combine shape.
+    NonAdditiveCombine,
+
+    /// A reduction/scan candidate did not use the explicit integer-zero seed.
+    NonNeutralSeed,
+
+    /// A candidate supplied an in-region or otherwise unsupported mask shape.
+    UnsupportedMaskShape,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -251,14 +292,21 @@ struct HirAspectRecordSortKey {
 }
 
 struct HirAspectCollector<'a> {
+    hir: &'a HirModule,
     types: &'a TypeTable,
     enum_variants: FxHashMap<DefId, Vec<DefId>>,
+    interner: Option<&'a Interner>,
     report: HirAspectReport,
 }
 
 impl<'a> HirAspectCollector<'a> {
-    fn new(types: &'a TypeTable, enum_variants: FxHashMap<DefId, Vec<DefId>>) -> Self {
-        Self { types, enum_variants, report: HirAspectReport::new(HirAspectPrecondition::CheckedHir) }
+    fn new(
+        hir: &'a HirModule,
+        types: &'a TypeTable,
+        enum_variants: FxHashMap<DefId, Vec<DefId>>,
+        interner: Option<&'a Interner>,
+    ) -> Self {
+        Self { hir, types, enum_variants, interner, report: HirAspectReport::new(HirAspectPrecondition::CheckedHir) }
     }
 
     fn push(&mut self, record: HirAspectRecord) {
@@ -340,6 +388,51 @@ impl<'a> HirAspectCollector<'a> {
         }
     }
 
+    fn record_mask_neutrality(
+        &mut self,
+        expr: &HirExpression,
+        method: crate::lexer::Symbol,
+        args: &[crate::hir::HirCallArg],
+    ) {
+        let Some(interner) = self.interner else {
+            return;
+        };
+        let method_name = interner.resolve(method);
+        let Some(family) = reduction_family(method_name) else {
+            return;
+        };
+
+        let detail = HirAspectDetail::MaskNeutrality { family };
+        let reason = if args.len() > 2 {
+            Some(HirAspectReason::UnsupportedMaskShape)
+        } else if args.len() != 2 {
+            Some(HirAspectReason::MissingReductionArguments)
+        } else if !is_additive_combine_in_program(&args[0].expr, self.hir) {
+            Some(HirAspectReason::NonAdditiveCombine)
+        } else if !is_integer_zero_seed(&args[1].expr) {
+            Some(HirAspectReason::NonNeutralSeed)
+        } else {
+            None
+        };
+
+        let record = match reason {
+            Some(reason) => HirAspectRecord::not_proven(
+                HirAspectKind::MaskNeutrality,
+                HirAspectSpan::Source(expr.span),
+                Some(expr.id),
+                reason,
+            )
+            .with_detail(detail),
+            None => HirAspectRecord::recognized(
+                HirAspectKind::MaskNeutrality,
+                HirAspectSpan::Source(expr.span),
+                Some(expr.id),
+            )
+            .with_detail(detail),
+        };
+        self.push(record);
+    }
+
     fn push_skipped(&mut self, expr: &HirExpression, reason: HirAspectReason) {
         self.push(HirAspectRecord::skipped_candidate(
             HirAspectKind::DiscerneOmnia,
@@ -350,10 +443,42 @@ impl<'a> HirAspectCollector<'a> {
     }
 }
 
+fn is_additive_combine_in_program(expr: &HirExpression, hir: &HirModule) -> bool {
+    let HirExpressionKind::Path(def_id) = expr.kind else {
+        return is_additive_combine(expr);
+    };
+
+    let Some(item) = hir.items.iter().find(|item| item.def_id == def_id) else {
+        return false;
+    };
+    let HirItemKind::Function(function) = &item.kind else {
+        return false;
+    };
+    let Some(body) = &function.body else {
+        return false;
+    };
+
+    if let Some(expr) = body.expr.as_deref() {
+        return is_additive_body(expr);
+    }
+
+    body.statements
+        .iter()
+        .rev()
+        .find_map(|statement| match &statement.kind {
+            crate::hir::HirStatementKind::Redde(Some(expr)) => Some(is_additive_body(expr)),
+            _ => None,
+        })
+        == Some(true)
+}
+
 impl HirVisitor for HirAspectCollector<'_> {
     fn visit_expr(&mut self, expr: &HirExpression) {
         if let HirExpressionKind::Discerne { scrutinees, arms, exhaustive } = &expr.kind {
             self.record_discerne(expr, scrutinees, arms, *exhaustive);
+        }
+        if let HirExpressionKind::MethodCall(_, method, _, args) = &expr.kind {
+            self.record_mask_neutrality(expr, *method, args);
         }
 
         walk_expr(self, expr);

@@ -8,10 +8,10 @@ use super::{
     HirAspectRecordKind, HirAspectSpan,
 };
 use crate::hir::{
-    DefId, HirBlock, HirCasuArm, HirEnum, HirExpression, HirExpressionKind, HirId, HirItem, HirItemKind, HirLiteral,
-    HirModule, HirPattern, HirStatement, HirStatementKind, HirVariant,
+    DefId, HirBinOp, HirBlock, HirCallArg, HirCasuArm, HirEnum, HirExpression, HirExpressionKind, HirId, HirItem,
+    HirItemKind, HirLiteral, HirModule, HirPattern, HirStatement, HirStatementKind, HirVariant,
 };
-use crate::lexer::Span;
+use crate::lexer::{Interner, Span};
 use crate::semantic::{Primitive, Type, TypeId, TypeTable};
 use crate::test_support::test_span_between;
 
@@ -481,4 +481,127 @@ fn future_fixture_air_gate_purity_record_and_verdict_shape() {
     // Pre-registration absence pin (holds today):
     let report = report_hir_aspects(&air_shaped_program(), &TypeTable::new());
     assert!(report.records().is_empty());
+}
+
+// ---------------------------------------------------------------------------
+// APA-L2: additive-combine reduction recognizer.
+// ---------------------------------------------------------------------------
+
+fn additive_closure(id: u32, span: Span) -> HirExpression {
+    let left = HirExpression { id: HirId(id + 1), kind: HirExpressionKind::Path(DefId(701)), ty: None, span };
+    let right = HirExpression { id: HirId(id + 2), kind: HirExpressionKind::Path(DefId(702)), ty: None, span };
+    HirExpression {
+        id: HirId(id),
+        kind: HirExpressionKind::Clausura(
+            Vec::new(),
+            None,
+            None,
+            Box::new(HirExpression {
+                id: HirId(id + 3),
+                kind: HirExpressionKind::Binary(HirBinOp::Add, Box::new(left), Box::new(right)),
+                ty: None,
+                span,
+            }),
+            true,
+        ),
+        ty: None,
+        span,
+    }
+}
+
+fn reduction_call(
+    id: u32,
+    span: Span,
+    method: crate::lexer::Symbol,
+    combine: HirExpression,
+    seed: HirExpression,
+) -> HirExpression {
+    let arg = |expr: HirExpression| HirCallArg { name: None, spread: false, span: expr.span, expr };
+    HirExpression {
+        id: HirId(id),
+        kind: HirExpressionKind::MethodCall(
+            Box::new(HirExpression { id: HirId(id + 1), kind: HirExpressionKind::Path(DefId(700)), ty: None, span }),
+            method,
+            Vec::new(),
+            vec![arg(combine), arg(seed)],
+        ),
+        ty: None,
+        span,
+    }
+}
+
+#[test]
+fn hir_aspect_report_recognizes_additive_reducta_and_cumulata() {
+    let span = test_span_between(40, 60);
+    let mut interner = Interner::new();
+    let reducta = interner.intern("reducta");
+    let cumulata = interner.intern("cumulata");
+    let program = expr_program(vec![
+        reduction_call(
+            40,
+            span,
+            reducta,
+            additive_closure(41, span),
+            expr(HirExpressionKind::Literal(HirLiteral::Int(0)), 42, span),
+        ),
+        reduction_call(
+            50,
+            span,
+            cumulata,
+            additive_closure(51, span),
+            expr(HirExpressionKind::Literal(HirLiteral::Int(0)), 52, span),
+        ),
+    ]);
+    let report = super::report_hir_aspects_with_interner(&program, &TypeTable::new(), &interner);
+
+    assert_eq!(report.records().len(), 2);
+    assert!(report
+        .records()
+        .iter()
+        .all(|record| record.record_kind == HirAspectRecordKind::Recognized));
+    assert_eq!(
+        report
+            .records()
+            .iter()
+            .map(|record| match &record.detail {
+                super::HirAspectDetail::MaskNeutrality { family } => *family,
+                _ => panic!("missing mask-neutrality detail"),
+            })
+            .collect::<Vec<_>>(),
+        vec![super::MaskNeutralityFamily::Reduce, super::MaskNeutralityFamily::Scan]
+    );
+}
+
+#[test]
+fn hir_aspect_report_does_not_admit_non_neutral_or_non_additive_reductions() {
+    let span = test_span_between(70, 90);
+    let mut interner = Interner::new();
+    let reducta = interner.intern("reducta");
+    let non_additive = expr(HirExpressionKind::Literal(HirLiteral::Int(1)), 61, span);
+    let non_zero = expr(HirExpressionKind::Literal(HirLiteral::Int(2)), 62, span);
+    let program = expr_program(vec![
+        reduction_call(60, span, reducta, non_additive, lit_expr(63, span, None)),
+        reduction_call(70, span, reducta, additive_closure(71, span), non_zero),
+        reduction_call(
+            80,
+            span,
+            reducta,
+            additive_closure(81, span),
+            expr(HirExpressionKind::Literal(HirLiteral::Float(0.0)), 82, span),
+        ),
+    ]);
+    let report = super::report_hir_aspects_with_interner(&program, &TypeTable::new(), &interner);
+
+    assert_eq!(report.records().len(), 3);
+    assert!(report
+        .records()
+        .iter()
+        .all(|record| record.record_kind == HirAspectRecordKind::NotProven));
+    assert_eq!(report.records()[0].reason, HirAspectReason::NonAdditiveCombine);
+    assert_eq!(report.records()[1].reason, HirAspectReason::NonNeutralSeed);
+    assert_eq!(report.records()[2].reason, HirAspectReason::NonNeutralSeed);
+}
+
+fn expr(kind: HirExpressionKind, id: u32, span: Span) -> HirExpression {
+    HirExpression { id: HirId(id), kind, ty: None, span }
 }
