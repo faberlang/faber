@@ -463,10 +463,9 @@ fn find_or_insert_buffer(
 fn compatible_roles(existing: BufferRole, next: BufferRole) -> bool {
     matches!(
         (existing, next),
-        (BufferRole::Input, BufferRole::Input)
+        (BufferRole::Input | BufferRole::Output, BufferRole::Input)
             | (BufferRole::InOut, _)
             | (_, BufferRole::InOut)
-            | (BufferRole::Output, BufferRole::Input)
             | (BufferRole::Input, BufferRole::Output)
     )
 }

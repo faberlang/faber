@@ -1,6 +1,6 @@
 use crate::{
-    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirOperand, MirParam,
-    MirPlaceBase, MirRuntimeCall, MirStatementKind, MirValidationContext,
+    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirOperand, MirParam, MirPlaceBase,
+    MirRuntimeCall, MirStatementKind, MirValidationContext,
 };
 use radix_lexer::Interner;
 use radix_types::NumericWidth;
@@ -305,12 +305,7 @@ impl PackedStorageLayout {
             Self::F32 => Some(NumericWidth::F32),
             Self::F16 => Some(NumericWidth::F16),
             Self::Bf16 => Some(NumericWidth::BF16),
-            Self::Q8_0
-            | Self::Q5_0
-            | Self::Q4_K
-            | Self::Q5_K
-            | Self::Q6_K
-            | Self::MXFP4 => None,
+            Self::Q8_0 | Self::Q5_0 | Self::Q4_K | Self::Q5_K | Self::Q6_K | Self::MXFP4 => None,
         }
     }
 
@@ -354,9 +349,7 @@ pub(crate) fn apply_collection_op_contract(
     // (`kernel_plan_for_function`'s declared-recipe scan).
     if let Some((lane_width, length)) = filum_declaration_launch_facts(function, validation)? {
         let partials = if lane_width == 0 {
-            return Err(MirAbiError::new(
-                "filum summa lane width must be non-zero",
-            ));
+            return Err(MirAbiError::new("filum summa lane width must be non-zero"));
         } else {
             length.div_ceil(u64::from(lane_width))
         };

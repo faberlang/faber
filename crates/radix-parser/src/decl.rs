@@ -1122,7 +1122,7 @@ impl Parser {
     ///
     /// GRAMMAR:
     ///   union-decl := discretio ident [type-params] { union-field* variant* }
-    ///   union-field := annotation* field_decl
+    ///   union-field := annotation* `field_decl`
     ///   variant := ident [ { field* } ]
     ///   field := type ident
     fn parse_union_decl(&mut self) -> Result<StmtKind, ParseError> {

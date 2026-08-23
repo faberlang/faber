@@ -93,12 +93,11 @@ impl Parser {
         let mut payloads = Vec::new();
         while self.eat(&TokenKind::Transfer) {
             if !Self::can_start_expression(&self.peek().kind) {
-                return Err(ParseError::structured(
-                    ParseErrorKind::Expected,
-                    self.current_span(),
-                )
-                .with_arg("issue", "transfer_payload_expected")
-                .with_arg("operator", "⇇"));
+                return Err(
+                    ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                        .with_arg("issue", "transfer_payload_expected")
+                        .with_arg("operator", "⇇"),
+                );
             }
             payloads.push(self.parse_ternary()?);
         }
@@ -2014,7 +2013,7 @@ impl Parser {
     ///
     /// GRAMMAR:
     ///   args := [[`sparge`] expr (',' [`sparge`] expr)*]
-    ///   template_argument := (IDENTIFIER ':')? expression
+    ///   `template_argument` := (IDENTIFIER ':')? expression
     ///
     /// Arguments can use `sparge` to unpack arrays or objects. Labeled actuals
     /// are admitted only when the caller has identified a direct string or

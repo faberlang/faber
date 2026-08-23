@@ -4815,7 +4815,10 @@ fn eot_transfer_one_sink_one_payload() {
     assert_eq!(symbol_name(&result, sink.name), "output");
     assert_eq!(transfer.payloads.len(), 1, "exactly one payload");
     assert!(
-        matches!(transfer.payloads[0].kind, ExprKind::Literal(Literal::String(_))),
+        matches!(
+            transfer.payloads[0].kind,
+            ExprKind::Literal(Literal::String(_))
+        ),
         "payload is the string literal, got {:?}",
         transfer.payloads[0].kind
     );

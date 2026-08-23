@@ -19,9 +19,7 @@ use crate::test_support::{parse_ok, parse_program};
 fn first_match_head_parses_into_a_dedicated_expression() {
     // Contract row: dedicated expression-valued first-match head over a
     // statically bounded source with an owned predicate tail.
-    parse_ok(
-        "functio t(tf32[4] a) → fractus ∪ nihil { redde primus_quem(a, ubi x { x > 0.0 }) }",
-    );
+    parse_ok("functio t(tf32[4] a) → fractus ∪ nihil { redde primus_quem(a, ubi x { x > 0.0 }) }");
 }
 
 #[test]
