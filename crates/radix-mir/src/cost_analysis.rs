@@ -90,6 +90,9 @@ pub enum CostFamily {
     NumerusToTextus,
     GenusRecordExtraction,
     ListTensor,
+    RegisterWindow,
+    RegisterBridge,
+    RegisterLista,
     TextusToRegex,
     ValorJson,
     ConstantOperand,
@@ -98,13 +101,16 @@ pub enum CostFamily {
 
 impl CostFamily {
     /// v1 families in table order.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 13] = [
         Self::Cast,
         Self::OctetiWindowUnpack,
         Self::TextusToNumerus,
         Self::NumerusToTextus,
         Self::GenusRecordExtraction,
         Self::ListTensor,
+        Self::RegisterWindow,
+        Self::RegisterBridge,
+        Self::RegisterLista,
         Self::TextusToRegex,
         Self::ValorJson,
         Self::ConstantOperand,
@@ -150,6 +156,21 @@ pub const COST_BASIS: &[CostBasisRow] = &[
     // Allocate + elementwise copy. Walker adds `+log10(N)` when shape is static.
     CostBasisRow {
         family: CostFamily::ListTensor,
+        tag: CostTag::Class(CostClass::C2),
+    },
+    // Register window: `octeti<N> ↦ vector<T, N/width>` in, `vector<T, N> ↦ octeti<N>` out.
+    CostBasisRow {
+        family: CostFamily::RegisterWindow,
+        tag: CostTag::Class(CostClass::C0),
+    },
+    // Register op: `vector<T, N> ↦ vector<U, N>` element bridge. No allocation.
+    CostBasisRow {
+        family: CostFamily::RegisterBridge,
+        tag: CostTag::Class(CostClass::C0),
+    },
+    // Allocate + elementwise copy (`vector<T, N> ↦ lista<T>`, `lista<T, N> ↦ vector<T, N>`).
+    CostBasisRow {
+        family: CostFamily::RegisterLista,
         tag: CostTag::Class(CostClass::C2),
     },
     // Allocation-heavy compile of a bounded pattern (`textus ↦ regex`).
@@ -217,6 +238,15 @@ pub fn conversion_family(conversion: &MirConversion, types: &TypeTable) -> CostF
     }
     if is_list_tensor_pair(source, target) {
         return CostFamily::ListTensor;
+    }
+    if is_octeti(source) && is_vector(target) || is_vector(source) && is_octeti(target) {
+        return CostFamily::RegisterWindow;
+    }
+    if is_vector(source) && is_vector(target) {
+        return CostFamily::RegisterBridge;
+    }
+    if is_vector(source) && is_list(target) || is_list(source) && is_vector(target) {
+        return CostFamily::RegisterLista;
     }
     if is_textus(source) && is_regex(target) {
         return CostFamily::TextusToRegex;
@@ -303,6 +333,10 @@ fn is_list(ty: &Type) -> bool {
 
 fn is_tensor(ty: &Type) -> bool {
     matches!(ty, Type::Tensor(_, _))
+}
+
+fn is_vector(ty: &Type) -> bool {
+    matches!(ty, Type::Vector(_, _))
 }
 
 fn is_numeric_scalar(ty: &Type) -> bool {

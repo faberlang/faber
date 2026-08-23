@@ -51,7 +51,7 @@ fn tensor_f32(types: &mut TypeTable, dims: [u64; 2]) -> MirType {
 }
 
 #[test]
-fn basis_table_is_the_ten_v1_rows() {
+fn basis_table_is_the_thirteen_v1_rows() {
     assert_eq!(COST_BASIS.len(), CostFamily::ALL.len());
     for (row, family) in COST_BASIS.iter().zip(CostFamily::ALL) {
         assert_eq!(row.family, family);
@@ -164,6 +164,75 @@ fn list_tensor_is_c2_intrinsic() {
     assert_eq!(conversion_family(&to_list, &types), CostFamily::ListTensor);
     assert_eq!(classify(&to_tensor, &types), CostTag::Class(CostClass::C2));
     assert_eq!(classify(&to_list, &types), CostTag::Class(CostClass::C2));
+}
+
+fn vector_u32x4(types: &mut TypeTable) -> MirType {
+    let u32 = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let width = types.intern_index(IndexExpr::Literal(4));
+    MirType::semantic(types.vector_with_width(u32, width))
+}
+
+#[test]
+fn register_window_rows_are_c0() {
+    let mut types = TypeTable::new();
+    let v_u32x4 = vector_u32x4(&mut types);
+    let cap16 = types.intern_index(IndexExpr::Literal(16));
+    let octeti16 = MirType::semantic(types.bounded_octeti(cap16));
+    let window_in = runtime(octeti16, v_u32x4);
+    let window_out = runtime(v_u32x4, octeti16);
+    assert_eq!(
+        conversion_family(&window_in, &types),
+        CostFamily::RegisterWindow
+    );
+    assert_eq!(
+        conversion_family(&window_out, &types),
+        CostFamily::RegisterWindow
+    );
+    assert_eq!(
+        classify(&window_in, &types),
+        CostTag::Class(CostClass::C0)
+    );
+    assert_eq!(
+        classify(&window_out, &types),
+        CostTag::Class(CostClass::C0)
+    );
+}
+
+#[test]
+fn register_bridge_is_c0() {
+    let mut types = TypeTable::new();
+    let u32 = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let width4 = types.intern_index(IndexExpr::Literal(4));
+    let v_u32x4 = MirType::semantic(types.vector_with_width(u32, width4));
+    let v_f32x4 = MirType::semantic(types.vector_with_width(f32, width4));
+    let conv = runtime(v_u32x4, v_f32x4);
+    assert_eq!(
+        conversion_family(&conv, &types),
+        CostFamily::RegisterBridge
+    );
+    assert_eq!(classify(&conv, &types), CostTag::Class(CostClass::C0));
+}
+
+#[test]
+fn register_lista_rows_are_c2() {
+    let mut types = TypeTable::new();
+    let u32 = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let width4 = types.intern_index(IndexExpr::Literal(4));
+    let v_u32x4 = MirType::semantic(types.vector_with_width(u32, width4));
+    let list_u32 = MirType::semantic(types.array(u32));
+    let to_list = runtime(v_u32x4, list_u32);
+    let to_vector = runtime(list_u32, v_u32x4);
+    assert_eq!(
+        conversion_family(&to_list, &types),
+        CostFamily::RegisterLista
+    );
+    assert_eq!(
+        conversion_family(&to_vector, &types),
+        CostFamily::RegisterLista
+    );
+    assert_eq!(classify(&to_list, &types), CostTag::Class(CostClass::C2));
+    assert_eq!(classify(&to_vector, &types), CostTag::Class(CostClass::C2));
 }
 
 #[test]

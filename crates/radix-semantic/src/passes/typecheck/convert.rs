@@ -112,6 +112,12 @@ const ISSUE_RECTANGULAR_LISTA_LITERAL_LEAF: &str = "rectangular_lista_literal_le
 const ISSUE_LISTA_TO_VECTOR_LITERAL_REQUIRED: &str = "lista_to_vector_literal_required";
 const ISSUE_LISTA_TO_VECTOR_ELEMENT_MISMATCH: &str = "lista_to_vector_element_mismatch";
 const ISSUE_LISTA_TO_VECTOR_LITERAL_WIDTH: &str = "lista_to_vector_literal_width";
+const ISSUE_OCTETI_TO_VECTOR_UNSPECIFIED: &str = "octeti_to_vector_unspecified";
+const ISSUE_VECTOR_TO_OCTETI_UNSPECIFIED: &str = "vector_to_octeti_unspecified";
+const ISSUE_REGISTER_WINDOW_WIDTH_MISMATCH: &str = "register_window_width_mismatch";
+const ISSUE_REGISTER_OUT_ELEMENT_MISMATCH: &str = "register_out_element_mismatch";
+const ISSUE_REGISTER_BRIDGE_WIDTH_MISMATCH: &str = "register_bridge_width_mismatch";
+const ISSUE_REGISTER_BRIDGE_ELEMENT_UNSUPPORTED: &str = "register_bridge_element_unsupported";
 const ISSUE_MATRIX_MATERIALIZE_UNSUPPORTED: &str = "matrix_materialize_unsupported";
 const ISSUE_DEREF_REQUIRES_REFERENCE: &str = "deref_requires_reference";
 const ISSUE_ARRAY_SPREAD_REQUIRES_LISTA: &str = "array_spread_requires_lista";
@@ -440,6 +446,28 @@ impl TypeChecker<'_> {
         }
 
         if let Some(result_ty) = self.check_lista_to_matrix_conversio(source, target_resolved, span)
+        {
+            if !self.types.equals(result_ty, self.error_type) {
+                if let Some(recovery) = recovery {
+                    self.note_conversio_recovery_checked(recovery, target_resolved);
+                }
+            }
+            return result_ty;
+        }
+
+        if let Some(result_ty) =
+            self.check_register_conversio(source, source_ty, target_resolved, params, span)
+        {
+            if !self.types.equals(result_ty, self.error_type) {
+                if let Some(recovery) = recovery {
+                    self.note_conversio_recovery_checked(recovery, target_resolved);
+                }
+            }
+            return result_ty;
+        }
+
+        if let Some(result_ty) =
+            self.check_bounded_lista_to_vector_conversio(source_ty, target_resolved, span)
         {
             if !self.types.equals(result_ty, self.error_type) {
                 if let Some(recovery) = recovery {
@@ -807,6 +835,148 @@ impl TypeChecker<'_> {
             self.types.get(self.resolve_inferred_type(ty)),
             Type::SizedNumeric(Primitive::Numerus, NumericWidth::U8)
         )
+    }
+
+    /// CTFP-1 register-class rows. Register-in windows
+    /// (`octeti<N> ↦ vector<T, N/width>`), register-out
+    /// (`vector<T, N> ↦ lista<T>` / `↦ octeti<N>`), and element bridges
+    /// (`vector<T, N> ↦ vector<U, N>`). v1 window elements are u16/u32 only;
+    /// every window needs a static byte length with `widths × count = N` and a
+    /// `Be`/`Le` hint. Out-of-set bridges and wrong widths fail closed.
+    fn check_register_conversio(
+        &mut self,
+        source: &HirExpression,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        params: &[Symbol],
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        let source_resolved = self.resolve_inferred_type(source_ty);
+        match (
+            self.types.get(source_resolved).clone(),
+            self.types.get(target_resolved).clone(),
+        ) {
+            // Register-in: exact static octeti window into a vector register.
+            (source_ty, Type::Vector(elem, width))
+                if matches!(source_ty, Type::BoundedOcteti { .. })
+                    || matches!(source_ty, Type::Primitive(Primitive::Octeti)) =>
+            {
+                if !self.conversio_has_endian_hint(params) {
+                    self.invalid_conversion(ISSUE_OCTETI_TO_VECTOR_UNSPECIFIED, span);
+                    return Some(self.error_type);
+                }
+                let Some(count) = crate::literal_vector_width(width, self.types) else {
+                    self.invalid_conversion(ISSUE_LISTA_TO_VECTOR_LITERAL_WIDTH, span);
+                    return Some(self.error_type);
+                };
+                let Some(element_bytes) = self.register_element_width_bytes(elem) else {
+                    self.invalid_conversion(ISSUE_REGISTER_WINDOW_WIDTH_MISMATCH, span);
+                    return Some(self.error_type);
+                };
+                let Some(window_bytes) = self.register_window_len(source, source_resolved)
+                else {
+                    self.invalid_conversion(ISSUE_OCTETI_TO_VECTOR_UNSPECIFIED, span);
+                    return Some(self.error_type);
+                };
+                if u64::from(count) * u64::from(element_bytes) != window_bytes {
+                    self.invalid_conversion(ISSUE_REGISTER_WINDOW_WIDTH_MISMATCH, span);
+                    return Some(self.error_type);
+                }
+                Some(target_resolved)
+            }
+            // Register-out / bridges from a vector register.
+            (Type::Vector(elem, width), target_ty) => {
+                let Some(count) = crate::literal_vector_width(width, self.types) else {
+                    self.invalid_conversion(ISSUE_LISTA_TO_VECTOR_LITERAL_WIDTH, span);
+                    return Some(self.error_type);
+                };
+                match target_ty {
+                    Type::Array(target_elem) => {
+                        if self.types.equals(elem, target_elem) {
+                            Some(target_resolved)
+                        } else {
+                            self.invalid_conversion(ISSUE_REGISTER_OUT_ELEMENT_MISMATCH, span);
+                            Some(self.error_type)
+                        }
+                    }
+                    Type::BoundedOcteti { capacity } => {
+                        if !self.conversio_has_endian_hint(params) {
+                            self.invalid_conversion(ISSUE_VECTOR_TO_OCTETI_UNSPECIFIED, span);
+                            return Some(self.error_type);
+                        }
+                        let Some(element_bytes) = self.register_element_width_bytes(elem) else {
+                            self.invalid_conversion(ISSUE_REGISTER_WINDOW_WIDTH_MISMATCH, span);
+                            return Some(self.error_type);
+                        };
+                        let IndexExpr::Literal(capacity) =
+                            self.types.get_index(capacity).clone()
+                        else {
+                            self.invalid_conversion(ISSUE_REGISTER_WINDOW_WIDTH_MISMATCH, span);
+                            return Some(self.error_type);
+                        };
+                        if u64::from(count) * u64::from(element_bytes) != capacity {
+                            self.invalid_conversion(ISSUE_REGISTER_WINDOW_WIDTH_MISMATCH, span);
+                            return Some(self.error_type);
+                        }
+                        Some(target_resolved)
+                    }
+                    Type::Vector(target_elem, target_width) => {
+                        let target_count = crate::literal_vector_width(target_width, self.types);
+                        if target_count != Some(count) {
+                            self.invalid_conversion(ISSUE_REGISTER_BRIDGE_WIDTH_MISMATCH, span);
+                            return Some(self.error_type);
+                        }
+                        if self.register_bridge_element_allowed(elem, target_elem) {
+                            Some(target_resolved)
+                        } else {
+                            self.invalid_conversion(
+                                ISSUE_REGISTER_BRIDGE_ELEMENT_UNSUPPORTED,
+                                span,
+                            );
+                            Some(self.error_type)
+                        }
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// v1 register window element widths: u16 and u32 numerus only.
+    fn register_element_width_bytes(&self, elem: TypeId) -> Option<u8> {
+        match self.types.get(self.resolve_inferred_type(elem)) {
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16) => Some(2),
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32) => Some(4),
+            _ => None,
+        }
+    }
+
+    /// Static byte length of a register-in source: a literal/index window, or
+    /// a bounded `octeti<N>` value with a literal capacity.
+    fn register_window_len(&self, source: &HirExpression, source_resolved: TypeId) -> Option<u64> {
+        if let Some(len) = self.static_octeti_window_len(source) {
+            return Some(len as u64);
+        }
+        match self.types.get(source_resolved) {
+            Type::BoundedOcteti { capacity } => match self.types.get_index(*capacity) {
+                IndexExpr::Literal(capacity) => Some(*capacity),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// Bridge element set: numeric scalar → numeric scalar (numerus/fractus).
+    fn register_bridge_element_allowed(&self, elem: TypeId, target_elem: TypeId) -> bool {
+        let numeric = |ty: TypeId| {
+            matches!(
+                self.types.get(self.resolve_inferred_type(ty)),
+                Type::Primitive(Primitive::Numerus | Primitive::Fractus)
+                    | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
+            )
+        };
+        numeric(elem) && numeric(target_elem)
     }
 
     /// Reject primitive `↦` pairs with no single obvious meaning (byte reinterpretation, etc.).
@@ -1298,6 +1468,42 @@ impl TypeChecker<'_> {
         }
         self.invalid_conversion(ISSUE_LISTA_TO_VECTOR_LITERAL_REQUIRED, span);
         Some(self.error_type)
+    }
+
+    /// CTFP-1: non-literal `lista<T, N> ↦ vector<T, N>` — a bounded lista with
+    /// a literal capacity that exactly matches the vector width materializes
+    /// into the register; unbounded `lista<T>` stays literal-only.
+    fn check_bounded_lista_to_vector_conversio(
+        &mut self,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        let Type::Vector(target_elem, width) = self.types.get(target_resolved).clone() else {
+            return None;
+        };
+        let target_width = crate::literal_vector_width(width, self.types)?;
+        let source_resolved = self.resolve_inferred_type(source_ty);
+        let Type::BoundedArray {
+            element: source_elem,
+            capacity,
+        } = self.types.get(source_resolved).clone()
+        else {
+            return None;
+        };
+        if !self.types.equals(source_elem, target_elem) {
+            self.invalid_conversion(ISSUE_LISTA_TO_VECTOR_ELEMENT_MISMATCH, span);
+            return Some(self.error_type);
+        }
+        match self.types.get_index(capacity) {
+            IndexExpr::Literal(capacity) if u64::from(target_width) == *capacity => {
+                Some(target_resolved)
+            }
+            _ => {
+                self.invalid_conversion(ISSUE_LISTA_TO_VECTOR_LITERAL_WIDTH, span);
+                Some(self.error_type)
+            }
+        }
     }
 
     /// Nested `lista` literal → register `matrix<T, [R, C]>` (CPU subset ≤4×4).
