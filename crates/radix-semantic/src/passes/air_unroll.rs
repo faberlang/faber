@@ -1334,8 +1334,9 @@ pub(crate) fn first_match_source_route(
                     let dims = crate::i64s_from_literal_index(*shape, types)?;
                     (!dims.is_empty()).then_some(FirstMatchSourceRoute::StaticShape)
                 }
-                Type::BoundedArray { .. } => bounded_capacity(ty, types)
-                    .map(|_| FirstMatchSourceRoute::StaticShape),
+                Type::BoundedArray { .. } => {
+                    bounded_capacity(ty, types).map(|_| FirstMatchSourceRoute::StaticShape)
+                }
                 _ => None,
             }
         }

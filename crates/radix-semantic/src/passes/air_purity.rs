@@ -267,7 +267,12 @@ impl AirPurityChecker<'_> {
                 self.check_expr(source);
                 self.check_block(body);
             }
-            HirExpressionKind::FirstMatch { source, coordinates, body, .. } => {
+            HirExpressionKind::FirstMatch {
+                source,
+                coordinates,
+                body,
+                ..
+            } => {
                 // AFM-4: bounded sources admit on the AIR lane (forward
                 // execution; reverse AD is fail-closed — see the vjp.rs
                 // forward-only note). The predicate is still traversed so

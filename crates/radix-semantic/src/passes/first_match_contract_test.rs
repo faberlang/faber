@@ -260,9 +260,11 @@ functio pick(lista<f32> xs) → fractus ∪ nihil {
     );
     assert!(
         errors.iter().any(|err| {
-            err.args.iter().any(|arg| arg.name == "issue"
-                && arg.value == "first_match_unbounded_source")
-                && err.args
+            err.args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "first_match_unbounded_source")
+                && err
+                    .args
                     .iter()
                     .any(|arg| arg.name == "causa" && arg.value == "not_bounded")
         }),
@@ -287,9 +289,11 @@ functio pick(numerus n) → fractus ∪ nihil {
     );
     assert!(
         errors.iter().any(|err| {
-            err.args.iter().any(|arg| arg.name == "issue"
-                && arg.value == "first_match_unbounded_source")
-                && err.args
+            err.args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "first_match_unbounded_source")
+                && err
+                    .args
                     .iter()
                     .any(|arg| arg.name == "causa" && arg.value == "not_bounded")
         }),
