@@ -70,10 +70,10 @@ const BUDGETS: Budgets = Budgets {
     // `let _ =` discards; remaining sites are deliberate side-effect binds
     // in lowering/resolver paths.
     let_underscore: 6,
-    // D03-MODULE-PI extracted package_instantiate.rs `mod tests` (path-wired).
-    // Remaining 1, not this unit: `library_home_test_support` helper in
-    // import_resolve.rs.
-    inline_test_modules: 1,
+    // D03-MODULE-PI extracted package_instantiate.rs `mod tests` (path-wired);
+    // D03-MODULE-LH moved the `library_home_test_support` helper into the
+    // import_resolve.rs companion (pub(crate) re-export preserves its path).
+    inline_test_modules: 0,
     // D03-MODULE-PI extracted the inline test from package_instantiate.rs.
     // Other `#[test]` attrs live in companions.
     test_attr_in_production: 0,

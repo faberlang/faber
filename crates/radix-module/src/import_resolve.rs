@@ -156,26 +156,7 @@ pub fn parse_paths_config(toml_source: &str) -> PathsConfig {
 }
 
 #[cfg(test)]
-pub(crate) mod library_home_test_support {
-    use std::cell::RefCell;
-    use std::path::PathBuf;
-
-    thread_local! {
-        /// Thread-local override so `compile_test` env-var mutations don't race
-        /// parallel vertex-source tests that also call `library_home()`.
-        static OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
-    }
-
-    /// Read the current thread-local library-home override.
-    pub(crate) fn get_thread_library_home() -> Option<PathBuf> {
-        OVERRIDE.with(|cell| cell.borrow().clone())
-    }
-
-    /// Set the thread-local library-home override. Returns the previous value.
-    pub(crate) fn set_thread_library_home(path: Option<PathBuf>) -> Option<PathBuf> {
-        OVERRIDE.with(|cell| cell.replace(path))
-    }
-}
+pub(crate) use tests::library_home_test_support;
 
 /// Structured resolution failure with a human-readable reason and a stable
 /// issue slug so callers can produce targeted diagnostics (F-108).
