@@ -1156,3 +1156,102 @@ functio loss(tf32[2, 2] x) → tf32[2, 2] {
         err.args
     );
 }
+
+// ---------------------------------------------------------------------------
+// ATH-3 (AIR Tier 0.5): recovery-arm Conversio slice. A conversion with an
+// inline `⇥` recovery resolves its failure inside its own expression —
+// self-resolved union dataflow, admitted like a locally-resolved handler. A
+// conversion without recovery is a boundary throw and keeps the
+// `runtime_conversion` decline everywhere in v1 — including inside admitted
+// handler regions — with a cause distinct from every handler cause.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn air_lane_admits_inline_recovery_conversio() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio parse_or_zero(textus s) → numerus {
+    fixum numerus v ← s ↦ numerus ⇥ 0
+    redde v
+}
+"#,
+    );
+
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
+}
+
+#[test]
+fn air_lane_admits_inline_recovery_conversio_inside_handler_region() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio in_region(textus s, bivalens bad) → numerus {
+    fac {
+        si bad { iace "x" }
+        fixum numerus v ← s ↦ numerus ⇥ 0
+        redde v
+    } cape err { redde 1 }
+}
+"#,
+    );
+
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
+}
+
+#[test]
+fn air_lane_bare_conversio_declines_inside_admitted_handler_region() {
+    // OQ-THROW-SOURCE default: a no-recovery conversion stays out in v1 even
+    // inside an admitted handler region, despite the base lane routing its
+    // failure into the region's ErrorSink::Local channel. The region itself
+    // admits; only the conversion declines, under its own named cause.
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio in_region(textus s, bivalens bad) → numerus {
+    fac {
+        si bad { iace "x" }
+        fixum numerus v ← s ↦ numerus
+        redde v
+    } cape err { redde 1 }
+}
+"#,
+    );
+
+    expect_air_issue(&errors, "runtime_conversion");
+    for cause in [
+        "recoverable_handler",
+        "conditional_recovery",
+        "recovery_type_mismatch",
+        "rethrow_in_recovery",
+    ] {
+        assert!(
+            !errors.iter().any(|err| err
+                .args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == cause)),
+            "handler cause {cause} must stay distinct from the conversion decline: {errors:?}"
+        );
+    }
+}
+
+#[test]
+fn air_lane_admits_non_literal_inline_recovery_expression() {
+    // The inline recovery grammar is `'⇥' unary_expr` (EBNF #153): a control
+    // expression carrying `iace` cannot appear in the recovery operand, so
+    // the rethrow-in-recovery case is unrepresentable at the v1 surface.
+    // The gate still checks the recovery arm as a Catch region (defensive
+    // against a future grammar widening); a path operand admits like a
+    // literal fallback.
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio parse_or_zero(textus s, numerus fallback) → numerus {
+    fixum numerus v ← s ↦ numerus ⇥ fallback
+    redde v
+}
+"#,
+    );
+
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
+}

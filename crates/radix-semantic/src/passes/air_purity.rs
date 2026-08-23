@@ -428,13 +428,27 @@ impl AirPurityChecker<'_> {
                 recovery,
                 ..
             } => {
-                self.reject(expr.span, "runtime_conversion");
+                // ATH-3 (AIR Tier 0.5): an inline `⇥` recovery resolves the
+                // conversion failure inside its own expression — self-resolved
+                // union dataflow, admitted like a locally-resolved handler. A
+                // bare conversion (`recovery: None`) is a boundary throw and
+                // keeps the `runtime_conversion` decline everywhere in v1 —
+                // including inside admitted handler regions — with a cause
+                // distinct from every handler cause.
+                if recovery.is_none() {
+                    self.reject(expr.span, "runtime_conversion");
+                }
                 self.check_expr(source);
                 if let radix_hir::HirConversioTarget::Intervallum(operand) = target {
                     self.check_expr(operand);
                 }
                 if let Some(recovery) = recovery {
+                    // The inline recovery arm is the catch side of the
+                    // self-resolved region: a throw from it is a rethrow
+                    // (Tier 2 keep-out).
+                    self.handler_regions.push(HandlerRegion::Catch);
                     self.check_expr(recovery);
+                    self.handler_regions.pop();
                 }
             }
             HirExpressionKind::Ref(_, operand) | HirExpressionKind::Deref(operand) => {
