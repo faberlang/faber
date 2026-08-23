@@ -725,6 +725,15 @@ pub struct HirImport {
 
     /// Named items introduced by the import.
     pub items: Vec<HirImportItem>,
+
+    /// EOT-2 selective import (`importa ex "…" fixum member [ut local], …`).
+    ///
+    /// When true, `items` are ordered caller-owned value bindings (functions
+    /// and consts), not namespace members: `name` is the exported spelling and
+    /// `alias` the caller-owned local when one was spelled. Legacy namespace
+    /// imports keep `false` and their existing item shape.
+    #[serde(default)]
+    pub selective: bool,
 }
 
 /// One binding introduced by an import declaration.

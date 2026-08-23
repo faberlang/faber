@@ -167,13 +167,26 @@ pub fn collect(
                 radix_syntax::ImportKind::Wildcard { alias } => {
                     define_import_symbol(resolver, &mut errors, alias.name, alias.span, false);
                 }
-                // EOT-2S repair (fail-closed): each selective member binds a
-                // caller-owned immutable local named by the alias when
-                // spelled, the exported name otherwise. Member resolution
-                // against the file interface happens in resolve.
+                // EOT-2M: each selective member binds a caller-owned immutable
+                // local named by the alias when spelled, the exported name
+                // otherwise. Member resolution against the imported file
+                // interface happens in resolve; here the locals must exist and
+                // be distinct within the list.
                 radix_syntax::ImportKind::Selective { members } => {
+                    let mut bound = Vec::new();
                     for member in members {
                         let binding = member.alias.as_ref().unwrap_or(&member.name);
+                        if bound.contains(&binding.name) {
+                            errors.push(
+                                SemanticError::structured(
+                                    SemanticErrorKind::DefinitionDuplicate,
+                                    binding.span,
+                                )
+                                .with_arg("issue", "selective_import_duplicate_alias"),
+                            );
+                            continue;
+                        }
+                        bound.push(binding.name);
                         define_symbol(
                             resolver,
                             &mut errors,

@@ -839,6 +839,8 @@ impl Lowerer<'_> {
     pub fn lower_importa(&mut self, stmt: &Stmt, decl: &ImportDecl) -> Option<HirItem> {
         let def_id = self.next_def_id();
 
+        let selective = matches!(&decl.kind, ImportKind::Selective { .. })
+            && self.interner.resolve(decl.path) != crate::kernel::KERNEL_GLOB_IMPORT;
         let path = self.interner.resolve(decl.path);
         let items = if path == crate::kernel::KERNEL_GLOB_IMPORT {
             match &decl.kind {
@@ -901,13 +903,24 @@ impl Lowerer<'_> {
                         alias: Some(alias.name),
                     }]
                 }
-                // EOT-2S repair (fail-closed): selective members are ordinary
-                // value locals, never namespace items. Fail closed until
-                // member resolution installs their identities (EOT-2M).
-                ImportKind::Selective { .. } => {
-                    self.error("selective_import_unsupported");
-                    vec![]
-                }
+                // EOT-2M: selective members lower as ordered value bindings.
+                // `name` is the exported spelling (locale surface as spelled),
+                // `alias` the caller-owned local when one was spelled; the
+                // binding identity is the collect-defined local DefId.
+                ImportKind::Selective { members } => members
+                    .iter()
+                    .map(|member| {
+                        let local = member.alias.as_ref().unwrap_or(&member.name);
+                        let item_def_id = self
+                            .lookup_name(local.name)
+                            .unwrap_or_else(|| self.next_def_id());
+                        HirImportItem {
+                            def_id: item_def_id,
+                            name: member.name.name,
+                            alias: member.alias.as_ref().map(|ident| ident.name),
+                        }
+                    })
+                    .collect(),
             }
         };
 
@@ -918,6 +931,7 @@ impl Lowerer<'_> {
                 path: decl.path,
                 visibility: decl.visibility,
                 items,
+                selective,
             }),
             span: stmt.span,
         })

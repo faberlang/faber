@@ -186,6 +186,9 @@ fn import_aliases(spec: &PackageSpec, file: &PackageFile) -> ImportAliases {
                     .named_aliases
                     .insert(file.interner.resolve(visible.name).to_owned());
             }
+            // EOT-2M: selective members are caller-owned value locals, not
+            // namespace aliases; they introduce no wildcard/named surface.
+            ImportKind::Selective { .. } => {}
         }
     }
     aliases
@@ -624,6 +627,15 @@ pub fn library_import_binding(
             import_span: decl.span,
             module,
         }),
+        // EOT-2M: a selective import binds no namespace; key the module by its
+        // import path so the driver installs the file interface where the
+        // resolve pass looks members up (see `import_binding` in analyze.rs).
+        ImportKind::Selective { .. } => Some(LibraryImportBinding {
+            binding: interner.resolve(decl.path).to_owned(),
+            visibility: decl.visibility,
+            import_span: decl.span,
+            module,
+        }),
     }
 }
 
@@ -776,6 +788,7 @@ pub fn import_unsupported_diagnostic(
     let kind = match &decl.kind {
         ImportKind::Named { .. } => "import",
         ImportKind::Wildcard { .. } => "wildcard import",
+        ImportKind::Selective { .. } => "selective import",
     };
     crate::package_diagnostic_error(format!(
         "package compilation only supports local intra-package imports; unsupported {kind} path `{import_path}`"

@@ -113,6 +113,8 @@ const ISSUE_UNRECOGNIZED_CURATA_ALLOCATOR: &str = "unrecognized_curata_allocator
 const ISSUE_NAME_NOT_VALUE: &str = "name_not_value";
 const ISSUE_NAMESPACE_MISSING_EXPORT: &str = "namespace_missing_export";
 const ISSUE_SCRIBE_CALLEE: &str = "scribe_callee";
+const ISSUE_SELECTIVE_IMPORT_MISSING_MEMBER: &str = "selective_import_missing_member";
+const ISSUE_SELECTIVE_IMPORT_TYPE_NOT_VALUE: &str = "selective_import_type_not_value";
 const ISSUE_UNKNOWN_IDENTIFIER: &str = "unknown_identifier";
 const ISSUE_UNKNOWN_NAMESPACE: &str = "unknown_namespace";
 const ISSUE_UNKNOWN_QUALIFIED_TYPE: &str = "unknown_qualified_type";
@@ -165,6 +167,8 @@ pub fn resolve(
     for stmt in &program.statements {
         resolve_stmt(resolver, interner, stmt, &mut errors);
     }
+
+    resolve_selective_imports(program, resolver, interner, types, &mut errors);
 
     resolve_alias_types(&aliases, resolver, interner, types, &mut errors);
     resolve_schema_decls(program, resolver, interner, types, &mut errors);
@@ -642,6 +646,80 @@ fn resolve_stmt(
                     SymbolKind::Local,
                     stmt.mutability == radix_syntax::AstMutability::Mutable,
                     errors,
+                );
+            }
+        }
+    }
+}
+
+/// Resolve each selective import member against the imported file interface.
+///
+/// A selective import binds no namespace: the driver installs the target
+/// interface under the import path, and each member's complete function or
+/// const value type lands on the caller-owned immutable local `DefId`
+/// collected for the binding. The exported spelling resolves through the
+/// interface's locale/canonical projection; the local alias is caller text
+/// and is never translated. Without an installed interface the binding stays
+/// untyped, matching namespace imports of unresolved libraries.
+fn resolve_selective_imports(
+    program: &Program,
+    resolver: &mut Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+    errors: &mut Vec<SemanticError>,
+) {
+    for stmt in &program.statements {
+        let StmtKind::Import(decl) = &stmt.kind else {
+            continue;
+        };
+        let radix_syntax::ImportKind::Selective { members } = &decl.kind else {
+            continue;
+        };
+        if !resolver.namespace_has_file_interface(decl.path) {
+            // No installed interface for the path: the member cannot be
+            // verified (same leniency as a namespace import of an unresolved
+            // library). Bind `ignotum` so use sites stay checkable instead of
+            // poisoning every later expression with unknown_identifier.
+            let ignotum = types.primitive(Primitive::Ignotum);
+            for member in members {
+                let binding = member.alias.as_ref().unwrap_or(&member.name);
+                let Some(def_id) = resolver.lookup(binding.name) else {
+                    continue;
+                };
+                if let Some(symbol) = resolver.get_symbol_mut(def_id) {
+                    symbol.ty = Some(ignotum);
+                }
+            }
+            continue;
+        }
+        for member in members {
+            let binding = member.alias.as_ref().unwrap_or(&member.name);
+            let Some(def_id) = resolver.lookup(binding.name) else {
+                continue;
+            };
+            let exported = member.name.name;
+            if let Some(sig) = resolver.namespace_file_function(decl.path, exported) {
+                let ty = types.function(sig.clone());
+                if let Some(symbol) = resolver.get_symbol_mut(def_id) {
+                    symbol.ty = Some(ty);
+                }
+            } else if let Some(ty) = resolver.namespace_file_const(decl.path, exported) {
+                if let Some(symbol) = resolver.get_symbol_mut(def_id) {
+                    symbol.ty = Some(ty);
+                }
+            } else if resolver.namespace_file_type(decl.path, exported).is_some() {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::ImportAbsent, member.span)
+                        .with_arg("issue", ISSUE_SELECTIVE_IMPORT_TYPE_NOT_VALUE)
+                        .with_arg("member", interner.resolve(exported))
+                        .with_arg("path", interner.resolve(decl.path)),
+                );
+            } else {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::ImportAbsent, member.span)
+                        .with_arg("issue", ISSUE_SELECTIVE_IMPORT_MISSING_MEMBER)
+                        .with_arg("member", interner.resolve(exported))
+                        .with_arg("path", interner.resolve(decl.path)),
                 );
             }
         }

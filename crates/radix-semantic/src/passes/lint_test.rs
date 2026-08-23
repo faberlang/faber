@@ -468,6 +468,7 @@ fn warns_on_unused_import() {
                     name: radix_lexer::Symbol(2),
                     alias: None,
                 }],
+                selective: false,
             }),
             span: test_span(),
         }],
@@ -1090,5 +1091,81 @@ incipit {
         result.is_ok(),
         "legacy namespace import/output baseline must remain analyzable: {:?}",
         result.diagnostics
+    );
+}
+
+// =============================================================================
+// EOT-2M — per-binding lint and resolved-use receipts
+// =============================================================================
+
+#[test]
+fn selective_import_lint_warns_unused_member_per_binding() {
+    let result = crate::test_support::analyze_source(
+        r#"importa ex "norma:consolum" fixum dic ut output, funde,
+incipit { nota output }"#,
+    );
+    assert!(
+        result.is_ok(),
+        "diagnostics: {:?}",
+        result.diagnostics
+    );
+    let unused: Vec<_> = result
+        .diagnostics
+        .iter()
+        .filter(|err| crate::test_support::issue(err) == Some("unused_import"))
+        .collect();
+    assert_eq!(
+        unused.len(),
+        1,
+        "exactly the unused member warns; got: {:?}",
+        result.diagnostics
+    );
+
+    // The used alias's DefId is distinct from the unused member's DefId, so
+    // the single warning above is attributable to one binding identity.
+    let mut interner = result.interner.clone();
+    let output_name = interner.intern("output");
+    let funde_name = interner.intern("funde");
+    let output_def = result.resolver.lookup(output_name).expect("used alias DefId");
+    let funde_def = result.resolver.lookup(funde_name).expect("unused member DefId");
+    assert_ne!(output_def, funde_def);
+}
+
+#[test]
+fn selective_import_resolved_use_records_each_binding() {
+    use crate::resolved_use::{analyze_resolved_uses, ResolvedUseKind};
+    use crate::QualifiedIdentityTable;
+
+    let mut result = crate::test_support::analyze_source(
+        r#"importa ex "norma:consolum" fixum dic ut output, funde,
+incipit { output("salve") }"#,
+    );
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+    let hir = result.hir.clone().expect("hir");
+    let qualified = QualifiedIdentityTable::default();
+    let index = analyze_resolved_uses(&hir, &result.types, &qualified);
+
+    let output_name = result.interner.intern("output");
+    let funde_name = result.interner.intern("funde");
+    let output_def = result.resolver.lookup(output_name).expect("used alias DefId");
+    let funde_def = result.resolver.lookup(funde_name).expect("unused member DefId");
+
+    // One ImportBinding receipt per selective member, on its own DefId.
+    // (ImportBinding receipts are keyed, not use-site indexed; scan `uses`.)
+    for def in [output_def, funde_def] {
+        assert!(
+            index.uses().iter().any(|use_site| {
+                use_site.key == crate::resolved_use::ResolvedUseKey::Local(def)
+                    && use_site.kind == ResolvedUseKind::ImportBinding
+            }),
+            "DefId {def:?} must carry its own ImportBinding receipt"
+        );
+    }
+    // The call through the alias is a use of the alias's local DefId.
+    assert!(
+        index
+            .uses_of_local(output_def)
+            .any(|use_site| use_site.kind == ResolvedUseKind::Call),
+        "the aliased call must record a Call use on the binding DefId"
     );
 }

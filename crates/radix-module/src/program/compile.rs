@@ -1553,6 +1553,9 @@ fn import_binding(interner: &crate::lexer::Interner, kind: &ImportKind) -> Optio
                 .to_owned(),
         ),
         ImportKind::Wildcard { alias } => Some(interner.resolve(alias.name).to_owned()),
+        // EOT-2M: selective members are caller-owned value locals, never a
+        // re-exported namespace surface.
+        ImportKind::Selective { .. } => None,
     }
 }
 

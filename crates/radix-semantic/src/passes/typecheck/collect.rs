@@ -358,8 +358,14 @@ impl TypeChecker<'_> {
                     }
                 }
                 HirItemKind::Import(import) => {
-                    for import_item in &import.items {
-                        self.import_receivers.insert(import_item.def_id);
+                    // Selective members (EOT-2M) are caller-owned value locals
+                    // with interface-supplied types, not namespace receivers;
+                    // keeping them out of `import_receivers` lets their real
+                    // function/const types govern call and use sites.
+                    if !import.selective {
+                        for import_item in &import.items {
+                            self.import_receivers.insert(import_item.def_id);
+                        }
                     }
                 }
                 HirItemKind::Struct(struct_item) => self.collect_struct(item.def_id, struct_item),

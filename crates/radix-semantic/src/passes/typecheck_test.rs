@@ -2185,3 +2185,213 @@ fn eot_legacy_output_and_input_forms_typecheck_unchanged() {
         result.diagnostics
     );
 }
+
+// =============================================================================
+// EOT-2M — selective member resolution through the imported file interface
+// =============================================================================
+
+fn eot_selective_test_interface() -> crate::file_interface::FileInterface {
+    use crate::file_interface::{
+        FileExport, FileExportKind, InterfaceCallable, InterfaceParam, InterfaceStructExport,
+        InterfaceTypeSnapshot,
+    };
+    use crate::{Primitive, SemanticParamMode};
+
+    let callable = || InterfaceCallable {
+        type_params: Vec::new(),
+        type_param_constraints: Vec::new(),
+        params: vec![InterfaceParam {
+            ty: InterfaceTypeSnapshot::Primitive(Primitive::Textus),
+            mode: SemanticParamMode::Ref,
+            optional: false,
+        }],
+        ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Vacuum)),
+        err: None,
+        is_async: false,
+        is_generator: false,
+    };
+    let mut interface = crate::file_interface::FileInterface::new();
+    interface.insert(FileExport {
+        name: "dic".to_owned(),
+        kind: FileExportKind::Function(callable()),
+    });
+    interface.insert(FileExport {
+        name: "PI".to_owned(),
+        kind: FileExportKind::Const(InterfaceTypeSnapshot::Primitive(Primitive::Fractus)),
+    });
+    interface.insert(FileExport {
+        name: "Vector".to_owned(),
+        kind: FileExportKind::Struct(InterfaceStructExport {
+            name: "Vector".to_owned(),
+            fields: Vec::new(),
+            methods: Vec::new(),
+            annotation_contract: None,
+        }),
+    });
+    interface
+}
+
+fn eot_analyze_with_selective_interface(source: &str) -> test_support::AnalyzedFixture {
+    test_support::analyze_source_with_import_contract(
+        source,
+        std::collections::BTreeMap::new(),
+        std::collections::BTreeMap::from([(
+            "norma:consolum".to_owned(),
+            eot_selective_test_interface(),
+        )]),
+    )
+}
+
+#[test]
+fn selective_import_missing_member_reports_named_issue() {
+    let result = eot_analyze_with_selective_interface(
+        r#"importa ex "norma:consolum" fixum absens,
+incipit { tacet }"#,
+    );
+    assert!(result.is_err());
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|err| test_support::issue(err) == Some("selective_import_missing_member")),
+        "expected selective_import_missing_member, got: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn selective_import_type_export_rejected_as_value() {
+    let result = eot_analyze_with_selective_interface(
+        r#"importa ex "norma:consolum" fixum Vector,
+incipit { tacet }"#,
+    );
+    assert!(result.is_err());
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|err| test_support::issue(err) == Some("selective_import_type_not_value")),
+        "expected selective_import_type_not_value, got: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn selective_import_function_member_types_call_through_alias() {
+    let ok = eot_analyze_with_selective_interface(
+        r#"importa ex "norma:consolum" fixum dic ut output,
+incipit { output("salve") }"#,
+    );
+    assert!(
+        ok.is_ok(),
+        "interface-supplied signature must typecheck the aliased call: {:?}",
+        ok.diagnostics
+    );
+
+    // The installed signature governs the call site: wrong arity fails.
+    let bad = eot_analyze_with_selective_interface(
+        r#"importa ex "norma:consolum" fixum dic ut output,
+incipit { output() }"#,
+    );
+    assert!(
+        bad.is_err(),
+        "wrong-arity call through the alias must fail against the installed signature"
+    );
+
+    // The complete function value type sits on the caller-owned local DefId.
+    let mut ok = ok;
+    let output_name = ok.interner.intern("output");
+    let def_id = ok
+        .resolver
+        .lookup(output_name)
+        .expect("alias binding DefId");
+    let symbol = ok.resolver.get_symbol(def_id).expect("alias symbol");
+    let ty = symbol.ty.expect("alias must carry the function value type");
+    assert!(
+        matches!(ok.types.get(ty), crate::Type::Func(_)),
+        "alias type must be the complete function value type"
+    );
+}
+
+#[test]
+fn selective_import_const_member_carries_interface_type() {
+    let mut result = eot_analyze_with_selective_interface(
+        r#"importa ex "norma:consolum" fixum PI ut pi,
+incipit { tacet }"#,
+    );
+    assert!(
+        result.is_ok(),
+        "const member must bind with its interface type: {:?}",
+        result.diagnostics
+    );
+    let pi_name = result.interner.intern("pi");
+    let def_id = result
+        .resolver
+        .lookup(pi_name)
+        .expect("const alias binding DefId");
+    let symbol = result.resolver.get_symbol(def_id).expect("const alias symbol");
+    assert_eq!(
+        symbol.ty,
+        Some(result.types.primitive(crate::Primitive::Fractus)),
+        "const alias must carry the interface-supplied value type"
+    );
+}
+
+#[test]
+fn selective_import_hir_carries_ordered_members_and_marker() {
+    use radix_hir::{HirItemKind, HirModule};
+
+    let mut result = eot_analyze_with_selective_interface(
+        r#"importa ex "norma:consolum" fixum dic ut output, PI,
+incipit { tacet }"#,
+    );
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+    let (dic, output, pi) = {
+        let interner = &mut result.interner;
+        (
+            interner.intern("dic"),
+            interner.intern("output"),
+            interner.intern("PI"),
+        )
+    };
+    let hir: &HirModule = result.hir.as_ref().expect("hir");
+    let imports: Vec<_> = hir
+        .items
+        .iter()
+        .filter_map(|item| match &item.kind {
+            HirItemKind::Import(import) => Some(import),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(imports.len(), 1, "one selective import item");
+    let import = imports[0];
+    assert!(import.selective, "selective marker must be set");
+    let names: Vec<_> = import
+        .items
+        .iter()
+        .map(|item| (item.name, item.alias))
+        .collect();
+    assert_eq!(
+        names,
+        vec![(dic, Some(output)), (pi, None)],
+        "ordered exported spellings with caller-owned aliases"
+    );
+
+    // Legacy namespace imports keep the unmarked shape.
+    let legacy = test_support::analyze_source(
+        r#"importa ex "norma:consolum" consolum
+incipit { tacet }"#,
+    );
+    assert!(legacy.is_ok(), "diagnostics: {:?}", legacy.diagnostics);
+    let legacy_hir = legacy.hir.as_ref().expect("hir");
+    let legacy_import = legacy_hir
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            HirItemKind::Import(import) => Some(import),
+            _ => None,
+        })
+        .expect("legacy import item");
+    assert!(!legacy_import.selective, "namespace import stays unmarked");
+}
+

@@ -610,3 +610,46 @@ fn eot_selective_import_collection_red_driver() {
         "selective bindings must collect independently: {result:?}"
     );
 }
+
+// =============================================================================
+// EOT-2M — selective binding collection diagnostics
+// =============================================================================
+
+#[test]
+fn selective_import_duplicate_alias_fails_with_named_issue() {
+    let parsed = parse(lex(
+        r#"importa ex "norma:consolum" fixum dic ut output, funde ut output,"#,
+    ));
+    assert!(parsed.errors.is_empty(), "parse errors: {:?}", parsed.errors);
+    let program = parsed.program.expect("selective import program");
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let errors = collect::collect(&program, &mut resolver, &mut types)
+        .expect_err("duplicate local alias within one list must fail collection");
+    assert!(
+        errors
+            .iter()
+            .any(|err| crate::test_support::issue(err) == Some("selective_import_duplicate_alias")),
+        "expected selective_import_duplicate_alias, got: {errors:?}"
+    );
+}
+
+#[test]
+fn selective_import_local_collision_reports_ordinary_duplicate() {
+    let parsed = parse(lex(
+        r#"functio output() → vacuum { tacet }
+importa ex "norma:consolum" fixum dic ut output,"#,
+    ));
+    assert!(parsed.errors.is_empty(), "parse errors: {:?}", parsed.errors);
+    let program = parsed.program.expect("program");
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let errors = collect::collect(&program, &mut resolver, &mut types)
+        .expect_err("collision with an existing declaration must fail collection");
+    assert!(
+        errors
+            .iter()
+            .any(|err| crate::test_support::issue(err) == Some("duplicate_definition")),
+        "expected ordinary duplicate_definition collision, got: {errors:?}"
+    );
+}

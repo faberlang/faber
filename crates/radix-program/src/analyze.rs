@@ -1260,6 +1260,12 @@ fn import_binding(interner: &Interner, decl: &ImportDecl) -> Option<String> {
                 .to_owned(),
         ),
         ImportKind::Wildcard { alias } => Some(interner.resolve(alias.name).to_owned()),
+        // EOT-2M: a selective import introduces no namespace binding; key its
+        // interface by the import path itself so the semantic resolve pass
+        // (which has no namespace to consult) finds members there. Paths are
+        // never valid identifiers, so this key cannot collide with a named or
+        // wildcard namespace entry.
+        ImportKind::Selective { .. } => Some(interner.resolve(decl.path).to_owned()),
     }
 }
 

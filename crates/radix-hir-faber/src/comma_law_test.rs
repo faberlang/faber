@@ -695,6 +695,7 @@ fn declaration_and_annotation_lists_emit_between_only() {
                 alias: Some(interner.intern("second")),
             },
         ],
+        selective: false,
     };
     let hir = radix_hir::HirModule {
         items: vec![

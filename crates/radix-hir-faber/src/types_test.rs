@@ -517,6 +517,7 @@ fn multi_import_emits_all_items() {
                 alias: None,
             },
         ],
+        selective: false,
     };
 
     let program = HirModule {
@@ -1327,6 +1328,7 @@ fn import_privata_emits_no_visibility_keyword() {
             name,
             alias: None,
         }],
+        selective: false,
     };
 
     let program = HirModule {
