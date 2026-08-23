@@ -1,0 +1,1363 @@
+//! Named-field MessagePack codec for the FHIR unit artifact (FPF-2).
+//!
+//! Implements the field spec in
+//! `faber/docs/factory/fhir-package-format/spec.md` (FPF-1, faber `0a305c4`)
+//! for the unit schema v5:
+//!
+//! - **§1.1 named fields** — every struct is a MessagePack map keyed by the
+//!   serde field names of the defining type; never a compact array.
+//! - **§1.2 versioning** — `schema_version` is a named `uint` field read
+//!   first; mismatch fails closed before the payload is interpreted.
+//! - **§1.3 no float-opcode facts** — the codec emits float opcodes only for
+//!   genuine `f32`/`f64` values; widths, indices, and dtype/shape ids are
+//!   `uint`/`int` per the Rust field type.
+//! - **§1.4 enums** — `{ "tag": <variant name>, ...payload }`; struct-variant
+//!   payload fields are inlined next to `"tag"`, newtype/tuple payloads ride
+//!   under the `"value"` key.
+//! - **§1.5 options** — bare payload for `Some`, `nil` for `None`.
+//! - **§1.6 scalar types** — `uint`/`int` matching the Rust width, `bool`,
+//!   `str`, `bin` for byte payloads.
+//! - **§2 rows 10/13** — the `(DefId, …)` tuple families (`function_facts`
+//!   entries, `gpu_builtins`) are carried as named maps `{ def_id, facts }`
+//!   and `{ def_id, builtin }` per the spec's MessagePack type rules.
+//!
+//! Postcard remains the live wire (FPF-5 owns any switch); this codec is
+//! additive and never used by [`crate::decode::encode`]/[`crate::decode::decode`].
+//!
+//! The codec is hand-rolled (no `rmp`/`rmp-serde` dependency): a generic
+//! serde `Serializer` over MessagePack bytes and a generic `Deserializer`
+//! over a parsed [`Value`] tree, so the whole directly-serde'd `HirModule`
+//! tree maps without per-type code. Multi-byte scalars are big-endian per
+//! the MessagePack specification.
+
+use serde::de::{DeserializeSeed, EnumAccess, MapAccess, SeqAccess, VariantAccess, Visitor};
+use serde::ser::{
+    SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant, SerializeTuple,
+    SerializeTupleStruct, SerializeTupleVariant,
+};
+use serde::{Deserialize, Deserializer, Serialize};
+
+use crate::artifact::{
+    CliProgramWire, FunctionFactTableWire, FunctionFactWire, GpuBuiltinWire, HirArtifact,
+    ResolverSnapshot, ResolvedUseWire, SourceIdentity, SCHEMA_VERSION,
+};
+use crate::error::HirArtifactError;
+use crate::validate::validate_referential_integrity;
+use radix_hir::{HirModule, HirPresentation, LibraryRegistry};
+use radix_types::{DefId, TypeTableSnapshot};
+
+/// Maximum nesting depth accepted when parsing a MessagePack document.
+///
+/// Fail-closed guard against stack exhaustion on hostile input; real unit
+/// artifacts nest far below this.
+const MAX_DEPTH: usize = 1024;
+
+// ---------------------------------------------------------------------------
+// Error type
+// ---------------------------------------------------------------------------
+
+/// Structured error for the FHIR MessagePack unit codec (fail-closed, F7).
+#[derive(Debug)]
+pub enum MsgpackError {
+    /// Serialization failed (unsupported data shape or oversized length).
+    Encode(String),
+    /// The payload ended before a complete MessagePack value was read.
+    Truncated,
+    /// The payload is not a spec-conformant MessagePack unit value
+    /// (bad marker, non-UTF-8 string, wrong shape, missing named field).
+    Decode(String),
+    /// The unit value carries a schema version this codec does not support
+    /// (F3 ratchet: refuse forward and backward).
+    UnsupportedSchemaVersion {
+        /// Version encoded in the unit value.
+        found: u32,
+        /// Version this codec accepts.
+        expected: u32,
+    },
+    /// The decoded artifact failed the referential-integrity gate (U2.3).
+    Invalid(HirArtifactError),
+}
+
+impl std::fmt::Display for MsgpackError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Encode(detail) => write!(f, "msgpack encode failed: {detail}"),
+            Self::Truncated => write!(f, "truncated msgpack unit value: unexpected end of data"),
+            Self::Decode(detail) => write!(f, "malformed msgpack unit value: {detail}"),
+            Self::UnsupportedSchemaVersion { found, expected } => write!(
+                f,
+                "unsupported msgpack unit schema version {found} (expected {expected})"
+            ),
+            Self::Invalid(inner) => write!(f, "invalid msgpack artifact: {inner}"),
+        }
+    }
+}
+
+impl std::error::Error for MsgpackError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Invalid(inner) => Some(inner),
+            _ => None,
+        }
+    }
+}
+
+impl serde::ser::Error for MsgpackError {
+    fn custom<T: std::fmt::Display>(msg: T) -> Self {
+        Self::Encode(msg.to_string())
+    }
+}
+
+impl serde::de::Error for MsgpackError {
+    fn custom<T: std::fmt::Display>(msg: T) -> Self {
+        Self::Decode(msg.to_string())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Owned MessagePack value tree
+// ---------------------------------------------------------------------------
+
+/// Owned, self-describing MessagePack value (decode intermediate).
+#[derive(Debug, Clone, PartialEq)]
+enum Value {
+    Nil,
+    Bool(bool),
+    Uint(u64),
+    Int(i64),
+    F32(f32),
+    F64(f64),
+    Str(String),
+    Bin(Vec<u8>),
+    Array(Vec<Value>),
+    Map(Vec<(Value, Value)>),
+}
+
+impl Value {
+    /// Parses one complete MessagePack document; trailing bytes are rejected.
+    fn from_bytes(bytes: &[u8]) -> Result<Self, MsgpackError> {
+        let mut pos = 0;
+        let value = read_value(bytes, &mut pos, 0)?;
+        if pos != bytes.len() {
+            return Err(MsgpackError::Decode(format!(
+                "{} trailing byte(s) after msgpack value",
+                bytes.len() - pos
+            )));
+        }
+        Ok(value)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Writer primitives (big-endian, minimal-width per the MessagePack spec)
+// ---------------------------------------------------------------------------
+
+fn write_uint(out: &mut Vec<u8>, n: u64) {
+    // Minimal-width uint encoding; each marker carries exactly its own width.
+    let bytes = n.to_be_bytes();
+    if n <= 0x7f {
+        out.push(bytes[7]);
+    } else if n <= u64::from(u8::MAX) {
+        out.push(0xcc);
+        out.push(bytes[7]);
+    } else if n <= u64::from(u16::MAX) {
+        out.push(0xcd);
+        out.extend_from_slice(&bytes[6..8]);
+    } else if n <= u64::from(u32::MAX) {
+        out.push(0xce);
+        out.extend_from_slice(&bytes[4..8]);
+    } else {
+        out.push(0xcf);
+        out.extend_from_slice(&bytes);
+    }
+}
+
+/// Signed opcodes only: the Rust signedness of a field is a wire fact (§1.6).
+fn write_int(out: &mut Vec<u8>, n: i64) {
+    if (-32..0).contains(&n) {
+        // Negative fixint 0xe0..=0xff encodes -32..=-1 directly.
+        let offset = u8::try_from(n + 32).expect("checked -32..=-1");
+        out.push(0xe0 + offset);
+    } else if i8::try_from(n).is_ok() {
+        out.push(0xd0);
+        out.extend_from_slice(&n.to_be_bytes()[7..8]);
+    } else if i16::try_from(n).is_ok() {
+        out.push(0xd1);
+        out.extend_from_slice(&n.to_be_bytes()[6..8]);
+    } else if i32::try_from(n).is_ok() {
+        out.push(0xd2);
+        out.extend_from_slice(&n.to_be_bytes()[4..8]);
+    } else {
+        out.push(0xd3);
+        out.extend_from_slice(&n.to_be_bytes());
+    }
+}
+
+fn write_f32(out: &mut Vec<u8>, n: f32) {
+    out.push(0xca);
+    out.extend_from_slice(&n.to_be_bytes());
+}
+
+fn write_f64(out: &mut Vec<u8>, n: f64) {
+    out.push(0xcb);
+    out.extend_from_slice(&n.to_be_bytes());
+}
+
+fn write_str(out: &mut Vec<u8>, s: &str) -> Result<(), MsgpackError> {
+    let len = s.len();
+    if len <= 31 {
+        out.push(0xa0 | u8::try_from(len).expect("checked <= 31"));
+    } else if len <= 0xff {
+        out.push(0xd9);
+        out.push(u8::try_from(len).expect("checked <= 0xff"));
+    } else if len <= 0xffff {
+        out.push(0xda);
+        out.extend_from_slice(&u16::try_from(len).expect("checked <= 0xffff").to_be_bytes());
+    } else {
+        let len32 = u32::try_from(len).map_err(|_| MsgpackError::Encode(
+            "string length exceeds msgpack u32".to_string(),
+        ))?;
+        out.push(0xdb);
+        out.extend_from_slice(&len32.to_be_bytes());
+    }
+    out.extend_from_slice(s.as_bytes());
+    Ok(())
+}
+
+fn write_bin(out: &mut Vec<u8>, b: &[u8]) -> Result<(), MsgpackError> {
+    let len = b.len();
+    if len <= 0xff {
+        out.push(0xc4);
+        out.push(u8::try_from(len).expect("checked <= 0xff"));
+    } else if len <= 0xffff {
+        out.push(0xc5);
+        out.extend_from_slice(&u16::try_from(len).expect("checked <= 0xffff").to_be_bytes());
+    } else {
+        let len32 = u32::try_from(len).map_err(|_| MsgpackError::Encode(
+            "byte length exceeds msgpack u32".to_string(),
+        ))?;
+        out.push(0xc6);
+        out.extend_from_slice(&len32.to_be_bytes());
+    }
+    out.extend_from_slice(b);
+    Ok(())
+}
+
+fn write_array_len(out: &mut Vec<u8>, len: usize) -> Result<(), MsgpackError> {
+    let len = u32::try_from(len)
+        .map_err(|_| MsgpackError::Encode("array length exceeds msgpack u32".to_string()))?;
+    if len <= 15 {
+        out.push(0x90 | u8::try_from(len).expect("checked <= 15"));
+    } else if len <= 0xffff {
+        out.push(0xdc);
+        out.extend_from_slice(&u16::try_from(len).expect("checked <= 0xffff").to_be_bytes());
+    } else {
+        out.push(0xdd);
+        out.extend_from_slice(&len.to_be_bytes());
+    }
+    Ok(())
+}
+
+fn write_map_len(out: &mut Vec<u8>, len: usize) -> Result<(), MsgpackError> {
+    let len = u32::try_from(len)
+        .map_err(|_| MsgpackError::Encode("map length exceeds msgpack u32".to_string()))?;
+    if len <= 15 {
+        out.push(0x80 | u8::try_from(len).expect("checked <= 15"));
+    } else if len <= 0xffff {
+        out.push(0xde);
+        out.extend_from_slice(&u16::try_from(len).expect("checked <= 0xffff").to_be_bytes());
+    } else {
+        out.push(0xdf);
+        out.extend_from_slice(&len.to_be_bytes());
+    }
+    Ok(())
+}
+
+/// Serializes a [`Value`] tree back to bytes (test seam for wire-shape pins).
+#[cfg(test)]
+fn write_value(out: &mut Vec<u8>, value: &Value) -> Result<(), MsgpackError> {
+    match value {
+        Value::Nil => out.push(0xc0),
+        Value::Bool(b) => out.push(if *b { 0xc3 } else { 0xc2 }),
+        Value::Uint(n) => write_uint(out, *n),
+        Value::Int(n) => write_int(out, *n),
+        Value::F32(n) => write_f32(out, *n),
+        Value::F64(n) => write_f64(out, *n),
+        Value::Str(s) => write_str(out, s)?,
+        Value::Bin(b) => write_bin(out, b)?,
+        Value::Array(items) => {
+            write_array_len(out, items.len())?;
+            for item in items {
+                write_value(out, item)?;
+            }
+        }
+        Value::Map(entries) => {
+            write_map_len(out, entries.len())?;
+            for (key, val) in entries {
+                write_value(out, key)?;
+                write_value(out, val)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Reader primitives
+// ---------------------------------------------------------------------------
+
+fn read_u8(bytes: &[u8], pos: &mut usize) -> Result<u8, MsgpackError> {
+    let b = *bytes.get(*pos).ok_or(MsgpackError::Truncated)?;
+    *pos += 1;
+    Ok(b)
+}
+
+fn read_exact<const N: usize>(bytes: &[u8], pos: &mut usize) -> Result<[u8; N], MsgpackError> {
+    let end = pos
+        .checked_add(N)
+        .ok_or_else(|| MsgpackError::Decode("length overflow".to_string()))?;
+    let slice = bytes.get(*pos..end).ok_or(MsgpackError::Truncated)?;
+    let mut buf = [0u8; N];
+    buf.copy_from_slice(slice);
+    *pos = end;
+    Ok(buf)
+}
+
+fn read_len(bytes: &[u8], pos: &mut usize, marker: u8) -> Result<usize, MsgpackError> {
+    // Byte widths: bin8/uint8/str8 → 1; bin16/uint16/str16/array16/map16 → 2;
+    // bin32/uint32/str32/array32/map32 → 4; uint64 → 8.
+    let len = match marker {
+        0xc4 | 0xcc | 0xd9 => u64::from(u8::from_be_bytes(read_exact::<1>(bytes, pos)?)),
+        0xc5 | 0xcd | 0xda | 0xdc | 0xde => {
+            u64::from(u16::from_be_bytes(read_exact::<2>(bytes, pos)?))
+        }
+        0xc6 | 0xce | 0xdb | 0xdd | 0xdf => {
+            u64::from(u32::from_be_bytes(read_exact::<4>(bytes, pos)?))
+        }
+        0xcf => u64::from(u64::from_be_bytes(read_exact::<8>(bytes, pos)?)),
+        _ => return Err(MsgpackError::Decode("not a length marker".to_string())),
+    };
+    usize::try_from(len).map_err(|_| MsgpackError::Decode("length exceeds usize".to_string()))
+}
+
+fn read_value(bytes: &[u8], pos: &mut usize, depth: usize) -> Result<Value, MsgpackError> {
+    if depth > MAX_DEPTH {
+        return Err(MsgpackError::Decode("nesting depth exceeded".to_string()));
+    }
+    let marker = read_u8(bytes, pos)?;
+    match marker {
+        0x00..=0x7f => Ok(Value::Uint(u64::from(marker))),
+        0xe0..=0xff => Ok(Value::Int(i64::from(marker as i8))),
+        0x80..=0x8f => read_map(bytes, pos, usize::from(marker & 0x0f), depth),
+        0x90..=0x9f => read_array(bytes, pos, usize::from(marker & 0x0f), depth),
+        0xa0..=0xbf => read_str(bytes, pos, usize::from(marker & 0x1f)),
+        0xc0 => Ok(Value::Nil),
+        0xc2 => Ok(Value::Bool(false)),
+        0xc3 => Ok(Value::Bool(true)),
+        0xc4 | 0xc5 | 0xc6 => {
+            let len = read_len(bytes, pos, marker)?;
+            let body = bytes
+                .get(*pos..pos.saturating_add(len))
+                .ok_or(MsgpackError::Truncated)?;
+            *pos += len;
+            Ok(Value::Bin(body.to_vec()))
+        }
+        0xca => Ok(Value::F32(f32::from_be_bytes(read_exact::<4>(bytes, pos)?))),
+        0xcb => Ok(Value::F64(f64::from_be_bytes(read_exact::<8>(bytes, pos)?))),
+        0xcc..=0xcf => Ok(Value::Uint(read_len(bytes, pos, marker)? as u64)),
+        0xd0 => Ok(Value::Int(i64::from(i8::from_be_bytes(read_exact::<1>(
+            bytes, pos,
+        )?)))),
+        0xd1 => Ok(Value::Int(i64::from(i16::from_be_bytes(read_exact::<2>(
+            bytes, pos,
+        )?)))),
+        0xd2 => Ok(Value::Int(i64::from(i32::from_be_bytes(read_exact::<4>(
+            bytes, pos,
+        )?)))),
+        0xd3 => Ok(Value::Int(i64::from_be_bytes(read_exact::<8>(bytes, pos)?))),
+        0xd9 | 0xda | 0xdb => {
+            let len = read_len(bytes, pos, marker)?;
+            read_str(bytes, pos, len)
+        }
+        0xdc | 0xdd => {
+            let len = read_len(bytes, pos, marker)?;
+            read_array(bytes, pos, len, depth)
+        }
+        0xde | 0xdf => {
+            let len = read_len(bytes, pos, marker)?;
+            read_map(bytes, pos, len, depth)
+        }
+        _ => Err(MsgpackError::Decode(format!(
+            "unsupported msgpack marker 0x{marker:02x}"
+        ))),
+    }
+}
+
+fn read_str(bytes: &[u8], pos: &mut usize, len: usize) -> Result<Value, MsgpackError> {
+    let body = bytes
+        .get(*pos..pos.saturating_add(len))
+        .ok_or(MsgpackError::Truncated)?;
+    let s = std::str::from_utf8(body)
+        .map_err(|_| MsgpackError::Decode("msgpack str is not UTF-8".to_string()))?;
+    *pos += len;
+    Ok(Value::Str(s.to_string()))
+}
+
+fn read_array(
+    bytes: &[u8],
+    pos: &mut usize,
+    len: usize,
+    depth: usize,
+) -> Result<Value, MsgpackError> {
+    let mut items = Vec::with_capacity(len.min(1024));
+    for _ in 0..len {
+        items.push(read_value(bytes, pos, depth + 1)?);
+    }
+    Ok(Value::Array(items))
+}
+
+fn read_map(
+    bytes: &[u8],
+    pos: &mut usize,
+    len: usize,
+    depth: usize,
+) -> Result<Value, MsgpackError> {
+    let mut entries = Vec::with_capacity(len.min(1024));
+    for _ in 0..len {
+        let key = read_value(bytes, pos, depth + 1)?;
+        let val = read_value(bytes, pos, depth + 1)?;
+        entries.push((key, val));
+    }
+    Ok(Value::Map(entries))
+}
+
+// ---------------------------------------------------------------------------
+// Generic serde Serializer over MessagePack bytes
+// ---------------------------------------------------------------------------
+
+struct Serializer<'a> {
+    out: &'a mut Vec<u8>,
+}
+
+impl<'a> Serializer<'a> {
+    fn elem<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), MsgpackError> {
+        value.serialize(Serializer {
+            out: &mut *self.out,
+        })
+    }
+}
+
+/// Drives element/field serialization into the same output buffer for every
+/// serde compound kind (seq, tuple, map, struct, struct variant).
+struct Compound<'a> {
+    out: &'a mut Vec<u8>,
+}
+
+impl<'a> Compound<'a> {
+    fn elem<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), MsgpackError> {
+        value.serialize(Serializer {
+            out: &mut *self.out,
+        })
+    }
+}
+
+impl<'a> serde::Serializer for Serializer<'a> {
+    type Ok = ();
+    type Error = MsgpackError;
+    type SerializeSeq = Compound<'a>;
+    type SerializeTuple = Compound<'a>;
+    type SerializeTupleStruct = Compound<'a>;
+    type SerializeTupleVariant = Compound<'a>;
+    type SerializeMap = Compound<'a>;
+    type SerializeStruct = Compound<'a>;
+    type SerializeStructVariant = Compound<'a>;
+
+    fn serialize_bool(self, v: bool) -> Result<(), MsgpackError> {
+        (*self.out).push(if v { 0xc3 } else { 0xc2 });
+        Ok(())
+    }
+
+    fn serialize_i8(self, v: i8) -> Result<(), MsgpackError> {
+        write_int(&mut *self.out, i64::from(v));
+        Ok(())
+    }
+    fn serialize_i16(self, v: i16) -> Result<(), MsgpackError> {
+        write_int(&mut *self.out, i64::from(v));
+        Ok(())
+    }
+    fn serialize_i32(self, v: i32) -> Result<(), MsgpackError> {
+        write_int(&mut *self.out, i64::from(v));
+        Ok(())
+    }
+    fn serialize_i64(self, v: i64) -> Result<(), MsgpackError> {
+        write_int(&mut *self.out, v);
+        Ok(())
+    }
+
+    fn serialize_u8(self, v: u8) -> Result<(), MsgpackError> {
+        write_uint(&mut *self.out, u64::from(v));
+        Ok(())
+    }
+    fn serialize_u16(self, v: u16) -> Result<(), MsgpackError> {
+        write_uint(&mut *self.out, u64::from(v));
+        Ok(())
+    }
+    fn serialize_u32(self, v: u32) -> Result<(), MsgpackError> {
+        write_uint(&mut *self.out, u64::from(v));
+        Ok(())
+    }
+    fn serialize_u64(self, v: u64) -> Result<(), MsgpackError> {
+        write_uint(&mut *self.out, v);
+        Ok(())
+    }
+
+    fn serialize_f32(self, v: f32) -> Result<(), MsgpackError> {
+        write_f32(&mut *self.out, v);
+        Ok(())
+    }
+    fn serialize_f64(self, v: f64) -> Result<(), MsgpackError> {
+        write_f64(&mut *self.out, v);
+        Ok(())
+    }
+
+    fn serialize_char(self, v: char) -> Result<(), MsgpackError> {
+        let mut buf = [0u8; 4];
+        write_str(&mut *self.out, v.encode_utf8(&mut buf))
+    }
+
+    fn serialize_str(self, v: &str) -> Result<(), MsgpackError> {
+        write_str(&mut *self.out, v)
+    }
+
+    fn serialize_bytes(self, v: &[u8]) -> Result<(), MsgpackError> {
+        write_bin(&mut *self.out, v)
+    }
+
+    fn serialize_none(self) -> Result<(), MsgpackError> {
+        (*self.out).push(0xc0);
+        Ok(())
+    }
+
+    fn serialize_some<T: ?Sized + Serialize>(mut self, value: &T) -> Result<(), MsgpackError> {
+        self.elem(value)
+    }
+
+    fn serialize_unit(self) -> Result<(), MsgpackError> {
+        (*self.out).push(0xc0);
+        Ok(())
+    }
+
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<(), MsgpackError> {
+        (*self.out).push(0xc0);
+        Ok(())
+    }
+
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        _index: u32,
+        variant_name: &'static str,
+    ) -> Result<(), MsgpackError> {
+        write_map_len(&mut *self.out, 1)?;
+        write_str(&mut *self.out, "tag")?;
+        write_str(&mut *self.out, variant_name)
+    }
+
+    fn serialize_newtype_struct<T: ?Sized + Serialize>(
+        mut self,
+        _name: &'static str,
+        value: &T,
+    ) -> Result<(), MsgpackError> {
+        self.elem(value)
+    }
+
+    fn serialize_newtype_variant<T: ?Sized + Serialize>(
+        mut self,
+        _name: &'static str,
+        _index: u32,
+        variant_name: &'static str,
+        value: &T,
+    ) -> Result<(), MsgpackError> {
+        write_map_len(&mut *self.out, 2)?;
+        write_str(&mut *self.out, "tag")?;
+        write_str(&mut *self.out, variant_name)?;
+        write_str(&mut *self.out, "value")?;
+        self.elem(value)
+    }
+
+    fn serialize_seq(self, len: Option<usize>) -> Result<Compound<'a>, MsgpackError> {
+        write_array_len(&mut *self.out, len.ok_or_else(|| {
+            MsgpackError::Encode("msgpack requires a sequence length".to_string())
+        })?)?;
+        Ok(Compound { out: self.out })
+    }
+
+    fn serialize_tuple(self, len: usize) -> Result<Compound<'a>, MsgpackError> {
+        write_array_len(&mut *self.out, len)?;
+        Ok(Compound { out: self.out })
+    }
+
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        len: usize,
+    ) -> Result<Compound<'a>, MsgpackError> {
+        write_array_len(&mut *self.out, len)?;
+        Ok(Compound { out: self.out })
+    }
+
+    fn serialize_tuple_variant(
+        self,
+        _name: &'static str,
+        _index: u32,
+        variant_name: &'static str,
+        len: usize,
+    ) -> Result<Compound<'a>, MsgpackError> {
+        write_map_len(&mut *self.out, 2)?;
+        write_str(&mut *self.out, "tag")?;
+        write_str(&mut *self.out, variant_name)?;
+        write_str(&mut *self.out, "value")?;
+        write_array_len(&mut *self.out, len)?;
+        Ok(Compound { out: self.out })
+    }
+
+    fn serialize_map(self, len: Option<usize>) -> Result<Compound<'a>, MsgpackError> {
+        write_map_len(&mut *self.out, len.ok_or_else(|| {
+            MsgpackError::Encode("msgpack requires a map length".to_string())
+        })?)?;
+        Ok(Compound { out: self.out })
+    }
+
+    fn serialize_struct(
+        self,
+        _name: &'static str,
+        len: usize,
+    ) -> Result<Compound<'a>, MsgpackError> {
+        write_map_len(&mut *self.out, len)?;
+        Ok(Compound { out: self.out })
+    }
+
+    fn serialize_struct_variant(
+        self,
+        _name: &'static str,
+        _index: u32,
+        variant_name: &'static str,
+        len: usize,
+    ) -> Result<Compound<'a>, MsgpackError> {
+        // "tag" plus the inlined struct-variant payload fields (§1.4).
+        write_map_len(&mut *self.out, len.checked_add(1).ok_or_else(|| {
+            MsgpackError::Encode("struct variant field count overflow".to_string())
+        })?)?;
+        write_str(&mut *self.out, "tag")?;
+        write_str(&mut *self.out, variant_name)?;
+        Ok(Compound { out: self.out })
+    }
+}
+
+impl SerializeSeq for Compound<'_> {
+    type Ok = ();
+    type Error = MsgpackError;
+    fn serialize_element<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), MsgpackError> {
+        self.elem(value)
+    }
+    fn end(self) -> Result<(), MsgpackError> {
+        Ok(())
+    }
+}
+
+impl SerializeTuple for Compound<'_> {
+    type Ok = ();
+    type Error = MsgpackError;
+    fn serialize_element<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), MsgpackError> {
+        self.elem(value)
+    }
+    fn end(self) -> Result<(), MsgpackError> {
+        Ok(())
+    }
+}
+
+impl SerializeTupleStruct for Compound<'_> {
+    type Ok = ();
+    type Error = MsgpackError;
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), MsgpackError> {
+        self.elem(value)
+    }
+    fn end(self) -> Result<(), MsgpackError> {
+        Ok(())
+    }
+}
+
+impl SerializeTupleVariant for Compound<'_> {
+    type Ok = ();
+    type Error = MsgpackError;
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), MsgpackError> {
+        self.elem(value)
+    }
+    fn end(self) -> Result<(), MsgpackError> {
+        Ok(())
+    }
+}
+
+impl SerializeMap for Compound<'_> {
+    type Ok = ();
+    type Error = MsgpackError;
+    fn serialize_key<T: ?Sized + Serialize>(&mut self, key: &T) -> Result<(), MsgpackError> {
+        self.elem(key)
+    }
+    fn serialize_value<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), MsgpackError> {
+        self.elem(value)
+    }
+    fn end(self) -> Result<(), MsgpackError> {
+        Ok(())
+    }
+}
+
+impl SerializeStruct for Compound<'_> {
+    type Ok = ();
+    type Error = MsgpackError;
+    fn serialize_field<T: ?Sized + Serialize>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<(), MsgpackError> {
+        write_str(&mut *self.out, key)?;
+        self.elem(value)
+    }
+    fn end(self) -> Result<(), MsgpackError> {
+        Ok(())
+    }
+}
+
+impl SerializeStructVariant for Compound<'_> {
+    type Ok = ();
+    type Error = MsgpackError;
+    fn serialize_field<T: ?Sized + Serialize>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<(), MsgpackError> {
+        write_str(&mut *self.out, key)?;
+        self.elem(value)
+    }
+    fn end(self) -> Result<(), MsgpackError> {
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Generic serde Deserializer over the Value tree
+// ---------------------------------------------------------------------------
+
+impl Value {
+    fn as_i64(&self) -> Option<i64> {
+        match self {
+            Value::Int(n) => Some(*n),
+            Value::Uint(n) => i64::try_from(*n).ok(),
+            _ => None,
+        }
+    }
+
+    fn as_u64(&self) -> Option<u64> {
+        match self {
+            Value::Uint(n) => Some(*n),
+            Value::Int(n) => u64::try_from(*n).ok(),
+            _ => None,
+        }
+    }
+
+    fn expect_map(self, expected: &str) -> Result<Vec<(Value, Value)>, MsgpackError> {
+        match self {
+            Value::Map(entries) => Ok(entries),
+            other => Err(MsgpackError::Decode(format!(
+                "expected a map for {expected}, found {other:?}"
+            ))),
+        }
+    }
+}
+
+struct SeqDeserializer {
+    iter: std::vec::IntoIter<Value>,
+}
+
+impl<'de> SeqAccess<'de> for SeqDeserializer {
+    type Error = MsgpackError;
+    fn next_element_seed<T: DeserializeSeed<'de>>(
+        &mut self,
+        seed: T,
+    ) -> Result<Option<T::Value>, MsgpackError> {
+        match self.iter.next() {
+            Some(value) => Ok(Some(seed.deserialize(value)?)),
+            None => Ok(None),
+        }
+    }
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.iter.len())
+    }
+}
+
+struct MapDeserializer {
+    iter: std::vec::IntoIter<(Value, Value)>,
+    pending_value: Option<Value>,
+}
+
+impl<'de> MapAccess<'de> for MapDeserializer {
+    type Error = MsgpackError;
+    fn next_key_seed<K: DeserializeSeed<'de>>(
+        &mut self,
+        seed: K,
+    ) -> Result<Option<K::Value>, MsgpackError> {
+        match self.iter.next() {
+            Some((key, value)) => {
+                self.pending_value = Some(value);
+                Ok(Some(seed.deserialize(key)?))
+            }
+            None => Ok(None),
+        }
+    }
+    fn next_value_seed<V: DeserializeSeed<'de>>(
+        &mut self,
+        seed: V,
+    ) -> Result<V::Value, MsgpackError> {
+        let value = self
+            .pending_value
+            .take()
+            .ok_or_else(|| MsgpackError::Decode("map value requested before key".to_string()))?;
+        seed.deserialize(value)
+    }
+}
+
+struct EnumDeserializer {
+    tag: String,
+    entries: Vec<(Value, Value)>,
+}
+
+impl<'de> EnumAccess<'de> for EnumDeserializer {
+    type Error = MsgpackError;
+    type Variant = VariantDeserializer;
+    fn variant_seed<V: DeserializeSeed<'de>>(
+        self,
+        seed: V,
+    ) -> Result<(V::Value, VariantDeserializer), MsgpackError> {
+        let variant = seed.deserialize(Value::Str(self.tag))?;
+        Ok((variant, VariantDeserializer {
+            entries: self.entries,
+        }))
+    }
+}
+
+struct VariantDeserializer {
+    entries: Vec<(Value, Value)>,
+}
+
+impl VariantDeserializer {
+    fn take_value(self) -> Result<Value, MsgpackError> {
+        self.entries
+            .into_iter()
+            .find(|(key, _)| matches!(key, Value::Str(k) if k == "value"))
+            .map(|(_, value)| value)
+            .ok_or_else(|| {
+                MsgpackError::Decode(
+                    "enum variant payload must ride under the \"value\" key".to_string(),
+                )
+            })
+    }
+}
+
+impl<'de> VariantAccess<'de> for VariantDeserializer {
+    type Error = MsgpackError;
+    fn unit_variant(self) -> Result<(), MsgpackError> {
+        if self.entries.is_empty() {
+            Ok(())
+        } else {
+            Err(MsgpackError::Decode(
+                "unexpected payload fields on a unit variant".to_string(),
+            ))
+        }
+    }
+    fn newtype_variant_seed<T: DeserializeSeed<'de>>(
+        self,
+        seed: T,
+    ) -> Result<T::Value, MsgpackError> {
+        seed.deserialize(self.take_value()?)
+    }
+    fn tuple_variant<V: Visitor<'de>>(
+        self,
+        _len: usize,
+        visitor: V,
+    ) -> Result<V::Value, MsgpackError> {
+        match self.take_value()? {
+            Value::Array(items) => visitor.visit_seq(SeqDeserializer {
+                iter: items.into_iter(),
+            }),
+            other => Err(MsgpackError::Decode(format!(
+                "tuple variant payload must be an array, found {other:?}"
+            ))),
+        }
+    }
+    fn struct_variant<V: Visitor<'de>>(
+        self,
+        _fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, MsgpackError> {
+        visitor.visit_map(MapDeserializer {
+            iter: self.entries.into_iter(),
+            pending_value: None,
+        })
+    }
+}
+
+impl<'de> Deserializer<'de> for Value {
+    type Error = MsgpackError;
+
+    fn is_human_readable(&self) -> bool {
+        false
+    }
+
+    fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        match self {
+            Value::Nil => visitor.visit_unit(),
+            Value::Bool(b) => visitor.visit_bool(b),
+            Value::Uint(n) => visitor.visit_u64(n),
+            Value::Int(n) => visitor.visit_i64(n),
+            Value::F32(n) => visitor.visit_f32(n),
+            Value::F64(n) => visitor.visit_f64(n),
+            Value::Str(s) => visitor.visit_string(s),
+            Value::Bin(b) => visitor.visit_byte_buf(b),
+            Value::Array(items) => visitor.visit_seq(SeqDeserializer {
+                iter: items.into_iter(),
+            }),
+            Value::Map(entries) => visitor.visit_map(MapDeserializer {
+                iter: entries.into_iter(),
+                pending_value: None,
+            }),
+        }
+    }
+
+    fn deserialize_bool<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        match self {
+            Value::Bool(b) => visitor.visit_bool(b),
+            other => Err(MsgpackError::Decode(format!(
+                "expected a bool, found {other:?}"
+            ))),
+        }
+    }
+
+    fn deserialize_i8<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        self.deserialize_i64(visitor)
+    }
+    fn deserialize_i16<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        self.deserialize_i64(visitor)
+    }
+    fn deserialize_i32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        self.deserialize_i64(visitor)
+    }
+    fn deserialize_i64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        match self.as_i64() {
+            Some(n) => visitor.visit_i64(n),
+            None => Err(MsgpackError::Decode(format!(
+                "expected an int, found {self:?}"
+            ))),
+        }
+    }
+
+    fn deserialize_u8<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        self.deserialize_u64(visitor)
+    }
+    fn deserialize_u16<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        self.deserialize_u64(visitor)
+    }
+    fn deserialize_u32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        self.deserialize_u64(visitor)
+    }
+    fn deserialize_u64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        match self.as_u64() {
+            Some(n) => visitor.visit_u64(n),
+            None => Err(MsgpackError::Decode(format!(
+                "expected a uint, found {self:?}"
+            ))),
+        }
+    }
+
+    fn deserialize_f32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        match self {
+            Value::F32(n) => visitor.visit_f32(n),
+            Value::F64(n) => visitor.visit_f64(n),
+            other => Err(MsgpackError::Decode(format!(
+                "expected a float, found {other:?}"
+            ))),
+        }
+    }
+
+    fn deserialize_f64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        match self {
+            Value::F32(n) => visitor.visit_f32(n),
+            Value::F64(n) => visitor.visit_f64(n),
+            other => Err(MsgpackError::Decode(format!(
+                "expected a float, found {other:?}"
+            ))),
+        }
+    }
+
+    fn deserialize_char<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        match self {
+            Value::Str(s) => {
+                let mut chars = s.chars();
+                match (chars.next(), chars.next()) {
+                    (Some(c), None) => visitor.visit_char(c),
+                    _ => Err(MsgpackError::Decode(format!(
+                        "expected a single-char str, found {s:?}"
+                    ))),
+                }
+            }
+            other => Err(MsgpackError::Decode(format!(
+                "expected a char, found {other:?}"
+            ))),
+        }
+    }
+
+    fn deserialize_str<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        self.deserialize_string(visitor)
+    }
+
+    fn deserialize_string<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        match self {
+            Value::Str(s) => visitor.visit_string(s),
+            other => Err(MsgpackError::Decode(format!(
+                "expected a str, found {other:?}"
+            ))),
+        }
+    }
+
+    fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        self.deserialize_byte_buf(visitor)
+    }
+
+    fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        match self {
+            Value::Bin(b) => visitor.visit_byte_buf(b),
+            other => Err(MsgpackError::Decode(format!(
+                "expected bin bytes, found {other:?}"
+            ))),
+        }
+    }
+
+    fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        match self {
+            Value::Nil => visitor.visit_none(),
+            _ => visitor.visit_some(self),
+        }
+    }
+
+    fn deserialize_unit<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        match self {
+            Value::Nil => visitor.visit_unit(),
+            other => Err(MsgpackError::Decode(format!(
+                "expected nil, found {other:?}"
+            ))),
+        }
+    }
+
+    fn deserialize_unit_struct<V: Visitor<'de>>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, MsgpackError> {
+        self.deserialize_unit(visitor)
+    }
+
+    fn deserialize_newtype_struct<V: Visitor<'de>>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, MsgpackError> {
+        visitor.visit_newtype_struct(self)
+    }
+
+    fn deserialize_seq<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        match self {
+            Value::Array(items) => visitor.visit_seq(SeqDeserializer {
+                iter: items.into_iter(),
+            }),
+            other => Err(MsgpackError::Decode(format!(
+                "expected an array, found {other:?}"
+            ))),
+        }
+    }
+
+    fn deserialize_tuple<V: Visitor<'de>>(
+        self,
+        _len: usize,
+        visitor: V,
+    ) -> Result<V::Value, MsgpackError> {
+        self.deserialize_seq(visitor)
+    }
+
+    fn deserialize_tuple_struct<V: Visitor<'de>>(
+        self,
+        _name: &'static str,
+        _len: usize,
+        visitor: V,
+    ) -> Result<V::Value, MsgpackError> {
+        self.deserialize_seq(visitor)
+    }
+
+    fn deserialize_map<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        let entries = self.expect_map("a map value")?;
+        visitor.visit_map(MapDeserializer {
+            iter: entries.into_iter(),
+            pending_value: None,
+        })
+    }
+
+    fn deserialize_struct<V: Visitor<'de>>(
+        self,
+        _name: &'static str,
+        _fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, MsgpackError> {
+        let entries = self.expect_map("a struct value")?;
+        visitor.visit_map(MapDeserializer {
+            iter: entries.into_iter(),
+            pending_value: None,
+        })
+    }
+
+    fn deserialize_enum<V: Visitor<'de>>(
+        self,
+        _name: &'static str,
+        _variants: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, MsgpackError> {
+        let mut entries = self.expect_map("an enum value")?;
+        let tag = entries
+            .iter()
+            .position(|(key, _)| matches!(key, Value::Str(k) if k == "tag"))
+            .map(|at| entries.remove(at).1)
+            .and_then(|value| match value {
+                Value::Str(s) => Some(s),
+                _ => None,
+            })
+            .ok_or_else(|| {
+                MsgpackError::Decode(
+                    "enum value must carry its variant name under the \"tag\" key".to_string(),
+                )
+            })?;
+        visitor.visit_enum(EnumDeserializer { tag, entries })
+    }
+
+    fn deserialize_identifier<V: Visitor<'de>>(
+        self,
+        visitor: V,
+    ) -> Result<V::Value, MsgpackError> {
+        self.deserialize_string(visitor)
+    }
+
+    fn deserialize_ignored_any<V: Visitor<'de>>(
+        self,
+        visitor: V,
+    ) -> Result<V::Value, MsgpackError> {
+        visitor.visit_unit()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Unit artifact DTO (spec §2 rows 10/13 tuple-family conversions)
+// ---------------------------------------------------------------------------
+
+/// Spec §2 row 13: one `gpu_builtins` entry as a named map on the wire.
+#[derive(Serialize, Deserialize)]
+struct GpuBuiltinEntryDto {
+    def_id: DefId,
+    builtin: GpuBuiltinWire,
+}
+
+/// Spec §2 row 10: one `function_facts.entries` element as a named map.
+#[derive(Serialize, Deserialize)]
+struct FunctionFactEntryDto {
+    def_id: DefId,
+    facts: FunctionFactWire,
+}
+
+/// Spec §2 row 10: the function-fact table with tuple entries widened to
+/// named maps.
+#[derive(Serialize, Deserialize)]
+struct FunctionFactTableDto {
+    entries: Vec<FunctionFactEntryDto>,
+    entry: Option<FunctionFactWire>,
+}
+
+/// Unit-value wire shape: the 13 spec §2 named keys in declaration order
+/// (`schema_version` first, §1.2), with the two tuple families converted.
+#[derive(Serialize, Deserialize)]
+struct HirArtifactDto {
+    schema_version: u32,
+    source_identity: SourceIdentity,
+    hir: HirModule,
+    presentation: HirPresentation,
+    cli_program: Option<CliProgramWire>,
+    types: TypeTableSnapshot,
+    interner: Vec<String>,
+    resolver: ResolverSnapshot,
+    libraries: LibraryRegistry,
+    function_facts: FunctionFactTableDto,
+    resolved_uses: Vec<ResolvedUseWire>,
+    analysis_stamp: u64,
+    gpu_builtins: Vec<GpuBuiltinEntryDto>,
+}
+
+impl From<&HirArtifact> for HirArtifactDto {
+    fn from(artifact: &HirArtifact) -> Self {
+        Self {
+            schema_version: artifact.schema_version,
+            source_identity: artifact.source_identity.clone(),
+            hir: artifact.hir.clone(),
+            presentation: artifact.presentation.clone(),
+            cli_program: artifact.cli_program.clone(),
+            types: artifact.types.clone(),
+            interner: artifact.interner.clone(),
+            resolver: artifact.resolver.clone(),
+            libraries: artifact.libraries.clone(),
+            function_facts: FunctionFactTableDto {
+                entries: artifact
+                    .function_facts
+                    .entries
+                    .iter()
+                    .map(|(def_id, facts)| FunctionFactEntryDto {
+                        def_id: *def_id,
+                        facts: facts.clone(),
+                    })
+                    .collect(),
+                entry: artifact.function_facts.entry.clone(),
+            },
+            resolved_uses: artifact.resolved_uses.clone(),
+            analysis_stamp: artifact.analysis_stamp,
+            gpu_builtins: artifact
+                .gpu_builtins
+                .iter()
+                .map(|(def_id, builtin)| GpuBuiltinEntryDto {
+                    def_id: *def_id,
+                    builtin: *builtin,
+                })
+                .collect(),
+        }
+    }
+}
+
+impl From<HirArtifactDto> for HirArtifact {
+    fn from(dto: HirArtifactDto) -> Self {
+        Self {
+            schema_version: dto.schema_version,
+            source_identity: dto.source_identity,
+            hir: dto.hir,
+            presentation: dto.presentation,
+            cli_program: dto.cli_program,
+            types: dto.types,
+            interner: dto.interner,
+            resolver: dto.resolver,
+            libraries: dto.libraries,
+            function_facts: FunctionFactTableWire {
+                entries: dto
+                    .function_facts
+                    .entries
+                    .into_iter()
+                    .map(|entry| (entry.def_id, entry.facts))
+                    .collect(),
+                entry: dto.function_facts.entry,
+            },
+            resolved_uses: dto.resolved_uses,
+            analysis_stamp: dto.analysis_stamp,
+            gpu_builtins: dto
+                .gpu_builtins
+                .into_iter()
+                .map(|entry| (entry.def_id, entry.builtin))
+                .collect(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Public codec entry points
+// ---------------------------------------------------------------------------
+
+/// Serializes a [`HirArtifact`] to a spec-conformant named-field MessagePack
+/// unit value (FPF-2). Postcard remains the live wire; this codec is additive.
+///
+/// # Errors
+///
+/// Returns [`MsgpackError::Encode`] if serialization fails (unsupported data
+/// shape or a length exceeding MessagePack's `u32` range); a valid artifact
+/// is expected to succeed.
+pub fn encode_msgpack(artifact: &HirArtifact) -> Result<Vec<u8>, MsgpackError> {
+    let dto = HirArtifactDto::from(artifact);
+    let mut out = Vec::new();
+    dto.serialize(Serializer { out: &mut out })?;
+    Ok(out)
+}
+
+/// Deserializes and validates a [`HirArtifact`] from a MessagePack unit
+/// value, mirroring the postcard [`crate::decode::decode`] gates.
+///
+/// # Version gate (§1.2, F3)
+///
+/// The named `schema_version` field is read from the parsed value before the
+/// payload is deserialized; any mismatch fails closed with
+/// [`MsgpackError::UnsupportedSchemaVersion`]. There is no compatibility
+/// decoder.
+///
+/// # Fail-closed (F7)
+///
+/// Malformed or truncated MessagePack input returns a structured
+/// [`MsgpackError`]; the referential-integrity gate (U2.3) then validates
+/// every arena index before the artifact is returned.
+///
+/// # Errors
+///
+/// Returns [`MsgpackError::Truncated`] on short input,
+/// [`MsgpackError::Decode`] on malformed or non-conformant values,
+/// [`MsgpackError::UnsupportedSchemaVersion`] on a version mismatch, and
+/// [`MsgpackError::Invalid`] when the referential-integrity gate rejects the
+/// decoded artifact.
+pub fn decode_msgpack(bytes: &[u8]) -> Result<HirArtifact, MsgpackError> {
+    let value = Value::from_bytes(bytes)?;
+
+    // §1.2: the version is a named field read first; it gates the payload.
+    let version_entries = match &value {
+        Value::Map(entries) => entries,
+        _ => {
+            return Err(MsgpackError::Decode(
+                "the unit value must be a map of named fields".to_string(),
+            ));
+        }
+    };
+    let found = version_entries
+        .iter()
+        .find(|(key, _)| matches!(key, Value::Str(k) if k == "schema_version"))
+        .and_then(|(_, v)| v.as_u64())
+        .ok_or_else(|| {
+            MsgpackError::Decode(
+                "unit value must carry schema_version as a named uint field".to_string(),
+            )
+        })?;
+    if found != u64::from(SCHEMA_VERSION) {
+        return Err(MsgpackError::UnsupportedSchemaVersion {
+            found: u32::try_from(found).unwrap_or(u32::MAX),
+            expected: SCHEMA_VERSION,
+        });
+    }
+
+    // Payload interpretation begins only after the version gate accepts.
+    let dto = HirArtifactDto::deserialize(value)?;
+
+    // U2.3: referential-integrity gate, mirroring the postcard decode path.
+    let artifact = HirArtifact::from(dto);
+    let type_count = artifact.types.type_count();
+    let interner_len = artifact.interner.len();
+    validate_referential_integrity(&artifact, type_count, interner_len)
+        .map_err(MsgpackError::Invalid)?;
+
+    Ok(artifact)
+}
+
+#[cfg(test)]
+#[path = "msgpack_test.rs"]
+mod tests;

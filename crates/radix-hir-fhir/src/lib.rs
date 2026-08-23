@@ -15,6 +15,7 @@ mod validate;
 pub mod artifact;
 mod decode;
 mod error;
+mod msgpack;
 pub mod package;
 
 #[cfg(test)]

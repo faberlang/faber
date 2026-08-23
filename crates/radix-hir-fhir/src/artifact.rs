@@ -454,4 +454,4 @@ pub struct HirArtifact {
 
 #[cfg(test)]
 #[path = "artifact_test.rs"]
-mod tests;
+pub(crate) mod tests;

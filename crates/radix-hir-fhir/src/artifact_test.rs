@@ -18,8 +18,8 @@ fn hir_artifact_round_trip() {
 /// (EOT-2M), so the wire carries it without a schema ratchet: v4 artifacts
 /// written before the field decode with `selective == false` (legacy
 /// namespace shape) and v4 artifacts written after carry it explicitly.
-fn selective_import_artifact() -> HirArtifact {
-    use radix_hir::{HirImport, HirImportItem};
+pub(crate) fn selective_import_artifact() -> HirArtifact {
+    use radix_hir::HirImportItem;
     use radix_types::USER_DEF_ID_BASE;
 
     let mut artifact = stub_artifact();
@@ -108,7 +108,7 @@ fn selective_import_field_kept_schema_v4_transfer_ratchets_to_v5() {
 // ── EOT-3W transfer wire contract ────────────────────────────────────────
 
 /// Artifact whose HIR carries one `⇇` transfer statement in the function body.
-fn transfer_artifact() -> HirArtifact {
+pub(crate) fn transfer_artifact() -> HirArtifact {
     use radix_hir::{HirBlock, HirStatement, HirStatementKind};
 
     let mut artifact = stub_artifact();
