@@ -1113,21 +1113,15 @@ fn exit_arrow_never_scans_as_conversio_assign() {
 
 #[test]
 fn leftwards_pair_arrow_never_scans_as_conversio_assign() {
-    // Confusion (OQ3 pin): `⇇` (U+21C7) is the planned exact-output-transfer
-    // glyph and is NOT a live token. It must never be aliased into the ↤ token
-    // (or any other arrow); it reports its exact scalar as an unknown
-    // character. Passes today and stays green after U3 (⇇ stays unowned until
-    // exact-output-transfer lands).
+    // Confusion (EOT-3L pin): `⇇` (U+21C7) is the dedicated
+    // exact-output-transfer token. It must never be aliased into the ↤ token
+    // (or any other arrow); it lexes as its own `Transfer` token.
     let result = lex("\u{21C7}");
-    let err = result
-        .errors
-        .iter()
-        .find(|err| err.kind == LexErrorKind::CharacterUnexpected)
-        .expect("U+21C7 must be an unknown character");
-    assert!(
-        has_arg(err, "char", &format!("'{}'", '\u{21C7}'.escape_default())),
-        "{:?}",
-        err.args
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    assert_eq!(
+        result.tokens[0].kind,
+        TokenKind::Transfer,
+        "U+21C7 must lex as the dedicated Transfer token"
     );
     for token in result.tokens.iter().filter(|t| t.kind != TokenKind::Eof) {
         assert!(
@@ -1981,19 +1975,17 @@ mod line_start_comment {
 }
 
 // =============================================================================
-// EOT-1 — exact-output-transfer red driver and absence receipt
+// EOT-3L — U+21C7 exact-output transfer token
 // =============================================================================
-// U+21C7 (`⇇`) is glyph-only and intentionally absent until EOT-3L. The
-// positive driver below must fail today with the structured
-// `unexpected_character` lexer issue; the absence receipt must stay green and
-// must not permit aliasing to any existing arrow token.
+// U+21C7 (`⇇`) is one exact operator token, never a keyword. The scanner maps
+// only that scalar; neighbor arrows and ASCII aliases must not produce it.
 
 #[test]
 fn eot_transfer_glyph_lexes_as_a_dedicated_token() {
     let result = lex("output ⇇ \"salve\\n\"");
     assert!(
         result.errors.is_empty(),
-        "EOT-3L red driver: U+21C7 must lex without errors; current expected issue is `unexpected_character`, got {:?}",
+        "EOT-3L: U+21C7 must lex without errors, got {:?}",
         result.errors
     );
     assert!(
@@ -2001,33 +1993,76 @@ fn eot_transfer_glyph_lexes_as_a_dedicated_token() {
             .tokens
             .iter()
             .any(|token| token.kind == TokenKind::Error),
-        "EOT-3L red driver: U+21C7 must not produce an Error token"
-    );
-}
-
-#[test]
-fn eot_transfer_glyph_absence_receipt_is_exact_and_non_aliasing() {
-    let result = lex("\u{21C7}");
-    let error = result
-        .errors
-        .iter()
-        .find(|error| error.kind == LexErrorKind::CharacterUnexpected)
-        .expect("pre-EOT-3L U+21C7 must report CharacterUnexpected");
-    assert!(
-        has_arg(error, "issue", "unexpected_character"),
-        "expected `unexpected_character`, got {:?}",
-        error.args
-    );
-    assert!(
-        has_arg(error, "char", &format!("'{}'", '\u{21C7}'.escape_default())),
-        "expected the exact U+21C7 scalar, got {:?}",
-        error.args
+        "EOT-3L: U+21C7 must not produce an Error token"
     );
     assert!(
         result
             .tokens
             .iter()
-            .any(|token| token.kind == TokenKind::Error),
-        "the absent glyph must recover as an Error token"
+            .any(|token| token.kind == TokenKind::Transfer),
+        "EOT-3L: U+21C7 must lex as the dedicated Transfer token, got {:?}",
+        result.tokens
+    );
+}
+
+#[test]
+fn eot_transfer_glyph_scalar_is_exact_and_non_aliasing() {
+    let result = lex("\u{21C7}");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![TokenKind::Transfer, TokenKind::Eof],
+        "the bare glyph must lex as exactly Transfer + Eof"
+    );
+}
+
+#[test]
+fn eot_transfer_glyph_is_distinct_from_neighbor_arrows() {
+    // Visual similarity is never permission to normalize a neighbor glyph.
+    assert_eq!('\u{21C7}', '⇇');
+    assert_ne!('\u{21C7}', '\u{2190}'); // ← ordinary assignment
+    assert_ne!('\u{21C7}', '\u{21A6}'); // ↦ explicit conversion
+    assert_ne!('\u{21C7}', '\u{21E5}'); // ⇥ inline recovery
+    assert_ne!('\u{21C7}', '\u{2192}'); // → arrow
+
+    // The neighbor arrows keep their own tokens.
+    let result = lex("← ↦ ⇥ →");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            TokenKind::Assign,    // ←
+            TokenKind::Conversio, // ↦
+            TokenKind::ExitArrow, // ⇥
+            TokenKind::Arrow,     // →
+            TokenKind::Eof,
+        ]
+    );
+}
+
+#[test]
+fn eot_transfer_ascii_alias_does_not_produce_transfer_token() {
+    // `<==` (or any ASCII alias) is not the transfer glyph and must never
+    // lex as the Transfer token; each ASCII char keeps its own operator.
+    let result = lex("<==");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            TokenKind::LtAscii,
+            TokenKind::Eq,
+            TokenKind::Eq,
+            TokenKind::Eof,
+        ]
+    );
+    assert!(
+        !result
+            .tokens
+            .iter()
+            .any(|token| token.kind == TokenKind::Transfer),
+        "ASCII <== must never produce the Transfer token"
     );
 }

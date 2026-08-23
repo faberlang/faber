@@ -282,6 +282,7 @@ pub enum TokenKind {
     BitwiseNot, // ¬
     BitwiseShl, // ⇐
     BitwiseShr, // ⇒
+    Transfer,   // ⇇ U+21C7 exact-output transfer sink (operator; never a keyword)
     Bang,       // !
     Question,   // ?
 

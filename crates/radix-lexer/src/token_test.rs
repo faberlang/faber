@@ -101,28 +101,34 @@ fn nabla_lexes_as_dedicated_gradient_operator() {
     assert!(!TokenKind::Nabla.is_keyword());
 }
 
-// EOT-1 baseline: U+21C7 is not a current TokenKind and must remain distinct
-// from the live arrow family until EOT-3L adds the exact transfer token.
+// EOT-3L: U+21C7 is one exact operator token, never a keyword identity, and
+// stays distinct from the live arrow family.
 #[test]
-fn eot_transfer_glyph_is_currently_an_unexpected_character() {
+fn eot_transfer_glyph_is_a_dedicated_non_keyword_token() {
     let result = crate::lex("\u{21C7}");
-    let error = result
-        .errors
-        .iter()
-        .find(|error| error.kind == crate::LexErrorKind::CharacterUnexpected)
-        .expect("U+21C7 must be absent from the current token set");
-    assert!(error
-        .args
-        .iter()
-        .any(|arg| { arg.name == "issue" && arg.value == "unexpected_character" }));
-    assert!(error.args.iter().any(|arg| {
-        arg.name == "char" && arg.value == format!("'{}'", '\u{21C7}'.escape_default())
-    }));
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
     assert!(
         result
             .tokens
             .iter()
-            .any(|token| token.kind == TokenKind::Error),
-        "an absent glyph must use the lexer Error recovery token"
+            .any(|token| token.kind == TokenKind::Transfer),
+        "U+21C7 must lex as the dedicated Transfer token, got {:?}",
+        result.tokens
     );
+    assert!(
+        !result
+            .tokens
+            .iter()
+            .any(|token| token.kind == TokenKind::Error),
+        "U+21C7 must not produce the Error recovery token"
+    );
+    // The transfer token is an operator identity, never a keyword.
+    assert!(!TokenKind::Transfer.is_keyword());
+    // Distinct from every live arrow-family token.
+    assert_ne!(TokenKind::Transfer, TokenKind::Assign); // ←
+    assert_ne!(TokenKind::Transfer, TokenKind::Conversio); // ↦
+    assert_ne!(TokenKind::Transfer, TokenKind::ExitArrow); // ⇥
+    assert_ne!(TokenKind::Transfer, TokenKind::Arrow); // →
+    assert_ne!(TokenKind::Transfer, TokenKind::BitwiseShl); // ⇐
+    assert_ne!(TokenKind::Transfer, TokenKind::BitwiseShr); // ⇒
 }
