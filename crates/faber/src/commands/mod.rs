@@ -27,6 +27,7 @@ mod doctor_test;
 mod emit;
 mod explain;
 mod format;
+mod output_transfer_codemod;
 #[cfg(test)]
 #[path = "format_corpus_test.rs"]
 mod format_corpus_test;
@@ -58,6 +59,7 @@ use doctor::cmd_doctor;
 use explain::cmd_explain;
 use format::cmd_format;
 use host::cmd_host;
+use output_transfer_codemod::cmd_output_transfer_codemod;
 use init::cmd_init;
 use model::cmd_model;
 use run::{cmd_eval, cmd_fmir_run_image, cmd_repl, cmd_run};
@@ -381,6 +383,15 @@ fn dispatch(command: Command) {
             write: args.write,
             stdin: args.stdin,
         }),
+        Command::OutputTransferCodemod(args) => {
+            cmd_output_transfer_codemod(&output_transfer_codemod::OutputTransferCodemodCommand {
+                paths: args.paths,
+                check: args.check,
+                stdout: args.stdout,
+                write: args.write,
+                stdin: args.stdin,
+            });
+        }
         Command::Host(args) => cmd_host(args.command),
         Command::Model(args) => cmd_model(args.command),
         Command::SelfManage(args) => cmd_self(&args),

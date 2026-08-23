@@ -172,6 +172,10 @@ pub enum Command {
     /// HIR-backed round-trip; not a formatter (see `faber convert --help`)
     Convert(ConvertArgs),
 
+    /// Rewrite admitted print/nota statements to imported `⇇` transfers
+    #[command(name = "output-transfer-codemod")]
+    OutputTransferCodemod(OutputTransferCodemodArgs),
+
     /// Script host introspection (kernel manifest)
     Host(crate::commands::host::HostArgs),
 
@@ -243,6 +247,33 @@ pub struct ConvertArgs {
     /// Read exactly one source document from stdin and print the converted
     /// result to stdout
     #[arg(long, conflicts_with_all = ["check", "stdout", "paths"])]
+    pub stdin: bool,
+}
+
+/// Arguments for `faber output-transfer-codemod`.
+#[derive(clap::Args, Debug)]
+pub struct OutputTransferCodemodArgs {
+    /// Files or directories to codemod (default: current directory)
+    #[arg(value_name = "PATH")]
+    pub paths: Vec<PathBuf>,
+
+    /// Report pending codemods without writing files; exit 1 if any file
+    /// would change
+    #[arg(long)]
+    pub check: bool,
+
+    /// Write codemodded output to stdout instead of updating files (exactly
+    /// one input file)
+    #[arg(long, conflicts_with = "check")]
+    pub stdout: bool,
+
+    /// Write codemodded source back to its file (the in-place default)
+    #[arg(long, conflicts_with = "stdout")]
+    pub write: bool,
+
+    /// Read exactly one source document from stdin and print the codemodded
+    /// result to stdout
+    #[arg(long, conflicts_with_all = ["check", "paths"])]
     pub stdin: bool,
 }
 
