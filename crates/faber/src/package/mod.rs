@@ -114,8 +114,9 @@ pub(crate) use library_link::emit_linked_library_crates;
 #[cfg(feature = "mir-llvm")]
 #[allow(unused_imports)]
 pub use llvm_host::{
-    build_host_program, discover_llvm_host_toolchain, ensure_llvm_runtime_archive,
-    host_llvm_target_triple, host_triple_for, LlvmHostBuild, LlvmHostProfile,
+    build_host_program, compile_nvvm_to_ptx, discover_llvm_host_toolchain,
+    ensure_llvm_runtime_archive, host_llvm_target_triple, host_triple_for, LlvmHostBuild,
+    LlvmHostProfile,
 };
 pub(crate) use manifest::validate_manifest;
 #[allow(unused_imports)]
