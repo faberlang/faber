@@ -1654,7 +1654,7 @@ fn bounded_ascii_one_assigns_to_textus_like_bare_ascii() {
     );
     assert!(
         !types.is_assignable(ascii8, textus),
-        "ascii<8> ↛ textus until BB-4"
+        "ascii<8> reaches textus via ↦ conversio, not implicit widening"
     );
     assert!(!types.is_assignable(textus, ascii1), "textus ↛ ascii<1>");
     assert!(types.is_assignable(ascii1, ascii), "ascii<1> → ascii (D17)");

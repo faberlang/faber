@@ -1119,7 +1119,8 @@ impl TypeTable {
 
             // ASCII machine text widens to Unicode `textus`. After D17, `'x'`
             // is `ascii<1>` (`BoundedAscii { 1 }`) and uses the same payload
-            // widening. Multi-char `ascii<N>` stays out until BB-4.
+            // widening. Multi-char `ascii<N>` reaches textus through the
+            // explicit D7 bounded-string conversio, not implicit widening.
             (from_ty, Type::Primitive(Primitive::Textus))
                 if self.ascii_payload_widens_to_textus_ty(from_ty) =>
             {
@@ -1257,7 +1258,8 @@ impl TypeTable {
 
     /// Bare `ascii` and D17 `'x'` (`ascii<1>`) widen to `textus`.
     ///
-    /// Multi-char `ascii<N>` does not; BB-4 names bounded→unbounded conversion.
+    /// Multi-char `ascii<N>` does not widen implicitly; the D7 bounded-string
+    /// conversio owns bounded→unbounded conversion explicitly.
     #[must_use]
     pub fn ascii_payload_widens_to_textus(&self, from: TypeId) -> bool {
         self.ascii_payload_widens_to_textus_ty(self.get(from))

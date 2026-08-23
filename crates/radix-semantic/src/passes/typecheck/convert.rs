@@ -55,6 +55,8 @@ const ISSUE_NUMERIC_TO_OCTETI_UNSPECIFIED: &str = "numeric_to_octeti_unspecified
 const ISSUE_OCTETI_TO_NUMERUS_UNSPECIFIED: &str = "octeti_to_numerus_unspecified";
 const ISSUE_OCTETI_ENDIAN_WIDTH_MISMATCH: &str = "octeti_endian_width_mismatch";
 const ISSUE_ASCII_FORMAT_HINT_NOT_CAPACITY: &str = "ascii_format_hint_not_capacity";
+const ISSUE_ASCII_LITERAL_TOO_LONG: &str = "ascii_literal_too_long";
+const ISSUE_TEXTUS_LITERAL_TOO_LONG: &str = "textus_literal_too_long";
 const ISSUE_ASCII_PACK_WIDTH_OVERFLOW: &str = "ascii_pack_width_overflow";
 const ISSUE_ASCII_PACK_NEGATIVE_SOURCE: &str = "ascii_pack_negative_source";
 const ISSUE_OCTETI_TO_FRACTUS_UNSPECIFIED: &str = "octeti_to_fractus_unspecified";
@@ -344,6 +346,11 @@ impl TypeChecker<'_> {
         }
 
         if self.is_bounded_ascii_conversio(source_ty, target_resolved) {
+            if let Some(error_ty) =
+                self.check_bounded_string_literal_overflow(source, target_resolved, span)
+            {
+                return error_ty;
+            }
             if let Some(recovery) = recovery {
                 self.note_conversio_recovery_checked(recovery, target_resolved);
             } else {
@@ -353,6 +360,11 @@ impl TypeChecker<'_> {
         }
 
         if self.is_bounded_textus_conversio(source_ty, target_resolved) {
+            if let Some(error_ty) =
+                self.check_bounded_string_literal_overflow(source, target_resolved, span)
+            {
+                return error_ty;
+            }
             if let Some(recovery) = recovery {
                 self.note_conversio_recovery_checked(recovery, target_resolved);
             } else {
@@ -1748,6 +1760,8 @@ impl TypeChecker<'_> {
     /// D7's explicit ASCII buffer bridges. Bounded values copy their valid
     /// prefix into an unbounded carrier; the reverse direction is fallible and
     /// keeps the declared capacity for the Rust carrier to enforce.
+    /// `ascii<N> ↔ ascii<M>` resizes by copying the initialized prefix with a
+    /// fail-closed overflow when the payload outgrows the target capacity.
     fn is_bounded_ascii_conversio(&self, source_ty: TypeId, target_ty: TypeId) -> bool {
         matches!(
             (
@@ -1756,9 +1770,65 @@ impl TypeChecker<'_> {
             ),
             (
                 Type::BoundedAscii { .. },
+                Type::BoundedAscii { .. }
+            ) | (
+                Type::BoundedAscii { .. },
                 Type::Primitive(Primitive::Ascii | Primitive::Textus)
             ) | (Type::Primitive(Primitive::Ascii), Type::BoundedAscii { .. })
         )
+    }
+
+    /// D7 fail-closed overflow for literal sources: a string literal entering
+    /// a bounded carrier must fit within the declared capacity. Non-literal
+    /// sources keep the runtime-carrier overflow contract.
+    fn check_bounded_string_literal_overflow(
+        &mut self,
+        source: &HirExpression,
+        target_resolved: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        let HirExpressionKind::Literal(literal) = &source.kind else {
+            return None;
+        };
+        let (sym, ascii) = match literal {
+            HirLiteral::Ascii(sym) => (*sym, true),
+            HirLiteral::String(sym) => (*sym, false),
+            _ => return None,
+        };
+        let target = self.types.get(self.resolve_inferred_type(target_resolved));
+        let capacity = match target {
+            Type::BoundedAscii { capacity } if ascii => *capacity,
+            Type::BoundedTextus { capacity } if !ascii => *capacity,
+            _ => return None,
+        };
+        let resolved_capacity = self.resolve_index(capacity);
+        let IndexExpr::Literal(capacity) = self.types.get_index(resolved_capacity) else {
+            return None;
+        };
+        let raw = self.interned_literal_payload(sym)?;
+        let decoded_len: u64 = if ascii {
+            radix_lexer::ascii_literal::decode_ascii_literal(raw)
+                .ok()?
+                .len() as u64
+        } else {
+            radix_lexer::textus_literal::decode_textus_literal(raw)
+                .chars()
+                .count() as u64
+        };
+        if decoded_len > *capacity {
+            let issue = if ascii {
+                ISSUE_ASCII_LITERAL_TOO_LONG
+            } else {
+                ISSUE_TEXTUS_LITERAL_TOO_LONG
+            };
+            self.invalid_operand_types_with_args(
+                issue,
+                span,
+                &[("capacity", capacity.to_string())],
+            );
+            return Some(self.error_type);
+        }
+        None
     }
 
     /// D7's explicit bounded-byte bridges. Bounded → unbounded copies the
@@ -1828,7 +1898,8 @@ impl TypeChecker<'_> {
             Type::Primitive(Primitive::Ascii) => PrimitiveConversioFamily::Ascii,
             // D17 / BB-2: `'x'` is `ascii<1>`. Same conversio family as bare
             // ascii so `'a' ↦ textus` / `s[i] ↦ numerus` stay explicit widens.
-            // Multi-char `ascii<N>` stays out until BB-4.
+            // Multi-char `ascii<N>` converts through the D7 bounded-string
+            // bridges instead of this scalar family.
             Type::BoundedAscii { capacity }
                 if matches!(self.types.get_index(*capacity), IndexExpr::Literal(1)) =>
             {

@@ -7,7 +7,7 @@
 //! error pointing at the `↦ numerus` conversio (see also
 //! `equality_exact_types_test.rs` for the message-pointer proof). Bare ascii
 //! literals of any length typecheck; `ascii_literal_too_long` is reserved for
-//! `ascii<N>` (BB-4).
+//! bounded `ascii<N>` carriers.
 
 use super::TypeChecker;
 use crate::semantic_message;

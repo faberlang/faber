@@ -1,0 +1,84 @@
+//! CTFP-2 pins: bounded string conversio rows — `ascii<N> ↦ textus`,
+//! `textus<N> ↦ textus`, `ascii<N> ↔ ascii<M>` (D7 resize: copy initialized
+//! prefix, fail-closed overflow). The landed AEU-5 `lista<T,N> ↦ tensor<T,[N]>`
+//! row is pinned by `lista_tensor_conversio` tests — cited, not duplicated.
+
+use crate::test_support::{assert_accepts, assert_rejects_with_issue};
+
+// --- ascii<N> ↦ textus ------------------------------------------------------
+
+#[test]
+fn ascii8_to_textus_accepts() {
+    assert_accepts(
+        "functio s(ascii<8> b) → textus {
+    redde b ↦ textus
+}",
+    );
+}
+
+// --- textus<N> ↦ textus -----------------------------------------------------
+
+#[test]
+fn bounded_textus_to_textus_accepts() {
+    assert_accepts(
+        "functio s(textus<4> t) → textus {
+    redde t ↦ textus
+}",
+    );
+}
+
+// --- ascii<N> ↔ ascii<M> (resize: copy initialized prefix) -----------------
+
+#[test]
+fn ascii4_to_ascii8_resize_grow_accepts() {
+    assert_accepts(
+        "functio s(ascii<4> b) → ascii<8> {
+    redde b ↦ ascii<8>
+}",
+    );
+}
+
+#[test]
+fn ascii8_to_ascii4_resize_shrink_accepts() {
+    assert_accepts(
+        "functio s(ascii<8> b) → ascii<4> {
+    redde b ↦ ascii<4>
+}",
+    );
+}
+
+#[test]
+fn ascii8_to_ascii8_identity_accepts() {
+    assert_accepts(
+        "functio s(ascii<8> b) → ascii<8> {
+    redde b ↦ ascii<8>
+}",
+    );
+}
+
+// --- fail-closed overflow (D7 pattern) --------------------------------------
+
+#[test]
+fn ascii_literal_over_capacity_rejects() {
+    assert_rejects_with_issue(
+        "incipit {
+    fixum _ s ← 'alpha' ↦ ascii<4>
+}",
+        "ascii_literal_too_long",
+    );
+}
+
+#[test]
+fn textus_literal_over_capacity_rejects() {
+    assert_rejects_with_issue(
+        "incipit {
+    fixum _ t ← \"abcdef\" ↦ textus<4>
+}",
+        "textus_literal_too_long",
+    );
+}
+
+#[test]
+fn probe_ascii_literal_to_bounded() {
+
+}

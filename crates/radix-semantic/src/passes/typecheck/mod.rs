@@ -671,6 +671,10 @@ mod octeti_endian_conversio_test;
 mod register_conversio_test;
 
 #[cfg(test)]
+#[path = "bounded_string_conversio_test.rs"]
+mod bounded_string_conversio_test;
+
+#[cfg(test)]
 #[path = "bits_conversio_test.rs"]
 mod bits_conversio_test;
 

@@ -907,9 +907,13 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
             Some(format!("ascii literal contains unescaped control character U+{codepoint}"))
         }
         "ascii_literal_too_long" => {
-            // Fires on `ascii<N>` literals with `len > N` (BB-4). Bare ascii
-            // is unbounded and no longer uses this issue.
+            // Fires on `ascii<N>` literals with `len > N`, including bounded
+            // conversio targets. Bare ascii is unbounded and no longer uses
+            // this issue.
             Some("ascii<N> literal exceeds the declared capacity".to_owned())
+        }
+        "textus_literal_too_long" => {
+            Some("textus<N> literal exceeds the declared capacity".to_owned())
         }
         "boolean_operands_required" => Some("boolean operands required".to_owned()),
         "atomic_method_requires_atomic_receiver" => Some("atomic operation requires an atomic receiver".to_owned()),
@@ -1101,6 +1105,10 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "ascii_literal_unescaped_control" => Some("escape control characters in ascii literals".to_owned()),
         "ascii_literal_too_long" => Some(
             "shorten the ascii<N> literal to fit its declared capacity, or use unbounded ascii"
+                .to_owned(),
+        ),
+        "textus_literal_too_long" => Some(
+            "shorten the textus<N> literal to fit its declared capacity, or use unbounded textus"
                 .to_owned(),
         ),
         "boolean_operands_required" => Some("use bivalens operands for this operator".to_owned()),
