@@ -5367,6 +5367,164 @@ incipit {
 }
 
 #[test]
+fn consolum_eot4_input_values_canonical() {
+    let dir = test_temp_dir("consolum-eot4-input-canonical");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+import from "norma:consolum" const read_line as line_reader, read_bytes as bytes_reader
+
+main {
+  const string line ← line_reader()
+  const bytes chunk ← bytes_reader(4)
+}
+"#,
+    )
+    .expect("write canonical consolum input fixture");
+
+    let result = compile_with_faber_seams(&Config::default(), &entry);
+    assert!(
+        result.success(),
+        "canonical consolum input fixture should compile: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected Rust output");
+    };
+
+    assert!(
+        output.code.contains("crate::consolum::read_line"),
+        "expected in-crate read_line call:\n{}",
+        output.code
+    );
+    assert!(
+        output.code.contains("crate::consolum::read_bytes"),
+        "expected in-crate read_bytes call:\n{}",
+        output.code
+    );
+    assert!(output.code.contains("fn read_line"));
+    assert!(output.code.contains("pub(crate) fn read_bytes"));
+    assert!(output.code.contains("consolum:lege"));
+    assert!(output.code.contains("consolum:hauri"));
+    assert!(output.code.contains("faber::frame::sermo_open"));
+    assert!(!output.code.contains("norma::consolum::read_line"));
+    assert!(!output.code.contains("norma::consolum::read_bytes"));
+    assert!(!output.code.contains("crate::norma::hal::consolum"));
+    assert!(!output.code.contains("builtin-claim"));
+    assert!(!output.code.contains("builtin-claimed"));
+    assert!(!output.code.contains("println!"));
+}
+
+#[test]
+fn consolum_eot4_input_values_la_surface() {
+    let dir = test_temp_dir("consolum-eot4-input-la");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "norma:consolum" fixum lege ut line_reader
+importa ex "norma:consolum" fixum hauri ut bytes_reader
+importa ex "norma:consolum" fixum scribe ut line_sink
+importa ex "norma:consolum" fixum funde ut bytes_sink
+importa ex "norma:solum" fixum lege ut terra_lege
+
+incipit {
+  line_sink ⇇ line_reader()
+  bytes_sink ⇇ bytes_reader(4)
+  line_sink ⇇ terra_lege("data.txt")
+}
+"#,
+    )
+    .expect("write la consolum input fixture");
+
+    let la_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/la/pack.toml");
+    let la_pack =
+        radix::module::locale::LocalePack::from_toml_path(la_path).expect("load la locale pack");
+    let config = Config::default().with_locale_pack(la_pack);
+    let result = compile_with_faber_seams(&config, &entry);
+    assert!(
+        result.success(),
+        "la-surface consolum input fixture should compile: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected Rust output");
+    };
+
+    assert!(
+        output.code.contains("use crate::consolum::lege as line_reader"),
+        "expected la lege to resolve to the consolum member, not solum:\n{}",
+        output.code
+    );
+    assert!(
+        output.code.contains("use crate::consolum::hauri as bytes_reader"),
+        "expected la hauri to resolve to the consolum member:\n{}",
+        output.code
+    );
+    assert!(
+        output.code.contains("use crate::solum::lege as terra_lege"),
+        "expected solum lege to stay module-scoped to solum:\n{}",
+        output.code
+    );
+    assert!(output.code.contains("pub(crate) fn read_line"));
+    assert!(output.code.contains("pub(crate) fn read_bytes"));
+    assert!(
+        output.code.contains("crate::solum::lege"),
+        "expected solum lege stub to be emitted:\n{}",
+        output.code
+    );
+    assert!(output.code.contains("consolum:lege"));
+    assert!(output.code.contains("consolum:hauri"));
+    assert!(output.code.contains("solum:lege"));
+    assert!(output.code.contains("faber::frame::sermo_open"));
+    assert!(!output.code.contains("norma::consolum::read_line"));
+    assert!(!output.code.contains("norma::consolum::read_bytes"));
+    assert!(!output.code.contains("crate::norma::hal::consolum"));
+    assert!(!output.code.contains("builtin-claim"));
+    assert!(!output.code.contains("builtin-claimed"));
+    assert!(!output.code.contains("println!"));
+}
+
+#[test]
+fn consolum_eot4_input_interpreted_stdin_roundtrip() {
+    let dir = test_temp_dir("consolum-eot4-input-run");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+import from "norma:consolum" const read_line, read_bytes, write_line, write_bytes
+
+main {
+  const _ line_out ← (string msg) → void ∴ write_line(msg)
+  const _ bytes_out ← (bytes data) → void ∴ write_bytes(data)
+  line_out ⇇ read_line()
+  bytes_out ⇇ read_bytes(4)
+  line_out ⇇ ""
+}
+"#,
+    )
+    .expect("write interpreted consolum input fixture");
+
+    let mut host = BufferHost::default()
+        .with_stdin_lines(["salve"])
+        .with_stdin_bytes([66, 89, 84, 69]);
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
+    assert!(
+        result.is_ok(),
+        "expected consolum input round-trip run success, got {:?}",
+        result
+            .err()
+            .unwrap_or_default()
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(host.stdout_lines, vec!["salve".to_owned(), "BYTE".to_owned()]);
+}
+
+#[test]
 fn compile_package_resolves_builtin_norma_solum_ad_wrapped_imports() {
     let dir = test_temp_dir("norma-solum-ad-import");
     let entry = dir.join("main.fab");
