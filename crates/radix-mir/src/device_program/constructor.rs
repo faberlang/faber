@@ -1,4 +1,7 @@
-//! The single typed MIR → [`DeviceProgram`] materializer (DPSC-U2).
+//! The single typed MIR → [`DeviceProgram`] materializer (DPSC-U2; extended
+//! to the faber superset in DPSC-U4a: decomposition fallback, training
+//! param/gradient aliasing, dependency-ordered launches, declared
+//! observation cadence, and the effective step count).
 //!
 //! This module owns the construction spine.  Consumers may build views over
 //! the returned program, but they do not rebuild its kernels, buffers,
@@ -9,20 +12,31 @@ use super::{
     DeviceProgramError, DeviceProgramLifetime, DeviceResource, KernelLaunchPlan, KernelUnit,
     LaunchId, LaunchUnit, ObservationCadence, ResultBuffer,
 };
-use crate::abi::{MirKernelResourceAccess, MirKernelResourceKind, MirKernelSignature};
+use crate::abi::{
+    collection_op_contract, MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind,
+    MirKernelResourceRole, MirKernelSignature,
+};
 use crate::device::MirCompanionMap;
-use crate::device_program_plans::kernel_plan_for_function;
+use crate::device_program_plans::{
+    is_transformer_recipe_op, kernel_plan_for_function, subchain_signature_for_emission_with_source,
+    transformer_subchain_signature_for_emission_with_source,
+};
 use crate::device_semantics::{
     DependencyEdge, DeviceSemantics, InitializationFact, InitializationPolicy,
     LosslessMirCompanionEntry, ObservationFact, SemanticValue, SemanticValueId,
     SemanticValueOrigin, ValueBinding, ValueGeneration,
 };
+use crate::kernel_decomposition::decompose_kernel_function;
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::layout::MirTensorStorageLayout;
 use crate::static_shape_fold::{fold_validated_device_program, ShapeFoldError};
-use crate::{MirFunction, MirFunctionId, MirLocalId, ValidatedMir};
+use crate::{
+    MirFunction, MirFunctionId, MirLocalId, MirStatementKind, MirType, ValidatedMir,
+};
+use radix_hir::DefId;
 use radix_lexer::Interner;
-use std::collections::{BTreeMap, BTreeSet};
+use radix_types::TypeTable;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt;
 
 /// A typed failure from the one device-program construction spine.
@@ -59,6 +73,23 @@ pub enum DeviceProgramBuildError {
         primal: u32,
         /// The missing companion's stable definition identity.
         companion: u32,
+    },
+    /// A multi-recipe body could not be decomposed at recipe boundaries.
+    Decomposition {
+        /// The offending MIR function.
+        function: MirFunctionId,
+        /// The decomposition diagnostic detail.
+        detail: String,
+    },
+    /// The subchain type table could not be restored for decomposition.
+    SubchainTypes {
+        /// The typed table diagnostic.
+        detail: String,
+    },
+    /// The carried producer/consumer dependency graph contains a cycle.
+    LaunchOrder {
+        /// The launch-order diagnostic detail.
+        detail: String,
     },
     /// The shared static-shape fold rejected a selected device function.
     ShapeFold(ShapeFoldError),
@@ -98,6 +129,15 @@ impl fmt::Display for DeviceProgramBuildError {
                 f,
                 "companion DefId({companion}) of device-resident primal DefId({primal}) is missing from the lowered MIR"
             ),
+            Self::Decomposition { function, detail } => write!(
+                f,
+                "kernel {} decomposition failed: {detail}",
+                function.0
+            ),
+            Self::SubchainTypes { detail } => {
+                write!(f, "subchain type table restoration failed: {detail}")
+            }
+            Self::LaunchOrder { detail } => write!(f, "launch order failed: {detail}"),
             Self::ShapeFold(error) => write!(f, "device shape fold failed: {error}"),
             Self::ReducedProjection {
                 buffer,
@@ -124,8 +164,20 @@ struct ResourceBuild {
     binding: u32,
     access: MirKernelResourceAccess,
     buffer_id: BufferId,
-    element_ty: crate::MirType,
+    element_ty: MirType,
+    element_count: u64,
     reduced_projection: Option<crate::abi::ReducedProjection>,
+}
+
+/// One kernel's build: signature/plan facts plus its resource slots (buffer
+/// ids resolved by the unification pass).
+#[derive(Debug, Clone)]
+struct KernelBuild {
+    function: MirFunctionId,
+    entry: String,
+    plan: CollectionKernelPlan,
+    launch: KernelLaunchPlan,
+    resources: Vec<ResourceBuild>,
 }
 
 /// The aggregate identity and independent resource-axis facts for one buffer.
@@ -133,43 +185,113 @@ struct ResourceBuild {
 struct ProgramBuffer {
     id: BufferId,
     name: String,
-    element_ty: crate::MirType,
+    element_ty: MirType,
     element_count: u64,
     role: BufferRole,
     written: bool,
     consumed: bool,
     readwrite: bool,
-    persistent: bool,
+    /// A trainable parameter of a `RepeatingStep` training program (S5-U5):
+    /// `PerProgram` persistent state with HostProvided init, updated in place
+    /// at every step. The flag is the independent fact behind the lifetime
+    /// and initialization axes — never derived from the access pattern.
+    param: bool,
+    /// A backward companion's gradient output slot (S5-U5): per-step scratch
+    /// feeding the optimizer step — never an observation point and never
+    /// persistent state, even when no step kernel consumes it.
+    gradient: bool,
     origin: SemanticValueOrigin,
 }
 
 impl ProgramBuffer {
-    fn matches(&self, name: &str, element_ty: crate::MirType, element_count: u64) -> bool {
+    /// The cross-kernel wiring key: same declared logical name and same
+    /// shape. Callers additionally guard on [`unify_roles`] before joining,
+    /// so a name/shape coincidence alone never aliases two unrelated values.
+    fn matches(&self, name: &str, element_ty: MirType, element_count: u64) -> bool {
         self.name == name && self.element_ty == element_ty && self.element_count == element_count
     }
 }
 
-/// Build the one target-neutral [`DeviceProgram`] and its carried semantics.
+/// Training-side facts intentionally stay MIR-owned.  Faber's package layer
+/// can translate its package analysis into this small carrier without making
+/// the compiler crate depend on product-private training types.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct DeviceTrainingFacts {
+    /// The admitted training-plan step count (S5-U5b): the constructor
+    /// returns it as the effective step count of the `RepeatingStep` program.
+    pub step_count: u32,
+    /// Additional validated MIR functions selected by training analysis.
+    pub device_function_ids: Vec<MirFunctionId>,
+    /// `(function, local)` origins that persist across repeating steps.
+    pub persistent_buffers: BTreeSet<(MirFunctionId, MirLocalId)>,
+    /// The trainable parameters of the package's training loop (S5-U5): each
+    /// step-function param whose update output slot aliases the param buffer
+    /// (the in-place update).
+    pub trainable: Vec<DeviceTrainableParam>,
+    /// The gradient-flow links (S5-U5): which companion result-tuple slot
+    /// produces the gradient each step-function param consumes.
+    pub gradients: Vec<DeviceGradientLink>,
+}
+
+/// One trainable parameter of a `RepeatingStep` training program.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceTrainableParam {
+    /// The optimizer-step function that updates the parameter.
+    pub step_function: MirFunctionId,
+    /// The parameter's position in the step function's signature.
+    pub param_position: u32,
+    /// The step function's full result-tuple slot carrying the update.
+    pub update_output: u32,
+}
+
+/// One gradient-flow link of a training program (S5-U5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceGradientLink {
+    /// The optimizer-step function that consumes the gradient.
+    pub step_function: MirFunctionId,
+    /// The gradient's position in the step function's signature.
+    pub gradient_position: u32,
+    /// The generated companion producing the gradient.
+    pub companion: DefId,
+    /// The companion's full result-tuple slot carrying the gradient.
+    pub gradient_slot: u32,
+}
+
+/// Build the one target-neutral [`DeviceProgram`], its carried semantics, and
+/// the effective declared step count.
 ///
 /// `interner` is explicit because kernel entry identity is a typed MIR fact
 /// that must be preserved at the public boundary.  `companions` carries the
 /// lossless primal/companion relation.  `training` optionally contributes
-/// additional device-resident MIR functions and persistent-buffer origins;
-/// the lifetime argument remains the caller's explicit program-lifetime fact.
-/// The shared static-shape fold is applied once to the complete selected
-/// device set before any ABI or plan derivation.
+/// additional device-resident MIR functions, persistent-buffer origins,
+/// trainable-param/gradient aliasing facts, and the admitted step count; the
+/// lifetime argument remains the caller's explicit program-lifetime fact.
+/// `declared_steps` is the caller's declared count, returned unchanged when
+/// there is no training program. The shared static-shape fold is applied once
+/// to the complete selected device set before any ABI or plan derivation.
+///
+/// **DPSC-U4a (the faber superset):** a multi-recipe body whose whole-function
+/// ABI/plan synthesis fails decomposes at recipe boundaries into subchain
+/// kernels (one kernel per recipe, transformer subchains through the P1
+/// seam); buffer unification joins producing and consuming slots by the
+/// carried `(function, local)` origin identity, the trainable-param update
+/// outputs (in-place updates), and the companion gradient outputs; the launch
+/// sequence follows the carried producer/consumer dependency graph — never
+/// kernel declaration order; and the result rows carry the S5A-U1 declared
+/// observation cadence.
 ///
 /// # Errors
-/// Returns a typed error when folding, ABI/plan derivation, companion lookup,
-/// buffer identity construction, or the shared program-plus-semantics schema
-/// rejects the result.
+/// Returns a typed error when folding, ABI/plan/decomposition derivation,
+/// companion lookup, buffer identity construction, launch ordering, or the
+/// shared program-plus-semantics schema rejects the result.
 pub fn build_device_program(
     validated: &ValidatedMir<'_>,
     interner: &Interner,
     companions: &MirCompanionMap,
     training: Option<&DeviceTrainingFacts>,
     lifetime: DeviceProgramLifetime,
-) -> Result<(DeviceProgram, DeviceSemantics), DeviceProgramBuildError> {
+    declared_steps: u32,
+) -> Result<(DeviceProgram, DeviceSemantics, u32), DeviceProgramBuildError> {
     let program = validated.program();
     let mut selected_ids: BTreeSet<MirFunctionId> = program
         .functions
@@ -228,85 +350,108 @@ pub fn build_device_program(
     // A validated MIR with no device body has no payload.  Returning the empty
     // pair keeps the constructor total and lets host-partition remain a view.
     if ordered_ids.is_empty() {
-        return Ok((DeviceProgram::new(lifetime), DeviceSemantics::default()));
-    }
-
-    let mut buffers = Vec::new();
-    let mut next_buffer_id = 1u32;
-    let mut builds = Vec::with_capacity(ordered_ids.len());
-
-    for function_id in ordered_ids {
-        let function = folded_program
-            .function_by_id(function_id)
-            .expect("selected function ids came from the validated MIR");
-        let signature = MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-            function,
-            folded.validation(),
-            interner,
-        )
-        .map_err(|error| DeviceProgramBuildError::KernelAbi {
-            function: function.id,
-            detail: error.message.clone(),
-        })?;
-        let plan = kernel_plan_for_function(function, &signature, folded.validation())
-            .map_err(|error| DeviceProgramBuildError::KernelPlan {
-                function: function.id,
-                detail: error.message.clone(),
-            })?
-            .unwrap_or(CollectionKernelPlan::Elementwise);
-        let mut resources = Vec::new();
-
-        for resource in signature
-            .resources()
-            .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
-        {
-            let role =
-                BufferRole::from_abi_role(resource.role, resource.access).ok_or_else(|| {
-                    DeviceProgramBuildError::BufferRole {
-                        function: function.id,
-                        binding: resource.binding,
-                        role: format!("{:?}", resource.role),
-                        access: format!("{:?}", resource.access),
-                    }
-                })?;
-            let name = buffer_slot_name(function, interner, resource);
-            let persistent = training.is_some_and(|training| {
-                resource.source_local.is_some_and(|local| {
-                    training.persistent_buffers.contains(&(function.id, local))
-                })
-            });
-            let buffer_id = find_or_insert_buffer(
-                &mut buffers,
-                &mut next_buffer_id,
-                function,
-                resource,
-                name,
-                role,
-                persistent,
-            );
-            resources.push(ResourceBuild {
-                group: resource.group,
-                binding: resource.binding,
-                access: resource.access,
-                buffer_id,
-                element_ty: resource.element_ty,
-                reduced_projection: resource.reduced_projection,
-            });
-        }
-
-        builds.push((
-            function.id,
-            crate::host_partition::kernel_entry_name(function, interner),
-            plan,
-            KernelLaunchPlan::from_signature_and_function(&signature, function),
-            resources,
+        return Ok((
+            DeviceProgram::new(lifetime),
+            DeviceSemantics::default(),
+            declared_steps,
         ));
     }
 
+    // The forward set (the declared compute-stage kernels, not the companions
+    // or the optimizer-step functions selected by training analysis): the
+    // S5A-U1 per-step observation is a forward kernel's return output.
+    let forward_ids: BTreeSet<MirFunctionId> = folded_program
+        .functions
+        .iter()
+        .filter(|function| {
+            function.shader_stage == Some(crate::MirKernelShaderStage::Compute)
+                && selected_ids.contains(&function.id)
+        })
+        .map(|function| function.id)
+        .collect();
+
+    // (step function, param local) → (param position, update output slot)
+    // for the trainable params of the training loop — resolved once from the
+    // folded program so the per-slot aliasing can key on locals.
+    let mut param_updates: BTreeMap<(MirFunctionId, MirLocalId), (u32, u32)> = BTreeMap::new();
+    if let Some(training) = training {
+        for param in &training.trainable {
+            if let Some(function) = folded_program
+                .functions
+                .iter()
+                .find(|function| function.id == param.step_function)
+            {
+                if let Some(param_local) = function
+                    .params
+                    .get(param.param_position as usize)
+                    .map(|param| param.local)
+                {
+                    param_updates.insert(
+                        (param.step_function, param_local),
+                        (param.param_position, param.update_output),
+                    );
+                }
+            }
+        }
+    }
+    let mut builder = KernelBuilder::new(interner, folded.validation(), companions, training, param_updates);
+    for function_id in &ordered_ids {
+        let function = folded_program
+            .function_by_id(*function_id)
+            .expect("selected function ids came from the validated MIR");
+        builder.build_function(function)?;
+    }
+
+    // S5A-U1: the declared per-step observation of a RepeatingStep training
+    // program — the forward kernel's RETURN output (the loss the training
+    // loop measures), identified from the training facts, never a shape scan:
+    // the last-built forward kernel's first write slot in binding order.
+    let per_step_observation: Option<BufferId> = training.is_some().then(|| {
+        builder
+            .builds
+            .iter()
+            .rev()
+            .find(|build| forward_ids.contains(&build.function))
+            .and_then(|build| {
+                build
+                    .resources
+                    .iter()
+                    .find(|resource| {
+                        matches!(
+                            resource.access,
+                            MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+                        )
+                    })
+                    .map(|resource| resource.buffer_id)
+            })
+    })   .flatten();
+
+    // S5A-U1: the declared END-OF-RUN gradient set — the companion gradient
+    // buffers the training plan's gradient-flow links feed into a train_step.
+    // A frozen-input gradient no step consumes is per-step scratch — declared
+    // never, observed never.
+    let train_step_gradients: BTreeSet<BufferId> = training
+        .map(|training| {
+            training
+                .gradients
+                .iter()
+                .filter_map(|link| {
+                    builder
+                        .gradient_buffers
+                        .get(&(link.companion.0, link.gradient_slot))
+                        .copied()
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    // Council-8 CB-3: the reduced-resource projection is a fact of the BUFFER
+    // VERSION, defined by its producing slot — reconciled to ONE fact per
+    // (buffer, version); two distinct `Some` facts fail closed here.
     let mut projection_by_buffer: BTreeMap<BufferId, Option<crate::abi::ReducedProjection>> =
         BTreeMap::new();
-    for (_, _, _, _, resources) in &builds {
-        for resource in resources {
+    for build in &builder.builds {
+        for resource in &build.resources {
             let Some(projection) = resource.reduced_projection else {
                 continue;
             };
@@ -324,13 +469,19 @@ pub fn build_device_program(
         }
     }
 
+    // Pass 2: materialize the program with the merged identity facts. Launch
+    // ids are assigned in declaration order; the launch SEQUENCE is
+    // re-ordered afterwards to follow the carried dependency graph.
+    let training_program = training.is_some();
     let mut device_program = DeviceProgram::new(lifetime);
-    for (function, entry, plan, launch, resources) in builds {
+    for build in &builder.builds {
         let kernel_index = device_program.kernels.len();
-        let device_resources = resources
+        let device_resources = build
+            .resources
             .iter()
             .map(|resource| {
-                let buffer = buffers
+                let buffer = builder
+                    .buffers
                     .iter()
                     .find(|buffer| buffer.id == resource.buffer_id)
                     .expect("every resource buffer was registered");
@@ -339,12 +490,12 @@ pub fn build_device_program(
                     name: buffer.name.clone(),
                     role: buffer.role,
                     storage: MirTensorStorageLayout::DeviceHandle,
-                    lifetime: buffer_lifetime(buffer, lifetime),
+                    lifetime: unified_lifetime(buffer, training_program, per_step_observation),
                 };
                 let version = BufferVersion {
                     version: 1,
                     element_ty: resource.element_ty,
-                    element_count: buffer.element_count,
+                    element_count: resource.element_count,
                     reduced_projection: projection_by_buffer
                         .get(&resource.buffer_id)
                         .copied()
@@ -363,11 +514,11 @@ pub fn build_device_program(
             })
             .collect::<Vec<_>>();
         device_program.kernels.push(KernelUnit {
-            function,
-            entry,
-            plan,
+            function: build.function,
+            entry: build.entry.clone(),
+            plan: build.plan.clone(),
             resources: device_resources,
-            launch,
+            launch: build.launch,
         });
         device_program.launches.push(LaunchUnit {
             id: LaunchId(u32::try_from(kernel_index + 1).unwrap_or(u32::MAX)),
@@ -375,9 +526,40 @@ pub fn build_device_program(
         });
     }
 
-    let dependencies = derive_dependencies(&device_program);
-    let mut semantics = derive_semantics(&device_program, &buffers, companions, &dependencies);
-    device_program.results = derive_results(&device_program, &buffers, lifetime);
+    // F3: the launch sequence follows the carried producer/consumer
+    // dependency graph, never kernel declaration order. A RepeatingStep
+    // program's trainable-param edges are persistent-state facts (the step
+    // writes the value the NEXT step reads) — excluded so the single-step
+    // sequence stays acyclic.
+    let param_buffer_ids: Vec<BufferId> = builder
+        .buffers
+        .iter()
+        .filter(|buffer| buffer.param)
+        .map(|buffer| buffer.id)
+        .collect();
+    device_program.launches =
+        dependency_ordered_launches(&device_program, &param_buffer_ids)?;
+
+    // S5A-U1: declare the observation-eligible results with their cadence —
+    // the constructor's DECLARED fact from the training program's structure,
+    // never derived from buffer shapes or names.
+    device_program.results = declared_result_rows(
+        &device_program,
+        &builder.buffers,
+        &projection_by_buffer,
+        training_program,
+        per_step_observation,
+        &train_step_gradients,
+    );
+
+    // Pass 3: mint the carried semantic facts (F1–F6) and validate the
+    // program together with them fail-closed.
+    let mut semantics = semantic_facts(
+        &device_program,
+        &builder.buffers,
+        companions,
+        &param_buffer_ids,
+    );
     semantics.observations = device_program
         .results
         .iter()
@@ -391,76 +573,592 @@ pub fn build_device_program(
     device_program
         .validate_with_semantics(&semantics)
         .map_err(DeviceProgramBuildError::Program)?;
-    Ok((device_program, semantics))
+
+    // The effective declared step count (S5-U5b): the admitted training-plan
+    // count when the program is a RepeatingStep training program; otherwise
+    // the caller's declared value.
+    let effective_steps = training
+        .map(|facts| facts.step_count)
+        .unwrap_or(declared_steps);
+    Ok((device_program, semantics, effective_steps))
 }
 
-/// Training-side facts intentionally stay MIR-owned.  Faber's package layer
-/// can translate its package analysis into this small carrier without making
-/// the compiler crate depend on product-private training types.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct DeviceTrainingFacts {
-    /// Additional validated MIR functions selected by training analysis.
-    pub device_function_ids: Vec<MirFunctionId>,
+// ---------------------------------------------------------------------------
+// Per-kernel construction (whole-function path + decomposition fallback)
+// ---------------------------------------------------------------------------
+
+/// One function's kernel construction state: the cross-kernel buffer
+/// unification table plus the training aliasing facts.
+struct KernelBuilder<'a> {
+    interner: &'a Interner,
+    validation: &'a crate::MirValidationContext<'a>,
     /// `(function, local)` origins that persist across repeating steps.
-    pub persistent_buffers: BTreeSet<(MirFunctionId, MirLocalId)>,
+    persistent_locals: BTreeSet<(MirFunctionId, MirLocalId)>,
+    /// (step function, param local) → (param position, update output slot)
+    /// for the trainable params of the training loop.
+    param_updates: BTreeMap<(MirFunctionId, MirLocalId), (u32, u32)>,
+    /// (step function, param position) → (companion DefId, gradient slot)
+    /// for the gradient-flow links.
+    gradient_links: BTreeMap<(MirFunctionId, u32), (u32, u32)>,
+    /// Every selected-input gradient slot of a device-resident companion.
+    companion_gradient_slots: BTreeMap<u32, BTreeSet<u32>>,
+    /// The companion gradient buffers minted so far, keyed by the producing
+    /// (companion DefId, full result-tuple slot) — consulted while the
+    /// train_step kernels are built (the backward → train_step edge).
+    gradient_buffers: BTreeMap<(u32, u32), BufferId>,
+    buffers: Vec<ProgramBuffer>,
+    next_buffer_id: u32,
+    builds: Vec<KernelBuild>,
 }
 
-fn find_or_insert_buffer(
-    buffers: &mut Vec<ProgramBuffer>,
-    next_buffer_id: &mut u32,
-    function: &MirFunction,
-    resource: &crate::abi::MirKernelResource,
-    name: String,
-    role: BufferRole,
-    persistent: bool,
-) -> BufferId {
-    // A read continues an existing logical buffer.  A second independent
-    // writer never aliases merely because its fallback name and shape match.
-    if let Some(entry) = buffers.iter_mut().find(|entry| {
-        entry.matches(&name, resource.element_ty, resource.element_count)
-            && compatible_roles(entry.role, role)
-            && (resource.access == MirKernelResourceAccess::Read || !entry.written)
-    }) {
-        merge_buffer_facts(entry, role, resource, persistent);
-        return entry.id;
+impl<'a> KernelBuilder<'a> {
+    fn new(
+        interner: &'a Interner,
+        validation: &'a crate::MirValidationContext<'a>,
+        companions: &MirCompanionMap,
+        training: Option<&DeviceTrainingFacts>,
+        param_updates: BTreeMap<(MirFunctionId, MirLocalId), (u32, u32)>,
+    ) -> Self {
+        let mut gradient_links = BTreeMap::new();
+        let persistent_locals = training
+            .map(|facts| facts.persistent_buffers.clone())
+            .unwrap_or_default();
+        if let Some(training) = training {
+            for link in &training.gradients {
+                gradient_links.insert(
+                    (link.step_function, link.gradient_position),
+                    (link.companion.0, link.gradient_slot),
+                );
+            }
+        }
+        // EVERY selected-input gradient slot of a device-resident companion
+        // is a per-step scratch buffer — including a frozen input's gradient.
+        let mut companion_gradient_slots: BTreeMap<u32, BTreeSet<u32>> = BTreeMap::new();
+        for entry in companions.iter().filter(|entry| entry.device_resident) {
+            for selected in &entry.selected_inputs {
+                companion_gradient_slots
+                    .entry(entry.companion.0)
+                    .or_default()
+                    .insert(selected.gradient_slot);
+            }
+        }
+        Self {
+            interner,
+            validation,
+            persistent_locals,
+            param_updates,
+            gradient_links,
+            companion_gradient_slots,
+            gradient_buffers: BTreeMap::new(),
+            buffers: Vec::new(),
+            next_buffer_id: 1,
+            builds: Vec::new(),
+        }
     }
 
-    let id = BufferId(*next_buffer_id);
-    *next_buffer_id = next_buffer_id.saturating_add(1);
-    let origin = resource.source_local.map_or_else(
-        || {
-            if resource.role == crate::abi::MirKernelResourceRole::Input {
-                SemanticValueOrigin::HostInput
+    /// Build every kernel of one device-resident function: the whole-function
+    /// path when the complete ABI signature and plan resolve, else the
+    /// decomposition fallback (one kernel per recipe subchain).
+    fn build_function(&mut self, function: &MirFunction) -> Result<(), DeviceProgramBuildError> {
+        let base_entry = crate::host_partition::kernel_entry_name(function, self.interner);
+        // The source function's return-tuple field locals (in full-tuple
+        // order) — the discriminator for the S5-U5 update-output aliasing.
+        let return_tuple_locals = tuple_return_locals(function).unwrap_or_default();
+
+        // Whole-function path: a single-recipe or elementwise-only body
+        // carries ONE kernel from its full ABI signature.
+        let whole_signature = MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+            function,
+            self.validation,
+            self.interner,
+        );
+        if let Ok(signature) = &whole_signature {
+            if let Ok(Some(plan)) = kernel_plan_for_function(function, signature, self.validation) {
+                return self.emit_subchain(
+                    function,
+                    function,
+                    signature,
+                    plan,
+                    base_entry,
+                    None,
+                    &return_tuple_locals,
+                    &mut BTreeMap::new(),
+                );
+            }
+        }
+
+        // Decomposition path (S5-U1/U5): split the body at recipe boundaries
+        // into subchain kernels, each carrying exactly one recipe (or an
+        // elementwise-only body), with the shared contract-shaped emission
+        // signature for recipe subchains and the full ABI synthesis for
+        // elementwise-only subchains.
+        let decomposition = decompose_kernel_function(function, self.validation).map_err(
+            |error| DeviceProgramBuildError::Decomposition {
+                function: function.id,
+                detail: error.message,
+            },
+        )?;
+        // An empty body (no statements at all) decomposes to zero subchains:
+        // it is trivially elementwise — no op exists to floor — and the
+        // whole-function signature emits it as one Elementwise kernel. An
+        // unplannable body never reaches here (the decomposition above
+        // already failed with the typed plan diagnostic).
+        if decomposition.subchains.is_empty() {
+            return match whole_signature {
+                Ok(signature) => {
+                    self.emit_subchain(
+                        function,
+                        function,
+                        &signature,
+                        CollectionKernelPlan::Elementwise,
+                        base_entry,
+                        None,
+                        &return_tuple_locals,
+                        &mut BTreeMap::new(),
+                    )
+                }
+                Err(error) => Err(DeviceProgramBuildError::KernelAbi {
+                    function: function.id,
+                    detail: error.message,
+                }),
+            };
+        }
+        let mut subchain_types = TypeTable::from_snapshot(
+            self.validation.types.snapshot(),
+        )
+        .map_err(|error| DeviceProgramBuildError::SubchainTypes {
+            detail: error,
+        })?;
+        decomposition.intern_output_tuple_types(function, &mut subchain_types);
+        let subchain_validation = self.validation.with_types(&subchain_types);
+
+        // The decomposed path records each subchain output slot's buffer id
+        // (subchain index, output-slot index) while the subchains are built,
+        // so the D-6 fill can resolve the companion's FULL result-tuple field
+        // producers after all subchains are emitted.
+        let mut subchain_output_buffer_ids: BTreeMap<(usize, u32), BufferId> = BTreeMap::new();
+        for (subchain_index, subchain) in decomposition.subchains.iter().enumerate() {
+            let synthetic =
+                decomposition.subchain_function(function, subchain_index, subchain_validation.types);
+            let contract = collection_op_contract(&synthetic, &subchain_validation).map_err(
+                |error| DeviceProgramBuildError::KernelPlan {
+                    function: function.id,
+                    detail: error.message,
+                },
+            )?;
+            let signature = match &contract {
+                Some(contract) => {
+                    subchain_signature_for_emission_with_source(
+                        &synthetic,
+                        contract,
+                        &subchain_validation,
+                        &subchain.outputs,
+                        Some(function),
+                    )
+                    .map_err(|error| DeviceProgramBuildError::KernelAbi {
+                        function: function.id,
+                        detail: error.message,
+                    })?
+                }
+                None => {
+                    // A transformer-recipe subchain (`TensorSumAxis` /
+                    // `TensorSoftmax` / `TensorLayerNorm` / the GI3-1
+                    // inference recipes) has no `CollectionOpContract`
+                    // variant — its signature dispatches through the P1 seam
+                    // (the transformer-shaped recipe resources plus the
+                    // subchain's data-flow inputs). Elementwise-only
+                    // subchains keep the full ABI synthesis. The SOURCE
+                    // function rides both seam calls so cross-kernel
+                    // unification sees one shape per local.
+                    if let Some(op) = transformer_recipe_op(&synthetic) {
+                        transformer_subchain_signature_for_emission_with_source(
+                            &synthetic,
+                            op,
+                            &subchain_validation,
+                            &subchain.outputs,
+                            Some(function),
+                        )
+                        .map_err(|error| DeviceProgramBuildError::KernelAbi {
+                            function: function.id,
+                            detail: error.message,
+                        })?
+                    } else {
+                        MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+                            &synthetic,
+                            &subchain_validation,
+                            self.interner,
+                        )
+                        .map_err(|error| DeviceProgramBuildError::KernelAbi {
+                            function: function.id,
+                            detail: error.message,
+                        })?
+                    }
+                }
+            };
+            let entry = if decomposition.subchains.len() == 1 {
+                base_entry.clone()
             } else {
-                SemanticValueOrigin::Synthetic {
-                    label: format!("buffer-{}", id.0),
+                format!("{base_entry}__{subchain_index}")
+            };
+            self.emit_subchain(
+                function,
+                &synthetic,
+                &signature,
+                subchain.plan.clone(),
+                entry,
+                Some(subchain_index),
+                &return_tuple_locals,
+                &mut subchain_output_buffer_ids,
+            )?;
+        }
+
+        // D-6 gradient-slot → buffer mapping: the companion's gradient slots
+        // index the FULL result-tuple, which the LAST subchain's return-tuple
+        // Construct binds to locals. The train_step gradient reads alias the
+        // producing subchains' gradient buffers (the backward → train_step
+        // device-to-device edge).
+        if let Some(source) = function.source {
+            if self.companion_gradient_slots.contains_key(&source.0) {
+                if let Some(fields) = decomposition.return_tuple_fields(function) {
+                    for (slot, field_local) in fields.iter().enumerate() {
+                        let slot = u32::try_from(slot).unwrap_or(u32::MAX);
+                        if !self.companion_gradient_slots[&source.0].contains(&slot) {
+                            continue;
+                        }
+                        let Some((producer_index, output_position)) =
+                            decomposition.producer_position(*field_local)
+                        else {
+                            continue;
+                        };
+                        let output_position =
+                            u32::try_from(output_position).unwrap_or(u32::MAX);
+                        let Some(&buffer_id) =
+                            subchain_output_buffer_ids.get(&(producer_index, output_position))
+                        else {
+                            continue;
+                        };
+                        if let Some(entry) = self
+                            .buffers
+                            .iter_mut()
+                            .find(|entry| entry.id == buffer_id)
+                        {
+                            entry.gradient = true;
+                        }
+                        self.gradient_buffers.insert((source.0, slot), buffer_id);
+                    }
                 }
             }
-        },
-        |local| SemanticValueOrigin::MirLocal {
-            function: function.id,
-            local: local.0,
-        },
-    );
-    buffers.push(ProgramBuffer {
-        id,
-        name,
-        element_ty: resource.element_ty,
-        element_count: resource.element_count,
-        role: if persistent { BufferRole::InOut } else { role },
-        written: matches!(
-            resource.access,
-            MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
-        ),
-        consumed: resource.access == MirKernelResourceAccess::Read,
-        readwrite: resource.access == MirKernelResourceAccess::ReadWrite,
-        persistent,
-        origin,
-    });
-    id
+        }
+        Ok(())
+    }
+
+    /// Emit one kernel (a whole function or one decomposition subchain): the
+    /// typed resource slots with buffer ids resolved by the unification pass
+    /// (the S2-5 wiring, the param-update aliasing, and the gradient
+    /// aliasing).
+    #[allow(clippy::too_many_arguments)]
+    fn emit_subchain(
+        &mut self,
+        kernel_source: &MirFunction,
+        synthetic: &MirFunction,
+        signature: &MirKernelSignature,
+        plan: CollectionKernelPlan,
+        entry: String,
+        subchain_index: Option<usize>,
+        return_tuple_locals: &[MirLocalId],
+        subchain_output_buffer_ids: &mut BTreeMap<(usize, u32), BufferId>,
+    ) -> Result<(), DeviceProgramBuildError> {
+        let mut resources: Vec<ResourceBuild> = Vec::new();
+        // The trainable param local → its registered buffer id, filled as the
+        // signature's input slots are processed (inputs precede outputs in
+        // the ABI), so the update output slots can alias it.
+        let mut param_buffer_by_local: BTreeMap<MirLocalId, BufferId> = BTreeMap::new();
+        for resource in signature
+            .resources()
+            .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
+        {
+            let role = BufferRole::from_abi_role(resource.role, resource.access).ok_or_else(
+                || DeviceProgramBuildError::BufferRole {
+                    function: kernel_source.id,
+                    binding: resource.binding,
+                    role: format!("{:?}", resource.role),
+                    access: format!("{:?}", resource.access),
+                },
+            )?;
+            // A trainable parameter's read slot: the buffer is persistent
+            // InOut state with HostProvided init — the program role is InOut
+            // regardless of the slot's ABI role.
+            let is_param_input = resource.role == MirKernelResourceRole::Input
+                && resource.source_local.is_some_and(|local| {
+                    self.param_updates.contains_key(&(kernel_source.id, local))
+                        || self
+                            .persistent_locals
+                            .contains(&(kernel_source.id, local))
+                });
+            // The output-slot tuple index (the ABI's first output is element
+            // 0, each extra output follows).
+            let output_index = if resource.role == MirKernelResourceRole::Output {
+                Some(output_slot_index(signature, resource))
+            } else {
+                None
+            };
+            // An update output slot: the slot's tuple index decides which
+            // parameter it updates. The alias applies ONLY when the output
+            // slot IS the full result-tuple slot for that parameter's update
+            // — an intermediate subchain's local output slot never carries a
+            // full-tuple index and must never be written into the parameter
+            // buffer.
+            let alias_param = match output_index {
+                Some(output_index) => {
+                    let full_tuple_slot = resource.source_local.is_some_and(|local| {
+                        return_tuple_locals.get(output_index as usize).copied() == Some(local)
+                    });
+                    if full_tuple_slot {
+                        self.param_updates
+                            .iter()
+                            .find(|((_, _), (_, update_output))| *update_output == output_index)
+                            .and_then(|((_, param_local), _)| {
+                                param_buffer_by_local.get(param_local).copied()
+                            })
+                    } else {
+                        None
+                    }
+                }
+                None => None,
+            };
+            // A gradient input slot of a train_step: the gradient buffer the
+            // companion's result-tuple slot writes — the explicit backward →
+            // train_step data-flow connection (the gradient identity rides
+            // the companion relation, never a name).
+            let gradient_alias = if resource.role == MirKernelResourceRole::Input {
+                resource.source_local.and_then(|local| {
+                    let position = kernel_source
+                        .params
+                        .iter()
+                        .position(|param| param.local == local);
+                    position.and_then(|position| {
+                        self.gradient_links
+                            .get(&(
+                                kernel_source.id,
+                                u32::try_from(position).unwrap_or(u32::MAX),
+                            ))
+                            .and_then(|(companion, slot)| {
+                                self.gradient_buffers.get(&(*companion, *slot)).copied()
+                            })
+                    })
+                })
+            } else {
+                None
+            };
+            let name = buffer_slot_name(kernel_source, self.interner, resource);
+            // The cross-kernel wiring: the same logical buffer appears at
+            // this kernel too. The role guard ([`unify_roles`]) keeps a
+            // name/shape coincidence from aliasing two unrelated values.
+            let buffer_id = if let Some(alias) = alias_param {
+                alias
+            } else if let Some(alias) = gradient_alias {
+                // The gradient input consumes the companion's gradient output
+                // buffer — the buffer becomes an InOut per-step intermediate,
+                // never an observation point.
+                if let Some(entry) = self.buffers.iter_mut().find(|entry| entry.id == alias) {
+                    entry.role = merge_buffer_roles(entry.role, BufferRole::InOut);
+                    entry.consumed = true;
+                }
+                alias
+            } else if let Some(entry) = self.buffers.iter_mut().find(|entry| {
+                // S5-U1 forward-save identity: when the slot carries a source
+                // local, the (function, local) origin fact joins the
+                // producing and consuming decomposition subchains even when
+                // the role-based fallback names differ. The role guard keeps
+                // the join honest exactly as it guards the name+shape wiring.
+                let same_local_identity = resource.source_local.is_some_and(|local| {
+                    matches!(
+                        entry.origin,
+                        SemanticValueOrigin::MirLocal {
+                            function: origin_function,
+                            local: origin_local,
+                        } if origin_function == kernel_source.id && origin_local == local.0
+                    )
+                });
+                same_local_identity && unify_roles(entry.role, role)
+            }) {
+                merge_slot_facts(entry, role, resource, is_param_input);
+                entry.id
+            } else if let Some(entry) = self.buffers.iter_mut().find(|entry| {
+                // The name+shape wiring is a data-flow continuation, never a
+                // second independent writer: a consumer slot joins any
+                // same-name/same-shape buffer; a producer slot joins only a
+                // buffer with NO writer yet (the reverse-declared
+                // producer→consumer chain).
+                entry.matches(&name, resource.element_ty, resource.element_count)
+                    && unify_roles(entry.role, role)
+                    && (resource.access == MirKernelResourceAccess::Read || !entry.written)
+            }) {
+                merge_slot_facts(entry, role, resource, is_param_input);
+                entry.id
+            } else {
+                let id = BufferId(self.next_buffer_id);
+                self.next_buffer_id = self.next_buffer_id.saturating_add(1);
+                self.buffers.push(ProgramBuffer {
+                    id,
+                    name,
+                    element_ty: resource.element_ty,
+                    element_count: resource.element_count,
+                    role: if is_param_input {
+                        BufferRole::InOut
+                    } else {
+                        role
+                    },
+                    written: matches!(
+                        resource.access,
+                        MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+                    ),
+                    consumed: resource.access == MirKernelResourceAccess::Read,
+                    readwrite: resource.access == MirKernelResourceAccess::ReadWrite,
+                    param: is_param_input,
+                    gradient: false,
+                    origin: value_origin(kernel_source, resource, id),
+                });
+                id
+            };
+            if is_param_input {
+                if let Some(local) = resource.source_local {
+                    param_buffer_by_local.insert(local, buffer_id);
+                }
+            }
+            // Record the companion's gradient output buffers as they are
+            // minted (the train_step kernels built afterwards alias them);
+            // a companion gradient slot is a per-step scratch value, never an
+            // observation point. Decomposed companions mark their gradient
+            // slots after ALL subchains from the decomposition's
+            // return-tuple field bindings (D-6) — here only the produced
+            // buffer id is recorded for that fill.
+            if let (Some(source), Some(output_index)) = (kernel_source.source, output_index) {
+                if subchain_index.is_none()
+                    && self
+                        .companion_gradient_slots
+                        .get(&source.0)
+                        .is_some_and(|slots| slots.contains(&output_index))
+                {
+                    if let Some(entry) = self.buffers.iter_mut().find(|entry| entry.id == buffer_id)
+                    {
+                        entry.gradient = true;
+                    }
+                    self.gradient_buffers.insert((source.0, output_index), buffer_id);
+                }
+                if let Some(subchain_index) = subchain_index {
+                    subchain_output_buffer_ids.insert((subchain_index, output_index), buffer_id);
+                }
+            }
+            resources.push(ResourceBuild {
+                group: resource.group,
+                binding: resource.binding,
+                access: resource.access,
+                buffer_id,
+                element_ty: resource.element_ty,
+                element_count: resource.element_count,
+                reduced_projection: resource.reduced_projection,
+            });
+        }
+        // The launch binds buffers in binding order (inputs first, output
+        // last), matching the emitted kernel's buffer indices / param order.
+        resources.sort_by_key(|resource| (resource.binding, resource.group));
+        self.builds.push(KernelBuild {
+            function: kernel_source.id,
+            entry,
+            plan,
+            launch: KernelLaunchPlan::from_signature_and_function(signature, synthetic),
+            resources,
+        });
+        Ok(())
+    }
 }
 
-fn compatible_roles(existing: BufferRole, next: BufferRole) -> bool {
+/// The transformer recipe op of a subchain body, when it carries exactly one
+/// (S6-P1 statement scan — a body mixing distinct transformer recipes fails
+/// closed upstream at plan resolution).
+fn transformer_recipe_op(function: &MirFunction) -> Option<crate::MirCollectionOp> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                continue;
+            };
+            let crate::MirIntrinsic::Collection(op) = call.intrinsic else {
+                continue;
+            };
+            if is_transformer_recipe_op(op) {
+                return Some(op);
+            }
+        }
+    }
+    None
+}
+
+/// The return-tuple element locals of a tuple-return function, in tuple order
+/// (from the aggregate construction that produces the returned tuple).
+fn tuple_return_locals(function: &MirFunction) -> Option<Vec<MirLocalId>> {
+    let block = function.blocks.first()?;
+    let crate::MirTerminatorKind::Return(Some(operand)) = &block.terminator.kind else {
+        return None;
+    };
+    let returned = match operand {
+        crate::MirOperand::Temp(temp) => crate::MirPlace::temp(*temp),
+        crate::MirOperand::Place(place) if place.projections.is_empty() => place.clone(),
+        _ => return None,
+    };
+    for statement in &block.statements {
+        let MirStatementKind::Construct {
+            destination,
+            aggregate,
+        } = &statement.kind
+        else {
+            continue;
+        };
+        if destination != &returned {
+            continue;
+        }
+        let locals: Vec<MirLocalId> = aggregate
+            .fields
+            .operands()
+            .iter()
+            .filter_map(|operand| match operand {
+                crate::MirOperand::Place(place) if place.projections.is_empty() => {
+                    match place.base {
+                        crate::MirPlaceBase::Local(local) => Some(local),
+                        _ => None,
+                    }
+                }
+                _ => None,
+            })
+            .collect();
+        if locals.is_empty() {
+            return None;
+        }
+        return Some(locals);
+    }
+    None
+}
+
+/// The output-slot tuple index of a multi-output ABI output resource: the
+/// first output (`signature.output`) is tuple element 0, each `extra_outputs`
+/// element follows.
+fn output_slot_index(signature: &MirKernelSignature, output: &MirKernelResource) -> u32 {
+    if signature.output.binding == output.binding {
+        return 0;
+    }
+    for (index, extra) in signature.extra_outputs.iter().enumerate() {
+        if extra.binding == output.binding {
+            return u32::try_from(index + 1).unwrap_or(u32::MAX);
+        }
+    }
+    u32::MAX
+}
+
+/// Whether a slot with program role `next` may join an existing buffer with
+/// role `existing` under the cross-kernel wiring: the wiring is a data-flow
+/// continuation, so two independent producers of the same named output never
+/// unify.
+fn unify_roles(existing: BufferRole, next: BufferRole) -> bool {
     matches!(
         (existing, next),
         (BufferRole::Input | BufferRole::Output, BufferRole::Input)
@@ -470,20 +1168,30 @@ fn compatible_roles(existing: BufferRole, next: BufferRole) -> bool {
     )
 }
 
-fn merge_buffer_facts(
+/// Merge an ABI-derived role onto a buffer's program-level role under one id.
+fn merge_buffer_roles(previous: BufferRole, next: BufferRole) -> BufferRole {
+    match (previous, next) {
+        (BufferRole::Input, BufferRole::Input) => BufferRole::Input,
+        (BufferRole::Output, BufferRole::Output) => BufferRole::Output,
+        _ => BufferRole::InOut,
+    }
+}
+
+/// Merge a slot's facts onto an existing unified buffer under one id: the
+/// role merge (a trainable-parameter slot forces InOut) and the independent
+/// resource-state axes (`written` / `consumed` / `readwrite` / `param`).
+/// Shared by the carried local-identity wiring (S5-U1) and the name+shape
+/// wiring — the two joins must never drift apart.
+fn merge_slot_facts(
     entry: &mut ProgramBuffer,
     role: BufferRole,
-    resource: &crate::abi::MirKernelResource,
-    persistent: bool,
+    resource: &MirKernelResource,
+    is_param_input: bool,
 ) {
-    entry.role = if persistent {
+    entry.role = if is_param_input {
         BufferRole::InOut
     } else {
-        match (entry.role, role) {
-            (BufferRole::Input, BufferRole::Input) => BufferRole::Input,
-            (BufferRole::Output, BufferRole::Output) => BufferRole::Output,
-            _ => BufferRole::InOut,
-        }
+        merge_buffer_roles(entry.role, role)
     };
     entry.written |= matches!(
         resource.access,
@@ -491,95 +1199,307 @@ fn merge_buffer_facts(
     );
     entry.consumed |= resource.access == MirKernelResourceAccess::Read;
     entry.readwrite |= resource.access == MirKernelResourceAccess::ReadWrite;
-    entry.persistent |= persistent;
+    entry.param |= is_param_input;
 }
 
+/// The buffer name for a storage slot: the kernel source function's param /
+/// local name when the slot names one, else the role-based fallback.
 fn buffer_slot_name(
     function: &MirFunction,
     interner: &Interner,
-    resource: &crate::abi::MirKernelResource,
+    resource: &MirKernelResource,
 ) -> String {
-    if let Some(name) = &resource.source_name {
-        return name.clone();
-    }
     if let Some(local) = resource.source_local {
         if let Some(name) = function
             .params
             .iter()
             .find(|param| param.local == local)
             .and_then(|param| param.name)
+            .and_then(|symbol| safe_interner_name(interner, symbol))
         {
-            return interner.resolve(name).to_owned();
+            return name;
         }
         if let Some(name) = function
             .locals
             .iter()
             .find(|local_info| local_info.id == local)
             .and_then(|local_info| local_info.name)
+            .and_then(|symbol| safe_interner_name(interner, symbol))
         {
-            return interner.resolve(name).to_owned();
+            return name;
         }
     }
     match resource.role {
-        crate::abi::MirKernelResourceRole::Input => format!("input_{}", resource.binding),
-        crate::abi::MirKernelResourceRole::Output => format!("output_{}", resource.binding),
+        MirKernelResourceRole::Input => format!("input_{}", resource.binding),
+        MirKernelResourceRole::Output => format!("output_{}", resource.binding),
     }
 }
 
-fn buffer_lifetime(buffer: &ProgramBuffer, lifetime: DeviceProgramLifetime) -> BufferLifetime {
-    if buffer.persistent || !buffer.written || buffer.readwrite {
+/// Resolve a symbol name safely: an uninterned synthetic symbol falls back to
+/// `None` instead of indexing past the interner's string table — the caller
+/// then uses the role-based fallback name.
+fn safe_interner_name(interner: &Interner, symbol: radix_lexer::Symbol) -> Option<String> {
+    if (symbol.0 as usize) < interner.strings().len() {
+        Some(interner.resolve(symbol).to_owned())
+    } else {
+        None
+    }
+}
+
+/// The carried fact a buffer's semantic value identity is minted from (F1):
+/// the MIR local the slot's value flows from when the slot names one (stable
+/// under rename), a host-provided input for an anonymous read slot, or a
+/// distinct synthetic label for an anonymous writer slot.
+fn value_origin(
+    function: &MirFunction,
+    resource: &MirKernelResource,
+    buffer_id: BufferId,
+) -> SemanticValueOrigin {
+    if let Some(local) = resource.source_local {
+        SemanticValueOrigin::MirLocal {
+            function: function.id,
+            local: local.0,
+        }
+    } else if resource.role == MirKernelResourceRole::Input {
+        SemanticValueOrigin::HostInput
+    } else {
+        SemanticValueOrigin::Synthetic {
+            label: format!("buffer-{}", buffer_id.0),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Launch ordering (F3) + lifetime/results/semantics derivation
+// ---------------------------------------------------------------------------
+
+/// Order the launch sequence to follow the carried producer/consumer
+/// dependency graph (F3) — never kernel declaration order. Producers always
+/// precede their consumers; the launch ids are carried facts and do not
+/// change, only their position in the execution sequence does.
+///
+/// A `RepeatingStep` program's trainable-parameter edges are EXCLUDED: the
+/// parameter is persistent state — the step writes the value the NEXT step
+/// reads — so the write→read edge within one step's sequence would form a
+/// cycle.
+///
+/// # Errors
+/// Fail-closed when the dependency graph contains a cycle (a launch sequence
+/// that follows it would never terminate).
+fn dependency_ordered_launches(
+    program: &DeviceProgram,
+    excluded_buffers: &[BufferId],
+) -> Result<Vec<LaunchUnit>, DeviceProgramBuildError> {
+    let edges = program
+        .buffer_registry()
+        .data_flow_pairs()
+        .into_iter()
+        .filter(|edge| !excluded_buffers.contains(&edge.buffer))
+        .collect::<Vec<_>>();
+    let mut indegree: BTreeMap<LaunchId, usize> = BTreeMap::new();
+    let mut dependents: BTreeMap<LaunchId, Vec<LaunchId>> = BTreeMap::new();
+    for launch in &program.launches {
+        indegree.insert(launch.id, 0);
+    }
+    for edge in &edges {
+        if edge.producer == edge.consumer {
+            continue;
+        }
+        *indegree.entry(edge.consumer).or_insert(0) += 1;
+        dependents
+            .entry(edge.producer)
+            .or_default()
+            .push(edge.consumer);
+    }
+    // Kahn's algorithm seeded in declaration order: independent launches keep
+    // their declaration order, and any launch that depends on another is
+    // emitted only after every producer has run.
+    let mut ready: VecDeque<LaunchId> = program
+        .launches
+        .iter()
+        .filter(|launch| indegree.get(&launch.id).copied().unwrap_or(0) == 0)
+        .map(|launch| launch.id)
+        .collect();
+    let mut ordered: Vec<LaunchId> = Vec::with_capacity(program.launches.len());
+    while let Some(id) = ready.pop_front() {
+        ordered.push(id);
+        if let Some(consumers) = dependents.get(&id) {
+            for &consumer in consumers {
+                if let Some(count) = indegree.get_mut(&consumer) {
+                    *count -= 1;
+                    if *count == 0 {
+                        ready.push_back(consumer);
+                    }
+                }
+            }
+        }
+    }
+    if ordered.len() != program.launches.len() {
+        return Err(DeviceProgramBuildError::LaunchOrder {
+            detail: "the carried producer/consumer dependency graph contains a cycle; the \
+                     launch sequence cannot follow it"
+                .to_owned(),
+        });
+    }
+    let mut position: BTreeMap<LaunchId, usize> = BTreeMap::new();
+    for (index, id) in ordered.iter().enumerate() {
+        position.insert(*id, index);
+    }
+    let mut sorted = program.launches.to_vec();
+    sorted.sort_by_key(|launch| position.get(&launch.id).copied().unwrap_or(usize::MAX));
+    Ok(sorted)
+}
+
+/// The independent allocation-lifetime axis (F5) of a unified buffer, decided
+/// from its aggregate access facts and the trainable-parameter flag — never
+/// from the role:
+///
+/// - a trainable parameter is persistent device-resident state (per-program);
+/// - a buffer no kernel ever writes is host-provided persistent state
+///   (per-program);
+/// - an in-place ReadWrite slot is persistent writable state (an accumulator
+///   / optimizer-state buffer, per-program);
+/// - a kernel-written buffer another kernel consumes is a step-local
+///   intermediate (per-step);
+/// - a companion gradient slot is per-step scratch;
+/// - a kernel-written final is read back at an observation point.
+///
+/// G2/G3 (U8 repair) + S5A-U1: a `RepeatingStep` training program's per-step
+/// observation is ONLY the DECLARED loss buffer — every other
+/// written-not-consumed final is a step-local final.
+fn unified_lifetime(
+    entry: &ProgramBuffer,
+    training_program: bool,
+    per_step_observation: Option<BufferId>,
+) -> BufferLifetime {
+    if entry.param {
         return BufferLifetime::PerProgram;
     }
-    if buffer.consumed {
+    if entry.readwrite {
+        return BufferLifetime::PerProgram;
+    }
+    if entry.gradient {
         return BufferLifetime::PerStep;
     }
-    match lifetime {
-        DeviceProgramLifetime::SingleRun => BufferLifetime::PerProgram,
-        DeviceProgramLifetime::RepeatingStep => BufferLifetime::ObservationPoint,
+    if !entry.written {
+        BufferLifetime::PerProgram
+    } else if entry.consumed {
+        BufferLifetime::PerStep
+    } else if Some(entry.id) == per_step_observation {
+        BufferLifetime::ObservationPoint
+    } else if training_program {
+        BufferLifetime::PerStep
+    } else {
+        BufferLifetime::ObservationPoint
     }
 }
 
-fn derive_dependencies(program: &DeviceProgram) -> Vec<DependencyEdge> {
-    let mut latest_writer: BTreeMap<BufferId, LaunchId> = BTreeMap::new();
-    let mut dependencies = Vec::new();
+/// The launch that produces a buffer's observed version: the LAST write in
+/// execution order — the version the final readback observes.
+fn producing_launch(program: &DeviceProgram, buffer: BufferId) -> Option<LaunchId> {
+    let mut produced: Option<LaunchId> = None;
     for launch in &program.launches {
         let Some(kernel) = program.kernels.get(launch.kernel_index) else {
             continue;
         };
-        let mut seen = BTreeSet::new();
-        for resource in &kernel.resources {
-            let reading = matches!(
-                resource.access,
-                MirKernelResourceAccess::Read | MirKernelResourceAccess::ReadWrite
-            );
-            if reading {
-                if let Some(producer) = latest_writer.get(&resource.buffer.id).copied() {
-                    if seen.insert((producer, resource.buffer.id)) {
-                        dependencies.push(DependencyEdge {
-                            producer,
-                            consumer: launch.id,
-                            buffer: resource.buffer.id,
-                            version: resource.version.version,
-                        });
-                    }
-                }
-            }
-            if matches!(
-                resource.access,
-                MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
-            ) {
-                latest_writer.insert(resource.buffer.id, launch.id);
-            }
+        if kernel.resources.iter().any(|resource| {
+            resource.buffer.id == buffer
+                && matches!(
+                    resource.access,
+                    MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+                )
+        }) {
+            produced = Some(launch.id);
         }
     }
-    dependencies
+    produced
 }
 
-fn derive_semantics(
+/// Declare the observation-eligible results of a materialized program with
+/// their observation cadence (S5A-U1). The cadence is a DECLARED fact from
+/// the training program's structure — never derived from buffer shapes or
+/// names:
+///
+/// - a `RepeatingStep` training program declares the forward's return output
+///   (the loss) `PerStep` and the final forward / final gradients / final
+///   params `EndOfRun`;
+/// - a `SingleRun` program declares every declared per-execution observation
+///   point (an `ObservationPoint`-lifetime final) `PerStep`; per-step scratch
+///   (a companion gradient slot) is never a result.
+fn declared_result_rows(
+    program: &DeviceProgram,
+    buffers: &[ProgramBuffer],
+    projection_by_buffer: &BTreeMap<BufferId, Option<crate::abi::ReducedProjection>>,
+    training_program: bool,
+    per_step_observation: Option<BufferId>,
+    train_step_gradients: &BTreeSet<BufferId>,
+) -> Vec<ResultBuffer> {
+    let mut rows = Vec::new();
+    for buffer in buffers {
+        let Some(produced_by) = producing_launch(program, buffer.id) else {
+            continue;
+        };
+        let lifetime = unified_lifetime(buffer, training_program, per_step_observation);
+        let cadence = if training_program {
+            if Some(buffer.id) == per_step_observation {
+                // The declared per-step observation — the loss.
+                ObservationCadence::PerStep
+            } else if buffer.param
+                || train_step_gradients.contains(&buffer.id)
+                || (buffer.role == BufferRole::Output && buffer.written && !buffer.consumed)
+            {
+                // The final forward / final gradients / final params.
+                ObservationCadence::EndOfRun
+            } else {
+                continue;
+            }
+        } else if lifetime == BufferLifetime::ObservationPoint {
+            ObservationCadence::PerStep
+        } else {
+            continue;
+        };
+        rows.push(ResultBuffer {
+            buffer: BufferIdentity {
+                id: buffer.id,
+                name: buffer.name.clone(),
+                role: buffer.role,
+                storage: MirTensorStorageLayout::DeviceHandle,
+                lifetime,
+            },
+            version: BufferVersion {
+                version: 1,
+                element_ty: buffer.element_ty,
+                element_count: buffer.element_count,
+                reduced_projection: projection_by_buffer
+                    .get(&buffer.id)
+                    .copied()
+                    .flatten(),
+            },
+            role: buffer.role,
+            produced_by,
+            cadence,
+        });
+    }
+    rows
+}
+
+/// Mint the carried semantic facts (F1–F6) of a materialized program.
+///
+/// - values + bindings: one semantic value per unified buffer, minted from
+///   the carried origin facts (F1);
+/// - generations: every logical write in the ordered launch sequence is an
+///   explicit new generation (F2);
+/// - roots + dependencies: the carried graph the host schedules from (F3);
+///   a trainable parameter's edges are persistent-state facts — excluded;
+/// - relations: the lossless primal/companion rows from the carrier (F4);
+/// - initializations: the independent axis facts (F5) — a trainable
+///   parameter is HostProvided (copied in exactly once at session creation),
+///   never zero-filled despite its InOut access.
+fn semantic_facts(
     program: &DeviceProgram,
     buffers: &[ProgramBuffer],
     companions: &MirCompanionMap,
-    dependencies: &[DependencyEdge],
+    param_buffer_ids: &[BufferId],
 ) -> DeviceSemantics {
     let values = buffers
         .iter()
@@ -599,117 +1519,81 @@ fn derive_semantics(
         })
         .collect::<Vec<_>>();
 
+    // Generations in EXECUTION order: a later write is a new generation,
+    // never another producer of the same one (F2).
     let mut generation_by_buffer: BTreeMap<BufferId, u32> = BTreeMap::new();
     let mut generations = Vec::new();
-    let mut initializations = Vec::new();
     for launch in &program.launches {
         let Some(kernel) = program.kernels.get(launch.kernel_index) else {
             continue;
         };
         for resource in &kernel.resources {
-            let entry = generation_by_buffer.entry(resource.buffer.id).or_default();
-            if !initializations
-                .iter()
-                .any(|fact: &InitializationFact| fact.buffer == resource.buffer.id)
-            {
-                let policy = match resource.access {
-                    MirKernelResourceAccess::Read => InitializationPolicy::HostProvided,
-                    MirKernelResourceAccess::Write => InitializationPolicy::KernelInitialized,
-                    MirKernelResourceAccess::ReadWrite => InitializationPolicy::ZeroFill,
-                };
-                initializations.push(InitializationFact {
-                    buffer: resource.buffer.id,
-                    policy,
-                });
-            }
-            if matches!(
+            if !matches!(
                 resource.access,
                 MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
             ) {
-                *entry = entry.saturating_add(1);
-                generations.push(ValueGeneration {
-                    value: SemanticValueId(resource.buffer.id.0),
-                    generation: *entry,
-                    element_ty: resource.version.element_ty,
-                    element_count: resource.version.element_count,
-                    produced_by: launch.id,
-                });
+                continue;
             }
+            let entry = generation_by_buffer.entry(resource.buffer.id).or_default();
+            *entry = entry.saturating_add(1);
+            generations.push(ValueGeneration {
+                value: SemanticValueId(resource.buffer.id.0),
+                generation: *entry,
+                element_ty: resource.version.element_ty,
+                element_count: resource.version.element_count,
+                produced_by: launch.id,
+            });
         }
     }
-    let launches = program
+
+    // Persistent trainable-parameter state: the step's write feeds the NEXT
+    // step's read — excluded from this step's dependency graph.
+    let dependencies: Vec<DependencyEdge> = program
+        .buffer_registry()
+        .data_flow_pairs()
+        .into_iter()
+        .filter(|pair| !param_buffer_ids.contains(&pair.buffer))
+        .map(|pair| DependencyEdge {
+            producer: pair.producer,
+            consumer: pair.consumer,
+            buffer: pair.buffer,
+            version: pair.version,
+        })
+        .collect();
+    let roots = program
         .launches
         .iter()
         .map(|launch| launch.id)
-        .collect::<Vec<_>>();
-    let roots = launches
-        .iter()
-        .copied()
         .filter(|launch| !dependencies.iter().any(|edge| edge.consumer == *launch))
         .collect();
     let relations: Vec<LosslessMirCompanionEntry> = companions.iter().cloned().collect();
+    let initializations = buffers
+        .iter()
+        .map(|buffer| {
+            let policy = if buffer.param {
+                InitializationPolicy::HostProvided
+            } else if buffer.readwrite {
+                InitializationPolicy::ZeroFill
+            } else if !buffer.written {
+                InitializationPolicy::HostProvided
+            } else {
+                InitializationPolicy::KernelInitialized
+            };
+            InitializationFact {
+                buffer: buffer.id,
+                policy,
+            }
+        })
+        .collect();
 
     DeviceSemantics {
         values,
         bindings,
         generations,
         roots,
-        dependencies: dependencies.to_vec(),
+        dependencies,
         relations,
         initializations,
         observations: Vec::new(),
     }
-}
-
-fn derive_results(
-    program: &DeviceProgram,
-    buffers: &[ProgramBuffer],
-    lifetime: DeviceProgramLifetime,
-) -> Vec<ResultBuffer> {
-    let mut results = Vec::new();
-    for buffer in buffers {
-        if !buffer.written || buffer.consumed || buffer.role == BufferRole::Input {
-            continue;
-        }
-        let Some((launch, resource)) = program
-            .launches
-            .iter()
-            .filter_map(|launch| {
-                let kernel = program.kernels.get(launch.kernel_index)?;
-                kernel
-                    .resources
-                    .iter()
-                    .find(|resource| {
-                        resource.buffer.id == buffer.id
-                            && matches!(
-                                resource.access,
-                                MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
-                            )
-                    })
-                    .map(|resource| (launch.id, resource))
-            })
-            .next_back()
-        else {
-            continue;
-        };
-        let identity = BufferIdentity {
-            id: buffer.id,
-            name: buffer.name.clone(),
-            role: buffer.role,
-            storage: MirTensorStorageLayout::DeviceHandle,
-            lifetime: buffer_lifetime(buffer, lifetime),
-        };
-        let cadence = match lifetime {
-            DeviceProgramLifetime::SingleRun => ObservationCadence::EndOfRun,
-            DeviceProgramLifetime::RepeatingStep => ObservationCadence::PerStep,
-        };
-        results.push(ResultBuffer {
-            buffer: identity,
-            version: resource.version.clone(),
-            role: buffer.role,
-            produced_by: launch,
-            cadence,
-        });
-    }
-    results
 }

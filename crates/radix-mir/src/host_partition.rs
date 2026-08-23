@@ -225,8 +225,10 @@ impl HostPartition {
 ///   storage-buffer resource onto a typed device-program slot (role from
 ///   [`BufferRole::from_abi_role`], element type/count carried from the
 ///   resource);
-/// - observations: one [`ResultBuffer`] per output-role buffer, produced by
-///   its kernel's launch at [`ObservationCadence::EndOfRun`];
+/// - observations: one [`ResultBuffer`] per declared observation-point
+///   buffer, produced by its kernel's launch at
+///   [`ObservationCadence::PerStep`] (a single-run program's per-execution
+///   readback);
 /// - the composed program passes [`DeviceProgram::validate`] or derivation
 ///   fails closed.
 ///
@@ -239,12 +241,13 @@ pub fn derive_host_partition(
     validated: &ValidatedMir<'_>,
     interner: &Interner,
 ) -> Result<HostPartition, HostPartitionError> {
-    let (device_program, _semantics) = build_device_program(
+    let (device_program, _semantics, _steps) = build_device_program(
         validated,
         interner,
         &crate::device::MirCompanionMap::default(),
         None,
         DeviceProgramLifetime::SingleRun,
+        0,
     )
     .map_err(HostPartitionError::from)?;
     let program = validated.program();
