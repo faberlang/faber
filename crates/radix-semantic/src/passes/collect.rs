@@ -167,6 +167,22 @@ pub fn collect(
                 radix_syntax::ImportKind::Wildcard { alias } => {
                     define_import_symbol(resolver, &mut errors, alias.name, alias.span, false);
                 }
+                // EOT-2S repair (fail-closed): each selective member binds a
+                // caller-owned immutable local named by the alias when
+                // spelled, the exported name otherwise. Member resolution
+                // against the file interface happens in resolve.
+                radix_syntax::ImportKind::Selective { members } => {
+                    for member in members {
+                        let binding = member.alias.as_ref().unwrap_or(&member.name);
+                        define_symbol(
+                            resolver,
+                            &mut errors,
+                            binding.name,
+                            binding.span,
+                            SymbolKind::Local,
+                        );
+                    }
+                }
             },
             _ => {}
         }

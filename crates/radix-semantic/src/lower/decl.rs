@@ -869,6 +869,14 @@ impl Lowerer<'_> {
                         alias: Some(alias.name),
                     }]
                 }
+                // EOT-2M (transitional repair for EOT-2S): the kernel glob
+                // is a namespace import surface; selective members are not
+                // kernel-glob bindings. Fail closed until resolved members
+                // lower as ordinary value locals.
+                ImportKind::Selective { .. } => {
+                    self.error("selective_import_kernel_glob_unsupported");
+                    vec![]
+                }
             }
         } else {
             match &decl.kind {
@@ -892,6 +900,13 @@ impl Lowerer<'_> {
                         name: alias.name,
                         alias: Some(alias.name),
                     }]
+                }
+                // EOT-2S repair (fail-closed): selective members are ordinary
+                // value locals, never namespace items. Fail closed until
+                // member resolution installs their identities (EOT-2M).
+                ImportKind::Selective { .. } => {
+                    self.error("selective_import_unsupported");
+                    vec![]
                 }
             }
         };
