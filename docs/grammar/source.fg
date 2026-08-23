@@ -1030,8 +1030,8 @@ adfirma_stmt        := 'adfirma' expression ('mori' expression)?
 requirit_stmt      := 'requirit' expression 'iace' expression
 
 expression := assignment
-# Exact-output transfer (EOT-3): sink ⇇ payload chains bind below assignment
-# and above ternary; operands are complete before transfer.
+# Exact-output transfer (EOT-3): sink ⇇ payload chains bind above assignment
+# and below ternary; operands are complete before transfer.
 transfer   := ternary ('⇇' ternary)*
 assignment := transfer ('←' assignment | '↤' assignment inline_recovery?)?
 @formerly incDecStmt
