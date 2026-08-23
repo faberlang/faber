@@ -21,8 +21,11 @@
 //!   entries, `gpu_builtins`) are carried as named maps `{ def_id, facts }`
 //!   and `{ def_id, builtin }` per the spec's MessagePack type rules.
 //!
-//! Postcard remains the live wire (FPF-5 owns any switch); this codec is
-//! additive and never used by [`crate::decode::encode`]/[`crate::decode::decode`].
+//! Postcard envelope bytes are the retired legacy v1 wire: they fail closed
+//! with the named legacy error
+//! ([`crate::package::FhirPackageError::LegacyPostcardPackage`]) — there is
+//! no fallback decode. The legacy postcard envelope codec itself stays in
+//! [`crate::package`] pinned to v1 for migration reads only.
 //!
 //! The codec is hand-rolled (no `rmp`/`rmp-serde` dependency): a generic
 //! serde `Serializer` over MessagePack bytes and a generic `Deserializer`
@@ -362,7 +365,7 @@ fn read_len(bytes: &[u8], pos: &mut usize, marker: u8) -> Result<usize, MsgpackE
         0xc6 | 0xce | 0xdb | 0xdd | 0xdf => {
             u64::from(u32::from_be_bytes(read_exact::<4>(bytes, pos)?))
         }
-        0xcf => u64::from(u64::from_be_bytes(read_exact::<8>(bytes, pos)?)),
+        0xcf => u64::from_be_bytes(read_exact::<8>(bytes, pos)?),
         _ => return Err(MsgpackError::Decode("not a length marker".to_string())),
     };
     usize::try_from(len).map_err(|_| MsgpackError::Decode("length exceeds usize".to_string()))
@@ -382,7 +385,7 @@ fn read_value(bytes: &[u8], pos: &mut usize, depth: usize) -> Result<Value, Msgp
         0xc0 => Ok(Value::Nil),
         0xc2 => Ok(Value::Bool(false)),
         0xc3 => Ok(Value::Bool(true)),
-        0xc4 | 0xc5 | 0xc6 => {
+        0xc4..=0xc6 => {
             let len = read_len(bytes, pos, marker)?;
             let body = bytes
                 .get(*pos..pos.saturating_add(len))
@@ -403,7 +406,7 @@ fn read_value(bytes: &[u8], pos: &mut usize, depth: usize) -> Result<Value, Msgp
             bytes, pos,
         )?)))),
         0xd3 => Ok(Value::Int(i64::from_be_bytes(read_exact::<8>(bytes, pos)?))),
-        0xd9 | 0xda | 0xdb => {
+        0xd9..=0xdb => {
             let len = read_len(bytes, pos, marker)?;
             read_str(bytes, pos, len)
         }
@@ -1409,8 +1412,9 @@ impl FhirPackageDto {
                     },
                 ));
             }
-            // The live wire unit stays postcard bytes (FPF-5 owns any
-            // switch); the nested named value is re-encoded deterministically.
+            // The unit stays postcard bytes in the in-memory wire form (the
+            // unit artifact's own codec); the nested named value is
+            // re-encoded deterministically.
             let unit = encode_unit_bytes(&artifact).map_err(|error| {
                 MsgpackError::Encode(format!(
                     "module `{}` unit failed to re-encode: {error}",
@@ -1556,6 +1560,31 @@ fn gate_package_versions(value: &Value) -> Result<(), MsgpackError> {
 }
 
 // ---------------------------------------------------------------------------
+// Legacy postcard rejection (FPF-5)
+// ---------------------------------------------------------------------------
+
+/// Detects the retired postcard envelope prefix (OQ-1 version ratchet).
+///
+/// A schema-v2+ package value is a top-level MessagePack **map**; the retired
+/// postcard envelope begins with its `u32 package_schema_version` varint — a
+/// bare uint followed by the rest of the document. A varint prefix can never
+/// be a v2+ map value, so this shape is unambiguously legacy (no magic bytes
+/// needed). Returns the legacy version number when the payload has that
+/// shape.
+fn legacy_postcard_version(bytes: &[u8]) -> Option<u32> {
+    let mut pos = 0;
+    // Parse the first value tolerating trailing bytes: a legacy envelope is
+    // never a single complete uint — the version varint is only its prefix.
+    let Ok(value) = read_value(bytes, &mut pos, 0) else {
+        return None;
+    };
+    match value {
+        Value::Uint(found) if pos < bytes.len() => u32::try_from(found).ok(),
+        _ => None,
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Public codec entry points
 // ---------------------------------------------------------------------------
 
@@ -1567,6 +1596,10 @@ fn gate_package_versions(value: &Value) -> Result<(), MsgpackError> {
 /// Returns [`MsgpackError::Encode`] if serialization fails (unsupported data
 /// shape or a length exceeding MessagePack's `u32` range); a valid artifact
 /// is expected to succeed.
+//
+// FPF-5 owns the unit-codec switch; the unit codec is consumed by the test
+// suite only until then (the package codec is the reachable entry point).
+#[allow(dead_code)]
 pub fn encode_msgpack(artifact: &HirArtifact) -> Result<Vec<u8>, MsgpackError> {
     let dto = HirArtifactDto::from(artifact);
     let mut out = Vec::new();
@@ -1597,6 +1630,10 @@ pub fn encode_msgpack(artifact: &HirArtifact) -> Result<Vec<u8>, MsgpackError> {
 /// [`MsgpackError::UnsupportedSchemaVersion`] on a version mismatch, and
 /// [`MsgpackError::Invalid`] when the referential-integrity gate rejects the
 /// decoded artifact.
+//
+// FPF-5 owns the unit-codec switch; the unit codec is consumed by the test
+// suite only until then (the package codec is the reachable entry point).
+#[allow(dead_code)]
 pub fn decode_msgpack(bytes: &[u8]) -> Result<HirArtifact, MsgpackError> {
     let value = Value::from_bytes(bytes)?;
 
@@ -1641,8 +1678,8 @@ pub fn decode_msgpack(bytes: &[u8]) -> Result<HirArtifact, MsgpackError> {
 /// Serializes a [`FhirPackage`] to a spec-conformant named-field MessagePack
 /// package value (FPF-3): the envelope's named keys with each embedded unit
 /// carried as a **nested named value** (OQ-3), not opaque nested bytes.
-/// Postcard ([`crate::package::encode_package`]) remains the live wire;
-/// this codec is additive.
+/// This is the live `.fhirpkg` wire since the FPF-5 switch (package schema
+/// v2).
 ///
 /// # Errors
 ///
@@ -1658,8 +1695,13 @@ pub fn encode_package_msgpack(pkg: &FhirPackage) -> Result<Vec<u8>, MsgpackError
 }
 
 /// Deserializes and validates a [`FhirPackage`] from a MessagePack package
-/// value, mirroring the postcard [`crate::package::decode_package`] gates:
+/// value (the live `.fhirpkg` wire since the FPF-5 switch, package schema
+/// v2), mirroring the gates of the retired postcard envelope codec:
 ///
+/// 0. legacy postcard rejection: bytes with the retired v1 postcard varint
+///    prefix fail closed with
+///    [`crate::package::FhirPackageError::LegacyPostcardPackage`] — no
+///    fallback decode;
 /// 1. `package_schema_version` prefix gate (read before payload
 ///    interpretation; mismatch fails closed, no compatibility decoder);
 /// 2. per-module `unit_schema_version` manifest gate and each nested unit's
@@ -1670,18 +1712,32 @@ pub fn encode_package_msgpack(pkg: &FhirPackage) -> Result<Vec<u8>, MsgpackError
 ///    entry presence/flag consistency, link-table targets).
 ///
 /// The returned package's unit bytes are deterministically re-encoded
-/// postcard (the live wire), so structural equality against the pre-encode
-/// package is the round-trip proof.
+/// postcard (the in-memory unit representation), so structural equality
+/// against the pre-encode package is the round-trip proof.
 ///
 /// # Errors
 ///
-/// Returns [`MsgpackError::Truncated`] on short input,
+/// Returns [`MsgpackError::InvalidPackage`] holding
+/// [`crate::package::FhirPackageError::LegacyPostcardPackage`] on legacy
+/// postcard bytes, [`MsgpackError::Truncated`] on short input,
 /// [`MsgpackError::Decode`] on malformed or non-conformant values,
 /// [`MsgpackError::UnsupportedPackageSchemaVersion`] on an envelope version
 /// mismatch, and [`MsgpackError::InvalidPackage`] for every package-level
 /// gate failure (unit version manifest, unit validation, hash consistency,
 /// module/dependency/link-table checks).
 pub fn decode_package_msgpack(bytes: &[u8]) -> Result<FhirPackage, MsgpackError> {
+    // FPF-5 legacy gate (OQ-1 version ratchet): retired postcard envelope
+    // bytes fail closed with the named legacy error before any payload
+    // interpretation — never a fallback postcard decode.
+    if let Some(found) = legacy_postcard_version(bytes) {
+        return Err(MsgpackError::InvalidPackage(
+            crate::package::FhirPackageError::LegacyPostcardPackage {
+                found,
+                expected: PACKAGE_SCHEMA_VERSION,
+            },
+        ));
+    }
+
     let value = Value::from_bytes(bytes)?;
 
     // §1.2: both version gates run before payload interpretation.

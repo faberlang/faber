@@ -1,8 +1,10 @@
 //! Portable analyzed-HIR artifact (`FHIR`) format crate.
 //!
 //! Owns the wire/schema contract for the serialized analyzed-HIR artifact:
-//! portable schema types, the deterministic `postcard` codec, schema/version
-//! checks, and fail-closed referential-integrity validation.
+//! portable schema types, the unit codec (`postcard` for unit artifacts, the
+//! named-field MessagePack codec for the live `.fhirpkg` package envelope
+//! since the FPF-5 switch), schema/version checks, and fail-closed
+//! referential-integrity validation.
 //!
 //! This is a format crate, not a compiler driver: `AnalyzedModule`
 //! reconstruction and driver orchestration stay in `radix-module`, which
@@ -26,12 +28,11 @@ mod test_support;
 pub use artifact::*;
 pub use decode::{decode, encode};
 pub use error::HirArtifactError;
-// FPF-4: the package MessagePack codecs are re-exported so the
-// radix-module loader-side equivalence proof (and later FPF-5) can reach
-// them; postcard stays the live wire.
+// FPF-5: the MessagePack package codecs are the live `.fhirpkg` wire
+// (package schema v2); the postcard package codec is the legacy v1 path.
 pub use msgpack::{decode_package_msgpack, encode_package_msgpack, MsgpackError};
 pub use package::{
     decode_package, encode_package, DecodedFhirPackage, DecodedFhirPackageModule, FhirPackage,
     FhirPackageError, FhirPackageModule, LibraryImportWire, LocalLinkWire, PackageDependencyWire,
-    PackageIdentityWire, PACKAGE_SCHEMA_VERSION,
+    PackageIdentityWire, LEGACY_PACKAGE_SCHEMA_VERSION, PACKAGE_SCHEMA_VERSION,
 };

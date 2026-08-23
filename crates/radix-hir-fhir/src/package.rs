@@ -10,6 +10,16 @@
 //! keeps its own [`SCHEMA_VERSION`] check (fail closed on both, no
 //! compatibility decoders).
 //!
+//! FPF-5 switch (package schema v1→2): the live `.fhirpkg` wire is the
+//! MessagePack envelope ([`crate::msgpack::encode_package_msgpack`] /
+//! [`crate::msgpack::decode_package_msgpack`], stamped
+//! [`PACKAGE_SCHEMA_VERSION`]). The postcard envelope below is the **legacy
+//! v1 codec** ([`encode_package`] / [`decode_package`]): it stays pinned to
+//! [`LEGACY_PACKAGE_SCHEMA_VERSION`] for migration reads and the equivalence
+//! proof only — the product load path never falls back to it, and v1
+//! postcard bytes handed to the MessagePack decoder fail closed with
+//! [`FhirPackageError::LegacyPostcardPackage`].
+//!
 //! Wire discipline mirrors the unit artifact:
 //! - `package_schema_version` is the first wire field (version prefix gate);
 //! - modules are sorted by canonical package-root-relative path and unique;
@@ -28,8 +38,18 @@ use serde::{Deserialize, Serialize};
 
 /// Schema version of the package envelope itself (distinct from the unit
 /// artifact [`SCHEMA_VERSION`]). Ratchets on breaking package-format changes;
-/// there is no v0 compatibility decoder.
-pub const PACKAGE_SCHEMA_VERSION: u32 = 1;
+/// there is no compatibility decoder.
+///
+/// FPF-5 ratchet (OQ-1): `2` is the first MessagePack envelope — the map
+/// value itself is the MessagePack-marked prefix, so retired v1 postcard
+/// bytes fail the envelope gate with
+/// [`FhirPackageError::LegacyPostcardPackage`]. No magic bytes.
+pub const PACKAGE_SCHEMA_VERSION: u32 = 2;
+
+/// Schema version of the retired postcard package envelope (pre-FPF-5
+/// artifacts). The legacy postcard codec accepts exactly this version; the
+/// live MessagePack codec rejects it.
+pub const LEGACY_PACKAGE_SCHEMA_VERSION: u32 = 1;
 
 /// File extension for FHIR package artifacts.
 pub const FHIR_PACKAGE_EXTENSION: &str = "fhirpkg";
@@ -154,11 +174,23 @@ pub struct DecodedFhirPackage {
 pub enum FhirPackageError {
     /// The binary payload is not valid `postcard`-encoded data.
     Malformed(postcard::Error),
+    /// The payload is not a valid MessagePack package value (the live wire
+    /// since the FPF-5 switch).
+    MalformedMsgpack(String),
     /// The payload ends before a complete package could be consumed.
     TruncatedPackage,
     /// The envelope was produced by a package schema version this loader
     /// does not support (clean break — no v0 decoder).
     UnsupportedPackageSchemaVersion { found: u32, expected: u32 },
+    /// The payload is a retired postcard-encoded envelope (FPF-5 ratchet:
+    /// schema v1 postcard → v2 MessagePack). Named legacy rejection: no
+    /// fallback decode, no dual writer. Rebuild the package.
+    LegacyPostcardPackage {
+        /// Legacy package schema version carried by the payload.
+        found: u32,
+        /// The live MessagePack package schema version.
+        expected: u32,
+    },
     /// An embedded unit declares a schema version this loader rejects.
     UnsupportedUnitSchemaVersion {
         module: String,
@@ -192,10 +224,19 @@ impl std::fmt::Display for FhirPackageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Malformed(inner) => write!(f, "malformed FHIR package: {inner}"),
+            Self::MalformedMsgpack(detail) => {
+                write!(f, "malformed MessagePack FHIR package: {detail}")
+            }
             Self::TruncatedPackage => write!(f, "truncated FHIR package: unexpected end of data"),
             Self::UnsupportedPackageSchemaVersion { found, expected } => write!(
                 f,
                 "unsupported FHIR package schema version {found} (expected {expected})"
+            ),
+            Self::LegacyPostcardPackage { found, expected } => write!(
+                f,
+                "legacy postcard-encoded FHIR package (schema v{found}) is no longer readable; \
+                 the live wire is MessagePack package schema v{expected} (ratcheted in FPF-5); \
+                 rebuild the package"
             ),
             Self::UnsupportedUnitSchemaVersion { module, found, expected } => write!(
                 f,
@@ -237,11 +278,38 @@ impl std::error::Error for FhirPackageError {
     }
 }
 
+impl From<crate::msgpack::MsgpackError> for FhirPackageError {
+    /// Maps a MessagePack package-codec failure onto the loader-facing
+    /// package error surface (the FPF-5 load path).
+    fn from(error: crate::msgpack::MsgpackError) -> Self {
+        match error {
+            crate::msgpack::MsgpackError::InvalidPackage(inner) => inner,
+            crate::msgpack::MsgpackError::UnsupportedPackageSchemaVersion { found, expected } => {
+                Self::UnsupportedPackageSchemaVersion { found, expected }
+            }
+            crate::msgpack::MsgpackError::Truncated => Self::TruncatedPackage,
+            crate::msgpack::MsgpackError::Decode(detail)
+            | crate::msgpack::MsgpackError::Encode(detail) => Self::MalformedMsgpack(detail),
+            crate::msgpack::MsgpackError::Invalid(inner) => {
+                Self::MalformedMsgpack(inner.to_string())
+            }
+            crate::msgpack::MsgpackError::UnsupportedSchemaVersion { found, expected } => {
+                Self::MalformedMsgpack(format!(
+                    "unsupported msgpack unit schema version {found} (expected {expected})"
+                ))
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Codec
 // ---------------------------------------------------------------------------
 
-/// Serialize a [`FhirPackage`] to deterministic `postcard` bytes.
+/// Serialize a [`FhirPackage`] to deterministic `postcard` bytes (**legacy
+/// v1 codec**, FPF-5). The caller stamps
+/// [`LEGACY_PACKAGE_SCHEMA_VERSION`]; the live writer is
+/// [`crate::msgpack::encode_package_msgpack`].
 ///
 /// Pure serializer: validity is enforced on [`decode_package`]. The builder
 /// (`radix::hir::package::build_package`) is responsible for canonical order.
@@ -254,7 +322,10 @@ pub fn encode_package(pkg: &FhirPackage) -> Result<Vec<u8>, postcard::Error> {
     postcard::to_allocvec(pkg)
 }
 
-/// Deserialize and validate a FHIR package from `postcard` bytes.
+/// Deserialize and validate a FHIR package from `postcard` bytes (**legacy
+/// v1 codec**, FPF-5): accepts only [`LEGACY_PACKAGE_SCHEMA_VERSION`]
+/// envelopes — the wire format of pre-FPF-5 artifacts. The live wire is the
+/// MessagePack codec ([`crate::msgpack::decode_package_msgpack`]).
 ///
 /// Gates, in order (fail closed):
 /// 1. package schema-version prefix (first wire field);
@@ -283,10 +354,10 @@ pub fn decode_package(bytes: &[u8]) -> Result<DecodedFhirPackage, FhirPackageErr
             FhirPackageError::Malformed(e)
         }
     })?;
-    if schema_version != PACKAGE_SCHEMA_VERSION {
+    if schema_version != LEGACY_PACKAGE_SCHEMA_VERSION {
         return Err(FhirPackageError::UnsupportedPackageSchemaVersion {
             found: schema_version,
-            expected: PACKAGE_SCHEMA_VERSION,
+            expected: LEGACY_PACKAGE_SCHEMA_VERSION,
         });
     }
 

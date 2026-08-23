@@ -1,6 +1,9 @@
 use super::*;
 use crate::test_support::stub_artifact;
 
+// FPF-5: this suite exercises the legacy v1 postcard envelope codec
+// (`encode_package`/`decode_package`); the live `.fhirpkg` wire is the
+// MessagePack codec covered in `msgpack_test.rs`.
 fn stub_module(path: &str, is_entry: bool) -> FhirPackageModule {
     let artifact = stub_artifact();
     let unit = crate::encode(&artifact).expect("encode stub unit");
@@ -19,7 +22,7 @@ fn stub_module(path: &str, is_entry: bool) -> FhirPackageModule {
 
 fn stub_package() -> FhirPackage {
     FhirPackage {
-        package_schema_version: PACKAGE_SCHEMA_VERSION,
+        package_schema_version: LEGACY_PACKAGE_SCHEMA_VERSION,
         identity: PackageIdentityWire {
             name: "exemplum".to_owned(),
             version: "1.0.0".to_owned(),
@@ -99,6 +102,21 @@ fn package_rejects_unsupported_package_schema_version() {
         }) => {}
         other => panic!("expected UnsupportedPackageSchemaVersion(99), got {other:?}"),
     }
+}
+
+#[test]
+fn package_legacy_rejects_live_msgpack_schema_version() {
+    // FPF-5 ratchet: the legacy postcard decoder accepts only v1; a v2
+    // (live MessagePack) version stamped into postcard bytes fails closed.
+    let mut pkg = stub_package();
+    pkg.package_schema_version = PACKAGE_SCHEMA_VERSION;
+    assert!(
+        matches!(
+            decode_package(&encode(&pkg)),
+            Err(FhirPackageError::UnsupportedPackageSchemaVersion { found: 2, expected: 1 })
+        ),
+        "the legacy postcard decoder must not grow a v2 envelope"
+    );
 }
 
 #[test]

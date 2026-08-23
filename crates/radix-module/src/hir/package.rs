@@ -24,8 +24,10 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 pub use radix_hir_fhir::{
-    decode_package, encode_package, DecodedFhirPackage, FhirPackage, FhirPackageError, LibraryImportWire,
-    LocalLinkWire, PackageDependencyWire, PackageIdentityWire, PACKAGE_SCHEMA_VERSION,
+    decode_package, decode_package_msgpack, encode_package, encode_package_msgpack,
+    DecodedFhirPackage, FhirPackage, FhirPackageError, LibraryImportWire, LocalLinkWire,
+    PackageDependencyWire, PackageIdentityWire, LEGACY_PACKAGE_SCHEMA_VERSION,
+    PACKAGE_SCHEMA_VERSION,
 };
 
 /// Compiler version recorded on fragment body artifacts (radix-module crate).
@@ -176,12 +178,15 @@ pub struct LoadedHirPackage {
     pub nucleum: NucleumProgramMetadata,
 }
 
-/// Load a FHIR package from `postcard` bytes.
+/// Load a FHIR package from `.fhirpkg` bytes.
 ///
-/// The format crate's [`decode_package`] runs the package version gate, the
-/// per-unit gates (unit schema version + F3 + U2.3 referential integrity +
-/// source-hash consistency), and the package-level module/dependency checks;
-/// this function only reconstructs arenas per unit via
+/// FPF-5 switch: the live wire is the MessagePack envelope (package schema
+/// v2); the format crate's [`decode_package_msgpack`] runs the legacy
+/// postcard rejection (named legacy error, no fallback decode), the package
+/// version gate, the per-unit gates (unit schema version + F3 + U2.3
+/// referential integrity + source-hash consistency), and the package-level
+/// module/dependency checks. This function then re-enters the unit codec for
+/// each module's unit bytes and reconstructs arenas via
 /// [`crate::hir::artifact::reconstruct_unit`] (U2.2), the same path the
 /// single-unit loader uses. Never panics on the load path (F7) and never
 /// invokes frontend phases.
@@ -189,12 +194,17 @@ pub struct LoadedHirPackage {
 /// # Errors
 ///
 /// Returns [`FhirPackageError`] when package decoding, validation, or unit
-/// reconstruction fails.
+/// reconstruction fails — including
+/// [`FhirPackageError::LegacyPostcardPackage`] for retired v1 postcard
+/// envelopes.
 pub fn load_package(bytes: &[u8]) -> Result<LoadedHirPackage, FhirPackageError> {
-    let decoded = decode_package(bytes)?;
-    let mut modules = Vec::with_capacity(decoded.modules.len());
-    for module in decoded.modules {
-        let unit = crate::hir::artifact::reconstruct_unit(module.unit).map_err(|error| {
+    let pkg = decode_package_msgpack(bytes).map_err(FhirPackageError::from)?;
+    let mut modules = Vec::with_capacity(pkg.modules.len());
+    for module in pkg.modules {
+        let artifact = radix_hir_fhir::decode(&module.unit).map_err(|error| {
+            FhirPackageError::MalformedUnit { module: module.path.clone(), detail: error.to_string() }
+        })?;
+        let unit = crate::hir::artifact::reconstruct_unit(artifact).map_err(|error| {
             FhirPackageError::MalformedUnit { module: module.path.clone(), detail: error.to_string() }
         })?;
         modules.push(LoadedHirModule {
@@ -209,11 +219,11 @@ pub fn load_package(bytes: &[u8]) -> Result<LoadedHirPackage, FhirPackageError> 
     }
     let nucleum = nucleum_metadata_from_loaded_modules(&modules).map_err(NucleumPackageError::into_fhir)?;
     Ok(LoadedHirPackage {
-        identity: decoded.identity,
-        entry_path: decoded.entry_path,
-        entry_frontmatter: decoded.entry_frontmatter,
+        identity: pkg.identity,
+        entry_path: pkg.entry_path,
+        entry_frontmatter: pkg.entry_frontmatter,
         modules,
-        dependencies: decoded.dependencies,
+        dependencies: pkg.dependencies,
         nucleum,
     })
 }

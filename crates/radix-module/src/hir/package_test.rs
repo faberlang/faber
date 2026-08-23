@@ -53,7 +53,7 @@ fn package_round_trip_two_modules() {
         sample_dependencies(),
     )
     .expect("build package");
-    let bytes = encode_package(&pkg).expect("encode package");
+    let bytes = encode_package_msgpack(&pkg).expect("encode package");
 
     let loaded = load_package(&bytes).expect("load package");
     assert_eq!(loaded.identity.name, "exemplum");
@@ -96,12 +96,45 @@ fn faber_code(output: &crate::Output) -> &str {
     }
 }
 
+/// Loads a legacy v1 postcard envelope through the legacy codec and the
+/// same reconstruction steps as [`load_package`] (FPF-4 proof seam: the
+/// retired wire, exercised without the product loader).
+fn load_package_legacy_postcard(bytes: &[u8]) -> LoadedHirPackage {
+    let decoded = decode_package(bytes).expect("decode legacy postcard package");
+    let mut modules = Vec::with_capacity(decoded.modules.len());
+    for module in decoded.modules {
+        let unit = crate::hir::artifact::reconstruct_unit(module.unit)
+            .expect("reconstruct legacy postcard unit");
+        modules.push(LoadedHirModule {
+            relative_path: module.path,
+            module_segments: module.module_segments,
+            is_entry: module.is_entry,
+            export_names: module.export_names,
+            local_links: module.local_links,
+            library_imports: module.library_imports,
+            unit,
+        });
+    }
+    let nucleum =
+        nucleum_metadata_from_loaded_modules(&modules).expect("legacy postcard nucleum metadata");
+    LoadedHirPackage {
+        identity: decoded.identity,
+        entry_path: decoded.entry_path,
+        entry_frontmatter: decoded.entry_frontmatter,
+        modules,
+        dependencies: decoded.dependencies,
+        nucleum,
+    }
+}
+
 #[test]
 fn both_codec_loaded_package_equivalence() {
-    // FPF-4: one real analyzed package, encoded through both codecs
-    // (postcard live wire + the FPF-2/3 MessagePack codecs), loaded through
-    // `load_package`, must reconstruct equal `LoadedHirPackage`s and emit
-    // identical canonical Faber from the loaded HIR.
+    // FPF-4 (post-FPF-5): one real analyzed package, encoded through both
+    // codecs (the live MessagePack wire + the retired legacy postcard v1
+    // envelope), loaded through the matching decode paths, must reconstruct
+    // equal `LoadedHirPackage`s and emit identical canonical Faber from the
+    // loaded HIR. The product loader (`load_package`) takes only the
+    // MessagePack wire; the postcard side rides the legacy codec directly.
     let main = analyze("main.fab", main_equivalence_source());
     let aux = analyze("aux.fab", aux_equivalence_source());
 
@@ -117,7 +150,7 @@ fn both_codec_loaded_package_equivalence() {
     let mut aux_input = input("aux.fab", false, &aux);
     aux_input.export_names = vec!["auxilia".to_owned()];
 
-    let pkg = build_package(
+    let mut pkg = build_package(
         PackageIdentityWire { name: "exemplum".to_owned(), version: "1.0.0".to_owned(), edition: "2026".to_owned() },
         "main.fab",
         None,
@@ -126,18 +159,23 @@ fn both_codec_loaded_package_equivalence() {
     )
     .expect("build package");
 
-    // Postcard live wire: the bytes `.fhirpkg` carries today.
-    let postcard_bytes = encode_package(&pkg).expect("encode package (postcard)");
-    let loaded_postcard = load_package(&postcard_bytes).expect("load package (postcard)");
+    // Live wire (FPF-5): `.fhirpkg` carries the v2 MessagePack envelope and
+    // `load_package` decodes it directly.
+    let msgpack_bytes = encode_package_msgpack(&pkg).expect("encode package (msgpack)");
+    let loaded_msgpack = load_package(&msgpack_bytes).expect("load package (msgpack)");
 
-    // MessagePack wire: the FPF-3 envelope with nested FPF-2 unit values.
-    // Decoding returns the wire form with deterministic postcard unit
-    // bytes; re-encoding hands the loader the exact same entry point.
-    let msgpack_bytes = radix_hir_fhir::encode_package_msgpack(&pkg).expect("encode package (msgpack)");
-    let msgpkg = radix_hir_fhir::decode_package_msgpack(&msgpack_bytes).expect("decode package (msgpack)");
+    // Legacy v1 postcard envelope: still decodable through the legacy codec
+    // for the equivalence proof, but rejected by the product loader with the
+    // named legacy error (no fallback decode).
+    pkg.package_schema_version = LEGACY_PACKAGE_SCHEMA_VERSION;
+    let postcard_bytes = encode_package(&pkg).expect("encode package (legacy postcard)");
     assert_ne!(msgpack_bytes, postcard_bytes, "the two codecs must produce distinct wires");
-    let loaded_msgpack = load_package(&encode_package(&msgpkg).expect("re-encode msgpack package"))
-        .expect("load package (msgpack)");
+    match load_package(&postcard_bytes) {
+        Err(FhirPackageError::LegacyPostcardPackage { found: 1, expected: 2 }) => {}
+        Err(other) => panic!("expected the named legacy rejection, got {other:?}"),
+        Ok(loaded) => panic!("legacy postcard bytes must not load, got {} modules", loaded.modules.len()),
+    }
+    let loaded_postcard = load_package_legacy_postcard(&postcard_bytes);
 
     // LoadedHirPackage equality: envelope, module table, dependencies, and
     // nucleum metadata all agree between the two load paths.
@@ -271,10 +309,10 @@ fn package_build_is_deterministic_across_input_order() {
         .expect("build package")
     };
 
-    let forward = encode_package(&build(vec![input("aux.fab", false, &aux), input("main.fab", true, &main)]))
+    let forward = encode_package_msgpack(&build(vec![input("aux.fab", false, &aux), input("main.fab", true, &main)]))
         .expect("encode forward");
 
-    let reversed = encode_package(&build(vec![input("main.fab", true, &main), input("aux.fab", false, &aux)]))
+    let reversed = encode_package_msgpack(&build(vec![input("main.fab", true, &main), input("aux.fab", false, &aux)]))
         .expect("encode reversed");
 
     assert_eq!(forward, reversed, "input order must not affect package bytes");
@@ -291,7 +329,7 @@ fn package_load_from_disk_round_trip() {
         vec![],
     )
     .expect("build package");
-    let bytes = encode_package(&pkg).expect("encode package");
+    let bytes = encode_package_msgpack(&pkg).expect("encode package");
 
     // Write and read back from disk: the loader must not need the source or
     // any in-memory analysis state (source-independent re-entry).
@@ -316,13 +354,43 @@ fn package_load_rejects_tampered_unit_payload() {
         vec![],
     )
     .expect("build package");
-    let mut bytes = encode_package(&pkg).expect("encode package");
+    let mut bytes = encode_package_msgpack(&pkg).expect("encode package");
     // Flip a byte in the unit payload region (past the version prefix + a
     // couple of fields). Any decode outcome must be a structured error —
     // never a panic, never a silently truncated package.
     let mid = bytes.len() / 2;
     bytes[mid] ^= 0xff;
     assert!(load_package(&bytes).is_err(), "tampered unit payload must fail closed");
+}
+
+#[test]
+fn load_package_rejects_legacy_postcard_fail_closed() {
+    // FPF-5: the v1 postcard envelope is retired. The product loader reads
+    // only the v2 MessagePack wire and rejects postcard bytes with the named
+    // legacy error naming the ratchet — no fallback decode, no dual writer.
+    let unit = analyze("main.fab", &sample_source("salve"));
+    let mut pkg = build_package(
+        PackageIdentityWire { name: "exemplum".to_owned(), version: "1.0.0".to_owned(), edition: "2026".to_owned() },
+        "main.fab",
+        None,
+        vec![input("main.fab", true, &unit)],
+        vec![],
+    )
+    .expect("build package");
+    pkg.package_schema_version = LEGACY_PACKAGE_SCHEMA_VERSION;
+    let legacy_bytes = encode_package(&pkg).expect("encode legacy postcard package");
+
+    match load_package(&legacy_bytes) {
+        Err(FhirPackageError::LegacyPostcardPackage { found, expected }) => {
+            assert_eq!(found, 1);
+            assert_eq!(expected, 2);
+            let text = FhirPackageError::LegacyPostcardPackage { found, expected }.to_string();
+            assert!(text.contains("legacy"), "the rejection must name the legacy wire: {text}");
+            assert!(text.contains("v2"), "the rejection must name the ratchet target: {text}");
+        }
+        Err(other) => panic!("expected the named legacy rejection, got {other:?}"),
+        Ok(loaded) => panic!("legacy postcard bytes must not load, got {} modules", loaded.modules.len()),
+    }
 }
 
 #[test]
@@ -337,7 +405,7 @@ fn package_entry_flag_is_single_and_matches_entry_path() {
         vec![],
     )
     .expect("build package");
-    let loaded = load_package(&encode_package(&pkg).expect("encode package")).expect("load package");
+    let loaded = load_package(&encode_package_msgpack(&pkg).expect("encode package")).expect("load package");
     let flagged = loaded
         .modules
         .iter()
@@ -358,7 +426,7 @@ fn package_dependencies_survive_round_trip() {
         sample_dependencies(),
     )
     .expect("build package");
-    let loaded = load_package(&encode_package(&pkg).expect("encode package")).expect("load package");
+    let loaded = load_package(&encode_package_msgpack(&pkg).expect("encode package")).expect("load package");
     assert_eq!(loaded.dependencies.len(), 1);
     assert_eq!(loaded.dependencies[0].name, "norma");
     assert_eq!(loaded.dependencies[0].lock_identity, "path:/tmp/norma");
@@ -424,7 +492,7 @@ fn nucleum_package_round_trip_preserves_roles() {
         vec![],
     )
     .expect("build package");
-    let loaded = load_package(&encode_package(&pkg).expect("encode")).expect("load");
+    let loaded = load_package(&encode_package_msgpack(&pkg).expect("encode")).expect("load");
     assert_eq!(loaded.nucleum.dispatch_and_reflection_names(), vec!["k".to_owned()]);
     assert_eq!(loaded.nucleum.omitted_target_symbol_names(), vec!["helper".to_owned()]);
 }

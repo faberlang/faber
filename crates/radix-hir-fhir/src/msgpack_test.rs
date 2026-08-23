@@ -608,9 +608,10 @@ fn package_msgpack_wire_uses_named_keys_and_nested_unit_values() {
     let bytes = encode_package_msgpack(&multi_module_package()).expect("encode");
     let value = parse(&bytes);
     assert_eq!(top_keys(&value), PACKAGE_KEYS);
+    // FPF-5 ratchet: the live envelope prefix is the v2 MessagePack value.
     assert_eq!(
         get(&value, &["package_schema_version"]),
-        Some(&Value::Uint(1))
+        Some(&Value::Uint(u64::from(PACKAGE_SCHEMA_VERSION)))
     );
 
     // modules[0] is src/aux.fab; its record carries the named module keys.
@@ -638,9 +639,12 @@ fn package_msgpack_wire_uses_named_keys_and_nested_unit_values() {
 
 #[test]
 fn package_msgpack_rejects_unsupported_package_schema_version() {
-    // Envelope gate: read before payload interpretation, fail closed.
+    // Envelope gate: read before payload interpretation, fail closed. v1 is
+    // the retired postcard envelope version (rejected as a plain version
+    // mismatch here because the payload is a genuine map value; bare postcard
+    // bytes get the named legacy rejection instead).
     let bytes = encode_package_msgpack(&multi_module_package()).expect("encode");
-    for wrong in [0u64, 2, 99] {
+    for wrong in [0u64, 1, 99] {
         let patched = patch_uint(&bytes, &[Step::Key("package_schema_version")], wrong);
         match decode_package_msgpack(&patched) {
             Err(MsgpackError::UnsupportedPackageSchemaVersion { found, expected }) => {
@@ -849,16 +853,55 @@ fn package_msgpack_encode_fails_closed_on_undecodable_unit() {
 }
 
 #[test]
-fn package_msgpack_codec_is_additive_postcard_stays_live() {
-    // Both codecs produce distinct bytes and both decode through their own
-    // path; the postcard codec (encode_package/decode_package) is untouched.
-    let pkg = multi_module_package();
+fn package_msgpack_is_the_live_wire_and_postcard_is_rejected_legacy() {
+    // FPF-5: `.fhirpkg` carries the v2 MessagePack envelope. The v1
+    // postcard envelope still decodes through the legacy codec (equivalence
+    // and migration reads), but the MessagePack decoder — the only load
+    // path — rejects it with the named legacy error; no fallback decode.
+    let mut pkg = multi_module_package();
     let msgpack_bytes = encode_package_msgpack(&pkg).expect("msgpack encode");
-    let postcard_bytes = crate::package::encode_package(&pkg).expect("postcard encode");
-    assert_ne!(msgpack_bytes, postcard_bytes);
+    pkg.package_schema_version = crate::package::LEGACY_PACKAGE_SCHEMA_VERSION;
+    let legacy_bytes = crate::package::encode_package(&pkg).expect("postcard encode");
+    assert_ne!(msgpack_bytes, legacy_bytes);
+
     let via_msgpack = decode_package_msgpack(&msgpack_bytes).expect("msgpack decode");
-    let via_postcard = crate::package::decode_package(&postcard_bytes).expect("postcard decode");
-    assert_eq!(via_msgpack.identity, via_postcard.identity);
-    assert_eq!(via_msgpack.entry_path, via_postcard.entry_path);
-    assert_eq!(via_msgpack.modules.len(), via_postcard.modules.len());
+    let via_legacy = crate::package::decode_package(&legacy_bytes).expect("legacy postcard decode");
+    assert_eq!(via_msgpack.identity, via_legacy.identity);
+    assert_eq!(via_msgpack.entry_path, via_legacy.entry_path);
+    assert_eq!(via_msgpack.modules.len(), via_legacy.modules.len());
+
+    match decode_package_msgpack(&legacy_bytes) {
+        Err(MsgpackError::InvalidPackage(FhirPackageError::LegacyPostcardPackage {
+            found,
+            expected,
+        })) => {
+            assert_eq!(found, crate::package::LEGACY_PACKAGE_SCHEMA_VERSION);
+            assert_eq!(expected, PACKAGE_SCHEMA_VERSION);
+        }
+        other => panic!("expected the named legacy rejection, got {other:?}"),
+    }
+}
+
+#[test]
+fn package_msgpack_rejects_bare_postcard_version_prefix() {
+    // OQ-1: a postcard envelope's u32 version varint (a bare uint prefix)
+    // can never be a v2+ map value — the version ratchet is the
+    // discriminator, no magic bytes. A v1-varint-prefixed payload is
+    // rejected as legacy even when the trailing bytes are garbage.
+    let legacy = decode_package_msgpack(&[0x01, 0xff, 0xfe, 0xfd]);
+    assert!(
+        matches!(
+            legacy,
+            Err(MsgpackError::InvalidPackage(
+                FhirPackageError::LegacyPostcardPackage { found: 1, expected: 2 }
+            ))
+        ),
+        "postcard-shaped bytes must fail closed as legacy, got {legacy:?}"
+    );
+    // A single complete uint with no trailing bytes is not a postcard
+    // prefix: it takes the ordinary malformed-path (not a map value).
+    assert!(matches!(
+        decode_package_msgpack(&[0x01]),
+        Err(MsgpackError::Decode(_))
+    ));
 }

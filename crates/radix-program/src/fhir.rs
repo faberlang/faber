@@ -12,6 +12,9 @@
 //! `run_loaded_package_fhir` (execution) — stay faber-side and consume the
 //! forwarded builder (ownership-freeze §5.3).
 //!
+//! FPF-5: the `.fhirpkg` write path emits the MessagePack envelope (package
+//! schema v2); the retired v1 postcard envelope is never written.
+//!
 //! The format crate (`radix-hir-fhir`) owns the wire types and codec; this
 //! module reaches them through `radix_module::hir::package`.
 #![allow(dead_code)] // Binary build/run and lib tests exercise different surfaces.
@@ -22,7 +25,7 @@ use crate::import_graph::{resolve_import, ImportResolution};
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::Config;
 use radix_module::hir::package::{
-    build_package_with_nucleum, encode_package, LibraryImportWire, LocalLinkWire,
+    build_package_with_nucleum, encode_package_msgpack, LibraryImportWire, LocalLinkWire,
     PackageDependencyWire, PackageIdentityWire, PackageUnitInput,
 };
 use radix_module::hir::HirItemKind;
@@ -55,7 +58,8 @@ pub struct PackageFhir {
 /// module table (paths, segments, entry flag, export names), the explicit
 /// local link table (binding → target module path), library references
 /// (binding/package/module — no absolute paths), dependency coordinates, and
-/// ordered per-unit artifacts.
+/// ordered per-unit artifacts. FPF-5: encoding is the MessagePack package
+/// codec (schema v2) — the single writer, no postcard output.
 ///
 /// RP5: moved from `crates/faber/src/package/fhir.rs`; faber product seams
 /// (locale packs, manifest validation, library resolver construction) enter
@@ -121,7 +125,7 @@ pub fn build_package_fhir(
             error.to_string(),
         )]
     })?;
-    let bytes = encode_package(&fhir_package).map_err(|error| {
+    let bytes = encode_package_msgpack(&fhir_package).map_err(|error| {
         vec![fhir_diag(
             input,
             format!("could not encode FHIR package: {error}"),
