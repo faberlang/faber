@@ -1,6 +1,6 @@
 # GOAL: FHIR package format — the HIR cargo spec
 
-**Status**: active — FPF-1 landed (faber 0a305c4: spec.md, 31 rows v5-pinned); FPF-2 (unit codec, long pole) dispatching; FPF-3..5 serial behind it. OQ-1 ruled version-ratchet; OQ-3 nested-named default (2026-08-23)
+**Status**: active — FPF-1 landed (faber 0a305c4); FPF-2 landed (radix 467866aaf: zero-dep msgpack codec, 45/45, 3/3 fixtures, postcard live wire untouched); FPF-3 (package codec) dispatching; FPF-4/5 serial (2026-08-23)
 **Created**: 2026-08-18
 **Campaign:** `—` (standalone; fcmp-profile-1 becomes a dependency of this goal, not the reverse)
 **Source:** operator addendum 2026-08-18 — the product is HIR package serialization; the envelope is a framing detail around this schema
