@@ -8,8 +8,9 @@ use super::{
     HirAspectRecordKind, HirAspectSpan,
 };
 use crate::hir::{
-    DefId, HirBinOp, HirBlock, HirCallArg, HirCasuArm, HirEnum, HirExpression, HirExpressionKind, HirId, HirItem,
-    HirItemKind, HirLiteral, HirModule, HirPattern, HirStatement, HirStatementKind, HirVariant,
+    DefId, HirBinOp, HirBlock, HirCallArg, HirCasuArm, HirEnum, HirExpression, HirExpressionKind, HirFunction, HirId,
+    HirItem, HirItemKind, HirLiteral, HirLocal, HirModule, HirParam, HirPattern, HirStatement, HirStatementKind,
+    HirVariant,
 };
 use crate::lexer::{Interner, Span};
 use crate::semantic::{Primitive, Type, TypeId, TypeTable};
@@ -458,14 +459,13 @@ fn future_fixture_air_mask_neutrality_record_and_verdict_shape() {
 }
 
 #[test]
-#[ignore = "APA-1 future fixture: GatePurity (evidence class machine-checked-structural) is unregistered until APA-2 lands registration and APA-L3 lands the real obligation; un-ignored only by its owner"]
 fn future_fixture_air_gate_purity_record_and_verdict_shape() {
-    // Owning line APA-L3: the scalar/let/call admitted fixture must become a
-    // Recognized GatePurity record proving inhabitation in the pure type
-    // fragment with no IO/monadic effects; a gate-admitted-but-impure form
-    // surfaces as a named gate-hole finding, never a suppressed failure.
-    // Machine-checked-structural, not semantic preservation.
-    // Pre-registration absence pin (holds today):
+    // APA-L3 landed: the scalar/let/call admitted fixture is a Recognized
+    // GatePurity record with the structural term; a gate-admitted-but-impure
+    // form surfaces as a named gate-hole finding, never a suppressed
+    // failure.  Machine-checked-structural, not semantic preservation.
+    // Pre-registration absence pin still holds for entry-level AIR shapes
+    // (no function items, no Line-3 population):
     let report = report_hir_aspects(&air_shaped_program(), &TypeTable::new());
     assert!(report.records().is_empty());
 }
@@ -736,4 +736,204 @@ fn hir_aspect_report_declined_routes_emit_no_line_one_obligation() {
         "declined AEU routes must emit no line-1 obligation, got {:?}",
         report.records()
     );
+}
+
+// ---------------------------------------------------------------------------
+// APA-L3: gate/purity recognizer over function declarations.
+// ---------------------------------------------------------------------------
+
+fn gate_expr(id: u32, kind: HirExpressionKind) -> HirExpression {
+    HirExpression { id: HirId(id), kind, ty: None, span: test_span_between(10, 20) }
+}
+
+fn gate_int(id: u32, value: u64) -> HirExpression {
+    gate_expr(id, HirExpressionKind::Literal(HirLiteral::Int(value)))
+}
+
+fn gate_path(id: u32, def_id: u32) -> HirExpression {
+    gate_expr(id, HirExpressionKind::Path(DefId(def_id)))
+}
+
+fn gate_call(id: u32, callee: HirExpression, args: Vec<HirExpression>) -> HirExpression {
+    gate_expr(
+        id,
+        HirExpressionKind::Call(
+            Box::new(callee),
+            Vec::new(),
+            args.into_iter()
+                .map(|arg| HirCallArg { name: None, spread: false, span: arg.span, expr: arg })
+                .collect(),
+        ),
+    )
+}
+
+fn gate_local(id: u32, init: HirExpression, mutate: impl FnOnce(&mut HirLocal)) -> HirStatement {
+    let mut local = HirLocal {
+        def_id: DefId(id + 100),
+        name: crate::lexer::Symbol(id + 1),
+        ty: None,
+        init: Some(init),
+        mutable: false,
+        is_await: false,
+        runtime_provided: false,
+    };
+    mutate(&mut local);
+    HirStatement { id: HirId(id), kind: HirStatementKind::Local(local), span: test_span_between(10, 20) }
+}
+
+fn gate_redde(id: u32, value: HirExpression) -> HirStatement {
+    HirStatement { id: HirId(id), kind: HirStatementKind::Redde(Some(value)), span: test_span_between(10, 20) }
+}
+
+fn gate_function_item(id: u32, statements: Vec<HirStatement>) -> HirItem {
+    HirItem {
+        id: HirId(id),
+        def_id: DefId(id + 200),
+        kind: HirItemKind::Function(Box::new(HirFunction {
+            name: crate::lexer::Symbol(1),
+            type_params: Vec::new(),
+            params: Vec::new(),
+            cli_args: None,
+            ret_ty: None,
+            err_ty: None,
+            body: Some(HirBlock { statements, expr: None, span: test_span_between(10, 20), ..Default::default() }),
+            posture: radix_syntax::CallablePosture::SyncFinite,
+            is_async: false,
+            is_generator: false,
+            is_kernel: false,
+            nucleum_fragment: false,
+            is_vertex: false,
+            is_fragment: false,
+            test: None,
+            annotations: Vec::new(),
+        })),
+        span: test_span_between(10, 20),
+    }
+}
+
+fn gate_function_program(items: Vec<HirItem>) -> HirModule {
+    HirModule { items, entry: None, entry_annotations: Vec::new(), entry_args_name: None, entry_is_async: false }
+}
+
+#[test]
+fn hir_aspect_report_recognizes_v1_scalar_let_call_gate_purity() {
+    // `let bound = 3; redde f(bound, 2)` — one admitted declaration.
+    let program = gate_function_program(vec![gate_function_item(
+        1,
+        vec![
+            gate_local(2, gate_int(3, 3), |_| {}),
+            gate_redde(4, gate_call(5, gate_path(6, 700), vec![gate_path(7, 102), gate_int(8, 2)])),
+        ],
+    )]);
+
+    let first = report_hir_aspects(&program, &TypeTable::new());
+    let second = report_hir_aspects(&program, &TypeTable::new());
+
+    assert_eq!(first, second);
+    assert_eq!(first.records().len(), 1);
+    let record = &first.records()[0];
+    assert_eq!(record.aspect, HirAspectKind::GatePurity);
+    assert_eq!(record.record_kind, HirAspectRecordKind::Recognized);
+    assert_eq!(record.node_id, Some(HirId(1)));
+    assert_eq!(
+        record.detail,
+        super::HirAspectDetail::GatePurity {
+            term: super::PurityTerm::Let(
+                Box::new(super::PurityTerm::Scalar(3)),
+                Box::new(super::PurityTerm::Call(
+                    Box::new(super::PurityTerm::Scalar(0)),
+                    vec![super::PurityTerm::Scalar(0), super::PurityTerm::Scalar(2)]
+                ))
+            )
+        }
+    );
+}
+
+#[test]
+fn hir_aspect_report_surfaces_awaiting_local_as_named_gate_hole() {
+    // The purity gate never inspects `HirLocal::is_await`: an awaited
+    // binding inside an otherwise-admissible body is a gate hole, and the
+    // report must carry it as a named finding — never silently dropped and
+    // never downgraded to an ignorable failed proof.
+    let program = gate_function_program(vec![gate_function_item(
+        1,
+        vec![
+            gate_local(2, gate_int(3, 3), |local| local.is_await = true),
+            gate_redde(4, gate_int(5, 1)),
+        ],
+    )]);
+
+    let report = report_hir_aspects(&program, &TypeTable::new());
+
+    assert_eq!(report.records().len(), 1);
+    let record = &report.records()[0];
+    assert_eq!(record.aspect, HirAspectKind::GatePurity);
+    assert_eq!(record.record_kind, HirAspectRecordKind::Recognized);
+    assert_eq!(
+        record.detail,
+        super::HirAspectDetail::GatePurityHole { issue: super::GateHoleIssue::AwaitingLocalInit }
+    );
+}
+
+#[test]
+fn hir_aspect_report_surfaces_silently_accepted_error_node_as_gate_hole() {
+    // `air_purity` accepts `HirExpressionKind::Error` without a reject; the
+    // model has no pure translation for it, so an otherwise-admissible body
+    // containing one is a named gate hole.
+    let program = gate_function_program(vec![gate_function_item(
+        1,
+        vec![gate_redde(2, gate_expr(3, HirExpressionKind::Error))],
+    )]);
+
+    let report = report_hir_aspects(&program, &TypeTable::new());
+
+    assert_eq!(report.records().len(), 1);
+    assert_eq!(
+        report.records()[0].detail,
+        super::HirAspectDetail::GatePurityHole { issue: super::GateHoleIssue::UntranslatableErrorNode }
+    );
+}
+
+#[test]
+fn hir_aspect_report_gate_purity_declines_gate_rejected_and_outside_subset() {
+    let types = TypeTable::new();
+
+    // Mutable local: the gate itself rejects the declaration.
+    let mutable = gate_function_program(vec![gate_function_item(
+        1,
+        vec![gate_local(2, gate_int(3, 3), |local| local.mutable = true)],
+    )]);
+    assert!(
+        report_hir_aspects(&mutable, &types).records().is_empty(),
+        "gate-rejected shapes emit no Line-3 obligation"
+    );
+
+    // Binary arithmetic: gate-admitted but outside the v1 scalar/let/call
+    // subset (and float leaves never enter the subset).
+    let binary = gate_function_program(vec![gate_function_item(
+        1,
+        vec![gate_redde(
+            2,
+            gate_expr(
+                3,
+                HirExpressionKind::Binary(HirBinOp::Add, Box::new(gate_int(4, 1)), Box::new(gate_int(5, 2))),
+            ),
+        )],
+    )]);
+    assert!(
+        report_hir_aspects(&binary, &types).records().is_empty(),
+        "outside-subset shapes emit no Line-3 obligation"
+    );
+
+    // Gate reject plus hole: the gate never admits the declaration, so the
+    // hole is suppressed — no record at all.
+    let both = gate_function_program(vec![gate_function_item(
+        1,
+        vec![
+            gate_local(2, gate_int(3, 3), |local| local.mutable = true),
+            gate_local(4, gate_int(5, 4), |local| local.is_await = true),
+            gate_redde(6, gate_int(7, 1)),
+        ],
+    )]);
+    assert!(report_hir_aspects(&both, &types).records().is_empty());
 }

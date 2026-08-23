@@ -10,6 +10,7 @@ use std::time::Duration;
 use wait_timeout::ChildExt;
 
 use super::air_mask_proof::{emit_mask_neutrality_theorem, MaskNeutralityFamily, MASK_NEUTRALITY_PRELUDE};
+use super::air_purity_proof::{emit_gate_purity_theorem, GATE_PURITY_PRELUDE};
 use super::air_unroll_proof::{emit_unroll_equivalence_theorem, UNROLL_PROOF_PRELUDE};
 use super::verifier::{HirAspectCheckResult, HirAspectCheckStatus, HirAspectEvidence, HirAspectVerifier};
 use super::{
@@ -374,10 +375,12 @@ impl HirAspectVerifier for LeanAspectChecker {
         // No-fall-through gate: registered kinds without landed proof content
         // never reach the generic `True := trivial` generator. They get a
         // deterministic Failed result naming the unproven kind instead of a
-        // fabricated verdict.
+        // fabricated verdict. Gate-hole records (APA-L3) are named findings:
+        // they short-circuit before any toolchain path so a gate-admitted
+        // impure form is never downgraded to an ignorable failed proof.
         let refused: Vec<HirAspectCheckResult> = recognized
             .iter()
-            .filter(|r| !has_registered_proof_generator(r.aspect))
+            .filter(|r| !has_proof_content(r) && !is_gate_hole_record(r))
             .map(|r| HirAspectCheckResult {
                 status: HirAspectCheckStatus::Failed,
                 evidence: HirAspectEvidence(format!(
@@ -388,14 +391,32 @@ impl HirAspectVerifier for LeanAspectChecker {
             })
             .collect();
 
+        let gate_holes: Vec<HirAspectCheckResult> = recognized
+            .iter()
+            .filter(|r| is_gate_hole_record(r))
+            .map(|r| {
+                let label = match &r.detail {
+                    HirAspectDetail::GatePurityHole { issue } => issue.label(),
+                    _ => unreachable!("is_gate_hole_record guards the detail"),
+                };
+                HirAspectCheckResult {
+                    status: HirAspectCheckStatus::Failed,
+                    evidence: HirAspectEvidence(format!(
+                        "gate hole (never downgraded): {label} — the AIR purity gate admitted a form whose Line-3 model translation carries an IO/monadic effect"
+                    )),
+                    backend: HirAspectBackendKind::Lean,
+                }
+            })
+            .collect();
+
         let checkable: Vec<&HirAspectRecord> = recognized
             .iter()
             .copied()
-            .filter(|r| has_registered_proof_generator(r.aspect))
+            .filter(|r| has_proof_content(r) && !is_gate_hole_record(r))
             .collect();
 
         if checkable.is_empty() {
-            return refused;
+            return merge_results(&recognized, Vec::new(), refused, gate_holes);
         }
 
         // Generate Lean source and a lakefile.toml for the temp project.
@@ -411,7 +432,12 @@ impl HirAspectVerifier for LeanAspectChecker {
                     evidence: HirAspectEvidence(error),
                     backend: HirAspectBackendKind::Lean,
                 };
-                return merge_results(&recognized, checkable.iter().map(|_| err_result.clone()).collect(), refused);
+                return merge_results(
+                    &recognized,
+                    checkable.iter().map(|_| err_result.clone()).collect(),
+                    refused,
+                    gate_holes,
+                );
             }
         };
 
@@ -424,7 +450,12 @@ impl HirAspectVerifier for LeanAspectChecker {
                 backend: HirAspectBackendKind::Lean,
             };
             ignore_result(std::fs::remove_dir_all(&temp_dir));
-            return merge_results(&recognized, checkable.iter().map(|_| err_result.clone()).collect(), refused);
+            return merge_results(
+                &recognized,
+                checkable.iter().map(|_| err_result.clone()).collect(),
+                refused,
+                gate_holes,
+            );
         }
         if let Err(error) = std::fs::write(temp_dir.join("lakefile.toml"), &lakefile_toml) {
             let err_result = HirAspectCheckResult {
@@ -433,7 +464,12 @@ impl HirAspectVerifier for LeanAspectChecker {
                 backend: HirAspectBackendKind::Lean,
             };
             ignore_result(std::fs::remove_dir_all(&temp_dir));
-            return merge_results(&recognized, checkable.iter().map(|_| err_result.clone()).collect(), refused);
+            return merge_results(
+                &recognized,
+                checkable.iter().map(|_| err_result.clone()).collect(),
+                refused,
+                gate_holes,
+            );
         }
 
         // Run lake build via the U1 runner.
@@ -443,7 +479,12 @@ impl HirAspectVerifier for LeanAspectChecker {
         // If lake build did not succeed, all records share the failure.
         if build_result.status != HirAspectCheckStatus::Proven {
             ignore_result(std::fs::remove_dir_all(&temp_dir));
-            return merge_results(&recognized, checkable.iter().map(|_| build_result.clone()).collect(), refused);
+            return merge_results(
+                &recognized,
+                checkable.iter().map(|_| build_result.clone()).collect(),
+                refused,
+                gate_holes,
+            );
         }
 
         // Run trust checks via the U2 mechanism.
@@ -455,24 +496,36 @@ impl HirAspectVerifier for LeanAspectChecker {
         // Clean up the temp project directory.
         ignore_result(std::fs::remove_dir_all(&temp_dir));
 
-        merge_results(&recognized, checkable.iter().map(|_| final_result.clone()).collect(), refused)
+        merge_results(
+            &recognized,
+            checkable.iter().map(|_| final_result.clone()).collect(),
+            refused,
+            gate_holes,
+        )
     }
 }
 
 /// Re-assemble per-record results in the original report order: checkable
-/// records take their checker result, refused kinds take their deterministic
-/// no-fall-through result.
+/// records take their checker result, gate-hole records take their named
+/// finding, and refused kinds take their deterministic no-fall-through
+/// result.
 fn merge_results(
     records: &[&HirAspectRecord],
     checked: Vec<HirAspectCheckResult>,
     refused: Vec<HirAspectCheckResult>,
+    gate_holes: Vec<HirAspectCheckResult>,
 ) -> Vec<HirAspectCheckResult> {
     let mut next_checked = checked.into_iter();
     let mut next_refused = refused.into_iter();
+    let mut next_gate_holes = gate_holes.into_iter();
     records
         .iter()
         .map(|record| {
-            if has_registered_proof_generator(record.aspect) {
+            if is_gate_hole_record(record) {
+                next_gate_holes
+                    .next()
+                    .expect("one gate-hole result per hole record")
+            } else if has_proof_content(record) {
                 next_checked
                     .next()
                     .expect("one checked result per checkable record")
@@ -536,6 +589,18 @@ fn generate_lean_source(records: &[&HirAspectRecord]) -> String {
         out.push('\n');
     }
 
+    let gate_purity_records = records
+        .iter()
+        .filter(|record| record.aspect == HirAspectKind::GatePurity)
+        .collect::<Vec<_>>();
+    if gate_purity_records
+        .iter()
+        .any(|record| matches!(record.detail, HirAspectDetail::GatePurity { .. }))
+    {
+        out.push_str(GATE_PURITY_PRELUDE);
+        out.push('\n');
+    }
+
     for (i, record) in records.iter().enumerate() {
         let label = theorem_label(record, i);
         match record.aspect {
@@ -555,6 +620,21 @@ fn generate_lean_source(records: &[&HirAspectRecord]) -> String {
                 out.push_str(&emit_unroll_equivalence_theorem(&label, &lanes));
                 out.push('\n');
             }
+            HirAspectKind::GatePurity => match &record.detail {
+                HirAspectDetail::GatePurity { term } => {
+                    out.push_str(&emit_gate_purity_theorem(&label, term));
+                    out.push('\n');
+                }
+                // A gate-hole record never reaches this generator through
+                // `verify` (it short-circuits to its named finding), and no
+                // fabricated theorem may stand in for it.
+                HirAspectDetail::GatePurityHole { issue } => {
+                    write!(out, "-- gate hole {label}: {} — no proof fabricated\n", issue.label()).ok();
+                }
+                _ => {
+                    write!(out, "-- {label}: no structural contract; no proof fabricated\n").ok();
+                }
+            },
             _ => {
                 // DiscerneOmnia remains the established generator.  AIR kinds
                 // are admitted here only when their owning line has registered
@@ -589,14 +669,21 @@ fn aspect_label(record: &HirAspectRecord) -> &'static str {
 /// Whether a checker-ready proof generator is registered for the kind.
 ///
 /// Only kinds with landed line-proof content may reach `generate_lean_source`.
-/// The remaining AIR kinds are registered (APA-2) but carry no proof generator
-/// until their owning lines land; they must never fall through the generic
-/// `True := trivial` placeholder as if they were proven obligations.
-fn has_registered_proof_generator(aspect: HirAspectKind) -> bool {
-    matches!(
-        aspect,
-        HirAspectKind::DiscerneOmnia | HirAspectKind::MaskNeutrality | HirAspectKind::UnrollEquivalence
-    )
+/// A registered kind without its record-level structural contract stays on
+/// the refusal path via [`has_proof_content`]; no kind may fall through the
+/// generic `True := trivial` placeholder as if it were a proven obligation.
+fn has_proof_content(record: &HirAspectRecord) -> bool {
+    match record.aspect {
+        HirAspectKind::DiscerneOmnia | HirAspectKind::MaskNeutrality | HirAspectKind::UnrollEquivalence => true,
+        // APA-L3: GatePurity is real only with the recognized structural
+        // term; bare registration cannot become a proof.
+        HirAspectKind::GatePurity => matches!(record.detail, HirAspectDetail::GatePurity { .. }),
+    }
+}
+
+/// Whether the record is a named Line-3 gate-hole finding.
+fn is_gate_hole_record(record: &HirAspectRecord) -> bool {
+    matches!(record.detail, HirAspectDetail::GatePurityHole { .. })
 }
 
 /// Create a unique temporary project directory.

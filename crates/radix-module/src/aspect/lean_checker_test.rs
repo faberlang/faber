@@ -1212,3 +1212,177 @@ fn lean_checker_unroll_equivalence_axiom_audit_is_live_not_vacuous() {
 
     let _ = std::fs::remove_dir_all(&temp);
 }
+
+// ---------------------------------------------------------------------------
+// APA-L3 pins: gate/purity obligations are real proof content, gate-hole
+// findings are named and never downgraded, and the trust gates stay
+// fail-closed without a toolchain.
+// ---------------------------------------------------------------------------
+
+fn admitted_gate_purity_record() -> HirAspectRecord {
+    HirAspectRecord::recognized(
+        HirAspectKind::GatePurity,
+        HirAspectSpan::Source(Span::new(0, 10)),
+        Some(crate::hir::HirId(5)),
+    )
+    .with_detail(HirAspectDetail::GatePurity {
+        term: crate::aspect::PurityTerm::Let(
+            Box::new(crate::aspect::PurityTerm::Scalar(3)),
+            Box::new(crate::aspect::PurityTerm::Call(
+                Box::new(crate::aspect::PurityTerm::Scalar(0)),
+                vec![
+                    crate::aspect::PurityTerm::Scalar(0),
+                    crate::aspect::PurityTerm::Scalar(2),
+                ],
+            )),
+        ),
+    })
+}
+
+#[test]
+fn lean_checker_gate_purity_generates_real_structural_obligation() {
+    let record = admitted_gate_purity_record();
+
+    let source = super::generate_lean_source(&[&record]);
+
+    assert!(source.contains("gatePurityCorrespondence"));
+    assert!(source.contains("gateAdmittedInhabitsPureFragment"));
+    assert!(source.contains("gateAdmittedCarriesNoEffects"));
+    assert!(source.contains("Term.letIn (Term.scalar 3)"));
+    assert!(source.contains("GateAdmits.letIn (GateAdmits.scalar 3)"));
+    assert!(source.contains("| io : Effect"));
+    assert!(source.contains("| monadic : Effect"));
+    assert!(source.contains("ioOpIsNeverAdmitted"));
+    assert!(source.contains("monadicBindIsNeverAdmitted"));
+    assert!(!source.contains(": True := trivial"));
+    assert!(!source.contains("f32"));
+    assert!(!source.contains("f64"));
+    assert_eq!(LeanAspectChecker::scan_for_sorry(&source), SorryVerdict::Clean);
+}
+
+#[test]
+fn lean_checker_gate_hole_record_yields_named_finding_never_downgraded() {
+    // A gate-hole record is a named finding. It short-circuits before any
+    // toolchain consult: with no Lean toolchain at all the result still
+    // names the hole and never reads as a mere failed (ignorable) proof,
+    // a refusal, or a fabricated Proven.
+    let temp_dir = crate::test_support::test_temp_dir("lean-verifier-apa-l3-hole");
+    let temp = temp_dir.path().to_path_buf();
+    let config = LeanAspectCheckerConfig {
+        lake_bin: temp.join("nonexistent-lake"),
+        lean_bin: temp.join("nonexistent-lean"),
+        timeout: Duration::from_secs(5),
+    };
+    let checker = LeanAspectChecker::new(config, temp);
+
+    let record = HirAspectRecord::recognized(
+        HirAspectKind::GatePurity,
+        HirAspectSpan::Source(Span::new(0, 10)),
+        Some(crate::hir::HirId(6)),
+    )
+    .with_detail(HirAspectDetail::GatePurityHole { issue: crate::aspect::GateHoleIssue::AwaitingLocalInit });
+
+    let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, vec![record]);
+
+    let results = checker.verify(&report);
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].status, HirAspectCheckStatus::Failed);
+    assert_eq!(results[0].backend, HirAspectBackendKind::Lean);
+    assert!(results[0]
+        .evidence
+        .0
+        .contains("gate hole (never downgraded)"));
+    assert!(results[0]
+        .evidence
+        .0
+        .contains(crate::aspect::GateHoleIssue::AwaitingLocalInit.label()));
+    assert!(!results[0]
+        .evidence
+        .0
+        .contains("registered without proof content"));
+}
+
+#[test]
+fn lean_checker_gate_purity_missing_toolchain_is_not_proven() {
+    let temp_dir = crate::test_support::test_temp_dir("lean-verifier-apa-l3-missing-tc");
+    let temp = temp_dir.path().to_path_buf();
+    let config = LeanAspectCheckerConfig {
+        lake_bin: temp.join("nonexistent-lake"),
+        lean_bin: temp.join("nonexistent-lean"),
+        timeout: Duration::from_secs(5),
+    };
+    let checker = LeanAspectChecker::new(config, temp);
+    let record = admitted_gate_purity_record();
+    let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, vec![record]);
+
+    let results = checker.verify(&report);
+    assert_eq!(results.len(), 1);
+    assert_ne!(results[0].status, HirAspectCheckStatus::Proven);
+    assert!(
+        results[0].status == HirAspectCheckStatus::ToolchainMissing || results[0].status == HirAspectCheckStatus::Error,
+        "expected missing-toolchain/error result, got {:?}",
+        results[0].status
+    );
+}
+
+#[test]
+fn lean_checker_gate_purity_hole_keeps_named_finding_alongside_checkable_records() {
+    // Report order: hole + admitted records interleave without the hole
+    // being swallowed by the shared lake result.
+    let temp_dir = crate::test_support::test_temp_dir("lean-verifier-apa-l3-order");
+    let temp = temp_dir.path().to_path_buf();
+    let config = LeanAspectCheckerConfig {
+        lake_bin: temp.join("nonexistent-lake"),
+        lean_bin: temp.join("nonexistent-lean"),
+        timeout: Duration::from_secs(5),
+    };
+    let checker = LeanAspectChecker::new(config, temp);
+
+    let span = HirAspectSpan::Source(Span::new(0, 10));
+    let records = vec![
+        HirAspectRecord::recognized(HirAspectKind::GatePurity, span, Some(crate::hir::HirId(6))).with_detail(
+            HirAspectDetail::GatePurityHole { issue: crate::aspect::GateHoleIssue::UntranslatableErrorNode },
+        ),
+        admitted_gate_purity_record(),
+    ];
+    let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, records);
+
+    let results = checker.verify(&report);
+    assert_eq!(results.len(), 2);
+    // The report sorts same-span records by kind then node id; the admitted
+    // record (node 5) sorts before the hole (node 6).
+    assert!(
+        results[0].status == HirAspectCheckStatus::ToolchainMissing || results[0].status == HirAspectCheckStatus::Error
+    );
+    assert_eq!(results[1].status, HirAspectCheckStatus::Failed);
+    assert!(results[1]
+        .evidence
+        .0
+        .contains("gate hole (never downgraded)"));
+    assert!(results[1]
+        .evidence
+        .0
+        .contains(crate::aspect::GateHoleIssue::UntranslatableErrorNode.label()));
+}
+
+#[test]
+#[ignore = "tracking: bulk-test-cleanup — requires Lean toolchain CI matrix step"]
+fn lean_checker_gate_purity_full_verify_real_theorem() {
+    // The real Line-3 harness check: lake build + sorry scan + transitive
+    // allowlisted axiom audit over the generated gate-purity theorem.
+    let config = LeanAspectCheckerConfig::default();
+    let temp = PathBuf::from(std::env::temp_dir());
+    let checker = LeanAspectChecker::new(config, temp);
+    let record = admitted_gate_purity_record();
+    let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, vec![record]);
+
+    let results = checker.verify(&report);
+    assert_eq!(results.len(), 1);
+    assert_eq!(
+        results[0].status,
+        HirAspectCheckStatus::Proven,
+        "expected Proven through real lake build + sorry scan + axiom audit, got: {}",
+        results[0].evidence.0
+    );
+    assert_eq!(results[0].backend, HirAspectBackendKind::Lean);
+}

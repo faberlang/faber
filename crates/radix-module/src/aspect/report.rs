@@ -6,13 +6,14 @@
 //! rather than re-resolving source names. Enum-variant facts are borrowed from
 //! the exhaustive-match pass so aspect recognition and pattern checking agree.
 
-use crate::hir::visit::{walk_expr, HirVisitor};
-use crate::hir::{DefId, HirCasuArm, HirExpression, HirExpressionKind, HirId, HirItemKind, HirModule};
+use crate::hir::visit::{walk_expr, walk_item, HirVisitor};
+use crate::hir::{DefId, HirCasuArm, HirExpression, HirExpressionKind, HirId, HirItem, HirItemKind, HirModule};
 use crate::lexer::{Interner, Span};
 
 use super::air_mask_proof::{
     is_additive_body, is_additive_combine, is_integer_zero_seed, reduction_family, MaskNeutralityFamily,
 };
+use super::air_purity_proof::{gate_purity_finding, GateHoleIssue, GatePurityFinding, PurityTerm};
 use super::air_unroll_proof::{unroll_route_facts, UnrollRoute};
 use crate::semantic::passes::exhaustive::{collect_enum_variants, enum_def_from_type, pattern_variant_id};
 use crate::semantic::TypeTable;
@@ -181,6 +182,17 @@ pub enum HirAspectDetail {
     UnrollEquivalence {
         route: UnrollRoute,
         lanes: Vec<i64>,
+    },
+    /// Structural contract consumed by the Line-3 Lean proof emitter: the
+    /// v1 scalar/let/call term of one admitted translated declaration.
+    GatePurity {
+        term: PurityTerm,
+    },
+    /// A named gate-hole finding (Line 3): a shape the mirrored gate policy
+    /// still admits while the model finds an IO/monadic effect.  Never
+    /// downgraded to an ignorable failed proof.
+    GatePurityHole {
+        issue: GateHoleIssue,
     },
 }
 
@@ -462,6 +474,21 @@ impl<'a> HirAspectCollector<'a> {
         );
     }
 
+    fn record_gate_purity(&mut self, item: &HirItem, function: &crate::hir::HirFunction) {
+        // Decline shapes (outside the v1 subset, or forms the gate itself
+        // rejects) carry no Line-3 obligation.  A gate hole is a named
+        // finding in the report — never a suppressed failure.
+        let detail = match gate_purity_finding(function) {
+            GatePurityFinding::Admitted(term) => HirAspectDetail::GatePurity { term },
+            GatePurityFinding::GateHole { issue } => HirAspectDetail::GatePurityHole { issue },
+            GatePurityFinding::NoObligation => return,
+        };
+        self.push(
+            HirAspectRecord::recognized(HirAspectKind::GatePurity, HirAspectSpan::Source(item.span), Some(item.id))
+                .with_detail(detail),
+        );
+    }
+
     fn push_skipped(&mut self, expr: &HirExpression, reason: HirAspectReason) {
         self.push(HirAspectRecord::skipped_candidate(
             HirAspectKind::DiscerneOmnia,
@@ -502,6 +529,13 @@ fn is_additive_combine_in_program(expr: &HirExpression, hir: &HirModule) -> bool
 }
 
 impl HirVisitor for HirAspectCollector<'_> {
+    fn visit_item(&mut self, item: &HirItem) {
+        if let HirItemKind::Function(function) = &item.kind {
+            self.record_gate_purity(item, function);
+        }
+        walk_item(self, item);
+    }
+
     fn visit_expr(&mut self, expr: &HirExpression) {
         if let HirExpressionKind::Discerne { scrutinees, arms, exhaustive } = &expr.kind {
             self.record_discerne(expr, scrutinees, arms, *exhaustive);

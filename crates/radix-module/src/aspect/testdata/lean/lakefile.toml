@@ -3,5 +3,18 @@ defaultTargets = ["LeanCheckerFixtures"]
 
 [leanOptions]
 
-[[leanLib]]
+# Lake >= 4.18 registers targets only from the snake_case `[[lean_lib]]` key
+# (the camelCase spelling is silently ignored, leaving the default target
+# unresolvable).  Roots are named explicitly: the buildable fixture modules
+# are library roots; the two deliberate build-failure fixtures
+# (`syntax_error`, `type_error`) stay out of the default build so `lake
+# build` over this directory proves the positive path.
+[[lean_lib]]
 name = "LeanCheckerFixtures"
+roots = [
+  "valid_theorem",
+  "allowed_axioms",
+  "custom_axiom",
+  "direct_sorry",
+  "transitive_sorry_ax",
+]
