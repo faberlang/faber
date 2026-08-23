@@ -232,7 +232,10 @@ fn order_rows_preserve_the_canonical_primary_to_tie_breaker_sequence() {
         column: ColumnRef(interner.intern("id")),
         direction: SortDirection::Desc,
     };
-    plan.order.as_mut().expect("order present").push(tie_breaker);
+    plan.order
+        .as_mut()
+        .expect("order present")
+        .push(tie_breaker);
 
     let order = plan.order.as_ref().expect("order present");
     assert_eq!(order[0].column, ColumnRef(interner.intern("nomen")));
@@ -301,10 +304,7 @@ fn fractus_values_compare_and_hash_by_canonical_bits() {
         PredicateValue::Fractus(f64::NAN * 2.0)
     );
 
-    assert_ne!(
-        PredicateValue::Fractus(1.5),
-        PredicateValue::Fractus(2.5)
-    );
+    assert_ne!(PredicateValue::Fractus(1.5), PredicateValue::Fractus(2.5));
 }
 
 #[test]

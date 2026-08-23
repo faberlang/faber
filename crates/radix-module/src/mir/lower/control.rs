@@ -2071,9 +2071,7 @@ impl FunctionBuilder<'_> {
             Type::BoundedOcteti { .. } => self
                 .types
                 .find_sized_numeric(Primitive::Numerus, NumericWidth::U8),
-            Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => {
-                radix_mir::ty::find_bounded_ascii_one(self.types)
-            }
+            Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => radix_mir::ty::find_bounded_ascii_one(self.types),
             _ => None,
         }
     }

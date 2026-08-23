@@ -982,7 +982,11 @@ functio octeti_full() → vacuum {
     assert!(!has_si(hir), "full octeti<8> iteration is guard-free");
     let mut gathers = GatherTys(Vec::new());
     walk_program(&mut gathers, hir);
-    assert_eq!(gathers.0.len(), 8, "one gather must be emitted per full slot");
+    assert_eq!(
+        gathers.0.len(),
+        8,
+        "one gather must be emitted per full slot"
+    );
     assert!(
         gathers.0.iter().all(|ty| is_numerus_u8(&result.types, *ty)),
         "every octeti<N> lane gathers numerus<u8>: {:?}",
@@ -1007,7 +1011,11 @@ functio ascii_full() → vacuum {
     assert!(!has_si(hir), "full ascii<8> iteration is guard-free");
     let mut gathers = GatherTys(Vec::new());
     walk_program(&mut gathers, hir);
-    assert_eq!(gathers.0.len(), 8, "one gather must be emitted per full slot");
+    assert_eq!(
+        gathers.0.len(),
+        8,
+        "one gather must be emitted per full slot"
+    );
     assert!(
         gathers.0.iter().all(|ty| is_ascii_one(&result.types, *ty)),
         "every ascii<N> lane gathers ascii<1>: {:?}",
@@ -1032,7 +1040,11 @@ functio textus_full() → vacuum {
     assert!(!has_si(hir), "full textus<8> iteration is guard-free");
     let mut gathers = GatherTys(Vec::new());
     walk_program(&mut gathers, hir);
-    assert_eq!(gathers.0.len(), 8, "one gather must be emitted per full slot");
+    assert_eq!(
+        gathers.0.len(),
+        8,
+        "one gather must be emitted per full slot"
+    );
     // Trap audit (D14/D17): each lane binds ascii<1> — the non-ASCII trap
     // row exists, but a full literal is pure ASCII and the loop reads only
     // the literal's own slots, so no lane can trap.

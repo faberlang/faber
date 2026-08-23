@@ -18,7 +18,8 @@ use crate::abi::{
 };
 use crate::device::MirCompanionMap;
 use crate::device_program_plans::{
-    is_transformer_recipe_op, kernel_plan_for_function, subchain_signature_for_emission_with_source,
+    is_transformer_recipe_op, kernel_plan_for_function,
+    subchain_signature_for_emission_with_source,
     transformer_subchain_signature_for_emission_with_source,
 };
 use crate::device_semantics::{
@@ -30,9 +31,7 @@ use crate::kernel_decomposition::decompose_kernel_function;
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::layout::MirTensorStorageLayout;
 use crate::static_shape_fold::{fold_validated_device_program, ShapeFoldError};
-use crate::{
-    MirFunction, MirFunctionId, MirLocalId, MirStatementKind, MirType, ValidatedMir,
-};
+use crate::{MirFunction, MirFunctionId, MirLocalId, MirStatementKind, MirType, ValidatedMir};
 use radix_hir::DefId;
 use radix_lexer::Interner;
 use radix_types::TypeTable;
@@ -394,7 +393,13 @@ pub fn build_device_program(
             }
         }
     }
-    let mut builder = KernelBuilder::new(interner, folded.validation(), companions, training, param_updates);
+    let mut builder = KernelBuilder::new(
+        interner,
+        folded.validation(),
+        companions,
+        training,
+        param_updates,
+    );
     for function_id in &ordered_ids {
         let function = folded_program
             .function_by_id(*function_id)
@@ -406,25 +411,28 @@ pub fn build_device_program(
     // program — the forward kernel's RETURN output (the loss the training
     // loop measures), identified from the training facts, never a shape scan:
     // the last-built forward kernel's first write slot in binding order.
-    let per_step_observation: Option<BufferId> = training.is_some().then(|| {
-        builder
-            .builds
-            .iter()
-            .rev()
-            .find(|build| forward_ids.contains(&build.function))
-            .and_then(|build| {
-                build
-                    .resources
-                    .iter()
-                    .find(|resource| {
-                        matches!(
-                            resource.access,
-                            MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
-                        )
-                    })
-                    .map(|resource| resource.buffer_id)
-            })
-    })   .flatten();
+    let per_step_observation: Option<BufferId> = training
+        .is_some()
+        .then(|| {
+            builder
+                .builds
+                .iter()
+                .rev()
+                .find(|build| forward_ids.contains(&build.function))
+                .and_then(|build| {
+                    build
+                        .resources
+                        .iter()
+                        .find(|resource| {
+                            matches!(
+                                resource.access,
+                                MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+                            )
+                        })
+                        .map(|resource| resource.buffer_id)
+                })
+        })
+        .flatten();
 
     // S5A-U1: the declared END-OF-RUN gradient set — the companion gradient
     // buffers the training plan's gradient-flow links feed into a train_step.
@@ -537,8 +545,7 @@ pub fn build_device_program(
         .filter(|buffer| buffer.param)
         .map(|buffer| buffer.id)
         .collect();
-    device_program.launches =
-        dependency_ordered_launches(&device_program, &param_buffer_ids)?;
+    device_program.launches = dependency_ordered_launches(&device_program, &param_buffer_ids)?;
 
     // S5A-U1: declare the observation-eligible results with their cadence —
     // the constructor's DECLARED fact from the training program's structure,
@@ -667,11 +674,12 @@ impl<'a> KernelBuilder<'a> {
 
         // Whole-function path: a single-recipe or elementwise-only body
         // carries ONE kernel from its full ABI signature.
-        let whole_signature = MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-            function,
-            self.validation,
-            self.interner,
-        );
+        let whole_signature =
+            MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+                function,
+                self.validation,
+                self.interner,
+            );
         if let Ok(signature) = &whole_signature {
             if let Ok(Some(plan)) = kernel_plan_for_function(function, signature, self.validation) {
                 return self.emit_subchain(
@@ -692,12 +700,13 @@ impl<'a> KernelBuilder<'a> {
         // elementwise-only body), with the shared contract-shaped emission
         // signature for recipe subchains and the full ABI synthesis for
         // elementwise-only subchains.
-        let decomposition = decompose_kernel_function(function, self.validation).map_err(
-            |error| DeviceProgramBuildError::Decomposition {
-                function: function.id,
-                detail: error.message,
-            },
-        )?;
+        let decomposition =
+            decompose_kernel_function(function, self.validation).map_err(|error| {
+                DeviceProgramBuildError::Decomposition {
+                    function: function.id,
+                    detail: error.message,
+                }
+            })?;
         // An empty body (no statements at all) decomposes to zero subchains:
         // it is trivially elementwise — no op exists to floor — and the
         // whole-function signature emits it as one Elementwise kernel. An
@@ -705,30 +714,24 @@ impl<'a> KernelBuilder<'a> {
         // already failed with the typed plan diagnostic).
         if decomposition.subchains.is_empty() {
             return match whole_signature {
-                Ok(signature) => {
-                    self.emit_subchain(
-                        function,
-                        function,
-                        &signature,
-                        CollectionKernelPlan::Elementwise,
-                        base_entry,
-                        None,
-                        &return_tuple_locals,
-                        &mut BTreeMap::new(),
-                    )
-                }
+                Ok(signature) => self.emit_subchain(
+                    function,
+                    function,
+                    &signature,
+                    CollectionKernelPlan::Elementwise,
+                    base_entry,
+                    None,
+                    &return_tuple_locals,
+                    &mut BTreeMap::new(),
+                ),
                 Err(error) => Err(DeviceProgramBuildError::KernelAbi {
                     function: function.id,
                     detail: error.message,
                 }),
             };
         }
-        let mut subchain_types = TypeTable::from_snapshot(
-            self.validation.types.snapshot(),
-        )
-        .map_err(|error| DeviceProgramBuildError::SubchainTypes {
-            detail: error,
-        })?;
+        let mut subchain_types = TypeTable::from_snapshot(self.validation.types.snapshot())
+            .map_err(|error| DeviceProgramBuildError::SubchainTypes { detail: error })?;
         decomposition.intern_output_tuple_types(function, &mut subchain_types);
         let subchain_validation = self.validation.with_types(&subchain_types);
 
@@ -738,28 +741,30 @@ impl<'a> KernelBuilder<'a> {
         // producers after all subchains are emitted.
         let mut subchain_output_buffer_ids: BTreeMap<(usize, u32), BufferId> = BTreeMap::new();
         for (subchain_index, subchain) in decomposition.subchains.iter().enumerate() {
-            let synthetic =
-                decomposition.subchain_function(function, subchain_index, subchain_validation.types);
-            let contract = collection_op_contract(&synthetic, &subchain_validation).map_err(
-                |error| DeviceProgramBuildError::KernelPlan {
-                    function: function.id,
-                    detail: error.message,
-                },
-            )?;
-            let signature = match &contract {
-                Some(contract) => {
-                    subchain_signature_for_emission_with_source(
-                        &synthetic,
-                        contract,
-                        &subchain_validation,
-                        &subchain.outputs,
-                        Some(function),
-                    )
-                    .map_err(|error| DeviceProgramBuildError::KernelAbi {
+            let synthetic = decomposition.subchain_function(
+                function,
+                subchain_index,
+                subchain_validation.types,
+            );
+            let contract =
+                collection_op_contract(&synthetic, &subchain_validation).map_err(|error| {
+                    DeviceProgramBuildError::KernelPlan {
                         function: function.id,
                         detail: error.message,
-                    })?
-                }
+                    }
+                })?;
+            let signature = match &contract {
+                Some(contract) => subchain_signature_for_emission_with_source(
+                    &synthetic,
+                    contract,
+                    &subchain_validation,
+                    &subchain.outputs,
+                    Some(function),
+                )
+                .map_err(|error| DeviceProgramBuildError::KernelAbi {
+                    function: function.id,
+                    detail: error.message,
+                })?,
                 None => {
                     // A transformer-recipe subchain (`TensorSumAxis` /
                     // `TensorSoftmax` / `TensorLayerNorm` / the GI3-1
@@ -778,9 +783,11 @@ impl<'a> KernelBuilder<'a> {
                             &subchain.outputs,
                             Some(function),
                         )
-                        .map_err(|error| DeviceProgramBuildError::KernelAbi {
-                            function: function.id,
-                            detail: error.message,
+                        .map_err(|error| {
+                            DeviceProgramBuildError::KernelAbi {
+                                function: function.id,
+                                detail: error.message,
+                            }
                         })?
                     } else {
                         MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
@@ -788,9 +795,11 @@ impl<'a> KernelBuilder<'a> {
                             &subchain_validation,
                             self.interner,
                         )
-                        .map_err(|error| DeviceProgramBuildError::KernelAbi {
-                            function: function.id,
-                            detail: error.message,
+                        .map_err(|error| {
+                            DeviceProgramBuildError::KernelAbi {
+                                function: function.id,
+                                detail: error.message,
+                            }
                         })?
                     }
                 }
@@ -830,17 +839,14 @@ impl<'a> KernelBuilder<'a> {
                         else {
                             continue;
                         };
-                        let output_position =
-                            u32::try_from(output_position).unwrap_or(u32::MAX);
+                        let output_position = u32::try_from(output_position).unwrap_or(u32::MAX);
                         let Some(&buffer_id) =
                             subchain_output_buffer_ids.get(&(producer_index, output_position))
                         else {
                             continue;
                         };
-                        if let Some(entry) = self
-                            .buffers
-                            .iter_mut()
-                            .find(|entry| entry.id == buffer_id)
+                        if let Some(entry) =
+                            self.buffers.iter_mut().find(|entry| entry.id == buffer_id)
                         {
                             entry.gradient = true;
                         }
@@ -877,23 +883,22 @@ impl<'a> KernelBuilder<'a> {
             .resources()
             .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
         {
-            let role = BufferRole::from_abi_role(resource.role, resource.access).ok_or_else(
-                || DeviceProgramBuildError::BufferRole {
-                    function: kernel_source.id,
-                    binding: resource.binding,
-                    role: format!("{:?}", resource.role),
-                    access: format!("{:?}", resource.access),
-                },
-            )?;
+            let role =
+                BufferRole::from_abi_role(resource.role, resource.access).ok_or_else(|| {
+                    DeviceProgramBuildError::BufferRole {
+                        function: kernel_source.id,
+                        binding: resource.binding,
+                        role: format!("{:?}", resource.role),
+                        access: format!("{:?}", resource.access),
+                    }
+                })?;
             // A trainable parameter's read slot: the buffer is persistent
             // InOut state with HostProvided init — the program role is InOut
             // regardless of the slot's ABI role.
             let is_param_input = resource.role == MirKernelResourceRole::Input
                 && resource.source_local.is_some_and(|local| {
                     self.param_updates.contains_key(&(kernel_source.id, local))
-                        || self
-                            .persistent_locals
-                            .contains(&(kernel_source.id, local))
+                        || self.persistent_locals.contains(&(kernel_source.id, local))
                 });
             // The output-slot tuple index (the ABI's first output is element
             // 0, each extra output follows).
@@ -1044,7 +1049,8 @@ impl<'a> KernelBuilder<'a> {
                     {
                         entry.gradient = true;
                     }
-                    self.gradient_buffers.insert((source.0, output_index), buffer_id);
+                    self.gradient_buffers
+                        .insert((source.0, output_index), buffer_id);
                 }
                 if let Some(subchain_index) = subchain_index {
                     subchain_output_buffer_ids.insert((subchain_index, output_index), buffer_id);
@@ -1470,10 +1476,7 @@ fn declared_result_rows(
                 version: 1,
                 element_ty: buffer.element_ty,
                 element_count: buffer.element_count,
-                reduced_projection: projection_by_buffer
-                    .get(&buffer.id)
-                    .copied()
-                    .flatten(),
+                reduced_projection: projection_by_buffer.get(&buffer.id).copied().flatten(),
             },
             role: buffer.role,
             produced_by,

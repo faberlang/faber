@@ -2,8 +2,8 @@ use super::build_device_program;
 use crate::abi::MirKernelResourceAccess;
 use crate::device::MirCompanionMap;
 use crate::device_program::{
-    BufferLifetime, BufferRole, DeviceGradientLink, DeviceProgramLifetime, DeviceTrainingFacts,
-    DeviceTrainableParam, ObservationCadence,
+    BufferLifetime, BufferRole, DeviceGradientLink, DeviceProgramLifetime, DeviceTrainableParam,
+    DeviceTrainingFacts, ObservationCadence,
 };
 use crate::device_semantics::{
     LosslessMirCompanionEntry, MirCompanionSelectedInput, MirCompanionSelectedOutput,
@@ -53,9 +53,9 @@ fn index_store_statement(out: u32, index: u32, value: u32, ty: MirType) -> MirSt
             },
             value: crate::MirValue {
                 id: crate::MirValueId(0),
-                kind: crate::MirValueKind::Operand(MirOperand::Place(MirPlace::local(
-                    MirLocalId(value),
-                ))),
+                kind: crate::MirValueKind::Operand(MirOperand::Place(MirPlace::local(MirLocalId(
+                    value,
+                )))),
                 ty,
                 span: span(),
             },
@@ -384,7 +384,12 @@ fn constructor_launch_sequence_follows_dependencies_not_declaration_order() {
         1,
         &mut interner,
         "recollige",
-        &[(0, "medius", r4), (1, "result", r1), (2, "id", index), (3, "total", scalar)],
+        &[
+            (0, "medius", r4),
+            (1, "result", r1),
+            (2, "id", index),
+            (3, "total", scalar),
+        ],
         &[0, 1, 2],
         vec![
             collection_statement(MirCollectionOp::Sum, &[0], 3, scalar),
@@ -402,7 +407,12 @@ fn constructor_launch_sequence_follows_dependencies_not_declaration_order() {
         2,
         &mut interner,
         "collige",
-        &[(0, "a", r1024), (1, "medius", r4), (2, "id", index), (3, "total", scalar)],
+        &[
+            (0, "a", r1024),
+            (1, "medius", r4),
+            (2, "id", index),
+            (3, "total", scalar),
+        ],
         &[0, 1, 2],
         vec![
             collection_statement(MirCollectionOp::Sum, &[0], 3, scalar),
@@ -500,12 +510,10 @@ fn train_step_function(types: &mut TypeTable, interner: &mut Interner) -> MirFun
         "train_step",
         &[(0, "w", r2), (1, "gw", r2), (2, "nw", r2)],
         &[0, 1],
-        vec![collection_statement(
-            MirCollectionOp::TensorSub,
-            &[0, 1],
-            2,
-            r2,
-        ), construct],
+        vec![
+            collection_statement(MirCollectionOp::TensorSub, &[0, 1], 2, r2),
+            construct,
+        ],
         Some(MirOperand::Temp(temp)),
         vec![crate::MirTemp {
             id: temp,
@@ -588,10 +596,7 @@ fn training_facts() -> DeviceTrainingFacts {
     DeviceTrainingFacts {
         step_count: 100,
         device_function_ids: vec![MirFunctionId(STEP_FN)],
-        persistent_buffers: BTreeSet::from_iter([(
-            MirFunctionId(STEP_FN),
-            MirLocalId(0),
-        )]),
+        persistent_buffers: BTreeSet::from_iter([(MirFunctionId(STEP_FN), MirLocalId(0))]),
         trainable: vec![DeviceTrainableParam {
             step_function: MirFunctionId(STEP_FN),
             param_position: 0,
@@ -606,9 +611,7 @@ fn training_facts() -> DeviceTrainingFacts {
     }
 }
 
-fn training_fixture<R>(
-    run: impl FnOnce(&Interner, &ValidatedMir<'_>, &MirCompanionMap) -> R,
-) -> R {
+fn training_fixture<R>(run: impl FnOnce(&Interner, &ValidatedMir<'_>, &MirCompanionMap) -> R) -> R {
     let mut types = TypeTable::new();
     let mut interner = Interner::new();
     let tensor_id = rank1_tensor_ty(&mut types, 2).semantic_id();
@@ -739,7 +742,10 @@ fn constructor_aliases_param_updates_and_gradients() {
             }
         }
         assert!(
-            !semantics.dependencies.iter().any(|edge| edge.buffer == param_id),
+            !semantics
+                .dependencies
+                .iter()
+                .any(|edge| edge.buffer == param_id),
             "no param edge rides the dependency graph (persistent state)"
         );
     })
