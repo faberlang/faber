@@ -730,6 +730,48 @@ fn intervallum_materialize_conversio_parses_after_range() {
     assert!(matches!(conversio.target, ConversioTarget::Explicit(_)));
 }
 
+// bits-f16 U4 — a chained `↦` folds LEFT: `a ↦ T1 ↦ T2` parses as
+// `(a ↦ T1) ↦ T2`, so `dbits ↦ fractus<f16, Bits> ↦ fractus<f32>` applies
+// the widen hop to the Bits hop's result (no intermediate binding).
+#[test]
+fn conversio_chain_folds_left() {
+    let result = parse_ok("fixum _ df ← dbits ↦ fractus<f16, Bits> ↦ fractus<f32>");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Conversio(outer) = &expr.kind else {
+        panic!("expected outer conversio, got {:?}", expr.kind);
+    };
+    // Outer hop targets fractus<f32> — the fold's final type.
+    let ConversioTarget::Explicit(outer_target) = &outer.target else {
+        panic!("expected explicit outer target");
+    };
+    let TypeExprKind::Named(outer_name, outer_params) = &outer_target.kind else {
+        panic!("expected named outer target, got {:?}", outer_target.kind);
+    };
+    assert_eq!(result.interner.resolve(outer_name.name), "fractus");
+    assert_eq!(outer_params.len(), 1);
+    // Left fold: the outer source is itself a conversio, not a bare operand.
+    let ExprKind::Conversio(inner) = &outer.expr.kind else {
+        panic!(
+            "expected inner conversio under the left fold, got {:?}",
+            outer.expr.kind
+        );
+    };
+    let ConversioTarget::Explicit(inner_target) = &inner.target else {
+        panic!("expected explicit inner target");
+    };
+    let TypeExprKind::Named(inner_name, inner_params) = &inner_target.kind else {
+        panic!("expected named inner target, got {:?}", inner_target.kind);
+    };
+    assert_eq!(result.interner.resolve(inner_name.name), "fractus");
+    assert_eq!(inner_params.len(), 2, "fractus<f16, Bits>");
+    // The chain's leaf is the bare source operand.
+    assert!(matches!(inner.expr.kind, ExprKind::Ident(_)));
+}
+
 // =============================================================================
 // F-059: conversio target miss range tails with non-type identifiers
 // F-060: speculative Integer/Float discards non-range in conversio target

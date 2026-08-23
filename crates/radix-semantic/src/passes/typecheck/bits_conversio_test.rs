@@ -129,3 +129,56 @@ fn without_bits_value_conversion_stays() {
 fn radix_hint_accept_row_stays_green() {
     test_support::assert_accepts("incipit { fixum _ n ← \"ff\" ↦ numerus<u32, Hex> }");
 }
+
+// U4 chain + derived-form pins (goal `bits-f16-pair`, unit U4): the
+// left-folded chain types as exact widen, the `↤` typed-destination form
+// routes through the same conversion table (zero new implementation), and
+// the no-hint form stays the distinct integer-value conversion.
+
+#[test]
+fn u16_bits_chain_to_f32_types_as_exact_widen() {
+    // `dbits ↦ fractus<f16, Bits> ↦ fractus<f32>`: Bits hop then the exact
+    // f16 → f32 widen — the value-level "no intermediate binding" proof is
+    // U5's runner exemplum; the type level pins the fold here.
+    test_support::assert_accepts(
+        "functio fold(numerus<u16> dbits) → fractus<f32> { redde dbits ↦ fractus<f16, Bits> ↦ fractus<f32> }",
+    );
+}
+
+#[test]
+fn u16_bits_chain_to_f32_typed_destination_accepts() {
+    // `df` names `fractus<f32>`; the chain must fold to exactly that type
+    // (not `fractus<f16>`), or the declaration rejects.
+    test_support::assert_accepts(
+        "incipit {\n  fixum numerus<u16> dbits ← 0x3E00\n  fixum fractus<f32> df ← dbits ↦ fractus<f16, Bits> ↦ fractus<f32>\n}",
+    );
+}
+
+#[test]
+fn typed_destination_conversio_assign_accepts_u16_to_f16() {
+    // `↤` routes the right side through the same conversion registry as an
+    // explicit `dbits ↦ fractus<f16>` — the destination type picks the pair
+    // implicitly. Derived test: zero new implementation by design.
+    test_support::assert_accepts(
+        "incipit {\n  fixum numerus<u16> dbits ← 0x3E00\n  fixum fractus<f16> d ↤ dbits\n}",
+    );
+}
+
+#[test]
+fn u16_to_f32_without_bits_stays_integer_value_conversion() {
+    // No `Bits` hint: this is the integer-value conversion, distinct from the
+    // reinterpretation row — u16 0x3E00 (15872) becomes f32 15872.0, not the
+    // f16-bits value 1.0. The value-level distinction is U5's corpus exemplum
+    // on the runner; the type level pins the distinct admission here.
+    test_support::assert_accepts(
+        "functio val(numerus<u16> dbits) → fractus<f32> { redde dbits ↦ fractus<f32> }",
+    );
+}
+
+#[test]
+fn u16_to_f16_without_bits_stays_integer_value_conversion() {
+    // Same distinct-value rule at the f16 width: no hint, no reinterpretation.
+    test_support::assert_accepts(
+        "functio val(numerus<u16> dbits) → fractus<f16> { redde dbits ↦ fractus<f16> }",
+    );
+}
