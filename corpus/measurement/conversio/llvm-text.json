@@ -2096,7 +2096,7 @@
     {
       "src": "vector",
       "tgt": "lista",
-      "tier": "dedicated",
+      "tier": "rejected",
       "measured": true
     },
     {
@@ -2126,7 +2126,7 @@
     {
       "src": "vector",
       "tgt": "vector",
-      "tier": "rejected",
+      "tier": "dedicated",
       "measured": true
     },
     {

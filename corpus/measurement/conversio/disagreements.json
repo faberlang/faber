@@ -2801,7 +2801,7 @@
       "target": "rust",
       "predicted": "fallback",
       "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
+      "detail": "frontend:octeti_to_vector_unspecified"
     },
     {
       "src": "octeti",
@@ -2809,7 +2809,7 @@
       "target": "ts",
       "predicted": "fallback",
       "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
+      "detail": "frontend:octeti_to_vector_unspecified"
     },
     {
       "src": "octeti",
@@ -2817,7 +2817,7 @@
       "target": "go",
       "predicted": "not-emitted",
       "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
+      "detail": "frontend:octeti_to_vector_unspecified"
     },
     {
       "src": "octeti",
@@ -2825,7 +2825,7 @@
       "target": "faber",
       "predicted": "dedicated",
       "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
+      "detail": "frontend:octeti_to_vector_unspecified"
     },
     {
       "src": "octeti",
@@ -2833,7 +2833,7 @@
       "target": "llvm-text",
       "predicted": "not-emitted",
       "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
+      "detail": "frontend:octeti_to_vector_unspecified"
     },
     {
       "src": "octeti",
@@ -2841,7 +2841,7 @@
       "target": "wasm-text",
       "predicted": "not-emitted",
       "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
+      "detail": "frontend:octeti_to_vector_unspecified"
     },
     {
       "src": "octeti",
@@ -2849,7 +2849,7 @@
       "target": "wasm",
       "predicted": "not-emitted",
       "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
+      "detail": "frontend:octeti_to_vector_unspecified"
     },
     {
       "src": "octeti",
@@ -2857,7 +2857,7 @@
       "target": "wgsl-text",
       "predicted": "not-emitted",
       "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
+      "detail": "frontend:octeti_to_vector_unspecified"
     },
     {
       "src": "octeti",
@@ -2865,7 +2865,7 @@
       "target": "sexp-struct",
       "predicted": "not-emitted",
       "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
+      "detail": "frontend:octeti_to_vector_unspecified"
     },
     {
       "src": "octeti",
@@ -2873,7 +2873,7 @@
       "target": "sexp",
       "predicted": "not-emitted",
       "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
+      "detail": "frontend:octeti_to_vector_unspecified"
     },
     {
       "src": "octeti",
@@ -8254,26 +8254,82 @@
     {
       "src": "vector",
       "tgt": "lista",
+      "target": "rust",
+      "predicted": "fallback",
+      "measured": "rejected",
+      "detail": "frontend:register_out_element_mismatch"
+    },
+    {
+      "src": "vector",
+      "tgt": "lista",
       "target": "ts",
       "predicted": "fallback",
-      "measured": "dedicated",
-      "detail": "arm:dedicated"
+      "measured": "rejected",
+      "detail": "frontend:register_out_element_mismatch"
     },
     {
       "src": "vector",
       "tgt": "lista",
       "target": "go",
       "predicted": "not-emitted",
-      "measured": "fallback",
-      "detail": "arm:fallback"
+      "measured": "rejected",
+      "detail": "frontend:register_out_element_mismatch"
+    },
+    {
+      "src": "vector",
+      "tgt": "lista",
+      "target": "faber",
+      "predicted": "dedicated",
+      "measured": "rejected",
+      "detail": "frontend:register_out_element_mismatch"
     },
     {
       "src": "vector",
       "tgt": "lista",
       "target": "llvm-text",
       "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
+      "measured": "rejected",
+      "detail": "frontend:register_out_element_mismatch"
+    },
+    {
+      "src": "vector",
+      "tgt": "lista",
+      "target": "wasm-text",
+      "predicted": "not-emitted",
+      "measured": "rejected",
+      "detail": "frontend:register_out_element_mismatch"
+    },
+    {
+      "src": "vector",
+      "tgt": "lista",
+      "target": "wasm",
+      "predicted": "not-emitted",
+      "measured": "rejected",
+      "detail": "frontend:register_out_element_mismatch"
+    },
+    {
+      "src": "vector",
+      "tgt": "lista",
+      "target": "wgsl-text",
+      "predicted": "not-emitted",
+      "measured": "rejected",
+      "detail": "frontend:register_out_element_mismatch"
+    },
+    {
+      "src": "vector",
+      "tgt": "lista",
+      "target": "sexp-struct",
+      "predicted": "not-emitted",
+      "measured": "rejected",
+      "detail": "frontend:register_out_element_mismatch"
+    },
+    {
+      "src": "vector",
+      "tgt": "lista",
+      "target": "sexp",
+      "predicted": "not-emitted",
+      "measured": "rejected",
+      "detail": "frontend:register_out_element_mismatch"
     },
     {
       "src": "vector",
@@ -8430,82 +8486,26 @@
     {
       "src": "vector",
       "tgt": "vector",
-      "target": "rust",
-      "predicted": "fallback",
-      "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
-    },
-    {
-      "src": "vector",
-      "tgt": "vector",
       "target": "ts",
       "predicted": "fallback",
-      "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
+      "measured": "dedicated",
+      "detail": "arm:dedicated"
     },
     {
       "src": "vector",
       "tgt": "vector",
       "target": "go",
       "predicted": "not-emitted",
-      "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
-    },
-    {
-      "src": "vector",
-      "tgt": "vector",
-      "target": "faber",
-      "predicted": "dedicated",
-      "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
+      "measured": "fallback",
+      "detail": "arm:fallback"
     },
     {
       "src": "vector",
       "tgt": "vector",
       "target": "llvm-text",
       "predicted": "not-emitted",
-      "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
-    },
-    {
-      "src": "vector",
-      "tgt": "vector",
-      "target": "wasm-text",
-      "predicted": "not-emitted",
-      "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
-    },
-    {
-      "src": "vector",
-      "tgt": "vector",
-      "target": "wasm",
-      "predicted": "not-emitted",
-      "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
-    },
-    {
-      "src": "vector",
-      "tgt": "vector",
-      "target": "wgsl-text",
-      "predicted": "not-emitted",
-      "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
-    },
-    {
-      "src": "vector",
-      "tgt": "vector",
-      "target": "sexp-struct",
-      "predicted": "not-emitted",
-      "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
-    },
-    {
-      "src": "vector",
-      "tgt": "vector",
-      "target": "sexp",
-      "predicted": "not-emitted",
-      "measured": "rejected",
-      "detail": "frontend:lista_to_vector_literal_required"
+      "measured": "dedicated",
+      "detail": "mir-capable"
     },
     {
       "src": "vector",

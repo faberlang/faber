@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 261,
-    "analyzable": 292
+    "capable": 264,
+    "analyzable": 300
   },
   "terms": [
     {
@@ -217,7 +217,7 @@
       "term": "↦",
       "rule": "operator-group",
       "capable": 8,
-      "analyzable": 10
+      "analyzable": 12
     },
     {
       "term": "copia",
@@ -343,7 +343,7 @@
       "term": "ex",
       "rule": "keyword",
       "capable": 4,
-      "analyzable": 4
+      "analyzable": 5
     },
     {
       "term": "exitus",
@@ -367,7 +367,7 @@
       "term": "f16",
       "rule": "existing-home",
       "capable": 1,
-      "analyzable": 1
+      "analyzable": 2
     },
     {
       "term": "fient",
@@ -426,8 +426,8 @@
     {
       "term": "functio",
       "rule": "keyword",
-      "capable": 4,
-      "analyzable": 6
+      "capable": 5,
+      "analyzable": 7
     },
     {
       "term": "futura",
@@ -546,14 +546,14 @@
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 4,
-      "analyzable": 5
+      "capable": 6,
+      "analyzable": 9
     },
     {
       "term": "iuncta",
       "rule": "existing-home",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 0
     },
     {
       "term": "lege",

@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 276,
-    "analyzable": 299
+    "capable": 279,
+    "analyzable": 304
   },
   "terms": [
     {
@@ -342,8 +342,8 @@
     {
       "term": "ex",
       "rule": "keyword",
-      "capable": 4,
-      "analyzable": 4
+      "capable": 5,
+      "analyzable": 5
     },
     {
       "term": "exitus",
@@ -366,8 +366,8 @@
     {
       "term": "f16",
       "rule": "existing-home",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "fient",
@@ -546,14 +546,14 @@
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 5,
-      "analyzable": 5
+      "capable": 7,
+      "analyzable": 9
     },
     {
       "term": "iuncta",
       "rule": "existing-home",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 0,
+      "analyzable": 0
     },
     {
       "term": "lege",
