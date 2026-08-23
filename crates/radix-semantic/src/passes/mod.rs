@@ -43,8 +43,8 @@
 //! severities rather than from pass execution alone.
 
 pub mod air_closure_lift;
-mod air_tensor_intrinsics;
 pub mod air_purity;
+mod air_tensor_intrinsics;
 pub mod air_unroll;
 pub mod borrow;
 pub mod borrow_region;
@@ -211,3 +211,6 @@ mod ratio_hole_test;
 #[cfg(test)]
 #[path = "visibility_annotation_test.rs"]
 mod visibility_annotation_test;
+#[cfg(test)]
+#[path = "summa_disambiguation_test.rs"]
+mod summa_disambiguation_test;

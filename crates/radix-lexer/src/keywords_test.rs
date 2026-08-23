@@ -11,6 +11,64 @@ use super::{
 };
 use crate::TokenKind;
 
+// =============================================================================
+// SFR-1 (summa-filum-reduction): `filum` freedom pins
+//
+// `filum` is zero-hit across the corpus and absent from the keyword registry.
+// It must keep lexing as a plain identifier in every position until SFR-2
+// mints its row; SFR-2's mechanism choice (contextual vs reserved) must keep
+// these census/substring laws intact.
+// =============================================================================
+
+#[test]
+fn filum_has_no_keyword_row_zero_hit_census() {
+    assert!(
+        lookup_keyword_spec("filum").is_none(),
+        "'filum' must have no KeywordSpec row before SFR-2 — zero corpus hits"
+    );
+}
+
+#[test]
+fn filum_lexes_as_plain_identifier_in_every_position() {
+    for source in [
+        "filum",
+        "fixum numerus filum ← 1",
+        "filum(1, 2)",
+        "a.filum()",
+        "filum ∴ filum",
+    ] {
+        let result = crate::lex(source);
+        assert!(
+            result.success(),
+            "'{source}' must lex cleanly with filum as a plain identifier, got {:?}",
+            result.errors
+        );
+        for token in &result.tokens {
+            assert!(
+                !token.kind.is_keyword(),
+                "'{source}': token {:?} must not claim keyword status for filum",
+                token.kind
+            );
+        }
+    }
+}
+
+#[test]
+fn filum_substring_law_keeps_containing_identifiers_plain() {
+    // Identifiers that merely contain "filum" as a substring stay identifiers;
+    // the future keyword claim (if any) is exact-spelling only.
+    for spelling in ["filum_x", "x_filum", "profilum", "filumensis"] {
+        let result = crate::lex(spelling);
+        assert!(result.success(), "'{spelling}' must lex cleanly");
+        assert!(
+            matches!(result.tokens[0].kind, crate::TokenKind::Ident(_)),
+            "'{spelling}' must lex as a plain identifier, got {:?}",
+            result.tokens[0].kind
+        );
+    }
+}
+
+
 #[test]
 fn registry_texts_are_unique() {
     let mut texts = std::collections::BTreeSet::new();
