@@ -613,6 +613,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
 # | Boolean | `vel` | nullable default |
 # | Boolean | `verum` | true |
 # | Objects | `clausura` | legacy closure |
+# | Objects | `libera` | capture-free closure modifier |
 # | Objects | `cura` | with-resource |
 # | Objects | `ego` | self |
 # | Objects | `finge` | construct variant |
@@ -819,11 +820,12 @@ clausura_expr   := compact_clausura_expr | clausura_legacy_expr
 @formerly compactClausuraExpr
 compact_clausura_expr := clausura_signature clausura_joint (expression | fac_block)
 @formerly clausuraSignature
-clausura_signature := (clausura_param | '(' clausura_params? ')') return_clause? alternate_exit_clause?
+clausura_signature := (clausura_param | '(' clausura_params? ')') closure_modifier? return_clause? alternate_exit_clause?
+closure_modifier := 'libera'
 @formerly closureFacBlock
 fac_block := 'fac' block_stmt cape_clause?
 @formerly legacyClausuraExpr
-clausura_legacy_expr := 'clausura' clausura_params? ('→' type_annotation)? (':' expression | block_stmt)
+clausura_legacy_expr := 'clausura' clausura_params? closure_modifier? ('→' type_annotation)? (':' expression | block_stmt)
 @formerly clausuraParams
 clausura_params := clausura_param (',' clausura_param)*
 @formerly clausuraParam
