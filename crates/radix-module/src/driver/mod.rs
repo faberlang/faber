@@ -2137,8 +2137,9 @@ fn generate_air_lane_backward_with_companion(
     use crate::air::{
         admit_generated_gradient_check, air_gradient_check_eligibility_witness,
         validate_generated_backward_to_mir_from_function, validate_mir_backward_result_contract,
-        AirCompanionDerivativeKind, AirCompanionOracleRef, AirCompanionRelation, AirCompanionSelectedInput,
-        AirCompanionSelectedOutput, AirGradientCheckAdmissionInputs,
+        AirCompanionDerivativeKind, AirCompanionErrorChannel, AirCompanionOracleRef,
+        AirCompanionRelation, AirCompanionSelectedInput, AirCompanionSelectedOutput,
+        AirGradientCheckAdmissionInputs,
     };
 
     let types_ref = lowered.validated.validation().types;
@@ -2188,6 +2189,14 @@ fn generate_air_lane_backward_with_companion(
         selected_outputs,
         return_ty: companion.return_ty,
         oracle: AirCompanionOracleRef { packet: "air-same-shape-derivative-oracle", case_family: "reverse_ad" },
+        // Tier 1 (AT1-1): driver-generated reverse-AD companions are
+        // success-only; a failable boundary must state its posture and
+        // record its typed error facts explicitly instead of defaulting
+        // silently.
+        error_channel: AirCompanionErrorChannel {
+            posture: crate::air::AirCompanionBoundaryPosture::SuccessOnly,
+            error: None,
+        },
     };
 
     // Run the validation chain: AIR-to-MIR → result contract → gradient check.
