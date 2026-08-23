@@ -28,10 +28,9 @@ const BUDGETS: Budgets = Budgets {
     // WHY: D03-HANDROLL extracts both inline test modules (entropy, sha256);
     // minted at observed, lowered to 0 by this unit.
     inline_test_modules: 0,
-    // WHY: D03-HANDROLL extracts test attributes from both production files
-    // (entropy, sha256). Residual 1 = lib.rs `manifest_is_std_only` guard
-    // test (U5a), outside this unit's file row; frozen at observed.
-    test_attr_in_production: 1,
+    // WHY: U5a extracts lib.rs `manifest_is_std_only` into the lib_test.rs
+    // companion (D-03 convention), closing the D03-HANDROLL residual: 0.
+    test_attr_in_production: 0,
 };
 
 #[test]
