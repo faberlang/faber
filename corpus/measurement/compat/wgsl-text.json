@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 6,
-    "analyzable": 305
+    "analyzable": 306
   },
   "terms": [
     {
@@ -169,7 +169,7 @@
       "term": "cape",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 2
+      "analyzable": 3
     },
     {
       "term": "⊻",
