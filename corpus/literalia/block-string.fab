@@ -10,6 +10,7 @@ aliases = ["«...»"]
 related = ["string", "textus"]
 locale = "en"
 +++
+import from "norma:consolum" const write_partial as output
 
 # =============================================================================
 # block-string — Block textus literals with embedded quotes and newlines.
@@ -34,10 +35,9 @@ locale = "en"
 #   he said "salve", line one
 
 main {
-    const _ quote ← «he said "salve"»
-    print quote
-
-    const _ multiline ← «line one
+    const string quote ← «he said "salve"»
+    output ⇇ "§\n"(quote)
+    const string multiline ← «line one
 still line one»
-    print multiline.slice(0, 8)
+    output ⇇ "§\n"(multiline.slice(0, 8))
 }
