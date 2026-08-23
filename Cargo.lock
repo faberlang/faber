@@ -819,6 +819,7 @@ dependencies = [
 name = "radix-syntax"
 version = "0.83.0"
 dependencies = [
+ "hygiene-ratchet",
  "radix-lexer",
  "serde",
 ]
