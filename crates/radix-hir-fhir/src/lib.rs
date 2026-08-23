@@ -26,6 +26,10 @@ mod test_support;
 pub use artifact::*;
 pub use decode::{decode, encode};
 pub use error::HirArtifactError;
+// FPF-4: the package MessagePack codecs are re-exported so the
+// radix-module loader-side equivalence proof (and later FPF-5) can reach
+// them; postcard stays the live wire.
+pub use msgpack::{decode_package_msgpack, encode_package_msgpack, MsgpackError};
 pub use package::{
     decode_package, encode_package, DecodedFhirPackage, DecodedFhirPackageModule, FhirPackage,
     FhirPackageError, FhirPackageModule, LibraryImportWire, LocalLinkWire, PackageDependencyWire,

@@ -88,6 +88,169 @@ fn output_code(output: &crate::Output) -> &str {
     }
 }
 
+/// Extract the code string from a codegen [`crate::Output`] (Faber lane).
+fn faber_code(output: &crate::Output) -> &str {
+    match output {
+        crate::Output::Faber(o) => &o.code,
+        _ => panic!("unexpected non-Faber output variant in package test"),
+    }
+}
+
+#[test]
+fn both_codec_loaded_package_equivalence() {
+    // FPF-4: one real analyzed package, encoded through both codecs
+    // (postcard live wire + the FPF-2/3 MessagePack codecs), loaded through
+    // `load_package`, must reconstruct equal `LoadedHirPackage`s and emit
+    // identical canonical Faber from the loaded HIR.
+    let main = analyze("main.fab", main_equivalence_source());
+    let aux = analyze("aux.fab", aux_equivalence_source());
+
+    let mut main_input = input("main.fab", true, &main);
+    main_input.export_names = vec!["computa".to_owned()];
+    main_input.local_links =
+        vec![LocalLinkWire { binding: "aux".to_owned(), target: "aux.fab".to_owned() }];
+    main_input.library_imports = vec![LibraryImportWire {
+        binding: "mathesis".to_owned(),
+        package: "norma".to_owned(),
+        module: vec!["mathesis".to_owned()],
+    }];
+    let mut aux_input = input("aux.fab", false, &aux);
+    aux_input.export_names = vec!["auxilia".to_owned()];
+
+    let pkg = build_package(
+        PackageIdentityWire { name: "exemplum".to_owned(), version: "1.0.0".to_owned(), edition: "2026".to_owned() },
+        "main.fab",
+        None,
+        vec![aux_input, main_input],
+        sample_dependencies(),
+    )
+    .expect("build package");
+
+    // Postcard live wire: the bytes `.fhirpkg` carries today.
+    let postcard_bytes = encode_package(&pkg).expect("encode package (postcard)");
+    let loaded_postcard = load_package(&postcard_bytes).expect("load package (postcard)");
+
+    // MessagePack wire: the FPF-3 envelope with nested FPF-2 unit values.
+    // Decoding returns the wire form with deterministic postcard unit
+    // bytes; re-encoding hands the loader the exact same entry point.
+    let msgpack_bytes = radix_hir_fhir::encode_package_msgpack(&pkg).expect("encode package (msgpack)");
+    let msgpkg = radix_hir_fhir::decode_package_msgpack(&msgpack_bytes).expect("decode package (msgpack)");
+    assert_ne!(msgpack_bytes, postcard_bytes, "the two codecs must produce distinct wires");
+    let loaded_msgpack = load_package(&encode_package(&msgpkg).expect("re-encode msgpack package"))
+        .expect("load package (msgpack)");
+
+    // LoadedHirPackage equality: envelope, module table, dependencies, and
+    // nucleum metadata all agree between the two load paths.
+    assert_eq!(loaded_postcard.identity, loaded_msgpack.identity);
+    assert_eq!(loaded_postcard.entry_path, loaded_msgpack.entry_path);
+    assert_eq!(loaded_postcard.entry_frontmatter, loaded_msgpack.entry_frontmatter);
+    assert_eq!(loaded_postcard.dependencies, loaded_msgpack.dependencies);
+    assert_eq!(loaded_postcard.nucleum, loaded_msgpack.nucleum);
+    assert_eq!(loaded_postcard.modules.len(), loaded_msgpack.modules.len());
+
+    let latin = latin_locale_pack();
+    let surface = KeywordSurface::new(&latin);
+    for (postcard_module, msgpack_module) in loaded_postcard.modules.iter().zip(&loaded_msgpack.modules) {
+        assert_eq!(postcard_module.relative_path, msgpack_module.relative_path);
+        assert_eq!(postcard_module.module_segments, msgpack_module.module_segments);
+        assert_eq!(postcard_module.is_entry, msgpack_module.is_entry);
+        assert_eq!(postcard_module.export_names, msgpack_module.export_names);
+        assert_eq!(postcard_module.local_links, msgpack_module.local_links);
+        assert_eq!(postcard_module.library_imports, msgpack_module.library_imports);
+
+        // Reconstructed AnalyzedModule equality: both loads run the same
+        // `reconstruct_unit`; equality of the re-serialized unit artifacts
+        // proves every loader-carried fact family (HIR, presentation, types,
+        // interner, resolver, libraries, facts, uses) agrees.
+        let postcard_artifact = crate::hir::serialize::from_analyzed(
+            &postcard_module.unit,
+            &format!("sha256:{}", postcard_module.relative_path),
+            &postcard_module.relative_path,
+        );
+        let msgpack_artifact = crate::hir::serialize::from_analyzed(
+            &msgpack_module.unit,
+            &format!("sha256:{}", msgpack_module.relative_path),
+            &msgpack_module.relative_path,
+        );
+        assert_eq!(
+            postcard_artifact, msgpack_artifact,
+            "unit `{}` must reconstruct identically from both codecs",
+            postcard_module.relative_path
+        );
+
+        // Canonical-Faber emit equality from the loaded HIR.
+        let postcard_output =
+            generate_from_analyzed(Target::HirFaber, &postcard_module.unit, &surface).expect("canonical Faber (postcard)");
+        let msgpack_output =
+            generate_from_analyzed(Target::HirFaber, &msgpack_module.unit, &surface).expect("canonical Faber (msgpack)");
+        let postcard_faber = faber_code(&postcard_output);
+        let msgpack_faber = faber_code(&msgpack_output);
+        assert_eq!(
+            postcard_faber, msgpack_faber,
+            "canonical Faber emit from unit `{}` must be codec-independent",
+            postcard_module.relative_path
+        );
+        assert!(!postcard_faber.is_empty(), "canonical Faber emit must not be empty");
+    }
+
+    // Both loaded programs emit the same canonical Faber as the original
+    // in-session analysis (loaded HIR is as capable as the analyzed HIR).
+    for (relative_path, original) in [("aux.fab", &aux), ("main.fab", &main)] {
+        let original_output =
+            generate_from_analyzed(Target::HirFaber, original, &surface).expect("original emit");
+        let original_faber = faber_code(&original_output);
+        for loaded in [&loaded_postcard, &loaded_msgpack] {
+            let module = loaded
+                .modules
+                .iter()
+                .find(|module| module.relative_path == relative_path)
+                .expect("module paired with original");
+            let loaded_output =
+                generate_from_analyzed(Target::HirFaber, &module.unit, &surface).expect("loaded emit");
+            let loaded_faber = faber_code(&loaded_output);
+            assert_eq!(
+                loaded_faber, original_faber,
+                "loaded unit `{relative_path}` must emit canonical Faber as the original"
+            );
+        }
+    }
+}
+
+fn main_equivalence_source() -> &'static str {
+    r#"
+discretio Event {
+    Click { numerus x },
+    Quit
+}
+
+@ publica
+functio computa(numerus x) → numerus {
+    si x > 10 {
+        redde x * 2
+    }
+    redde x + 1
+}
+
+incipit {
+    fixum Event event ← finge Click { x = 7 }
+    discerne event {
+        casu Click fixum x { nota computa(x) }
+        casu Quit { nota "quit" }
+    }
+}
+"#
+}
+
+fn aux_equivalence_source() -> &'static str {
+    r"
+@ publica
+functio auxilia(numerus x) → numerus {
+    fixum numerus duplum ← x * 2
+    redde duplum + 1
+}
+"
+}
+
 #[test]
 fn package_build_is_deterministic_across_input_order() {
     let main = analyze("main.fab", &sample_source("salve"));
@@ -281,7 +444,7 @@ fn signature_only_fragment_import_fails_closed() {
         err.iter().any(|diagnostic| diagnostic
             .args
             .iter()
-            .any(|arg| arg.name == "issue" && arg.value == "nucleum_fragment_effect")
+            .any(|arg| arg.name == "issue" && arg.value == "NUCLEUM_FRAGMENT_EFFECT")
             && diagnostic
                 .args
                 .iter()
