@@ -1,7 +1,7 @@
 +++
 term = "summa"
 kind = "kernel"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "summa_expr", "filum_clause", "apud_clause", "fixum_decl", "varia_decl", "redde_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "summa_expr", "filum_clause", "apud_clause", "fixum_decl", "redde_stmt"]
 category = "collection"
 summary = "Distributed sum-reduce kernel admit: summa ex … apud [i] filum f fixum s { redde <term> } inside @ nucleum."
 syntax = "summa ex <tf32[32]> apud [i] filum f fixum s { redde <term> }"
