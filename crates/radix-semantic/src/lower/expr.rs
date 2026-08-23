@@ -92,6 +92,13 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::TypeCheck(type_check) => lowerer.lower_type_check(type_check),
         ExprKind::Iuncta(iuncta) => lowerer.lower_iuncta(iuncta),
         ExprKind::Summa(summa) => lower_summa(lowerer, summa),
+        // EOT-3S repair (fail-closed): `⇇` transfer lowering is owned by
+        // EOT-3M. Until then a parsed transfer recovers as an Error node with
+        // a named issue instead of silently dropping the sink or payloads.
+        ExprKind::Transfer(_) => {
+            lowerer.error("transfer_unsupported");
+            HirExpressionKind::Error
+        }
     };
 
     HirExpression {

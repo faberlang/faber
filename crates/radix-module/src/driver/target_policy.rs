@@ -427,6 +427,17 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             scan_go_expr(&summa.source, file, diagnostics);
             scan_go_block(&summa.body, file, diagnostics);
         }
+        // EOT-3S repair (exhaustive-match completion): `⇇` transfer parses
+        // from this unit; lowering is fail-closed in semantic until EOT-3M,
+        // and per-target fail-closed recording is EOT-3W's unit. Walk the
+        // subexpressions only — the HIR Error node keeps this from being
+        // silently accepted.
+        ExprKind::Transfer(transfer) => {
+            scan_go_expr(&transfer.sink, file, diagnostics);
+            for payload in &transfer.payloads {
+                scan_go_expr(payload, file, diagnostics);
+            }
+        }
         ExprKind::Paren(expr) => scan_go_expr(expr, file, diagnostics),
         ExprKind::Literal(_)
         | ExprKind::Vacua(_)
@@ -780,6 +791,15 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         ExprKind::Summa(summa) => {
             scan_rust_expr(&summa.source, file, diagnostics);
             scan_rust_block(&summa.body, file, diagnostics);
+        }
+        // EOT-3S repair (exhaustive-match completion): same contract as the
+        // Go scanner — walk subexpressions, no per-target verdict until
+        // EOT-3W records unsupported-target behavior.
+        ExprKind::Transfer(transfer) => {
+            scan_rust_expr(&transfer.sink, file, diagnostics);
+            for payload in &transfer.payloads {
+                scan_rust_expr(payload, file, diagnostics);
+            }
         }
         ExprKind::Paren(expr) => scan_rust_expr(expr, file, diagnostics),
         ExprKind::Literal(_)

@@ -1007,6 +1007,21 @@ pub enum ExprKind {
     /// `summa` is immediately followed by `ex`; ordinary identifiers, calls,
     /// and receivers keep their existing meaning.
     Summa(Box<SummaExpr>),
+    /// Exact-output transfer: `sink ⇇ p1 ⇇ p2` (U+21C7).
+    ///
+    /// One sink evaluated once plus an ordered payload list. Each payload is
+    /// transferred on that single sink left-to-right; the chain is never a
+    /// pipeline of return values and the whole expression is `vacuum`-shaped.
+    Transfer(TransferExpr),
+}
+
+/// Source shape for the `⇇` exact-output transfer chain.
+#[derive(Debug)]
+pub struct TransferExpr {
+    /// Unary callable receiving every payload; evaluated once.
+    pub sink: Box<Expr>,
+    /// Payloads in source order, one transfer each, left-to-right.
+    pub payloads: Vec<Expr>,
 }
 
 /// Source shape for the contextual `summa ex` term-fold expression.

@@ -4784,3 +4784,148 @@ fn eot_selective_import_missing_separator_rejected() {
         ParseExpectation::Issue("item_list_missing_separator"),
     );
 }
+
+// =============================================================================
+// EOT-3S — transfer syntax, AST, and chain precedence
+// =============================================================================
+
+/// Extract the single top-level expression statement's expression.
+fn eot_transfer_expr(result: &ParseResult) -> &radix_syntax::Expr {
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1, "one expression statement");
+    let StmtKind::Expr(expr_stmt) = &program.statements[0].kind else {
+        panic!(
+            "expected expression statement, got {:?}",
+            program.statements[0].kind
+        );
+    };
+    &expr_stmt.expr
+}
+
+#[test]
+fn eot_transfer_one_sink_one_payload() {
+    let result = parse_ok(r#"output ⇇ "salve\n""#);
+    let expr = eot_transfer_expr(&result);
+    let ExprKind::Transfer(transfer) = &expr.kind else {
+        panic!("expected transfer expression, got {:?}", expr.kind);
+    };
+    let ExprKind::Ident(sink) = &transfer.sink.kind else {
+        panic!("expected ident sink, got {:?}", transfer.sink.kind);
+    };
+    assert_eq!(symbol_name(&result, sink.name), "output");
+    assert_eq!(transfer.payloads.len(), 1, "exactly one payload");
+    assert!(
+        matches!(transfer.payloads[0].kind, ExprKind::Literal(Literal::String(_))),
+        "payload is the string literal, got {:?}",
+        transfer.payloads[0].kind
+    );
+}
+
+#[test]
+fn eot_transfer_chain_is_one_sink_with_ordered_payloads() {
+    let result = parse_ok(r#"output ⇇ "a" ⇇ "b" ⇇ "c""#);
+    let expr = eot_transfer_expr(&result);
+    let ExprKind::Transfer(transfer) = &expr.kind else {
+        panic!("expected transfer expression, got {:?}", expr.kind);
+    };
+    let ExprKind::Ident(sink) = &transfer.sink.kind else {
+        panic!("expected ident sink, got {:?}", transfer.sink.kind);
+    };
+    assert_eq!(symbol_name(&result, sink.name), "output");
+    assert_eq!(transfer.payloads.len(), 3, "one sink, three payloads");
+
+    // Left-to-right order: a, b, c (string symbols carry the raw inner text).
+    // The chain is flat — no payload is itself a Transfer node, so the form is
+    // never a pipeline of return values.
+    for (index, expected) in ["a", "b", "c"].iter().enumerate() {
+        let ExprKind::Literal(Literal::String(text)) = &transfer.payloads[index].kind else {
+            panic!(
+                "payload {index} must be a string literal, got {:?}",
+                transfer.payloads[index].kind
+            );
+        };
+        assert_eq!(symbol_name(&result, *text), *expected);
+        assert!(
+            !matches!(transfer.payloads[index].kind, ExprKind::Transfer(_)),
+            "payload {index} must not nest a transfer"
+        );
+    }
+}
+
+#[test]
+fn eot_transfer_groups_around_calls_conversions_and_templates() {
+    // Sink is a complete postfix call; payloads are a conversion and a
+    // string-constructor application. The ⇇ sits outside all of them.
+    let result = parse_ok(r#"scribe("x") ⇇ payload ↦ textus ⇇ "§ §\n"(a, b)"#);
+    let expr = eot_transfer_expr(&result);
+    let ExprKind::Transfer(transfer) = &expr.kind else {
+        panic!("expected transfer expression, got {:?}", expr.kind);
+    };
+    assert!(
+        matches!(transfer.sink.kind, ExprKind::Call(_)),
+        "sink keeps the complete call, got {:?}",
+        transfer.sink.kind
+    );
+    assert_eq!(transfer.payloads.len(), 2);
+    assert!(
+        matches!(transfer.payloads[0].kind, ExprKind::Conversio(_)),
+        "first payload is the complete conversion, got {:?}",
+        transfer.payloads[0].kind
+    );
+    let ExprKind::Call(template) = &transfer.payloads[1].kind else {
+        panic!(
+            "second payload is the string-constructor application, got {:?}",
+            transfer.payloads[1].kind
+        );
+    };
+    assert!(
+        matches!(template.callee.kind, ExprKind::Literal(Literal::String(_))),
+        "template callee is the string literal"
+    );
+    assert_eq!(template.args.len(), 2);
+}
+
+#[test]
+fn eot_transfer_binary_operators_group_into_the_payload() {
+    // ⇇ is locked at low precedence: `+` binds into the payload, never around
+    // the chain.
+    let result = parse_ok(r#"output ⇇ 1 + 2 ⇇ "c""#);
+    let expr = eot_transfer_expr(&result);
+    let ExprKind::Transfer(transfer) = &expr.kind else {
+        panic!("expected transfer expression, got {:?}", expr.kind);
+    };
+    assert_eq!(transfer.payloads.len(), 2);
+    assert!(
+        matches!(transfer.payloads[0].kind, ExprKind::Binary(_)),
+        "payload keeps `1 + 2`, got {:?}",
+        transfer.payloads[0].kind
+    );
+}
+
+#[test]
+fn eot_transfer_inside_assignment_value() {
+    // `⇇` binds tighter than `←`: the transfer is the assigned value.
+    let result = parse_ok(r#"fixum _ sink ← output ⇇ "a""#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let init = var.init.as_deref().expect("initializer");
+    assert!(
+        matches!(init.kind, ExprKind::Transfer(_)),
+        "declaration initializer is the transfer chain, got {:?}",
+        init.kind
+    );
+}
+
+#[test]
+fn eot_transfer_missing_payload_rejected() {
+    assert_parse_error_matches(
+        r#"output ⇇"#,
+        ParseExpectation::Issue("transfer_payload_expected"),
+    );
+    assert_parse_error_matches(
+        r#"output ⇇ "a" ⇇"#,
+        ParseExpectation::Issue("transfer_payload_expected"),
+    );
+}

@@ -67,7 +67,49 @@ impl Parser {
     fn parse_assignment(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let expr = self.parse_ternary()?;
+        let expr = self.parse_transfer_chain(expr, start)?;
         self.parse_assignment_tail(expr, start)
+    }
+
+    /// Parse the `⇇` (U+21C7) exact-output transfer suffix at the locked low
+    /// precedence — below assignment, above ternary.
+    ///
+    /// GRAMMAR:
+    ///   transfer := sink ('⇇' ternary)+
+    ///
+    /// WHY: one sink plus repeated unary payload transfers, never a pipeline
+    /// of return values. The sink is the complete expression already parsed
+    /// (calls, conversions, and string-constructor applications finished
+    /// inside `parse_ternary`'s postfix level); each payload is a complete
+    /// ternary so binary operators group into the payload, not around the
+    /// chain. The chain shape is flat on purpose: lowering transfers payloads
+    /// on the single sink left-to-right.
+    fn parse_transfer_chain(&mut self, sink: Expr, start: Span) -> Result<Expr, ParseError> {
+        if !self.check(&TokenKind::Transfer) {
+            return Ok(sink);
+        }
+
+        let sink = Box::new(sink);
+        let mut payloads = Vec::new();
+        while self.eat(&TokenKind::Transfer) {
+            if !Self::can_start_expression(&self.peek().kind) {
+                return Err(ParseError::structured(
+                    ParseErrorKind::Expected,
+                    self.current_span(),
+                )
+                .with_arg("issue", "transfer_payload_expected")
+                .with_arg("operator", "⇇"));
+            }
+            payloads.push(self.parse_ternary()?);
+        }
+
+        let span = start.merge(self.previous_span());
+        let id = self.next_id();
+        Ok(Expr {
+            id,
+            kind: ExprKind::Transfer(TransferExpr { sink, payloads }),
+            span,
+        })
     }
 
     /// Continue an assignment whose left operand is already parsed.
