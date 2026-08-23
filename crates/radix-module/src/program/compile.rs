@@ -647,22 +647,14 @@ fn collect_transitive_relative_interfaces(
         let Some(binding) = import_binding(&interner, &decl.kind) else {
             continue;
         };
-        let Some(target) =
-            cached_import_target(from_file, import_path, pack_key, pack_ref, templates)
-        else {
+        let Some(target) = cached_import_target(from_file, import_path, pack_key, pack_ref, templates) else {
             continue;
         };
         if !visited.insert(target.target_path.clone()) {
             continue;
         }
         out.push((binding, target.interface.clone()));
-        collect_transitive_relative_interfaces(
-            &target.target_path,
-            pack_key,
-            templates,
-            visited,
-            out,
-        );
+        collect_transitive_relative_interfaces(&target.target_path, pack_key, templates, visited, out);
     }
 }
 
