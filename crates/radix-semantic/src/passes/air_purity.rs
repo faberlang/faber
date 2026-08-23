@@ -12,6 +12,7 @@ use radix_hir::{
     HirItemKind, HirLocal, HirModule, HirObjectField, HirObjectKey, HirStatement, HirStatementKind,
 };
 use radix_lexer::{Interner, Span, Symbol};
+use radix_types::TypeId;
 
 /// Check every `@ radix lane "air"` function against the accepted v1 pure subset.
 ///
@@ -34,6 +35,7 @@ pub fn check(
         interner,
         types,
         errors: Vec::new(),
+        handler_regions: Vec::new(),
     };
     checker.check_program(hir);
     errors.extend(checker.errors);
@@ -50,6 +52,17 @@ struct AirPurityChecker<'a> {
     interner: &'a Interner,
     types: &'a TypeTable,
     errors: Vec<SemanticError>,
+    /// ATH-2 (AIR Tier 0.5): nearest enclosing handler scope, if any. A
+    /// `Throw` whose nearest region is `Try` is caught in-region (the v1
+    /// throw source); in `Catch` it is a rethrow (Tier 2, declined); with no
+    /// region it keeps the unhandled `iace` decline.
+    handler_regions: Vec<HandlerRegion>,
+}
+
+#[derive(Clone, Copy)]
+enum HandlerRegion {
+    Try,
+    Catch,
 }
 
 impl AirPurityChecker<'_> {
@@ -102,7 +115,13 @@ impl AirPurityChecker<'_> {
     }
 
     fn check_block(&mut self, block: &HirBlock) {
-        if block.breakable.is_some() {
+        // ATH-2: a `fac` body carries its breakable marker unconditionally,
+        // but inside a handler try-region an escape is already independently
+        // declined (`loop_control` rejects every `rumpe`/`perge` statement),
+        // so the inert marker must not block a locally-resolved handler.
+        if block.breakable.is_some()
+            && !matches!(self.handler_regions.last(), Some(HandlerRegion::Try))
+        {
             self.reject(block.span, "breakable_block");
         }
         for stmt in &block.statements {
@@ -119,7 +138,12 @@ impl AirPurityChecker<'_> {
             HirStatementKind::Redde(Some(expr)) => self.check_expr(expr),
             HirStatementKind::Redde(None) => {}
             HirStatementKind::Expr(expr) => {
-                if !is_control_expr_statement(expr) {
+                // ATH-2: a `Throw` statement inside a handler scope is
+                // control flow (it exits the region), not a discarded value;
+                // outside any handler it keeps the ordinary statement rule.
+                let is_region_throw = matches!(expr.kind, HirExpressionKind::Throw(_))
+                    && !self.handler_regions.is_empty();
+                if !is_control_expr_statement(expr) && !is_region_throw {
                     self.reject(stmt.span, "expression_statement");
                 }
                 self.check_expr(expr);
@@ -226,11 +250,20 @@ impl AirPurityChecker<'_> {
                 then_catch,
                 else_block,
             } => {
+                // ATH-2: a per-arm `cape` riding `Si.then_catch` admits when
+                // the arm is locally resolved — the catch arm's value type
+                // must match the whole `si` expression's type, throws from the
+                // then arm are the in-region throw source, and a throw from
+                // the catch arm itself declines as a rethrow.
                 self.check_expr(cond);
                 if let Some(catch) = then_catch {
-                    self.check_cape(catch, "conditional_recovery");
+                    self.handler_regions.push(HandlerRegion::Try);
+                    self.check_block(then_block);
+                    self.handler_regions.pop();
+                    self.check_recovery(catch, self.normal_exit_type(then_block));
+                } else {
+                    self.check_block(then_block);
                 }
-                self.check_block(then_block);
                 if let Some(else_block) = else_block {
                     self.check_block(else_block);
                 }
@@ -339,13 +372,26 @@ impl AirPurityChecker<'_> {
                 self.check_expr(message);
             }
             HirExpressionKind::Throw(value) => {
-                self.reject(expr.span, "iace");
+                // ATH-2: a caught `iace` inside an admitted handler region is
+                // the v1 throw source; a rethrow from the catch arm declines
+                // into Tier 2; anything else keeps the unhandled `iace` keep-out.
+                match self.handler_regions.last() {
+                    Some(HandlerRegion::Try) => {}
+                    Some(HandlerRegion::Catch) => self.reject(expr.span, "rethrow_in_recovery"),
+                    None => self.reject(expr.span, "iace"),
+                }
                 self.check_expr(value);
             }
             HirExpressionKind::Handled { body, catch } => {
-                self.reject(expr.span, "recoverable_handler");
+                // ATH-2: a locally-resolved handler admits as union/branch
+                // dataflow. The body is the try region (its `iace`s are the
+                // in-region throw source), and the recovery arm must resolve
+                // to the whole expression's type. Keep-out forms inside the
+                // body (loops, effects) still decline under their own causes.
+                self.handler_regions.push(HandlerRegion::Try);
                 self.check_block(body);
-                self.check_cape(catch, "recoverable_handler");
+                self.handler_regions.pop();
+                self.check_recovery(catch, self.normal_exit_type(body));
             }
             HirExpressionKind::Clausura(params, _, _, body, _) => {
                 // ARC-4 rewrites higher-order capture-free combines before this
@@ -475,9 +521,74 @@ impl AirPurityChecker<'_> {
         }
     }
 
-    fn check_cape(&mut self, cape: &HirCape, reason: &'static str) {
-        self.reject(cape.span, reason);
+    /// Check a locally-resolved handler's recovery arm (ATH-2).
+    ///
+    /// The recovery arm's value type is compared against the region's
+    /// normal-exit value type: on the AIR lane, `redde` is reinterpreted as
+    /// the block's value (existing `If`/arm lowering), so a recovery that
+    /// exits without a value of the region's type declines with a named
+    /// cause. A region whose only exit is the throw constrains nothing (the
+    /// recovery arm owns every exit), and a rethrowing catch declines under
+    /// its own cause instead.
+    fn check_recovery(&mut self, cape: &HirCape, outer_ty: Option<TypeId>) {
+        if !block_has_unconditional_throw(&cape.body) {
+            if let Some(outer) = outer_ty {
+                if self.normal_exit_type(&cape.body) != Some(outer) {
+                    self.reject(cape.span, "recovery_type_mismatch");
+                }
+            }
+        }
+        self.handler_regions.push(HandlerRegion::Catch);
         self.check_block(&cape.body);
+        self.handler_regions.pop();
+    }
+
+    /// Value-level type of a block's normal exit: the last `redde` value's
+    /// type (AIR-lane value reinterpretation) or the trailing expression's
+    /// construct-exit type. `None` when the block never completes normally
+    /// (an unconditional `iace`) or produces no value at all.
+    fn normal_exit_type(&self, block: &HirBlock) -> Option<TypeId> {
+        let mut ty = block
+            .expr
+            .as_ref()
+            .and_then(|expr| self.construct_exit_type(expr));
+        for stmt in &block.statements {
+            match &stmt.kind {
+                HirStatementKind::Expr(expr) => {
+                    if matches!(expr.kind, HirExpressionKind::Throw(_)) {
+                        return None;
+                    }
+                }
+                HirStatementKind::Redde(Some(value)) => ty = value.ty,
+                _ => {}
+            }
+        }
+        ty
+    }
+
+    /// Value type a control construct produces on its non-throwing exits. A
+    /// throwing arm has no normal exit and constrains nothing; a construct
+    /// whose every exit throws produces no value, so the recovery arm owns
+    /// every exit and no outer type applies.
+    fn construct_exit_type(&self, expr: &HirExpression) -> Option<TypeId> {
+        match &expr.kind {
+            HirExpressionKind::Throw(_) => None,
+            HirExpressionKind::Block(block) => self.normal_exit_type(block),
+            HirExpressionKind::Si {
+                then_block,
+                else_block,
+                ..
+            } => {
+                let arms = [Some(then_block), else_block.as_ref()];
+                arms.iter()
+                    .flatten()
+                    .find_map(|block| self.normal_exit_type(block))
+            }
+            HirExpressionKind::Discerne { arms, .. } => arms
+                .iter()
+                .find_map(|arm| self.construct_exit_type(&arm.body)),
+            _ => expr.ty,
+        }
     }
 
     fn reject(&mut self, span: Span, issue: &'static str) {
@@ -510,11 +621,21 @@ impl AirPurityChecker<'_> {
     }
 }
 
+fn block_has_unconditional_throw(block: &HirBlock) -> bool {
+    block.statements.iter().any(|stmt| {
+        matches!(
+            &stmt.kind,
+            HirStatementKind::Expr(expr) if matches!(expr.kind, HirExpressionKind::Throw(_))
+        )
+    })
+}
+
 fn is_control_expr_statement(expr: &HirExpression) -> bool {
     matches!(
         expr.kind,
         HirExpressionKind::Si { .. }
             | HirExpressionKind::Discerne { .. }
             | HirExpressionKind::Block(_)
+            | HirExpressionKind::Handled { .. }
     )
 }

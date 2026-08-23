@@ -851,14 +851,20 @@ functio h(numerus n) → numerus {
     );
 }
 
+// ATH-2 (red→green flip of the ATH-1 decline pins): the per-arm and
+// whole-construct handlers above now ADMIT when locally resolved — recovery
+// arm resolves to the outer type and every throw is caught in-region. The
+// keep-out pins (loop cape, unroll scan, method allowlist, unhandled `iace`,
+// bare conversion, `optional_null_chain`) below stay green unchanged.
+
 #[test]
-fn air_lane_declines_si_per_arm_cape_as_conditional_recovery() {
+fn air_lane_admits_si_per_arm_cape_when_locally_resolved() {
     let errors = air_errors(
         r#"
 @ radix lane "air"
-functio loss(bivalens bad) → numerus {
+functio then_arm(bivalens bad) → numerus {
     si bad {
-        redde 1
+        iace "x"
     } cape err {
         redde 0
     } secus {
@@ -868,11 +874,52 @@ functio loss(bivalens bad) → numerus {
 "#,
     );
 
-    expect_air_issue(&errors, "conditional_recovery");
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
 }
 
 #[test]
-fn air_lane_declines_whole_construct_cape_as_recoverable_handler() {
+fn air_lane_admits_secus_arm_cape_when_locally_resolved() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio secus_arm(bivalens bad) → numerus {
+    si bad {
+        redde 1
+    } secus {
+        iace "x"
+    } cape err {
+        redde 0
+    }
+    redde 3
+}
+"#,
+    );
+
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
+}
+
+#[test]
+fn air_lane_admits_sin_arm_cape_when_locally_resolved() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio sin_arm(bivalens bad) → numerus {
+    si bad {
+        redde 1
+    } sin {
+        iace "x"
+    } cape err {
+        redde 0
+    }
+}
+"#,
+    );
+
+    assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
+}
+
+#[test]
+fn air_lane_admits_whole_construct_fac_and_elige_cape() {
     let fac = air_errors(
         r#"
 @ radix lane "air"
@@ -885,23 +932,28 @@ functio a(bivalens bad) → numerus {
 }
 "#,
     );
-    expect_air_issue(&fac, "recoverable_handler");
+    assert!(fac.is_empty(), "unexpected AIR errors: {fac:?}");
 
     let elige = air_errors(
         r#"
 @ radix lane "air"
 functio b(bivalens bad) → numerus {
     elige bad {
-        casu verum { redde 1 }
+        casu verum { iace "x" }
         ceterum { redde 2 }
     } cape err { redde 0 }
     redde 3
 }
 "#,
     );
-    expect_air_issue(&elige, "recoverable_handler");
+    assert!(elige.is_empty(), "unexpected AIR errors: {elige:?}");
+}
 
-    let cura = air_errors(
+#[test]
+fn air_lane_cura_cape_handler_admits_construct_keepout_stands() {
+    // The cura handler itself admits (no handler decline); the construct's
+    // independent deferred-init ruling still keeps the function out of AIR.
+    let errors = air_errors(
         r#"
 @ radix lane "air"
 functio c() → numerus {
@@ -910,7 +962,72 @@ functio c() → numerus {
 }
 "#,
     );
-    expect_air_issue(&cura, "recoverable_handler");
+
+    assert!(
+        !errors.iter().any(|err| err
+            .args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "recoverable_handler")),
+        "cura handler must not decline under the handler cause: {errors:?}"
+    );
+    expect_air_issue(&errors, "deferred_local_init");
+}
+
+#[test]
+fn air_lane_declines_recovery_arm_type_mismatch() {
+    // Statement form: the region's normal exit is a numerus value (redde 1),
+    // but the recovery arm exits without a value of that type.
+    let handled = air_errors(
+        r#"
+@ radix lane "air"
+functio d(bivalens bad) → numerus {
+    fac {
+        si bad { iace "x" }
+        redde 1
+    } cape err { fixum numerus z ← 0 }
+    redde 2
+}
+"#,
+    );
+    expect_air_issue(&handled, "recovery_type_mismatch");
+
+    // Per-arm form: the then arm completes with a numerus value, so the
+    // recovery arm must resolve to the same value type.
+    let then_catch = air_errors(
+        r#"
+@ radix lane "air"
+functio e(bivalens bad) → numerus {
+    si bad {
+        redde 1
+    } cape err { fixum numerus z ← 0 } secus {
+        redde 2
+    }
+}
+"#,
+    );
+    expect_air_issue(&then_catch, "recovery_type_mismatch");
+}
+
+#[test]
+fn air_lane_declines_in_catch_rethrow() {
+    // A throw from inside the catch arm is a rethrow — Tier 2, fail-closed
+    // with its own named cause (never silently treated as a recovered value).
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio f(bivalens bad) → numerus ⇥ textus {
+    fac {
+        si bad { iace "x" }
+        redde 1
+    } cape err {
+        iace "rethrown"
+    }
+    redde 2
+}
+"#,
+    );
+
+    expect_air_issue(&errors, "rethrow_in_recovery");
 }
 
 #[test]
