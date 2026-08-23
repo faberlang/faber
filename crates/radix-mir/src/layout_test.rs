@@ -4,10 +4,16 @@
 //! (host-staged per the existing tensor facts) with its static length; a
 //! capacity that is not a compile-time literal stays opaque, as does the
 //! unbounded `octeti` primitive.
+//!
+//! MLC-3 extends the census: `BoundedArray<T, N>` / `BoundedAscii<N>` /
+//! `BoundedTextus<N>` moved from opaque-by-design to physical aggregate rows
+//! (14+3 physical / 21 opaque-by-design); the pin-table counts below are the
+//! corrected census, never weakened.
 
 use crate::{
-    MirDeviceViewLayout, MirLayoutKind, MirLayoutTable, MirScalarLayout, MirTensorLocusLayout,
-    MirTensorStorageLayout, MirTensorStrideLayout, MirTensorViewLayout, MirType,
+    MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirDeviceViewLayout,
+    MirLayoutKind, MirLayoutTable, MirScalarLayout, MirTensorLocusLayout, MirTensorStorageLayout,
+    MirTensorStrideLayout, MirTensorViewLayout, MirType,
 };
 use radix_types::{IndexExpr, Primitive, Type, TypeTable};
 
@@ -122,6 +128,11 @@ fn intended_bucket(ty: &Type) -> Bucket {
             Bucket::Physical
         }
         Type::Record(_) | Type::Struct(_) | Type::Tuple(_) => Bucket::Physical,
+        // MLC-3: the bounded families with literal capacities are physical
+        // aggregates (row-of-T / byte-storage + length member).
+        Type::BoundedArray { .. } | Type::BoundedTextus { .. } | Type::BoundedAscii { .. } => {
+            Bucket::Physical
+        }
         Type::Array(_)
         | Type::Map(_, _)
         | Type::Set(_)
@@ -134,10 +145,7 @@ fn intended_bucket(ty: &Type) -> Bucket {
         | Type::MarkerHole { .. }
         | Type::Error => Bucket::Internal,
         Type::Alias(_, _) => panic!("alias is transparent; pinned separately, not a census row"),
-        Type::BoundedArray { .. }
-        | Type::BoundedTextus { .. }
-        | Type::BoundedAscii { .. }
-        | Type::BoundedOcteti { .. }
+        Type::BoundedOcteti { .. }
         | Type::Sparsa(_, _)
         | Type::Intervallum(_)
         | Type::SizedInstans(_)
@@ -187,6 +195,14 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     rows.push(Type::Record(FxHashMap::from_iter([(LexSymbol(1), int64_ty)])));
     rows.push(Type::Struct(DefId(10)));
     rows.push(Type::Tuple(vec![int64_ty]));
+    // MLC-3: the bounded families with literal capacities are physical
+    // aggregates — row-of-T and byte-storage + length member.
+    rows.push(Type::BoundedArray {
+        element: float64_ty,
+        capacity: cap,
+    });
+    rows.push(Type::BoundedTextus { capacity: cap });
+    rows.push(Type::BoundedAscii { capacity: cap });
     // Opaque aggregate (6).
     rows.push(Type::Array(float64_ty));
     rows.push(Type::Map(int64_ty, float64_ty));
@@ -194,10 +210,12 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     rows.push(Type::Option(float64_ty));
     rows.push(Type::Enum(DefId(11)));
     rows.push(Type::Union(vec![int64_ty, float64_ty]));
-    // OpaqueHandle by design (24): the nine non-physical primitives plus the
-    // fifteen opaque carriers. `octeti<N>` with a literal capacity refines to
-    // a byte `DeviceView` (pinned by MLC-1); its census seat here is the
-    // runtime-length state, which stays opaque by design (MLC-6).
+    // OpaqueHandle by design (21): the nine non-physical primitives plus the
+    // twelve opaque carriers. `octeti<N>` with a literal capacity refines to
+    // a byte `DeviceView` (pinned by MLC-1) and the bounded array/ascii/
+    // textus families to physical aggregates (MLC-3); the census seats here
+    // are the runtime-length / non-literal-capacity states, which stay opaque
+    // by design (MLC-6).
     for prim in [
         Primitive::Ascii,
         Primitive::Textus,
@@ -211,12 +229,6 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     ] {
         rows.push(Type::Primitive(prim));
     }
-    rows.push(Type::BoundedArray {
-        element: float64_ty,
-        capacity: cap,
-    });
-    rows.push(Type::BoundedTextus { capacity: cap });
-    rows.push(Type::BoundedAscii { capacity: cap });
     rows.push(Type::BoundedOcteti {
         capacity: dynamic_cap,
     });
@@ -269,9 +281,9 @@ fn pin_table_census_is_49_rows_across_the_four_buckets() {
             Bucket::Internal => internal += 1,
         }
     }
-    assert_eq!(physical, 14, "physical census rows");
+    assert_eq!(physical, 17, "physical census rows (MLC-3: +3 bounded families)");
     assert_eq!(aggregate, 6, "opaque-aggregate census rows");
-    assert_eq!(opaque, 24, "opaque-by-design census rows");
+    assert_eq!(opaque, 21, "opaque-by-design census rows (MLC-3: -3 to physical)");
     assert_eq!(internal, 5, "internal census rows");
 }
 
@@ -470,6 +482,121 @@ fn unmapped_sized_numerics_error_loudly_with_the_width_named() {
             err.message.contains(marker),
             "width named in the message: {}",
             err.message
+        );
+    }
+}
+
+// MLC-3: the bounded families own physical layout rows — `BoundedArray<T, N>`
+// is a fixed-capacity row of `T`, and `ascii<N>`/`textus<N>` are byte
+// aggregates (`u8 × N` storage plus the runtime length member). These were
+// the three OpaqueHandle resolutions the unit pinned red first; the rows
+// below are the corrected facts. Scalar reads (OQ1 default) stay with AEU-7 —
+// no read-surface change here.
+
+#[test]
+fn bounded_array_resolves_physical_row_of_t_with_element_fact() {
+    let mut types = TypeTable::new();
+    let numerus = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let cap = types.intern_index(IndexExpr::Literal(4));
+    let array_ty = types.intern(Type::BoundedArray {
+        element: numerus,
+        capacity: cap,
+    });
+    let table = MirLayoutTable::from_types(&types);
+
+    let layout = table
+        .layout_for_type(MirType::semantic(array_ty))
+        .expect("BoundedArray layout fact");
+    assert_eq!(
+        layout.kind,
+        MirLayoutKind::Aggregate(MirAggregateLayout {
+            family: MirAggregateFamily::BoundedArray,
+            carrier: MirAggregateCarrier::PhysicalValue,
+            element: Some(MirScalarLayout::I64),
+            capacity: Some(4),
+        })
+    );
+}
+
+#[test]
+fn bounded_array_with_non_scalar_element_keeps_physical_row_without_element_fact() {
+    let mut types = TypeTable::new();
+    let numerus = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let cap = types.intern_index(IndexExpr::Literal(2));
+    let row = types.intern(Type::Tuple(vec![numerus]));
+    let array_ty = types.intern(Type::BoundedArray {
+        element: row,
+        capacity: cap,
+    });
+    let table = MirLayoutTable::from_types(&types);
+
+    let layout = table
+        .layout_for_type(MirType::semantic(array_ty))
+        .expect("BoundedArray layout fact");
+    assert!(matches!(
+        layout.kind,
+        MirLayoutKind::Aggregate(MirAggregateLayout {
+            family: MirAggregateFamily::BoundedArray,
+            carrier: MirAggregateCarrier::PhysicalValue,
+            element: None,
+            capacity: Some(2),
+        })
+    ));
+}
+
+#[test]
+fn bounded_ascii_and_textus_resolve_physical_byte_aggregates_with_length_member() {
+    let mut types = TypeTable::new();
+    let cap = types.intern_index(IndexExpr::Literal(16));
+    let textus_ty = types.intern(Type::BoundedTextus { capacity: cap });
+    let ascii_ty = types.intern(Type::BoundedAscii { capacity: cap });
+    let table = MirLayoutTable::from_types(&types);
+
+    let expected = |family| {
+        MirLayoutKind::Aggregate(MirAggregateLayout {
+            family,
+            carrier: MirAggregateCarrier::PhysicalValue,
+            element: Some(MirScalarLayout::U8),
+            capacity: Some(16),
+        })
+    };
+    let textus_layout = table
+        .layout_for_type(MirType::semantic(textus_ty))
+        .expect("textus<16> layout fact");
+    assert_eq!(textus_layout.kind, expected(MirAggregateFamily::BoundedTextus));
+    let ascii_layout = table
+        .layout_for_type(MirType::semantic(ascii_ty))
+        .expect("ascii<16> layout fact");
+    assert_eq!(ascii_layout.kind, expected(MirAggregateFamily::BoundedAscii));
+}
+
+#[test]
+fn bounded_families_with_non_literal_capacity_stay_opaque() {
+    let mut types = TypeTable::new();
+    let numerus = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let dynamic_cap = types.intern_index(IndexExpr::Unspecified);
+    let bounded = [
+        types.intern(Type::BoundedArray {
+            element: numerus,
+            capacity: dynamic_cap,
+        }),
+        types.intern(Type::BoundedTextus {
+            capacity: dynamic_cap,
+        }),
+        types.intern(Type::BoundedAscii {
+            capacity: dynamic_cap,
+        }),
+    ];
+    let table = MirLayoutTable::from_types(&types);
+
+    for ty in bounded {
+        let layout = table
+            .layout_for_type(MirType::semantic(ty))
+            .expect("bounded family layout fact");
+        assert_eq!(
+            layout.kind,
+            MirLayoutKind::OpaqueHandle,
+            "non-literal capacity has no provable bounds"
         );
     }
 }

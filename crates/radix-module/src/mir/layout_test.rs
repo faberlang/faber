@@ -145,6 +145,8 @@ fn layout_table_classifies_aggregate_carriers_explicitly() {
         MirLayoutKind::Aggregate(MirAggregateLayout {
             family: MirAggregateFamily::Array,
             carrier: MirAggregateCarrier::OpaqueRuntimeHandle,
+            element: None,
+            capacity: None,
         })
     );
     assert_eq!(
@@ -155,6 +157,8 @@ fn layout_table_classifies_aggregate_carriers_explicitly() {
         MirLayoutKind::Aggregate(MirAggregateLayout {
             family: MirAggregateFamily::Record,
             carrier: MirAggregateCarrier::PhysicalValue,
+            element: None,
+            capacity: None,
         })
     );
     assert_eq!(
@@ -165,6 +169,8 @@ fn layout_table_classifies_aggregate_carriers_explicitly() {
         MirLayoutKind::Aggregate(MirAggregateLayout {
             family: MirAggregateFamily::Struct,
             carrier: MirAggregateCarrier::PhysicalValue,
+            element: None,
+            capacity: None,
         })
     );
     assert_eq!(
@@ -175,6 +181,8 @@ fn layout_table_classifies_aggregate_carriers_explicitly() {
         MirLayoutKind::Aggregate(MirAggregateLayout {
             family: MirAggregateFamily::Enum,
             carrier: MirAggregateCarrier::OpaqueRuntimeHandle,
+            element: None,
+            capacity: None,
         })
     );
     assert_eq!(
@@ -185,6 +193,8 @@ fn layout_table_classifies_aggregate_carriers_explicitly() {
         MirLayoutKind::Aggregate(MirAggregateLayout {
             family: MirAggregateFamily::Tuple,
             carrier: MirAggregateCarrier::PhysicalValue,
+            element: None,
+            capacity: None,
         })
     );
 }
@@ -367,6 +377,8 @@ fn layout_table_classifies_unknown_rank_tensors_as_runtime_aggregates() {
         MirLayoutKind::Aggregate(MirAggregateLayout {
             family: MirAggregateFamily::TensorRuntime,
             carrier: MirAggregateCarrier::OpaqueRuntimeHandle,
+            element: None,
+            capacity: None,
         })
     );
 }

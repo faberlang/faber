@@ -53,6 +53,9 @@ pub enum MirAggregateFamily {
     Enum,
     Union,
     Tuple,
+    BoundedArray,
+    BoundedAscii,
+    BoundedTextus,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,6 +68,14 @@ pub enum MirAggregateCarrier {
 pub struct MirAggregateLayout {
     pub family: MirAggregateFamily,
     pub carrier: MirAggregateCarrier,
+    /// Scalar element fact for the bounded families: `Some(U8)` for the
+    /// `ascii<N>`/`textus<N>` byte storage; `Some(s)` when the `T` of
+    /// `BoundedArray<T, N>` is itself scalar. `None` for every other family.
+    pub element: Option<MirScalarLayout>,
+    /// Compile-time capacity for the bounded families — `element × capacity`
+    /// storage cells, plus the runtime length member on the byte families.
+    /// `None` for every other family.
+    pub capacity: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -566,6 +577,15 @@ fn layout_kind_for_type(
         Type::Matrix(element, shape) => matrix_layout_kind(types, *element, *shape, memo, visiting),
         Type::Atomic(element) => atomic_layout_kind(types, *element, memo, visiting),
         Type::BoundedOcteti { capacity } => bounded_octeti_layout_kind(types, *capacity),
+        Type::BoundedArray { element, capacity } => {
+            bounded_array_layout_kind(types, *element, *capacity, memo, visiting)
+        }
+        Type::BoundedTextus { capacity } => {
+            bounded_text_layout_kind(MirAggregateFamily::BoundedTextus, types, *capacity)
+        }
+        Type::BoundedAscii { capacity } => {
+            bounded_text_layout_kind(MirAggregateFamily::BoundedAscii, types, *capacity)
+        }
         Type::Option(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Option)),
         Type::Struct(_) => LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Struct)),
         Type::Enum(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Enum)),
@@ -592,10 +612,7 @@ fn layout_kind_for_type(
         | Type::Ref(_, _)
         | Type::Interface(_)
         | Type::Func(_)
-        | Type::Applied(_, _)
-        | Type::BoundedArray { .. }
-        | Type::BoundedTextus { .. }
-        | Type::BoundedAscii { .. } => LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle),
+        | Type::Applied(_, _) => LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle),
     };
     visiting.remove(&ty);
     memo.insert(ty, kind.clone());
@@ -625,6 +642,8 @@ fn opaque_aggregate(family: MirAggregateFamily) -> MirLayoutKind {
     MirLayoutKind::Aggregate(MirAggregateLayout {
         family,
         carrier: MirAggregateCarrier::OpaqueRuntimeHandle,
+        element: None,
+        capacity: None,
     })
 }
 
@@ -632,7 +651,63 @@ fn physical_aggregate(family: MirAggregateFamily) -> MirLayoutKind {
     MirLayoutKind::Aggregate(MirAggregateLayout {
         family,
         carrier: MirAggregateCarrier::PhysicalValue,
+        element: None,
+        capacity: None,
     })
+}
+
+/// MLC-3: `BoundedArray<T, N>` — a fixed-capacity row of `T` is a physical
+/// aggregate. The element fact records `T` when it is itself scalar
+/// (`Some(s)`); a non-scalar member keeps the physical row with no scalar
+/// element fact. A capacity that is not a compile-time literal has no
+/// provable bounds and stays opaque (same law as `octeti<N>`).
+fn bounded_array_layout_kind(
+    types: &TypeTable,
+    element_ty: TypeId,
+    capacity: radix_types::IndexId,
+    memo: &mut FxHashMap<TypeId, LayoutResolution>,
+    visiting: &mut FxHashSet<TypeId>,
+) -> LayoutResolution {
+    let Some(length) = literal_capacity(types, capacity) else {
+        return LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle);
+    };
+    layout_kind_for_type(types, element_ty, memo, visiting).then(|element_layout| {
+        let element = match element_layout {
+            MirLayoutKind::Scalar(scalar) => Some(scalar),
+            _ => None,
+        };
+        LayoutResolution::Resolved(MirLayoutKind::Aggregate(MirAggregateLayout {
+            family: MirAggregateFamily::BoundedArray,
+            carrier: MirAggregateCarrier::PhysicalValue,
+            element,
+            capacity: Some(length),
+        }))
+    })
+}
+
+/// MLC-3: `ascii<N>` / `textus<N>` — a physical byte aggregate: `u8 × N`
+/// storage plus a runtime length member. Non-literal capacities stay opaque.
+fn bounded_text_layout_kind(
+    family: MirAggregateFamily,
+    types: &TypeTable,
+    capacity: radix_types::IndexId,
+) -> LayoutResolution {
+    let Some(length) = literal_capacity(types, capacity) else {
+        return LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle);
+    };
+    LayoutResolution::Resolved(MirLayoutKind::Aggregate(MirAggregateLayout {
+        family,
+        carrier: MirAggregateCarrier::PhysicalValue,
+        element: Some(MirScalarLayout::U8),
+        capacity: Some(length),
+    }))
+}
+
+fn literal_capacity(types: &TypeTable, capacity: radix_types::IndexId) -> Option<u64> {
+    match types.get_index(capacity) {
+        IndexExpr::Literal(length) => Some(*length),
+        _ => None,
+    }
 }
 
 fn vector_layout_kind(
