@@ -12,6 +12,9 @@ radix-syntax = { path = "../radix-syntax" }
 radix-diagnostics = { path = "../radix-diagnostics" }
 radix-types = { path = "../radix-types" }
 
+[dev-dependencies]
+hygiene-ratchet = { path = "../hygiene-ratchet" }
+
 [lints.clippy]
 # Group first at lower priority so per-lint allows below win package-wide.
 pedantic = { level = "deny", priority = -1 }

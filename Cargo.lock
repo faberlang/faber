@@ -767,6 +767,7 @@ dependencies = [
 name = "radix-parser"
 version = "0.83.0"
 dependencies = [
+ "hygiene-ratchet",
  "radix-diagnostics",
  "radix-lexer",
  "radix-syntax",
