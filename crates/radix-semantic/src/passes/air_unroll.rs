@@ -102,7 +102,7 @@ fn unroll_function(
     };
     let root_locals = block_local_defs(body);
     let mask = MaskAnalysis::analyze(&function.params, body, types, interner);
-    let fullness = FullnessFacts::from_block(body, types);
+    let fullness = FullnessFacts::from_block(body, interner, types);
     let mut emitted_lanes = 0;
     rewrite_block(
         body,
@@ -715,10 +715,15 @@ fn rewrite_nested_expr(
 struct FullnessFacts;
 
 impl FullnessFacts {
-    fn from_block(block: &HirBlock, types: &TypeTable) -> FxHashMap<DefId, usize> {
+    fn from_block(
+        block: &HirBlock,
+        interner: &Interner,
+        types: &TypeTable,
+    ) -> FxHashMap<DefId, usize> {
         let mut facts = FxHashMap::default();
         let mut collector = Collector {
             facts: &mut facts,
+            interner,
             types,
         };
         collector.visit_block(block);
@@ -728,6 +733,7 @@ impl FullnessFacts {
 
 struct Collector<'a> {
     facts: &'a mut FxHashMap<DefId, usize>,
+    interner: &'a Interner,
     types: &'a TypeTable,
 }
 
@@ -735,7 +741,7 @@ impl HirVisitor for Collector<'_> {
     fn visit_local(&mut self, local: &HirLocal) {
         if !local.mutable {
             if let Some(init) = &local.init {
-                if let Some(length) = static_length(init, self.facts, self.types) {
+                if let Some(length) = static_length(init, self.interner, self.facts, self.types) {
                     self.facts.insert(local.def_id, length);
                 }
             }
@@ -748,6 +754,7 @@ impl HirVisitor for Collector<'_> {
 
 fn static_length(
     expr: &HirExpression,
+    interner: &Interner,
     facts: &FxHashMap<DefId, usize>,
     types: &TypeTable,
 ) -> Option<usize> {
@@ -759,33 +766,73 @@ fn static_length(
         {
             Some(elements.len())
         }
+        // AEU-7: whole-literal scalar buffers prove their own fullness —
+        // `"abcdefgh"` is 8 UTF-8 bytes, `'alpha'` 5, `|61 62|` 2 decoded
+        // bytes. The conversio capacity check above then requires len == N.
+        HirExpressionKind::Literal(HirLiteral::String(sym) | HirLiteral::Ascii(sym)) => {
+            Some(interner.resolve(*sym).as_bytes().len())
+        }
+        HirExpressionKind::Literal(HirLiteral::Octeti(sym)) => {
+            radix_lexer::octeti_literal::decode_octeti_hex(interner.resolve(*sym))
+                .ok()
+                .map(|bytes| bytes.len())
+        }
         HirExpressionKind::Path(def_id) => facts.get(def_id).copied(),
         HirExpressionKind::Conversio {
             source,
             target: HirConversioTarget::Type(target),
             ..
         } => {
-            let length = static_length(source, facts, types)?;
+            let length = static_length(source, interner, facts, types)?;
             if let Some(capacity) = bounded_capacity(*target, types) {
                 (capacity == length).then_some(length)
             } else {
                 Some(length)
             }
         }
-        HirExpressionKind::Verte { source, .. } => static_length(source, facts, types),
+        HirExpressionKind::Verte { source, .. } => static_length(source, interner, facts, types),
         _ => None,
     }
 }
 
 fn bounded_capacity(ty: TypeId, types: &TypeTable) -> Option<usize> {
     let (_, ty) = types.peel_access_marker(ty);
-    let Type::BoundedArray { capacity, .. } = types.get(ty) else {
-        return None;
+    let capacity = match types.get(ty) {
+        Type::BoundedArray { capacity, .. }
+        | Type::BoundedTextus { capacity }
+        | Type::BoundedAscii { capacity }
+        | Type::BoundedOcteti { capacity } => *capacity,
+        _ => return None,
     };
-    let IndexExpr::Literal(value) = types.get_index(*capacity) else {
+    let IndexExpr::Literal(value) = types.get_index(capacity) else {
         return None;
     };
     usize::try_from(*value).ok()
+}
+
+/// AEU-7: the scalar buffer element row — `octeti<N>[i]` reads `numerus<u8>`,
+/// `ascii<N>[i]` / `textus<N>[i]` read `ascii<1>` (D14 / D17). The typecheck
+/// `itera` arm interns both rows for the very loop being classified, so the
+/// shared table already holds them when this AIR pass runs; a miss fails
+/// closed into the caller's `not_concrete` decline.
+fn scalar_bounded_element(ty: TypeId, types: &TypeTable) -> Option<TypeId> {
+    match types.get(ty) {
+        Type::BoundedOcteti { .. } => types.find_sized_numeric(
+            radix_types::Primitive::Numerus,
+            radix_types::NumericWidth::U8,
+        ),
+        Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => {
+            (0..u32::try_from(types.type_count()).ok()?)
+                .map(TypeId)
+                .find(|&id| match types.get(id) {
+                    Type::BoundedAscii { capacity } => {
+                        matches!(types.get_index(*capacity), IndexExpr::Literal(1))
+                    }
+                    _ => false,
+                })
+        }
+        _ => None,
+    }
 }
 
 enum UnrollPlan {
@@ -983,14 +1030,23 @@ fn classify_ex_loop(
         };
     };
     let (_, source_ty) = types.peel_access_marker(source_ty);
-    if let Type::BoundedArray { element, .. } = types.get(source_ty) {
+    // Route A bounded element sources: `lista<T, N>` (AEU-3) and the scalar
+    // buffer forms `octeti<N>` / `ascii<N>` / `textus<N>` (AEU-7).
+    let bounded_element = match types.get(source_ty) {
+        Type::BoundedArray { element, .. } => Some(*element),
+        Type::BoundedOcteti { .. } | Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => {
+            scalar_bounded_element(source_ty, types)
+        }
+        _ => None,
+    };
+    if let Some(element) = bounded_element {
         let Some(lane_count) = bounded_capacity(source_ty, types) else {
             return UnrollPlan::Decline {
                 span,
                 causa: CAUSA_NOT_CONCRETE,
             };
         };
-        if static_length(source, fullness, types) != Some(lane_count) {
+        if static_length(source, interner, fullness, types) != Some(lane_count) {
             return UnrollPlan::Decline {
                 span,
                 causa: CAUSA_NOT_CONCRETE,
@@ -1031,7 +1087,7 @@ fn classify_ex_loop(
             body: body.clone(),
             accumulators,
             tensor_source: Some(source.clone()),
-            tensor_binding_ty: Some(*element),
+            tensor_binding_ty: Some(element),
             coordinate_defs: Vec::new(),
             lane_coordinates: Vec::new(),
         });

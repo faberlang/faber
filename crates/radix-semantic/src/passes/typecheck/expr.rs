@@ -334,6 +334,23 @@ impl TypeChecker<'_> {
                         {
                             *element
                         }
+                        // AEU-7 scalar buffer forms: the lane binding is the
+                        // scalar index element row — `octeti<N>[i]` reads
+                        // `numerus<u8>`, `ascii<N>[i]` / `textus<N>[i]` read
+                        // `ascii<1>` (D14 / D17). Unrolls read only `0..len`,
+                        // so the non-ASCII trap row can never fire from a
+                        // dead slot.
+                        Type::BoundedOcteti { .. }
+                            if matches!(mode, radix_hir::HirIteraMode::Ex) =>
+                        {
+                            self.types
+                                .sized_numeric(Primitive::Numerus, NumericWidth::U8)
+                        }
+                        Type::BoundedAscii { .. } | Type::BoundedTextus { .. }
+                            if matches!(mode, radix_hir::HirIteraMode::Ex) =>
+                        {
+                            self.ascii_one_type()
+                        }
                         _ => self.numerus_type(),
                     }
                 };

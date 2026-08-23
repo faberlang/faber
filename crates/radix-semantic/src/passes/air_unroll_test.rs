@@ -917,6 +917,176 @@ functio unbounded() → vacuum {
     expect_decline_causa(&errors, "not_concrete");
 }
 
+// --- AEU-7: scalar bounded buffer forms (`octeti<N>` / `ascii<N>` / `textus<N>`)
+
+/// Collects the element types of the emitted lane gathers.
+struct GatherTys(Vec<crate::TypeId>);
+impl HirVisitor for GatherTys {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if matches!(expr.kind, HirExpressionKind::Index(..)) {
+            if let Some(ty) = expr.ty {
+                self.0.push(ty);
+            }
+        }
+        walk_expr(self, expr);
+    }
+}
+
+fn assert_no_itera_decline(result: &crate::SemanticResult, why: &str) {
+    assert!(
+        air_errors_from(result).iter().all(|error| {
+            !error
+                .args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "itera_loop")
+        }),
+        "{why}: {:?}",
+        result.diagnostics
+    );
+}
+
+fn is_numerus_u8(types: &crate::TypeTable, ty: crate::TypeId) -> bool {
+    matches!(
+        types.get(ty),
+        crate::Type::SizedNumeric(
+            radix_types::Primitive::Numerus,
+            radix_types::NumericWidth::U8
+        )
+    )
+}
+
+fn is_ascii_one(types: &crate::TypeTable, ty: crate::TypeId) -> bool {
+    let crate::Type::BoundedAscii { capacity } = types.get(ty) else {
+        return false;
+    };
+    matches!(
+        types.get_index(*capacity),
+        radix_types::IndexExpr::Literal(1)
+    )
+}
+
+#[test]
+fn octeti_ex_full_literal_admits_guard_free_lanes() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio octeti_full() → vacuum {
+    fixum octeti<8> xs ← |de ad be ef ba dc fe ca| ↦ octeti<8>
+    itera ex xs fixum b { }
+}
+"#,
+    );
+    assert_no_itera_decline(&result, "full octeti<8> must not decline its itera loop");
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "full octeti<8> iteration must be erased");
+    assert!(!has_si(hir), "full octeti<8> iteration is guard-free");
+    let mut gathers = GatherTys(Vec::new());
+    walk_program(&mut gathers, hir);
+    assert_eq!(gathers.0.len(), 8, "one gather must be emitted per full slot");
+    assert!(
+        gathers.0.iter().all(|ty| is_numerus_u8(&result.types, *ty)),
+        "every octeti<N> lane gathers numerus<u8>: {:?}",
+        gathers.0
+    );
+}
+
+#[test]
+fn ascii_ex_full_literal_admits_guard_free_lanes() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio ascii_full() → vacuum {
+    fixum ascii<8> xs ← 'alphabet' ↦ ascii<8>
+    itera ex xs fixum c { }
+}
+"#,
+    );
+    assert_no_itera_decline(&result, "full ascii<8> must not decline its itera loop");
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "full ascii<8> iteration must be erased");
+    assert!(!has_si(hir), "full ascii<8> iteration is guard-free");
+    let mut gathers = GatherTys(Vec::new());
+    walk_program(&mut gathers, hir);
+    assert_eq!(gathers.0.len(), 8, "one gather must be emitted per full slot");
+    assert!(
+        gathers.0.iter().all(|ty| is_ascii_one(&result.types, *ty)),
+        "every ascii<N> lane gathers ascii<1>: {:?}",
+        gathers.0
+    );
+}
+
+#[test]
+fn textus_ex_full_literal_admits_guard_free_lanes() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio textus_full() → vacuum {
+    fixum textus<8> xs ← "abcdefgh" ↦ textus<8>
+    itera ex xs fixum c { }
+}
+"#,
+    );
+    assert_no_itera_decline(&result, "full textus<8> must not decline its itera loop");
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "full textus<8> iteration must be erased");
+    assert!(!has_si(hir), "full textus<8> iteration is guard-free");
+    let mut gathers = GatherTys(Vec::new());
+    walk_program(&mut gathers, hir);
+    assert_eq!(gathers.0.len(), 8, "one gather must be emitted per full slot");
+    // Trap audit (D14/D17): each lane binds ascii<1> — the non-ASCII trap
+    // row exists, but a full literal is pure ASCII and the loop reads only
+    // the literal's own slots, so no lane can trap.
+    assert!(
+        gathers.0.iter().all(|ty| is_ascii_one(&result.types, *ty)),
+        "every textus<N> lane gathers ascii<1>: {:?}",
+        gathers.0
+    );
+}
+
+#[test]
+fn scalar_bounded_ex_runtime_len_param_declines_not_concrete() {
+    for source in [
+        r#"
+@ radix lane "air"
+functio runtime(octeti<8> xs) → vacuum {
+    itera ex xs fixum b { }
+}"#,
+        r#"
+@ radix lane "air"
+functio runtime(ascii<8> xs) → vacuum {
+    itera ex xs fixum c { }
+}"#,
+        r#"
+@ radix lane "air"
+functio runtime(textus<8> xs) → vacuum {
+    itera ex xs fixum c { }
+}"#,
+    ] {
+        expect_decline_causa(&air_errors(source), "not_concrete");
+    }
+}
+
+#[test]
+fn textus_ex_over_budget_declines_whole_with_causa() {
+    let literal = "a".repeat(65);
+    let source = format!(
+        r#"
+@ radix lane "air"
+functio too_wide() → vacuum {{
+    fixum textus<65> xs ← "{literal}" ↦ textus<65>
+    itera ex xs fixum c {{ }}
+}}
+"#
+    );
+    let result = analyze(&source);
+    expect_decline_causa(&air_errors_from(&result), "budget");
+    let hir = result.hir.as_ref().expect("typed HIR despite AIR decline");
+    assert!(
+        has_itera(hir),
+        "the over-budget textus loop must remain whole"
+    );
+}
+
 #[test]
 fn pipeline_unroll_admits_arc3_intrinsic_before_purity() {
     let result = analyze(
