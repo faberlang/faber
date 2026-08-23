@@ -100,11 +100,13 @@ fn unroll_function(
     let Some(body) = &mut function.body else {
         return;
     };
+    let root_locals = block_local_defs(body);
     let mask = MaskAnalysis::analyze(&function.params, body, types, interner);
     let fullness = FullnessFacts::from_block(body, types);
     let mut emitted_lanes = 0;
     rewrite_block(
         body,
+        &root_locals,
         lanes,
         interner,
         ids,
@@ -113,11 +115,13 @@ fn unroll_function(
         types,
         &fullness,
         &mut emitted_lanes,
+        1,
     );
 }
 
 fn rewrite_block(
     block: &mut HirBlock,
+    root_locals: &FxHashSet<DefId>,
     lanes: &RadixLaneMetadata,
     interner: &mut Interner,
     ids: &mut IdGen,
@@ -126,24 +130,30 @@ fn rewrite_block(
     types: &TypeTable,
     fullness: &FxHashMap<DefId, usize>,
     emitted_lanes: &mut usize,
+    multiplicity: usize,
 ) {
     let mut index = 0;
     while index < block.statements.len() {
         // Classify `itera` before walking into it so a nested range loop is
-        // still visible to the outer decline check.
+        // still visible to the outer decline check. The counter snapshot
+        // backs the whole-nest rollback when a nested unit fails.
+        let lanes_before = *emitted_lanes;
         let plan = classify_itera_stmt(
             &block.statements[index],
             block,
+            root_locals,
             lanes,
             interner,
             mask,
             types,
             fullness,
             emitted_lanes,
+            multiplicity,
         );
         if plan.is_none() {
             rewrite_nested_stmt(
                 &mut block.statements[index],
+                root_locals,
                 lanes,
                 interner,
                 ids,
@@ -152,6 +162,7 @@ fn rewrite_block(
                 types,
                 fullness,
                 emitted_lanes,
+                multiplicity,
             );
         }
         let Some(plan) = plan else {
@@ -163,7 +174,32 @@ fn rewrite_block(
                 errors.push(decline(span, causa));
                 index += 1;
             }
-            UnrollPlan::Ready(ready) => {
+            UnrollPlan::Ready(mut ready) => {
+                // Nested units in the body charge multiplicatively (each
+                // body copy is emitted once per lane). A nested failure
+                // rolls the whole nest back to a decline; the source stays
+                // intact (3E/3F).
+                let body_multiplicity = ready.lanes.len().saturating_mul(multiplicity);
+                let mut nested_errors = Vec::new();
+                rewrite_block(
+                    &mut ready.body,
+                    root_locals,
+                    lanes,
+                    interner,
+                    ids,
+                    &mut nested_errors,
+                    mask,
+                    types,
+                    fullness,
+                    emitted_lanes,
+                    body_multiplicity,
+                );
+                if let Some(causa) = first_decline_causa(&nested_errors) {
+                    *emitted_lanes = lanes_before;
+                    errors.push(decline(ready.span, causa));
+                    index += 1;
+                    continue;
+                }
                 let (unrolled, acc_final) = emit_unrolled_lanes(&ready, interner, ids);
                 freeze_accumulators(block, &acc_final);
                 let mut rest = block.statements.split_off(index + 1);
@@ -183,6 +219,7 @@ fn rewrite_block(
     if let Some(mut expr) = block.expr.take() {
         rewrite_nested_expr(
             &mut expr,
+            root_locals,
             lanes,
             interner,
             ids,
@@ -191,41 +228,77 @@ fn rewrite_block(
             types,
             fullness,
             emitted_lanes,
+            multiplicity,
         );
+        let lanes_before = *emitted_lanes;
         match classify_itera_expr(
             &expr,
             block,
+            root_locals,
             lanes,
             interner,
             mask,
             types,
             fullness,
             emitted_lanes,
+            multiplicity,
         ) {
             Some(UnrollPlan::Decline { span, causa }) => {
                 errors.push(decline(span, causa));
                 block.expr = Some(expr);
             }
-            Some(UnrollPlan::Ready(ready)) => {
+            Some(UnrollPlan::Ready(mut ready)) => {
                 let span = expr.span;
                 let ty = expr.ty;
-                let (unrolled, acc_final) = emit_unrolled_lanes(&ready, interner, ids);
-                freeze_accumulators(block, &acc_final);
-                remap_acc_paths_in_stmts(&mut block.statements, &acc_final);
-                block.expr = Some(Box::new(HirExpression {
-                    id: ids.next_hir(),
-                    kind: HirExpressionKind::Block(HirBlock::simple(unrolled, None, span)),
-                    ty,
-                    span,
-                }));
+                let body_multiplicity = ready.lanes.len().saturating_mul(multiplicity);
+                let mut nested_errors = Vec::new();
+                rewrite_block(
+                    &mut ready.body,
+                    root_locals,
+                    lanes,
+                    interner,
+                    ids,
+                    &mut nested_errors,
+                    mask,
+                    types,
+                    fullness,
+                    emitted_lanes,
+                    body_multiplicity,
+                );
+                if let Some(causa) = first_decline_causa(&nested_errors) {
+                    *emitted_lanes = lanes_before;
+                    block.expr = Some(expr);
+                    errors.push(decline(ready.span, causa));
+                } else {
+                    let (unrolled, acc_final) = emit_unrolled_lanes(&ready, interner, ids);
+                    freeze_accumulators(block, &acc_final);
+                    remap_acc_paths_in_stmts(&mut block.statements, &acc_final);
+                    block.expr = Some(Box::new(HirExpression {
+                        id: ids.next_hir(),
+                        kind: HirExpressionKind::Block(HirBlock::simple(unrolled, None, span)),
+                        ty,
+                        span,
+                    }));
+                }
             }
             None => block.expr = Some(expr),
         }
     }
 }
 
+fn first_decline_causa(errors: &[SemanticError]) -> Option<&str> {
+    errors.iter().find_map(|error| {
+        error
+            .args
+            .iter()
+            .find(|arg| arg.name == "causa")
+            .map(|arg| arg.value.as_str())
+    })
+}
+
 fn rewrite_nested_stmt(
     stmt: &mut HirStatement,
+    root_locals: &FxHashSet<DefId>,
     lanes: &RadixLaneMetadata,
     interner: &mut Interner,
     ids: &mut IdGen,
@@ -234,12 +307,14 @@ fn rewrite_nested_stmt(
     types: &TypeTable,
     fullness: &FxHashMap<DefId, usize>,
     emitted_lanes: &mut usize,
+    multiplicity: usize,
 ) {
     match &mut stmt.kind {
         HirStatementKind::Local(local) => {
             if let Some(init) = &mut local.init {
                 rewrite_nested_expr(
                     init,
+                    root_locals,
                     lanes,
                     interner,
                     ids,
@@ -248,12 +323,14 @@ fn rewrite_nested_stmt(
                     types,
                     fullness,
                     emitted_lanes,
+                    multiplicity,
                 );
             }
         }
         HirStatementKind::Expr(expr) | HirStatementKind::Redde(Some(expr)) => {
             rewrite_nested_expr(
                 expr,
+                root_locals,
                 lanes,
                 interner,
                 ids,
@@ -262,12 +339,14 @@ fn rewrite_nested_stmt(
                 types,
                 fullness,
                 emitted_lanes,
+                multiplicity,
             );
         }
         HirStatementKind::Custodi(custodi) => {
             for clause in &mut custodi.clauses {
                 rewrite_nested_expr(
                     &mut clause.cond,
+                    root_locals,
                     lanes,
                     interner,
                     ids,
@@ -276,9 +355,11 @@ fn rewrite_nested_stmt(
                     types,
                     fullness,
                     emitted_lanes,
+                    multiplicity,
                 );
                 rewrite_block(
                     &mut clause.body,
+                    root_locals,
                     lanes,
                     interner,
                     ids,
@@ -287,6 +368,7 @@ fn rewrite_nested_stmt(
                     types,
                     fullness,
                     emitted_lanes,
+                    multiplicity,
                 );
             }
         }
@@ -300,6 +382,7 @@ fn rewrite_nested_stmt(
 
 fn rewrite_nested_expr(
     expr: &mut HirExpression,
+    root_locals: &FxHashSet<DefId>,
     lanes: &RadixLaneMetadata,
     interner: &mut Interner,
     ids: &mut IdGen,
@@ -308,10 +391,12 @@ fn rewrite_nested_expr(
     types: &TypeTable,
     fullness: &FxHashMap<DefId, usize>,
     emitted_lanes: &mut usize,
+    multiplicity: usize,
 ) {
     match &mut expr.kind {
         HirExpressionKind::Block(block) => rewrite_block(
             block,
+            root_locals,
             lanes,
             interner,
             ids,
@@ -320,6 +405,7 @@ fn rewrite_nested_expr(
             types,
             fullness,
             emitted_lanes,
+            multiplicity,
         ),
         HirExpressionKind::Si {
             cond,
@@ -329,6 +415,7 @@ fn rewrite_nested_expr(
         } => {
             rewrite_nested_expr(
                 cond,
+                root_locals,
                 lanes,
                 interner,
                 ids,
@@ -337,9 +424,11 @@ fn rewrite_nested_expr(
                 types,
                 fullness,
                 emitted_lanes,
+                multiplicity,
             );
             rewrite_block(
                 then_block,
+                root_locals,
                 lanes,
                 interner,
                 ids,
@@ -348,10 +437,12 @@ fn rewrite_nested_expr(
                 types,
                 fullness,
                 emitted_lanes,
+                multiplicity,
             );
             if let Some(catch) = then_catch {
                 rewrite_block(
                     &mut catch.body,
+                    root_locals,
                     lanes,
                     interner,
                     ids,
@@ -360,11 +451,13 @@ fn rewrite_nested_expr(
                     types,
                     fullness,
                     emitted_lanes,
+                    multiplicity,
                 );
             }
             if let Some(else_block) = else_block {
                 rewrite_block(
                     else_block,
+                    root_locals,
                     lanes,
                     interner,
                     ids,
@@ -373,6 +466,7 @@ fn rewrite_nested_expr(
                     types,
                     fullness,
                     emitted_lanes,
+                    multiplicity,
                 );
             }
         }
@@ -382,6 +476,7 @@ fn rewrite_nested_expr(
             for scrutinee in scrutinees {
                 rewrite_nested_expr(
                     scrutinee,
+                    root_locals,
                     lanes,
                     interner,
                     ids,
@@ -390,12 +485,14 @@ fn rewrite_nested_expr(
                     types,
                     fullness,
                     emitted_lanes,
+                    multiplicity,
                 );
             }
             for arm in arms {
                 if let Some(guard) = &mut arm.guard {
                     rewrite_nested_expr(
                         guard,
+                        root_locals,
                         lanes,
                         interner,
                         ids,
@@ -404,10 +501,12 @@ fn rewrite_nested_expr(
                         types,
                         fullness,
                         emitted_lanes,
+                        multiplicity,
                     );
                 }
                 rewrite_nested_expr(
                     &mut arm.body,
+                    root_locals,
                     lanes,
                     interner,
                     ids,
@@ -416,12 +515,14 @@ fn rewrite_nested_expr(
                     types,
                     fullness,
                     emitted_lanes,
+                    multiplicity,
                 );
             }
         }
         HirExpressionKind::Loop(block) | HirExpressionKind::Itera(_, _, _, _, _, block) => {
             rewrite_block(
                 block,
+                root_locals,
                 lanes,
                 interner,
                 ids,
@@ -430,11 +531,13 @@ fn rewrite_nested_expr(
                 types,
                 fullness,
                 emitted_lanes,
+                multiplicity,
             );
         }
         HirExpressionKind::Dum(cond, block) => {
             rewrite_nested_expr(
                 cond,
+                root_locals,
                 lanes,
                 interner,
                 ids,
@@ -443,9 +546,11 @@ fn rewrite_nested_expr(
                 types,
                 fullness,
                 emitted_lanes,
+                multiplicity,
             );
             rewrite_block(
                 block,
+                root_locals,
                 lanes,
                 interner,
                 ids,
@@ -454,11 +559,13 @@ fn rewrite_nested_expr(
                 types,
                 fullness,
                 emitted_lanes,
+                multiplicity,
             );
         }
         HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
             rewrite_nested_expr(
                 lhs,
+                root_locals,
                 lanes,
                 interner,
                 ids,
@@ -467,9 +574,11 @@ fn rewrite_nested_expr(
                 types,
                 fullness,
                 emitted_lanes,
+                multiplicity,
             );
             rewrite_nested_expr(
                 rhs,
+                root_locals,
                 lanes,
                 interner,
                 ids,
@@ -478,6 +587,7 @@ fn rewrite_nested_expr(
                 types,
                 fullness,
                 emitted_lanes,
+                multiplicity,
             );
         }
         HirExpressionKind::Unary(_, operand)
@@ -492,6 +602,7 @@ fn rewrite_nested_expr(
         | HirExpressionKind::TypeCheck { expr: operand, .. } => {
             rewrite_nested_expr(
                 operand,
+                root_locals,
                 lanes,
                 interner,
                 ids,
@@ -500,11 +611,13 @@ fn rewrite_nested_expr(
                 types,
                 fullness,
                 emitted_lanes,
+                multiplicity,
             );
         }
         HirExpressionKind::Index(object, index) => {
             rewrite_nested_expr(
                 object,
+                root_locals,
                 lanes,
                 interner,
                 ids,
@@ -513,9 +626,11 @@ fn rewrite_nested_expr(
                 types,
                 fullness,
                 emitted_lanes,
+                multiplicity,
             );
             rewrite_nested_expr(
                 index,
+                root_locals,
                 lanes,
                 interner,
                 ids,
@@ -524,11 +639,13 @@ fn rewrite_nested_expr(
                 types,
                 fullness,
                 emitted_lanes,
+                multiplicity,
             );
         }
         HirExpressionKind::Call(callee, _, args) => {
             rewrite_nested_expr(
                 callee,
+                root_locals,
                 lanes,
                 interner,
                 ids,
@@ -537,10 +654,12 @@ fn rewrite_nested_expr(
                 types,
                 fullness,
                 emitted_lanes,
+                multiplicity,
             );
             for arg in args {
                 rewrite_nested_expr(
                     &mut arg.expr,
+                    root_locals,
                     lanes,
                     interner,
                     ids,
@@ -549,12 +668,14 @@ fn rewrite_nested_expr(
                     types,
                     fullness,
                     emitted_lanes,
+                    multiplicity,
                 );
             }
         }
         HirExpressionKind::MethodCall(receiver, _, _, args) => {
             rewrite_nested_expr(
                 receiver,
+                root_locals,
                 lanes,
                 interner,
                 ids,
@@ -563,10 +684,12 @@ fn rewrite_nested_expr(
                 types,
                 fullness,
                 emitted_lanes,
+                multiplicity,
             );
             for arg in args {
                 rewrite_nested_expr(
                     &mut arg.expr,
+                    root_locals,
                     lanes,
                     interner,
                     ids,
@@ -575,6 +698,7 @@ fn rewrite_nested_expr(
                     types,
                     fullness,
                     emitted_lanes,
+                    multiplicity,
                 );
             }
         }
@@ -670,6 +794,9 @@ enum UnrollPlan {
 }
 
 struct ReadyUnroll {
+    /// Span of the loop statement; used when a nested unit failure rolls
+    /// the whole nest back to a decline.
+    span: Span,
     index_def: DefId,
     lanes: Vec<i64>,
     body: HirBlock,
@@ -691,12 +818,14 @@ struct AccInfo {
 fn classify_itera_stmt(
     stmt: &HirStatement,
     block: &HirBlock,
+    root_locals: &FxHashSet<DefId>,
     lanes: &RadixLaneMetadata,
     interner: &Interner,
     mask: &MaskAnalysis,
     types: &TypeTable,
     fullness: &FxHashMap<DefId, usize>,
     emitted_lanes: &mut usize,
+    multiplicity: usize,
 ) -> Option<UnrollPlan> {
     let HirStatementKind::Expr(expr) = &stmt.kind else {
         return None;
@@ -704,27 +833,30 @@ fn classify_itera_stmt(
     classify_itera_expr(
         expr,
         block,
+        root_locals,
         lanes,
         interner,
         mask,
         types,
         fullness,
         emitted_lanes,
+        multiplicity,
     )
 }
 
 fn classify_itera_expr(
     expr: &HirExpression,
     block: &HirBlock,
+    root_locals: &FxHashSet<DefId>,
     lanes: &RadixLaneMetadata,
     interner: &Interner,
     mask: &MaskAnalysis,
     types: &TypeTable,
     fullness: &FxHashMap<DefId, usize>,
     emitted_lanes: &mut usize,
+    multiplicity: usize,
 ) -> Option<UnrollPlan> {
-    let HirExpressionKind::Itera(mode, coordinates, index_def, _, source, body) = &expr.kind
-    else {
+    let HirExpressionKind::Itera(mode, coordinates, index_def, _, source, body) = &expr.kind else {
         return None;
     };
     match mode {
@@ -734,10 +866,12 @@ fn classify_itera_expr(
             source,
             body,
             block,
+            root_locals,
             lanes,
             interner,
             mask,
             emitted_lanes,
+            multiplicity,
         )),
         HirIteraMode::Ex => Some(classify_ex_loop(
             expr.span,
@@ -746,12 +880,14 @@ fn classify_itera_expr(
             source,
             body,
             block,
+            root_locals,
             lanes,
             interner,
             mask,
             types,
             fullness,
             emitted_lanes,
+            multiplicity,
         )),
         HirIteraMode::De => Some(UnrollPlan::Decline {
             span: expr.span,
@@ -766,10 +902,12 @@ fn classify_ab_loop(
     source: &HirExpression,
     body: &HirBlock,
     block: &HirBlock,
+    root_locals: &FxHashSet<DefId>,
     lanes: &RadixLaneMetadata,
     interner: &Interner,
     mask: &MaskAnalysis,
     emitted_lanes: &mut usize,
+    multiplicity: usize,
 ) -> UnrollPlan {
     let Some(values) = concrete_range_values(source) else {
         return UnrollPlan::Decline {
@@ -777,7 +915,9 @@ fn classify_ab_loop(
             causa: CAUSA_NOT_CONCRETE,
         };
     };
-    if values.len() > UNROLL_BUDGET.saturating_sub(*emitted_lanes) {
+    let lane_count = values.len();
+    let charge = lane_count.saturating_mul(multiplicity);
+    if charge > UNROLL_BUDGET.saturating_sub(*emitted_lanes) {
         return UnrollPlan::Decline {
             span,
             causa: CAUSA_BUDGET,
@@ -792,12 +932,23 @@ fn classify_ab_loop(
     if let Some(causa) = mask.decline() {
         return UnrollPlan::Decline { span, causa };
     }
-    if let Some(causa) = body_decline(body, block, index_def, lanes, interner) {
+    let block_locals = block_local_defs(block);
+    let decline_locals = if multiplicity > 1 {
+        root_locals
+    } else {
+        &block_locals
+    };
+    if let Some(causa) = body_decline(body, decline_locals, index_def, lanes, interner) {
         return UnrollPlan::Decline { span, causa };
     }
-    let accumulators = block_accumulators(block, body);
-    *emitted_lanes += values.len();
+    let accumulators = if multiplicity > 1 {
+        FxHashMap::default()
+    } else {
+        block_accumulators(block, body)
+    };
+    *emitted_lanes += lane_count.saturating_mul(multiplicity);
     UnrollPlan::Ready(ReadyUnroll {
+        span,
         index_def,
         lanes: values,
         body: body.clone(),
@@ -816,12 +967,14 @@ fn classify_ex_loop(
     source: &HirExpression,
     body: &HirBlock,
     block: &HirBlock,
+    root_locals: &FxHashSet<DefId>,
     lanes: &RadixLaneMetadata,
     interner: &Interner,
     mask: &MaskAnalysis,
     types: &TypeTable,
     fullness: &FxHashMap<DefId, usize>,
     emitted_lanes: &mut usize,
+    multiplicity: usize,
 ) -> UnrollPlan {
     let Some(source_ty) = source.ty else {
         return UnrollPlan::Decline {
@@ -843,7 +996,8 @@ fn classify_ex_loop(
                 causa: CAUSA_NOT_CONCRETE,
             };
         }
-        if lane_count > UNROLL_BUDGET.saturating_sub(*emitted_lanes) {
+        let charge = lane_count.saturating_mul(multiplicity);
+        if charge > UNROLL_BUDGET.saturating_sub(*emitted_lanes) {
             return UnrollPlan::Decline {
                 span,
                 causa: CAUSA_BUDGET,
@@ -852,15 +1006,26 @@ fn classify_ex_loop(
         if let Some(causa) = mask.decline() {
             return UnrollPlan::Decline { span, causa };
         }
-        if let Some(causa) = body_decline(body, block, index_def, lanes, interner) {
+        let block_locals = block_local_defs(block);
+        let decline_locals = if multiplicity > 1 {
+            root_locals
+        } else {
+            &block_locals
+        };
+        if let Some(causa) = body_decline(body, decline_locals, index_def, lanes, interner) {
             return UnrollPlan::Decline { span, causa };
         }
 
-        let accumulators = block_accumulators(block, body);
-        *emitted_lanes += lane_count;
+        let accumulators = if multiplicity > 1 {
+            FxHashMap::default()
+        } else {
+            block_accumulators(block, body)
+        };
+        *emitted_lanes += charge;
         #[allow(clippy::cast_possible_wrap)]
         let values = (0..lane_count).map(|lane| lane as i64).collect();
         return UnrollPlan::Ready(ReadyUnroll {
+            span,
             index_def,
             lanes: values,
             body: body.clone(),
@@ -926,10 +1091,12 @@ fn classify_ex_loop(
                     source,
                     body,
                     block,
+                    root_locals,
                     lanes,
                     interner,
                     mask,
                     emitted_lanes,
+                    multiplicity,
                     count,
                     Vec::new(),
                     Vec::new(),
@@ -975,7 +1142,9 @@ fn classify_ex_loop(
         }
     };
 
-    let Some(lane_count) = dims.iter().try_fold(1usize, |acc, dim| acc.checked_mul(*dim))
+    let Some(lane_count) = dims
+        .iter()
+        .try_fold(1usize, |acc, dim| acc.checked_mul(*dim))
     else {
         return UnrollPlan::Decline {
             span,
@@ -990,10 +1159,12 @@ fn classify_ex_loop(
             source,
             body,
             block,
+            root_locals,
             lanes,
             interner,
             mask,
             emitted_lanes,
+            multiplicity,
             lane_count,
             Vec::new(),
             Vec::new(),
@@ -1020,10 +1191,12 @@ fn classify_ex_loop(
         source,
         body,
         block,
+        root_locals,
         lanes,
         interner,
         mask,
         emitted_lanes,
+        multiplicity,
         lane_count,
         coordinate_defs,
         lane_coordinates,
@@ -1046,16 +1219,19 @@ fn classify_ex_tensor_ready(
     source: &HirExpression,
     body: &HirBlock,
     block: &HirBlock,
+    root_locals: &FxHashSet<DefId>,
     lanes: &RadixLaneMetadata,
     interner: &Interner,
     mask: &MaskAnalysis,
     emitted_lanes: &mut usize,
+    multiplicity: usize,
     lane_count: usize,
     coordinate_defs: Vec<DefId>,
     lane_coordinates: Vec<Vec<i64>>,
     element_ty: TypeId,
 ) -> UnrollPlan {
-    if lane_count > UNROLL_BUDGET.saturating_sub(*emitted_lanes) {
+    let charge = lane_count.saturating_mul(multiplicity);
+    if charge > UNROLL_BUDGET.saturating_sub(*emitted_lanes) {
         return UnrollPlan::Decline {
             span,
             causa: CAUSA_BUDGET,
@@ -1064,15 +1240,26 @@ fn classify_ex_tensor_ready(
     if let Some(causa) = mask.decline() {
         return UnrollPlan::Decline { span, causa };
     }
-    if let Some(causa) = body_decline(body, block, index_def, lanes, interner) {
+    let block_locals = block_local_defs(block);
+    let decline_locals = if multiplicity > 1 {
+        root_locals
+    } else {
+        &block_locals
+    };
+    if let Some(causa) = body_decline(body, decline_locals, index_def, lanes, interner) {
         return UnrollPlan::Decline { span, causa };
     }
 
-    let accumulators = block_accumulators(block, body);
-    *emitted_lanes += lane_count;
+    let accumulators = if multiplicity > 1 {
+        FxHashMap::default()
+    } else {
+        block_accumulators(block, body)
+    };
+    *emitted_lanes += charge;
     #[allow(clippy::cast_possible_wrap)]
     let values = (0..lane_count).map(|lane| lane as i64).collect();
     UnrollPlan::Ready(ReadyUnroll {
+        span,
         index_def,
         lanes: values,
         body: body.clone(),
@@ -1140,12 +1327,11 @@ fn as_i64(expr: &HirExpression) -> Option<i64> {
 
 fn body_decline(
     body: &HirBlock,
-    parent: &HirBlock,
+    same_block_locals: &FxHashSet<DefId>,
     index_def: DefId,
     lanes: &RadixLaneMetadata,
     interner: &Interner,
 ) -> Option<&'static str> {
-    let same_block_locals = block_local_defs(parent);
     let mut walker = BodyDecline {
         index_def,
         same_block_locals,
@@ -1157,7 +1343,6 @@ fn body_decline(
     walker.scan_loop_body(body);
     walker.causa
 }
-
 fn block_local_defs(block: &HirBlock) -> FxHashSet<DefId> {
     block
         .statements
@@ -1194,13 +1379,18 @@ fn collect_straight_assigns(block: &HirBlock, assigned: &mut FxHashSet<DefId>) {
                     assigned.insert(def);
                 }
             }
+            // A nested unroll unit splices straight-line lanes into this
+            // block, so its body's assigns are accumulator updates here too.
+            if let HirExpressionKind::Itera(_, _, _, _, _, body) = &expr.kind {
+                collect_straight_assigns(body, assigned);
+            }
         }
     }
 }
 
 struct BodyDecline<'a> {
     index_def: DefId,
-    same_block_locals: FxHashSet<DefId>,
+    same_block_locals: &'a FxHashSet<DefId>,
     lanes: &'a RadixLaneMetadata,
     interner: &'a Interner,
     at_loop_body_root: bool,
@@ -1292,8 +1482,14 @@ impl BodyDecline<'_> {
             }
             HirExpressionKind::Loop(_)
             | HirExpressionKind::Dum(_, _)
-            | HirExpressionKind::Itera(_, _, _, _, _, _)
             | HirExpressionKind::Discerne { .. } => self.reject(CAUSA_UNSUPPORTED_CONTROL),
+            // A nested itera directly at the loop body root is its own
+            // unroll unit: the body rewrite validates it recursively
+            // (multiplicative budget, fail-closed decline) instead of this
+            // purity scan. Nested iteras under control flow stay rejected:
+            // conditional lanes cannot chain a straight-line accumulator.
+            HirExpressionKind::Itera(..) if self.at_loop_body_root && as_statement => {}
+            HirExpressionKind::Itera(..) => self.reject(CAUSA_UNSUPPORTED_CONTROL),
             HirExpressionKind::Call(callee, _, args) => {
                 if !matches!(&callee.kind, HirExpressionKind::Path(def) if self.lanes.lane_for(*def) == Some(RadixLane::Air))
                 {
@@ -1697,7 +1893,7 @@ fn int_literal(value: i64, ids: &mut IdGen) -> HirExpressionKind {
     }
 }
 
-fn decline(span: Span, causa: &'static str) -> SemanticError {
+fn decline(span: Span, causa: &str) -> SemanticError {
     SemanticError::structured(SemanticErrorKind::AirPurityViolation, span)
         .with_arg("issue", "itera_loop")
         .with_arg("lane", "air")

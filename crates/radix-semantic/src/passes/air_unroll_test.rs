@@ -386,11 +386,7 @@ fn coordinate_lane_tuples(hir: &HirModule, rank: usize) -> Vec<Vec<u64>> {
         found.0.len() % rank == 0,
         "coordinate constants must chunk evenly by rank"
     );
-    found
-        .0
-        .chunks(rank)
-        .map(|chunk| chunk.to_vec())
-        .collect()
+    found.0.chunks(rank).map(|chunk| chunk.to_vec()).collect()
 }
 
 #[test]
@@ -959,7 +955,6 @@ functio reduce_tensor(tensor<f32, [4]> x) → f32 {
     assert!(!has_itera(hir), "the pipeline must erase the admitted loop");
 }
 
-
 // AC-8: index-dependent bodies and the decline catalog. Coordinate-reading
 // conditions are ordinary pure per-lane control — they admit through the
 // unroll (constants substituted per lane) — while ragged iterables decline
@@ -1068,10 +1063,7 @@ functio ragged(lista<lista<f32>> pairs) → f32 {
     expect_issue(&result.diagnostics, "itera_apud_requires_shaped_iterable");
     expect_issue(&result.diagnostics, "itera_loop");
     let hir = result.hir.as_ref().expect("typed HIR despite the decline");
-    assert!(
-        has_itera(hir),
-        "ragged apud iteration must remain whole"
-    );
+    assert!(has_itera(hir), "ragged apud iteration must remain whole");
 }
 
 #[test]
@@ -1094,11 +1086,12 @@ functio mixed(tensor<f32, [40]> x) → f32 {
     );
     let declined: Vec<_> = air_errors_from(&result)
         .into_iter()
-        .filter(|err| err
-            .args
-            .iter()
-            .any(|arg| arg.name == "issue" && arg.value == "itera_loop")
-            && err.args.iter().any(|arg| arg.name == "causa"))
+        .filter(|err| {
+            err.args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "itera_loop")
+                && err.args.iter().any(|arg| arg.name == "causa")
+        })
         .collect();
     assert_eq!(
         declined.len(),
@@ -1139,3 +1132,398 @@ impl HirVisitor for CountSi {
     }
 }
 
+// AC-9: nesting and budget composition. Nested unroll units charge
+// multiplicatively against the shared per-function UNROLL_BUDGET: an
+// `itera` directly inside another loop's body admits when the product of
+// the two lane counts fits, declines whole when it does not, and the whole
+// nest stays intact on any decline (3E/3F: source stays intact). Lanes
+// splice in source order; non-AIR-lane loops are untouched.
+
+struct CountBinaryInits(usize);
+impl HirVisitor for CountBinaryInits {
+    fn visit_stmt(&mut self, stmt: &HirStatement) {
+        if let HirStatementKind::Local(local) = &stmt.kind {
+            if let Some(init) = &local.init {
+                if matches!(init.kind, HirExpressionKind::Binary(..)) {
+                    self.0 += 1;
+                }
+            }
+        }
+        walk_stmt(self, stmt);
+    }
+}
+
+#[test]
+fn apud_itera_ab_nest_admits_product_lanes_in_source_order() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+@ radix backward "nest_backward"
+functio nested_sum(tensor<f32, [2, 3]> x) → f32 ⇥ textus {
+    varia f32 total ← 0.0
+    itera ex x apud [i, j] fixum cell {
+        itera ab 0‥2 fixum k {
+            si k > 0 { iace "inner" }
+            total ← total + 1.0
+        }
+    }
+    redde total
+}
+"#,
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|err| !err.args.iter().any(|arg| arg.name == "causa")),
+        "apud x itera ab nest must admit within budget (no decline): {:?}",
+        result.diagnostics
+    );
+    expect_issue(&result.diagnostics, "iace");
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "admitted nest must be fully erased");
+    assert!(
+        has_si(hir),
+        "per-lane inner conditions must remain (failure lanes preserved)"
+    );
+    let mut steps = CountBinaryInits(0);
+    walk_program(&mut steps, hir);
+    assert_eq!(
+        steps.0, 12,
+        "total lanes must be the product: 6 outer x 2 inner"
+    );
+    let mut sis = CountSi(0);
+    walk_program(&mut sis, hir);
+    assert_eq!(sis.0, 12, "one per-lane condition per emitted lane");
+    assert_eq!(
+        if_eq_literals(hir),
+        vec![0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+        "inner lanes must splice in source order inside each outer lane"
+    );
+    assert_eq!(
+        coordinate_lane_tuples(hir, 2),
+        vec![
+            vec![0, 0],
+            vec![0, 1],
+            vec![0, 2],
+            vec![1, 0],
+            vec![1, 1],
+            vec![1, 2],
+        ],
+        "outer apud lanes must run first-bound=outer in source order"
+    );
+}
+
+#[test]
+fn itera_ab_apud_nest_admits_product_lanes() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio nested_ab_outer(tensor<f32, [2, 3]> x) → f32 {
+    varia f32 total ← 0.0
+    itera ab 0‥2 fixum k {
+        itera ex x apud [i, j] fixum cell {
+            total ← total + 1.0
+        }
+    }
+    redde total
+}
+"#,
+    );
+    assert!(
+        result.is_ok(),
+        "itera ab x apud nest must admit within budget: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "admitted nest must be fully erased");
+    let mut steps = CountBinaryInits(0);
+    walk_program(&mut steps, hir);
+    assert_eq!(
+        steps.0, 12,
+        "total lanes must be the product: 2 outer x 6 inner"
+    );
+    assert_eq!(
+        coordinate_lane_tuples(hir, 2),
+        vec![
+            vec![0, 0],
+            vec![0, 1],
+            vec![0, 2],
+            vec![1, 0],
+            vec![1, 1],
+            vec![1, 2],
+            vec![0, 0],
+            vec![0, 1],
+            vec![0, 2],
+            vec![1, 0],
+            vec![1, 1],
+            vec![1, 2],
+        ],
+        "inner apud lanes must splice in source order inside each outer lane"
+    );
+}
+
+#[test]
+fn apud_apud_nest_admits_product_lanes() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio nested_apud(tensor<f32, [2, 3]> x, tensor<f32, [4]> y) → f32 ⇥ textus {
+    varia f32 total ← 0.0
+    itera ex x apud [i, j] fixum cell {
+        itera ex y apud [k] fixum other {
+            si k > 0 { iace "inner" }
+            total ← total + 1.0
+        }
+    }
+    redde total
+}
+"#,
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|err| !err.args.iter().any(|arg| arg.name == "causa")),
+        "apud x apud nest must admit within budget (no decline): {:?}",
+        result.diagnostics
+    );
+    expect_issue(&result.diagnostics, "iace");
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "admitted apud x apud nest must be erased");
+    let mut steps = CountBinaryInits(0);
+    walk_program(&mut steps, hir);
+    assert_eq!(
+        steps.0, 24,
+        "total lanes must be the product: 6 outer x 4 inner"
+    );
+    let mut sis = CountSi(0);
+    walk_program(&mut sis, hir);
+    assert_eq!(sis.0, 24, "one per-lane condition per emitted lane");
+    let mut coords = CollectCoordLets(Vec::new());
+    walk_program(&mut coords, hir);
+    assert_eq!(
+        coords.0,
+        vec![
+            0, 0, 0, 1, 2, 3, // outer (0,0): i, j, then k = 0..4
+            0, 1, 0, 1, 2, 3, 0, 2, 0, 1, 2, 3, 1, 0, 0, 1, 2, 3, 1, 1, 0, 1, 2, 3, 1, 2, 0, 1, 2,
+            3,
+        ],
+        "outer lanes in first-bound=outer order, inner k in source order per lane"
+    );
+}
+
+#[test]
+fn nested_product_over_budget_declines_whole_with_causa() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio too_deep(tensor<f32, [8]> x) → f32 {
+    varia f32 total ← 0.0
+    itera ex x apud [i] fixum cell {
+        itera ab 0‥8 fixum k {
+            total ← total + 1.0
+        }
+    }
+    redde total
+}
+"#,
+    );
+    expect_decline_causa(&air_errors_from(&result), "budget");
+    let hir = result.hir.as_ref().expect("typed HIR despite AIR decline");
+    let mut iteras = CountIteras(0);
+    walk_program(&mut iteras, hir);
+    assert_eq!(
+        iteras.0, 2,
+        "the whole nest must remain intact: no partial admission"
+    );
+}
+
+#[test]
+fn nested_not_concrete_inner_declines_whole_with_causa() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio runtime_inner(tensor<f32, [2, 3]> x, numerus n) → f32 {
+    varia f32 total ← 0.0
+    itera ex x apud [i, j] fixum cell {
+        itera ab 0‥n fixum k {
+            total ← total + 1.0
+        }
+    }
+    redde total
+}
+"#,
+    );
+    expect_decline_causa(&air_errors_from(&result), "not_concrete");
+    let hir = result.hir.as_ref().expect("typed HIR despite AIR decline");
+    let mut iteras = CountIteras(0);
+    walk_program(&mut iteras, hir);
+    assert_eq!(
+        iteras.0, 2,
+        "a failing nested unit keeps the whole nest intact"
+    );
+}
+
+#[test]
+fn si_conditioned_nested_itera_declines_fail_closed() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio conditioned(tensor<f32, [2, 3]> x) → f32 {
+    varia f32 total ← 0.0
+    itera ex x apud [i, j] fixum cell {
+        si i > j {
+            itera ab 0‥2 fixum k {
+                total ← total + 1.0
+            }
+        }
+    }
+    redde total
+}
+"#,
+    );
+    expect_decline_causa(&air_errors_from(&result), "unsupported_control");
+    let hir = result.hir.as_ref().expect("typed HIR despite AIR decline");
+    let mut iteras = CountIteras(0);
+    walk_program(&mut iteras, hir);
+    assert_eq!(iteras.0, 2, "conditional nesting stays whole (fail-closed)");
+}
+
+#[test]
+fn sequential_apud_and_ab_share_the_function_budget() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio two_units(tensor<f32, [2, 3]> x) → f32 {
+    varia f32 total ← 0.0
+    itera ex x apud [i, j] fixum cell {
+        total ← total + 1.0
+    }
+    itera ab 0‥4 fixum k {
+        total ← total + 1.0
+    }
+    redde total
+}
+"#,
+    );
+    assert!(
+        result.is_ok(),
+        "apud and itera ab must share the budget within limits: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "both units must be erased");
+    let mut steps = CountBinaryInits(0);
+    walk_program(&mut steps, hir);
+    assert_eq!(steps.0, 10, "lanes add for sequential units (6 + 4)");
+}
+
+#[test]
+fn sequential_units_over_budget_declines_the_exceeding_loop() {
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio too_many(tensor<f32, [8]> x) → f32 {
+    varia f32 total ← 0.0
+    itera ex x apud [i] fixum cell {
+        total ← total + 1.0
+    }
+    itera ab 0‥60 fixum k {
+        total ← total + 1.0
+    }
+    redde total
+}
+"#,
+    );
+    let declined: Vec<_> = air_errors_from(&result)
+        .into_iter()
+        .filter(|err| {
+            err.args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "itera_loop")
+                && err.args.iter().any(|arg| arg.name == "causa")
+        })
+        .collect();
+    assert_eq!(
+        declined.len(),
+        1,
+        "exactly the over-budget loop declines: {:?}",
+        result.diagnostics
+    );
+    assert!(declined[0]
+        .args
+        .iter()
+        .any(|arg| arg.name == "causa" && arg.value == "budget"));
+    let hir = result.hir.as_ref().expect("typed HIR despite the decline");
+    let mut iteras = CountIteras(0);
+    walk_program(&mut iteras, hir);
+    assert_eq!(
+        iteras.0, 1,
+        "the admitted apud is erased; only the declined loop remains whole"
+    );
+}
+
+#[test]
+fn nested_non_air_loop_stays_in_place() {
+    let result = analyze(
+        r#"
+functio host_nested(tensor<f32, [2, 3]> x) → vacuum {
+    itera ex x apud [i, j] fixum cell {
+        itera ab 0‥2 fixum k { }
+    }
+}
+"#,
+    );
+    assert!(
+        result.is_ok(),
+        "non-AIR nested loops must keep ordinary lowering: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    let mut iteras = CountIteras(0);
+    walk_program(&mut iteras, hir);
+    assert_eq!(
+        iteras.0, 2,
+        "non-AIR-lane iteras must remain byte-identical for MIR lowering"
+    );
+}
+
+#[test]
+fn apud_route_a_bounded_lista_nest_admits_product_lanes() {
+    // `apud` x the sibling Route A (full-literal bounded lista, AEU-3 live):
+    // the nest admits with the product lane count like any other unit pair.
+    let result = analyze(
+        r#"
+@ radix lane "air"
+functio nested_lista(tensor<f32, [4]> x) → f32 {
+    varia f32 total ← 0.0
+    fixum lista<f32, 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ lista<f32, 4>
+    itera ex x apud [i] fixum cell {
+        itera ex xs fixum value {
+            total ← total + 1.0
+        }
+    }
+    redde total
+}
+"#,
+    );
+    assert!(
+        air_errors_from(&result).iter().all(|error| {
+            !error
+                .args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "itera_loop")
+        }),
+        "apud x Route A nest must admit within budget: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    assert!(!has_itera(hir), "admitted Route A nest must be erased");
+    let mut steps = CountBinaryInits(0);
+    walk_program(&mut steps, hir);
+    assert_eq!(
+        steps.0, 16,
+        "total lanes must be the product: 4 outer x 4 inner"
+    );
+}
