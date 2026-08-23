@@ -1,0 +1,109 @@
++++
+term = "cape"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "si_stmt", "cape_clause", "secus_clause", "elige_stmt", "casu_elige_clause", "ceterum_clause", "fac_stmt", "iace_stmt", "conversio_expr", "fixum_decl", "binding_decl", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "errors"
+canonical = false
+summary = "Locally-resolved handler recovery: per-arm si/secus/sin cape, whole-construct fac/elige cape, and inline-recovery conversio each resolve their throw to a value of the outer type."
+syntax = "si <cond> { iace } cape <err> { redde <outer value> } secus { … }"
+related = ["cape", "si", "secus", "sin", "fac", "elige", "iace", "conversio"]
+locale = "la"
++++
+
+# =============================================================================
+# receptio — a caught throw resolves inside its own arm or construct.
+# =============================================================================
+#
+# What this teaches:
+#   • per-arm recovery — `cape` wraps one `si`/`secus`/`sin` arm only; the
+#     other arms keep their own values (a chain nests one handler per arm)
+#   • whole-construct recovery — `fac { … } cape err { … }` and
+#     `elige … { … } cape err { … }` wrap the complete construct: any caught
+#     `iace` inside exits to the recovery arm, which resolves to the
+#     construct's outer type
+#   • recovery-arm conversion — `s ↦ numerus ⇥ 0` resolves a failed
+#     conversion in its own expression: the fallback rides the same
+#     recovery contract without a handler
+#
+# Common mistakes:
+#   • letting the recovery arm return a different type than the guarded arm —
+#     recovery resolves to the outer expression's type (a mismatch is a
+#     checked error, not a silent coercion)
+#   • expecting the loop forms to recover per iteration — `dum`/`itera`
+#     `cape` stays out of AIR under the loop-spectrum ruling (see
+#     receptio-decline.fab); this exemplum uses no loops
+#
+# See also: cape, si, secus, sin, fac, elige, iace, conversio
+# =============================================================================
+
+# per-arm then — the cape wraps only the `si` arm; the `secus` arm is bare
+functio bracchium(bivalens malum) → numerus {
+    si malum { iace "x" } cape err { redde 0 } secus { redde 2 }
+}
+
+# per-arm secus — the handler moves to the `secus` arm; the `si` arm is bare
+functio bracchium_secus(bivalens malum) → numerus {
+    si malum {
+        redde 1
+    } secus {
+        iace "x"
+    } cape err {
+        redde 3
+    }
+}
+
+# per-arm sin — the else-if arm carries its own handler; the trailing
+# `secus` arm keeps its value when the chain falls through
+functio bracchium_sin(bivalens primus, bivalens secundus) → numerus {
+    si primus {
+        redde 1
+    } sin secundus {
+        iace "x"
+    } cape err {
+        redde 4
+    } secus {
+        redde 5
+    }
+}
+
+# whole-construct fac — one cape wraps the whole block; a caught iace
+# anywhere inside exits to the recovery arm
+functio conatus(bivalens malum) → numerus {
+    fac {
+        si malum { iace "x" }
+        redde 1
+    } cape err { redde 0 }
+}
+
+# whole-construct elige — one cape wraps the whole branch construct; a
+# throwing casu arm exits to the recovery arm, ceterum keeps its value
+functio electio(bivalens malum) → numerus {
+    elige malum {
+        casu verum { iace "x" }
+        ceterum { redde 2 }
+    } cape err { redde 0 }
+}
+
+# recovery-arm conversion — the inline ⇥ fallback resolves a failed
+# conversion inside its own expression (no handler needed)
+functio lectio(textus s) → numerus {
+    fixum numerus v ← s ↦ numerus ⇥ 0
+    redde v
+}
+
+incipit {
+    # per-arm: kept arms keep their values, throwing arms resolve to 0
+    nota bracchium(falsum)
+    nota bracchium(verum)
+    nota bracchium_secus(verum)
+    nota bracchium_secus(falsum)
+    nota bracchium_sin(falsum, verum)
+    nota bracchium_sin(falsum, falsum)
+    # whole-construct: caught throws exit to the recovery arm
+    nota conatus(verum)
+    nota electio(verum)
+    nota electio(falsum)
+    # conversion: success passes through, failure resolves to the fallback
+    nota lectio("7")
+    nota lectio("non numerus")
+}

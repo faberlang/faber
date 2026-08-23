@@ -1,0 +1,7 @@
+# Reject oracle for cape AIR Tier 0.5 declines.
+# Tokens: stable diagnostic identities (faber check --air output); one per line.
+SEM059:dum_loop
+SEM059:itera_loop
+SEM059:recovery_type_mismatch
+SEM059:rethrow_in_recovery
+SEM059:deferred_local_init
