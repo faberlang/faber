@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 6,
-    "analyzable": 300
+    "analyzable": 301
   },
   "terms": [
     {
@@ -217,7 +217,7 @@
       "term": "↦",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 12
+      "analyzable": 13
     },
     {
       "term": "copia",
@@ -367,7 +367,7 @@
       "term": "f16",
       "rule": "existing-home",
       "capable": 0,
-      "analyzable": 2
+      "analyzable": 1
     },
     {
       "term": "fient",
@@ -1021,7 +1021,7 @@
       "term": "summa",
       "rule": "existing-home",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 2
     },
     {
       "term": "tacet",

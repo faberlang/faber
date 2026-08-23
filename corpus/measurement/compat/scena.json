@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 255,
-    "analyzable": 300
+    "capable": 256,
+    "analyzable": 301
   },
   "terms": [
     {
@@ -216,8 +216,8 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 12,
-      "analyzable": 12
+      "capable": 13,
+      "analyzable": 13
     },
     {
       "term": "copia",
@@ -367,7 +367,7 @@
       "term": "f16",
       "rule": "existing-home",
       "capable": 0,
-      "analyzable": 2
+      "analyzable": 1
     },
     {
       "term": "fient",
@@ -1021,7 +1021,7 @@
       "term": "summa",
       "rule": "existing-home",
       "capable": 1,
-      "analyzable": 1
+      "analyzable": 2
     },
     {
       "term": "tacet",
