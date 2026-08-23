@@ -1514,6 +1514,69 @@ fn lowers_array_itera_ex_and_de_to_index_loops() {
 }
 
 #[test]
+fn borrowed_receiver_itera_ex_declines_before_iterator_mir_lowering() {
+    // MRL-1: passing pins of today's decline for borrowed receivers. The
+    // decline fails lowering outright, so the pin asserts the MIR error
+    // message itself; MRL-2 flips these when control.rs classification lands.
+    let declined = |source: &str| -> Vec<String> {
+        let mut unit = analyze(source);
+        lower_analyzed_unit(&mut unit, Default::default())
+            .expect_err("borrowed-receiver itera ex must decline before the MRL-2 fix")
+            .into_iter()
+            .map(|error| error.message)
+            .collect()
+    };
+
+    let list_errors = declined(
+        r"functio summa(de lista<numerus> xs) → numerus {
+  varia numerus total ← 0
+  itera ex xs fixum n {
+    total ← total + n
+  }
+  redde total
+}",
+    );
+    assert!(
+        list_errors.iter().any(|message| message.contains("itera collection before iterator MIR lowering")),
+        "itera ex over a de lista param must carry the decline: {list_errors:?}"
+    );
+
+    let field_errors = declined(
+        r"genus Crater {
+  lista<numerus> mensurae
+}
+
+functio summaCrateris(de Crater c) → numerus {
+  varia numerus total ← 0
+  itera ex c.mensurae fixum n {
+    total ← total + n
+  }
+  redde total
+}",
+    );
+    assert!(
+        field_errors
+            .iter()
+            .any(|message| message.contains("itera collection before iterator MIR lowering")),
+        "itera ex over a de struct param field must carry the decline: {field_errors:?}"
+    );
+
+    let map_errors = declined(
+        r"functio summaPondereum(de tabula<textus, numerus> pondera) → numerus {
+  varia numerus total ← 0
+  itera ex pondera fixum v {
+    total ← total + v
+  }
+  redde total
+}",
+    );
+    assert!(
+        map_errors.iter().any(|message| message.contains("itera collection before iterator MIR lowering")),
+        "itera ex over a de tabula param must carry the decline: {map_errors:?}"
+    );
+}
+
+#[test]
 fn tensor_itera_ex_rank1_lowers_to_literal_bound_index_loop() {
     let source = r"functio sumTensor(tensor<numerus, [8]> t) → numerus {
   varia numerus total ← 0
