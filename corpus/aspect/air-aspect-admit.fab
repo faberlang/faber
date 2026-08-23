@@ -1,0 +1,45 @@
++++
+term = "air-aspect-admit"
+kind = "annotation"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "binding_decl", "itera_stmt", "range_expr", "range_tail", "redde_stmt", "expression", "literal", "nota_stmt"]
+category = "lane"
+canonical = false
+summary = "Shapes the AIR proof-aspect report admits: a literal-range itera ab loop (unroll-equivalence obligation) and a pure scalar let/return function (gate-purity obligation)."
+syntax = "itera ab <literal range> fixum <ident>; return <path>"
+related = ["itera", "ab", "air-aspect-decline"]
+locale = "en"
++++
+
+# =============================================================================
+# air-aspect-admit — admitted AIR proof-aspect shapes.
+# =============================================================================
+#
+# What this teaches:
+#   • the aspect report is lane-agnostic: a literal `itera ab` range carries
+#     concrete lane facts, so the report records an UnrollEquivalence
+#     obligation (machine-checked-structural evidence class — no
+#     semantic-preservation or numeric claim)
+#   • a body of immutable bindings ending in `return <path>` sits inside the
+#     v1 scalar/let/call subset, so the report records a GatePurity obligation
+#
+# Common mistakes:
+#   • reading an admitted record as a proven theorem — recognition carries the
+#     obligation; proof verdicts come from the Lean checker
+#   • routing these shapes through an `@ radix lane "air"` annotation when the
+#     target backend drops AIR-lane functions — the report sees the checked
+#     HIR of ordinary declarations
+#
+# See also: itera, ab, air-aspect-decline
+# =============================================================================
+
+# Admitted Line 1 shape: literal range gives concrete lanes (route ab, 4 lanes).
+fn unroll_admit() → vacuum {
+    for range 0‥4 const i { }
+}
+
+# Admitted Line 3 shape: immutable let chain + returned path — inside the
+# scalar/let/call purity subset, no IO or monadic effect forms.
+fn purum(int x) → int {
+    const int s ← x
+    return s
+}

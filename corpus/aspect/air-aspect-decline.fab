@@ -1,0 +1,41 @@
++++
+term = "air-aspect-decline"
+kind = "annotation"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "binding_decl", "itera_stmt", "range_expr", "range_tail", "redde_stmt", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "lane"
+canonical = false
+summary = "Shapes the aspect report declines: a non-literal itera ab range emits no unroll-equivalence obligation, and a binary-arithmetic return leaves the scalar/let/call purity subset."
+syntax = "itera ab <runtime range>; return <a + b>"
+related = ["radix-lane", "itera", "ab", "air-aspect-admit"]
+locale = "en"
++++
+
+# =============================================================================
+# air-aspect-decline — declined AIR proof-aspect shapes.
+# =============================================================================
+#
+# What this teaches:
+#   • a runtime `itera ab` range has no concrete lane facts, so the report
+#     emits no UnrollEquivalence obligation (decline paths emit none)
+#   • `return a + b` uses binary arithmetic outside the v1 scalar/let/call
+#     subset, so the report emits no GatePurity obligation
+#
+# Common mistakes:
+#   • expecting a declined shape to appear as a failed proof — a decline is
+#     silence, not a NotProven verdict
+#
+# See also: radix-lane, itera, ab, air-aspect-admit
+# =============================================================================
+
+# Declined Line 1 shape: the range bounds are runtime values, so no concrete
+# lanes exist and no unroll obligation is recorded.
+fn deambulatio(int n) → int {
+    const int summa ← 0
+    for range n‥4 const i { }
+    return summa
+}
+
+# Declined Line 3 shape: binary arithmetic is outside the v1 purity subset.
+fn additio(int a, int b) → int {
+    return a + b
+}

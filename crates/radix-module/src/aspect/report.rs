@@ -23,6 +23,10 @@ use rustc_hash::{FxHashMap, FxHashSet};
 #[path = "report_test.rs"]
 mod tests;
 
+#[cfg(test)]
+#[path = "report_corpus_test.rs"]
+mod corpus_tests;
+
 /// Build a deterministic aspect report from checked HIR.
 ///
 /// The caller provides the semantic type table so aspect recognition can rely on
