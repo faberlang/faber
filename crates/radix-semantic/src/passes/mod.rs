@@ -214,3 +214,7 @@ mod visibility_annotation_test;
 #[cfg(test)]
 #[path = "summa_disambiguation_test.rs"]
 mod summa_disambiguation_test;
+
+#[cfg(test)]
+#[path = "first_match_contract_test.rs"]
+mod first_match_contract_test;

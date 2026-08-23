@@ -1102,6 +1102,10 @@ mod comma_law_matrix_test;
 mod summa_disambiguation_test;
 
 #[cfg(test)]
+#[path = "first_match_test.rs"]
+mod first_match_test;
+
+#[cfg(test)]
 #[path = "union_commune_test.rs"]
 mod union_commune_test;
 
