@@ -66,3 +66,410 @@ fn unbounded_octeti_primitive_stays_opaque() {
         .expect("octeti layout fact");
     assert_eq!(layout.kind, MirLayoutKind::OpaqueHandle);
 }
+
+// MLC-2: the fallthrough law and the pin table — the layout census made
+// permanent.
+//
+// Every `Type` variant maps to an intended bucket (physical / opaque
+// aggregate / opaque-by-design / compiler-internal; `Alias` is transparent),
+// and every sized-numeric `(family, width)` combination maps to a named arm
+// or a loud resolver error. The exhaustive matches below are the
+// compile-time guards: a new variant or width without a row here stops
+// compilation, and the runtime assertions pin the corrected census
+// (14 physical / 6 opaque-agg / 24 OpaqueHandle-by-design / 5 internal).
+
+use radix_types::{
+    DefId, FuncSig, InferVar, InstansPrecision, MarkerFamily, NumericWidth, SemanticMutability,
+};
+use radix_lexer::Symbol as LexSymbol;
+use rustc_hash::FxHashMap;
+
+/// The four census buckets (goal census table; the sized-numeric row is a
+/// Physical census seat — its unmapped widths are loud errors, not opaques).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Bucket {
+    Physical,
+    OpaqueAggregate,
+    OpaqueHandle,
+    Internal,
+}
+
+/// Intended bucket for every `Type` variant. The exhaustive match is the
+/// audit made permanent: a new variant without a row here fails to compile.
+/// `Alias` is transparent and is refused a census seat on purpose.
+fn intended_bucket(ty: &Type) -> Bucket {
+    match ty {
+        Type::Primitive(
+            Primitive::Bivalens
+            | Primitive::Numerus
+            | Primitive::Fractus
+            | Primitive::Vacuum
+            | Primitive::Numquam,
+        ) => Bucket::Physical,
+        Type::Primitive(
+            Primitive::Ascii
+            | Primitive::Textus
+            | Primitive::Nihil
+            | Primitive::Ignotum
+            | Primitive::Octeti
+            | Primitive::Regex
+            | Primitive::Json
+            | Primitive::Valor
+            | Primitive::Instans,
+        ) => Bucket::OpaqueHandle,
+        Type::SizedNumeric(_, _) | Type::ModularWord(_) => Bucket::Physical,
+        Type::Tensor(_, _) | Type::Vector(_, _) | Type::Matrix(_, _) | Type::Atomic(_) => {
+            Bucket::Physical
+        }
+        Type::Record(_) | Type::Struct(_) | Type::Tuple(_) => Bucket::Physical,
+        Type::Array(_)
+        | Type::Map(_, _)
+        | Type::Set(_)
+        | Type::Option(_)
+        | Type::Enum(_)
+        | Type::Union(_) => Bucket::OpaqueAggregate,
+        Type::Param(_)
+        | Type::Infer(_)
+        | Type::InferUnion(_)
+        | Type::MarkerHole { .. }
+        | Type::Error => Bucket::Internal,
+        Type::Alias(_, _) => panic!("alias is transparent; pinned separately, not a census row"),
+        Type::BoundedArray { .. }
+        | Type::BoundedTextus { .. }
+        | Type::BoundedAscii { .. }
+        | Type::BoundedOcteti { .. }
+        | Type::Sparsa(_, _)
+        | Type::Intervallum(_)
+        | Type::SizedInstans(_)
+        | Type::Promissum(_)
+        | Type::PromissumFailable(_, _)
+        | Type::Cursor(_)
+        | Type::AsyncCursor(_, _)
+        | Type::Ref(_, _)
+        | Type::Interface(_)
+        | Type::Func(_)
+        | Type::Applied(_, _) => Bucket::OpaqueHandle,
+    }
+}
+
+/// One representative `Type` per census row (49 rows: 14 Primitive-expanded
+/// variants + 35 other variants; `Alias` excluded). Nested ids are interned
+/// into `types` so the rows are resolvable.
+fn census_rows(types: &mut TypeTable) -> Vec<Type> {
+    let int64_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let int32_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    let float64_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
+    let cap = types.intern_index(IndexExpr::Literal(8));
+    let dynamic_cap = types.intern_index(IndexExpr::Unspecified);
+    let tensor_shape = types.intern_index(IndexExpr::Literal(1));
+    let vector_width = tensor_shape;
+    let two = types.intern_index(IndexExpr::Literal(2));
+    let matrix_shape = types.intern_index(IndexExpr::Tuple(vec![two, two]));
+
+    let mut rows = Vec::with_capacity(49);
+    // Physical (14): the five physical primitives, the sized/word numerics,
+    // the device-class rows, and the physical aggregates.
+    for prim in [
+        Primitive::Bivalens,
+        Primitive::Numerus,
+        Primitive::Fractus,
+        Primitive::Vacuum,
+        Primitive::Numquam,
+    ] {
+        rows.push(Type::Primitive(prim));
+    }
+    rows.push(Type::SizedNumeric(Primitive::Numerus, NumericWidth::I64));
+    rows.push(Type::ModularWord(NumericWidth::U32));
+    rows.push(Type::Tensor(float64_ty, tensor_shape));
+    rows.push(Type::Vector(float64_ty, vector_width));
+    rows.push(Type::Matrix(float64_ty, matrix_shape));
+    rows.push(Type::Atomic(int32_ty));
+    rows.push(Type::Record(FxHashMap::from_iter([(LexSymbol(1), int64_ty)])));
+    rows.push(Type::Struct(DefId(10)));
+    rows.push(Type::Tuple(vec![int64_ty]));
+    // Opaque aggregate (6).
+    rows.push(Type::Array(float64_ty));
+    rows.push(Type::Map(int64_ty, float64_ty));
+    rows.push(Type::Set(float64_ty));
+    rows.push(Type::Option(float64_ty));
+    rows.push(Type::Enum(DefId(11)));
+    rows.push(Type::Union(vec![int64_ty, float64_ty]));
+    // OpaqueHandle by design (24): the nine non-physical primitives plus the
+    // fifteen opaque carriers. `octeti<N>` with a literal capacity refines to
+    // a byte `DeviceView` (pinned by MLC-1); its census seat here is the
+    // runtime-length state, which stays opaque by design (MLC-6).
+    for prim in [
+        Primitive::Ascii,
+        Primitive::Textus,
+        Primitive::Nihil,
+        Primitive::Ignotum,
+        Primitive::Octeti,
+        Primitive::Regex,
+        Primitive::Json,
+        Primitive::Valor,
+        Primitive::Instans,
+    ] {
+        rows.push(Type::Primitive(prim));
+    }
+    rows.push(Type::BoundedArray {
+        element: float64_ty,
+        capacity: cap,
+    });
+    rows.push(Type::BoundedTextus { capacity: cap });
+    rows.push(Type::BoundedAscii { capacity: cap });
+    rows.push(Type::BoundedOcteti {
+        capacity: dynamic_cap,
+    });
+    rows.push(Type::Sparsa(float64_ty, tensor_shape));
+    rows.push(Type::Intervallum(float64_ty));
+    rows.push(Type::SizedInstans(InstansPrecision::Millis));
+    rows.push(Type::Promissum(float64_ty));
+    rows.push(Type::PromissumFailable(float64_ty, int64_ty));
+    rows.push(Type::Cursor(float64_ty));
+    rows.push(Type::AsyncCursor(float64_ty, int64_ty));
+    rows.push(Type::Ref(SemanticMutability::Immutable, float64_ty));
+    rows.push(Type::Interface(DefId(12)));
+    rows.push(Type::Func(FuncSig {
+        type_params: vec![],
+        type_param_constraints: vec![],
+        params: vec![],
+        ret: float64_ty,
+        err: None,
+        is_async: false,
+        is_generator: false,
+    }));
+    rows.push(Type::Applied(int64_ty, vec![float64_ty]));
+    // Internal (5): no layout row.
+    rows.push(Type::Param(LexSymbol(2)));
+    rows.push(Type::Infer(InferVar(0)));
+    rows.push(Type::InferUnion(InferVar(1)));
+    rows.push(Type::MarkerHole {
+        family: MarkerFamily::Numerus,
+        var: InferVar(2),
+    });
+    rows.push(Type::Error);
+    assert_eq!(rows.len(), 49, "the census must stay 49 Primitive-expanded rows");
+    rows
+}
+
+#[test]
+fn pin_table_census_is_49_rows_across_the_four_buckets() {
+    let mut types = TypeTable::new();
+    let rows = census_rows(&mut types);
+
+    let mut physical = 0;
+    let mut aggregate = 0;
+    let mut opaque = 0;
+    let mut internal = 0;
+    for ty in &rows {
+        match intended_bucket(ty) {
+            Bucket::Physical => physical += 1,
+            Bucket::OpaqueAggregate => aggregate += 1,
+            Bucket::OpaqueHandle => opaque += 1,
+            Bucket::Internal => internal += 1,
+        }
+    }
+    assert_eq!(physical, 14, "physical census rows");
+    assert_eq!(aggregate, 6, "opaque-aggregate census rows");
+    assert_eq!(opaque, 24, "opaque-by-design census rows");
+    assert_eq!(internal, 5, "internal census rows");
+}
+
+/// The resolver's nominal outcome agrees with each census bucket: opaque
+/// seats resolve opaque, aggregate seats resolve aggregates, physical seats
+/// resolve concrete layouts, and internal seats carry no layout row.
+#[test]
+fn pin_table_buckets_agree_with_the_resolver_on_nominal_rows() {
+    let mut types = TypeTable::new();
+    let rows = census_rows(&mut types);
+    // Intern every census row first: the layout table is built once over the
+    // complete arena, so row types are present when the resolver runs.
+    let interned: Vec<(radix_types::TypeId, Bucket)> = rows
+        .iter()
+        .map(|ty| (types.intern(ty.clone()), intended_bucket(ty)))
+        .collect();
+    let table = MirLayoutTable::from_types(&types);
+
+    for (id, bucket) in interned {
+        match bucket {
+            Bucket::OpaqueHandle => {
+                let layout = table
+                    .layout_for_type(MirType::semantic(id))
+                    .expect("opaque seat must resolve");
+                assert_eq!(
+                    layout.kind,
+                    MirLayoutKind::OpaqueHandle,
+                    "opaque seat resolved off-bucket"
+                );
+            }
+            Bucket::OpaqueAggregate => {
+                let layout = table
+                    .layout_for_type(MirType::semantic(id))
+                    .expect("aggregate seat must resolve");
+                assert!(
+                    matches!(layout.kind, MirLayoutKind::Aggregate(_)),
+                    "aggregate seat resolved off-bucket: {layout:?}"
+                );
+            }
+            Bucket::Physical => {
+                let layout = table
+                    .layout_for_type(MirType::semantic(id))
+                    .expect("physical seat must resolve");
+                assert!(
+                    !matches!(layout.kind, MirLayoutKind::OpaqueHandle),
+                    "physical seat must not resolve opaque: {layout:?}"
+                );
+            }
+            Bucket::Internal => {
+                table
+                    .layout_for_type(MirType::semantic(id))
+                    .expect_err("internal seats carry no layout row");
+            }
+        }
+    }
+}
+
+#[test]
+fn alias_is_transparent_and_not_a_census_row() {
+    let mut types = TypeTable::new();
+    let float64_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
+    let alias = Type::Alias(DefId(20), float64_ty);
+
+    let refused = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        intended_bucket(&alias)
+    }));
+    assert!(refused.is_err(), "alias must not occupy a census bucket");
+
+    let alias_ty = types.intern(alias);
+    let table = MirLayoutTable::from_types(&types);
+    let layout = table
+        .layout_for_type(MirType::semantic(alias_ty))
+        .expect("alias resolves through its target");
+    assert_eq!(layout.kind, MirLayoutKind::Scalar(MirScalarLayout::F64));
+}
+
+/// Sized-numeric outcome under the fallthrough law.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SizedNumericOutcome {
+    PhysicalScalar,
+    LoudError,
+}
+/// Sized-numeric width sub-table: for each width, the outcome on `numerus`
+/// and on `fractus`. A new width lands a row here or the match stops
+/// compiling.
+fn width_sub_table(width: NumericWidth) -> (SizedNumericOutcome, SizedNumericOutcome) {
+    match width {
+        NumericWidth::I8
+        | NumericWidth::I16
+        | NumericWidth::I32
+        | NumericWidth::I64
+        | NumericWidth::U8
+        | NumericWidth::U16
+        | NumericWidth::U32
+        | NumericWidth::U64 => (
+            SizedNumericOutcome::PhysicalScalar,
+            SizedNumericOutcome::LoudError,
+        ),
+        NumericWidth::F16 | NumericWidth::F32 | NumericWidth::F64 => (
+            SizedNumericOutcome::LoudError,
+            SizedNumericOutcome::PhysicalScalar,
+        ),
+        NumericWidth::BF16 => (
+            SizedNumericOutcome::LoudError,
+            SizedNumericOutcome::LoudError,
+        ),
+    }
+}
+
+fn all_numeric_widths() -> [NumericWidth; 12] {
+    [
+        NumericWidth::I8,
+        NumericWidth::I16,
+        NumericWidth::I32,
+        NumericWidth::I64,
+        NumericWidth::U8,
+        NumericWidth::U16,
+        NumericWidth::U32,
+        NumericWidth::U64,
+        NumericWidth::F16,
+        NumericWidth::BF16,
+        NumericWidth::F32,
+        NumericWidth::F64,
+    ]
+}
+
+fn resolve_outcome(table: &MirLayoutTable, ty: radix_types::TypeId) -> SizedNumericOutcome {
+    match table.layout_for_type(MirType::semantic(ty)) {
+        Ok(layout) => match layout.kind {
+            MirLayoutKind::Scalar(_) => SizedNumericOutcome::PhysicalScalar,
+            other => panic!("sized numeric resolved to a non-scalar layout: {other:?}"),
+        },
+        Err(err) => {
+            assert_eq!(
+                err.issue, "mir_layout_missing_type_fact",
+                "loud error issue: {}",
+                err.message
+            );
+            assert!(
+                err.message.contains("has no named layout arm"),
+                "fallthrough-law message: {}",
+                err.message
+            );
+            SizedNumericOutcome::LoudError
+        }
+    }
+}
+
+/// Every one of the 24 sized-numeric combinations matches the sub-table: a
+/// named scalar arm or a loud `mir_layout_missing_type_fact` error naming the
+/// width. This is the fallthrough law at runtime.
+#[test]
+fn every_sized_numeric_width_matches_its_sub_table_row() {
+    for width in all_numeric_widths() {
+        let mut types = TypeTable::new();
+        let numerus = types.sized_numeric(Primitive::Numerus, width);
+        let fractus = types.sized_numeric(Primitive::Fractus, width);
+        let table = MirLayoutTable::from_types(&types);
+        let (numerus_outcome, fractus_outcome) = width_sub_table(width);
+        let numerus_marker = width.faber_marker();
+        assert_eq!(
+            resolve_outcome(&table, numerus),
+            numerus_outcome,
+            "numerus<{numerus_marker}>"
+        );
+        assert_eq!(
+            resolve_outcome(&table, fractus),
+            fractus_outcome,
+            "fractus<{numerus_marker}>"
+        );
+    }
+}
+
+/// The named pending-error rows: `fractus<bf16>` stays loud until bf16 owns
+/// `MirScalarLayout::BF16`, and family-mismatch widths are loud too.
+#[test]
+fn unmapped_sized_numerics_error_loudly_with_the_width_named() {
+    for (prim, width) in [
+        (Primitive::Fractus, NumericWidth::BF16),
+        (Primitive::Numerus, NumericWidth::F32),
+        (Primitive::Fractus, NumericWidth::U32),
+    ] {
+        let mut types = TypeTable::new();
+        let ty = types.sized_numeric(prim, width);
+        let table = MirLayoutTable::from_types(&types);
+        let err = table
+            .layout_for_type(MirType::semantic(ty))
+            .expect_err("unmapped sized numeric must not resolve a layout");
+        assert_eq!(
+            err.issue, "mir_layout_missing_type_fact",
+            "loud error issue: {}",
+            err.message
+        );
+        let marker = width.faber_marker();
+        assert!(
+            err.message.contains(marker),
+            "width named in the message: {}",
+            err.message
+        );
+    }
+}

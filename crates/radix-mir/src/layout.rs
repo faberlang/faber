@@ -270,10 +270,39 @@ pub struct MirLayoutError {
     pub ty: Option<TypeId>,
 }
 
+/// Resolution of one `Type` variant under the layout resolver.
+///
+/// Distinct from `Option<MirLayoutKind>` so an unmapped sized numeric is a
+/// *loud* missing fact (the fallthrough law) instead of a silent no-row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LayoutResolution {
+    Resolved(MirLayoutKind),
+    /// Compiler-internal type — no layout row and no error (`Param`, `Infer`,
+    /// holes, `Error`).
+    NoLayout,
+    /// A type that fails the layout resolver loudly; the message names the
+    /// offending family/width.
+    MissingFact(String),
+}
+
+impl LayoutResolution {
+    /// Continue with a resolved kind; `NoLayout` / `MissingFact` propagate.
+    fn then(self, f: impl FnOnce(MirLayoutKind) -> LayoutResolution) -> LayoutResolution {
+        match self {
+            LayoutResolution::Resolved(kind) => f(kind),
+            other => other,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MirLayoutTable {
     layouts: Vec<MirLayout>,
     by_type: FxHashMap<TypeId, MirLayoutId>,
+    /// Named missing-fact rows (fallthrough law): an unmapped sized numeric
+    /// records its width-named message here instead of a silent no-row, so
+    /// resolving it fails loudly with `mir_layout_missing_type_fact`.
+    missing_facts: FxHashMap<TypeId, String>,
 }
 
 impl MirLayoutTable {
@@ -289,8 +318,14 @@ impl MirLayoutTable {
                 reason = "TypeId is a u32 arena index by design"
             )]
             let ty = TypeId(index as u32);
-            if let Some(kind) = layout_kind_for_type(types, ty, &mut memo, &mut visiting) {
-                table.insert_type_layout(ty, kind);
+            match layout_kind_for_type(types, ty, &mut memo, &mut visiting) {
+                LayoutResolution::Resolved(kind) => {
+                    table.insert_type_layout(ty, kind);
+                }
+                LayoutResolution::MissingFact(message) => {
+                    table.missing_facts.insert(ty, message);
+                }
+                LayoutResolution::NoLayout => {}
             }
         }
         table
@@ -299,14 +334,25 @@ impl MirLayoutTable {
     /// # Errors
     /// Returns an error when validation or type resolution fails. See [`MirLayoutError`].
     pub fn layout_for_type(&self, ty: MirType) -> Result<&MirLayout, MirLayoutError> {
+        let semantic = ty.semantic_id();
         let id = ty
             .layout_id()
-            .or_else(|| self.by_type.get(&ty.semantic_id()).copied())
-            .ok_or_else(|| MirLayoutError {
-                message: format!("missing layout fact for ty#{}", ty.semantic_id().0),
-                issue: "mir_layout_missing_type_fact",
-                id: None,
-                ty: Some(ty.semantic_id()),
+            .or_else(|| self.by_type.get(&semantic).copied())
+            .ok_or_else(|| match self.missing_facts.get(&semantic) {
+                // Fallthrough law: a named missing fact (an unmapped sized
+                // numeric) is loud, with the family/width named in the message.
+                Some(message) => MirLayoutError {
+                    message: message.clone(),
+                    issue: "mir_layout_missing_type_fact",
+                    id: None,
+                    ty: Some(semantic),
+                },
+                None => MirLayoutError {
+                    message: format!("missing layout fact for ty#{}", semantic.0),
+                    issue: "mir_layout_missing_type_fact",
+                    id: None,
+                    ty: Some(semantic),
+                },
             })?;
         self.layout(id).ok_or_else(|| MirLayoutError {
             message: format!("missing layout row #{}", id.0),
@@ -478,55 +524,53 @@ impl MirScalarLayout {
 fn layout_kind_for_type(
     types: &TypeTable,
     ty: TypeId,
-    memo: &mut FxHashMap<TypeId, Option<MirLayoutKind>>,
+    memo: &mut FxHashMap<TypeId, LayoutResolution>,
     visiting: &mut FxHashSet<TypeId>,
-) -> Option<MirLayoutKind> {
+) -> LayoutResolution {
     if let Some(cached) = memo.get(&ty) {
-        return *cached;
+        return cached.clone();
     }
     // Alias-cycle guard: path-local membership; remove after the recursive walk.
     if !visiting.insert(ty) {
-        memo.insert(ty, None);
-        return None;
+        memo.insert(ty, LayoutResolution::NoLayout);
+        return LayoutResolution::NoLayout;
     }
     let kind = match types.get(ty) {
-        Type::Primitive(Primitive::Bivalens) => Some(MirLayoutKind::Scalar(MirScalarLayout::Bool)),
-        Type::Primitive(Primitive::Numerus) => Some(MirLayoutKind::Scalar(MirScalarLayout::I64)),
-        Type::Primitive(Primitive::Fractus) => Some(MirLayoutKind::Scalar(MirScalarLayout::F64)),
-        Type::SizedNumeric(Primitive::Numerus, width) => int_layout(*width),
+        Type::Primitive(Primitive::Bivalens) => {
+            LayoutResolution::Resolved(MirLayoutKind::Scalar(MirScalarLayout::Bool))
+        }
+        Type::Primitive(Primitive::Numerus) => {
+            LayoutResolution::Resolved(MirLayoutKind::Scalar(MirScalarLayout::I64))
+        }
+        Type::Primitive(Primitive::Fractus) => {
+            LayoutResolution::Resolved(MirLayoutKind::Scalar(MirScalarLayout::F64))
+        }
+        // Fallthrough law: every sized-numeric combination resolves through a
+        // named arm or errors loudly; nothing reaches `OpaqueHandle` silently.
+        Type::SizedNumeric(prim, width) => sized_numeric_layout(*prim, *width),
         Type::ModularWord(width) => int_layout(*width),
-        Type::SizedNumeric(Primitive::Fractus, NumericWidth::F16) => {
-            Some(MirLayoutKind::Scalar(MirScalarLayout::F16))
-        }
-        Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32) => {
-            Some(MirLayoutKind::Scalar(MirScalarLayout::F32))
-        }
-        Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => {
-            Some(MirLayoutKind::Scalar(MirScalarLayout::F64))
-        }
-        Type::Primitive(Primitive::Vacuum) => Some(MirLayoutKind::Void),
-        Type::Primitive(Primitive::Numquam) => Some(MirLayoutKind::Never),
+        Type::Primitive(Primitive::Vacuum) => LayoutResolution::Resolved(MirLayoutKind::Void),
+        Type::Primitive(Primitive::Numquam) => LayoutResolution::Resolved(MirLayoutKind::Never),
         Type::Alias(_, target) => layout_kind_for_type(types, *target, memo, visiting),
         Type::Param(_)
         | Type::Infer(_)
         | Type::InferUnion(_)
         | Type::MarkerHole { .. }
-        | Type::Error => None,
-        Type::SizedNumeric(_, _) => Some(MirLayoutKind::OpaqueHandle),
-        Type::Array(_) => Some(opaque_aggregate(MirAggregateFamily::Array)),
-        Type::Map(_, _) => Some(opaque_aggregate(MirAggregateFamily::Map)),
-        Type::Record(_) => Some(physical_aggregate(MirAggregateFamily::Record)),
-        Type::Set(_) => Some(opaque_aggregate(MirAggregateFamily::Set)),
+        | Type::Error => LayoutResolution::NoLayout,
+        Type::Array(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Array)),
+        Type::Map(_, _) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Map)),
+        Type::Record(_) => LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Record)),
+        Type::Set(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Set)),
         Type::Tensor(element, shape) => tensor_layout_kind(types, *element, *shape, memo, visiting),
         Type::Vector(element, width) => vector_layout_kind(types, *element, *width, memo, visiting),
         Type::Matrix(element, shape) => matrix_layout_kind(types, *element, *shape, memo, visiting),
         Type::Atomic(element) => atomic_layout_kind(types, *element, memo, visiting),
         Type::BoundedOcteti { capacity } => bounded_octeti_layout_kind(types, *capacity),
-        Type::Option(_) => Some(opaque_aggregate(MirAggregateFamily::Option)),
-        Type::Struct(_) => Some(physical_aggregate(MirAggregateFamily::Struct)),
-        Type::Enum(_) => Some(opaque_aggregate(MirAggregateFamily::Enum)),
-        Type::Union(_) => Some(opaque_aggregate(MirAggregateFamily::Union)),
-        Type::Tuple(_) => Some(physical_aggregate(MirAggregateFamily::Tuple)),
+        Type::Option(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Option)),
+        Type::Struct(_) => LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Struct)),
+        Type::Enum(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Enum)),
+        Type::Union(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Union)),
+        Type::Tuple(_) => LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Tuple)),
         Type::Primitive(
             Primitive::Ascii
             | Primitive::Textus
@@ -551,29 +595,30 @@ fn layout_kind_for_type(
         | Type::Applied(_, _)
         | Type::BoundedArray { .. }
         | Type::BoundedTextus { .. }
-        | Type::BoundedAscii { .. } => Some(MirLayoutKind::OpaqueHandle),
+        | Type::BoundedAscii { .. } => LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle),
     };
     visiting.remove(&ty);
-    memo.insert(ty, kind);
+    memo.insert(ty, kind.clone());
     kind
 }
 
 fn atomic_layout_kind(
     types: &TypeTable,
     element_ty: TypeId,
-    memo: &mut FxHashMap<TypeId, Option<MirLayoutKind>>,
+    memo: &mut FxHashMap<TypeId, LayoutResolution>,
     visiting: &mut FxHashSet<TypeId>,
-) -> Option<MirLayoutKind> {
+) -> LayoutResolution {
     if !radix_types::is_atomic_element_type(types, element_ty) {
-        return Some(MirLayoutKind::OpaqueHandle);
+        return LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle);
     }
-    let element_layout = layout_kind_for_type(types, element_ty, memo, visiting)?;
-    let MirLayoutKind::Scalar(scalar_element) = element_layout else {
-        return Some(MirLayoutKind::OpaqueHandle);
-    };
-    Some(MirLayoutKind::Atomic(MirAtomicLayout {
-        element: scalar_element,
-    }))
+    layout_kind_for_type(types, element_ty, memo, visiting).then(|element_layout| {
+        let MirLayoutKind::Scalar(scalar_element) = element_layout else {
+            return LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle);
+        };
+        LayoutResolution::Resolved(MirLayoutKind::Atomic(MirAtomicLayout {
+            element: scalar_element,
+        }))
+    })
 }
 
 fn opaque_aggregate(family: MirAggregateFamily) -> MirLayoutKind {
@@ -594,43 +639,45 @@ fn vector_layout_kind(
     types: &TypeTable,
     element_ty: TypeId,
     width: IndexId,
-    memo: &mut FxHashMap<TypeId, Option<MirLayoutKind>>,
+    memo: &mut FxHashMap<TypeId, LayoutResolution>,
     visiting: &mut FxHashSet<TypeId>,
-) -> Option<MirLayoutKind> {
-    let element_layout = layout_kind_for_type(types, element_ty, memo, visiting)?;
-    let MirLayoutKind::Scalar(scalar_element) = element_layout else {
-        return Some(MirLayoutKind::OpaqueHandle);
-    };
-    let Some(width) = crate::vector_width::literal_vector_width(width, types) else {
-        return Some(MirLayoutKind::OpaqueHandle);
-    };
-    Some(MirLayoutKind::DeviceVector(MirDeviceVectorLayout {
-        element: scalar_element,
-        width,
-        align: device_vector_align(scalar_element, width),
-    }))
+) -> LayoutResolution {
+    layout_kind_for_type(types, element_ty, memo, visiting).then(|element_layout| {
+        let MirLayoutKind::Scalar(scalar_element) = element_layout else {
+            return LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle);
+        };
+        let Some(width) = crate::vector_width::literal_vector_width(width, types) else {
+            return LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle);
+        };
+        LayoutResolution::Resolved(MirLayoutKind::DeviceVector(MirDeviceVectorLayout {
+            element: scalar_element,
+            width,
+            align: device_vector_align(scalar_element, width),
+        }))
+    })
 }
 
 fn matrix_layout_kind(
     types: &TypeTable,
     element_ty: TypeId,
     shape: IndexId,
-    memo: &mut FxHashMap<TypeId, Option<MirLayoutKind>>,
+    memo: &mut FxHashMap<TypeId, LayoutResolution>,
     visiting: &mut FxHashSet<TypeId>,
-) -> Option<MirLayoutKind> {
-    let element_layout = layout_kind_for_type(types, element_ty, memo, visiting)?;
-    let MirLayoutKind::Scalar(scalar_element) = element_layout else {
-        return Some(MirLayoutKind::OpaqueHandle);
-    };
-    let Some((rows, columns)) = crate::matrix_shape::literal_matrix_shape(shape, types) else {
-        return Some(MirLayoutKind::OpaqueHandle);
-    };
-    Some(MirLayoutKind::DeviceMatrix(MirDeviceMatrixLayout {
-        element: scalar_element,
-        rows,
-        columns,
-        align: device_matrix_align(scalar_element, rows),
-    }))
+) -> LayoutResolution {
+    layout_kind_for_type(types, element_ty, memo, visiting).then(|element_layout| {
+        let MirLayoutKind::Scalar(scalar_element) = element_layout else {
+            return LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle);
+        };
+        let Some((rows, columns)) = crate::matrix_shape::literal_matrix_shape(shape, types) else {
+            return LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle);
+        };
+        LayoutResolution::Resolved(MirLayoutKind::DeviceMatrix(MirDeviceMatrixLayout {
+            element: scalar_element,
+            rows,
+            columns,
+            align: device_matrix_align(scalar_element, rows),
+        }))
+    })
 }
 
 fn device_vector_align(element: MirScalarLayout, width: u8) -> u8 {
@@ -656,30 +703,34 @@ fn tensor_layout_kind(
     types: &TypeTable,
     element: TypeId,
     shape: radix_types::IndexId,
-    memo: &mut FxHashMap<TypeId, Option<MirLayoutKind>>,
+    memo: &mut FxHashMap<TypeId, LayoutResolution>,
     visiting: &mut FxHashSet<TypeId>,
-) -> Option<MirLayoutKind> {
-    let element_layout = layout_kind_for_type(types, element, memo, visiting)?;
-    let MirLayoutKind::Scalar(element) = element_layout else {
-        return Some(opaque_aggregate(MirAggregateFamily::TensorRuntime));
-    };
-    let Some(rank) = tensor_rank(types, shape) else {
-        return Some(opaque_aggregate(MirAggregateFamily::TensorRuntime));
-    };
-    Some(MirLayoutKind::DeviceView(
-        MirDeviceViewLayout::materialized_row_major(element, rank),
-    ))
+) -> LayoutResolution {
+    layout_kind_for_type(types, element, memo, visiting).then(|element| {
+        let MirLayoutKind::Scalar(element) = element else {
+            return LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::TensorRuntime));
+        };
+        let Some(rank) = tensor_rank(types, shape) else {
+            return LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::TensorRuntime));
+        };
+        LayoutResolution::Resolved(MirLayoutKind::DeviceView(
+            MirDeviceViewLayout::materialized_row_major(element, rank),
+        ))
+    })
 }
 
 /// `octeti<N>` — a statically-bounded byte buffer is a rank-1 `u8` device
 /// view with its static length. A capacity that is not a compile-time
 /// literal has no provable bounds and stays opaque.
-fn bounded_octeti_layout_kind(types: &TypeTable, capacity: radix_types::IndexId) -> Option<MirLayoutKind> {
+fn bounded_octeti_layout_kind(
+    types: &TypeTable,
+    capacity: radix_types::IndexId,
+) -> LayoutResolution {
     match types.get_index(capacity) {
-        IndexExpr::Literal(length) => Some(MirLayoutKind::DeviceView(
+        IndexExpr::Literal(length) => LayoutResolution::Resolved(MirLayoutKind::DeviceView(
             MirDeviceViewLayout::static_byte_buffer(*length),
         )),
-        _ => Some(MirLayoutKind::OpaqueHandle),
+        _ => LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle),
     }
 }
 
@@ -757,7 +808,42 @@ fn tensor_rank(types: &TypeTable, shape: radix_types::IndexId) -> Option<u8> {
     u8::try_from(rank).ok()
 }
 
-fn int_layout(width: NumericWidth) -> Option<MirLayoutKind> {
+/// Named arms for the sized-numeric family — the fallthrough law.
+///
+/// Every `(family, width)` combination resolves through a named arm or fails
+/// loudly with the width named; nothing reaches `OpaqueHandle` by fallthrough.
+/// `fractus<bf16>` is the loud pending-error row until bf16 owns
+/// `MirScalarLayout::BF16` (bf16-width-admission U2); a new width lands a row
+/// here or the pin-table test fails first.
+fn sized_numeric_layout(prim: Primitive, width: NumericWidth) -> LayoutResolution {
+    let scalar = match (prim, width) {
+        (Primitive::Numerus, NumericWidth::I8) => MirScalarLayout::I8,
+        (Primitive::Numerus, NumericWidth::I16) => MirScalarLayout::I16,
+        (Primitive::Numerus, NumericWidth::I32) => MirScalarLayout::I32,
+        (Primitive::Numerus, NumericWidth::I64) => MirScalarLayout::I64,
+        (Primitive::Numerus, NumericWidth::U8) => MirScalarLayout::U8,
+        (Primitive::Numerus, NumericWidth::U16) => MirScalarLayout::U16,
+        (Primitive::Numerus, NumericWidth::U32) => MirScalarLayout::U32,
+        (Primitive::Numerus, NumericWidth::U64) => MirScalarLayout::U64,
+        (Primitive::Fractus, NumericWidth::F16) => MirScalarLayout::F16,
+        (Primitive::Fractus, NumericWidth::F32) => MirScalarLayout::F32,
+        (Primitive::Fractus, NumericWidth::F64) => MirScalarLayout::F64,
+        (prim, width) => {
+            let family = match prim {
+                Primitive::Numerus => "numerus",
+                Primitive::Fractus => "fractus",
+                _ => "sized-numeric",
+            };
+            return LayoutResolution::MissingFact(format!(
+                "{family}<{}> has no named layout arm",
+                width.faber_marker()
+            ));
+        }
+    };
+    LayoutResolution::Resolved(MirLayoutKind::Scalar(scalar))
+}
+
+fn int_layout(width: NumericWidth) -> LayoutResolution {
     let scalar = match width {
         NumericWidth::I8 => MirScalarLayout::I8,
         NumericWidth::I16 => MirScalarLayout::I16,
@@ -768,8 +854,11 @@ fn int_layout(width: NumericWidth) -> Option<MirLayoutKind> {
         NumericWidth::U32 => MirScalarLayout::U32,
         NumericWidth::U64 => MirScalarLayout::U64,
         NumericWidth::F16 | NumericWidth::BF16 | NumericWidth::F32 | NumericWidth::F64 => {
-            return None
+            return LayoutResolution::MissingFact(format!(
+                "modulus<{}> has no named layout arm",
+                width.faber_marker()
+            ));
         }
     };
-    Some(MirLayoutKind::Scalar(scalar))
+    LayoutResolution::Resolved(MirLayoutKind::Scalar(scalar))
 }
