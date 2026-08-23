@@ -13,6 +13,7 @@ use crate::lexer::{Interner, Span};
 use super::air_mask_proof::{
     is_additive_body, is_additive_combine, is_integer_zero_seed, reduction_family, MaskNeutralityFamily,
 };
+use super::air_unroll_proof::{unroll_route_facts, UnrollRoute};
 use crate::semantic::passes::exhaustive::{collect_enum_variants, enum_def_from_type, pattern_variant_id};
 use crate::semantic::TypeTable;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -174,6 +175,12 @@ pub enum HirAspectDetail {
     /// Structural contract consumed by the Line-2 Lean proof emitter.
     MaskNeutrality {
         family: MaskNeutralityFamily,
+    },
+    /// Structural contract consumed by the Line-1 Lean proof emitter: the
+    /// settled AEU route and its lane sequence in source order.
+    UnrollEquivalence {
+        route: UnrollRoute,
+        lanes: Vec<i64>,
     },
 }
 
@@ -433,6 +440,28 @@ impl<'a> HirAspectCollector<'a> {
         self.push(record);
     }
 
+    fn record_unroll_equivalence(
+        &mut self,
+        expr: &HirExpression,
+        mode: crate::hir::HirIteraMode,
+        coordinates: &[(DefId, crate::lexer::Symbol)],
+        source: &HirExpression,
+    ) {
+        // Decline shapes carry no proof obligation (spec: decline paths emit
+        // none), so only settled route facts produce a record.
+        let Some(facts) = unroll_route_facts(mode, coordinates.len(), source, self.types) else {
+            return;
+        };
+        self.push(
+            HirAspectRecord::recognized(
+                HirAspectKind::UnrollEquivalence,
+                HirAspectSpan::Source(expr.span),
+                Some(expr.id),
+            )
+            .with_detail(HirAspectDetail::UnrollEquivalence { route: facts.route, lanes: facts.lanes }),
+        );
+    }
+
     fn push_skipped(&mut self, expr: &HirExpression, reason: HirAspectReason) {
         self.push(HirAspectRecord::skipped_candidate(
             HirAspectKind::DiscerneOmnia,
@@ -479,6 +508,9 @@ impl HirVisitor for HirAspectCollector<'_> {
         }
         if let HirExpressionKind::MethodCall(_, method, _, args) = &expr.kind {
             self.record_mask_neutrality(expr, *method, args);
+        }
+        if let HirExpressionKind::Itera(mode, coordinates, _, _, source, _) = &expr.kind {
+            self.record_unroll_equivalence(expr, *mode, coordinates, source);
         }
 
         walk_expr(self, expr);

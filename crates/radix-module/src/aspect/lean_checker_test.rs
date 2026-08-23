@@ -1031,7 +1031,9 @@ fn lean_checker_air_kind_records_never_become_proven_via_placeholder_generator()
     let checker = LeanAspectChecker::new(config, temp);
 
     let span = HirAspectSpan::Source(Span::new(0, 10));
-    let air_kinds = [HirAspectKind::UnrollEquivalence, HirAspectKind::GatePurity];
+    // APA-L1 landed a real UnrollEquivalence generator, so only the kinds
+    // whose owning lines have not landed may be refused here.
+    let air_kinds = [HirAspectKind::GatePurity];
     let records: Vec<HirAspectRecord> = air_kinds
         .iter()
         .map(|&kind| HirAspectRecord::recognized(kind, span, Some(crate::hir::HirId(1))))
@@ -1074,23 +1076,139 @@ fn lean_checker_air_refusal_preserves_per_record_order_alongside_checkable_kinds
 
     let span = HirAspectSpan::Source(Span::new(0, 10));
     let records = vec![
-        HirAspectRecord::recognized(HirAspectKind::UnrollEquivalence, span, Some(crate::hir::HirId(1))),
+        HirAspectRecord::recognized(HirAspectKind::GatePurity, span, Some(crate::hir::HirId(1))),
         HirAspectRecord::recognized(HirAspectKind::DiscerneOmnia, span, Some(crate::hir::HirId(2))),
-        HirAspectRecord::recognized(HirAspectKind::GatePurity, span, Some(crate::hir::HirId(3))),
     ];
     let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, records);
 
     let results = checker.verify(&report);
-    assert_eq!(results.len(), 3);
+    assert_eq!(results.len(), 2);
     // The report sorts same-span records by kind, so the deterministic order
-    // is DiscerneOmnia, UnrollEquivalence, GatePurity. DiscerneOmnia with a
-    // missing toolchain is ToolchainMissing/Error, never Proven; the AIR
-    // kinds keep their deterministic refusals, in order.
+    // is DiscerneOmnia, GatePurity. DiscerneOmnia with a missing toolchain is
+    // ToolchainMissing/Error, never Proven; the unlanded AIR kind keeps its
+    // deterministic refusal, in order.
     assert!(
         results[0].status == HirAspectCheckStatus::ToolchainMissing || results[0].status == HirAspectCheckStatus::Error
     );
     assert_eq!(results[1].status, HirAspectCheckStatus::Failed);
-    assert!(results[1].evidence.0.contains("unroll_equivalence"));
-    assert_eq!(results[2].status, HirAspectCheckStatus::Failed);
-    assert!(results[2].evidence.0.contains("gate_purity"));
+    assert!(results[1].evidence.0.contains("gate_purity"));
+}
+
+// ---------------------------------------------------------------------------
+// APA-L1 pins: the unroll-equivalence obligation is real proof content, and
+// the trust gates stay fail-closed without a toolchain.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lean_checker_unroll_equivalence_generates_real_structural_obligation() {
+    let record = HirAspectRecord::recognized(
+        HirAspectKind::UnrollEquivalence,
+        HirAspectSpan::Source(Span::new(0, 10)),
+        Some(crate::hir::HirId(9)),
+    )
+    .with_detail(HirAspectDetail::UnrollEquivalence { route: crate::aspect::UnrollRoute::Ab, lanes: vec![0, 1, 2] });
+
+    let source = super::generate_lean_source(&[&record]);
+
+    assert!(source.contains("unrolledLanesMatchSource"));
+    assert!(source.contains("unrollEvaluationPreservesSourceOrder"));
+    assert!(source.contains("unrollFailureBehaviorPreserved"));
+    assert!(source.contains("unrolledStraightLine [0, 1, 2]"));
+    assert!(source.contains("aspect_unroll_equivalence_9"));
+    assert!(!source.contains(": True := trivial"));
+    assert!(!source.contains("f32"));
+    assert!(!source.contains("f64"));
+    assert_eq!(LeanAspectChecker::scan_for_sorry(&source), SorryVerdict::Clean);
+}
+
+#[test]
+fn lean_checker_unroll_equivalence_missing_toolchain_is_not_proven() {
+    let temp_dir = crate::test_support::test_temp_dir("lean-verifier-apa-l1-missing-tc");
+    let temp = temp_dir.path().to_path_buf();
+    let config = LeanAspectCheckerConfig {
+        lake_bin: temp.join("nonexistent-lake"),
+        lean_bin: temp.join("nonexistent-lean"),
+        timeout: Duration::from_secs(5),
+    };
+    let checker = LeanAspectChecker::new(config, temp);
+    let record = HirAspectRecord::recognized(
+        HirAspectKind::UnrollEquivalence,
+        HirAspectSpan::Source(Span::new(0, 10)),
+        Some(crate::hir::HirId(9)),
+    )
+    .with_detail(HirAspectDetail::UnrollEquivalence { route: crate::aspect::UnrollRoute::Ab, lanes: vec![0, 1, 2] });
+    let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, vec![record]);
+
+    let results = checker.verify(&report);
+    assert_eq!(results.len(), 1);
+    assert_ne!(results[0].status, HirAspectCheckStatus::Proven);
+    assert!(
+        results[0].status == HirAspectCheckStatus::ToolchainMissing || results[0].status == HirAspectCheckStatus::Error,
+        "expected missing-toolchain/error result, got {:?}",
+        results[0].status
+    );
+}
+
+#[test]
+#[ignore = "tracking: bulk-test-cleanup — requires Lean toolchain CI matrix step"]
+fn lean_checker_unroll_equivalence_full_verify_real_theorem() {
+    // The real Line-1 harness check: lake build + sorry scan + transitive
+    // allowlisted axiom audit over the generated unroll-equivalence theorem.
+    let config = LeanAspectCheckerConfig::default();
+    let temp = PathBuf::from(std::env::temp_dir());
+    let checker = LeanAspectChecker::new(config, temp);
+    let record = HirAspectRecord::recognized(
+        HirAspectKind::UnrollEquivalence,
+        HirAspectSpan::Source(Span::new(0, 10)),
+        Some(crate::hir::HirId(9)),
+    )
+    .with_detail(HirAspectDetail::UnrollEquivalence { route: crate::aspect::UnrollRoute::Ab, lanes: vec![0, 1, 2] });
+    let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, vec![record]);
+
+    let results = checker.verify(&report);
+    assert_eq!(results.len(), 1);
+    assert_eq!(
+        results[0].status,
+        HirAspectCheckStatus::Proven,
+        "expected Proven through real lake build + sorry scan + axiom audit, got: {}",
+        results[0].evidence.0
+    );
+    assert_eq!(results[0].backend, HirAspectBackendKind::Lean);
+}
+
+#[test]
+#[ignore = "tracking: bulk-test-cleanup — requires Lean toolchain CI matrix step"]
+fn lean_checker_unroll_equivalence_axiom_audit_is_live_not_vacuous() {
+    // Negative integration pin: a module whose theorem secretly uses `sorry`
+    // must surface `sorryAx` through the transitive audit — proving the
+    // wrapper import actually resolves against the built module instead of
+    // failing open with an empty audit.
+    let temp = std::env::temp_dir().join(format!("radix-lean-audit-live-{}", std::process::id()));
+    std::fs::create_dir_all(&temp).expect("create audit probe dir");
+    let module = temp.join("FaberGenerated.lean");
+    std::fs::write(&module, "theorem seeded_sorry_probe : True := by sorry\n").expect("write audit probe module");
+    std::fs::write(temp.join("lakefile.toml"), super::generate_lakefile_toml()).expect("write audit probe lakefile");
+
+    let checker = LeanAspectChecker::new(LeanAspectCheckerConfig::default(), temp.clone());
+    let lake = checker.run_lake_build(&temp);
+    let build_result = normalize_result(lake);
+    assert_eq!(
+        build_result.status,
+        HirAspectCheckStatus::Proven,
+        "sorry type-checks; build must pass"
+    );
+
+    let audit = checker.audit_axioms(&module);
+    let verdict = LeanAspectChecker::classify_axioms(&audit);
+    match verdict {
+        AxiomVerdict::Rejected { disallowed } => {
+            assert!(
+                disallowed.iter().any(|dep| dep.axiom_name == "sorryAx"),
+                "expected sorryAx in the transitive audit, got: {disallowed:?}"
+            );
+        }
+        AxiomVerdict::Allowed => panic!("transitive axiom audit failed open; it is vacuous"),
+    }
+
+    let _ = std::fs::remove_dir_all(&temp);
 }

@@ -10,6 +10,7 @@ use std::time::Duration;
 use wait_timeout::ChildExt;
 
 use super::air_mask_proof::{emit_mask_neutrality_theorem, MaskNeutralityFamily, MASK_NEUTRALITY_PRELUDE};
+use super::air_unroll_proof::{emit_unroll_equivalence_theorem, UNROLL_PROOF_PRELUDE};
 use super::verifier::{HirAspectCheckResult, HirAspectCheckStatus, HirAspectEvidence, HirAspectVerifier};
 use super::{
     HirAspectBackendKind, HirAspectDetail, HirAspectKind, HirAspectRecord, HirAspectRecordKind, HirAspectReport,
@@ -225,7 +226,25 @@ impl LeanAspectChecker {
         let wrapper_path = parent.join(format!("_axiom_audit_{module_name}.lean"));
         ignore_result(std::fs::write(&wrapper_path, &wrapper));
 
-        let output = self.run_lean_command(&wrapper_path);
+        // The wrapper imports the built module, so the package's compiled
+        // olean directory must be on LEAN_PATH; without it the import fails
+        // and the audit silently reports no dependencies (a fake pass).
+        // Lake ≥ 4.19 nests oleans one level deeper (`lib/lean`).  LEAN_PATH
+        // entries are separated with the OS path-list separator.
+        let path_list_sep = if cfg!(windows) { ";" } else { ":" };
+        let build_lib = parent.join(".lake").join("build").join("lib");
+        let lean_path = format!(
+            "{lib}{sep}{lib_lean}",
+            lib = build_lib.display(),
+            lib_lean = build_lib.join("lean").display(),
+            sep = path_list_sep
+        );
+        let lean_path = match std::env::var("LEAN_PATH") {
+            Ok(existing) if !existing.is_empty() => format!("{lean_path}{path_list_sep}{existing}"),
+            _ => lean_path,
+        };
+
+        let output = self.run_lean_command_with_lean_path(&wrapper_path, &lean_path);
 
         ignore_result(std::fs::remove_file(&wrapper_path));
 
@@ -287,6 +306,35 @@ impl LeanAspectChecker {
 
         match std::process::Command::new(&self.config.lean_bin)
             .arg(file_path)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .output()
+        {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+                let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+                if stdout.is_empty() {
+                    stderr
+                } else {
+                    stdout
+                }
+            }
+            Err(error) => {
+                format!("failed to launch lean: {error}")
+            }
+        }
+    }
+
+    /// Run `lean` with an explicit `LEAN_PATH` so wrapper imports resolve
+    /// against the built module.
+    fn run_lean_command_with_lean_path(&self, file_path: &Path, lean_path: &str) -> String {
+        if !self.toolchain_available() {
+            return format!("lean ({}) not found on PATH", self.config.lean_bin.display());
+        }
+
+        match std::process::Command::new(&self.config.lean_bin)
+            .arg(file_path)
+            .env("LEAN_PATH", lean_path)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .output()
@@ -441,16 +489,22 @@ fn merge_results(
 const LAKE_PROJECT_NAME: &str = "FaberGenerated";
 
 /// Generate a minimal `lakefile.toml` for the temp project.
+///
+/// Lake 4.18+ only registers `[[lean_lib]]` targets from snake_case table
+/// keys; the camelCase spelling is silently ignored, leaving the default
+/// target unresolvable.  The lib root must be named explicitly so the
+/// generated module is compiled.
 #[must_use]
 fn generate_lakefile_toml() -> String {
     format!(
         "name = \"{LAKE_PROJECT_NAME}\"\n\
-         defaultTargets = [\"{LAKE_PROJECT_NAME}\"]\n\
+         defaultTargets = [\"{LAKE_PROJECT_NAME}Lib\"]\n\
          \n\
          [leanOptions]\n\
          \n\
-         [[leanLib]]\n\
-         name = \"{LAKE_PROJECT_NAME}\"\n"
+         [[lean_lib]]\n\
+         name = \"{LAKE_PROJECT_NAME}Lib\"\n\
+         roots = [\"{LAKE_PROJECT_NAME}\"]\n"
     )
 }
 
@@ -473,6 +527,15 @@ fn generate_lean_source(records: &[&HirAspectRecord]) -> String {
         out.push('\n');
     }
 
+    let unroll_records = records
+        .iter()
+        .filter(|record| record.aspect == HirAspectKind::UnrollEquivalence)
+        .collect::<Vec<_>>();
+    if !unroll_records.is_empty() {
+        out.push_str(UNROLL_PROOF_PRELUDE);
+        out.push('\n');
+    }
+
     for (i, record) in records.iter().enumerate() {
         let label = theorem_label(record, i);
         match record.aspect {
@@ -482,6 +545,14 @@ fn generate_lean_source(records: &[&HirAspectRecord]) -> String {
                     _ => MaskNeutralityFamily::Reduce,
                 };
                 out.push_str(&emit_mask_neutrality_theorem(&label, family));
+                out.push('\n');
+            }
+            HirAspectKind::UnrollEquivalence => {
+                let lanes = match &record.detail {
+                    HirAspectDetail::UnrollEquivalence { lanes, .. } => lanes.clone(),
+                    _ => Vec::new(),
+                };
+                out.push_str(&emit_unroll_equivalence_theorem(&label, &lanes));
                 out.push('\n');
             }
             _ => {
@@ -522,7 +593,10 @@ fn aspect_label(record: &HirAspectRecord) -> &'static str {
 /// until their owning lines land; they must never fall through the generic
 /// `True := trivial` placeholder as if they were proven obligations.
 fn has_registered_proof_generator(aspect: HirAspectKind) -> bool {
-    matches!(aspect, HirAspectKind::DiscerneOmnia | HirAspectKind::MaskNeutrality)
+    matches!(
+        aspect,
+        HirAspectKind::DiscerneOmnia | HirAspectKind::MaskNeutrality | HirAspectKind::UnrollEquivalence
+    )
 }
 
 /// Create a unique temporary project directory.

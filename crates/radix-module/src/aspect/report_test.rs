@@ -445,19 +445,6 @@ fn air_shaped_program_produces_no_aspect_records_before_registration() {
 }
 
 #[test]
-#[ignore = "APA-1 future fixture: UnrollEquivalence (evidence class machine-checked-structural) is unregistered until APA-2 lands registration and APA-L1 lands the real obligation after AEU-2; un-ignored only by its owner"]
-fn future_fixture_air_unroll_equivalence_record_and_verdict_shape() {
-    // Owning line APA-L1 (after AEU-2): the unroll-route fixture must become a
-    // Recognized UnrollEquivalence record whose Lean checker verdict is Proven
-    // only through real `lake build` + sorry scan + allowlisted transitive
-    // axiom audit (machine-checked-structural, never semantic preservation).
-    // No float theorem, no sorry, no unallowlisted axiom, no execution claim.
-    // Pre-registration absence pin (holds today):
-    let report = report_hir_aspects(&air_shaped_program(), &TypeTable::new());
-    assert!(report.records().is_empty());
-}
-
-#[test]
 #[ignore = "APA-1 future fixture: MaskNeutrality (evidence class machine-checked-structural) is unregistered until APA-2 lands registration and APA-L2 lands the real obligation after ARC-3 and ARC-4; un-ignored only by its owner"]
 fn future_fixture_air_mask_neutrality_record_and_verdict_shape() {
     // Owning line APA-L2 (after ARC-3/ARC-4): the caller-built-mask zero-fill
@@ -604,4 +591,149 @@ fn hir_aspect_report_does_not_admit_non_neutral_or_non_additive_reductions() {
 
 fn expr(kind: HirExpressionKind, id: u32, span: Span) -> HirExpression {
     HirExpression { id: HirId(id), kind, ty: None, span }
+}
+
+// ---------------------------------------------------------------------------
+// APA-L1: unroll-equivalence recognizer over the settled AEU route facts.
+// ---------------------------------------------------------------------------
+
+use crate::hir::{HirIteraMode, HirRangeKind, HirUnOp};
+
+fn int_expr(id: u32, value: u64) -> HirExpression {
+    HirExpression {
+        id: HirId(id),
+        kind: HirExpressionKind::Literal(HirLiteral::Int(value)),
+        ty: None,
+        span: Span::new(0, 1),
+    }
+}
+
+fn interval_expr(id: u32, start: i64, end: i64, inclusive: bool) -> HirExpression {
+    let neg = |inner: u64, sub: u32| -> Box<HirExpression> {
+        Box::new(HirExpression {
+            id: HirId(id + sub),
+            kind: HirExpressionKind::Unary(HirUnOp::Neg, Box::new(int_expr(id + sub + 1, inner))),
+            ty: None,
+            span: Span::new(0, 1),
+        })
+    };
+    let start_expr = if start < 0 {
+        neg(start.unsigned_abs(), 0)
+    } else {
+        Box::new(int_expr(id + 1, start.unsigned_abs()))
+    };
+    let end_expr = if end < 0 {
+        neg(end.unsigned_abs(), 5)
+    } else {
+        Box::new(int_expr(id + 6, end.unsigned_abs()))
+    };
+    HirExpression {
+        id: HirId(id),
+        kind: HirExpressionKind::Intervallum {
+            start: start_expr,
+            end: end_expr,
+            step: None,
+            kind: if inclusive {
+                HirRangeKind::Inclusive
+            } else {
+                HirRangeKind::Exclusive
+            },
+        },
+        ty: None,
+        span: Span::new(0, 1),
+    }
+}
+
+fn itera_expr(
+    id: u32,
+    mode: HirIteraMode,
+    coordinates: Vec<(DefId, crate::lexer::Symbol)>,
+    source: HirExpression,
+) -> HirExpression {
+    HirExpression {
+        id: HirId(id),
+        kind: HirExpressionKind::Itera(
+            mode,
+            coordinates,
+            DefId(50),
+            crate::lexer::Symbol(1),
+            Box::new(source),
+            HirBlock::default(),
+        ),
+        ty: None,
+        span: test_span_between(8, 20),
+    }
+}
+
+#[test]
+fn hir_aspect_report_recognizes_admitted_ab_route_with_lane_sequence() {
+    let types = TypeTable::new();
+    let program = expr_program(vec![itera_expr(
+        1,
+        HirIteraMode::Ab,
+        Vec::new(),
+        interval_expr(2, 0, 3, false),
+    )]);
+
+    let report = report_hir_aspects(&program, &types);
+
+    assert_eq!(report.records().len(), 1);
+    let record = &report.records()[0];
+    assert_eq!(record.aspect, HirAspectKind::UnrollEquivalence);
+    assert_eq!(record.record_kind, HirAspectRecordKind::Recognized);
+    assert_eq!(record.reason, HirAspectReason::Recognized);
+    assert_eq!(
+        record.detail,
+        super::HirAspectDetail::UnrollEquivalence { route: super::UnrollRoute::Ab, lanes: vec![0, 1, 2] }
+    );
+}
+
+#[test]
+fn hir_aspect_report_recognizes_ex_route_over_static_shapes() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let shape = types.intern_index(crate::semantic::IndexExpr::Literal(2));
+    let tensor = types.tensor_with_shape(numerus, shape);
+    let mut source = int_expr(2, 0);
+    source.ty = Some(tensor);
+
+    let program = expr_program(vec![itera_expr(1, HirIteraMode::Ex, Vec::new(), source)]);
+
+    let report = report_hir_aspects(&program, &types);
+
+    assert_eq!(report.records().len(), 1);
+    assert_eq!(report.records()[0].aspect, HirAspectKind::UnrollEquivalence);
+    assert_eq!(
+        report.records()[0].detail,
+        super::HirAspectDetail::UnrollEquivalence { route: super::UnrollRoute::Ex, lanes: vec![0, 1] }
+    );
+}
+
+#[test]
+fn hir_aspect_report_declined_routes_emit_no_line_one_obligation() {
+    let types = TypeTable::new();
+    let program = expr_program(vec![
+        // `itera de`: not a range route.
+        itera_expr(1, HirIteraMode::De, Vec::new(), interval_expr(2, 0, 3, false)),
+        // Non-concrete bounds: the AEU pass declines with causa not_concrete.
+        itera_expr(
+            10,
+            HirIteraMode::Ab,
+            Vec::new(),
+            expr(HirExpressionKind::Path(DefId(60)), 11, test_span_between(8, 20)),
+        ),
+        // Over-budget charge: the pass declines with causa budget.
+        itera_expr(20, HirIteraMode::Ab, Vec::new(), interval_expr(21, 0, 100, false)),
+    ]);
+
+    let report = report_hir_aspects(&program, &types);
+
+    assert!(
+        report
+            .records()
+            .iter()
+            .all(|record| record.aspect != HirAspectKind::UnrollEquivalence),
+        "declined AEU routes must emit no line-1 obligation, got {:?}",
+        report.records()
+    );
 }

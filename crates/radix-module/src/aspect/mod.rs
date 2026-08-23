@@ -5,6 +5,7 @@
 //! coverage summaries used before any public CLI behavior is exposed.
 
 mod air_mask_proof;
+mod air_unroll_proof;
 mod coverage;
 pub mod lean_checker;
 mod obligation;
@@ -14,6 +15,7 @@ pub(crate) mod tla_checker;
 mod verifier;
 
 pub use air_mask_proof::MaskNeutralityFamily;
+pub use air_unroll_proof::{UnrollRoute, UnrollRouteFacts};
 pub use coverage::{
     render_hir_aspect_coverage, summarize_hir_aspect_coverage, HirAspectAssumption, HirAspectAssumptionStatus,
     HirAspectCoverageEntry, HirAspectCoverageReason, HirAspectCoverageReport, HirAspectCoverageStatus,
