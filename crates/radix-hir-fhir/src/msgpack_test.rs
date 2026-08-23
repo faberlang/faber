@@ -905,3 +905,171 @@ fn package_msgpack_rejects_bare_postcard_version_prefix() {
         Err(MsgpackError::Decode(_))
     ));
 }
+
+// ---------------------------------------------------------------------------
+// Codec-level marker pins (FPF-2-PIN)
+//
+// Pins the length-marker selection and write_uint width-class behavior from
+// FPF-2 (467866aaf) directly at the primitive level: exact marker bytes on
+// both sides of each width boundary, encode → decode round-trip where a full
+// value exists. These would fail if the minimal-width selection or the
+// uint/int marker classes regressed.
+// ---------------------------------------------------------------------------
+
+/// Encodes a Value and asserts the exact leading bytes, then decodes back.
+fn assert_wire(value: &Value, prefix: &[u8], label: &str) {
+    let mut out = Vec::new();
+    write_value(&mut out, value).expect("encode");
+    assert!(
+        out.starts_with(prefix),
+        "{label}: expected prefix {prefix:02x?}, got {out:02x?}"
+    );
+    // Round-trip: the full document decodes back to the same value.
+    let back = Value::from_bytes(&out).expect("decode");
+    assert_eq!(&back, value, "{label}: round-trip mismatch");
+}
+
+#[test]
+fn write_uint_width_classes_pin_the_467866aaf_boundaries() {
+    // Each value class selects exactly one marker; the boundary values are
+    // the ones FPF-2's minimal-width selection moved between.
+    assert_wire(&Value::Uint(0x7f), &[0x7f], "positive fixint top 0x7f");
+    assert_wire(
+        &Value::Uint(0x80),
+        &[0xcc, 0x80],
+        "uint8 bottom 128",
+    );
+    assert_wire(&Value::Uint(0xff), &[0xcc, 0xff], "uint8 top 255");
+    assert_wire(
+        &Value::Uint(0x100),
+        &[0xcd, 0x01, 0x00],
+        "uint16 bottom 256",
+    );
+    assert_wire(
+        &Value::Uint(0xffff),
+        &[0xcd, 0xff, 0xff],
+        "uint16 top 65535",
+    );
+    assert_wire(
+        &Value::Uint(0x1_0000),
+        &[0xce, 0x00, 0x01, 0x00, 0x00],
+        "uint32 bottom 65536",
+    );
+    assert_wire(
+        &Value::Uint(u64::from(u32::MAX)),
+        &[0xce, 0xff, 0xff, 0xff, 0xff],
+        "uint32 top 4294967295",
+    );
+    assert_wire(
+        &Value::Uint(0x1_0000_0000),
+        &[0xcf, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00],
+        "uint64 bottom 4294967296",
+    );
+    assert_wire(
+        &Value::Uint(u64::MAX),
+        &[0xcf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
+        "uint64 top u64::MAX",
+    );
+    // Zero is a positive fixint, never a wider uint marker.
+    assert_wire(&Value::Uint(0), &[0x00], "zero is fixint");
+}
+
+#[test]
+fn str_length_markers_pin_fixstr32_str8_256_str16_65536_boundaries() {
+    assert_wire(&Value::Str("a".repeat(31)), &[0xbf], "fixstr top 31");
+    assert_wire(
+        &Value::Str("a".repeat(32)),
+        &[0xd9, 0x20],
+        "str8 bottom 32",
+    );
+    assert_wire(
+        &Value::Str("a".repeat(0xff)),
+        &[0xd9, 0xff],
+        "str8 top 255",
+    );
+    assert_wire(
+        &Value::Str("a".repeat(0x100)),
+        &[0xda, 0x01, 0x00],
+        "str16 bottom 256",
+    );
+    assert_wire(
+        &Value::Str("a".repeat(0xffff)),
+        &[0xda, 0xff, 0xff],
+        "str16 top 65535",
+    );
+    assert_wire(
+        &Value::Str("a".repeat(0x1_0000)),
+        &[0xdb, 0x00, 0x01, 0x00, 0x00],
+        "str32 bottom 65536",
+    );
+}
+
+#[test]
+fn bin_length_markers_pin_bin8_256_bin16_65536_boundaries() {
+    assert_wire(&Value::Bin(vec![0u8; 0xff]), &[0xc4, 0xff], "bin8 top 255");
+    assert_wire(
+        &Value::Bin(vec![0u8; 0x100]),
+        &[0xc5, 0x01, 0x00],
+        "bin16 bottom 256",
+    );
+    assert_wire(
+        &Value::Bin(vec![0u8; 0xffff]),
+        &[0xc5, 0xff, 0xff],
+        "bin16 top 65535",
+    );
+    assert_wire(
+        &Value::Bin(vec![0u8; 0x1_0000]),
+        &[0xc6, 0x00, 0x01, 0x00, 0x00],
+        "bin32 bottom 65536",
+    );
+}
+
+#[test]
+fn array_length_markers_pin_fixarray16_array16_65536_boundaries() {
+    let nils = |n: usize| Value::Array(vec![Value::Nil; n]);
+    assert_wire(&nils(15), &[0x9f], "fixarray top 15");
+    assert_wire(&nils(16), &[0xdc, 0x00, 0x10], "array16 bottom 16");
+    assert_wire(&nils(0xffff), &[0xdc, 0xff, 0xff], "array16 top 65535");
+    assert_wire(
+        &nils(0x1_0000),
+        &[0xdd, 0x00, 0x01, 0x00, 0x00],
+        "array32 bottom 65536",
+    );
+}
+
+#[test]
+fn map_length_markers_pin_fixmap16_map16_65536_boundaries() {
+    let nilmap = |n: usize| {
+        Value::Map((0..n).map(|_| (Value::Nil, Value::Nil)).collect())
+    };
+    assert_wire(&nilmap(15), &[0x8f], "fixmap top 15");
+    assert_wire(&nilmap(16), &[0xde, 0x00, 0x10], "map16 bottom 16");
+    assert_wire(&nilmap(0xffff), &[0xde, 0xff, 0xff], "map16 top 65535");
+    assert_wire(
+        &nilmap(0x1_0000),
+        &[0xdf, 0x00, 0x01, 0x00, 0x00],
+        "map32 bottom 65536",
+    );
+}
+
+#[test]
+fn int_width_markers_pin_negative_fixint_and_signed_classes() {
+    // write_uint's sibling: signed opcodes are a wire fact, never the uint
+    // classes, and the -32..-1 negative-fixint window overlaps uint space.
+    assert_wire(&Value::Int(-32), &[0xe0], "nfix bottom -32");
+    assert_wire(&Value::Int(-1), &[0xff], "nfix top -1");
+    assert_wire(&Value::Int(-33), &[0xd0, 0xdf], "int8 bottom -33");
+    assert_wire(&Value::Int(-129), &[0xd1, 0xff, 0x7f], "int16 bottom -129");
+    assert_wire(
+        &Value::Int(-32769),
+        &[0xd2, 0xff, 0xff, 0x7f, 0xff],
+        "int32 bottom -32769",
+    );
+    assert_wire(
+        &Value::Int(i64::MIN),
+        &[
+            0xd3, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ],
+        "int64 bottom i64::MIN",
+    );
+}
