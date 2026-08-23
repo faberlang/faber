@@ -727,6 +727,19 @@ impl super::FaberCodegen {
                 // until AFM-3 provides a valid Faber surface.
                 writer.write(surface.contextual_keyword("nihil"));
             }
+            HirExpressionKind::Transfer { sink, payloads } => {
+                // `sink ⇇ p1 ⇇ p2` — the glyph is an operator token, never a
+                // keyword, so it is locale-invariant. The chain binds between
+                // assignment and the ternary level: the sink and every payload
+                // are complete ternaries (emitted at chain precedence 2 / 3),
+                // so looser operands parenthesize and re-parse to the same
+                // flat chain.
+                self.write_expr_prec(sink, 2, types, names, interner, surface, writer);
+                for payload in payloads {
+                    writer.write(" ⇇ ");
+                    self.write_expr_prec(payload, 3, types, names, interner, surface, writer);
+                }
+            }
             HirExpressionKind::Error => writer.write(surface.contextual_keyword("nihil")),
         }
 

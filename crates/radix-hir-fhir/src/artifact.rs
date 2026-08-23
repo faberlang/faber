@@ -374,10 +374,15 @@ pub enum GpuBuiltinWire {
 /// parameter slots now carry their own modes.
 ///
 /// Old artifacts fail closed by design: `decode.rs` has no compatibility
-/// decoder, so any schema mismatch (v1, v2, or v3) is rejected as
+/// decoder, so any schema mismatch (v1–v4) is rejected as
 /// [`HirArtifactError::UnsupportedSchemaVersion`] before the payload is
 /// interpreted — never a confusing field-layout error.
-pub const SCHEMA_VERSION: u32 = 4;
+///
+/// v5 (EOT-3W): the unreleased `HirExpressionKind::Transfer` (EOT-3M) and
+/// `FirstMatch` (AFM-2) variants shifted serde ordinals in the directly-
+/// serde'd HIR payload — a wire break that ratchets the version rather than
+/// inventing a compatibility decoder.
+pub const SCHEMA_VERSION: u32 = 5;
 
 /// Serializable snapshot of one analyzed compilation unit (F1, F2, F4).
 ///

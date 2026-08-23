@@ -299,6 +299,12 @@ fn collect_expr_defs(
         HirExpressionKind::Praefixum(inner) => {
             collect_expr_defs(inner, registry);
         }
+        HirExpressionKind::Transfer { sink, payloads } => {
+            collect_expr_defs(sink, registry);
+            for payload in payloads {
+                collect_expr_defs(payload, registry);
+            }
+        }
         HirExpressionKind::Binary(_, lhs, rhs) => {
             collect_expr_defs(lhs, registry);
             collect_expr_defs(rhs, registry);
@@ -607,6 +613,12 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                 collect_expr(callee, registry);
                 for arg in args {
                     collect_expr(&arg.expr, registry);
+                }
+            }
+            HirExpressionKind::Transfer { sink, payloads } => {
+                collect_expr(sink, registry);
+                for payload in payloads {
+                    collect_expr(payload, registry);
                 }
             }
             HirExpressionKind::Gradient {
@@ -1332,6 +1344,12 @@ pub(crate) fn validate_referential_integrity(
                         check_symbol(n)?;
                     }
                     validate_expr(&arg.expr, check_symbol, check_def, check_hir, check_type)?;
+                }
+            }
+            HirExpressionKind::Transfer { sink, payloads } => {
+                validate_expr(sink, check_symbol, check_def, check_hir, check_type)?;
+                for payload in payloads {
+                    validate_expr(payload, check_symbol, check_def, check_hir, check_type)?;
                 }
             }
             HirExpressionKind::Gradient {

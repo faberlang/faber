@@ -1991,6 +1991,28 @@ pub(super) fn rewrite_expr(
                 diagnostics,
             );
         }
+        HirExpressionKind::Transfer { sink, payloads } => {
+            rewrite_expr(
+                unit_path,
+                sink,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+            for payload in payloads {
+                rewrite_expr(
+                    unit_path,
+                    payload,
+                    interner,
+                    targets,
+                    data_member_targets,
+                    namespaces,
+                    diagnostics,
+                );
+            }
+        }
         HirExpressionKind::Path(_)
         | HirExpressionKind::Literal(_)
         | HirExpressionKind::Vacua

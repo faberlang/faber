@@ -2140,3 +2140,120 @@ fn cape_handler_keeps_leading_author_local() {
         "cape handler must keep its leading authored local:\n{code}"
     );
 }
+
+// ── EOT-3W: ⇇ transfer re-emission ─────────────────────────────────────────
+
+fn transfer_program(interner: &mut Interner) -> HirModule {
+    let funde = interner.intern("funde");
+    let alpha = interner.intern("alpha");
+    let beta = interner.intern("beta");
+
+    let transfer = HirExpression {
+        id: HirId(3),
+        ty: None,
+        kind: HirExpressionKind::Transfer {
+            sink: Box::new(HirExpression {
+                id: HirId(1),
+                ty: None,
+                kind: HirExpressionKind::Path(DefId(radix_types::USER_DEF_ID_BASE)),
+                span: span(),
+            }),
+            payloads: vec![
+                HirExpression {
+                    id: HirId(2),
+                    ty: None,
+                    kind: HirExpressionKind::Literal(HirLiteral::String(alpha)),
+                    span: span(),
+                },
+                HirExpression {
+                    id: HirId(4),
+                    ty: None,
+                    kind: HirExpressionKind::Literal(HirLiteral::String(beta)),
+                    span: span(),
+                },
+            ],
+        },
+        span: span(),
+    };
+
+    let function = HirFunction {
+        cli_args: None,
+        name: funde,
+        type_params: Vec::new(),
+        params: Vec::new(),
+        ret_ty: None,
+        err_ty: None,
+        body: Some(HirBlock {
+            statements: vec![HirStatement {
+                id: HirId(5),
+                kind: HirStatementKind::Expr(transfer),
+                span: span(),
+            }],
+            expr: None,
+            span: span(),
+            ..Default::default()
+        }),
+        posture: radix_syntax::CallablePosture::SyncFinite,
+        is_async: false,
+        is_generator: false,
+        is_kernel: false,
+        nucleum_fragment: false,
+        is_vertex: false,
+        is_fragment: false,
+        annotations: Vec::new(),
+        test: None,
+    };
+
+    HirModule {
+        items: vec![HirItem {
+            id: HirId(0),
+            def_id: DefId(radix_types::USER_DEF_ID_BASE),
+            kind: HirItemKind::Function(Box::new(function)),
+            span: span(),
+        }],
+        entry: None,
+        entry_annotations: Vec::new(),
+        entry_args_name: None,
+        entry_is_async: false,
+    }
+}
+
+#[test]
+fn transfer_emits_glyph_chain_canonical() {
+    // EOT-3W: canonical re-emission keeps the U+21C7 glyph between the sink
+    // and every payload, in source order, with no console or formatting
+    // vocabulary.
+    let mut interner = Interner::new();
+    let program = transfer_program(&mut interner);
+    let types = TypeTable::new();
+
+    let code = generate_faber(&program, &types, &interner);
+    assert!(
+        code.contains(r#"funde ⇇ "alpha" ⇇ "beta""#),
+        "transfer must re-emit the flat glyph chain, got:\n{code}"
+    );
+}
+
+#[test]
+fn transfer_glyph_is_locale_invariant() {
+    // `⇇` is an operator token, never a keyword: localized re-emission keeps
+    // the glyph exactly while keywords project through the reader surface.
+    let mut interner = Interner::new();
+    let program = transfer_program(&mut interner);
+    let types = TypeTable::new();
+
+    let code = FaberCodegen::default()
+        .generate(
+            &program,
+            &empty_presentation(),
+            &types,
+            &interner,
+            &LocaleSurface,
+        )
+        .expect("codegen")
+        .code;
+    assert!(
+        code.contains("⇇"),
+        "localized transfer output must keep the U+21C7 glyph, got:\n{code}"
+    );
+}

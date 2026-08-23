@@ -403,3 +403,31 @@ fn body_def_id(metadata: &NucleumProgramMetadata, name: &str) -> u32 {
         .expect("item")
         .def_id
 }
+
+#[test]
+fn fragment_transfer_sink_is_recorded_as_fragment_callee() {
+    // EOT-3W: `walk_expr_callees` covers `HirExpressionKind::Transfer` — a
+    // fragment invoked as a `⇇` sink is a called fragment (once per payload),
+    // so the post-import call graph records the edge instead of silently
+    // dropping it through the catch-all.
+    let unit = analyze(
+        "device.fab",
+        r"
+@ nucleum fragment
+functio emit(fractus<f32> x) → vacuum { tacet }
+
+@ nucleum
+functio k(fractus<f32> x) → fractus<f32> {
+    emit ⇇ x
+    redde x
+}
+",
+    );
+    let metadata = collect_nucleum_metadata(&unit, "device.fab").expect("collect");
+    let k = metadata
+        .items
+        .iter()
+        .find(|item| item.name == "k")
+        .expect("k entry");
+    assert_eq!(k.fragment_callees, vec!["emit".to_owned()]);
+}

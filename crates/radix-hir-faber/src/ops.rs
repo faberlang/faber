@@ -28,6 +28,10 @@ impl super::FaberCodegen {
             HirExpressionKind::Assign(_, _) | HirExpressionKind::ConversioAssign { .. } => 1,
             HirExpressionKind::Si { .. } | HirExpressionKind::Conversio { .. } => 2,
             HirExpressionKind::Binary(op, _, _) => self.binop_precedence(*op),
+            // `⇇` sits between assignment and the ternary level: the sink and
+            // payloads are complete ternaries (parser locks it just above
+            // assignment), so the chain shares the Si/Conversio level.
+            HirExpressionKind::Transfer { .. } => 2,
             // TypeCheck (`expr est <type>`) behaves like Is (precedence 4):
             // both are relational-style checks spelled with `est`.
             HirExpressionKind::TypeCheck { .. } => 4,

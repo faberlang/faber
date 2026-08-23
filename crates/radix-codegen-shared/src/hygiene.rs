@@ -52,6 +52,12 @@ pub fn temp(id: u32) -> String {
     format!("t{id}")
 }
 
+/// Transfer sink temporary (`⇇` single-evaluation binding).
+#[must_use]
+pub fn transfer_sink(id: u32) -> String {
+    format!("z{id}")
+}
+
 /// Loop item scratch when the binding name is not emitted directly.
 #[must_use]
 pub fn item(def_id: u32) -> String {

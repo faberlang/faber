@@ -801,6 +801,26 @@ fn walk_expr_callees(expr: &HirExpression, index: &NucleumIndex, names: &mut Vec
                 walk_expr_callees(&arg.expr, index, names);
             }
         }
+        // A transfer invokes its sink once per payload (EOT-3M/MIR contract),
+        // so a fragment sink is a called fragment callee per payload — never
+        // silently dropped by the catch-all.
+        HirExpressionKind::Transfer { sink, payloads } => {
+            let sink_fragment_def = match &sink.kind {
+                HirExpressionKind::Path(def_id) if index.roles.get(def_id) == Some(&NucleumRole::Fragment) => {
+                    Some(*def_id)
+                }
+                _ => None,
+            };
+            for payload in payloads {
+                if let Some(def_id) = sink_fragment_def {
+                    if let Some(name) = index.names.get(&def_id) {
+                        names.push(name.clone());
+                    }
+                }
+                walk_expr_callees(payload, index, names);
+            }
+            walk_expr_callees(sink, index, names);
+        }
         HirExpressionKind::Binary(_, lhs, rhs)
         | HirExpressionKind::Assign(lhs, rhs)
         | HirExpressionKind::Index(lhs, rhs) => {

@@ -92,13 +92,124 @@ fn selective_import_decode_passes_referential_integrity() {
 }
 
 #[test]
-fn selective_import_field_keeps_schema_v4_no_ratchet() {
+fn selective_import_field_kept_schema_v4_transfer_ratchets_to_v5() {
     // Schema-version receipt (fail-closed policy): `HirImport.selective` is an
-    // additive `#[serde(default)]` field, so the version stays 4 — no wire
-    // break, no compatibility decoder. Consumers of the bool today:
+    // additive `#[serde(default)]` field, so the version stayed 4 at EOT-2W —
+    // no wire break, no compatibility decoder. Consumers of the bool today:
     // radix-hir-faber decl emission (locale-preserving `fixum` list),
     // radix-hir-rust namespace/use analysis (locals, not namespaces),
     // radix-hir-ts decl emission (value-import form), radix-hir-go
     // fail-closed, and this crate's round-trip/validate proof.
-    assert_eq!(SCHEMA_VERSION, 4);
+    // EOT-3W ratchets to 5 (Transfer variant shifts serde ordinals); this pin
+    // records the v4 policy and its consumers.
+    assert_eq!(SCHEMA_VERSION, 5);
+}
+
+// ── EOT-3W transfer wire contract ────────────────────────────────────────
+
+/// Artifact whose HIR carries one `⇇` transfer statement in the function body.
+fn transfer_artifact() -> HirArtifact {
+    use radix_hir::{HirBlock, HirStatement, HirStatementKind};
+
+    let mut artifact = stub_artifact();
+    artifact.interner = vec!["main".to_string(), "test".to_string(), "funde".to_string()];
+    let transfer = radix_hir::HirExpression {
+        id: radix_hir::HirId(7),
+        ty: None,
+        kind: radix_hir::HirExpressionKind::Transfer {
+            sink: Box::new(radix_hir::HirExpression {
+                id: radix_hir::HirId(8),
+                ty: None,
+                kind: radix_hir::HirExpressionKind::Path(DefId(0)),
+                span: radix_lexer::Span::default(),
+            }),
+            payloads: vec![
+                radix_hir::HirExpression {
+                    id: radix_hir::HirId(9),
+                    ty: None,
+                    kind: radix_hir::HirExpressionKind::Literal(radix_hir::HirLiteral::String(
+                        Symbol(2),
+                    )),
+                    span: radix_lexer::Span::default(),
+                },
+                radix_hir::HirExpression {
+                    id: radix_hir::HirId(10),
+                    ty: None,
+                    kind: radix_hir::HirExpressionKind::Literal(radix_hir::HirLiteral::String(
+                        Symbol(2),
+                    )),
+                    span: radix_lexer::Span::default(),
+                },
+            ],
+        },
+        span: radix_lexer::Span::default(),
+    };
+    let radix_hir::HirItemKind::Function(function) = &mut artifact.hir.items[0].kind else {
+        panic!("stub artifact must carry a function item");
+    };
+    function.body = Some(HirBlock {
+        statements: vec![HirStatement {
+            id: radix_hir::HirId(11),
+            kind: HirStatementKind::Expr(transfer),
+            span: radix_lexer::Span::default(),
+        }],
+        expr: None,
+        span: radix_lexer::Span::default(),
+        ..Default::default()
+    });
+    artifact
+}
+
+#[test]
+fn transfer_round_trips_through_postcard() {
+    // The Transfer variant rides the direct-serde HIR payload; its insertion
+    // before `Error` shifts later serde ordinals, which is exactly why
+    // SCHEMA_VERSION ratcheted to 5.
+    let original = transfer_artifact();
+    let bytes = postcard::to_allocvec(&original).expect("serialize transfer HirArtifact");
+    let deserialized: HirArtifact = postcard::from_bytes(&bytes).expect("deserialize");
+    assert_eq!(original, deserialized);
+    let radix_hir::HirItemKind::Function(function) = &deserialized.hir.items[0].kind else {
+        panic!("expected function item");
+    };
+    let body = function.body.as_ref().expect("body");
+    let radix_hir::HirStatementKind::Expr(expr) = &body.statements[0].kind else {
+        panic!("expected expr statement");
+    };
+    let radix_hir::HirExpressionKind::Transfer { sink, payloads } = &expr.kind else {
+        panic!("expected transfer expression");
+    };
+    assert!(
+        matches!(sink.kind, radix_hir::HirExpressionKind::Path(DefId(0))),
+        "sink must survive the wire"
+    );
+    assert_eq!(
+        payloads.len(),
+        2,
+        "ordered payload list must survive the wire"
+    );
+}
+
+#[test]
+fn transfer_decode_passes_referential_integrity() {
+    // decode() runs the schema-version gate plus validate_referential_integrity:
+    // the sink/payload expressions must be collected (ids + defs) so a valid
+    // transfer artifact loads rather than failing with DanglingIndex.
+    let artifact = transfer_artifact();
+    let bytes = crate::decode::encode(&artifact).expect("encode");
+    let decoded = crate::decode::decode(&bytes).expect("transfer artifact must validate");
+    let radix_hir::HirItemKind::Function(function) = &decoded.hir.items[0].kind else {
+        panic!("expected function item");
+    };
+    let body = function.body.as_ref().expect("body");
+    assert!(
+        matches!(
+            &body.statements[0].kind,
+            radix_hir::HirStatementKind::Expr(radix_hir::HirExpression {
+                kind: radix_hir::HirExpressionKind::Transfer { .. },
+                ..
+            })
+        ),
+        "transfer must survive the full decode/validate path"
+    );
 }
