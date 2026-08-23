@@ -267,10 +267,12 @@ fn resource_identity_and_mutation_rules_survive_to_device_program() {
 }
 
 /// Lifetimes survive: the one-shot boundary-call regime of the NGAB0-U11
-/// vertical slice is carried as the program lifetime (`SingleRun`) and every
-/// buffer lifetime (`PerProgram`), and the observation rows are declared for
-/// exactly the output-role buffers — produced by the kernel's launch, read
-/// back once at end of run. No observation is inferred from role or text.
+/// vertical slice is carried as the program lifetime (`SingleRun`), the
+/// host-provided input lives for the whole program (`PerProgram`), the
+/// written output is a declared observation point, and the observation rows
+/// are declared for exactly the output-role buffers — produced by the
+/// kernel's launch at the per-execution cadence. No observation is inferred
+/// from role or text.
 #[test]
 fn lifetimes_and_observation_facts_survive_to_device_program() {
     let mut types = TypeTable::new();
@@ -280,10 +282,18 @@ fn lifetimes_and_observation_facts_survive_to_device_program() {
 
     // Program lifetime: the declared single-run regime.
     assert_eq!(program.lifetime, DeviceProgramLifetime::SingleRun);
-    // Buffer lifetime: every slot's storage lives for the whole program.
+    // Buffer lifetime: the read-only input persists for the whole program;
+    // the written output is read back at its observation point.
     for kernel in &program.kernels {
+        assert_eq!(
+            kernel.resources[0].buffer.lifetime,
+            BufferLifetime::PerProgram
+        );
+        assert_eq!(
+            kernel.resources[1].buffer.lifetime,
+            BufferLifetime::ObservationPoint
+        );
         for slot in &kernel.resources {
-            assert_eq!(slot.buffer.lifetime, BufferLifetime::PerProgram);
             assert_eq!(
                 slot.buffer.storage,
                 MirTensorStorageLayout::DeviceHandle,
@@ -298,7 +308,7 @@ fn lifetimes_and_observation_facts_survive_to_device_program() {
     let launch_id = program.launches[0].id;
 
     // Observations: exactly one declared result row — the output-role buffer,
-    // produced by the single launch, read back once at the end of the run.
+    // produced by the single launch, read back at the per-execution cadence.
     // A declared observation point, never an inference from role/lifetime.
     let output = &program.kernels[0].resources[1];
     assert_eq!(program.results.len(), 1);
@@ -307,11 +317,11 @@ fn lifetimes_and_observation_facts_survive_to_device_program() {
     assert_eq!(result.role, BufferRole::Output);
     assert_eq!(result.buffer.role, BufferRole::Output);
     assert_eq!(result.produced_by, launch_id);
-    assert_eq!(result.cadence, ObservationCadence::EndOfRun);
+    assert_eq!(result.cadence, ObservationCadence::PerStep);
 
     // The derived program passes the shared schema (the derivation ran the
     // gate already, but the observation/lifetime cross-checks are proven here
-    // on the carried facts: EndOfRun × PerProgram is the legal pair).
+    // on the carried facts: PerStep × ObservationPoint is the legal pair).
     program
         .validate()
         .expect("derived program passes shared schema validation");
