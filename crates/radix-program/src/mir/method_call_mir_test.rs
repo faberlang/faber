@@ -237,9 +237,6 @@ fn package_mir_nested_library_method_calls_execute() {
         panic!(
             "nested tensor method calls must link: {:?}",
             diagnostics
-                .iter()
-                .map(|diag| diag.message.clone())
-                .collect::<Vec<_>>()
         )
     });
     assert_nested_tensor_output(host.stdout_lines);
@@ -352,9 +349,6 @@ fn package_test_self_provider_nested_tensor_methods_execute() {
         panic!(
             "self-provider nested tensor methods must lower: {:?}",
             diagnostics
-                .iter()
-                .map(|diag| diag.message.clone())
-                .collect::<Vec<_>>()
         )
     });
     assert_nested_tensor_output(output);
@@ -530,9 +524,6 @@ fn package_test_sibling_union_payloads_project() {
         panic!(
             "sibling union payload projections must link: {:?}",
             diagnostics
-                .iter()
-                .map(|diag| diag.message.clone())
-                .collect::<Vec<_>>()
         )
     });
     assert_eq!(
@@ -566,9 +557,6 @@ fn gradus_cache_proba_package_test_links() {
         panic!(
             "analyze gradus cache.proba: {:?}",
             diagnostics
-                .iter()
-                .map(|diag| diag.message.clone())
-                .collect::<Vec<_>>()
         )
     });
     let (root_id, _) = package
@@ -606,9 +594,6 @@ fn gradus_cache_proba_package_test_links() {
         panic!(
             "gradus cache.proba must link: {:?}",
             diagnostics
-                .iter()
-                .map(|diag| diag.message.clone())
-                .collect::<Vec<_>>()
         )
     });
 }
@@ -677,9 +662,6 @@ fn package_mir_nested_library_method_calls_link_through_test_package() {
         panic!(
             "nested tensor method calls must lower on the test-link lane: {:?}",
             diagnostics
-                .iter()
-                .map(|diag| diag.message.clone())
-                .collect::<Vec<_>>()
         )
     });
     assert_nested_tensor_output(output);

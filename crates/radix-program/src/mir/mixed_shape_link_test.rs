@@ -179,9 +179,6 @@ fn package_mir_mixed_shape_generic_instances_are_distinct() {
         panic!(
             "mixed-shape package MIR must link, got {:?}",
             errors
-                .iter()
-                .map(|error| error.message.clone())
-                .collect::<Vec<_>>()
         )
     });
 }
@@ -236,9 +233,6 @@ fn package_mir_mixed_shape_generic_links_through_test_package() {
         panic!(
             "mixed-shape test-package MIR must link, got {:?}",
             errors
-                .iter()
-                .map(|error| error.message.clone())
-                .collect::<Vec<_>>()
         )
     });
 }

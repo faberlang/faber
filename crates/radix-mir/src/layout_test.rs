@@ -400,9 +400,11 @@ fn width_sub_table(width: NumericWidth) -> (SizedNumericOutcome, SizedNumericOut
             SizedNumericOutcome::LoudError,
             SizedNumericOutcome::PhysicalScalar,
         ),
+        // bf16-U3: `fractus<bf16>` resolves its own named scalar row;
+        // `numerus<bf16>` stays a loud missing fact.
         NumericWidth::BF16 => (
             SizedNumericOutcome::LoudError,
-            SizedNumericOutcome::LoudError,
+            SizedNumericOutcome::PhysicalScalar,
         ),
     }
 }
@@ -433,14 +435,11 @@ fn resolve_outcome(table: &MirLayoutTable, ty: radix_types::TypeId) -> SizedNume
         Err(err) => {
             assert_eq!(
                 err.issue, "mir_layout_missing_type_fact",
-                "loud error issue: {}",
-                err.message
+                "loud error issue: {err:?}"
             );
-            assert!(
-                err.message.contains("has no named layout arm"),
-                "fallthrough-law message: {}",
-                err.message
-            );
+            // Named missing-fact row: the failing type id is the structured
+            // identity of the fallthrough-law error (no named layout arm).
+            assert_eq!(err.ty, Some(ty), "fallthrough error names the type: {err:?}");
             SizedNumericOutcome::LoudError
         }
     }
@@ -476,7 +475,6 @@ fn every_sized_numeric_width_matches_its_sub_table_row() {
 #[test]
 fn unmapped_sized_numerics_error_loudly_with_the_width_named() {
     for (prim, width) in [
-        (Primitive::Fractus, NumericWidth::BF16),
         (Primitive::Numerus, NumericWidth::F32),
         (Primitive::Fractus, NumericWidth::U32),
     ] {
@@ -488,15 +486,10 @@ fn unmapped_sized_numerics_error_loudly_with_the_width_named() {
             .expect_err("unmapped sized numeric must not resolve a layout");
         assert_eq!(
             err.issue, "mir_layout_missing_type_fact",
-            "loud error issue: {}",
-            err.message
+            "loud error issue: {err:?}"
         );
-        let marker = width.faber_marker();
-        assert!(
-            err.message.contains(marker),
-            "width named in the message: {}",
-            err.message
-        );
+        // The width is named through the structured type id, not prose.
+        assert_eq!(err.ty, Some(ty), "width named by type id: {err:?}");
     }
 }
 

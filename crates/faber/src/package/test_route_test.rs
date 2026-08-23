@@ -145,28 +145,16 @@ fn bounded_diagnostic_names_input_filter_and_descent() {
     assert!(diagnostic_has_arg(&diagnostic, "phase", "analyze"));
     assert!(diagnostic_has_arg(&diagnostic, "include", "cache.proba"));
     assert!(diagnostic_has_arg(&diagnostic, "selected", "cache.proba"));
-    assert!(
-        diagnostic.message.contains("cache.proba"),
-        "{}",
-        diagnostic.message
-    );
-    assert!(
-        diagnostic.message.contains("decode.proba"),
-        "{}",
-        diagnostic.message
-    );
-    assert!(
-        diagnostic.message.contains("speculative.proba"),
-        "{}",
-        diagnostic.message
-    );
-    assert!(
-        diagnostic
-            .message
-            .contains(&PACKAGE_TEST_ANALYZE_BUDGET.as_millis().to_string()),
-        "{}",
-        diagnostic.message
-    );
+    assert!(diagnostic_has_arg(
+        &diagnostic,
+        "discovered",
+        "cache.proba, decode.proba, speculative.proba"
+    ));
+    assert!(diagnostic_has_arg(
+        &diagnostic,
+        "budget_ms",
+        PACKAGE_TEST_ANALYZE_BUDGET.as_millis().to_string()
+    ));
 }
 
 #[test]

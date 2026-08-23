@@ -105,7 +105,6 @@ fn cli_exposes_the_dedicated_output_transfer_codemod_command() {
 fn assert_decline(reason: &DeclineReason, code: &str) {
     assert_eq!(reason.code, code);
     assert!(reason.end >= reason.start);
-    assert!(!reason.message.is_empty());
 }
 
 fn rust_emit(name: &str, source: &str) -> String {
@@ -114,11 +113,7 @@ fn rust_emit(name: &str, source: &str) -> String {
     assert!(
         result.success(),
         "native rust emit failed for {name}: {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|diagnostic| diagnostic.message.clone())
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
     radix::services::output_code(result.output.expect("rust output"))
 }

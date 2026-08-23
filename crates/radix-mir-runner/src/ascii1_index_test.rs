@@ -27,16 +27,13 @@ fn scalar_ascii_index_second_byte_is_ascii1() {
 #[test]
 fn scalar_index_out_of_bounds_fails_closed() {
     let err = scalar_text_index("ab", 2, span()).expect_err("OOB");
-    assert!(
-        err.message.contains("text index out of bounds"),
-        "got {err:?}"
-    );
+    assert_eq!(err.issue, "runner_text_index_out_of_bounds");
 }
 
 #[test]
 fn non_ascii_scalar_index_fails_closed() {
     let err = ascii1_from_scalar('é', span()).expect_err("non-ASCII");
-    assert!(err.message.contains("textus index trap"), "got {err:?}");
+    assert_eq!(err.issue, "runner_textus_index_trap");
     let _: RunnerError = err;
 }
 

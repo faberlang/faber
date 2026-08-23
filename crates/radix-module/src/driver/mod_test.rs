@@ -948,8 +948,9 @@ fn call_argument_type_mismatch_renders_code_file_line_and_expected_got() {
         .find(|d| d.is_error())
         .expect("error diagnostic");
     let rendered = crate::diagnostics::render_plain(diag);
-    assert!(
-        rendered.contains("CODEGEN001"),
+    assert_eq!(
+        diag.code,
+        Some("CODEGEN001"),
         "driver route must carry a catalog code: {rendered}"
     );
     assert!(

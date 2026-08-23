@@ -79,11 +79,6 @@ fn emit_rejects_legacy_context_dependent_cede_hir() {
     .expect_err("legacy Cede HIR must fail closed before Faber emission");
 
     assert!(
-        err.message.contains("legacy context-dependent cede HIR"),
-        "unexpected error message: {}",
-        err.message
-    );
-    assert!(
         err.args
             .iter()
             .any(|arg| arg.name == "issue" && arg.value == "legacy_cede_reached_faber_codegen"),

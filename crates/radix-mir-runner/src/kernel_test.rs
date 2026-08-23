@@ -922,9 +922,13 @@ fn consolum_unknown_verb_fails_closed() {
         "unknown verb must stay fail-closed, got {}",
         err.issue
     );
-    assert!(err
-        .message
-        .contains("consolum kernel verb `write_bytes_async`"));
+    assert_eq!(
+        err.issue,
+        "runner_faberscript_unsupported_consolum_kernel_verb_write_bytes_async"
+    );
     let err = consolum(&mut host, "not_a_verb", &[]).expect_err("unknown");
-    assert!(err.message.contains("consolum kernel verb `not_a_verb`"));
+    assert_eq!(
+        err.issue,
+        "runner_faberscript_unsupported_consolum_kernel_verb_not_a_verb"
+    );
 }

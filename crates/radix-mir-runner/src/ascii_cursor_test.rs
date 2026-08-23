@@ -86,13 +86,7 @@ fn textus_cursor_two_scalars_are_ascii1_not_heap_strings() {
 #[test]
 fn textus_cursor_non_ascii_scalar_traps() {
     let err = eval_cord_cursor(Value::Str("é".to_owned())).expect_err("non-ASCII");
-    assert!(
-        err.message.contains("textus index trap"),
-        "non-ASCII cursor must use the live [i] trap, got {err:?}"
-    );
+    assert_eq!(err.issue, "runner_textus_index_trap");
     let err = eval_cord_cursor(Value::Str("ξ".to_owned())).expect_err("non-ASCII greek");
-    assert!(
-        err.message.contains("textus index trap"),
-        "non-ASCII cursor must use the live [i] trap, got {err:?}"
-    );
+    assert_eq!(err.issue, "runner_textus_index_trap");
 }
