@@ -296,7 +296,7 @@ pub fn build_device_program(
 
         builds.push((
             function.id,
-            kernel_entry_name(function, interner),
+            crate::host_partition::kernel_entry_name(function, interner),
             plan,
             KernelLaunchPlan::from_signature_and_function(&signature, function),
             resources,
@@ -524,10 +524,6 @@ fn buffer_slot_name(
         crate::abi::MirKernelResourceRole::Input => format!("input_{}", resource.binding),
         crate::abi::MirKernelResourceRole::Output => format!("output_{}", resource.binding),
     }
-}
-
-fn kernel_entry_name(function: &MirFunction, interner: &Interner) -> String {
-    crate::host_partition::kernel_entry_name(function, interner)
 }
 
 fn buffer_lifetime(buffer: &ProgramBuffer, lifetime: DeviceProgramLifetime) -> BufferLifetime {
