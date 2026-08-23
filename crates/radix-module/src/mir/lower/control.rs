@@ -1481,6 +1481,20 @@ impl FunctionBuilder<'_> {
         Some(())
     }
 
+    /// Pointee classification for a borrowed itera receiver: the same
+    /// lista/tabula arms the by-value lanes already iterate, applied to the
+    /// carrier under the `Ref` marker. Other pointees stay unsupported so the
+    /// fail-closed decline (and the sibling tensor/bounded admission goals)
+    /// is untouched.
+    fn borrowed_collection_itera_kind(&self, pointee: TypeId, mode: HirIteraMode) -> CollectionIteraKind {
+        match self.normalized_type(pointee) {
+            Type::Array(item) => CollectionIteraKind::Array(*item),
+            Type::Map(key, _) if matches!(mode, HirIteraMode::De) => CollectionIteraKind::MapKeys(*key),
+            Type::Map(_, value) if matches!(mode, HirIteraMode::Ex) => CollectionIteraKind::MapValues(*value),
+            _ => CollectionIteraKind::Unsupported,
+        }
+    }
+
     fn lower_array_itera(&mut self, iter: ArrayIteraLowering<'_>) -> Option<()> {
         let Some(iter_ty) = iter.iter.ty else {
             self.errors
@@ -1557,6 +1571,11 @@ impl FunctionBuilder<'_> {
                 Type::Array(item) => CollectionIteraKind::Array(*item),
                 Type::Map(key, _) if matches!(iter.mode, HirIteraMode::De) => CollectionIteraKind::MapKeys(*key),
                 Type::Map(_, value) if matches!(iter.mode, HirIteraMode::Ex) => CollectionIteraKind::MapValues(*value),
+                // Borrowed receiver (`de`/`in` param, or a field read through
+                // a reference): classify by pointee. Only the by-value carrier
+                // arms are admitted through the borrow; other pointees keep
+                // the fail-closed decline below.
+                Type::Ref(_, inner) => self.borrowed_collection_itera_kind(*inner, iter.mode),
                 Type::Cursor(value) if matches!(iter.mode, HirIteraMode::Ex) => CollectionIteraKind::Cursor(*value),
                 Type::AsyncCursor(value, _) if matches!(iter.mode, HirIteraMode::Ex) => {
                     CollectionIteraKind::AsyncCursor(*value)
@@ -1594,6 +1613,13 @@ impl FunctionBuilder<'_> {
 
         let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        // A borrowed receiver types its loop-local collection by the payload
+        // under the `Ref` marker, so a borrowed receiver and its by-value twin
+        // lower byte-identically.
+        let collection_semantic = match self.normalized_type(iter_ty) {
+            Type::Ref(_, inner) => *inner,
+            _ => iter_ty,
+        };
         let collection = self.lower_expr_value(iter.iter)?;
         let (collection, collection_ty) = match &collection_kind {
             CollectionIteraKind::Cursor(element) | CollectionIteraKind::AsyncCursor(element) => {
@@ -1607,7 +1633,7 @@ impl FunctionBuilder<'_> {
                 );
                 (snapshot, array_ty)
             }
-            _ => (collection, MirType::semantic(iter_ty)),
+            _ => (collection, MirType::semantic(collection_semantic)),
         };
         let collection = self.materialize_operand_place(collection, collection_ty, iter.iter.span);
         if let CollectionIteraKind::Shaped { element, dimensions, matrix } = &collection_kind {

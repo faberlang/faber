@@ -1514,21 +1514,25 @@ fn lowers_array_itera_ex_and_de_to_index_loops() {
 }
 
 #[test]
-fn borrowed_receiver_itera_ex_declines_before_iterator_mir_lowering() {
-    // MRL-1: passing pins of today's decline for borrowed receivers. The
-    // decline fails lowering outright, so the pin asserts the MIR error
-    // message itself; MRL-2 flips these when control.rs classification lands.
-    let declined = |source: &str| -> Vec<String> {
-        let mut unit = analyze(source);
-        lower_analyzed_unit(&mut unit, Default::default())
-            .expect_err("borrowed-receiver itera ex must decline before the MRL-2 fix")
-            .into_iter()
-            .map(|error| error.message)
-            .collect()
-    };
+fn borrowed_receiver_itera_ex_lowers_by_pointee_with_by_value_identical_dump() {
+    // MRL-2 flip of MRL-1's decline pins: a borrowed receiver (`de` param,
+    // or a field read through one) classifies by pointee and lowers through
+    // the same lanes as its by-value twin — byte-identical dump.
+    let twin_dump = |mode: &str, source: &str| dump_source(&source.replace("MODUS", mode));
 
-    let list_errors = declined(
-        r"functio summa(de lista<numerus> xs) → numerus {
+    let list_borrowed = twin_dump(
+        "de",
+        r"functio summa(MODUS lista<numerus> xs) → numerus {
+  varia numerus total ← 0
+  itera ex xs fixum n {
+    total ← total + n
+  }
+  redde total
+}",
+    );
+    let list_by_value = twin_dump(
+        "",
+        r"functio summa(MODUS lista<numerus> xs) → numerus {
   varia numerus total ← 0
   itera ex xs fixum n {
     total ← total + n
@@ -1537,16 +1541,32 @@ fn borrowed_receiver_itera_ex_declines_before_iterator_mir_lowering() {
 }",
     );
     assert!(
-        list_errors.iter().any(|message| message.contains("itera collection before iterator MIR lowering")),
-        "itera ex over a de lista param must carry the decline: {list_errors:?}"
+        !list_borrowed.contains("itera collection before iterator MIR lowering"),
+        "itera ex over a de lista param must lower: {list_borrowed}"
     );
+    assert_eq!(list_borrowed, list_by_value, "de lista receiver must match by-value twin");
 
-    let field_errors = declined(
+    let field_borrowed = twin_dump(
+        "de",
         r"genus Crater {
   lista<numerus> mensurae
 }
 
-functio summaCrateris(de Crater c) → numerus {
+functio summaCrateris(MODUS Crater c) → numerus {
+  varia numerus total ← 0
+  itera ex c.mensurae fixum n {
+    total ← total + n
+  }
+  redde total
+}",
+    );
+    let field_by_value = twin_dump(
+        "",
+        r"genus Crater {
+  lista<numerus> mensurae
+}
+
+functio summaCrateris(MODUS Crater c) → numerus {
   varia numerus total ← 0
   itera ex c.mensurae fixum n {
     total ← total + n
@@ -1555,14 +1575,24 @@ functio summaCrateris(de Crater c) → numerus {
 }",
     );
     assert!(
-        field_errors
-            .iter()
-            .any(|message| message.contains("itera collection before iterator MIR lowering")),
-        "itera ex over a de struct param field must carry the decline: {field_errors:?}"
+        !field_borrowed.contains("itera collection before iterator MIR lowering"),
+        "itera ex over a de struct param field must lower: {field_borrowed}"
     );
+    assert_eq!(field_borrowed, field_by_value, "de struct field receiver must match by-value twin");
 
-    let map_errors = declined(
-        r"functio summaPondereum(de tabula<textus, numerus> pondera) → numerus {
+    let map_borrowed = twin_dump(
+        "de",
+        r"functio summaPondereum(MODUS tabula<textus, numerus> pondera) → numerus {
+  varia numerus total ← 0
+  itera ex pondera fixum v {
+    total ← total + v
+  }
+  redde total
+}",
+    );
+    let map_by_value = twin_dump(
+        "",
+        r"functio summaPondereum(MODUS tabula<textus, numerus> pondera) → numerus {
   varia numerus total ← 0
   itera ex pondera fixum v {
     total ← total + v
@@ -1571,8 +1601,146 @@ functio summaCrateris(de Crater c) → numerus {
 }",
     );
     assert!(
-        map_errors.iter().any(|message| message.contains("itera collection before iterator MIR lowering")),
-        "itera ex over a de tabula param must carry the decline: {map_errors:?}"
+        !map_borrowed.contains("itera collection before iterator MIR lowering"),
+        "itera ex over a de tabula param must lower: {map_borrowed}"
+    );
+    // The `de` marker interns one extra `Ref` type, shifting later opaque
+    // type-table ids by one (ty#31 vs ty#30); the lowering itself is
+    // identical, so the map twins compare with type ids erased.
+    assert_eq!(
+        erase_type_ids(&map_borrowed),
+        erase_type_ids(&map_by_value),
+        "de tabula receiver must match by-value twin"
+    );
+
+    // OQ4: `itera de` key iteration shares the classifier — its borrowed arm
+    // lowers through the same MapKeys lane as the by-value twin.
+    let keys_borrowed = twin_dump(
+        "de",
+        r"functio numerateClaves(MODUS tabula<textus, numerus> pondera) → numerus {
+  varia numerus total ← 0
+  itera de pondera fixum k {
+    total ← total + pondera[k]
+  }
+  redde total
+}",
+    );
+    let keys_by_value = twin_dump(
+        "",
+        r"functio numerateClaves(MODUS tabula<textus, numerus> pondera) → numerus {
+  varia numerus total ← 0
+  itera de pondera fixum k {
+    total ← total + pondera[k]
+  }
+  redde total
+}",
+    );
+    assert!(
+        !keys_borrowed.contains("itera collection before iterator MIR lowering"),
+        "itera de over a de tabula param must lower: {keys_borrowed}"
+    );
+    assert_eq!(
+        erase_type_ids(&keys_borrowed),
+        erase_type_ids(&keys_by_value),
+        "de tabula key iteration must match by-value twin"
+    );
+}
+
+/// Erase opaque `ty#N` ids from a dump so twin comparisons ignore the
+/// type-table interning shift a `de` marker's `Ref` wrapper introduces.
+fn erase_type_ids(dump: &str) -> String {
+    let mut parts = dump.split("ty#");
+    let mut erased = String::from(parts.next().unwrap_or_default());
+    for part in parts {
+        erased.push_str("ty#");
+        erased.push_str(part.trim_start_matches(|c: char| c.is_ascii_digit()));
+    }
+    erased
+}
+
+#[test]
+fn borrowed_receiver_itera_runs_runtime_correct_results() {
+    let source = r#"genus Crater {
+  lista<numerus> mensurae
+}
+
+functio summa(de lista<numerus> xs) → numerus {
+  varia numerus total ← 0
+  itera ex xs fixum n {
+    total ← total + n
+  }
+  redde total
+}
+
+functio summaCrateris(de Crater c) → numerus {
+  varia numerus total ← 0
+  itera ex c.mensurae fixum n {
+    total ← total + n
+  }
+  redde total
+}
+
+functio summaPondereum(de tabula<textus, numerus> pondera) → numerus {
+  varia numerus total ← 0
+  itera ex pondera fixum v {
+    total ← total + v
+  }
+  redde total
+}
+
+functio numerateClaves(de tabula<textus, numerus> pondera) → numerus {
+  varia numerus total ← 0
+  itera de pondera fixum k {
+    total ← total + pondera[k]
+  }
+  redde total
+}
+
+incipit {
+  varia lista<numerus> numeri ← [1, 2, 3]
+  nota summa(numeri)
+  fixum Crater crater ← Crater { mensurae = [4, 5] }
+  nota summaCrateris(crater)
+  varia tabula<textus, numerus> pondera ← vacua
+  pondera.pone("a", 10)
+  pondera.pone("b", 32)
+  nota summaPondereum(pondera)
+  nota numerateClaves(pondera)
+}
+"#;
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "borrowed-itera.fab",
+        source,
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("borrowed-receiver itera must run: {error:?}"));
+    assert_eq!(host.stdout_lines, ["6", "9", "42", "42"]);
+}
+
+#[test]
+fn borrowed_pointee_outside_carrier_arms_keeps_fail_closed_decline() {
+    // Only the lista/tabula carrier arms are admitted through the borrow;
+    // a borrowed tensor keeps MRL-1's fail-closed decline (tensor admission
+    // belongs to the air-itera-ex-unroll sibling goal).
+    let mut unit = analyze(
+        r"functio summaTensoris(de tensor<numerus, [8]> t) → numerus {
+  varia numerus total ← 0
+  itera ex t fixum x {
+    total ← total + x
+  }
+  redde total
+}",
+    );
+    let errors = lower_analyzed_unit(&mut unit, Default::default())
+        .expect_err("borrowed tensor itera ex stays outside the pointee admission")
+        .into_iter()
+        .map(|error| error.message)
+        .collect::<Vec<_>>();
+    assert!(
+        errors.iter().any(|message| message.contains("itera collection before iterator MIR lowering")),
+        "borrowed tensor itera ex must keep the decline: {errors:?}"
     );
 }
 
