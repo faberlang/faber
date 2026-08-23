@@ -299,6 +299,12 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
         | HirExpressionKind::ReadLine(_)
         | HirExpressionKind::Error => {}
         HirExpressionKind::Praefixum(inner) => visitor.visit_expr(inner),
+        HirExpressionKind::Transfer { sink, payloads } => {
+            visitor.visit_expr(sink);
+            for payload in payloads {
+                visitor.visit_expr(payload);
+            }
+        }
         HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
             visitor.visit_expr(lhs);
             visitor.visit_expr(rhs);
@@ -815,6 +821,12 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
         | HirExpressionKind::ReadLine(_)
         | HirExpressionKind::Error => {}
         HirExpressionKind::Praefixum(inner) => visitor.visit_expr_mut(inner),
+        HirExpressionKind::Transfer { sink, payloads } => {
+            visitor.visit_expr_mut(sink);
+            for payload in payloads {
+                visitor.visit_expr_mut(payload);
+            }
+        }
         HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
             visitor.visit_expr_mut(lhs);
             visitor.visit_expr_mut(rhs);

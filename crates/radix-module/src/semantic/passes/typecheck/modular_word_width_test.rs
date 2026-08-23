@@ -4,7 +4,8 @@
 //! R3 replaces the `lower_modular_word` u32 allowlist with the unsigned-width
 //! gate.
 
-#[cfg(any(feature = "hir-rust", feature = "hir-faber"))]
+// Unconditional: `analyze_diagnostics` below runs in every feature set and is
+// not target-specific (previously cfg'd, which broke reduced-feature builds).
 use crate::driver::AnalyzeRequest;
 use crate::Compiler;
 use crate::{Config, Target};

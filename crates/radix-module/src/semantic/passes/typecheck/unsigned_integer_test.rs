@@ -3,7 +3,8 @@
 //! signed `i64` literal carrier caps source magnitudes at `i64::MAX`, so every
 //! acceptance test here fails until R1 lands the unsigned magnitude carrier.
 
-#[cfg(feature = "hir-rust")]
+// Unconditional: `analyze_diagnostics` below runs in every feature set and is
+// not hir-rust-specific (previously cfg'd, which broke reduced-feature builds).
 use crate::driver::AnalyzeRequest;
 use crate::Compiler;
 use crate::{Config, Target};

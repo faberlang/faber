@@ -30,6 +30,10 @@ enum DirectionalViewKind {
 const ISSUE_ASCII_LITERAL_TEMPLATE_APPLICATION: &str = "ascii_literal_template_application";
 const ISSUE_ARGUMENT_TYPE_MISMATCH: &str = "argument_type_mismatch";
 const ISSUE_CALLEE_NOT_CALLABLE: &str = "callee_not_callable";
+const ISSUE_TRANSFER_PAYLOAD_TYPE_MISMATCH: &str = "transfer_payload_type_mismatch";
+const ISSUE_TRANSFER_SINK_MUST_BE_UNARY: &str = "transfer_sink_must_be_unary";
+const ISSUE_TRANSFER_SINK_MUST_RETURN_VACUUM: &str = "transfer_sink_must_return_vacuum";
+const ISSUE_TRANSFER_SINK_NOT_CALLABLE: &str = "transfer_sink_not_callable";
 const ISSUE_DIRECTIONAL_VIEW_METHOD_TYPE_ARGS: &str = "directional_view_method_type_args";
 const ISSUE_DYNAMIC_CALLEE_TYPE_ARGS: &str = "dynamic_callee_type_args";
 const ISSUE_DYNAMIC_RECEIVER_METHOD_TYPE_ARGS: &str = "dynamic_receiver_method_type_args";
@@ -1046,6 +1050,126 @@ impl TypeChecker<'_> {
 
         self.invalid_operand_types(ISSUE_FAILABLE_CALL_REQUIRES_HANDLER, span);
         true
+    }
+
+    /// Checks the `⇇` transfer chain (EOT-3M).
+    ///
+    /// Ordinary call semantics with two sink constraints: the sink must be a
+    /// unary callable returning `vacuum`. Each payload is one ordinary call
+    /// argument against the single parameter (per-payload generic
+    /// instantiation, exactly like a direct call per payload), and the whole
+    /// expression is `vacuum`. Diagnostics are target-neutral: no console,
+    /// formatting, or channel wording.
+    pub fn check_transfer(
+        &mut self,
+        sink: &mut HirExpression,
+        payloads: &mut [HirExpression],
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        let vacuum = self.vacuum_type();
+        let sink_ty = self.check_expr(sink);
+        let resolved = self.resolve_inferred_type(sink_ty);
+
+        if self.is_infer(resolved) {
+            // Provisional shape, mirroring inferred ordinary callees: a unary
+            // callable from the first payload's type to `vacuum`.
+            let mut param_ty = self.fresh_infer();
+            for (index, payload) in payloads.iter_mut().enumerate() {
+                let payload_ty = self.check_expr(payload);
+                if index == 0 {
+                    param_ty = payload_ty;
+                }
+            }
+            let sig = FuncSig {
+                type_params: Vec::new(),
+                type_param_constraints: Vec::new(),
+                params: vec![ParamType {
+                    ty: param_ty,
+                    mode: SemanticParamMode::Owned,
+                    optional: false,
+                }],
+                ret: vacuum,
+                err: None,
+                is_async: false,
+                is_generator: false,
+            };
+            let func_ty = self.types.function(sig);
+            self.unify_assign_issue(sink_ty, func_ty, span, ISSUE_TRANSFER_SINK_NOT_CALLABLE);
+            return vacuum;
+        }
+
+        if matches!(
+            self.types.get(resolved),
+            Type::Primitive(Primitive::Ignotum)
+        ) {
+            for payload in payloads {
+                self.check_expr(payload);
+            }
+            return vacuum;
+        }
+
+        let Some(sig) = self.signature_from_type(resolved) else {
+            for payload in payloads {
+                self.check_expr(payload);
+            }
+            self.not_callable(ISSUE_TRANSFER_SINK_NOT_CALLABLE, span);
+            return self.error_type;
+        };
+
+        let unary = sig.params.len() == 1 && !sig.params[0].optional;
+        if !unary {
+            self.invalid_operand_types(ISSUE_TRANSFER_SINK_MUST_BE_UNARY, span);
+        }
+        let ret_vacuum = matches!(
+            self.types.get(self.resolve_inferred_type(sig.ret)),
+            Type::Primitive(Primitive::Vacuum)
+        );
+        if !ret_vacuum {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_TRANSFER_SINK_MUST_RETURN_VACUUM,
+                span,
+            );
+        }
+        if !unary {
+            for payload in payloads {
+                self.check_expr(payload);
+            }
+            return self.error_type;
+        }
+
+        for payload in payloads {
+            // One ordinary call per payload: fresh generic instantiation so
+            // each payload drives its own inference, like separate calls.
+            let mut vars = FxHashMap::default();
+            let instantiated = self.substitute_func_sig(&sig, &mut vars, None);
+            let param = &instantiated.params[0];
+            let payload_ty = self.check_expr_with_expected(payload, Some(param.ty));
+            if self.types.is_ref_view(payload_ty)
+                && (matches!(
+                    param.mode,
+                    SemanticParamMode::MutRef | SemanticParamMode::Move
+                ) || self.types.is_mut_or_own_view(param.ty))
+            {
+                self.error_issue(
+                    SemanticErrorKind::ModeMismatch,
+                    crate::ISSUE_REF_TO_MUT_OR_OWN_POSITION,
+                    payload.span,
+                );
+            }
+            self.unify_carrier_assign(
+                payload_ty,
+                param.ty,
+                payload.span,
+                ISSUE_TRANSFER_PAYLOAD_TYPE_MISMATCH,
+            );
+        }
+
+        // Failable sinks propagate exactly like ordinary failable calls.
+        if self.reject_failable_call(&sig, span) {
+            return self.error_type;
+        }
+        vacuum
     }
 
     /// Whether a nominal def declares generic type parameters.

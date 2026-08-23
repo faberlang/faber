@@ -2607,6 +2607,9 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         | HirExpressionKind::Reddet(_)
         | HirExpressionKind::Tacebit(_)
         | HirExpressionKind::Yield(_)
+        // Transfer lowers through its own visitor arm (sink-once/per-payload
+        // calls); it is unreachable on the unsupported path.
+        | HirExpressionKind::Transfer { .. }
         | HirExpressionKind::TypeCheck { .. } => "primitive expression",
     }
 }

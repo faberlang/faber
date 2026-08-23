@@ -1887,7 +1887,7 @@ impl FunctionBuilder<'_> {
         Some(MirOperand::Temp(destination))
     }
 
-    fn callable_error_ty(&self, callee: &HirExpression) -> Option<MirType> {
+    pub(super) fn callable_error_ty(&self, callee: &HirExpression) -> Option<MirType> {
         fn error_ty(types: &TypeTable, ty: TypeId) -> Option<MirType> {
             match types.get(ty) {
                 Type::Func(signature) => signature.err.map(MirType::semantic),
@@ -1899,7 +1899,7 @@ impl FunctionBuilder<'_> {
     }
 
     // consumes callee and args into MIR statements
-    fn lower_failable_call(
+    pub(super) fn lower_failable_call(
         &mut self,
         callee: MirCallee,
         lowered_args: Vec<MirOperand>,

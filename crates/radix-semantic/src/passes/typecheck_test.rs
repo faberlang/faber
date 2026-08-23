@@ -2167,6 +2167,118 @@ incipit { output ⇇ "salve" }"#,
     );
 }
 
+// =============================================================================
+// EOT-3M — transfer typing (greens the EOT-1 red driver above)
+// =============================================================================
+
+#[test]
+fn transfer_lowers_to_typed_hir_node_with_vacuum_result() {
+    let result = analyze(
+        r#"functio output(textus value) → vacuum { tacet }
+incipit { output ⇇ "salve" ⇇ "mundus" }"#,
+    );
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+
+    let hir = result.hir.as_ref().expect("hir");
+    let entry = hir.entry.as_ref().expect("incipit");
+    let expr = entry
+        .statements
+        .iter()
+        .find_map(|stmt| match &stmt.kind {
+            HirStatementKind::Expr(expr) => Some(expr),
+            _ => None,
+        })
+        .expect("expression statement");
+    let HirExpressionKind::Transfer { sink, payloads } = &expr.kind else {
+        panic!("expected Transfer expression, got {:?}", expr.kind);
+    };
+    assert!(
+        matches!(sink.kind, HirExpressionKind::Path(_)),
+        "sink must lower once as an ordinary path value"
+    );
+    assert_eq!(payloads.len(), 2, "one payload per ⇇");
+    let vacuum = result.types.primitive(Primitive::Vacuum);
+    assert_eq!(expr.ty, Some(vacuum), "transfer result is vacuum");
+}
+
+#[test]
+fn transfer_byte_like_payload_typechecks() {
+    let result = analyze(
+        r#"functio emitte(octeti corpus) → vacuum { tacet }
+incipit { emitte ⇇ |41| }"#,
+    );
+    assert!(
+        result.is_ok(),
+        "byte-like payload must typecheck through ordinary argument rules: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn transfer_sink_not_callable_reports_named_issue() {
+    let result = analyze(r#"incipit { 5 ⇇ "salve" }"#);
+    assert!(result.is_err());
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|err| test_support::issue(err) == Some("transfer_sink_not_callable")),
+        "expected transfer_sink_not_callable, got: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn transfer_sink_must_be_unary_reports_named_issue() {
+    let result = analyze(
+        r#"functio duo(textus a, textus b) → vacuum { tacet }
+incipit { duo ⇇ "salve" }"#,
+    );
+    assert!(result.is_err());
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|err| test_support::issue(err) == Some("transfer_sink_must_be_unary")),
+        "expected transfer_sink_must_be_unary, got: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn transfer_sink_must_return_vacuum_reports_named_issue() {
+    let result = analyze(
+        r#"functio copia(textus a) → textus { redde a }
+incipit { copia ⇇ "salve" }"#,
+    );
+    assert!(result.is_err());
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|err| test_support::issue(err) == Some("transfer_sink_must_return_vacuum")),
+        "expected transfer_sink_must_return_vacuum, got: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn transfer_payload_type_mismatch_reports_named_issue() {
+    let result = analyze(
+        r#"functio output(textus value) → vacuum { tacet }
+incipit { output ⇇ 5 }"#,
+    );
+    assert!(result.is_err());
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|err| test_support::issue(err) == Some("transfer_payload_type_mismatch")),
+        "expected transfer_payload_type_mismatch, got: {:?}",
+        result.diagnostics
+    );
+}
+
 #[test]
 fn eot_legacy_output_and_input_forms_typecheck_unchanged() {
     let result = analyze(

@@ -781,6 +781,64 @@ functio check(valor v) → bivalens {
 // Section G: Direct calls, intrinsics, methods
 // ===========================================================================
 
+/// EOT-3M: one sink evaluation, one invocation per payload, left-to-right.
+///
+/// The sink is an effect-bearing expression (a closure literal constructed at
+/// the transfer site), so a second `const function` or a re-evaluated callee
+/// would be visible in the dump. Payloads `"a"` then `"b"` must each produce
+/// exactly one call on the single sink temp.
+#[test]
+fn lowers_transfer_with_single_sink_evaluation_and_ordered_payloads() {
+    let dump = dump_source(
+        r#"functio output(textus value) → vacuum { tacet }
+incipit {
+  ((textus value) → vacuum ∴ output(value)) ⇇ "a" ⇇ "b"
+}"#,
+    );
+
+    assert_eq!(
+        dump.matches("%0 = const function").count(),
+        1,
+        "sink expression must be evaluated exactly once:\n{dump}"
+    );
+    let first = dump
+        .find("call %0(const string sym#7)")
+        .unwrap_or_else(|| panic!("first payload call missing:\n{dump}"));
+    let second = dump
+        .find("call %0(const string sym#8)")
+        .unwrap_or_else(|| panic!("second payload call missing:\n{dump}"));
+    assert!(first < second, "payloads must be invoked left-to-right:\n{dump}");
+    assert_eq!(
+        dump.matches("call %0(").count(),
+        2,
+        "exactly one invocation per payload:\n{dump}"
+    );
+}
+
+/// EOT-3M: a path sink binds once and every payload transfers on that single
+/// callable value.
+#[test]
+fn lowers_transfer_path_sink_invokes_once_per_payload() {
+    let dump = dump_source(
+        r#"functio output(textus value) → vacuum { tacet }
+incipit {
+  fixum _ sink ← (textus value) → vacuum ∴ output(value)
+  sink ⇇ "a" ⇇ "b"
+}"#,
+    );
+
+    assert_eq!(
+        dump.matches("%0 = const function").count(),
+        1,
+        "closure sink constructed once:\n{dump}"
+    );
+    assert_eq!(
+        dump.matches("call _0(").count(),
+        2,
+        "one invocation per payload on the single sink:\n{dump}"
+    );
+}
+
 fn lowers_direct_calls_to_definition_callees() {
     let dump =
         dump_source("functio duplex(numerus n) → numerus { redde n * 2 } functio usa() → numerus { redde duplex(4) }");

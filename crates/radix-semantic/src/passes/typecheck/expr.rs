@@ -134,6 +134,9 @@ impl TypeChecker<'_> {
                 );
                 self.error_type
             }
+            HirExpressionKind::Transfer { sink, payloads } => {
+                self.check_transfer(sink, payloads, expr.span)
+            }
             HirExpressionKind::MethodCall(receiver, name, type_args, args) => {
                 self.check_method_call(receiver, name, type_args, args, expected)
             }

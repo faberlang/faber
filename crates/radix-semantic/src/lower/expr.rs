@@ -92,13 +92,10 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::TypeCheck(type_check) => lowerer.lower_type_check(type_check),
         ExprKind::Iuncta(iuncta) => lowerer.lower_iuncta(iuncta),
         ExprKind::Summa(summa) => lower_summa(lowerer, summa),
-        // EOT-3S repair (fail-closed): `⇇` transfer lowering is owned by
-        // EOT-3M. Until then a parsed transfer recovers as an Error node with
-        // a named issue instead of silently dropping the sink or payloads.
-        ExprKind::Transfer(_) => {
-            lowerer.error("transfer_unsupported");
-            HirExpressionKind::Error
-        }
+        // EOT-3M: `⇇` transfer lowers to the typed HIR node. The sink and
+        // payloads are ordinary expressions; typecheck owns the unary
+        // vacuum-returning callable rules and payload compatibility.
+        ExprKind::Transfer(transfer) => lowerer.lower_transfer(transfer),
     };
 
     HirExpression {
@@ -715,6 +712,25 @@ impl Lowerer<'_> {
         HirExpressionKind::Gradient {
             call: Box::new(call),
             selected_arguments,
+        }
+    }
+
+    /// Lower the `⇇` transfer chain (EOT-3M).
+    ///
+    /// The node is not normalized to nested calls: the single sink plus the
+    /// ordered payload list is the contract that typecheck and MIR lowering
+    /// prove sink-once / left-to-right evaluation against. The sink expression
+    /// lowers exactly once here, before any payload.
+    fn lower_transfer(&mut self, transfer: &radix_syntax::TransferExpr) -> HirExpressionKind {
+        let sink = lower_expr(self, &transfer.sink);
+        let payloads = transfer
+            .payloads
+            .iter()
+            .map(|payload| lower_expr(self, payload))
+            .collect();
+        HirExpressionKind::Transfer {
+            sink: Box::new(sink),
+            payloads,
         }
     }
 
