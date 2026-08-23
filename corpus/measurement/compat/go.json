@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 285,
-    "analyzable": 310
+    "capable": 286,
+    "analyzable": 311
   },
   "terms": [
     {
@@ -168,8 +168,8 @@
     {
       "term": "cape",
       "rule": "keyword",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "⊻",
