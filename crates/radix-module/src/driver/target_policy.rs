@@ -427,6 +427,10 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             scan_go_expr(&summa.source, file, diagnostics);
             scan_go_block(&summa.body, file, diagnostics);
         }
+        ExprKind::FirstMatch(first_match) => {
+            scan_go_expr(&first_match.source, file, diagnostics);
+            scan_go_block(&first_match.body, file, diagnostics);
+        }
         // EOT-3S repair (exhaustive-match completion): `⇇` transfer parses
         // from this unit; lowering is fail-closed in semantic until EOT-3M,
         // and per-target fail-closed recording is EOT-3W's unit. Walk the
@@ -791,6 +795,10 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         ExprKind::Summa(summa) => {
             scan_rust_expr(&summa.source, file, diagnostics);
             scan_rust_block(&summa.body, file, diagnostics);
+        }
+        ExprKind::FirstMatch(first_match) => {
+            scan_rust_expr(&first_match.source, file, diagnostics);
+            scan_rust_block(&first_match.body, file, diagnostics);
         }
         // EOT-3S repair (exhaustive-match completion): same contract as the
         // Go scanner — walk subexpressions, no per-target verdict until

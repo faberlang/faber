@@ -822,6 +822,23 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
         category: KeywordKind::Literal,
     },
+    // === Keywords: First-match selection ===
+    // `primus_quem` is the dedicated first-match expression head and `ubi`
+    // introduces its owned predicate tail. Both are tokenless: the parser
+    // claims each spelling only inside the first-match production slots, so
+    // the registry rows carry the pack-emit surface for reader packs.
+    KeywordSpec {
+        text: "primus_quem",
+        token_kind: None,
+        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
+        text: "ubi",
+        token_kind: None,
+        scope: KeywordScope::Contextual(PREDICATE_OPERATOR),
+        category: KeywordKind::Misc,
+    },
     // === Keywords: Logical operators ===
     KeywordSpec {
         text: "aut",

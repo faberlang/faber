@@ -1007,12 +1007,31 @@ pub enum ExprKind {
     /// `summa` is immediately followed by `ex`; ordinary identifiers, calls,
     /// and receivers keep their existing meaning.
     Summa(Box<SummaExpr>),
+    /// Dedicated first-match selection: `primus_quem(source, ubi binder { predicate })`.
+    ///
+    /// The parser claims this spelling only in expression-head position when
+    /// `primus_quem` is immediately followed by `(`; the `ubi` predicate tail
+    /// is owned by this head and is never shared with the reduce/scan tails.
+    FirstMatch(Box<FirstMatchExpr>),
     /// Exact-output transfer: `sink ⇇ p1 ⇇ p2` (U+21C7).
     ///
     /// One sink evaluated once plus an ordered payload list. Each payload is
     /// transferred on that single sink left-to-right; the chain is never a
     /// pipeline of return values and the whole expression is `vacuum`-shaped.
     Transfer(TransferExpr),
+}
+
+/// Source shape for the dedicated `primus_quem` first-match expression.
+#[derive(Debug)]
+pub struct FirstMatchExpr {
+    /// Bounded source expression whose elements are candidates.
+    pub source: Box<Expr>,
+    /// Optional coordinate names from the shared `apud` production.
+    pub apud: Vec<Ident>,
+    /// Candidate binder introduced by the owned `ubi` predicate tail.
+    pub binding: Ident,
+    /// Predicate body evaluated for every candidate lane.
+    pub body: BlockStmt,
 }
 
 /// Source shape for the `⇇` exact-output transfer chain.

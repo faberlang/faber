@@ -267,6 +267,13 @@ impl AirPurityChecker<'_> {
                 self.check_expr(source);
                 self.check_block(body);
             }
+            HirExpressionKind::FirstMatch { source, body, .. } => {
+                // AFM-2 lands the source shape only; the head stays AIR-rejected
+                // until AFM-4 lands the bounded-source admission rules.
+                self.reject(expr.span, "first_match_expression_unsupported");
+                self.check_expr(source);
+                self.check_block(body);
+            }
             HirExpressionKind::Intervallum {
                 start, end, step, ..
             } => {

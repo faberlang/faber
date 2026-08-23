@@ -283,6 +283,19 @@ fn collect_expr_defs(
             registry.insert(binding.0);
             collect_block_defs(body, registry);
         }
+        HirExpressionKind::FirstMatch {
+            source,
+            coordinates,
+            binding,
+            body,
+        } => {
+            collect_expr_defs(source, registry);
+            for (def_id, _) in coordinates {
+                registry.insert(*def_id);
+            }
+            registry.insert(binding.0);
+            collect_block_defs(body, registry);
+        }
         HirExpressionKind::Praefixum(inner) => {
             collect_expr_defs(inner, registry);
         }
@@ -574,6 +587,10 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
         registry.insert(expr.id);
         match &expr.kind {
             HirExpressionKind::Summa { source, body, .. } => {
+                collect_expr(source, registry);
+                collect_block(body, registry);
+            }
+            HirExpressionKind::FirstMatch { source, body, .. } => {
                 collect_expr(source, registry);
                 collect_block(body, registry);
             }
@@ -1264,6 +1281,21 @@ pub(crate) fn validate_referential_integrity(
                     check_symbol(*name)?;
                 }
                 if let Some((def_id, name)) = filum {
+                    check_def(*def_id)?;
+                    check_symbol(*name)?;
+                }
+                check_def(binding.0)?;
+                check_symbol(binding.1)?;
+                validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+            }
+            HirExpressionKind::FirstMatch {
+                source,
+                coordinates,
+                binding,
+                body,
+            } => {
+                validate_expr(source, check_symbol, check_def, check_hir, check_type)?;
+                for (def_id, name) in coordinates {
                     check_def(*def_id)?;
                     check_symbol(*name)?;
                 }

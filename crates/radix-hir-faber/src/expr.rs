@@ -722,6 +722,11 @@ impl super::FaberCodegen {
                 // until the reduction lowering units provide a valid surface.
                 writer.write(surface.contextual_keyword("nihil"));
             }
+            HirExpressionKind::FirstMatch { .. } => {
+                // AFM-2 is source-shaped only; keep re-emission fail-closed
+                // until AFM-3 provides a valid Faber surface.
+                writer.write(surface.contextual_keyword("nihil"));
+            }
             HirExpressionKind::Error => writer.write(surface.contextual_keyword("nihil")),
         }
 

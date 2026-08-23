@@ -2572,6 +2572,9 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Dum(_, _) => "dum before control-flow MIR lowering",
         HirExpressionKind::Itera(_, _, _, _, _, _) => "itera before iterator MIR lowering",
         HirExpressionKind::Summa { .. } => "summa before term-fold MIR lowering",
+        HirExpressionKind::FirstMatch { .. } => {
+            "primus_quem before first-match MIR lowering"
+        }
         HirExpressionKind::Intervallum { .. } => "range expressions before range MIR lowering",
         HirExpressionKind::Array(_) => "array literals before aggregate MIR lowering",
         HirExpressionKind::Struct(_, _) => "struct literals before aggregate MIR lowering",

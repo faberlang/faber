@@ -96,6 +96,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         // payloads are ordinary expressions; typecheck owns the unary
         // vacuum-returning callable rules and payload compatibility.
         ExprKind::Transfer(transfer) => lowerer.lower_transfer(transfer),
+        ExprKind::FirstMatch(first_match) => lower_first_match(lowerer, first_match),
     };
 
     HirExpression {
@@ -140,6 +141,42 @@ fn lower_summa(lowerer: &mut Lowerer, summa: &radix_syntax::SummaExpr) -> HirExp
         coordinates,
         filum,
         binding: (binding_def_id, summa.binding.name),
+        body,
+    }
+}
+
+/// Lower the source shape of `primus_quem` while preserving its declaration
+/// in HIR.
+///
+/// The node keeps its own shape — it is never normalized onto `Itera` or the
+/// `Summa` reduce tail, and no `rumpe` control transfer is involved. AFM-3/4
+/// own the base-lane admission and the AIR first-live mask after this
+/// source-shaped node lands.
+fn lower_first_match(
+    lowerer: &mut Lowerer,
+    first_match: &radix_syntax::FirstMatchExpr,
+) -> HirExpressionKind {
+    let source = lower_expr(lowerer, &first_match.source);
+
+    lowerer.push_scope();
+    let coordinates = first_match
+        .apud
+        .iter()
+        .map(|ident| {
+            let def_id = lowerer.next_def_id();
+            lowerer.bind_local(ident.name, def_id);
+            (def_id, ident.name)
+        })
+        .collect();
+    let binding_def_id = lowerer.next_def_id();
+    lowerer.bind_local(first_match.binding.name, binding_def_id);
+    let body = lowerer.lower_block(&first_match.body);
+    lowerer.pop_scope();
+
+    HirExpressionKind::FirstMatch {
+        source: Box::new(source),
+        coordinates,
+        binding: (binding_def_id, first_match.binding.name),
         body,
     }
 }

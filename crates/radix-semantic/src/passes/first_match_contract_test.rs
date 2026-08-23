@@ -6,11 +6,18 @@
 //! propagation, AIR admission, and the `filtrata(pred).primus()` not-AIR
 //! differentiation pin.
 //!
-//! The head spelling `primus_quem(<source>, fixum <binder> { <predicate> })` is a PLACEHOLDER
-//! (terminal choice is AFM-2's). Until AFM-2 lands, the placeholder-driving
-//! tests fail at the parse level — the pinned red reason. The
-//! `filtrata+primus` composition drivers pin live composition facts and do
-//! not depend on the placeholder spelling.
+//! The terminals are AFM-2's choice (goal OQ1 default): the dedicated head
+//! `primus_quem(<source>, ubi <binder> { <predicate> })` with the owned `ubi`
+//! predicate tail. AFM-2 admits the parse and lands the source-shaped HIR
+//! node; until AFM-3 (base lane) and AFM-4 (AIR lane) land the admission
+//! rules these behavior pins fail at the semantic level — typecheck declines
+//! the head with `first_match_expression_unsupported` — which is the pinned
+//! red reason. The `filtrata+primus` composition drivers pin live
+//! composition facts and do not depend on the head spelling.
+//!
+//! AFM-2 spelling repair: the AFM-1 draft wrote the runtime-conversion trap
+//! as `(x ut u8)`; `ut` is an alias marker, never a cast. The drivers use the
+//! real conversio form `(x ↦ u8)`.
 
 use crate::{PassConfig, SemanticError, SemanticErrorKind};
 use radix_target::Target;
@@ -20,9 +27,8 @@ fn analyze(source: &str) -> Vec<SemanticError> {
     let mut parse = radix_parser::parse(lex);
     assert!(
         parse.success(),
-        "AFM-1 pinned red: the placeholder first-match head spelling must \
-         parse once AFM-2 lands the dedicated expression head; parse errors: \
-         {:?}",
+        "AFM-2 contract: the first-match head spelling must parse; \
+         parse errors: {:?}",
         parse.errors
     );
     let program = parse.program.expect("successful parse yields a program");
@@ -38,7 +44,7 @@ fn air_errors(source: &str) -> Vec<SemanticError> {
 }
 
 // ---------------------------------------------------------------------------
-// Red drivers — placeholder-spelling behavior pins. RED today at the parse
+// Red drivers — first-match behavior pins. RED today at the semantic
 // level (spelling admitted by AFM-2); AFM-3 must make each pass on the base
 // lane, AFM-4 on the AIR lane.
 // ---------------------------------------------------------------------------
@@ -48,11 +54,11 @@ fn first_match_total_evaluation_observes_post_match_predicate_error() {
     // Contract row: the predicate is evaluated for EVERY candidate lane,
     // including lanes after the first live match (post-match trap is
     // observable) — dataflow first-live selection, no early exit.
-    // RED today: parse-level rejection of the placeholder head spelling.
+    // RED today: typecheck declines the head (AFM-2 admits the parse only).
     let errors = analyze(
         r#"
 functio t(tf32[4] a) → fractus ∪ nihil {
-    redde primus_quem(a, fixum x { (x ut u8) > 0 })
+    redde primus_quem(a, ubi x { (x ↦ u8) > 0 })
 }
 "#,
     );
@@ -62,11 +68,11 @@ functio t(tf32[4] a) → fractus ∪ nihil {
 #[test]
 fn first_match_no_match_yields_nihil() {
     // Contract row: no live match → `nihil`, never an error.
-    // RED today: parse-level rejection of the placeholder head spelling.
+    // RED today: typecheck declines the head (AFM-2 admits the parse only).
     let errors = analyze(
         r#"
 functio t(tf32[4] a) → fractus ∪ nihil {
-    redde primus_quem(a, fixum x { x < 0.0 })
+    redde primus_quem(a, ubi x { x < 0.0 })
 }
 "#,
     );
@@ -76,11 +82,11 @@ functio t(tf32[4] a) → fractus ∪ nihil {
 #[test]
 fn first_match_empty_source_yields_nihil() {
     // Contract row: empty (statically zero-length) source → `nihil`.
-    // RED today: parse-level rejection of the placeholder head spelling.
+    // RED today: typecheck declines the head (AFM-2 admits the parse only).
     let errors = analyze(
         r#"
 functio t(tf32[0] a) → fractus ∪ nihil {
-    redde primus_quem(a, fixum x { x > 0.0 })
+    redde primus_quem(a, ubi x { x > 0.0 })
 }
 "#,
     );
@@ -92,11 +98,11 @@ fn first_match_predicate_error_propagates_never_becomes_nihil() {
     // Contract row: a predicate ERROR rides the error channel; it is never
     // converted to a `nihil` result. The nullable result covers only
     // no-match/empty, not predicate failure.
-    // RED today: parse-level rejection of the placeholder head spelling.
+    // RED today: typecheck declines the head (AFM-2 admits the parse only).
     let errors = analyze(
         r#"
 functio t(tf32[4] a) → fractus ∪ nihil {
-    redde primus_quem(a, fixum x { (x ut u8) > 100 })
+    redde primus_quem(a, ubi x { (x ↦ u8) > 100 })
 }
 "#,
     );
@@ -107,7 +113,7 @@ functio t(tf32[4] a) → fractus ∪ nihil {
 fn air_lane_admits_dedicated_first_match_head() {
     // Contract row: the dedicated head (with a named AIR predicate) is
     // AIR-admitted over a bounded tensor source with a first-live mask.
-    // RED today: parse-level rejection of the placeholder head spelling.
+    // RED today: typecheck declines the head (AFM-2 admits the parse only).
     // (AFM-4 must make this pass without any method-allowlist row — the
     // head is not a method.)
     let errors = air_errors(
@@ -119,7 +125,7 @@ functio keep(fractus x) → bivalens {
 
 @ radix lane "air"
 functio pick(tf32[2, 2] x) → fractus ∪ nihil {
-    redde primus_quem(x, fixum v { keep(v) })
+    redde primus_quem(x, ubi v { keep(v) })
 }
 "#,
     );

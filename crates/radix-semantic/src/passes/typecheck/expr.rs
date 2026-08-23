@@ -47,6 +47,7 @@ const ISSUE_INVALID_LOWERED_EXPRESSION: &str = "invalid_lowered_expression";
 /// operand-eligibility and selector rules land with tensor-glyphs 2B. No `∇`
 /// expression may pass typecheck untyped or silently.
 const ISSUE_GRADIENT_EXPRESSION_UNSUPPORTED: &str = "gradient_expression_unsupported";
+const ISSUE_FIRST_MATCH_EXPRESSION_UNSUPPORTED: &str = "first_match_expression_unsupported";
 
 /// Rank (shape length) of a tensor shape when statically known.
 ///
@@ -362,6 +363,19 @@ impl TypeChecker<'_> {
                 body,
                 expr.span,
             ),
+            HirExpressionKind::FirstMatch { source, body, .. } => {
+                // AFM-2 lands the source shape only; fail closed until AFM-3
+                // lands the admission rule (T ∪ nihil result, total
+                // evaluation, first-live selection).
+                self.check_expr(source);
+                self.check_block(body, None);
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_FIRST_MATCH_EXPRESSION_UNSUPPORTED,
+                    expr.span,
+                );
+                self.error_type
+            }
             HirExpressionKind::Intervallum {
                 start, end, step, ..
             } => self.check_intervallum_expr(start, end, step, expr.span),
