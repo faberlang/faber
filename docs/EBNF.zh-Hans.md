@@ -466,7 +466,7 @@ template_argument ::= '展开'? IDENTIFIER ':' expression
 # [159] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '真' | '假' | '空'
 # [160] primary
-primary ::= IDENTIFIER | literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | '(' expression ')'
 # formerly: adExpr
 # [161] ad_expr
 ad_expr ::= '调用' ASCII_STRING ad_opener?
@@ -529,87 +529,91 @@ scriptum_expr ::= '格式化' '(' STRING (',' expression)* ')'
 lege_expr ::= '读取' '行'?
 # [181] first_match_expr
 first_match_expr ::= '首个匹配' '(' expression apud_clause? ',' '其中' IDENTIFIER block_stmt ')'
+# [182] summa_expr
+summa_expr ::= '求和' '取自' expression apud_clause? filum_clause? ('常量' | '变量') IDENTIFIER block_stmt
+# [183] filum_clause
+filum_clause ::= '线程' IDENTIFIER
 # formerly: objectPattern
-# [182] object_pattern
+# [184] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
 # formerly: patternProperty
-# [183] pattern_property
+# [185] pattern_property
 pattern_property ::= '其余'? IDENTIFIER ('作为' IDENTIFIER)?
 # formerly: arrayPattern
-# [184] array_pattern
+# [186] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
 # formerly: arrayPatternElement
-# [185] array_pattern_element
+# [187] array_pattern_element
 array_pattern_element ::= '_' | '其余'? IDENTIFIER
 # formerly: outputStmt
-# [186] nota_stmt
+# [188] nota_stmt
 nota_stmt ::= ('显示' | '查看' | '警告' | '写入') expression (',' expression)*
 # formerly: entryHeader
-# [187] entry_header
+# [189] entry_header
 entry_header ::= ('参数' IDENTIFIER)? ('退出' expression)?
 # formerly: incipitStmt
-# [188] incipit_stmt
+# [190] incipit_stmt
 incipit_stmt ::= '入口' entry_header block_stmt
 # formerly: incipietStmt
-# [189] incipiet_stmt
+# [191] incipiet_stmt
 incipiet_stmt ::= '异步入口' entry_header block_stmt
 # formerly: probandumDecl
-# [190] probandum_decl
+# [192] probandum_decl
 probandum_decl ::= '验题' STRING proba_modifier* '{' probandum_body '}'
 # formerly: probandumBody
-# [191] probandum_body
+# [193] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
 # formerly: probaStmt
-# [192] proba_stmt
+# [194] proba_stmt
 proba_stmt ::= '测试' STRING proba_modifier* block_stmt
 # formerly: probaModifier
-# [193] proba_modifier
+# [195] proba_modifier
 proba_modifier ::= '跳过' STRING | '预期' STRING | '仅' | '标签' STRING | '时限' NUMBER | '计量' | '重复' NUMBER | '易碎' NUMBER | '仅于' STRING
 # formerly: praeparaBlock
-# [194] praepara_block
+# [196] praepara_block
 praepara_block ::= ('备置' | '异步备置' | '收尾' | '异步收尾') '全部'? block_stmt
 # formerly: facBlockStmt
-# [195] fac_stmt
+# [197] fac_stmt
 fac_stmt ::= '执行' block_stmt cape_clause? ('当' expression)?
-# [196] IDENTIFIER
+# [198] IDENTIFIER
 IDENTIFIER ::=
-# [197] NUMBER
+# [199] NUMBER
 NUMBER ::=
-# [198] NATURAL
+# [200] NATURAL
 NATURAL ::=
-# [199] STRING
+# [201] STRING
 STRING ::=
-# [200] ASCII_STRING
+# [202] ASCII_STRING
 ASCII_STRING ::=
-# [201] BACKTICK_STRING
+# [203] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [202] OCTETI_STRING
+# [204] OCTETI_STRING
 OCTETI_STRING ::=
-# [203] NEWLINE
+# [205] NEWLINE
 NEWLINE ::=
-# [204] WIDTH_MARKER
+# [206] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [205] LISTA_WIDTH_SUGAR
+# [207] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [206] TENSOR_WIDTH_SUGAR
+# [208] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [207] SPARSA_WIDTH_SUGAR
+# [209] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [208] VECTOR_WIDTH_SUGAR
+# [210] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [209] MATRIX_WIDTH_SUGAR
+# [211] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [210] FRONTMATTER_DELIMITER
+# [212] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [211] TOML_LINES
+# [213] TOML_LINES
 TOML_LINES ::=
-# [212] ANNOTATION_NAME
+# [214] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [213] ANNOTATION_FIELD_NAME
+# [215] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [214] NON_NEWLINE_TOKEN
+# [216] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [215] NO_NEWLINE
+# [217] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -818,6 +822,8 @@ NO_NEWLINE ::=
 | [`scriptum_expr`](#scriptum-expr) | `#格式化-expr` | live | scriptumExpr |
 | [`lege_expr`](#lege-expr) | `#读取-expr` | live | legeExpr |
 | [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live | — |
+| [`summa_expr`](#summa-expr) | `#求和-expr` | live | — |
+| [`filum_clause`](#filum-clause) | `#线程-clause` | live | — |
 | [`object_pattern`](#object-pattern) | `#object-pattern` | live | objectPattern |
 | [`pattern_property`](#pattern-property) | `#pattern-property` | live | patternProperty |
 | [`array_pattern`](#array-pattern) | `#array-pattern` | live | arrayPattern |
@@ -904,6 +910,7 @@ productions. It is not a second keyword authority.
 | Async | `异流` | async stream posture |
 | Async | `异步` | async finite posture |
 | Async | `等定` | await-bind immutable |
+| Grammar | `线程` | keyword literal derived from the production |
 | Objects | `构造` | construct variant |
 | Async | `流` | sync stream posture |
 | Declarations | `常量` | immutable binding |
@@ -973,6 +980,7 @@ productions. It is not a second keyword authority.
 | Params | `展开` | spread |
 | Declarations | `可选` | optional declaration slot |
 | Genus | `继承` | extends |
+| Grammar | `求和` | keyword literal derived from the production |
 | Async | `等弃` | await-discard |
 | Control | `静默` | no-op |
 | Testing | `标签` | tag |
@@ -1528,7 +1536,7 @@ The second type argument of a `↦` target is the convert-hint slot. `Hex` / `Bi
 - `"ff" ↦ numerus<i32, Hex>` — shipped; text parse at radix 16 (`Bin` = 2, `Oct` = 8). Hex/Bin/Oct text parse is unchanged by endian hints.
 - `octeti[lo‥hi] ↦ numerus<W, Be>` / `… ↦ numerus<W, Le>` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust, the MIR runner, Go, and TypeScript. TypeScript `i64`/`u64` stay fail-closed (JS number is not exact). English `int<W, Be>` is the same form. `octeti` itself has no endian; `bytes ↦ numerus<u32>` without `Be`/`Le` stays rejected. A short window fails (no pad).
 - `octeti[lo‥hi] ↦ fractus<f32, Be|Le>` / `… ↦ fractus<f64, Be|Le>` — shipped alongside the integer rows (float endian unpack of an exact-width window, 4 / 8 bytes; same fail rules: exact window required, a short window fails, `Be`/`Le` mandatory).
-- `n ↦ numerus<u32, Bits>` / `n ↦ numerus<u64, Bits>` / `n ↦ fractus<f32, Bits>` / `n ↦ fractus<f64, Bits>` — shipped; the `Bits` hint reinterprets between exact-width integer/float pairs (u32↔f32, u64↔f64) bit-identically. It is reinterpretation, not value conversion; wrong-pair rows reject with the structured issue, and `Bits` is never a base or an ascii format hint. `Bits` is a convert-slot hint in the same Hex slot, not a keyword and not a `baseType` production.
+- `n ↦ numerus<u32, Bits>` / `n ↦ numerus<u64, Bits>` / `n ↦ fractus<f32, Bits>` / `n ↦ fractus<f64, Bits>` / `n ↦ fractus<f16, Bits>` — shipped; the `Bits` hint reinterprets between exact-width integer/float pairs (u32↔f32, u64↔f64, u16↔f16) bit-identically. It is reinterpretation, not value conversion; wrong-pair rows reject with the structured issue, and `Bits` is never a base or an ascii format hint. `Bits` is a convert-slot hint in the same Hex slot, not a keyword and not a `baseType` production.
 - `n ↦ octeti<N, Be>` / `… ↦ octeti<N, Le>` — proposed (not shipped); write convert after `octeti<N>` (`N` ∈ {2, 4, 8}). `Be`/`Le` stay Hex-slot hints, not a second capacity.
 
 Inline failure recovery uses `⇥` immediately after the conversio target (`↦ T ⇥ recovery-expr`). The unparenthesized recovery operand is a unary-precedence expression; parenthesize arithmetic, coalescing, ternary, or assignment recovery expressions. The recovery value must have type `T`.
