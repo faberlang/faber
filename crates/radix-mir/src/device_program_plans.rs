@@ -180,6 +180,45 @@ pub fn kernel_plan_for_function_with_limit(
             storage_buffer_limit_error(buffer_count, limit).message,
         ));
     }
+    // SFR-5 declared-recipe scan: a `FilumSum` declaration is the author-
+    // stated recipe. The collection-op statement scan never sees it (the
+    // declaration is not a collection op), so it resolves ahead of the op
+    // scan; the source length `K` comes from the kernel signature's source
+    // buffer — never guessed from the body. A second declared or recognized
+    // recipe in the same body fails closed (one kernel, one recipe).
+    let filum_declarations = filum_sum_declarations(function);
+    if !filum_declarations.is_empty() {
+        if filum_declarations.len() > 1 {
+            return Err(PlanMappingError::mapping(
+                "kernel body carries more than one filum summa declaration (one recipe per kernel)",
+            ));
+        }
+        let (filum, source_local) = &filum_declarations[0];
+        let length = signature
+            .resources()
+            .find(|resource| resource.source_local == Some(*source_local))
+            .map(|resource| resource.element_count)
+            .ok_or_else(|| {
+                PlanMappingError::mapping(format!(
+                    "filum summa source local {source_local:?} has no storage-buffer resource in the kernel signature"
+                ))
+            })?;
+        let plan = CollectionKernelPlan::from_filum_summa(filum, length).ok_or_else(|| {
+            PlanMappingError::mapping(format!(
+                "filum summa declaration has no kernel plan under its typed facts \
+                 (lane width {}, source length {length})",
+                filum.lane_width
+            ))
+        })?;
+        for op in crate::collection_ops::collection_ops_for_function(function) {
+            if is_contract_recipe_op(op) || is_transformer_recipe_op(op) {
+                return Err(PlanMappingError::mapping(format!(
+                    "filum summa kernel body mixes a second recipe ({op:?}) with the declared distributed sum"
+                )));
+            }
+        }
+        return Ok(Some(plan));
+    }
     // Scan ALL statements: the kernel body's plan is decided by its complete
     // collection-op set, never by the first matching statement (N3.2).
     let ops = crate::collection_ops::collection_ops_for_function(function);
@@ -241,6 +280,40 @@ pub fn kernel_plan_for_function_with_limit(
         }
     }
     Ok(recipe)
+}
+
+/// The kernel body's `FilumSum` declarations (SFR-5): each entry is the
+/// declaration facts plus the source local its lone tensor argument reads.
+/// The caller admits exactly one per kernel (one recipe per kernel).
+fn filum_sum_declarations(function: &MirFunction) -> Vec<(crate::MirFilumSumOp, MirLocalId)> {
+    let mut declarations = Vec::new();
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let MirStatementKind::RuntimeCall {
+                call:
+                    MirRuntimeCall {
+                        intrinsic: MirIntrinsic::FilumSum(filum),
+                        args,
+                        ..
+                    },
+                ..
+            } = &statement.kind
+            else {
+                continue;
+            };
+            let Some(MirOperand::Place(place)) = args.first() else {
+                continue;
+            };
+            if !place.projections.is_empty() {
+                continue;
+            }
+            let MirPlaceBase::Local(source_local) = place.base else {
+                continue;
+            };
+            declarations.push((filum.clone(), source_local));
+        }
+    }
+    declarations
 }
 
 fn adopt_recipe(
@@ -459,6 +532,11 @@ impl RecipeKind {
             CollectionKernelPlan::BatchedAttention(_) => Self::BatchedAttention,
             CollectionKernelPlan::SsmConv1d(_) => Self::SsmConv1d,
             CollectionKernelPlan::SsmScan(_) => Self::SsmScan,
+            // SFR-5: the declared distributed sum's floor IS the tree
+            // recipe — a backend with no native collective arm selects the
+            // tree-reduction launch semantics here; native arms (SFR-6/7)
+            // match the plan variant before consulting this tag.
+            CollectionKernelPlan::DistributedSum(_) => Self::TreeReduction,
         }
     }
 }
@@ -1921,7 +1999,10 @@ fn bind_dimensions(plan: &CollectionKernelPlan, output_extent: u64) -> (Vec<u64>
         | CollectionKernelPlan::LayerNormalization(_)
         | CollectionKernelPlan::Gather(_)
         | CollectionKernelPlan::SsmConv1d(_)
-        | CollectionKernelPlan::SsmScan(_) => (vec![output_extent.max(1)], BindLayout::Flat),
+        | CollectionKernelPlan::SsmScan(_)
+        // SFR-5: the declared distributed sum's broadcast result is a flat
+        // partial-slot write — same bind shape as the tree floor.
+        | CollectionKernelPlan::DistributedSum(_) => (vec![output_extent.max(1)], BindLayout::Flat),
     }
 }
 
@@ -2222,6 +2303,11 @@ fn plan_shared_memory_bytes(plan: &CollectionKernelPlan) -> u64 {
         | CollectionKernelPlan::SsmConv1d(_)
         | CollectionKernelPlan::SsmScan(_) => 0,
         CollectionKernelPlan::TreeReduction(plan) => {
+            shared_memory_layout_bytes(&plan.shared_memory)
+        }
+        // SFR-5: the declared distributed sum carries the same tree floor
+        // shared-memory layout — one slot per workgroup lane.
+        CollectionKernelPlan::DistributedSum(plan) => {
             shared_memory_layout_bytes(&plan.shared_memory)
         }
         CollectionKernelPlan::TiledMatMul(plan) => {

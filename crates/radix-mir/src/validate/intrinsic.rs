@@ -200,6 +200,26 @@ impl Validator<'_, '_> {
                     "type_check runtime call does not return bivalens",
                 );
             }
+            // SFR-5: the filum sum declaration validates its surface shape —
+            // one source operand, a fractus broadcast result (the L7 f32
+            // device surface). The declaration facts (term body, coordinate
+            // binders, floor coherence) are the kernel-plan pass's typed
+            // checks, never re-derived here.
+            MirIntrinsic::FilumSum(op) => {
+                self.require_arg_count(call.args.len(), 1, span, "filum sum runtime call");
+                if let Some(arg) = call.args.first() {
+                    self.validate_operand(scope, arg, span);
+                }
+                if !matches!(
+                    self.type_kind(call.return_ty),
+                    Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+                ) {
+                    self.error(span, "filum sum runtime call does not return fractus");
+                }
+                if op.lane_width == 0 || !op.lane_width.is_power_of_two() {
+                    self.error(span, "filum lane width must be a positive power of two");
+                }
+            }
         }
     }
 

@@ -1,8 +1,9 @@
 use super::plan::{
-    AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, GatherPlan,
-    GroupedMatMulPlan, MatMulPlan, QuantizedMatMulPlan, ReduceOp, ReductionPlan,
-    RmsNormalizationPlan, RopePlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
-    MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
+    AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan,
+    DistributedSumPlan, GatherPlan, GroupedMatMulPlan, MatMulPlan, QuantizedMatMulPlan, ReduceOp,
+    ReductionPlan, RmsNormalizationPlan, RopePlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan,
+    TransposePlan, MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME,
+    WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
 };
 use std::fmt;
 
@@ -11,6 +12,35 @@ pub(super) fn validate_reduction_plan(plan: &ReductionPlan) -> Result<(), PlanVa
     validate_output_write_exclusivity(plan)?;
     validate_shared_memory_sizing(&plan.shared_memory)?;
     validate_oob_padding_coverage(plan)?;
+    Ok(())
+}
+
+/// Declared distributed sum-reduce (SFR-5): the tree-floor facts must pass
+/// the same checks as the [`ReductionPlan`] recipe (the floor IS the tree
+/// recipe), plus the filum declaration coherence — lane width equals the
+/// workgroup, and the term-body/coordinate facts name distinct locals.
+pub(super) fn validate_distributed_sum_plan(
+    plan: &DistributedSumPlan,
+) -> Result<(), PlanValidationError> {
+    let floor = ReductionPlan {
+        op: ReduceOp::Sum,
+        length: plan.length,
+        workgroup_x: plan.workgroup_x,
+        partials: plan.partials,
+        shared_memory: plan.shared_memory.clone(),
+        barriers: plan.barriers.clone(),
+        oob_padding: plan.oob_padding,
+    };
+    validate_reduction_plan(&floor)?;
+    if plan.filum.lane_width != plan.workgroup_x {
+        return Err(PlanValidationError::DistributedSumLaneWidthMismatch {
+            lane_width: plan.filum.lane_width,
+            workgroup_x: plan.workgroup_x,
+        });
+    }
+    if plan.length == 0 {
+        return Err(PlanValidationError::DistributedSumZeroLength);
+    }
     Ok(())
 }
 
@@ -631,6 +661,11 @@ pub enum PlanValidationError {
     },
     /// SSM scan requires positive length and state dim.
     SsmScanZeroDimension { length: u64, state_dim: u64 },
+    /// The filum lane width must equal the tree-floor workgroup lane count
+    /// (SFR-5: one shared slot per lane).
+    DistributedSumLaneWidthMismatch { lane_width: u32, workgroup_x: u32 },
+    /// The filum source length `K` must be positive (SFR-5).
+    DistributedSumZeroLength,
 }
 
 impl fmt::Display for PlanValidationError {
@@ -707,19 +742,14 @@ impl fmt::Display for PlanValidationError {
                 f,
                 "transpose requires a positive workgroup lane count, got {workgroup_x}"
             ),
-            Self::TransposeDispatchMismatch {
-                m,
-                n,
-                dispatch_x,
-            } => write!(
+            Self::TransposeDispatchMismatch { m, n, dispatch_x } => write!(
                 f,
                 "transpose dispatch extent {dispatch_x} must tile exactly {m}×{n} = {} output elements",
                 m.saturating_mul(*n)
             ),
-            Self::AxisReductionUnsupportedOp { op } => write!(
-                f,
-                "axis-reduction recipe v1 admits only Sum, got {op:?}"
-            ),
+            Self::AxisReductionUnsupportedOp { op } => {
+                write!(f, "axis-reduction recipe v1 admits only Sum, got {op:?}")
+            }
             Self::AxisReductionZeroProjection {
                 axis_extent,
                 inner_stride,
@@ -785,6 +815,17 @@ impl fmt::Display for PlanValidationError {
             Self::SsmScanZeroDimension { length, state_dim } => write!(
                 f,
                 "ssm scan requires positive length and state dim, got length={length}, state_dim={state_dim}"
+            ),
+            Self::DistributedSumLaneWidthMismatch {
+                lane_width,
+                workgroup_x,
+            } => write!(
+                f,
+                "distributed sum lane width {lane_width} must equal the tree-floor workgroup lane count {workgroup_x}"
+            ),
+            Self::DistributedSumZeroLength => write!(
+                f,
+                "distributed sum requires a positive source length"
             ),
         }
     }

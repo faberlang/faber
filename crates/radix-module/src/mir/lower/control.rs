@@ -407,8 +407,10 @@ impl FunctionBuilder<'_> {
     /// The accumulator starts at the `+` identity; a valued `redde` in the
     /// term body adds its value into the accumulator (through the summa fold
     /// context, never as a function return) and continues the iteration loop.
-    /// The distributed `filum` spelling stays unsupported here — SFR-5 lowers
-    /// it through the kernel-plan entry instead of inline base-lane MIR.
+    /// The distributed `filum` spelling lowers here to the declared kernel-
+    /// plan entry (SFR-5): a `FilumSum` runtime call carrying the filum
+    /// metadata, the captured term-body MIR, and the coordinate facts —
+    /// the plan pass resolves it to `DistributedSum`, never inline MIR.
     pub(super) fn lower_summa_expr(
         &mut self,
         source: &HirExpression,
@@ -418,12 +420,8 @@ impl FunctionBuilder<'_> {
         body: &HirBlock,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        if filum.is_some() {
-            self.errors.push(MirError::unsupported(
-                expr.span,
-                "filum summa before distributed reduction MIR lowering",
-            ));
-            return None;
+        if let Some(filum) = filum {
+            return self.lower_filum_summa_expr(source, coordinates, filum, binding, body, expr);
         }
         let Some(term_ty) = expr.ty else {
             self.errors
@@ -461,6 +459,167 @@ impl FunctionBuilder<'_> {
         self.summa_fold = previous_fold;
         lowered?;
         Some(MirOperand::Place(MirPlace::local(accumulator)))
+    }
+
+    /// Frozen filum lane width `W` (SFR-5 settled default: W=32 cyclic; tails
+    /// fail closed at admission — `K % W ≠ 0` is rejected by typecheck).
+    const FILUM_LANE_WIDTH: u32 = 32;
+
+    /// Lower the distributed `summa … filum` spelling to the declared
+    /// kernel-plan entry (SFR-5): one `FilumSum` runtime call carrying the
+    /// filum metadata, the captured term-body MIR, and the coordinate
+    /// facts. The plan pass (`kernel_plan_for_function`) resolves the call
+    /// to `CollectionKernelPlan::DistributedSum`; backends without a native
+    /// arm lower it through the shared-memory tree floor the plan pins.
+    ///
+    /// The term body is lowered once into scratch blocks with the binder and
+    /// coordinate locals bound; the emitted statements are captured into the
+    /// declaration and the scratch blocks are dropped, so nothing of the
+    /// term body runs inline in the base lane.
+    fn lower_filum_summa_expr(
+        &mut self,
+        source: &HirExpression,
+        coordinates: &[(DefId, Symbol)],
+        filum: &(DefId, Symbol),
+        binding: &(DefId, Symbol),
+        body: &HirBlock,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let Some(term_ty) = expr.ty else {
+            self.errors
+                .push(MirError::missing_type(expr.span, "summa term type"));
+            return None;
+        };
+        let term_mir_ty = MirType::semantic(term_ty);
+        match self.types.get(term_ty) {
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {}
+            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {}
+            _ => {
+                self.errors.push(MirError::unsupported(
+                    expr.span,
+                    "filum summa before numeric scalar MIR lowering",
+                ));
+                return None;
+            }
+        }
+        let Some(source_ty) = source.ty else {
+            self.errors
+                .push(MirError::missing_type(source.span, "filum summa source type"));
+            return None;
+        };
+        let element_ty = match self.normalized_type(source_ty) {
+            Type::Tensor(element, _) => *element,
+            _ => {
+                self.errors.push(MirError::unsupported(
+                    source.span,
+                    "filum summa source before tensor MIR lowering",
+                ));
+                return None;
+            }
+        };
+        // The source operand lowers into the real flow (ahead of the
+        // capture) so the declaration's argument is a live kernel value.
+        let source_operand = self.lower_expr_value(source)?;
+        let source_operand =
+            self.materialize_operand_place(source_operand, MirType::semantic(source_ty), source.span);
+
+        // Per-element binders: coordinates (numerus, one per axis) and the
+        // term binder (the element type). They live as real locals so the
+        // captured term-body statements resolve against them.
+        let numerus_ty = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let mut saved_bindings: Vec<(DefId, Option<LocalBinding>)> = Vec::new();
+        let mut coordinate_facts = Vec::with_capacity(coordinates.len());
+        for (def_id, name) in coordinates {
+            let local = self.next_local_id();
+            self.locals.push(MirLocalDecl {
+                id: local,
+                name: Some(*name),
+                ty: numerus_ty,
+                mutable: false,
+                span: expr.span,
+            });
+            saved_bindings.push((*def_id, self.bindings.insert(*def_id, LocalBinding { local, ty: numerus_ty })));
+            coordinate_facts.push(MirFilumCoordinate { local, name: Some(*name) });
+        }
+        let binder_local = self.next_local_id();
+        let binder_ty = MirType::semantic(element_ty);
+        self.locals.push(MirLocalDecl {
+            id: binder_local,
+            name: Some(binding.1),
+            ty: binder_ty,
+            mutable: false,
+            span: expr.span,
+        });
+        saved_bindings.push((
+            binding.0,
+            self.bindings.insert(binding.0, LocalBinding { local: binder_local, ty: binder_ty }),
+        ));
+        let term_result = self.next_local_id();
+        self.locals.push(MirLocalDecl {
+            id: term_result,
+            name: None,
+            ty: term_mir_ty,
+            mutable: true,
+            span: expr.span,
+        });
+
+        // Capture the term body into scratch blocks: the redde arm stores
+        // the term value into `term_result` and jumps to the capture exit.
+        let blocks_mark = self.blocks.len();
+        let saved_current = self.current;
+        let capture_entry = self.fresh_block(expr.span);
+        let capture_exit = self.fresh_block(expr.span);
+        self.current = Some(capture_entry);
+        self.breakables.push(BreakableContext {
+            perge_target: Some(capture_exit),
+            rumpe_target: capture_exit,
+            rumpe_used: false,
+        });
+        let previous_capture =
+            self.filum_capture.replace(SummaFoldContext { accumulator: term_result, ty: term_mir_ty });
+        self.visit_block(body);
+        self.filum_capture = previous_capture;
+        self.breakables.pop();
+        if !self.blocks[blocks_mark..].iter().any(|block| block.terminator.is_some()) {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "filum summa term body without a valued redde",
+            ));
+        }
+        let term_body: Vec<MirStatement> = self.blocks[blocks_mark..]
+            .iter()
+            .flat_map(|block| block.statements.iter().cloned())
+            .collect();
+        self.blocks.truncate(blocks_mark);
+        self.current = saved_current;
+        for (def_id, binding) in saved_bindings {
+            match binding {
+                Some(previous) => {
+                    self.bindings.insert(def_id, previous);
+                }
+                None => {
+                    self.bindings.remove(&def_id);
+                }
+            }
+        }
+
+        let declaration = MirFilumSumOp {
+            filum_binder: Some(filum.1),
+            term_binder: binder_local,
+            term_binder_name: Some(binding.1),
+            coordinates: coordinate_facts,
+            lane_width: Self::FILUM_LANE_WIDTH,
+            term_body,
+            term_result,
+        };
+        let call = self.runtime_call_value(
+            MirIntrinsic::FilumSum(declaration),
+            vec![MirOperand::Place(source_operand)],
+            term_mir_ty,
+            expr.span,
+        );
+        let result = self.materialize_operand_place(call, term_mir_ty, expr.span);
+        Some(MirOperand::Place(result))
     }
 
     /// Lower the literal `elige` subset into a MIR switch.

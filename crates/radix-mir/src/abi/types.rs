@@ -82,6 +82,7 @@ pub enum MirRuntimeAbiFamily {
     RuntimeCursorStream,
     RuntimeGradient,
     RuntimeTypeCheck,
+    RuntimeFilumSum,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -172,6 +173,13 @@ impl MirRuntimeAbi {
             ),
             MirIntrinsic::TypeCheck(_) => (
                 MirRuntimeAbiFamily::RuntimeTypeCheck,
+                MirRuntimeAbiKind::CoreSemantics,
+                false,
+            ),
+            // SFR-5: the filum sum declaration is core semantics (the plan
+            // pass resolves it); host lanes reject it by target policy.
+            MirIntrinsic::FilumSum(_) => (
+                MirRuntimeAbiFamily::RuntimeFilumSum,
                 MirRuntimeAbiKind::CoreSemantics,
                 false,
             ),

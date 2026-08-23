@@ -437,6 +437,12 @@ fn intrinsic(value: &MirIntrinsic) -> String {
             op.positive,
             op.ty.semantic_id().0
         ),
+        MirIntrinsic::FilumSum(op) => format!(
+            "filum_sum lane_width={} term_binder={} coordinates={}",
+            op.lane_width,
+            op.term_binder_name.map(|s| s.0).unwrap_or(0),
+            op.coordinates.len()
+        ),
     }
 }
 

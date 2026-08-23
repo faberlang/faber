@@ -1085,6 +1085,9 @@ fn collection_kernel_plan_carries_no_communication_variant() {
             CollectionKernelPlan::BatchedAttention(_) => true,
             CollectionKernelPlan::SsmConv1d(_) => true,
             CollectionKernelPlan::SsmScan(_) => true,
+            // SFR-5: the declared distributed sum is an in-kernel recipe —
+            // no communication variant.
+            CollectionKernelPlan::DistributedSum(_) => true,
         }
     }
 

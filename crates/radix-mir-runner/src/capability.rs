@@ -84,7 +84,11 @@ pub fn runner_dispatch_status(family: MirRuntimeAbiFamily) -> RunnerDispatchStat
         | MirRuntimeAbiFamily::RuntimeGradient
         | MirRuntimeAbiFamily::RuntimeTypeCheck => RunnerDispatchStatus::Implement,
         MirRuntimeAbiFamily::RuntimeProvider => RunnerDispatchStatus::HostDelegate,
-        MirRuntimeAbiFamily::RuntimeAtomic | MirRuntimeAbiFamily::RuntimeGpuBuiltin => {
+        // SFR-5: the filum sum declaration is device-lane only; the host
+        // script runner rejects it by target policy.
+        MirRuntimeAbiFamily::RuntimeFilumSum
+        | MirRuntimeAbiFamily::RuntimeAtomic
+        | MirRuntimeAbiFamily::RuntimeGpuBuiltin => {
             RunnerDispatchStatus::IntentionalReject
         }
     }

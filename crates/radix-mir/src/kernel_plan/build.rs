@@ -1,17 +1,19 @@
 use super::plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, BatchedAttentionKind, BatchedAttentionPlan,
-    CausalMaskedSoftmaxPlan, CollectionKernelPlan, GatherPlan, GroupedMatMulPlan,
-    LayerNormalizationPlan, MatMulPlan, MatMulShapes, MatMulSharedMemory, OobPaddingPolicy,
-    ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, RowSoftmaxPlan, SharedMemoryLayout,
-    SsmConv1dPlan, SsmScanPlan, TransposePlan, F32_ELEMENT_BYTE_WIDTH, MATMUL_SHARED_A_BUFFER_NAME,
-    MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE, REDUCTION_SHARED_BUFFER_NAME, TRANSPOSE_WORKGROUP_X,
+    CausalMaskedSoftmaxPlan, CollectionKernelPlan, DistributedSumPlan, GatherPlan,
+    GroupedMatMulPlan, LayerNormalizationPlan, MatMulPlan, MatMulShapes, MatMulSharedMemory,
+    OobPaddingPolicy, ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, RowSoftmaxPlan,
+    SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan, F32_ELEMENT_BYTE_WIDTH,
+    MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE,
+    REDUCTION_SHARED_BUFFER_NAME, TRANSPOSE_WORKGROUP_X,
 };
 use super::validate::{
     validate_axis_reduction_plan, validate_batched_attention_plan,
-    validate_causal_masked_softmax_plan, validate_gather_plan, validate_grouped_matmul_plan,
-    validate_matmul_plan, validate_quantized_matmul_plan, validate_reduction_plan,
-    validate_rms_normalization_plan, validate_rope_plan, validate_ssm_conv1d_plan,
-    validate_ssm_scan_plan, validate_transpose_plan, PlanValidationError,
+    validate_causal_masked_softmax_plan, validate_distributed_sum_plan, validate_gather_plan,
+    validate_grouped_matmul_plan, validate_matmul_plan, validate_quantized_matmul_plan,
+    validate_reduction_plan, validate_rms_normalization_plan, validate_rope_plan,
+    validate_ssm_conv1d_plan, validate_ssm_scan_plan, validate_transpose_plan,
+    PlanValidationError,
 };
 use crate::abi::{CollectionOpContract, MirKernelSignature};
 use crate::{
@@ -332,6 +334,47 @@ impl CollectionKernelPlan {
         }
     }
 
+    /// Resolve the declared distributed sum-reduce (`summa ex … filum …`,
+    /// SFR-5) — the declared-recipe admission path.
+    ///
+    /// Like the transformer recipes, the filum sum has **no**
+    /// `CollectionOpContract` variant: the declaration facts come from the
+    /// [`MirIntrinsic::FilumSum`] runtime call the module lowering emitted
+    /// (filum metadata, term-body MIR, coordinate binders), and `length` is
+    /// the source buffer's element count resolved from the kernel signature
+    /// — never guessed from the body. The tree-floor facts
+    /// (`workgroup_x`, `shared_memory`, `barriers`, `oob_padding`) mirror
+    /// the [`CollectionKernelPlan::TreeReduction`] recipe exactly, so a
+    /// backend with no native collective arm emits the shared-memory tree
+    /// floor by construction (the plan law of this module).
+    ///
+    /// Returns `None` on a degenerate declaration (zero lane width or
+    /// length); the caller fails closed with a typed diagnostic.
+    #[must_use]
+    pub fn from_filum_summa(
+        filum: &crate::MirFilumSumOp,
+        length: u64,
+    ) -> Option<CollectionKernelPlan> {
+        let workgroup_x = filum.lane_width;
+        if workgroup_x == 0 || !workgroup_x.is_power_of_two() || length == 0 {
+            return None;
+        }
+        let partials = length.div_ceil(u64::from(workgroup_x));
+        Some(CollectionKernelPlan::DistributedSum(DistributedSumPlan {
+            filum: filum.clone(),
+            length,
+            workgroup_x,
+            partials,
+            shared_memory: SharedMemoryLayout {
+                element_byte_width: F32_ELEMENT_BYTE_WIDTH,
+                slot_count: workgroup_x,
+                buffer_name: REDUCTION_SHARED_BUFFER_NAME.to_owned(),
+            },
+            barriers: reduction_barrier_schedule(workgroup_x),
+            oob_padding: OobPaddingPolicy::ZeroFill,
+        }))
+    }
+
     /// Resolve the transformer-op recipe plans (`AxisReduction` /
     /// `RowSoftmax` / `LayerNormalization`) — the S6-P1 admission path.
     ///
@@ -545,6 +588,7 @@ impl CollectionKernelPlan {
             CollectionKernelPlan::BatchedAttention(plan) => validate_batched_attention_plan(plan),
             CollectionKernelPlan::SsmConv1d(plan) => validate_ssm_conv1d_plan(plan),
             CollectionKernelPlan::SsmScan(plan) => validate_ssm_scan_plan(plan),
+            CollectionKernelPlan::DistributedSum(plan) => validate_distributed_sum_plan(plan),
         }
     }
 }

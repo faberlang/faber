@@ -753,7 +753,53 @@ pub enum MirIntrinsic {
     /// variant-check surface (archived `docs/archived/est-variant-check/`);
     /// device/application lanes fail closed on it.
     TypeCheck(MirTypeCheckOp),
+    /// Declared distributed sum-reduce (`summa ex … filum …`, SFR-5): the
+    /// first author-stated kernel recipe. The runtime call IS the
+    /// declaration site — the kernel-plan pass resolves it to
+    /// [`crate::kernel_plan::CollectionKernelPlan::DistributedSum`] from the
+    /// carried facts, never by pattern recognition over the body. The lone
+    /// argument is the source tensor operand; the result is the broadcast
+    /// sum.
+    FilumSum(MirFilumSumOp),
 }
+
+/// Filum declaration facts carried by [`MirIntrinsic::FilumSum`] (SFR-5):
+/// filum metadata (lane binder + frozen lane width), the per-element
+/// binders, and the captured term-body MIR the per-lane inliner replays.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MirFilumSumOp {
+    /// The `filum f` lane binder's source name (metadata for emitters).
+    pub filum_binder: Option<Symbol>,
+    /// The per-element term binder local the term body reads.
+    pub term_binder: MirLocalId,
+    /// The term binder's source name.
+    pub term_binder_name: Option<Symbol>,
+    /// The coordinate binder locals (one per source tensor axis).
+    pub coordinates: Vec<MirFilumCoordinate>,
+    /// Frozen filum lane width `W` (32; tails fail closed at admission).
+    pub lane_width: u32,
+    /// The captured term-body MIR: per-element statements that produce the
+    /// `redde` term value into `term_result`.
+    pub term_body: Vec<MirStatement>,
+    /// The local the term value lands in at term-body exit.
+    pub term_result: MirLocalId,
+}
+
+/// One coordinate binder of a filum declaration (SFR-5).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MirFilumCoordinate {
+    /// The coordinate's local (numerus; one per tensor axis).
+    pub local: MirLocalId,
+    /// The coordinate binder's source name.
+    pub name: Option<Symbol>,
+}
+
+// `Eq` marker for the plan-carried declaration facts — the same bitwise
+// equality stance `impl Eq for MirConstant` already takes for float-bearing
+// payloads; the kernel plan derives `Eq`.
+impl Eq for MirFilumSumOp {}
+
+impl Eq for MirFilumCoordinate {}
 
 /// Type-check intrinsic payload (`est <type>` / `non est <type>`).
 ///

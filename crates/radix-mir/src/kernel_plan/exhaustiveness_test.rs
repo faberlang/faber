@@ -42,6 +42,7 @@ const KNOWN_VARIANTS: &[&str] = &[
     "BatchedAttention",
     "SsmConv1d",
     "SsmScan",
+    "DistributedSum",
 ];
 
 /// Known match families that must name every [`CollectionKernelPlan`] variant.
@@ -113,6 +114,7 @@ fn variant_coverage(plan: &CollectionKernelPlan) -> FamilyCoverage {
         CollectionKernelPlan::BatchedAttention(_) => covered("BatchedAttention"),
         CollectionKernelPlan::SsmConv1d(_) => covered("SsmConv1d"),
         CollectionKernelPlan::SsmScan(_) => covered("SsmScan"),
+        CollectionKernelPlan::DistributedSum(_) => covered("DistributedSum"),
     }
 }
 
@@ -276,7 +278,28 @@ fn representative_plans() -> [CollectionKernelPlan; KNOWN_VARIANTS.len()] {
             state_dim: 1,
             layout: PackedStorageLayout::F32,
         }),
+        CollectionKernelPlan::DistributedSum(dummy_distributed_sum()),
     ]
+}
+
+fn dummy_distributed_sum() -> DistributedSumPlan {
+    DistributedSumPlan {
+        filum: crate::MirFilumSumOp {
+            filum_binder: None,
+            term_binder: crate::MirLocalId(0),
+            term_binder_name: None,
+            coordinates: Vec::new(),
+            lane_width: 32,
+            term_body: Vec::new(),
+            term_result: crate::MirLocalId(1),
+        },
+        length: 32,
+        workgroup_x: 32,
+        partials: 1,
+        shared_memory: dummy_shared(),
+        barriers: Vec::new(),
+        oob_padding: super::OobPaddingPolicy::ZeroFill,
+    }
 }
 
 #[test]

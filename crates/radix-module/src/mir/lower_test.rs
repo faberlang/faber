@@ -4997,17 +4997,18 @@ fn sequential_summa_transformed_term_folds_per_element_body() {
 }
 
 #[test]
-fn filum_summa_stays_unsupported_before_sfr5() {
+fn filum_summa_lowers_to_declared_plan_entry() {
+    // SFR-5: the `filum` spelling lowers to the `FilumSum` declaration (the
+    // kernel-plan entry), never inline base-lane MIR.
     let mut unit = analyze(
         r"@ nucleum
 functio k(tensor<f32, [256]> a) → f32 {
     redde summa ex a apud [i] filum f fixum s { redde s }
 }",
     );
-    let errors = dump_analyzed_unit(&mut unit).expect_err("filum summa must fail closed pre-SFR-5");
+    let dump = dump_analyzed_unit(&mut unit).expect("filum summa lowers to the SFR-5 declaration");
     assert!(
-        errors.iter().any(|err| err.issue.contains("filum_summa")),
-        "expected a filum summa unsupported issue, got: {:?}",
-        errors.iter().map(|err| &err.issue).collect::<Vec<_>>()
+        dump.contains("filum_sum"),
+        "expected the FilumSum declaration in the MIR dump:\n{dump}"
     );
 }

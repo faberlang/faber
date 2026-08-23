@@ -45,7 +45,8 @@ use crate::mir::{
     dump_program, instantiate_existing_generic_type, type_contains_param, MirAggregate, MirAggregateFields,
     MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock, MirBlockId, MirCallee, MirClosureCallee, MirClosureCapture,
     MirClosureEnvironment, MirClosureEnvironmentId, MirClosureValue, MirConstant, MirConversion, MirConversionFlavor,
-    MirDeviceRole, MirDiagnosticKind, MirFunction, MirFunctionId, MirGenericBindings, MirIntrinsic,
+    MirDeviceRole, MirDiagnosticKind, MirFilumCoordinate, MirFilumSumOp, MirFunction, MirFunctionId,
+    MirGenericBindings, MirIntrinsic,
     MirKernelShaderStage, MirKeyValueOperand, MirLayoutTable, MirLocal as MirLocalDecl, MirLocalId,
     MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirParam,
     MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirProjection, MirProvider, MirProviderKind, MirRuntimeCall,
@@ -1292,6 +1293,11 @@ struct FunctionBuilder<'a> {
     current: Option<MirBlockId>,
     breakables: Vec<BreakableContext>,
     summa_fold: Option<SummaFoldContext>,
+    /// Active `summa … filum` term capture (SFR-5): a valued `redde` inside
+    /// the captured term body stores the term value into `accumulator` and
+    /// exits the body — the statements land in the filum plan entry, not the
+    /// kernel's inline flow.
+    filum_capture: Option<SummaFoldContext>,
     handlers: Vec<HandlerContext>,
     materializing_consts: FxHashSet<DefId>,
     errors: Vec<MirError>,
@@ -1333,6 +1339,7 @@ impl<'a> FunctionBuilder<'a> {
             current: None,
             breakables: Vec::new(),
             summa_fold: None,
+            filum_capture: None,
             handlers: Vec::new(),
             materializing_consts: FxHashSet::default(),
             errors: Vec::new(),

@@ -3904,3 +3904,171 @@ fn speculative_verification_version_skew_fails_closed() {
         Err(VerificationAdmissionError::UnsupportedVersion { .. })
     ));
 }
+
+// -----------------------------------------------------------------------
+// Declared distributed sum (SFR-5: `summa ex … filum …` plan entry).
+// -----------------------------------------------------------------------
+
+fn filum_declaration(lane_width: u32) -> crate::MirFilumSumOp {
+    crate::MirFilumSumOp {
+        filum_binder: None,
+        term_binder: MirLocalId(2),
+        term_binder_name: None,
+        coordinates: vec![crate::MirFilumCoordinate {
+            local: MirLocalId(3),
+            name: None,
+        }],
+        lane_width,
+        term_body: Vec::new(),
+        term_result: MirLocalId(4),
+    }
+}
+
+fn filum_function(types: &mut TypeTable) -> MirFunction {
+    let tensor = tensor_ty(types, 1024);
+    let scalar = f32_ty(types);
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: tensor,
+            mode: MirParamMode::Owned,
+            span: test_span(),
+        }],
+        locals: vec![MirLocal {
+            id: MirLocalId(0),
+            name: None,
+            ty: tensor,
+            mutable: false,
+            span: test_span(),
+        }],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(1))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::FilumSum(filum_declaration(32)),
+                        args: vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                        return_ty: scalar,
+                    },
+                },
+                span: test_span(),
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(1),
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: scalar,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
+}
+
+#[test]
+fn kernel_plan_for_function_derives_distributed_sum_plan() {
+    let mut types = TypeTable::new();
+    let function = filum_function(&mut types);
+    let signature = reduction_signature(1024, 32, 32);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("filum declaration facts resolve")
+        .expect("filum function carries the declared recipe plan");
+    let CollectionKernelPlan::DistributedSum(plan) = &derived else {
+        panic!("filum declaration must resolve to DistributedSum, got {derived:?}");
+    };
+    assert_eq!(plan.length, 1024);
+    assert_eq!(plan.workgroup_x, 32);
+    assert_eq!(plan.partials, 32);
+    assert_eq!(plan.filum.lane_width, 32);
+    derived
+        .validate()
+        .expect("declared distributed sum plan validates");
+}
+
+#[test]
+fn distributed_sum_floor_is_the_tree_reduction_recipe() {
+    // SFR-5 plan law: a backend with no native arm lowers the declared
+    // distributed sum through the shared-memory tree floor — the floor facts
+    // must equal the TreeReduction recipe's exactly, by construction.
+    let mut types = TypeTable::new();
+    let signature = reduction_signature(1024, 32, 32);
+    let validation = MirValidationContext::new(&types);
+    let filum = filum_declaration(32);
+    let declared = CollectionKernelPlan::from_filum_summa(&filum, 1024)
+        .expect("declaration facts resolve a plan");
+    let recognized = CollectionKernelPlan::from_contract(
+        &signature,
+        &CollectionOpContract::Reduction {
+            length: 1024,
+            workgroup_x: 32,
+            partials: 32,
+        },
+        MirCollectionOp::Sum,
+        None,
+    )
+    .expect("reduction contract resolves the tree recipe");
+    let CollectionKernelPlan::DistributedSum(declared_plan) = &declared else {
+        panic!("from_filum_summa yields DistributedSum");
+    };
+    let CollectionKernelPlan::TreeReduction(tree) = &recognized else {
+        panic!("from_contract yields TreeReduction");
+    };
+    assert_eq!(declared_plan.workgroup_x, tree.workgroup_x);
+    assert_eq!(declared_plan.length, tree.length);
+    assert_eq!(declared_plan.partials, tree.partials);
+    assert_eq!(declared_plan.shared_memory, tree.shared_memory);
+    assert_eq!(declared_plan.barriers, tree.barriers);
+    assert_eq!(declared_plan.oob_padding, tree.oob_padding);
+    // The launch tag selects the tree-reduction semantics — the no-native-
+    // arm floor.
+    assert_eq!(
+        RecipeKind::from_plan(&declared),
+        RecipeKind::from_plan(&recognized)
+    );
+    assert_eq!(plan_shared_memory_bytes(&declared), plan_shared_memory_bytes(&recognized));
+    let _ = validation;
+}
+
+#[test]
+fn distributed_sum_second_recipe_fails_closed() {
+    let mut types = TypeTable::new();
+    let mut function = filum_function(&mut types);
+    // A second, recognized recipe op in the same body must not silently
+    // merge with the declared distributed sum.
+    function.blocks[0].statements.push(MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace::local(MirLocalId(1))),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorSoftmax),
+                args: vec![MirOperand::Place(MirPlace::local(MirLocalId(1)))],
+                return_ty: f32_ty(&mut types),
+            },
+        },
+        span: test_span(),
+    });
+    let signature = reduction_signature(1024, 32, 32);
+    let validation = MirValidationContext::new(&types);
+    assert!(kernel_plan_for_function(&function, &signature, &validation).is_err());
+}
+
+#[test]
+fn from_filum_summa_rejects_degenerate_declarations() {
+    let filum = filum_declaration(0);
+    assert!(CollectionKernelPlan::from_filum_summa(&filum, 1024).is_none());
+    let filum = filum_declaration(24);
+    assert!(CollectionKernelPlan::from_filum_summa(&filum, 1024).is_none());
+    let filum = filum_declaration(32);
+    assert!(CollectionKernelPlan::from_filum_summa(&filum, 0).is_none());
+}

@@ -4,8 +4,11 @@
 //! shared memory plus a barrier. Lane-ISA collectives such as simdgroup/warp
 //! shuffle, reduce, or scan are recipe-local optimizations, not portable MIR
 //! semantics: each optimization carries a portable fallback or an explicit
-//! lane admission. No collective MIR op is introduced until a second caller
-//! requires one.
+//! lane admission. The one admitted collective caller is the declared
+//! `summa ex … filum …` distributed sum-reduce (SFR-5,
+//! [`CollectionKernelPlan::DistributedSum`]): backends without a native arm
+//! lower it through the shared-memory tree floor this plan pins, so the plan
+//! law is satisfied by construction.
 
 #[allow(unused_imports)] // intra-doc links only; the plan pass lives in build.rs
 use crate::abi::CollectionOpContract;
@@ -123,6 +126,13 @@ pub enum CollectionKernelPlan {
     /// Hybrid SSM linear-recurrence scan / state-update recipe (R-PACK-01A:
     /// name frozen; admission is R-PACK-04A). See [`SsmScanPlan`].
     SsmScan(SsmScanPlan),
+    /// Declared distributed sum-reduce (`summa ex … filum …`, SFR-5): the
+    /// first author-stated recipe — declaration, not pattern recognition.
+    /// Carries the filum metadata, the term-body MIR, and the coordinate
+    /// facts; backends without a native arm lower it through the
+    /// shared-memory tree floor the plan pins (plan law by construction).
+    /// See [`DistributedSumPlan`].
+    DistributedSum(DistributedSumPlan),
 }
 
 /// Axis-reduction recipe plan (name frozen by S6-N1; admission, resolution,
@@ -362,6 +372,38 @@ pub struct SsmScanPlan {
     pub state_dim: u64,
     /// Stored state/weight layout.
     pub layout: crate::abi::PackedStorageLayout,
+}
+
+/// Declared distributed sum-reduce plan (`summa ex … filum …`, SFR-5). The
+/// recipe is stated by the author, not recognized from a source pattern:
+/// `filum` carries the filum metadata (lane binder, frozen lane width),
+/// the term-body MIR, and the coordinate facts the per-lane inliner binds.
+///
+/// The floor facts (`workgroup_x`, `shared_memory`, `barriers`,
+/// `oob_padding`) mirror the [`ReductionPlan`] tree recipe exactly: a
+/// backend with no native collective arm emits the shared-memory tree
+/// floor from these carried facts, so the portable-collective law of this
+/// module is satisfied by construction. `length` is the source tensor's
+/// element count `K`, resolved from the kernel signature's source buffer
+/// (never guessed); `partials` is the per-workgroup partial slot count.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DistributedSumPlan {
+    /// The filum declaration facts: filum metadata, term-body MIR, and
+    /// coordinate binders (the module lowering's captured term body).
+    pub filum: crate::MirFilumSumOp,
+    /// True flat source length `K` (the source buffer's element count).
+    pub length: u64,
+    /// Workgroup lane count on `x` — equals the filum lane width `W`.
+    pub workgroup_x: u32,
+    /// Per-workgroup partial slot count `ceil(length / workgroup_x)`.
+    pub partials: u64,
+    /// Shared-memory buffer the tree floor reduces through.
+    pub shared_memory: SharedMemoryLayout,
+    /// Ordered barrier schedule of the tree floor: the post-load barrier
+    /// first, then one barrier after every tree halving step.
+    pub barriers: Vec<BarrierPoint>,
+    /// Zero-fill policy for tail elements beyond `length`.
+    pub oob_padding: OobPaddingPolicy,
 }
 
 /// Matmul operand shapes `(M, K, N)`, resolved from the rank-2 tensor types
