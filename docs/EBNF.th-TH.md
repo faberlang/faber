@@ -466,7 +466,7 @@ template_argument ::= 'กระจาย'? IDENTIFIER ':' expression
 # [159] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'จริง' | 'เท็จ' | 'ว่าง'
 # [160] primary
-primary ::= IDENTIFIER | literal | 'ตัวฉัน' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | 'ตัวฉัน' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | '(' expression ')'
 # formerly: adExpr
 # [161] ad_expr
 ad_expr ::= 'ถึง' ASCII_STRING ad_opener?
@@ -527,87 +527,89 @@ scriptum_expr ::= 'จารึก' '(' STRING (',' expression)* ')'
 # formerly: legeExpr
 # [180] lege_expr
 lege_expr ::= 'อ่าน' 'บรรทัด'?
+# [181] first_match_expr
+first_match_expr ::= 'ตรงแรก' '(' expression apud_clause? ',' 'ที่ซึ่ง' IDENTIFIER block_stmt ')'
 # formerly: objectPattern
-# [181] object_pattern
+# [182] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
 # formerly: patternProperty
-# [182] pattern_property
+# [183] pattern_property
 pattern_property ::= 'ที่เหลือ'? IDENTIFIER ('ในชื่อ' IDENTIFIER)?
 # formerly: arrayPattern
-# [183] array_pattern
+# [184] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
 # formerly: arrayPatternElement
-# [184] array_pattern_element
+# [185] array_pattern_element
 array_pattern_element ::= '_' | 'ที่เหลือ'? IDENTIFIER
 # formerly: outputStmt
-# [185] nota_stmt
+# [186] nota_stmt
 nota_stmt ::= ('บันทึก' | 'ดู' | 'เตือน' | 'เขียน') expression (',' expression)*
 # formerly: entryHeader
-# [186] entry_header
+# [187] entry_header
 entry_header ::= ('อาร์กิวเมนต์' IDENTIFIER)? ('ทางออก' expression)?
 # formerly: incipitStmt
-# [187] incipit_stmt
+# [188] incipit_stmt
 incipit_stmt ::= 'เริ่ม' entry_header block_stmt
 # formerly: incipietStmt
-# [188] incipiet_stmt
+# [189] incipiet_stmt
 incipiet_stmt ::= 'เริ่มอะซิงก์' entry_header block_stmt
 # formerly: probandumDecl
-# [189] probandum_decl
+# [190] probandum_decl
 probandum_decl ::= 'ทดสอบชุด' STRING proba_modifier* '{' probandum_body '}'
 # formerly: probandumBody
-# [190] probandum_body
+# [191] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
 # formerly: probaStmt
-# [191] proba_stmt
+# [192] proba_stmt
 proba_stmt ::= 'ทดสอบ' STRING proba_modifier* block_stmt
 # formerly: probaModifier
-# [192] proba_modifier
+# [193] proba_modifier
 proba_modifier ::= 'ละเว้น' STRING | 'ค้าง' STRING | 'เฉพาะ' | 'แท็ก' STRING | 'เวลา' NUMBER | 'วัด' | 'ทำซ้ำ' NUMBER | 'เปราะบาง' NUMBER | 'เฉพาะใน' STRING
 # formerly: praeparaBlock
-# [193] praepara_block
+# [194] praepara_block
 praepara_block ::= ('เตรียม' | 'จะเตรียม' | 'หลังเตรียม' | 'จะหลังเตรียม') 'ทั้งหมด'? block_stmt
 # formerly: facBlockStmt
-# [194] fac_stmt
+# [195] fac_stmt
 fac_stmt ::= 'ทำ' block_stmt cape_clause? ('ขณะ' expression)?
-# [195] IDENTIFIER
+# [196] IDENTIFIER
 IDENTIFIER ::=
-# [196] NUMBER
+# [197] NUMBER
 NUMBER ::=
-# [197] NATURAL
+# [198] NATURAL
 NATURAL ::=
-# [198] STRING
+# [199] STRING
 STRING ::=
-# [199] ASCII_STRING
+# [200] ASCII_STRING
 ASCII_STRING ::=
-# [200] BACKTICK_STRING
+# [201] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [201] OCTETI_STRING
+# [202] OCTETI_STRING
 OCTETI_STRING ::=
-# [202] NEWLINE
+# [203] NEWLINE
 NEWLINE ::=
-# [203] WIDTH_MARKER
+# [204] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [204] LISTA_WIDTH_SUGAR
+# [205] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [205] TENSOR_WIDTH_SUGAR
+# [206] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [206] SPARSA_WIDTH_SUGAR
+# [207] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [207] VECTOR_WIDTH_SUGAR
+# [208] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [208] MATRIX_WIDTH_SUGAR
+# [209] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [209] FRONTMATTER_DELIMITER
+# [210] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [210] TOML_LINES
+# [211] TOML_LINES
 TOML_LINES ::=
-# [211] ANNOTATION_NAME
+# [212] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [212] ANNOTATION_FIELD_NAME
+# [213] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [213] NON_NEWLINE_TOKEN
+# [214] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [214] NO_NEWLINE
+# [215] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -815,6 +817,7 @@ NO_NEWLINE ::=
 | [`praefixum_expr`](#praefixum-expr) | `#นำหน้า-expr` | live | praefixumExpr |
 | [`scriptum_expr`](#scriptum-expr) | `#จารึก-expr` | live | scriptumExpr |
 | [`lege_expr`](#lege-expr) | `#อ่าน-expr` | live | legeExpr |
+| [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live | — |
 | [`object_pattern`](#object-pattern) | `#object-pattern` | live | objectPattern |
 | [`pattern_property`](#pattern-property) | `#pattern-property` | live | patternProperty |
 | [`array_pattern`](#array-pattern) | `#array-pattern` | live | arrayPattern |
@@ -948,6 +951,7 @@ productions. It is not a second keyword authority.
 | Objects | `นำหน้า` | prefix expression |
 | Testing | `เตรียม` | setup |
 | Testing | `จะเตรียม` | async setup |
+| Grammar | `ตรงแรก` | first-match selection head |
 | Testing | `ทดสอบ` | test |
 | Testing | `ทดสอบชุด` | test suite |
 | Declarations | `สาธารณะ` | public visibility |
@@ -975,6 +979,7 @@ productions. It is not a second keyword authority.
 | Testing | `เวลา` | timeout |
 | JSON | `true` | JSON true |
 | Declarations | `ชนิดนามแฝง` | type alias |
+| Grammar | `ที่ซึ่ง` | first-match predicate tail |
 | Iteration | `จนถึง` | range until inclusive |
 | Params | `ในชื่อ` | as / alias |
 | Declarations | `แปร` | mutable binding |
@@ -1710,6 +1715,16 @@ construction `Type { field = expr }` uses the Faber `=` grammar unchanged.
 ### Special Expressions
 
 
+`ตรงแรก(source, ที่ซึ่ง binder { predicate })` is the dedicated first-match
+selection expression over a statically bounded source: the predicate is
+evaluated for every candidate lane (total evaluation, no early exit), the
+first live match is selected, and a no-match or empty source yields `ว่าง`
+(the result type is `T ∪ ว่าง`). The `ที่ซึ่ง` predicate tail is owned by this
+head and never shares the reduce/scan `คงที่`/`แปร` binder tail.
+`ตรงแรก` claims only the expression-head position immediately followed
+by `(`; elsewhere the spelling stays an ordinary identifier. An optional
+`ที่` coordinate clause binds per-axis indices as in `วน ออก`.
+
 `จารึก` and `อ่าน`/`บรรทัด` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
 in-scope definition); otherwise they are the builtin. The same binding-wins rule
@@ -1844,8 +1859,9 @@ grammar-level query expression. `textus`, `numerus`, `fractus`, `lista<T>`,
 `tabula<K,V>`, and `copia<T>` are compiler-owned core types; their method
 surfaces are not Norma declarations.
 
-`prima` and `ultima` are ordinary method names, not transform keywords. `ubi` is
-not active collection syntax.
+`prima` and `ultima` are ordinary method names, not transform keywords. `ที่ซึ่ง` is
+the owned predicate-tail introducer of the `ตรงแรก` first-match expression
+(see Special Expressions), not collection syntax.
 
 `ออก` is used for iteration (`วน ออก items คงที่ x`) and imports (`นำเข้า ออก "path"`).
 

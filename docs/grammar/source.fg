@@ -619,6 +619,8 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
 # | Objects | `iuncta` | tuple type/constructor |
 # | Objects | `ratio` | named-field aggregate type/constructor |
 # | Objects | `praefixum` | prefix expression |
+# | Grammar | `primus_quem` | first-match selection head |
+# | Grammar | `ubi` | first-match predicate tail |
 # | Type | `copy` | copy ownership |
 # | Type | `de` | borrow / for-in keys |
 # | Type | `in` | ownership in |
@@ -1107,6 +1109,7 @@ literal := NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING
 primary := IDENTIFIER | literal | 'ego'
          | array_literal | json_literal | typed_constructor | iuncta_expr
          | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr
+         | first_match_expr
          | '(' expression ')'
 @formerly adExpr
 ad_expr    := 'ad' ASCII_STRING ad_opener?
@@ -1154,6 +1157,10 @@ praefixum_expr := 'praefixum' (block_stmt | '(' expression ')')
 scriptum_expr  := 'scriptum' '(' STRING (',' expression)* ')'
 @formerly legeExpr
 lege_expr      := 'lege' 'lineam'?
+# Dedicated first-match selection: total over a bounded source, first-live
+# selection, `T ∪ nihil` for no-match/empty. The `ubi` predicate tail is owned
+# by this head — never the reduce/scan `fixum`/`varia` binder tail.
+first_match_expr := 'primus_quem' '(' expression apud_clause? ',' 'ubi' IDENTIFIER block_stmt ')'
 
 @formerly objectPattern
 object_pattern  := '{' pattern_property (',' pattern_property)* '}'

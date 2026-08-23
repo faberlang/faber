@@ -466,7 +466,7 @@ template_argument ::= 'انشر'? IDENTIFIER ':' expression
 # [159] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'صواب' | 'خطأ' | 'لاشيء'
 # [160] primary
-primary ::= IDENTIFIER | literal | 'ذات' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | 'ذات' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | '(' expression ')'
 # formerly: adExpr
 # [161] ad_expr
 ad_expr ::= 'اتصل' ASCII_STRING ad_opener?
@@ -527,87 +527,89 @@ scriptum_expr ::= 'حرر' '(' STRING (',' expression)* ')'
 # formerly: legeExpr
 # [180] lege_expr
 lege_expr ::= 'اقرأ' 'سطرا'?
+# [181] first_match_expr
+first_match_expr ::= 'أول_مطابقة' '(' expression apud_clause? ',' 'حيث' IDENTIFIER block_stmt ')'
 # formerly: objectPattern
-# [181] object_pattern
+# [182] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
 # formerly: patternProperty
-# [182] pattern_property
+# [183] pattern_property
 pattern_property ::= 'باقي'? IDENTIFIER ('كـ' IDENTIFIER)?
 # formerly: arrayPattern
-# [183] array_pattern
+# [184] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
 # formerly: arrayPatternElement
-# [184] array_pattern_element
+# [185] array_pattern_element
 array_pattern_element ::= '_' | 'باقي'? IDENTIFIER
 # formerly: outputStmt
-# [185] nota_stmt
+# [186] nota_stmt
 nota_stmt ::= ('اعرض' | 'شاهد' | 'نبه' | 'اكتب') expression (',' expression)*
 # formerly: entryHeader
-# [186] entry_header
+# [187] entry_header
 entry_header ::= ('وسائط' IDENTIFIER)? ('مخرج' expression)?
 # formerly: incipitStmt
-# [187] incipit_stmt
+# [188] incipit_stmt
 incipit_stmt ::= 'بداية' entry_header block_stmt
 # formerly: incipietStmt
-# [188] incipiet_stmt
+# [189] incipiet_stmt
 incipiet_stmt ::= 'استهلال' entry_header block_stmt
 # formerly: probandumDecl
-# [189] probandum_decl
+# [190] probandum_decl
 probandum_decl ::= 'مختبر' STRING proba_modifier* '{' probandum_body '}'
 # formerly: probandumBody
-# [190] probandum_body
+# [191] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
 # formerly: probaStmt
-# [191] proba_stmt
+# [192] proba_stmt
 proba_stmt ::= 'اختبر' STRING proba_modifier* block_stmt
 # formerly: probaModifier
-# [192] proba_modifier
+# [193] proba_modifier
 proba_modifier ::= 'أهمل' STRING | 'مستقبلي' STRING | 'فقط' | 'وسم' STRING | 'زمني' NUMBER | 'قس' | 'معاد' NUMBER | 'هش' NUMBER | 'حصري' STRING
 # formerly: praeparaBlock
-# [193] praepara_block
+# [194] praepara_block
 praepara_block ::= ('جهز' | 'سيهيئ' | 'لاحق' | 'سيلحق') 'جميع'? block_stmt
 # formerly: facBlockStmt
-# [194] fac_stmt
+# [195] fac_stmt
 fac_stmt ::= 'افعل' block_stmt cape_clause? ('طالما' expression)?
-# [195] IDENTIFIER
+# [196] IDENTIFIER
 IDENTIFIER ::=
-# [196] NUMBER
+# [197] NUMBER
 NUMBER ::=
-# [197] NATURAL
+# [198] NATURAL
 NATURAL ::=
-# [198] STRING
+# [199] STRING
 STRING ::=
-# [199] ASCII_STRING
+# [200] ASCII_STRING
 ASCII_STRING ::=
-# [200] BACKTICK_STRING
+# [201] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [201] OCTETI_STRING
+# [202] OCTETI_STRING
 OCTETI_STRING ::=
-# [202] NEWLINE
+# [203] NEWLINE
 NEWLINE ::=
-# [203] WIDTH_MARKER
+# [204] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [204] LISTA_WIDTH_SUGAR
+# [205] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [205] TENSOR_WIDTH_SUGAR
+# [206] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [206] SPARSA_WIDTH_SUGAR
+# [207] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [207] VECTOR_WIDTH_SUGAR
+# [208] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [208] MATRIX_WIDTH_SUGAR
+# [209] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [209] FRONTMATTER_DELIMITER
+# [210] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [210] TOML_LINES
+# [211] TOML_LINES
 TOML_LINES ::=
-# [211] ANNOTATION_NAME
+# [212] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [212] ANNOTATION_FIELD_NAME
+# [213] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [213] NON_NEWLINE_TOKEN
+# [214] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [214] NO_NEWLINE
+# [215] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -815,6 +817,7 @@ NO_NEWLINE ::=
 | [`praefixum_expr`](#praefixum-expr) | `#بادئة-expr` | live | praefixumExpr |
 | [`scriptum_expr`](#scriptum-expr) | `#حرر-expr` | live | scriptumExpr |
 | [`lege_expr`](#lege-expr) | `#اقرأ-expr` | live | legeExpr |
+| [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live | — |
 | [`object_pattern`](#object-pattern) | `#object-pattern` | live | objectPattern |
 | [`pattern_property`](#pattern-property) | `#pattern-property` | live | patternProperty |
 | [`array_pattern`](#array-pattern) | `#array-pattern` | live | arrayPattern |
@@ -948,6 +951,7 @@ productions. It is not a second keyword authority.
 | Objects | `بادئة` | prefix expression |
 | Testing | `جهز` | setup |
 | Testing | `سيهيئ` | async setup |
+| Grammar | `أول_مطابقة` | first-match selection head |
 | Testing | `اختبر` | test |
 | Testing | `مختبر` | test suite |
 | Declarations | `عام` | public visibility |
@@ -975,6 +979,7 @@ productions. It is not a second keyword authority.
 | Testing | `زمني` | timeout |
 | JSON | `true` | JSON true |
 | Declarations | `نمط` | type alias |
+| Grammar | `حيث` | first-match predicate tail |
 | Iteration | `حتى` | range until inclusive |
 | Params | `كـ` | as / alias |
 | Declarations | `متغير` | mutable binding |
@@ -1710,6 +1715,16 @@ construction `Type { field = expr }` uses the Faber `=` grammar unchanged.
 ### Special Expressions
 
 
+`أول_مطابقة(source, حيث binder { predicate })` is the dedicated first-match
+selection expression over a statically bounded source: the predicate is
+evaluated for every candidate lane (total evaluation, no early exit), the
+first live match is selected, and a no-match or empty source yields `لاشيء`
+(the result type is `T ∪ لاشيء`). The `حيث` predicate tail is owned by this
+head and never shares the reduce/scan `ثابت`/`متغير` binder tail.
+`أول_مطابقة` claims only the expression-head position immediately followed
+by `(`; elsewhere the spelling stays an ordinary identifier. An optional
+`عند` coordinate clause binds per-axis indices as in `كرر من`.
+
 `حرر` and `اقرأ`/`سطرا` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
 in-scope definition); otherwise they are the builtin. The same binding-wins rule
@@ -1844,8 +1859,9 @@ grammar-level query expression. `textus`, `numerus`, `fractus`, `lista<T>`,
 `tabula<K,V>`, and `copia<T>` are compiler-owned core types; their method
 surfaces are not Norma declarations.
 
-`prima` and `ultima` are ordinary method names, not transform keywords. `ubi` is
-not active collection syntax.
+`prima` and `ultima` are ordinary method names, not transform keywords. `حيث` is
+the owned predicate-tail introducer of the `أول_مطابقة` first-match expression
+(see Special Expressions), not collection syntax.
 
 `من` is used for iteration (`كرر من items ثابت x`) and imports (`استورد من "path"`).
 

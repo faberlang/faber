@@ -466,7 +466,7 @@ template_argument ::= '展開'? IDENTIFIER ':' expression
 # [159] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '真' | '假' | '空'
 # [160] primary
-primary ::= IDENTIFIER | literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | '(' expression ')'
 # formerly: adExpr
 # [161] ad_expr
 ad_expr ::= '端點' ASCII_STRING ad_opener?
@@ -527,87 +527,89 @@ scriptum_expr ::= '格式文字' '(' STRING (',' expression)* ')'
 # formerly: legeExpr
 # [180] lege_expr
 lege_expr ::= '讀取' '行'?
+# [181] first_match_expr
+first_match_expr ::= '首個匹配' '(' expression apud_clause? ',' '其中' IDENTIFIER block_stmt ')'
 # formerly: objectPattern
-# [181] object_pattern
+# [182] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
 # formerly: patternProperty
-# [182] pattern_property
+# [183] pattern_property
 pattern_property ::= '其餘'? IDENTIFIER ('作為' IDENTIFIER)?
 # formerly: arrayPattern
-# [183] array_pattern
+# [184] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
 # formerly: arrayPatternElement
-# [184] array_pattern_element
+# [185] array_pattern_element
 array_pattern_element ::= '_' | '其餘'? IDENTIFIER
 # formerly: outputStmt
-# [185] nota_stmt
+# [186] nota_stmt
 nota_stmt ::= ('註記' | '檢視' | '警告' | '寫出') expression (',' expression)*
 # formerly: entryHeader
-# [186] entry_header
+# [187] entry_header
 entry_header ::= ('引數' IDENTIFIER)? ('出口' expression)?
 # formerly: incipitStmt
-# [187] incipit_stmt
+# [188] incipit_stmt
 incipit_stmt ::= '入口' entry_header block_stmt
 # formerly: incipietStmt
-# [188] incipiet_stmt
+# [189] incipiet_stmt
 incipiet_stmt ::= '非同步入口' entry_header block_stmt
 # formerly: probandumDecl
-# [189] probandum_decl
+# [190] probandum_decl
 probandum_decl ::= '測試規格' STRING proba_modifier* '{' probandum_body '}'
 # formerly: probandumBody
-# [190] probandum_body
+# [191] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
 # formerly: probaStmt
-# [191] proba_stmt
+# [192] proba_stmt
 proba_stmt ::= '測試' STRING proba_modifier* block_stmt
 # formerly: probaModifier
-# [192] proba_modifier
+# [193] proba_modifier
 proba_modifier ::= '略過' STRING | '預期' STRING | '僅限' | '標籤' STRING | '時限' NUMBER | '測量' | '重複' NUMBER | '脆弱' NUMBER | '僅限於' STRING
 # formerly: praeparaBlock
-# [193] praepara_block
+# [194] praepara_block
 praepara_block ::= ('準備' | '準備非同步' | '後置準備' | '後置準備非同步') '全部'? block_stmt
 # formerly: facBlockStmt
-# [194] fac_stmt
+# [195] fac_stmt
 fac_stmt ::= '執行' block_stmt cape_clause? ('當' expression)?
-# [195] IDENTIFIER
+# [196] IDENTIFIER
 IDENTIFIER ::=
-# [196] NUMBER
+# [197] NUMBER
 NUMBER ::=
-# [197] NATURAL
+# [198] NATURAL
 NATURAL ::=
-# [198] STRING
+# [199] STRING
 STRING ::=
-# [199] ASCII_STRING
+# [200] ASCII_STRING
 ASCII_STRING ::=
-# [200] BACKTICK_STRING
+# [201] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [201] OCTETI_STRING
+# [202] OCTETI_STRING
 OCTETI_STRING ::=
-# [202] NEWLINE
+# [203] NEWLINE
 NEWLINE ::=
-# [203] WIDTH_MARKER
+# [204] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [204] LISTA_WIDTH_SUGAR
+# [205] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [205] TENSOR_WIDTH_SUGAR
+# [206] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [206] SPARSA_WIDTH_SUGAR
+# [207] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [207] VECTOR_WIDTH_SUGAR
+# [208] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [208] MATRIX_WIDTH_SUGAR
+# [209] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [209] FRONTMATTER_DELIMITER
+# [210] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [210] TOML_LINES
+# [211] TOML_LINES
 TOML_LINES ::=
-# [211] ANNOTATION_NAME
+# [212] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [212] ANNOTATION_FIELD_NAME
+# [213] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [213] NON_NEWLINE_TOKEN
+# [214] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [214] NO_NEWLINE
+# [215] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -815,6 +817,7 @@ NO_NEWLINE ::=
 | [`praefixum_expr`](#praefixum-expr) | `#前綴-expr` | live | praefixumExpr |
 | [`scriptum_expr`](#scriptum-expr) | `#格式文字-expr` | live | scriptumExpr |
 | [`lege_expr`](#lege-expr) | `#讀取-expr` | live | legeExpr |
+| [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live | — |
 | [`object_pattern`](#object-pattern) | `#object-pattern` | live | objectPattern |
 | [`pattern_property`](#pattern-property) | `#pattern-property` | live | patternProperty |
 | [`array_pattern`](#array-pattern) | `#array-pattern` | live | arrayPattern |
@@ -948,6 +951,7 @@ productions. It is not a second keyword authority.
 | Objects | `前綴` | prefix expression |
 | Testing | `準備` | setup |
 | Testing | `準備非同步` | async setup |
+| Grammar | `首個匹配` | first-match selection head |
 | Testing | `測試` | test |
 | Testing | `測試規格` | test suite |
 | Declarations | `公開` | public visibility |
@@ -975,6 +979,7 @@ productions. It is not a second keyword authority.
 | Testing | `時限` | timeout |
 | JSON | `true` | JSON true |
 | Declarations | `型別` | type alias |
+| Grammar | `其中` | first-match predicate tail |
 | Iteration | `直到` | range until inclusive |
 | Params | `作為` | as / alias |
 | Declarations | `變值` | mutable binding |
@@ -1710,6 +1715,16 @@ construction `Type { field = expr }` uses the Faber `=` grammar unchanged.
 ### Special Expressions
 
 
+`首個匹配(source, 其中 binder { predicate })` is the dedicated first-match
+selection expression over a statically bounded source: the predicate is
+evaluated for every candidate lane (total evaluation, no early exit), the
+first live match is selected, and a no-match or empty source yields `空`
+(the result type is `T ∪ 空`). The `其中` predicate tail is owned by this
+head and never shares the reduce/scan `定值`/`變值` binder tail.
+`首個匹配` claims only the expression-head position immediately followed
+by `(`; elsewhere the spelling stays an ordinary identifier. An optional
+`於` coordinate clause binds per-axis indices as in `遍歷 取自`.
+
 `格式文字` and `讀取`/`行` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
 in-scope definition); otherwise they are the builtin. The same binding-wins rule
@@ -1844,8 +1859,9 @@ grammar-level query expression. `textus`, `numerus`, `fractus`, `lista<T>`,
 `tabula<K,V>`, and `copia<T>` are compiler-owned core types; their method
 surfaces are not Norma declarations.
 
-`prima` and `ultima` are ordinary method names, not transform keywords. `ubi` is
-not active collection syntax.
+`prima` and `ultima` are ordinary method names, not transform keywords. `其中` is
+the owned predicate-tail introducer of the `首個匹配` first-match expression
+(see Special Expressions), not collection syntax.
 
 `取自` is used for iteration (`遍歷 取自 items 定值 x`) and imports (`匯入 取自 "path"`).
 
