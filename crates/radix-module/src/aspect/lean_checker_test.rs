@@ -276,6 +276,54 @@ fn lean_checker_axiom_parse_output_malformed_is_empty() {
     assert!(audit.dependencies.is_empty());
 }
 
+// ---------------------------------------------------------------------------
+// fail-closed axiom audit (operator ruling 6a0fafde option (b)): an
+// unresolved wrapper import is a FAILURE, never a silent Allowed.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lean_checker_axiom_parse_unresolved_import_marks_audit_unresolved() {
+    let output = "error: unknown import: FaberGenerated\ninfo: ...";
+    let audit = parse_axiom_output(output);
+    assert!(audit.unresolved_import);
+    assert!(audit.dependencies.is_empty());
+}
+
+#[test]
+fn lean_checker_axiom_unresolved_import_never_classifies_allowed() {
+    // Empty dependency list with an unresolved import must still fail: no
+    // allowlist verdict is possible without trustworthy audit evidence.
+    let audit = AxiomAudit { dependencies: vec![], unresolved_import: true };
+    assert_eq!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::UnresolvedImport);
+}
+
+#[test]
+fn lean_checker_axiom_unresolved_wrapper_import_is_failure() {
+    // End-to-end classification proof (no Lean toolchain needed): when the
+    // wrapper import cannot resolve — here because `lean` is unavailable —
+    // the audit is unresolved and a Proven build still fails the verdict.
+    let temp_dir = crate::test_support::test_temp_dir("lean-axiom-unresolved-import");
+    let temp = temp_dir.path().to_path_buf();
+    let module = temp.join("Unresolvable.lean");
+    std::fs::write(&module, "theorem unresolvable_thm : True := trivial\n").expect("write module");
+
+    let config = LeanAspectCheckerConfig {
+        lake_bin: temp.join("nonexistent-lake"),
+        lean_bin: temp.join("nonexistent-lean"),
+        timeout: Duration::from_secs(5),
+    };
+    let checker = LeanAspectChecker::new(config, temp);
+
+    let audit = checker.audit_axioms(&module);
+    assert!(audit.unresolved_import, "unavailable lean must leave the audit unresolved");
+    let verdict = LeanAspectChecker::classify_axioms(&audit);
+    assert_ne!(verdict, AxiomVerdict::Allowed, "unresolved import must never classify Allowed");
+
+    let result = combined_verdict(proven_result(), &verdict, &SorryVerdict::Clean);
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+    assert!(result.evidence.0.contains("unresolved"), "expected unresolved-import evidence, got: {}", result.evidence.0);
+}
+
 #[test]
 fn lean_checker_axiom_parse_output_all_clean() {
     let output = concat!(
@@ -289,7 +337,7 @@ fn lean_checker_axiom_parse_output_all_clean() {
 #[test]
 fn lean_checker_axiom_allowlist_accepts_propext() {
     let audit =
-        AxiomAudit { dependencies: vec![AxiomDependency { axiom_name: "propext".into(), declaration: "thm".into() }] };
+        AxiomAudit { dependencies: vec![AxiomDependency { axiom_name: "propext".into(), declaration: "thm".into() }], unresolved_import: false };
     assert_eq!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::Allowed);
 }
 
@@ -297,6 +345,7 @@ fn lean_checker_axiom_allowlist_accepts_propext() {
 fn lean_checker_axiom_allowlist_accepts_classical_choice() {
     let audit = AxiomAudit {
         dependencies: vec![AxiomDependency { axiom_name: "Classical.choice".into(), declaration: "thm".into() }],
+        unresolved_import: false,
     };
     assert_eq!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::Allowed);
 }
@@ -305,6 +354,7 @@ fn lean_checker_axiom_allowlist_accepts_classical_choice() {
 fn lean_checker_axiom_allowlist_accepts_quot_sound() {
     let audit = AxiomAudit {
         dependencies: vec![AxiomDependency { axiom_name: "Quot.sound".into(), declaration: "thm".into() }],
+        unresolved_import: false,
     };
     assert_eq!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::Allowed);
 }
@@ -317,6 +367,7 @@ fn lean_checker_axiom_allowlist_accepts_all_allowed() {
             AxiomDependency { axiom_name: "Classical.choice".into(), declaration: "thm1".into() },
             AxiomDependency { axiom_name: "Quot.sound".into(), declaration: "thm2".into() },
         ],
+        unresolved_import: false,
     };
     assert_eq!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::Allowed);
 }
@@ -325,6 +376,7 @@ fn lean_checker_axiom_allowlist_accepts_all_allowed() {
 fn lean_checker_axiom_allowlist_rejects_custom_axiom() {
     let audit = AxiomAudit {
         dependencies: vec![AxiomDependency { axiom_name: "myCustomAxiom".into(), declaration: "thm".into() }],
+        unresolved_import: false,
     };
     let verdict = LeanAspectChecker::classify_axioms(&audit);
     match verdict {
@@ -332,7 +384,7 @@ fn lean_checker_axiom_allowlist_rejects_custom_axiom() {
             assert_eq!(disallowed.len(), 1);
             assert_eq!(disallowed[0].axiom_name, "myCustomAxiom");
         }
-        AxiomVerdict::Allowed => panic!("expected Rejected"),
+        AxiomVerdict::Allowed | AxiomVerdict::UnresolvedImport => panic!("expected Rejected"),
     }
 }
 
@@ -343,6 +395,7 @@ fn lean_checker_axiom_allowlist_rejects_mixed() {
             AxiomDependency { axiom_name: "propext".into(), declaration: "thm".into() },
             AxiomDependency { axiom_name: "userAxiom".into(), declaration: "thm".into() },
         ],
+        unresolved_import: false,
     };
     let verdict = LeanAspectChecker::classify_axioms(&audit);
     match verdict {
@@ -350,13 +403,15 @@ fn lean_checker_axiom_allowlist_rejects_mixed() {
             assert_eq!(disallowed.len(), 1);
             assert_eq!(disallowed[0].axiom_name, "userAxiom");
         }
-        AxiomVerdict::Allowed => panic!("expected Rejected for mixed allowed+disallowed"),
+        AxiomVerdict::Allowed | AxiomVerdict::UnresolvedImport => {
+            panic!("expected Rejected for mixed allowed+disallowed")
+        }
     }
 }
 
 #[test]
 fn lean_checker_axiom_allowlist_no_axioms_is_allowed() {
-    let audit = AxiomAudit { dependencies: vec![] };
+    let audit = AxiomAudit { dependencies: vec![], unresolved_import: false };
     assert_eq!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::Allowed);
 }
 
@@ -939,6 +994,7 @@ fn lean_checker_mask_neutrality_seeded_non_allowlisted_axiom_is_rejected() {
             axiom_name: "maskNeutralityExternalAssumption".into(),
             declaration: "mask_neutrality_seeded_axiom".into(),
         }],
+        unresolved_import: false,
     };
     let verdict = LeanAspectChecker::classify_axioms(&audit);
     match verdict {
@@ -946,7 +1002,9 @@ fn lean_checker_mask_neutrality_seeded_non_allowlisted_axiom_is_rejected() {
             assert_eq!(disallowed.len(), 1);
             assert_eq!(disallowed[0].axiom_name, "maskNeutralityExternalAssumption");
         }
-        AxiomVerdict::Allowed => panic!("seeded non-allowlisted axiom must be rejected"),
+        AxiomVerdict::Allowed | AxiomVerdict::UnresolvedImport => {
+            panic!("seeded non-allowlisted axiom must be rejected")
+        }
     }
 }
 
@@ -1207,7 +1265,9 @@ fn lean_checker_unroll_equivalence_axiom_audit_is_live_not_vacuous() {
                 "expected sorryAx in the transitive audit, got: {disallowed:?}"
             );
         }
-        AxiomVerdict::Allowed => panic!("transitive axiom audit failed open; it is vacuous"),
+        AxiomVerdict::Allowed | AxiomVerdict::UnresolvedImport => {
+            panic!("transitive axiom audit failed open; it is vacuous")
+        }
     }
 
     let _ = std::fs::remove_dir_all(&temp);

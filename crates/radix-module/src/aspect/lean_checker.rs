@@ -55,6 +55,9 @@ pub struct AxiomDependency {
 pub struct AxiomAudit {
     /// Every axiom→declaration edge found during the audit.
     pub dependencies: Vec<AxiomDependency>,
+    /// The audit could not resolve the wrapper import (or read the module),
+    /// so the collected evidence is not trustworthy.
+    pub unresolved_import: bool,
 }
 
 /// Verdict after checking axiom usage against the allowlist.
@@ -67,6 +70,11 @@ pub enum AxiomVerdict {
         /// The offending dependencies.
         disallowed: Vec<AxiomDependency>,
     },
+    /// The `#print axioms` audit could not resolve the wrapper import (or
+    /// could not run at all), so no allowlist decision is possible.
+    /// Operator ruling 6a0fafde option (b): an unresolved import is a
+    /// FAILURE, never a silent `Allowed`.
+    UnresolvedImport,
 }
 
 /// Verdict after scanning source for `sorry` tokens.
@@ -205,7 +213,9 @@ impl LeanAspectChecker {
     #[must_use]
     pub fn audit_axioms(&self, module_path: &Path) -> AxiomAudit {
         let Ok(source) = std::fs::read_to_string(module_path) else {
-            return AxiomAudit::default();
+            // Fail-closed: an unreadable module means no audit evidence at
+            // all — that must not classify as Allowed.
+            return AxiomAudit { dependencies: Vec::new(), unresolved_import: true };
         };
 
         let decls = extract_declarations(&source);
@@ -258,6 +268,12 @@ impl LeanAspectChecker {
     /// Any axiom not in that set is rejected.
     #[must_use]
     pub fn classify_axioms(audit: &AxiomAudit) -> AxiomVerdict {
+        // Fail-closed (operator ruling 6a0fafde option (b)): an unresolved
+        // wrapper import can never classify as Allowed.
+        if audit.unresolved_import {
+            return AxiomVerdict::UnresolvedImport;
+        }
+
         let allowed: &[&str] = &["propext", "Classical.choice", "Quot.sound"];
 
         let disallowed: Vec<AxiomDependency> = audit
@@ -766,6 +782,16 @@ pub fn combined_verdict(
         };
     }
 
+    if matches!(axiom_verdict, AxiomVerdict::UnresolvedImport) {
+        return HirAspectCheckResult {
+            status: HirAspectCheckStatus::Failed,
+            evidence: HirAspectEvidence(
+                "axiom audit unresolved: the #print-axioms wrapper import did not resolve; axioms are unverified".into(),
+            ),
+            backend: HirAspectBackendKind::Lean,
+        };
+    }
+
     if let AxiomVerdict::Rejected { disallowed } = axiom_verdict {
         let names: Vec<&str> = disallowed.iter().map(|d| d.axiom_name.as_str()).collect();
         return HirAspectCheckResult {
@@ -793,6 +819,10 @@ pub fn combined_verdict(
 #[must_use]
 pub fn parse_axiom_output(output: &str) -> AxiomAudit {
     let mut dependencies = Vec::new();
+    // Fail-closed (operator ruling 6a0fafde option (b)): explicit Lean
+    // errors — an unresolved wrapper import above all — mean the audit ran
+    // without trustworthy evidence and must never classify as Allowed.
+    let unresolved_import = is_unresolved_import_evidence(output);
 
     for line in output.lines() {
         let line = line.trim();
@@ -816,7 +846,19 @@ pub fn parse_axiom_output(output: &str) -> AxiomAudit {
         // "does not depend on any axioms" → nothing to record
     }
 
-    AxiomAudit { dependencies }
+    AxiomAudit { dependencies, unresolved_import }
+}
+
+/// Whether `#print axioms` output carries explicit error evidence (unresolved
+/// wrapper import, unknown identifier, missing toolchain) instead of parsed
+/// axiom lines.
+fn is_unresolved_import_evidence(output: &str) -> bool {
+    let haystack = output.to_lowercase();
+    haystack.contains("unknown import")
+        || haystack.contains("unknown identifier")
+        || haystack.contains("no such file")
+        || haystack.contains("not found")
+        || haystack.contains("error:")
 }
 
 /// Extract candidate Lean declaration names from source text.
