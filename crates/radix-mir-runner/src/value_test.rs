@@ -35,3 +35,17 @@ fn mixed_integer_float_equality_uses_numeric_promotion() {
     assert!(values_equal(&Value::Float(1.0), &Value::UInt(1)));
     assert!(!values_equal(&Value::Int(42), &Value::Float(42.145)));
 }
+
+#[test]
+fn scalar_get_ascii1_equals_textus_literal() {
+    // `s.get(i)` yields `ascii<1>`; textus literals are heap `Str`. Equality
+    // joins the carriers by character value per the Textus `accipe` contract.
+    let span = Span::default();
+    let ch = scalar_text_index("abc", 0, span).expect("in-range ASCII index");
+    assert!(values_equal(&ch, &Value::Str("a".to_owned())));
+    assert!(values_equal(&Value::Str("a".to_owned()), &ch));
+    assert!(!values_equal(&ch, &Value::Str("b".to_owned())));
+    // Multi-byte / non-ASCII textus is never equal to a one-byte carrier.
+    assert!(!values_equal(&ch, &Value::Str("ab".to_owned())));
+    assert!(!values_equal(&ch, &Value::Str("é".to_owned())));
+}

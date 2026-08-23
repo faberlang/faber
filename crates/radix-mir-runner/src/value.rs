@@ -832,6 +832,12 @@ pub fn values_equal(left: &Value, right: &Value) -> bool {
         (Value::Float(a), Value::UInt(b)) => a
             .partial_cmp(&(*b as f64))
             .is_some_and(std::cmp::Ordering::is_eq),
+        // Scalar `s[i]`/`accipe` yields the one-byte `ascii<1>` carrier while
+        // literals arrive as heap textus; the declared intrinsic return is
+        // Textus, so equality joins the carriers by character value (a single
+        // ASCII byte). Multi-byte textus never equals an `ascii<1>`.
+        (Value::Ascii(a), Value::Str(b)) => b.as_bytes() == [*a],
+        (Value::Str(a), Value::Ascii(b)) => a.as_bytes() == [*b],
         _ => left == right,
     }
 }
