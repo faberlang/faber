@@ -914,6 +914,21 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 // The WGSL emitter keeps its per-op fail-closed emit gate.
                 crate::visit::walk_stmt(self, stmt);
             }
+            // SFR-7: a `FilumSum` declaration is the author-stated recipe
+            // (SFR-5 plan entry) — the emitters lower it in place (the
+            // Metal native simdgroup arm, the NVVM warp collective). The
+            // gate admits the statement the same way it admits the other
+            // recipe ops; the operand layouts are still walked and checked.
+            MirStatementKind::RuntimeCall {
+                call:
+                    MirRuntimeCall {
+                        intrinsic: MirIntrinsic::FilumSum(_),
+                        ..
+                    },
+                ..
+            } => {
+                crate::visit::walk_stmt(self, stmt);
+            }
             // EXEC02-PC1: the wildcard runtime-call reject names the
             // offending collection op — the first CUDA dense run died
             // unnamed; a diagnostic must not be vaguer than the fact.
