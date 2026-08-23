@@ -6,5 +6,8 @@ edition = "2021"
 # std-only, zero dependencies — enforced by manifest_is_std_only (U5a).
 [dependencies]
 
+[dev-dependencies]
+hygiene-ratchet = { path = "../hygiene-ratchet" }
+
 [lints]
 workspace = true
