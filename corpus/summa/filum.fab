@@ -1,0 +1,43 @@
++++
+term = "summa"
+kind = "kernel"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "summa_expr", "filum_clause", "apud_clause", "fixum_decl", "varia_decl", "redde_stmt"]
+category = "collection"
+summary = "Distributed sum-reduce kernel admit: summa ex … apud [i] filum f fixum s { redde <term> } inside @ nucleum."
+syntax = "summa ex <tf32[32]> apud [i] filum f fixum s { redde <term> }"
+related = ["summa", "filum", "nucleum", "apud", "tensor"]
+locale = "la"
++++
+
+# =============================================================================
+# summa filum — distributed sum-reduce admit inside @ nucleum
+# =============================================================================
+#
+# What this teaches:
+#   • Declared distributed sum — the `filum` spelling lowers to the
+#     DistributedSum plan entry: cyclic per-lane term-body fold with exactly
+#     one lane collective at group exit (Metal simd_sum, CUDA redux.sync,
+#     WGSL shared-memory tree) and a broadcast result.
+#   • Term body — per-lane scalar computation with exactly one valued
+#     `redde`; local mutation of term-local bindings is allowed.
+#   • Alignment — the source length must be a multiple of the 32-lane width
+#     in v1; K = 32 here. Tails (K % 32 ≠ 0) decline at admission.
+#   • Sequential spelling — omit `filum` for the portable host-lane fold
+#     (see summa.fab for the identity-term oracle pair).
+#
+# Common mistakes:
+#   • `filum` outside a `@ nucleum` kernel — declines (see summa-decline.fab)
+#   • non-scalar terms — the term must be a numeric scalar
+#     (fractus/numerus family)
+#
+# See also: summa, filum, nucleum, apud, tensor
+# =============================================================================
+
+@ nucleum
+functio column_dot(tf32[32] a, tf32[1] out, u32 id) → vacuum {
+    fixum f32 total ← summa ex a apud [i] filum f fixum s {
+        varia f32 t ← s * 1.4140625
+        redde t
+    }
+    out[id] ← total
+}

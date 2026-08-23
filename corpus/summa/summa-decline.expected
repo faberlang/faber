@@ -1,0 +1,5 @@
+# Reject oracle for summa admission declines.
+# Tokens: stable diagnostic identities (faber check output); one per line.
+SEM010:summa_filum_requires_nucleum_kernel
+SEM010:summa_tail_not_aligned
+SEM010:summa_term_type_non_scalar

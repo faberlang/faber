@@ -1,0 +1,4 @@
+# Reject oracle for the summa general-combine refusal.
+# The combine clause is not grammar: the parse declines before semantics
+# (bare PARSE001 at the attempted `coniunge` tail; no stable sub-identity).
+error[PARSE001]

@@ -1,0 +1,49 @@
++++
+term = "summa"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "summa_expr", "filum_clause", "apud_clause", "fixum_decl", "redde_stmt"]
+category = "collection"
+summary = "summa decline rows: filum placement outside @ nucleum, K % 32 ≠ 0 tails, and non-scalar terms fail closed."
+syntax = "summa ex <tensor> apud [coords] filum f fixum s { redde <term> }"
+related = ["summa", "filum", "nucleum", "apud", "tensor"]
+locale = "la"
++++
+
+# =============================================================================
+# summa decline — placement, tail alignment, and scalar terms fail closed.
+# =============================================================================
+#
+# Decline rows (reject reason in each comment):
+#   1. placement — `filum` admits only inside an `@ nucleum` kernel;
+#      this host function declines: SEM010 summa_filum_requires_nucleum_kernel
+#   2. tail — K = 8 is not a multiple of the 32-lane width; the v1 tail
+#      gate fails closed at admission:
+#      SEM010 summa_tail_not_aligned
+#   3. non-scalar term — the term body returns a matrix row (a tensor),
+#      not a numeric scalar: SEM010 summa_term_type_non_scalar
+#
+# Common mistakes:
+#   • expecting a partial-lane filum fold — K % W ≠ 0 is an admission
+#     error, never a tail loop
+#   • expecting list/tensor terms to combine element-wise — the term type
+#     must be a scalar of the element family
+#
+# See also: summa, filum, nucleum, apud, tensor
+# =============================================================================
+
+# 1. placement — filum outside @ nucleum declines
+functio placement(tensor<f32, [32]> a) → f32 {
+    redde summa ex a apud [i] filum f fixum s { redde s }
+}
+
+# 2. tail — K = 8 not aligned to the 32-lane width declines
+@ nucleum
+functio tail(tensor<f32, [8]> a, tf32[1] out, u32 id) → vacuum {
+    fixum f32 total ← summa ex a apud [i] filum f fixum s { redde s }
+    out[id] ← total
+}
+
+# 3. non-scalar term — a textus element is not a numeric scalar
+functio non_scalar(tensor<textus, [8]> t) → textus {
+    redde summa ex t apud [i] fixum s { redde s }
+}

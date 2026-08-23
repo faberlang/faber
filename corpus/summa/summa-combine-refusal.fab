@@ -1,0 +1,33 @@
++++
+term = "summa"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "summa_expr", "apud_clause", "fixum_decl", "expression", "literal"]
+category = "collection"
+summary = "General-combine refusal: summa admits no identity/combine clause — the combine is sum only, pinned by a parse reject."
+syntax = "summa ex <tensor> apud [i] fixum sconiunge <op> { } (parse reject)"
+related = ["summa", "filum", "apud", "tensor"]
+locale = "la"
++++
+
+# =============================================================================
+# summa general-combine refusal — no identity/combine clause exists.
+# =============================================================================
+#
+# Decline row (reject reason in the comment):
+#   1. general combine — the reducta ruling bars overloading `summa` with a
+#      general combiner; there is no identity or combine clause in the
+#      grammar. An attempted `coniunge` tail after the binder fails at
+#      parse: the production expects the term block, never an operator
+#
+# Common mistakes:
+#   • expecting `summa` to spell product/min/max reduces — the combine is
+#     sum only; general reduce/scan heads belong to the rejection-review
+#     sketch, and `reducta`/`cumulata` own the intrinsic family
+#
+# See also: summa, filum, apud, tensor
+# =============================================================================
+
+# 1. general combine — a combine-operator tail is not grammar; parse reject
+functio product(tensor<f32, [8]> a) → f32 {
+    redde summa ex a apud [i] fixum sconiunge '*' { redde s }
+}
