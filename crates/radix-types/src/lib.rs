@@ -1,13 +1,15 @@
 //! Semantic type model for the Radix compiler (foundation crate).
 //!
-//! Owns [`Type`], [`TypeTable`], [`Primitive`], index/width helpers, and the
+//! Owns [`Type`], [`TypeTable`], [`Primitive`], index/width helpers, the
 //! shared [`DefId`] definition-identity handle used by both the type system and
-//! HIR. Package `radix` re-exports these through `radix::semantic` for path
-//! stability.
+//! HIR, and the provider-neutral `filtrum` relational plan model
+//! (census-types S3). Package `radix` re-exports these through
+//! `radix::semantic` for path stability.
 //!
 //! This crate must not depend on HIR nodes, semantic passes, parser, or codegen.
 
 mod def_id;
+mod filtrum;
 mod index;
 pub mod instans_precision;
 pub mod numeric_width;
@@ -17,6 +19,11 @@ mod types;
 pub mod vocabulary;
 
 pub use def_id::DefId;
+pub use filtrum::{
+    CapabilityRequirement, ColumnRef, ComparisonOp, FiltrumPlan, OrderRow, Predicate,
+    PredicateValue, SortDirection, SourceIdentity, Window, WindowError,
+    FILTRUM_ENCODING_VERSION_V1,
+};
 pub use vocabulary::{
     CapabilityGap, KernelModule, Lowerability, MirAtomicOp, MirCollectionOp, MirKernelAxis,
     MirKernelBuiltin,
@@ -68,6 +75,10 @@ mod lattice_property_tests;
 #[cfg(test)]
 #[path = "schema_subset_test.rs"]
 mod schema_subset_tests;
+
+#[cfg(test)]
+#[path = "filtrum_test.rs"]
+mod filtrum_tests;
 
 #[cfg(test)]
 mod smoke_tests {
