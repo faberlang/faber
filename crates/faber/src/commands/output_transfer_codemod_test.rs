@@ -87,3 +87,117 @@ fn assert_decline(reason: &DeclineReason, code: &str) {
     assert!(reason.end >= reason.start);
     assert!(!reason.message.is_empty());
 }
+
+fn rust_emit(name: &str, source: &str) -> String {
+    let result =
+        radix::services::compile_cli_source(name, source, radix::module::codegen::Target::HirRust);
+    assert!(
+        result.success(),
+        "native rust emit failed for {name}: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.message.clone())
+            .collect::<Vec<_>>()
+    );
+    radix::services::output_code(result.output.expect("rust output"))
+}
+
+fn rust_format_literal(code: &str, macro_name: &str) -> String {
+    let needle = format!("{macro_name}!(\"");
+    let start = code
+        .find(&needle)
+        .unwrap_or_else(|| panic!("missing {macro_name}! format string in:\n{code}"))
+        + needle.len();
+    let bytes = code.as_bytes();
+    let mut end = start;
+    while end < bytes.len() {
+        if bytes[end] == b'"' && (end == start || bytes[end - 1] != b'\\') {
+            break;
+        }
+        end += 1;
+    }
+    code[start..end].to_owned()
+}
+
+fn decode_format_source(source: &str) -> String {
+    let mut out = String::new();
+    let mut chars = source.chars();
+    while let Some(ch) = chars.next() {
+        if ch != '\\' {
+            out.push(ch);
+            continue;
+        }
+        match chars.next() {
+            Some('\\') => out.push('\\'),
+            Some('"') => out.push('"'),
+            Some('n') => out.push('\n'),
+            Some('t') => out.push('\t'),
+            Some('r') => out.push('\r'),
+            Some(other) => {
+                out.push('\\');
+                out.push(other);
+            }
+            None => out.push('\\'),
+        }
+    }
+    out
+}
+
+#[test]
+fn eot5b_representative_pre_post_native_output_is_byte_identical() {
+    // Representative pre/post through the EOT-5A command. Native identity is
+    // the shared hir-rust format table (rust_scribe_format /
+    // rust_format_template / generate_format_arg_expr): scribe println! plus
+    // macro newline vs write_partial of a constructor with embedded `\n`.
+    // Compared as bytes. Not a corpus-wide migration claim.
+    let pre = r#"+++
+locale = "la"
++++
+incipit {
+    nota 7, "salve"
+}
+"#;
+    let (path, _) = fixture("eot5b-pre", pre);
+    let report = codemod_single_doc(&path, &fs::read_to_string(&path).expect("read fixture"))
+        .expect("codemod accepted representative source");
+    let _ = fs::remove_file(&path);
+
+    assert_eq!(report.rewritten_statements, 1);
+    assert!(
+        report.source.contains("output ⇇ \"§ §\\n\"(7, \"salve\")"),
+        "admitted rewrite must keep sequential holes, space separators, and the embedded newline:\n{}",
+        report.source
+    );
+
+    let pre_rust = rust_emit("eot5b-pre.fab", pre);
+    let post_rust = rust_emit("eot5b-post.fab", &report.source);
+    let pre_fmt = rust_format_literal(&pre_rust, "println");
+    let post_fmt = rust_format_literal(&post_rust, "format");
+    assert_eq!(
+        pre_fmt.as_bytes(),
+        post_fmt.trim_end_matches("\\n").as_bytes(),
+        "format-choice table must pick the same slots; diverging {{}}/{{:?}} fails the lemma\npre={pre_fmt:?}\npost={post_fmt:?}"
+    );
+    assert!(
+        post_fmt.ends_with("\\n"),
+        "template path must embed the trailing newline: {post_fmt:?}"
+    );
+
+    let mut pre_native = decode_format_source(&pre_fmt);
+    pre_native.push('\n');
+    let post_native = decode_format_source(&post_fmt);
+    assert_eq!(
+        pre_native.as_bytes(),
+        post_native.as_bytes(),
+        "EOT-5B compares native output as bytes, not normalized text\npre={pre_native:?}\npost={post_native:?}"
+    );
+    assert!(
+        pre_native.ends_with('\n') && post_native.ends_with('\n'),
+        "trailing newline is a native byte, not optional whitespace"
+    );
+    assert!(
+        !pre_rust.contains("format!(") && post_rust.contains("format!("),
+        "pre stays on println!; post uses the template path"
+    );
+}
