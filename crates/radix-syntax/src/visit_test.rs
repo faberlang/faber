@@ -1,0 +1,326 @@
+use super::{walk_expr, walk_stmt, walk_type_expr, Visitor, MAX_VISIT_DEPTH};
+use crate::{AstMutability, ExField, PathPattern};
+use crate::{
+    BinOp, BinaryExpr, BlockStmt, CasuArm, DiscerneStmt, Expr, ExprKind, FuncDecl, Ident,
+    IfBody, Literal, Pattern, PatternBind, ProbandumBody, ProbandumDecl, Stmt, StmtKind,
+    TypeExpr, TypeExprKind,
+};
+use crate::{PraeparaBlock, PraeparaKind};
+use radix_lexer::{Span, Symbol};
+
+/// Visitor that records depth-limit hits instead of panicking.
+struct DepthProbe {
+    exceeded_at: Option<usize>,
+    expr_visits: usize,
+    type_visits: usize,
+}
+
+impl DepthProbe {
+    fn new() -> Self {
+        Self {
+            exceeded_at: None,
+            expr_visits: 0,
+            type_visits: 0,
+        }
+    }
+}
+
+impl Visitor for DepthProbe {
+    fn on_depth_exceeded(&mut self, depth: usize) {
+        self.exceeded_at = Some(depth);
+    }
+
+    fn visit_expr(&mut self, expr: &Expr) {
+        if self.exceeded_at.is_some() {
+            return;
+        }
+        self.expr_visits += 1;
+        walk_expr(self, expr);
+    }
+
+    fn visit_type_expr(&mut self, ty: &TypeExpr) {
+        if self.exceeded_at.is_some() {
+            return;
+        }
+        self.type_visits += 1;
+        walk_type_expr(self, ty);
+    }
+}
+
+fn lit_expr(id: u32) -> Expr {
+    Expr {
+        id,
+        kind: ExprKind::Literal(Literal::Int(1)),
+        span: Span::new(0, 1),
+    }
+}
+
+/// Left-nested binary chain: depth `n` means `n` Binary nodes above a leaf.
+/// Walk depth along the left spine reaches `n` at the deepest leaf entry.
+fn deep_binary_chain(depth: usize) -> Expr {
+    let mut expr = lit_expr(0);
+    for i in 0..depth {
+        let id = u32::try_from(i.saturating_add(1)).unwrap_or(u32::MAX);
+        let rhs_id = u32::try_from(i.saturating_add(10_000)).unwrap_or(u32::MAX);
+        expr = Expr {
+            id,
+            kind: ExprKind::Binary(BinaryExpr {
+                op: BinOp::Add,
+                lhs: Box::new(expr),
+                rhs: Box::new(lit_expr(rhs_id)),
+            }),
+            span: Span::new(0, 1),
+        };
+    }
+    expr
+}
+
+fn infer_type() -> TypeExpr {
+    TypeExpr {
+        nullable: false,
+        mode: None,
+        kind: TypeExprKind::Infer,
+        span: Span::new(0, 1),
+        iuncta_label: None,
+    }
+}
+
+/// Nested `atomic<...atomic<_>...>` chain of the given depth.
+fn deep_atomic_chain(depth: usize) -> TypeExpr {
+    let mut ty = infer_type();
+    for _ in 0..depth {
+        ty = TypeExpr {
+            nullable: false,
+            mode: None,
+            kind: TypeExprKind::Atomic(Box::new(ty)),
+            span: Span::new(0, 1),
+            iuncta_label: None,
+        };
+    }
+    ty
+}
+
+#[test]
+fn shallow_expr_walk_succeeds() {
+    let expr = deep_binary_chain(3);
+    let mut probe = DepthProbe::new();
+    probe.visit_expr(&expr);
+    assert!(probe.exceeded_at.is_none());
+    // 3 Binary + 1 leftmost leaf + 3 rhs leaves = 7 expression nodes
+    assert_eq!(probe.expr_visits, 7);
+}
+
+#[test]
+fn expr_at_max_depth_succeeds() {
+    // Left spine depths 0..=MAX: root Binary at 0, leaf entry at MAX.
+    let expr = deep_binary_chain(MAX_VISIT_DEPTH);
+    let mut probe = DepthProbe::new();
+    probe.visit_expr(&expr);
+    assert!(
+        probe.exceeded_at.is_none(),
+        "depth {MAX_VISIT_DEPTH} must be allowed, got {:?}",
+        probe.exceeded_at
+    );
+    assert!(probe.expr_visits > MAX_VISIT_DEPTH);
+}
+
+#[test]
+fn expr_beyond_max_depth_fails_closed() {
+    let expr = deep_binary_chain(MAX_VISIT_DEPTH + 1);
+    let mut probe = DepthProbe::new();
+    probe.visit_expr(&expr);
+    assert_eq!(
+        probe.exceeded_at,
+        Some(MAX_VISIT_DEPTH + 1),
+        "walker must fail closed past MAX_VISIT_DEPTH"
+    );
+}
+
+#[test]
+fn type_expr_beyond_max_depth_fails_closed() {
+    let ty = deep_atomic_chain(MAX_VISIT_DEPTH + 1);
+    let mut probe = DepthProbe::new();
+    probe.visit_type_expr(&ty);
+    assert_eq!(probe.exceeded_at, Some(MAX_VISIT_DEPTH + 1));
+}
+
+#[test]
+fn type_expr_at_max_depth_succeeds() {
+    let ty = deep_atomic_chain(MAX_VISIT_DEPTH);
+    let mut probe = DepthProbe::new();
+    probe.visit_type_expr(&ty);
+    assert!(probe.exceeded_at.is_none());
+    // MAX Atomic wrappers + 1 Infer leaf
+    assert_eq!(probe.type_visits, MAX_VISIT_DEPTH + 1);
+}
+
+#[test]
+fn default_on_depth_exceeded_panics() {
+    struct PanicVisitor;
+    impl Visitor for PanicVisitor {}
+
+    let expr = deep_binary_chain(MAX_VISIT_DEPTH + 1);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut v = PanicVisitor;
+        v.visit_expr(&expr);
+    }));
+    assert!(result.is_err(), "default on_depth_exceeded must panic");
+}
+
+fn test_ident(sym: u32) -> Ident {
+    Ident {
+        name: Symbol(sym),
+        span: Span::new(0, 1),
+    }
+}
+
+fn test_block() -> BlockStmt {
+    BlockStmt {
+        statements: vec![],
+        end_trivia: Vec::new(),
+        span: Span::new(0, 1),
+    }
+}
+
+struct CountVisitor {
+    idents: usize,
+    types: usize,
+    blocks: usize,
+}
+
+impl CountVisitor {
+    fn new() -> Self {
+        Self {
+            idents: 0,
+            types: 0,
+            blocks: 0,
+        }
+    }
+}
+
+impl Visitor for CountVisitor {
+    fn visit_ident(&mut self, _ident: &Ident) {
+        self.idents += 1;
+    }
+    fn visit_type_expr(&mut self, ty: &TypeExpr) {
+        self.types += 1;
+        walk_type_expr(self, ty);
+    }
+    fn visit_block(&mut self, block: &BlockStmt) {
+        self.blocks += 1;
+        for stmt in &block.statements {
+            walk_stmt(self, stmt);
+        }
+    }
+}
+
+#[test]
+fn walk_func_decl_err() {
+    let func = FuncDecl {
+        name: test_ident(1),
+        type_params: vec![],
+        params: vec![],
+        modifiers: vec![],
+        posture: crate::CallablePosture::SyncFinite,
+        ret: None,
+        err: Some(infer_type()),
+        body: None,
+        annotations: vec![],
+        leading_trivia: vec![],
+    };
+    let stmt = Stmt {
+        id: 0,
+        kind: StmtKind::Func(func),
+        span: Span::new(0, 1),
+        annotations: vec![],
+        leading_trivia: vec![],
+    };
+
+    let mut visitor = CountVisitor::new();
+    walk_stmt(&mut visitor, &stmt);
+
+    assert_eq!(visitor.idents, 1, "must visit func name");
+    assert_eq!(visitor.types, 1, "must visit decl.err");
+}
+
+#[test]
+fn walk_probandum_setup() {
+    let probandum = ProbandumDecl {
+        name: Symbol(1),
+        modifiers: vec![],
+        body: ProbandumBody {
+            setup: vec![PraeparaBlock {
+                kind: PraeparaKind::Praepara,
+                all: false,
+                body: test_block(),
+                span: Span::new(0, 1),
+            }],
+            tests: vec![],
+            nested: vec![],
+        },
+        span: Span::new(0, 1),
+    };
+    let stmt = Stmt {
+        id: 0,
+        kind: StmtKind::Probandum(probandum),
+        span: Span::new(0, 1),
+        annotations: vec![],
+        leading_trivia: vec![],
+    };
+
+    let mut visitor = CountVisitor::new();
+    walk_stmt(&mut visitor, &stmt);
+
+    assert_eq!(visitor.blocks, 1, "must visit setup block");
+}
+
+#[test]
+fn walk_discern_patterns() {
+    // Ident pattern with alias bind + Path pattern with destructure bindings.
+    let ident_pattern = Pattern::Ident(test_ident(1), Some(PatternBind::Alias(test_ident(2))));
+    let path_pattern = Pattern::Path(PathPattern {
+        segments: vec![test_ident(3), test_ident(4)],
+        bind: Some(PatternBind::Bindings {
+            mutability: AstMutability::Immutable,
+            bindings: vec![
+                ExField {
+                    name: test_ident(5),
+                    alias: Some(test_ident(6)),
+                },
+                ExField {
+                    name: test_ident(7),
+                    alias: None,
+                },
+            ],
+        }),
+        span: Span::new(0, 1),
+    });
+
+    let discerne = DiscerneStmt {
+        exhaustive: false,
+        subjects: vec![],
+        arms: vec![CasuArm {
+            patterns: vec![ident_pattern, path_pattern],
+            body: IfBody::Block(test_block()),
+            span: Span::new(0, 1),
+        }],
+        default: None,
+    };
+    let stmt = Stmt {
+        id: 0,
+        kind: StmtKind::Discerne(discerne),
+        span: Span::new(0, 1),
+        annotations: vec![],
+        leading_trivia: vec![],
+    };
+
+    let mut visitor = CountVisitor::new();
+    walk_stmt(&mut visitor, &stmt);
+
+    // Expected ident visits:
+    //   - Ident pattern: name=1 + alias=2           = 2
+    //   - Path segments: 3 + 4                      = 2
+    //   - Bindings: name=5 + alias=6 + name=7       = 3
+    // Total: 7
+    assert_eq!(visitor.idents, 7, "must visit all pattern idents");
+}
