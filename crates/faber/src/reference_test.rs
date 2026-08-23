@@ -154,8 +154,8 @@ fn dev_fallback_loads_repo_exempla_index() {
     std::env::remove_var(REFERENCE_ROOT_ENV);
 
     let pack = ReferencePack::load().expect("dev fallback loads repo exempla");
-    assert_eq!(pack.term_count(), 194);
-    assert_eq!(pack.metadata().registry_terms, 194);
+    assert_eq!(pack.term_count(), 200);
+    assert_eq!(pack.metadata().registry_terms, 200);
     assert_eq!(pack.layout(), ReferenceLayout::Repo);
     assert!(pack.term("functio").is_some());
     assert!(pack.term("≡").is_some());
@@ -169,7 +169,7 @@ fn dev_fallback_loads_repo_exempla_index() {
 fn load_from_repo_root_lists_canonical_terms() {
     let root = repo_exempla_root();
     let pack = ReferencePack::load_from(&root).expect("load repo exempla");
-    assert_eq!(pack.term_count(), 194);
+    assert_eq!(pack.term_count(), 200);
     assert_eq!(pack.legacy_redirects().len(), 14);
     assert!(pack.resolve_exempla_path("functio/functio.fab").is_file());
 }
@@ -236,10 +236,58 @@ fn missing_root_reports_actionable_error() {
 fn build_registry_loads_canonical_and_legacy_entries() {
     let pack = ReferencePack::load_from(repo_exempla_root()).expect("load pack");
     let registry = pack.build_registry().expect("build registry");
-    assert_eq!(registry.entries().len(), 208);
+    assert_eq!(registry.entries().len(), 214);
     assert!(registry.reference_root().is_some());
     assert!(registry.lookup("functio").is_some());
     assert!(matches!(registry.lookup("=="), Some(Lookup::Legacy { .. })));
+}
+
+#[test]
+fn audit_finding_topics_resolve_with_current_behavior() {
+    let pack = ReferencePack::load_from(repo_exempla_root()).expect("load pack");
+    let registry = pack.build_registry().expect("build registry");
+
+    // ⇇ transfer: alias and term both reach the same canonical entry, and the
+    // body carries the EBNF [126]/[127] precedence rows.
+    assert!(matches!(registry.lookup("⇇"), Some(Lookup::Exact(_))));
+    assert!(matches!(registry.lookup("transfer"), Some(Lookup::Alias { .. })));
+    let transfer = render_plain(&registry.lookup("⇇").expect("transfer resolves"));
+    assert!(transfer.contains("[126]"), "transfer entry cites EBNF row 126");
+    assert!(transfer.contains("[127]"), "transfer entry cites EBNF row 127");
+    assert!(transfer.contains("vacuum"), "transfer chain result is vacuum");
+
+    // Selective imports cite the [067]/[071] rows and the fixum member rule.
+    let selective = render_plain(&registry.lookup("selective_import").expect("selective"));
+    assert!(selective.contains("[071]"));
+    assert!(selective.contains("fixum"));
+
+    // primus_quem documents first-match semantics and the SEM059 declines.
+    let primus = render_plain(&registry.lookup("primus_quem").expect("primus_quem"));
+    assert!(primus.contains("first live"));
+    assert!(primus.contains("SEM059"));
+
+    // filum is the distributed sum-reduce grammar reduction, not a list op.
+    let filum = render_plain(&registry.lookup("filum").expect("filum"));
+    assert!(filum.contains("summa ex"));
+    assert!(filum.contains("@ nucleum"));
+
+    // Bits lists the four exact pairs, including both u16 rows.
+    let bits = render_plain(&registry.lookup("Bits").expect("Bits"));
+    assert!(bits.contains("u16↔f16"));
+    assert!(bits.contains("u16↔bf16"));
+    assert!(bits.contains("u32↔f32"));
+    assert!(bits.contains("u64↔f64"));
+
+    // finite teaches the bit-field read gate, never x ≠ x.
+    let finite = render_plain(&registry.lookup("finite").expect("finite"));
+    assert!(finite.contains("exponent"));
+    assert!(finite.contains("≠ x"));
+
+    // summa explains the grammar reduction, not the list `.summa()` method.
+    let summa_lookup = registry.lookup("summa").expect("summa resolves");
+    let summa = render_plain(&summa_lookup);
+    assert!(summa.contains("summa ex"), "summa entry is the reduce grammar");
+    assert!(!summa.contains(".sum()"));
 }
 
 #[test]
@@ -249,7 +297,7 @@ fn load_from_disk_builds_explain_registry() {
     std::env::remove_var(REFERENCE_ROOT_ENV);
 
     let registry = Registry::load_from_disk().expect("disk registry");
-    assert_eq!(registry.entries().len(), 208);
+    assert_eq!(registry.entries().len(), 214);
     let list = render_list(&registry);
     assert!(list.contains("reference:"));
 

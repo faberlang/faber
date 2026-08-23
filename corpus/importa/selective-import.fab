@@ -1,0 +1,51 @@
++++
+term = "selective_import"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "selective_import", "import_value_binding", "incipit_stmt", "fixum_decl", "assignment", "transfer", "expression", "literal", "nota_stmt"]
+category = "package"
+summary = "Selective value imports create ordinary immutable value bindings: one exported value member per fixum local, with the imported file interface supplying the complete type."
+syntax = "importa ex <source> [publica] fixum <member> [ut <local>]{, <member> [ut <local>]}"
+aliases = ["selective imports", "importa fixum"]
+related = ["importa", "ex", "⇇"]
+locale = "la"
++++
+# =============================================================================
+# selective_import — selective value imports (EBNF rows [067] importa_sugar /
+# [071] selective_import / [072] import_value_binding).
+# =============================================================================
+#
+# What this teaches:
+#   • Value bindings — `importa ex "norma:consolum" fixum dic ut output,
+#     funde ut output_bytes` imports one exported value member per `fixum`
+#     local; the pre-`ut` identifier names an exported value in the imported
+#     file, the post-`ut` identifier is the caller-owned local binding
+#   • Values only — functions and constants are values and may be imported;
+#     types are not
+#   • Ordinary locals — the bindings obey ordinary local-binding rules
+#     (duplicates, shadowing, lints), are locale-resolved through the
+#     imported module, and are never re-exports
+#   • No wildcard mixing — wildcard members cannot mix into the selective
+#     list; `publica` before `fixum` re-exports each binding
+#   • Trailing comma — the current parser tolerates one trailing comma after
+#     the final member; the canonical spine keeps every comma required
+#   • Pairs with ⇇ — import a sink value this way and replace compiler-owned
+#     output statements with ordinary typed values
+#
+# Common mistakes:
+#   • expecting a type member to import — selective imports are value-only;
+#     types arrive through the module's own qualified surface
+#   • expecting the bindings to re-export — only `publica` bindings do
+#
+# See also: importa, ex, ⇇
+# =============================================================================
+
+importa ex "norma:consolum" fixum dic ut output, funde ut output_bytes
+
+functio scribe((textus) → vacuum sink, textus nomen) → vacuum {
+    sink ⇇ nomen
+}
+
+incipit {
+    fixum textus nomen ← "salve"
+    nota nomen
+}

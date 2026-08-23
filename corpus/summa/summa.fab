@@ -1,12 +1,12 @@
 +++
 term = "summa"
-kind = "expression"
+kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "incipit_stmt", "fixum_decl", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "collection"
-canonical = false
+canonical = true
 summary = "Sequential sum-reduce expression: summa ex <tensor> apud [i] fixum s { redde <term> }."
 syntax = "summa ex <source> apud [coords] fixum <binder> { redde <term> }"
-related = ["tensor", "apud", "filum"]
+related = ["tensor", "filum"]
 locale = "la"
 +++
 

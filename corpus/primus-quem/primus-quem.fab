@@ -1,12 +1,13 @@
 +++
 term = "primus_quem"
-kind = "expression"
+kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "binding_decl", "fixum_decl", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "first_match_expr", "incipit_stmt", "optional_suffix", "expression", "literal", "nota_stmt"]
 category = "collection"
-canonical = false
+canonical = true
 summary = "Dedicated total first-match expression: first live element of a source satisfying the owned ubi predicate, nihil for no-match and empty sources."
 syntax = "primus_quem(<source>, ubi <binder> { <predicate> })"
-related = ["ubi", "nihil", "filtrata", "primus"]
+aliases = ["primus quem"]
+related = ["nihil"]
 locale = "la"
 +++
 
@@ -26,6 +27,10 @@ locale = "la"
 #     `nihil`
 #   • first-live — later live lanes never overwrite the first stored match
 #     ([1.0, 5.0, 3.0] over `> 2.0` picks 5.0, not 3.0)
+#   • declines — unbounded sources fail closed (SEM059
+#     first_match_unbounded_source, causa not_bounded) and multi-axis `apud`
+#     coordinates stay unsupported in v1 (SEM059
+#     first_match_expression_unsupported); see primus-quem-decline.fab
 #
 # Common mistakes:
 #   • expecting an index/value pair — v1 returns only `T ∪ nihil`; construct
