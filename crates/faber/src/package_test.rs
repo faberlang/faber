@@ -5210,6 +5210,163 @@ main {
 }
 
 #[test]
+fn consolum_eot4_native_output_sinks_canonical() {
+    let dir = test_temp_dir("consolum-eot4-canonical");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+import from "norma:consolum" const write_partial as partial_sink, write_bytes as bytes_sink, write_line as line_sink, warn_line as warning_sink, debug_line as debug_sink
+
+main {
+  partial_sink ⇇ "partial" ⇇ "chain"
+  bytes_sink ⇇ |41 42|
+  line_sink ⇇ "line"
+  warning_sink ⇇ "warning"
+  debug_sink ⇇ "debug"
+}
+"#,
+    )
+    .expect("write canonical consolum fixture");
+
+    let result = compile_with_faber_seams(&Config::default(), &entry);
+    assert!(
+        result.success(),
+        "canonical consolum output fixture should compile: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected Rust output");
+    };
+
+    for member in [
+        "write_partial",
+        "write_bytes",
+        "write_line",
+        "warn_line",
+        "debug_line",
+    ] {
+        assert!(
+            output.code.contains(&format!("crate::consolum::{member}")),
+            "expected in-crate consolum call for {member}:\n{}",
+            output.code
+        );
+    }
+    for route in [
+        "consolum:dic",
+        "consolum:funde",
+        "consolum:scribe",
+        "consolum:mone",
+        "consolum:vide",
+    ] {
+        assert!(
+            output.code.contains(route),
+            "expected consolum provider route {route}:\n{}",
+            output.code
+        );
+    }
+
+    let sink_line = output
+        .code
+        .lines()
+        .find(|line| line.contains("let z") && line.contains(" = partial_sink;"))
+        .expect("chained partial sink binding");
+    let sink = sink_line
+        .split_once("let ")
+        .and_then(|(_, line)| line.split_once(" = partial_sink;"))
+        .map(|(name, _)| name)
+        .expect("hygienic partial sink binding");
+    assert_eq!(
+        sink_line.matches(&format!("{sink}(")).count(),
+        2,
+        "chained transfer must invoke the partial sink once per payload:\n{}",
+        output.code
+    );
+    assert!(!output.code.contains("println!"));
+    assert!(!output.code.contains("format!("));
+}
+
+#[test]
+fn consolum_eot4_native_output_sinks_la_surface() {
+    let dir = test_temp_dir("consolum-eot4-la");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "norma:consolum" fixum dic ut partial_sink
+importa ex "norma:consolum" fixum funde ut bytes_sink
+importa ex "norma:consolum" fixum scribe ut line_sink
+importa ex "norma:consolum" fixum mone ut warning_sink
+importa ex "norma:consolum" fixum vide ut debug_sink
+
+incipit {
+  partial_sink ⇇ "partial" ⇇ "chain"
+  bytes_sink ⇇ |43 44|
+  line_sink ⇇ "line"
+  warning_sink ⇇ "warning"
+  debug_sink ⇇ "debug"
+}
+"#,
+    )
+    .expect("write la consolum fixture");
+
+    let la_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/la/pack.toml");
+    let la_pack =
+        radix::module::locale::LocalePack::from_toml_path(la_path).expect("load la locale pack");
+    let config = Config::default().with_locale_pack(la_pack);
+    let result = compile_with_faber_seams(&config, &entry);
+    assert!(
+        result.success(),
+        "la-surface consolum output fixture should compile: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected Rust output");
+    };
+
+    for surface in ["dic", "funde", "scribe", "mone", "vide"] {
+        assert!(
+            output.code.contains(&format!("crate::consolum::{surface}")),
+            "expected la-surface member to lower to in-crate consolum call for {surface}:\n{}",
+            output.code
+        );
+    }
+    for route in [
+        "consolum:dic",
+        "consolum:funde",
+        "consolum:scribe",
+        "consolum:mone",
+        "consolum:vide",
+    ] {
+        assert!(
+            output.code.contains(route),
+            "expected la-surface consolum provider route {route}:\n{}",
+            output.code
+        );
+    }
+
+    let sink_line = output
+        .code
+        .lines()
+        .find(|line| line.contains("let z") && line.contains(" = partial_sink;"))
+        .expect("chained la partial sink binding");
+    let sink = sink_line
+        .split_once("let ")
+        .and_then(|(_, line)| line.split_once(" = partial_sink;"))
+        .map(|(name, _)| name)
+        .expect("hygienic la partial sink binding");
+    assert_eq!(
+        sink_line.matches(&format!("{sink}(")).count(),
+        2,
+        "la chained transfer must invoke the partial sink once per payload:\n{}",
+        output.code
+    );
+    assert!(!output.code.contains("println!"));
+    assert!(!output.code.contains("format!("));
+}
+
+#[test]
 fn compile_package_resolves_builtin_norma_solum_ad_wrapped_imports() {
     let dir = test_temp_dir("norma-solum-ad-import");
     let entry = dir.join("main.fab");
