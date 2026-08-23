@@ -556,7 +556,7 @@ impl TypeChecker<'_> {
                 }
 
                 // Bare ascii is unbounded: `ascii_literal_too_long` is reserved
-                // for `ascii<N>` (BB-4). One-byte payloads stay `ascii<1>`.
+                // for `ascii<N>`. One-byte payloads stay `ascii<1>`.
                 if decoded.len() == 1 {
                     return self.ascii_one_type();
                 }

@@ -136,10 +136,11 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         span: Span,
     ) -> Result<Value, RunnerError> {
         if self.has_bits_hint(params) {
-            // `numerus<u32|u64, Bits>` reinterprets float bits; exact pairs
+            // `numerus<u16|u32|u64, Bits>` reinterprets float bits; exact pairs
             // only, NaN payloads pass through bit-identical.
             if let Value::Float(value) = value {
                 return match width {
+                    NumericWidth::U16 => Ok(Value::UInt(u64::from(f64_to_f16_bits(value)))),
                     NumericWidth::U32 => Ok(Value::UInt(u64::from((value as f32).to_bits()))),
                     NumericWidth::U64 => Ok(Value::UInt(value.to_bits())),
                     _ => self.recover_or_fail(recovery, span, "bits pair width mismatch"),
@@ -369,9 +370,15 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         span: Span,
     ) -> Result<Value, RunnerError> {
         if self.has_bits_hint(params) {
-            // `fractus<f32|f64, Bits>` reinterprets integer bits; exact pairs
+            // `fractus<f16|f32|f64, Bits>` reinterprets integer bits; exact pairs
             // only, NaN payloads pass through bit-identical.
             return match (value, width) {
+                (Value::Int(value), NumericWidth::F16) => Ok(Value::Float(f64::from(
+                    super::super::half_to_f32(value as u16),
+                ))),
+                (Value::UInt(value), NumericWidth::F16) => Ok(Value::Float(f64::from(
+                    super::super::half_to_f32(value as u16),
+                ))),
                 (Value::Int(value), NumericWidth::F32) => {
                     Ok(Value::Float(f64::from(f32::from_bits(value as u32))))
                 }
@@ -968,6 +975,15 @@ fn materialize_sermo_value(
             &format!("sermo route {route} before runner provider runtime"),
         )),
     }
+}
+
+/// Encode the width-agnostic `Value::Float` (f64) carrier back to f16 bits via
+/// the runner's manual half seam. A NaN carrier re-canonicalizes to the seam's
+/// 0x7E00 payload, so the `u16 ↦ fractus<f16,Bits> ↦ numerus<u16,Bits>` round
+/// trip returns the original payload bits.
+#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+fn f64_to_f16_bits(v: f64) -> u16 {
+    super::super::f32_to_f16_rn(v as f32)
 }
 
 /// `true` when `v` fits the signed range of `width`. Mirrors Rust codegen's

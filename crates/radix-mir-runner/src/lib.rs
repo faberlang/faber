@@ -462,11 +462,14 @@ fn half_to_f32(bits: u16) -> f32 {
         return (mantissa as f32) * 2f32.powi(-24) * if sign == 1 { -1.0 } else { 1.0 };
     }
     if exponent == 0x1f {
-        return if mantissa == 0 {
+        // Infinity/NaN decode must honor the sign bit so Bits round trips
+        // return the original ±Inf/NaN bits.
+        let magnitude = if mantissa == 0 {
             f32::INFINITY
         } else {
             f32::NAN
         };
+        return if sign == 1 { -magnitude } else { magnitude };
     }
     let value = (1.0f32 + mantissa as f32 / 1024.0f32) * 2f32.powi(exponent as i32 - 15);
     if sign == 1 {

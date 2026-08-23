@@ -19,6 +19,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 mod aggregate;
+mod bits_f16_test;
 mod scalar;
 
 #[derive(Clone, Copy)]
