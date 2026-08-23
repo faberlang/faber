@@ -1500,7 +1500,7 @@ impl Parser {
                 // identifier.
                 if self.keyword_claim_key(ident.name) == Some("vacua") {
                     ExprKind::Vacua(ident)
-                } else if self.interner.resolve(ident.name) == "ratio"
+                } else if self.is_ratio_constructor_surface(ident.name)
                     && self.check(&TokenKind::LtAscii)
                     && self.ratio_constructor_head()
                 {
@@ -1569,6 +1569,20 @@ impl Parser {
         Ok(Expr { id, kind, span })
     }
 
+    /// Locale claim for the ratio constructor head: resolve the surface
+    /// spelling to its latin identity through the type rows (map-in-both,
+    /// mirroring the retired-call guards), so the en pack's `record<g: …>`
+    /// constructs like `ratio<g: …>`; an unmapped spelling (`record` under
+    /// `la`) stays an ordinary identifier.
+    fn is_ratio_constructor_surface(&self, sym: Symbol) -> bool {
+        let name = self.interner.resolve(sym);
+        let latin = self
+            .reader_type_latin_keys
+            .get(name)
+            .map_or(name, String::as_str);
+        latin == "ratio"
+    }
+
     /// Two-token lookahead for the expression-position `ratio` constructor
     /// claim (mirrors `is_summa_expr_head`): commit only when the tokens after
     /// `<` open a labeled element (`IDENT/Tag` then `:`), the same
@@ -1583,9 +1597,12 @@ impl Parser {
 
     /// Parse the ratio constructor claim: `ratio<label: T, …> { field = value, … }`.
     ///
-    /// The canonical identifier is claimed only in this angle-bracket slot, so
-    /// ordinary bindings named `ratio` remain ordinary identifiers.
+    /// The head is claimed only in this angle-bracket slot, so ordinary
+    /// bindings named `ratio` (or a pack surface like `record`) remain
+    /// ordinary identifiers. The head canonicalizes to its latin identity so
+    /// the constructed type matches the annotation path under any reader pack.
     fn parse_ratio_constructor(&mut self, name: Ident) -> Result<ExprKind, ParseError> {
+        let name = self.canonical_type_ident(name);
         self.expect(&TokenKind::LtAscii, "expected '<' after 'ratio'")?;
 
         let mut type_args = Vec::new();

@@ -18,6 +18,8 @@
 //! | `ratio < 5` | parses as comparison (was ratio_type_arg_label_required) |
 //! | `iuncta` as declaration name | stays rejected (lexer keyword) |
 //! | `fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }` (la) | keeps parsing |
+//! | `fixum record<g: int> r ← record<g: int> { g = 1 }` (en pack) | constructs; head canonicalizes to `ratio` |
+//! | `record < 5` (la) | parses (unmapped spelling, comparison) |
 //! | `textus(5)` | rejected: retired type-call constructor |
 //! | `string(5)` (en pack) | rejected: retired type-call constructor (ruling) |
 //! | undefined ordinary identifier + `<` | parses; definedness is a check-phase matter |
@@ -39,7 +41,7 @@
 use crate::parse;
 use crate::test_support::parse_ok;
 use radix_lexer::{lex_with_locale_pack, KeywordPack, TokenKind};
-use radix_syntax::{ExprKind, IfBody, StmtKind};
+use radix_syntax::{ExprKind, IfBody, StmtKind, TypeExprKind};
 
 /// Minimal en-like reader pack: no keyword rows, only the [types] rows the
 /// matrix exercises (spellings from `stdlib/locale/en/pack.toml`).
@@ -164,6 +166,37 @@ fn en_like_pack_mapped_spelling_less_than_parses_as_comparison() {
 #[test]
 fn la_ratio_declaration_and_constructor_keep_parsing() {
     parse_ok("fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }");
+}
+
+#[test]
+fn en_record_declaration_and_constructor_parse() {
+    // Locale completeness (unit 047eef65): under a reader pack the ratio
+    // type surface (`record`) must claim the constructor slot too, mirroring
+    // the `iuncta` identity claim — same-locale surface, no mixed
+    // `record<g: int>` annotation + `ratio<g: int>` initializer.
+    let result = parse_ok_with_en_like_pack(
+        "incipit {\n    fixum record<g: int> r ← record<g: int> { g = 1 }\n}",
+    );
+    let init = incipit_init_expr(&result);
+    let ExprKind::Verte(verte) = &init.kind else {
+        panic!("expected Verte constructor, got {:?}", init.kind);
+    };
+    let TypeExprKind::Named(head, args) = &verte.ty.kind else {
+        panic!("expected Named type head, got {:?}", verte.ty.kind);
+    };
+    let resolved = result.interner.resolve(head.name);
+    assert_eq!(
+        resolved, "ratio",
+        "constructor head must canonicalize to the latin identity"
+    );
+    assert_eq!(args.len(), 1, "one labeled type argument");
+}
+
+#[test]
+fn unmapped_record_stays_ordinary_on_latin_surface() {
+    // On the plain Latin surface `record` is unmapped: `record < 5` stays a
+    // comparison and `record<g: int> { … }` is not a ratio constructor.
+    assert_init_is_binary("record < 5");
 }
 
 #[test]

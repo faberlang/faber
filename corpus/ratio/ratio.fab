@@ -16,8 +16,9 @@ locale = "en"
 #
 # What this teaches:
 #   • labeled type args: record<g: f32, w: int>
-#   • construction: ratio<g: f32, w: int> { g = 1.0, w = 2 }
-#     (constructor slot claims the canonical ident; en type-head is record)
+#   • construction: record<g: f32, w: int> { g = 1.0, w = 2 }
+#     (both spellings construct: en `record` and canonical `ratio`; the
+#     constructor head canonicalizes to `ratio` at parse — unit 047eef65)
 #   • .name access: point.g (labels only — no bracket form)
 #   • objectPattern destructuring: const {g, w} ← point
 #   • partial + rest: const {loss, rest leftover} ← metrics
@@ -35,9 +36,10 @@ locale = "en"
 
 main {
     # Construction and .name access.
-    # Type-head is the en spelling `record`; the constructor slot claims the
-    # canonical ident `ratio` (RR-1).
-    const record<g: f32, w: int> point ← ratio<g: f32, w: int> { g = 1.0, w = 2 }
+    # Same-locale surface: the en type-head `record` claims the constructor
+    # slot too (map-in-both, unit 047eef65); the canonical `ratio` spelling
+    # still constructs (hole site below).
+    const record<g: f32, w: int> point ← record<g: f32, w: int> { g = 1.0, w = 2 }
     print point.g
     print point.w
 
