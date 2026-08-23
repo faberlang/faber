@@ -59,6 +59,7 @@ const ISSUE_ASCII_PACK_WIDTH_OVERFLOW: &str = "ascii_pack_width_overflow";
 const ISSUE_ASCII_PACK_NEGATIVE_SOURCE: &str = "ascii_pack_negative_source";
 const ISSUE_OCTETI_TO_FRACTUS_UNSPECIFIED: &str = "octeti_to_fractus_unspecified";
 const ISSUE_BITS_PAIR_WIDTH_MISMATCH: &str = "bits_pair_width_mismatch";
+const ISSUE_BITS_HINT_CONFLICT: &str = "conversio_bits_format_hint_conflict";
 const ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED: &str = "octeti_to_bivalens_unsupported";
 const ISSUE_PROMISSUM_TARGET_BOUNDARY: &str = "promissum_target_boundary";
 const ISSUE_PROMISSUM_SOURCE_BOUNDARY: &str = "promissum_source_boundary";
@@ -901,9 +902,9 @@ impl TypeChecker<'_> {
             .any(|param| matches!(interner.resolve(*param), "Be" | "Le"))
     }
 
-    /// `Bits` is an exact-width IEEE bitcast: `u32↔f32` and `u64↔f64` only.
-    /// Any other pair (or unsized primitive) fail-closes; without the hint the
-    /// ordinary value-conversion families stay in charge.
+    /// `Bits` is an exact-width IEEE bitcast: `u16↔f16`, `u32↔f32` and
+    /// `u64↔f64` only. Any other pair (or unsized primitive) fail-closes;
+    /// without the hint the ordinary value-conversion families stay in charge.
     fn bits_pair_issue(
         &self,
         source_ty: TypeId,
@@ -913,6 +914,12 @@ impl TypeChecker<'_> {
         if !self.conversio_has_bits_hint(params) {
             return None;
         }
+        if params
+            .iter()
+            .any(|param| self.is_format_hint(*param))
+        {
+            return Some(ISSUE_BITS_HINT_CONFLICT);
+        }
         let source = self.types.get(self.resolve_inferred_type(source_ty));
         let target = self.types.get(target_resolved);
         let exact_pair = matches!(
@@ -921,11 +928,17 @@ impl TypeChecker<'_> {
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32),
                 Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32)
             ) | (
+                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16),
+                Type::SizedNumeric(Primitive::Fractus, NumericWidth::F16)
+            ) | (
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64),
                 Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64)
             ) | (
                 Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32),
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)
+            ) | (
+                Type::SizedNumeric(Primitive::Fractus, NumericWidth::F16),
+                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16)
             ) | (
                 Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64),
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64)
@@ -1027,6 +1040,13 @@ impl TypeChecker<'_> {
         params
             .iter()
             .any(|param| crate::numeric_width::is_ascii_format_hint(interner.resolve(*param)))
+    }
+
+    fn is_format_hint(&self, param: Symbol) -> bool {
+        let Some(interner) = self.interner else {
+            return false;
+        };
+        matches!(interner.resolve(param), "Hex" | "Bin" | "Oct")
     }
 
     fn ascii_format_radix(&self, params: &[Symbol]) -> Option<u32> {

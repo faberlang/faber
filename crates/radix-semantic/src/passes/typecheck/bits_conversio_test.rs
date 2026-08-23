@@ -30,10 +30,8 @@ fn f64_to_u64_bits_accepts() {
     );
 }
 
-// U1 red drivers (goal `bits-f16-pair`, unit U1): the `u16 ↔ f16` `Bits` row
-// is admitted in U2; until then both directions reject `bits_pair_width_mismatch`.
-// The accept tests flip green when U2 extends `bits_pair_issue`; the reject
-// tests are expected to pass today.
+// U1 red drivers (goal `bits-f16-pair`, unit U1) flipped green by U2: the
+// `u16 ↔ f16` `Bits` row is admitted both directions in `bits_pair_issue`.
 //
 // Expected accept values fixed in advance for the runner pin (U3):
 //   u16 0x3C00 ↔ 1.0, 0x3E00 ↔ 1.5, 0xBC00 ↔ -1.0, 0x7BFF ↔ 65504,
@@ -62,6 +60,14 @@ fn u16_to_f32_bits_rejects() {
 }
 
 #[test]
+fn u16_to_f64_bits_rejects() {
+    test_support::assert_rejects_with_issue(
+        "functio bits(numerus<u16> n) → fractus<f64> { redde n ↦ fractus<f64, Bits> }",
+        "bits_pair_width_mismatch",
+    );
+}
+
+#[test]
 fn unsized_fractus_to_u32_bits_rejects() {
     test_support::assert_rejects_with_issue(
         "functio bits(fractus x) → numerus<u32> { redde x ↦ numerus<u32, Bits> }",
@@ -78,22 +84,6 @@ fn u32_to_f64_bits_rejects() {
 }
 
 #[test]
-fn u16_to_f16_bits_rejects_today() {
-    test_support::assert_rejects_with_issue(
-        "functio bits(numerus<u16> n) → fractus<f16> { redde n ↦ fractus<f16, Bits> }",
-        "bits_pair_width_mismatch",
-    );
-}
-
-#[test]
-fn f16_to_u16_bits_rejects_today() {
-    test_support::assert_rejects_with_issue(
-        "functio bits(fractus<f16> x) → numerus<u16> { redde x ↦ numerus<u16, Bits> }",
-        "bits_pair_width_mismatch",
-    );
-}
-
-#[test]
 fn f16_to_u32_bits_rejects() {
     test_support::assert_rejects_with_issue(
         "functio bits(fractus<f16> x) → numerus<u32> { redde x ↦ numerus<u32, Bits> }",
@@ -101,36 +91,30 @@ fn f16_to_u32_bits_rejects() {
     );
 }
 
-// OQ3 default: `Bits` never co-occurs with `Hex`/`Bin`/`Oct` in one hint
-// list. Red today (co-occurrence is silently accepted); the issue code is
-// deliberately not pinned until U2 settles the diagnostic shape.
-fn assert_rejects(source: &str) {
-    let result = test_support::analyze_source(source);
-    assert!(
-        result.diagnostics.iter().any(|err| err.is_error()),
-        "expected rejection, got: {:?}",
-        result.diagnostics
-    );
-}
-
+// OQ3 (settled by U2): `Bits` never co-occurs with `Hex`/`Bin`/`Oct` in one
+// hint list — one interpretation family per `↦`; the structured issue is
+// `conversio_bits_format_hint_conflict`.
 #[test]
 fn bits_with_hex_hint_rejects() {
-    assert_rejects(
+    test_support::assert_rejects_with_issue(
         "functio bits(numerus<u32> n) → fractus<f32> { redde n ↦ fractus<f32, Bits, Hex> }",
+        "conversio_bits_format_hint_conflict",
     );
 }
 
 #[test]
 fn bits_with_bin_hint_rejects() {
-    assert_rejects(
+    test_support::assert_rejects_with_issue(
         "functio bits(numerus<u32> n) → fractus<f32> { redde n ↦ fractus<f32, Bits, Bin> }",
+        "conversio_bits_format_hint_conflict",
     );
 }
 
 #[test]
 fn bits_with_oct_hint_rejects() {
-    assert_rejects(
+    test_support::assert_rejects_with_issue(
         "functio bits(numerus<u32> n) → fractus<f32> { redde n ↦ fractus<f32, Bits, Oct> }",
+        "conversio_bits_format_hint_conflict",
     );
 }
 
