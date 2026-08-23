@@ -674,9 +674,8 @@ impl radix_hir::visit::HirVisitor for Ar2Facts {
         match &expr.kind {
             radix_hir::HirExpressionKind::Handled { body, .. } => {
                 self.handled += 1;
-                if block_contains_kind(body, |k| {
-                    matches!(k, radix_hir::HirExpressionKind::Dum(..))
-                }) {
+                if block_contains_kind(body, |k| matches!(k, radix_hir::HirExpressionKind::Dum(..)))
+                {
                     self.handled_wrapping_dum += 1;
                 }
                 if block_contains_kind(body, |k| {
@@ -744,7 +743,14 @@ fn ar2_dum_and_itera_variants_carry_no_catch_field() {
             let _: &Box<radix_hir::HirExpression> = cond;
             let _: &radix_hir::HirBlock = block;
         }
-        radix_hir::HirExpressionKind::Itera(mode, bindings, index_def, index_name, source, body) => {
+        radix_hir::HirExpressionKind::Itera(
+            mode,
+            bindings,
+            index_def,
+            index_name,
+            source,
+            body,
+        ) => {
             let _: &radix_hir::HirIteraMode = mode;
             let _: &Vec<(radix_hir::DefId, radix_lexer::Symbol)> = bindings;
             let _: &radix_hir::DefId = index_def;
@@ -810,7 +816,8 @@ functio g(bivalens bad) → numerus {
         "whole-construct handlers wrap non-loop bodies"
     );
     assert_eq!(
-        facts.handled_wrapping_dum + facts.handled_wrapping_itera, 0,
+        facts.handled_wrapping_dum + facts.handled_wrapping_itera,
+        0,
         "no loop is involved in whole-construct handlers"
     );
 }
@@ -838,7 +845,10 @@ functio h(numerus n) → numerus {
     assert_eq!(facts.handled, 2, "one Handled per loop cape");
     assert_eq!(facts.handled_wrapping_dum, 1);
     assert_eq!(facts.handled_wrapping_itera, 1);
-    assert_eq!(facts.si_then_catch, 0, "loop cape never rides Si.then_catch");
+    assert_eq!(
+        facts.si_then_catch, 0,
+        "loop cape never rides Si.then_catch"
+    );
 }
 
 #[test]
