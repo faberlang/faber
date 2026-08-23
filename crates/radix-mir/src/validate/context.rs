@@ -543,6 +543,7 @@ fn integer_payload_carrier(payload: MirScalarLayout) -> Option<(MirScalarLayout,
         MirScalarLayout::Bool
         | MirScalarLayout::I128
         | MirScalarLayout::F16
+        | MirScalarLayout::Bf16
         | MirScalarLayout::F32
         | MirScalarLayout::F64 => None,
     }
@@ -579,6 +580,7 @@ fn integer_layout_bounds(layout: MirScalarLayout) -> Option<(i128, i128)> {
         MirScalarLayout::Bool
         | MirScalarLayout::I128
         | MirScalarLayout::F16
+        | MirScalarLayout::Bf16
         | MirScalarLayout::F32
         | MirScalarLayout::F64 => None,
     }

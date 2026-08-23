@@ -681,3 +681,23 @@ fn bounded_families_with_non_literal_capacity_stay_opaque() {
         );
     }
 }
+
+// bf16-U3: `fractus<bf16>` resolves to its own named scalar layout — never
+// MissingFact and never a silent f32 row.
+#[test]
+fn fractus_bf16_resolves_to_named_bf16_scalar_layout() {
+    let mut types = TypeTable::new();
+    let bf16 = types.intern(Type::SizedNumeric(
+        Primitive::Fractus,
+        radix_types::NumericWidth::BF16,
+    ));
+    let table = MirLayoutTable::from_types(&types);
+
+    let layout = table
+        .layout_for_type(MirType::semantic(bf16))
+        .expect("fractus<bf16> layout fact");
+    assert_eq!(layout.kind, MirLayoutKind::Scalar(MirScalarLayout::Bf16));
+    assert_eq!(MirScalarLayout::Bf16.spelling(), "bf16");
+    assert_eq!(MirScalarLayout::Bf16.size_bits(), 16);
+    assert!(MirScalarLayout::Bf16.is_float());
+}

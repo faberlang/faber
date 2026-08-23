@@ -23,6 +23,9 @@ pub enum MirScalarLayout {
     U32,
     U64,
     F16,
+    /// IEEE-754 bfloat16 (top 16 bits of an f32). Native on Metal (`bfloat`);
+    /// fail-closed on targets without a carrier.
+    Bf16,
     F32,
     F64,
 }
@@ -464,6 +467,7 @@ impl MirScalarLayout {
             Self::U32 => "u32",
             Self::U64 => "u64",
             Self::F16 => "f16",
+            Self::Bf16 => "bf16",
             Self::F32 => "f32",
             Self::F64 => "f64",
         }
@@ -474,7 +478,7 @@ impl MirScalarLayout {
         match self {
             Self::Bool => 1,
             Self::I8 | Self::U8 => 8,
-            Self::I16 | Self::U16 | Self::F16 => 16,
+            Self::I16 | Self::U16 | Self::F16 | Self::Bf16 => 16,
             Self::I32 | Self::U32 | Self::F32 => 32,
             Self::I64 | Self::U64 | Self::F64 => 64,
             Self::I128 => 128,
@@ -506,7 +510,7 @@ impl MirScalarLayout {
 
     #[must_use]
     pub fn is_float(self) -> bool {
-        matches!(self, Self::F16 | Self::F32 | Self::F64)
+        matches!(self, Self::F16 | Self::Bf16 | Self::F32 | Self::F64)
     }
 
     #[must_use]
@@ -517,7 +521,7 @@ impl MirScalarLayout {
             Self::I32 | Self::U32 => Some(32),
             Self::I64 | Self::U64 => Some(64),
             Self::I128 => Some(128),
-            Self::Bool | Self::F16 | Self::F32 | Self::F64 => None,
+            Self::Bool | Self::F16 | Self::Bf16 | Self::F32 | Self::F64 => None,
         }
     }
 
@@ -944,6 +948,7 @@ fn sized_numeric_layout(prim: Primitive, width: NumericWidth) -> LayoutResolutio
         (Primitive::Numerus, NumericWidth::U32) => MirScalarLayout::U32,
         (Primitive::Numerus, NumericWidth::U64) => MirScalarLayout::U64,
         (Primitive::Fractus, NumericWidth::F16) => MirScalarLayout::F16,
+        (Primitive::Fractus, NumericWidth::BF16) => MirScalarLayout::Bf16,
         (Primitive::Fractus, NumericWidth::F32) => MirScalarLayout::F32,
         (Primitive::Fractus, NumericWidth::F64) => MirScalarLayout::F64,
         (prim, width) => {
