@@ -1,0 +1,47 @@
++++
+term = "itera-ex-scalar-buffers"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "assignment", "itera_stmt", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Value iteration over runtime-length bytes<N> / ascii<N> / string<N> (N <= 10) lowers to a static split on len; arm k unrolls k lanes; spare slots are never read."
+syntax = "for from bytes<N> | ascii<N> | string<N> const x { }"
+related = ["bytes", "ascii", "string", "ex", "itera", "longitudo"]
+locale = "en"
++++
+
+# =============================================================================
+# itera-ex-scalar-buffers — Route B runtime-len scalar buffer iteration.
+# =============================================================================
+#
+# What this teaches:
+#   • `for from` over a runtime-length `bytes<N>` / `ascii<N>` / `string<N>`
+#     becomes a `discerne` on len with N+1 arms — arm k runs the body exactly
+#     k times (lanes 0..k)
+#   • each arm reads only 0..k ⊆ 0..len, so spare slots past len are never
+#     read and the `string<N>` non-ASCII trap row never fires from a dead slot
+#   • the branch lives in the base lane; AIR functions keep declining this
+#     shape (causa=not_concrete)
+#
+# Common mistakes:
+#   • expecting this to unroll in an `@ radix lane "air"` function — Route B
+#     is base-language only
+#   • capacities above 10 — the N(N+1)/2 lane budget caps at N = 10
+#
+# See also: bytes, ascii, string, itera-ex-air-scalar-buffers
+# =============================================================================
+
+# Route B static split on the carrier len — declaration-only driver; the MIR
+# unit tests pin the N+1-arm switch and the N <= 10 decline.
+
+fn visit_bytes(bytes<8> xs) → vacuum {
+    for from xs const b {
+        print b
+    }
+}
+
+fn visit_string(string<8> xs) → vacuum {
+    for from xs const c {
+        print c
+    }
+}

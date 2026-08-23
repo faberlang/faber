@@ -12,7 +12,7 @@
 use crate::{
     MirConstant, MirFunctionId, MirLocalId, MirPlace, MirPlaceBase, MirProgram, MirTempId, MirType,
 };
-use radix_types::{NumericWidth, Primitive, Type, TypeTable};
+use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
 
 const MIR_TYPE_RESOLUTION_PREFIX: &str = "MIR type resolution unsupported";
 
@@ -164,6 +164,21 @@ pub fn constant_ty(
 /// element type. See DEFER-029 / DEFER-030 parity.
 /// # Errors
 /// Returns an error when validation or type resolution fails. See [`MirTypeError`].
+/// Locate the `ascii<1>` row (the `'x'` scalar) without interning — a scan of
+/// the append-only arena. The typecheck `itera`/index arms intern it for any
+/// source that reaches a bounded byte index projection, so callers may treat
+/// a miss as a type-resolution failure.
+pub fn find_bounded_ascii_one(types: &TypeTable) -> Option<TypeId> {
+    (0..u32::try_from(types.type_count()).ok()?)
+        .map(TypeId)
+        .find(|&id| match types.get(id) {
+            Type::BoundedAscii { capacity } => {
+                matches!(types.get_index(*capacity), IndexExpr::Literal(1))
+            }
+            _ => false,
+        })
+}
+
 pub fn index_projection_result_ty(
     base_ty: MirType,
     types: &TypeTable,
@@ -178,6 +193,16 @@ pub fn index_projection_result_ty(
             .find_sized_numeric(Primitive::Numerus, NumericWidth::U8)
             .map(MirType::semantic)
             .ok_or_else(|| MirTypeError::unsupported("octeti element type")),
+        // AEU-7: the bounded scalar buffer element rows — `octeti<N>[i]` is
+        // `numerus<u8>`, `ascii<N>[i]` / `textus<N>[i]` are `ascii<1>`
+        // (D14 / D17), matching the semantic index row exactly.
+        Type::BoundedOcteti { .. } => types
+            .find_sized_numeric(Primitive::Numerus, NumericWidth::U8)
+            .map(MirType::semantic)
+            .ok_or_else(|| MirTypeError::unsupported("bounded octeti element type")),
+        Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => find_bounded_ascii_one(types)
+            .map(MirType::semantic)
+            .ok_or_else(|| MirTypeError::unsupported("ascii<1> element type")),
         Type::Tuple(_) => Err(MirTypeError::unsupported(
             "tuple index projection (use tuple_index_projection for physical aggregate tuples)",
         )),

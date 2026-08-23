@@ -299,6 +299,28 @@ impl Validator<'_, '_> {
                 }
                 Some(MirType::semantic(element))
             }
+            // Route B (AEU-7): scalar bounded buffer element gathers — the
+            // `octeti<N>[i]` → `numerus<u8>` and `ascii<N>[i]` /
+            // `textus<N>[i]` → `ascii<1>` rows (D14 / D17). Like the lista
+            // arm, the lowerer emits only constant lanes below len, so the
+            // non-ASCII trap row can never fire from a dead slot.
+            Type::BoundedOcteti { .. } | Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => {
+                if let Some((_, index_ty)) = index {
+                    self.require_assignable(
+                        index_ty,
+                        self.primitive(Primitive::Numerus),
+                        span,
+                        "bounded buffer index is not numerus",
+                    );
+                }
+                match crate::ty::index_projection_result_ty(base_ty, self.context.types) {
+                    Ok(ty) => Some(ty),
+                    Err(error) => {
+                        self.error(span, error.message);
+                        None
+                    }
+                }
+            }
             Type::Tensor(inner, _) => {
                 if let Some((_, index_ty)) = index {
                     self.require_device_view_index(index_ty, span);
@@ -436,10 +458,17 @@ impl Validator<'_, '_> {
             }
             // Route B (AEU-4): the bounded-array row is an indexable physical
             // aggregate — `element × capacity` storage cells; the gather reads
-            // the live prefix lanes by constant index below len.
+            // the live prefix lanes by constant index below len. The AEU-7
+            // byte families (`ascii<N>` / `textus<N>`, `u8 × N` plus the
+            // runtime length member) ride the same contract.
             MirLayoutKind::Aggregate(layout)
                 if layout.carrier == MirAggregateCarrier::PhysicalValue
-                    && layout.family == MirAggregateFamily::BoundedArray =>
+                    && matches!(
+                        layout.family,
+                        MirAggregateFamily::BoundedArray
+                            | MirAggregateFamily::BoundedAscii
+                            | MirAggregateFamily::BoundedTextus
+                    ) =>
             {
                 if !matches!(projection, MirProjection::Index(_)) {
                     self.error(span, "bounded array projection must be an index");

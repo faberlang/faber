@@ -105,3 +105,103 @@ fn bounded_lista_ex_capacity_above_ten_stays_unsupported() {
         errors[0].issue
     );
 }
+
+// --- AEU-7: scalar bounded buffer forms (`octeti<N>` / `ascii<N>` / `textus<N>`)
+
+/// Route B proof: the scalar buffers lower to the same live-prefix static
+/// split as `lista<T, N>` — a switch on the carrier `len` with N+1 arms, arm
+/// k reading only lanes 0..k by constant index. Arm k ⊆ 0..len holds for
+/// every arm, so the `textus<N>` non-ASCII trap row can never fire from a
+/// dead slot.
+#[test]
+fn lowers_scalar_bounded_buffers_to_live_prefix_static_splits() {
+    let cases: [(&str, &str); 3] = [
+        (
+            "octeti<8>",
+            r"functio visit(octeti<8> xs) → vacuum {
+  itera ex xs fixum b {
+    nota b
+  }
+  redde
+}",
+        ),
+        (
+            "ascii<8>",
+            r"functio visit(ascii<8> xs) → vacuum {
+  itera ex xs fixum c {
+    nota c
+  }
+  redde
+}",
+        ),
+        (
+            "textus<8>",
+            r"functio visit(textus<8> xs) → vacuum {
+  itera ex xs fixum c {
+    nota c
+  }
+  redde
+}",
+        ),
+    ];
+    for (name, source) in cases {
+        let mut unit =
+            analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
+                .unwrap_or_else(|error| panic!("{name} source analyzes: {error:?}"));
+        let lowered = lower_analyzed_unit(&mut unit, Default::default())
+            .unwrap_or_else(|error| panic!("{name} itera ex lowers in the base MIR lane: {error:?}"));
+        validate_program(&lowered.program, lowered.validated.validation())
+            .unwrap_or_else(|error| panic!("{name} live-prefix split MIR must validate: {error:?}"));
+        let dump = dump_program(&lowered.program);
+        assert!(
+            !dump.contains("itera collection before iterator MIR lowering"),
+            "{name} must lower to the Route B split: {dump}"
+        );
+        assert!(
+            dump.contains("runtime collection length("),
+            "{name} split scrutinee is the runtime carrier len: {dump}"
+        );
+        let switch = dump
+            .lines()
+            .find(|line| line.trim_start().starts_with("switch "))
+            .unwrap_or_else(|| panic!("{name} split must be a switch on len: {dump}"));
+        for k in 0..=8 {
+            assert!(
+                switch.contains(&format!("{}: ", k)),
+                "{name} arm {k} (0..=8, N+1 literal cases) must appear in: {switch}"
+            );
+        }
+        assert!(
+            !dump.contains("[const int 8]"),
+            "{name} no arm may read lane >= capacity (dead slot): {dump}"
+        );
+    }
+}
+
+/// The N <= 10 code-size cap governs the scalar buffer forms exactly as it
+/// governs `lista<T, N>`.
+#[test]
+fn scalar_bounded_buffers_capacity_above_ten_stay_unsupported() {
+    let mut unit = analyze_source(
+        &session(),
+        "bounded-itera.fab",
+        r"functio big(textus<11> xs) → vacuum {
+  itera ex xs fixum c {
+    nota c
+  }
+  redde
+}",
+        AnalyzeRequest::default(),
+    )
+    .expect("source analyzes; the decline is MIR's");
+    let errors = lower_analyzed_unit(&mut unit, Default::default())
+        .expect_err("N > 10 exceeds the Route B code-size cap and must fail closed");
+    assert_eq!(errors.len(), 1, "exactly the itera decline fires: {errors:?}");
+    assert!(
+        errors[0]
+            .issue
+            .contains("itera_collection_before_iterator_mir_lowering"),
+        "the N <= 10 cap keeps the Unsupported diagnostic family: {:?}",
+        errors[0].issue
+    );
+}

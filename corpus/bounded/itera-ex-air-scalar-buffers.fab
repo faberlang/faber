@@ -1,0 +1,55 @@
++++
+term = "itera-ex-air-scalar-buffers"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "assignment", "itera_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "AIR-lane itera ex over full-literal bytes<N> / ascii<N> / string<N> unrolls guard-free with the scalar element type (u8 byte / ascii<1>); runtime-length values decline not_concrete."
+syntax = "@ radix lane \"air\"; itera ex bytes<N> | ascii<N> | string<N>"
+related = ["bytes", "ascii", "string", "ex", "itera", "radix"]
+locale = "en"
++++
+
+# =============================================================================
+# itera-ex-air-scalar-buffers — AIR-lane scalar bounded buffer iteration.
+# =============================================================================
+#
+# What this teaches:
+#   • a full literal `bytes<N>` / `ascii<N>` / `string<N>` proves len == N, so
+#     `for from` unrolls guard-free on the AIR lane (N lanes against the
+#     per-function unroll budget of 64)
+#   • each lane binds the scalar index element row — `bytes<N>[i]` is a
+#     `u8` byte, `ascii<N>[i]` / `string<N>[i]` is `ascii<1>` — and a full
+#     literal only reads its own slots, so the non-ASCII trap row can never
+#     fire from a dead slot
+#   • a runtime-length buffer (a parameter) keeps declining causa=
+#     not_concrete; spare slots past len are never read
+#
+# Common mistakes:
+#   • expecting a runtime-length buffer to unroll — only a proven-full literal
+#     erases the loop
+#   • capacities past 64 lanes — the AIR budget declines the whole loop
+#
+# See also: bytes, ascii, string, itera-ex-scalar-buffers
+# =============================================================================
+
+# Route A full-literal drivers — declaration-only; the semantic unit tests pin
+# the emitted lanes, the guard-free shape, and the element types.
+
+@ radix lane "air"
+fn full_bytes() → vacuum {
+    const bytes<8> xs ← |de ad be ef ba dc fe ca| ↦ bytes<8>
+    for from xs const b { }
+}
+
+@ radix lane "air"
+fn full_ascii() → vacuum {
+    const ascii<8> xs ← 'alphabet' ↦ ascii<8>
+    for from xs const c { }
+}
+
+@ radix lane "air"
+fn full_string() → vacuum {
+    const string<8> xs ← "abcdefgh" ↦ string<8>
+    for from xs const c { }
+}

@@ -1568,6 +1568,29 @@ impl FunctionBuilder<'_> {
                         None => CollectionIteraKind::Unsupported,
                     }
                 }
+                // Route B (AEU-7): the scalar buffer forms ride the same
+                // static split — `octeti<N>` lanes bind `numerus<u8>`,
+                // `ascii<N>` / `textus<N>` lanes bind `ascii<1>` (the D14/D17
+                // scalar index rows). Arm k reads only lanes 0..k ⊆ 0..len,
+                // so the non-ASCII trap row can never fire from a dead slot.
+                Type::BoundedOcteti { capacity }
+                | Type::BoundedAscii { capacity }
+                | Type::BoundedTextus { capacity } => {
+                    let literal_n = if matches!(iter.mode, HirIteraMode::Ex) {
+                        i64s_from_literal_index(*capacity, self.types)
+                            .and_then(|dims| dims.first().copied())
+                            .filter(|n| (0..=10).contains(n))
+                    } else {
+                        None
+                    };
+                    match literal_n {
+                        Some(n) => match self.scalar_buffer_element(normalized) {
+                            Some(element) => CollectionIteraKind::BoundedArray(element, n),
+                            None => CollectionIteraKind::Unsupported,
+                        },
+                        None => CollectionIteraKind::Unsupported,
+                    }
+                }
                 Type::Array(item) => CollectionIteraKind::Array(*item),
                 Type::Map(key, _) if matches!(iter.mode, HirIteraMode::De) => CollectionIteraKind::MapKeys(*key),
                 Type::Map(_, value) if matches!(iter.mode, HirIteraMode::Ex) => CollectionIteraKind::MapValues(*value),
@@ -2039,6 +2062,22 @@ impl FunctionBuilder<'_> {
     /// ever read. The branch is base-lane MIR; the AIR lane never admits the
     /// loop (`air_unroll` declines runtime-len values `not_concrete`), so
     /// reverse AD never sees a non-literal scrutinee.
+    /// AEU-7: the scalar buffer lane element — `octeti<N>` binds
+    /// `numerus<u8>`, `ascii<N>` / `textus<N>` bind `ascii<1>` (D14 / D17).
+    /// The typecheck `itera` arm interns both rows for the loop being
+    /// lowered; a miss fails closed into Unsupported.
+    fn scalar_buffer_element(&self, ty: &Type) -> Option<TypeId> {
+        match ty {
+            Type::BoundedOcteti { .. } => self
+                .types
+                .find_sized_numeric(Primitive::Numerus, NumericWidth::U8),
+            Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => {
+                radix_mir::ty::find_bounded_ascii_one(self.types)
+            }
+            _ => None,
+        }
+    }
+
     fn lower_bounded_array_itera_split(
         &mut self,
         iter: &ArrayIteraLowering<'_>,
