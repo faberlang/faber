@@ -1335,7 +1335,7 @@ Sized primitives accept one optional **width marker** (not a user type parameter
 | Family | Markers | Invalid example |
 | ------ | ------- | --------------- |
 | `numerus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64` | `numerus<f32>` → use `fractus<f32>` |
-| `fractus<W>` | `f16`, `f32`, `f64` | `fractus<i32>` → use `numerus<i32>`; `bf16` is deferred |
+| `fractus<W>` | `f16`, `bf16`, `f32`, `f64` | `fractus<i32>` → use `numerus<i32>` |
 | `modulus<W>` | `u8`, `u16`, `u32`, `u64` | `modulus<i32>` → signed widths are not modular words |
 
 Bare `numerus` / `fractus` remain shorthand for `numerus<i64>` / `fractus<f64>`.
