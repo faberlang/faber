@@ -1307,6 +1307,8 @@ fn storage_spelling(storage: MirTensorStorageLayout) -> &'static str {
     match storage {
         MirTensorStorageLayout::DeviceHandle => "device-handle",
         MirTensorStorageLayout::HostOwned => "host-owned",
+        // MLC-4: the sparse marker is rendered by name; never coerced to a host/device row.
+        MirTensorStorageLayout::Sparse => "sparse",
     }
 }
 
