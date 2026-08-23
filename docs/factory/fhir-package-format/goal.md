@@ -1,6 +1,6 @@
 # GOAL: FHIR package format — the HIR cargo spec
 
-**Status**: planned — goal-checked 2026-08-23 (planner) against radix 333177658 / faber b4ae10c tips; P3-lowered below; awaiting Mind dispatch
+**Status**: active — FPF-1 landed (faber 0a305c4: spec.md, 31 rows v5-pinned); FPF-2 (unit codec, long pole) dispatching; FPF-3..5 serial behind it. OQ-1 ruled version-ratchet; OQ-3 nested-named default (2026-08-23)
 **Created**: 2026-08-18
 **Campaign:** `—` (standalone; fcmp-profile-1 becomes a dependency of this goal, not the reverse)
 **Source:** operator addendum 2026-08-18 — the product is HIR package serialization; the envelope is a framing detail around this schema
