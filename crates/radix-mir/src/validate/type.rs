@@ -434,6 +434,28 @@ impl Validator<'_, '_> {
                     self.error(span, "device view projection element layout mismatch");
                 }
             }
+            // Route B (AEU-4): the bounded-array row is an indexable physical
+            // aggregate — `element × capacity` storage cells; the gather reads
+            // the live prefix lanes by constant index below len.
+            MirLayoutKind::Aggregate(layout)
+                if layout.carrier == MirAggregateCarrier::PhysicalValue
+                    && layout.family == MirAggregateFamily::BoundedArray =>
+            {
+                if !matches!(projection, MirProjection::Index(_)) {
+                    self.error(span, "bounded array projection must be an index");
+                }
+                let Ok(result_layout) = self.context.layouts.layout_for_type(result_ty) else {
+                    self.error(span, "bounded array projection result has no layout");
+                    return;
+                };
+                if let (Some(element), MirLayoutKind::Scalar(result_scalar)) =
+                    (layout.element, result_layout.kind)
+                {
+                    if result_scalar != element {
+                        self.error(span, "bounded array projection element layout mismatch");
+                    }
+                }
+            }
             MirLayoutKind::Aggregate(layout)
                 if layout.carrier == MirAggregateCarrier::PhysicalValue
                     && layout.family != MirAggregateFamily::Tuple =>
