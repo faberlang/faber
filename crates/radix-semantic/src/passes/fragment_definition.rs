@@ -275,6 +275,11 @@ impl FragmentDefinitionChecker<'_> {
                 self.check_expr(source);
                 self.check_block(block);
             }
+            HirExpressionKind::Summa { source, body, .. } => {
+                self.effect(expr.span, "unapproved_effect");
+                self.check_expr(source);
+                self.check_block(body);
+            }
             HirExpressionKind::Intervallum {
                 start, end, step, ..
             } => {

@@ -251,6 +251,11 @@ impl AirPurityChecker<'_> {
                 self.check_expr(source);
                 self.check_block(block);
             }
+            HirExpressionKind::Summa { source, body, .. } => {
+                self.reject(expr.span, "summa_expression_unsupported");
+                self.check_expr(source);
+                self.check_block(body);
+            }
             HirExpressionKind::Intervallum {
                 start, end, step, ..
             } => {

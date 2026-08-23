@@ -985,6 +985,29 @@ pub enum ExprKind {
     TypeCheck(TypeCheckExpr),
     /// `iuncta<A, B> [a, b]` tuple construction.
     Iuncta(IunctaExpr),
+    /// Contextual term-fold reduction: `summa ex source ...`.
+    ///
+    /// The parser claims this spelling only in expression-head position when
+    /// `summa` is immediately followed by `ex`; ordinary identifiers, calls,
+    /// and receivers keep their existing meaning.
+    Summa(Box<SummaExpr>),
+}
+
+/// Source shape for the contextual `summa ex` term-fold expression.
+#[derive(Debug)]
+pub struct SummaExpr {
+    /// Iterable expression whose elements feed the term body.
+    pub source: Box<Expr>,
+    /// Optional coordinate names from the shared `apud` production.
+    pub apud: Vec<Ident>,
+    /// Optional lane binder from the contextual `filum` clause.
+    pub filum: Option<Ident>,
+    /// Mutability marker for the term binder.
+    pub mutability: AstMutability,
+    /// Term binder introduced for the block body.
+    pub binding: Ident,
+    /// Term body evaluated for each source element.
+    pub body: BlockStmt,
 }
 
 #[derive(Debug)]

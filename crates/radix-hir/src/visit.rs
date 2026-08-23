@@ -393,6 +393,23 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
             visitor.visit_expr(iter);
             visitor.visit_block(block);
         }
+        HirExpressionKind::Summa {
+            source,
+            coordinates,
+            filum,
+            binding,
+            body,
+        } => {
+            for (coordinate_def_id, coordinate_name) in coordinates {
+                visitor.visit_def(*coordinate_def_id, *coordinate_name);
+            }
+            if let Some((filum_def_id, filum_name)) = filum {
+                visitor.visit_def(*filum_def_id, *filum_name);
+            }
+            visitor.visit_def(binding.0, binding.1);
+            visitor.visit_expr(source);
+            visitor.visit_block(body);
+        }
         HirExpressionKind::Intervallum {
             start, end, step, ..
         } => {
@@ -891,6 +908,23 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             visitor.visit_def(*def_id, *name);
             visitor.visit_expr_mut(iter);
             visitor.visit_block_mut(block);
+        }
+        HirExpressionKind::Summa {
+            source,
+            coordinates,
+            filum,
+            binding,
+            body,
+        } => {
+            for (coordinate_def_id, coordinate_name) in coordinates {
+                visitor.visit_def(*coordinate_def_id, *coordinate_name);
+            }
+            if let Some((filum_def_id, filum_name)) = filum {
+                visitor.visit_def(*filum_def_id, *filum_name);
+            }
+            visitor.visit_def(binding.0, binding.1);
+            visitor.visit_expr_mut(source);
+            visitor.visit_block_mut(body);
         }
         HirExpressionKind::Intervallum {
             start, end, step, ..

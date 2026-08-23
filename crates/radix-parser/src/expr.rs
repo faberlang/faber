@@ -1200,6 +1200,57 @@ impl Parser {
 
     // PRIMARY EXPRESSIONS
 
+    /// Return whether the current expression head is the contextual `summa`.
+    fn is_summa_expr_head(&self) -> bool {
+        matches!(self.peek().kind, TokenKind::Ident(sym) if self.interner.resolve(sym) == "summa")
+            && self.keyword_ident_at(1) == Some(TokenKind::Ex)
+    }
+
+    /// Parse the contextual `summa ex` term-fold expression.
+    ///
+    /// `summa` remains an ordinary identifier unless it is the expression
+    /// head immediately followed by `ex`. The optional `apud` clause delegates
+    /// to the same production used by `itera`; `filum` is recognized by exact
+    /// spelling here and is deliberately absent from the lexer keyword table.
+    ///
+    /// GRAMMAR:
+    ///   summa-expr := `summa` `ex` expression [apud-clause] [filum-clause]
+    ///                 (`fixum` | `varia`) IDENTIFIER block
+    ///   filum-clause := `filum` IDENTIFIER
+    fn parse_summa_expr(&mut self) -> Result<Expr, ParseError> {
+        let start = self.current_span();
+        self.eat_identifier_text("summa");
+        self.expect_keyword_ident(TokenKind::Ex, "expected 'ex' after 'summa'")?;
+
+        let source = Box::new(self.parse_expression()?);
+        let apud = if self.eat_keyword_ident(TokenKind::Apud) {
+            self.parse_apud_clause()?
+        } else {
+            Vec::new()
+        };
+        let filum = if self.eat_identifier_text("filum") {
+            Some(self.parse_ident()?)
+        } else {
+            None
+        };
+        let mutability = self.parse_mutability()?;
+        let binding = self.parse_ident()?;
+        let body = self.parse_block()?;
+
+        Ok(Expr {
+            id: self.next_id(),
+            kind: ExprKind::Summa(Box::new(SummaExpr {
+                source,
+                apud,
+                filum,
+                mutability,
+                binding,
+                body,
+            })),
+            span: start.merge(self.previous_span()),
+        })
+    }
+
     /// Parse primary expressions, the atoms that postfix and infix forms compose.
     ///
     /// GRAMMAR:
@@ -1215,6 +1266,9 @@ impl Parser {
     /// object initialization. Anything that starts with a non-primary token must
     /// be introduced by an earlier precedence layer.
     fn parse_primary(&mut self) -> Result<Expr, ParseError> {
+        if self.is_summa_expr_head() {
+            return self.parse_summa_expr();
+        }
         if let Some(expr) = self.try_parse_compact_clausura_expr()? {
             return Ok(expr);
         }

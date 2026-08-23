@@ -1021,6 +1021,23 @@ pub enum HirExpressionKind {
         HirBlock,
     ),
 
+    /// Contextual `summa ex` term-fold expression.
+    ///
+    /// This is a source-declaration node only in SFR-2. Typecheck deliberately
+    /// declines it until the SFR-3 admission rules and SFR-4 lowering land.
+    Summa {
+        /// Iterable expression supplying the terms.
+        source: Box<HirExpression>,
+        /// Coordinate bindings inherited from the shared `apud` production.
+        coordinates: Vec<(DefId, Symbol)>,
+        /// Optional lane binder from `filum`.
+        filum: Option<(DefId, Symbol)>,
+        /// Term binding visible in the body.
+        binding: (DefId, Symbol),
+        /// Term body evaluated for each source element.
+        body: HirBlock,
+    },
+
     /// Range (`intervallum`).
     Intervallum {
         start: Box<HirExpression>,

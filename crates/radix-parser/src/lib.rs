@@ -371,6 +371,15 @@ impl Parser {
         lookup_keyword_spec(latin).and_then(|spec| spec.token_kind.clone())
     }
 
+    /// Resolve a lookahead word to its locale-independent keyword identity.
+    fn keyword_ident_at(&self, offset: usize) -> Option<TokenKind> {
+        let TokenKind::Ident(sym) = self.peek_at(offset).kind else {
+            return None;
+        };
+        let latin = self.keyword_claim_key(sym)?;
+        lookup_keyword_spec(latin).and_then(|spec| spec.token_kind.clone())
+    }
+
     /// Check whether the current word is the given keyword, by identity.
     ///
     /// Keywords are locale items: this matches the registry identity, not a

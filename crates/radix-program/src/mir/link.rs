@@ -1736,6 +1736,26 @@ pub(super) fn rewrite_expr(
                 diagnostics,
             );
         }
+        HirExpressionKind::Summa { source, body, .. } => {
+            rewrite_expr(
+                unit_path,
+                source,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+            rewrite_block(
+                unit_path,
+                body,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+        }
         HirExpressionKind::Intervallum {
             start, end, step, ..
         } => {

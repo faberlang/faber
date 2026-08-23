@@ -42,6 +42,7 @@ const ISSUE_CEDE_REQUIRES_GENERATOR: &str = "cede_requires_generator";
 const ISSUE_REDDET_REQUIRES_ASYNC_FUNCTION: &str = "reddet_requires_async_function";
 const ISSUE_TACEBIT_REQUIRES_ASYNC_CONTEXT: &str = "tacebit_requires_async_context";
 const ISSUE_INVALID_LOWERED_EXPRESSION: &str = "invalid_lowered_expression";
+const ISSUE_SUMMA_EXPRESSION_UNSUPPORTED: &str = "summa_expression_unsupported";
 /// Phase 2A fail-closed fact: the dedicated gradient node exists in HIR, but the
 /// operand-eligibility and selector rules land with tensor-glyphs 2B. No `∇`
 /// expression may pass typecheck untyped or silently.
@@ -305,6 +306,16 @@ impl TypeChecker<'_> {
                 self.check_block(block, None);
                 self.pop_scope();
                 self.vacuum_type()
+            }
+            HirExpressionKind::Summa { .. } => {
+                // SFR-2 admits the source-shaped HIR node, but SFR-3 owns
+                // admission and SFR-4 owns the sequential fold lowering.
+                self.error_issue(
+                    SemanticErrorKind::LoweringError,
+                    ISSUE_SUMMA_EXPRESSION_UNSUPPORTED,
+                    expr.span,
+                );
+                self.error_type
             }
             HirExpressionKind::Intervallum {
                 start, end, step, ..

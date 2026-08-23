@@ -423,6 +423,10 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             PraefixumBody::Block(block) => scan_go_block(block, file, diagnostics),
             PraefixumBody::Expr(expr) => scan_go_expr(expr, file, diagnostics),
         },
+        ExprKind::Summa(summa) => {
+            scan_go_expr(&summa.source, file, diagnostics);
+            scan_go_block(&summa.body, file, diagnostics);
+        }
         ExprKind::Paren(expr) => scan_go_expr(expr, file, diagnostics),
         ExprKind::Literal(_)
         | ExprKind::Vacua(_)
@@ -773,6 +777,10 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             PraefixumBody::Block(block) => scan_rust_block(block, file, diagnostics),
             PraefixumBody::Expr(expr) => scan_rust_expr(expr, file, diagnostics),
         },
+        ExprKind::Summa(summa) => {
+            scan_rust_expr(&summa.source, file, diagnostics);
+            scan_rust_block(&summa.body, file, diagnostics);
+        }
         ExprKind::Paren(expr) => scan_rust_expr(expr, file, diagnostics),
         ExprKind::Literal(_)
         | ExprKind::Vacua(_)

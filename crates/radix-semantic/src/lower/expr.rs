@@ -91,6 +91,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Paren(expr) => lower_expr(lowerer, expr).kind,
         ExprKind::TypeCheck(type_check) => lowerer.lower_type_check(type_check),
         ExprKind::Iuncta(iuncta) => lowerer.lower_iuncta(iuncta),
+        ExprKind::Summa(summa) => lower_summa(lowerer, summa),
     };
 
     HirExpression {
@@ -98,6 +99,44 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         kind,
         ty: None,
         span,
+    }
+}
+
+/// Lower the source shape of `summa ex` while preserving its declaration in HIR.
+///
+/// The node is intentionally not normalized to `Itera`: `summa` is an
+/// expression with a term body, while `itera` remains a statement with its own
+/// control-flow and mutation semantics. SFR-3/SFR-4 own the admission and
+/// lowering rules after this source-shaped node lands.
+fn lower_summa(lowerer: &mut Lowerer, summa: &radix_syntax::SummaExpr) -> HirExpressionKind {
+    let source = lower_expr(lowerer, &summa.source);
+
+    lowerer.push_scope();
+    let coordinates = summa
+        .apud
+        .iter()
+        .map(|ident| {
+            let def_id = lowerer.next_def_id();
+            lowerer.bind_local(ident.name, def_id);
+            (def_id, ident.name)
+        })
+        .collect();
+    let filum = summa.filum.as_ref().map(|ident| {
+        let def_id = lowerer.next_def_id();
+        lowerer.bind_local(ident.name, def_id);
+        (def_id, ident.name)
+    });
+    let binding_def_id = lowerer.next_def_id();
+    lowerer.bind_local(summa.binding.name, binding_def_id);
+    let body = lowerer.lower_block(&summa.body);
+    lowerer.pop_scope();
+
+    HirExpressionKind::Summa {
+        source: Box::new(source),
+        coordinates,
+        filum,
+        binding: (binding_def_id, summa.binding.name),
+        body,
     }
 }
 

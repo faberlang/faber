@@ -717,6 +717,11 @@ impl super::FaberCodegen {
             HirExpressionKind::Praefixum(inner) => {
                 self.write_expr(inner, types, names, interner, surface, writer);
             }
+            HirExpressionKind::Summa { .. } => {
+                // SFR-2 is source-shaped only; keep re-emission fail-closed
+                // until the reduction lowering units provide a valid surface.
+                writer.write(surface.contextual_keyword("nihil"));
+            }
             HirExpressionKind::Error => writer.write(surface.contextual_keyword("nihil")),
         }
 

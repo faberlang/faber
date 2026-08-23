@@ -1245,6 +1245,40 @@ fn resolve_expr(
             }
             resolver.exit_scope();
         }
+        ExprKind::Summa(expr) => {
+            resolve_expr(resolver, interner, &expr.source, errors);
+            resolver.enter_scope(ScopeKind::Block);
+            for coordinate in &expr.apud {
+                define_symbol(
+                    resolver,
+                    coordinate.name,
+                    coordinate.span,
+                    SymbolKind::Local,
+                    false,
+                    errors,
+                );
+            }
+            if let Some(filum) = &expr.filum {
+                define_symbol(
+                    resolver,
+                    filum.name,
+                    filum.span,
+                    SymbolKind::Local,
+                    false,
+                    errors,
+                );
+            }
+            define_symbol(
+                resolver,
+                expr.binding.name,
+                expr.binding.span,
+                SymbolKind::Local,
+                expr.mutability == radix_syntax::AstMutability::Mutable,
+                errors,
+            );
+            resolve_block(resolver, interner, &expr.body, errors);
+            resolver.exit_scope();
+        }
         ExprKind::Cede(expr) => resolve_expr(resolver, interner, &expr.expr, errors),
         ExprKind::Array(expr) => {
             for element in &expr.elements {

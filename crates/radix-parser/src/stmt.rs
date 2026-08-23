@@ -208,7 +208,7 @@ impl Parser {
     }
 
     /// Parse the bracketed coordinate names claimed by an `apud` clause.
-    fn parse_apud_clause(&mut self) -> Result<Vec<Ident>, ParseError> {
+    pub(super) fn parse_apud_clause(&mut self) -> Result<Vec<Ident>, ParseError> {
         self.expect(&TokenKind::LBracket, "expected '[' after 'apud'")?;
 
         let mut coordinates = vec![self.parse_ident()?];
@@ -827,7 +827,7 @@ impl Parser {
     }
 
     /// Parse the required `fixum` / `varia` mutability marker shared by binding statements.
-    fn parse_mutability(&mut self) -> Result<AstMutability, ParseError> {
+    pub(super) fn parse_mutability(&mut self) -> Result<AstMutability, ParseError> {
         if self.eat_keyword_ident(TokenKind::Fixum) {
             Ok(AstMutability::Immutable)
         } else if self.eat_keyword_ident(TokenKind::Varia) {

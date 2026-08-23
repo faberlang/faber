@@ -266,6 +266,23 @@ fn collect_expr_defs(
         | HirExpressionKind::Vacua
         | HirExpressionKind::ReadLine(_)
         | HirExpressionKind::Error => {}
+        HirExpressionKind::Summa {
+            source,
+            coordinates,
+            filum,
+            binding,
+            body,
+        } => {
+            collect_expr_defs(source, registry);
+            for (def_id, _) in coordinates {
+                registry.insert(*def_id);
+            }
+            if let Some((def_id, _)) = filum {
+                registry.insert(*def_id);
+            }
+            registry.insert(binding.0);
+            collect_block_defs(body, registry);
+        }
         HirExpressionKind::Praefixum(inner) => {
             collect_expr_defs(inner, registry);
         }
@@ -556,6 +573,10 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
     fn collect_expr(expr: &radix_hir::HirExpression, registry: &mut FxHashSet<radix_hir::HirId>) {
         registry.insert(expr.id);
         match &expr.kind {
+            HirExpressionKind::Summa { source, body, .. } => {
+                collect_expr(source, registry);
+                collect_block(body, registry);
+            }
             HirExpressionKind::Binary(_, lhs, rhs) => {
                 collect_expr(lhs, registry);
                 collect_expr(rhs, registry);
@@ -1230,6 +1251,26 @@ pub(crate) fn validate_referential_integrity(
             check_type(ty)?;
         }
         match &expr.kind {
+            HirExpressionKind::Summa {
+                source,
+                coordinates,
+                filum,
+                binding,
+                body,
+            } => {
+                validate_expr(source, check_symbol, check_def, check_hir, check_type)?;
+                for (def_id, name) in coordinates {
+                    check_def(*def_id)?;
+                    check_symbol(*name)?;
+                }
+                if let Some((def_id, name)) = filum {
+                    check_def(*def_id)?;
+                    check_symbol(*name)?;
+                }
+                check_def(binding.0)?;
+                check_symbol(binding.1)?;
+                validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+            }
             HirExpressionKind::Path(def_id) => check_def(*def_id)?,
             HirExpressionKind::Literal(lit) => match lit {
                 radix_hir::HirLiteral::String(s)

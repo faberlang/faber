@@ -521,6 +521,17 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
                 visitor.visit_expr(expr);
             }
         }
+        ExprKind::Summa(summa) => {
+            visitor.visit_expr(&summa.source);
+            for coordinate in &summa.apud {
+                visitor.visit_ident(coordinate);
+            }
+            if let Some(filum) = &summa.filum {
+                visitor.visit_ident(filum);
+            }
+            visitor.visit_ident(&summa.binding);
+            visitor.visit_block(&summa.body);
+        }
         ExprKind::Vacua(_) | ExprKind::Literal(_) | ExprKind::Lege(_) | ExprKind::Ego(_) => {}
         ExprKind::OptionalChain(opt) => {
             visitor.visit_expr(&opt.object);

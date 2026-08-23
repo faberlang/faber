@@ -1758,6 +1758,9 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
         "invalid_lowered_expression" => {
             Some("invalid expression produced during lowering".to_owned())
         }
+        "summa_expression_unsupported" => Some(
+            "`summa ex` is admitted in HIR but not yet lowered; the reduction admission lands in SFR-3/SFR-4".to_owned(),
+        ),
         "invalid_numerus_width_marker" => Some("unknown width marker for numerus".to_owned()),
         "invalid_precision_marker" => {
             Some("instans accepts only ms, us, or ns as a precision marker".to_owned())

@@ -1,10 +1,10 @@
-//! SFR-1 (summa-filum-reduction) pins: `summa` contextual-disambiguation
-//! baseline. These lock TODAY's behavior — `summa ex …` parse-rejects and
-//! every non-head `summa` spelling stays an ordinary identifier/call — so
-//! SFR-2 can invert only the reject assertions into admits without touching
-//! the disambiguation pins.
+//! SFR-2 (summa-filum-reduction) parser pins: `summa ex` is a contextual
+//! expression head, while every non-head `summa` spelling stays an ordinary
+//! identifier or call. The source shape is admitted here; semantic admission
+//! and lowering remain follow-up units.
 
 use crate::test_support::{parse_ok, parse_program};
+use radix_syntax::{ExprKind, StmtKind};
 
 /// Kernel source from `examples/training/device-summa/src/device_summa.fab`,
 /// verbatim. Used as the live-file fallback in lane worktrees where the
@@ -34,18 +34,50 @@ fn exemplar_source(relative: &str, fallback: &str) -> String {
 }
 
 #[test]
-fn summa_ex_expression_parse_rejects_today() {
-    // SFR-1 pins the reject; SFR-2 inverts these two assertions into admits.
-    let sequential = "functio t(numerus[8] a) → numerus { summa ex a fixum s { s } }";
+fn summa_ex_expression_is_admitted_in_both_forms() {
+    let sequential = "functio t(numerus a) → numerus { summa ex a fixum s { s } }";
     let distributed =
-        "functio t(numerus[8] a) → numerus { summa ex a apud [i] filum f fixum s { s } }";
+        "functio t(numerus a) → numerus { summa ex a apud [i] filum f fixum s { s } }";
     for source in [sequential, distributed] {
-        let result = parse_program(source);
         assert!(
-            !result.success(),
-            "`summa ex …` must parse-reject before SFR-2: {source}"
+            parse_program(source).success(),
+            "`summa ex …` must parse in SFR-2: {source}"
         );
     }
+}
+
+#[test]
+fn summa_expr_preserves_apud_filum_and_term_body() {
+    let result = parse_program(
+        "functio t(numerus a) → numerus { summa ex a apud [i, j] filum f varia s { s } }",
+    );
+    assert!(
+        result.success(),
+        "unexpected parse errors: {:?}",
+        result.errors
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(function) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let body = function.body.as_ref().expect("function body");
+    let StmtKind::Expr(statement) = &body.statements[0].kind else {
+        panic!("expected expression statement");
+    };
+    let ExprKind::Summa(summa) = &statement.expr.kind else {
+        panic!("expected summa expression");
+    };
+    assert_eq!(summa.apud.len(), 2);
+    assert_eq!(
+        result.interner.resolve(summa.filum.as_ref().unwrap().name),
+        "f"
+    );
+    assert_eq!(result.interner.resolve(summa.binding.name), "s");
+    assert!(matches!(
+        summa.mutability,
+        radix_syntax::AstMutability::Mutable
+    ));
+    assert_eq!(summa.body.statements.len(), 1);
 }
 
 #[test]
