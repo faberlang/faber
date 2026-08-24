@@ -3612,10 +3612,10 @@ pub fn resolve_subchain_plan(
 }
 
 /// Matmul operand shapes `(M, K, N)` resolved from the `TensorMatMul`
-/// statement's rank-2 tensor operands — the same literal dims the ABI
-/// contract resolver reads (the contract stops at the tile grid; the recipe
-/// needs the exact dims for the K-tile loop count, the output guard, and the
-/// OOB tile tails). `None` when the function carries no matmul statement.
+/// statement's rank-2 left and rank-1/rank-2 right tensor operands — the same
+/// literal dims the ABI contract resolver reads. The plan also carries each
+/// operand's scalar layout so dense emitters can widen BF16 at load time.
+/// `None` when the function carries no matmul statement.
 fn kernel_matmul_shapes(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
@@ -3637,9 +3637,9 @@ fn kernel_matmul_shapes(
         .map_err(PlanMappingError::mapping)?;
     let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)
         .map_err(PlanMappingError::mapping)?;
-    if left_dims.len() != 2 || right_dims.len() != 2 {
+    if left_dims.len() != 2 || !(1..=2).contains(&right_dims.len()) {
         return Err(PlanMappingError::mapping(
-            "matmul requires rank-2 tensor operands",
+            "matmul requires a rank-2 left tensor and rank-1 or rank-2 right tensor",
         ));
     }
     if left_dims[1] != right_dims[0] {
@@ -3647,10 +3647,27 @@ fn kernel_matmul_shapes(
             "matmul inner dimensions must match",
         ));
     }
+    let left_layout = validation
+        .layouts
+        .layout_for_type(left_ty)
+        .map_err(|error| PlanMappingError::mapping(error.message))?;
+    let right_layout = validation
+        .layouts
+        .layout_for_type(right_ty)
+        .map_err(|error| PlanMappingError::mapping(error.message))?;
+    let (MirLayoutKind::DeviceView(left_view), MirLayoutKind::DeviceView(right_view)) =
+        (&left_layout.kind, &right_layout.kind)
+    else {
+        return Err(PlanMappingError::mapping(
+            "matmul operands require device-view layouts",
+        ));
+    };
     Ok(Some(MatMulShapes {
         m: left_dims[0],
         k: left_dims[1],
-        n: right_dims[1],
+        n: right_dims.get(1).copied().unwrap_or(1),
+        left_layout: left_view.element,
+        right_layout: right_view.element,
     }))
 }
 

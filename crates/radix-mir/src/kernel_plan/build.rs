@@ -17,7 +17,7 @@ use super::validate::{
 use crate::abi::{CollectionOpContract, MirKernelSignature};
 use crate::{
     MirCollectionOp, MirConstant, MirFunction, MirLocalId, MirOperand, MirParam, MirPlaceBase,
-    MirRuntimeCall, MirStatementKind, MirValidationContext, MirWorkgroupSize,
+    MirRuntimeCall, MirScalarLayout, MirStatementKind, MirValidationContext, MirWorkgroupSize,
 };
 use radix_types::Type;
 
@@ -153,6 +153,8 @@ impl CollectionKernelPlan {
                     m: shapes.m,
                     k: shapes.k,
                     n: shapes.n,
+                    left_layout: shapes.left_layout,
+                    right_layout: shapes.right_layout,
                     tile,
                     workgroup_x: signature.workgroup.x,
                     workgroup_y: signature.workgroup.y,
@@ -197,7 +199,13 @@ impl CollectionKernelPlan {
                 if op != MirCollectionOp::TensorQuantizedMatMul {
                     return None;
                 }
-                let shapes = MatMulShapes { m, k, n };
+                let shapes = MatMulShapes {
+                    m,
+                    k,
+                    n,
+                    left_layout: MirScalarLayout::F32,
+                    right_layout: MirScalarLayout::F32,
+                };
                 if !shapes_match_matmul_dispatch(shapes, dispatch_x, dispatch_y, MATMUL_TILE) {
                     return None;
                 }
@@ -221,7 +229,13 @@ impl CollectionKernelPlan {
                 if op != MirCollectionOp::TensorGroupedMatMul {
                     return None;
                 }
-                let shapes = MatMulShapes { m, k, n };
+                let shapes = MatMulShapes {
+                    m,
+                    k,
+                    n,
+                    left_layout: MirScalarLayout::F32,
+                    right_layout: MirScalarLayout::F32,
+                };
                 if !shapes_match_matmul_dispatch(shapes, dispatch_x, dispatch_y, MATMUL_TILE) {
                     return None;
                 }

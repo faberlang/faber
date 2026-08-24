@@ -572,17 +572,18 @@ pub fn collection_op_contract(
                         .map_err(MirAbiError::new)?;
                     let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)
                         .map_err(MirAbiError::new)?;
-                    if left_dims.len() != 2 || right_dims.len() != 2 {
+                    if left_dims.len() != 2 || !(1..=2).contains(&right_dims.len()) {
                         return Err(MirAbiError::new(
-                            "matmul dispatch contract requires rank-2 tensor operands",
+                            "matmul dispatch contract requires a rank-2 left tensor and rank-1 or rank-2 right tensor",
                         ));
                     }
                     if left_dims[1] != right_dims[0] {
                         return Err(MirAbiError::new("matmul inner dimensions must match"));
                     }
                     let tile: u64 = 8;
+                    let right_columns = right_dims.get(1).copied().unwrap_or(1);
                     return Ok(Some(CollectionOpContract::MatMul {
-                        dispatch_x: right_dims[1].div_ceil(tile),
+                        dispatch_x: right_columns.div_ceil(tile),
                         dispatch_y: left_dims[0].div_ceil(tile),
                     }));
                 }

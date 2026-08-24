@@ -1039,6 +1039,8 @@ fn matmul_maps_to_tiled_matmul() {
         m: 17,
         k: 12,
         n: 33,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
     };
     let signature = matmul_signature(shapes, 5, 3);
     let contract = CollectionOpContract::MatMul {
@@ -1117,6 +1119,8 @@ fn kernel_plan_for_function_derives_matmul_plan() {
         m: 17,
         k: 12,
         n: 33,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
     };
     let signature = matmul_signature(shapes, 5, 3);
     let validation = MirValidationContext::new(&types);
@@ -2102,6 +2106,8 @@ fn matmul_kernel_descriptor_reports_tiled_matmul_recipe() {
         m: 17,
         k: 12,
         n: 33,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
         tile,
         workgroup_x: tile,
         workgroup_y: tile,
@@ -3512,7 +3518,13 @@ fn quantized_matmul_function(types: &mut TypeTable) -> MirFunction {
 fn kernel_plan_for_function_derives_q4k_quantized_matmul_plan() {
     let mut types = TypeTable::new();
     let function = quantized_matmul_function(&mut types);
-    let shapes = MatMulShapes { m: 8, k: 16, n: 16 };
+    let shapes = MatMulShapes {
+        m: 8,
+        k: 16,
+        n: 16,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    };
     let signature = matmul_signature(shapes, 2, 1);
     let validation = MirValidationContext::new(&types);
     let derived = kernel_plan_for_function(&function, &signature, &validation)

@@ -161,18 +161,52 @@ pub(super) fn unify_tensor_shape_indices(
     })
 }
 
-/// Constrain `result_shape` to `[M, N]` for rank-2 matmul where `receiver` is
-/// `[M, K]` and `arg` is `[K, N]`. Enforces rank-2 on both operands and that
-/// the shared inner dimension `K` unifies. Rejects on mismatch.
-///
-/// Shared by the `matmul` intrinsic and the glyph `·` tensor arm so both
-/// surfaces accept or fail closed identically.
+/// Constrain the rank-2 `matmul` intrinsic result shape. The intrinsic keeps
+/// its existing rank-2 peer contract; the glyph's rank-1 promotion uses the
+/// explicitly separate [`constrain_glyph_matmul_result_shape`] wrapper below.
 pub(super) fn constrain_matmul_result_shape(
     checker: &mut TypeChecker<'_>,
     receiver_ty: TypeId,
     arg_ty: TypeId,
     result_shape: IndexId,
     span: Span,
+) {
+    constrain_matmul_result_shape_with_rank1(
+        checker,
+        receiver_ty,
+        arg_ty,
+        result_shape,
+        span,
+        false,
+    );
+}
+
+/// Constrain the glyph `·` result shape, admitting a rank-1 RHS `[K]` as the
+/// GEMV promotion of `[K, 1]` and demoting the observable result to `[M]`.
+pub(super) fn constrain_glyph_matmul_result_shape(
+    checker: &mut TypeChecker<'_>,
+    receiver_ty: TypeId,
+    arg_ty: TypeId,
+    result_shape: IndexId,
+    span: Span,
+) {
+    constrain_matmul_result_shape_with_rank1(
+        checker,
+        receiver_ty,
+        arg_ty,
+        result_shape,
+        span,
+        true,
+    );
+}
+
+fn constrain_matmul_result_shape_with_rank1(
+    checker: &mut TypeChecker<'_>,
+    receiver_ty: TypeId,
+    arg_ty: TypeId,
+    result_shape: IndexId,
+    span: Span,
+    allow_rank1_argument: bool,
 ) {
     let Some(receiver_shape) = tensor_shape_id(checker, receiver_ty) else {
         return;
@@ -211,29 +245,37 @@ pub(super) fn constrain_matmul_result_shape(
         );
         return;
     }
-    if arg_tuple.len() != 2 {
-        checker.error_issue(
-            SemanticErrorKind::TypeMismatch,
-            ISSUE_MATMUL_ARGUMENT_RANK_MUST_BE_TWO,
-            span,
-        );
-        return;
-    }
+    let (argument_k, result_rank1) = match arg_tuple.as_slice() {
+        [argument_k] if allow_rank1_argument => (*argument_k, true),
+        [argument_k, _] => (*argument_k, false),
+        _ => {
+            checker.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_MATMUL_ARGUMENT_RANK_MUST_BE_TWO,
+                span,
+            );
+            return;
+        }
+    };
     // WHY: enforce K (receiver cols) == K (argument rows) before publishing the
-    // `[M, N]` result shape. A failed inner-dimension check must not also let
-    // downstream constraints treat the contraction as valid.
-    if unify_tensor_shape_indices(checker, receiver_tuple[1], arg_tuple[0], span).is_err() {
+    // result shape. A failed inner-dimension check must not also let downstream
+    // constraints treat the contraction as valid.
+    if unify_tensor_shape_indices(checker, receiver_tuple[1], argument_k, span).is_err() {
         return;
     }
-    // WHY: result shape is [M, N] — receiver's first dim and argument's last dim.
-    // The dims are IndexIds; look up the resolved expressions to build a new tuple.
+    // WHY: the rank-1 argument is promoted to [K, 1] for the tiled recipe, but
+    // its observable GEMV result is demoted back to [M]. Rank-2 matmul retains
+    // the conventional [M, N] result shape.
     let m_expr = checker.types.get_index(receiver_tuple[0]).clone();
-    let n_expr = checker.types.get_index(arg_tuple[1]).clone();
     let m_id = checker.types.intern_index(m_expr);
-    let n_id = checker.types.intern_index(n_expr);
-    let result = checker
-        .types
-        .intern_index(IndexExpr::Tuple(vec![m_id, n_id]));
+    let result_dims = if result_rank1 {
+        vec![m_id]
+    } else {
+        let n_expr = checker.types.get_index(arg_tuple[1]).clone();
+        let n_id = checker.types.intern_index(n_expr);
+        vec![m_id, n_id]
+    };
+    let result = checker.types.intern_index(IndexExpr::Tuple(result_dims));
     checker.constrain_index_equal(result_shape, result, span);
 }
 

@@ -69,15 +69,15 @@ use radix_mir::kernel_plan::{
     SsmConv1dPlan, SsmScanPlan, TransposePlan,
 };
 use radix_mir::layout::MirTensorStorageLayout;
-use radix_mir::{MirFunctionId, MirType};
+use radix_mir::{MirFunctionId, MirScalarLayout, MirType};
 use radix_types::TypeId;
 
 use super::wire::{
     WireBarrierPhase, WireBarrierPoint, WireBatchedAttentionKind, WireBufferIdentity,
     WireBufferLifetime, WireBufferRole, WireBufferVersion, WireCollectionKernelPlan,
-    WireDeviceProgram, WireKernelUnit, WireOobPaddingPolicy, WirePackedStorageLayout,
-    WireProgramLifetime, WireReduceOp, WireResourceAccess, WireResultBuffer,
-    WireSharedMemoryLayout, WireStorageLayout,
+    WireDeviceProgram, WireKernelUnit, WireMatMulLayout, WireOobPaddingPolicy,
+    WirePackedStorageLayout, WireProgramLifetime, WireReduceOp, WireResourceAccess,
+    WireResultBuffer, WireSharedMemoryLayout, WireStorageLayout,
 };
 use crate::error::FmirImageError;
 
@@ -517,6 +517,13 @@ fn wire_oob_padding(padding: WireOobPaddingPolicy) -> OobPaddingPolicy {
     }
 }
 
+fn wire_matmul_layout(layout: WireMatMulLayout) -> MirScalarLayout {
+    match layout {
+        WireMatMulLayout::F32 => MirScalarLayout::F32,
+        WireMatMulLayout::Bf16 => MirScalarLayout::Bf16,
+    }
+}
+
 fn wire_reduce_op(op: WireReduceOp) -> ReduceOp {
     match op {
         WireReduceOp::Sum => ReduceOp::Sum,
@@ -539,6 +546,8 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
                 m: plan.m,
                 k: plan.k,
                 n: plan.n,
+                left_layout: wire_matmul_layout(plan.left_layout),
+                right_layout: wire_matmul_layout(plan.right_layout),
                 tile: plan.tile,
                 workgroup_x: plan.workgroup_x,
                 workgroup_y: plan.workgroup_y,

@@ -36,13 +36,14 @@ pub use schema::{
     WireBufferVersion, WireCollectionKernelPlan, WireDependencyEdge, WireDeviceProgram,
     WireDeviceResource, WireDispatchSize, WireExecutorPlan, WireInitializationPolicy,
     WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit, WireLibraryBind, WireLogicalSignature,
-    WireMatMulPlan, WireMatMulSharedMemory, WireObservationCadence, WireObservationFact,
-    WireOffsetBinding, WireOobPaddingPolicy, WirePlanProvenance, WireProgramLifetime, WireReduceOp,
-    WireReductionPlan, WireResourceAccess, WireResultBuffer, WireSemanticValue,
-    WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout, WireTransposePlan,
-    WireUniformBinding, WireWorkgroupCount, WireWorkgroupSize, WireWorkspaceBinding,
-    ARTIFACT_ABI_VERSION, ARTIFACT_REFLECTION_VERSION, EXECUTOR_PLAN_SECTION_VERSION,
-    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
+    WireMatMulLayout, WireMatMulPlan, WireMatMulSharedMemory, WireObservationCadence,
+    WireObservationFact, WireOffsetBinding, WireOobPaddingPolicy, WirePlanProvenance,
+    WireProgramLifetime, WireReduceOp, WireReductionPlan, WireResourceAccess, WireResultBuffer,
+    WireSemanticValue, WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout,
+    WireTransposePlan, WireUniformBinding, WireWorkgroupCount, WireWorkgroupSize,
+    WireWorkspaceBinding, ARTIFACT_ABI_VERSION, ARTIFACT_REFLECTION_VERSION,
+    EXECUTOR_PLAN_SECTION_VERSION, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
+    PACKAGE_MIR_ARTIFACT_VERSION,
 };
 
 #[cfg(test)]

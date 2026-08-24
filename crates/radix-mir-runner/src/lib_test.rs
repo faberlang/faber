@@ -4103,6 +4103,22 @@ fn tensor_matmul_float_2x3_by_3x4() {
 }
 
 #[test]
+fn tensor_matmul_float_2x3_by_rank1_vector() {
+    let left = dense_float_tensor(2, 3, |i, j| (i * 3 + j + 1) as f64);
+    let right = tensor_value(
+        vec![Value::Float(1.0), Value::Float(2.0), Value::Float(3.0)],
+        vec![3],
+    );
+    let result = eval_tensor_matmul(left, right).expect("rank-1 RHS GEMV");
+    let Value::Tensor(cell) = result else {
+        panic!("expected tensor");
+    };
+    let out = cell.borrow();
+    assert_eq!(out.shape, vec![2]);
+    assert_numeric_close(&out.data, &[14.0, 32.0], 1e-9);
+}
+
+#[test]
 fn tensor_matmul_int_2x2() {
     let left = tensor_value(
         vec![Value::Int(1), Value::Int(2), Value::Int(3), Value::Int(4)],

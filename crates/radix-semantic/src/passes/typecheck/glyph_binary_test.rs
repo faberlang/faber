@@ -324,12 +324,51 @@ fn glyph_dot_whole_shape_tensor_rejects() {
 }
 
 #[test]
+fn glyph_dot_tensor_rank1_rhs_returns_rank1_tensor() {
+    accepts(
+        r"functio apply(tensor<f32, [2, 3]> weights, tensor<f32, [3]> input) → tensor<f32, [2]> {
+    redde weights · input
+}",
+    );
+}
+
+#[test]
+fn glyph_dot_tensor_rank1_rhs_inner_dim_mismatch_rejects() {
+    rejects_with_contract_issue(
+        r"functio apply(tensor<f32, [2, 3]> weights, tensor<f32, [4]> input) → tensor<f32, [2]> {
+    redde weights · input
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
 fn glyph_dot_rank1_tensor_rejects() {
     rejects_with_contract_issue(
         r"functio dot(tensor<f32, [3]> a, tensor<f32, [3]> b) → f32 {
     redde a · b
 }",
         "matmul_receiver_rank_must_be_two",
+    );
+}
+
+#[test]
+fn glyph_dot_tensor_bf16_f32_returns_f32() {
+    accepts(
+        r"functio apply(tensor<bf16, [2, 3]> weights, tensor<f32, [3]> input) → tensor<f32, [2]> {
+    redde weights · input
+}",
+    );
+}
+
+#[test]
+fn glyph_dot_tensor_f32_bf16_stays_fail_closed() {
+    rejects_with_issue(
+        r"functio apply(tensor<f32, [2, 3]> weights, tensor<bf16, [3]> input) → tensor<f32, [2]> {
+    redde weights · input
+}",
+        "glyph_element_type_mismatch",
+        "·",
     );
 }
 

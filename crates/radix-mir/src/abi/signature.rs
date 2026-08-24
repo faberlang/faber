@@ -1,7 +1,7 @@
 use crate::{
     MirAggregateFields, MirAggregateItem, MirAggregateKind, MirFunction, MirLayoutKind, MirLocalId,
-    MirOperand, MirParam, MirPlace, MirPlaceBase, MirStatementKind, MirTerminatorKind, MirType,
-    MirValidationContext,
+    MirOperand, MirParam, MirPlace, MirPlaceBase, MirScalarLayout, MirStatementKind,
+    MirTerminatorKind, MirType, MirValidationContext,
 };
 use radix_lexer::Interner;
 use radix_types::{NumericWidth, Primitive, Type, TypeId};
@@ -28,6 +28,34 @@ struct IndexedViewKernelContext<'a> {
     builtin_inputs: Vec<MirKernelBuiltinInput>,
     interner: Option<&'a Interner>,
     allow_host_owned_tensor_entry: bool,
+}
+
+/// The dense matmul glyph admits BF16 weights only in the first input slot;
+/// the result and all F32 peers retain their ordinary strict element rule.
+fn require_indexed_element_compatibility(
+    function: &MirFunction,
+    input_element_ty: MirType,
+    output_element_ty: MirType,
+    validation: &MirValidationContext<'_>,
+    allow_bf16_left: bool,
+) -> Result<(), MirAbiError> {
+    let is_bf16_left = allow_bf16_left
+        && kernel_has_collection_op(function, |op| {
+            matches!(op, crate::MirCollectionOp::TensorMatMul)
+        })
+        && matches!(
+            validation.layouts.layout_for_type(input_element_ty),
+            Ok(layout) if matches!(layout.kind, MirLayoutKind::Scalar(MirScalarLayout::Bf16))
+        )
+        && matches!(
+            validation.layouts.layout_for_type(output_element_ty),
+            Ok(layout) if matches!(layout.kind, MirLayoutKind::Scalar(MirScalarLayout::F32))
+        );
+    if is_bf16_left {
+        Ok(())
+    } else {
+        require_same_element_type(input_element_ty, output_element_ty, validation)
+    }
 }
 
 /// Well-known resource name for the runtime-extent count channel.
@@ -849,7 +877,13 @@ impl MirKernelSignature {
             device_view_element_type(input.ty, validation, context.allow_host_owned_tensor_entry)?;
         let output_element_ty =
             device_view_element_type(output.ty, validation, context.allow_host_owned_tensor_entry)?;
-        require_same_element_type(input_element_ty, output_element_ty, validation)?;
+        require_indexed_element_compatibility(
+            function,
+            input_element_ty,
+            output_element_ty,
+            validation,
+            true,
+        )?;
         let input_element_count = device_view_element_count(input.ty, validation)?;
         let output_element_count = device_view_element_count(output.ty, validation)?;
 
@@ -918,7 +952,13 @@ impl MirKernelSignature {
                 validation,
                 context.allow_host_owned_tensor_entry,
             )?;
-            require_same_element_type(input_element_ty, output_element_ty, validation)?;
+            require_indexed_element_compatibility(
+                function,
+                input_element_ty,
+                output_element_ty,
+                validation,
+                binding == 0,
+            )?;
             let input_element_count = device_view_element_count(input.ty, validation)?;
             input_resources.push(MirKernelResource {
                 group: DEFAULT_KERNEL_RESOURCE_GROUP,
