@@ -4,6 +4,7 @@ mod emit;
 
 use clap::{Parser, Subcommand, ValueEnum};
 pub use emit::{EmitArgs, FaberCliTarget};
+#[cfg(feature = "runner")]
 use radix::program::mir::DeviceSelection;
 use std::path::PathBuf;
 
@@ -550,6 +551,7 @@ pub enum BackendSelection {
 impl BackendSelection {
     /// Convert to the shared route-selection request.
     #[must_use]
+    #[cfg(feature = "runner")]
     pub fn selection(self) -> DeviceSelection {
         match self {
             Self::Auto => DeviceSelection::Auto,

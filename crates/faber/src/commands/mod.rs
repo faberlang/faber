@@ -37,6 +37,7 @@ pub mod host;
 pub(crate) mod init;
 mod model;
 mod output_transfer_codemod;
+#[cfg(feature = "runner")]
 mod run;
 pub(crate) mod self_update;
 #[cfg(test)]
@@ -62,6 +63,7 @@ use host::cmd_host;
 use init::cmd_init;
 use model::cmd_model;
 use output_transfer_codemod::cmd_output_transfer_codemod;
+#[cfg(feature = "runner")]
 use run::{cmd_eval, cmd_fmir_run_image, cmd_repl, cmd_run};
 use self_update::cmd_self;
 use targets::cmd_targets;
@@ -70,6 +72,12 @@ use test::cmd_test;
 
 pub(crate) const PACKAGE_CHECK_MESSAGE: &str =
     "error: package checking is owned by the `faber` tool; rerun with `faber check --package`";
+
+#[cfg(not(feature = "runner"))]
+fn exit_runner_feature_unavailable(command: &str) -> ! {
+    eprintln!("error: {command} requires the runner feature; rebuild with feature `runner`");
+    std::process::exit(1);
+}
 
 /// `faber check --air --json` machine rows (schema version 1).
 ///
@@ -185,7 +193,14 @@ pub(super) fn eprint_io_error(path: &std::path::Path, err: &std::io::Error) -> !
 pub fn run() {
     let cli = crate::cli::Cli::parse();
     if let Some(source) = cli.eval_source {
+        #[cfg(feature = "runner")]
         cmd_eval(&source, cli.eval_args);
+        #[cfg(not(feature = "runner"))]
+        {
+            let _ = source;
+            let _ = cli.eval_args;
+            exit_runner_feature_unavailable("-c/--command");
+        }
         return;
     }
     let Some(command) = cli.command else {
@@ -315,9 +330,18 @@ fn dispatch(command: Command) {
         Command::VerifyLibrary(args) => cmd_verify_library(args),
         Command::Init(args) => cmd_init(args),
         Command::Explain(args) => cmd_explain(args),
+        #[cfg(feature = "runner")]
         Command::Run(args) => cmd_run(args),
+        #[cfg(not(feature = "runner"))]
+        Command::Run(_) => exit_runner_feature_unavailable("run"),
+        #[cfg(feature = "runner")]
         Command::FmirRun(args) => cmd_fmir_run_image(args),
+        #[cfg(not(feature = "runner"))]
+        Command::FmirRun(_) => exit_runner_feature_unavailable("__fmir-run"),
+        #[cfg(feature = "runner")]
         Command::Repl(args) => cmd_repl(args),
+        #[cfg(not(feature = "runner"))]
+        Command::Repl(_) => exit_runner_feature_unavailable("repl"),
         #[cfg(feature = "runner")]
         Command::Test(args) => cmd_test(&args),
         #[cfg(not(feature = "runner"))]
@@ -328,7 +352,10 @@ fn dispatch(command: Command) {
         Command::Lex(args) => cmd_inspect_lex(&args.input),
         Command::Parse(args) => cmd_inspect_parse(&args.input),
         Command::Hir(args) => cmd_inspect_hir(&args.input, args.load),
+        #[cfg(feature = "runner")]
         Command::Mir(args) => cmd_inspect_mir(&args.input),
+        #[cfg(not(feature = "runner"))]
+        Command::Mir(_) => exit_runner_feature_unavailable("mir"),
         Command::CliIr(args) => cmd_inspect_cli_ir(&args.input),
         Command::Emit(args) => {
             let emit_command = EmitCommand {
@@ -482,6 +509,7 @@ fn cmd_inspect_hir(input: &[String], load: Option<std::path::PathBuf>) {
     print_inspection(radix::services::hir_inspection_for_source(&name, &source));
 }
 
+#[cfg(feature = "runner")]
 fn cmd_inspect_mir(input: &[String]) {
     let (name, source) = read_source(input);
     match radix::services::mir_output_for_source(&name, &source) {

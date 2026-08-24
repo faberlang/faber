@@ -1,3 +1,5 @@
+#![cfg(feature = "runner")]
+
 //! `faber run` — interpreted execution, always.
 //!
 //! `faber run <path>` interprets a single `.fab` file, package directory,

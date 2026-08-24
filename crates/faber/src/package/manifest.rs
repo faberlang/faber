@@ -23,6 +23,7 @@ use radix::program::manifest::{
     manifest_build_target, ManifestBuild, ManifestLibrary, ManifestPackage, ManifestPaths,
     ManifestReader, ManifestTarget,
 };
+#[cfg(feature = "runner")]
 use radix::program::mir::DeviceSelection;
 
 #[derive(Debug, Deserialize)]
@@ -212,6 +213,7 @@ pub(crate) fn manifest_build_target_for_input(
 /// (N1.1). `None` when the key is absent — the caller applies the portable
 /// default `auto`. An unsupported spelling fails closed with a structured
 /// diagnostic (never silently ignored).
+#[cfg(feature = "runner")]
 pub(crate) fn manifest_backend_selection(
     backend: Option<&str>,
     path: &Path,
@@ -396,6 +398,7 @@ pub(crate) fn validate_manifest(
     // N1.1: the `[device] backend` selection default is validated at package
     // load so an unsupported spelling fails closed early, never silently
     // ignored.
+    #[cfg(feature = "runner")]
     manifest_backend_selection(manifest.device.backend.as_deref(), path)?;
 
     // S5-U5b: the `[device] steps` declared training step count is validated

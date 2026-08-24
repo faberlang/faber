@@ -1,3 +1,5 @@
+#![cfg(feature = "runner")]
+
 //! Exit/abort traps so interpreted Faber can return an [`ExitCode`] without
 //! terminating the embedder process.
 

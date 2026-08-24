@@ -4,23 +4,32 @@
 //! through `radix::module::mir`. Custom hosts implement [`Host`] for diagnostics,
 //! stdin, argv, and capability expansion.
 
+#[cfg(feature = "runner")]
 mod trap;
 
+#[cfg(feature = "runner")]
 use radix::module::codegen::Target;
+#[cfg(feature = "runner")]
 use radix::module::driver::Session;
+#[cfg(feature = "runner")]
 use radix::module::mir::run_source as radix_run_source;
+#[cfg(feature = "runner")]
 use std::panic::AssertUnwindSafe;
+#[cfg(feature = "runner")]
 use std::process::ExitCode;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "runner"))]
 pub use radix::module::mir::BufferHost;
+#[cfg(feature = "runner")]
 pub use radix::module::mir::{Host, RunSourceError, StdioHost};
+#[cfg(feature = "runner")]
 pub use trap::raw_exit_code;
 
 /// Default diagnostic identity for [`run_source`].
 ///
 /// Used by unit tests and as the default name when callers omit a path identity.
 #[cfg_attr(not(test), allow(dead_code))]
+#[cfg(feature = "runner")]
 pub const EMBED_SOURCE_NAME: &str = "<source>";
 
 /// Analyze, lower, and interpret Faber source; return a process-style exit code.
@@ -33,11 +42,13 @@ pub const EMBED_SOURCE_NAME: &str = "<source>";
 /// Frontend, MIR, and runner failures return [`RunSourceError`] without running
 /// `exit` on the embedder process.
 #[cfg_attr(not(test), allow(dead_code))]
+#[cfg(feature = "runner")]
 pub fn run_source(source: &str, host: &mut dyn Host) -> Result<ExitCode, RunSourceError> {
     run_named(EMBED_SOURCE_NAME, source, host)
 }
 
 /// Like [`run_source`], but uses `name` as the unit identity in diagnostics.
+#[cfg(feature = "runner")]
 pub fn run_named(
     name: &str,
     source: &str,
@@ -51,6 +62,7 @@ pub fn run_named(
 }
 
 /// Interpret source with a caller-owned [`Session`] (target and policy reuse).
+#[cfg(feature = "runner")]
 pub fn run_with_session(
     session: &Session,
     name: &str,
@@ -77,6 +89,7 @@ pub fn run_with_session(
 }
 
 /// Print [`RunSourceError`] diagnostics to stderr.
+#[cfg(feature = "runner")]
 pub fn print_run_source_error(error: &RunSourceError) {
     match error {
         RunSourceError::Frontend(diagnostics) => {
@@ -102,6 +115,7 @@ pub fn print_run_source_error(error: &RunSourceError) {
 }
 
 /// Analyze, lower, and interpret Faber source on the runner.
+#[cfg(feature = "runner")]
 pub fn interpret_source<H: Host>(
     name: &str,
     source: &str,
@@ -111,6 +125,7 @@ pub fn interpret_source<H: Host>(
 }
 
 /// Run source via the runner, printing errors and exiting the process on failure.
+#[cfg(feature = "runner")]
 pub fn interpret_source_or_exit(name: &str, source: &str, host: &mut StdioHost) {
     match run_named(name, source, host) {
         Ok(status) => {

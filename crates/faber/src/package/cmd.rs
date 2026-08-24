@@ -47,6 +47,14 @@ fn exit_target_feature_unavailable(target_name: &str, feature: &str) -> ! {
     std::process::exit(1);
 }
 
+#[cfg(not(feature = "runner"))]
+fn exit_runner_feature_unavailable() -> ! {
+    eprintln!(
+        "error: MIR package commands are not available in this faber build; rebuild with feature `runner`"
+    );
+    std::process::exit(1);
+}
+
 /// Report a diagnostic's message and terminate.
 fn fail_with_diagnostic(diag: &radix::module::Diagnostic) -> ! {
     let has_path_context = ["path", "base", "artifact"]
@@ -130,76 +138,96 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
     };
 
     if is_package && target == Target::MirScena {
-        let artifact = match radix::program::mir::build_package_mir_artifact(
-            &config,
-            &input_path,
-            &[],
-            &super::mir::faber_mir_seams(),
-        ) {
-            Ok(artifact) => artifact,
-            Err(diagnostics) => report_diagnostics_and_exit(
-                &diagnostics,
-                locale_pack.as_ref(),
-                "scena artifact build failed",
-            ),
-        };
-        println!("{}", artifact.manifest_path.display());
-        return;
+        #[cfg(not(feature = "runner"))]
+        exit_runner_feature_unavailable();
+        #[cfg(feature = "runner")]
+        {
+            let artifact = match radix::program::mir::build_package_mir_artifact(
+                &config,
+                &input_path,
+                &[],
+                &super::mir::faber_mir_seams(),
+            ) {
+                Ok(artifact) => artifact,
+                Err(diagnostics) => report_diagnostics_and_exit(
+                    &diagnostics,
+                    locale_pack.as_ref(),
+                    "scena artifact build failed",
+                ),
+            };
+            println!("{}", artifact.manifest_path.display());
+            return;
+        }
     }
 
     if is_package && target == Target::MirFmir {
-        let image = match radix::program::mir::build_package_fmir_text_image(
-            &config,
-            &input_path,
-            &[],
-            &super::mir::faber_mir_seams(),
-        ) {
-            Ok(image) => image,
-            Err(diagnostics) => report_diagnostics_and_exit(
-                &diagnostics,
-                locale_pack.as_ref(),
-                "fmir-text image build failed",
-            ),
-        };
-        println!("{}", image.image_path.display());
-        return;
+        #[cfg(not(feature = "runner"))]
+        exit_runner_feature_unavailable();
+        #[cfg(feature = "runner")]
+        {
+            let image = match radix::program::mir::build_package_fmir_text_image(
+                &config,
+                &input_path,
+                &[],
+                &super::mir::faber_mir_seams(),
+            ) {
+                Ok(image) => image,
+                Err(diagnostics) => report_diagnostics_and_exit(
+                    &diagnostics,
+                    locale_pack.as_ref(),
+                    "fmir-text image build failed",
+                ),
+            };
+            println!("{}", image.image_path.display());
+            return;
+        }
     }
 
     if is_package && target == Target::MirFmirBinary {
-        let image = match radix::program::mir::build_package_fmir_image(
-            &config,
-            &input_path,
-            &[],
-            &super::mir::faber_mir_seams(),
-        ) {
-            Ok(image) => image,
-            Err(diagnostics) => report_diagnostics_and_exit(
-                &diagnostics,
-                locale_pack.as_ref(),
-                "fmir image build failed",
-            ),
-        };
-        println!("{}", image.image_path.display());
-        return;
+        #[cfg(not(feature = "runner"))]
+        exit_runner_feature_unavailable();
+        #[cfg(feature = "runner")]
+        {
+            let image = match radix::program::mir::build_package_fmir_image(
+                &config,
+                &input_path,
+                &[],
+                &super::mir::faber_mir_seams(),
+            ) {
+                Ok(image) => image,
+                Err(diagnostics) => report_diagnostics_and_exit(
+                    &diagnostics,
+                    locale_pack.as_ref(),
+                    "fmir image build failed",
+                ),
+            };
+            println!("{}", image.image_path.display());
+            return;
+        }
     }
 
     if is_package && target == Target::MirFmirBundle {
-        let bundle = match radix::program::mir::build_package_fmir_binary_bundle(
-            &config,
-            &input_path,
-            &[],
-            command.release,
-            &super::mir::faber_mir_seams(),
-        ) {
-            Ok(bundle) => bundle,
-            Err(diagnostics) => report_diagnostics_and_exit(
-                &diagnostics,
-                locale_pack.as_ref(),
-                "fmir-bin bundle build failed",
-            ),
-        };
-        println!("{}", bundle.entrypoint_path.display());
-        return;
+        #[cfg(not(feature = "runner"))]
+        exit_runner_feature_unavailable();
+        #[cfg(feature = "runner")]
+        {
+            let bundle = match radix::program::mir::build_package_fmir_binary_bundle(
+                &config,
+                &input_path,
+                &[],
+                command.release,
+                &super::mir::faber_mir_seams(),
+            ) {
+                Ok(bundle) => bundle,
+                Err(diagnostics) => report_diagnostics_and_exit(
+                    &diagnostics,
+                    locale_pack.as_ref(),
+                    "fmir-bin bundle build failed",
+                ),
+            };
+            println!("{}", bundle.entrypoint_path.display());
+            return;
+        }
     }
 
     if is_package && target == Target::HirFhir {
@@ -815,23 +843,28 @@ pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, lin
     };
 
     if command.reflection {
-        let reflection_json = match radix::services::output_reflection_json(&output) {
-            Ok(Some(json)) => json,
-            Ok(None) => {
-                eprintln!("error: target does not expose GPU reflection metadata");
-                std::process::exit(1);
+        #[cfg(not(feature = "runner"))]
+        exit_runner_feature_unavailable();
+        #[cfg(feature = "runner")]
+        {
+            let reflection_json = match radix::services::output_reflection_json(&output) {
+                Ok(Some(json)) => json,
+                Ok(None) => {
+                    eprintln!("error: target does not expose GPU reflection metadata");
+                    std::process::exit(1);
+                }
+                Err(err) => {
+                    eprintln!("error: failed to serialize GPU reflection metadata: {err}");
+                    std::process::exit(1);
+                }
+            };
+            if let Some(path) = command.output {
+                crate::postprocess::write_text_artifact(&path, &reflection_json);
+            } else {
+                println!("{}", reflection_json);
             }
-            Err(err) => {
-                eprintln!("error: failed to serialize GPU reflection metadata: {err}");
-                std::process::exit(1);
-            }
-        };
-        if let Some(path) = command.output {
-            crate::postprocess::write_text_artifact(&path, &reflection_json);
-        } else {
-            println!("{}", reflection_json);
+            return;
         }
-        return;
     }
 
     if let Some(path) = command.output {

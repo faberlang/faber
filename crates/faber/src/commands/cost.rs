@@ -121,6 +121,7 @@ pub(crate) struct CostSpanJson {
     pub end: u32,
 }
 
+#[cfg(feature = "runner")]
 pub(super) fn cmd_cost(args: CostArgs) {
     if args.input.is_empty() || args.input[0] == "-" {
         eprintln!("error: package cost requires a path input");
@@ -160,7 +161,13 @@ pub(super) fn cmd_cost(args: CostArgs) {
     }
 }
 
+#[cfg(not(feature = "runner"))]
+pub(super) fn cmd_cost(_args: CostArgs) {
+    super::exit_runner_feature_unavailable("cost");
+}
+
 /// Compile a package to validated MIR and build the cost report.
+#[cfg(feature = "runner")]
 pub(crate) fn cost_report_for_input(
     input: &Path,
     locale: Option<&str>,

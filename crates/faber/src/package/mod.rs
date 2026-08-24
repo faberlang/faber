@@ -118,17 +118,20 @@ pub use llvm_host::{
     ensure_llvm_runtime_archive, host_llvm_target_triple, host_triple_for, LlvmHostBuild,
     LlvmHostProfile,
 };
+#[cfg(feature = "runner")]
+#[allow(unused_imports)]
+pub(crate) use manifest::manifest_backend_selection;
 pub(crate) use manifest::validate_manifest;
 #[allow(unused_imports)]
-pub(crate) use manifest::{
-    manifest_backend_selection, manifest_build_target_for_input, manifest_device_inputs,
-};
+pub(crate) use manifest::{manifest_build_target_for_input, manifest_device_inputs};
 pub use manifest::{
     read_manifest, FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
     ManifestProductShaders,
 };
+#[cfg(feature = "runner")]
 #[allow(unused_imports)]
 pub use mir::run_fmir_image_bytes_with_stdio;
+#[cfg(feature = "runner")]
 #[allow(unused_imports)]
 pub use mir::with_lowered_package_mir;
 pub(crate) use product::build_browser_product_with_postprocess;

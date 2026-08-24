@@ -17,27 +17,36 @@
 //!   not compiler compatibility modules.
 #![allow(dead_code)] // Binary and library targets exercise different package runner surfaces.
 
+#[cfg(feature = "runner")]
 pub(crate) mod bin_runner;
+#[cfg(feature = "runner")]
 mod manifest;
 
 #[cfg(test)]
 #[path = "mir_test.rs"]
 mod tests;
 
+#[cfg(feature = "runner")]
 use radix::module::diagnostics::Diagnostic;
+#[cfg(feature = "runner")]
 use radix::module::driver::Config;
+#[cfg(feature = "runner")]
 use std::fs;
+#[cfg(feature = "runner")]
 use std::path::Path;
 
+#[cfg(feature = "runner")]
 use radix::program::mir::{mir_diag, DeviceSelection};
 
 // Faber's fmir-bin runner writer is the seam body radix-program's binary
 // bundle builder receives (`MirSeams::bin_runner_writer`).
+#[cfg(feature = "runner")]
 use bin_runner::write_fmir_bin_runner;
 
 /// The faber-supplied package-MIR seams (RP5). Every faber product input the
 /// moved compiler subset needs enters as an explicit function — no ambient
 /// reads inside `radix-program`.
+#[cfg(feature = "runner")]
 pub(crate) fn faber_mir_seams() -> radix::program::mir::MirSeams {
     radix::program::mir::MirSeams {
         analysis: super::faber_analysis_seams(),
@@ -56,6 +65,7 @@ pub(crate) fn faber_mir_seams() -> radix::program::mir::MirSeams {
 /// (ownership-freeze §5.1): faber's `device/` subtree builds the device
 /// payload. `Ok(None)` when the package declares no `[device]` surface or
 /// when this build compiles no `device-runtime`.
+#[cfg(feature = "runner")]
 fn device_section_builder(
     prepared: &radix::program::mir::PreparedPackageMir<'_>,
     lowered: &radix::module::mir::LoweredMirUnit<'_>,
@@ -205,6 +215,7 @@ fn device_section_builder(
 /// loaded image runs on the CPU/FMIR runner or a device route, and execute
 /// the device route when selected. `Ok(None)` runs the CPU route with the
 /// caller's host; `Ok(Some(()))` means the device route already executed.
+#[cfg(feature = "runner")]
 fn host_route(
     image: &radix::program::mir::FmirPackageImage,
     selection: DeviceSelection,
@@ -241,6 +252,7 @@ fn host_route(
 
 /// Public package-MIR callback for external backend harnesses: forward to the
 /// moved compiler driver with the faber seams.
+#[cfg(feature = "runner")]
 pub fn with_lowered_package_mir<R>(
     config: &Config,
     input: &Path,
@@ -287,6 +299,7 @@ pub(crate) fn with_linked_test_package_mir<R>(
 
 /// Generated fmir-bin runner crates consume this public API (the stdio
 /// entry). Forward to the moved route with the faber seams.
+#[cfg(feature = "runner")]
 pub fn run_fmir_image_bytes_with_stdio(
     image_bytes: &[u8],
     diagnostic_path: &Path,
@@ -307,6 +320,7 @@ pub(crate) const FMIR_BIN_RUNNER_CRATE_DIR: &str = "runner";
 pub(crate) const FMIR_BIN_RUNNER_PACKAGE_NAME: &str = "faber-fmir-bin-runner";
 
 /// Diagnostic constructors used by the faber seam bodies.
+#[cfg(feature = "runner")]
 pub(crate) fn mir_issue_diag(
     path: &Path,
     issue: &'static str,

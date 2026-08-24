@@ -75,23 +75,28 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
     };
 
     if command.reflection {
-        let reflection_json = match radix::services::output_reflection_json(&output) {
-            Ok(Some(json)) => json,
-            Ok(None) => {
-                eprintln!("error: target does not expose GPU reflection metadata");
-                std::process::exit(1);
+        #[cfg(not(feature = "runner"))]
+        super::exit_runner_feature_unavailable("emit --reflection");
+        #[cfg(feature = "runner")]
+        {
+            let reflection_json = match radix::services::output_reflection_json(&output) {
+                Ok(Some(json)) => json,
+                Ok(None) => {
+                    eprintln!("error: target does not expose GPU reflection metadata");
+                    std::process::exit(1);
+                }
+                Err(err) => {
+                    eprintln!("error: failed to serialize GPU reflection metadata: {err}");
+                    std::process::exit(1);
+                }
+            };
+            if let Some(path) = command.output {
+                crate::postprocess::write_text_artifact(&path, &reflection_json);
+            } else {
+                println!("{reflection_json}");
             }
-            Err(err) => {
-                eprintln!("error: failed to serialize GPU reflection metadata: {err}");
-                std::process::exit(1);
-            }
-        };
-        if let Some(path) = command.output {
-            crate::postprocess::write_text_artifact(&path, &reflection_json);
-        } else {
-            println!("{reflection_json}");
+            return;
         }
-        return;
     }
 
     if let Some(path) = command.output {
