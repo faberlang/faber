@@ -486,6 +486,24 @@ impl PackageInstantiate<'_> {
             .collect()
     }
 
+    /// Concrete shape bindings for one monomorphization key: shape params in
+    /// declaration order paired with the key's shape args.
+    fn shape_bindings_from_key(&self, key: &MirMonomorphizationKey) -> MirShapeBindings {
+        let mut shape_bindings = MirShapeBindings::default();
+        let Some(params) = self.generic_params.get(&key.source) else {
+            return shape_bindings;
+        };
+        let mut shape_args = key.shape_args.iter();
+        for param in params {
+            if param.is_shape {
+                if let Some(concrete) = shape_args.next().copied() {
+                    shape_bindings.insert(param.name, concrete);
+                }
+            }
+        }
+        shape_bindings
+    }
+
     fn ensure_instance(
         &mut self,
         template: &MirFunction,
@@ -510,17 +528,7 @@ impl PackageInstantiate<'_> {
         if !self.substitute_function(&mut instance, type_bindings, span) {
             return None;
         }
-        let mut shape_bindings = MirShapeBindings::default();
-        if let Some(params) = self.generic_params.get(&key.source) {
-            let mut shape_args = key.shape_args.iter();
-            for param in params {
-                if param.is_shape {
-                    if let Some(concrete) = shape_args.next().copied() {
-                        shape_bindings.insert(param.name, concrete);
-                    }
-                }
-            }
-        }
+        let shape_bindings = self.shape_bindings_from_key(key);
         if !finalize_function(self.types, &mut instance, type_bindings, &shape_bindings, &mut self.errors) {
             return None;
         }
@@ -697,18 +705,7 @@ impl PackageInstantiate<'_> {
             .map(|monomorphization| (monomorphization.function, monomorphization.key.clone()))
             .collect();
         for (function_id, key) in to_finalize {
-            let Some(params) = self.generic_params.get(&key.source).cloned() else {
-                continue;
-            };
-            let mut shape_bindings = MirShapeBindings::default();
-            let mut shape_args = key.shape_args.iter();
-            for param in &params {
-                if param.is_shape {
-                    if let Some(concrete) = shape_args.next().copied() {
-                        shape_bindings.insert(param.name, concrete);
-                    }
-                }
-            }
+            let shape_bindings = self.shape_bindings_from_key(&key);
             let Some(function) = super::monomorphize::function_by_id_mut(&mut program.functions, function_id) else {
                 continue;
             };
