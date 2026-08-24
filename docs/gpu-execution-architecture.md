@@ -1,15 +1,19 @@
 # GPU Execution Architecture
 
-**Status**: accepted direction; implementation is partial
+**Status**: accepted direction; delivery is tracked and implementation is partial
 **Date**: 2026-08-23
+**Amended**: 2026-08-24 — the first proof now pairs BF16 and F32 GEMV
 **Authority**: cross-repository GPU execution contract for Faber, Gradus,
 Radix, and Hosts
+**Delivery tracking**: private Radix campaign
+`radix/docs/factory/gpu-execution-architecture/CAMPAIGN.md`
 
 This document defines where GPU semantics, compilation, and physical execution
 belong. It also defines the first bounded performance proof for that
 architecture. It is not a claim that the current implementation already
-conforms, and it is not a campaign to deliver every backend, model format, or
-kernel family at once.
+conforms. This document remains the design authority; the Radix campaign named
+above is the delivery ledger. Neither document claims that naming a backend,
+model format, or kernel family delivers it.
 
 ## Core invariant
 
@@ -203,19 +207,35 @@ is competitive and, when it is not, to identify the owning layer.
 | Axis | First proof |
 | --- | --- |
 | Model | SmolLM2-360M-Instruct |
-| Artifact | One F32 GGUF produced from the original model weights |
-| Kernel source | Gradus Faber |
-| Initial operation | Dense F32 decode GEMV |
+| Source artifact | Official BF16 Safetensors at one pinned Hub revision |
+| Derived artifact | F32 GGUF produced by exact BF16-to-F32 value expansion from that revision |
+| Kernel source | Two separate Gradus Faber bodies implementing one logical GEMV |
+| Initial operation | Model-shaped dense decode GEMV with F32 input, accumulation, and output |
+| Weight representations | Resident BF16 and resident expanded F32 |
 | Initial target | Metal on burgus |
-| Comparator | llama.cpp on the same artifact and physical device |
+| Kernel oracle | Independent CPU F32 reference over the same represented values and input |
+| Model comparator | llama.cpp on the derived F32 artifact and same physical device |
 
-The F32 artifact must be produced from the original model weights. Expanding a
-quantized model into F32 is not an equivalent baseline.
+The pinned source is the official model's BF16 Safetensors artifact. Every
+source BF16 value is exactly representable in F32, so the derived F32 artifact
+preserves the represented values without adding precision that the source did
+not contain. This proves F32 execution over the official values; it is not a
+claim that the model was trained or published with original-F32 precision.
+Expanding an integer-quantized model into F32 remains an invalid substitute.
+
+The two kernels are deliberately separate in the first slice. One reads BF16
+weights and converts each value for F32 accumulation. The other reads the
+already-expanded F32 weights. They use the same F32 input and output contract.
+Shared abstractions are extracted only after both bodies execute, so the second
+implementation reveals the real tensor-view, descriptor, residency, dispatch,
+measurement, and numerical seams.
 
 ### Benchmark ladder
 
-1. **Kernel:** deterministic model-shaped F32 GEMV cases with inputs and
-   weights already resident. Compare numerical output, device time, effective
+1. **Kernel:** deterministic model-shaped paired GEMV cases with inputs and
+   weights already resident. Compare the BF16-weight/F32-accumulate body and
+   the F32-weight/F32-accumulate body against the independent CPU F32 oracle
+   and against each other. Record numerical output, device time, effective
    bandwidth, dispatch geometry, and submission/synchronization overhead.
 2. **Transformer block:** repeat one SmolLM2 block with resident tensors. This
    introduces normalization, Q/K/V and output projections, RoPE, attention,
@@ -243,12 +263,19 @@ the steady-state timing window and are reported separately.
 
 The first proof is complete when:
 
-1. Both implementations consume the same F32 weights.
-2. The Gradus-authored kernel is numerically correct.
-3. Radix produces the device artifact and complete execution descriptor.
-4. Hosts runs that artifact without a CPU substitute in the timed path.
-5. Measurements separate GPU work, host work, synchronization, and transfers.
-6. Every material gap from llama.cpp is attributed to a named layer with
+1. Both Gradus-authored kernels consume the same represented weight values.
+2. Both kernels are numerically correct against the independent CPU F32 oracle,
+   and their cross-kernel difference is recorded.
+3. Radix produces distinct device artifacts and complete execution descriptors.
+4. Hosts runs both artifacts without a CPU substitute in the timed path.
+5. Measurements separate loading, conversion, residency, GPU work, host work,
+   synchronization, and transfers.
+6. The resident F32 transformer-block rung passes its numerical and execution
+   gates.
+7. The full F32 decode rung and pinned llama.cpp comparator consume the same
+   derived artifact under the matched model-level comparison contract; that
+   receipt is not presented as an isolated GEMV oracle.
+8. Every material gap from llama.cpp is attributed to a named layer with
    evidence and a concrete next change.
 
 The first measurement does not have to reach parity. An unexplained aggregate
@@ -298,9 +325,13 @@ containers, multiple tensor representations, dense and MoE models, and
 multi-device execution. The first proof implements none of those merely by
 naming them.
 
-The F32 proof does not include:
+The paired BF16/F32 kernel slice does not extend BF16 through the transformer
+block or full-decode rungs. Those rungs remain F32 until a later campaign stage
+explicitly advances another representation.
 
-- F16, BF16, quantized, or MoE kernel delivery;
+The first proof does not include:
+
+- F16, integer-quantized, or MoE kernel delivery;
 - CUDA or WebGPU parity;
 - hardware isolation for virtual partitions;
 - a multi-tenant scheduler or inference server;
