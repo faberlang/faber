@@ -1137,6 +1137,7 @@ fn batched_attention_accepts_both_m3_gqa_shapes() {
             rotate_half: false,
             output_strides: [hidden, 1, 1, 1],
             scale_bits: f32::to_bits(0.125),
+            decode_outputs_per_workgroup: None,
         });
 
         plan.validate().expect("both M3 GQA shapes must validate");

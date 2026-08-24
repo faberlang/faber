@@ -346,6 +346,16 @@ pub struct BatchedAttentionPlan {
     pub output_strides: [u64; 4],
     /// IEEE-754 bits of the scale applied by scores before softmax.
     pub scale_bits: u32,
+    /// Typed launch fact for the decode (M=1) projection body: the number
+    /// of logical outputs one 64-thread workgroup computes (the body
+    /// partitions the workgroup into this many eight-lane reductions and
+    /// guards each output with `output_valid`). `Some(n)` for single-row
+    /// Q/K/V projections; `None` keeps the generic one-thread-per-output
+    /// launch law. The launch grid must be `ceil(logical / n)` workgroups —
+    /// deriving it from `ceil(logical / 64)` under-dispatches by `64 / n`
+    /// (R4 repair: 15 workgroups published 120 of 960 logical Q). The
+    /// LOGICAL output span is unchanged by this fact.
+    pub decode_outputs_per_workgroup: Option<u64>,
 }
 
 /// SSM conv1d plan (R-PACK-01A: name frozen). Length, channel, and kernel

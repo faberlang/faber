@@ -736,7 +736,13 @@ fn packed_rank2_matmul_operands(
 /// the concrete thread geometry is a per-lane recipe fact (Metal states it
 /// in `radix-mir-metal` quantized_matmul emit). The ELP-02 lane admission
 /// map is the handoff for owning it per lane.
-const PROJECTION_GEMV_DISPATCH_LANES: u64 = 8;
+///
+/// This is also the decode (M=1) body's outputs-per-workgroup fact: one
+/// 64-thread workgroup partitions into this many eight-lane reductions, so
+/// the launch grid carries one workgroup per `lanes` LOGICAL outputs (R4
+/// repair — `BatchedAttentionPlan::decode_outputs_per_workgroup`). The
+/// logical output span itself stays unpadded.
+pub(crate) const PROJECTION_GEMV_DISPATCH_LANES: u64 = 8;
 
 fn batched_attention_contract(
     function: &MirFunction,

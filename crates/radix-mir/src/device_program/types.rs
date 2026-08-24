@@ -230,7 +230,10 @@ impl DeviceResource {
 /// workgroup size, the dispatch size, and the derived workgroup (grid) count.
 /// The count is derived by the live ABI helper
 /// [`collection_op_workgroup_count`] (matmul launches the tile grid verbatim;
-/// everything else dispatches `ceil(dispatch / workgroup)` per axis).
+/// everything else dispatches `ceil(dispatch / workgroup)` per axis), then
+/// corrected by the kernel plan's typed launch facts via
+/// [`KernelLaunchPlan::from_signature_plan_and_function`] (decode M=1
+/// batched-attention projections launch `ceil(dispatch / outputs)`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct KernelLaunchPlan {
     /// Threads per workgroup.
@@ -257,6 +260,34 @@ impl KernelLaunchPlan {
             dispatch_size,
             workgroup_count,
         }
+    }
+
+    /// Plan-aware launch derivation (R4 repair): the shared rule above, then
+    /// the kernel plan's typed launch facts override the grid.
+    ///
+    /// A decode (M=1) batched-attention projection computes
+    /// [`crate::kernel_plan::BatchedAttentionPlan::decode_outputs_per_workgroup`]
+    /// outputs per workgroup, so its grid is `ceil(dispatch / outputs)`
+    /// workgroups — the generic `ceil(dispatch / workgroup)` law
+    /// under-dispatches by the partition ratio (15 workgroups published 120
+    /// of 960 logical Q). Emitters and launches must be built from the same
+    /// plan; prefer this constructor whenever the plan is at hand.
+    #[must_use]
+    pub fn from_signature_plan_and_function(
+        signature: &MirKernelSignature,
+        plan: &crate::kernel_plan::CollectionKernelPlan,
+        function: &MirFunction,
+    ) -> Self {
+        let mut launch = Self::from_signature_and_function(signature, function);
+        if let crate::kernel_plan::CollectionKernelPlan::BatchedAttention(attention) = plan {
+            if let Some(outputs) = attention
+                .decode_outputs_per_workgroup
+                .filter(|outputs| *outputs > 0)
+            {
+                launch.workgroup_count.x = launch.dispatch_size.x.div_ceil(outputs);
+            }
+        }
+        launch
     }
 }
 

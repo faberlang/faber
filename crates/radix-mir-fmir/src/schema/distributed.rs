@@ -663,6 +663,7 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
                 rotate_half: plan.rotate_half,
                 output_strides: plan.output_strides,
                 scale_bits: plan.scale_bits,
+                decode_outputs_per_workgroup: plan.decode_outputs_per_workgroup,
             })
         }
         WireCollectionKernelPlan::SsmConv1d(plan) => {

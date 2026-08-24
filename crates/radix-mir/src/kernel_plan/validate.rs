@@ -336,6 +336,14 @@ pub(super) fn validate_batched_attention_plan(
     {
         return Err(PlanValidationError::BatchedAttentionInvalid);
     }
+    // R4 repair: a typed decode launch fact of zero would divide by zero at
+    // grid derivation; it must also partition the 64-thread workgroup.
+    if plan
+        .decode_outputs_per_workgroup
+        .is_some_and(|outputs| outputs == 0 || outputs > 64 || 64 % outputs != 0)
+    {
+        return Err(PlanValidationError::BatchedAttentionInvalid);
+    }
     if plan.kind == super::plan::BatchedAttentionKind::ContextSequenceMajor
         && plan.hidden
             != plan

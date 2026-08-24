@@ -291,6 +291,21 @@ impl CollectionKernelPlan {
                         rotate_half,
                         output_strides,
                         scale_bits,
+                        // R4 repair: the M=1 projection body computes this
+                        // many outputs per 64-thread workgroup, so the same
+                        // typed fact must drive the launch grid. `seq` here
+                        // is the contract's step-row count (decode = 1).
+                        decode_outputs_per_workgroup: if seq == 1
+                            && matches!(
+                                kind,
+                                BatchedAttentionKind::ProjectionQ
+                                    | BatchedAttentionKind::ProjectionK
+                                    | BatchedAttentionKind::ProjectionV
+                            ) {
+                            Some(crate::abi::PROJECTION_GEMV_DISPATCH_LANES)
+                        } else {
+                            None
+                        },
                     },
                 ))
             }
