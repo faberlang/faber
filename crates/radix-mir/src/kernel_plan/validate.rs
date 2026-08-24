@@ -59,6 +59,7 @@ fn validate_barrier_dominance(plan: &ReductionPlan) -> Result<(), PlanValidation
     let tree_steps = plan.workgroup_x.trailing_zeros();
     let mut load_barriers = 0u32;
     let mut reduction_barriers = 0u32;
+    let mut cross_recipe_barriers = 0u32;
     for point in &plan.barriers {
         match point.after {
             BarrierPhase::SharedMemoryLoad => load_barriers += 1,
@@ -66,14 +67,15 @@ fn validate_barrier_dominance(plan: &ReductionPlan) -> Result<(), PlanValidation
             // A matmul-only phase has no place in the tree recipe; the plan
             // is a closed recipe set (L2), so a cross-recipe barrier is a
             // malformed plan.
-            BarrierPhase::InnerProductStep => {
-                return Err(PlanValidationError::BarrierDominance {
-                    phase: BarrierPhase::InnerProductStep,
-                    required_count: 0,
-                    present_count: 1,
-                });
-            }
+            BarrierPhase::InnerProductStep => cross_recipe_barriers += 1,
         }
+    }
+    if cross_recipe_barriers > 0 {
+        return Err(PlanValidationError::BarrierDominance {
+            phase: BarrierPhase::InnerProductStep,
+            required_count: 0,
+            present_count: cross_recipe_barriers,
+        });
     }
     // The post-load barrier must dominate the first tree read: it is the
     // first barrier in the schedule.
@@ -458,17 +460,20 @@ fn validate_matmul_barrier_coverage(plan: &MatMulPlan) -> Result<(), PlanValidat
     let step = BarrierPoint {
         after: BarrierPhase::InnerProductStep,
     };
-    for point in &plan.barriers {
-        if matches!(point.after, BarrierPhase::ReductionStep) {
-            // A reduction-only phase has no place in the matmul recipe; the
-            // plan is a closed recipe set (L2), so a cross-recipe barrier is
-            // a malformed plan.
-            return Err(PlanValidationError::BarrierDominance {
-                phase: BarrierPhase::ReductionStep,
-                required_count: 0,
-                present_count: 1,
-            });
-        }
+    let cross_recipe_barriers = plan
+        .barriers
+        .iter()
+        .filter(|point| matches!(point.after, BarrierPhase::ReductionStep))
+        .count();
+    if cross_recipe_barriers > 0 {
+        // A reduction-only phase has no place in the matmul recipe; the
+        // plan is a closed recipe set (L2), so a cross-recipe barrier is
+        // a malformed plan.
+        return Err(PlanValidationError::BarrierDominance {
+            phase: BarrierPhase::ReductionStep,
+            required_count: 0,
+            present_count: u32::try_from(cross_recipe_barriers).unwrap_or(u32::MAX),
+        });
     }
     let load_count = plan.barriers.iter().filter(|point| **point == load).count();
     let step_count = plan.barriers.iter().filter(|point| **point == step).count();
