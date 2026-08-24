@@ -1839,9 +1839,7 @@ impl Parser {
             || matches!(
                 spec.scope,
                 KeywordScope::Contextual(owners)
-                    if owners
-                        .iter()
-                        .any(|owner| *owner == KeywordOwner::AnnotationName)
+                    if owners.contains(&KeywordOwner::AnnotationName)
             );
         if !annotation_owned {
             return None;
