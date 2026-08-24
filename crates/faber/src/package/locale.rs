@@ -90,9 +90,7 @@ pub(crate) fn load_locale_pack_for_input(
         .then(|| spec.package_root.join(super::MANIFEST_FILE));
     let package_root = package_root_for_selection(&spec, manifest_path.as_deref());
 
-    let Some(locale) = selected_locale(cli_locale, manifest.as_ref())? else {
-        return Ok(None);
-    };
+    let locale = selected_locale(cli_locale, manifest.as_ref())?;
     let pack =
         load_selected_locale_pack(input, &package_root, &locale, cli_locale, manifest.as_ref())?;
     Ok(Some(pack))
@@ -101,7 +99,7 @@ pub(crate) fn load_locale_pack_for_input(
 fn selected_locale<'a>(
     cli_locale: Option<&'a str>,
     manifest: Option<&'a FaberManifest>,
-) -> Result<Option<String>, Box<Diagnostic>> {
+) -> Result<String, Box<Diagnostic>> {
     if let Some(locale) = cli_locale {
         let trimmed = locale.trim();
         if trimmed.is_empty() {
@@ -109,7 +107,7 @@ fn selected_locale<'a>(
                 "--locale must not be empty",
             )));
         }
-        return Ok(Some(trimmed.to_owned()));
+        return Ok(trimmed.to_owned());
     }
 
     let manifest_locale = manifest
@@ -117,9 +115,7 @@ fn selected_locale<'a>(
         .map(str::trim)
         .map(str::to_owned);
 
-    Ok(Some(
-        manifest_locale.unwrap_or_else(|| DEFAULT_CODE_LOCALE.to_owned()),
-    ))
+    Ok(manifest_locale.unwrap_or_else(|| DEFAULT_CODE_LOCALE.to_owned()))
 }
 
 fn load_selected_locale_pack(
