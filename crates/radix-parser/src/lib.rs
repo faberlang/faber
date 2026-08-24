@@ -1112,6 +1112,10 @@ mod comma_law_matrix_test;
 mod summa_disambiguation_test;
 
 #[cfg(test)]
+#[path = "max_min_disambiguation_test.rs"]
+mod max_min_disambiguation_test;
+
+#[cfg(test)]
 #[path = "lt_divert_regression_test.rs"]
 mod lt_divert_regression_test;
 
