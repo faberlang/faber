@@ -185,8 +185,16 @@ impl FunctionBuilder<'_> {
         // collection intrinsic with its nullable enclosing type at the call
         // site. The MIR operation contract remains scalar; adapt the value at
         // the expression boundary instead of weakening intrinsic validation.
+        //
+        // Tier 2 selects the checked read at this lowering seam from the
+        // receiver's declared type. The runner sees the strict element return
+        // type and traps on OOB; the source-level nullable carrier is restored
+        // with `Some` so existing `vel`/`coalesce` expressions stay typed.
         let call_ty = match op {
             MirCollectionOp::Length => MirType::semantic(self.types.primitive(Primitive::Numerus)),
+            MirCollectionOp::Index | MirCollectionOp::TensorGet => self
+                .checked_read_result_type(op, receiver.ty, expr_ty)
+                .unwrap_or(expr_ty),
             _ => expr_ty,
         };
         let value = self.runtime_call_value(MirIntrinsic::Collection(op), lowered_args, call_ty, expr.span);
@@ -1990,6 +1998,55 @@ impl FunctionBuilder<'_> {
         self.terminate_current(MirTerminatorKind::ReturnError(MirOperand::Temp(error_temp)), span);
         self.switch_to(ok_block);
         Some(MirOperand::Temp(destination))
+    }
+
+    /// Select the strict read carrier for a declared literal-bound receiver.
+    ///
+    /// MIR values do not carry the declared receiver type at runtime. Using a
+    /// non-optional return type on the existing read op is the lower-time
+    /// checked/lookup variant: the runner traps for strict reads and keeps
+    /// `Option` lookup behavior for dynamic receivers.
+    pub(super) fn checked_read_result_type(
+        &self,
+        op: MirCollectionOp,
+        receiver_ty: Option<TypeId>,
+        expr_ty: MirType,
+    ) -> Option<MirType> {
+        let receiver_ty = receiver_ty?;
+        let result = self.types.nullable_inner(expr_ty.semantic_id())?;
+        let checked = match op {
+            MirCollectionOp::Index => self.declared_literal_bound(receiver_ty),
+            MirCollectionOp::TensorGet => self.declared_literal_tensor_shape(receiver_ty),
+            _ => false,
+        };
+        checked.then_some(MirType::semantic(result))
+    }
+
+    fn declared_literal_bound(&self, ty: TypeId) -> bool {
+        let ty = self.normalized_type(ty);
+        let capacity = match ty {
+            Type::BoundedArray { capacity, .. }
+            | Type::BoundedTextus { capacity }
+            | Type::BoundedAscii { capacity }
+            | Type::BoundedOcteti { capacity } => *capacity,
+            _ => return false,
+        };
+        matches!(self.types.get_index(capacity), radix_types::IndexExpr::Literal(_))
+    }
+
+    fn declared_literal_tensor_shape(&self, ty: TypeId) -> bool {
+        let Type::Tensor(_, shape) = self.normalized_type(ty) else {
+            return false;
+        };
+        match self.types.get_index(*shape) {
+            radix_types::IndexExpr::Literal(_) => true,
+            radix_types::IndexExpr::Tuple(dims) => dims
+                .iter()
+                .all(|dim| matches!(self.types.get_index(*dim), radix_types::IndexExpr::Literal(_))),
+            radix_types::IndexExpr::Param(_)
+            | radix_types::IndexExpr::Infer(_)
+            | radix_types::IndexExpr::Unspecified => false,
+        }
     }
 
     /// Resolve a HIR method call into the small set of collection intrinsics

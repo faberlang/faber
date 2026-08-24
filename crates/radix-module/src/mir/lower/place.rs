@@ -87,12 +87,19 @@ impl FunctionBuilder<'_> {
         let receiver = self.lower_expr_value(object)?;
         let index_list = self.lower_tensor_index_list_operand(index)?;
         let ty = self.expr_ty(expr)?;
-        Some(self.runtime_call_value(
+        let call_ty = self
+            .checked_read_result_type(MirCollectionOp::TensorGet, object.ty, ty)
+            .unwrap_or(ty);
+        let value = self.runtime_call_value(
             MirIntrinsic::Collection(MirCollectionOp::TensorGet),
             vec![receiver, index_list],
-            ty,
+            call_ty,
             expr.span,
-        ))
+        );
+        if call_ty != ty && self.types.nullable_inner(ty.semantic_id()) == Some(call_ty.semantic_id()) {
+            return Some(self.assign_temp(MirValueKind::Option(MirOptionOp::Some(value)), ty, expr.span));
+        }
+        Some(value)
     }
 
     /// Lower a tensor bracket index to the list operand `TensorGet` / `TensorSet`

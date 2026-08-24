@@ -986,7 +986,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 };
                 let receiver = self.eval_operand(receiver, span)?;
                 let index = self.eval_operand(index, span)?;
-                self.collection_index(receiver, index, span)
+                if matches!(self.types.get(return_ty.semantic_id()), Type::Option(_)) {
+                    self.optional_collection_index(receiver, index, span)
+                } else {
+                    self.collection_index(receiver, index, span)
+                }
             }
             MirCollectionOp::Contains => {
                 let [receiver, needle] = args else {
@@ -1258,7 +1262,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorSumAxis => self.tensor_sum_axis(args, span, return_ty),
             MirCollectionOp::TensorShape => self.tensor_shape(args, span),
             MirCollectionOp::TensorReshape => self.tensor_reshape(args, span),
-            MirCollectionOp::TensorGet => self.tensor_get(args, span),
+            MirCollectionOp::TensorGet => self.tensor_get(args, return_ty, span),
             MirCollectionOp::TensorSet => self.tensor_set(args, span),
             MirCollectionOp::TensorFill => self.tensor_fill(args, span),
             MirCollectionOp::TensorCreate => self.tensor_create(args, span),
@@ -1449,17 +1453,31 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         Ok(tensor_value(data, shape))
     }
 
-    fn tensor_get(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+    fn tensor_get(
+        &mut self,
+        args: &[MirOperand],
+        return_ty: MirType,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
         let [receiver, index] = args else {
             return Err(RunnerError::internal(span, "tensor get arity"));
         };
         let tensor = self.tensor_arg(receiver, span)?;
         let index = self.shape_arg(index, span, ERR_ACCIPE_INVALID_INDEX)?;
+        let checked = !matches!(self.types.get(return_ty.semantic_id()), Type::Option(_));
         let borrow = tensor.borrow();
         let Some(offset) = tensor_flat_offset(&borrow.shape, &index) else {
-            return Ok(Value::Nil);
+            return if checked {
+                Err(RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX))
+            } else {
+                Ok(Value::Nil)
+            };
         };
-        Ok(borrow.data.get(offset).cloned().unwrap_or(Value::Nil))
+        match borrow.data.get(offset).cloned() {
+            Some(value) => Ok(value),
+            None if checked => Err(RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX)),
+            None => Ok(Value::Nil),
+        }
     }
 
     fn tensor_set(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {

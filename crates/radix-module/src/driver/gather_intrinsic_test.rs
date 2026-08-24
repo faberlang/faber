@@ -31,7 +31,7 @@ use crate::semantic::{self, PassConfig};
 use crate::test_support::test_session;
 use radix_mir::device_program_plans::transformer_shape_signature;
 use radix_mir::kernel_plan::CollectionKernelPlan;
-use radix_types::TypeTable;
+use radix_types::{Type, TypeTable};
 
 /// Full frontend to an AIR program plus the semantic type table the program's
 /// `TypeId`s resolve against (mirrors `air/lower_test.rs`; the lane-annotated
@@ -289,6 +289,127 @@ functio select(tf32[4, 3] table) → tf32[4, 3] {
     validate_program(&mir, &MirValidationContext::new(&types)).expect("AIR MIR validates");
     let call = collection_runtime_call(&mir, MirCollectionOp::TensorGather);
     assert_eq!(call.args.len(), 2, "MIR layout [x, ids]");
+}
+
+/// Tier 2: a dynamic out-of-bounds read on an exact-shape tensor is a hard
+/// runner error, not a nullable result or a recoverable `⇥` path.
+#[test]
+fn exact_tensor_dynamic_read_oob_is_hard_error() {
+    let source = r"
+incipit {
+    fixum lista<f32> flat ← [1.0, 2.0, 3.0]
+    fixum tf32[] seed ← vacua
+    fixum tf32[3] input ← seed.strue(flat, [3])
+    fixum numerus i ← 3
+    fixum f32 bad ← input.accipe([i]) vel 99.0
+    nota bad
+}
+";
+    let mut analysis = analyze_source(
+        &runner_session(),
+        "exact_tensor_dynamic_oob.fab",
+        source,
+        AnalyzeRequest::default(),
+    )
+    .expect("exact tensor OOB source should analyze");
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default())
+        .expect("exact tensor OOB source should lower");
+    let tensor_get = lowered
+        .program
+        .functions
+        .iter()
+        .flat_map(|function| &function.blocks)
+        .flat_map(|block| &block.statements)
+        .find_map(|statement| match &statement.kind {
+            MirStatementKind::RuntimeCall { call, .. }
+                if call.intrinsic == MirIntrinsic::Collection(MirCollectionOp::TensorGet) =>
+            {
+                Some(call)
+            }
+            _ => None,
+        })
+        .expect("exact tensor read must lower to TensorGet");
+    assert!(
+        !matches!(
+            lowered
+                .validated
+                .validation()
+                .types
+                .get(tensor_get.return_ty.semantic_id()),
+            Type::Option(_)
+        ),
+        "exact declared shape must select the strict MIR read carrier"
+    );
+
+    let mut host = BufferHost::default();
+    let result = run_source(&runner_session(), "exact_tensor_dynamic_oob.fab", source, &mut host);
+    let Err(RunSourceError::Stepper(errors)) = result else {
+        panic!("exact tensor dynamic OOB must abort the runner: {result:?}");
+    };
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("tensor accipe invalid index")),
+        "expected the named hard bounds error, got {errors:?}"
+    );
+}
+
+/// Tier 3: dynamic-shape tensors retain nullable lookup semantics.
+#[test]
+fn dynamic_tensor_read_oob_remains_nullable() {
+    let source = r"
+functio lege<magnitudo N>(tensor<f32, [N]> input, numerus i) → f32 {
+    redde input.accipe([i]) vel 99.0
+}
+
+incipit {
+    fixum lista<f32> flat ← [1.0, 2.0, 3.0]
+    fixum tf32[] seed ← vacua
+    fixum tf32[3] input ← seed.strue(flat, [3])
+    fixum f32 missing ← lege(input, 3)
+    nota missing
+}
+";
+    let mut host = BufferHost::default();
+    run_source(&runner_session(), "dynamic_tensor_oob.fab", source, &mut host)
+        .expect("dynamic tensor OOB stays a nullable lookup");
+    assert_eq!(host.stdout_lines, vec!["99.0".to_owned()]);
+}
+
+/// Tier 2 in-bounds dynamic reads stay handler-free and preserve the value.
+#[test]
+fn exact_tensor_dynamic_read_in_bounds_is_handler_free() {
+    let source = r"
+incipit {
+    fixum lista<f32> flat ← [1.0, 2.0, 3.0]
+    fixum tf32[] seed ← vacua
+    fixum tf32[3] input ← seed.strue(flat, [3])
+    fixum numerus i ← 1
+    fixum f32 value ← input.accipe([i]) vel 99.0
+    nota value
+}
+";
+    let mut host = BufferHost::default();
+    run_source(&runner_session(), "exact_tensor_dynamic_in_bounds.fab", source, &mut host)
+        .expect("in-bounds exact read does not need a handler");
+    assert_eq!(host.stdout_lines, vec!["2.0".to_owned()]);
+}
+
+/// Tier 3: unbounded lists keep nullable lookup semantics on dynamic reads.
+#[test]
+fn unbounded_lista_dynamic_read_oob_remains_nullable() {
+    let source = r"
+incipit {
+    fixum lista<numerus> values ← [1, 2]
+    fixum numerus i ← 2
+    fixum numerus missing ← values.accipe(i) vel 99
+    nota missing
+}
+";
+    let mut host = BufferHost::default();
+    run_source(&runner_session(), "unbounded_lista_dynamic_oob.fab", source, &mut host)
+        .expect("unbounded lista OOB stays a nullable lookup");
+    assert_eq!(host.stdout_lines, vec!["99".to_owned()]);
 }
 
 /// CCI-4: `TensorGet` (`accipe`) and `TensorSlice` (`sectio`) still compile

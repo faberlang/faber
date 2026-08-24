@@ -1216,9 +1216,23 @@ impl Validator<'_, '_> {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };
-                self.require_tensor_type(receiver_ty, span, "tensor get receiver is not tensor");
-                if !matches!(self.type_kind(call.return_ty), Type::Option(_)) {
-                    self.error(span, "tensor get result is not optional");
+                let receiver_kind = self.type_kind(receiver_ty).clone();
+                let Type::Tensor(element, _) = receiver_kind else {
+                    self.error(span, "tensor get receiver is not tensor");
+                    return;
+                };
+                let result_ok = match self.type_kind(call.return_ty) {
+                    Type::Option(inner) => self.context.types.equals(*inner, element),
+                    _ => self
+                        .context
+                        .types
+                        .equals(call.return_ty.semantic_id(), element),
+                };
+                if !result_ok {
+                    self.error(
+                        span,
+                        "tensor get result must be element or optional element",
+                    );
                 }
             }
             MirCollectionOp::TensorSet => {
