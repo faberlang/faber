@@ -239,13 +239,13 @@ pub fn conversion_family(conversion: &MirConversion, types: &TypeTable) -> CostF
     if is_list_tensor_pair(source, target) {
         return CostFamily::ListTensor;
     }
-    if is_octeti(source) && is_vector(target) || is_vector(source) && is_octeti(target) {
+    if (is_octeti(source) && is_vector(target)) || (is_vector(source) && is_octeti(target)) {
         return CostFamily::RegisterWindow;
     }
     if is_vector(source) && is_vector(target) {
         return CostFamily::RegisterBridge;
     }
-    if is_vector(source) && is_list(target) || is_list(source) && is_vector(target) {
+    if (is_vector(source) && is_list(target)) || (is_list(source) && is_vector(target)) {
         return CostFamily::RegisterLista;
     }
     if is_textus(source) && is_regex(target) {
