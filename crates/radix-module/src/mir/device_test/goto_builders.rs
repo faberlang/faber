@@ -2,8 +2,8 @@
 //!
 //! Each `*_goto_program` fn builds a `MirProgram` exercising one goto control
 //! shape (scalar vs indexed x loop-entry/return/switch-arm/branch-arm/value-join
-//! permutations). Extracted from device_test.rs so the ~1500 lines of builder
-//! scaffolding sit apart from the `#[test]` corpus.
+//! permutations). Extracted from device_test.rs so the builder scaffolding sits
+//! apart from the `#[test]` corpus.
 
 use super::*;
 
