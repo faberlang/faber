@@ -786,17 +786,6 @@ def source_lexicon_rows(source_text: str) -> list[tuple[str, str, str]]:
     return rows
 
 
-def load_sidecar(path: Path) -> dict[str, object]:
-    if not path.is_file():
-        raise FileNotFoundError(f"missing grammar sidecar: {path}")
-    with path.open("rb") as handle:
-        data = tomllib.load(handle)
-    productions = data.get("productions", {})
-    if not isinstance(productions, dict):
-        raise ValueError(f"{path}: productions must be a TOML table")
-    return data
-
-
 def canonical_source_grammar(source_text: str, source_path: Path) -> Grammar:
     grammar = parse_source(source_text, path=display_path(source_path))
     payload = validate_dialect(grammar)
@@ -1154,13 +1143,6 @@ def default_glossary_path(locale: str) -> Path:
 
 def default_locale_ebnf_path(locale: str) -> Path:
     return default_ebnf_path().with_name(f"EBNF.{locale}.md")
-
-
-def default_site_locale_ebnf_path(locale: str) -> Path | None:
-    directory = default_locale_dir()
-    if directory is None:
-        return None
-    return directory / f"EBNF.{locale}.md"
 
 
 def dumps_glossary(locale: str, mapping: dict[str, str]) -> str:
