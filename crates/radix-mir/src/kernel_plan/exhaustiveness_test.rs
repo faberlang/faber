@@ -242,6 +242,7 @@ fn dummy_batched_attention() -> BatchedAttentionPlan {
         rotate_half: false,
         output_strides: [1, 1, 1, 1],
         scale_bits: 0,
+        decode_outputs_per_workgroup: None,
     }
 }
 

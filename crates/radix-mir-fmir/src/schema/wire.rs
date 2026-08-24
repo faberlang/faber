@@ -746,6 +746,9 @@ pub struct WireBatchedAttentionPlan {
     pub output_strides: [u64; 4],
     /// IEEE-754 score scale bits.
     pub scale_bits: u32,
+    /// Typed decode (M=1) launch fact: outputs one workgroup computes;
+    /// `None` keeps the generic one-thread-per-output launch law.
+    pub decode_outputs_per_workgroup: Option<u64>,
 }
 
 /// Wire spelling of the M3 batched-attention operation kind.

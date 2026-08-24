@@ -1069,11 +1069,12 @@ impl<'a> KernelBuilder<'a> {
         // The launch binds buffers in binding order (inputs first, output
         // last), matching the emitted kernel's buffer indices / param order.
         resources.sort_by_key(|resource| (resource.binding, resource.group));
+        let launch = KernelLaunchPlan::from_signature_plan_and_function(signature, &plan, synthetic);
         self.builds.push(KernelBuild {
             function: kernel_source.id,
             entry,
             plan,
-            launch: KernelLaunchPlan::from_signature_and_function(signature, synthetic),
+            launch,
             resources,
         });
         Ok(())

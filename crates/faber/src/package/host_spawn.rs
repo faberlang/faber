@@ -395,6 +395,21 @@ pub struct DeviceExecuteSession {
     _work: WorkDir,
 }
 
+/// Producer fact for one derived fused-library dispatch.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FusedLibraryDispatchReceipt {
+    /// Derived carrier entry that selected the library route.
+    pub entry: String,
+    /// Owning body used by the route.
+    pub body: String,
+    /// Q destination binding.
+    pub q_output_binding: u32,
+    /// K destination binding.
+    pub k_output_binding: u32,
+    /// V destination binding.
+    pub v_output_binding: u32,
+}
+
 /// Receipt the hosts CLI prints on exit 0.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DeviceExecuteReceipt {
@@ -422,6 +437,10 @@ pub struct DeviceExecuteReceipt {
     /// Kernel entries dispatched, in order.
     #[serde(default)]
     pub launch_entries: Vec<String>,
+    /// Producer facts for derived fused-library launches, including the
+    /// explicit K/V output bindings.
+    #[serde(default)]
+    pub fused_library_dispatches: Vec<FusedLibraryDispatchReceipt>,
     /// Host→device copy-ins.
     #[serde(default)]
     pub copy_ins: usize,
