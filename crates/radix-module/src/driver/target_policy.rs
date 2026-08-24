@@ -284,10 +284,6 @@ fn scan_go_else(clause: &SecusClause, file: &str, diagnostics: &mut Vec<Diagnost
 }
 
 fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
-    use crate::syntax::{
-        ArrayElement, ClausuraBody, ExprKind, NonNullKind, ObjectKey, OptionalChainKind, PraefixumBody,
-    };
-
     match &expr.kind {
         ExprKind::Binary(binary) => {
             scan_go_expr(&binary.lhs, file, diagnostics);
@@ -655,10 +651,6 @@ fn scan_rust_else(clause: &SecusClause, file: &str, diagnostics: &mut Vec<Diagno
 }
 
 fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
-    use crate::syntax::{
-        ArrayElement, ClausuraBody, ExprKind, NonNullKind, ObjectKey, OptionalChainKind, PraefixumBody,
-    };
-
     match &expr.kind {
         ExprKind::Binary(binary) => {
             scan_rust_expr(&binary.lhs, file, diagnostics);
