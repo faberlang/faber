@@ -474,9 +474,8 @@ fn cmd_inspect_parse(input: &[String]) {
 }
 
 fn cmd_inspect_hir(input: &[String], load: Option<std::path::PathBuf>) {
-    if let Some(path) = load {
+    if load.is_some() {
         eprintln!("error: `faber hir --load` is not supported; use `radix hir --load`");
-        drop(path);
         std::process::exit(1);
     }
     let (name, source) = read_source(input);
